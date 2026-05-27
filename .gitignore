@@ -1,0 +1,26 @@
+# Configuración local con credenciales (cada PC tiene su copia)
+config.js
+
+# Vercel
+.vercel/
+
+# Editor / OS
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+
+# Backups locales
+*.bak
+*.tmp
+*.log

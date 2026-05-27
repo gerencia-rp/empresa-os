@@ -1,0 +1,362 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// ─── Prompts especializados por sistema ───
+const SYSTEM_PROMPTS: Record<string, (ctx: any, today: string) => string> = {
+
+  // ============================================================
+  // PREDICTOR DE CASHFLOW
+  // ============================================================
+  'cashflow-predictor': (ctx, today) => `Eres un experto inversor inmobiliario residencial en ${ctx.city || 'Austin'}, ${ctx.state || 'TX'}. Hoy es ${today}.
+
+Esta propiedad será evaluada como RENTA con modelo "${ctx.model_label}":
+- Dirección: ${ctx.address || 'sin dirección'}
+- ARV: $${ctx.arv?.toLocaleString() || '?'}
+- ${ctx.bedrooms} habitaciones / ${ctx.bathrooms} baños
+- Hipoteca: $${ctx.mortgage_monthly?.toLocaleString() || '?'}/mes
+- Renta estimada actual: $${ctx.current_gross_rent?.toLocaleString() || '?'}/mes
+
+Investiga RIGUROSAMENTE en internet (mínimo 8 web_searches) para ESTA dirección específica:
+
+1. **Renta real del mercado** para ese modelo:
+   - Si "long_term": busca rent comps Zillow/RentCafe/Realtor para ${ctx.bedrooms}BR en ese zip
+   - Si "by_room": busca PadSplit/Roomies precios por habitación en esa zona
+   - Si "mid_term": busca Furnished Finder rates para travel nurses
+   - Si "short_term": busca AirDNA/AirROI/Rabbu ADR y ocupación REAL del zip
+2. **Vacancy/Occupancy** actual del submercado (no defaults)
+3. **Restricciones legales**: STR permits requeridos en Austin? ADU rules?
+4. **Competencia en la zona** (cuántos Airbnbs activos, oversaturación?)
+5. **Demand level** (¿quién renta ahí: students, families, travel workers?)
+6. **Seasonality** si aplica
+7. **Recommended adjustments** a la renta estimada por características de la propiedad
+
+Devuelve SOLO JSON (sin markdown):
+{
+  "validated_rent": { "low": 0, "typical": 0, "high": 0, "confidence": "high|medium|low" },
+  "vs_user_estimate": "+X%/-X%",
+  "market_comps": [ { "source": "Zillow", "price": 0, "url": "..." } ],
+  "vacancy_or_occupancy_real": "número y descripción",
+  "legal_restrictions": ["..."],
+  "competition_level": "low|medium|high + descripción",
+  "demand_profile": "...",
+  "seasonality_note": "...",
+  "key_risks": ["..."],
+  "recommendations": ["..."],
+  "best_model_for_this_property": "long_term|by_room|mid_term|short_term + razón",
+  "expected_monthly_cashflow_range": { "low": 0, "typical": 0, "high": 0 },
+  "summary": "1 párrafo con la conclusión"
+}`,
+
+  // ============================================================
+  // CASHOUT REFI
+  // ============================================================
+  'cashout-refi': (ctx, today) => `Eres experto en refinanciación BRRRR Texas. Hoy es ${today}.
+
+Esta propiedad:
+- Dirección: ${ctx.name || ctx.address}
+- ARV usuario: $${ctx.arv?.toLocaleString()}
+- Payoff HML: $${ctx.payoff?.toLocaleString()}
+- LTV asumido: ${ctx.ltv}%
+- Closing costs asumidos: $${ctx.closing_costs?.toLocaleString()}
+
+Investiga en internet (mínimo 6 web_searches):
+1. **ARV real**: busca comps recientes Redfin/Zillow del zip ${ctx.zip || ''} para casa de ~${ctx.sqft || '?'}sqft. ¿Tu ARV es realista?
+2. **LTV real** que lenders Texas dan en mayo 2026 para DSCR cash-out refi
+3. **Tasas actuales** DSCR/conv 30-year Texas mayo 2026 (rango)
+4. **Closing costs típicos** en Texas para refi de investor (sin escrow vs con escrow)
+5. **Cash-out reserves** requeridos por lenders (6 months PITI típico)
+
+Devuelve SOLO JSON:
+{
+  "arv_validated": { "low": 0, "typical": 0, "high": 0 },
+  "arv_vs_user_pct": número,
+  "ltv_market_real": "70-80%",
+  "rate_market_now_pct": "7.X-8.X%",
+  "closing_costs_real": "X% del loan típico",
+  "reserves_required": "6 months PITI o equivalente",
+  "comps_found": [ { "address": "", "sold_price": 0, "ppsf": 0, "url": "" } ],
+  "lender_recommendations": ["Kiavi", "Lima One", "etc"],
+  "cashout_realistic_range": { "low": 0, "typical": 0, "high": 0 },
+  "risks": ["..."],
+  "summary": "1 párrafo"
+}`,
+
+  // ============================================================
+  // LOAN CALCULATOR
+  // ============================================================
+  'loan-calculator': (ctx, today) => `Eres experto en HML y financiamiento residencial Texas. Hoy es ${today}.
+
+Deal:
+- Precio compra: $${ctx.purchase_price?.toLocaleString()}
+- Remodel: $${ctx.remodel_cost?.toLocaleString()}
+- ARV: $${ctx.arv?.toLocaleString()}
+- Modo análisis: ${ctx.mode}
+
+Investiga en internet (mínimo 8 web_searches) para mayo 2026:
+1. **HML actuales en Texas** (Kiavi, Lima One, Streamline, Lightning Funding, Easy Street): LTC%, rate, points, term típico
+2. **DSCR / Conv 30-y investor** lenders activos en TX: LTV%, rate, plazos, requisitos DSCR mínimo
+3. **Closing costs reales** para investor (no homeowner) en TX 2026
+4. **Loan products específicos** para fix-and-flip vs BRRRR
+5. **Lender ranking** por velocidad de cierre y aprobación
+
+Devuelve SOLO JSON:
+{
+  "hml_market_now": { "ltc_range_pct": "80-90%", "rate_range_pct": "10.5-13%", "points_range": "1-3", "term_typical_months": "6-12", "best_lenders": ["Kiavi","Lima One"] },
+  "conv30_market_now": { "ltv_range_pct": "70-80%", "rate_range_pct": "7.25-8.0%", "dscr_min": 1.0, "closing_costs_pct": "6-8%", "best_lenders": ["..."] },
+  "specialty_products": ["fix-and-flip line of credit", "DSCR loans no income verification"],
+  "fast_close_lenders": ["..."],
+  "recommendations_for_deal": ["..."],
+  "estimated_total_cost_realistic": 0,
+  "summary": "1 párrafo con recomendación específica para este deal"
+}`,
+
+  // ============================================================
+  // ARV CALC
+  // ============================================================
+  'arv-calc': (ctx, today) => `Eres appraiser experto residencial Austin TX. Hoy es ${today}.
+
+Casa a estimar:
+- Zip: ${ctx.zip}
+- ${ctx.sqft} sqft, ${ctx.beds}BR/${ctx.baths}BA, año ${ctx.year_built}, lot ${ctx.lot_size}sqft
+- Condition target: ${ctx.condition}
+- ARV estimado por mi sistema (basado en appraisals propios): $${ctx.system_arv?.toLocaleString()}
+
+Investiga en internet (mínimo 6 web_searches):
+1. **Comps activos y sold** Redfin/Zillow/Realtor zip ${ctx.zip}, mismo BR/BA, ±15% sqft, sold últimos 6 meses
+2. **$/sqft promedio del zip** y trend YoY
+3. **Condition adjustments** típicos C2 vs C3 vs C4 en este zip
+4. **Days on market** y demanda
+5. **Premium/discount** por características especiales (pool, garage, lot grande)
+
+Devuelve SOLO JSON:
+{
+  "arv_market_range": { "low": 0, "typical": 0, "high": 0 },
+  "ppsf_market": número,
+  "vs_system_estimate_pct": número,
+  "comps_found": [ { "address": "", "sold_price": 0, "sqft": 0, "ppsf": 0, "condition": "", "url": "" } ],
+  "market_trend_yoy_pct": número,
+  "days_on_market_avg": número,
+  "condition_adjustment_per_level": "C2→C3: +$X/sqft típico",
+  "premium_features_in_zip": ["..."],
+  "summary": "1 párrafo + recomendación de ARV final"
+}`,
+
+  // ============================================================
+  // REMODEL PRO — análisis ingenieril completo
+  // ============================================================
+  'remodel-pro': (ctx, today) => `Eres ingeniero civil + GC con 20+ años en remodelación residencial Texas. Hoy es ${today}.
+
+PROYECTO A ANALIZAR:
+- Nombre: ${ctx.project_name}
+- Dirección: ${ctx.address || '(sin dirección)'}
+- Sqft: ${ctx.sqft}
+- Crew planificado: ${ctx.crew_size} personas
+- Total actividades: ${ctx.activities_count}
+- Días estimados: ${ctx.total_days}
+
+${ctx.matterport_url ? `🌐 TOUR 360° MATTERPORT: ${ctx.matterport_url}
+(Si puedes visitar el link, valida medidas y características visualmente. Si no, considera que el sqft fue verificado con Matterport real.)` : ''}
+
+${ctx.scope_text ? `📝 SCOPE DETALLADO DEL CLIENTE:
+"""
+${ctx.scope_text}
+"""
+USA este scope para validar que las actividades seleccionadas cubren TODO lo que el cliente quiere. Si falta algo, dilo en "missing_categories".` : ''}
+
+${ctx.scope_audio_transcript ? `🎙️ TRANSCRIPCIÓN AUDIO SCOPE:
+"${ctx.scope_audio_transcript}"` : ''}
+
+${ctx.plans_count > 0 ? `📐 PLANOS ADJUNTOS: ${ctx.plans_count} archivos uploaded (planos arquitectónicos/estructurales). Asume que se hizo análisis técnico previo.` : ''}
+${ctx.photos_count > 0 ? `📷 FOTOS DEL ESTADO ACTUAL: ${ctx.photos_count} fotos disponibles para evaluar condición visible.` : ''}
+
+PRESUPUESTO ACTUAL:
+- Costo directo: $${ctx.direct_cost?.toLocaleString()}
+- Costo interno (con contingencia ${ctx.contingency_pct}% + overhead ${ctx.overhead_pct}%): $${ctx.internal_cost?.toLocaleString()}
+- Precio al cliente (markup ${ctx.markup_pct}%): $${ctx.client_price?.toLocaleString()}
+
+ACTIVIDADES SELECCIONADAS (top 30):
+${(ctx.activities_summary || []).map((a: any) => `- ${a.code} ${a.desc} (qty:${a.qty}, $${Math.round(a.total).toLocaleString()})`).join('\n')}
+
+═══════════════════════════════════════
+TU TRABAJO (mínimo 8 web_searches):
+═══════════════════════════════════════
+1. **Validar pricing por categoría** vs mercado actual Texas mayo 2026 (cocina, baños, pisos, drywall, exterior). Cita fuentes (HomeAdvisor, Angi, Houzz, RSMeans, contractors locales).
+2. **Lead times reales** para materiales especiales (custom cabinets, quartz, windows). ¿El cronograma considera esperas?
+3. **Permits ciudad específica** (Austin/Round Rock/Marlin): costo real, tiempos de aprobación, qué requiere permit
+4. **Hidden costs típicos** que suelen aparecer en remodelaciones (foundation, asbestos, lead paint, electrical to code, plumbing rotten)
+5. **Supply chain issues actuales** que afectan pricing (lumber, drywall, fixtures)
+6. **Labor market Texas** mayo 2026: rate real por trade, escasez, recomendaciones
+7. **Contingencia recomendada** para casa de esa edad / tipo de scope
+8. **Markup competitivo** Texas 2026 vs el ${ctx.markup_pct}% aplicado
+
+Devuelve SOLO JSON (sin markdown):
+{
+  "summary": "1 párrafo con veredicto ingenieril del presupuesto/cronograma",
+  "pricing_validation": {
+    "direct_cost_realistic": true/false,
+    "vs_market_pct": número,
+    "categories_overpriced": ["..."],
+    "categories_underpriced": ["..."],
+    "missing_categories": ["líneas que faltan agregar al scope"]
+  },
+  "contingency_recommendation": {
+    "current_pct": ${ctx.contingency_pct},
+    "recommended_pct": número,
+    "reason": "..."
+  },
+  "schedule_analysis": {
+    "total_days_realistic": true/false,
+    "lead_times_to_add_days": número,
+    "inspections_to_add_days": número,
+    "weather_buffer_days": número,
+    "realistic_total_days": número
+  },
+  "missing_soft_costs": ["..."],
+  "hidden_cost_risks": [{"risk": "...", "estimated_cost": 0, "likelihood": "low/medium/high"}],
+  "permits_required": ["...", "..."],
+  "permits_estimated_cost": número,
+  "supply_chain_alerts": ["..."],
+  "labor_market_note": "...",
+  "markup_recommendation": {"competitive_range": "X-Y%", "your_markup": ${ctx.markup_pct}, "recommendation": "raise/lower/keep + reason"},
+  "critical_path_warnings": ["..."],
+  "engineering_recommendations": ["..."],
+  "expected_real_internal_cost_range": {"low": 0, "typical": 0, "high": 0},
+  "expected_profit_margin_pct": número,
+  "go_no_go": "go|hold|renegotiate",
+  "confidence_score": "1-10"
+}
+
+CRITERIOS:
+- Sé CONSERVADOR (filosofía: si funciona con peores números, es buen deal)
+- Cita fuentes en cada estimación
+- Si falta info crítica, dilo en engineering_recommendations
+- score 8+ solo si TODO es sólido`,
+
+  // ============================================================
+  // ESTIMADOR DE REMODELACIÓN (legacy fix-flip)
+  // ============================================================
+  'estimator': (ctx, today) => `Eres GC experto en remodelación residencial Texas. Hoy es ${today}.
+
+Proyecto:
+- ${ctx.sqft} sqft, tipo: ${ctx.type_label}
+- Ciudad: ${ctx.city}, ${ctx.state}
+- Trabajos seleccionados: ${ctx.jobs_count}
+- Costo interno calculado: $${ctx.internal_cost?.toLocaleString()}
+- Crew: ${ctx.crew_size}
+
+Investiga en internet (mínimo 6 web_searches) para mayo 2026 ${ctx.city}:
+1. **Costo por categoría** real actualizado: cocina completa, baño, pisos, drywall, exterior, roofing en ${ctx.city}
+2. **Supply chain issues** activos que afectan precios (lumber, drywall, fixtures)
+3. **Labor shortage** en TX y su impacto en pricing
+4. **Permits/inspections** requeridos en ${ctx.city} y costo
+5. **Hidden costs** comunes en casas del año ${ctx.year_built || 'desconocido'}: foundation, lead, asbestos, electrical updates
+6. **Timeline real** vs el calculado
+
+Devuelve SOLO JSON:
+{
+  "market_pricing_by_category": { "cocina_completa": { "min": 0, "typical": 0, "max": 0, "source": "" }, "bano_completo": { ... } },
+  "vs_internal_pct": número,
+  "supply_chain_notes": "...",
+  "permit_costs": { "typical": 0, "what_requires_permit": ["..."] },
+  "hidden_costs_for_year_built": ["..."],
+  "labor_market_note": "...",
+  "timeline_realistic_days": número,
+  "recommendations": ["..."],
+  "summary": "1 párrafo"
+}`
+};
+
+function hashContext(ctx: any): string {
+  // hash simple para cache
+  return btoa(JSON.stringify(ctx)).slice(0, 32);
+}
+
+Deno.serve(async (req) => {
+  const cors = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS"
+  };
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
+  try {
+    const { system, context, force } = await req.json();
+    if (!system || !SYSTEM_PROMPTS[system]) {
+      throw new Error("system requerido. Valid: " + Object.keys(SYSTEM_PROMPTS).join(", "));
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const contextHash = hashContext(context);
+
+    // Cache check
+    if (!force) {
+      const { data: cached } = await supabase
+        .from("ai_analyses")
+        .select("*")
+        .eq("system_key", system)
+        .eq("context_hash", contextHash)
+        .gte("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (cached) {
+        return new Response(JSON.stringify({ ...cached.result, _fromCache: true, _cachedAt: cached.created_at }), {
+          status: 200, headers: { ...cors, "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const prompt = SYSTEM_PROMPTS[system](context, today);
+
+    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 8000,
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!claudeResp.ok) throw new Error("Claude API: " + await claudeResp.text());
+    const claudeData = await claudeResp.json();
+    const allText = (claudeData.content || [])
+      .filter((b: any) => b.type === "text")
+      .map((b: any) => b.text)
+      .join("\n");
+
+    // Parse JSON
+    const jsonMatch = allText.match(/```json\s*([\s\S]*?)```/) || allText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON. Got: " + allText.slice(0, 500));
+    const result = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+
+    // Cache
+    await supabase.from("ai_analyses").insert({
+      system_key: system,
+      context_hash: contextHash,
+      context,
+      result,
+      raw_text: allText.slice(0, 4000),
+      tokens_used: claudeData.usage?.input_tokens || 0
+    });
+
+    return new Response(JSON.stringify(result), {
+      status: 200, headers: { ...cors, "Content-Type": "application/json" }
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500, headers: { ...cors, "Content-Type": "application/json" }
+    });
+  }
+});

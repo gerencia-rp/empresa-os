@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Empresa OS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900 h-screen overflow-hidden">
+
+<!-- Auth screen -->
+<div id="auth-screen" class="fixed inset-0 bg-slate-900 flex items-center justify-center p-4 z-50">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🏢</div>
+      <h1 class="text-2xl font-bold">Empresa OS</h1>
+      <p class="text-sm text-slate-500 mt-1">Fix & Flip Holding</p>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <input id="auth-email" type="email" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+        <input id="auth-password" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <div id="auth-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2"></div>
+      <div class="flex gap-2 pt-2">
+        <button id="auth-login-btn" class="flex-1 bg-slate-900 text-white text-sm font-medium py-2 rounded-lg hover:bg-slate-700">Iniciar sesión</button>
+        <button id="auth-signup-btn" class="flex-1 bg-slate-100 text-slate-900 text-sm font-medium py-2 rounded-lg hover:bg-slate-200">Registrarse</button>
+      </div>
+      <p class="text-xs text-slate-500 text-center mt-3">El primer usuario que se registre será <strong>admin</strong>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" class="hidden flex h-full">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-slate-900 text-slate-100 flex flex-col">
+    <div class="px-5 py-5 border-b border-slate-800">
+      <h1 class="text-lg font-bold">Empresa OS</h1>
+      <p class="text-xs text-slate-400 mt-1">Fix & Flip Holding</p>
+    </div>
+    <nav id="sidebar-nav" class="flex-1 px-2 py-3 space-y-1 overflow-y-auto scrollbar-thin"></nav>
+    <div class="px-3 py-3 border-t border-slate-800 space-y-1">
+      <button id="add-area-btn" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">+ Agregar área</button>
+      <div class="px-2 pt-2 border-t border-slate-800">
+        <div id="user-email" class="text-xs text-slate-400 truncate"></div>
+        <div class="flex items-center justify-between mt-1">
+          <span id="user-role" class="text-[10px] font-bold uppercase tracking-wide"></span>
+          <button id="logout-btn" class="text-xs text-slate-400 hover:text-white">Salir</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+      <div>
+        <h2 id="area-title" class="text-2xl font-bold"></h2>
+        <p id="area-desc" class="text-sm text-slate-500 mt-0.5"></p>
+      </div>
+      <button id="add-system-btn" class="admin-only bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2 rounded-lg">+ Nuevo sistema</button>
+    </header>
+    <div id="content" class="flex-1 overflow-y-auto p-8"></div>
+  </main>
+</div>
+
+<!-- Modal genérico -->
+<div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 id="modal-title" class="text-lg font-semibold"></h3>
+      <button onclick="closeModal()" class="text-slate-400 hover:text-slate-900 text-2xl leading-none">&times;</button>
+    </div>
+    <div id="modal-body" class="flex-1 overflow-y-auto p-6"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script src="estimator.js"></script>
+<script src="rental-predictor.js"></script>
+<script src="loan-calculator.js"></script>
+<script src="property-analyzer.js"></script>
+<script src="remodel-pro.js"></script>
+<script src="weekly-planner.js"></script>
+</body>
+</html>
