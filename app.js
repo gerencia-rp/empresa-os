@@ -276,23 +276,31 @@ function renderSystems(area) {
       </div>`;
     return;
   }
+  const adminHint = isAdmin() ? '<div class="text-[10px] text-slate-400 mb-2">Admin: arrastrá las tarjetas para reordenar. El orden se guarda automáticamente.</div>' : '';
   content.innerHTML = `
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    ${adminHint}
+    <div id="sys-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-area-id="${area.id}">
       ${systems.map(sys => systemCard(area, sys)).join('')}
     </div>`;
 }
 
 function systemCard(area, sys) {
   const type = SYSTEM_TYPES[sys.type] || { icon: sys.icon || '💎', label: sys.type };
-  const adminBtns = isAdmin() ? `
+  const admin = isAdmin();
+  const adminBtns = admin ? `
     <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-      <button onclick="editSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-slate-900 p-1">✏️</button>
-      <button onclick="deleteSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-red-600 p-1">🗑️</button>
+      <button onclick="event.stopPropagation(); editSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-slate-900 p-1">✏️</button>
+      <button onclick="event.stopPropagation(); deleteSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-red-600 p-1">🗑️</button>
     </div>` : '';
+  const dragHandle = admin ? `<span class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-700 select-none text-lg leading-none" title="Arrastrá para reordenar">⋮⋮</span>` : '';
+  const dragAttrs = admin ? `draggable="true" ondragstart="sysDragStart(event,'${sys.id}')" ondragover="sysDragOver(event)" ondragleave="sysDragLeave(event)" ondrop="sysDrop(event,'${area.id}','${sys.id}')" ondragend="sysDragEnd(event)"` : '';
   return `
-    <div class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition group">
+    <div class="sys-card bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition group" data-sys-id="${sys.id}" ${dragAttrs}>
       <div class="flex items-start justify-between mb-3">
-        <div class="text-3xl">${sys.icon || type.icon}</div>
+        <div class="flex items-center gap-2">
+          ${dragHandle}
+          <div class="text-3xl">${sys.icon || type.icon}</div>
+        </div>
         ${adminBtns}
       </div>
       <h4 class="font-semibold text-slate-900">${sys.name}</h4>
@@ -301,6 +309,49 @@ function systemCard(area, sys) {
         Abrir
       </button>
     </div>`;
+}
+
+// ─── Drag & drop reordenar sistemas (solo admin) ───
+let _sysDragId = null;
+function sysDragStart(ev, sysId) {
+  _sysDragId = sysId;
+  ev.dataTransfer.effectAllowed = 'move';
+  ev.currentTarget.classList.add('opacity-40');
+}
+function sysDragOver(ev) {
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  ev.currentTarget.classList.add('ring-2','ring-slate-900');
+}
+function sysDragLeave(ev) {
+  ev.currentTarget.classList.remove('ring-2','ring-slate-900');
+}
+function sysDragEnd(ev) {
+  ev.currentTarget.classList.remove('opacity-40');
+  document.querySelectorAll('.sys-card').forEach(el => el.classList.remove('ring-2','ring-slate-900'));
+}
+async function sysDrop(ev, areaId, targetSysId) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('ring-2','ring-slate-900');
+  const draggedId = _sysDragId;
+  _sysDragId = null;
+  if (!draggedId || draggedId === targetSysId) return;
+  const list = state.systems[areaId] || [];
+  const from = list.findIndex(s => s.id === draggedId);
+  const to = list.findIndex(s => s.id === targetSysId);
+  if (from === -1 || to === -1) return;
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  // Reasignar positions 0..N
+  list.forEach((s, i) => s.position = i);
+  // Re-render local inmediato
+  const area = state.areas.find(a => a.id === areaId);
+  if (area) renderSystems(area);
+  // Persistir en DB
+  const updates = list.map(s => sb.from('systems').update({ position: s.position }).eq('id', s.id));
+  const results = await Promise.all(updates);
+  const errs = results.filter(r => r.error);
+  if (errs.length) console.warn('sysDrop persist errors:', errs.map(e => e.error.message));
 }
 
 // ============================================================
@@ -481,6 +532,8 @@ function openInternalSystem(sys) {
   if (sys.type === 'deep-analyzer') return openPropertyAnalyzer(sys);
   if (sys.type === 'remodel-pro') return openRemodelPro(sys);
   if (sys.type === 'weekly-planner') return openWeeklyPlanner(sys);
+  if (sys.type === 'ops-planner') return openOpsPlanner(sys);
+  if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
 }
 
 // ============================================================
