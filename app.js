@@ -534,6 +534,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'weekly-planner') return openWeeklyPlanner(sys);
   if (sys.type === 'ops-planner') return openOpsPlanner(sys);
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
+  if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
 }
 
 // ============================================================
