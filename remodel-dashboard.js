@@ -16,6 +16,118 @@ const rdState = {
 
 const RD_FN_URL = `${window.SUPABASE_URL}/functions/v1/sync-remodel-airtable`;
 
+// Benchmarks Austin TX (de la industria + tu informe interno)
+const BENCHMARKS_AUSTIN = {
+  margen_min: 20,        // % objetivo mínimo
+  margen_max: 35,        // % rango sano
+  margen_critico: 10,    // <10% = peligro
+  labor_ratio_max: 60,   // % máximo de labor sobre total
+  labor_ratio_gut: 53,   // benchmark gut renovation
+  materiales_ratio_gut: 47,
+  ejecucion_max: 100,    // % presupuesto no debe pasarse
+  desviacion_critica: 10, // >10% sobre presupuesto = 🔴
+  retraso_critico: 10,   // >10 días de retraso = 🔴
+  retraso_advertencia: 5,
+  discrepancia_min: 500, // diferencia valor_interno vs (mat+lab) que dispara alerta
+};
+
+// ─── KPIs avanzados por obra (replica el formato del informe ejecutivo) ───
+function rdAdvancedKPIs(p) {
+  const mat = +p.gasto_materiales || 0;
+  const lab = +p.gasto_trabajadores || 0;
+  const totalCost = mat + lab;
+  const presup = +p.presupuesto_interno || 0;
+  const valor_interno = +p.valor_interno || 0;
+  const cliente = +p.valor_cliente || 0;
+  const avance = +p.avance_pct || 0;
+  const ganancia = +p.ganancia || (cliente - totalCost);
+
+  // Eficiencia gasto: % real vs lo esperado al punto de avance
+  // Esperado al X% avance = presup × (avance/100)
+  // Eficiencia = real / esperado → <100% es bueno (gastaste menos de lo presupuestado para tu avance)
+  let eficiencia_gasto = null;
+  if (presup > 0 && avance > 0) {
+    const esperado = presup * (avance / 100);
+    if (esperado > 0) eficiencia_gasto = Math.round(totalCost / esperado * 100);
+  }
+
+  // Ratio labor / costo
+  const labor_ratio = totalCost > 0 ? Math.round(lab / totalCost * 100) : null;
+  const materiales_ratio = totalCost > 0 ? Math.round(mat / totalCost * 100) : null;
+  const labor_delta_benchmark = labor_ratio != null ? labor_ratio - BENCHMARKS_AUSTIN.labor_ratio_gut : null;
+
+  // Ejecución presupuestal
+  const ejecucion_pct = presup > 0 ? Math.round(totalCost / presup * 100 * 10) / 10 : null;
+  const faltante_por_gastar = presup - totalCost;
+
+  // Sobre/bajo presupuesto
+  const sobre_presupuesto_pct = presup > 0 ? Math.round((totalCost - presup) / presup * 100 * 10) / 10 : null;
+
+  // Margen sobre venta
+  const margen_venta = cliente > 0 ? Math.round((cliente - totalCost) / cliente * 100 * 10) / 10 : null;
+
+  // Días de retraso
+  let dias_retraso = null;
+  const hoy = new Date();
+  if (p.fecha_estimada_fin) {
+    const finEst = new Date(p.fecha_estimada_fin);
+    if (p.proceso === 'Finalizado' && p.fecha_real_fin) {
+      const finReal = new Date(p.fecha_real_fin);
+      dias_retraso = Math.round((finReal - finEst) / 86400000);
+    } else if (avance < 100) {
+      dias_retraso = Math.round((hoy - finEst) / 86400000);
+    }
+  }
+
+  // Discrepancia valor_interno vs (mat+lab) — valor_interno típicamente lleva markup +5%, pero si la diferencia es muy distinta del esperado, hay error
+  // Esperado: valor_interno ≈ totalCost × 1.05
+  let discrepancia = null;
+  if (valor_interno > 0 && totalCost > 0) {
+    const esperado_interno = totalCost * 1.05;
+    discrepancia = Math.round((valor_interno - esperado_interno) * 100) / 100;
+  }
+
+  // Status semáforo
+  const flags = [];
+  if (sobre_presupuesto_pct != null && sobre_presupuesto_pct > BENCHMARKS_AUSTIN.desviacion_critica) flags.push('sobre_presupuesto_critico');
+  if (labor_ratio != null && labor_ratio > BENCHMARKS_AUSTIN.labor_ratio_max) flags.push('labor_alto');
+  if (dias_retraso != null && dias_retraso > BENCHMARKS_AUSTIN.retraso_critico) flags.push('retraso_critico');
+  if (margen_venta != null && margen_venta < BENCHMARKS_AUSTIN.margen_critico) flags.push('margen_critico');
+  if (discrepancia != null && Math.abs(discrepancia) > BENCHMARKS_AUSTIN.discrepancia_min) flags.push('discrepancia_cifras');
+
+  // Estado global
+  let estado = 'sano';
+  if (flags.some(f => f.includes('critico') || f === 'discrepancia_cifras')) estado = 'critico';
+  else if (flags.length > 0) estado = 'advertencia';
+
+  return {
+    totalCost, eficiencia_gasto, labor_ratio, materiales_ratio, labor_delta_benchmark,
+    ejecucion_pct, faltante_por_gastar, sobre_presupuesto_pct, margen_venta,
+    dias_retraso, discrepancia, ganancia, flags, estado
+  };
+}
+
+// ─── Acciones requeridas computadas por obra ───
+function rdAccionesRequeridas(p, kpis) {
+  const acciones = [];
+  if (kpis.flags.includes('retraso_critico')) {
+    acciones.push({ titulo: 'URGENTE: Coordinar cierre inmediato', responsable: p.lider || 'Líder', razon: `${kpis.dias_retraso} días de retraso` });
+  }
+  if (kpis.flags.includes('sobre_presupuesto_critico')) {
+    acciones.push({ titulo: 'Revisar sobrecostos con líder', responsable: 'Administración', razon: `+${kpis.sobre_presupuesto_pct}% sobre presupuesto` });
+  }
+  if (kpis.flags.includes('labor_alto')) {
+    acciones.push({ titulo: 'Auditar horas de cuadrilla', responsable: 'Daniel / ' + (p.lider || 'Líder'), razon: `Labor ${kpis.labor_ratio}% (benchmark ${BENCHMARKS_AUSTIN.labor_ratio_gut}%)` });
+  }
+  if (kpis.flags.includes('discrepancia_cifras')) {
+    acciones.push({ titulo: `Reconciliar cifras (diferencia $${Math.abs(kpis.discrepancia).toLocaleString()})`, responsable: 'Michell', razon: 'Valor interno reportado no coincide con costo real' });
+  }
+  if (kpis.flags.includes('margen_critico')) {
+    acciones.push({ titulo: 'Revisar viabilidad del proyecto', responsable: 'Nicolas', razon: `Margen ${kpis.margen_venta}% (objetivo ${BENCHMARKS_AUSTIN.margen_min}-${BENCHMARKS_AUSTIN.margen_max}%)` });
+  }
+  return acciones;
+}
+
 async function openRemodelDashboard(sys) {
   rdState.sys = sys;
   openModal(`📊 ${sys.name}`, '<div id="rd-root">Cargando...</div>');
@@ -78,9 +190,9 @@ function rdRender() {
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 flex-wrap gap-2">
         <div class="flex items-center gap-2">
-          ${['portfolio','obras','lideres','alertas','tendencias'].map(t => `
+          ${['portfolio','informe','obras','lideres','alertas','tendencias'].map(t => `
             <button onclick="rdSetTab('${t}')" class="px-3 py-1.5 rounded text-xs font-bold ${rdState.tab===t?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
-              ${t==='portfolio'?'📊 Portfolio':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='alertas'?'🚨 Alertas':'📈 Tendencias'}
+              ${t==='portfolio'?'📊 Portfolio':t==='informe'?'📑 Informe':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='alertas'?'🚨 Alertas':'📈 Tendencias'}
               ${t==='alertas' && rdState.alerts.length ? `<span class="ml-1 bg-red-600 text-white px-1.5 rounded">${rdState.alerts.length}</span>` : ''}
             </button>
           `).join('')}
@@ -96,6 +208,7 @@ function rdRender() {
       <!-- BODY tab content -->
       <div class="flex-1 overflow-y-auto">
         ${rdState.tab === 'portfolio' ? rdRenderPortfolio(active, finalizada) :
+          rdState.tab === 'informe' ? rdRenderInforme(active, finalizada) :
           rdState.tab === 'obras' ? rdRenderObras(active, finalizada, sinAsignar) :
           rdState.tab === 'lideres' ? rdRenderLideres() :
           rdState.tab === 'alertas' ? rdRenderAlertas() :
@@ -108,6 +221,41 @@ function rdRender() {
 function rdSetTab(t) { rdState.tab = t; rdRender(); }
 
 // ─── PORTFOLIO TAB ───
+// Análisis profundo del histórico (21 finalizadas) por líder
+function rdHistoricalInsights(finalizada) {
+  const byLider = {};
+  finalizada.forEach(p => {
+    if (!p.lider) return;
+    if (!byLider[p.lider]) byLider[p.lider] = { obras: [], total_gastado: 0, total_cliente: 0, total_ganancia: 0, total_mat: 0, total_lab: 0, dias: [], sobrepresup: 0 };
+    const L = byLider[p.lider];
+    L.obras.push(p);
+    L.total_gastado += (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0);
+    L.total_cliente += +p.valor_cliente || 0;
+    L.total_ganancia += +p.ganancia || 0;
+    L.total_mat += +p.gasto_materiales || 0;
+    L.total_lab += +p.gasto_trabajadores || 0;
+    const presup = +p.presupuesto_interno || 0;
+    const real = (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0);
+    if (presup > 0 && real > presup) L.sobrepresup++;
+    if (p.fecha_inicio && p.fecha_real_fin) {
+      const d = Math.round((new Date(p.fecha_real_fin) - new Date(p.fecha_inicio)) / 86400000);
+      if (d > 0 && d < 1000) L.dias.push(d);
+    }
+  });
+  return Object.entries(byLider).map(([name, L]) => ({
+    name,
+    obras: L.obras.length,
+    ganancia: L.total_ganancia,
+    margen: L.total_cliente > 0 ? Math.round(L.total_ganancia / L.total_cliente * 100) : 0,
+    ratio_lab: L.total_gastado > 0 ? Math.round(L.total_lab / L.total_gastado * 100) : 0,
+    avg_dias: L.dias.length ? Math.round(L.dias.reduce((s,x)=>s+x,0) / L.dias.length) : null,
+    max_dias: L.dias.length ? Math.max(...L.dias) : null,
+    sobrepresup: L.sobrepresup,
+    ganancia_por_obra: L.obras.length ? Math.round(L.total_ganancia / L.obras.length) : 0,
+    obras_lista: L.obras
+  })).sort((a,b) => b.ganancia - a.ganancia);
+}
+
 function rdRenderPortfolio(active, finalizada) {
   if (rdState.properties.length === 0) {
     return `
@@ -120,14 +268,22 @@ function rdRenderPortfolio(active, finalizada) {
   }
 
   // KPIs portfolio
-  const totalGastado = active.reduce((s,p) => s + (p.gasto_materiales||0) + (p.gasto_trabajadores||0), 0);
-  const totalPresup = active.reduce((s,p) => s + (p.presupuesto_interno||0), 0);
-  const totalPipeline = active.reduce((s,p) => s + ((p.valor_cliente||0) - (p.presupuesto_interno||0)), 0);
-  const avgAvance = active.length ? Math.round(active.reduce((s,p) => s + (p.avance_pct||0), 0) / active.length) : 0;
-  const totalGananciaCerrada = finalizada.reduce((s,p) => s + (p.ganancia||0), 0);
-  const matSum = active.reduce((s,p) => s + (p.gasto_materiales||0), 0);
-  const labSum = active.reduce((s,p) => s + (p.gasto_trabajadores||0), 0);
+  const totalGastado = active.reduce((s,p) => s + (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0), 0);
+  const totalPresup = active.reduce((s,p) => s + (+p.presupuesto_interno||0), 0);
+  const totalPipeline = active.reduce((s,p) => s + ((+p.valor_cliente||0) - (+p.presupuesto_interno||0)), 0);
+  const avgAvance = active.length ? Math.round(active.reduce((s,p) => s + (+p.avance_pct||0), 0) / active.length) : 0;
+  const totalGananciaCerrada = finalizada.reduce((s,p) => s + (+p.ganancia||0), 0);
+  const totalClienteHist = finalizada.reduce((s,p) => s + (+p.valor_cliente||0), 0);
+  const totalGastadoHist = finalizada.reduce((s,p) => s + (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0), 0);
+  const margenHist = totalClienteHist > 0 ? Math.round(totalGananciaCerrada / totalClienteHist * 100) : 0;
+  const matHist = finalizada.reduce((s,p) => s + (+p.gasto_materiales||0), 0);
+  const labHist = finalizada.reduce((s,p) => s + (+p.gasto_trabajadores||0), 0);
+  const matPctHist = (matHist+labHist) > 0 ? Math.round(matHist/(matHist+labHist)*100) : 0;
+  const matSum = active.reduce((s,p) => s + (+p.gasto_materiales||0), 0);
+  const labSum = active.reduce((s,p) => s + (+p.gasto_trabajadores||0), 0);
   const matPct = (matSum+labSum) > 0 ? Math.round(matSum/(matSum+labSum)*100) : 0;
+
+  const lideres = rdHistoricalInsights(finalizada);
 
   // Critical alerts
   const criticalAlerts = rdState.alerts.filter(a => a.severity === 'critical');
@@ -136,27 +292,30 @@ function rdRenderPortfolio(active, finalizada) {
     <div class="space-y-4">
       <!-- KPIs principales -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-emerald-600 text-white rounded-xl p-4">
+          <div class="text-[10px] text-emerald-200 uppercase font-bold">Ganancia histórica</div>
+          <div class="text-3xl font-bold">$${Math.round(totalGananciaCerrada/1000)}K</div>
+          <div class="text-[10px] text-emerald-200 mt-1">${finalizada.length} obras cerradas · margen ${margenHist}%</div>
+        </div>
         <div class="bg-slate-900 text-white rounded-xl p-4">
           <div class="text-[10px] text-slate-400 uppercase font-bold">Obras activas</div>
           <div class="text-3xl font-bold">${active.length}</div>
-          <div class="text-[10px] text-slate-400 mt-1">${finalizada.length} finalizadas históricas</div>
+          <div class="text-[10px] text-slate-400 mt-1">${avgAvance}% avance promedio</div>
         </div>
         <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div class="text-[10px] text-blue-700 uppercase font-bold">Capital en obra</div>
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Capital en obra ahora</div>
           <div class="text-3xl font-bold text-blue-900">$${Math.round(totalGastado/1000)}K</div>
-          <div class="text-[10px] text-blue-700 mt-1">vs $${Math.round(totalPresup/1000)}K presupuestado (${totalPresup?Math.round(totalGastado/totalPresup*100):0}%)</div>
+          <div class="text-[10px] text-blue-700 mt-1">de $${Math.round(totalPresup/1000)}K presup (${totalPresup?Math.round(totalGastado/totalPresup*100):0}%) · ${matPct}/${100-matPct} mat/lab</div>
         </div>
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <div class="text-[10px] text-emerald-700 uppercase font-bold">Pipeline ganancia</div>
-          <div class="text-3xl font-bold text-emerald-900">$${Math.round(totalPipeline/1000)}K</div>
-          <div class="text-[10px] text-emerald-700 mt-1">cuando se cierren las activas</div>
-        </div>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div class="text-[10px] text-amber-700 uppercase font-bold">Avance promedio</div>
-          <div class="text-3xl font-bold text-amber-900">${avgAvance}%</div>
-          <div class="text-[10px] text-amber-700 mt-1">${matPct}% mat / ${100-matPct}% trabaj</div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-4">
+          <div class="text-[10px] text-violet-700 uppercase font-bold">Pipeline ganancia</div>
+          <div class="text-3xl font-bold text-violet-900">$${Math.round(totalPipeline/1000)}K</div>
+          <div class="text-[10px] text-violet-700 mt-1">cuando cierren las ${active.length} activas</div>
         </div>
       </div>
+
+      <!-- Insights del histórico -->
+      ${finalizada.length > 0 ? rdRenderHistoricalPanel(lideres, totalGastadoHist, totalClienteHist, matPctHist) : ''}
 
       <!-- Alertas críticas inline -->
       ${criticalAlerts.length ? `
@@ -197,6 +356,100 @@ function rdRenderPortfolio(active, finalizada) {
           </table>
         </div>
       </div>
+    </div>
+  `;
+}
+
+// ─── Panel de Insights del Histórico ───
+function rdRenderHistoricalPanel(lideres, totalGastadoHist, totalClienteHist, matPctHist) {
+  // Detectar líderes problemáticos y top
+  const bottom = lideres.filter(l => l.obras >= 3 && l.margen < 10);
+  const top = lideres.filter(l => l.obras >= 2 && l.margen >= 25);
+  const promedioMargen = lideres.reduce((s,l) => s + l.margen * l.obras, 0) / lideres.reduce((s,l) => s + l.obras, 0);
+
+  return `
+    <div class="border-2 border-violet-300 bg-violet-50/30 rounded-xl p-4 space-y-3">
+      <div class="text-sm font-bold uppercase text-violet-900">🧠 Insights del Histórico — ${lideres.reduce((s,l)=>s+l.obras,0)} obras finalizadas</div>
+
+      <!-- Resumen del portfolio histórico -->
+      <div class="grid md:grid-cols-3 gap-2 text-xs">
+        <div class="bg-white rounded p-2">
+          <div class="text-[10px] text-slate-500 uppercase">Inversión histórica</div>
+          <div class="text-base font-bold">$${Math.round(totalGastadoHist/1000)}K</div>
+          <div class="text-[10px] text-slate-500">${matPctHist}% materiales / ${100-matPctHist}% trabajadores</div>
+        </div>
+        <div class="bg-white rounded p-2">
+          <div class="text-[10px] text-slate-500 uppercase">Revenue cliente histórico</div>
+          <div class="text-base font-bold">$${Math.round(totalClienteHist/1000)}K</div>
+          <div class="text-[10px] text-slate-500">Margen ponderado: ${Math.round(promedioMargen)}%</div>
+        </div>
+        <div class="bg-white rounded p-2">
+          <div class="text-[10px] text-slate-500 uppercase">Ratio mat/lab</div>
+          <div class="text-base font-bold ${matPctHist >= 40 && matPctHist <= 55 ? 'text-emerald-700' : 'text-amber-700'}">${matPctHist}% / ${100-matPctHist}%</div>
+          <div class="text-[10px] text-slate-500">Benchmark gut: 47/53 ${matPctHist >= 40 && matPctHist <= 55 ? '✅' : '⚠️'}</div>
+        </div>
+      </div>
+
+      <!-- Alertas de líderes problemáticos -->
+      ${bottom.length > 0 ? `
+        <div class="bg-red-50 border border-red-300 rounded p-2">
+          <div class="text-xs font-bold text-red-900 mb-1">🚨 Líderes con margen bajo (< 10%, ≥3 obras)</div>
+          ${bottom.map(l => `
+            <div class="text-xs">
+              <strong>${l.name}</strong> · ${l.obras} obras · <span class="text-red-700 font-bold">margen ${l.margen}%</span> ·
+              ganancia total $${Math.round(l.ganancia/1000)}K · <span class="text-slate-500">$${Math.round(l.ganancia_por_obra/1000)}K/obra</span>
+              ${l.sobrepresup > 0 ? ` · <span class="text-red-700">${l.sobrepresup} sobre-presup</span>` : ''}
+            </div>
+          `).join('')}
+          <div class="text-[10px] text-red-700 mt-1 italic">Recomendación: revisar metodología de estimación y control de horas con este líder. Considerar asignar obras más simples o pair-up con líder top.</div>
+        </div>
+      ` : ''}
+
+      ${top.length > 0 ? `
+        <div class="bg-emerald-50 border border-emerald-300 rounded p-2">
+          <div class="text-xs font-bold text-emerald-900 mb-1">👑 Líderes top (margen ≥25%)</div>
+          ${top.map(l => `
+            <div class="text-xs">
+              <strong>${l.name}</strong> · ${l.obras} obras · <span class="text-emerald-700 font-bold">margen ${l.margen}%</span> ·
+              ganancia $${Math.round(l.ganancia/1000)}K · <span class="text-slate-500">$${Math.round(l.ganancia_por_obra/1000)}K/obra promedio</span>
+              ${l.avg_dias ? ` · ${l.avg_dias}d/obra` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Tabla completa por líder -->
+      <details class="bg-white rounded border border-violet-200">
+        <summary class="cursor-pointer p-2 text-xs font-bold hover:bg-violet-50">📊 Performance detallada por líder (click)</summary>
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left p-2">Líder</th>
+              <th class="text-right p-2">Obras</th>
+              <th class="text-right p-2">Ganancia</th>
+              <th class="text-right p-2">Margen</th>
+              <th class="text-right p-2">$/obra</th>
+              <th class="text-right p-2">Días/obra</th>
+              <th class="text-right p-2">Labor%</th>
+              <th class="text-right p-2">Sobre-presup</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lideres.map(l => `
+              <tr class="border-t border-slate-100 ${l.margen < 10 ? 'bg-red-50/50' : l.margen >= 25 ? 'bg-emerald-50/50' : ''}">
+                <td class="p-2 font-semibold">${l.name}</td>
+                <td class="p-2 text-right">${l.obras}</td>
+                <td class="p-2 text-right ${l.ganancia >= 0 ? 'text-emerald-700' : 'text-red-700'} font-semibold">$${Math.round(l.ganancia/1000)}K</td>
+                <td class="p-2 text-right font-bold ${l.margen >= 25 ? 'text-emerald-700' : l.margen < 10 ? 'text-red-700' : 'text-amber-700'}">${l.margen}%</td>
+                <td class="p-2 text-right">$${Math.round(l.ganancia_por_obra/1000)}K</td>
+                <td class="p-2 text-right ${l.max_dias > 200 ? 'text-red-700' : ''}">${l.avg_dias != null ? l.avg_dias + 'd' : '—'}${l.max_dias != null && l.max_dias !== l.avg_dias ? ` <span class="text-[9px] text-slate-400">(max ${l.max_dias}d)</span>` : ''}</td>
+                <td class="p-2 text-right ${l.ratio_lab > 60 ? 'text-red-700' : ''}">${l.ratio_lab}%</td>
+                <td class="p-2 text-right ${l.sobrepresup > 0 ? 'text-amber-700 font-bold' : ''}">${l.sobrepresup}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </details>
     </div>
   `;
 }
@@ -458,6 +711,202 @@ async function rdRenderTendencias() {
   `;
 }
 
+// ════════════════════════════════════════════════════════════
+// 📑 INFORME EJECUTIVO — replica el formato del PDF interno
+// ════════════════════════════════════════════════════════════
+function rdRenderInforme(active, finalizada) {
+  // Calcular KPIs avanzados de todas las obras activas
+  const activeKpis = active.map(p => ({ p, k: rdAdvancedKPIs(p), acciones: rdAccionesRequeridas(p, rdAdvancedKPIs(p)) }));
+  const criticas = activeKpis.filter(x => x.k.estado === 'critico');
+  const advertencias = activeKpis.filter(x => x.k.estado === 'advertencia');
+  const sanas = activeKpis.filter(x => x.k.estado === 'sano');
+
+  // Portfolio totals
+  const totalReal = active.reduce((s,p) => s + (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0), 0);
+  const totalMat = active.reduce((s,p) => s + (+p.gasto_materiales||0), 0);
+  const totalLab = active.reduce((s,p) => s + (+p.gasto_trabajadores||0), 0);
+  const totalPresup = active.reduce((s,p) => s + (+p.presupuesto_interno||0), 0);
+  const totalCliente = active.reduce((s,p) => s + (+p.valor_cliente||0), 0);
+  const gananciaPipeline = totalCliente - totalReal;
+  const margenGlobal = totalCliente > 0 ? Math.round((totalCliente - totalReal) / totalCliente * 100 * 10) / 10 : 0;
+  const ratioLaborGlobal = totalReal > 0 ? Math.round(totalLab / totalReal * 100) : 0;
+  const ejecucionGlobal = totalPresup > 0 ? Math.round(totalReal / totalPresup * 100 * 10) / 10 : 0;
+  const gananciaHistorica = finalizada.reduce((s,p) => s + (+p.ganancia||0), 0);
+
+  // Métricas operativas
+  const enPlazo = activeKpis.filter(x => (x.k.dias_retraso||0) <= 0).length;
+  const vencidos = activeKpis.filter(x => (x.k.dias_retraso||0) > 0).length;
+  const sobrecosto = activeKpis.filter(x => x.k.sobre_presupuesto_pct > 0).length;
+  const enPerdida = activeKpis.filter(x => (x.k.margen_venta||100) < 0).length;
+
+  const hoy = new Date();
+  const fechaStr = hoy.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Resumen ejecutivo automático
+  let estadoPortfolio = '✅ PORTAFOLIO RENTABLE';
+  if (margenGlobal < BENCHMARKS_AUSTIN.margen_critico) estadoPortfolio = '🔴 PORTAFOLIO EN RIESGO';
+  else if (criticas.length > 0) estadoPortfolio = '⚠️ PORTAFOLIO CON ALERTAS CRÍTICAS';
+  let prioridad1 = 'Mantener disciplina de registro semanal';
+  let accionSistemica = 'Mantener registro diario en Airtable';
+  if (criticas.length > 0) {
+    const peor = criticas[0];
+    prioridad1 = `Atender ${peor.p.address} (${peor.k.flags.join(', ')})`;
+  }
+  if (ratioLaborGlobal > BENCHMARKS_AUSTIN.labor_ratio_max) {
+    accionSistemica = `Reducir ratio labor portfolio (${ratioLaborGlobal}% vs ${BENCHMARKS_AUSTIN.labor_ratio_max}% benchmark)`;
+  }
+
+  return `
+    <div id="rd-informe-print" class="space-y-3">
+      <!-- Toolbar print -->
+      <div class="flex justify-end gap-2 print:hidden">
+        <button onclick="rdPrintInforme()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">🖨️ Imprimir / Guardar PDF</button>
+      </div>
+
+      <!-- Header -->
+      <div class="border-2 border-slate-900 rounded-lg p-4 bg-white">
+        <div class="text-lg font-bold tracking-wide">INFORME EJECUTIVO DE REMODELACIÓN</div>
+        <div class="text-xs text-slate-600 capitalize">${fechaStr}</div>
+        <div class="text-xs text-slate-500 mt-1">Agua Construction Group · Structure One · Flipping Rentals</div>
+      </div>
+
+      <!-- Semáforo ejecutivo -->
+      <div class="border-t-2 border-slate-200 pt-3">
+        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ SEMÁFORO EJECUTIVO ━━</div>
+        <div class="flex gap-4 text-sm font-bold">
+          <span class="text-red-700">🔴 CRÍTICAS: ${criticas.length}</span>
+          <span class="text-amber-700">🟡 ADVERTENCIAS: ${advertencias.length}</span>
+          <span class="text-emerald-700">✅ SANOS: ${sanas.length}</span>
+        </div>
+        ${criticas.length ? `<div class="mt-2 space-y-0.5 text-xs">${criticas.map(x => `<div>🔴 <strong>${x.p.address}</strong> — ${x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · ')}</div>`).join('')}</div>` : ''}
+      </div>
+
+      <!-- KPIs Globales -->
+      <div class="border-t-2 border-slate-200 pt-3">
+        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ KPIs GLOBALES ━━</div>
+        <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+          <div>Proyectos activos: <strong>${active.length}</strong> | Finalizados: <strong>${finalizada.length}</strong></div>
+          <div>Ratio labor/costo: <strong>${ratioLaborGlobal}% ${ratioLaborGlobal <= BENCHMARKS_AUSTIN.labor_ratio_max ? '✅ OK' : '⚠️ ALTO'}</strong></div>
+          <div>Costo total ejecutado: <strong>$${Math.round(totalReal).toLocaleString()}</strong> (Mat: $${Math.round(totalMat).toLocaleString()} · Lab: $${Math.round(totalLab).toLocaleString()})</div>
+          <div>Presupuesto total: <strong>$${Math.round(totalPresup).toLocaleString()}</strong> → Ejecución: <strong>${ejecucionGlobal}%</strong></div>
+          <div>Valor total cliente: <strong>$${Math.round(totalCliente).toLocaleString()}</strong></div>
+          <div>Margen global real: <strong>${margenGlobal > 0 ? '+' : ''}${margenGlobal}%</strong> ($${Math.round(gananciaPipeline).toLocaleString()} ganancia)</div>
+          <div>Ganancia histórica acum.: <strong>$${Math.round(gananciaHistorica).toLocaleString()}</strong> (${finalizada.length} proyectos cerrados)</div>
+        </div>
+      </div>
+
+      <!-- Métricas operativas -->
+      <div class="border-t-2 border-slate-200 pt-3">
+        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ MÉTRICAS OPERATIVAS ━━</div>
+        <div class="grid grid-cols-4 gap-2 text-xs">
+          <div>En plazo: <strong class="text-emerald-700">${enPlazo}/${active.length}</strong></div>
+          <div>Vencidos: <strong class="${vencidos>0?'text-red-700':''}">${vencidos} ${vencidos>0?'⚠️':''}</strong></div>
+          <div>En sobrecosto: <strong class="${sobrecosto>0?'text-amber-700':''}">${sobrecosto}</strong></div>
+          <div>En pérdida: <strong class="${enPerdida>0?'text-red-700':''}">${enPerdida}</strong></div>
+        </div>
+      </div>
+
+      <!-- Benchmarks vs industria -->
+      <div class="border-t-2 border-slate-200 pt-3">
+        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ BENCHMARKS vs INDUSTRIA AUSTIN TX ━━</div>
+        <div class="grid grid-cols-1 gap-1 text-xs">
+          <div>${margenGlobal >= BENCHMARKS_AUSTIN.margen_min ? '✅' : '🔴'} Margen neto objetivo — Referencia: ${BENCHMARKS_AUSTIN.margen_min}–${BENCHMARKS_AUSTIN.margen_max}% — Actual: <strong>${margenGlobal > 0 ? '+' : ''}${margenGlobal}%</strong></div>
+          <div>${ratioLaborGlobal <= BENCHMARKS_AUSTIN.labor_ratio_max ? '✅' : '🔴'} Labor/costo máximo — Referencia: ≤${BENCHMARKS_AUSTIN.labor_ratio_max}% — Actual: <strong>${ratioLaborGlobal}%</strong></div>
+          <div>${ejecucionGlobal <= BENCHMARKS_AUSTIN.ejecucion_max ? '✅' : '🔴'} Ejecución presupuestal — Referencia: ≤${BENCHMARKS_AUSTIN.ejecucion_max}% — Actual: <strong>${ejecucionGlobal}%</strong></div>
+          <div>${enPerdida === 0 ? '✅' : '🔴'} Proyectos en pérdida — Referencia: 0 — Actual: <strong>${enPerdida}</strong></div>
+          <div>${vencidos === 0 ? '✅' : (vencidos <= 1 ? '⚠️' : '🔴')} Proyectos vencidos — Referencia: ≤1 — Actual: <strong>${vencidos}</strong></div>
+        </div>
+      </div>
+
+      <!-- Análisis detallado por proyecto -->
+      <div class="border-t-2 border-slate-200 pt-3">
+        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ ANÁLISIS DETALLADO POR PROYECTO ━━</div>
+        ${activeKpis.length === 0 ? '<div class="text-xs text-slate-400">Sin proyectos activos</div>' :
+          activeKpis.map((x, i) => rdRenderProyectoBloque(x, i+1)).join('')}
+      </div>
+
+      <!-- Resumen ejecutivo -->
+      <div class="border-t-2 border-slate-200 pt-3">
+        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ RESUMEN EJECUTIVO ━━</div>
+        <div class="text-xs space-y-1">
+          <div>Estado: <strong>${estadoPortfolio}</strong></div>
+          <div>Prioridad #1: <strong>${prioridad1}</strong></div>
+          <div>Acción sistémica: <strong>${accionSistemica}</strong></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function rdFlagLabel(flag, k) {
+  const map = {
+    sobre_presupuesto_critico: `+${k.sobre_presupuesto_pct}% sobre presupuesto`,
+    labor_alto: `Labor ${k.labor_ratio}% (max ${BENCHMARKS_AUSTIN.labor_ratio_max}%)`,
+    retraso_critico: `${k.dias_retraso}d retraso`,
+    margen_critico: `Margen ${k.margen_venta}% (min ${BENCHMARKS_AUSTIN.margen_critico}%)`,
+    discrepancia_cifras: `Discrepancia $${Math.abs(k.discrepancia).toLocaleString()}`
+  };
+  return map[flag] || flag;
+}
+
+function rdRenderProyectoBloque(x, num) {
+  const p = x.p, k = x.k;
+  const estadoLabel = k.estado === 'critico' ? '🔴 ' + (k.dias_retraso>0?'VENCIDO':'CRÍTICO') :
+                      k.estado === 'advertencia' ? '🟡 ADVERTENCIA' : '✅ SANO';
+  const finInicio = p.fecha_inicio && p.fecha_estimada_fin
+    ? `Inicio: ${p.fecha_inicio} → Entrega: ${p.fecha_estimada_fin} ${k.dias_retraso > 0 ? `(${k.dias_retraso} días de RETRASO)` : k.dias_retraso != null && k.dias_retraso < 0 ? `(${-k.dias_retraso} días restantes)` : ''}`
+    : '';
+
+  return `
+    <div class="border border-slate-300 rounded-lg p-3 mb-2 ${k.estado==='critico'?'bg-red-50':k.estado==='advertencia'?'bg-amber-50':'bg-emerald-50/30'}">
+      <div class="font-bold text-sm">┌─ PROYECTO ${num}: ${p.address?.toUpperCase() || '—'} ${estadoLabel}</div>
+      <div class="text-xs text-slate-700 ml-2">│ Líder: ${p.lider || '—'} · ${p.city || ''}</div>
+      ${finInicio ? `<div class="text-xs text-slate-700 ml-2">│ ${finInicio}</div>` : ''}
+      <div class="ml-2 mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+        <div>│ AVANCE: <strong>${rdBar(p.avance_pct || 0)} ${p.avance_pct || 0}%</strong></div>
+        <div>│ Eficiencia gasto: <strong>${k.eficiencia_gasto != null ? k.eficiencia_gasto + '% del esperado' : '—'}</strong> ${k.eficiencia_gasto != null && k.eficiencia_gasto <= 100 ? '✅' : k.eficiencia_gasto > 120 ? '🔴' : ''}</div>
+        <div class="col-span-2 border-t border-slate-200 my-1"></div>
+        <div>│ Gasto Materiales: <strong>$${Math.round(p.gasto_materiales||0).toLocaleString()}</strong> (${k.materiales_ratio||0}% del costo)</div>
+        <div>│ Gasto Trabajadores: <strong>$${Math.round(p.gasto_trabajadores||0).toLocaleString()}</strong> (${k.labor_ratio||0}% del costo)</div>
+        <div class="col-span-2 border-t border-slate-200 my-1"></div>
+        <div>│ Valor Interno (costo): <strong>$${Math.round(k.totalCost).toLocaleString()}</strong></div>
+        <div>│ Presupuesto Interno: <strong>$${Math.round(p.presupuesto_interno||0).toLocaleString()}</strong></div>
+        <div>│ Ejecución presupuestal: <strong>${k.ejecucion_pct != null ? k.ejecucion_pct + '%' : '—'}</strong> ${k.ejecucion_pct != null && k.ejecucion_pct <= 100 ? '✅' : '🔴'}</div>
+        <div>│ Faltante por gastar: <strong>$${Math.round(k.faltante_por_gastar).toLocaleString()}</strong> ${k.faltante_por_gastar > 0 ? '✅ disponible' : '🔴 excedido'}</div>
+        <div class="col-span-2 border-t border-slate-200 my-1"></div>
+        <div>│ Valor Cliente: <strong>$${Math.round(p.valor_cliente||0).toLocaleString()}</strong></div>
+        <div>│ Ganancia Real: <strong class="${k.ganancia>=0?'text-emerald-700':'text-red-700'}">$${Math.round(k.ganancia).toLocaleString()}</strong> ${k.ganancia >= 0 ? '✅ GANANCIA' : '🔴 PÉRDIDA'}</div>
+        <div>│ Margen sobre Venta: <strong>${k.margen_venta != null ? (k.margen_venta>0?'+':'') + k.margen_venta + '%' : '—'}</strong> ${k.margen_venta >= BENCHMARKS_AUSTIN.margen_min ? '✅ EXCELENTE' : k.margen_venta >= BENCHMARKS_AUSTIN.margen_critico ? '🟡 BAJO' : '🔴 CRÍTICO'}</div>
+        ${k.discrepancia != null && Math.abs(k.discrepancia) > BENCHMARKS_AUSTIN.discrepancia_min ? `<div class="col-span-2">│ <strong class="text-amber-700">⚠️ Discrepancia valor interno vs costo real: $${k.discrepancia > 0 ? '+' : ''}${k.discrepancia.toLocaleString()}</strong></div>` : ''}
+      </div>
+      ${x.acciones.length ? `
+        <div class="ml-2 mt-2 pt-2 border-t border-slate-200">
+          <div class="text-xs font-bold">│ ALERTAS ACTIVAS (${x.acciones.length})</div>
+          ${k.flags.map(f => `<div class="text-xs ml-2 text-red-700">│ 🔴 ${rdFlagLabel(f, k)}</div>`).join('')}
+          <div class="text-xs font-bold mt-1">│ ACCIONES REQUERIDAS</div>
+          ${x.acciones.map((a, i) => `<div class="text-xs ml-2">│ ${i+1}. <strong>${a.titulo}</strong> — ${a.responsable} <span class="text-slate-500">(${a.razon})</span></div>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function rdBar(pct) {
+  const blocks = Math.round(pct / 5);
+  return '[' + '█'.repeat(blocks) + '░'.repeat(20 - blocks) + ']';
+}
+
+function rdPrintInforme() {
+  const content = document.getElementById('rd-informe-print').innerHTML;
+  const w = window.open('', '_blank', 'width=900,height=1200');
+  w.document.write(`<!DOCTYPE html><html><head><title>Informe Ejecutivo Remodelación</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>@media print { .print\\:hidden { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>
+    </head><body class="p-6">${content}</body></html>`);
+  w.document.close();
+  setTimeout(() => { w.print(); }, 500);
+}
+
 // ─── DRILL-DOWN POR OBRA ───
 async function rdOpenObra(airtable_id) {
   const p = rdState.properties.find(x => x.airtable_id === airtable_id);
@@ -475,6 +924,8 @@ async function rdOpenObra(airtable_id) {
 
   const latestSnap = (history || [])[history.length-1];
   const obraAlerts = rdState.alerts.filter(a => a.airtable_id === airtable_id);
+  const kpis = rdAdvancedKPIs(p);
+  const acciones = rdAccionesRequeridas(p, kpis);
 
   const html = `
     <div class="space-y-3">
@@ -510,10 +961,16 @@ async function rdOpenObra(airtable_id) {
           <div class="text-xs font-bold uppercase text-slate-600 mb-2">💰 Costos reales</div>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between"><span>🧱 Materiales</span><span class="font-bold">$${Math.round(p.gasto_materiales||0).toLocaleString()} <span class="text-slate-400">(${matPct}%)</span></span></div>
-            <div class="flex justify-between"><span>👷 Trabajadores</span><span class="font-bold">$${Math.round(p.gasto_trabajadores||0).toLocaleString()} <span class="text-slate-400">(${100-matPct}%)</span></span></div>
+            <div class="flex justify-between"><span>👷 Trabajadores</span><span class="font-bold ${kpis.labor_ratio > BENCHMARKS_AUSTIN.labor_ratio_max ? 'text-red-700' : ''}">$${Math.round(p.gasto_trabajadores||0).toLocaleString()} <span class="text-slate-400">(${100-matPct}%)</span></span></div>
+            ${kpis.labor_ratio != null ? `<div class="text-[10px] text-slate-500 ml-4">→ Ratio labor: ${kpis.labor_ratio}% (benchmark gut ${BENCHMARKS_AUSTIN.labor_ratio_gut}%, max ${BENCHMARKS_AUSTIN.labor_ratio_max}%) ${kpis.labor_ratio > BENCHMARKS_AUSTIN.labor_ratio_max ? '🔴 ALTO' : '✅'}</div>` : ''}
             <div class="flex justify-between border-t pt-1"><span>Total real</span><span class="font-bold">$${Math.round(cost).toLocaleString()}</span></div>
             <div class="flex justify-between"><span>Presupuesto</span><span class="text-slate-500">$${Math.round(presup).toLocaleString()}</span></div>
+            ${kpis.ejecucion_pct != null ? `<div class="text-[10px] text-slate-500 ml-4">→ Ejecución: ${kpis.ejecucion_pct}% ${kpis.ejecucion_pct > 100 ? '🔴' : '✅'} · Faltante: $${Math.round(kpis.faltante_por_gastar).toLocaleString()}</div>` : ''}
+            ${kpis.sobre_presupuesto_pct != null && kpis.sobre_presupuesto_pct > 0 ? `<div class="text-[10px] text-red-700 ml-4">→ ⚠️ Sobre presupuesto: +${kpis.sobre_presupuesto_pct}% ($${Math.round(cost - presup).toLocaleString()})</div>` : ''}
             <div class="flex justify-between"><span>Valor cliente</span><span class="text-slate-500">$${Math.round(p.valor_cliente||0).toLocaleString()}</span></div>
+            ${kpis.margen_venta != null ? `<div class="text-[10px] ml-4 ${kpis.margen_venta >= BENCHMARKS_AUSTIN.margen_min ? 'text-emerald-700' : kpis.margen_venta >= BENCHMARKS_AUSTIN.margen_critico ? 'text-amber-700' : 'text-red-700 font-bold'}">→ Margen: ${kpis.margen_venta > 0 ? '+' : ''}${kpis.margen_venta}% (objetivo ${BENCHMARKS_AUSTIN.margen_min}-${BENCHMARKS_AUSTIN.margen_max}%)</div>` : ''}
+            ${kpis.discrepancia != null && Math.abs(kpis.discrepancia) > BENCHMARKS_AUSTIN.discrepancia_min ? `<div class="border-t pt-1 mt-1 text-[11px] text-amber-700 font-bold">⚠️ Discrepancia valor interno vs costo real: $${kpis.discrepancia > 0 ? '+' : ''}${kpis.discrepancia.toLocaleString()} — revisar con admin</div>` : ''}
+            ${kpis.eficiencia_gasto != null ? `<div class="border-t pt-1 mt-1 text-[11px] ${kpis.eficiencia_gasto > 120 ? 'text-red-700' : kpis.eficiencia_gasto > 100 ? 'text-amber-700' : 'text-emerald-700'}">Eficiencia gasto: ${kpis.eficiencia_gasto}% del esperado (al ${p.avance_pct||0}% de avance) ${kpis.eficiencia_gasto <= 100 ? '✅' : '⚠️'}</div>` : ''}
           </div>
         </div>
         <div class="border border-slate-200 rounded-xl p-3">
@@ -523,10 +980,26 @@ async function rdOpenObra(airtable_id) {
             <div class="flex justify-between"><span>Fin estimado</span><span>${p.fecha_estimada_fin || '—'}</span></div>
             <div class="flex justify-between"><span>Fin real</span><span>${p.fecha_real_fin || '—'}</span></div>
             ${p.dias_transcurridos ? `<div class="text-[10px] text-slate-500 italic mt-2">${p.dias_transcurridos}</div>` : ''}
+            ${kpis.dias_retraso != null ? `<div class="text-[11px] mt-1 ${kpis.dias_retraso > BENCHMARKS_AUSTIN.retraso_critico ? 'text-red-700 font-bold' : kpis.dias_retraso > 0 ? 'text-amber-700' : 'text-emerald-700'}">${kpis.dias_retraso > 0 ? `🔴 RETRASO: ${kpis.dias_retraso} días fuera de fecha` : kpis.dias_retraso < 0 ? `✅ ${-kpis.dias_retraso} días restantes` : '✅ En fecha'}</div>` : ''}
             ${latestSnap?.burn_rate ? `<div class="text-[11px] mt-2 pt-1 border-t"><strong>Burn rate:</strong> $${Math.round(latestSnap.burn_rate)}/día · <strong>Proyectado:</strong> $${Math.round(latestSnap.proyeccion_costo_final||0).toLocaleString()}</div>` : ''}
           </div>
         </div>
       </div>
+
+      ${acciones.length ? `
+        <!-- Acciones requeridas -->
+        <div class="border-2 border-amber-300 bg-amber-50 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">⚡ ACCIONES REQUERIDAS (${acciones.length})</div>
+          <div class="space-y-1">
+            ${acciones.map((a, i) => `
+              <div class="bg-white border border-amber-200 rounded p-2 text-xs">
+                <div><strong>${i+1}. ${a.titulo}</strong> — <span class="text-slate-600">${a.responsable}</span></div>
+                <div class="text-[10px] text-slate-500">${a.razon}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Histórico -->
       ${(history && history.length) ? `

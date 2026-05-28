@@ -41,11 +41,26 @@ const THRESHOLD_DAYS_ESTANCADA = 7;
 const THRESHOLD_BUDGET_USAGE_HIGH = 0.95;
 
 function parseAvance(v: any): number | null {
-  if (!v) return null;
+  if (v == null) return null;
+  if (typeof v === "number") return v;
   if (typeof v === "object" && v.name) v = v.name;
   if (typeof v !== "string") return null;
   const m = v.match(/(\d+)/);
   return m ? Number(m[1]) : null;
+}
+
+// La API Airtable devuelve singleSelect como STRING directo (no objeto).
+// Manejamos los 3 formatos posibles para máxima robustez.
+function getName(v: any): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    if (v.name) return v.name;
+    if (Array.isArray(v) && v.length > 0) {
+      return typeof v[0] === "string" ? v[0] : (v[0].name || null);
+    }
+  }
+  return null;
 }
 
 function daysBetween(a: string | null, b: string | null): number | null {
@@ -75,11 +90,10 @@ async function fetchAirtable(): Promise<any[]> {
 
 function projectFromAirtable(r: any) {
   const f = r.fields || {};
-  const lider = Array.isArray(f[FIELD_IDS.lider]) && f[FIELD_IDS.lider][0]?.name
-    ? f[FIELD_IDS.lider][0].name
-    : null;
-  const proceso = f[FIELD_IDS.proceso]?.name || null;
+  const lider = getName(f[FIELD_IDS.lider]);
+  const proceso = getName(f[FIELD_IDS.proceso]);
   const avance_pct = parseAvance(f[FIELD_IDS.avance]);
+  const desviacion = getName(f[FIELD_IDS.desviacion]);
 
   return {
     airtable_id: r.id,
@@ -94,7 +108,7 @@ function projectFromAirtable(r: any) {
     valor_interno: f[FIELD_IDS.interno] || null,
     valor_cliente: f[FIELD_IDS.cliente] || null,
     ganancia: f[FIELD_IDS.ganancia] || null,
-    desviacion_label: f[FIELD_IDS.desviacion] || null,
+    desviacion_label: desviacion,
     fecha_inicio: f[FIELD_IDS.inicio] || null,
     fecha_estimada_fin: f[FIELD_IDS.fin_estimado] || null,
     fecha_real_fin: f[FIELD_IDS.fin_real] || null,

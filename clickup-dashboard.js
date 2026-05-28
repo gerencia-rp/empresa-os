@@ -127,6 +127,144 @@ function cuRenderEmpty() {
   `;
 }
 
+// ════════════════════════════════════════════════════════════
+// 🧠 ANÁLISIS PROFUNDO — insights operativos derivados del snapshot
+// ════════════════════════════════════════════════════════════
+
+// Keywords que sugieren que la tarea es automatizable (drive, airtable, registro, etc.)
+const CU_AUTO_KEYWORDS = [
+  { kw: ['drive','google'], tipo: 'Google Drive API', ahorro_min: 15 },
+  { kw: ['airtable'], tipo: 'Airtable API', ahorro_min: 20 },
+  { kw: ['bitacora','bitácora','reporte','informe','resumen'], tipo: 'IA + data agregada', ahorro_min: 60 },
+  { kw: ['actualiz','actualización','subir','subida','registro','registrar'], tipo: 'Script/API', ahorro_min: 10 },
+  { kw: ['pago','payment','factura'], tipo: 'Stripe/Bank API', ahorro_min: 25 },
+  { kw: ['crear carpeta','crear proyecto','crear grupo'], tipo: 'Template automation', ahorro_min: 10 },
+  { kw: ['video','foto','imagen','ia'], tipo: 'IA generativa', ahorro_min: 45 },
+  { kw: ['recordatorio','reminder','notificación','aviso'], tipo: 'Cron + notify', ahorro_min: 5 },
+  { kw: ['validar','verificar','revisar','chequear'], tipo: 'Validación automática', ahorro_min: 15 }
+];
+
+function cuDetectAutomationCandidates(tasks) {
+  // Agrupa por nombre normalizado, cuenta repeticiones
+  const byName = {};
+  tasks.forEach(t => {
+    const norm = (t.name || '').trim().toLowerCase();
+    if (!norm) return;
+    if (!byName[norm]) byName[norm] = { name: t.name, count: 0, closed: 0, list: t.list_name, fase: t.fase };
+    byName[norm].count++;
+    if (t.status_type === 'closed' || t.status === 'completado') byName[norm].closed++;
+  });
+
+  // Para cada tarea repetida o recurrente, evaluar si es automatizable
+  const candidates = [];
+  Object.values(byName).forEach((g) => {
+    const lowerName = g.name.toLowerCase();
+    let match = null;
+    for (const k of CU_AUTO_KEYWORDS) {
+      if (k.kw.some(w => lowerName.includes(w))) { match = k; break; }
+    }
+    // Considera candidata si: aparece 3+ veces O está en lista recurrente y match keyword
+    const inRecurrent = (g.list || '').toLowerCase().includes('recurrent');
+    if (!match) return;
+    if (g.count < 3 && !inRecurrent) return;
+
+    const ahorroAnual = match.ahorro_min * g.count * (inRecurrent ? 4 : 1); // recurrentes asumimos mensual×12
+    candidates.push({
+      name: g.name,
+      count: g.count,
+      closed: g.closed,
+      tipo_automatizacion: match.tipo,
+      ahorro_por_ejecucion_min: match.ahorro_min,
+      ejecuciones_estimadas_anuales: inRecurrent ? 52 : g.count * 4,
+      ahorro_horas_anuales: Math.round((inRecurrent ? 52 : g.count * 4) * match.ahorro_min / 60),
+      recurrente: inRecurrent
+    });
+  });
+
+  return candidates.sort((a,b) => b.ahorro_horas_anuales - a.ahorro_horas_anuales);
+}
+
+function cuDetectBottlenecks(snap, tasks) {
+  const findings = [];
+
+  // 1. Bus factor crítico
+  if (snap.bus_factor_pct >= 60) {
+    findings.push({
+      sev: 'critical',
+      titulo: `Bus factor ${snap.bus_factor_pct}%`,
+      detalle: `${snap.top_overloaded_person} concentra el ${snap.bus_factor_pct}% de las tareas (${snap.top_overloaded_count} abiertas). Si esa persona se enferma o se va, la operación se detiene.`,
+      accion: `Reasignar al menos ${Math.round(snap.top_overloaded_count * 0.4)} tareas a otras personas. Identificar qué subset puede hacer otro miembro del equipo.`
+    });
+  }
+
+  // 2. Cuello de botella por status (cuál acumula más abierto)
+  const byStatus = snap.by_status || {};
+  const closedStatuses = ['completado','closed','done'];
+  const openStatusEntries = Object.entries(byStatus)
+    .filter(([s,_]) => !closedStatuses.includes(s.toLowerCase()))
+    .sort((a,b) => b[1]-a[1]);
+  if (openStatusEntries.length && openStatusEntries[0][1] >= 5) {
+    findings.push({
+      sev: 'warning',
+      titulo: `Cuello de botella en status "${openStatusEntries[0][0]}"`,
+      detalle: `${openStatusEntries[0][1]} tareas se acumulan en este status. Es donde más se está atascando el flujo.`,
+      accion: `Hacer un review específico de este status. Quizás necesita criterio de "definition of done" más claro o una persona dedicada.`
+    });
+  }
+
+  // 3. Casas inactivas
+  const byCasa = snap.by_casa || {};
+  const inactivas = Object.entries(byCasa).filter(([id,v]) => {
+    if (!v.last_activity_iso || v.open === 0) return false;
+    const days = (Date.now() - +new Date(v.last_activity_iso)) / 86400000;
+    return days >= 14;
+  });
+  if (inactivas.length) {
+    findings.push({
+      sev: 'warning',
+      titulo: `${inactivas.length} casa(s) inactivas 14+ días con tareas abiertas`,
+      detalle: inactivas.slice(0,3).map(([id,v]) => `${v.name} (${v.open} abiertas)`).join(' · '),
+      accion: 'Revisar si el proyecto está bloqueado, si el líder respondió, o si hay tareas que se deben cerrar por estar obsoletas.'
+    });
+  }
+
+  // 4. Tareas sin asignar críticas
+  if (snap.total_no_assignee > 0) {
+    findings.push({
+      sev: snap.total_no_assignee >= 5 ? 'warning' : 'info',
+      titulo: `${snap.total_no_assignee} tareas sin responsable`,
+      detalle: 'Tareas abiertas sin asignar pueden quedarse olvidadas indefinidamente.',
+      accion: 'Asignar dueño a cada una o cerrarlas si ya no son relevantes.'
+    });
+  }
+
+  // 5. Recurrentes con baja completitud
+  const recur = snap.recurrentes_status || {};
+  const failingRecur = Object.entries(recur).filter(([n,v]) => v.total >= 3 && v.completion_rate < 70);
+  if (failingRecur.length) {
+    findings.push({
+      sev: 'warning',
+      titulo: `${failingRecur.length} recurrente(s) con baja completitud`,
+      detalle: failingRecur.slice(0,3).map(([n,v]) => `${n} (${v.completion_rate}%)`).join(' · '),
+      accion: 'Estas son las primeras candidatas a automatizar — si no se están cumpliendo manualmente, automatizarlas evita que se sigan saltando.'
+    });
+  }
+
+  return findings;
+}
+
+function cuComputeBalancing(snap) {
+  // Calcula cómo se vería la distribución si redistribuyéramos hacia el balance
+  const ass = snap.by_assignee || {};
+  const entries = Object.entries(ass).filter(([n]) => n !== '(sin asignar)');
+  if (!entries.length) return null;
+  const total = entries.reduce((s, [_, v]) => s + (v.open || 0), 0);
+  const avg = Math.round(total / entries.length);
+  const overloaded = entries.filter(([_, v]) => v.open > avg * 1.5);
+  const underloaded = entries.filter(([_, v]) => v.open < avg * 0.5);
+  return { total, avg, overloaded, underloaded, n: entries.length };
+}
+
 // ─── PORTFOLIO ───
 function cuRenderPortfolio() {
   const s = cuState.snapshot;
@@ -173,6 +311,9 @@ function cuRenderPortfolio() {
         </div>
       ` : ''}
 
+      <!-- Panel de Insights Operativos -->
+      ${cuRenderInsightsOperativos()}
+
       <!-- Top sobrecargados -->
       <div class="grid md:grid-cols-2 gap-3">
         <div class="border border-slate-200 rounded-xl p-3">
@@ -184,6 +325,141 @@ function cuRenderPortfolio() {
           ${cuRenderCasasList(5)}
         </div>
       </div>
+    </div>
+  `;
+}
+
+// ─── Panel narrativo de Insights Operativos ───
+function cuRenderInsightsOperativos() {
+  const snap = cuState.snapshot;
+  if (!snap) return '';
+  const findings = cuDetectBottlenecks(snap, cuState.tasks);
+  const autoCandidates = cuDetectAutomationCandidates(cuState.tasks);
+  const balance = cuComputeBalancing(snap);
+  const totalAhorroH = autoCandidates.reduce((s, c) => s + c.ahorro_horas_anuales, 0);
+
+  return `
+    <div class="border-2 border-violet-300 bg-violet-50/30 rounded-xl p-4 space-y-3">
+      <div class="text-sm font-bold uppercase text-violet-900">🧠 Insights operativos — análisis profundo</div>
+
+      <!-- Findings (cuellos de botella) -->
+      ${findings.length ? `
+        <div class="space-y-2">
+          ${findings.map(f => {
+            const cls = f.sev === 'critical' ? 'bg-red-50 border-red-300' : f.sev === 'warning' ? 'bg-amber-50 border-amber-300' : 'bg-blue-50 border-blue-300';
+            return `
+              <div class="${cls} border rounded p-2.5">
+                <div class="text-xs font-bold">${f.sev === 'critical' ? '🚨' : f.sev === 'warning' ? '⚠️' : 'ℹ️'} ${f.titulo}</div>
+                <div class="text-[11px] text-slate-700 mt-1">${f.detalle}</div>
+                <div class="text-[11px] text-slate-900 mt-1.5 font-semibold">→ Acción: ${f.accion}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '<div class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2">✅ Sin cuellos de botella críticos detectados.</div>'}
+
+      <!-- Re-balanceo recomendado -->
+      ${balance && balance.overloaded.length && balance.underloaded.length ? `
+        <div class="bg-white border border-violet-200 rounded p-3">
+          <div class="text-xs font-bold mb-2">⚖️ Recomendación de re-balanceo</div>
+          <div class="text-[11px] text-slate-600 mb-2">Promedio de carga: <strong>${balance.avg} tareas/persona</strong> (${balance.n} personas activas, ${balance.total} tareas totales).</div>
+          <div class="grid md:grid-cols-2 gap-2">
+            <div>
+              <div class="text-[10px] font-bold uppercase text-red-700">Sobrecargados</div>
+              ${balance.overloaded.map(([n,v]) => `<div class="text-xs">⤵️ <strong>${n}</strong> · ${v.open} tareas (×${(v.open/balance.avg).toFixed(1)} promedio)</div>`).join('')}
+            </div>
+            <div>
+              <div class="text-[10px] font-bold uppercase text-emerald-700">Subutilizados</div>
+              ${balance.underloaded.map(([n,v]) => `<div class="text-xs">⤴️ <strong>${n}</strong> · ${v.open} tareas (×${(v.open/balance.avg).toFixed(1)} promedio)</div>`).join('')}
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-900 mt-2 italic">→ Mover ~${Math.max(...balance.overloaded.map(([_,v]) => v.open - balance.avg))} tareas de los sobrecargados hacia los subutilizados acercaría todos al promedio.</div>
+        </div>
+      ` : ''}
+
+      <!-- Candidatas a automatización -->
+      ${autoCandidates.length ? `
+        <div class="bg-white border border-emerald-300 rounded p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-bold">🤖 Candidatas a automatización (${autoCandidates.length})</div>
+            <div class="text-xs text-emerald-700 font-bold">Ahorro potencial: ~${totalAhorroH}h/año</div>
+          </div>
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="text-left p-1.5">Tarea</th>
+                <th class="text-center p-1.5">Veces</th>
+                <th class="text-left p-1.5">Cómo automatizar</th>
+                <th class="text-right p-1.5">Min/exec</th>
+                <th class="text-right p-1.5">Ahorro/año</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${autoCandidates.slice(0, 12).map(c => `
+                <tr class="border-t border-slate-100 hover:bg-emerald-50/50">
+                  <td class="p-1.5 font-semibold">${c.name} ${c.recurrente?'<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded">RECUR</span>':''}</td>
+                  <td class="p-1.5 text-center">${c.count}</td>
+                  <td class="p-1.5 text-slate-600">${c.tipo_automatizacion}</td>
+                  <td class="p-1.5 text-right">${c.ahorro_por_ejecucion_min}m</td>
+                  <td class="p-1.5 text-right font-bold text-emerald-700">${c.ahorro_horas_anuales}h</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="text-[10px] text-slate-500 mt-2 italic">Top 3 ROI: ${autoCandidates.slice(0,3).map(c => `<strong>${c.name}</strong> (${c.ahorro_horas_anuales}h/año)`).join(' · ')}</div>
+        </div>
+      ` : ''}
+
+      <!-- Resumen narrativo -->
+      ${cuRenderNarrativeSummary(snap, autoCandidates, balance, findings)}
+    </div>
+  `;
+}
+
+function cuRenderNarrativeSummary(snap, autos, balance, findings) {
+  const totalAhorroH = autos.reduce((s, c) => s + c.ahorro_horas_anuales, 0);
+  const bullets = [];
+
+  if (snap.bus_factor_pct >= 60) {
+    bullets.push(`<strong>Riesgo operacional alto</strong>: ${snap.bus_factor_pct}% de la operación depende de una persona (${snap.top_overloaded_person}). Reasignar o cross-trainear urgente.`);
+  } else if (snap.bus_factor_pct >= 40) {
+    bullets.push(`Carga concentrada: ${snap.bus_factor_pct}% en ${snap.top_overloaded_person}. Monitorear que no se vuelva crítico.`);
+  }
+
+  if (totalAhorroH >= 100) {
+    bullets.push(`<strong>Oportunidad de automatización fuerte</strong>: ~${totalAhorroH}h/año recuperables (~${Math.round(totalAhorroH/40)} semanas de trabajo). Top: ${autos.slice(0,3).map(c => c.name).join(', ')}.`);
+  } else if (totalAhorroH > 0) {
+    bullets.push(`Automatizaciones detectadas: ~${totalAhorroH}h/año (no crítico pero útil).`);
+  }
+
+  if (snap.total_overdue > 0) {
+    bullets.push(`<strong>${snap.total_overdue} tareas vencidas</strong> arrastrando. Las vencidas más viejas son las que peor impacto operativo tienen.`);
+  }
+
+  if (snap.recurrentes_status) {
+    const failing = Object.entries(snap.recurrentes_status).filter(([_,v]) => v.total >= 3 && v.completion_rate < 70).length;
+    if (failing > 0) {
+      bullets.push(`${failing} tareas recurrentes con completitud <70%. Esto indica proceso roto — la persona se salta esa rutina sistemáticamente.`);
+    }
+  }
+
+  // Recomendación priorizada
+  let recomendacion = '';
+  if (findings.some(f => f.sev === 'critical' && f.titulo.includes('Bus'))) {
+    recomendacion = `<strong>Prioridad #1:</strong> Romper la dependencia única de ${snap.top_overloaded_person}. Identificar 5 tipos de tareas que otro miembro pueda absorber y transferir gradualmente.`;
+  } else if (autos.length >= 3) {
+    recomendacion = `<strong>Prioridad #1:</strong> Empezar por automatizar la tarea con mejor ROI: <strong>${autos[0].name}</strong> (${autos[0].tipo_automatizacion}, ${autos[0].ahorro_horas_anuales}h/año). 1 sprint de implementación.`;
+  } else if (snap.total_overdue >= 10) {
+    recomendacion = `<strong>Prioridad #1:</strong> Cleanup de vencidas. ${snap.total_overdue} tareas vencidas distraen mentalmente del equipo. Ofrecer 1 hora dedicada a cerrar o descartar.`;
+  } else {
+    recomendacion = `<strong>Prioridad #1:</strong> Sostener la operación. KPIs en rango aceptable. Continuar con sync semanal.`;
+  }
+
+  return `
+    <div class="bg-slate-900 text-white rounded-xl p-3">
+      <div class="text-xs font-bold uppercase text-slate-300 mb-2">📝 Resumen narrativo</div>
+      ${bullets.length ? `<ul class="text-xs space-y-1 list-disc list-inside">${bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : '<div class="text-xs text-slate-300">Sin findings críticos. Operación estable.</div>'}
+      <div class="text-xs mt-3 pt-2 border-t border-slate-700">${recomendacion}</div>
     </div>
   `;
 }
