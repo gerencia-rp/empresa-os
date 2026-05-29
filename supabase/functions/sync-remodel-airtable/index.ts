@@ -29,7 +29,22 @@ const FIELD_IDS = {
   dias: "fld8kILrCV4xXras6",
   ciudad: "fldupd1Y33ciLAHjj",
   fotos_url: "fldVnVcQU9MjNHTYp",
+  sqft: "fldQrlNrrEJexZRrp",
 };
+
+// Tabla "Pagos otros" (otros costos por casa) para refinar el % otros costos
+const AIRTABLE_PAGOS_OTROS_TABLE = "tbluntyaPtpfuvuT6";
+const PAGOS_OTROS_FIELDS = { casa: "fldngcDQ9dkXeimdW", precio: "fldXr6RL6TwfkUB82" };
+
+// Tabla "Horas trabajadas semana" — para costo/hora y rendimiento por trabajador
+const AIRTABLE_HORAS_TABLE = "tblyCieXLFdZM60El";
+const HORAS_FIELDS = {
+  trabajador: "fldpIYjB33HK0tdEk",
+  horas: "fldRWftVP66WRcbYD",
+  pago: "fldP8mv5lJdehwvKx"
+};
+
+const N_THRESHOLD_DEFAULT = 3; // mín casas completas para usar refinamiento histórico
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -170,6 +185,7 @@ function projectFromAirtable(r: any, liderCache: Map<string, string>) {
     valor_interno: f[FIELD_IDS.interno] || null,
     valor_cliente: f[FIELD_IDS.cliente] || null,
     ganancia: f[FIELD_IDS.ganancia] || null,
+    sqft: f[FIELD_IDS.sqft] || null,
     desviacion_label: desviacion,
     fecha_inicio: f[FIELD_IDS.inicio] || null,
     fecha_estimada_fin: f[FIELD_IDS.fin_estimado] || null,
@@ -299,6 +315,128 @@ function generateAlerts(p: any, kpis: any, estancada: boolean): any[] {
   return alerts;
 }
 
+// Fetch genérico de una tabla por ID (returnFieldsByFieldId)
+async function fetchAirtableTableById(tableId: string): Promise<any[]> {
+  const records: any[] = [];
+  let offset: string | undefined;
+  do {
+    const url = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableId}`);
+    url.searchParams.set("returnFieldsByFieldId", "true");
+    if (offset) url.searchParams.set("offset", offset);
+    const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+    if (!res.ok) { console.warn(`Skip table ${tableId}: ${res.status}`); return []; }
+    const data = await res.json();
+    records.push(...(data.records || []));
+    offset = data.offset;
+  } while (offset);
+  return records;
+}
+
+function normAddr(s: string): string {
+  return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 14);
+}
+
+// Agrega "Horas trabajadas semana" → costo/hora promedio + rendimiento por trabajador.
+// Sección 3.3-3.4 del prompt: anidar horas y pago por trabajador para obtener costo/hora.
+async function computeWorkerStats(): Promise<{costoHora: number, totalHoras: number, nTrabajadores: number, porTrabajador: Record<string, {horas:number, pago:number, costoHora:number}>}> {
+  const records = await fetchAirtableTableById(AIRTABLE_HORAS_TABLE);
+  let totalHoras = 0, totalPago = 0;
+  const porTrabajador: Record<string, {horas:number, pago:number, costoHora:number}> = {};
+  records.forEach((r: any) => {
+    const f = r.fields || {};
+    const trab = getName(f[HORAS_FIELDS.trabajador]) || "(sin trabajador)";
+    const horas = +f[HORAS_FIELDS.horas] || 0;
+    const pago = +f[HORAS_FIELDS.pago] || 0;
+    if (horas <= 0) return;
+    totalHoras += horas;
+    totalPago += pago;
+    if (!porTrabajador[trab]) porTrabajador[trab] = { horas: 0, pago: 0, costoHora: 0 };
+    porTrabajador[trab].horas += horas;
+    porTrabajador[trab].pago += pago;
+  });
+  Object.values(porTrabajador).forEach(w => { w.costoHora = w.horas > 0 ? +(w.pago / w.horas).toFixed(2) : 0; });
+  const costoHora = totalHoras > 0 ? +(totalPago / totalHoras).toFixed(2) : 0;
+  return { costoHora, totalHoras, nTrabajadores: Object.keys(porTrabajador).length, porTrabajador };
+}
+
+// Refina coeficientes globales desde casas completas y los escribe a remodel_forecast_params
+async function computeAndStoreRefinement(sb: any, projected: any[]) {
+  // Pagos otros agregados por casa (match por dirección normalizada)
+  const otrosRecords = await fetchAirtableTableById(AIRTABLE_PAGOS_OTROS_TABLE);
+  const otrosByCasa: Record<string, number> = {};
+  otrosRecords.forEach((r: any) => {
+    const f = r.fields || {};
+    const casa = getName(f[PAGOS_OTROS_FIELDS.casa]);
+    const precio = +f[PAGOS_OTROS_FIELDS.precio] || 0;
+    if (!casa) return;
+    const k = normAddr(casa);
+    otrosByCasa[k] = (otrosByCasa[k] || 0) + precio;
+  });
+
+  // Casas COMPLETAS = Finalizado + sqft válido + ambas fechas
+  const completas = projected.filter(p =>
+    p.proceso === "Finalizado" && +p.sqft > 0 && p.fecha_inicio && p.fecha_real_fin
+  );
+
+  const n = completas.length;
+  let totalPsf = 0, moRatioSum = 0, diasPorSqftSum = 0, otrosPctSum = 0, otrosCount = 0;
+  completas.forEach(p => {
+    const mat = +p.gasto_materiales || 0, lab = +p.gasto_trabajadores || 0;
+    const cost = mat + lab;
+    const sqft = +p.sqft;
+    if (cost > 0 && sqft > 0) {
+      totalPsf += cost / sqft;
+      moRatioSum += lab / cost;
+      const dias = daysBetween(p.fecha_inicio, p.fecha_real_fin);
+      if (dias && dias > 0) diasPorSqftSum += dias / sqft;
+      const otros = otrosByCasa[normAddr(p.address)] || 0;
+      if (otros > 0) { otrosPctSum += otros / cost; otrosCount++; }
+    }
+  });
+
+  const params: Record<string, number> = { n_casas_completas: n };
+  if (n > 0) {
+    params.total_psf_real = +(totalPsf / n).toFixed(2);
+    params.mo_ratio_real = +((moRatioSum / n) * 100).toFixed(1);
+    params.dias_por_sqft_real = +(diasPorSqftSum / n).toFixed(4);
+  }
+  if (otrosCount > 0) params.otros_costos_pct_real = +((otrosPctSum / otrosCount) * 100).toFixed(1);
+
+  // Leer n_threshold actual
+  const { data: thRow } = await sb.from("remodel_forecast_params").select("value").eq("key", "n_threshold").maybeSingle();
+  const nThreshold = thRow ? +thRow.value : N_THRESHOLD_DEFAULT;
+
+  // Estadísticas de trabajadores (Horas trabajadas semana → costo/hora promedio)
+  let workerStats: any = null;
+  try { workerStats = await computeWorkerStats(); }
+  catch (e) { console.warn("workerStats skip:", String(e)); }
+
+  // Escribir SIEMPRE los valores "_real" + n_casas (visibilidad).
+  // Solo promover a los params que usa el motor (dias_por_sqft, otros_costos_pct) si n >= threshold.
+  const upserts: any[] = [
+    { key: "n_casas_completas", value: n, label: "Casas completas (Finalizado + sqft + fechas)" },
+  ];
+  if (workerStats && workerStats.costoHora > 0) {
+    upserts.push({ key: "costo_hora_promedio", value: workerStats.costoHora, label: "Costo/hora promedio (de Horas trabajadas semana)" });
+    upserts.push({ key: "total_horas_trabajadas", value: workerStats.totalHoras, label: "Total horas registradas en Airtable" });
+    upserts.push({ key: "n_trabajadores", value: workerStats.nTrabajadores, label: "# trabajadores únicos con horas registradas" });
+  }
+  if (params.total_psf_real != null) upserts.push({ key: "total_psf_real", value: params.total_psf_real, label: "Total $/sqft real (histórico)" });
+  if (params.mo_ratio_real != null) upserts.push({ key: "mo_ratio_real", value: params.mo_ratio_real, label: "% mano de obra real (histórico)" });
+  if (params.dias_por_sqft_real != null) upserts.push({ key: "dias_por_sqft_real", value: params.dias_por_sqft_real, label: "Días/sqft real (histórico)" });
+  if (params.otros_costos_pct_real != null) upserts.push({ key: "otros_costos_pct_real", value: params.otros_costos_pct_real, label: "% otros costos real (histórico)" });
+
+  if (n >= nThreshold) {
+    if (params.dias_por_sqft_real != null) upserts.push({ key: "dias_por_sqft", value: params.dias_por_sqft_real, label: "Días/sqft (activo, refinado)" });
+    if (params.otros_costos_pct_real != null) upserts.push({ key: "otros_costos_pct", value: params.otros_costos_pct_real, label: "% otros costos (activo, refinado)" });
+  }
+
+  for (const u of upserts) {
+    await sb.from("remodel_forecast_params").upsert({ ...u, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  }
+  return { n, nThreshold, promovido: n >= nThreshold, ...params, workerStats };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -341,6 +479,7 @@ Deno.serve(async (req) => {
 
     const airtableRecords = await fetchAirtable();
     let snapshotCount = 0, alertCount = 0;
+    const projectedAll: any[] = [];
 
     // Limpiar alertas no resueltas — se regeneran
     await sb.from("remodel_alerts").delete().is("resolved_at", null);
@@ -348,6 +487,7 @@ Deno.serve(async (req) => {
     for (const r of airtableRecords) {
       const proj = projectFromAirtable(r, liderCache);
       if (!proj.address) continue;
+      projectedAll.push(proj);
 
       // Upsert propiedad
       await sb.from("remodel_at_properties")
@@ -386,6 +526,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Refinamiento del pronosticador desde casas completas (no rompe el sync si falla)
+    let refinement: any = null;
+    try { refinement = await computeAndStoreRefinement(sb, projectedAll); }
+    catch (e) { console.warn("refinement skip:", String(e)); }
+
     // Log
     const duration_ms = Date.now() - startMs;
     await sb.from("remodel_sync_log").insert({
@@ -401,6 +546,7 @@ Deno.serve(async (req) => {
       records_synced: airtableRecords.length,
       snapshots: snapshotCount,
       alerts: alertCount,
+      refinement,
       duration_ms,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

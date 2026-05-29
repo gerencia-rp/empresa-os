@@ -1160,6 +1160,7 @@ function rmTagInputKey(ev, el) {
 async function openRemodelPro(sys) {
   rmState.sys = sys;
   await rmLoadAll();
+  if (typeof fcLoadConfig === 'function') { fcState.sys = sys; await fcLoadConfig().catch(() => {}); }
   openModal(`🏗️ ${sys.name}`, '<div id="rm-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
@@ -1175,6 +1176,7 @@ function rmRender() {
     { id: 'compare', label: '🎯 3 Estimaciones' },
     { id: 'rates', label: '📊 Tasas $/ft²' },
     { id: 'editor', label: rmState.currentProject ? `✏️ ${rmState.currentProject.name}` : '➕ Editor detallado' },
+    { id: 'forecast', label: '🔮 Pronóstico' },
     { id: 'seguimiento', label: '🔄 Seguimiento' },
     { id: 'gantt', label: '📅 Cronograma' },
     { id: 'sow', label: '📋 SOW (Lender)' },
@@ -1237,6 +1239,7 @@ function rmRenderTab() {
   if (rmState.tab === 'compare') return rmRenderCompare(body);
   if (rmState.tab === 'rates') return rmRenderRates(body);
   if (rmState.tab === 'editor') return rmRenderEditor(body);
+  if (rmState.tab === 'forecast') return (typeof fcRenderTab === 'function') ? fcRenderTab(body) : (body.innerHTML = '<p class="text-slate-500 py-8 text-center">Módulo de pronóstico no cargado.</p>');
   if (rmState.tab === 'seguimiento') return rmRenderSeguimiento(body);
   if (rmState.tab === 'gantt') return rmRenderGantt(body);
   if (rmState.tab === 'sow') return rmRenderSow(body);
