@@ -6,6 +6,17 @@ Formato: `YYYY-MM-DD · TIPO · alcance` (TIPO = Feature | Fix | Schema | UX | D
 
 ---
 
+## 2026-05-29 — Sprint 7 · Dashboards Operativos (Airtable + ClickUp) (✅ Hecho)
+
+- **S7-A** — pg_cron + pg_net. Jobs auto-sync Airtable (30min) y ClickUp (60min). Tablas `notification_log` + `user_notification_prefs`. Función `queue_alert_notifications()`. Archivo: `supabase/s7-a-auto-sync.sql`.
+- **S7-B (schema)** — `clickup_action_log` + columnas extra en `clickup_automations` + 4 seeds pausadas (auto-close vencidas, recordatorio recurrentes, re-asignar sobrecargados, bitácora semanal). Archivo: `supabase/s7-b-clickup-automations.sql`.
+- **S7-B (Edge Functions)** — `clickup-execute` (proxy a ClickUp API con 5 acciones + log). `clickup-ai-agent` (Claude semanal que genera propuestas accionables con payload ejecutable + guarda en weekly_insights).
+- **S7-B (UI)** — Tab Automatizaciones funcional con CRUD + activar/pausar. Tab Agente IA con botón "Correr agente ahora" + propuestas con "⚡ Ejecutar" que dispara contra ClickUp. Mata los 2 placeholders previos.
+- **S7-C** — View `unified_houses` que une `remodel_projects` + `remodel_at_properties` + `clickup_snapshots.by_casa` con normalize_address + match_quality. View `house_match_suggestions` con pg_trgm. Tabla `house_link_overrides`. Archivo: `supabase/s7-c-unified-houses.sql`.
+- **S7-D (schema)** — `remodel_required_actions` persistente con categoría/responsable/due_date/status/source. View `remodel_actions_summary`. Archivo: `supabase/s7-d-acciones-charts.sql`.
+- **S7-D (UI)** — 2 tabs nuevas en Dashboard Obras: "📋 Acciones" (con regenerar desde KPIs + 3 botones por acción) y "🧠 Insights IA" (lista semanas con summary_md y recomendaciones).
+- Doc completo: `docs/remodel-pro/sprint-7.md`.
+
 ## 2026-05-29 — Sprint 6 · Mejoras Planner Semanal + Cronograma Juan (✅ Hecho)
 
 - **S6-U1** — Trigger SECURITY DEFINER sincroniza `remodel_crew` → `resources.crew` automáticamente. Backfill incluido. Una sola fuente de verdad para "quién es mi equipo". Archivo: `supabase/s6-u1-unified-crew.sql`.

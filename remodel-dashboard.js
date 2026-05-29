@@ -8,10 +8,14 @@ const rdState = {
   properties: [],
   alerts: [],
   syncLog: null,
-  tab: 'portfolio',          // portfolio | obras | lideres | alertas | tendencias
+  tab: 'portfolio',          // portfolio | obras | lideres | alertas | tendencias | insights
   selectedAirtableId: null,  // para drill-down de obra
   obraHistory: [],
-  loading: false
+  loading: false,
+  // S7-D: acciones requeridas persistentes + filtros tab Obras + insights IA
+  requiredActions: [],
+  obrasFilter: { lider: 'all', status: 'all', search: '' },
+  weeklyInsights: []
 };
 
 const RD_FN_URL = `${window.SUPABASE_URL}/functions/v1/sync-remodel-airtable`;
@@ -138,14 +142,64 @@ async function openRemodelDashboard(sys) {
 }
 
 async function rdLoadAll() {
-  const [p, a, l] = await Promise.all([
+  const [p, a, l, ra, wi] = await Promise.all([
     sb.from('remodel_at_properties').select('*').order('proceso').order('avance_pct', { ascending: true }),
     sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').order('detected_at', { ascending: false }),
-    sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1)
+    sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1),
+    sb.from('remodel_required_actions').select('*').neq('status', 'done').order('due_date', { ascending: true }).then(r => r.data || []).catch(() => []),
+    sb.from('remodel_weekly_insights').select('*').order('week_start', { ascending: false }).limit(8).then(r => r.data || []).catch(() => [])
   ]);
   rdState.properties = p.data || [];
   rdState.alerts = a.data || [];
   rdState.syncLog = (l.data && l.data[0]) || null;
+  rdState.requiredActions = ra;
+  rdState.weeklyInsights = wi;
+}
+
+// S7-D: Materializa las acciones requeridas (calculadas client-side) en la tabla persistente
+async function rdMaterializeActions() {
+  if (!confirm('Generar / actualizar las acciones requeridas en la tabla persistente?\n\nVa a recorrer todas las obras activas, calcular acciones según KPIs y guardarlas (skip duplicados).')) return;
+  const active = rdState.properties.filter(p => p.proceso !== 'Finalizado' && p.proceso);
+  let inserted = 0;
+  for (const p of active) {
+    const k = rdAdvancedKPIs(p);
+    const acciones = rdAccionesRequeridas(p, k);
+    for (const a of acciones) {
+      // Categoría según el contenido
+      let cat = 'otro';
+      if (a.titulo.toLowerCase().includes('cierre') || a.titulo.toLowerCase().includes('retraso')) cat = 'retraso';
+      else if (a.titulo.toLowerCase().includes('sobrecost')) cat = 'sobrepresupuesto';
+      else if (a.titulo.toLowerCase().includes('horas') || a.titulo.toLowerCase().includes('cuadrilla')) cat = 'labor_alto';
+      else if (a.titulo.toLowerCase().includes('reconciliar') || a.titulo.toLowerCase().includes('cifras')) cat = 'discrepancia';
+      else if (a.titulo.toLowerCase().includes('margen') || a.titulo.toLowerCase().includes('viabilidad')) cat = 'margen';
+
+      const { error } = await sb.from('remodel_required_actions').insert({
+        airtable_id: p.airtable_id,
+        title: a.titulo,
+        detail: a.razon,
+        category: cat,
+        responsable: a.responsable,
+        status: 'pending',
+        source: 'auto',
+        created_by: state.user.id
+      });
+      if (!error) inserted++;
+    }
+  }
+  alert(`✅ ${inserted} acciones generadas. Ver tab "📋 Acciones".`);
+  await rdLoadAll();
+  rdRender();
+}
+
+async function rdActionToggleStatus(id, newStatus) {
+  const upd = { status: newStatus };
+  if (newStatus === 'done') {
+    upd.completed_at = new Date().toISOString();
+    upd.completed_by = state.user.id;
+  }
+  await sb.from('remodel_required_actions').update(upd).eq('id', id);
+  await rdLoadAll();
+  rdRender();
 }
 
 async function rdSync() {
@@ -189,11 +243,13 @@ function rdRender() {
 
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 flex-wrap gap-2">
-        <div class="flex items-center gap-2">
-          ${['portfolio','informe','obras','lideres','alertas','tendencias'].map(t => `
-            <button onclick="rdSetTab('${t}')" class="px-3 py-1.5 rounded text-xs font-bold ${rdState.tab===t?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
-              ${t==='portfolio'?'📊 Portfolio':t==='informe'?'📑 Informe':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='alertas'?'🚨 Alertas':'📈 Tendencias'}
+        <div class="flex items-center gap-1.5 flex-wrap">
+          ${['portfolio','informe','obras','lideres','alertas','acciones','tendencias','insights'].map(t => `
+            <button onclick="rdSetTab('${t}')" class="px-2.5 py-1.5 rounded text-xs font-bold ${rdState.tab===t?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
+              ${t==='portfolio'?'📊 Portfolio':t==='informe'?'📑 Informe':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='alertas'?'🚨 Alertas':t==='acciones'?'📋 Acciones':t==='tendencias'?'📈 Tendencias':'🧠 Insights IA'}
               ${t==='alertas' && rdState.alerts.length ? `<span class="ml-1 bg-red-600 text-white px-1.5 rounded">${rdState.alerts.length}</span>` : ''}
+              ${t==='acciones' && rdState.requiredActions.length ? `<span class="ml-1 bg-amber-600 text-white px-1.5 rounded">${rdState.requiredActions.length}</span>` : ''}
+              ${t==='insights' && rdState.weeklyInsights.length ? `<span class="ml-1 bg-violet-600 text-white px-1.5 rounded">${rdState.weeklyInsights.length}</span>` : ''}
             </button>
           `).join('')}
         </div>
@@ -212,6 +268,8 @@ function rdRender() {
           rdState.tab === 'obras' ? rdRenderObras(active, finalizada, sinAsignar) :
           rdState.tab === 'lideres' ? rdRenderLideres() :
           rdState.tab === 'alertas' ? rdRenderAlertas() :
+          rdState.tab === 'acciones' ? rdRenderAcciones() :
+          rdState.tab === 'insights' ? rdRenderInsights() :
           rdRenderTendencias()}
       </div>
     </div>
@@ -1042,4 +1100,94 @@ async function rdOpenObra(airtable_id) {
   openModal(`🏗️ ${p.address}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-7xl');
   document.querySelector('#modal > div').classList.add('max-w-5xl');
+}
+
+// ─── S7-D · TAB ACCIONES (persistentes en remodel_required_actions) ───
+function rdRenderAcciones() {
+  const acts = rdState.requiredActions || [];
+  const byCat = {};
+  acts.forEach(a => { (byCat[a.category || 'otro'] = byCat[a.category || 'otro'] || []).push(a); });
+  const overdueCount = acts.filter(a => a.due_date && new Date(a.due_date) < new Date() && a.status === 'pending').length;
+
+  return `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+        <div class="text-xs text-amber-900">
+          📋 <strong>${acts.length} acciones</strong> pendientes${overdueCount?` · <span class="text-red-700 font-bold">${overdueCount} vencidas</span>`:''}.
+          Las acciones se generan automáticamente desde los KPIs de cada obra (retraso, sobrecosto, labor alto, discrepancia, margen).
+        </div>
+        <button onclick="rdMaterializeActions()" class="bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold px-3 py-2 rounded">⚡ Regenerar desde KPIs</button>
+      </div>
+
+      ${Object.entries(byCat).map(([cat, items]) => `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${cat} (${items.length})</div>
+          <div class="divide-y divide-slate-100">
+            ${items.map(a => {
+              const obra = rdState.properties.find(p => p.airtable_id === a.airtable_id);
+              const overdue = a.due_date && new Date(a.due_date) < new Date() && a.status === 'pending';
+              return `
+                <div class="p-3 ${overdue?'bg-red-50':''}">
+                  <div class="flex items-start justify-between gap-2 flex-wrap">
+                    <div class="flex-1 min-w-0">
+                      <div class="font-bold text-sm">${a.title}</div>
+                      <div class="text-[11px] text-slate-600 mt-0.5">${a.detail || ''}</div>
+                      <div class="text-[10px] text-slate-400 mt-0.5">
+                        ${obra ? `🏠 ${obra.address}` : ''}
+                        ${a.responsable ? ` · 👤 ${a.responsable}` : ''}
+                        ${a.due_date ? ` · 📅 ${a.due_date}${overdue?' ⏰ vencida':''}` : ''}
+                      </div>
+                    </div>
+                    <div class="flex gap-1">
+                      ${a.status === 'pending' ? `<button onclick="rdActionToggleStatus('${a.id}','in_progress')" class="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold">▶ Empezar</button>` : ''}
+                      ${a.status !== 'done' ? `<button onclick="rdActionToggleStatus('${a.id}','done')" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded font-bold">✓ Done</button>` : ''}
+                      <button onclick="rdActionToggleStatus('${a.id}','dismissed')" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded">✕</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `).join('') || '<div class="text-center text-slate-400 py-12">Sin acciones registradas. Click "⚡ Regenerar desde KPIs" para crearlas automáticamente.</div>'}
+    </div>
+  `;
+}
+
+// ─── S7-D · TAB INSIGHTS IA (remodel_weekly_insights) ───
+function rdRenderInsights() {
+  const insights = rdState.weeklyInsights || [];
+  if (insights.length === 0) {
+    return `<div class="text-center py-16 text-slate-500">
+      <div class="text-5xl mb-3">🧠</div>
+      <div class="font-bold">Sin insights IA todavía</div>
+      <div class="text-xs mt-2 max-w-md mx-auto">Los insights semanales se generan automáticamente cuando corre la Edge Function de análisis IA. Pegá el SQL de S7-A para activar pg_cron.</div>
+    </div>`;
+  }
+  return `
+    <div class="space-y-3">
+      <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-900">
+        🧠 <strong>Insights IA semanales</strong>: cada lunes Claude analiza tu portfolio y genera un resumen + recomendaciones priorizadas.
+      </div>
+      ${insights.map(i => `
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold flex justify-between">
+            <span>📅 Semana del ${i.week_start}</span>
+            <span class="text-slate-500">${i.obras_analizadas || 0} obras · ${i.cost_tokens_used || 0} tokens</span>
+          </div>
+          <div class="p-3">
+            ${i.summary_md ? `<div class="text-xs whitespace-pre-wrap prose prose-sm max-w-none">${i.summary_md}</div>` : '<div class="text-xs text-slate-400">Sin resumen.</div>'}
+            ${(i.recomendaciones || []).length ? `
+              <div class="mt-3">
+                <div class="text-[10px] font-bold uppercase text-slate-600 mb-1">Recomendaciones</div>
+                <ul class="text-xs space-y-0.5 list-disc list-inside">
+                  ${(i.recomendaciones || []).slice(0,10).map(r => `<li>${typeof r === 'string' ? r : (r.titulo || JSON.stringify(r))}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }

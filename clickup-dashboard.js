@@ -16,6 +16,8 @@ const cuState = {
 };
 
 const CU_FN_URL = `${window.SUPABASE_URL}/functions/v1/sync-clickup`;
+const CU_EXEC_URL = `${window.SUPABASE_URL}/functions/v1/clickup-execute`;
+const CU_AGENT_URL = `${window.SUPABASE_URL}/functions/v1/clickup-ai-agent`;
 
 async function openClickupDashboard(sys) {
   cuState.sys = sys;
@@ -689,59 +691,151 @@ async function cuResolveAlert(id) {
   cuRender();
 }
 
-// ─── AUTOMATIZACIONES (placeholder funcional) ───
+// ─── S7-B · AUTOMATIZACIONES (REALES, no más placeholder) ───
 function cuRenderAutomatizaciones() {
+  const autos = cuState.automations || [];
   return `
     <div class="space-y-3">
-      <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-violet-900">⚙️ Automatizaciones — próxima pasada</div>
-        <div class="text-xs text-violet-800 mt-1">
-          Próximos componentes a implementar:
-          <ul class="list-disc list-inside mt-1 text-[11px] space-y-0.5">
-            <li>Edge function que ejecuta acciones en ClickUp (cerrar tarea, crear subtask, comentar)</li>
-            <li>Triggers configurables: cuando una recurrente vence, cuando se sube evidencia a Drive, semanal/diaria</li>
-            <li>Acciones IA: generar Bitácora semanal automática desde las tasks cerradas, generar Reporte Estado Obras desde data de Airtable</li>
-            <li>Webhook desde ClickUp para reaccionar a cambios en tiempo real</li>
-          </ul>
+      <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-900">
+        ⚙️ <strong>Automatizaciones</strong>: triggers programados que ejecutan acciones contra ClickUp.
+        Los seeds vienen pre-creados pero <strong>desactivados</strong> — actívalos uno por uno cuando confirmes que el flujo te conviene.
+        Cada ejecución queda registrada en <code>clickup_action_log</code>.
+      </div>
+
+      <div class="border border-slate-200 rounded-xl overflow-hidden">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="text-left p-2">Nombre</th>
+              <th class="text-left p-2">Trigger</th>
+              <th class="text-left p-2">Acción</th>
+              <th class="text-right p-2">Runs</th>
+              <th class="text-center p-2">Estado</th>
+              <th class="text-center p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${autos.length === 0 ? `<tr><td colspan="6" class="p-6 text-center text-slate-400">Sin automatizaciones. Aplicá <code>s7-b-clickup-automations.sql</code> para cargar 4 templates pre-configuradas.</td></tr>` : autos.map(a => `
+              <tr class="border-t border-slate-100">
+                <td class="p-2 font-semibold">${a.name}<div class="text-[10px] text-slate-500">${a.description || ''}</div></td>
+                <td class="p-2 text-[10px] font-mono">${a.trigger_type}<div class="text-slate-500">${(a.trigger_config?.cron) || '—'}</div></td>
+                <td class="p-2 text-[10px]"><span class="bg-slate-100 px-1.5 py-0.5 rounded">${a.action_type}</span></td>
+                <td class="p-2 text-right">${a.run_count || 0}</td>
+                <td class="p-2 text-center"><span class="text-[10px] ${a.active?'bg-emerald-100 text-emerald-800':'bg-slate-200 text-slate-600'} px-2 py-0.5 rounded">${a.active?'🟢 Activa':'⏸ Pausada'}</span></td>
+                <td class="p-2 text-center">
+                  <button onclick="cuToggleAutomation('${a.id}', ${a.active})" class="text-[10px] bg-${a.active?'amber':'emerald'}-100 hover:bg-${a.active?'amber':'emerald'}-200 text-${a.active?'amber':'emerald'}-700 px-2 py-1 rounded font-bold">${a.active?'Pausar':'Activar'}</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="border border-slate-200 rounded-xl p-3 bg-slate-50">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">+ Nueva automatización</div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <input id="cu-auto-name" placeholder="Nombre (ej. 'Auto-close vencidas')" class="border border-slate-300 rounded px-3 py-2 text-sm" />
+          <input id="cu-auto-desc" placeholder="Descripción corta" class="border border-slate-300 rounded px-3 py-2 text-sm" />
+          <select id="cu-auto-trigger" class="border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="on_schedule">⏰ Programado (cron)</option>
+            <option value="task_status_change">📍 Cambio de status</option>
+            <option value="task_created">➕ Task creada</option>
+            <option value="recurring_due">🔁 Recurrente vence</option>
+          </select>
+          <select id="cu-auto-action" class="border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="close_task">✓ Cerrar task</option>
+            <option value="comment">💬 Comentar</option>
+            <option value="assign">👤 Re-asignar</option>
+            <option value="create_subtask">➕ Crear subtask</option>
+            <option value="add_tag">🏷 Agregar tag</option>
+            <option value="run_ai_template">🤖 Run AI template</option>
+          </select>
+          <input id="cu-auto-cron" placeholder="Cron (ej. 0 9 * * MON)" value="0 9 * * MON" class="border border-slate-300 rounded px-3 py-2 text-sm font-mono col-span-2" />
         </div>
+        <button onclick="cuCreateAutomation()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Crear automatización (pausada)</button>
       </div>
-      <div class="border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-600 mb-2">Borrador de nueva automatización</div>
-        <input id="cu-auto-name" placeholder="Nombre" class="w-full border border-slate-300 rounded px-3 py-2 text-sm mb-2" />
-        <textarea placeholder="Descripción de qué debería hacer (ej. 'Cada lunes 8am, crear el draft de Bitácora con las tasks cerradas la semana')" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" rows="3"></textarea>
-        <button class="mt-2 w-full bg-slate-200 text-slate-500 text-sm py-2 rounded cursor-not-allowed" disabled>💾 Guardar borrador (próxima pasada)</button>
-      </div>
-      ${cuState.automations.length ? `<div class="text-xs text-slate-600">Activas (${cuState.automations.length})</div>` : ''}
     </div>
   `;
 }
 
-// ─── AGENTE IA (placeholder funcional) ───
+async function cuToggleAutomation(id, currentActive) {
+  await sb.from('clickup_automations').update({ active: !currentActive }).eq('id', id);
+  await cuLoadAll();
+  cuRender();
+}
+
+async function cuCreateAutomation() {
+  const name = document.getElementById('cu-auto-name').value.trim();
+  if (!name) return alert('Nombre requerido');
+  const description = document.getElementById('cu-auto-desc').value;
+  const trigger_type = document.getElementById('cu-auto-trigger').value;
+  const action_type = document.getElementById('cu-auto-action').value;
+  const cron = document.getElementById('cu-auto-cron').value || '0 9 * * MON';
+  const { error } = await sb.from('clickup_automations').insert({
+    name, description,
+    trigger_type, trigger_config: { cron },
+    action_type, action_config: {},
+    active: false
+  });
+  if (error) return alert('Error: ' + error.message);
+  await cuLoadAll();
+  cuRender();
+}
+
+// ─── S7-B · AGENTE IA REAL (llama Edge Function clickup-ai-agent) ───
+async function cuRunAgentNow() {
+  if (!confirm('Correr Claude ahora sobre tu snapshot actual?\n\nGenera hasta 5 propuestas accionables.\nCosto aproximado: ~$0.02 (Sonnet).')) return;
+  const btn = document.getElementById('cu-agent-run');
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ Pensando...'; }
+  try {
+    const res = await fetch(CU_AGENT_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ max_proposals: 5 })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'Falló');
+    alert(`✅ ${r.proposals_generated} propuestas generadas.`);
+    await cuLoadAll();
+    cuRender();
+  } catch (e) {
+    alert('Error: ' + e.message + '\n\nVerificá ANTHROPIC_API_KEY y que clickup-ai-agent esté deployada.');
+    if (btn) { btn.disabled = false; btn.innerText = '🧠 Correr agente ahora'; }
+  }
+}
+
 function cuRenderAgente() {
+  const props = cuState.proposals || [];
   return `
     <div class="space-y-3">
       <div class="bg-violet-50 border border-violet-300 rounded-xl p-3">
-        <div class="text-sm font-bold text-violet-900">🧠 Agente IA — inbox de propuestas</div>
-        <div class="text-xs text-violet-800 mt-1">
-          El agente IA analiza tu operación cada lunes y propone acciones concretas en ClickUp. Vos las aprobás o rechazás aquí.
-          Ejemplos de propuestas: reasignar X tareas de Michell a Diego, cerrar 12 tasks que llevan 60d sin movimiento, crear 4 templates de Bitácora.
-        </div>
-        <div class="text-[11px] text-violet-700 mt-2">
-          <strong>Próxima pasada:</strong> edge function que corre Claude API sobre el snapshot + tasks_mirror, genera propuestas con payload ejecutable.
+        <div class="flex justify-between items-start gap-2 flex-wrap">
+          <div>
+            <div class="text-sm font-bold text-violet-900">🧠 Agente IA — propuestas accionables</div>
+            <div class="text-xs text-violet-800 mt-1">Claude analiza tu snapshot + tasks y propone acciones concretas (close, reassign, automate). Vos aprobás → se ejecuta contra ClickUp API.</div>
+          </div>
+          <button id="cu-agent-run" onclick="cuRunAgentNow()" class="text-xs bg-violet-700 hover:bg-violet-800 text-white px-4 py-2 rounded font-bold">🧠 Correr agente ahora</button>
         </div>
       </div>
 
       <div>
-        <div class="text-xs font-bold uppercase text-slate-600 mb-2">Pendientes de aprobación (${cuState.proposals.length})</div>
-        ${cuState.proposals.length === 0 ? '<div class="text-center text-slate-400 text-xs py-8">Sin propuestas pendientes. El agente IA corre los lunes 8am o podés invocarlo manualmente (próxima pasada).</div>' : cuState.proposals.map(p => `
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">Propuestas pendientes (${props.length})</div>
+        ${props.length === 0 ? '<div class="text-center text-slate-400 text-xs py-8">Sin propuestas. Click "🧠 Correr agente ahora" para generar.</div>' : props.map(p => `
           <div class="border border-slate-200 rounded-xl p-3 mb-2">
             <div class="flex items-start justify-between gap-2">
-              <div class="flex-1">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                  <span class="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold uppercase">${p.proposal_type}</span>
+                  <span class="text-[10px] text-slate-400">${new Date(p.created_at).toLocaleString('es-MX')}</span>
+                </div>
                 <div class="font-bold text-sm">${p.title}</div>
                 <div class="text-[11px] text-slate-600 mt-1">${p.rationale || ''}</div>
-                <div class="text-[10px] text-slate-400 mt-1">${p.proposal_type} · ${new Date(p.created_at).toLocaleString('es-MX')}</div>
+                ${p.action_payload ? `<details class="mt-1"><summary class="text-[10px] text-slate-500 cursor-pointer">payload (click para ver)</summary><pre class="text-[10px] bg-slate-50 p-1.5 rounded mt-1 overflow-x-auto">${JSON.stringify(p.action_payload, null, 2)}</pre></details>` : ''}
               </div>
               <div class="flex flex-col gap-1">
+                ${(p.proposal_type==='close' || p.proposal_type==='reassign' || p.proposal_type==='notify') && p.action_payload?.target_task_id ? `
+                  <button onclick="cuExecuteProposal('${p.id}')" class="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded font-bold">⚡ Ejecutar</button>
+                ` : ''}
                 <button onclick="cuApproveProposal('${p.id}')" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded font-bold">✓ Aprobar</button>
                 <button onclick="cuRejectProposal('${p.id}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded">✕ Rechazar</button>
               </div>
@@ -757,7 +851,6 @@ async function cuApproveProposal(id) {
   await sb.from('clickup_ai_proposals').update({
     status: 'approved', approved_by: state.user.id, approved_at: new Date().toISOString()
   }).eq('id', id);
-  alert('Propuesta aprobada. La ejecución contra ClickUp API se activa en la próxima pasada.');
   await cuLoadAll();
   cuRender();
 }
@@ -765,4 +858,34 @@ async function cuRejectProposal(id) {
   await sb.from('clickup_ai_proposals').update({ status: 'rejected' }).eq('id', id);
   await cuLoadAll();
   cuRender();
+}
+
+// S7-B: Ejecuta propuesta directamente contra ClickUp via Edge Function
+async function cuExecuteProposal(id) {
+  const p = cuState.proposals.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`Ejecutar contra ClickUp?\n\n${p.title}\n\n${p.rationale || ''}\n\nAcción: ${p.proposal_type}\nTarget: ${p.action_payload?.target_task_id || 'N/A'}`)) return;
+  const action_type = p.proposal_type === 'close' ? 'close_task' :
+                      p.proposal_type === 'reassign' ? 'assign' :
+                      p.proposal_type === 'notify' ? 'comment' : 'comment';
+  try {
+    const res = await fetch(CU_EXEC_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        action_type,
+        target_task_id: p.action_payload?.target_task_id,
+        payload: p.action_payload,
+        proposal_id: p.id,
+        executed_by: state.user.id
+      })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || JSON.stringify(r.result || {}));
+    alert('✅ Ejecutada contra ClickUp.');
+    await cuLoadAll();
+    cuRender();
+  } catch (e) {
+    alert('Error: ' + e.message + '\n\nVerificá CLICKUP_TOKEN y que clickup-execute esté deployada.');
+  }
 }
