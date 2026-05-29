@@ -22,7 +22,12 @@ const opState = {
   libBusinessFilter: 'all',
   zonaFilter: 'all',
   backlogZonaFilter: 'all',
-  showAddPendiente: false
+  showAddPendiente: false,
+  // S6-U5: search + filtros backlog
+  backlogSearch: '',
+  backlogCategoryFilter: 'all',
+  backlogPriorityFilter: 'all',
+  backlogSort: 'oldest' // oldest | newest | priority | duration
 };
 
 function opMondayOf(dStr) {
@@ -293,7 +298,39 @@ function opRender() {
 
 // ─── Panel Backlog ───
 function opRenderBacklogPanel(backlogByZona) {
-  const filtered = opState.backlog.filter(t => opState.backlogZonaFilter === 'all' || t.zona === opState.backlogZonaFilter);
+  const search = (opState.backlogSearch || '').toLowerCase().trim();
+  const catF = opState.backlogCategoryFilter || 'all';
+  const prioF = opState.backlogPriorityFilter || 'all';
+  const sortBy = opState.backlogSort || 'oldest';
+
+  // S6-U5: filtros aplicados
+  let filtered = opState.backlog.filter(t => {
+    if (opState.backlogZonaFilter !== 'all' && t.zona !== opState.backlogZonaFilter) return false;
+    if (catF !== 'all') {
+      const tpl = opState.tasks.find(x => x.id === t.task_id);
+      if ((tpl?.category || '') !== catF) return false;
+    }
+    if (prioF !== 'all' && (t.priority || 'normal') !== prioF) return false;
+    if (search) {
+      const hay = ((t.title || '') + ' ' + (opPropName(t) || '') + ' ' + (t.notes || '')).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // S6-U5: ordenar
+  filtered.sort((a, b) => {
+    if (sortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+    if (sortBy === 'priority') {
+      const ord = { urgent: 0, high: 1, normal: 2, low: 3 };
+      return (ord[a.priority] || 2) - (ord[b.priority] || 2);
+    }
+    if (sortBy === 'duration') return (b.duration_min || 0) - (a.duration_min || 0);
+    return new Date(a.created_at) - new Date(b.created_at); // oldest first (default)
+  });
+
+  // Categorías únicas (desde templates) para el filtro
+  const categories = Array.from(new Set(opState.tasks.map(t => t.category).filter(Boolean))).sort();
 
   // Agrupar por casa (property_id || project_id || '__sin__')
   const byProp = {};
@@ -310,6 +347,33 @@ function opRenderBacklogPanel(backlogByZona) {
     <div class="p-2 bg-slate-50 border-b border-slate-200">
       <button onclick="opOpenAddPendiente()" class="w-full text-xs bg-slate-900 hover:bg-slate-700 text-white py-2 rounded font-bold">+ Pendiente</button>
       <button onclick="opOpenManageRecurring()" class="w-full text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 py-1 mt-1 rounded" title="Configurar tareas recurrentes (cambio filtros AC cada 90d, podar cada 14d)">⚙️ Recurrentes (${opState.recurring.length})</button>
+
+      <!-- S6-U5: Search + filtros -->
+      <div class="mt-2 space-y-1">
+        <input type="text" placeholder="🔎 Buscar título, casa, notas..." value="${(search || '').replace(/"/g,'&quot;')}"
+          oninput="opState.backlogSearch=this.value; opRender()"
+          class="w-full border border-slate-300 rounded px-2 py-1 text-[11px]" />
+        <div class="grid grid-cols-2 gap-1">
+          <select onchange="opState.backlogCategoryFilter=this.value; opRender()" class="border border-slate-300 rounded px-1 py-0.5 text-[10px]">
+            <option value="all" ${catF==='all'?'selected':''}>Toda categoría</option>
+            ${categories.map(c => `<option value="${c}" ${catF===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+          <select onchange="opState.backlogPriorityFilter=this.value; opRender()" class="border border-slate-300 rounded px-1 py-0.5 text-[10px]">
+            <option value="all" ${prioF==='all'?'selected':''}>Toda prioridad</option>
+            <option value="urgent" ${prioF==='urgent'?'selected':''}>🔴 Urgent</option>
+            <option value="high" ${prioF==='high'?'selected':''}>🟠 High</option>
+            <option value="normal" ${prioF==='normal'?'selected':''}>Normal</option>
+            <option value="low" ${prioF==='low'?'selected':''}>Low</option>
+          </select>
+        </div>
+        <select onchange="opState.backlogSort=this.value; opRender()" class="w-full border border-slate-300 rounded px-1 py-0.5 text-[10px]">
+          <option value="oldest" ${sortBy==='oldest'?'selected':''}>Orden: más viejo primero</option>
+          <option value="newest" ${sortBy==='newest'?'selected':''}>Orden: más nuevo primero</option>
+          <option value="priority" ${sortBy==='priority'?'selected':''}>Orden: por prioridad</option>
+          <option value="duration" ${sortBy==='duration'?'selected':''}>Orden: por duración</option>
+        </select>
+      </div>
+
       <div class="flex gap-0.5 mt-2 flex-wrap">
         <button onclick="opSetBacklogZona('all')" class="text-[10px] px-1.5 py-0.5 rounded ${opState.backlogZonaFilter==='all'?'bg-slate-900 text-white':'bg-white border border-slate-300'}">Todas (${opState.backlog.length})</button>
         ${OP_ZONAS.map(z => {
@@ -318,6 +382,12 @@ function opRenderBacklogPanel(backlogByZona) {
           return `<button onclick="opSetBacklogZona('${z}')" class="text-[10px] px-1.5 py-0.5 rounded ${opState.backlogZonaFilter===z?'bg-slate-900 text-white':opZonaColor(z)}">${z} ${c}</button>`;
         }).join('')}
       </div>
+      ${(search || catF !== 'all' || prioF !== 'all' || opState.backlogZonaFilter !== 'all') ? `
+        <div class="mt-1 text-[9px] text-slate-600">
+          Mostrando ${filtered.length} de ${opState.backlog.length}
+          <button onclick="opState.backlogSearch=''; opState.backlogCategoryFilter='all'; opState.backlogPriorityFilter='all'; opState.backlogZonaFilter='all'; opRender()" class="ml-1 text-blue-600 hover:underline">✕ limpiar</button>
+        </div>
+      ` : ''}
     </div>
     <div class="flex-1 overflow-y-auto p-1.5 space-y-1.5">
       ${propOrder.length === 0 ? '<div class="text-center text-slate-400 text-xs py-6">Backlog vacío. ¡Todo al día!</div>' : propOrder.map(([key, prop]) => `
@@ -828,17 +898,21 @@ function opOpenArmarDia() {
           <input id="op-ar-start" type="time" value="08:00" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-4 gap-2">
         <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje entre casas (min)</label>
-          <input id="op-ar-travel" type="number" value="${OP_TRAVEL_BETWEEN_HOUSES}" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje misma zona</label>
+          <input id="op-ar-travel" type="number" value="${OP_TRAVEL_BETWEEN_HOUSES}" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" title="Minutos entre casas de la misma zona" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje cruzar zona</label>
+          <input id="op-ar-travel-cross" type="number" value="${OP_TRAVEL_BETWEEN_HOUSES * 2}" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" title="S6-U6: minutos extra al cambiar de zona (Norte → Sur)" />
         </div>
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora almuerzo</label>
           <input id="op-ar-lunch" type="time" value="12:00" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
         <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración almuerzo</label>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Almuerzo (min)</label>
           <input id="op-ar-lunch-dur" type="number" value="60" min="0" step="15" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
       </div>
@@ -854,7 +928,8 @@ function opOpenArmarDia() {
 async function opEjecutarArmarDia() {
   const zona = document.getElementById('op-ar-zona').value;
   const startTime = document.getElementById('op-ar-start').value || '08:00';
-  const travelBetween = +document.getElementById('op-ar-travel').value || 0;
+  const travelSame = +document.getElementById('op-ar-travel').value || 0;
+  const travelCross = +(document.getElementById('op-ar-travel-cross')?.value || travelSame * 2) || travelSame;
   const lunchTime = document.getElementById('op-ar-lunch').value || '12:00';
   const lunchDur = +document.getElementById('op-ar-lunch-dur').value || 0;
 
@@ -864,40 +939,60 @@ async function opEjecutarArmarDia() {
   else if (zona !== 'all') cand = cand.filter(t => t.zona === zona);
   if (!cand.length) return alert('No hay pendientes para esa zona.');
 
-  // Agrupar por casa
+  // S6-U6: Agrupar PRIMERO por zona (si all), DESPUÉS por casa dentro de zona
+  // Sort: cada zona como bloque, ordenadas por más vieja → minimizar viajes inter-zona
   const byProp = {};
   cand.forEach(t => {
     const k = t.property_id ? 'p:'+t.property_id : t.project_id ? 'j:'+t.project_id : '__sin__';
-    if (!byProp[k]) byProp[k] = { tasks: [], oldestCreated: t.created_at };
+    if (!byProp[k]) byProp[k] = { tasks: [], oldestCreated: t.created_at, zona: t.zona || null };
     byProp[k].tasks.push(t);
     if (t.created_at < byProp[k].oldestCreated) byProp[k].oldestCreated = t.created_at;
+    // Una casa puede tener tareas con zona = null y otra con zona X → usar la más definida
+    if (!byProp[k].zona && t.zona) byProp[k].zona = t.zona;
   });
-  // Ordenar casas: la del pendiente más viejo primero
-  const propOrder = Object.entries(byProp).sort((a,b) => new Date(a[1].oldestCreated) - new Date(b[1].oldestCreated));
+
+  // S6-U6: Orden = (zona, oldest) — todas las casas de Norte juntas, después todas las de Sur
+  // Dentro de cada zona, casas ordenadas por antigüedad
+  const propOrder = Object.entries(byProp).sort((a, b) => {
+    const zA = a[1].zona || 'zzz'; // sin zona al final
+    const zB = b[1].zona || 'zzz';
+    if (zA !== zB) return zA.localeCompare(zB);
+    return new Date(a[1].oldestCreated) - new Date(b[1].oldestCreated);
+  });
 
   // Asignar horarios
   let cursor = opTimeToMin(startTime);
   const lunchAt = opTimeToMin(lunchTime);
-  const lunchEnd = lunchAt + lunchDur;
   let lunchPlaced = lunchDur === 0;
   const updates = [];
+  let lastZona = null;
+  let crossZoneCount = 0;
+  let sameZoneCount = 0;
 
   propOrder.forEach(([propKey, info], idx) => {
-    // Insertar viaje entre casas (excepto la primera)
-    if (idx > 0) cursor += travelBetween;
+    // Insertar viaje entre casas — diferenciar misma zona vs cruzar zona
+    if (idx > 0) {
+      const isCross = info.zona && lastZona && info.zona !== lastZona;
+      const travelHere = isCross ? travelCross : travelSame;
+      cursor += travelHere;
+      if (isCross) crossZoneCount++; else sameZoneCount++;
+    }
+    lastZona = info.zona;
+
     info.tasks.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
     info.tasks.forEach((t, i) => {
       const dur = t.duration_min || 30;
-      // Si cursor cruza el almuerzo y no lo pusimos, ponerlo
       if (!lunchPlaced && cursor >= lunchAt) {
         cursor = Math.max(cursor, lunchAt) + lunchDur;
         lunchPlaced = true;
       }
+      const isFirstOfHouse = i === 0;
+      const isFirstOfDay = idx === 0 && i === 0;
       updates.push({
         id: t.id,
         date: opState.date,
         start_time: opMinToTime(cursor),
-        travel_min: (idx > 0 && i === 0) ? travelBetween : 0
+        travel_min: isFirstOfDay ? 0 : (isFirstOfHouse ? (info.zona !== lastZona ? travelCross : travelSame) : 0)
       });
       cursor += dur;
     });
@@ -925,7 +1020,8 @@ async function opEjecutarArmarDia() {
   closeModal();
   await opLoadAll();
   opRender();
-  alert(`✅ Día armado: ${updates.length} tareas, ${propOrder.length} casas, hasta ${opFmt12(opMinToTime(cursor))}.\n\nPodés re-arrastrar lo que quieras manualmente.`);
+  const zonas = Array.from(new Set(propOrder.map(([_,info]) => info.zona).filter(Boolean)));
+  alert(`✅ Día armado: ${updates.length} tareas, ${propOrder.length} casas across ${zonas.length} zona(s) (${zonas.join(', ') || 'sin zona'}), hasta ${opFmt12(opMinToTime(cursor))}.\n\n🚗 Viajes: ${sameZoneCount} intra-zona, ${crossZoneCount} inter-zona.\n\nPodés re-arrastrar lo que quieras manualmente.`);
 }
 
 // ─── Editar pendiente del backlog ───

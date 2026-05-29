@@ -6,6 +6,16 @@ Formato: `YYYY-MM-DD · TIPO · alcance` (TIPO = Feature | Fix | Schema | UX | D
 
 ---
 
+## 2026-05-29 — Sprint 6 · Mejoras Planner Semanal + Cronograma Juan (✅ Hecho)
+
+- **S6-U1** — Trigger SECURITY DEFINER sincroniza `remodel_crew` → `resources.crew` automáticamente. Backfill incluido. Una sola fuente de verdad para "quién es mi equipo". Archivo: `supabase/s6-u1-unified-crew.sql`.
+- **S6-U2** — `weekly_activities.activity_code` agregado. `wpCheckDeps` valida dependencias del catálogo CPM. Actividades con deps pending → badge ámbar `🔗 N dep` + fecha sugerida. Mover viola deps → confirm con detalle. Archivo: `supabase/s6-u2-weekly-cpm.sql`.
+- **S6-U3** — Drag & drop entre celdas en weekly-planner. `wpActivityDragStart` + extensión de `wpDropOnCell` para detectar tipo de drag (actividad vs recurso).
+- **S6-U4** — `wpOpenCrewByHour(dateStr)` — vista grid 18h × N workers con bloques coloreados por casa, ring rojo en overbookings, total horas/worker. Botón en header.
+- **S6-U5** — Search + filtros (categoría, prioridad) + sort (oldest/newest/priority/duration) en backlog del Ops Planner. Estado `backlogSearch/backlogCategoryFilter/backlogPriorityFilter/backlogSort`.
+- **S6-U6** — `opEjecutarArmarDia` agrupa primero por zona después por casa. Diferencia viaje intra-zona vs inter-zona (`travelSame` vs `travelCross`). Alert final con stats de viajes.
+- Doc completo: `docs/remodel-pro/sprint-6.md`.
+
 ## 2026-05-28 — Sprint 5 · IA agente + PDF cliente + facturas + fotos (✅ Hecho)
 
 - **S5-G11 · UI** — `rmGenerateProposalPDF()` abre HTML branded en ventana nueva con watermark DRAFT/FINAL + auto window.print(). Botón "📄 Generar propuesta cliente PDF" en sidebar Editor.

@@ -12,7 +12,13 @@ const wpState = {
   filterType: 'all', // all|tool|crew|specialist|vehicle
   draggedResource: null,
   showResourceForm: false,
-  editingActivity: null
+  editingActivity: null,
+  // S6-U2: catálogo para CPM
+  catalog: [], // remodel_catalog_items con depends_on
+  // S6-U3: drag de actividad entre celdas
+  draggedActivityId: null,
+  // S6-U4: vista Crew × Hora
+  crewHourViewDate: null // null o YYYY-MM-DD
 };
 
 function wpFmtDate(d) {
@@ -34,14 +40,51 @@ async function wpLoadAll() {
   if (!wpState.weekStart) wpState.weekStart = wpMondayOf(new Date());
   const start = wpDateOnly(wpState.weekStart);
   const end = wpDateOnly(wpAddDays(wpState.weekStart, 6)); // domingo (7 días lun-dom)
-  const [{ data: resources }, { data: activities }, { data: projects }] = await Promise.all([
+  const [{ data: resources }, { data: activities }, { data: projects }, catRes] = await Promise.all([
     sb.from('resources').select('*').eq('active', true).order('type').order('name'),
     sb.from('weekly_activities').select('*').gte('date', start).lte('date', end).order('date'),
-    sb.from('remodel_projects').select('id,name,address,status,sqft,budget_total,activities,start_date,end_date_estimated,completed_at').order('created_at', { ascending: false })
+    sb.from('remodel_projects').select('id,name,address,status,sqft,budget_total,activities,start_date,end_date_estimated,completed_at').order('created_at', { ascending: false }),
+    sb.from('remodel_catalog_items').select('code,description,depends_on').then(r => r.data || []).catch(() => [])
   ]);
   wpState.resources = resources || [];
   wpState.activities = activities || [];
   wpState.projects = projects || [];
+  wpState.catalog = catRes || [];
+}
+
+// ─── S6-U2: CPM helpers ───
+// Para una activity del weekly_planner, devuelve los activity_codes que deben estar done antes
+function wpGetActivityDeps(act) {
+  if (!act?.activity_code) return [];
+  const catItem = wpState.catalog.find(c => c.code === act.activity_code);
+  return (catItem?.depends_on) || [];
+}
+
+// Devuelve { satisfied: bool, blockers: [{code, date, status}], minDate: 'YYYY-MM-DD' }
+// blockers = dependencias que NO están done en este proyecto/casa
+function wpCheckDeps(act, allHomeActs) {
+  const deps = wpGetActivityDeps(act);
+  if (!deps.length) return { satisfied: true, blockers: [], minDate: null };
+  const blockers = [];
+  let latestDoneEf = null;
+  deps.forEach(depCode => {
+    // Buscar actividad de esta casa con ese code
+    const matches = allHomeActs.filter(a => a.activity_code === depCode);
+    if (matches.length === 0) {
+      blockers.push({ code: depCode, date: null, status: 'no_existe' });
+    } else {
+      const allDone = matches.every(m => m.status === 'done' || m.status === 'cancelled');
+      if (!allDone) {
+        const last = matches.sort((a,b) => (b.date || '').localeCompare(a.date || ''))[0];
+        blockers.push({ code: depCode, date: last.date, status: last.status });
+      }
+      const lastDate = matches.map(m => m.date).sort().slice(-1)[0];
+      if (lastDate && (!latestDoneEf || lastDate > latestDoneEf)) latestDoneEf = lastDate;
+    }
+  });
+  // minDate = día después de la última dep completada
+  const minDate = latestDoneEf ? wpDateOnly(wpAddDays(new Date(latestDoneEf + 'T00:00:00'), 1)) : null;
+  return { satisfied: blockers.length === 0, blockers, minDate };
 }
 
 // ─── ENTRY ───
@@ -110,6 +153,7 @@ function wpRender() {
           ${overdueCount ? `<span class="text-xs bg-red-600 text-white px-2 py-1 rounded font-bold">⏰ ${overdueCount} atrasadas</span>` : ''}
           ${conflicts.length ? `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold">⚠️ ${conflicts.length} conflictos</span>` : '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">✓ Sin conflictos</span>'}
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
+          <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpToggleResourceForm()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">+ Recurso</button>
         </div>
       </div>
@@ -204,14 +248,22 @@ function wpRenderCell(home, date, conflicts) {
           const hasConflict = (a.resource_ids || []).some(rid =>
             conflicts.some(c => c.resourceId === rid && c.date === dateStr)
           );
+          // S6-U2: validar dependencias contra TODAS las actividades de esta casa (no solo de la semana)
+          const allHomeActs = wpState.activities.filter(x => x.project_id === home.id || (!x.project_id && home.id.startsWith('name:') && x.property_name === home.id.slice(5)));
+          const depCheck = a.status === 'done' ? { satisfied: true, blockers: [], minDate: null } : wpCheckDeps(a, allHomeActs);
+          const hasDepIssue = !depCheck.satisfied;
           const statusColor = a.status === 'done' ? 'bg-emerald-50 border-emerald-300' :
                               a.status === 'in_progress' ? 'bg-blue-50 border-blue-300' :
                               a.status === 'cancelled' ? 'bg-slate-50 border-slate-200 opacity-60' :
                               hasConflict ? 'bg-red-50 border-red-300' :
+                              hasDepIssue ? 'bg-amber-50 border-amber-300' :
                               'bg-white border-slate-200';
           const isLate = a.status !== 'done' && a.status !== 'cancelled' && new Date(a.date) < new Date(wpDateOnly(new Date()));
           return `
-            <div class="${statusColor} border-2 rounded p-1.5 text-[11px] hover:border-slate-500">
+            <div class="${statusColor} border-2 rounded p-1.5 text-[11px] hover:border-slate-500"
+                 draggable="true"
+                 ondragstart="wpActivityDragStart('${a.id}', event)"
+                 ondragend="wpState.draggedActivityId=null">
               <div class="flex items-start gap-1">
                 <input type="checkbox" ${a.status==='done'?'checked':''} onclick="event.stopPropagation(); wpQuickToggleDone('${a.id}', event)" class="mt-0.5 cursor-pointer" title="Marcar como done" />
                 <div class="flex-1 min-w-0 cursor-pointer" onclick="wpEditActivity('${a.id}')">
@@ -220,9 +272,11 @@ function wpRenderCell(home, date, conflicts) {
                     ${a.stage ? `<div class="text-[10px] text-slate-500">${a.stage}</div>` : ''}
                     ${(a.notes||'').startsWith('[Estimador]') ? '<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded font-bold">📐 EST</span>' : ''}
                     ${isLate ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded font-bold">⏰ ATRASADA</span>' : ''}
+                    ${hasDepIssue ? `<span class="text-[9px] bg-amber-600 text-white px-1 rounded font-bold" title="Dependencias no listas: ${depCheck.blockers.map(b => b.code).join(', ')}">🔗 ${depCheck.blockers.length} dep</span>` : ''}
                   </div>
                   ${acts.length ? `<div class="flex flex-wrap gap-0.5 mt-1">${acts.map(r => `<span class="text-[10px] bg-white border border-slate-300 px-1 rounded" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}</div>` : ''}
-                  ${hasConflict ? '<div class="text-[9px] text-red-600 font-bold mt-0.5">⚠️ Conflicto</div>' : ''}
+                  ${hasConflict ? '<div class="text-[9px] text-red-600 font-bold mt-0.5">⚠️ Conflicto recurso</div>' : ''}
+                  ${hasDepIssue && depCheck.minDate ? `<div class="text-[9px] text-amber-700 font-semibold mt-0.5">📅 Sugerido: ${depCheck.minDate}</div>` : ''}
                 </div>
               </div>
             </div>
@@ -233,6 +287,13 @@ function wpRenderCell(home, date, conflicts) {
       </div>
     </td>
   `;
+}
+
+// S6-U3: handlers de drag de actividades entre celdas
+function wpActivityDragStart(activityId, ev) {
+  wpState.draggedActivityId = activityId;
+  wpState.draggedResource = null;
+  if (ev && ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
 }
 
 function wpRenderResourceGroup(type, label, borderClass) {
@@ -312,9 +373,43 @@ function wpDragStart(rid) { wpState.draggedResource = rid; }
 
 async function wpDropOnCell(homeId, homeName, dateStr, event) {
   event.preventDefault();
+
+  // S6-U3: si lo que se arrastró es una actividad → mover
+  if (wpState.draggedActivityId) {
+    const actId = wpState.draggedActivityId;
+    wpState.draggedActivityId = null;
+    const a = wpState.activities.find(x => x.id === actId);
+    if (!a) return;
+    // Si misma fecha y misma casa → no hacer nada
+    if (a.date === dateStr) {
+      const sameHome = a.project_id === homeId || (!a.project_id && homeId.startsWith('name:') && a.property_name === homeId.slice(5));
+      if (sameHome) return;
+    }
+    // S6-U2: si la actividad tiene deps no satisfechas en la nueva casa, avisar (no bloquear)
+    const newProjectId = homeId.startsWith('name:') ? null : homeId;
+    const newPropertyName = homeId.startsWith('name:') ? homeId.slice(5) : homeName;
+    const newHomeActs = wpState.activities.filter(x => x.id !== actId && (x.project_id === newProjectId || (!x.project_id && newPropertyName && x.property_name === newPropertyName)));
+    const movedAct = { ...a, date: dateStr };
+    const depCheck = wpCheckDeps(movedAct, newHomeActs);
+    if (!depCheck.satisfied) {
+      const msg = `⚠️ Esta actividad depende de: ${depCheck.blockers.map(b => b.code + ' (' + (b.status || 'no existe') + ')').join(', ')}\n\nSugerencia: mover después del ${depCheck.minDate || '?'}\n\n¿Mover igual?`;
+      if (!confirm(msg)) return;
+    }
+    const { error } = await sb.from('weekly_activities').update({
+      date: dateStr,
+      project_id: newProjectId,
+      property_name: newProjectId ? a.property_name : newPropertyName,
+      updated_at: new Date().toISOString()
+    }).eq('id', actId);
+    if (error) return alert('Error moviendo: ' + error.message);
+    await wpLoadAll();
+    wpRender();
+    return;
+  }
+
+  // Flujo original: drop de un resource
   const rid = wpState.draggedResource;
   if (!rid) return;
-  // Si la celda ya tiene 1 actividad, agregar resource a ESA. Si no, crear nueva actividad placeholder
   const cellActs = wpState.activities.filter(a => {
     const matchProj = a.project_id === homeId;
     const matchName = !a.project_id && homeId.startsWith('name:') && a.property_name === homeId.slice(5);
@@ -327,7 +422,6 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
     ids.add(rid);
     await sb.from('weekly_activities').update({ resource_ids: Array.from(ids), updated_at: new Date().toISOString() }).eq('id', a.id);
   } else {
-    // Crear actividad nueva con un recurso
     const res = wpState.resources.find(r => r.id === rid);
     const payload = {
       project_id: homeId.startsWith('name:') ? null : homeId,
@@ -599,6 +693,123 @@ function wpOpenDayView(dateStr) {
   openModal(`📅 Día completo: ${wpFmtDate(d)}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-5xl');
+}
+
+// ─── S6-U4 · VISTA CREW × HORA del día ───
+// Identifica overbookings de personas (1 worker en 2+ obras a la misma hora)
+async function wpOpenCrewByHour(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  // Cargar las activities del día (puede no ser de la semana cargada en wpState)
+  const { data: dayActs } = await sb.from('weekly_activities').select('*').eq('date', dateStr).order('start_hour');
+  const acts = dayActs || [];
+
+  // Solo crews/specialists (los workers que ocupan capacity humana)
+  const workers = wpState.resources.filter(r => r.type === 'crew' || r.type === 'specialist');
+  // Para cada worker, qué activities involucran a ese worker
+  const workerSlots = {};
+  workers.forEach(w => workerSlots[w.id] = []);
+  acts.forEach(a => {
+    (a.resource_ids || []).forEach(rid => {
+      if (workerSlots[rid]) workerSlots[rid].push(a);
+    });
+  });
+
+  // Horas 5am-22pm (rango más usado para construcción)
+  const hours = [];
+  for (let h = 5; h <= 22; h++) hours.push(h);
+
+  // Detectar overbookings: misma hora con 2+ activities en distintas casas
+  function getOverbookings(slots) {
+    const byHour = {};
+    slots.forEach(a => {
+      for (let h = (a.start_hour || 7); h < (a.end_hour || 17); h++) {
+        if (!byHour[h]) byHour[h] = [];
+        byHour[h].push(a);
+      }
+    });
+    const overbook = [];
+    Object.entries(byHour).forEach(([h, as]) => {
+      // Si hay 2+ activities en distintas casas a la misma hora → conflicto
+      const uniqueHomes = new Set(as.map(a => a.project_id || a.property_name));
+      if (uniqueHomes.size > 1) overbook.push({ hour: +h, activities: as });
+    });
+    return overbook;
+  }
+
+  // Color por proyecto (mismo home → mismo color)
+  function homeColor(a) {
+    const key = a.project_id || a.property_name || 'no_home';
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h*31 + key.charCodeAt(i)) >>> 0;
+    const palette = ['bg-sky-200','bg-emerald-200','bg-rose-200','bg-violet-200','bg-amber-200','bg-cyan-200','bg-fuchsia-200','bg-lime-200'];
+    return palette[h % palette.length];
+  }
+
+  const html = `
+    <div class="space-y-3">
+      <div class="bg-slate-900 text-white rounded-xl p-4">
+        <div class="text-xs text-slate-400 uppercase font-bold">Cobertura humana · ${wpFmtDate(d)}</div>
+        <div class="text-2xl font-bold">👷 Crew × Hora</div>
+        <div class="text-xs text-slate-400 mt-1">${workers.length} workers · ${acts.length} actividades · solo crews y specialists</div>
+      </div>
+
+      <div class="border border-slate-200 rounded-xl overflow-x-auto">
+        <table class="w-full text-[10px] border-collapse">
+          <thead class="bg-slate-50 sticky top-0">
+            <tr>
+              <th class="text-left p-1.5 border-r border-slate-200 sticky left-0 bg-slate-50 z-10 min-w-[140px]">Worker</th>
+              ${hours.map(h => `<th class="text-center p-1.5 border-r border-slate-200 min-w-[40px] font-mono">${h}</th>`).join('')}
+              <th class="text-center p-1.5 min-w-[60px]">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${workers.map(w => {
+              const slots = workerSlots[w.id] || [];
+              const overbook = getOverbookings(slots);
+              const overHours = new Set(overbook.map(o => o.hour));
+              const totalHours = slots.reduce((s,a) => s + ((a.end_hour || 17) - (a.start_hour || 7)), 0);
+              return `
+                <tr class="border-t border-slate-100">
+                  <td class="p-1.5 border-r border-slate-200 sticky left-0 bg-white z-10">
+                    <div class="font-bold">${w.emoji} ${w.name}</div>
+                    <div class="text-[9px] text-slate-500">${w.category || w.type}${w.cost_per_day ? ' · $' + w.cost_per_day + '/d' : ''}</div>
+                  </td>
+                  ${hours.map(h => {
+                    const activeHere = slots.filter(a => h >= (a.start_hour || 7) && h < (a.end_hour || 17));
+                    if (activeHere.length === 0) return `<td class="border-r border-slate-100 p-0.5"></td>`;
+                    const isOver = overHours.has(h);
+                    const a0 = activeHere[0];
+                    const color = homeColor(a0);
+                    const title = activeHere.map(a => `${a.activity_name} (${wpState.projects.find(p => p.id === a.project_id)?.name || a.property_name || '?'})`).join('\n');
+                    return `<td class="border-r border-slate-100 p-0 align-middle">
+                      <div class="${color} ${isOver?'ring-2 ring-red-500':''} h-7 flex items-center justify-center text-[9px] font-bold cursor-pointer" title="${title.replace(/"/g,'&quot;')}">
+                        ${activeHere.length > 1 ? `<span class="text-red-700">⚠️${activeHere.length}</span>` : '●'}
+                      </div>
+                    </td>`;
+                  }).join('')}
+                  <td class="p-1.5 text-center font-bold ${overbook.length?'text-red-700':'text-slate-700'}">${totalHours}h${overbook.length?' ⚠️':''}</td>
+                </tr>
+              `;
+            }).join('')}
+            ${workers.length === 0 ? `<tr><td colspan="${hours.length + 2}" class="text-center text-slate-400 py-8">No hay workers en el catálogo. Agregá crews o specialists desde el tab Crew del Estimador Pro.</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-700">
+        <strong>💡 Cómo leer:</strong> Cada fila es un worker. Cada celda es 1 hora. Color = casa donde trabaja. <strong class="text-red-700">⚠️ borde rojo</strong> = overbooking (mismo worker en 2+ casas a la misma hora). Hover para detalle. La idea es ver el día completo en una sola pantalla y detectar conflictos antes de que pasen.
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="wpOpenCrewByHour('${wpDateOnly(wpAddDays(new Date(dateStr + 'T00:00:00'), -1))}')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← ${wpFmtDate(wpAddDays(new Date(dateStr + 'T00:00:00'), -1))}</button>
+        <button onclick="closeModal(); setTimeout(()=>openWeeklyPlanner(wpState.sys), 100)" class="flex-1 bg-slate-900 text-white text-sm font-bold py-2 rounded">← Volver al calendario</button>
+        <button onclick="wpOpenCrewByHour('${wpDateOnly(wpAddDays(new Date(dateStr + 'T00:00:00'), 1))}')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">${wpFmtDate(wpAddDays(new Date(dateStr + 'T00:00:00'), 1))} →</button>
+      </div>
+    </div>
+  `;
+  openModal(`👷 Crew × Hora · ${wpFmtDate(d)}`, html);
+  document.querySelector('#modal > div').classList.remove('max-w-3xl');
+  document.querySelector('#modal > div').classList.add('max-w-7xl');
 }
 
 // ─── VISTA CELDA: Casa × Día (todas las actividades de esa casa ese día) ───

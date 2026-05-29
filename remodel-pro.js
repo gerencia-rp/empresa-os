@@ -2704,6 +2704,7 @@ async function rmSyncToPlanner() {
         date: date.toISOString().split('T')[0],
         activity_name: cat.desc + dayLabel,
         stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'),
+        activity_code: code, // S6-U2: link a catalog para validar dependencias CPM
         notes: `[Estimador] ${code} · qty ${cfg.qty || 1} ${cat.unit} · $${Math.round((cfg.qty||0)*(cfg.vu||cat.vu))}`,
         start_hour: 7,
         end_hour: 17,
