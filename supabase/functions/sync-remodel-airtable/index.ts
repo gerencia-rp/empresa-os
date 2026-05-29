@@ -6,6 +6,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const AIRTABLE_TOKEN = Deno.env.get("AIRTABLE_TOKEN")!;
 const AIRTABLE_BASE_ID = Deno.env.get("AIRTABLE_BASE_ID_REMODEL") || "appwFRqnkyyRljOld";
 const AIRTABLE_TABLE_ID = "tblw28KVOUcCAKZBU"; // Propiedad en reparación
+// Tablas linked que resolvemos a nombres (accedidas por nombre URL-encoded)
+const AIRTABLE_LINKED_TABLES = ["Cuadrillas", "Contactos del negocio"];
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -88,9 +90,69 @@ async function fetchAirtable(): Promise<any[]> {
   return records;
 }
 
-function projectFromAirtable(r: any) {
+// S7-Fix · Fetchea linked tables (Cuadrillas, etc) sin returnFieldsByFieldId
+// para poder leer el "Name" primary directamente
+async function fetchAirtableTableByName(tableName: string): Promise<any[]> {
+  const records: any[] = [];
+  let offset: string | undefined;
+  do {
+    const url = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}`);
+    if (offset) url.searchParams.set("offset", offset);
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
+    });
+    if (!res.ok) {
+      console.warn(`Skip linked table "${tableName}": ${res.status}`);
+      return [];
+    }
+    const data = await res.json();
+    records.push(...(data.records || []));
+    offset = data.offset;
+  } while (offset);
+  return records;
+}
+
+// Extrae el "name" de un record de Airtable buscando el primer campo de texto razonable
+function extractPrimaryName(r: any): string | null {
   const f = r.fields || {};
-  const lider = getName(f[FIELD_IDS.lider]);
+  // Buscar campos típicos de nombre
+  const candidates = ["Name", "Nombre", "name", "nombre", "Title", "Titulo", "Title", "Líder", "Lider"];
+  for (const c of candidates) {
+    if (f[c] && typeof f[c] === "string") return f[c];
+  }
+  // Si no encontramos, tomar el primer string field
+  for (const k of Object.keys(f)) {
+    if (typeof f[k] === "string" && f[k].length < 100) return f[k];
+  }
+  return null;
+}
+
+// Resuelve un valor que puede ser ID o array de IDs usando el cache
+function resolveLinked(v: any, cache: Map<string, string>): string | null {
+  if (!v) return null;
+  if (typeof v === "string") {
+    // ¿Parece un Airtable recID?
+    if (/^rec[A-Za-z0-9]{14,}$/.test(v)) return cache.get(v) || v;
+    return v;
+  }
+  if (Array.isArray(v) && v.length > 0) {
+    const names = v.map((id) => {
+      if (typeof id === "string") {
+        if (/^rec[A-Za-z0-9]{14,}$/.test(id)) return cache.get(id) || id;
+        return id;
+      }
+      return id?.name || null;
+    }).filter(Boolean);
+    return names.join(", ");
+  }
+  if (typeof v === "object" && v.name) return v.name;
+  return null;
+}
+
+function projectFromAirtable(r: any, liderCache: Map<string, string>) {
+  const f = r.fields || {};
+  // S7-Fix · resolver linked record IDs a nombres si tenemos cache
+  const lider = resolveLinked(f[FIELD_IDS.lider], liderCache) || getName(f[FIELD_IDS.lider]);
   const proceso = getName(f[FIELD_IDS.proceso]);
   const avance_pct = parseAvance(f[FIELD_IDS.avance]);
   const desviacion = getName(f[FIELD_IDS.desviacion]);
@@ -249,6 +311,34 @@ Deno.serve(async (req) => {
   const triggeredBy = body.user_id || null;
 
   try {
+    // S7-Fix · Resolver linked records (Cuadrillas → nombres de líderes)
+    // Fetcheamos las tablas linked primero y construimos un cache ID → nombre
+    const liderCache = new Map<string, string>();
+    const nameRows: any[] = [];
+    for (const tableName of AIRTABLE_LINKED_TABLES) {
+      try {
+        const linked = await fetchAirtableTableByName(tableName);
+        for (const lr of linked) {
+          const name = extractPrimaryName(lr);
+          if (name) {
+            liderCache.set(lr.id, name);
+            nameRows.push({
+              record_id: lr.id,
+              name,
+              table_ref: tableName,
+              base_id: AIRTABLE_BASE_ID,
+              last_synced_at: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (e) {
+        console.warn(`Linked table ${tableName} failed:`, e);
+      }
+    }
+    if (nameRows.length) {
+      await sb.from("airtable_record_names").upsert(nameRows, { onConflict: "record_id" });
+    }
+
     const airtableRecords = await fetchAirtable();
     let snapshotCount = 0, alertCount = 0;
 
@@ -256,7 +346,7 @@ Deno.serve(async (req) => {
     await sb.from("remodel_alerts").delete().is("resolved_at", null);
 
     for (const r of airtableRecords) {
-      const proj = projectFromAirtable(r);
+      const proj = projectFromAirtable(r, liderCache);
       if (!proj.address) continue;
 
       // Upsert propiedad

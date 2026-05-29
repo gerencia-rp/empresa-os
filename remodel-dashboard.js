@@ -142,18 +142,42 @@ async function openRemodelDashboard(sys) {
 }
 
 async function rdLoadAll() {
-  const [p, a, l, ra, wi] = await Promise.all([
+  const [p, a, l, ra, wi, names] = await Promise.all([
     sb.from('remodel_at_properties').select('*').order('proceso').order('avance_pct', { ascending: true }),
     sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').order('detected_at', { ascending: false }),
     sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1),
     sb.from('remodel_required_actions').select('*').neq('status', 'done').order('due_date', { ascending: true }).then(r => r.data || []).catch(() => []),
-    sb.from('remodel_weekly_insights').select('*').order('week_start', { ascending: false }).limit(8).then(r => r.data || []).catch(() => [])
+    sb.from('remodel_weekly_insights').select('*').order('week_start', { ascending: false }).limit(8).then(r => r.data || []).catch(() => []),
+    sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => [])
   ]);
   rdState.properties = p.data || [];
   rdState.alerts = a.data || [];
   rdState.syncLog = (l.data && l.data[0]) || null;
   rdState.requiredActions = ra;
   rdState.weeklyInsights = wi;
+  // S7-Fix · cache id → nombre para resolver linked records que vinieron antes del fix
+  rdState.airtableNames = {};
+  (names || []).forEach(n => { rdState.airtableNames[n.record_id] = n.name; });
+  // Aplicar resolución a las propiedades cargadas (no toca DB)
+  rdState.properties.forEach(p => {
+    p.lider = rdResolveAirtableName(p.lider);
+  });
+}
+
+// S7-Fix · resuelve string que puede ser un Airtable recID a nombre legible
+function rdResolveAirtableName(v) {
+  if (!v) return v;
+  // Si ya es texto legible, retornar tal cual
+  if (typeof v !== 'string') return v;
+  // ¿Parece un recID Airtable?
+  if (/^rec[A-Za-z0-9]{14,}$/.test(v)) {
+    return (rdState.airtableNames && rdState.airtableNames[v]) || v;
+  }
+  // String con coma (varios IDs)
+  if (v.includes(',')) {
+    return v.split(',').map(s => rdResolveAirtableName(s.trim())).join(', ');
+  }
+  return v;
 }
 
 // S7-D: Materializa las acciones requeridas (calculadas client-side) en la tabla persistente
