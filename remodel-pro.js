@@ -281,6 +281,253 @@ const RM_TYPES = {
   gut:      { name: 'Gut Renovation',     icon: '⛏️', mult: 2.20, desc: 'Demolición a studs + replanteo + ampliación' }
 };
 
+// ─── AUTO-FILL TEMPLATES: para cada tipo, qué actividades incluir + cantidades por sqft ───
+// El equipo elige el tipo, ingresa sqft, y el editor se llena con cantidades realistas.
+// `qty` = fijo · `f(s)` = función del sqft (devuelve cantidad)
+const RM_AUTOFILL_TEMPLATES = {
+  lipstick: {
+    label: '✨ Lipstick',
+    desc: 'Pintura + fixtures + clean. Refresh barato para vender rápido.',
+    activities: {
+      '5.1.2': { f: s => s * 3 },       // interior paint ~3× sqft (paredes + techos)
+      '5.1.7': { qty: 1 },              // light fixtures + ceiling fans
+      '5.2.4p': { qty: 1 },             // plumbing fixtures finales
+      '6.1.1': { qty: 1 },              // touch-up
+      '6.2.3': { qty: 1 },              // move-in deep clean
+      '6.3.2': { qty: 1 },              // deep cleaning
+      '4.2.1': { qty: 1 },              // permits
+    }
+  },
+  light: {
+    label: '🖌️ Cosmético Ligero',
+    desc: 'Pintura + pisos + repairs + fixtures básicos. Sin tocar cocina ni baños.',
+    activities: {
+      '1.1.6': { f: s => s * 0.3 },     // drywall removal parcial
+      '1.1.9': { f: s => Math.max(1, Math.ceil(s/800)) }, // dumpster (1 cada 800 sqft)
+      '5.1.1': { f: s => s * 0.3 },     // drywall install parcial
+      '5.1.2': { f: s => s * 3 },       // interior paint
+      '5.6.1': { f: s => s },           // LVP toda la casa
+      '5.6.3': { f: s => s * 0.4 },     // baseboards
+      '5.1.7': { qty: 1 },              // light fixtures
+      '5.2.4p': { qty: 1 },             // plumbing fixtures
+      '6.1.1': { qty: 1 },              // touch-up
+      '6.3.1': { f: s => s },           // construction cleanup
+      '4.2.1': { qty: 1 },              // permits
+    }
+  },
+  heavy: {
+    label: '🔧 Cosmético Pesado',
+    desc: 'Cocina O baños + acabados generales. Asume 2 baños.',
+    activities: {
+      // Demo
+      '1.1.1': { f: s => s * 0.6 },     // floor demo parcial
+      '1.1.3': { qty: 1 },              // kitchen tearout
+      '1.1.4': { qty: 2 },              // bathroom tearout (2 baños)
+      '1.1.6': { f: s => s * 0.6 },     // drywall removal
+      '1.1.9': { f: s => Math.max(1, Math.ceil(s/600)) }, // dumpsters
+      // Interior
+      '5.1.1': { f: s => s * 0.6 },     // drywall install
+      '5.1.2': { f: s => s * 3 },       // interior paint
+      '5.1.3': { f: s => s * 0.6 },     // wall insulation
+      '5.6.1': { f: s => s * 0.75 },    // LVP (no en baños)
+      '5.6.3': { f: s => s * 0.4 },     // baseboards
+      '5.8.1': { f: s => Math.max(3, Math.ceil(s/300)) }, // interior doors
+      // Cocina
+      '5.4.1': { qty: 20 },             // cabinets 20 lin_ft típico
+      '5.4.2': { qty: 35 },             // quartz countertops 35 sqft
+      '5.4.3': { qty: 30 },             // backsplash
+      '5.4.4': { qty: 1 },              // sink + faucet
+      '5.4.6': { qty: 1 },              // appliances set
+      // Baños (2)
+      '5.3.1': { qty: 200 },            // bathroom tile ~100 sqft × 2
+      '5.3.5': { qty: 2 },              // vanity × 2
+      '5.3.6': { qty: 2 },              // toilet × 2
+      '5.3.4': { qty: 2 },              // accessories × 2
+      // Eléctrica + plomería final
+      '5.1.4': { qty: 1 },              // outlets
+      '5.1.7': { qty: 1 },              // light fixtures
+      '5.1.9': { qty: 1 },              // smoke detectors
+      '5.2.4p': { qty: 1 },             // plumbing fixtures
+      // Permits + cierre
+      '4.2.1': { qty: 1 },
+      '4.2.2': { qty: 1 },              // architect/engineer
+      '6.1.1': { qty: 1 },
+      '6.2.1': { qty: 1 },
+      '6.2.2': { qty: 1 },              // city inspection
+      '6.3.1': { f: s => s },           // cleanup
+    }
+  },
+  full: {
+    label: '🔨 Renovación Total',
+    desc: 'Cocina + baños + sistemas + acabados. Sin demo a studs.',
+    activities: {
+      // Demo completa
+      '1.1.1': { f: s => s },
+      '1.1.3': { qty: 1 },
+      '1.1.4': { qty: 2 },
+      '1.1.6': { f: s => s },
+      '1.1.9': { f: s => Math.max(2, Math.ceil(s/500)) },
+      '1.1.10': { qty: 1 },
+      // Sistemas completos
+      '5.1.5': { qty: 1 },              // panel upgrade
+      '5.1.6': { qty: 1 },              // rewire
+      '5.2.1p': { qty: 1 },             // repipe
+      '5.2.3p': { qty: 1 },             // water heater
+      '5.5.1h': { qty: 1 },             // HVAC
+      // Interior
+      '5.1.1': { f: s => s },           // drywall install
+      '5.1.2': { f: s => s * 3 },       // paint
+      '5.1.3': { f: s => s },           // wall insulation
+      '5.2.3': { f: s => s },           // attic insulation
+      '5.6.1': { f: s => s * 0.75 },    // LVP
+      '5.6.3': { f: s => s * 0.4 },     // baseboards
+      '5.8.1': { f: s => Math.max(4, Math.ceil(s/250)) }, // interior doors
+      // Cocina full
+      '5.4.1': { qty: 25 },
+      '5.4.2': { qty: 40 },
+      '5.4.3': { qty: 35 },
+      '5.4.4': { qty: 1 },
+      '5.4.6': { qty: 1 },
+      // Baños full (2)
+      '5.3.1': { qty: 200 },
+      '5.3.2': { qty: 2 },              // custom showers
+      '5.3.5': { qty: 2 },
+      '5.3.6': { qty: 2 },
+      '5.3.4': { qty: 2 },
+      // Eléctrica final
+      '5.1.4': { qty: 1 },
+      '5.1.7': { qty: 1 },
+      '5.1.9': { qty: 1 },
+      // Exterior básico
+      '3.4.3': { qty: 1 },              // exterior paint
+      // Soft + cierre
+      '4.2.1': { qty: 1 },
+      '4.2.2': { qty: 1 },
+      '6.1.1': { qty: 1 },
+      '6.2.1': { qty: 1 },
+      '6.2.2': { qty: 1 },
+      '6.3.1': { f: s => s },
+      '6.3.2': { qty: 1 },
+    }
+  },
+  gut: {
+    label: '⛏️ Gut Renovation',
+    desc: 'Demolición a studs + framing + replanteo total + exterior.',
+    activities: {
+      // Demo total
+      '1.1.1': { f: s => s },
+      '1.1.3': { qty: 1 },
+      '1.1.4': { qty: 2 },
+      '1.1.6': { f: s => s * 1.2 },     // todas las paredes
+      '1.1.8': { f: s => s * 0.1 },     // wall removal (paredes load-bearing)
+      '1.1.9': { f: s => Math.max(3, Math.ceil(s/400)) },
+      '1.1.10': { qty: 1 },
+      // Framing nuevo
+      '4.1.2': { f: s => s },           // wood framing
+      '4.1.3': { qty: 1 },              // steel beam
+      '4.1.5': { f: s => s * 0.5 },     // sub-floor
+      // Cimentación check
+      '2.1.1': { qty: 1 },              // foundation eval
+      // Sistemas nuevos
+      '5.1.5': { qty: 1 },
+      '5.1.6': { qty: 1 },
+      '5.2.1p': { qty: 1 },
+      '5.2.2p': { qty: 1 },             // sewer line
+      '5.2.3p': { qty: 1 },
+      '5.5.1h': { qty: 1 },
+      // Interior
+      '5.1.1': { f: s => s * 1.2 },
+      '5.1.2': { f: s => s * 3 },
+      '5.1.3': { f: s => s * 1.2 },
+      '5.2.3': { f: s => s },
+      '5.6.1': { f: s => s * 0.75 },
+      '5.6.3': { f: s => s * 0.4 },
+      '5.8.1': { f: s => Math.max(5, Math.ceil(s/250)) },
+      // Cocina premium
+      '5.4.1': { qty: 30 },
+      '5.4.2': { qty: 45 },
+      '5.4.3': { qty: 40 },
+      '5.4.4': { qty: 1 },
+      '5.4.5': { qty: 1 },              // kitchen island
+      '5.4.6': { qty: 1 },
+      // Baños premium
+      '5.3.1': { qty: 250 },
+      '5.3.2': { qty: 2 },
+      '5.3.3': { qty: 2 },              // glass enclosure
+      '5.3.5': { qty: 2 },
+      '5.3.6': { qty: 2 },
+      '5.3.4': { qty: 2 },
+      // Eléctrica
+      '5.1.4': { qty: 1 },
+      '5.1.7': { qty: 1 },
+      '5.1.9': { qty: 1 },
+      '5.2.4p': { qty: 1 },
+      // Exterior renovado
+      '3.1.1': { qty: 1 },              // roof replacement
+      '3.4.3': { qty: 1 },              // exterior paint
+      '3.7.1': { qty: 1 },              // windows
+      '3.5.1': { qty: 1 },              // front door
+      // Soft + cierre
+      '4.2.1': { qty: 1 },
+      '4.2.2': { qty: 1 },
+      '6.1.1': { qty: 1 },
+      '6.2.1': { qty: 1 },
+      '6.2.2': { qty: 1 },
+      '6.3.1': { f: s => s },
+      '6.3.2': { qty: 1 },
+    }
+  }
+};
+
+// Aplica un template auto-llenando rmState.selectedActivities con cantidades calculadas
+function rmAutoFillEditor(typeKey) {
+  const template = RM_AUTOFILL_TEMPLATES[typeKey];
+  if (!template) return alert('Template no encontrado');
+
+  const sqft = +rmState.editSqft || 1500;
+  if (sqft < 200) {
+    if (!confirm(`Tu sqft está en ${sqft}. Las cantidades van a ser muy chicas. ¿Continuamos igual?`)) return;
+  }
+
+  const cat = rmGetCatalog();
+  const existingCount = Object.keys(rmState.selectedActivities).length;
+  if (existingCount > 0) {
+    if (!confirm(`¿Reemplazar las ${existingCount} actividades actuales con el template "${template.label}"?\n\nSqft: ${sqft}\nTipo: ${template.label}\n\nTip: después podés ajustar cualquier cantidad o quitar lo que no aplique.`)) return;
+  }
+
+  const newSelected = {};
+  let skipped = [];
+  Object.entries(template.activities).forEach(([code, rule]) => {
+    const catItem = cat.find(c => c.code === code);
+    if (!catItem) { skipped.push(code); return; }
+
+    let qty;
+    if (rule.qty != null) qty = rule.qty;
+    else if (typeof rule.f === 'function') {
+      try { qty = rule.f(sqft); } catch { qty = 1; }
+    } else qty = 1;
+
+    qty = Math.max(0.1, Math.round(qty * 10) / 10);
+    const days = Math.max(1, Math.ceil(qty * (catItem.days_per_qty || 0)));
+
+    newSelected[code] = {
+      qty,
+      vu: catItem.vu,
+      days,
+      start_offset: 0
+    };
+  });
+
+  rmState.selectedActivities = newSelected;
+  rmState.remodelType = typeKey;
+  rmRenderTab();
+
+  const e = rmCalcProject();
+  setTimeout(() => {
+    alert(`✅ Auto-llenado completo\n\n• ${Object.keys(newSelected).length} actividades agregadas (template ${template.label})\n• Sqft usado: ${sqft}\n• Costo directo estimado: $${Math.round(e.totals.total).toLocaleString()}\n• Precio cliente sugerido: $${Math.round(e.pricing.clientPrice).toLocaleString()}\n• Duración estimada: ${e.totalDays} días\n${skipped.length?'\n⚠️ '+skipped.length+' codes del template no están en el catálogo: '+skipped.slice(0,5).join(', ')+'\n':''}\nAhora revisá la lista, ajustá cantidades y quitá lo que no aplique a esta casa.`);
+  }, 100);
+}
+
 // Cache de benchmarks dinámicos (cargados de DB)
 let rmDynamicBenchmarks = null; // {stage_key: {avg_psf, std_psf, samples, ...}}
 
@@ -1603,6 +1850,31 @@ function rmRenderEditor(body) {
 
         <!-- Activos del proyecto: Matterport + scope + audio + planos -->
         ${rmRenderAssets()}
+
+        <!-- 🪄 AUTO-LLENADO INTELIGENTE -->
+        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-3">
+          <div class="flex justify-between items-start gap-2 flex-wrap mb-2">
+            <div>
+              <div class="text-sm font-bold text-violet-900">🪄 Auto-llenar el catálogo</div>
+              <div class="text-[11px] text-violet-700 mt-0.5">Elegí el tipo de remodelación + ya tenés <strong>${rmState.editSqft || '?'} ft²</strong> → llena todo el catálogo con cantidades realistas. Después ajustás lo que no aplique.</div>
+            </div>
+            ${Object.keys(rmState.selectedActivities).length > 0 ? `<span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold">✓ ${Object.keys(rmState.selectedActivities).length} ya cargadas</span>` : ''}
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-1.5">
+            ${Object.entries(RM_AUTOFILL_TEMPLATES).map(([k, t]) => {
+              const isCurrent = rmState.remodelType === k;
+              return `
+                <button onclick="rmAutoFillEditor('${k}')"
+                  class="text-left p-2 rounded-lg border-2 ${isCurrent?'border-violet-600 bg-violet-600 text-white':'border-violet-200 bg-white hover:border-violet-400 text-slate-900'} transition-colors"
+                  title="${t.desc}">
+                  <div class="text-xs font-bold">${t.label}</div>
+                  <div class="text-[9px] opacity-80 leading-tight mt-0.5">${t.desc.slice(0, 60)}${t.desc.length > 60 ? '…' : ''}</div>
+                  <div class="text-[9px] opacity-70 mt-1">${Object.keys(t.activities).length} activ.</div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
 
         <!-- QW3 — Buscador en catálogo -->
         <div class="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-2">
