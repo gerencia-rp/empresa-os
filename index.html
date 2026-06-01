@@ -56,11 +56,16 @@
     <nav id="sidebar-nav" class="flex-1 px-2 py-3 space-y-1 overflow-y-auto scrollbar-thin"></nav>
     <div class="px-3 py-3 border-t border-slate-800 space-y-1">
       <button id="add-area-btn" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">+ Agregar área</button>
+      <button onclick="openTeamMgmt()" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">👥 Gestionar equipo</button>
+      <button onclick="openAuditLog()" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">📜 Auditoría</button>
       <div class="px-2 pt-2 border-t border-slate-800">
-        <div id="user-email" class="text-xs text-slate-400 truncate"></div>
+        <button onclick="openMyProfile()" class="w-full text-left text-xs text-slate-400 hover:text-white truncate" id="user-email"></button>
         <div class="flex items-center justify-between mt-1">
           <span id="user-role" class="text-[10px] font-bold uppercase tracking-wide"></span>
-          <button id="logout-btn" class="text-xs text-slate-400 hover:text-white">Salir</button>
+          <div class="flex items-center gap-2">
+            <button onclick="openMyProfile()" class="text-xs text-slate-400 hover:text-white" title="Mi perfil">⚙️</button>
+            <button id="logout-btn" class="text-xs text-slate-400 hover:text-white">Salir</button>
+          </div>
         </div>
       </div>
     </div>

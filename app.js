@@ -80,8 +80,9 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 
 async function onLogin(user) {
   state.user = user;
-  const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single();
+  const { data: profile } = await sb.from('profiles').select('role,allowed_areas').eq('id', user.id).single();
   state.role = profile?.role || 'viewer';
+  state.allowedAreas = profile?.allowed_areas || [];
   document.getElementById('user-email').textContent = user.email;
   const roleEl = document.getElementById('user-role');
   roleEl.textContent = state.role;
@@ -232,6 +233,18 @@ async function upsertProperty(payload, currentId) {
 // ============================================================
 function render() {
   renderSidebar();
+  // Viewer sin áreas asignadas
+  if (!isAdmin() && (!state.allowedAreas || state.allowedAreas.length === 0)) {
+    document.getElementById('content').innerHTML = `
+      <div class="text-center py-20 max-w-md mx-auto">
+        <div class="text-5xl mb-4">🔒</div>
+        <h3 class="text-lg font-semibold text-slate-700">Sin acceso asignado</h3>
+        <p class="text-sm text-slate-500 mt-2">Tu administrador todavía no te asignó áreas de trabajo. Contactalo para pedir acceso.</p>
+      </div>`;
+    document.getElementById('area-title').textContent = '';
+    document.getElementById('area-desc').textContent = '';
+    return;
+  }
   const area = state.areas.find(a => a.id === state.currentAreaId);
   if (!area) {
     document.getElementById('content').innerHTML = '<p class="text-slate-500">Crea un área para empezar.</p>';
@@ -246,7 +259,13 @@ function render() {
 
 function renderSidebar() {
   const nav = document.getElementById('sidebar-nav');
-  nav.innerHTML = state.areas.map(area => {
+  // Admin ve todas las áreas; viewer solo las que el admin le asignó
+  const visibleAreas = isAdmin() ? state.areas : state.areas.filter(a => (state.allowedAreas || []).includes(a.id));
+  // Si el viewer no tiene áreas asignadas o la actual no está permitida, resetea
+  if (!isAdmin() && visibleAreas.length && !visibleAreas.find(a => a.id === state.currentAreaId)) {
+    state.currentAreaId = visibleAreas[0].id;
+  }
+  nav.innerHTML = visibleAreas.map(area => {
     const count = (state.systems[area.id] || []).length;
     return `
       <button onclick="selectArea('${area.id}')"
@@ -261,6 +280,279 @@ function renderSidebar() {
 function selectArea(id) {
   state.currentAreaId = id;
   render();
+}
+
+// ════════════════════════════════════════════════════════════
+// 👥 GESTIÓN DE EQUIPO (admin: invita usuarios, asigna áreas)
+// ════════════════════════════════════════════════════════════
+async function openTeamMgmt() {
+  if (!isAdmin()) return alert('Solo admins');
+  const { data: profiles, error } = await sb.from('profiles')
+    .select('id,email,role,allowed_areas,created_at')
+    .order('created_at');
+  if (error) return alert('Error: ' + error.message);
+
+  const areaCheckboxes = (selected = [], idPrefix = 'inv') => state.areas.map(a => `
+    <label class="inline-flex items-center gap-1 text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded cursor-pointer">
+      <input type="checkbox" value="${a.id}" id="${idPrefix}-area-${a.id}" ${selected.includes(a.id)?'checked':''} class="cursor-pointer" />
+      <span>${a.icon} ${a.name}</span>
+    </label>`).join('');
+
+  const html = `
+    <div class="space-y-4">
+      <!-- Invitar nuevo -->
+      <div class="border-2 border-emerald-300 bg-emerald-50 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-emerald-900 mb-2">➕ Invitar usuario nuevo</div>
+        <div class="space-y-2">
+          <input id="inv-email" type="email" placeholder="email@ejemplo.com" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-600">Rol:</label>
+            <select id="inv-role" class="border border-slate-300 rounded px-2 py-1 text-sm">
+              <option value="viewer">viewer (solo ver lo asignado)</option>
+              <option value="admin">admin (ve todo + gestiona)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-slate-600 block mb-1">Áreas visibles (no aplica si es admin):</label>
+            <div class="flex flex-wrap gap-1">${areaCheckboxes([], 'inv')}</div>
+          </div>
+          <button onclick="inviteUser()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">📧 Enviar invitación</button>
+          <p class="text-[10px] text-slate-500">El usuario recibirá un email para crear su contraseña. El rol y las áreas quedan pre-asignados.</p>
+        </div>
+      </div>
+
+      <!-- Usuarios actuales -->
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">Usuarios actuales (${profiles?.length||0})</div>
+        <div class="space-y-2">
+          ${(profiles || []).map(p => {
+            const isCurrent = p.id === state.user.id;
+            return `
+              <div class="border border-slate-200 rounded-lg p-3 ${isCurrent?'bg-slate-50':''}">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold truncate">${p.email}${isCurrent?' <span class="text-[10px] text-slate-500">(vos)</span>':''}</div>
+                    <div class="text-[10px] text-slate-500">Creado: ${new Date(p.created_at).toLocaleDateString('es-MX')}</div>
+                  </div>
+                  <select onchange="updateUserRole('${p.id}', this.value)" ${isCurrent?'disabled':''} class="text-xs border border-slate-300 rounded px-2 py-1">
+                    <option value="viewer" ${p.role==='viewer'?'selected':''}>viewer</option>
+                    <option value="admin" ${p.role==='admin'?'selected':''}>admin</option>
+                  </select>
+                  ${!isCurrent ? `<button onclick="deleteUser('${p.id}','${p.email.replace(/'/g,"\\'")}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario">🗑</button>` : ''}
+                </div>
+                ${p.role !== 'admin' ? `
+                  <div class="text-[10px] text-slate-500 mb-1">Áreas asignadas:</div>
+                  <div class="flex flex-wrap gap-1 mb-2">${areaCheckboxes(p.allowed_areas || [], 'u'+p.id)}</div>
+                  <button onclick="updateUserAreas('${p.id}')" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1 rounded">💾 Guardar áreas</button>
+                ` : '<div class="text-[10px] text-emerald-700 italic">Admin: ve todas las áreas</div>'}
+              </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  openModal('👥 Gestión de equipo', html);
+}
+
+async function inviteUser() {
+  const email = document.getElementById('inv-email').value.trim();
+  if (!email) return alert('Pon un email');
+  const role = document.getElementById('inv-role').value;
+  const areas = state.areas.filter(a => document.getElementById(`inv-area-${a.id}`)?.checked).map(a => a.id);
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/invite-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ email, role, allowed_areas: areas, inviter_id: state.user.id })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'falló');
+    alert(`✓ ${r.action === 'invited' ? 'Invitación enviada a ' : 'Usuario actualizado: '}${r.email}\n\n${r.action === 'invited' ? 'Va a recibir un email para crear su contraseña.' : ''}`);
+    closeModal();
+    setTimeout(openTeamMgmt, 200);
+  } catch (e) {
+    alert('Error: ' + e.message + '\n\n(¿Está desplegada la edge function invite-user? `npx supabase functions deploy invite-user --no-verify-jwt`)');
+    btn.disabled = false; btn.textContent = '📧 Enviar invitación';
+  }
+}
+
+async function updateUserAreas(userId) {
+  const areas = state.areas.filter(a => document.getElementById(`u${userId}-area-${a.id}`)?.checked).map(a => a.id);
+  const { error } = await sb.from('profiles').update({ allowed_areas: areas }).eq('id', userId);
+  if (error) return alert('Error: ' + error.message);
+  alert('✓ Áreas actualizadas');
+}
+
+async function updateUserRole(userId, role) {
+  if (!confirm(`¿Cambiar rol a "${role}"?`)) { setTimeout(openTeamMgmt, 0); return; }
+  const { error } = await sb.from('profiles').update({ role }).eq('id', userId);
+  if (error) return alert('Error: ' + error.message);
+  closeModal(); setTimeout(openTeamMgmt, 200);
+}
+
+async function deleteUser(userId, email) {
+  if (!confirm(`¿Eliminar usuario "${email}"?\n\nEsto borra su perfil pero no su cuenta auth (eso se hace desde Supabase Studio).`)) return;
+  const { error } = await sb.from('profiles').delete().eq('id', userId);
+  if (error) return alert('Error: ' + error.message);
+  closeModal(); setTimeout(openTeamMgmt, 200);
+}
+
+// ════════════════════════════════════════════════════════════
+// ⚙️ MI PERFIL — cualquier usuario edita sus datos + contraseña
+// ════════════════════════════════════════════════════════════
+async function openMyProfile() {
+  if (!state.user) return;
+  const { data: p } = await sb.from('profiles').select('email,role,full_name,phone,allowed_areas,created_at').eq('id', state.user.id).single();
+  if (!p) return alert('No se pudo cargar tu perfil');
+
+  const areaNames = state.areas.filter(a => (p.allowed_areas || []).includes(a.id)).map(a => `${a.icon} ${a.name}`);
+  const html = `
+    <div class="space-y-4">
+      <!-- Datos -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-3">👤 Mis datos</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] text-slate-500 mb-0.5">Email</label>
+            <input value="${p.email}" disabled class="w-full border border-slate-200 bg-slate-50 rounded px-3 py-2 text-sm text-slate-500" />
+            <p class="text-[9px] text-slate-400 mt-0.5">Para cambiar el email contactá a tu admin</p>
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-500 mb-0.5">Rol</label>
+            <input value="${p.role}" disabled class="w-full border border-slate-200 bg-slate-50 rounded px-3 py-2 text-sm text-slate-500" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-[10px] text-slate-500 mb-0.5">Nombre completo</label>
+            <input id="mp-name" value="${(p.full_name||'').replace(/"/g,'&quot;')}" placeholder="Nicolas Lara" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-[10px] text-slate-500 mb-0.5">Teléfono</label>
+            <input id="mp-phone" value="${(p.phone||'').replace(/"/g,'&quot;')}" placeholder="+1 555 ..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+        </div>
+        ${p.role !== 'admin' ? `
+          <div class="mt-3 pt-3 border-t border-slate-100">
+            <div class="text-[10px] text-slate-500 mb-1">Áreas con acceso (${areaNames.length}):</div>
+            <div class="flex flex-wrap gap-1">${areaNames.length ? areaNames.map(n => `<span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded">${n}</span>`).join('') : '<span class="text-[10px] text-amber-600">Ninguna — contactá a tu admin</span>'}</div>
+          </div>
+        ` : '<div class="mt-3 pt-3 border-t border-slate-100 text-[10px] text-emerald-700">✨ Como admin, ves todas las áreas y podés gestionar el equipo</div>'}
+        <button onclick="saveMyProfile()" class="mt-3 w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar datos</button>
+      </div>
+
+      <!-- Cambiar contraseña -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-3">🔐 Cambiar contraseña</div>
+        <div class="space-y-2">
+          <input id="mp-pwd1" type="password" placeholder="Contraseña nueva (mín 8 caracteres)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          <input id="mp-pwd2" type="password" placeholder="Repetí la contraseña" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          <button onclick="changeMyPassword()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🔐 Actualizar contraseña</button>
+          <p class="text-[10px] text-slate-400">No necesitás tu contraseña actual (ya estás autenticado). Si te olvidás la nueva, usá "olvidé mi contraseña" en login o pedile al admin que te reenvíe una invitación.</p>
+        </div>
+      </div>
+
+      <div class="text-[10px] text-slate-400 text-center">Cuenta creada: ${new Date(p.created_at).toLocaleString('es-MX')}</div>
+    </div>
+  `;
+  openModal('⚙️ Mi perfil', html);
+}
+
+async function saveMyProfile() {
+  const full_name = document.getElementById('mp-name').value.trim();
+  const phone = document.getElementById('mp-phone').value.trim();
+  const { error } = await sb.from('profiles').update({ full_name, phone }).eq('id', state.user.id);
+  if (error) return alert('Error: ' + error.message);
+  alert('✓ Datos guardados');
+}
+
+async function changeMyPassword() {
+  const p1 = document.getElementById('mp-pwd1').value;
+  const p2 = document.getElementById('mp-pwd2').value;
+  if (!p1 || p1.length < 8) return alert('La contraseña debe tener al menos 8 caracteres');
+  if (p1 !== p2) return alert('Las contraseñas no coinciden');
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) return alert('Error: ' + error.message);
+  document.getElementById('mp-pwd1').value = '';
+  document.getElementById('mp-pwd2').value = '';
+  alert('✓ Contraseña actualizada. Te recomendamos cerrar sesión y volver a entrar.');
+}
+
+// ════════════════════════════════════════════════════════════
+// 📜 AUDITORÍA (admin) — quién hizo qué cambio y cuándo
+// ════════════════════════════════════════════════════════════
+async function openAuditLog() {
+  if (!isAdmin()) return alert('Solo admins');
+  const [{ data: events }, { data: team }] = await Promise.all([
+    sb.from('audit_log').select('*').order('created_at', { ascending: false }).limit(100),
+    sb.rpc('get_team_audit')
+  ]);
+
+  const html = `
+    <div class="space-y-3">
+      <!-- Últimos accesos -->
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📅 Últimos accesos</div>
+        <div class="border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50"><tr>
+              <th class="text-left p-2">Usuario</th>
+              <th class="text-left p-2">Rol</th>
+              <th class="text-left p-2">Último ingreso</th>
+              <th class="text-left p-2">Cuenta creada</th>
+            </tr></thead>
+            <tbody>
+              ${(team || []).map(u => `
+                <tr class="border-t border-slate-100">
+                  <td class="p-2 font-semibold">${u.email}${u.full_name?` <span class="text-slate-400 font-normal">(${u.full_name})</span>`:''}</td>
+                  <td class="p-2"><span class="text-[10px] ${u.role==='admin'?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-700'} px-1.5 py-0.5 rounded">${u.role}</span></td>
+                  <td class="p-2 text-slate-600">${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('es-MX') : '<span class="text-amber-600">nunca</span>'}</td>
+                  <td class="p-2 text-slate-500">${new Date(u.created_at).toLocaleDateString('es-MX')}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin datos</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Últimos cambios -->
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📜 Últimos cambios (100 más recientes)</div>
+        <div class="border border-slate-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50 sticky top-0"><tr>
+              <th class="text-left p-2">Cuándo</th>
+              <th class="text-left p-2">Quién</th>
+              <th class="text-left p-2">Acción</th>
+              <th class="text-left p-2">Tabla</th>
+              <th class="text-left p-2">Cambios</th>
+            </tr></thead>
+            <tbody>
+              ${(events || []).map(e => {
+                const actionIcon = e.action === 'insert' ? '➕' : e.action === 'delete' ? '🗑️' : '✏️';
+                const changesPreview = e.changes ? (
+                  e.action === 'update'
+                    ? Object.entries(e.changes).slice(0,3).map(([k,v]) => `<code class="text-[10px]">${k}</code>`).join(', ') + (Object.keys(e.changes).length > 3 ? '...' : '')
+                    : (e.changes.summary || '')
+                ) : '';
+                return `
+                  <tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="alert('Cambios:\\n' + ${JSON.stringify(JSON.stringify(e.changes, null, 2))})">
+                    <td class="p-2 text-slate-500 whitespace-nowrap">${new Date(e.created_at).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</td>
+                    <td class="p-2 truncate max-w-[150px]" title="${e.actor_email||''}">${e.actor_email || '<span class="text-slate-400">sistema</span>'}</td>
+                    <td class="p-2">${actionIcon} ${e.action}</td>
+                    <td class="p-2 text-slate-600"><code class="text-[10px]">${e.table_name}</code></td>
+                    <td class="p-2 text-slate-500 truncate max-w-[250px]">${changesPreview}</td>
+                  </tr>
+                `;
+              }).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-400">Sin eventos todavía</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">Click en una fila para ver el detalle completo del cambio.</p>
+      </div>
+    </div>
+  `;
+  openModal('📜 Auditoría', html);
 }
 
 function renderSystems(area) {
@@ -535,6 +827,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'ops-planner') return openOpsPlanner(sys);
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
+  if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
 }
 
 // ============================================================
