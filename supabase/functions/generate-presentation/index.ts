@@ -33,9 +33,10 @@ Deno.serve(async (req) => {
     language = "es",
     outline_hint,
     require_live_data = true,
-    domain = "real-estate",          // 'real-estate' | 'marketing' | 'finance' | 'tech' | 'sales' | 'leadership' | 'general'
-    preferred_sources,                // string libre con fuentes que el coach quiere priorizar
-    geographic_focus,                 // 'texas' | 'usa' | 'latam' | 'global' | string libre
+    research_mode = false,            // 🔬 Modo investigación profunda (extended thinking + 25 searches)
+    domain = "real-estate",
+    preferred_sources,
+    geographic_focus,
     user_id
   } = body;
 
@@ -82,7 +83,20 @@ INPUT:
 ${outline_hint ? `\n- Outline sugerido por el coach: ${outline_hint}` : ''}
 ${preferred_sources ? `\n- FUENTES QUE EL COACH PIDE PRIORIZAR: ${preferred_sources}` : ''}
 
-REGLAS CRÍTICAS:
+${research_mode ? `🔬 MODO INVESTIGACIÓN PROFUNDA ACTIVADO
+- ANTES de empezar a escribir slides, PIENSA EN EXTENSO (thinking habilitado):
+  · Qué subtemas son los más relevantes para esta audiencia
+  · Qué data específica necesitás buscar
+  · Qué ángulos / contrastes / casos reales harían la clase memorable
+- DESPUÉS investigá ITERATIVAMENTE (tenés 25 web searches disponibles):
+  · Primero búsqueda amplia del tema → identifica subtemas y fuentes clave
+  · Después búsquedas específicas por cada slide importante (data, casos, ejemplos)
+  · Verifica al menos 2 fuentes para cada estadística importante
+  · Busca casos reales, números actualizados al ${today.slice(0,4)}, comparativas, contradicciones
+- La clase debe sentirse curada por un EXPERTO que pasó horas investigando, no Wikipedia copy-paste.
+- Incluí "deep_insights" que un coach junior NO sabría.
+
+` : ''}REGLAS CRÍTICAS:
 1. **TODA estadística, tasa, precio, número o dato DEBE venir de web search en VIVO**.
    No inventes números. No uses "approximately" sin fuente. Cada número debe venir con su fuente y fecha de acceso.
 2. Para este dominio (${domain}), USA fuentes oficiales/confiables sugeridas:
@@ -92,7 +106,9 @@ REGLAS CRÍTICAS:
 4. Tone profesional pero accesible. Si el idioma es español, usá español neutro/rioplatense según audiencia.
 5. Slides 0-15 segundos de lectura cada uno. Bullets de máximo 12 palabras.
 6. Cada slide debe tener "speaker_notes" con el guion del coach (2-4 oraciones).
-7. Adaptá el contenido y ejemplos al tema solicitado — NO defaultees a real estate si el topic no lo pide.
+7. Adaptá el contenido y ejemplos al tema solicitado — NO defaultees a real estate si el topic no lo pide.${research_mode ? `
+8. **MODO INVESTIGACIÓN**: cada speaker_notes debe incluir 1 dato concreto extra (case study, contradicción, insight no obvio) que solo se descubre investigando profundo.
+9. **MODO INVESTIGACIÓN**: agregá 2-3 slides extra al final con "Bonus deep dives" — los temas que descubriste investigando que vale la pena cubrir.` : ''}
 
 ESTRUCTURA TÍPICA (adaptar al tema):
 - Slide 1: Portada (title + presenter + class number)
@@ -125,12 +141,19 @@ Devolvé SOLO JSON válido (sin markdown wrapper):
 }`;
 
   // Llamar a Anthropic con web_search habilitado
+  // Modo investigación profunda: extended thinking + 25 web searches + más tokens
   const requestBody: any = {
     model: "claude-sonnet-4-5",
-    max_tokens: 16000,
-    tools: require_live_data ? [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }] : undefined,
+    max_tokens: research_mode ? 32000 : 16000,
+    tools: require_live_data
+      ? [{ type: "web_search_20250305", name: "web_search", max_uses: research_mode ? 25 : 8 }]
+      : undefined,
     messages: [{ role: "user", content: prompt }]
   };
+  // Extended thinking solo en research mode (más caro, más profundo)
+  if (research_mode) {
+    requestBody.thinking = { type: "enabled", budget_tokens: 12000 };
+  }
 
   const startMs = Date.now();
   const r = await fetch("https://api.anthropic.com/v1/messages", {

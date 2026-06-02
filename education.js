@@ -986,14 +986,20 @@ function eduRenderPresentations() {
           <input id="edu-pres-audience" value="${m?.name ? 'Estudiantes de ' + m.name : 'Estudiantes de la mentoría'}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
         </div>
 
-        <div class="flex items-center gap-3 mt-3 pt-3 border-t border-violet-200">
-          <label class="flex items-center gap-2 text-xs">
-            <input type="checkbox" id="edu-pres-live" checked />
-            <span><strong>🌐 Web search live</strong> — datos verificables en vivo</span>
-          </label>
-          <button onclick="withLoading(this, eduGeneratePresentation)" class="ml-auto bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2 rounded">🤖 Generar con IA</button>
+        <div class="flex flex-col gap-2 mt-3 pt-3 border-t border-violet-200">
+          <div class="flex items-center gap-4 flex-wrap">
+            <label class="flex items-center gap-2 text-xs">
+              <input type="checkbox" id="edu-pres-live" checked />
+              <span><strong>🌐 Web search live</strong> — datos verificables en vivo</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs bg-amber-50 border border-amber-300 px-2 py-1 rounded">
+              <input type="checkbox" id="edu-pres-research" />
+              <span><strong>🔬 Investigación profunda</strong> — extended thinking + 25 búsquedas (3-5 min, +costo, insights no obvios)</span>
+            </label>
+          </div>
+          <button onclick="withLoading(this, eduGeneratePresentation)" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2.5 rounded">🤖 Generar con IA</button>
         </div>
-        <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~30-90 seg. Claude hace hasta 8 web searches en vivo según el dominio elegido. Cita cada dato con fuente y fecha.</div>
+        <div class="text-[10px] text-violet-700 mt-2 italic" id="edu-pres-time-hint">⚡ Modo normal: ~30-90 seg, 8 web searches. Modo investigación: ~3-5 min, 25 searches + thinking. Activá investigación para casos donde necesitás profundidad real (clase nueva, tema técnico, lanzamiento).</div>
       </div>
 
       ${ai.loading ? `
@@ -1101,6 +1107,7 @@ async function eduGeneratePresentation() {
       geographic_focus: document.getElementById('edu-pres-geo')?.value || null,
       preferred_sources: document.getElementById('edu-pres-sources')?.value || null,
       require_live_data: document.getElementById('edu-pres-live').checked,
+      research_mode: document.getElementById('edu-pres-research')?.checked || false,
       user_id: state.user.id
     };
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/generate-presentation`, {
