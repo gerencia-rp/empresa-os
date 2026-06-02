@@ -2249,11 +2249,12 @@ function opRenderPrintable(filteredDay) {
   });
 
   return `
+    <div class="flex-1 overflow-y-auto bg-white" id="op-print-scroll">
     <div class="bg-white p-4 sm:p-6 print:p-0" id="op-printable">
-      <div class="sticky top-0 bg-amber-100 border-b border-amber-300 px-3 py-2 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-4 flex justify-between items-center print:hidden">
-        <div class="text-xs text-amber-900"><strong>🖼️ Vista entregable</strong> — Cmd+Shift+4 para screenshot, o "Imprimir → Guardar PDF"</div>
+      <div class="sticky top-0 bg-amber-100 border-b border-amber-300 px-3 py-2 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-4 flex justify-between items-center print:hidden z-20">
+        <div class="text-xs text-amber-900"><strong>🖼️ Vista entregable</strong> — scrolleá ↓ para ver todo · 🖨️ para PDF completo</div>
         <div class="flex gap-1">
-          <button onclick="window.print()" class="text-xs bg-slate-900 text-white px-3 py-1 rounded font-bold">🖨️ Imprimir</button>
+          <button onclick="window.print()" class="text-xs bg-slate-900 text-white px-3 py-1 rounded font-bold">🖨️ Imprimir PDF</button>
           <button onclick="opSetView('day')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded font-bold">← Volver</button>
         </div>
       </div>
@@ -2318,11 +2319,27 @@ function opRenderPrintable(filteredDay) {
         `;
       })()}
     </div>
+    </div>
     <style>
       @media print {
-        body * { visibility: hidden; }
-        #op-printable, #op-printable * { visibility: visible; }
-        #op-printable { position: absolute; left: 0; top: 0; width: 100%; }
+        /* Ocultar TODO menos el printable */
+        body * { visibility: hidden !important; }
+        #op-printable, #op-printable * { visibility: visible !important; }
+        /* Quitar overflow/altura de TODOS los padres para que el contenido fluya completo */
+        html, body { height: auto !important; overflow: visible !important; background: white !important; }
+        #modal, #modal *, #op-print-scroll, #op-root { overflow: visible !important; height: auto !important; max-height: none !important; position: static !important; background: white !important; }
+        #op-printable {
+          position: absolute !important;
+          left: 0 !important; top: 0 !important;
+          width: 100% !important; height: auto !important;
+          overflow: visible !important;
+          padding: 12px !important;
+        }
+        #op-printable .print\\:hidden { display: none !important; }
+        /* Evitar que las tarjetas se partan a la mitad entre páginas */
+        #op-printable [class*="break-inside-avoid"] { break-inside: avoid; page-break-inside: avoid; }
+        /* Forzar fondo en bloques con clases bg-* */
+        #op-printable * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       }
     </style>
   `;
