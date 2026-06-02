@@ -1882,6 +1882,10 @@ async function openCashout(sys) {
 
   openModal(`💰 ${sys.name}`, `
     ${propertySelectorHtml(d.propertyId, 'cashoutOnPropertyChange', 'cashoutSaveProperty')}
+    <div class="flex items-center justify-between text-[10px] mb-3 -mt-1">
+      <span class="text-emerald-700 font-bold">🔒 Auto-guardado — los números persisten al cerrar el modal</span>
+      <span id="co-saved-badge" class="text-emerald-600 font-bold opacity-0 transition-opacity"></span>
+    </div>
     <div class="flex items-center gap-2 mb-5 pb-3 border-b border-slate-200">
       <label class="text-xs font-semibold text-slate-600 uppercase">Deal:</label>
       <select id="co-deal-select" class="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">${dealOptions}</select>
@@ -2007,11 +2011,52 @@ async function openCashout(sys) {
     if (opt) opt.textContent = dd.name || sys.data.currentDealId;
 
     saveSystemData(sys);
+    // Mostrar badge de guardado por 2s
+    const b = document.getElementById('co-saved-badge');
+    if (b) {
+      b.textContent = '💾 Guardado ' + new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      b.classList.remove('opacity-0'); b.classList.add('opacity-100');
+      clearTimeout(window._coSavedTimer);
+      window._coSavedTimer = setTimeout(() => { b.classList.remove('opacity-100'); b.classList.add('opacity-0'); }, 2000);
+    }
   };
 
-  ['co-name','co-arv','co-payoff'].forEach(id => document.getElementById(id).addEventListener('input', recompute));
+  // input → re-calcula visualmente en vivo (sin guardar)
+  // change → guarda al hacer blur (evita 5 escrituras a Supabase mientras tipeás "2000")
+  const visualUpdate = () => {
+    // Solo actualiza la UI; no toca DB
+    const dd = sys.data.deals[sys.data.currentDealId];
+    dd.name = document.getElementById('co-name').value;
+    dd.arv = parseFloat(document.getElementById('co-arv').value) || 0;
+    dd.payoff = parseFloat(document.getElementById('co-payoff').value) || 0;
+    if (showAdminSettings) {
+      s.ltv = parseFloat(document.getElementById('co-ltv').value) || 75;
+      s.closingCostsFixed = parseFloat(document.getElementById('co-costs-fixed-input').value) || 0;
+      s.closingCostsPct = parseFloat(document.getElementById('co-costs-pct-input').value) || 0;
+    }
+    const loan = dd.arv * (s.ltv / 100);
+    const closingCosts = s.useCostsPct ? loan * (s.closingCostsPct / 100) : s.closingCostsFixed;
+    const cashout = loan - dd.payoff - closingCosts;
+    document.getElementById('co-ltv-show').textContent = s.ltv;
+    document.getElementById('co-loan').textContent = fmt(loan);
+    document.getElementById('co-payoff-out').textContent = fmt(dd.payoff);
+    document.getElementById('co-costs').textContent = fmt(closingCosts);
+    const co = document.getElementById('co-cashout');
+    co.textContent = fmt(cashout);
+    co.className = `text-4xl font-bold mt-1 ${cashout < 0 ? 'text-red-400' : cashout < 5000 ? 'text-amber-300' : 'text-green-400'}`;
+    document.getElementById('co-cashout-arv').textContent = dd.arv ? `${(cashout/dd.arv*100).toFixed(2)}%` : '—';
+    document.getElementById('co-ltc').textContent = loan ? `${(dd.payoff/loan*100).toFixed(1)}%` : '—';
+  };
+
+  ['co-name','co-arv','co-payoff'].forEach(id => {
+    document.getElementById(id).addEventListener('input', visualUpdate);
+    document.getElementById(id).addEventListener('change', recompute);
+  });
   if (showAdminSettings) {
-    ['co-ltv','co-costs-fixed-input','co-costs-pct-input'].forEach(id => document.getElementById(id).addEventListener('input', recompute));
+    ['co-ltv','co-costs-fixed-input','co-costs-pct-input'].forEach(id => {
+      document.getElementById(id).addEventListener('input', visualUpdate);
+      document.getElementById(id).addEventListener('change', recompute);
+    });
     document.querySelectorAll('input[name="co-mode"]').forEach(el => el.addEventListener('change', recompute));
   }
   recompute();
@@ -2046,6 +2091,15 @@ function cashoutOnPropertyChange(propId) {
   if (!propId) { d.propertyId = null; saveSystemData(sys); openCashout(sys); return; }
   const p = window.propertiesCache.find(x => x.id === propId);
   if (!p) return;
+  // 1) Buscar si ya hay un deal vinculado a esta propiedad — si existe, activarlo (NO sobrescribir)
+  const existingDealId = Object.entries(sys.data.deals).find(([id, dd]) => dd.propertyId === p.id)?.[0];
+  if (existingDealId && existingDealId !== sys.data.currentDealId) {
+    sys.data.currentDealId = existingDealId;
+    saveSystemData(sys);
+    openCashout(sys);
+    return;
+  }
+  // 2) Si NO había deal previo para esta propiedad, vincular el deal actual + traer defaults desde properties
   d.propertyId = p.id;
   if (p.address) d.name = p.address;
   if (p.arv) d.arv = +p.arv;

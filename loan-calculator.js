@@ -56,11 +56,67 @@ function loanCalc() {
 // ─── ENTRY POINT ───
 async function openLoanCalculator(sys) {
   loanState.sys = sys;
+  // Inicializar contenedor de datos por propiedad
+  if (!sys.data) sys.data = {};
+  if (!sys.data.byProperty) sys.data.byProperty = {};
+  if (!sys.data.lastPropertyId) sys.data.lastPropertyId = null;
   await loadProperties();
+  // Restaurar la última propiedad/cálculo donde el usuario estaba
+  if (sys.data.lastPropertyId) {
+    loanLoadFromSaved(sys.data.lastPropertyId);
+  }
   openModal(`🏦 ${sys.name}`, '<div id="loan-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-6xl');
   loanRender();
+}
+
+// Carga loanState desde sys.data.byProperty[propId] si existe
+function loanLoadFromSaved(propId) {
+  const sys = loanState.sys;
+  if (!sys) return false;
+  const saved = sys.data?.byProperty?.[propId];
+  if (!saved) return false;
+  // Cargar todos los campos guardados
+  Object.assign(loanState, saved);
+  loanState.propertyId = propId;
+  return true;
+}
+
+// Persiste el estado actual del loan calc a sys.data.byProperty[propId]
+function loanPersist() {
+  const sys = loanState.sys;
+  if (!sys || !loanState.propertyId) return; // solo guardamos si hay propiedad vinculada
+  if (!sys.data.byProperty) sys.data.byProperty = {};
+  const snapshot = {
+    mode: loanState.mode,
+    purchasePrice: loanState.purchasePrice,
+    remodelCost: loanState.remodelCost,
+    arv: loanState.arv,
+    hmlLtcPct: loanState.hmlLtcPct,
+    hmlRatePct: loanState.hmlRatePct,
+    hmlPointsPct: loanState.hmlPointsPct,
+    hmlTermMonths: loanState.hmlTermMonths,
+    hmlClosingFlat: loanState.hmlClosingFlat,
+    convLtvPct: loanState.convLtvPct,
+    convRatePct: loanState.convRatePct,
+    convTermMonths: loanState.convTermMonths,
+    convClosingPct: loanState.convClosingPct,
+    _updatedAt: new Date().toISOString()
+  };
+  sys.data.byProperty[loanState.propertyId] = snapshot;
+  sys.data.lastPropertyId = loanState.propertyId;
+  saveSystemData(sys);
+  loanShowSavedBadge();
+}
+
+function loanShowSavedBadge() {
+  const b = document.getElementById('loan-saved-badge');
+  if (!b) return;
+  b.textContent = '💾 Guardado ' + new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  b.classList.remove('opacity-0'); b.classList.add('opacity-100');
+  clearTimeout(loanState._savedTimer);
+  loanState._savedTimer = setTimeout(() => { b.classList.remove('opacity-100'); b.classList.add('opacity-0'); }, 2000);
 }
 
 function loanOnPropertyChange(propId) {
@@ -68,10 +124,20 @@ function loanOnPropertyChange(propId) {
   const p = window.propertiesCache.find(x => x.id === propId);
   if (!p) return;
   loanState.propertyId = p.id;
-  if (p.purchase_price) loanState.purchasePrice = +p.purchase_price;
-  if (p.remodel_cost_estimated) loanState.remodelCost = +p.remodel_cost_estimated;
-  if (p.arv) loanState.arv = +p.arv;
-  if (p.ltv_pct) loanState.convLtvPct = +p.ltv_pct;
+  // 1) Cargar lo que tengamos guardado para esta propiedad (preserva los inputs del usuario)
+  const restored = loanLoadFromSaved(p.id);
+  // 2) Si NO había nada guardado, traer defaults desde la tabla properties
+  if (!restored) {
+    if (p.purchase_price) loanState.purchasePrice = +p.purchase_price;
+    if (p.remodel_cost_estimated) loanState.remodelCost = +p.remodel_cost_estimated;
+    if (p.arv) loanState.arv = +p.arv;
+    if (p.ltv_pct) loanState.convLtvPct = +p.ltv_pct;
+  }
+  // 3) Actualizar lastPropertyId aunque no haya datos guardados aún
+  if (loanState.sys && loanState.sys.data) {
+    loanState.sys.data.lastPropertyId = p.id;
+    saveSystemData(loanState.sys);
+  }
   loanRender();
 }
 
@@ -118,20 +184,30 @@ function loanRender() {
 
   root.innerHTML = `
     ${propertySelectorHtml(loanState.propertyId, 'loanOnPropertyChange', 'loanSaveProperty')}
+    ${loanState.propertyId ? `
+      <div class="flex items-center justify-between text-[10px] mb-3 -mt-1">
+        <span class="text-emerald-700 font-bold">🔒 Auto-guardado por propiedad — tus números persisten al cerrar el modal</span>
+        <span id="loan-saved-badge" class="text-emerald-600 font-bold opacity-0 transition-opacity"></span>
+      </div>
+    ` : `
+      <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900 mb-3">
+        ⚠️ <strong>Estás en modo "one-off"</strong> — los cálculos NO se guardan. Vinculá una propiedad arriba para que se guarden automáticamente.
+      </div>
+    `}
 
     <!-- Toggle tipo de préstamo -->
     <div class="flex gap-2 mb-4">
-      <button onclick="loanState.mode='hml'; loanRender()" class="flex-1 p-3 rounded-lg border-2 ${m==='hml'?'border-orange-500 bg-orange-50':'border-slate-200 hover:border-slate-400'}">
+      <button onclick="loanState.mode='hml'; loanRender(); loanPersist()" class="flex-1 p-3 rounded-lg border-2 ${m==='hml'?'border-orange-500 bg-orange-50':'border-slate-200 hover:border-slate-400'}">
         <div class="text-2xl mb-1">⚡</div>
         <div class="text-sm font-bold ${m==='hml'?'text-orange-900':''}">Hard Money Lender</div>
         <div class="text-[10px] text-slate-500">Corto plazo (6-12m) · Interest only · 10-13%</div>
       </button>
-      <button onclick="loanState.mode='conv'; loanRender()" class="flex-1 p-3 rounded-lg border-2 ${m==='conv'?'border-blue-500 bg-blue-50':'border-slate-200 hover:border-slate-400'}">
+      <button onclick="loanState.mode='conv'; loanRender(); loanPersist()" class="flex-1 p-3 rounded-lg border-2 ${m==='conv'?'border-blue-500 bg-blue-50':'border-slate-200 hover:border-slate-400'}">
         <div class="text-2xl mb-1">🏛️</div>
         <div class="text-sm font-bold ${m==='conv'?'text-blue-900':''}">Convencional 30 años (Refi)</div>
         <div class="text-[10px] text-slate-500">Largo plazo · P&I amortizado · 7-8%</div>
       </button>
-      <button onclick="loanState.mode='compare'; loanRender()" class="flex-1 p-3 rounded-lg border-2 ${m==='compare'?'border-slate-900 bg-slate-100':'border-slate-200 hover:border-slate-400'}">
+      <button onclick="loanState.mode='compare'; loanRender(); loanPersist()" class="flex-1 p-3 rounded-lg border-2 ${m==='compare'?'border-slate-900 bg-slate-100':'border-slate-200 hover:border-slate-400'}">
         <div class="text-2xl mb-1">⚖️</div>
         <div class="text-sm font-bold ${m==='compare'?'text-slate-900':''}">Comparar BRRRR completo</div>
         <div class="text-[10px] text-slate-500">HML → Refi → Cash-out</div>
@@ -146,15 +222,15 @@ function loanRender() {
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Precio compra</label>
-              <input type="number" value="${loanState.purchasePrice}" onchange="loanState.purchasePrice=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${loanState.purchasePrice}" onchange="loanState.purchasePrice=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Costo remodelación</label>
-              <input type="number" value="${loanState.remodelCost}" onchange="loanState.remodelCost=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${loanState.remodelCost}" onchange="loanState.remodelCost=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">ARV (después remodel)</label>
-              <input type="number" value="${loanState.arv}" onchange="loanState.arv=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${loanState.arv}" onchange="loanState.arv=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
           </div>
           <p class="text-[10px] text-slate-400 mt-2">Base HML = Precio + Remodel = ${loanFmt(loanState.purchasePrice + loanState.remodelCost)} · Loan-to-ARV implícito = ${(((loanState.purchasePrice + loanState.remodelCost) / (loanState.arv || 1)) * 100).toFixed(1)}%</p>
@@ -166,27 +242,27 @@ function loanRender() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">LTC % (Loan to Cost)</label>
-                <input type="number" step="1" value="${loanState.hmlLtcPct}" onchange="loanState.hmlLtcPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="1" value="${loanState.hmlLtcPct}" onchange="loanState.hmlLtcPct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt: 80-90% (purchase + rehab)</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Tasa anual %</label>
-                <input type="number" step="0.25" value="${loanState.hmlRatePct}" onchange="loanState.hmlRatePct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.25" value="${loanState.hmlRatePct}" onchange="loanState.hmlRatePct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt 2026: 10-13% (interest only)</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Origination % (points)</label>
-                <input type="number" step="0.5" value="${loanState.hmlPointsPct}" onchange="loanState.hmlPointsPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.5" value="${loanState.hmlPointsPct}" onchange="loanState.hmlPointsPct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt: 1-3 points</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Plazo (meses)</label>
-                <input type="number" value="${loanState.hmlTermMonths}" onchange="loanState.hmlTermMonths=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" value="${loanState.hmlTermMonths}" onchange="loanState.hmlTermMonths=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Típico 6-12 meses</p>
               </div>
               <div class="col-span-2">
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Closing costs adicionales (flat)</label>
-                <input type="number" value="${loanState.hmlClosingFlat}" onchange="loanState.hmlClosingFlat=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" value="${loanState.hmlClosingFlat}" onchange="loanState.hmlClosingFlat=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Appraisal + title + legal típico $2-3K</p>
               </div>
             </div>
@@ -199,17 +275,17 @@ function loanRender() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">LTV % del ARV</label>
-                <input type="number" step="1" value="${loanState.convLtvPct}" onchange="loanState.convLtvPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="1" value="${loanState.convLtvPct}" onchange="loanState.convLtvPct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt DSCR investor: 70-80%</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Tasa anual %</label>
-                <input type="number" step="0.125" value="${loanState.convRatePct}" onchange="loanState.convRatePct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.125" value="${loanState.convRatePct}" onchange="loanState.convRatePct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt 2026 investor: 7.25-8.0%</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Plazo (meses)</label>
-                <select onchange="loanState.convTermMonths=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                <select onchange="loanState.convTermMonths=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
                   <option value="360" ${loanState.convTermMonths===360?'selected':''}>360 (30 años)</option>
                   <option value="240" ${loanState.convTermMonths===240?'selected':''}>240 (20 años)</option>
                   <option value="180" ${loanState.convTermMonths===180?'selected':''}>180 (15 años)</option>
@@ -217,7 +293,7 @@ function loanRender() {
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Closing costs %</label>
-                <input type="number" step="0.5" value="${loanState.convClosingPct}" onchange="loanState.convClosingPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.5" value="${loanState.convClosingPct}" onchange="loanState.convClosingPct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Tu data real: ~8% (incluye escrow). Aproximado ${loanFmt((loanState.arv * loanState.convLtvPct / 100) * loanState.convClosingPct / 100)}</p>
               </div>
             </div>
