@@ -1161,25 +1161,75 @@ function opSchedDragStart(id) { opState.draggedScheduledId = id; opState.dragged
 
 async function opDropOnSlot(slotTime, ev) {
   ev.preventDefault();
+  let droppedId = null;
+  let droppedTask = null;
+
   if (opState.draggedScheduledId) {
     const id = opState.draggedScheduledId; opState.draggedScheduledId = null;
-    await sb.from('ops_day_tasks').update({ start_time: slotTime, updated_at: new Date().toISOString() }).eq('id', id);
+    droppedId = id;
+    droppedTask = opState.dayTasks.find(x => x.id === id);
   } else if (opState.draggedBacklogId) {
     const id = opState.draggedBacklogId; opState.draggedBacklogId = null;
-    await sb.from('ops_day_tasks').update({ date: opState.date, start_time: slotTime, updated_at: new Date().toISOString() }).eq('id', id);
+    droppedId = id;
+    droppedTask = opState.backlog.find(x => x.id === id);
   } else if (opState.draggedTemplateId) {
     const tmpl = opState.tasks.find(x => x.id === opState.draggedTemplateId);
     opState.draggedTemplateId = null;
     if (!tmpl) return;
-    await sb.from('ops_day_tasks').insert({
-      date: opState.date, start_time: slotTime,
-      duration_min: tmpl.default_duration_min || 30,
-      title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
-      materials: tmpl.default_materials || [],
-      checklist: (tmpl.default_checklist || []).map(item => ({ item, done: false })),
-      created_by: state.user.id
-    });
+    droppedTask = { duration_min: tmpl.default_duration_min || 30, travel_min: 0, title: tmpl.name };
   } else return;
+
+  // Detectar conflicto si el drop pone la tarea sobre otra
+  const dur = droppedTask?.duration_min || 30;
+  const travel = droppedTask?.travel_min || 0;
+  const newStartMin = opTimeToMin(slotTime);
+  const newEndMin = newStartMin + dur + travel;
+  const conflicts = opState.dayTasks
+    .filter(t => t.id !== droppedId && t.date === opState.date && t.start_time)
+    .filter(t => {
+      const tStart = opTimeToMin(t.start_time);
+      const tEnd = tStart + (t.duration_min||0) + (t.travel_min||0);
+      return tStart < newEndMin && tEnd > newStartMin;
+    });
+
+  let resolution = 'overlap'; // default si no hay conflicto
+  if (conflicts.length > 0) {
+    conflicts.sort((a,b) => opTimeToMin(a.start_time) - opTimeToMin(b.start_time));
+    const overlapMin = newEndMin - opTimeToMin(conflicts[0].start_time);
+    resolution = await opAskConflictResolution(
+      { start_time: slotTime, duration_min: dur, travel_min: travel },
+      droppedTask || { title: 'Nueva tarea', duration_min: dur },
+      conflicts,
+      overlapMin
+    );
+    if (resolution === 'cancel') return;
+    if (resolution === 'shift') {
+      await opShiftTasksAfter(opState.date, newStartMin, overlapMin, droppedId ? [droppedId] : []);
+    }
+  }
+
+  // Aplicar el drop ahora que el conflicto está resuelto
+  if (droppedId) {
+    // Reschedule existing task (scheduled or backlog)
+    await sb.from('ops_day_tasks').update({
+      date: opState.date,
+      start_time: slotTime,
+      updated_at: new Date().toISOString()
+    }).eq('id', droppedId);
+  } else {
+    // Nueva tarea desde plantilla
+    const tmpl = opState.tasks.find(x => x.name === droppedTask.title);
+    if (tmpl) {
+      await sb.from('ops_day_tasks').insert({
+        date: opState.date, start_time: slotTime,
+        duration_min: tmpl.default_duration_min || 30,
+        title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
+        materials: tmpl.default_materials || [],
+        checklist: (tmpl.default_checklist || []).map(item => ({ item, done: false })),
+        created_by: state.user.id
+      });
+    }
+  }
   await opLoadAll();
   opRender();
 }
@@ -1602,6 +1652,39 @@ async function opSaveEdit(id, isBacklog) {
     payload.travel_min = +document.getElementById('op-e-travel').value || 0;
     payload.status = document.getElementById('op-e-status').value;
   }
+
+  // ─── Detección de conflictos de horario ───
+  // Si cambiaron start_time o duration_min y hay overlap con tareas posteriores,
+  // preguntar al usuario: correr todas / sobreponer / cancelar
+  if (!isBacklog && payload.start_time) {
+    const currentTask = opState.dayTasks.find(x => x.id === id);
+    if (currentTask) {
+      const newStartMin = opTimeToMin(payload.start_time);
+      const newEndMin = newStartMin + payload.duration_min + (payload.travel_min || 0);
+      // Buscar overlap con cualquier otra tarea del día
+      const conflicts = opState.dayTasks
+        .filter(t => t.id !== id && t.date === currentTask.date && t.start_time)
+        .filter(t => {
+          const tStart = opTimeToMin(t.start_time);
+          const tEnd = tStart + (t.duration_min||0) + (t.travel_min||0);
+          return tStart < newEndMin && tEnd > newStartMin; // overlap real
+        });
+      if (conflicts.length > 0) {
+        // Ordenar conflictos por start_time
+        conflicts.sort((a,b) => opTimeToMin(a.start_time) - opTimeToMin(b.start_time));
+        const firstConflict = conflicts[0];
+        const overlapMin = newEndMin - opTimeToMin(firstConflict.start_time);
+        const choice = await opAskConflictResolution(payload, currentTask, conflicts, overlapMin);
+        if (choice === 'cancel') return;
+        if (choice === 'shift') {
+          // Aplicar shift cascada ANTES de guardar la tarea actual
+          await opShiftTasksAfter(currentTask.date, opTimeToMin(payload.start_time), overlapMin, [id]);
+        }
+        // Si 'overlap' → seguir normal (las dejamos pisadas)
+      }
+    }
+  }
+
   const { error } = await sb.from('ops_day_tasks').update(payload).eq('id', id);
   if (error) return alert(error.message);
 
@@ -2671,4 +2754,100 @@ async function opSaveDayTemplateEdits() {
     await openOpsPlanner(opState.sys);
     opSetLeftTab('daytemplates');
   }, 100);
+}
+
+// ============================================================
+// RESOLUCIÓN DE CONFLICTOS DE HORARIO
+// Cuando edits una tarea y se solapa con la siguiente:
+//   - shift  → empuja todas las siguientes en cascada
+//   - overlap → permite que queden pisadas (visual lanes)
+//   - cancel → no guarda
+// ============================================================
+
+// Modal de pregunta — devuelve 'shift' | 'overlap' | 'cancel'
+function opAskConflictResolution(payload, currentTask, conflicts, overlapMin) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.id = 'op-conflict-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    const newEnd = opMinToTime(opTimeToMin(payload.start_time) + payload.duration_min);
+    const conflictList = conflicts.slice(0, 5).map(c => `<li class="text-xs"><strong>${c.title}</strong> · ${opFmt12(c.start_time)} (${c.duration_min}m)</li>`).join('');
+    const moreCount = conflicts.length > 5 ? conflicts.length - 5 : 0;
+
+    overlay.innerHTML = `
+      <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div class="bg-amber-100 border-b border-amber-300 px-4 py-3">
+          <div class="font-bold text-amber-900">⚠️ Conflicto de horario</div>
+          <div class="text-xs text-amber-800 mt-0.5">"${currentTask.title}" (${opFmt12(payload.start_time)} → ${opFmt12(newEnd)}) se pisa con ${conflicts.length} tarea${conflicts.length>1?'s':''} (${overlapMin} min de solapamiento).</div>
+        </div>
+        <div class="p-4">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">Tarea${conflicts.length>1?'s':''} afectada${conflicts.length>1?'s':''}:</div>
+          <ul class="space-y-1 mb-4 ml-3 list-disc">${conflictList}${moreCount?`<li class="text-[10px] text-slate-500">...y ${moreCount} más</li>`:''}</ul>
+
+          <div class="space-y-2">
+            <button data-act="shift" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 px-3 rounded text-left">
+              ↪️ Correr todas las siguientes (+${overlapMin}m)
+              <div class="text-[10px] font-normal opacity-90 mt-0.5">Mantiene el orden, evita pisados. RECOMENDADO.</div>
+            </button>
+            <button data-act="overlap" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2.5 px-3 rounded text-left">
+              🔀 Permitir solapamiento
+              <div class="text-[10px] font-normal opacity-90 mt-0.5">Quedan pisadas. Útil si vas a hacer ambas en paralelo (2 personas).</div>
+            </button>
+            <button data-act="cancel" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold py-2.5 px-3 rounded">
+              ✕ Cancelar (no guardar)
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll('[data-act]').forEach(b => {
+      b.onclick = () => { overlay.remove(); resolve(b.dataset.act); };
+    });
+    overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve('cancel'); } });
+  });
+}
+
+// Shift en cascada: todas las tareas del día que arrancan >= startMin se corren X minutos
+async function opShiftTasksAfter(dateStr, fromStartMin, shiftMin, excludeIds = []) {
+  const tasks = opState.dayTasks
+    .filter(t => t.date === dateStr && t.start_time && !excludeIds.includes(t.id))
+    .filter(t => opTimeToMin(t.start_time) >= fromStartMin);
+  if (tasks.length === 0) return;
+
+  // Aplicar shift en cascada — cada tarea se mueve por al menos shiftMin
+  // pero respetando que cada una arranque DESPUÉS de cuando termina la anterior
+  const sorted = [...tasks].sort((a,b) => opTimeToMin(a.start_time) - opTimeToMin(b.start_time));
+  // Buscar la "ancla": la tarea editada — su fin marca el nuevo inicio mínimo
+  const updates = [];
+  let minStartMin = fromStartMin + shiftMin;
+  // Capear a 22:00 (OP_END_HOUR)
+  const dayEndMin = OP_END_HOUR * 60;
+
+  for (const t of sorted) {
+    const origStart = opTimeToMin(t.start_time);
+    const newStart = Math.max(origStart + shiftMin, minStartMin);
+    if (newStart >= dayEndMin) {
+      // Se sale del día — la mandamos a backlog
+      updates.push({ id: t.id, date: null, start_time: null, _toBacklog: true });
+    } else {
+      updates.push({ id: t.id, date: dateStr, start_time: opMinToTime(newStart), _toBacklog: false });
+      minStartMin = newStart + (t.duration_min || 0) + (t.travel_min || 0);
+    }
+  }
+
+  // Aplicar en serie (Supabase no soporta batch update con valores distintos)
+  for (const u of updates) {
+    await sb.from('ops_day_tasks').update({
+      start_time: u.start_time,
+      date: u.date,
+      updated_at: new Date().toISOString()
+    }).eq('id', u.id);
+  }
+
+  const movedToBacklog = updates.filter(u => u._toBacklog).length;
+  if (movedToBacklog > 0) {
+    setTimeout(() => alert(`⚠️ ${movedToBacklog} tarea${movedToBacklog>1?'s':''} no cupo${movedToBacklog>1?'n':''} en el día y fue${movedToBacklog>1?'ron':''} enviada${movedToBacklog>1?'s':''} al backlog.`), 200);
+  }
 }
