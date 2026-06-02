@@ -10,6 +10,98 @@
 const FC_STAGES = ['Demolición','Cimentación','Exterior','Estructura','Interior','Limpieza'];
 const FC_STAGE_GROUP = { 'Demolición':'1','Cimentación':'2','Exterior':'3','Estructura':'4','Interior':'5','Limpieza':'6' };
 
+// Catálogo de sub-items por etapa — replica el template Denfield para el export Excel.
+// El usuario llena cantidades + VU; el Excel calcula totales con fórmulas.
+const FC_DETAIL_ITEMS = {
+  'Demolición': [
+    { sub:'Demoliciones', cod:'1.1.1', desc:'Floor demolition - gut to studs (whole house)', unit:'Sq ft' },
+    { sub:'Demoliciones', cod:'1.1.3', desc:'Kitchen tearout (cabinets, countertops, appliances)', unit:'Unit' },
+    { sub:'Demoliciones', cod:'1.1.4', desc:'Bathroom tearout (full demolition)', unit:'Unit' },
+    { sub:'Demoliciones', cod:'1.1.6', desc:'Drywall removal', unit:'Sq ft' },
+    { sub:'Demoliciones', cod:'1.1.7', desc:'Top demolition concrete. Entrance/BackYard', unit:'Sq ft' },
+    { sub:'Demoliciones', cod:'1.1.8', desc:'Wall removal - load bearing (incl. structural engineer)', unit:'Sq ft' },
+    { sub:'Disposición',  cod:'1.1.9', desc:'Dumpster rental and debris hauling 40 yards', unit:'Unit' },
+    { sub:'Disposición',  cod:'1.1.13', desc:'Trash removal existing', unit:'Sq ft' },
+    { sub:'Disposición',  cod:'1.1.12', desc:'Disposal and dump fees per truckload', unit:'Load' },
+    { sub:'Preliminares', cod:'1.1.11', desc:'Site protection, workers protection and prep', unit:'Project' }
+  ],
+  'Cimentación': [
+    { sub:'Reparación', cod:'2.1.4', desc:'Foundation crack repair (basic settling)', unit:'Project' },
+    { sub:'Concreto',   cod:'2.2.6', desc:'Concrete slab repair', unit:'Unit' }
+  ],
+  'Exterior': [
+    { sub:'Cubierta',    cod:'3.1.1', desc:'Roof replacement (architectural shingle)', unit:'Roof' },
+    { sub:'Cubierta',    cod:'3.1.2', desc:'Roof underlayment and flashing', unit:'Roof' },
+    { sub:'Cubierta',    cod:'3.1.3', desc:'Gutters and downspouts', unit:'Lin ft' },
+    { sub:'Cerramiento', cod:'3.2.1', desc:'Enclosure replacement', unit:'Roof' },
+    { sub:'Redes',       cod:'3.3.1', desc:'Siding replacement (Hardieboard fiber cement)', unit:'Sq ft' },
+    { sub:'Redes',       cod:'3.3.2', desc:'Stone veneer accent (manufactured)', unit:'Sq ft' },
+    { sub:'Redes',       cod:'3.3.3', desc:'Exterior paint (whole house, full prep)', unit:'House' },
+    { sub:'Fachada',     cod:'3.4.1', desc:'Siding replacement (Hardieboard fiber cement)', unit:'Sq ft' },
+    { sub:'Fachada',     cod:'3.4.3', desc:'Exterior paint (whole house, full prep)', unit:'House' },
+    { sub:'Puertas',     cod:'3.5.1', desc:'Front entry door (premium)', unit:'Door' },
+    { sub:'Puertas',     cod:'3.5.2', desc:'Secondary exterior doors (back / side)', unit:'Door' },
+    { sub:'Urbanismo',   cod:'3.6.1', desc:'Concrete patio installation', unit:'Sq ft' },
+    { sub:'Urbanismo',   cod:'3.6.2', desc:'Wood deck construction', unit:'Sq ft' },
+    { sub:'Urbanismo',   cod:'3.6.3', desc:'Driveway repair / resurfacing', unit:'Sq ft' },
+    { sub:'Urbanismo',   cod:'3.6.4', desc:'Landscaping and sod (full refresh)', unit:'Project' },
+    { sub:'Ventanería',  cod:'3.7.1', desc:'Window replacement (energy-efficient)', unit:'Window' }
+  ],
+  'Estructura': [
+    { sub:'Estructura', cod:'4.1.2', desc:'Wood framing (structural carpentry whole house)', unit:'Sq ft' },
+    { sub:'Estructura', cod:'4.1.3', desc:'Steel beam / load-bearing modification', unit:'Beam' },
+    { sub:'Estructura', cod:'4.1.4', desc:'Roof framing / truss repair', unit:'Sq ft' },
+    { sub:'Estructura', cod:'4.1.5', desc:'Sub-floor installation (new)', unit:'Sq ft' },
+    { sub:'Permisos y diseño', cod:'4.2.1', desc:'Building permits (whole house remodel)', unit:'Unit' },
+    { sub:'Permisos y diseño', cod:'4.2.2', desc:'Architect / structural engineer fees', unit:'Project' },
+    { sub:'Permisos y diseño', cod:'4.2.3', desc:'General contractor management (overhead 10%)', unit:'Project' }
+  ],
+  'Interior': [
+    { sub:'Muros', cod:'5.1.1', desc:'Drywall installation/replacement', unit:'Sq ft' },
+    { sub:'Muros', cod:'5.1.2', desc:'Interior painting (whole house)', unit:'Sq ft' },
+    { sub:'Muros', cod:'5.1.3', desc:'Insulation - wall batts', unit:'Sq ft' },
+    { sub:'Techo', cod:'5.2.1', desc:'Crown molding installation', unit:'Lin ft' },
+    { sub:'Techo', cod:'5.2.3', desc:'Insulation - blown-in attic', unit:'Sq ft' },
+    { sub:'Techo', cod:'5.2.4', desc:'Drywall installation/replacement (techo)', unit:'Sq ft' },
+    { sub:'Baños', cod:'5.3.1', desc:'Bathroom tile (floor + walls)', unit:'Sq ft' },
+    { sub:'Baños', cod:'5.3.2', desc:'Custom shower', unit:'Unit' },
+    { sub:'Baños', cod:'5.3.3', desc:'Glass enclosure', unit:'Unit' },
+    { sub:'Baños', cod:'5.3.4', desc:'Bathroom accessories (medicine cabinets, towel bars)', unit:'Set' },
+    { sub:'Cocina', cod:'5.4.1', desc:'Kitchen cabinets (semi-custom)', unit:'Lin ft' },
+    { sub:'Cocina', cod:'5.4.2', desc:'Countertops (quartz)', unit:'Unit' },
+    { sub:'Cocina', cod:'5.4.3', desc:'Tile backsplash', unit:'Sq ft' },
+    { sub:'Cocina', cod:'5.4.6', desc:'Kitchen tile (floor + walls)', unit:'Sq ft' },
+    { sub:'Cocina', cod:'5.4.4', desc:'Kitchen appliances package (mid-range)', unit:'Package' },
+    { sub:'Cocina', cod:'5.4.7', desc:'Kitchen sink and faucet', unit:'Package' },
+    { sub:'Cocina', cod:'5.4.8', desc:'Kitchen island construction', unit:'Lin ft' },
+    { sub:'Carpintería', cod:'5.5.1', desc:'Interior doors', unit:'Unit' },
+    { sub:'Carpintería', cod:'5.5.2', desc:'Closet systems', unit:'Unit' },
+    { sub:'Eléctrico', cod:'5.6.1', desc:'Whole-house rewiring', unit:'Project' },
+    { sub:'Eléctrico', cod:'5.6.3', desc:'New circuits installation', unit:'Circuit' },
+    { sub:'Eléctrico', cod:'5.6.4', desc:'Outlets and switches (interior)', unit:'Unit' },
+    { sub:'Eléctrico', cod:'5.6.6', desc:'Light fixtures installation', unit:'Unit' },
+    { sub:'Eléctrico', cod:'5.6.7', desc:'Recessed can lighting (set of 6)', unit:'Unit' },
+    { sub:'Eléctrico', cod:'5.6.9', desc:'Smoke and CO detectors (hardwired)', unit:'Unit' },
+    { sub:'HVAC', cod:'5.7.1', desc:'New HVAC system (AC + furnace high-efficiency)', unit:'Project' },
+    { sub:'HVAC', cod:'5.7.2', desc:'Ductwork installation/replacement', unit:'Lin ft' },
+    { sub:'Hidrosanitario', cod:'5.8.1', desc:'Whole-house potable water repipe (PEX)', unit:'Lin ft' },
+    { sub:'Hidrosanitario', cod:'5.8.2', desc:'Sewer line replacement (main)', unit:'Lin ft' },
+    { sub:'Hidrosanitario', cod:'5.8.3', desc:'Tank water heater', unit:'Unit' },
+    { sub:'Pisos', cod:'5.9.1', desc:'Hardwood flooring', unit:'Sq ft' },
+    { sub:'Pisos', cod:'5.9.3', desc:'Floor leveling concrete', unit:'Sq ft' },
+    { sub:'Pisos', cod:'5.9.2', desc:'Baseboards installation', unit:'Lin ft' },
+    { sub:'Mobiliario', cod:'5.10.1', desc:'Furniture (bedrooms, kitchen, bathrooms, lounge)', unit:'Package' }
+  ],
+  'Limpieza': [
+    { sub:'Acabados finales', cod:'6.1.1', desc:'Touch-up painting and repairs', unit:'Project' },
+    { sub:'Cierre', cod:'6.2.1', desc:'Punch list completion', unit:'Project' },
+    { sub:'Cierre', cod:'6.2.2', desc:'City final inspection fees', unit:'Inspection' },
+    { sub:'Cierre', cod:'6.2.3', desc:'Move-in deep clean', unit:'House' },
+    { sub:'Limpieza final', cod:'6.3.1', desc:'Final construction cleanup', unit:'Sq ft' },
+    { sub:'Limpieza final', cod:'6.3.2', desc:'Deep cleaning (interior + exterior)', unit:'House' }
+  ]
+};
+
 // Coeficientes semilla (5 obras reales, ponderado, excluye ceros). EDITABLES.
 // mo = mano de obra $/sqft · mat = material $/sqft · tiempo = % del tiempo total
 const FC_SEED_COEF = {
@@ -1160,6 +1252,210 @@ async function fcExportXLSX() {
   });
 
   // ─── Descargar ───
+  // ════════════════════════════════════════════════════════════
+  // HOJAS 5-10: DETALLE POR ETAPA (1. DEMOLICION ... 6. LIMPIEZA)
+  // ════════════════════════════════════════════════════════════
+  const ETAPA_NAMES = {
+    'Demolición': '1. DEMOLICION',
+    'Cimentación': '2. CIMENTACION',
+    'Exterior': '3. EXTERNO',
+    'Estructura': '4. ESTRUCTURA',
+    'Interior': '5. INTERNO',
+    'Limpieza': '6. LIMPIEZA'
+  };
+
+  FC_STAGES.forEach((etapa, etapaIdx) => {
+    const sheetName = ETAPA_NAMES[etapa];
+    const items = FC_DETAIL_ITEMS[etapa] || [];
+    const etapaResult = r.etapas[etapaIdx];
+    const ws = wb.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 3 }] });
+
+    // Anchos
+    ws.columns = [
+      { width: 4 },   // A: #
+      { width: 22 },  // B: Subcategoría
+      { width: 10 },  // C: Código
+      { width: 50 },  // D: Descripción
+      { width: 11 },  // E: Unidad
+      { width: 10 },  // F: Cantidad
+      { width: 13 },  // G: VU Total ($)
+      { width: 13 },  // H: VU Mat ($)
+      { width: 13 },  // I: VU MO ($)
+      { width: 10 },  // J: % Mat
+      { width: 14 },  // K: Total Mat
+      { width: 14 },  // L: Total MO
+      { width: 14 },  // M: Total ($)
+      { width: 14 },  // N: Real ($)
+      { width: 11 }   // O: % Margen
+    ];
+
+    // Título
+    ws.mergeCells('A1:O1');
+    ws.getCell('A1').value = sheetName;
+    ws.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font, size:14} };
+    ws.getRow(1).height = 24;
+
+    // Sub-título con presupuesto macro
+    ws.mergeCells('A2:O2');
+    ws.getCell('A2').value = `Presupuesto macro etapa: ${etapaResult ? '$' + Math.round(etapaResult.subtotal).toLocaleString() : '—'} (Material $${etapaResult ? Math.round(etapaResult.mat).toLocaleString() : 0} + MO $${etapaResult ? Math.round(etapaResult.mo).toLocaleString() : 0}). Llená cantidades y VU para desglosar.`;
+    ws.getCell('A2').style = { font:{italic:true,color:{argb:'FF6B7280'},size:9}, alignment:{horizontal:'left'} };
+    ws.getRow(2).height = 18;
+
+    // Header
+    const headers = ['#','Subcategoría','Código','Descripción','Unidad','Cantidad','VU Total ($)','VU Mat ($)','VU MO ($)','% Mat','Total Mat','Total MO','Total ($)','Real ($)','% Margen'];
+    headers.forEach((h,i) => {
+      const c = ws.getCell(3, i+1);
+      c.value = h; c.style = styleHeader;
+    });
+    ws.getRow(3).height = 28;
+
+    // Filas — agrupar por subcategoría
+    let row = 4;
+    let lastSub = null;
+    let itemNum = 0;
+    items.forEach(it => {
+      if (it.sub !== lastSub) {
+        ws.mergeCells(`A${row}:O${row}`);
+        ws.getCell(`A${row}`).value = `▸ ${it.sub}`;
+        ws.getCell(`A${row}`).style = styleSub;
+        row++;
+        lastSub = it.sub;
+      }
+      itemNum++;
+      ws.getCell(`A${row}`).value = itemNum;
+      ws.getCell(`A${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+      ws.getCell(`B${row}`).value = it.sub;
+      ws.getCell(`B${row}`).style = { border:thinBorder, font:{size:9,color:{argb:'FF6B7280'}} };
+      ws.getCell(`C${row}`).value = it.cod;
+      ws.getCell(`C${row}`).style = { ...styleCalc, font:{bold:true}, alignment:{horizontal:'center'} };
+      ws.getCell(`D${row}`).value = it.desc;
+      ws.getCell(`D${row}`).style = { border:thinBorder, alignment:{horizontal:'left',wrapText:true} };
+      ws.getCell(`E${row}`).value = it.unit;
+      ws.getCell(`E${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+      ws.getCell(`F${row}`).value = null;
+      ws.getCell(`F${row}`).style = { ...styleEditable, numFmt: FMT_INT };
+      ws.getCell(`G${row}`).value = null;
+      ws.getCell(`G${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+      ws.getCell(`H${row}`).value = null;
+      ws.getCell(`H${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+      ws.getCell(`I${row}`).value = null;
+      ws.getCell(`I${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+      ws.getCell(`J${row}`).value = { formula: `IFERROR(H${row}/G${row},0)` };
+      ws.getCell(`J${row}`).style = { ...styleCalc, numFmt: FMT_PCT };
+      ws.getCell(`K${row}`).value = { formula: `IFERROR(F${row}*H${row},0)` };
+      ws.getCell(`K${row}`).style = { ...styleCalc, numFmt: FMT_CURRENCY };
+      ws.getCell(`L${row}`).value = { formula: `IFERROR(F${row}*I${row},0)` };
+      ws.getCell(`L${row}`).style = { ...styleCalc, numFmt: FMT_CURRENCY };
+      ws.getCell(`M${row}`).value = { formula: `K${row}+L${row}` };
+      ws.getCell(`M${row}`).style = { ...styleCalc, numFmt: FMT_CURRENCY, font:{bold:true} };
+      ws.getCell(`N${row}`).value = null;
+      ws.getCell(`N${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+      ws.getCell(`O${row}`).value = { formula: `IFERROR((M${row}-N${row})/M${row},0)` };
+      ws.getCell(`O${row}`).style = { ...styleCalc, numFmt: FMT_PCT };
+      row++;
+    });
+
+    // TOTAL
+    ws.getCell(`D${row}`).value = 'TOTAL ETAPA';
+    ws.getCell(`D${row}`).style = { ...styleTotal, alignment:{horizontal:'right'} };
+    ['K','L','M','N'].forEach(col => {
+      ws.getCell(`${col}${row}`).value = { formula: `SUM(${col}4:${col}${row-1})` };
+      ws.getCell(`${col}${row}`).style = { ...styleTotal, numFmt: FMT_CURRENCY };
+    });
+    ws.getCell(`O${row}`).value = { formula: `IFERROR((M${row}-N${row})/M${row},0)` };
+    ws.getCell(`O${row}`).style = { ...styleTotal, numFmt: FMT_PCT };
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // HOJA 11: MATERIALES (log de compras)
+  // ════════════════════════════════════════════════════════════
+  const wsMat = wb.addWorksheet('MATERIALES', { views: [{ state: 'frozen', ySplit: 2 }] });
+  wsMat.columns = [
+    { width: 8 },   // ITEM
+    { width: 50 },  // Descripción
+    { width: 14 },  // Fase
+    { width: 18 },  // Sub etapa
+    { width: 10 },  // Cantidad
+    { width: 14 },  // Unidad
+    { width: 14 },  // Precio unit
+    { width: 14 },  // Subtotal
+    { width: 14 }   // Vendor
+  ];
+  wsMat.mergeCells('A1:I1');
+  wsMat.getCell('A1').value = `MATERIALES — ${f.propiedad || 'Proyecto'}`;
+  wsMat.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font, size:14} };
+  wsMat.getRow(1).height = 24;
+  ['ITEM','Descripción','Fase','Sub etapa','Cantidad','Unidad / SQFT c/u','Precio unit (USD)','Subtotal (USD)','Vendor'].forEach((h,i) => {
+    const c = wsMat.getCell(2, i+1);
+    c.value = h; c.style = styleHeader;
+  });
+  wsMat.getRow(2).height = 28;
+  // 200 filas vacías editables con fórmula de subtotal
+  for (let i = 0; i < 200; i++) {
+    const row = 3 + i;
+    ['A','B','C','D','E','F','G','I'].forEach(col => {
+      wsMat.getCell(`${col}${row}`).style = { ...styleEditable, alignment:{horizontal: col==='B'?'left':col==='G'?'right':'center'} };
+    });
+    wsMat.getCell(`G${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+    wsMat.getCell(`H${row}`).value = { formula: `IFERROR(E${row}*G${row},0)` };
+    wsMat.getCell(`H${row}`).style = { ...styleCalc, numFmt: FMT_CURRENCY, font:{bold:true} };
+  }
+  // TOTAL al final
+  const matTotalRow = 203;
+  wsMat.getCell(`G${matTotalRow}`).value = 'TOTAL';
+  wsMat.getCell(`G${matTotalRow}`).style = { ...styleTotal, alignment:{horizontal:'right'} };
+  wsMat.getCell(`H${matTotalRow}`).value = { formula: `SUM(H3:H${matTotalRow-1})` };
+  wsMat.getCell(`H${matTotalRow}`).style = { ...styleTotal, numFmt: FMT_CURRENCY };
+
+  // ════════════════════════════════════════════════════════════
+  // HOJA 12: ACTIVIDADES DIARIAS
+  // ════════════════════════════════════════════════════════════
+  const wsAct = wb.addWorksheet('ACTIVIDADES DIARIAS', { views: [{ state: 'frozen', ySplit: 2 }] });
+  wsAct.columns = [
+    { width: 4 },   // A vacío
+    { width: 18 },  // ITEM
+    { width: 16 },  // SUBITEM
+    { width: 12 },  // FECHA
+    { width: 50 },  // MATERIALES
+    { width: 14 },  // COSTO MATERIAL
+    { width: 14 },  // HORAS TRABAJADAS
+    { width: 14 },  // OTROS COSTOS
+    { width: 50 }   // OBSERVACIONES
+  ];
+  wsAct.mergeCells('A1:I1');
+  wsAct.getCell('A1').value = `BITÁCORA DIARIA — ${f.propiedad || 'Proyecto'}`;
+  wsAct.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font, size:14} };
+  wsAct.getRow(1).height = 24;
+  // Header row 2
+  const actHeaders = ['','ITEM','SUBITEM','FECHA','MATERIALES','COSTO DE MATERIAL','HORAS TRABAJADAS','OTROS COSTOS','OBSERVACIONES'];
+  actHeaders.forEach((h,i) => {
+    const c = wsAct.getCell(2, i+1);
+    c.value = h; c.style = styleHeader;
+  });
+  wsAct.getRow(2).height = 28;
+  // 300 filas editables
+  for (let i = 0; i < 300; i++) {
+    const row = 3 + i;
+    ['B','C','D','E','F','G','H','I'].forEach(col => {
+      const c = wsAct.getCell(`${col}${row}`);
+      c.style = { ...styleEditable, alignment:{horizontal:(col==='E'||col==='I')?'left':(col==='F'||col==='G'||col==='H')?'right':'center'} };
+    });
+    wsAct.getCell(`D${row}`).style = { ...styleEditable, numFmt: FMT_DATE };
+    wsAct.getCell(`F${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+    wsAct.getCell(`G${row}`).style = { ...styleEditable, numFmt: FMT_INT };
+    wsAct.getCell(`H${row}`).style = { ...styleEditable, numFmt: FMT_CURRENCY };
+  }
+  // TOTAL al final
+  const actTotalRow = 304;
+  wsAct.getCell(`E${actTotalRow}`).value = 'TOTALES';
+  wsAct.getCell(`E${actTotalRow}`).style = { ...styleTotal, alignment:{horizontal:'right'} };
+  wsAct.getCell(`F${actTotalRow}`).value = { formula: `SUM(F3:F${actTotalRow-1})` };
+  wsAct.getCell(`F${actTotalRow}`).style = { ...styleTotal, numFmt: FMT_CURRENCY };
+  wsAct.getCell(`G${actTotalRow}`).value = { formula: `SUM(G3:G${actTotalRow-1})` };
+  wsAct.getCell(`G${actTotalRow}`).style = { ...styleTotal, numFmt: FMT_INT };
+  wsAct.getCell(`H${actTotalRow}`).value = { formula: `SUM(H3:H${actTotalRow-1})` };
+  wsAct.getCell(`H${actTotalRow}`).style = { ...styleTotal, numFmt: FMT_CURRENCY };
+
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
