@@ -656,7 +656,29 @@ async function fcUploadTaskadeFile(file) {
     const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').order('updated_at', { ascending: false });
     fcState.diagnoses = diags || [];
 
-    if (statusEl) statusEl.innerHTML = `<span class="text-emerald-700">✓ ${file.name} cargado y guardado. Daño global: ${parsed.dano_global_pct.toFixed(1)}% (${parsed.veredicto || '—'})</span>`;
+    if (statusEl) statusEl.innerHTML = `<span class="text-emerald-700">✓ ${file.name} cargado y guardado. Daño global: ${parsed.dano_global_pct.toFixed(1)}% (${parsed.veredicto || '—'}). Pasando a Editor detallado...</span>`;
+
+    // Auto-navegar al Editor detallado con los datos del Taskade pre-cargados
+    if (typeof rmState !== 'undefined' && typeof rmRender === 'function') {
+      rmState.editName = parsed.propiedad || fcState.form.propiedad || '';
+      rmState.editAddress = parsed.direccion || fcState.form.direccion || '';
+      rmState.editSqft = fcState.form.sqft || 1500;
+      rmState.editStartDate = fcState.form.fechaInicio || new Date().toISOString().split('T')[0];
+      // Marca que viene de Taskade para mostrar banner en el editor
+      rmState._linkedTaskade = {
+        propiedad: parsed.propiedad,
+        veredicto: parsed.veredicto,
+        dano_global_pct: parsed.dano_global_pct,
+        afectacion: { ...fcState.form.afectacion },
+        archivo_nombre: file.name
+      };
+      // Switch al tab editor (delay corto para que el usuario vea el mensaje verde)
+      setTimeout(() => {
+        rmState.tab = 'editor';
+        rmRender();
+      }, 1200);
+      return;
+    }
     const body = document.getElementById('rm-body');
     if (body) fcRenderTab(body);
   } catch (e) {

@@ -1172,7 +1172,6 @@ function rmRender() {
   const samplesCount = (Object.values(rmDynamicBenchmarks || {}).reduce((s,d) => s + (d.samples||0), 0)) + 5;
   const tabs = [
     { id: 'projects', label: `📁 Proyectos (${rmState.projects.length})` },
-    { id: 'quick', label: '⚡ Estimación Rápida' },
     { id: 'compare', label: '🎯 3 Estimaciones' },
     { id: 'rates', label: '📊 Tasas $/ft²' },
     { id: 'editor', label: rmState.currentProject ? `✏️ ${rmState.currentProject.name}` : '➕ Editor detallado' },
@@ -1821,9 +1820,25 @@ async function rmDeleteProject(id) {
 // ─── TAB: EDITOR ───
 function rmRenderEditor(body) {
   const e = rmCalcProject();
+  const linked = rmState._linkedTaskade;
+  const taskadeBanner = linked ? `
+    <div class="bg-gradient-to-r from-violet-100 to-fuchsia-100 border-2 border-violet-400 rounded-xl p-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">📎</span>
+          <div>
+            <div class="text-xs font-bold text-violet-900">Vinculado a Taskade Visita Previa</div>
+            <div class="text-[11px] text-violet-800">${linked.propiedad} · ${linked.veredicto || '—'} · daño global ${linked.dano_global_pct?.toFixed(1)}% · ${linked.archivo_nombre || ''}</div>
+            <div class="text-[10px] text-violet-700 mt-0.5">Afectación: ${Object.entries(linked.afectacion||{}).map(([k,v])=>`${k} ${v}%`).join(' · ')}</div>
+          </div>
+        </div>
+        <button onclick="rmSetTab('forecast')" class="text-xs bg-white hover:bg-violet-50 text-violet-700 px-3 py-1.5 rounded font-bold border border-violet-300">↩ Volver al Pronóstico</button>
+      </div>
+    </div>` : '';
   body.innerHTML = `
     <div class="grid lg:grid-cols-12 gap-4">
       <div class="lg:col-span-8 space-y-3">
+        ${taskadeBanner}
         <!-- Info -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
           <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Información del proyecto</h3>
