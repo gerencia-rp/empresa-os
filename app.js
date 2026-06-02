@@ -74,6 +74,39 @@ document.getElementById('auth-signup-btn').addEventListener('click', async () =>
   await onLogin(data.user);
 });
 
+// "¿Olvidaste tu contraseña?" — manda un email de recovery
+document.getElementById('auth-forgot-btn').addEventListener('click', async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) return showAuthError('Pon tu email arriba primero');
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/'
+  });
+  if (error) return showAuthError(error.message);
+  showAuthError('✓ Te mandamos un email para resetear tu contraseña. Revisa tu inbox (puede tardar 1-2 min).');
+  const errEl = document.getElementById('auth-error');
+  if (errEl) errEl.className = 'text-sm text-emerald-700 bg-emerald-50 rounded-lg p-2';
+});
+
+// Detectar el flujo de recovery — si el URL tiene access_token + type=recovery, pedir nueva pwd
+(async function checkPasswordRecovery() {
+  const hash = window.location.hash || '';
+  if (hash.includes('type=recovery') || hash.includes('access_token')) {
+    // Supabase ya restauró la sesión. Pedir nueva contraseña.
+    setTimeout(async () => {
+      const newPwd = prompt('Recibiste un link de recuperación. Ingresá tu nueva contraseña (6+ caracteres):');
+      if (!newPwd || newPwd.length < 6) {
+        alert('Contraseña inválida. Refresh y volvé a clickear el link.');
+        return;
+      }
+      const { error } = await sb.auth.updateUser({ password: newPwd });
+      if (error) return alert('Error: ' + error.message);
+      alert('✓ Contraseña actualizada. Ya estás logueado.');
+      // Limpiar el hash para que no se ejecute al refresh
+      history.replaceState(null, '', window.location.pathname);
+    }, 500);
+  }
+})();
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await sb.auth.signOut();
 });
@@ -338,7 +371,10 @@ async function openTeamMgmt() {
                     <option value="viewer" ${p.role==='viewer'?'selected':''}>viewer</option>
                     <option value="admin" ${p.role==='admin'?'selected':''}>admin</option>
                   </select>
-                  ${!isCurrent ? `<button onclick="deleteUser('${p.id}','${p.email.replace(/'/g,"\\'")}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario">🗑</button>` : ''}
+                  ${!isCurrent ? `
+                    <button onclick="adminSetUserPassword('${p.id}','${p.email.replace(/'/g,"\\'")}')" class="text-xs text-blue-600 hover:text-blue-800" title="Cambiar contraseña">🔑</button>
+                    <button onclick="deleteUser('${p.id}','${p.email.replace(/'/g,"\\'")}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario completamente">🗑</button>
+                  ` : ''}
                 </div>
                 ${p.role !== 'admin' ? `
                   <div class="text-[10px] text-slate-500 mb-1">Áreas asignadas:</div>
@@ -393,10 +429,41 @@ async function updateUserRole(userId, role) {
 }
 
 async function deleteUser(userId, email) {
-  if (!confirm(`¿Eliminar usuario "${email}"?\n\nEsto borra su perfil pero no su cuenta auth (eso se hace desde Supabase Studio).`)) return;
-  const { error } = await sb.from('profiles').delete().eq('id', userId);
-  if (error) return alert('Error: ' + error.message);
-  closeModal(); setTimeout(openTeamMgmt, 200);
+  if (!confirm(`¿Eliminar usuario "${email}" completamente?\n\nEsto borra su PERFIL + CUENTA AUTH. Vas a poder volver a invitar el mismo email después.`)) return;
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/delete-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ user_id: userId, requester_id: state.user.id })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'falló');
+    if (r.warning) alert('⚠️ ' + r.warning);
+    else alert('✓ Usuario eliminado completamente. Podés re-invitar el email cuando quieras.');
+    closeModal(); setTimeout(openTeamMgmt, 200);
+  } catch (e) {
+    alert('Error: ' + e.message + '\n\n(¿Está desplegada la edge function delete-user? `npx supabase functions deploy delete-user --no-verify-jwt`)');
+  }
+}
+
+// Admin setea contraseña de otro usuario
+async function adminSetUserPassword(userId, email) {
+  const newPwd = prompt(`Nueva contraseña para ${email}:\n(mínimo 6 caracteres)`);
+  if (!newPwd) return;
+  if (newPwd.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
+  if (!confirm(`¿Cambiar contraseña de ${email}?\n\nEl usuario va a poder loguear con esta nueva contraseña inmediatamente.`)) return;
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/admin-set-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ user_id: userId, new_password: newPwd, requester_id: state.user.id })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'falló');
+    alert(`✓ Contraseña actualizada.\nAvisale a ${email} que su nueva contraseña es: ${newPwd}`);
+  } catch (e) {
+    alert('Error: ' + e.message + '\n\n(¿Está desplegada admin-set-password? `npx supabase functions deploy admin-set-password --no-verify-jwt`)');
+  }
 }
 
 // ════════════════════════════════════════════════════════════

@@ -34,14 +34,41 @@ Deno.serve(async (req) => {
   const { data: inviter } = await admin.from("profiles").select("role").eq("id", inviter_id).maybeSingle();
   if (!inviter || inviter.role !== "admin") return json({ ok: false, error: "Solo admins pueden invitar" }, 403);
 
-  // Si el email ya existe, solo actualizamos rol/áreas
+  // Si el email ya existe en profiles, solo actualizamos rol/áreas
   const { data: existing } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
   if (existing) {
     await admin.from("profiles").update({ role, allowed_areas }).eq("id", existing.id);
     return json({ ok: true, user_id: existing.id, action: "updated", email });
   }
 
-  // Invitar al usuario (Supabase envía email con link de signup)
+  // Si NO está en profiles, puede estar todavía en auth.users (de una eliminación previa).
+  // Buscamos en auth.users por email — si existe, re-creamos el profile y mandamos reset password.
+  // (auth.admin.listUsers + filter es la API oficial)
+  const { data: authList } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const existingAuth = authList?.users?.find((u: any) => (u.email || "").toLowerCase() === email);
+
+  if (existingAuth) {
+    // Ya existe en auth pero el profile fue eliminado. Re-crear profile + mandar magic link
+    // de password recovery para que el usuario pueda volver a entrar.
+    await admin.from("profiles").upsert(
+      { id: existingAuth.id, email, role, allowed_areas },
+      { onConflict: "id" }
+    );
+    // Mandamos un magic link / recovery para que reset su password
+    const { error: linkErr } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo: `${APP_URL}/` }
+    });
+    if (linkErr) {
+      // No es bloqueante — el profile ya existe. Solo avisamos
+      return json({ ok: true, user_id: existingAuth.id, action: "reactivated_no_email", email,
+        warning: "Profile re-creado pero no pude mandar email de recovery: " + linkErr.message });
+    }
+    return json({ ok: true, user_id: existingAuth.id, action: "reactivated", email });
+  }
+
+  // Invitar al usuario nuevo (Supabase envía email con link de signup)
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${APP_URL}/` });
   if (error) return json({ ok: false, error: error.message }, 400);
 
