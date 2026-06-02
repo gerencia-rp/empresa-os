@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     mentorship_id,
     title,
     topic,
-    audience = "estudiantes de mentoría de real estate",
+    audience = "estudiantes de mentoría",
     presentation_type = "class",
     class_number,
     duration_min = 60,
@@ -33,6 +33,9 @@ Deno.serve(async (req) => {
     language = "es",
     outline_hint,
     require_live_data = true,
+    domain = "real-estate",          // 'real-estate' | 'marketing' | 'finance' | 'tech' | 'sales' | 'leadership' | 'general'
+    preferred_sources,                // string libre con fuentes que el coach quiere priorizar
+    geographic_focus,                 // 'texas' | 'usa' | 'latam' | 'global' | string libre
     user_id
   } = body;
 
@@ -48,30 +51,48 @@ Deno.serve(async (req) => {
     if (m) mentorshipContext = `\n\nCONTEXTO DE LA MENTORÍA: "${m.name}" — ${m.description}\nEtapas del programa: ${(m.stages||[]).map((s:any)=>s.name).join(', ')}`;
   }
 
-  // Prompt al estilo profesor experto que arma slides con data verificable
-  const prompt = `Eres un creador de presentaciones de élite para mentorías de real estate. Hoy es ${today}.
+  // Catálogo de fuentes confiables por dominio
+  const sourcesByDomain: Record<string, string> = {
+    'real-estate': 'Redfin, Zillow, Realtor.com, FRED (St. Louis Fed), NAR (National Association of Realtors), HUD, IRS, Texas Comptroller, Travis CAD, MLS reports, Freddie Mac PMMS, Bankrate, Mortgage News Daily',
+    'marketing': 'HubSpot Research, Statista, eMarketer, Pew Research, Nielsen, Sensor Tower, similarweb, Google Trends, Meta Business Insights, Backlinko studies',
+    'finance': 'FRED (St. Louis Fed), SEC EDGAR, Bloomberg, WSJ, Investopedia, Morningstar, S&P Global, Federal Reserve, IMF, World Bank',
+    'tech': 'TechCrunch research, Gartner, IDC, CB Insights, Crunchbase, Statista, GitHub State of Octoverse, Stack Overflow Developer Survey, Pew Research Tech',
+    'sales': 'HubSpot Sales Benchmark, Salesforce State of Sales, Gong.io research, McKinsey B2B reports, Forrester, Outreach.io insights',
+    'leadership': 'Harvard Business Review, McKinsey Quarterly, Bain & Company, BCG insights, MIT Sloan Review, Deloitte Insights, Gallup workplace research',
+    'general': 'Pew Research, Statista, Our World in Data, World Bank Open Data, Reuters, AP News, university research papers'
+  };
+  const trustedSources = sourcesByDomain[domain] || sourcesByDomain.general;
+  const geoNote = geographic_focus
+    ? `\n- Foco geográfico: ${geographic_focus}`
+    : (domain === 'real-estate' ? '\n- Foco geográfico default: Texas (Austin/Houston/Dallas) salvo que el tema indique otra cosa' : '');
 
-TAREA: armar una presentación de ${slides_count} slides para una clase/taller.
+  // Prompt adaptive
+  const prompt = `Eres un creador de presentaciones de élite para audiencias profesionales. Hoy es ${today}.
+
+TAREA: armar una presentación de ${slides_count} slides para una clase/taller/webinar.
 
 INPUT:
 - Título: "${title}"
 - Tema: ${topic}
+- Dominio temático: ${domain}
 - Audiencia: ${audience}
 - Tipo: ${presentation_type}${class_number ? ` (clase #${class_number})` : ''}
 - Duración: ${duration_min} minutos
-- Idioma: ${language}${mentorshipContext}
+- Idioma: ${language}${mentorshipContext}${geoNote}
 ${outline_hint ? `\n- Outline sugerido por el coach: ${outline_hint}` : ''}
+${preferred_sources ? `\n- FUENTES QUE EL COACH PIDE PRIORIZAR: ${preferred_sources}` : ''}
 
 REGLAS CRÍTICAS:
-1. **TODA estadística, tasa, precio, número o dato de mercado DEBE venir de web search en VIVO**.
-   No inventes números. No uses "approximately" sin fuente. Cada número debe venir con su fuente y fecha.
-2. Para data inmobiliaria USA fuentes oficiales/confiables: Redfin, Zillow, Realtor.com, FRED (St. Louis Fed),
-   NAR (National Association of Realtors), HUD, IRS, Texas Comptroller, Travis CAD, local MLS reports.
-3. Para tasas de interés actuales: Freddie Mac PMMS, Bankrate, Mortgage News Daily.
-4. Tone profesional pero accesible. Audiencia hispana — usá español rioplatense/neutro.
+1. **TODA estadística, tasa, precio, número o dato DEBE venir de web search en VIVO**.
+   No inventes números. No uses "approximately" sin fuente. Cada número debe venir con su fuente y fecha de acceso.
+2. Para este dominio (${domain}), USA fuentes oficiales/confiables sugeridas:
+   ${trustedSources}
+   ${preferred_sources ? `Y especialmente: ${preferred_sources}` : ''}
+3. Si el tema toca múltiples dominios (ej. real estate + finanzas), combiná fuentes apropiadas de cada uno.
+4. Tone profesional pero accesible. Si el idioma es español, usá español neutro/rioplatense según audiencia.
 5. Slides 0-15 segundos de lectura cada uno. Bullets de máximo 12 palabras.
 6. Cada slide debe tener "speaker_notes" con el guion del coach (2-4 oraciones).
-7. Si el tema involucra Wholesale, Fix&Flip o Rentas → adapta data a Texas (Austin/Houston/Dallas) por default.
+7. Adaptá el contenido y ejemplos al tema solicitado — NO defaultees a real estate si el topic no lo pide.
 
 ESTRUCTURA TÍPICA (adaptar al tema):
 - Slide 1: Portada (title + presenter + class number)
@@ -168,6 +189,7 @@ Devolvé SOLO JSON válido (sin markdown wrapper):
       cost_tokens_used: tokensIn + tokensOut,
       web_searches_used: webSearchUses,
       generated_by: user_id || null
+      // Nota: domain + preferred_sources + geographic_focus quedan en el outline/slides metadata
     }).select().single();
     if (!error) saved = data;
   }

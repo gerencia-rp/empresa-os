@@ -945,9 +945,36 @@ function eduRenderPresentations() {
           </div>
         </div>
 
+        <!-- Dominio temático + foco geográfico — para que las fuentes se adapten -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Dominio temático *</label>
+            <select id="edu-pres-domain" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+              <option value="real-estate">🏠 Real Estate (Redfin, FRED, NAR, MLS)</option>
+              <option value="marketing">📣 Marketing / Growth (HubSpot, Statista, Pew)</option>
+              <option value="finance">💰 Finanzas / Inversión (SEC, FRED, Bloomberg)</option>
+              <option value="tech">💻 Tech / Software (Gartner, IDC, CB Insights)</option>
+              <option value="sales">🤝 Ventas / B2B (HubSpot Sales, Salesforce, Gong)</option>
+              <option value="leadership">👥 Liderazgo / Management (HBR, McKinsey, Bain)</option>
+              <option value="general">🌍 General / Otro tema</option>
+            </select>
+            <div class="text-[9px] text-slate-500 mt-0.5">Define qué fuentes prioriza la IA</div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Foco geográfico (opcional)</label>
+            <input id="edu-pres-geo" placeholder="Ej. Texas · USA · LATAM · Global · México" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+            <div class="text-[9px] text-slate-500 mt-0.5">Default Real Estate: Texas. Vacío en otros dominios.</div>
+          </div>
+        </div>
+
         <div class="mt-2">
           <label class="block text-[10px] font-bold text-slate-600 mb-1">Outline sugerido (opcional)</label>
           <textarea id="edu-pres-outline" rows="2" placeholder="Si tenés ya una estructura en mente, pegala acá. Si no, Claude la arma." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+        </div>
+
+        <div class="mt-2">
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">🔍 Fuentes preferidas (opcional)</label>
+          <textarea id="edu-pres-sources" rows="2" placeholder="Si querés que la IA priorice fuentes específicas, listalas. Ej: 'Statista, Gartner, McKinsey 2024 report'. La IA igual usa las del dominio por default." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
         </div>
 
         <div class="mt-2">
@@ -962,7 +989,7 @@ function eduRenderPresentations() {
           </label>
           <button onclick="withLoading(this, eduGeneratePresentation)" class="ml-auto bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2 rounded">🤖 Generar con IA</button>
         </div>
-        <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~30-90 seg. Claude busca data en vivo (Redfin, FRED, Freddie Mac, NAR) y arma slides con fuentes citadas.</div>
+        <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~30-90 seg. Claude hace hasta 8 web searches en vivo según el dominio elegido. Cita cada dato con fuente y fecha.</div>
       </div>
 
       ${ai.loading ? `
@@ -1066,6 +1093,9 @@ async function eduGeneratePresentation() {
       slides_count: +document.getElementById('edu-pres-slides').value || 15,
       language: document.getElementById('edu-pres-lang').value,
       outline_hint: document.getElementById('edu-pres-outline').value || null,
+      domain: document.getElementById('edu-pres-domain')?.value || 'real-estate',
+      geographic_focus: document.getElementById('edu-pres-geo')?.value || null,
+      preferred_sources: document.getElementById('edu-pres-sources')?.value || null,
       require_live_data: document.getElementById('edu-pres-live').checked,
       user_id: state.user.id
     };
