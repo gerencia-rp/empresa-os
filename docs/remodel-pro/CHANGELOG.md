@@ -6,6 +6,26 @@ Formato: `YYYY-MM-DD · TIPO · alcance` (TIPO = Feature | Fix | Schema | UX | D
 
 ---
 
+## 2026-05-29 — Sprint 9 · PM Pro · Multi-empresa + Performance Management (✅ Hecho)
+
+- **S9-A · Schema** — `pm_companies` (4+ empresas), `pm_performance_weekly` (5 scores composite), `pm_okrs` + `pm_okr_progress`, `pm_one_on_ones`, `pm_coaching_prompts`. Vistas `pm_bottleneck_heatmap`, `pm_executive_cross_company`, `pm_performance_leaderboard`. `company_id` agregado a clickup_tasks_mirror + snapshots con UNIQUE multi-empresa. 2 cron jobs nuevos. Archivo: `supabase/s9-pm-pro.sql`.
+- **S9-B · Refactor `sync-clickup`** — itera empresas activas con space_id, syncea cada space en paralelo, etiqueta tasks con company_id, snapshots por empresa.
+- **S9-C · Edge Function `pm-compute-performance`** — Mon 6am Texas. Calcula 5 scores (completion/quality/velocity/capacity/composite) por persona × empresa × semana. Detecta tendencia.
+- **S9-D · Edge Function `pm-prepare-1on1`** — on-demand. Claude lee 28 días de data y arma agenda de 1-on-1 con talking points priorizados.
+- **S9-E · Edge Function `pm-coaching-prompts`** — Mon 7:30am. Claude genera playbook semanal con 5-10 sugerencias por persona (feedback/recognition/intervention/learning/reassignment). Manda top 5 al CEO via WhatsApp.
+- **S9-F · UI** — 7 tabs nuevas: Cross-Empresa, Performance, OKRs, 1-on-1s, Coaching IA, Heatmap, Empresas. CRUD inline + integración con todas las Edge Functions.
+- Doc completo: `docs/remodel-pro/sprint-9.md`.
+
+## 2026-05-29 — Sprint 8 · Área Project Management — sistema nervioso central (✅ Hecho)
+
+- **S8-A · Schema** — área `pm`, sistema `pm-dashboard`, 8 tablas (recipients, config, messages, daily_assignments, dependencies_cross, executive_reports, risks, compliance), view `pm_scorecard` cross-área, 4 cron jobs. Archivo: `supabase/s8-pm-area.sql`.
+- **S8-B · Edge Function `whatsapp-send`** — proxy a WhatsApp Cloud API (text/template/interactive). Log en pm_whatsapp_messages.
+- **S8-C · Edge Function `whatsapp-webhook`** — recibe respuestas, parsea intents ("1 ok"/botones), cierra tasks en ClickUp via clickup-execute, responde confirmaciones.
+- **S8-D · Edge Functions Daily Loop** — `pm-daily-push` (7am), `pm-daily-close` (6pm), `pm-group-report` (8pm), `pm-weekly-review` (lun 7am con Claude).
+- **S8-E · UI `pm-dashboard.js`** — 8 tabs: Scorecard, WhatsApp Config+Logs, Workload, Dependencias, IA Agente, Reportes, Risks, Compliance. CRUD inline para recipients/risks/compliance/deps.
+- **S8-F · Doc completo + guía WhatsApp Cloud API** — `docs/remodel-pro/sprint-8.md` con paso a paso (Meta for Developers, phone_number_id, access token permanent, webhook setup, templates).
+- Sumado a `index.html` + dispatcher en `app.js`.
+
 ## 2026-05-29 — Sprint 7 · Dashboards Operativos (Airtable + ClickUp) (✅ Hecho)
 
 - **S7-A** — pg_cron + pg_net. Jobs auto-sync Airtable (30min) y ClickUp (60min). Tablas `notification_log` + `user_notification_prefs`. Función `queue_alert_notifications()`. Archivo: `supabase/s7-a-auto-sync.sql`.
