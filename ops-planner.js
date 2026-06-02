@@ -16,7 +16,7 @@ const opState = {
   draggedBacklogId: null,
   draggedScheduledId: null,
   draggedTemplateId: null,
-  leftTab: 'backlog',   // backlog | templates
+  leftTab: 'backlog',   // backlog | templates | recurrentes
   view: 'day',          // day | week
   weekTasks: [],        // tareas de la semana actual (cuando view='week')
   libBusinessFilter: 'all',
@@ -269,9 +269,12 @@ function opRender() {
             <button onclick="opSetLeftTab('templates')" class="flex-1 px-2 py-2 text-xs font-bold ${opState.leftTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">
               📚 Plantillas
             </button>
+            <button onclick="opSetLeftTab('recurrentes')" class="flex-1 px-2 py-2 text-xs font-bold ${opState.leftTab==='recurrentes'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">
+              🔁 Recurrentes <span class="bg-violet-600 text-white text-[10px] px-1.5 rounded">${(opState.recurring||[]).length}</span>
+            </button>
           </div>
 
-          ${opState.leftTab === 'backlog' ? opRenderBacklogPanel(backlogByZona) : opRenderTemplatesPanel()}
+          ${opState.leftTab === 'backlog' ? opRenderBacklogPanel(backlogByZona) : opState.leftTab === 'templates' ? opRenderTemplatesPanel() : opRenderRecurrentesPanel()}
         </div>
 
         <!-- DERECHA: Día o Semana -->
@@ -346,7 +349,6 @@ function opRenderBacklogPanel(backlogByZona) {
   return `
     <div class="p-2 bg-slate-50 border-b border-slate-200">
       <button onclick="opOpenAddPendiente()" class="w-full text-xs bg-slate-900 hover:bg-slate-700 text-white py-2 rounded font-bold">+ Pendiente</button>
-      <button onclick="opOpenManageRecurring()" class="w-full text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 py-1 mt-1 rounded" title="Configurar tareas recurrentes (cambio filtros AC cada 90d, podar cada 14d)">⚙️ Recurrentes (${opState.recurring.length})</button>
 
       <!-- S6-U5: Search + filtros -->
       <div class="mt-2 space-y-1">
@@ -425,6 +427,78 @@ function opRenderBacklogPanel(backlogByZona) {
 }
 
 // ─── Panel Plantillas ───
+// ─── Panel Recurrentes (lista + crear inline) ───
+function opRenderRecurrentesPanel() {
+  const tmplOpts = opState.tasks.map(t => `<option value="${t.id}" data-emoji="${t.emoji}" data-name="${(t.name||'').replace(/"/g,'&quot;')}">${t.emoji||'🧰'} ${t.name} (cada ${t.default_duration_min}m)</option>`).join('');
+  const propsOpts = opState.properties.map(p => `<option value="prop:${p.id}">🏠 ${p.nickname || p.address}</option>`).join('');
+  const projsOpts = opState.projects.map(p => `<option value="proj:${p.id}">🏗️ ${p.name || p.address}</option>`).join('');
+  const today = opDateOnly(new Date());
+
+  return `
+    <div class="p-2 bg-violet-50 border-b border-violet-200">
+      <div class="text-[10px] text-violet-900 mb-2">🔁 Las recurrentes generan pendientes automáticos al backlog cuando vencen. Ej: filtros AC cada 90d.</div>
+      <div class="space-y-1.5 mb-2">
+        <select id="op-r-task" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">${tmplOpts}</select>
+        <select id="op-r-target" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">
+          <option value="">— sin casa específica —</option>
+          <optgroup label="🏠 Rentas">${propsOpts}</optgroup>
+          <optgroup label="🏗️ Obras">${projsOpts}</optgroup>
+        </select>
+        <div class="grid grid-cols-2 gap-1">
+          <input id="op-r-interval" type="number" value="14" min="1" placeholder="Cada N días" class="border border-slate-300 rounded px-2 py-1 text-xs" />
+          <input id="op-r-next" type="date" value="${today}" class="border border-slate-300 rounded px-2 py-1 text-xs" />
+        </div>
+        <select id="op-r-zona" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">
+          <option value="">— sin zona —</option>${OP_ZONAS.map(z => `<option>${z}</option>`).join('')}
+        </select>
+        <button onclick="opCreateRecurringFromPanel()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs py-1.5 rounded font-bold">+ Crear recurrente</button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-1.5 space-y-1">
+      ${(opState.recurring||[]).length === 0 ? '<div class="text-center text-slate-400 text-xs py-6">Sin recurrentes activas.</div>' :
+        opState.recurring.map(r => {
+          const base = opState.tasks.find(x => x.id === r.base_task_id);
+          const prop = r.property_id ? opState.properties.find(x => x.id === r.property_id) : null;
+          const proj = r.project_id ? opState.projects.find(x => x.id === r.project_id) : null;
+          const where = prop ? (prop.nickname || prop.address) : proj ? (proj.name || proj.address) : 'todas las casas';
+          const daysToDue = r.next_due ? Math.round((new Date(r.next_due) - new Date(today)) / 86400000) : null;
+          const dueClass = daysToDue == null ? '' : daysToDue < 0 ? 'text-red-600 font-bold' : daysToDue <= 3 ? 'text-amber-600' : 'text-slate-500';
+          return `
+            <div class="bg-white border border-slate-200 rounded p-2">
+              <div class="flex items-start gap-1">
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-bold leading-tight">${base?.emoji||'🔁'} ${r.custom_title || base?.name || '—'}</div>
+                  <div class="text-[10px] text-slate-500 mt-0.5">🏠 ${where} · cada ${r.interval_days}d</div>
+                  <div class="text-[10px] ${dueClass}">⏰ próxima: ${r.next_due || '—'}${daysToDue != null ? ` (${daysToDue >= 0 ? 'en '+daysToDue+'d' : Math.abs(daysToDue)+'d vencida'})` : ''}${r.zona ? ` · ${r.zona}`:''}</div>
+                </div>
+                <button onclick="opDeleteRecurring('${r.id}')" class="text-[10px] text-slate-400 hover:text-red-600">✕</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+    </div>
+  `;
+}
+
+async function opCreateRecurringFromPanel() {
+  const base_task_id = document.getElementById('op-r-task').value;
+  if (!base_task_id) return alert('Elegí una plantilla');
+  const target = document.getElementById('op-r-target').value || '';
+  const payload = {
+    base_task_id,
+    property_id: target.startsWith('prop:') ? target.slice(5) : null,
+    project_id: target.startsWith('proj:') ? target.slice(5) : null,
+    interval_days: +document.getElementById('op-r-interval').value || 14,
+    next_due: document.getElementById('op-r-next').value || opDateOnly(new Date()),
+    zona: document.getElementById('op-r-zona').value || null,
+    business: 'rentas'
+  };
+  const { error } = await sb.from('ops_recurring').insert(payload);
+  if (error) return alert('Error: ' + error.message);
+  await opLoadAll();
+  opRender();
+}
+
 function opRenderTemplatesPanel() {
   const filtered = opState.tasks.filter(t => opState.libBusinessFilter === 'all' || t.business === opState.libBusinessFilter);
   const byCat = {};
@@ -1182,55 +1256,192 @@ async function opClearDay() {
 function opOpenAddLoose() {
   const propsOpts = opState.properties.map(p => `<option value="prop:${p.id}">🏠 ${p.nickname || p.address}</option>`).join('');
   const projsOpts = opState.projects.map(p => `<option value="proj:${p.id}">🏗️ ${p.name || p.address}</option>`).join('');
+  const tmplOpts = opState.tasks.map(t => `<option value="${t.id}" data-emoji="${t.emoji}" data-dur="${t.default_duration_min}" data-mats='${JSON.stringify(t.default_materials||[])}' data-checklist='${JSON.stringify(t.default_checklist||[])}'>${t.emoji} ${t.name} (${t.default_duration_min}m)</option>`).join('');
+  const today = opDateOnly(new Date());
+
   const html = `
     <div class="space-y-3">
-      <input id="op-l-title" placeholder="Título" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
-      <div class="grid grid-cols-4 gap-2">
-        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora</label>
-          <input id="op-l-start" type="time" value="08:00" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
-        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Dur</label>
-          <input id="op-l-dur" type="number" value="30" min="5" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
-        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje</label>
+      <!-- Tipo: ocasional vs recurrente -->
+      <div class="bg-slate-50 border border-slate-200 rounded p-2">
+        <div class="text-[10px] font-bold uppercase text-slate-700 mb-1">¿Tipo de tarea?</div>
+        <div class="flex gap-2">
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="op-l-tipo" value="ocasional" checked onchange="opToggleTipoLoose('ocasional')" class="hidden peer" />
+            <div class="peer-checked:bg-emerald-100 peer-checked:border-emerald-500 peer-checked:font-bold border border-slate-300 rounded px-2 py-1.5 text-xs text-center">📅 Ocasional (1 vez)</div>
+          </label>
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="op-l-tipo" value="recurrente" onchange="opToggleTipoLoose('recurrente')" class="hidden peer" />
+            <div class="peer-checked:bg-violet-100 peer-checked:border-violet-500 peer-checked:font-bold border border-slate-300 rounded px-2 py-1.5 text-xs text-center">🔁 Recurrente (se repite)</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Plantilla (autocompleta) -->
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Plantilla (autocompleta título, duración, materiales, checklist)</label>
+        <select id="op-l-template" onchange="opLooseFromTemplate(this)" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+          <option value="">— ninguna (manual) —</option>
+          ${tmplOpts}
+        </select>
+      </div>
+
+      <input id="op-l-title" placeholder="Título *" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
+
+      <!-- Tiempos: 3 campos auto-sincronizados -->
+      <div id="op-l-times-ocasional" class="grid grid-cols-4 gap-2">
+        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora inicio</label>
+          <input id="op-l-start" type="time" value="08:00" onchange="opSyncTimesLoose('start')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora cierre</label>
+          <input id="op-l-end" type="time" value="08:30" onchange="opSyncTimesLoose('end')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración (min)</label>
+          <input id="op-l-dur" type="number" value="30" min="5" step="5" onchange="opSyncTimesLoose('dur')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje (min)</label>
           <input id="op-l-travel" type="number" value="0" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+      </div>
+
+      <!-- Campos solo para recurrente -->
+      <div id="op-l-times-recurrente" class="hidden grid grid-cols-2 gap-2">
+        <div><label class="block text-[10px] font-bold uppercase text-violet-700 mb-1">Repetir cada (días)</label>
+          <input id="op-l-interval" type="number" value="14" min="1" class="w-full border border-violet-300 rounded px-2 py-2 text-sm" /></div>
+        <div><label class="block text-[10px] font-bold uppercase text-violet-700 mb-1">Próxima fecha</label>
+          <input id="op-l-next-due" type="date" value="${today}" class="w-full border border-violet-300 rounded px-2 py-2 text-sm" /></div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
         <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Zona</label>
           <select id="op-l-zona" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-            <option value="">—</option>${OP_ZONAS.map(z => `<option>${z}</option>`).join('')}</select></div>
+            <option value="">—</option>${OP_ZONAS.map(z => `<option>${z}</option>`).join('')}
+          </select>
+        </div>
+        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Casa</label>
+          <select id="op-l-target" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+            <option value="">— sin casa —</option>
+            <optgroup label="🏠 Rentas">${propsOpts}</optgroup>
+            <optgroup label="🏗️ Obras">${projsOpts}</optgroup>
+          </select>
+        </div>
       </div>
-      <select id="op-l-target" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-        <option value="">— sin casa —</option>
-        <optgroup label="🏠 Rentas">${propsOpts}</optgroup>
-        <optgroup label="🏗️ Obras">${projsOpts}</optgroup>
-      </select>
-      <input id="op-l-materials" placeholder="Materiales (coma)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-      <textarea id="op-l-notes" rows="2" placeholder="Notas" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+
+      <input id="op-l-materials" placeholder="Materiales (coma separados)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+
+      <!-- Checklist -->
+      <div class="bg-amber-50 border border-amber-200 rounded p-2">
+        <label class="block text-[10px] font-bold uppercase text-amber-900 mb-1">📋 Checklist de entregables (qué tiene que hacer / verificar)</label>
+        <textarea id="op-l-checklist" rows="3" placeholder="Un item por línea. Ej:&#10;Pisos trapeados&#10;Baños desinfectados&#10;Foto del resultado" class="w-full border border-amber-300 rounded px-2 py-1.5 text-xs"></textarea>
+      </div>
+
+      <textarea id="op-l-notes" rows="2" placeholder="Notas adicionales" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+
       <div class="flex gap-2">
         <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="opCreateLoose()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Agendar</button>
+        <button onclick="opCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Agendar</button>
       </div>
     </div>
   `;
-  openModal('+ Tarea libre en el día', html);
+  openModal('+ Nueva tarea', html);
+}
+
+// Pre-llena el form desde una plantilla seleccionada
+function opLooseFromTemplate(sel) {
+  const opt = sel.selectedOptions[0];
+  if (!opt || !opt.value) return;
+  // Título: del texto sin emoji
+  const tmpl = opState.tasks.find(t => t.id === opt.value);
+  if (!tmpl) return;
+  document.getElementById('op-l-title').value = tmpl.name || '';
+  document.getElementById('op-l-dur').value = tmpl.default_duration_min || 30;
+  opSyncTimesLoose('dur');
+  try {
+    const mats = tmpl.default_materials || [];
+    document.getElementById('op-l-materials').value = mats.join(', ');
+    const cl = tmpl.default_checklist || [];
+    document.getElementById('op-l-checklist').value = cl.join('\n');
+  } catch {}
+}
+
+// Sincroniza start/end/dur (cuando cambia uno, los otros se ajustan)
+function opSyncTimesLoose(changed) {
+  const startEl = document.getElementById('op-l-start');
+  const endEl = document.getElementById('op-l-end');
+  const durEl = document.getElementById('op-l-dur');
+  if (!startEl || !endEl || !durEl) return;
+  if (changed === 'start' || changed === 'dur') {
+    const startMin = opTimeToMin(startEl.value);
+    const dur = +durEl.value || 0;
+    endEl.value = opMinToTime(startMin + dur);
+  } else if (changed === 'end') {
+    const startMin = opTimeToMin(startEl.value);
+    const endMin = opTimeToMin(endEl.value);
+    durEl.value = Math.max(5, endMin - startMin);
+  }
+}
+
+// Toggle entre ocasional/recurrente: oculta/muestra campos
+function opToggleTipoLoose(tipo) {
+  const ocas = document.getElementById('op-l-times-ocasional');
+  const rec = document.getElementById('op-l-times-recurrente');
+  const submit = document.getElementById('op-l-submit');
+  if (tipo === 'recurrente') {
+    ocas.classList.add('hidden');
+    rec.classList.remove('hidden');
+    submit.textContent = '🔁 Crear recurrente';
+    submit.classList.remove('bg-emerald-600','hover:bg-emerald-700');
+    submit.classList.add('bg-violet-600','hover:bg-violet-700');
+  } else {
+    ocas.classList.remove('hidden');
+    rec.classList.add('hidden');
+    submit.textContent = '+ Agendar';
+    submit.classList.remove('bg-violet-600','hover:bg-violet-700');
+    submit.classList.add('bg-emerald-600','hover:bg-emerald-700');
+  }
 }
 
 async function opCreateLoose() {
   const title = document.getElementById('op-l-title').value.trim();
   if (!title) return alert('Pon un título');
+  const tipo = document.querySelector('input[name="op-l-tipo"]:checked')?.value || 'ocasional';
   const target = document.getElementById('op-l-target').value || '';
-  const payload = {
-    date: opState.date,
-    start_time: document.getElementById('op-l-start').value || '08:00',
-    duration_min: +document.getElementById('op-l-dur').value || 30,
-    travel_min: +document.getElementById('op-l-travel').value || 0,
-    title,
-    zona: document.getElementById('op-l-zona').value || null,
-    property_id: target.startsWith('prop:') ? target.slice(5) : null,
-    project_id: target.startsWith('proj:') ? target.slice(5) : null,
-    materials: (document.getElementById('op-l-materials').value || '').split(',').map(s => s.trim()).filter(Boolean),
-    notes: document.getElementById('op-l-notes').value || null,
-    created_by: state.user.id
-  };
-  const { error } = await sb.from('ops_day_tasks').insert(payload);
-  if (error) return alert(error.message);
+  const tmplId = document.getElementById('op-l-template').value || null;
+  const property_id = target.startsWith('prop:') ? target.slice(5) : null;
+  const project_id = target.startsWith('proj:') ? target.slice(5) : null;
+  const zona = document.getElementById('op-l-zona').value || null;
+  const materials = (document.getElementById('op-l-materials').value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const checklistItems = (document.getElementById('op-l-checklist').value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const checklist = checklistItems.map(item => ({ item, done: false }));
+  const notes = document.getElementById('op-l-notes').value || null;
+
+  if (tipo === 'recurrente') {
+    // Insertar a ops_recurring — el sistema genera pendientes automáticos
+    const interval_days = +document.getElementById('op-l-interval').value || 14;
+    const next_due = document.getElementById('op-l-next-due').value || opDateOnly(new Date());
+    const dur = +document.getElementById('op-l-dur').value || 30;
+    const payload = {
+      base_task_id: tmplId,
+      property_id, project_id, zona,
+      custom_title: title,
+      custom_duration_min: dur,
+      custom_materials: materials,
+      interval_days, next_due,
+      business: project_id ? 'remodelacion' : 'rentas',
+      active: true
+    };
+    const { error } = await sb.from('ops_recurring').insert(payload);
+    if (error) return alert('Error: ' + error.message);
+  } else {
+    // Ocasional: inserta a ops_day_tasks en el día activo
+    const dur = +document.getElementById('op-l-dur').value || 30;
+    const payload = {
+      date: opState.date,
+      start_time: document.getElementById('op-l-start').value || '08:00',
+      duration_min: dur,
+      travel_min: +document.getElementById('op-l-travel').value || 0,
+      title, task_id: tmplId, zona, property_id, project_id, materials, checklist, notes,
+      business: project_id ? 'remodelacion' : 'rentas',
+      created_by: state.user.id
+    };
+    const { error } = await sb.from('ops_day_tasks').insert(payload);
+    if (error) return alert('Error: ' + error.message);
+  }
   closeModal();
   setTimeout(() => openOpsPlanner(opState.sys), 100);
 }
