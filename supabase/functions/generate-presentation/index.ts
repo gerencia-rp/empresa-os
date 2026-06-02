@@ -96,7 +96,20 @@ ${research_mode ? `🔬 MODO INVESTIGACIÓN PROFUNDA ACTIVADO
 - La clase debe sentirse curada por un EXPERTO que pasó horas investigando, no Wikipedia copy-paste.
 - Incluí "deep_insights" que un coach junior NO sabría.
 
-` : ''}REGLAS CRÍTICAS:
+` : ''}ESTRUCTURA OBLIGATORIA DE LA PRESENTACIÓN (estilo profesional, no genérico):
+
+- Slide 1: PORTADA — title + subtitle/quote + 3 KPIs grandes destacados (layout: "cover")
+- Slide 2: AGENDA — 4-6 pasos del proceso visualmente (layout: "agenda")
+- Slide 3-4: CONTEXTO / DEFINICIÓN — qué es + por qué importa, con comparativa side-by-side si aplica (layout: "comparison")
+- Slide 5-7: CONCEPTOS PRINCIPALES con 3-5 beneficios/principios cada uno (layout: "benefits")
+- **Slide 8-10: AL MENOS 2 CASOS REALES** con dirección/nombre + KPIs antes/después + ROI (layout: "case-study")
+- Slide 11-13: FRAMEWORKS / CHECKLISTS / PARÁMETROS (layout: "framework" o "checklist")
+- Slide 14-16: COMPARATIVAS de estrategias/opciones (layout: "comparison" o "strategy-grid")
+- Slide 17-18: METRICS DASHBOARD con KPI cards grandes (layout: "metrics-dashboard")
+- Slide N-1: QUOTE memorable + 3 stats finales (layout: "quote")
+- Slide N: CIERRE / CTA con call to action específico + métricas resumen (layout: "closing")
+
+REGLAS CRÍTICAS:
 1. **TODA estadística, tasa, precio, número o dato DEBE venir de web search en VIVO**.
    No inventes números. No uses "approximately" sin fuente. Cada número debe venir con su fuente y fecha de acceso.
 2. Para este dominio (${domain}), USA fuentes oficiales/confiables sugeridas:
@@ -120,25 +133,78 @@ ESTRUCTURA TÍPICA (adaptar al tema):
 - Slide 14: Pitfalls comunes + cómo evitarlos
 - Slide 15: Resources + tarea de la semana
 
-Devolvé SOLO JSON válido (sin markdown wrapper):
+Devolvé SOLO JSON válido (sin markdown wrapper, sin comentarios):
 {
   "title": "${title}",
-  "outline": ["Sección 1", "Sección 2", ...],
+  "subtitle": "Hook o frase memorable de la clase",
+  "brand": "${audience.includes('Flipping')?'FLIPPING RENTALS':audience.includes('Rental')?'RENTAL PROFITS':'EMPRESA OS'}",
+  "outline": ["Sección 1", "Sección 2", "..."],
   "slides": [
     {
       "number": 1,
       "title": "...",
-      "subtitle": "...",
-      "layout": "title|content|two-column|stats|quote|closing",
-      "bullets": ["punto 1 (max 12 palabras)", "punto 2"],
-      "stats": [{"label": "Median home price Austin", "value": "$469,500", "source_url": "https://...", "source_name": "Redfin May 2026"}],
-      "speaker_notes": "Guion del coach: qué decir, ejemplo concreto, transición al siguiente slide. 2-4 oraciones.",
+      "subtitle": "opcional",
+      "layout": "cover | agenda | comparison | benefits | case-study | framework | checklist | strategy-grid | metrics-dashboard | quote | closing | content",
+      "bullets": ["bullet 1 max 12 palabras", "bullet 2"],
+
+      "stats": [{"label": "Median home price Austin", "value": "$469,500", "source_name": "Redfin May 2026"}],
+
+      "agenda_steps": [{"step": "Compra", "label": "Adquisición estratégica"}],
+
+      "comparison": {
+        "left": {"title": "Opción A", "items": ["check item 1", "check item 2"]},
+        "right": {"title": "Opción B", "items": ["check item 1", "check item 2"]}
+      },
+
+      "case_study": {
+        "name": "Dove Springs",
+        "location": "Austin, TX",
+        "compra": 185000,
+        "remodelacion": 42500,
+        "arv": 285000,
+        "cash_flow_monthly": 1200,
+        "roi_anual": 18.5,
+        "duracion_meses": 4,
+        "estrategia": "Rent by Rooms",
+        "key_takeaway": "Frase de cierre del caso"
+      },
+
+      "framework_items": [
+        {"label": "ARV", "value": "$285K"},
+        {"label": "Rentas comparables", "value": "$2,200"}
+      ],
+
+      "checklist_items": [
+        {"title": "Durabilidad", "detail": "Materiales de larga duración"},
+        {"title": "Funcionalidad", "detail": "Diseño práctico"}
+      ],
+
+      "strategy_options": [
+        {"name": "Long-term", "cash_flow": "Media", "scalability": "Alta", "operation": "Baja", "ideal_for": "Inversores que buscan estabilidad"}
+      ],
+
+      "metric_cards": [
+        {"label": "ROI Anual", "value": "15%", "trend": "+2pp"},
+        {"label": "Cash Flow", "value": "$50K", "trend": "+12%"}
+      ],
+
+      "quote_text": "Frase memorable corta",
+      "quote_author": "Atribución (opcional)",
+
+      "speaker_notes": "Guion del coach: qué decir, ejemplo concreto, transición. 2-4 oraciones.",
       "sources": [{"title": "Redfin Austin Market Data", "url": "https://...", "accessed_at": "${today}"}]
     }
   ],
   "all_sources": [{"title": "...", "url": "..."}],
-  "summary": "1 párrafo sobre la presentación"
-}`;
+  "summary": "1 párrafo ejecutivo sobre la presentación"
+}
+
+NOTAS IMPORTANTES:
+- En cada slide, INCLUÍ SOLO los campos que apliquen a su layout (no llenes todos).
+- Para "case-study" siempre incluí "case_study" con números reales (busca casos REALES vía web search si require_live_data).
+- Para "comparison" incluí "comparison" con left/right.
+- Para "agenda" incluí "agenda_steps".
+- "speaker_notes" SIEMPRE — son el guion para el coach.`;
 
   // Llamar a Anthropic con web_search habilitado
   // Modo investigación profunda: extended thinking + 25 web searches + más tokens
