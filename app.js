@@ -917,6 +917,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
+  if (sys.type === 'edu-manager') return openEduManager(sys);
 }
 
 // ============================================================

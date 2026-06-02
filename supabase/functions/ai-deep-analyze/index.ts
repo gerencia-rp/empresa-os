@@ -340,6 +340,50 @@ Devolvé SOLO JSON válido:
   "summary": "1 párrafo del nivel de riesgo agregado"
 }`,
 
+  'edu-plan': (ctx, today) => `Eres mentor experto en real estate (${ctx.mentorship}). Hoy es ${today}.
+
+CONTEXTO DEL ESTUDIANTE:
+- Nombre: ${ctx.student?.name}
+- Mentoría: ${ctx.mentorship}
+- Etapa actual: ${ctx.current_stage} (target ${ctx.stage_target_weeks||'?'} semanas, lleva ${ctx.days_in_stage||0} días)
+- Inscrito desde: ${ctx.student?.enrolled_at}
+- Vence: ${ctx.student?.expires_at || 'sin fecha'}
+- GLScore: ${ctx.student?.glscore || '?'}/100
+- Metas del estudiante: ${ctx.student?.goals || 'no especificadas'}
+- Notas históricas: ${ctx.student?.notes || 'sin notas'}
+
+ETAPAS DEL PROGRAMA: ${JSON.stringify(ctx.stages)}
+
+DIAGNÓSTICO DEL COACH (qué pasó en última sesión + objetivos):
+${ctx.coach_diagnostic || '(el coach no agregó diagnóstico — usá la info del estudiante)'}
+
+HORIZONTE DEL PLAN: ${ctx.horizon_weeks} semanas
+
+Tu trabajo: armar un plan de trabajo CONCRETO para este estudiante. Debe ser:
+1) Específico para su etapa actual y nivel (no genérico)
+2) Realista al horizonte de ${ctx.horizon_weeks} semanas
+3) Accionable: cada tarea con QUÉ exactamente hacer + cómo medir el éxito
+4) Personalizado al diagnóstico del coach
+5) Pensado para COPY-PASTE: el coach lo manda directo al estudiante por WhatsApp/email
+
+Devolvé SOLO JSON válido:
+{
+  "message": "Hola [Nombre], este es tu plan para las próximas ${ctx.horizon_weeks} semanas. (tono motivador rioplatense, 2-3 oraciones)",
+  "objective": "Meta principal de estas 2 semanas, 1 oración clara",
+  "tasks": [
+    {
+      "title": "Tarea concreta 1",
+      "description": "Cómo hacerla paso a paso (2-3 oraciones)",
+      "due_date": "${ctx.horizon_weeks ? new Date(Date.now()+5*86400000).toISOString().split('T')[0] : null}"
+    }
+  ],
+  "resources": [
+    { "title": "Recurso recomendado (slide/doc/video)", "url": null }
+  ],
+  "success_criteria": ["Al final de la semana 1 debe...", "Al final de la semana 2 debe..."],
+  "summary": "1 párrafo resumen del plan"
+}`,
+
   'pm-compliance': (ctx, today) => `Eres compliance officer experto en operación inmobiliaria Texas (Austin/Travis). Hoy es ${today}.
 
 CONTEXTO OPERATIVO DE LA EMPRESA "${ctx.company}":
