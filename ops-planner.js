@@ -281,18 +281,24 @@ function opRender() {
         <div class="w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
           <!-- Tabs -->
           <div class="flex border-b border-slate-200 bg-slate-50">
-            <button onclick="opSetLeftTab('backlog')" class="flex-1 px-2 py-2 text-xs font-bold ${opState.leftTab==='backlog'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">
-              📥 Backlog <span class="bg-slate-900 text-white text-[10px] px-1.5 rounded">${backlogTotal}</span>
+            <button onclick="opSetLeftTab('backlog')" class="flex-1 px-1.5 py-2 text-[10px] font-bold ${opState.leftTab==='backlog'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">
+              📥 Backlog <span class="bg-slate-900 text-white text-[9px] px-1 rounded">${backlogTotal}</span>
             </button>
-            <button onclick="opSetLeftTab('templates')" class="flex-1 px-2 py-2 text-xs font-bold ${opState.leftTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">
-              📚 Plantillas
+            <button onclick="opSetLeftTab('templates')" class="flex-1 px-1.5 py-2 text-[10px] font-bold ${opState.leftTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">
+              📚 Tareas
             </button>
-            <button onclick="opSetLeftTab('recurrentes')" class="flex-1 px-2 py-2 text-xs font-bold ${opState.leftTab==='recurrentes'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">
-              🔁 Recurrentes <span class="bg-violet-600 text-white text-[10px] px-1.5 rounded">${(opState.recurring||[]).length}</span>
+            <button onclick="opSetLeftTab('daytemplates')" class="flex-1 px-1.5 py-2 text-[10px] font-bold ${opState.leftTab==='daytemplates'?'bg-white border-b-2 border-blue-600':'text-slate-500 hover:bg-slate-100'}">
+              🗂️ Días <span class="bg-blue-600 text-white text-[9px] px-1 rounded">${(opState.dayTemplates||[]).length}</span>
+            </button>
+            <button onclick="opSetLeftTab('recurrentes')" class="flex-1 px-1.5 py-2 text-[10px] font-bold ${opState.leftTab==='recurrentes'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">
+              🔁 Recur. <span class="bg-violet-600 text-white text-[9px] px-1 rounded">${(opState.recurring||[]).length}</span>
             </button>
           </div>
 
-          ${opState.leftTab === 'backlog' ? opRenderBacklogPanel(backlogByZona) : opState.leftTab === 'templates' ? opRenderTemplatesPanel() : opRenderRecurrentesPanel()}
+          ${opState.leftTab === 'backlog' ? opRenderBacklogPanel(backlogByZona) :
+            opState.leftTab === 'templates' ? opRenderTemplatesPanel() :
+            opState.leftTab === 'daytemplates' ? opRenderDayTemplatesPanel() :
+            opRenderRecurrentesPanel()}
         </div>
 
         <!-- DERECHA: Día / Semana / Casas / Entregable -->
@@ -1538,6 +1544,33 @@ function _opOpenEditModal(t, isBacklog) {
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas</label>
         <textarea id="op-e-notes" rows="2" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${t.notes||''}</textarea>
       </div>
+
+      <!-- 🔁 Sección recurrencia (collapsible) -->
+      <details ${t.recurring_id ? 'open' : ''} class="bg-violet-50 border border-violet-200 rounded-lg">
+        <summary class="px-3 py-2 cursor-pointer text-xs font-bold text-violet-900 flex items-center justify-between">
+          <span>🔁 ${t.recurring_id ? 'Esta tarea ES recurrente' : 'Convertir en recurrente'}</span>
+          <span class="text-[10px] font-normal text-violet-700">${t.recurring_id ? '(click para editar)' : '(click para configurar)'}</span>
+        </summary>
+        <div class="p-3 border-t border-violet-200 space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="op-e-recurring-toggle" ${t.recurring_id ? 'checked' : ''} onchange="opToggleRecurringFields(this.checked)" class="w-4 h-4" />
+            <span class="text-xs font-bold text-violet-900">Es tarea recurrente</span>
+          </label>
+          <div id="op-e-recurring-fields" class="${t.recurring_id ? '' : 'hidden'} grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-violet-700 mb-1">Repetir cada (días)</label>
+              <input id="op-e-recurring-interval" type="number" value="${(() => { const r = (opState.recurring||[]).find(x => x.id === t.recurring_id); return r?.interval_days || 7; })()}" min="1" max="365" class="w-full border border-violet-300 rounded px-2 py-2 text-sm" />
+              <div class="text-[9px] text-violet-600 mt-0.5">1=diaria · 7=sem · 14=quinc · 30=mens</div>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-violet-700 mb-1">Próxima fecha</label>
+              <input id="op-e-recurring-next" type="date" value="${(() => { const r = (opState.recurring||[]).find(x => x.id === t.recurring_id); return r?.next_due || opDateOnly(new Date()); })()}" class="w-full border border-violet-300 rounded px-2 py-2 text-sm" />
+            </div>
+          </div>
+          ${t.recurring_id ? `<div class="text-[10px] text-violet-700 italic">Si destildás "Es tarea recurrente" y guardás, se DESACTIVA la recurrencia (esta instancia queda).</div>` : ''}
+        </div>
+      </details>
+
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         ${!isBacklog ? `<button onclick="opSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-2 rounded" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
         <button onclick="opDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 rounded">🗑️</button>
@@ -1571,8 +1604,66 @@ async function opSaveEdit(id, isBacklog) {
   }
   const { error } = await sb.from('ops_day_tasks').update(payload).eq('id', id);
   if (error) return alert(error.message);
+
+  // Manejar la sección de recurrencia
+  const recToggle = document.getElementById('op-e-recurring-toggle');
+  const currentTask = opState.dayTasks.find(x => x.id === id) || opState.backlog.find(x => x.id === id);
+  const wasRecurring = !!currentTask?.recurring_id;
+  const wantsRecurring = recToggle?.checked || false;
+  if (wantsRecurring && !wasRecurring) {
+    // Crear nueva recurrencia
+    const interval = +document.getElementById('op-e-recurring-interval').value || 7;
+    const nextDue = document.getElementById('op-e-recurring-next').value || opDateOnly(new Date());
+    const { data: rec, error: rErr } = await sb.from('ops_recurring').insert({
+      base_task_id: currentTask.task_id || null,
+      custom_title: payload.title,
+      custom_duration_min: payload.duration_min,
+      custom_materials: payload.materials,
+      property_id: payload.property_id,
+      project_id: payload.project_id,
+      zona: payload.zona,
+      business: payload.business,
+      priority: payload.priority,
+      interval_days: interval,
+      next_due: nextDue,
+      active: true,
+      created_by: state.user.id
+    }).select().single();
+    if (!rErr && rec) {
+      await sb.from('ops_day_tasks').update({ recurring_id: rec.id }).eq('id', id);
+    } else if (rErr) {
+      alert('Aviso: tarea guardada pero la recurrencia falló: ' + rErr.message);
+    }
+  } else if (wantsRecurring && wasRecurring) {
+    // Actualizar la recurrencia existente
+    const interval = +document.getElementById('op-e-recurring-interval').value || 7;
+    const nextDue = document.getElementById('op-e-recurring-next').value || opDateOnly(new Date());
+    await sb.from('ops_recurring').update({
+      custom_title: payload.title,
+      custom_duration_min: payload.duration_min,
+      custom_materials: payload.materials,
+      property_id: payload.property_id,
+      project_id: payload.project_id,
+      zona: payload.zona,
+      business: payload.business,
+      priority: payload.priority,
+      interval_days: interval,
+      next_due: nextDue,
+      updated_at: new Date().toISOString()
+    }).eq('id', currentTask.recurring_id);
+  } else if (!wantsRecurring && wasRecurring) {
+    // Desactivar la recurrencia
+    await sb.from('ops_recurring').update({ active: false }).eq('id', currentTask.recurring_id);
+    await sb.from('ops_day_tasks').update({ recurring_id: null }).eq('id', id);
+  }
+
   closeModal();
   setTimeout(() => openOpsPlanner(opState.sys), 100);
+}
+
+function opToggleRecurringFields(checked) {
+  const fields = document.getElementById('op-e-recurring-fields');
+  if (fields) fields.classList.toggle('hidden', !checked);
 }
 
 async function opSendToBacklog(id, fromModal) {
@@ -2333,4 +2424,234 @@ async function opMakeTaskOneTime(taskId) {
   await sb.from('ops_day_tasks').update({ recurring_id: null }).eq('id', taskId);
   await opLoadAll(); opRender();
   alert('✅ Recurrencia desactivada. La tarea de hoy queda como única.');
+}
+
+// ============================================================
+// PANEL: PLANTILLAS DE DÍA (sidebar tab)
+// ============================================================
+function opRenderDayTemplatesPanel() {
+  const tpls = opState.dayTemplates || [];
+  return `
+    <div class="flex-1 overflow-y-auto p-2">
+      <div class="bg-blue-50 border border-blue-200 rounded p-2 text-[10px] text-blue-900 mb-2">
+        🗂️ Plantillas de día completo. Aplicalas con un click al día actual o editá su contenido.
+      </div>
+      ${tpls.length === 0 ? `
+        <div class="text-center py-10 text-slate-400 text-xs">
+          <div class="text-3xl mb-2">📭</div>
+          <div>Sin plantillas guardadas.</div>
+          <div class="mt-2 text-[10px]">Armá un día y dale "💾 Guardar día como plantilla" arriba.</div>
+        </div>
+      ` : `
+        <div class="space-y-2">
+          ${tpls.map(t => `
+            <div class="bg-white border border-slate-200 rounded-lg p-2 hover:shadow-sm">
+              <div class="flex justify-between items-start gap-1">
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-bold truncate">${t.name}</div>
+                  ${t.description ? `<div class="text-[10px] text-slate-500 mt-0.5 truncate" title="${t.description.replace(/"/g,'&quot;')}">${t.description}</div>` : ''}
+                  <div class="text-[10px] text-slate-600 mt-1 flex gap-1 flex-wrap">
+                    <span class="bg-slate-100 px-1 rounded">${t.task_count} t</span>
+                    <span class="bg-slate-100 px-1 rounded">${Math.floor(t.total_min/60)}h${t.total_min%60?(t.total_min%60)+'m':''}</span>
+                    ${t.zona ? `<span class="${opZonaColor(t.zona)} border px-1 rounded">${t.zona[0]}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="flex gap-1 mt-2">
+                <button onclick="opApplyTemplate('${t.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1 rounded" title="Copiar al día actual">📋 Aplicar</button>
+                <button onclick="opOpenEditDayTemplate('${t.id}')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold px-2 py-1 rounded" title="Editar contenido">✏️</button>
+                <button onclick="opDeleteTemplate('${t.id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold px-2 py-1 rounded" title="Eliminar">🗑️</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// ============================================================
+// EDITOR DE CONTENIDO DE PLANTILLA DE DÍA
+// ============================================================
+function opOpenEditDayTemplate(templateId) {
+  const tpl = opState.dayTemplates.find(t => t.id === templateId);
+  if (!tpl) return alert('Plantilla no encontrada');
+  // Guardamos referencia editable en window para que los inputs onchange muten
+  window._opEditingTpl = JSON.parse(JSON.stringify(tpl));
+  opRenderEditDayTemplate();
+}
+
+function opRenderEditDayTemplate() {
+  const tpl = window._opEditingTpl;
+  if (!tpl) return;
+  const tasks = tpl.tasks || [];
+  const totalMin = tasks.reduce((s,t) => s + (+t.duration_min||0) + (+t.travel_min||0), 0);
+
+  const propsOpts = opState.properties.map(p => `<option value="prop:${p.id}">🏠 ${p.nickname || p.address}</option>`).join('');
+  const projsOpts = opState.projects.map(p => `<option value="proj:${p.id}">🏗️ ${p.name || p.address}</option>`).join('');
+
+  const html = `
+    <div class="space-y-3">
+      <!-- Cabecera de plantilla -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-blue-900 mb-1">Nombre *</label>
+            <input value="${(tpl.name||'').replace(/"/g,'&quot;')}" oninput="window._opEditingTpl.name=this.value" class="w-full border border-blue-300 rounded px-2 py-1.5 text-sm font-bold" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-blue-900 mb-1">Zona dominante</label>
+            <select onchange="window._opEditingTpl.zona=this.value||null" class="w-full border border-blue-300 rounded px-2 py-1.5 text-sm">
+              <option value="">— sin zona —</option>
+              ${OP_ZONAS.map(z => `<option value="${z}" ${tpl.zona===z?'selected':''}>${z}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-blue-900 mb-1">Descripción</label>
+          <textarea oninput="window._opEditingTpl.description=this.value" rows="2" class="w-full border border-blue-300 rounded px-2 py-1.5 text-xs">${tpl.description||''}</textarea>
+        </div>
+        <div class="text-[11px] text-blue-700">
+          ${tasks.length} tarea${tasks.length===1?'':'s'} · ${Math.floor(totalMin/60)}h ${totalMin%60}m total
+        </div>
+      </div>
+
+      <!-- Lista editable de tareas -->
+      <div class="border border-slate-200 rounded-lg overflow-hidden">
+        <div class="bg-slate-100 px-3 py-2 flex items-center justify-between">
+          <span class="text-xs font-bold uppercase text-slate-700">Tareas de la plantilla</span>
+          <button onclick="opAddTaskToTemplate()" class="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-bold">+ Agregar tarea</button>
+        </div>
+        ${tasks.length === 0 ? '<div class="p-6 text-center text-xs text-slate-400">Sin tareas. Agregá una.</div>' : `
+          <div class="max-h-[50vh] overflow-y-auto divide-y divide-slate-100">
+            ${tasks.map((task, idx) => {
+              const targetVal = task.property_id ? 'prop:'+task.property_id : task.project_id ? 'proj:'+task.project_id : '';
+              return `
+                <div class="p-2 bg-white hover:bg-slate-50">
+                  <div class="flex gap-1 items-center mb-1">
+                    <span class="bg-slate-200 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0">#${idx+1}</span>
+                    <input value="${(task.title||'').replace(/"/g,'&quot;')}" oninput="opTplTaskField(${idx},'title',this.value)" placeholder="Título *" class="flex-1 border border-slate-300 rounded px-2 py-1 text-xs font-bold" />
+                    <button onclick="opRemoveTaskFromTemplate(${idx})" class="text-red-500 hover:text-red-700 text-xs px-1" title="Eliminar">🗑️</button>
+                  </div>
+                  <div class="grid grid-cols-4 gap-1 mb-1">
+                    <div>
+                      <label class="block text-[9px] text-slate-500">Inicio</label>
+                      <input type="time" value="${(task.start_time||'').substring(0,5)}" oninput="opTplTaskField(${idx},'start_time',this.value)" class="w-full border border-slate-300 rounded px-1 py-0.5 text-[11px]" />
+                    </div>
+                    <div>
+                      <label class="block text-[9px] text-slate-500">Dur (m)</label>
+                      <input type="number" value="${task.duration_min||30}" min="5" step="5" oninput="opTplTaskField(${idx},'duration_min',+this.value)" class="w-full border border-slate-300 rounded px-1 py-0.5 text-[11px]" />
+                    </div>
+                    <div>
+                      <label class="block text-[9px] text-emerald-600">Cierre auto</label>
+                      <input type="time" value="${opAddMin((task.start_time||'08:00').substring(0,5), task.duration_min||30)}" readonly class="w-full border border-emerald-300 bg-emerald-50 rounded px-1 py-0.5 text-[11px] text-emerald-700 cursor-not-allowed" />
+                    </div>
+                    <div>
+                      <label class="block text-[9px] text-slate-500">Viaje (m)</label>
+                      <input type="number" value="${task.travel_min||0}" min="0" step="5" oninput="opTplTaskField(${idx},'travel_min',+this.value)" class="w-full border border-slate-300 rounded px-1 py-0.5 text-[11px]" />
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-3 gap-1 mb-1">
+                    <select onchange="opTplTaskField(${idx},'zona',this.value||null)" class="border border-slate-300 rounded px-1 py-0.5 text-[11px]">
+                      <option value="">— zona —</option>
+                      ${OP_ZONAS.map(z => `<option value="${z}" ${task.zona===z?'selected':''}>${z}</option>`).join('')}
+                    </select>
+                    <select onchange="opTplTaskField(${idx},'priority',this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[11px]">
+                      ${['low','normal','high','urgent'].map(p => `<option value="${p}" ${task.priority===p?'selected':''}>${p}</option>`).join('')}
+                    </select>
+                    <select onchange="opTplTaskTarget(${idx}, this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[11px]">
+                      <option value="" ${!targetVal?'selected':''}>— casa —</option>
+                      <optgroup label="🏠 Rentas">${propsOpts.replace(new RegExp(`value="${targetVal}"`,'g'), `value="${targetVal}" selected`)}</optgroup>
+                      <optgroup label="🏗️ Obras">${projsOpts.replace(new RegExp(`value="${targetVal}"`,'g'), `value="${targetVal}" selected`)}</optgroup>
+                    </select>
+                  </div>
+                  <input value="${((task.materials||[]).join(', ')).replace(/"/g,'&quot;')}" oninput="opTplTaskMaterials(${idx}, this.value)" placeholder="Materiales (coma)" class="w-full border border-slate-300 rounded px-2 py-0.5 text-[11px] mb-1" />
+                  <textarea oninput="opTplTaskField(${idx},'notes',this.value||null)" rows="1" placeholder="Notas (opcional)" class="w-full border border-slate-300 rounded px-2 py-0.5 text-[11px]">${task.notes||''}</textarea>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal(); window._opEditingTpl=null; setTimeout(()=>openOpsPlanner(opState.sys),100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opSaveDayTemplateEdits()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">💾 Guardar cambios</button>
+      </div>
+    </div>
+  `;
+  openModal('✏️ Editar plantilla de día', html);
+}
+
+// Mutadores del state editable
+function opTplTaskField(idx, field, value) {
+  if (!window._opEditingTpl?.tasks?.[idx]) return;
+  window._opEditingTpl.tasks[idx][field] = value;
+  // Si cambió duración o start_time, re-renderizar para mostrar el cierre auto
+  if (field === 'duration_min' || field === 'start_time') {
+    opRenderEditDayTemplate();
+  }
+}
+function opTplTaskMaterials(idx, value) {
+  if (!window._opEditingTpl?.tasks?.[idx]) return;
+  window._opEditingTpl.tasks[idx].materials = (value || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function opTplTaskTarget(idx, value) {
+  if (!window._opEditingTpl?.tasks?.[idx]) return;
+  window._opEditingTpl.tasks[idx].property_id = value.startsWith('prop:') ? value.slice(5) : null;
+  window._opEditingTpl.tasks[idx].project_id = value.startsWith('proj:') ? value.slice(5) : null;
+}
+function opAddTaskToTemplate() {
+  if (!window._opEditingTpl) return;
+  const existing = window._opEditingTpl.tasks || [];
+  // Heredar hora del final de la última tarea
+  let startTime = '08:00';
+  if (existing.length) {
+    const last = existing[existing.length-1];
+    startTime = opAddMin(last.start_time || '08:00', (last.duration_min||30) + (last.travel_min||0));
+  }
+  window._opEditingTpl.tasks = [...existing, {
+    title: 'Nueva tarea', start_time: startTime, duration_min: 30, travel_min: 0,
+    materials: [], checklist: [], notes: null,
+    zona: null, business: 'rentas', priority: 'normal',
+    property_id: null, project_id: null
+  }];
+  opRenderEditDayTemplate();
+}
+function opRemoveTaskFromTemplate(idx) {
+  if (!window._opEditingTpl) return;
+  if (!confirm('¿Quitar esta tarea de la plantilla?')) return;
+  window._opEditingTpl.tasks = window._opEditingTpl.tasks.filter((_, i) => i !== idx);
+  opRenderEditDayTemplate();
+}
+
+async function opSaveDayTemplateEdits() {
+  const tpl = window._opEditingTpl;
+  if (!tpl) return;
+  if (!tpl.name?.trim()) return alert('El nombre es obligatorio');
+  const tasks = tpl.tasks || [];
+  const totalMin = tasks.reduce((s,t) => s + (+t.duration_min||0) + (+t.travel_min||0), 0);
+  // Auto-detectar zona si no fue puesta a mano
+  let zonaDom = tpl.zona;
+  if (!zonaDom) {
+    const cnt = {};
+    tasks.forEach(t => { if (t.zona) cnt[t.zona] = (cnt[t.zona]||0)+1; });
+    zonaDom = Object.entries(cnt).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
+  }
+  const { error } = await sb.from('ops_day_templates').update({
+    name: tpl.name.trim(),
+    description: tpl.description || null,
+    tasks,
+    zona: zonaDom,
+    task_count: tasks.length,
+    total_min: totalMin,
+    updated_at: new Date().toISOString()
+  }).eq('id', tpl.id);
+  if (error) return alert('Error: ' + error.message);
+  window._opEditingTpl = null;
+  closeModal();
+  setTimeout(async () => {
+    await openOpsPlanner(opState.sys);
+    opSetLeftTab('daytemplates');
+  }, 100);
 }
