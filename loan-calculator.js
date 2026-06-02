@@ -22,6 +22,9 @@ const loanState = {
   convRatePct: 7.5,        // tasa 30y investor 2026
   convTermMonths: 360,
   convClosingPct: 4,       // % del loan (ya lo viste en tus closing statements)
+  // Impuestos + seguro — para calcular PITI real (lo que el dueño paga mensual)
+  propertyTaxAnnualPct: 2.2,  // % del ARV. Austin/Travis: 2.0-2.5% típico
+  insuranceAnnual: 1900,     // $/año. Single family Texas ~$1.5k-2.2k típico
 };
 
 const loanFmt = n => '$' + Math.round(n || 0).toLocaleString('en-US');
@@ -47,9 +50,22 @@ function loanCalc() {
   // Cash-out al refi: lo que sobra después de pagar el HML
   const convCashOut = convLoan - hmlLoan - convClosingCost;
 
+  // PITI: lo que el dueño realmente paga mensual (P&I + Tax + Insurance)
+  const propertyTaxAnnual = (+loanState.arv || 0) * ((+loanState.propertyTaxAnnualPct || 0) / 100);
+  const monthlyTax = propertyTaxAnnual / 12;
+  const monthlyInsurance = (+loanState.insuranceAnnual || 0) / 12;
+  const convPITI = convMonthly + monthlyTax + monthlyInsurance;
+  // Vs renta mensual estimada (regla DSCR: rent / PITI >= 1.2 es saludable)
+  const dscrTarget = convPITI > 0 ? convPITI * 1.2 : 0;  // renta mínima recomendada
+
   return {
     hml: { loan: hmlLoan, cash: hmlCash, monthlyInt: hmlMonthlyInt, origination: hmlOrigination, totalInt: hmlTotalInt, totalCost: hmlTotalCost, base: hmlBase },
-    conv: { loan: convLoan, monthly: convMonthly, totalPaid: convTotalPaid, totalInt: convTotalInt, closingCost: convClosingCost, cashOut: convCashOut }
+    conv: {
+      loan: convLoan, monthly: convMonthly, totalPaid: convTotalPaid, totalInt: convTotalInt,
+      closingCost: convClosingCost, cashOut: convCashOut,
+      monthlyTax, monthlyInsurance, piti: convPITI,
+      propertyTaxAnnual, dscrTarget
+    }
   };
 }
 
@@ -102,6 +118,8 @@ function loanPersist() {
     convRatePct: loanState.convRatePct,
     convTermMonths: loanState.convTermMonths,
     convClosingPct: loanState.convClosingPct,
+    propertyTaxAnnualPct: loanState.propertyTaxAnnualPct,
+    insuranceAnnual: loanState.insuranceAnnual,
     _updatedAt: new Date().toISOString()
   };
   sys.data.byProperty[loanState.propertyId] = snapshot;
@@ -164,7 +182,7 @@ async function loanSaveProperty() {
     remodel_cost_estimated: loanState.remodelCost,
     arv: loanState.arv,
     ltv_pct: loanState.convLtvPct,
-    mortgage_monthly: r.conv.monthly,
+    mortgage_monthly: r.conv.piti,  // PITI completo (P&I + Tax + Insurance) — lo que realmente paga el dueño
     payoff_hml: r.hml.loan,
     cashout_estimated: r.conv.cashOut
   };
@@ -294,7 +312,24 @@ function loanRender() {
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Closing costs %</label>
                 <input type="number" step="0.5" value="${loanState.convClosingPct}" onchange="loanState.convClosingPct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-                <p class="text-[9px] text-slate-400">Tu data real: ~8% (incluye escrow). Aproximado ${loanFmt((loanState.arv * loanState.convLtvPct / 100) * loanState.convClosingPct / 100)}</p>
+                <p class="text-[9px] text-slate-400">Tu data real: ~8% (incluye escrow). Aprox ${loanFmt((loanState.arv * loanState.convLtvPct / 100) * loanState.convClosingPct / 100)}</p>
+              </div>
+            </div>
+
+            <!-- Impuestos + Seguro para calcular PITI real -->
+            <div class="mt-3 pt-3 border-t border-blue-200">
+              <h4 class="text-[10px] font-bold text-blue-900 uppercase mb-2">🏠 Impuestos + Seguro (escrow mensual)</h4>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Property tax % anual del ARV</label>
+                  <input type="number" step="0.1" value="${loanState.propertyTaxAnnualPct}" onchange="loanState.propertyTaxAnnualPct=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                  <p class="text-[9px] text-slate-400">Austin/Travis típico: 2.0-2.5% · Aprox ${loanFmt(loanState.arv * loanState.propertyTaxAnnualPct / 100)} /año</p>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Seguro anual ($)</label>
+                  <input type="number" step="50" value="${loanState.insuranceAnnual}" onchange="loanState.insuranceAnnual=+this.value; loanRender(); loanPersist()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                  <p class="text-[9px] text-slate-400">Texas SFH típico: $1,500-$2,200/año · ${loanFmt(loanState.insuranceAnnual/12)} /mes</p>
+                </div>
               </div>
             </div>
           </div>
@@ -358,28 +393,52 @@ function loanRenderConvResult(r) {
       <div class="text-4xl font-bold">${loanFmt(r.conv.loan)}</div>
       <div class="text-xs text-blue-100 mt-1">${loanState.convLtvPct}% del ARV ${loanFmt(loanState.arv)}</div>
     </div>
+
+    <!-- PITI = lo que el dueño realmente paga cada mes -->
     <div class="bg-slate-900 text-white rounded-xl p-4">
-      <div class="text-xs font-bold text-slate-400 uppercase mb-2">Pago mensual (P&I)</div>
-      <div class="text-3xl font-bold">${loanFmt(r.conv.monthly)}/mes</div>
-      <div class="text-xs text-slate-400 mt-1">Por ${loanState.convTermMonths/12} años · tasa ${loanState.convRatePct}%</div>
+      <div class="text-xs font-bold text-slate-400 uppercase mb-1">💰 Pago mensual TOTAL (PITI)</div>
+      <div class="text-4xl font-bold text-emerald-300">${loanFmt(r.conv.piti)}/mes</div>
+      <div class="text-[10px] text-slate-400 mt-1">Esto es lo que vas a quedar pagando cada mes</div>
+      <div class="mt-3 pt-3 border-t border-slate-700 space-y-1.5 text-xs">
+        <div class="flex justify-between"><span class="text-slate-300">Principal + Interés (banco)</span><span class="font-bold">${loanFmt(r.conv.monthly)}</span></div>
+        <div class="flex justify-between"><span class="text-slate-300">Property Tax (${loanState.propertyTaxAnnualPct}% del ARV)</span><span class="font-bold">${loanFmt(r.conv.monthlyTax)}</span></div>
+        <div class="flex justify-between"><span class="text-slate-300">Insurance</span><span class="font-bold">${loanFmt(r.conv.monthlyInsurance)}</span></div>
+        <div class="flex justify-between border-t border-slate-700 pt-1.5 mt-1.5">
+          <span class="text-emerald-300 font-bold">= Total PITI</span>
+          <span class="font-bold text-emerald-300">${loanFmt(r.conv.piti)}</span>
+        </div>
+      </div>
     </div>
+
+    <!-- Análisis DSCR (¿es buen rental?) -->
+    <div class="bg-amber-50 border border-amber-300 rounded-lg p-3">
+      <div class="text-xs font-bold text-amber-900 uppercase mb-1">📊 Para que sea rentable necesitas</div>
+      <div class="text-2xl font-bold text-amber-900">${loanFmt(r.conv.dscrTarget)} /mes de renta</div>
+      <div class="text-[10px] text-amber-800 mt-1">DSCR 1.20 = renta cubre 120% del PITI (estándar lender investor TX)</div>
+    </div>
+
+    <!-- Desglose vida del préstamo -->
     <div class="bg-white rounded-lg p-4 border border-slate-200">
       <div class="text-xs font-bold text-slate-700 uppercase mb-2">Vida completa del préstamo</div>
       <table class="w-full text-xs">
         <tbody>
           <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">Principal (loan)</td><td class="py-1.5 text-right">${loanFmt(r.conv.loan)}</td></tr>
-          <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">+ Intereses totales</td><td class="py-1.5 text-right text-red-600">${loanFmt(r.conv.totalInt)}</td></tr>
-          <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">Total pagado en ${loanState.convTermMonths/12} años</td><td class="py-1.5 text-right font-bold">${loanFmt(r.conv.totalPaid)}</td></tr>
+          <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">+ Intereses totales (${loanState.convTermMonths/12} años)</td><td class="py-1.5 text-right text-red-600">${loanFmt(r.conv.totalInt)}</td></tr>
+          <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">Total pagado al banco</td><td class="py-1.5 text-right font-bold">${loanFmt(r.conv.totalPaid)}</td></tr>
           <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">Closing costs al refi (${loanState.convClosingPct}%)</td><td class="py-1.5 text-right text-red-600">${loanFmt(r.conv.closingCost)}</td></tr>
+          <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">Property tax anual</td><td class="py-1.5 text-right text-amber-700">${loanFmt(r.conv.propertyTaxAnnual)}</td></tr>
+          <tr class="border-b border-slate-100"><td class="py-1.5 text-slate-600">Insurance anual</td><td class="py-1.5 text-right text-amber-700">${loanFmt(loanState.insuranceAnnual)}</td></tr>
         </tbody>
       </table>
     </div>
+
     <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-950">
       <strong>💡 Refi a 30 años — mayo 2026:</strong>
       <ul class="mt-1 ml-4 list-disc space-y-0.5">
         <li>DSCR loans investor: 7.25-8.0% (peor que owner-occupied)</li>
         <li>LTV 75% es estándar cash-out. 70% si DSCR < 1.2</li>
-        <li>Closing costs reales en TX: ~7-8% del loan (escrow tax + insurance)</li>
+        <li>Property tax Travis: 2.0-2.5% del valor. Austin SFH típico 2.2%</li>
+        <li>Insurance TX: $1,500-$2,200/año single family</li>
         <li>Pago va al Predictor de Cashflow automáticamente al guardar</li>
       </ul>
     </div>
