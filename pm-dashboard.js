@@ -150,24 +150,28 @@ function pmRender() {
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
 
-      <!-- SELECTOR DE EMPRESA -->
-      <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-200 flex-wrap">
-        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Empresa:</span>
-        <button onclick="pmSetCompany('holding')" class="px-3 py-1.5 rounded-lg text-xs font-bold ${isHolding ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">🏛️ Holding (todas)</button>
-        ${cos.map(c => `
-          <button onclick="pmSetCompany('${c.id}')" class="px-3 py-1.5 rounded-lg text-xs font-bold ${cur===c.id ? `bg-${c.color||'slate'}-600 text-white shadow` : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${c.icon} ${c.name}</button>
-        `).join('')}
-        <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
-          ${curCo ? `<span>Space ClickUp: <code class="bg-slate-100 px-1.5 py-0.5 rounded">${curCo.clickup_space_id || '⚠️ falta'}</code></span>` : ''}
-          <button onclick="pmTriggerSync()" title="Sincronizar ClickUp ahora" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">🔄 Sync</button>
+      <!-- SELECTOR DE EMPRESA — scroll horizontal en mobile -->
+      <div class="mb-2 pb-2 border-b border-slate-200">
+        <div class="flex items-center gap-2 overflow-x-auto sm:flex-wrap pb-1">
+          <span class="text-[10px] font-bold uppercase text-slate-500 mr-1 whitespace-nowrap">Empresa:</span>
+          <button onclick="pmSetCompany('holding')" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold ${isHolding ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">🏛️ Holding</button>
+          ${cos.map(c => `
+            <button onclick="pmSetCompany('${c.id}')" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${cur===c.id ? `bg-${c.color||'slate'}-600 text-white shadow` : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${c.icon} ${c.name}</button>
+          `).join('')}
+          <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500 flex-shrink-0">
+            ${curCo ? `<span class="hidden sm:inline">Space: <code class="bg-slate-100 px-1.5 py-0.5 rounded">${curCo.clickup_space_id || '⚠️'}</code></span>` : ''}
+            <button onclick="withLoading(this, pmTriggerSync)" title="Sincronizar ClickUp ahora" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold whitespace-nowrap">🔄 Sync</button>
+          </div>
         </div>
       </div>
 
-      <!-- TABS -->
-      <div class="flex items-center gap-1 mb-3 pb-2 border-b border-slate-200 flex-wrap">
-        ${tabs.map(([k,l]) => `
-          <button onclick="pmSetTab('${k}')" class="px-2.5 py-1.5 rounded text-xs font-bold ${pmState.tab===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${l}</button>
-        `).join('')}
+      <!-- TABS — scroll horizontal en mobile -->
+      <div class="mb-3 pb-2 border-b border-slate-200">
+        <div class="flex items-center gap-1 overflow-x-auto sm:flex-wrap pb-1" role="tablist">
+          ${tabs.map(([k,l]) => `
+            <button onclick="pmSetTab('${k}')" role="tab" aria-selected="${pmState.tab===k}" class="flex-shrink-0 px-2.5 py-1.5 rounded text-xs font-bold whitespace-nowrap ${pmState.tab===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${l}</button>
+          `).join('')}
+        </div>
       </div>
 
       <!-- BODY -->
@@ -303,7 +307,7 @@ function pmRenderWhatsApp() {
             <input value="${cfg.group_chat_id || ''}" placeholder="ej. 5215512345678" onchange="pmConfigUpdate('group_chat_id', this.value)" class="w-full border border-slate-300 rounded px-2 py-1" />
           </div>
           <div class="flex items-end">
-            <button onclick="pmRunDailyPushNow()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded">⚡ Correr push ahora</button>
+            <button onclick="withLoading(this, pmRunDailyPushNow)" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded">⚡ Correr push ahora</button>
           </div>
         </div>
       </div>
@@ -501,7 +505,7 @@ function pmRenderAgent() {
       <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-900">
         🤖 <strong>IA Agente PM</strong>: corre Claude sobre tu scorecard + ClickUp + Remodel data para generar el Weekly Business Review (lunes 7am automático).
       </div>
-      <button onclick="pmRunWeeklyReviewNow()" class="w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-3 rounded">🧠 Generar Weekly Review ahora</button>
+      <button onclick="withLoading(this, pmRunWeeklyReviewNow)" class="w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-3 rounded">🧠 Generar Weekly Review ahora</button>
       <div class="text-[11px] text-slate-500 text-center">Costo aproximado: ~$0.03 por ejecución.</div>
     </div>
   `;
@@ -728,7 +732,7 @@ function pmRenderPerformance() {
     <div class="space-y-3">
       <div class="flex justify-between items-center">
         <div class="text-xs text-slate-600">Performance score por persona. Composite = cumplimiento + on-time + calidad + velocidad + capacity adherence.</div>
-        <button onclick="pmRunComputePerformance()" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">🧮 Recalcular ahora</button>
+        <button onclick="withLoading(this, pmRunComputePerformance)" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">🧮 Recalcular ahora</button>
       </div>
       ${lb.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin scores aún. Click "🧮 Recalcular ahora" para generar.</div>` : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
@@ -918,7 +922,7 @@ function pmRenderCoaching() {
     <div class="space-y-3">
       <div class="flex justify-between items-center">
         <div class="text-xs text-slate-600">Playbook de coaching semanal. Claude analiza performance + alertas + dailies y sugiere qué hacer con cada persona.</div>
-        <button onclick="pmRunCoaching()" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">🧠 Generar ahora</button>
+        <button onclick="withLoading(this, pmRunCoaching)" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">🧠 Generar ahora</button>
       </div>
       ${prompts.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin sugerencias todavía. Click "🧠 Generar ahora" o esperá al lunes 7:30am.</div>` : `
         <div class="space-y-2">

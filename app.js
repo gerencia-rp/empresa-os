@@ -675,10 +675,32 @@ function editSystem(areaId, sysId) {
 // ============================================================
 // MODAL
 // ============================================================
-function openModal(title, html) {
+function openModal(title, html, opts) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = html;
-  document.getElementById('modal').classList.remove('hidden');
+  const modal = document.getElementById('modal');
+  const inner = modal.querySelector(':scope > div');
+  // Reset clases de tamaño previas
+  ['max-w-sm','max-w-md','max-w-lg','max-w-xl','max-w-2xl','max-w-3xl','max-w-4xl','max-w-5xl','max-w-6xl','max-w-7xl'].forEach(c => inner.classList.remove(c));
+  const size = (opts && opts.size) || '3xl'; // mantener default antiguo por compatibilidad
+  inner.classList.add('max-w-' + size);
+  modal.classList.remove('hidden');
+  // ESC para cerrar
+  if (!window._modalEscBound) {
+    window._modalEscBound = true;
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !document.getElementById('modal').classList.contains('hidden')) {
+        // No cerrar si hay un dialog/prompt encima
+        if (document.getElementById('ui-confirm-overlay') || document.getElementById('ui-prompt-overlay')) return;
+        closeModal();
+      }
+    });
+  }
+  // Click en backdrop cierra
+  if (!modal._backdropBound) {
+    modal._backdropBound = true;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  }
 }
 function closeModal() {
   document.getElementById('modal').classList.add('hidden');

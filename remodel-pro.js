@@ -2229,7 +2229,7 @@ function rmRenderEditor(body) {
 
         ${aiBoxHtml('remodel-pro', 'Validar con mercado actual + ingeniería', 'Claude busca pricing real Texas, lead times, permits ciudad, hidden costs por edad, supply chain, labor market', 'rmRunAI')}
 
-        <button onclick="rmSaveProject()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${rmState.currentProject?'💾 Guardar cambios':'💾 Crear proyecto'}</button>
+        <button onclick="withLoading(this, rmSaveProject)" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${rmState.currentProject?'💾 Guardar cambios':'💾 Crear proyecto'}</button>
 
         ${rmState.currentProject ? `
         <button onclick="rmSyncToPlanner()" class="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">

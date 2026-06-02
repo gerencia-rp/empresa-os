@@ -541,8 +541,8 @@ function fcRenderResultado(r, crew, otrosPct) {
 
     <!-- Acciones -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-      <button onclick="fcSaveForecast()" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda el pronóstico completo (con cálculo)">💾 Guardar pronóstico</button>
-      <button onclick="fcSaveDiagnosis('manual')" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda solo la Visita Previa (datos + afectación) para reutilizarla">📋 Guardar diagnóstico</button>
+      <button onclick="withLoading(this, fcSaveForecast)" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda el pronóstico completo (con cálculo)">💾 Guardar pronóstico</button>
+      <button onclick="withLoading(this, () => fcSaveDiagnosis('manual'))" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda solo la Visita Previa (datos + afectación) para reutilizarla">📋 Guardar diagnóstico</button>
       <button onclick="fcExportXLSX()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2.5 rounded-lg" title="Excel multi-hoja: Info · Presupuesto · Cronograma · Gantt">📥 Excel</button>
       <button onclick="fcExportCSV()" class="bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2.5 rounded-lg" title="CSV plano">📄 CSV</button>
       <button onclick="fcExportTaskadeCSV()" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded-lg" title="CSV de tareas para reimportar a Taskade">📋 Taskade</button>
