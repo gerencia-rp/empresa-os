@@ -30,13 +30,27 @@ function findField(fields: any, candidates: string[]): any {
   return null;
 }
 
+// Normaliza un valor que puede ser string, array (linked records), o objeto
+function normalize(v: any): string | null {
+  if (v == null) return null;
+  if (Array.isArray(v)) {
+    if (v.length === 0) return null;
+    // Array de strings (linked record names) o de objetos {name, id}
+    const first = v[0];
+    if (typeof first === 'string') return first;
+    if (typeof first === 'object') return first.name || first.value || String(first);
+    return String(first);
+  }
+  if (typeof v === 'object') return v.name || v.value || JSON.stringify(v);
+  return String(v);
+}
+
 // Parse date from various formats
 function parseDate(v: any): string | null {
-  if (!v) return null;
-  if (typeof v === 'string') {
-    const d = new Date(v);
-    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-  }
+  const s = normalize(v);
+  if (!s) return null;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   return null;
 }
 
@@ -95,81 +109,125 @@ Deno.serve(async (req) => {
   }
 
   // 3) Mapear cada record → estructura edu_students
+  // Heurísticas AMPLIADAS para nomenclatura real del usuario
   const stages = Array.isArray(m.stages) ? m.stages : [];
   const rows = allRecords.map((rec: any) => {
     const f = rec.fields || {};
-    const fullName = findField(f, ['Nombre completo','Nombre Completo','Full Name','Nombre','Name','Estudiante','Student']) || `Estudiante ${rec.id.slice(-6)}`;
-    const email = findField(f, ['Email','Correo','Correo electrónico','e-mail','Mail']);
-    const phone = findField(f, ['Phone','Teléfono','Telefono','Celular','WhatsApp','Tel']);
-    const city = findField(f, ['City','Ciudad']);
-    const state = findField(f, ['State','Estado','Provincia']);
-    const country = findField(f, ['Country','País','Pais']);
-    const enrolledRaw = findField(f, ['Fecha inicio','Inicio','Fecha de inscripción','Enrolled','Start Date','Fecha ingreso','Ingreso']);
-    const expiresRaw = findField(f, ['Vence','Fecha vencimiento','Expires','Expiration','End Date','Fecha fin','Termina']);
-    const stageRaw = findField(f, ['Etapa','Stage','Current Stage','Etapa actual','Progreso','Fase']);
-    const paymentRaw = findField(f, ['Pago','Payment','Estado de pago','Payment Status','Status de Pago']);
-    const notes = findField(f, ['Notas','Notes','Comentarios','Observaciones']);
-    const goals = findField(f, ['Metas','Goals','Objetivos','Objetivo']);
+    // Nombre — añadidas variantes de linked records (From Ventas), "Nombre Cliente"
+    const fullName = normalize(findField(f, [
+      'Nombre completo','Nombre Completo','Full Name','Nombre',
+      'Nombre Cliente','Nombre Cliente (From Ventas)','Cliente',
+      'Name','Estudiante','Student'
+    ])) || `Estudiante ${rec.id.slice(-6)}`;
 
-    const stageKey = stageRaw ? detectStage(String(Array.isArray(stageRaw)?stageRaw[0]:stageRaw), stages) : null;
+    const email = normalize(findField(f, ['Email','Correo','Correo electrónico','e-mail','Mail','correo electronico']));
+    const phone = normalize(findField(f, ['Phone','Teléfono','Telefono','Celular','WhatsApp','Tel']));
+    const city = normalize(findField(f, ['City','Ciudad']));
+    const state = normalize(findField(f, ['State','Estado','Provincia']));
+    const country = normalize(findField(f, ['Country','País','Pais']));
+
+    // FECHAS — más variantes
+    const enrolledRaw = findField(f, [
+      'Fecha inicio','Fecha de inicio','Inicio','Fecha de inscripción','Fecha inscripción',
+      'Enrolled','Start Date','Fecha ingreso','Ingreso','Fecha de Compra','Fecha compra'
+    ]);
+    const expiresRaw = findField(f, [
+      'Vence','Fecha vencimiento','Fecha de vencimiento','Vencimiento',
+      'Fecha de finalización','Fecha finalización','Fecha fin','Termina',
+      'Expires','Expiration','End Date'
+    ]);
+
+    // STAGE — ampliado a "Proceso", "Estado del Estudiante", "Estado"
+    const stageRaw = normalize(findField(f, [
+      'Etapa','Etapa actual','Stage','Current Stage',
+      'Proceso','Estado del Estudiante','Estado Estudiante',
+      'Progreso','Fase','Estado Renovación','ONBOARDING'
+    ]));
+
+    const paymentRaw = normalize(findField(f, [
+      'Estado de pago','Estado pago','Payment Status','Status de Pago',
+      'Pago','Payment','Estado de vigencia','Estado de Cuotas Visual','Estado Cuotas'
+    ]));
+
+    const notes = normalize(findField(f, ['Notas','Notes','Comentarios','Observaciones','Próximo seguimiento']));
+    const goals = normalize(findField(f, ['Metas','Goals','Objetivos','Objetivo','Compromiso']));
+
+    const stageKey = stageRaw ? detectStage(stageRaw, stages) : null;
     const paymentStatus = paymentRaw ? (() => {
-      const p = String(Array.isArray(paymentRaw)?paymentRaw[0]:paymentRaw).toLowerCase();
-      if (p.includes('vencid') || p.includes('expired') || p.includes('inactiv')) return 'expired';
-      if (p.includes('atras') || p.includes('past') || p.includes('overdue')) return 'past_due';
+      const p = paymentRaw.toLowerCase();
+      if (p.includes('vencid') || p.includes('expired') || p.includes('inactiv') || p.includes('bloque')) return 'expired';
+      if (p.includes('atras') || p.includes('past') || p.includes('overdue') || p.includes('pendiente')) return 'past_due';
       if (p.includes('pausa') || p.includes('paused')) return 'paused';
       if (p.includes('cancel')) return 'cancelled';
       return 'active';
     })() : 'active';
 
+    // STATUS general del estudiante
+    const statusRaw = normalize(findField(f, ['Status','Estado','Estado del Estudiante']));
+    let status = 'active';
+    if (statusRaw) {
+      const s = statusRaw.toLowerCase();
+      if (s.includes('expir') || s.includes('vencid')) status = 'dropped';
+      else if (s.includes('graduad')) status = 'graduated';
+      else if (s.includes('pausa')) status = 'paused';
+      else if (s.includes('riesgo') || s.includes('risk')) status = 'at_risk';
+    }
+
     return {
       mentorship_id: mentorshipId,
       airtable_record_id: rec.id,
-      full_name: typeof fullName === 'object' ? JSON.stringify(fullName) : String(fullName).slice(0, 200),
-      email: email ? String(Array.isArray(email)?email[0]:email).slice(0, 200) : null,
-      phone: phone ? String(Array.isArray(phone)?phone[0]:phone).slice(0, 50) : null,
-      city: city ? String(Array.isArray(city)?city[0]:city).slice(0, 100) : null,
-      state: state ? String(Array.isArray(state)?state[0]:state).slice(0, 100) : null,
-      country: country ? String(Array.isArray(country)?country[0]:country).slice(0, 100) : null,
+      full_name: (fullName || `Estudiante ${rec.id.slice(-6)}`).slice(0, 200),
+      email: email ? email.slice(0, 200) : null,
+      phone: phone ? phone.slice(0, 50) : null,
+      city: city ? city.slice(0, 100) : null,
+      state: state ? state.slice(0, 100) : null,
+      country: country ? country.slice(0, 100) : null,
       enrolled_at: parseDate(enrolledRaw),
       expires_at: parseDate(expiresRaw),
       current_stage: stageKey,
       payment_status: paymentStatus,
-      notes: notes ? String(notes).slice(0, 2000) : null,
-      goals: goals ? String(goals).slice(0, 2000) : null,
+      status,
+      notes: notes ? notes.slice(0, 2000) : null,
+      goals: goals ? goals.slice(0, 2000) : null,
       updated_at: new Date().toISOString()
     };
   });
 
   // 4) Upsert por (mentorship_id, airtable_record_id)
-  let inserted = 0;
-  let updated = 0;
+  let synced = 0;
   const errors: any[] = [];
   const BATCH = 100;
   for (let i = 0; i < rows.length; i += BATCH) {
     const slice = rows.slice(i, i + BATCH);
-    const { error, count } = await supabase
+    const { error, data } = await supabase
       .from("edu_students")
-      .upsert(slice, { onConflict: "mentorship_id,airtable_record_id", count: "exact" });
-    if (error) errors.push(error.message);
-    else updated += count || slice.length;
+      .upsert(slice, { onConflict: "mentorship_id,airtable_record_id" })
+      .select("id");
+    if (error) {
+      errors.push(error.message);
+    } else {
+      synced += (data?.length || 0);
+    }
   }
 
-  // Debug info: campos detectados en la primera tarea + sample mapeado
+  // Debug info
   const fieldNamesInAirtable = allRecords.length > 0 ? Object.keys(allRecords[0].fields || {}) : [];
-  const sampleRaw = allRecords.slice(0, 2).map((r:any) => ({ id: r.id, fields: r.fields }));
   const sampleMapped = rows.slice(0, 2);
 
   return json({
     ok: true,
     mentorship: m.name,
     fetched_from_airtable: allRecords.length,
-    synced: rows.length,
+    synced,
     errors: errors.length ? errors : undefined,
     debug: {
       airtable_field_names: fieldNamesInAirtable,
-      sample_raw_record: sampleRaw[0] || null,
       sample_mapped_record: sampleMapped[0] || null,
-      note: "Si full_name dice 'Estudiante XXX' es que no encontré el campo de nombre. Mira airtable_field_names para ver los nombres reales y avísame."
+      note: synced === 0 && errors.length
+        ? "Synced=0 + errores → corré el SQL edu-fix-constraint.sql en Supabase para arreglar el ON CONFLICT."
+        : synced > 0
+          ? "Verificá los campos mapeados. Si algo está vacío decime cómo se llama en Airtable y lo mapeo."
+          : "Sin records ni errores — la tabla Airtable está vacía."
     }
   });
 });
