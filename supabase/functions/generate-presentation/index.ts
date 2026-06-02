@@ -96,18 +96,23 @@ ${research_mode ? `🔬 MODO INVESTIGACIÓN PROFUNDA ACTIVADO
 - La clase debe sentirse curada por un EXPERTO que pasó horas investigando, no Wikipedia copy-paste.
 - Incluí "deep_insights" que un coach junior NO sabría.
 
-` : ''}ESTRUCTURA OBLIGATORIA DE LA PRESENTACIÓN (estilo profesional, no genérico):
+` : ''}ESTRUCTURA OBLIGATORIA DE LA PRESENTACIÓN (estilo deck profesional con arco pedagógico completo):
 
-- Slide 1: PORTADA — title + subtitle/quote + 3 KPIs grandes destacados (layout: "cover")
-- Slide 2: AGENDA — 4-6 pasos del proceso visualmente (layout: "agenda")
-- Slide 3-4: CONTEXTO / DEFINICIÓN — qué es + por qué importa, con comparativa side-by-side si aplica (layout: "comparison")
-- Slide 5-7: CONCEPTOS PRINCIPALES con 3-5 beneficios/principios cada uno (layout: "benefits")
-- **Slide 8-10: AL MENOS 2 CASOS REALES** con dirección/nombre + KPIs antes/después + ROI (layout: "case-study")
-- Slide 11-13: FRAMEWORKS / CHECKLISTS / PARÁMETROS (layout: "framework" o "checklist")
-- Slide 14-16: COMPARATIVAS de estrategias/opciones (layout: "comparison" o "strategy-grid")
-- Slide 17-18: METRICS DASHBOARD con KPI cards grandes (layout: "metrics-dashboard")
-- Slide N-1: QUOTE memorable + 3 stats finales (layout: "quote")
-- Slide N: CIERRE / CTA con call to action específico + métricas resumen (layout: "closing")
+1. PORTADA — title + subtitle/quote + 3 KPIs grandes destacados (layout: "cover")
+2. AGENDA — 4-6 pasos del proceso visualmente (layout: "agenda")
+3-4. CONTEXTO / DEFINICIÓN — qué es + por qué importa, con comparativa side-by-side si aplica (layout: "comparison")
+5. BENEFICIOS PRINCIPALES — 4-6 beneficios concretos (layout: "benefits")
+6. **STACK DE CAPITAL / COSTOS REALES** — desglose claro del dinero necesario, lo que recuperás vs lo que perdés (layout: "metrics-dashboard" con 6-8 cards)
+7-8. **CASOS REALES (2 mínimo)** — con dirección, números antes/después, estrategia, ROI, key_takeaway. Si require_live_data, BUSCALOS en web (zillow, redfin, news). Si no, inventá realistas pero plausibles para el mercado actual. (layout: "case-study")
+9. BUY BOX / FRAMEWORK — parámetros no negociables con valores numéricos (layout: "framework")
+10. **CONCEPTO TÉCNICO IMPORTANTE EXPLICADO** — comparación de lo viejo vs lo nuevo (ej: loan tradicional vs DSCR, w-2 vs LLC, etc.) ANTES de mostrar números técnicos (layout: "comparison")
+11. DETALLE TÉCNICO — fórmulas, ratios, números específicos (layout: "framework")
+12. ESTRATEGIAS / OPCIONES — comparativa de 3-4 opciones con métricas (layout: "strategy-grid")
+13. METRICS DASHBOARD DE MERCADO — 6-8 KPIs actualizados con fuentes (layout: "metrics-dashboard")
+14. **ERRORES COMUNES / PITFALLS** — 5-6 errores que matan el proyecto + cómo evitarlos (layout: "checklist")
+15. QUOTE memorable de mindset (layout: "quote")
+16. **RECURSOS DESCARGABLES + PRE-WORK** — calculadoras, templates, lecturas, tarea para próxima clase (layout: "checklist")
+17. CIERRE / CTA — quote final + 3 stats grandes + call to action específico medible (layout: "closing")
 
 REGLAS CRÍTICAS:
 1. **TODA estadística, tasa, precio, número o dato DEBE venir de web search en VIVO**.
