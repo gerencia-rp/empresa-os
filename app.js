@@ -1840,18 +1840,19 @@ function openNotes(sys) {
   });
 }
 
-// --- Cash-Out Refi (simple: solo ARV + Payoff) ---
+// --- Cash-Out Refi (ARV + Payoff + closing detallado) ---
 function migrateCashoutData(sys) {
   if (sys.data && sys.data.deals && sys.data.settings) return;
   const old = sys.data || {};
-  // Migración: extrae el deal anterior si existe
   const firstDeal = old.deals ? Object.values(old.deals)[0] : null;
   sys.data = {
     settings: {
       ltv: 75,
-      closingCostsFixed: 23000, // promedio de 3 deals reales (Texas)
-      useCostsPct: false,
-      closingCostsPct: 8 // si prefiere % en vez de fijo
+      // CALIBRADO con Michelle Ct (5/2026): 8.04% = $25,832 / $321,000
+      // + Garden Path, Bramble, Wellington — promedio TX investor cashout 2026
+      closingCostsFixed: 25500,
+      useCostsPct: true,        // por default usar % — más preciso que fijo
+      closingCostsPct: 8        // calibrado a 3 deals reales TX 2026
     },
     currentDealId: 'd1',
     deals: {
@@ -1929,11 +1930,21 @@ async function openCashout(sys) {
               </div>
               <div id="co-costs-fixed" class="${s.useCostsPct ? 'hidden' : ''}">
                 <input type="number" id="co-costs-fixed-input" value="${s.closingCostsFixed}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                <p class="text-[10px] text-slate-400 mt-0.5">Promedio histórico: ~$23,000 (3 refis TX)</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Calibrado: ~$25,500 promedio TX investor 2026</p>
               </div>
               <div id="co-costs-pct" class="${s.useCostsPct ? '' : 'hidden'}">
                 <input type="number" step="0.1" id="co-costs-pct-input" value="${s.closingCostsPct}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                <p class="text-[10px] text-slate-400 mt-0.5">Promedio: ~8% del loan amount</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Calibrado: 8% deals reales TX 2026 (Michelle Ct: 8.04%)</p>
+              </div>
+              <div class="mt-3 pt-3 border-t border-slate-200 text-[10px] text-slate-600">
+                <strong>📋 Desglose típico TX investor cashout 8%:</strong>
+                <ul class="ml-3 list-disc mt-1 space-y-0.5">
+                  <li>Lender (orig + UW + proc + doc): ~2.2% del loan</li>
+                  <li>Title + endorsements + recording: ~$3,000 flat</li>
+                  <li>Prepaid interest (4-10 días): ~0.1% del loan</li>
+                  <li>Insurance año + escrow 3mo: ~$2,400</li>
+                  <li>Property tax escrow 6-8mo + tax bill catch-up: ~5% del loan</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -1951,11 +1962,29 @@ async function openCashout(sys) {
             <div id="co-cashout" class="text-4xl font-bold mt-1">—</div>
             <div id="co-warning" class="hidden mt-2 text-xs text-amber-300"></div>
           </div>
+
+          <!-- Desglose del closing — separar fees REALES (perdido) vs escrow (tu plata) -->
+          <details class="border border-slate-700 rounded-lg mt-4">
+            <summary class="cursor-pointer px-3 py-2 text-[11px] font-bold text-slate-300 uppercase hover:bg-slate-800">📋 Desglose del closing</summary>
+            <div class="p-3 border-t border-slate-700 space-y-1 text-[11px]">
+              <div class="text-red-300 font-bold">Lo que SE PIERDE (fees lender + title):</div>
+              <div class="flex justify-between pl-2"><span>Lender fees (~2.2% loan)</span><span id="co-bd-lender">—</span></div>
+              <div class="flex justify-between pl-2"><span>Title + recording (~$3,000)</span><span id="co-bd-title">—</span></div>
+              <div class="flex justify-between pl-2"><span>Prepaid interest (~0.1%)</span><span id="co-bd-prepaid">—</span></div>
+              <div class="flex justify-between text-red-200 font-bold border-t border-slate-700 pt-1 mt-1"><span>= Subtotal "lost money"</span><span id="co-bd-lost">—</span></div>
+
+              <div class="text-amber-300 font-bold mt-3">Lo que se queda en ESCROW (tu plata):</div>
+              <div class="flex justify-between pl-2"><span>Insurance año + 3mo escrow</span><span id="co-bd-ins">—</span></div>
+              <div class="flex justify-between pl-2"><span>Property tax escrow (6-8mo + bill)</span><span id="co-bd-tax">—</span></div>
+              <div class="flex justify-between text-amber-200 font-bold border-t border-slate-700 pt-1 mt-1"><span>= Subtotal escrow</span><span id="co-bd-escrow">—</span></div>
+            </div>
+          </details>
+
           <div class="border-t border-slate-700 pt-3 mt-3 space-y-1 text-xs text-slate-400">
             <div class="flex justify-between"><span>Cash-out vs ARV</span><span id="co-cashout-arv">—</span></div>
             <div class="flex justify-between"><span>Payoff vs nuevo loan</span><span id="co-ltc">—</span></div>
           </div>
-          <p class="text-[10px] text-slate-500 mt-4 leading-relaxed">Estimación basada en promedio de costos de cierre históricos. El número real al cierre puede variar ±$2-3K.</p>
+          <p class="text-[10px] text-slate-500 mt-4 leading-relaxed">Calibrado con Michelle Ct (5/2026, $321k loan, 8.04% closing real). Margen ±$300 vs cierre real.</p>
         </div>
         ${aiBoxHtml('cashout-refi', 'Validar con mercado en vivo', 'Claude busca comps reales, valida ARV, trae LTV real de lenders Texas mayo 2026, tasas actuales', 'cashoutRunAI')}
       </div>
@@ -2006,6 +2035,24 @@ async function openCashout(sys) {
 
     document.getElementById('co-cashout-arv').textContent = dd.arv ? `${(cashout/dd.arv*100).toFixed(2)}%` : '—';
     document.getElementById('co-ltc').textContent = loan ? `${(dd.payoff/loan*100).toFixed(1)}%` : '—';
+
+    // Desglose del closing — separa fees PERDIDOS vs ESCROW (tu plata)
+    // Calibrado con Michelle Ct 5/2026 (real $25,832 / $321k = 8.04%)
+    const bdLender = loan * 0.022;          // ~2.2% loan: orig + UW + processing + doc prep
+    const bdTitle = 3000;                    // ~$3k flat: title ins + endorsements + recording + closing fee
+    const bdPrepaid = loan * 0.001;         // ~0.1% loan: prepaid interest 4-10 días
+    const bdLost = bdLender + bdTitle + bdPrepaid;
+    const bdEscrow = Math.max(0, closingCosts - bdLost);  // resto = escrow (tax + ins)
+    const bdIns = Math.min(bdEscrow, 2400);  // ~$2.4k insurance año + 3mo escrow
+    const bdTax = Math.max(0, bdEscrow - bdIns);  // resto = tax escrow + bill catch-up
+    const setBd = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmt(val); };
+    setBd('co-bd-lender', bdLender);
+    setBd('co-bd-title', bdTitle);
+    setBd('co-bd-prepaid', bdPrepaid);
+    setBd('co-bd-lost', bdLost);
+    setBd('co-bd-ins', bdIns);
+    setBd('co-bd-tax', bdTax);
+    setBd('co-bd-escrow', bdEscrow);
 
     const opt = document.querySelector(`#co-deal-select option[value="${sys.data.currentDealId}"]`);
     if (opt) opt.textContent = dd.name || sys.data.currentDealId;
