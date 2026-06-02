@@ -846,6 +846,7 @@ function opRenderCasas() {
              oninput="opSetCasasSearch(this.value)"
              class="flex-1 max-w-xs border border-slate-300 rounded px-2 py-1 text-xs" />
       <div class="text-[10px] text-slate-500">${filtered.length} casas</div>
+      <button onclick="opOpenAddCasa()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white font-bold px-3 py-1 rounded">+ Nueva casa</button>
     </div>
     <div class="flex-1 overflow-y-auto p-2 space-y-2">
       ${filtered.map(c => {
@@ -950,6 +951,93 @@ async function opToggleDoneFromCasas(id, isDone) {
   await opLoadAll();
   opRender();
 }
+// ─── Crear casa rápida desde Ops Planner ───
+function opOpenAddCasa() {
+  const html = `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-500">Crea una propiedad para asignarle tareas. La verás de inmediato en la vista "Por casa".</div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Dirección *</label>
+        <input id="op-casa-address" placeholder="Ej. 5320 Wellington Dr, Austin TX" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Apodo (corto, opcional)</label>
+          <input id="op-casa-nickname" placeholder="Ej. Wellington" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tipo</label>
+          <select id="op-casa-type" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+            <option value="rental">🏠 Renta</option>
+            <option value="flip">🔄 Fix & Flip</option>
+            <option value="own">🏡 Propia</option>
+            <option value="airbnb">🛏️ Airbnb / Mid-term</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">City</label>
+          <input id="op-casa-city" value="Austin" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">State</label>
+          <input id="op-casa-state" value="TX" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">ZIP (opcional)</label>
+          <input id="op-casa-zip" placeholder="78745" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas (opcional)</label>
+        <textarea id="op-casa-notes" rows="2" placeholder="Detalles, observaciones..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opSaveCasa()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Crear casa</button>
+      </div>
+    </div>
+  `;
+  openModal('+ Nueva casa', html);
+}
+
+async function opSaveCasa() {
+  const address = document.getElementById('op-casa-address').value.trim();
+  if (!address) return alert('La dirección es obligatoria');
+  const payload = {
+    user_id: state.user.id,
+    address,
+    nickname: document.getElementById('op-casa-nickname').value.trim() || null,
+    property_type: document.getElementById('op-casa-type').value,
+    city: document.getElementById('op-casa-city').value.trim() || 'Austin',
+    state: document.getElementById('op-casa-state').value.trim() || 'TX',
+    zip: document.getElementById('op-casa-zip').value.trim() || null,
+    notes: document.getElementById('op-casa-notes').value.trim() || null,
+    status: 'evaluating',
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('properties').insert(payload);
+  if (error) {
+    // Si falla por columnas que no existen, dar pista clara
+    if (error.message.includes('nickname') || error.message.includes('property_type')) {
+      return alert('Falta correr la migración SQL. Pegá en Supabase SQL Editor:\n\nalter table public.properties add column if not exists nickname text;\nalter table public.properties add column if not exists property_type text;');
+    }
+    return alert('Error al guardar: ' + error.message);
+  }
+  closeModal();
+  setTimeout(async () => {
+    await openOpsPlanner(opState.sys);
+    opState.view = 'casas';
+    opRender();
+  }, 100);
+}
+
 function opEditFromCasas(id, bucket) {
   // Buscar la tarea en backlog o upcoming
   const t = (bucket === 'backlog'
