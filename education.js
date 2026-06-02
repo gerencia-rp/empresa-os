@@ -136,6 +136,7 @@ function eduRender() {
         <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
           ${cur?.airtable_base_id ? `<span>🔗 Airtable: <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">${cur.airtable_base_id}</code></span>` : '<span class="text-amber-700">⚠️ Airtable no configurado</span>'}
           <button onclick="eduTriggerSync()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">🔄 Sync</button>
+          <button onclick="eduDebugDB()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold" title="Ver qué hay en la DB">🔍 Debug DB</button>
         </div>
       </div>
 
@@ -831,12 +832,58 @@ async function eduTriggerSync() {
       body: JSON.stringify({ mentorship_id: m.id })
     });
     const r = await res.json();
-    if (!r.ok) throw new Error(r.error);
-    alert(`✓ Sync OK · ${r.synced} estudiantes`);
+    if (!r.ok) throw new Error(r.error || 'falló');
+
+    // Diagnóstico detallado
+    let msg = `✅ Sync ejecutado\n\n`;
+    msg += `📥 De Airtable: ${r.fetched_from_airtable} records\n`;
+    msg += `💾 Guardados en DB: ${r.synced}\n`;
+    if (r.errors?.length) msg += `\n⚠️ Errores: ${r.errors.join('; ')}\n`;
+    if (r.debug?.airtable_field_names?.length) {
+      msg += `\n🔍 Columnas detectadas en Airtable (las primeras 12):\n${r.debug.airtable_field_names.slice(0,12).join(' · ')}\n`;
+    }
+    if (r.fetched_from_airtable === 0) {
+      msg += `\n⚠️ Airtable devolvió 0 records. Verificá:\n• Que la tabla tenga registros\n• Que el table_id sea el correcto\n`;
+    }
+    if (r.debug?.sample_mapped_record) {
+      const s = r.debug.sample_mapped_record;
+      msg += `\n📋 Primer registro mapeado:\n• full_name: ${s.full_name}\n• email: ${s.email||'(vacío)'}\n• enrolled_at: ${s.enrolled_at||'(vacío)'}\n• current_stage: ${s.current_stage||'(vacío)'}\n`;
+      if (s.full_name?.startsWith('Estudiante ')) {
+        msg += `\n⚠️ No detectó el campo NOMBRE. Decime cómo se llama la columna en Airtable y la mapeo.`;
+      }
+    }
+    alert(msg);
+    console.log('[Edu Sync Debug]', r);
     await eduLoadAll(); eduRender();
   } catch (e) {
-    alert('Error: ' + e.message + '\n\n(La edge function sync-education-airtable se desplegará en la próxima fase.)');
+    alert('Error en sync: ' + e.message);
   }
+}
+
+// Botón "🔍 Debug DB" — muestra estado real de la DB
+async function eduDebugDB() {
+  const m = eduCurrentMentorship();
+  if (!m) return;
+  const { data, error, count } = await sb.from('edu_students')
+    .select('id, full_name, email, current_stage, expires_at, status, airtable_record_id', { count: 'exact' })
+    .eq('mentorship_id', m.id)
+    .limit(5);
+  if (error) return alert('Error consultando DB: ' + error.message);
+  let msg = `📊 Estado en la DB Supabase\n\n`;
+  msg += `Mentoría: ${m.name}\n`;
+  msg += `Estudiantes guardados: ${count}\n\n`;
+  if (count === 0) {
+    msg += 'NO hay registros para esta mentoría.\n\nPosibles causas:\n• El sync nunca corrió correctamente\n• Falló el INSERT silenciosamente\n• El mentorship_id está mal seteado\n\nProbá:\n1. Click "🔄 Sync" otra vez\n2. Mirá si el alert de sync dice "synced > 0"';
+  } else {
+    msg += 'Primeros 5 estudiantes:\n';
+    data.forEach((s, i) => {
+      msg += `\n${i+1}. ${s.full_name}`;
+      msg += `\n   email: ${s.email||'—'} | etapa: ${s.current_stage||'—'} | status: ${s.status}`;
+      msg += `\n   airtable_id: ${s.airtable_record_id?.slice(0,15) || '—'}`;
+    });
+    msg += '\n\n✅ La DB tiene registros. Si el UI los muestra en 0, hard refresh.';
+  }
+  alert(msg);
 }
 
 // ============================================================

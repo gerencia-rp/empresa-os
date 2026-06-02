@@ -154,11 +154,22 @@ Deno.serve(async (req) => {
     else updated += count || slice.length;
   }
 
+  // Debug info: campos detectados en la primera tarea + sample mapeado
+  const fieldNamesInAirtable = allRecords.length > 0 ? Object.keys(allRecords[0].fields || {}) : [];
+  const sampleRaw = allRecords.slice(0, 2).map((r:any) => ({ id: r.id, fields: r.fields }));
+  const sampleMapped = rows.slice(0, 2);
+
   return json({
     ok: true,
     mentorship: m.name,
     fetched_from_airtable: allRecords.length,
     synced: rows.length,
-    errors: errors.length ? errors : undefined
+    errors: errors.length ? errors : undefined,
+    debug: {
+      airtable_field_names: fieldNamesInAirtable,
+      sample_raw_record: sampleRaw[0] || null,
+      sample_mapped_record: sampleMapped[0] || null,
+      note: "Si full_name dice 'Estudiante XXX' es que no encontré el campo de nombre. Mira airtable_field_names para ver los nombres reales y avísame."
+    }
   });
 });
