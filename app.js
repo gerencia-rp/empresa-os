@@ -918,6 +918,8 @@ function openInternalSystem(sys) {
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
   if (sys.type === 'edu-manager') return openEduManager(sys);
+  if (sys.type === 'edu-presentations') return openEduPresentationsSystem(sys);
+  if (sys.type === 'edu-reports') return openEduReportsSystem(sys);
 }
 
 // ============================================================

@@ -19,16 +19,16 @@ const eduState = {
 };
 
 const EDU_TABS = [
-  { key: 'students',     label: '👥 Estudiantes' },
-  { key: 'plan',         label: '🎯 Plan IA' },
-  { key: 'progress',     label: '📊 Progreso & GLScore' },
-  { key: 'presentations', label: '🎬 Presentaciones IA' },
-  { key: 'reports',      label: '📈 Informes IA' },
-  { key: 'resources',    label: '📑 Recursos' },
-  { key: 'calls',        label: '📅 Calendario' },
-  { key: 'alerts',       label: '🔔 Alertas' },
-  { key: 'config',       label: '⚙️ Config' }
+  { key: 'students',  label: '👥 Estudiantes' },
+  { key: 'plan',      label: '🎯 Plan IA' },
+  { key: 'progress',  label: '📊 Progreso & GLScore' },
+  { key: 'resources', label: '📑 Recursos' },
+  { key: 'calls',     label: '📅 Calendario' },
+  { key: 'alerts',    label: '🔔 Alertas' },
+  { key: 'config',    label: '⚙️ Config' }
 ];
+// NOTA: Presentaciones e Informes son sistemas INDEPENDIENTES ahora
+// (openEduPresentationsSystem y openEduReportsSystem abren modales propios)
 
 async function openEduManager(sys) {
   eduState.sys = sys;
@@ -159,8 +159,6 @@ function eduRender() {
         ${eduState.tab === 'students' ? eduRenderStudents() :
           eduState.tab === 'plan' ? eduRenderPlan() :
           eduState.tab === 'progress' ? eduRenderProgress() :
-          eduState.tab === 'presentations' ? eduRenderPresentations() :
-          eduState.tab === 'reports' ? eduRenderReports() :
           eduState.tab === 'resources' ? eduRenderResources() :
           eduState.tab === 'calls' ? eduRenderCalls() :
           eduState.tab === 'alerts' ? eduRenderAlerts() :
@@ -1181,4 +1179,326 @@ function eduRenderReports() {
       ` : ''}
     </div>
   `;
+}
+
+// ============================================================
+// SISTEMA INDEPENDIENTE: GENERADOR DE PRESENTACIONES
+// Reusa eduState + eduRenderPresentations pero abre su propio modal
+// con selector de mentoría arriba.
+// ============================================================
+async function openEduPresentationsSystem(sys) {
+  eduState.sys = sys;
+  // Por default arranca con la primera mentoría activa
+  openModal(`🎬 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
+  document.querySelector('#modal > div').classList.remove('max-w-3xl');
+  document.querySelector('#modal > div').classList.add('max-w-7xl');
+  await eduLoadAll();
+  if (!eduState.mentorshipId && eduState.mentorships.length) {
+    const firstActive = eduState.mentorships.find(m => m.active);
+    if (firstActive) eduState.mentorshipId = firstActive.id;
+  }
+  eduState.tab = '__presentations_only__';  // marker para el render custom
+  eduRenderPresentationsStandalone();
+}
+
+function eduRenderPresentationsStandalone() {
+  const root = document.getElementById('edu-root');
+  if (!root) return;
+  const cur = eduCurrentMentorship();
+  root.innerHTML = `
+    <div class="flex flex-col h-full max-h-[84vh]">
+      <!-- Selector mentoría -->
+      <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200 flex-wrap">
+        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Mentoría:</span>
+        ${eduState.mentorships.filter(m => m.active).map(m => `
+          <button onclick="eduState.mentorshipId='${m.id}'; eduRenderPresentationsStandalone()"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold ${eduState.mentorshipId===m.id?'bg-slate-900 text-white shadow':'bg-slate-100 hover:bg-slate-200'}">
+            ${m.icon} ${m.name}
+          </button>
+        `).join('')}
+        <div class="ml-auto text-[10px] text-slate-500">${cur ? cur.name : 'Sin mentoría seleccionada'}</div>
+      </div>
+      <!-- Reusa el render existente -->
+      <div class="flex-1 overflow-y-auto">
+        ${eduRenderPresentations()}
+      </div>
+    </div>
+  `;
+}
+
+// Sobreescribir eduRender para volver acá cuando estamos en standalone
+const _eduRenderOrig = eduRender;
+window.eduRender = function() {
+  if (eduState.tab === '__presentations_only__') return eduRenderPresentationsStandalone();
+  if (eduState.tab === '__reports_only__') return eduRenderReportsStandalone();
+  return _eduRenderOrig();
+};
+
+// ============================================================
+// SISTEMA INDEPENDIENTE: INFORMES EJECUTIVOS
+// ============================================================
+async function openEduReportsSystem(sys) {
+  eduState.sys = sys;
+  openModal(`📈 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
+  document.querySelector('#modal > div').classList.remove('max-w-3xl');
+  document.querySelector('#modal > div').classList.add('max-w-6xl');
+  await eduLoadAll();
+  if (!eduState.mentorshipId && eduState.mentorships.length) {
+    const firstActive = eduState.mentorships.find(m => m.active);
+    if (firstActive) eduState.mentorshipId = firstActive.id;
+  }
+  eduState.tab = '__reports_only__';
+  eduRenderReportsStandalone();
+}
+
+function eduRenderReportsStandalone() {
+  const root = document.getElementById('edu-root');
+  if (!root) return;
+  const cur = eduCurrentMentorship();
+  const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
+  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
+  const ai = (window.aiState && window.aiState[aiKey]) || {};
+
+  const today = new Date();
+  const period = eduState._reportPeriod || 'weekly';
+  const periodDays = period === 'weekly' ? 7 : period === 'biweekly' ? 14 : 30;
+  const periodStart = new Date(today); periodStart.setDate(periodStart.getDate() - periodDays);
+
+  root.innerHTML = `
+    <div class="flex flex-col h-full max-h-[84vh]">
+      <!-- Selector mentoría -->
+      <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200 flex-wrap">
+        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Mentoría:</span>
+        ${eduState.mentorships.filter(m => m.active).map(m => `
+          <button onclick="eduState.mentorshipId='${m.id}'; eduRenderReportsStandalone()"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold ${eduState.mentorshipId===m.id?'bg-slate-900 text-white shadow':'bg-slate-100 hover:bg-slate-200'}">
+            ${m.icon} ${m.name}
+          </button>
+        `).join('')}
+        <div class="ml-auto text-[10px] text-slate-500">${cur ? cur.name : 'Sin mentoría'}</div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-3">
+        <!-- Form de generación -->
+        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+          <div class="text-xs font-bold uppercase text-violet-900 mb-3">📈 Generar informe ejecutivo con IA</div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Período</label>
+              <select onchange="eduState._reportPeriod=this.value; eduRenderReportsStandalone()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                <option value="weekly" ${period==='weekly'?'selected':''}>📅 Semanal (últimos 7 días)</option>
+                <option value="biweekly" ${period==='biweekly'?'selected':''}>📆 Quincenal (últimos 14 días)</option>
+                <option value="monthly" ${period==='monthly'?'selected':''}>🗓 Mensual (últimos 30 días)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Desde</label>
+              <input id="edu-rep-start" type="date" value="${periodStart.toISOString().split('T')[0]}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-600 mb-1">Hasta</label>
+              <input id="edu-rep-end" type="date" value="${today.toISOString().split('T')[0]}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">📝 Notas de las clases grabadas (opcional)</label>
+            <textarea id="edu-rep-classes" rows="4" placeholder="Pega un resumen de las clases dadas en el período: temas cubiertos, dudas frecuentes, casos discutidos. Claude lo incluye en el análisis pedagógico." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+          </div>
+
+          <button onclick="withLoading(this, eduGenerateReport)" class="mt-3 w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded">🤖 Generar informe con IA</button>
+          <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~20-40 seg. Claude analiza estudiantes + cartera + progreso + tus notas de clase.</div>
+        </div>
+
+        ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-3xl animate-pulse">🧠</div><div class="mt-2 font-bold text-violet-900">Generando informe...</div></div>` : ''}
+        ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+
+        ${ai.report ? `
+          <div class="bg-white border-2 border-emerald-300 rounded-xl overflow-hidden">
+            <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 flex justify-between items-center">
+              <div class="text-xs font-bold uppercase text-emerald-900">✅ Informe generado</div>
+              <div class="flex gap-1">
+                <button onclick="eduCopyReport()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📋 Copiar markdown</button>
+                <button onclick="eduDownloadReport()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 .md</button>
+              </div>
+            </div>
+            <div class="p-4 max-h-[55vh] overflow-y-auto">
+              <h2 class="text-lg font-bold">${ai.report.title || 'Informe'}</h2>
+              <!-- KPIs -->
+              ${ai.report.kpis ? `
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
+                  ${Object.entries(ai.report.kpis).map(([k,v]) => `<div class="bg-blue-50 border border-blue-200 rounded p-2"><div class="text-[10px] text-blue-700 uppercase font-bold">${k.replace(/_/g,' ')}</div><div class="text-xl font-bold text-blue-900">${v}</div></div>`).join('')}
+                </div>
+              ` : ''}
+              <!-- Summary md -->
+              <div id="edu-rep-md" class="text-xs whitespace-pre-wrap mt-4 prose prose-sm max-w-none">${(ai.report.summary_md || '').replace(/##\s/g,'\n## ').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}</div>
+              <!-- Highlights -->
+              ${(ai.report.highlights||[]).length ? `
+                <div class="mt-4 pt-3 border-t border-slate-200">
+                  <div class="text-xs font-bold uppercase mb-2">⭐ Highlights del período</div>
+                  ${ai.report.highlights.map(h => `<div class="text-xs mb-1"><span class="bg-${h.type==='win'?'emerald':h.type==='risk'?'red':'amber'}-100 text-${h.type==='win'?'emerald':h.type==='risk'?'red':'amber'}-800 px-1.5 py-0.5 rounded font-bold text-[10px]">${h.type}</span> <strong>${h.student_name}</strong>: ${h.detail}</div>`).join('')}
+                </div>
+              ` : ''}
+              <!-- Recommendations -->
+              ${(ai.report.recommendations||[]).length ? `
+                <div class="mt-4 pt-3 border-t border-slate-200">
+                  <div class="text-xs font-bold uppercase mb-2">🎯 Acciones recomendadas</div>
+                  <ul class="text-xs space-y-1.5">
+                    ${ai.report.recommendations.map(r => `<li>• <strong>[${r.priority||'med'}]</strong> ${r.action} <span class="text-slate-500">(${r.owner||'?'}, en ${r.due_in_days||7}d)</span></li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Historial -->
+        ${reports.length ? `
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">📚 Historial (${reports.length})</div>
+            <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+              ${reports.map(r => `
+                <div class="p-2 flex justify-between items-center hover:bg-slate-50">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-xs font-bold truncate">${r.title || r.period_type}</div>
+                    <div class="text-[10px] text-slate-500">${r.period_type} · ${r.period_start} → ${r.period_end}</div>
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0">
+                    <button onclick="eduLoadReport('${r.id}')" class="text-blue-600 text-[10px] hover:underline">cargar</button>
+                    <button onclick="eduDeleteReport('${r.id}')" class="text-red-500 text-[10px]">🗑</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function eduGenerateReport() {
+  const cur = eduCurrentMentorship();
+  if (!cur) return alert('Seleccioná una mentoría');
+  const periodType = eduState._reportPeriod || 'weekly';
+  const startDate = document.getElementById('edu-rep-start').value;
+  const endDate = document.getElementById('edu-rep-end').value;
+  const classesNotes = document.getElementById('edu-rep-classes').value;
+  if (!startDate || !endDate) return alert('Seleccioná fechas');
+
+  const aiKey = `edu-report-${eduState.mentorshipId}-${periodType}`;
+  window.aiState = window.aiState || {};
+  window.aiState[aiKey] = { loading: true };
+  eduRenderReportsStandalone();
+
+  try {
+    // Construir contexto operativo
+    const myStudents = eduMyStudents();
+    const start = new Date(startDate); const end = new Date(endDate);
+    const newEnrolled = myStudents.filter(s => s.enrolled_at && new Date(s.enrolled_at) >= start && new Date(s.enrolled_at) <= end).length;
+    const expiring = myStudents.filter(s => { const d = eduDaysToExpiry(s); return d != null && d >= 0 && d <= 30; }).length;
+    const expired = myStudents.filter(s => { const d = eduDaysToExpiry(s); return d != null && d < 0; }).length;
+    const byStage = {}; myStudents.forEach(s => { if (s.current_stage) byStage[s.current_stage] = (byStage[s.current_stage]||0)+1; });
+    const avgScore = myStudents.length ? Math.round(myStudents.reduce((a,s) => a+(s.glscore||50),0)/myStudents.length) : 0;
+    const bands = { excelente:0, bueno:0, atencion:0, critico:0 };
+    myStudents.forEach(s => { const g=s.glscore||50; if(g>=80)bands.excelente++; else if(g>=60)bands.bueno++; else if(g>=40)bands.atencion++; else bands.critico++; });
+    const topStudents = [...myStudents].sort((a,b)=>(b.glscore||0)-(a.glscore||0)).slice(0,5).map(s => ({name:s.full_name, stage:eduStageObj(s.current_stage)?.name, glscore:s.glscore}));
+    const atRisk = myStudents.filter(s => s.status === 'at_risk' || (s.glscore && s.glscore < 40) || (eduDaysToExpiry(s) || 999) < 30).slice(0,8).map(s => ({name:s.full_name, glscore:s.glscore, days_to_expiry:eduDaysToExpiry(s), stage:eduStageObj(s.current_stage)?.name}));
+
+    const { data, error } = await sb.functions.invoke('ai-deep-analyze', {
+      body: {
+        system: 'edu-report',
+        context: {
+          mentorship: cur.name,
+          mentorship_slug: cur.id,
+          period_type: periodType,
+          period_start: startDate,
+          period_end: endDate,
+          snapshot: {
+            total_students: myStudents.length,
+            active: myStudents.filter(s=>s.status==='active').length,
+            at_risk: myStudents.filter(s=>s.status==='at_risk').length,
+            graduated: myStudents.filter(s=>s.status==='graduated').length,
+            paused: myStudents.filter(s=>s.status==='paused').length
+          },
+          movements: { new_enrolled: newEnrolled, calls_done: 0, calls_total: 0, tasks_created: 0, tasks_done: 0, stage_changes: 0 },
+          cartera: {
+            active: myStudents.filter(s=>s.payment_status==='active').length,
+            past_due: myStudents.filter(s=>s.payment_status==='past_due').length,
+            expired,
+            expiring_soon: expiring
+          },
+          by_stage: byStage,
+          avg_glscore: avgScore,
+          glscore_bands: bands,
+          top_students: topStudents,
+          at_risk_students: atRisk,
+          classes_notes: classesNotes
+        },
+        force: true
+      }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    // Guardar en DB
+    const { data: saved } = await sb.from('edu_reports').insert({
+      mentorship_id: cur.id,
+      period_type: periodType,
+      period_start: startDate,
+      period_end: endDate,
+      title: data.title,
+      summary_md: data.summary_md,
+      kpis: data.kpis || {},
+      insights: data.insights || [],
+      recommendations: data.recommendations || [],
+      highlights: data.highlights || [],
+      classes_notes: classesNotes || null,
+      generated_by: state.user.id
+    }).select().single().then(r => r).catch(() => ({}));
+
+    window.aiState[aiKey] = { loading: false, report: data, saved_id: saved?.id };
+    await eduLoadAll();
+  } catch (e) {
+    window.aiState[aiKey] = { loading: false, error: e.message };
+  }
+  eduRenderReportsStandalone();
+}
+
+function eduCopyReport() {
+  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
+  const r = (window.aiState[aiKey] || {}).report;
+  if (!r) return;
+  const text = `# ${r.title}\n\n${r.summary_md}\n\n## Recomendaciones\n${(r.recommendations||[]).map(x => `- [${x.priority||'med'}] ${x.action} (${x.owner||'?'}, ${x.due_in_days||7}d)`).join('\n')}`;
+  navigator.clipboard.writeText(text).then(() => alert('✓ Copiado al portapapeles'));
+}
+
+function eduDownloadReport() {
+  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
+  const r = (window.aiState[aiKey] || {}).report;
+  if (!r) return;
+  const text = `# ${r.title}\n\n${r.summary_md}\n\n## Recomendaciones\n${(r.recommendations||[]).map(x => `- **[${x.priority||'med'}]** ${x.action} (${x.owner||'?'}, en ${x.due_in_days||7}d)`).join('\n')}`;
+  const blob = new Blob([text], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${r.title.replace(/[^a-z0-9]/gi,'_')}.md`;
+  a.click();
+}
+
+function eduLoadReport(id) {
+  const r = (eduState.reports || []).find(x => x.id === id);
+  if (!r) return;
+  const aiKey = `edu-report-${r.mentorship_id}-${r.period_type}`;
+  window.aiState = window.aiState || {};
+  window.aiState[aiKey] = { report: { title: r.title, summary_md: r.summary_md, kpis: r.kpis, recommendations: r.recommendations, highlights: r.highlights } };
+  eduState.mentorshipId = r.mentorship_id;
+  eduState._reportPeriod = r.period_type;
+  eduRenderReportsStandalone();
+}
+
+async function eduDeleteReport(id) {
+  if (!confirm('¿Eliminar este informe?')) return;
+  await sb.from('edu_reports').delete().eq('id', id);
+  await eduLoadAll(); eduRenderReportsStandalone();
 }
