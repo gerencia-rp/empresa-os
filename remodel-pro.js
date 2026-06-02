@@ -1818,9 +1818,89 @@ async function rmDeleteProject(id) {
 }
 
 // ─── TAB: EDITOR ───
+async function rmLoadFromForecast(forecastId) {
+  if (!forecastId) return;
+  const { data: f } = await sb.from('remodel_forecasts').select('*').eq('id', forecastId).single();
+  if (!f) return alert('Pronóstico no encontrado');
+  // Busca diagnóstico para traer dirección, fecha inicio, vínculo Taskade
+  const { data: d } = await sb.from('remodel_forecast_diagnoses').select('*')
+    .eq('propiedad', f.propiedad).eq('sqft', f.sqft).maybeSingle();
+  rmState.currentProject = null;
+  rmState.editName = f.propiedad;
+  rmState.editAddress = d?.direccion || '';
+  rmState.editSqft = f.sqft;
+  rmState.editStartDate = d?.fecha_inicio || (f.created_at ? f.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+  rmState.selectedActivities = {};
+  rmState.matterportUrl = ''; rmState.scopeText = ''; rmState.scopeAudioPath = '';
+  rmState.scopeAudioTranscript = ''; rmState.plans = []; rmState.photos = [];
+  rmState.tracking = {};
+  if (d?.source === 'taskade' && d.detalle) {
+    rmState._linkedTaskade = {
+      propiedad: f.propiedad, veredicto: d.veredicto,
+      dano_global_pct: d.dano_global_pct, afectacion: f.afectacion || {},
+      archivo_nombre: d.archivo_nombre
+    };
+  } else {
+    rmState._linkedTaskade = {
+      propiedad: f.propiedad, veredicto: 'Pronóstico (sin Taskade)',
+      dano_global_pct: 0, afectacion: f.afectacion || {},
+      archivo_nombre: '—'
+    };
+  }
+  rmState.tab = 'editor';
+  rmRender();
+}
+
 function rmRenderEditor(body) {
   const e = rmCalcProject();
   const linked = rmState._linkedTaskade;
+  const forecasts = (typeof fcState !== 'undefined' && fcState.forecasts) ? fcState.forecasts : [];
+  const isEmpty = !rmState.currentProject && !linked && !rmState.editName;
+
+  // GATE: si está vacío y no hay pronósticos, forzá el flujo Taskade→Pronóstico→Editor
+  if (isEmpty && forecasts.length === 0) {
+    body.innerHTML = `
+      <div class="max-w-md mx-auto text-center py-16">
+        <div class="text-5xl mb-3">🔮</div>
+        <h3 class="text-lg font-bold text-slate-800">Primero hacé un pronóstico</h3>
+        <p class="text-sm text-slate-500 mt-2">Para usar el Editor detallado necesitás subir un archivo Taskade y generar un pronóstico de la casa. El detalle parte de ahí.</p>
+        <button onclick="rmSetTab('forecast')" class="mt-5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg">→ Ir al Pronosticador</button>
+      </div>`;
+    return;
+  }
+
+  // GATE: si está vacío pero hay pronósticos guardados, mostrá el picker prominente
+  if (isEmpty && forecasts.length > 0) {
+    body.innerHTML = `
+      <div class="max-w-2xl mx-auto">
+        <div class="bg-gradient-to-br from-blue-50 to-violet-50 border-2 border-blue-300 rounded-2xl p-6">
+          <div class="text-center mb-4">
+            <div class="text-4xl mb-2">🔮</div>
+            <h3 class="text-lg font-bold text-blue-900">Cargá un pronóstico para empezar el detalle</h3>
+            <p class="text-xs text-blue-800 mt-1">El Editor detallado parte de un pronóstico previo (Taskade + Pronosticador). Elegí la casa:</p>
+          </div>
+          <select onchange="rmLoadFromForecast(this.value)" class="w-full border-2 border-blue-300 rounded-lg px-3 py-3 text-sm font-semibold bg-white">
+            <option value="">— Seleccionar pronóstico (${forecasts.length} guardados) —</option>
+            ${forecasts.map(f => `<option value="${f.id}">${f.propiedad} · ${f.sqft||'?'}sqft · ${f.presupuesto_total?'$'+Math.round(f.presupuesto_total).toLocaleString():''} · ${new Date(f.created_at).toLocaleDateString('es-MX')}</option>`).join('')}
+          </select>
+          <div class="text-center text-[11px] text-blue-700 mt-3">
+            ¿No está la casa que buscás? <button onclick="rmSetTab('forecast')" class="underline font-bold hover:text-blue-900">→ Hacer pronóstico nuevo</button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Picker discreto cuando ya hay algo cargado (siempre disponible para cambiar de casa)
+  const forecastPicker = forecasts.length > 0 ? `
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center gap-2">
+      <label class="text-[10px] font-bold uppercase text-blue-900 whitespace-nowrap">🔮 Cargar otro pronóstico:</label>
+      <select onchange="if(this.value && confirm('Esto reemplaza el proyecto actual. ¿Continuar?'))rmLoadFromForecast(this.value); else this.value=''" class="flex-1 border border-blue-300 rounded px-2 py-1 text-xs">
+        <option value="">— ${forecasts.length} disponibles —</option>
+        ${forecasts.map(f => `<option value="${f.id}">${f.propiedad} · ${f.sqft||'?'}sqft · ${new Date(f.created_at).toLocaleDateString('es-MX')}</option>`).join('')}
+      </select>
+    </div>` : '';
+
   const taskadeBanner = linked ? `
     <div class="bg-gradient-to-r from-violet-100 to-fuchsia-100 border-2 border-violet-400 rounded-xl p-3">
       <div class="flex items-center justify-between">
@@ -1838,6 +1918,7 @@ function rmRenderEditor(body) {
   body.innerHTML = `
     <div class="grid lg:grid-cols-12 gap-4">
       <div class="lg:col-span-8 space-y-3">
+        ${forecastPicker}
         ${taskadeBanner}
         <!-- Info -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
