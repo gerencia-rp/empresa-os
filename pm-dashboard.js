@@ -6,7 +6,8 @@
 
 const pmState = {
   sys: null,
-  tab: 'scorecard',
+  tab: 'pulse',
+  currentCompany: 'holding',   // 'holding' | <uuid de empresa>
   scorecard: null,
   recipients: [],
   config: null,
@@ -24,6 +25,10 @@ const pmState = {
   oneOnOnes: [],
   coachingPrompts: [],
   heatmap: [],
+  // ClickUp data por empresa
+  clickupTasks: [],
+  clickupSnapshots: [],
+  clickupAlerts: [],
   loading: false
 };
 
@@ -43,7 +48,7 @@ async function openPMDashboard(sys) {
 }
 
 async function pmLoadAll() {
-  const [s, r, c, m, d, rep, ri, co, dep, comp, exec, lb, okrs, ono, cp, hm] = await Promise.all([
+  const [s, r, c, m, d, rep, ri, co, dep, comp, exec, lb, okrs, ono, cp, hm, cTasks, cSnap, cAlerts] = await Promise.all([
     sb.from('pm_scorecard').select('*').single(),
     sb.from('pm_whatsapp_recipients').select('*').order('full_name'),
     sb.from('pm_whatsapp_config').select('*').eq('id', 1).single(),
@@ -60,7 +65,11 @@ async function pmLoadAll() {
     sb.from('pm_okrs').select('*, pm_companies(name, slug, icon), pm_whatsapp_recipients(full_name)').neq('status', 'completed').neq('status', 'dropped').order('quarter', { ascending: false }).then(r => r.data || []).catch(() => []),
     sb.from('pm_one_on_ones').select('*, pm_whatsapp_recipients(full_name)').order('scheduled_date', { ascending: false }).limit(30).then(r => r.data || []).catch(() => []),
     sb.from('pm_coaching_prompts').select('*, pm_whatsapp_recipients(full_name)').gte('week_start', new Date(Date.now()-14*86400000).toISOString().split('T')[0]).order('priority').then(r => r.data || []).catch(() => []),
-    sb.from('pm_bottleneck_heatmap').select('*').then(r => r.data || []).catch(() => [])
+    sb.from('pm_bottleneck_heatmap').select('*').then(r => r.data || []).catch(() => []),
+    // ClickUp por empresa
+    sb.from('clickup_tasks_mirror').select('*').then(r => r.data || []).catch(() => []),
+    sb.from('clickup_snapshots').select('*').order('snapshot_date', { ascending: false }).limit(60).then(r => r.data || []).catch(() => []),
+    sb.from('clickup_alerts').select('*').is('resolved_at', null).order('severity', { ascending: false }).limit(50).then(r => r.data || []).catch(() => [])
   ]);
   pmState.scorecard = s.data;
   pmState.recipients = r.data || [];
@@ -79,40 +88,94 @@ async function pmLoadAll() {
   pmState.oneOnOnes = ono;
   pmState.coachingPrompts = cp;
   pmState.heatmap = hm;
+  // ClickUp
+  pmState.clickupTasks = cTasks;
+  pmState.clickupSnapshots = cSnap;
+  pmState.clickupAlerts = cAlerts;
 }
+
+// ─── Helpers de filtrado por empresa actual ───
+function pmCurrentCompanyObj() {
+  if (pmState.currentCompany === 'holding') return null;
+  return pmState.companies.find(c => c.id === pmState.currentCompany);
+}
+function pmFilterByCompany(items, fieldName = 'company_id') {
+  if (pmState.currentCompany === 'holding') return items;
+  return items.filter(x => x[fieldName] === pmState.currentCompany);
+}
+function pmFilterByArea(items) {
+  // Para tablas que tienen .area en string (slug). Holding muestra todo.
+  if (pmState.currentCompany === 'holding') return items;
+  const co = pmCurrentCompanyObj();
+  if (!co) return items;
+  return items.filter(x => x.area === co.slug);
+}
+function pmSetCompany(id) { pmState.currentCompany = id; pmRender(); }
 
 function pmSetTab(t) { pmState.tab = t; pmRender(); }
 
 function pmRender() {
   const root = document.getElementById('pm-root');
   if (!root) return;
-  const tabs = [
-    ['scorecard', '📊 Scorecard'],
-    ['executive', '🏢 Cross-Empresa'],
+  const cos = (pmState.companies || []).filter(c => c.active && !c.is_holding);
+  const cur = pmState.currentCompany;
+  const isHolding = cur === 'holding';
+  const curCo = pmCurrentCompanyObj();
+
+  // Tabs adaptados según vista (Holding vs Empresa)
+  const tabs = isHolding ? [
+    ['pulse', '📊 Cross-Empresa'],
     ['performance', '🏆 Performance'],
     ['okrs', '🎯 OKRs'],
     ['oneOnOnes', '💬 1-on-1s'],
     ['coaching', '🧠 Coaching IA'],
-    ['heatmap', '🔥 Heatmap'],
-    ['companies', '🏛️ Empresas'],
-    ['whatsapp', '📱 WhatsApp'],
-    ['workload', '👥 Workload'],
+    ['risks', '⚠️ Riesgos'],
+    ['compliance', '📜 Compliance'],
     ['deps', '🔗 Dependencias'],
-    ['agent', '🤖 Reports IA'],
-    ['reports', '📈 Reportes'],
-    ['risks', '⚠️ Risks'],
-    ['compliance', '📜 Compliance']
+    ['reports', '📈 Reportes IA'],
+    ['whatsapp', '📱 WhatsApp'],
+    ['companies', '🏛️ Empresas']
+  ] : [
+    ['pulse', '📊 Pulse'],
+    ['tasks', '📋 Tareas ClickUp'],
+    ['team', '👥 Equipo'],
+    ['heatmap', '🔥 Bottlenecks'],
+    ['okrs', '🎯 OKRs'],
+    ['decisiones', '✅ Decisiones'],
+    ['risks', '⚠️ Riesgos'],
+    ['compliance', '📜 Compliance'],
+    ['oneOnOnes', '💬 1-on-1s']
   ];
+
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
-      <div class="flex items-center gap-1.5 mb-3 pb-3 border-b border-slate-200 flex-wrap">
+
+      <!-- SELECTOR DE EMPRESA -->
+      <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-200 flex-wrap">
+        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Empresa:</span>
+        <button onclick="pmSetCompany('holding')" class="px-3 py-1.5 rounded-lg text-xs font-bold ${isHolding ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">🏛️ Holding (todas)</button>
+        ${cos.map(c => `
+          <button onclick="pmSetCompany('${c.id}')" class="px-3 py-1.5 rounded-lg text-xs font-bold ${cur===c.id ? `bg-${c.color||'slate'}-600 text-white shadow` : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${c.icon} ${c.name}</button>
+        `).join('')}
+        <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
+          ${curCo ? `<span>Space ClickUp: <code class="bg-slate-100 px-1.5 py-0.5 rounded">${curCo.clickup_space_id || '⚠️ falta'}</code></span>` : ''}
+          <button onclick="pmTriggerSync()" title="Sincronizar ClickUp ahora" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">🔄 Sync</button>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="flex items-center gap-1 mb-3 pb-2 border-b border-slate-200 flex-wrap">
         ${tabs.map(([k,l]) => `
           <button onclick="pmSetTab('${k}')" class="px-2.5 py-1.5 rounded text-xs font-bold ${pmState.tab===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${l}</button>
         `).join('')}
       </div>
+
+      <!-- BODY -->
       <div class="flex-1 overflow-y-auto">
-        ${pmState.tab === 'scorecard' ? pmRenderScorecard() :
-          pmState.tab === 'executive' ? pmRenderExecutive() :
+        ${pmState.tab === 'pulse' ? (isHolding ? pmRenderHoldingPulse() : pmRenderEmpresaPulse()) :
+          pmState.tab === 'tasks' ? pmRenderClickUpTasks() :
+          pmState.tab === 'team' ? pmRenderTeam() :
+          pmState.tab === 'decisiones' ? pmRenderDecisiones() :
           pmState.tab === 'performance' ? pmRenderPerformance() :
           pmState.tab === 'okrs' ? pmRenderOKRs() :
           pmState.tab === 'oneOnOnes' ? pmRenderOneOnOnes() :
@@ -120,15 +183,33 @@ function pmRender() {
           pmState.tab === 'heatmap' ? pmRenderHeatmap() :
           pmState.tab === 'companies' ? pmRenderCompanies() :
           pmState.tab === 'whatsapp' ? pmRenderWhatsApp() :
-          pmState.tab === 'workload' ? pmRenderWorkload() :
           pmState.tab === 'deps' ? pmRenderDeps() :
-          pmState.tab === 'agent' ? pmRenderAgent() :
           pmState.tab === 'reports' ? pmRenderReports() :
           pmState.tab === 'risks' ? pmRenderRisks() :
           pmRenderCompliance()}
       </div>
     </div>
   `;
+}
+
+// ─── Trigger sync ClickUp manual ───
+async function pmTriggerSync() {
+  if (!confirm('Sincronizar ClickUp ahora (las 3 empresas)? Puede tardar 30-60 seg.')) return;
+  try {
+    const url = `${window.SUPABASE_URL}/functions/v1/sync-clickup`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ user_id: state.user.id })
+    });
+    const r = await res.json();
+    if (r.ok) {
+      alert(`✅ Sync completado.\n${r.tasks_synced} tasks, ${r.companies_synced} empresas, ${r.alerts} alertas.\n${(r.per_company||[]).map(c => '• '+c.company+': '+c.tasks+' tasks').join('\n')}`);
+    } else {
+      alert('Error: ' + r.error);
+    }
+    await pmLoadAll(); pmRender();
+  } catch (e) { alert('Error: ' + e.message); }
 }
 
 // ─── SCORECARD ───
@@ -470,7 +551,7 @@ function pmRenderReports() {
 
 // ─── RISKS ───
 function pmRenderRisks() {
-  const risks = pmState.risks || [];
+  const risks = pmFilterByArea(pmState.risks || []);
   return `
     <div class="space-y-3">
       <div class="flex justify-between items-center">
@@ -509,7 +590,7 @@ async function pmAddRisk() {
 
 // ─── COMPLIANCE ───
 function pmRenderCompliance() {
-  const items = pmState.compliance || [];
+  const items = pmFilterByArea(pmState.compliance || []);
   const today = new Date(); today.setHours(0,0,0,0);
   return `
     <div class="space-y-3">
@@ -641,7 +722,8 @@ function pmRenderExecutive() {
 
 // ─── PERFORMANCE LEADERBOARD ───
 function pmRenderPerformance() {
-  const lb = pmState.leaderboard || [];
+  const co = pmCurrentCompanyObj();
+  const lb = (pmState.leaderboard || []).filter(p => pmState.currentCompany === 'holding' || p.company_name === co?.name);
   return `
     <div class="space-y-3">
       <div class="flex justify-between items-center">
@@ -706,7 +788,7 @@ async function pmRunComputePerformance() {
 
 // ─── OKRs ───
 function pmRenderOKRs() {
-  const okrs = pmState.okrs || [];
+  const okrs = pmFilterByCompany(pmState.okrs || []);
   return `
     <div class="space-y-3">
       <div class="flex justify-between items-center">
@@ -879,7 +961,7 @@ async function pmRunCoaching() {
 
 // ─── HEATMAP ───
 function pmRenderHeatmap() {
-  const hm = pmState.heatmap || [];
+  const hm = pmFilterByCompany(pmState.heatmap || []);
   if (hm.length === 0) {
     return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">🔥</div><div class="font-bold">Sin data todavía</div><div class="text-xs mt-2">Sincronizá ClickUp para llenar el heatmap.</div></div>`;
   }
@@ -918,6 +1000,468 @@ function pmRenderHeatmap() {
         </table>
       </div>
       <div class="text-[11px] text-slate-500 italic">💡 Las celdas rojas indican tasks que llevan mucho tiempo en ese status. Hace un review específico de esas — son el cuello de botella real.</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// NUEVAS VISTAS — multi-empresa
+// ============================================================
+
+// ─── HOLDING — vista cross-empresa (resumen ejecutivo) ───
+function pmRenderHoldingPulse() {
+  const exec = pmState.executiveCross || [];
+  const alerts = pmState.clickupAlerts || [];
+  const tasks = pmState.clickupTasks || [];
+  const now = Date.now();
+
+  // Totales cross-empresa
+  const totalOpen = tasks.filter(t => t.status_type !== 'closed').length;
+  const totalOverdue = tasks.filter(t => t.status_type !== 'closed' && t.due_date && new Date(t.due_date) < new Date()).length;
+  const totalClosed7d = tasks.filter(t => t.status_type === 'closed' && t.date_closed && (now - new Date(t.date_closed).getTime()) < 7*86400000).length;
+  const totalPeople = new Set(tasks.filter(t => t.status_type !== 'closed').map(t => t.primary_assignee).filter(Boolean)).size;
+
+  if (exec.length === 0) {
+    return `<div class="text-center py-12 text-slate-500">
+      <div class="text-5xl mb-3">🏢</div>
+      <div class="font-bold">Sin data de empresas todavía</div>
+      <div class="text-xs mt-2 max-w-md mx-auto">Corré "🔄 Sync" arriba para que ClickUp tire data en las 3 empresas. Si recién configuraste los space IDs, esto puede tardar 30-60 seg.</div>
+    </div>`;
+  }
+
+  return `
+    <div class="space-y-4">
+      <!-- KPIs totales del holding -->
+      <div class="bg-slate-900 text-white rounded-xl p-4">
+        <div class="text-xs text-slate-400 uppercase font-bold mb-2">🏛️ Holding Total</div>
+        <div class="grid grid-cols-4 gap-3">
+          <div><div class="text-[10px] text-slate-400 uppercase">Open</div><div class="text-3xl font-bold">${totalOpen}</div></div>
+          <div><div class="text-[10px] text-slate-400 uppercase">Vencidas</div><div class="text-3xl font-bold ${totalOverdue>10?'text-red-300':'text-amber-300'}">${totalOverdue}</div></div>
+          <div><div class="text-[10px] text-slate-400 uppercase">Cerradas 7d</div><div class="text-3xl font-bold text-emerald-300">${totalClosed7d}</div></div>
+          <div><div class="text-[10px] text-slate-400 uppercase">Personas activas</div><div class="text-3xl font-bold">${totalPeople}</div></div>
+        </div>
+      </div>
+
+      <!-- Cards por empresa -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        ${exec.map(e => {
+          const tone = e.tasks_overdue > 10 ? 'border-red-300 bg-red-50' : e.tasks_overdue > 3 ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50';
+          return `
+            <button onclick="pmSetCompany('${e.company_id}')" class="text-left bg-white border-2 ${tone} rounded-xl p-3 hover:shadow-lg transition-shadow">
+              <div class="text-base font-bold">${e.icon} ${e.company_name}</div>
+              <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                <div><div class="text-[10px] text-slate-500 uppercase">Open</div><div class="text-2xl font-bold">${e.tasks_open || 0}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase">Vencidas</div><div class="text-2xl font-bold ${(e.tasks_overdue||0)>5?'text-red-700':'text-slate-700'}">${e.tasks_overdue || 0}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase">Cerradas 7d</div><div class="text-2xl font-bold text-emerald-700">${e.tasks_closed_7d || 0}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase">Personas</div><div class="text-2xl font-bold">${e.active_people || 0}</div></div>
+              </div>
+              ${e.avg_score_this_week ? `<div class="mt-2 pt-2 border-t border-slate-200"><div class="text-[10px] text-slate-500 uppercase">Score equipo (semana)</div><div class="text-xl font-bold ${e.avg_score_this_week>=80?'text-emerald-700':e.avg_score_this_week>=60?'text-amber-700':'text-red-700'}">${e.avg_score_this_week}/100</div></div>` : ''}
+              ${e.okrs_active > 0 ? `<div class="mt-1 text-[11px]"><strong>${e.okrs_active}</strong> OKRs · ${e.okrs_avg_progress||0}% progreso</div>` : ''}
+              ${e.risks_high > 0 ? `<div class="mt-1 text-[11px] text-red-700 font-bold">🚨 ${e.risks_high} risks high</div>` : ''}
+              <div class="mt-2 text-[10px] text-slate-400">→ Click para drill-down</div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Alertas activas top -->
+      ${alerts.length > 0 ? `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">🚨 Alertas activas (${alerts.length})</div>
+          <div class="max-h-64 overflow-y-auto divide-y divide-slate-100">
+            ${alerts.slice(0, 20).map(a => `
+              <div class="p-2 text-xs flex justify-between items-start gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold">${a.alert_type || 'Alerta'}</div>
+                  <div class="text-[10px] text-slate-500">${a.message || ''}</div>
+                </div>
+                <span class="text-[10px] bg-${a.severity==='critical'?'red':'amber'}-100 text-${a.severity==='critical'?'red':'amber'}-800 px-2 py-0.5 rounded">${a.severity}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ─── PULSE por empresa — vista decisional ───
+function pmRenderEmpresaPulse() {
+  const co = pmCurrentCompanyObj();
+  if (!co) return `<div class="text-center py-12 text-slate-500">Empresa no encontrada.</div>`;
+  if (!co.clickup_space_id) {
+    return `<div class="text-center py-12">
+      <div class="text-5xl mb-3">⚠️</div>
+      <div class="font-bold text-amber-700">Falta configurar el ClickUp Space ID</div>
+      <div class="text-xs mt-2 text-slate-500">Andá al tab "🏛️ Empresas" y pegá el space_id de ${co.name}.</div>
+    </div>`;
+  }
+
+  const tasks = pmFilterByCompany(pmState.clickupTasks);
+  const now = new Date();
+  const open = tasks.filter(t => t.status_type !== 'closed');
+  const overdue = open.filter(t => t.due_date && new Date(t.due_date) < now);
+  const dueToday = open.filter(t => {
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date);
+    return d.toDateString() === now.toDateString();
+  });
+  const dueWeek = open.filter(t => {
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date);
+    const diff = (d - now) / 86400000;
+    return diff > 0 && diff <= 7;
+  });
+  const closed7d = tasks.filter(t => t.status_type === 'closed' && t.date_closed && (now - new Date(t.date_closed)) < 7*86400000);
+
+  // Por status
+  const byStatus = {};
+  open.forEach(t => { const s = t.status || '?'; byStatus[s] = (byStatus[s]||0)+1; });
+
+  // Top assignees (por carga abierta)
+  const byPerson = {};
+  open.forEach(t => {
+    const p = t.primary_assignee || 'Sin asignar';
+    if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0 };
+    byPerson[p].total++;
+    if (t.due_date && new Date(t.due_date) < now) byPerson[p].overdue++;
+  });
+  const topPeople = Object.entries(byPerson).sort((a,b) => b[1].total - a[1].total).slice(0, 10);
+
+  const myAlerts = (pmState.clickupAlerts || []).filter(a => !a.related_folder_id || a.related_folder_id === co.slug);
+  const myRisks = pmFilterByArea(pmState.risks);
+
+  return `
+    <div class="space-y-4">
+      <!-- KPIs principales -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-slate-900 text-white rounded-xl p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-bold">Tasks abiertas</div>
+          <div class="text-3xl font-bold">${open.length}</div>
+          <div class="text-[10px] text-slate-400">${tasks.length} totales</div>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="text-[10px] text-red-700 uppercase font-bold">Vencidas</div>
+          <div class="text-3xl font-bold text-red-900">${overdue.length}</div>
+          <div class="text-[10px] text-red-700">${open.length>0?Math.round(overdue.length/open.length*100):0}% del abierto</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">Vencen hoy</div>
+          <div class="text-3xl font-bold text-amber-900">${dueToday.length}</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Próx 7 días</div>
+          <div class="text-3xl font-bold text-blue-900">${dueWeek.length}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-[10px] text-emerald-700 uppercase font-bold">Cerradas 7d</div>
+          <div class="text-3xl font-bold text-emerald-900">${closed7d.length}</div>
+        </div>
+      </div>
+
+      <!-- Por status + Por persona, lado a lado -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Por status (abiertas)</div>
+          ${Object.keys(byStatus).length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin tasks abiertas.</div>' : `
+            <table class="w-full text-xs">
+              <tbody>
+                ${Object.entries(byStatus).sort((a,b) => b[1]-a[1]).map(([s,n]) => {
+                  const pct = open.length > 0 ? Math.round(n/open.length*100) : 0;
+                  return `<tr class="border-t border-slate-100">
+                    <td class="p-2 font-semibold">${s}</td>
+                    <td class="p-2 text-right font-bold">${n}</td>
+                    <td class="p-2"><div class="bg-slate-100 rounded-full h-2"><div class="bg-slate-700 h-2 rounded-full" style="width:${pct}%"></div></div></td>
+                    <td class="p-2 text-right text-[10px] text-slate-500">${pct}%</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">👥 Carga por persona (top 10)</div>
+          ${topPeople.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin asignados.</div>' : `
+            <table class="w-full text-xs">
+              <tbody>
+                ${topPeople.map(([p, s]) => `
+                  <tr class="border-t border-slate-100">
+                    <td class="p-2 font-semibold truncate max-w-[140px]">${p}</td>
+                    <td class="p-2 text-right">${s.total}</td>
+                    <td class="p-2 text-right ${s.overdue>0?'text-red-700 font-bold':'text-slate-400'}">${s.overdue?s.overdue+' venc':''}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+
+      <!-- Vencidas críticas (top 10) -->
+      ${overdue.length > 0 ? `
+        <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">🚨 Top vencidas (${overdue.length})</div>
+          <div class="max-h-64 overflow-y-auto">
+            <table class="w-full text-xs">
+              <tbody>
+                ${overdue.sort((a,b) => new Date(a.due_date) - new Date(b.due_date)).slice(0, 15).map(t => {
+                  const daysLate = Math.floor((now - new Date(t.due_date))/86400000);
+                  return `<tr class="border-t border-slate-100 hover:bg-slate-50">
+                    <td class="p-2 font-semibold truncate max-w-md">${t.name || '(sin título)'}</td>
+                    <td class="p-2 text-[11px] text-slate-500">${t.primary_assignee || '—'}</td>
+                    <td class="p-2 text-[11px]">${t.status || '—'}</td>
+                    <td class="p-2 text-right text-red-700 font-bold">${daysLate}d</td>
+                    ${t.url ? `<td class="p-2"><a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir</a></td>` : '<td></td>'}
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Alertas + Risks de la empresa -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        ${myAlerts.length > 0 ? `
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase text-amber-900">⚠️ Alertas (${myAlerts.length})</div>
+            <div class="max-h-48 overflow-y-auto divide-y divide-slate-100">
+              ${myAlerts.slice(0, 10).map(a => `
+                <div class="p-2 text-xs"><strong>${a.alert_type}</strong><div class="text-[10px] text-slate-500">${a.message || ''}</div></div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${myRisks.length > 0 ? `
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">⚠️ Riesgos (${myRisks.length})</div>
+            <div class="max-h-48 overflow-y-auto divide-y divide-slate-100">
+              ${myRisks.slice(0, 10).map(r => `
+                <div class="p-2 text-xs"><strong>${r.title}</strong> <span class="text-[10px] ${r.score>=12?'text-red-700':'text-slate-500'}">score ${r.score}</span></div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ─── TAREAS ClickUp filtrable ───
+function pmRenderClickUpTasks() {
+  const co = pmCurrentCompanyObj();
+  if (!co) return '';
+  const tasks = pmFilterByCompany(pmState.clickupTasks);
+  const filter = pmState._taskFilter || 'open';
+  const search = (pmState._taskSearch || '').toLowerCase();
+
+  let list = tasks;
+  if (filter === 'open') list = list.filter(t => t.status_type !== 'closed');
+  if (filter === 'overdue') list = list.filter(t => t.status_type !== 'closed' && t.due_date && new Date(t.due_date) < new Date());
+  if (filter === 'unassigned') list = list.filter(t => t.status_type !== 'closed' && !t.primary_assignee);
+  if (filter === 'closed7d') list = list.filter(t => t.status_type === 'closed' && t.date_closed && (Date.now() - new Date(t.date_closed)) < 7*86400000);
+  if (search) list = list.filter(t => ((t.name||'') + ' ' + (t.primary_assignee||'') + ' ' + (t.status||'')).toLowerCase().includes(search));
+
+  list = list.sort((a,b) => {
+    // overdue primero, después por due_date ascendente
+    const aOver = a.due_date && new Date(a.due_date) < new Date() ? 1 : 0;
+    const bOver = b.due_date && new Date(b.due_date) < new Date() ? 1 : 0;
+    if (aOver !== bOver) return bOver - aOver;
+    if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date);
+    return (a.due_date ? -1 : 1);
+  });
+
+  return `
+    <div class="space-y-3">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="flex gap-1">
+          ${[['open','Abiertas'],['overdue','Vencidas'],['unassigned','Sin asignar'],['closed7d','Cerradas 7d'],['all','Todas']].map(([k,l]) => `
+            <button onclick="pmState._taskFilter='${k}'; pmRender()" class="px-2.5 py-1 rounded text-xs font-bold ${filter===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">${l}</button>
+          `).join('')}
+        </div>
+        <input type="text" placeholder="Buscar título/asignado/status..." value="${(pmState._taskSearch||'').replace(/"/g,'&quot;')}" oninput="pmState._taskSearch=this.value; pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs w-64" />
+        <div class="text-[10px] text-slate-500">${list.length} de ${tasks.length}</div>
+      </div>
+      ${list.length === 0 ? '<div class="text-center py-12 text-slate-400">Sin tasks con esos filtros.</div>' : `
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50">
+              <tr><th class="text-left p-2">Task</th><th class="text-left p-2">Status</th><th class="text-left p-2">Asignado</th><th class="text-left p-2">Due</th><th class="text-right p-2">Días</th><th></th></tr>
+            </thead>
+            <tbody>
+              ${list.slice(0, 200).map(t => {
+                const dueDate = t.due_date ? new Date(t.due_date) : null;
+                const daysLate = dueDate ? Math.floor((Date.now() - dueDate)/86400000) : null;
+                const isOver = daysLate != null && daysLate > 0 && t.status_type !== 'closed';
+                return `<tr class="border-t border-slate-100 ${isOver?'bg-red-50':''} hover:bg-slate-50">
+                  <td class="p-2 font-semibold truncate max-w-md">${t.name || '(sin título)'}</td>
+                  <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${t.status || '—'}</span></td>
+                  <td class="p-2 text-[11px] text-slate-600">${t.primary_assignee || '—'}</td>
+                  <td class="p-2 text-[11px]">${dueDate ? dueDate.toLocaleDateString('es-MX') : '—'}</td>
+                  <td class="p-2 text-right text-[11px] ${isOver?'text-red-700 font-bold':'text-slate-500'}">${daysLate != null ? (daysLate > 0 ? '+'+daysLate : daysLate) : '—'}</td>
+                  <td class="p-2">${t.url ? `<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir</a>` : ''}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          ${list.length > 200 ? `<div class="bg-slate-50 px-3 py-2 text-[10px] text-slate-500 text-center">Mostrando 200 de ${list.length}. Usá filtros + búsqueda para ver menos.</div>` : ''}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// ─── EQUIPO — combinación de workload + performance + coaching ───
+function pmRenderTeam() {
+  const co = pmCurrentCompanyObj();
+  const tasks = pmFilterByCompany(pmState.clickupTasks);
+  const open = tasks.filter(t => t.status_type !== 'closed');
+
+  // Workload por persona (de ClickUp, real data)
+  const byPerson = {};
+  open.forEach(t => {
+    const p = t.primary_assignee || 'Sin asignar';
+    if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0, byStatus: {} };
+    byPerson[p].total++;
+    if (t.due_date && new Date(t.due_date) < new Date()) byPerson[p].overdue++;
+    byPerson[p].byStatus[t.status||'?'] = (byPerson[p].byStatus[t.status||'?']||0) + 1;
+  });
+  const list = Object.entries(byPerson).sort((a,b) => b[1].total - a[1].total);
+
+  // Performance leaderboard filtrado
+  const lb = (pmState.leaderboard || []).filter(p => pmState.currentCompany === 'holding' || p.company_name === co?.name);
+
+  // Coaching prompts pendientes
+  const coaching = (pmState.coachingPrompts || []).filter(p => !p.delivered).slice(0, 5);
+
+  return `
+    <div class="space-y-4">
+      <!-- Workload real desde ClickUp -->
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 Carga de trabajo (ClickUp en vivo)</div>
+        ${list.length === 0 ? '<div class="text-center py-8 text-slate-400">Sin gente asignada.</div>' : `
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full text-xs">
+              <thead class="bg-slate-50">
+                <tr><th class="text-left p-2">Persona</th><th class="text-right p-2">Tasks abiertas</th><th class="text-right p-2">Vencidas</th><th class="text-left p-2">Status mix</th></tr>
+              </thead>
+              <tbody>
+                ${list.map(([p, s]) => {
+                  const overPct = s.total > 0 ? Math.round(s.overdue/s.total*100) : 0;
+                  const isOverloaded = s.total >= 15;
+                  return `<tr class="border-t border-slate-100 ${isOverloaded?'bg-amber-50':''}">
+                    <td class="p-2 font-semibold">${p} ${isOverloaded?'🔥':''}</td>
+                    <td class="p-2 text-right font-bold ${s.total>=15?'text-amber-700':''}">${s.total}</td>
+                    <td class="p-2 text-right ${s.overdue>0?'text-red-700 font-bold':'text-slate-400'}">${s.overdue} (${overPct}%)</td>
+                    <td class="p-2 text-[10px] text-slate-600">${Object.entries(s.byStatus).map(([k,v]) => `<span class="bg-slate-100 px-1 rounded mr-1">${k}:${v}</span>`).join('')}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+
+      <!-- Performance leaderboard (si hay data) -->
+      ${lb.length > 0 ? `
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🏆 Performance semana actual</div>
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full text-xs">
+              <thead class="bg-slate-50"><tr><th class="text-left p-2">Persona</th><th class="text-center p-2">Score</th><th class="text-center p-2">Tier</th><th class="text-center p-2">Tend</th></tr></thead>
+              <tbody>
+                ${lb.slice(0, 15).map(p => `
+                  <tr class="border-t border-slate-100">
+                    <td class="p-2 font-semibold">${p.full_name}</td>
+                    <td class="p-2 text-center font-bold ${p.composite_score>=80?'text-emerald-700':p.composite_score>=60?'text-amber-700':'text-red-700'}">${p.composite_score||'—'}</td>
+                    <td class="p-2 text-center text-[10px]">${p.performance_tier}</td>
+                    <td class="p-2 text-center">${p.trend==='up'?'⬆️':p.trend==='down'?'⬇️':p.trend==='flat'?'➡️':'🆕'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Coaching prompts -->
+      ${coaching.length > 0 ? `
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🧠 Coaching sugerido por IA (pendientes)</div>
+          <div class="space-y-2">
+            ${coaching.map(p => `
+              <div class="border ${p.priority==='urgent'?'border-red-400 bg-red-50':p.priority==='high'?'border-amber-400 bg-amber-50':'border-slate-200 bg-white'} rounded-xl p-3">
+                <div class="text-[10px] uppercase font-bold">${p.priority} · ${p.prompt_type} · ${p.pm_whatsapp_recipients?.full_name || '?'}</div>
+                <div class="text-sm font-bold mt-1">${p.title}</div>
+                <div class="text-xs mt-1 whitespace-pre-wrap">${p.message}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ─── DECISIONES — qué requiere acción YA ───
+function pmRenderDecisiones() {
+  const co = pmCurrentCompanyObj();
+  const tasks = pmFilterByCompany(pmState.clickupTasks).filter(t => t.status_type !== 'closed');
+  const now = new Date();
+
+  // Vencidas
+  const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < now)
+    .sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+
+  // Sin asignar
+  const unassigned = tasks.filter(t => !t.primary_assignee);
+
+  // Sin due date (alta prioridad sin fecha)
+  const noDue = tasks.filter(t => !t.due_date && (t.priority === 'urgent' || t.priority === 'high'));
+
+  // Risks score >= 12
+  const riskHigh = pmFilterByArea(pmState.risks).filter(r => r.score >= 12);
+
+  // Compliance vence en 30d
+  const compSoon = (pmState.compliance || [])
+    .filter(c => pmState.currentCompany === 'holding' || c.area === co?.slug)
+    .filter(c => c.expiry_date && (new Date(c.expiry_date) - now) <= 30*86400000)
+    .sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+
+  // Deps bloqueando
+  const deps = (pmState.deps || []).filter(d => pmState.currentCompany === 'holding' || d.target_area === co?.slug || d.source_area === co?.slug);
+
+  const sections = [
+    { title: '🔴 Tasks vencidas', items: overdue, render: t => `<div class="text-xs"><strong>${t.name}</strong> · ${t.primary_assignee || 'sin asignar'} · <span class="text-red-700 font-bold">${Math.floor((now-new Date(t.due_date))/86400000)}d vencida</span> ${t.url?`<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] ml-1">abrir</a>`:''}</div>` },
+    { title: '⚪ Tasks sin asignar', items: unassigned, render: t => `<div class="text-xs"><strong>${t.name}</strong> · status ${t.status} ${t.url?`<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] ml-1">abrir</a>`:''}</div>` },
+    { title: '🟡 Alta prio sin fecha', items: noDue, render: t => `<div class="text-xs"><strong>${t.name}</strong> · ${t.primary_assignee||'sin asignar'} · prio ${t.priority} ${t.url?`<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] ml-1">abrir</a>`:''}</div>` },
+    { title: '🚨 Riesgos score ≥ 12', items: riskHigh, render: r => `<div class="text-xs"><strong>${r.title}</strong> · score ${r.score} · owner ${r.owner||'?'}</div>` },
+    { title: '📜 Compliance vence < 30d', items: compSoon, render: c => `<div class="text-xs"><strong>${c.title}</strong> · vence ${c.expiry_date} (${Math.floor((new Date(c.expiry_date)-now)/86400000)}d)</div>` },
+    { title: '🔗 Dependencias bloqueando', items: deps, render: d => `<div class="text-xs"><strong>${d.source_label}</strong> → bloquea → <strong>${d.target_label}</strong> · severidad ${d.severity}</div>` }
+  ];
+
+  const totalAccion = sections.reduce((s, x) => s + x.items.length, 0);
+
+  return `
+    <div class="space-y-3">
+      <div class="bg-slate-900 text-white rounded-xl p-3">
+        <div class="text-xs uppercase font-bold text-slate-400">Acciones requeridas</div>
+        <div class="text-3xl font-bold mt-1">${totalAccion} ítems esperando decisión</div>
+        <div class="text-xs text-slate-400 mt-1">${co ? co.name : 'Holding (todas las empresas)'}</div>
+      </div>
+      ${sections.filter(s => s.items.length > 0).map(s => `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700 flex justify-between">
+            <span>${s.title}</span><span class="bg-slate-900 text-white px-2 rounded">${s.items.length}</span>
+          </div>
+          <div class="max-h-64 overflow-y-auto divide-y divide-slate-100">
+            ${s.items.slice(0, 30).map(x => `<div class="p-2 hover:bg-slate-50">${s.render(x)}</div>`).join('')}
+            ${s.items.length > 30 ? `<div class="p-2 text-[10px] text-slate-400 text-center">...y ${s.items.length-30} más</div>` : ''}
+          </div>
+        </div>
+      `).join('')}
+      ${totalAccion === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">✅</div><div class="font-bold mt-2">Sin decisiones pendientes</div><div class="text-xs text-slate-500 mt-1">Todo bajo control en ${co?co.name:'el holding'}.</div></div>` : ''}
     </div>
   `;
 }
