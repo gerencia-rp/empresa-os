@@ -267,6 +267,112 @@ Devuelve SOLO JSON:
   "timeline_realistic_days": número,
   "recommendations": ["..."],
   "summary": "1 párrafo"
+}`,
+
+  'pm-okrs': (ctx, today) => `Eres COO/Chief of Staff experto en empresas de real estate (fix & flip + rentas + property mgmt). Hoy es ${today}.
+
+CONTEXTO OPERATIVO DE LA EMPRESA "${ctx.company}":
+${JSON.stringify(ctx, null, 2)}
+
+Tu trabajo: proponer 4-6 OKRs (Objectives + Key Results) AMBICIOSOS pero alcanzables para el próximo trimestre, basados en la operación REAL actual.
+
+REGLAS:
+1. OBJECTIVE: aspiracional, en lenguaje natural, retador (no "mantener X" sino "transformar X")
+2. KEY RESULTS: numéricos + medibles + ambiciosos (60-80% probabilidad de lograrlos = stretch goal correcto)
+3. Mezclá categorías: operacional, financiero, de equipo, de calidad
+4. Mira los puntos débiles (overdue_pct alto → OKR de cycle time · backlog grande → OKR de throughput · etc.)
+5. Para Remodelación: márgenes, cycle time obra, % cierres a tiempo, GP en obra
+6. Para Rentas: occupancy %, tenant retention, response time, NOI
+7. Para Fix & Flip: deals/quarter, margen %, días-on-market, ROI
+
+Devolvé SOLO un JSON válido:
+{
+  "context": "1 línea describiendo el momento de la empresa basado en el contexto",
+  "suggestions": [
+    {
+      "objective": "Reducir el tiempo de cierre de obra de 90 a 70 días sin perder calidad",
+      "rationale": "Por qué: el avg_cycle_days es 90 y costo de capital en obra es alto. Reducir 20% libera capital.",
+      "key_results": [
+        { "title": "Cycle time promedio obra", "target": 70, "unit": "días" },
+        { "title": "% obras cerradas dentro de timeline", "target": 80, "unit": "%" },
+        { "title": "Margen bruto por obra", "target": 25, "unit": "%" }
+      ]
+    }
+  ],
+  "summary": "1 párrafo del estado actual"
+}`,
+
+  'pm-risks': (ctx, today) => `Eres risk officer experto en empresas inmobiliarias en Texas. Hoy es ${today}.
+
+CONTEXTO OPERATIVO DE LA EMPRESA "${ctx.company}":
+${JSON.stringify(ctx, null, 2)}
+
+Tu trabajo: detectar 4-8 RIESGOS REALES no registrados todavía, basándote en patrones de la operación.
+
+LENTES A CONSIDERAR:
+- Concentración: ¿1 persona con muchas tareas overdue? bus factor
+- Compliance: vencimientos próximos sin owner
+- Capital: backlog enorme + capital en obra alto → riesgo de cash crunch
+- Operacional: cycle time degradándose, mucho atascado en 1 status
+- Mercado: rate hikes, tax bills (Travis sube assess en enero), insurance hikes
+- Legal: contratos por vencer, permits sin renovar, GC liability, tenant evictions
+- Reputacional: tareas muy viejas con clientes/inquilinos esperando
+
+PARA CADA RIESGO:
+- probability 1-5 (1=raro, 5=casi seguro)
+- impact 1-5 (1=mínimo, 5=catastrófico para el negocio)
+- score = probability × impact
+- evidence: dato concreto del contexto que lo respalda
+- mitigation: 1 acción específica para reducirlo
+
+Devolvé SOLO JSON válido:
+{
+  "detected_risks": [
+    {
+      "title": "Cash crunch en Q3 por capital en obra alto + cierre lento",
+      "category": "financiero",
+      "probability": 3, "impact": 5, "score": 15,
+      "evidence": "X obras activas con avg_cycle +30d sobre target. Capital expuesto $XXX.",
+      "mitigation": "Auditar 3 obras más viejas y forzar cierre antes de 60d. Renegociar lender para extender HML."
+    }
+  ],
+  "recommendations": ["acción general 1", "acción general 2"],
+  "summary": "1 párrafo del nivel de riesgo agregado"
+}`,
+
+  'pm-compliance': (ctx, today) => `Eres compliance officer experto en operación inmobiliaria Texas (Austin/Travis). Hoy es ${today}.
+
+CONTEXTO OPERATIVO DE LA EMPRESA "${ctx.company}":
+${JSON.stringify(ctx, null, 2)}
+
+Compliance items EXISTENTES (no los repitas): ${JSON.stringify(ctx.compliance_expiring || [])}
+
+Tu trabajo: sugerir 5-10 items de compliance que la empresa PROBABLEMENTE NECESITE pero no ha registrado.
+
+ÁREAS COMUNES TX RE:
+- Permits de remodelación (City of Austin)
+- Contractor's license (si aplica)
+- LLC annual filings (Texas SOS)
+- Sales tax / franchise tax (Comptroller)
+- Insurance: general liability, workers comp, builders risk, landlord/property
+- Lender compliance: insurance proof, tax payment proof
+- Tenant lease compliance: TX Property Code, fair housing
+- HOA: ARC approvals si aplica
+- Environmental: lead paint disclosure (casas pre-1978), asbestos
+- IRS: 1099s contractors, W-9s
+
+Devolvé SOLO JSON válido:
+{
+  "missing_items": [
+    {
+      "title": "Texas Franchise Tax 2026",
+      "type": "tax",
+      "issuer": "Texas Comptroller",
+      "why": "Toda LLC TX debe filear antes del 15 de mayo o multa $50/mes."
+    }
+  ],
+  "recommendations": ["acción 1", "acción 2"],
+  "summary": "1 párrafo del estado de compliance"
 }`
 };
 

@@ -114,6 +114,55 @@ function pmSetCompany(id) { pmState.currentCompany = id; pmRender(); }
 
 function pmSetTab(t) { pmState.tab = t; pmRender(); }
 
+// ─── Definiciones operativas ───
+// BACKLOG: tarea abierta SIN persona asignada — está esperando que alguien la tome.
+//          NO debe contar como "activa/abierta/vencida" en métricas operativas.
+// ACTIVA: tarea abierta CON persona asignada — alguien está/debería trabajar en ella.
+// CERRADA: status_type === 'closed' o status === 'completado'.
+function pmIsClosed(t) { return t.status_type === 'closed' || t.status === 'completado'; }
+function pmIsBacklog(t) { return !pmIsClosed(t) && !t.primary_assignee; }
+function pmIsActive(t)  { return !pmIsClosed(t) && !!t.primary_assignee; }
+function pmIsOverdue(t) {
+  // Solo cuenta vencida si está ASIGNADA y tiene due_date pasado
+  return pmIsActive(t) && t.due_date && new Date(t.due_date) < new Date();
+}
+// Contexto completo de la tarea para drill-down
+function pmTaskContext(t) {
+  const parts = [];
+  if (t.folder_name) parts.push(`📁 ${t.folder_name}`);
+  if (t.list_name) parts.push(`📋 ${t.list_name}`);
+  return parts.join(' › ') || '—';
+}
+function pmTaskContextShort(t) {
+  const parts = [];
+  if (t.folder_name) parts.push(t.folder_name);
+  if (t.list_name) parts.push(t.list_name);
+  return parts.join(' › ');
+}
+// Días con signo: positivo = vencida hace X días · negativo = quedan X días
+function pmDaysLate(t) {
+  if (!t.due_date) return null;
+  const due = new Date(t.due_date);
+  // Si está cerrada → días entre cierre y due (negativo = a tiempo, positivo = tarde)
+  if (pmIsClosed(t) && t.date_closed) {
+    return Math.floor((new Date(t.date_closed) - due) / 86400000);
+  }
+  // Abierta → días desde hoy vs due
+  return Math.floor((Date.now() - due.getTime()) / 86400000);
+}
+function pmDaysLateLabel(days) {
+  if (days == null) return '—';
+  if (days > 0) return `+${days}d`;
+  if (days < 0) return `${days}d`;
+  return '0d';
+}
+function pmDaysLateClass(days) {
+  if (days == null) return 'text-slate-400';
+  if (days > 0) return 'text-red-700 font-bold';
+  if (days < 0) return 'text-emerald-700';
+  return 'text-amber-700 font-bold';
+}
+
 function pmRender() {
   const root = document.getElementById('pm-root');
   if (!root) return;
@@ -556,13 +605,50 @@ function pmRenderReports() {
 // ─── RISKS ───
 function pmRenderRisks() {
   const risks = pmFilterByArea(pmState.risks || []);
+  const aiKey = 'pm-risks-' + pmState.currentCompany;
+  const ai = (window.aiState && window.aiState[aiKey]) || {};
   return `
     <div class="space-y-3">
-      <div class="flex justify-between items-center">
+      <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">Risk register. Score = probabilidad × impacto. Score ≥ 12 = atender.</div>
-        <button onclick="pmAddRisk()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">+ Agregar risk</button>
+        <div class="flex gap-2">
+          <button onclick="pmGenerateRisksAnalysis()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude analiza la operación y detecta riesgos no registrados">🤖 Analizar riesgos con IA</button>
+          <button onclick="pmAddRisk()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">+ Agregar risk</button>
+        </div>
       </div>
-      ${risks.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin riesgos registrados.</div>` : `
+
+      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900"><span class="animate-pulse">🧠 Claude analizando tu operación para detectar riesgos...</span></div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+      ${ai.detected_risks && ai.detected_risks.length ? `
+        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+          <div class="text-xs font-bold text-violet-900 uppercase mb-2">🤖 Riesgos detectados por Claude (no en tu register)</div>
+          <div class="space-y-2">
+            ${ai.detected_risks.map((r,i) => `
+              <div class="bg-white border border-violet-200 rounded-lg p-3">
+                <div class="flex justify-between gap-2">
+                  <div class="flex-1">
+                    <div class="font-bold text-sm">${r.title}</div>
+                    ${r.evidence ? `<div class="text-[11px] text-slate-600 italic mt-1">📊 ${r.evidence}</div>` : ''}
+                    ${r.mitigation ? `<div class="text-[11px] text-emerald-700 mt-1">💡 ${r.mitigation}</div>` : ''}
+                  </div>
+                  <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span class="text-[10px] bg-${r.score>=15?'red':r.score>=10?'amber':'slate'}-100 text-${r.score>=15?'red':r.score>=10?'amber':'slate'}-800 px-2 py-0.5 rounded font-bold">score ${r.score}</span>
+                    <button onclick="pmAdoptDetectedRisk(${i})" class="text-[10px] bg-violet-600 hover:bg-violet-700 text-white font-bold px-2 py-1 rounded">+ Agregar</button>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      ${ai.recommendations && ai.recommendations.length ? `
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
+          <strong>🎯 Recomendaciones generales (IA):</strong>
+          <ul class="mt-1 ml-4 list-disc space-y-1">${ai.recommendations.map(r => `<li>${typeof r==='string'?r:JSON.stringify(r)}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
+      ${risks.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin riesgos registrados aún. Click "🤖 Analizar riesgos con IA" para que Claude detecte riesgos basados en tu operación.</div>` : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50"><tr><th class="text-left p-2">Título</th><th class="text-center p-2">Área</th><th class="text-center p-2">Prob</th><th class="text-center p-2">Impacto</th><th class="text-center p-2">Score</th><th class="text-center p-2">Status</th></tr></thead>
@@ -596,13 +682,42 @@ async function pmAddRisk() {
 function pmRenderCompliance() {
   const items = pmFilterByArea(pmState.compliance || []);
   const today = new Date(); today.setHours(0,0,0,0);
+  const aiKey = 'pm-compliance-' + pmState.currentCompany;
+  const ai = (window.aiState && window.aiState[aiKey]) || {};
   return `
     <div class="space-y-3">
-      <div class="flex justify-between items-center">
+      <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">Permisos, licencias, seguros con fecha de vencimiento.</div>
-        <button onclick="pmAddCompliance()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">+ Agregar item</button>
+        <div class="flex gap-2">
+          <button onclick="pmGenerateComplianceAnalysis()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude sugiere compliance items que probablemente te falten">🤖 Análisis IA</button>
+          <button onclick="pmAddCompliance()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">+ Agregar item</button>
+        </div>
       </div>
-      ${items.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin items.</div>` : items.map(c => {
+
+      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900"><span class="animate-pulse">🧠 Claude analizando compliance...</span></div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+      ${ai.missing_items && ai.missing_items.length ? `
+        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+          <div class="text-xs font-bold text-violet-900 uppercase mb-2">🤖 Compliance que probablemente te falta</div>
+          <div class="space-y-2">
+            ${ai.missing_items.map(m => `
+              <div class="bg-white border border-violet-200 rounded-lg p-3 text-xs">
+                <div class="flex justify-between"><strong>${m.title}</strong><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${m.type}</span></div>
+                ${m.why ? `<div class="text-[11px] text-slate-600 italic mt-1">${m.why}</div>` : ''}
+                ${m.issuer ? `<div class="text-[10px] text-slate-500 mt-1">Emisor: ${m.issuer}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      ${ai.recommendations && ai.recommendations.length ? `
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
+          <strong>🎯 Recomendaciones (IA):</strong>
+          <ul class="mt-1 ml-4 list-disc space-y-1">${ai.recommendations.map(r => `<li>${typeof r==='string'?r:JSON.stringify(r)}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
+      ${items.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin items. Click "🤖 Análisis IA" para que Claude sugiera compliance items según tu negocio.</div>` : items.map(c => {
         const exp = c.expiry_date ? new Date(c.expiry_date) : null;
         const days = exp ? Math.round((exp - today) / 86400000) : null;
         const tone = days != null && days <= 0 ? 'border-red-400 bg-red-50' : days != null && days <= 30 ? 'border-amber-400 bg-amber-50' : 'border-slate-200';
@@ -793,13 +908,42 @@ async function pmRunComputePerformance() {
 // ─── OKRs ───
 function pmRenderOKRs() {
   const okrs = pmFilterByCompany(pmState.okrs || []);
+  const aiKey = 'pm-okrs-' + pmState.currentCompany;
+  const ai = (window.aiState && window.aiState[aiKey]) || {};
   return `
     <div class="space-y-3">
-      <div class="flex justify-between items-center">
+      <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">OKRs trimestrales por empresa o persona. Objetivos + Key Results medibles.</div>
-        <button onclick="pmAddOKR()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">+ OKR</button>
+        <div class="flex gap-2">
+          <button onclick="pmGenerateOKRSuggestions()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude analiza tu operación y propone OKRs ambiciosos">🤖 Sugerir OKRs con IA</button>
+          <button onclick="pmAddOKR()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">+ OKR manual</button>
+        </div>
       </div>
-      ${okrs.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin OKRs. Empezá creando uno para el trimestre.</div>` : okrs.map(o => `
+
+      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center text-xs text-violet-900"><div class="text-3xl animate-pulse">🧠</div><div class="mt-2 font-bold">Claude analizando tu operación...</div><div class="text-[10px] text-violet-700 mt-1">~30 segundos · revisando ClickUp, performance, alertas, capital en obra</div></div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+      ${ai.suggestions && ai.suggestions.length ? `
+        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+          <div class="text-xs font-bold text-violet-900 uppercase mb-2">🤖 OKRs sugeridos por Claude — ${ai.context || 'basado en tu operación actual'}</div>
+          <div class="space-y-3">
+            ${ai.suggestions.map((o, i) => `
+              <div class="bg-white border border-violet-200 rounded-lg p-3">
+                <div class="flex justify-between items-start mb-1">
+                  <div class="text-sm font-bold text-violet-900">${i+1}. ${o.objective}</div>
+                  <button onclick='pmAdoptOKRSuggestion(${i})' class="text-[10px] bg-violet-600 hover:bg-violet-700 text-white font-bold px-2 py-1 rounded flex-shrink-0">+ Adoptar</button>
+                </div>
+                ${o.rationale ? `<div class="text-[11px] text-slate-600 italic mb-2">${o.rationale}</div>` : ''}
+                <div class="text-[10px] uppercase text-slate-500 mb-1">Key Results propuestos:</div>
+                <ul class="space-y-0.5">
+                  ${(o.key_results || []).map(kr => `<li class="text-xs">• ${kr.title} — target <strong>${kr.target} ${kr.unit||''}</strong></li>`).join('')}
+                </ul>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${okrs.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin OKRs activos. Click "🤖 Sugerir OKRs con IA" para que Claude te proponga 3-5 basados en tu operación.</div>` : okrs.map(o => `
         <div class="bg-white border border-slate-200 rounded-xl p-3">
           <div class="flex justify-between items-start gap-2 flex-wrap">
             <div class="flex-1 min-w-0">
@@ -965,45 +1109,151 @@ async function pmRunCoaching() {
 
 // ─── HEATMAP ───
 function pmRenderHeatmap() {
-  const hm = pmFilterByCompany(pmState.heatmap || []);
-  if (hm.length === 0) {
-    return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">🔥</div><div class="font-bold">Sin data todavía</div><div class="text-xs mt-2">Sincronizá ClickUp para llenar el heatmap.</div></div>`;
+  // Reconstruimos client-side desde clickupTasks para EXCLUIR backlog (no es bottleneck — es backlog)
+  const tasks = pmFilterByCompany(pmState.clickupTasks).filter(pmIsActive);
+  if (tasks.length === 0) {
+    return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">🔥</div><div class="font-bold">Sin tareas activas</div><div class="text-xs mt-2">Backlog excluido. Sincronizá ClickUp si recién configuraste el space.</div></div>`;
   }
-  // Agrupar por status × age_bucket
-  const statuses = Array.from(new Set(hm.map(h => h.status))).sort();
+
   const buckets = ['0-1d','2-3d','4-7d','8-14d','15d+'];
-  const matrix = {};
-  hm.forEach(h => {
-    if (!matrix[h.status]) matrix[h.status] = {};
-    matrix[h.status][h.age_bucket] = h.task_count;
+  function bucketOf(t) {
+    const days = (Date.now() - new Date(t.date_updated || t.date_created)) / 86400000;
+    if (days <= 1) return '0-1d';
+    if (days <= 3) return '2-3d';
+    if (days <= 7) return '4-7d';
+    if (days <= 14) return '8-14d';
+    return '15d+';
+  }
+  const matrix = {}; // matrix[status][bucket] = { count, tasks: [] }
+  tasks.forEach(t => {
+    const s = t.status || '?';
+    const b = bucketOf(t);
+    if (!matrix[s]) matrix[s] = {};
+    if (!matrix[s][b]) matrix[s][b] = { count: 0, tasks: [] };
+    matrix[s][b].count++;
+    matrix[s][b].tasks.push(t);
   });
-  // Max para escalar color
-  const max = Math.max(...hm.map(h => h.task_count));
+  const statuses = Object.keys(matrix).sort();
+  const max = Math.max(...Object.values(matrix).flatMap(row => Object.values(row).map(c => c.count)));
+
+  // Analysis: encontrar el cell más caliente y la peor task
+  let hottest = null;
+  statuses.forEach(s => Object.entries(matrix[s] || {}).forEach(([b, c]) => {
+    if (!hottest || c.count > hottest.count || (c.count === hottest.count && (b === '15d+' && hottest.bucket !== '15d+'))) {
+      hottest = { status: s, bucket: b, count: c.count, tasks: c.tasks };
+    }
+  }));
+  // Worst tasks (≥15d stale)
+  const worstTasks = tasks
+    .filter(t => (Date.now() - new Date(t.date_updated || t.date_created)) / 86400000 > 14)
+    .sort((a,b) => new Date(a.date_updated||a.date_created) - new Date(b.date_updated||b.date_created))
+    .slice(0, 15);
+
+  // Análisis textual automático
+  const analysisLines = [];
+  if (hottest && hottest.count > 0) {
+    if (hottest.bucket === '15d+') {
+      analysisLines.push(`🚨 <strong>Cuello de botella crítico:</strong> ${hottest.count} tareas atascadas en status "<strong>${hottest.status}</strong>" por más de 15 días. Esto es donde el flujo se está rompiendo. Hacé review específico de estas con los asignados.`);
+    } else if (hottest.bucket === '8-14d') {
+      analysisLines.push(`⚠️ <strong>Atención:</strong> ${hottest.count} tareas llevan 8-14 días en "<strong>${hottest.status}</strong>". Si pasan a 15d+, son cuello de botella.`);
+    } else {
+      analysisLines.push(`✅ El status más cargado es "<strong>${hottest.status}</strong>" con ${hottest.count} tareas en ${hottest.bucket} — flujo saludable.`);
+    }
+  }
+  const stale15 = tasks.filter(t => (Date.now() - new Date(t.date_updated || t.date_created)) / 86400000 > 14).length;
+  if (stale15 >= 5) {
+    analysisLines.push(`📊 <strong>${stale15} tareas activas llevan +15 días sin actualizarse</strong> (${Math.round(stale15/tasks.length*100)}% del total activo). Revisá si están bloqueadas o reasignar.`);
+  }
+  // Personas con tareas viejas
+  const oldByPerson = {};
+  worstTasks.forEach(t => { const p = t.primary_assignee; if (!p) return; oldByPerson[p] = (oldByPerson[p]||0)+1; });
+  const topStuckPerson = Object.entries(oldByPerson).sort((a,b) => b[1]-a[1])[0];
+  if (topStuckPerson && topStuckPerson[1] >= 3) {
+    analysisLines.push(`👤 <strong>${topStuckPerson[0]}</strong> tiene ${topStuckPerson[1]} tareas atascadas +15d. Posible sobrecarga o bloqueo. Hablá 1-on-1.`);
+  }
 
   return `
     <div class="space-y-3">
-      <div class="text-xs text-slate-600">Heatmap: cuántas tasks abiertas están bloqueadas en cada status por X días. Más rojo = más viejo. Identificá dónde se atascan.</div>
-      <div class="border border-slate-200 rounded-xl overflow-x-auto">
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+        <strong>🔥 Heatmap de bottlenecks (solo tareas activas, backlog excluido):</strong>
+        <p class="mt-1 text-slate-600">Cuántas tareas asignadas llevan X días sin update en cada status. Rojo = atascadas hace mucho. El status con muchas celdas rojas es donde el flujo se rompe.</p>
+      </div>
+
+      <div class="border border-slate-200 rounded-xl overflow-x-auto bg-white">
         <table class="w-full text-xs">
-          <thead class="bg-slate-50">
-            <tr><th class="text-left p-2">Status</th>${buckets.map(b => `<th class="text-center p-2">${b}</th>`).join('')}</tr>
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="text-left p-2 text-[10px] uppercase text-slate-600">Status</th>
+              ${buckets.map(b => `<th class="text-center p-2 text-[10px] uppercase text-slate-600">${b}</th>`).join('')}
+              <th class="text-center p-2 text-[10px] uppercase text-slate-600">Total</th>
+            </tr>
           </thead>
           <tbody>
-            ${statuses.map(s => `
-              <tr class="border-t border-slate-100">
-                <td class="p-2 font-semibold">${s}</td>
+            ${statuses.map(s => {
+              const rowTotal = buckets.reduce((sum, b) => sum + (matrix[s]?.[b]?.count || 0), 0);
+              return `<tr class="border-t border-slate-100">
+                <td class="p-2 font-bold">${s}</td>
                 ${buckets.map(b => {
-                  const v = matrix[s]?.[b] || 0;
+                  const cell = matrix[s]?.[b];
+                  const v = cell?.count || 0;
                   const intensity = max > 0 ? Math.round(v/max*100) : 0;
-                  const bg = intensity === 0 ? 'bg-slate-50' : intensity < 30 ? 'bg-yellow-100' : intensity < 60 ? 'bg-orange-200' : 'bg-red-300';
-                  return `<td class="${bg} text-center font-bold p-2">${v || ''}</td>`;
+                  const bg = intensity === 0 ? 'bg-slate-50' : intensity < 30 ? 'bg-yellow-100' : intensity < 60 ? 'bg-orange-200' : intensity < 80 ? 'bg-red-300' : 'bg-red-500 text-white';
+                  return `<td class="${bg} text-center font-bold p-2" ${v > 0 && cell.tasks.length ? `title="${cell.tasks.slice(0,5).map(t => '· '+ (t.name||'').slice(0,60)).join('\n')}${cell.tasks.length>5?'\n...y '+(cell.tasks.length-5)+' más':''}"` : ''}>${v || ''}</td>`;
                 }).join('')}
-              </tr>
-            `).join('')}
+                <td class="p-2 text-center font-bold bg-slate-100">${rowTotal}</td>
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>
-      <div class="text-[11px] text-slate-500 italic">💡 Las celdas rojas indican tasks que llevan mucho tiempo en ese status. Hace un review específico de esas — son el cuello de botella real.</div>
+
+      <!-- Análisis automático -->
+      ${analysisLines.length > 0 ? `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis automático</div>
+          <ul class="space-y-1.5 text-xs text-slate-700">
+            ${analysisLines.map(l => `<li>${l}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+
+      <!-- Top tareas atascadas con drill-down -->
+      ${worstTasks.length > 0 ? `
+        <div class="border border-red-200 rounded-xl overflow-hidden">
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">
+            🚨 Top tareas atascadas (15+ días sin update) — ${worstTasks.length}
+          </div>
+          <div class="max-h-72 overflow-y-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-red-50">
+                <tr class="text-[10px] uppercase text-red-900">
+                  <th class="text-left p-2">Tarea</th>
+                  <th class="text-left p-2">Ubicación</th>
+                  <th class="text-left p-2">Status</th>
+                  <th class="text-left p-2">Asignado</th>
+                  <th class="text-right p-2">Días sin update</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${worstTasks.map(t => {
+                  const days = Math.floor((Date.now() - new Date(t.date_updated || t.date_created))/86400000);
+                  return `<tr class="border-t border-slate-100 hover:bg-red-50">
+                    <td class="p-2 font-semibold truncate max-w-xs">${t.name || '(sin título)'}</td>
+                    <td class="p-2 text-[10px] text-slate-600">${pmTaskContext(t)}</td>
+                    <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${t.status || '—'}</span></td>
+                    <td class="p-2 text-[11px]">${t.primary_assignee || '—'}</td>
+                    <td class="p-2 text-right text-red-700 font-bold">${days}d</td>
+                    <td class="p-2">${t.url ? `<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir↗</a>` : ''}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="text-[11px] text-slate-500 italic">💡 Hovereá las celdas para ver los nombres de las tareas atascadas. Las celdas rojas son el cuello de botella real.</div>
     </div>
   `;
 }
@@ -1103,75 +1353,100 @@ function pmRenderEmpresaPulse() {
 
   const tasks = pmFilterByCompany(pmState.clickupTasks);
   const now = new Date();
-  const open = tasks.filter(t => t.status_type !== 'closed');
-  const overdue = open.filter(t => t.due_date && new Date(t.due_date) < now);
-  const dueToday = open.filter(t => {
+  // SEPARAR backlog (sin asignar) de activas (con asignado) — backlog NO cuenta en métricas operativas
+  const backlog = tasks.filter(pmIsBacklog);
+  const active = tasks.filter(pmIsActive);
+  const closed = tasks.filter(pmIsClosed);
+  const overdue = active.filter(pmIsOverdue);  // solo activas vencidas
+  const dueToday = active.filter(t => {
     if (!t.due_date) return false;
-    const d = new Date(t.due_date);
-    return d.toDateString() === now.toDateString();
+    return new Date(t.due_date).toDateString() === now.toDateString();
   });
-  const dueWeek = open.filter(t => {
+  const dueWeek = active.filter(t => {
     if (!t.due_date) return false;
-    const d = new Date(t.due_date);
-    const diff = (d - now) / 86400000;
+    const diff = (new Date(t.due_date) - now) / 86400000;
     return diff > 0 && diff <= 7;
   });
-  const closed7d = tasks.filter(t => t.status_type === 'closed' && t.date_closed && (now - new Date(t.date_closed)) < 7*86400000);
+  const closed7d = closed.filter(t => t.date_closed && (now - new Date(t.date_closed)) < 7*86400000);
 
-  // Por status
+  // Por status SOLO de activas (excluye backlog)
   const byStatus = {};
-  open.forEach(t => { const s = t.status || '?'; byStatus[s] = (byStatus[s]||0)+1; });
+  active.forEach(t => { const s = t.status || '?'; byStatus[s] = (byStatus[s]||0)+1; });
 
-  // Top assignees (por carga abierta)
+  // Carga por persona — solo activas
   const byPerson = {};
-  open.forEach(t => {
-    const p = t.primary_assignee || 'Sin asignar';
+  active.forEach(t => {
+    const p = t.primary_assignee;
     if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0 };
     byPerson[p].total++;
-    if (t.due_date && new Date(t.due_date) < now) byPerson[p].overdue++;
+    if (pmIsOverdue(t)) byPerson[p].overdue++;
   });
   const topPeople = Object.entries(byPerson).sort((a,b) => b[1].total - a[1].total).slice(0, 10);
+
+  // Backlog por folder (qué casa/proyecto tiene más cosas sin asignar)
+  const backlogByFolder = {};
+  backlog.forEach(t => {
+    const k = t.folder_name || '(sin folder)';
+    backlogByFolder[k] = (backlogByFolder[k]||0) + 1;
+  });
 
   const myAlerts = (pmState.clickupAlerts || []).filter(a => !a.related_folder_id || a.related_folder_id === co.slug);
   const myRisks = pmFilterByArea(pmState.risks);
 
+  // Análisis de cycle time: días reales para cerrar (desde due_date)
+  const closedWithDue = closed.filter(t => t.date_closed && t.due_date);
+  const avgCycleLate = closedWithDue.length ? Math.round(closedWithDue.reduce((s,t) => s + pmDaysLate(t), 0) / closedWithDue.length) : null;
+
   return `
     <div class="space-y-4">
-      <!-- KPIs principales -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <!-- KPIs principales (NO incluye backlog) -->
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div class="bg-slate-900 text-white rounded-xl p-3">
-          <div class="text-[10px] text-slate-400 uppercase font-bold">Tasks abiertas</div>
-          <div class="text-3xl font-bold">${open.length}</div>
-          <div class="text-[10px] text-slate-400">${tasks.length} totales</div>
+          <div class="text-[10px] text-slate-400 uppercase font-bold">Activas</div>
+          <div class="text-3xl font-bold">${active.length}</div>
+          <div class="text-[10px] text-slate-400">con persona asignada</div>
         </div>
         <div class="bg-red-50 border border-red-200 rounded-xl p-3">
           <div class="text-[10px] text-red-700 uppercase font-bold">Vencidas</div>
           <div class="text-3xl font-bold text-red-900">${overdue.length}</div>
-          <div class="text-[10px] text-red-700">${open.length>0?Math.round(overdue.length/open.length*100):0}% del abierto</div>
+          <div class="text-[10px] text-red-700">${active.length>0?Math.round(overdue.length/active.length*100):0}% de activas</div>
         </div>
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
           <div class="text-[10px] text-amber-700 uppercase font-bold">Vencen hoy</div>
           <div class="text-3xl font-bold text-amber-900">${dueToday.length}</div>
         </div>
         <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
-          <div class="text-[10px] text-blue-700 uppercase font-bold">Próx 7 días</div>
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Próx 7d</div>
           <div class="text-3xl font-bold text-blue-900">${dueWeek.length}</div>
         </div>
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
           <div class="text-[10px] text-emerald-700 uppercase font-bold">Cerradas 7d</div>
           <div class="text-3xl font-bold text-emerald-900">${closed7d.length}</div>
         </div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3" title="Tareas SIN persona asignada — pendientes de tomar dueño. NO se cuentan como vencidas.">
+          <div class="text-[10px] text-violet-700 uppercase font-bold">📥 Backlog</div>
+          <div class="text-3xl font-bold text-violet-900">${backlog.length}</div>
+          <div class="text-[10px] text-violet-700">sin asignar</div>
+        </div>
       </div>
 
-      <!-- Por status + Por persona, lado a lado -->
+      <!-- Cycle time histórico (cerradas) -->
+      ${avgCycleLate !== null ? `
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+          <strong>⏱ Velocidad histórica:</strong> Promedio de cierre vs due date en las últimas ${closedWithDue.length} tareas: <span class="${avgCycleLate>0?'text-red-700':'text-emerald-700'} font-bold">${avgCycleLate>0?'+':''}${avgCycleLate} días</span>
+          ${avgCycleLate>0 ? `<span class="text-slate-600 ml-2">→ las tareas se cierran ${avgCycleLate} días después de su fecha objetivo. Mejorar planning de duedates o capacidad.</span>` : `<span class="text-emerald-700 ml-2">→ el equipo cierra a tiempo. 👏</span>`}
+        </div>
+      ` : ''}
+
+      <!-- Por status (activas) + Por persona, lado a lado -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Por status (abiertas)</div>
-          ${Object.keys(byStatus).length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin tasks abiertas.</div>' : `
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Por status (solo activas, NO backlog)</div>
+          ${Object.keys(byStatus).length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin tareas activas.</div>' : `
             <table class="w-full text-xs">
               <tbody>
                 ${Object.entries(byStatus).sort((a,b) => b[1]-a[1]).map(([s,n]) => {
-                  const pct = open.length > 0 ? Math.round(n/open.length*100) : 0;
+                  const pct = active.length > 0 ? Math.round(n/active.length*100) : 0;
                   return `<tr class="border-t border-slate-100">
                     <td class="p-2 font-semibold">${s}</td>
                     <td class="p-2 text-right font-bold">${n}</td>
@@ -1185,7 +1460,7 @@ function pmRenderEmpresaPulse() {
         </div>
 
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">👥 Carga por persona (top 10)</div>
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">👥 Carga por persona (top 10, solo activas)</div>
           ${topPeople.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin asignados.</div>' : `
             <table class="w-full text-xs">
               <tbody>
@@ -1202,21 +1477,53 @@ function pmRenderEmpresaPulse() {
         </div>
       </div>
 
-      <!-- Vencidas críticas (top 10) -->
+      <!-- Backlog por folder (drill-down) -->
+      ${backlog.length > 0 ? `
+        <div class="bg-white border border-violet-200 rounded-xl overflow-hidden">
+          <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 text-xs font-bold uppercase text-violet-900 flex justify-between">
+            <span>📥 Backlog por folder (${backlog.length} tareas sin dueño)</span>
+            <span class="text-[10px] font-normal text-violet-700">Estas tareas están esperando que alguien las tome — asigná un responsable o dejalas en backlog si todavía no es el momento</span>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-1 p-2">
+            ${Object.entries(backlogByFolder).sort((a,b) => b[1]-a[1]).slice(0, 12).map(([folder, n]) => `
+              <div class="bg-violet-50 border border-violet-200 rounded p-2 text-xs">
+                <div class="font-bold text-violet-900 truncate" title="${folder}">📁 ${folder}</div>
+                <div class="text-violet-700">${n} sin asignar</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Top vencidas con folder + list -->
       ${overdue.length > 0 ? `
         <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
-          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">🚨 Top vencidas (${overdue.length})</div>
-          <div class="max-h-64 overflow-y-auto">
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900 flex justify-between">
+            <span>🚨 Top vencidas (${overdue.length})</span>
+            <span class="text-[10px] font-normal text-red-700">tarea + folder + lista + responsable + días vencidas</span>
+          </div>
+          <div class="max-h-72 overflow-auto">
             <table class="w-full text-xs">
+              <thead class="bg-red-50 sticky top-0">
+                <tr class="text-[10px] uppercase text-red-900">
+                  <th class="text-left p-2">Tarea</th>
+                  <th class="text-left p-2">Ubicación (folder › lista)</th>
+                  <th class="text-left p-2">Asignado</th>
+                  <th class="text-left p-2">Status</th>
+                  <th class="text-right p-2">Days late</th>
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
-                ${overdue.sort((a,b) => new Date(a.due_date) - new Date(b.due_date)).slice(0, 15).map(t => {
-                  const daysLate = Math.floor((now - new Date(t.due_date))/86400000);
-                  return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-                    <td class="p-2 font-semibold truncate max-w-md">${t.name || '(sin título)'}</td>
-                    <td class="p-2 text-[11px] text-slate-500">${t.primary_assignee || '—'}</td>
-                    <td class="p-2 text-[11px]">${t.status || '—'}</td>
-                    <td class="p-2 text-right text-red-700 font-bold">${daysLate}d</td>
-                    ${t.url ? `<td class="p-2"><a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir</a></td>` : '<td></td>'}
+                ${overdue.sort((a,b) => new Date(a.due_date) - new Date(b.due_date)).slice(0, 20).map(t => {
+                  const days = pmDaysLate(t);
+                  return `<tr class="border-t border-slate-100 hover:bg-red-50">
+                    <td class="p-2 font-semibold truncate max-w-xs">${t.name || '(sin título)'}</td>
+                    <td class="p-2 text-[10px] text-slate-600">${pmTaskContext(t)}</td>
+                    <td class="p-2 text-[11px] text-slate-700">${t.primary_assignee || '—'}</td>
+                    <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${t.status || '—'}</span></td>
+                    <td class="p-2 text-right ${pmDaysLateClass(days)}">${pmDaysLateLabel(days)}</td>
+                    <td class="p-2">${t.url ? `<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir↗</a>` : ''}</td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -1225,14 +1532,24 @@ function pmRenderEmpresaPulse() {
         </div>
       ` : ''}
 
-      <!-- Alertas + Risks de la empresa -->
+      <!-- Alertas + Risks con contexto completo -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         ${myAlerts.length > 0 ? `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase text-amber-900">⚠️ Alertas (${myAlerts.length})</div>
-            <div class="max-h-48 overflow-y-auto divide-y divide-slate-100">
-              ${myAlerts.slice(0, 10).map(a => `
-                <div class="p-2 text-xs"><strong>${a.alert_type}</strong><div class="text-[10px] text-slate-500">${a.message || ''}</div></div>
+            <div class="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase text-amber-900">⚠️ Alertas (${myAlerts.length}) — origen detallado</div>
+            <div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
+              ${myAlerts.slice(0, 12).map(a => `
+                <div class="p-2 text-xs">
+                  <div class="flex justify-between items-start gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="font-bold text-slate-900">${a.alert_type}</div>
+                      <div class="text-[11px] text-slate-700 mt-0.5">${a.message || ''}</div>
+                      ${a.detail ? `<div class="text-[10px] text-slate-500 mt-1">${a.detail}</div>` : ''}
+                    </div>
+                    <span class="text-[10px] bg-${a.severity==='critical'?'red':'amber'}-100 text-${a.severity==='critical'?'red':'amber'}-800 px-2 py-0.5 rounded flex-shrink-0">${a.severity}</span>
+                  </div>
+                  ${a.related_folder_id ? `<div class="text-[10px] text-slate-400 mt-1">📁 folder_id: ${a.related_folder_id}${a.metric_value!=null?` · ${a.metric_value}`:''}</div>` : ''}
+                </div>
               `).join('')}
             </div>
           </div>
@@ -1240,9 +1557,13 @@ function pmRenderEmpresaPulse() {
         ${myRisks.length > 0 ? `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">⚠️ Riesgos (${myRisks.length})</div>
-            <div class="max-h-48 overflow-y-auto divide-y divide-slate-100">
+            <div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
               ${myRisks.slice(0, 10).map(r => `
-                <div class="p-2 text-xs"><strong>${r.title}</strong> <span class="text-[10px] ${r.score>=12?'text-red-700':'text-slate-500'}">score ${r.score}</span></div>
+                <div class="p-2 text-xs">
+                  <div class="flex justify-between"><strong>${r.title}</strong><span class="text-[10px] ${r.score>=12?'text-red-700 font-bold':'text-slate-500'}">score ${r.score}</span></div>
+                  ${r.description ? `<div class="text-[10px] text-slate-600 mt-0.5">${r.description}</div>` : ''}
+                  <div class="text-[10px] text-slate-400 mt-1">${r.category||''} · owner: ${r.owner||'?'} · ${r.status}</div>
+                </div>
               `).join('')}
             </div>
           </div>
@@ -1252,59 +1573,82 @@ function pmRenderEmpresaPulse() {
   `;
 }
 
-// ─── TAREAS ClickUp filtrable ───
+// ─── TAREAS ClickUp filtrable con folder + list + días ───
 function pmRenderClickUpTasks() {
   const co = pmCurrentCompanyObj();
   if (!co) return '';
   const tasks = pmFilterByCompany(pmState.clickupTasks);
-  const filter = pmState._taskFilter || 'open';
+  const filter = pmState._taskFilter || 'active';
   const search = (pmState._taskSearch || '').toLowerCase();
 
   let list = tasks;
-  if (filter === 'open') list = list.filter(t => t.status_type !== 'closed');
-  if (filter === 'overdue') list = list.filter(t => t.status_type !== 'closed' && t.due_date && new Date(t.due_date) < new Date());
-  if (filter === 'unassigned') list = list.filter(t => t.status_type !== 'closed' && !t.primary_assignee);
-  if (filter === 'closed7d') list = list.filter(t => t.status_type === 'closed' && t.date_closed && (Date.now() - new Date(t.date_closed)) < 7*86400000);
-  if (search) list = list.filter(t => ((t.name||'') + ' ' + (t.primary_assignee||'') + ' ' + (t.status||'')).toLowerCase().includes(search));
+  if (filter === 'active')   list = list.filter(pmIsActive);
+  if (filter === 'overdue')  list = list.filter(pmIsOverdue);
+  if (filter === 'backlog')  list = list.filter(pmIsBacklog);
+  if (filter === 'closed7d') list = list.filter(t => pmIsClosed(t) && t.date_closed && (Date.now() - new Date(t.date_closed)) < 7*86400000);
+  if (filter === 'closed')   list = list.filter(pmIsClosed);
+  if (search) list = list.filter(t => ((t.name||'') + ' ' + (t.primary_assignee||'') + ' ' + (t.status||'') + ' ' + (t.folder_name||'') + ' ' + (t.list_name||'')).toLowerCase().includes(search));
 
   list = list.sort((a,b) => {
-    // overdue primero, después por due_date ascendente
-    const aOver = a.due_date && new Date(a.due_date) < new Date() ? 1 : 0;
-    const bOver = b.due_date && new Date(b.due_date) < new Date() ? 1 : 0;
+    const aOver = pmIsOverdue(a) ? 1 : 0;
+    const bOver = pmIsOverdue(b) ? 1 : 0;
     if (aOver !== bOver) return bOver - aOver;
     if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date);
     return (a.due_date ? -1 : 1);
   });
 
+  const filters = [
+    ['active', `Activas (${tasks.filter(pmIsActive).length})`],
+    ['overdue', `🚨 Vencidas (${tasks.filter(pmIsOverdue).length})`],
+    ['backlog', `📥 Backlog (${tasks.filter(pmIsBacklog).length})`],
+    ['closed7d', `✅ Cerradas 7d`],
+    ['closed', `Cerradas (${tasks.filter(pmIsClosed).length})`],
+    ['all', `Todas (${tasks.length})`]
+  ];
+
   return `
     <div class="space-y-3">
       <div class="flex items-center justify-between gap-2 flex-wrap">
-        <div class="flex gap-1">
-          ${[['open','Abiertas'],['overdue','Vencidas'],['unassigned','Sin asignar'],['closed7d','Cerradas 7d'],['all','Todas']].map(([k,l]) => `
+        <div class="flex gap-1 flex-wrap">
+          ${filters.map(([k,l]) => `
             <button onclick="pmState._taskFilter='${k}'; pmRender()" class="px-2.5 py-1 rounded text-xs font-bold ${filter===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">${l}</button>
           `).join('')}
         </div>
-        <input type="text" placeholder="Buscar título/asignado/status..." value="${(pmState._taskSearch||'').replace(/"/g,'&quot;')}" onchange="pmState._taskSearch=this.value; pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs w-64" />
+        <input type="text" placeholder="Buscar título/asignado/folder/lista..." value="${(pmState._taskSearch||'').replace(/"/g,'&quot;')}" onchange="pmState._taskSearch=this.value; pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs w-72" />
         <div class="text-[10px] text-slate-500">${list.length} de ${tasks.length}</div>
       </div>
       ${list.length === 0 ? '<div class="text-center py-12 text-slate-400">Sin tasks con esos filtros.</div>' : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
-            <thead class="bg-slate-50">
-              <tr><th class="text-left p-2">Task</th><th class="text-left p-2">Status</th><th class="text-left p-2">Asignado</th><th class="text-left p-2">Due</th><th class="text-right p-2">Días</th><th></th></tr>
+            <thead class="bg-slate-50 sticky top-0 z-[1]">
+              <tr class="text-[10px] uppercase text-slate-600">
+                <th class="text-left p-2">Tarea</th>
+                <th class="text-left p-2">Ubicación (folder › lista)</th>
+                <th class="text-left p-2">Status</th>
+                <th class="text-left p-2">Asignado</th>
+                <th class="text-left p-2">Due / Cierre</th>
+                <th class="text-right p-2" title="Activas: días vencida (+/-). Cerradas: días vs fecha objetivo (+ = tarde, − = a tiempo)">Días real</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               ${list.slice(0, 200).map(t => {
-                const dueDate = t.due_date ? new Date(t.due_date) : null;
-                const daysLate = dueDate ? Math.floor((Date.now() - dueDate)/86400000) : null;
-                const isOver = daysLate != null && daysLate > 0 && t.status_type !== 'closed';
-                return `<tr class="border-t border-slate-100 ${isOver?'bg-red-50':''} hover:bg-slate-50">
-                  <td class="p-2 font-semibold truncate max-w-md">${t.name || '(sin título)'}</td>
+                const isClosed = pmIsClosed(t);
+                const days = pmDaysLate(t);
+                const isOver = pmIsOverdue(t);
+                const isBack = pmIsBacklog(t);
+                const rowCls = isOver ? 'bg-red-50' : isBack ? 'bg-violet-50/40' : isClosed ? 'opacity-70' : '';
+                const dateShown = isClosed && t.date_closed
+                  ? `<span class="text-[10px] text-slate-500">cerró </span>${new Date(t.date_closed).toLocaleDateString('es-MX')}`
+                  : t.due_date ? new Date(t.due_date).toLocaleDateString('es-MX') : '—';
+                return `<tr class="border-t border-slate-100 ${rowCls} hover:bg-slate-50">
+                  <td class="p-2 font-semibold truncate max-w-xs">${isBack?'📥 ':''}${t.name || '(sin título)'}</td>
+                  <td class="p-2 text-[10px] text-slate-600">${pmTaskContext(t)}</td>
                   <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${t.status || '—'}</span></td>
-                  <td class="p-2 text-[11px] text-slate-600">${t.primary_assignee || '—'}</td>
-                  <td class="p-2 text-[11px]">${dueDate ? dueDate.toLocaleDateString('es-MX') : '—'}</td>
-                  <td class="p-2 text-right text-[11px] ${isOver?'text-red-700 font-bold':'text-slate-500'}">${daysLate != null ? (daysLate > 0 ? '+'+daysLate : daysLate) : '—'}</td>
-                  <td class="p-2">${t.url ? `<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir</a>` : ''}</td>
+                  <td class="p-2 text-[11px] text-slate-700">${t.primary_assignee || '<span class="text-violet-700 font-bold">— sin asignar</span>'}</td>
+                  <td class="p-2 text-[11px]">${dateShown}</td>
+                  <td class="p-2 text-right ${pmDaysLateClass(days)}">${pmDaysLateLabel(days)}</td>
+                  <td class="p-2">${t.url ? `<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir↗</a>` : ''}</td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -1408,21 +1752,23 @@ function pmRenderTeam() {
   `;
 }
 
-// ─── DECISIONES — qué requiere acción YA ───
+// ─── DECISIONES — qué requiere acción YA (excluye backlog que no es urgente) ───
 function pmRenderDecisiones() {
   const co = pmCurrentCompanyObj();
-  const tasks = pmFilterByCompany(pmState.clickupTasks).filter(t => t.status_type !== 'closed');
+  const allTasks = pmFilterByCompany(pmState.clickupTasks);
+  const tasks = allTasks.filter(t => !pmIsClosed(t));
   const now = new Date();
 
-  // Vencidas
-  const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < now)
-    .sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+  // VENCIDAS — solo activas (asignadas + due pasado)
+  const overdue = tasks.filter(pmIsOverdue).sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
 
-  // Sin asignar
-  const unassigned = tasks.filter(t => !t.primary_assignee);
+  // BACKLOG sin asignar (no urgente, pero hay que tomarlas eventualmente)
+  const backlog = tasks.filter(pmIsBacklog);
+  // Backlog crítico = sin asignar PERO con due date próximo (≤7 días)
+  const backlogUrgent = backlog.filter(t => t.due_date && (new Date(t.due_date) - now) <= 7*86400000);
 
-  // Sin due date (alta prioridad sin fecha)
-  const noDue = tasks.filter(t => !t.due_date && (t.priority === 'urgent' || t.priority === 'high'));
+  // ACTIVAS con alta prio sin fecha
+  const noDue = tasks.filter(t => pmIsActive(t) && !t.due_date && (t.priority === 'urgent' || t.priority === 'high'));
 
   // Risks score >= 12
   const riskHigh = pmFilterByArea(pmState.risks).filter(r => r.score >= 12);
@@ -1436,13 +1782,31 @@ function pmRenderDecisiones() {
   // Deps bloqueando
   const deps = (pmState.deps || []).filter(d => pmState.currentCompany === 'holding' || d.target_area === co?.slug || d.source_area === co?.slug);
 
+  const taskRow = (t, extraLabel) => {
+    const days = pmDaysLate(t);
+    return `<div class="text-xs flex items-start gap-2">
+      <div class="flex-1 min-w-0">
+        <div class="font-bold truncate">${t.name || '(sin título)'}</div>
+        <div class="text-[10px] text-slate-600 mt-0.5">${pmTaskContext(t)}</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">
+          <strong>${t.primary_assignee || '— sin asignar'}</strong>
+          ${t.status ? ` · ${t.status}` : ''}
+          ${t.priority && t.priority !== 'normal' ? ` · prio <span class="font-bold ${t.priority==='urgent'?'text-red-700':'text-amber-700'}">${t.priority}</span>` : ''}
+          ${extraLabel || ''}
+          ${days !== null ? ` · <span class="${pmDaysLateClass(days)}">${pmDaysLateLabel(days)}</span>` : ''}
+        </div>
+      </div>
+      ${t.url ? `<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline flex-shrink-0">abrir↗</a>` : ''}
+    </div>`;
+  };
+
   const sections = [
-    { title: '🔴 Tasks vencidas', items: overdue, render: t => `<div class="text-xs"><strong>${t.name}</strong> · ${t.primary_assignee || 'sin asignar'} · <span class="text-red-700 font-bold">${Math.floor((now-new Date(t.due_date))/86400000)}d vencida</span> ${t.url?`<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] ml-1">abrir</a>`:''}</div>` },
-    { title: '⚪ Tasks sin asignar', items: unassigned, render: t => `<div class="text-xs"><strong>${t.name}</strong> · status ${t.status} ${t.url?`<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] ml-1">abrir</a>`:''}</div>` },
-    { title: '🟡 Alta prio sin fecha', items: noDue, render: t => `<div class="text-xs"><strong>${t.name}</strong> · ${t.primary_assignee||'sin asignar'} · prio ${t.priority} ${t.url?`<a href="${t.url}" target="_blank" class="text-blue-600 text-[10px] ml-1">abrir</a>`:''}</div>` },
-    { title: '🚨 Riesgos score ≥ 12', items: riskHigh, render: r => `<div class="text-xs"><strong>${r.title}</strong> · score ${r.score} · owner ${r.owner||'?'}</div>` },
-    { title: '📜 Compliance vence < 30d', items: compSoon, render: c => `<div class="text-xs"><strong>${c.title}</strong> · vence ${c.expiry_date} (${Math.floor((new Date(c.expiry_date)-now)/86400000)}d)</div>` },
-    { title: '🔗 Dependencias bloqueando', items: deps, render: d => `<div class="text-xs"><strong>${d.source_label}</strong> → bloquea → <strong>${d.target_label}</strong> · severidad ${d.severity}</div>` }
+    { title: '🔴 Vencidas (activas)', desc: 'Tareas asignadas con due_date pasado. Excluye backlog.', items: overdue, render: t => taskRow(t) },
+    { title: '🟣 Backlog urgente', desc: 'Sin persona asignada PERO con due date ≤ 7 días. Asignar YA.', items: backlogUrgent, render: t => taskRow(t) },
+    { title: '🟡 Alta prio sin fecha', desc: 'Activas con prioridad urgent/high pero sin due_date — riesgo de quedar olvidadas.', items: noDue, render: t => taskRow(t) },
+    { title: '🚨 Riesgos score ≥ 12', desc: 'Probabilidad × Impacto ≥ 12 → atención inmediata.', items: riskHigh, render: r => `<div class="text-xs"><strong>${r.title}</strong> · score ${r.score} · owner ${r.owner||'?'} · ${r.category||''}</div>` },
+    { title: '📜 Compliance vence < 30d', desc: 'Permisos/licencias/seguros que vencen pronto. Renovar antes.', items: compSoon, render: c => `<div class="text-xs"><strong>${c.title}</strong> · vence ${c.expiry_date} (${Math.floor((new Date(c.expiry_date)-now)/86400000)}d) · ${c.area||''}</div>` },
+    { title: '🔗 Dependencias bloqueando', desc: 'X bloquea Y cross-área. Si no se resuelve, Y no avanza.', items: deps, render: d => `<div class="text-xs"><strong>${d.source_label}</strong> [${d.source_area}] → bloquea → <strong>${d.target_label}</strong> [${d.target_area}] · severidad ${d.severity}</div>` }
   ];
 
   const totalAccion = sections.reduce((s, x) => s + x.items.length, 0);
@@ -1456,10 +1820,14 @@ function pmRenderDecisiones() {
       </div>
       ${sections.filter(s => s.items.length > 0).map(s => `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700 flex justify-between">
-            <span>${s.title}</span><span class="bg-slate-900 text-white px-2 rounded">${s.items.length}</span>
+          <div class="bg-slate-100 px-3 py-2 border-b border-slate-200">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold uppercase text-slate-700">${s.title}</span>
+              <span class="bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded">${s.items.length}</span>
+            </div>
+            ${s.desc ? `<div class="text-[10px] text-slate-500 mt-0.5">${s.desc}</div>` : ''}
           </div>
-          <div class="max-h-64 overflow-y-auto divide-y divide-slate-100">
+          <div class="max-h-80 overflow-y-auto divide-y divide-slate-100">
             ${s.items.slice(0, 30).map(x => `<div class="p-2 hover:bg-slate-50">${s.render(x)}</div>`).join('')}
             ${s.items.length > 30 ? `<div class="p-2 text-[10px] text-slate-400 text-center">...y ${s.items.length-30} más</div>` : ''}
           </div>
@@ -1468,4 +1836,137 @@ function pmRenderDecisiones() {
       ${totalAccion === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">✅</div><div class="font-bold mt-2">Sin decisiones pendientes</div><div class="text-xs text-slate-500 mt-1">Todo bajo control en ${co?co.name:'el holding'}.</div></div>` : ''}
     </div>
   `;
+}
+
+// ============================================================
+// IA PARA OKRs / RIESGOS / COMPLIANCE — análisis y sugerencias profundas
+// ============================================================
+
+// Construye el contexto operativo de la empresa actual para mandar a la IA
+function pmBuildOperationalContext() {
+  const co = pmCurrentCompanyObj();
+  const tasks = pmFilterByCompany(pmState.clickupTasks);
+  const active = tasks.filter(pmIsActive);
+  const closed = tasks.filter(pmIsClosed);
+  const overdue = tasks.filter(pmIsOverdue);
+  const backlog = tasks.filter(pmIsBacklog);
+  const closedWithDue = closed.filter(t => t.date_closed && t.due_date);
+  const avgCycleLate = closedWithDue.length ? closedWithDue.reduce((s,t) => s + pmDaysLate(t), 0) / closedWithDue.length : null;
+
+  // Carga por persona
+  const byPerson = {};
+  active.forEach(t => {
+    const p = t.primary_assignee;
+    if (!p) return;
+    if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0 };
+    byPerson[p].total++;
+    if (pmIsOverdue(t)) byPerson[p].overdue++;
+  });
+  const topPeople = Object.entries(byPerson).sort((a,b) => b[1].total - a[1].total).slice(0, 8)
+    .map(([name, s]) => ({ name, active: s.total, overdue: s.overdue }));
+
+  // Folders con más actividad
+  const byFolder = {};
+  active.forEach(t => { const f = t.folder_name; if (!f) return; byFolder[f] = (byFolder[f]||0) + 1; });
+  const topFolders = Object.entries(byFolder).sort((a,b) => b[1]-a[1]).slice(0, 10);
+
+  return {
+    company: co?.name || 'Holding',
+    companySlug: co?.slug || 'holding',
+    summary: {
+      total_tasks: tasks.length,
+      active_tasks: active.length,
+      backlog_tasks: backlog.length,
+      overdue_tasks: overdue.length,
+      overdue_pct: active.length ? Math.round(overdue.length/active.length*100) : 0,
+      closed_total: closed.length,
+      avg_cycle_days_vs_due: avgCycleLate !== null ? Math.round(avgCycleLate) : null,
+      active_people: topPeople.length
+    },
+    workload: topPeople,
+    top_folders: topFolders.map(([n,c]) => ({ folder: n, active_tasks: c })),
+    risks_high: pmFilterByArea(pmState.risks).filter(r => r.score >= 12).map(r => ({ title: r.title, score: r.score, category: r.category, owner: r.owner })),
+    compliance_expiring: (pmState.compliance||[]).filter(c => c.expiry_date).slice(0, 10).map(c => ({ title: c.title, expiry_date: c.expiry_date, type: c.type, area: c.area })),
+    existing_okrs: pmFilterByCompany(pmState.okrs || []).map(o => ({ objective: o.objective, progress: o.progress_pct, status: o.status }))
+  };
+}
+
+// Llama a Claude vía aiAnalyze (sistema genérico de aiAnalyze ya implementado en app.js)
+async function pmAIAnalyze(analysisType) {
+  const aiKey = `pm-${analysisType}-${pmState.currentCompany}`;
+  window.aiState = window.aiState || {};
+  window.aiState[aiKey] = { loading: true };
+  pmRender();
+  try {
+    const context = pmBuildOperationalContext();
+    const { data, error } = await sb.functions.invoke('ai-deep-analyze', {
+      body: {
+        system: `pm-${analysisType}`,
+        context: { analysis_type: analysisType, ...context },
+        force: true
+      }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    window.aiState[aiKey] = { loading: false, ...data };
+  } catch (e) {
+    window.aiState[aiKey] = { loading: false, error: e.message || String(e) };
+  }
+  pmRender();
+}
+
+window.pmGenerateOKRSuggestions = () => pmAIAnalyze('okrs');
+window.pmGenerateRisksAnalysis = () => pmAIAnalyze('risks');
+window.pmGenerateComplianceAnalysis = () => pmAIAnalyze('compliance');
+
+// Adoptar una sugerencia OKR de Claude → crear el OKR real en la DB
+async function pmAdoptOKRSuggestion(idx) {
+  const aiKey = `pm-okrs-${pmState.currentCompany}`;
+  const ai = window.aiState[aiKey];
+  if (!ai?.suggestions?.[idx]) return alert('Sugerencia no encontrada');
+  const o = ai.suggestions[idx];
+  const co = pmCurrentCompanyObj();
+  if (!co) return alert('Seleccioná una empresa primero (no holding)');
+  const quarter = new Date().getFullYear() + '-Q' + Math.ceil((new Date().getMonth()+1)/3);
+  const krs = (o.key_results||[]).map((kr,i) => ({
+    id: 'kr_'+Date.now()+'_'+i,
+    title: kr.title,
+    target: +kr.target || 0,
+    current: 0,
+    unit: kr.unit || '',
+    source: 'manual'
+  }));
+  const { error } = await sb.from('pm_okrs').insert({
+    company_id: co.id, quarter, objective: o.objective,
+    key_results: krs, status: 'active'
+  });
+  if (error) return alert('Error: ' + error.message);
+  // Quitar la sugerencia adoptada
+  ai.suggestions.splice(idx, 1);
+  await pmLoadAll();
+  pmRender();
+  alert('✅ OKR adoptado y activo. Ya aparece en tu lista.');
+}
+
+async function pmAdoptDetectedRisk(idx) {
+  const aiKey = `pm-risks-${pmState.currentCompany}`;
+  const ai = window.aiState[aiKey];
+  if (!ai?.detected_risks?.[idx]) return alert('Riesgo no encontrado');
+  const r = ai.detected_risks[idx];
+  const co = pmCurrentCompanyObj();
+  const { error } = await sb.from('pm_risks').insert({
+    title: r.title,
+    description: r.evidence || null,
+    area: co?.slug || 'pm',
+    category: r.category || 'operativo',
+    probability: r.probability || Math.min(5, Math.max(1, Math.ceil(r.score/5))),
+    impact: r.impact || Math.min(5, Math.max(1, Math.ceil(r.score/5))),
+    mitigation: r.mitigation || null,
+    status: 'open'
+  });
+  if (error) return alert('Error: ' + error.message);
+  ai.detected_risks.splice(idx, 1);
+  await pmLoadAll();
+  pmRender();
+  alert('✅ Riesgo agregado a tu register.');
 }
