@@ -474,26 +474,26 @@ function rpRenderEstimador(body) {
     <div class="grid grid-cols-2 gap-2">
       <div>
         <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Renta por habitación</label>
-        <input type="number" value="${rpState.rent_per_room}" oninput="rpState.rent_per_room=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+        <input type="number" value="${rpState.rent_per_room}" onchange="rpState.rent_per_room=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
       </div>
       <div>
         <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Habs ocupadas (de ${rpState.bedrooms})</label>
-        <input type="number" value="${rpState.occupied_rooms}" max="${rpState.bedrooms}" oninput="rpState.occupied_rooms=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+        <input type="number" value="${rpState.occupied_rooms}" max="${rpState.bedrooms}" onchange="rpState.occupied_rooms=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
       </div>
     </div>` : rpState.model === 'short_term' ? `
     <div class="grid grid-cols-2 gap-2">
       <div>
         <label class="block text-[10px] font-medium text-slate-500 mb-0.5">$/noche</label>
-        <input type="number" value="${rpState.nightly_rate}" oninput="rpState.nightly_rate=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+        <input type="number" value="${rpState.nightly_rate}" onchange="rpState.nightly_rate=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
       </div>
       <div>
         <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Ocupación %</label>
-        <input type="number" min="0" max="100" value="${rpState.occupancy_pct}" oninput="rpState.occupancy_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+        <input type="number" min="0" max="100" value="${rpState.occupancy_pct}" onchange="rpState.occupancy_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
       </div>
     </div>` : `
     <div>
       <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Renta mensual esperada</label>
-      <input type="number" value="${rpState.monthly_rent}" oninput="rpState.monthly_rent=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-lg font-bold" />
+      <input type="number" value="${rpState.monthly_rent}" onchange="rpState.monthly_rent=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-lg font-bold" />
     </div>`;
 
   body.innerHTML = `
@@ -521,16 +521,16 @@ function rpRenderEstimador(body) {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">ARV / Valor casa</label>
-              <input type="number" value="${rpState.arv}" oninput="rpState.arv=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${rpState.arv}" onchange="rpState.arv=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Hipoteca Ref30 $/mes</label>
-              <input type="number" value="${rpState.mortgage_monthly}" oninput="rpState.mortgage_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${rpState.mortgage_monthly}" onchange="rpState.mortgage_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
               <p class="text-[9px] text-slate-400">Tu promedio: ~$2,100</p>
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5"># Habitaciones</label>
-              <input type="number" value="${rpState.bedrooms}" oninput="rpState.bedrooms=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base" />
+              <input type="number" value="${rpState.bedrooms}" onchange="rpState.bedrooms=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-3 py-2 text-base" />
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5"># Baños</label>
@@ -557,23 +557,23 @@ function rpRenderEstimador(body) {
               <div>
                 <h4 class="text-xs font-bold text-slate-600 uppercase mb-1">Gastos fijos mensuales</h4>
                 <div class="grid grid-cols-2 gap-2">
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Property tax %/año</label><input type="number" step="0.1" value="${rpState.property_tax_pct}" oninput="rpState.property_tax_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Seguro $/mes</label><input type="number" value="${rpState.insurance_monthly}" oninput="rpState.insurance_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">HOA $/mes</label><input type="number" value="${rpState.hoa_monthly}" oninput="rpState.hoa_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Utilities $/mes</label><input type="number" value="${rpState.utilities_monthly}" oninput="rpState.utilities_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Cleaning $/mes</label><input type="number" value="${rpState.cleaning_monthly}" oninput="rpState.cleaning_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Otros $/mes</label><input type="number" value="${rpState.other_monthly}" oninput="rpState.other_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Property tax %/año</label><input type="number" step="0.1" value="${rpState.property_tax_pct}" onchange="rpState.property_tax_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Seguro $/mes</label><input type="number" value="${rpState.insurance_monthly}" onchange="rpState.insurance_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">HOA $/mes</label><input type="number" value="${rpState.hoa_monthly}" onchange="rpState.hoa_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Utilities $/mes</label><input type="number" value="${rpState.utilities_monthly}" onchange="rpState.utilities_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Cleaning $/mes</label><input type="number" value="${rpState.cleaning_monthly}" onchange="rpState.cleaning_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Otros $/mes</label><input type="number" value="${rpState.other_monthly}" onchange="rpState.other_monthly=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                 </div>
               </div>
               <div>
                 <h4 class="text-xs font-bold text-slate-600 uppercase mb-1">Reservas % de renta</h4>
                 <div class="grid grid-cols-3 gap-2">
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Vacancy</label><input type="number" step="0.5" value="${rpState.vacancy_pct}" oninput="rpState.vacancy_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Maintenance</label><input type="number" step="0.5" value="${rpState.maintenance_pct}" oninput="rpState.maintenance_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">CapEx</label><input type="number" step="0.5" value="${rpState.capex_pct}" oninput="rpState.capex_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Property mgmt</label><input type="number" step="0.5" value="${rpState.property_mgmt_pct}" oninput="rpState.property_mgmt_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Plataforma</label><input type="number" step="0.5" value="${rpState.platform_pct}" oninput="rpState.platform_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Cash invertido</label><input type="number" value="${rpState.cash_invested}" oninput="rpState.cash_invested=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Vacancy</label><input type="number" step="0.5" value="${rpState.vacancy_pct}" onchange="rpState.vacancy_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Maintenance</label><input type="number" step="0.5" value="${rpState.maintenance_pct}" onchange="rpState.maintenance_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">CapEx</label><input type="number" step="0.5" value="${rpState.capex_pct}" onchange="rpState.capex_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Property mgmt</label><input type="number" step="0.5" value="${rpState.property_mgmt_pct}" onchange="rpState.property_mgmt_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Plataforma</label><input type="number" step="0.5" value="${rpState.platform_pct}" onchange="rpState.platform_pct=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                  <div><label class="block text-[10px] text-slate-500 mb-0.5">Cash invertido</label><input type="number" value="${rpState.cash_invested}" onchange="rpState.cash_invested=+this.value; rpRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
                 </div>
               </div>
             </div>

@@ -653,7 +653,7 @@ function estRenderCronograma(body) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div>
             <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Crew (personas)</label>
-            <input type="number" min="1" max="15" value="${estState.crewSize}" oninput="estState.crewSize=Math.max(1,+this.value); estRenderTab()" class="w-full bg-slate-800 border border-slate-700 text-white rounded px-3 py-2 text-lg font-bold" />
+            <input type="number" min="1" max="15" value="${estState.crewSize}" onchange="estState.crewSize=Math.max(1,+this.value); estRenderTab()" class="w-full bg-slate-800 border border-slate-700 text-white rounded px-3 py-2 text-lg font-bold" />
             <p class="text-[10px] text-slate-500 mt-0.5">${estState.crewSize >= 4 ? '✓ Exterior corre en paralelo' : 'Suma 1+ para paralelizar exterior'}</p>
           </div>
           <div>
@@ -866,7 +866,7 @@ function estRenderEstimador(body) {
           <div class="grid grid-cols-3 gap-2 mb-2">
             <div class="col-span-1">
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Sqft</label>
-              <input type="number" value="${estState.sqft}" oninput="estState.sqft=+this.value; estRenderTab()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-lg font-bold" />
+              <input type="number" value="${estState.sqft}" onchange="estState.sqft=+this.value; estRenderTab()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-lg font-bold" />
             </div>
             <div class="col-span-1">
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Ciudad</label>
@@ -941,7 +941,7 @@ function estRenderEstimador(body) {
         <!-- 4. PRESUPUESTO -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
           <div class="flex items-center gap-2 mb-2"><div class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">4</div><h3 class="text-sm font-bold">Presupuesto cliente <span class="text-xs text-slate-400 font-normal">(opcional)</span></h3></div>
-          <input type="number" value="${estState.presupuesto||''}" oninput="estState.presupuesto=+this.value; estRenderTab()" placeholder="Ej: 80000" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input type="number" value="${estState.presupuesto||''}" onchange="estState.presupuesto=+this.value; estRenderTab()" placeholder="Ej: 80000" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
 
         <!-- AVANZADO -->
@@ -953,11 +953,11 @@ function estRenderEstimador(body) {
             <div class="p-3 pt-0 space-y-3 border-t border-slate-100">
               <div>
                 <div class="flex justify-between text-xs mb-1"><span class="font-bold text-green-700">Margen</span><span class="font-bold">${estState.marginPct}%</span></div>
-                <input type="range" min="0" max="80" step="5" value="${estState.marginPct}" oninput="estState.marginPct=+this.value; estRenderTab()" class="w-full accent-green-600" />
+                <input type="range" min="0" max="80" step="5" value="${estState.marginPct}" onchange="estState.marginPct=+this.value; estRenderTab()" class="w-full accent-green-600" />
               </div>
               <div class="grid grid-cols-2 gap-2">
-                <div><label class="text-xs text-slate-500 block mb-0.5">Tarifa $/h</label><input type="number" step="0.01" value="${estState.hourlyRate}" oninput="estState.hourlyRate=+this.value; estRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
-                <div><label class="text-xs text-slate-500 block mb-0.5">Buffer %</label><input type="number" value="${estState.bufferPct}" oninput="estState.bufferPct=+this.value; estRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
+                <div><label class="text-xs text-slate-500 block mb-0.5">Tarifa $/h</label><input type="number" step="0.01" value="${estState.hourlyRate}" onchange="estState.hourlyRate=+this.value; estRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
+                <div><label class="text-xs text-slate-500 block mb-0.5">Buffer %</label><input type="number" value="${estState.bufferPct}" onchange="estState.bufferPct=+this.value; estRenderTab()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
               </div>
             </div>
           ` : ''}

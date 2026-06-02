@@ -1280,7 +1280,7 @@ function pmRenderClickUpTasks() {
             <button onclick="pmState._taskFilter='${k}'; pmRender()" class="px-2.5 py-1 rounded text-xs font-bold ${filter===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">${l}</button>
           `).join('')}
         </div>
-        <input type="text" placeholder="Buscar título/asignado/status..." value="${(pmState._taskSearch||'').replace(/"/g,'&quot;')}" oninput="pmState._taskSearch=this.value; pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs w-64" />
+        <input type="text" placeholder="Buscar título/asignado/status..." value="${(pmState._taskSearch||'').replace(/"/g,'&quot;')}" onchange="pmState._taskSearch=this.value; pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs w-64" />
         <div class="text-[10px] text-slate-500">${list.length} de ${tasks.length}</div>
       </div>
       ${list.length === 0 ? '<div class="text-center py-12 text-slate-400">Sin tasks con esos filtros.</div>' : `

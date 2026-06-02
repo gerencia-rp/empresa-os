@@ -1287,7 +1287,7 @@ function rmRenderCompare(body) {
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-[10px] text-slate-500 mb-1">Sqft</label>
-            <input type="number" value="${sqft}" oninput="rmQuickState.sqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+            <input type="number" value="${sqft}" onchange="rmQuickState.sqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
           </div>
           <div>
             <label class="block text-[10px] text-slate-500 mb-1">Tipo de remodelación</label>
@@ -1522,7 +1522,7 @@ function rmRenderQuick(body) {
           <div class="grid grid-cols-3 gap-3 items-end">
             <div>
               <label class="block text-[10px] text-slate-500 mb-1">Sqft de la casa</label>
-              <input type="number" value="${sqft}" oninput="rmQuickState.sqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-lg font-bold" />
+              <input type="number" value="${sqft}" onchange="rmQuickState.sqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-lg font-bold" />
             </div>
             <div class="col-span-2">
               <label class="block text-[10px] text-slate-500 mb-1">Modo de cálculo</label>
@@ -1962,7 +1962,7 @@ function rmRenderEditor(body) {
           <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Información del proyecto</h3>
           <div class="grid grid-cols-3 gap-2">
             <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Nombre *</label><input value="${rmEsc(rmState.editName)}" oninput="rmState.editName=this.value" placeholder="Ej: 1308 Denfield" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-semibold" /></div>
-            <div><label class="block text-[10px] text-slate-500 mb-0.5">Sqft</label><input type="number" value="${rmState.editSqft}" oninput="rmState.editSqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
+            <div><label class="block text-[10px] text-slate-500 mb-0.5">Sqft</label><input type="number" value="${rmState.editSqft}" onchange="rmState.editSqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
             <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Dirección</label><input value="${rmEsc(rmState.editAddress)}" oninput="rmState.editAddress=this.value" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
             <div><label class="block text-[10px] text-slate-500 mb-0.5">Fecha inicio</label><input type="date" value="${rmEsc(rmState.editStartDate)}" onchange="rmState.editStartDate=this.value; rmRenderTabPreservingFocus()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
           </div>
@@ -2018,7 +2018,7 @@ function rmRenderEditor(body) {
           <input
             type="text"
             value="${(rmState.catalogFilter || '').replace(/"/g,'&quot;')}"
-            oninput="rmState.catalogFilter=this.value; rmRenderTabDebounced()"
+            onchange="rmState.catalogFilter=this.value; rmRenderTabDebounced()"
             placeholder="Buscar actividad (código, descripción, subcategoría, unidad)..."
             class="flex-1 border-0 outline-none text-sm"
           />
@@ -2135,18 +2135,18 @@ function rmRenderEditor(body) {
           <summary class="cursor-pointer p-3 text-xs font-bold uppercase text-slate-700 hover:bg-slate-50">⚙️ Ajustes de pricing</summary>
           <div class="p-3 pt-0 space-y-2 border-t border-slate-100">
             <div class="grid grid-cols-2 gap-2">
-              <div><label class="block text-[10px] text-slate-500">Contingencia %</label><input type="number" step="1" value="${rmState.contingencyPct}" oninput="rmState.contingencyPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 15-20% remodel</p></div>
-              <div><label class="block text-[10px] text-slate-500">Overhead %</label><input type="number" step="1" value="${rmState.overheadPct}" oninput="rmState.overheadPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 10-15%</p></div>
+              <div><label class="block text-[10px] text-slate-500">Contingencia %</label><input type="number" step="1" value="${rmState.contingencyPct}" onchange="rmState.contingencyPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 15-20% remodel</p></div>
+              <div><label class="block text-[10px] text-slate-500">Overhead %</label><input type="number" step="1" value="${rmState.overheadPct}" onchange="rmState.overheadPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 10-15%</p></div>
               <div>
                 <label class="block text-[10px] text-slate-500 flex items-center justify-between">
                   <span>Permits $</span>
                   <button onclick="rmAutoPermitsAustin()" class="text-[9px] bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded font-bold" title="Auto Austin TX: $1,500 base + $0.50/ft² sobre 1,500">📐 Auto Austin</button>
                 </label>
-                <input type="number" value="${rmState.permitsCost}" oninput="rmState.permitsCost=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" />
+                <input type="number" value="${rmState.permitsCost}" onchange="rmState.permitsCost=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" />
               </div>
-              <div><label class="block text-[10px] text-slate-500">Design fees $</label><input type="number" value="${rmState.designFeesCost}" oninput="rmState.designFeesCost=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
-              <div class="col-span-2"><label class="block text-[10px] text-slate-500">Markup al cliente %</label><input type="number" step="1" value="${rmState.markupPct}" oninput="rmState.markupPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 20-30% típico, 50% high-end</p></div>
-              <div><label class="block text-[10px] text-slate-500">Crew (personas)</label><input type="number" value="${rmState.crewSize}" oninput="rmState.crewSize=Math.max(1,+this.value); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
+              <div><label class="block text-[10px] text-slate-500">Design fees $</label><input type="number" value="${rmState.designFeesCost}" onchange="rmState.designFeesCost=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
+              <div class="col-span-2"><label class="block text-[10px] text-slate-500">Markup al cliente %</label><input type="number" step="1" value="${rmState.markupPct}" onchange="rmState.markupPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 20-30% típico, 50% high-end</p></div>
+              <div><label class="block text-[10px] text-slate-500">Crew (personas)</label><input type="number" value="${rmState.crewSize}" onchange="rmState.crewSize=Math.max(1,+this.value); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
               <div><label class="block text-[10px] text-slate-500">Días/semana</label><select onchange="rmState.workDays=+this.value; rmRenderTabPreservingFocus()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs"><option value="5" ${rmState.workDays===5?'selected':''}>5 (L-V)</option><option value="6" ${rmState.workDays===6?'selected':''}>6 (L-S)</option><option value="7" ${rmState.workDays===7?'selected':''}>7</option></select></div>
             </div>
           </div>
@@ -3899,8 +3899,8 @@ function rmRenderSow(body) {
         <div class="grid grid-cols-4 gap-2">
           <div><label class="block text-[10px] text-slate-500 mb-0.5">Lender</label><input value="${rmSowState.lenderName}" oninput="rmSowState.lenderName=this.value" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
           <div><label class="block text-[10px] text-slate-500 mb-0.5">Loan #</label><input value="${rmSowState.loanNumber}" oninput="rmSowState.loanNumber=this.value" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
-          <div><label class="block text-[10px] text-slate-500 mb-0.5"># Draws</label><input type="number" min="1" max="5" value="${rmSowState.numDraws}" oninput="rmSowState.numDraws=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
-          <div><label class="block text-[10px] text-slate-500 mb-0.5">Contingency %</label><input type="number" value="${rmSowState.contingencyPct}" oninput="rmSowState.contingencyPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
+          <div><label class="block text-[10px] text-slate-500 mb-0.5"># Draws</label><input type="number" min="1" max="5" value="${rmSowState.numDraws}" onchange="rmSowState.numDraws=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
+          <div><label class="block text-[10px] text-slate-500 mb-0.5">Contingency %</label><input type="number" value="${rmSowState.contingencyPct}" onchange="rmSowState.contingencyPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
           <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Borrower Name</label><input value="${rmSowState.borrowerName}" oninput="rmSowState.borrowerName=this.value" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
           <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Borrower Email</label><input value="${rmSowState.borrowerEmail}" oninput="rmSowState.borrowerEmail=this.value" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" /></div>
           <div class="col-span-4"><label class="block text-[10px] text-slate-500 mb-0.5">Description of Work (overview general)</label><textarea oninput="rmSowState.description=this.value" rows="2" placeholder="Full remodel: new kitchen, 2 bathrooms, paint, flooring, exterior refresh..." class="w-full border border-slate-300 rounded px-2 py-1 text-sm">${rmSowState.description}</textarea></div>

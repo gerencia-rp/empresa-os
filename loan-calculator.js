@@ -146,15 +146,15 @@ function loanRender() {
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Precio compra</label>
-              <input type="number" value="${loanState.purchasePrice}" oninput="loanState.purchasePrice=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${loanState.purchasePrice}" onchange="loanState.purchasePrice=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Costo remodelación</label>
-              <input type="number" value="${loanState.remodelCost}" oninput="loanState.remodelCost=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${loanState.remodelCost}" onchange="loanState.remodelCost=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">ARV (después remodel)</label>
-              <input type="number" value="${loanState.arv}" oninput="loanState.arv=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
+              <input type="number" value="${loanState.arv}" onchange="loanState.arv=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-base font-bold" />
             </div>
           </div>
           <p class="text-[10px] text-slate-400 mt-2">Base HML = Precio + Remodel = ${loanFmt(loanState.purchasePrice + loanState.remodelCost)} · Loan-to-ARV implícito = ${(((loanState.purchasePrice + loanState.remodelCost) / (loanState.arv || 1)) * 100).toFixed(1)}%</p>
@@ -166,27 +166,27 @@ function loanRender() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">LTC % (Loan to Cost)</label>
-                <input type="number" step="1" value="${loanState.hmlLtcPct}" oninput="loanState.hmlLtcPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="1" value="${loanState.hmlLtcPct}" onchange="loanState.hmlLtcPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt: 80-90% (purchase + rehab)</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Tasa anual %</label>
-                <input type="number" step="0.25" value="${loanState.hmlRatePct}" oninput="loanState.hmlRatePct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.25" value="${loanState.hmlRatePct}" onchange="loanState.hmlRatePct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt 2026: 10-13% (interest only)</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Origination % (points)</label>
-                <input type="number" step="0.5" value="${loanState.hmlPointsPct}" oninput="loanState.hmlPointsPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.5" value="${loanState.hmlPointsPct}" onchange="loanState.hmlPointsPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt: 1-3 points</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Plazo (meses)</label>
-                <input type="number" value="${loanState.hmlTermMonths}" oninput="loanState.hmlTermMonths=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" value="${loanState.hmlTermMonths}" onchange="loanState.hmlTermMonths=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Típico 6-12 meses</p>
               </div>
               <div class="col-span-2">
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Closing costs adicionales (flat)</label>
-                <input type="number" value="${loanState.hmlClosingFlat}" oninput="loanState.hmlClosingFlat=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" value="${loanState.hmlClosingFlat}" onchange="loanState.hmlClosingFlat=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Appraisal + title + legal típico $2-3K</p>
               </div>
             </div>
@@ -199,12 +199,12 @@ function loanRender() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">LTV % del ARV</label>
-                <input type="number" step="1" value="${loanState.convLtvPct}" oninput="loanState.convLtvPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="1" value="${loanState.convLtvPct}" onchange="loanState.convLtvPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt DSCR investor: 70-80%</p>
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Tasa anual %</label>
-                <input type="number" step="0.125" value="${loanState.convRatePct}" oninput="loanState.convRatePct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.125" value="${loanState.convRatePct}" onchange="loanState.convRatePct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Mkt 2026 investor: 7.25-8.0%</p>
               </div>
               <div>
@@ -217,7 +217,7 @@ function loanRender() {
               </div>
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Closing costs %</label>
-                <input type="number" step="0.5" value="${loanState.convClosingPct}" oninput="loanState.convClosingPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+                <input type="number" step="0.5" value="${loanState.convClosingPct}" onchange="loanState.convClosingPct=+this.value; loanRender()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
                 <p class="text-[9px] text-slate-400">Tu data real: ~8% (incluye escrow). Aproximado ${loanFmt((loanState.arv * loanState.convLtvPct / 100) * loanState.convClosingPct / 100)}</p>
               </div>
             </div>

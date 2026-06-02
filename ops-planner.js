@@ -380,7 +380,7 @@ function opRenderBacklogPanel(backlogByZona) {
       <!-- S6-U5: Search + filtros -->
       <div class="mt-2 space-y-1">
         <input type="text" placeholder="🔎 Buscar título, casa, notas..." value="${(search || '').replace(/"/g,'&quot;')}"
-          oninput="opState.backlogSearch=this.value; opRender()"
+          onchange="opState.backlogSearch=this.value; opRender()"
           class="w-full border border-slate-300 rounded px-2 py-1 text-[11px]" />
         <div class="grid grid-cols-2 gap-1">
           <select onchange="opState.backlogCategoryFilter=this.value; opRender()" class="border border-slate-300 rounded px-1 py-0.5 text-[10px]">
