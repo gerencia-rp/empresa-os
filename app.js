@@ -1853,7 +1853,9 @@ async function openCashout(sys) {
     `<option value="${id}" ${id === sys.data.currentDealId ? 'selected' : ''}>${dd.name || id}</option>`
   ).join('');
 
-  const showAdminSettings = isAdmin();
+  // Parámetros editables por TODOS (admin + viewers). El equipo necesita ajustar LTV
+  // y closing costs cuando hacen cálculos reales para cada deal.
+  const showAdminSettings = true;
   window._cashoutCurrentSys = sys;
 
   openModal(`💰 ${sys.name}`, `
@@ -1886,7 +1888,7 @@ async function openCashout(sys) {
 
         ${showAdminSettings ? `
         <details class="border border-slate-200 rounded-lg">
-          <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-600 uppercase hover:bg-slate-50">⚙️ Ajustes (admin)</summary>
+          <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-600 uppercase hover:bg-slate-50">⚙️ Parámetros del cálculo (editables por el equipo)</summary>
           <div class="p-3 space-y-3 border-t border-slate-200">
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">LTV % del refi</label>
