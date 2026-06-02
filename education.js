@@ -1,1851 +1,760 @@
-// ============================================================
-// EDUCACIÓN — Gestor de Mentorías (Flipping / Rental Profits / Wholesale)
-// ============================================================
+// =============================================================================
+// EDUCATION.js · Área Educación (FlipMentoría)
+// 5 sistemas: Mi Ruta · Biblioteca · Preguntas · Panel Mentor · Curriculum
+// Reescrito desde cero para Sprint E1 — usa schema edu_* y RLS por rol
+// =============================================================================
+(function () {
+  const supabase = window.supabaseClient || window.sb || window.supabase;
+  const user = () => window.currentUser || window.user || {};
+  const role = () => (user()?.role || 'student');
+  const isMentor = () => ['admin', 'mentor'].includes(role());
+  const openModal = window.openModal || ((title, html) => {
+    const m = document.getElementById('modal');
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = html;
+    m.classList.remove('hidden');
+  });
+  const closeModal = window.closeModal || (() => document.getElementById('modal').classList.add('hidden'));
+  const toast = window.toast || ((m) => console.log('toast:', m));
+  const fmtDate = window.fmtDate || ((d) => new Date(d).toLocaleDateString('es'));
 
-const eduState = {
-  sys: null,
-  mentorshipId: 'flipping-rentals',  // mentoría activa
-  tab: 'students',                    // students | plan | progress | resources | calls | config
-  mentorships: [],
-  students: [],
-  resources: [],
-  alerts: [],
-  calls: [],
-  selectedStudentId: null,
-  searchQuery: '',
-  stageFilter: 'all',
-  statusFilter: 'all',
-  loading: false
-};
-
-const EDU_TABS = [
-  { key: 'students',  label: '👥 Estudiantes' },
-  { key: 'plan',      label: '🎯 Plan IA' },
-  { key: 'progress',  label: '📊 Progreso & GLScore' },
-  { key: 'resources', label: '📑 Recursos' },
-  { key: 'calls',     label: '📅 Calendario' },
-  { key: 'alerts',    label: '🔔 Alertas' },
-  { key: 'config',    label: '⚙️ Config' }
-];
-// NOTA: Presentaciones e Informes son sistemas INDEPENDIENTES ahora
-// (openEduPresentationsSystem y openEduReportsSystem abren modales propios)
-
-async function openEduManager(sys) {
-  eduState.sys = sys;
-  // CRÍTICO: reset del tab a uno válido del Manager (no quedar en marker de otro sistema)
-  if (!EDU_TABS.find(t => t.key === eduState.tab)) {
-    eduState.tab = 'students';
+  // -------------------------------------------------------------------------
+  // Cache global de curriculum (se carga una vez por sesión)
+  // -------------------------------------------------------------------------
+  let CURRICULUM = null;
+  async function loadCurriculum(force = false) {
+    if (CURRICULUM && !force) return CURRICULUM;
+    const [{ data: stages }, { data: blocks }, { data: tasks }, { data: deps }] =
+      await Promise.all([
+        supabase.from('edu_curriculum_stages').select('*').order('order_idx'),
+        supabase.from('edu_curriculum_blocks').select('*').order('order_idx'),
+        supabase.from('edu_curriculum_tasks').select('*').order('order_idx'),
+        supabase.from('edu_curriculum_deps').select('*'),
+      ]);
+    CURRICULUM = { stages: stages || [], blocks: blocks || [], tasks: tasks || [], deps: deps || [] };
+    return CURRICULUM;
   }
-  openModal(`🎓 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
-  document.querySelector('#modal > div').classList.remove('max-w-3xl');
-  document.querySelector('#modal > div').classList.add('max-w-7xl');
-  await eduLoadAll();
-  eduRender();
-}
 
-async function eduLoadAll() {
-  eduState.loading = true;
-  try {
-    const [mRes, sRes, rRes, aRes, cRes, repRes, tRes, presRes] = await Promise.all([
-      sb.from('edu_mentorships').select('*').order('position'),
-      sb.from('edu_students').select('*').order('updated_at', { ascending: false }),
-      sb.from('edu_resources').select('*').order('updated_at', { ascending: false }),
-      sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false }),
-      sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(200),
-      sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
-      sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500).then(r => r).catch(() => ({ data: [] })),
-      sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] }))
-    ]);
-    eduState.mentorships = mRes.data || [];
-    eduState.students = sRes.data || [];
-    eduState.resources = rRes.data || [];
-    eduState.alerts = aRes.data || [];
-    eduState.calls = cRes.data || [];
-    eduState.reports = repRes.data || [];
-    eduState.tasks = tRes.data || [];
-    eduState.presentations = presRes.data || [];
-  } catch (e) {
-    console.error('eduLoadAll', e);
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
-  eduState.loading = false;
-}
 
-function eduCurrentMentorship() {
-  return eduState.mentorships.find(m => m.id === eduState.mentorshipId);
-}
-function eduMyStudents() {
-  return eduState.students.filter(s => s.mentorship_id === eduState.mentorshipId);
-}
-function eduMyResources() {
-  return eduState.resources.filter(r => r.mentorship_id === eduState.mentorshipId);
-}
-function eduMyAlerts() {
-  const ids = new Set(eduMyStudents().map(s => s.id));
-  return eduState.alerts.filter(a => ids.has(a.student_id));
-}
-function eduSetMentorship(id) { eduState.mentorshipId = id; eduState.selectedStudentId = null; eduRender(); }
-function eduSetTab(t) { eduState.tab = t; eduRender(); }
-function eduStageObj(stageKey) {
-  const m = eduCurrentMentorship();
-  return (m?.stages || []).find(s => s.key === stageKey);
-}
-function eduStageIdx(stageKey) {
-  const m = eduCurrentMentorship();
-  return (m?.stages || []).findIndex(s => s.key === stageKey);
-}
-function eduDaysToExpiry(s) {
-  if (!s.expires_at) return null;
-  return Math.floor((new Date(s.expires_at) - Date.now()) / 86400000);
-}
-function eduDaysInStage(s) {
-  if (!s.stage_started_at) return null;
-  return Math.floor((Date.now() - new Date(s.stage_started_at)) / 86400000);
-}
-function eduIsStageOverdue(s) {
-  const stage = eduStageObj(s.current_stage);
-  if (!stage || !stage.target_weeks) return false;
-  const days = eduDaysInStage(s);
-  return days != null && days > stage.target_weeks * 7;
-}
+  async function ensureMyStudent() {
+    const u = user();
+    if (!u?.id) return null;
+    const { data } = await supabase.from('edu_students').select('*').eq('user_id', u.id).maybeSingle();
+    if (data) return data;
+    const { data: created } = await supabase.from('edu_students').insert({
+      user_id: u.id, full_name: u.email?.split('@')[0] || 'Estudiante'
+    }).select('*').single();
+    return created;
+  }
 
-// ─── RENDER PRINCIPAL ───
-function eduRender() {
-  const root = document.getElementById('edu-root');
-  if (!root) return;
-  if (eduState.loading) { root.innerHTML = '<div class="text-center py-12 text-slate-400">⏳ Cargando...</div>'; return; }
-  if (eduState.mentorships.length === 0) {
+  async function ensureMyEnrollment() {
+    const me = await ensureMyStudent();
+    if (!me) return null;
+    const { data } = await supabase.from('edu_enrollments')
+      .select('*, edu_cohorts(*)').eq('student_id', me.id).maybeSingle();
+    if (data) return data;
+    const { data: cohort } = await supabase.from('edu_cohorts').select('*').eq('status', 'active').limit(1).maybeSingle();
+    const { data: enr } = await supabase.from('edu_enrollments').insert({
+      student_id: me.id, cohort_id: cohort?.id || null, current_stage: 'E0', status: 'active'
+    }).select('*').single();
+    return enr;
+  }
+
+  // =========================================================================
+  // VISTA 1 · MI RUTA 90 DÍAS (Portal Estudiante)
+  // =========================================================================
+  window.openEducationStudent = async function (sys) {
+    const root = document.getElementById('content');
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando tu ruta…</div>`;
+
+    const [curr, enr] = await Promise.all([loadCurriculum(), ensureMyEnrollment()]);
+    if (!enr) { root.innerHTML = `<div class="text-center text-red-600 py-12">No pude crear tu enrollment.</div>`; return; }
+    const me = await ensureMyStudent();
+
+    const { data: progress } = await supabase
+      .from('edu_student_progress').select('*').eq('enrollment_id', enr.id);
+    const progressByTask = Object.fromEntries((progress || []).map(p => [p.task_id, p]));
+
+    const total = curr.tasks.length;
+    const done = (progress || []).filter(p => ['submitted', 'approved'].includes(p.status)).length;
+    const inprog = (progress || []).filter(p => p.status === 'in_progress').length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    const stagesHtml = curr.stages.map(stage => {
+      const blocks = curr.blocks.filter(b => b.stage_id === stage.id);
+      const stageTasks = curr.tasks.filter(t => blocks.some(b => b.id === t.block_id));
+      const stageDone = stageTasks.filter(t => ['submitted', 'approved'].includes(progressByTask[t.id]?.status)).length;
+      const stagePct = stageTasks.length ? Math.round((stageDone / stageTasks.length) * 100) : 0;
+
+      const blocksHtml = blocks.map(block => {
+        const blockTasks = curr.tasks.filter(t => t.block_id === block.id);
+        const tasksHtml = blockTasks.map(t => {
+          const p = progressByTask[t.id] || {};
+          const status = p.status || 'pending';
+          const icon = { pending: '⚪', in_progress: '🟡', submitted: '🔵', approved: '🟢', blocked: '🔴', skipped: '⚫' }[status];
+          const hint = t.estimated_hours_max ? ` · ⏱️ ${t.estimated_hours_min}-${t.estimated_hours_max}h` : '';
+          const critical = t.is_critical ? ' <span class="text-amber-600 text-xs">★ crítica</span>' : '';
+          return `
+            <div class="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200"
+                 onclick="openTaskDetail(${t.id})">
+              <span class="text-lg">${icon}</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-900 truncate">
+                  <span class="text-slate-400 font-mono text-xs">${t.code}</span> ${escapeHtml(t.title)}${critical}
+                </div>
+                <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(t.deliverable || t.description || '').slice(0, 100)}${hint}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-white rounded-lg border border-slate-200 mb-2">
+            <div class="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <span class="text-xs font-mono text-slate-400">${block.code}</span>
+                <span class="text-sm font-semibold text-slate-700 ml-1">${escapeHtml(block.title)}</span>
+              </div>
+              <span class="text-xs text-slate-500">${blockTasks.length} tareas</span>
+            </div>
+            <div class="p-2 space-y-0.5">${tasksHtml}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <details class="bg-slate-50 rounded-xl p-4 mb-4" ${stage.code === enr.current_stage ? 'open' : ''}>
+          <summary class="cursor-pointer">
+            <div class="inline-flex items-center gap-3 w-[calc(100%-2rem)]">
+              <div class="text-3xl">${stage.emoji || '📘'}</div>
+              <div class="flex-1">
+                <div class="text-xs font-mono text-slate-400">${stage.code}</div>
+                <div class="text-lg font-bold text-slate-900">${escapeHtml(stage.title)}</div>
+                <div class="text-xs text-slate-500">${escapeHtml(stage.description || '')}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-bold text-slate-900">${stagePct}%</div>
+                <div class="text-xs text-slate-500">${stageDone}/${stageTasks.length}</div>
+              </div>
+            </div>
+          </summary>
+          <div class="mt-3">${blocksHtml}</div>
+        </details>
+      `;
+    }).join('');
+
     root.innerHTML = `
-      <div class="text-center py-12">
-        <div class="text-5xl mb-3">📭</div>
-        <div class="font-bold text-slate-700">Sin mentorías configuradas</div>
-        <div class="text-xs text-slate-500 mt-2">Falta correr el SQL <code>education-schema.sql</code> en Supabase.</div>
-      </div>`;
-    return;
-  }
+      <div class="max-w-5xl mx-auto">
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 mb-6">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div class="text-sm font-semibold text-amber-700 uppercase tracking-wide">FlipMentoría · Tu ruta de 90 días</div>
+              <h1 class="text-3xl font-bold text-slate-900 mt-1">Hola, ${escapeHtml(me?.full_name || 'inversionista')}</h1>
+              <p class="text-sm text-slate-600 mt-1">Etapa actual: <strong>${enr.current_stage}</strong> · ${done} de ${total} tareas completadas</p>
+            </div>
+            <div class="text-center">
+              <div class="relative w-24 h-24">
+                <svg class="transform -rotate-90 w-24 h-24">
+                  <circle cx="48" cy="48" r="40" stroke="#fed7aa" stroke-width="8" fill="none"/>
+                  <circle cx="48" cy="48" r="40" stroke="#d97706" stroke-width="8" fill="none"
+                          stroke-dasharray="${2 * Math.PI * 40}" stroke-dashoffset="${2 * Math.PI * 40 * (1 - pct / 100)}"
+                          stroke-linecap="round"/>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <span class="text-2xl font-bold text-amber-900">${pct}%</span>
+                </div>
+              </div>
+              <div class="text-xs text-slate-600 mt-1">Avance total</div>
+            </div>
+          </div>
+          <div class="flex gap-3 mt-4 text-xs">
+            <span class="bg-white px-3 py-1 rounded-full border border-slate-200">🟢 ${done} hechas</span>
+            <span class="bg-white px-3 py-1 rounded-full border border-slate-200">🟡 ${inprog} en proceso</span>
+            <span class="bg-white px-3 py-1 rounded-full border border-slate-200">⚪ ${total - done - inprog} pendientes</span>
+          </div>
+        </div>
+        ${stagesHtml}
+      </div>
+    `;
+  };
 
-  const cur = eduCurrentMentorship();
-  const myStudents = eduMyStudents();
-  const myAlerts = eduMyAlerts();
+  // Detalle de tarea (modal)
+  window.openTaskDetail = async function (taskId) {
+    await loadCurriculum();
+    const t = CURRICULUM.tasks.find(x => x.id === taskId);
+    const block = CURRICULUM.blocks.find(b => b.id === t.block_id);
+    const stage = CURRICULUM.stages.find(s => s.id === block.stage_id);
+    const enr = await ensureMyEnrollment();
+    const { data: p } = await supabase.from('edu_student_progress')
+      .select('*').eq('enrollment_id', enr.id).eq('task_id', t.id).maybeSingle();
+    const status = p?.status || 'pending';
 
-  root.innerHTML = `
-    <div class="flex flex-col h-full max-h-[84vh]">
-      <!-- Selector de mentoría -->
-      <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-200 flex-wrap">
-        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Mentoría:</span>
-        ${eduState.mentorships.map(m => `
-          <button onclick="eduSetMentorship('${m.id}')" class="px-3 py-1.5 rounded-lg text-xs font-bold ${eduState.mentorshipId===m.id ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 hover:bg-slate-200'}">
-            ${m.icon} ${m.name}
-          </button>
-        `).join('')}
-        <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
-          ${cur?.airtable_base_id ? `<span>🔗 Airtable: <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">${cur.airtable_base_id}</code></span>` : '<span class="text-amber-700">⚠️ Airtable no configurado</span>'}
-          <button onclick="eduTriggerSync()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">🔄 Sync</button>
-          <button onclick="eduDebugDB()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold" title="Ver qué hay en la DB">🔍 Debug DB</button>
+    const deps = CURRICULUM.deps.filter(d => d.task_id === t.id);
+    const depTasks = deps.map(d => CURRICULUM.tasks.find(x => x.id === d.depends_on_id)).filter(Boolean);
+
+    const { data: resources } = await supabase.from('edu_resources').select('*').eq('task_code', t.code);
+
+    const modalHtml = `
+      <div class="space-y-4">
+        <div>
+          <div class="text-xs font-mono text-slate-400">${stage.code} · ${block.code} · ${t.code}</div>
+          <h2 class="text-xl font-bold text-slate-900 mt-1">${escapeHtml(t.title)}</h2>
+          ${t.is_critical ? '<span class="inline-block mt-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">★ Tarea crítica</span>' : ''}
+        </div>
+
+        ${t.estimated_hours_max ? `<div class="text-sm text-slate-600">⏱️ Tiempo estimado: <strong>${t.estimated_hours_min}–${t.estimated_hours_max} horas</strong></div>` : ''}
+
+        ${t.description ? `<div class="bg-blue-50 rounded-lg p-3 text-sm text-slate-700"><div class="text-xs font-semibold text-blue-700 uppercase mb-1">Actividad</div>${escapeHtml(t.description)}</div>` : ''}
+        ${t.deliverable ? `<div class="bg-green-50 rounded-lg p-3 text-sm text-slate-700"><div class="text-xs font-semibold text-green-700 uppercase mb-1">Entregable</div>${escapeHtml(t.deliverable)}</div>` : ''}
+
+        ${depTasks.length ? `
+          <div class="bg-slate-50 rounded-lg p-3 text-sm">
+            <div class="text-xs font-semibold text-slate-700 uppercase mb-2">⚠️ Depende de:</div>
+            <ul class="space-y-1">${depTasks.map(d => `<li class="text-xs">• <span class="font-mono">${d.code}</span> — ${escapeHtml(d.title)}</li>`).join('')}</ul>
+          </div>
+        ` : ''}
+
+        ${resources?.length ? `
+          <div class="bg-amber-50 rounded-lg p-3 text-sm">
+            <div class="text-xs font-semibold text-amber-800 uppercase mb-2">🛠️ Recursos sugeridos</div>
+            ${resources.map(r => `
+              <a href="${r.url || '#'}" target="_blank" class="block py-1 text-xs text-amber-900 hover:underline">
+                ${r.is_recommended ? '⭐' : '•'} <strong>${escapeHtml(r.name)}</strong>
+                ${r.price_tier ? ` · <span class="text-slate-500">${r.price_tier}</span>` : ''}
+                ${r.description ? ` — ${escapeHtml(r.description)}` : ''}
+              </a>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <div class="border-t border-slate-200 pt-4 space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Estado</label>
+            <select id="task-status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="pending"     ${status === 'pending' ? 'selected' : ''}>⚪ Pendiente</option>
+              <option value="in_progress" ${status === 'in_progress' ? 'selected' : ''}>🟡 En proceso</option>
+              <option value="submitted"   ${status === 'submitted' ? 'selected' : ''}>🔵 Enviada para revisión</option>
+              ${isMentor() ? `<option value="approved" ${status === 'approved' ? 'selected' : ''}>🟢 Aprobada (mentor)</option>` : ''}
+              <option value="blocked"     ${status === 'blocked' ? 'selected' : ''}>🔴 Bloqueada</option>
+              <option value="skipped"     ${status === 'skipped' ? 'selected' : ''}>⚫ No aplica</option>
+            </select>
+          </div>
+          ${t.evidence_required ? `
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Evidencia</label>
+              ${t.evidence_hint ? `<div class="text-xs text-slate-500 mb-1">${escapeHtml(t.evidence_hint)}</div>` : ''}
+              <input type="url" id="task-evidence" value="${escapeHtml(p?.evidence_url || '')}"
+                     placeholder="https://... (Drive/Dropbox/foto)"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+            </div>
+          ` : ''}
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mis notas</label>
+            <textarea id="task-notes" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">${escapeHtml(p?.student_notes || '')}</textarea>
+          </div>
+          ${p?.mentor_notes ? `
+            <div class="bg-purple-50 rounded-lg p-3">
+              <div class="text-xs font-semibold text-purple-800 mb-1">💬 Comentario del mentor</div>
+              <div class="text-sm text-slate-700">${escapeHtml(p.mentor_notes)}</div>
+            </div>
+          ` : ''}
+          ${isMentor() ? `
+            <div>
+              <label class="block text-xs font-semibold text-purple-700 mb-1">Notas del mentor (solo tú las escribes)</label>
+              <textarea id="task-mentor-notes" rows="2" class="w-full border border-purple-300 rounded-lg px-3 py-2 text-sm bg-purple-50">${escapeHtml(p?.mentor_notes || '')}</textarea>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="closeModal()" class="px-4 py-2 text-sm rounded-lg border border-slate-300 hover:bg-slate-50">Cancelar</button>
+          <button onclick="saveTaskProgress(${t.id})" class="px-4 py-2 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-700">Guardar</button>
         </div>
       </div>
+    `;
+    openModal('Detalle de tarea', modalHtml);
+  };
 
-      <!-- Tabs -->
-      <div class="flex items-center gap-1 mb-3 pb-2 border-b border-slate-200 overflow-x-auto">
-        ${EDU_TABS.map(t => {
-          let badge = '';
-          if (t.key === 'students') badge = myStudents.length;
-          if (t.key === 'alerts')   badge = myAlerts.length;
-          if (t.key === 'resources') badge = eduMyResources().length;
+  window.saveTaskProgress = async function (taskId) {
+    const enr = await ensureMyEnrollment();
+    const status = document.getElementById('task-status').value;
+    const evidence_url = document.getElementById('task-evidence')?.value || null;
+    const student_notes = document.getElementById('task-notes')?.value || null;
+    const mentor_notes_el = document.getElementById('task-mentor-notes');
+    const mentor_notes = mentor_notes_el?.value;
+
+    const payload = {
+      enrollment_id: enr.id,
+      task_id: taskId,
+      status,
+      student_notes,
+      evidence_url,
+    };
+    if (status === 'in_progress') payload.started_at = new Date().toISOString();
+    if (status === 'submitted') payload.submitted_at = new Date().toISOString();
+    if (isMentor() && mentor_notes !== undefined) {
+      payload.mentor_notes = mentor_notes;
+      if (status === 'approved') {
+        payload.reviewed_at = new Date().toISOString();
+        payload.reviewer_id = user().id;
+      }
+    }
+
+    const { error } = await supabase.from('edu_student_progress').upsert(payload, { onConflict: 'enrollment_id,task_id' });
+    if (error) { alert('Error: ' + error.message); return; }
+    toast('Guardado ✓');
+    closeModal();
+    if (!isMentor()) {
+      window.openEducationStudent({ type: 'education-student' });
+    } else {
+      window.openEducationMentor?.();
+    }
+  };
+
+  // =========================================================================
+  // VISTA 2 · BIBLIOTECA
+  // =========================================================================
+  window.openEducationLibrary = async function () {
+    const root = document.getElementById('content');
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando biblioteca…</div>`;
+    await loadCurriculum();
+    const { data: resources } = await supabase.from('edu_resources').select('*').order('stage_code').order('name');
+
+    const renderResources = (filtered) => filtered.map(r => `
+      <div class="bg-white border border-slate-200 rounded-lg p-3 hover:shadow-sm transition">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <span class="text-xs font-mono text-slate-400">${r.stage_code || '—'}${r.task_code ? ` · ${r.task_code}` : ''}</span>
+          ${r.is_recommended ? '<span class="text-xs">⭐</span>' : ''}
+        </div>
+        <a href="${r.url || '#'}" target="_blank" class="block font-semibold text-slate-900 hover:text-amber-700">${escapeHtml(r.name)}</a>
+        <div class="text-xs text-slate-600 mt-1">${escapeHtml(r.description || '')}</div>
+        <div class="flex flex-wrap gap-1 mt-2 text-[10px]">
+          <span class="bg-slate-100 px-2 py-0.5 rounded">${r.kind}</span>
+          ${r.price_tier ? `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">${r.price_tier}</span>` : ''}
+          ${r.geo_scope ? `<span class="bg-green-50 text-green-700 px-2 py-0.5 rounded">${r.geo_scope}</span>` : ''}
+          ${r.state ? `<span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded">${r.state}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    root.innerHTML = `
+      <div class="max-w-6xl mx-auto">
+        <div class="mb-6">
+          <h1 class="text-3xl font-bold">📚 Biblioteca</h1>
+          <p class="text-sm text-slate-500 mt-1">Contactos verificados · Herramientas · Plantillas · Por etapa.</p>
+        </div>
+        <div class="flex gap-3 mb-4 flex-wrap">
+          <input id="lib-search" placeholder="🔍 Buscar..." class="flex-1 min-w-[200px] border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+          <select id="lib-stage" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">Todas las etapas</option>
+            ${CURRICULUM.stages.map(s => `<option value="${s.code}">${s.emoji} ${s.code} — ${escapeHtml(s.title)}</option>`).join('')}
+          </select>
+          <select id="lib-kind" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">Todo tipo</option>
+            <option value="tool">🛠️ Herramientas</option>
+            <option value="contact">📞 Contactos</option>
+            <option value="template">📋 Plantillas</option>
+            <option value="script">📜 Scripts</option>
+            <option value="kpi">📊 KPIs</option>
+          </select>
+          <select id="lib-state" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">Todos los estados</option>
+            <option>FL</option><option>TX</option><option>CA</option><option>NY</option><option>NJ</option><option>AZ</option><option>GA</option>
+          </select>
+        </div>
+        <div id="lib-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          ${renderResources(resources || [])}
+        </div>
+        <div class="text-xs text-slate-400 text-center mt-6">${resources?.length || 0} recursos disponibles</div>
+      </div>
+    `;
+
+    const apply = () => {
+      const q = document.getElementById('lib-search').value.toLowerCase();
+      const st = document.getElementById('lib-stage').value;
+      const k = document.getElementById('lib-kind').value;
+      const sStat = document.getElementById('lib-state').value;
+      const filtered = (resources || []).filter(r =>
+        (!q || (r.name + ' ' + (r.description || '')).toLowerCase().includes(q)) &&
+        (!st || r.stage_code === st) &&
+        (!k || r.kind === k) &&
+        (!sStat || r.state === sStat)
+      );
+      document.getElementById('lib-grid').innerHTML = renderResources(filtered);
+    };
+    ['lib-search', 'lib-stage', 'lib-kind', 'lib-state'].forEach(id =>
+      document.getElementById(id).addEventListener('input', apply));
+  };
+
+  // =========================================================================
+  // VISTA 3 · PREGUNTAS AL MENTOR (Q&A)
+  // =========================================================================
+  window.openEducationQA = async function () {
+    const root = document.getElementById('content');
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando Q&A…</div>`;
+    const enr = await ensureMyEnrollment();
+
+    const { data: myQs } = await supabase.from('edu_questions').select('*')
+      .eq('enrollment_id', enr.id).order('asked_at', { ascending: false });
+    const { data: pubQs } = await supabase.from('edu_questions').select('*')
+      .eq('is_published', true).neq('enrollment_id', enr.id).order('answered_at', { ascending: false }).limit(20);
+
+    root.innerHTML = `
+      <div class="max-w-3xl mx-auto">
+        <h1 class="text-3xl font-bold mb-4">❓ Preguntas al mentor</h1>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+          <div class="text-sm font-semibold mb-2">Hacer una pregunta nueva</div>
+          <textarea id="new-q" rows="3" placeholder="Ej: ¿Cómo escojo el state para mi LLC si vivo en CA pero quiero invertir en TX?"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2"></textarea>
+          <input id="new-q-context" placeholder="(Opcional) Código de tarea: E0.1.1, E1.3.4..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2"/>
+          <button onclick="submitQuestion()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">Enviar pregunta</button>
+        </div>
+
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold mb-2">Mis preguntas</h2>
+          <div class="space-y-3">
+            ${(myQs || []).map(q => `
+              <div class="bg-white border border-slate-200 rounded-lg p-3">
+                <div class="text-xs text-slate-400">${fmtDate(q.asked_at)} ${q.task_code ? `· ${q.task_code}` : ''}</div>
+                <div class="font-medium text-sm mt-1">${escapeHtml(q.question)}</div>
+                ${q.answer ? `<div class="mt-2 bg-amber-50 rounded p-2 text-sm"><strong>Mentor:</strong> ${escapeHtml(q.answer)}</div>` : '<div class="text-xs text-slate-400 mt-2">⏳ En espera de respuesta</div>'}
+              </div>
+            `).join('') || '<div class="text-sm text-slate-400">Aún no has hecho preguntas.</div>'}
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-lg font-semibold mb-2">📚 Preguntas frecuentes (de otros estudiantes)</h2>
+          <div class="space-y-3">
+            ${(pubQs || []).map(q => `
+              <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <div class="text-xs text-slate-400">${q.task_code || ''}</div>
+                <div class="font-medium text-sm">${escapeHtml(q.question)}</div>
+                ${q.answer ? `<div class="mt-2 text-sm text-slate-700">${escapeHtml(q.answer)}</div>` : ''}
+              </div>
+            `).join('') || '<div class="text-sm text-slate-400">Sin preguntas publicadas todavía.</div>'}
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  window.submitQuestion = async function () {
+    const enr = await ensureMyEnrollment();
+    const question = document.getElementById('new-q').value.trim();
+    const task_code = document.getElementById('new-q-context').value.trim() || null;
+    if (!question) return alert('Escribe tu pregunta');
+    const { error } = await supabase.from('edu_questions').insert({
+      enrollment_id: enr.id, question, task_code
+    });
+    if (error) return alert('Error: ' + error.message);
+    toast('Pregunta enviada ✓');
+    window.openEducationQA();
+  };
+
+  // =========================================================================
+  // VISTA 4 · PANEL MENTOR
+  // =========================================================================
+  window.openEducationMentor = async function () {
+    const root = document.getElementById('content');
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido (mentor/admin).</div>`; return; }
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando panel mentor…</div>`;
+
+    const [{ data: scorecard }, { data: alerts }, { data: pendingReviews }, { data: pendingQs }] = await Promise.all([
+      supabase.from('edu_scorecard').select('*').order('pct_complete', { ascending: false }),
+      supabase.from('edu_alerts').select('*'),
+      supabase.from('edu_student_progress').select('*, edu_curriculum_tasks(code,title), edu_enrollments(*, edu_students(full_name))').eq('status', 'submitted').limit(50),
+      supabase.from('edu_questions').select('*, edu_enrollments(*, edu_students(full_name))').is('answered_at', null).order('asked_at', { ascending: false }).limit(20),
+    ]);
+
+    const stuck = (alerts || []).filter(a => a.kind === 'stuck');
+    const review = (alerts || []).filter(a => a.kind === 'awaiting_review');
+
+    root.innerHTML = `
+      <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-3xl font-bold">👥 Panel Mentor</h1>
+            <p class="text-sm text-slate-500 mt-1">${scorecard?.length || 0} estudiantes · ${stuck.length} atascados · ${review.length} pendientes</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="addStudentModal()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">+ Estudiante</button>
+            <button onclick="addCohortModal()" class="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">+ Cohorte</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Estudiantes activos</div>
+            <div class="text-3xl font-bold">${scorecard?.length || 0}</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Avance promedio</div>
+            <div class="text-3xl font-bold">${scorecard?.length ? Math.round(scorecard.reduce((a, s) => a + (s.pct_complete || 0), 0) / scorecard.length) : 0}%</div>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div class="text-xs text-amber-700">Atascados (>7 días)</div>
+            <div class="text-3xl font-bold text-amber-900">${stuck.length}</div>
+          </div>
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div class="text-xs text-blue-700">Por revisar</div>
+            <div class="text-3xl font-bold text-blue-900">${pendingReviews?.length || 0}</div>
+          </div>
+        </div>
+
+        <div class="flex border-b border-slate-200 mb-4">
+          <button data-tab="students" class="mentor-tab px-4 py-2 text-sm font-medium border-b-2 border-slate-900">📋 Estudiantes</button>
+          <button data-tab="reviews" class="mentor-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent">📥 Por revisar (${pendingReviews?.length || 0})</button>
+          <button data-tab="alerts" class="mentor-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent">🚨 Alertas (${alerts?.length || 0})</button>
+          <button data-tab="qa" class="mentor-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent">❓ Preguntas (${pendingQs?.length || 0})</button>
+        </div>
+
+        <div id="mentor-tab-content"></div>
+      </div>
+    `;
+
+    const tabs = {
+      students: () => `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr><th class="text-left p-3">Estudiante</th><th class="text-left p-3">Cohorte</th><th class="text-left p-3">Etapa</th><th class="text-left p-3">Avance</th><th class="text-left p-3">Última actividad</th><th class="p-3"></th></tr>
+            </thead>
+            <tbody>
+              ${(scorecard || []).map(s => `
+                <tr class="border-t border-slate-100 hover:bg-slate-50">
+                  <td class="p-3 font-medium">${escapeHtml(s.full_name)}</td>
+                  <td class="p-3 text-xs">${s.cohort_code || '—'}</td>
+                  <td class="p-3 text-xs"><span class="font-mono">${s.current_stage}</span></td>
+                  <td class="p-3">
+                    <div class="flex items-center gap-2">
+                      <div class="w-32 bg-slate-200 rounded-full h-2"><div class="bg-amber-500 h-2 rounded-full" style="width:${s.pct_complete || 0}%"></div></div>
+                      <span class="text-xs font-semibold">${s.pct_complete || 0}%</span>
+                    </div>
+                  </td>
+                  <td class="p-3 text-xs text-slate-500">${s.days_since_last_activity ? Math.round(s.days_since_last_activity) + ' días atrás' : 'sin actividad'}</td>
+                  <td class="p-3 text-right"><button onclick="openStudentDetail(${s.student_id})" class="text-xs text-blue-600 hover:underline">Ver →</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `,
+      reviews: () => `
+        <div class="space-y-2">
+          ${(pendingReviews || []).map(p => `
+            <div class="bg-white border border-blue-200 rounded-lg p-3 flex items-center gap-3">
+              <span class="text-2xl">🔵</span>
+              <div class="flex-1">
+                <div class="font-semibold text-sm">${escapeHtml(p.edu_enrollments?.edu_students?.full_name || '?')}</div>
+                <div class="text-xs text-slate-500">${p.edu_curriculum_tasks?.code} — ${escapeHtml(p.edu_curriculum_tasks?.title || '')}</div>
+                ${p.evidence_url ? `<a href="${p.evidence_url}" target="_blank" class="text-xs text-blue-600 hover:underline">Ver evidencia →</a>` : '<span class="text-xs text-amber-700">⚠️ Sin evidencia</span>'}
+                ${p.student_notes ? `<div class="text-xs italic text-slate-600 mt-1">"${escapeHtml(p.student_notes.slice(0, 200))}"</div>` : ''}
+              </div>
+              <div class="flex flex-col gap-1">
+                <button onclick="approveProgress(${p.id})" class="bg-green-600 text-white text-xs px-3 py-1 rounded hover:bg-green-700">Aprobar</button>
+                <button onclick="openTaskDetail(${p.task_id})" class="text-xs text-slate-600 hover:underline">Editar</button>
+              </div>
+            </div>
+          `).join('') || '<div class="text-center text-slate-400 py-6">No hay tareas pendientes de revisión.</div>'}
+        </div>
+      `,
+      alerts: () => `
+        <div class="space-y-2">
+          ${(alerts || []).map(a => `
+            <div class="bg-${a.kind === 'stuck' ? 'amber' : 'blue'}-50 border border-${a.kind === 'stuck' ? 'amber' : 'blue'}-200 rounded-lg p-3 flex items-center gap-3">
+              <span class="text-2xl">${a.kind === 'stuck' ? '🚨' : '📥'}</span>
+              <div class="flex-1">
+                <div class="font-semibold text-sm">${escapeHtml(a.full_name)}</div>
+                <div class="text-xs text-slate-600">${escapeHtml(a.message)}</div>
+              </div>
+              <button onclick="openStudentDetail(${a.student_id})" class="text-xs text-slate-700 hover:underline">Ver →</button>
+            </div>
+          `).join('') || '<div class="text-center text-slate-400 py-6">Sin alertas. ✨</div>'}
+        </div>
+      `,
+      qa: () => `
+        <div class="space-y-3">
+          ${(pendingQs || []).map(q => `
+            <div class="bg-white border border-slate-200 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-sm font-semibold">${escapeHtml(q.edu_enrollments?.edu_students?.full_name || '?')}</div>
+                <div class="text-xs text-slate-400">${q.task_code || ''} · ${fmtDate(q.asked_at)}</div>
+              </div>
+              <div class="text-sm mb-3">${escapeHtml(q.question)}</div>
+              <textarea id="ans-${q.id}" rows="3" placeholder="Tu respuesta..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2"></textarea>
+              <label class="text-xs flex items-center gap-1 mb-2"><input type="checkbox" id="pub-${q.id}" checked/> Publicar para toda la cohorte</label>
+              <button onclick="answerQuestion(${q.id})" class="bg-slate-900 text-white text-xs px-3 py-1 rounded hover:bg-slate-700">Responder</button>
+            </div>
+          `).join('') || '<div class="text-center text-slate-400 py-6">Sin preguntas pendientes.</div>'}
+        </div>
+      `,
+    };
+
+    function setTab(name) {
+      document.querySelectorAll('.mentor-tab').forEach(b => {
+        b.classList.toggle('border-slate-900', b.dataset.tab === name);
+        b.classList.toggle('border-transparent', b.dataset.tab !== name);
+      });
+      document.getElementById('mentor-tab-content').innerHTML = tabs[name]();
+    }
+    document.querySelectorAll('.mentor-tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+    setTab('students');
+  };
+
+  window.approveProgress = async function (progressId) {
+    const { error } = await supabase.from('edu_student_progress')
+      .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewer_id: user().id })
+      .eq('id', progressId);
+    if (error) return alert(error.message);
+    toast('Aprobada ✓');
+    window.openEducationMentor();
+  };
+
+  window.answerQuestion = async function (qid) {
+    const answer = document.getElementById('ans-' + qid).value.trim();
+    const is_published = document.getElementById('pub-' + qid).checked;
+    if (!answer) return alert('Escribe la respuesta');
+    const { error } = await supabase.from('edu_questions')
+      .update({ answer, is_published, answered_at: new Date().toISOString(), answered_by: user().id })
+      .eq('id', qid);
+    if (error) return alert(error.message);
+    toast('Respondida ✓');
+    window.openEducationMentor();
+  };
+
+  window.openStudentDetail = async function (studentId) {
+    const { data: stu } = await supabase.from('edu_students').select('*').eq('id', studentId).single();
+    const { data: enr } = await supabase.from('edu_enrollments').select('*, edu_cohorts(*)').eq('student_id', studentId).maybeSingle();
+    const { data: prog } = await supabase.from('edu_student_progress')
+      .select('*, edu_curriculum_tasks(code,title)').eq('enrollment_id', enr?.id || 0).order('submitted_at', { ascending: false });
+    openModal(`Estudiante: ${stu?.full_name || ''}`, `
+      <div class="space-y-3">
+        <div class="text-sm">
+          <strong>Ciudad inversión:</strong> ${escapeHtml(stu?.city_invest || '—')}, ${escapeHtml(stu?.state_invest || '')}<br>
+          <strong>Capital:</strong> $${(stu?.capital_available || 0).toLocaleString()}<br>
+          <strong>Big Why:</strong> ${escapeHtml(stu?.big_why || '—')}<br>
+          <strong>Etapa actual:</strong> ${enr?.current_stage || '—'}<br>
+          <strong>Cohorte:</strong> ${enr?.edu_cohorts?.code || '—'}
+        </div>
+        <div class="border-t pt-3">
+          <div class="text-sm font-semibold mb-2">Últimas tareas:</div>
+          <div class="max-h-96 overflow-y-auto space-y-1">
+            ${(prog || []).slice(0, 30).map(p => `
+              <div class="text-xs flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer" onclick="openTaskDetail(${p.task_id})">
+                <span>${ ({pending:'⚪',in_progress:'🟡',submitted:'🔵',approved:'🟢',blocked:'🔴'})[p.status] || '⚪' }</span>
+                <span class="font-mono">${p.edu_curriculum_tasks?.code}</span>
+                <span class="flex-1 truncate">${escapeHtml(p.edu_curriculum_tasks?.title || '')}</span>
+              </div>
+            `).join('') || '<div class="text-slate-400">Sin actividad</div>'}
+          </div>
+        </div>
+      </div>
+    `);
+  };
+
+  window.addStudentModal = function () {
+    openModal('Agregar estudiante', `
+      <div class="space-y-3">
+        <input id="ns-email" placeholder="Email del estudiante" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="ns-name" placeholder="Nombre completo" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="ns-state" placeholder="Estado donde invierte (FL, TX...)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <button onclick="createStudent()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">Crear</button>
+        <p class="text-xs text-slate-500">El estudiante se vincula a su cuenta cuando hace signup con el mismo email.</p>
+      </div>
+    `);
+  };
+
+  window.createStudent = async function () {
+    const email = document.getElementById('ns-email').value.trim();
+    const full_name = document.getElementById('ns-name').value.trim();
+    const state = document.getElementById('ns-state').value.trim();
+    if (!email || !full_name) return alert('Email y nombre requeridos');
+    const { error } = await supabase.from('edu_students').insert({ full_name, state_invest: state, status: 'lead' });
+    if (error) return alert(error.message);
+    toast('Estudiante creado: ' + email);
+    closeModal();
+    window.openEducationMentor();
+  };
+
+  window.addCohortModal = function () {
+    openModal('Nueva cohorte', `
+      <div class="space-y-3">
+        <input id="nc-code" placeholder="Código (2026-Q1)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="nc-name" placeholder="Nombre" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="nc-start" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="nc-cap" type="number" placeholder="Capacidad (20)" value="20" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <button onclick="createCohort()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">Crear</button>
+      </div>
+    `);
+  };
+
+  window.createCohort = async function () {
+    const payload = {
+      code: document.getElementById('nc-code').value.trim(),
+      name: document.getElementById('nc-name').value.trim(),
+      starts_on: document.getElementById('nc-start').value,
+      capacity: parseInt(document.getElementById('nc-cap').value || '20'),
+      status: 'active',
+    };
+    const { error } = await supabase.from('edu_cohorts').insert(payload);
+    if (error) return alert(error.message);
+    toast('Cohorte creada ✓');
+    closeModal();
+    window.openEducationMentor();
+  };
+
+  // =========================================================================
+  // VISTA 5 · CURRICULUM (admin edita)
+  // =========================================================================
+  window.openEducationCurriculum = async function () {
+    const root = document.getElementById('content');
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido.</div>`; return; }
+    await loadCurriculum(true);
+    root.innerHTML = `
+      <div class="max-w-5xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-3xl font-bold">✏️ Curriculum</h1>
+          <div class="text-sm text-slate-500">${CURRICULUM.tasks.length} tareas · ${CURRICULUM.blocks.length} bloques · ${CURRICULUM.stages.length} etapas</div>
+        </div>
+        ${CURRICULUM.stages.map(s => {
+          const blocks = CURRICULUM.blocks.filter(b => b.stage_id === s.id);
           return `
-            <button onclick="eduSetTab('${t.key}')" class="px-2.5 py-1.5 rounded text-xs font-bold whitespace-nowrap flex-shrink-0 ${eduState.tab===t.key?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">
-              ${t.label}${badge?` <span class="bg-${eduState.tab===t.key?'white text-slate-900':'slate-900 text-white'} text-[9px] px-1 rounded ml-1">${badge}</span>`:''}
-            </button>
+            <details class="bg-white border border-slate-200 rounded-xl p-4 mb-3" open>
+              <summary class="cursor-pointer text-lg font-semibold">${s.emoji} <span class="font-mono text-sm text-slate-400">${s.code}</span> ${escapeHtml(s.title)}</summary>
+              <div class="mt-3 space-y-2">
+                ${blocks.map(b => {
+                  const ts = CURRICULUM.tasks.filter(t => t.block_id === b.id);
+                  return `
+                    <div class="bg-slate-50 rounded-lg p-3">
+                      <div class="text-sm font-semibold mb-2"><span class="font-mono text-slate-400 text-xs">${b.code}</span> ${escapeHtml(b.title)}</div>
+                      <div class="text-xs space-y-1">
+                        ${ts.map(t => `
+                          <div class="flex items-center gap-2 p-1 hover:bg-white rounded cursor-pointer" onclick="openTaskDetail(${t.id})">
+                            <span class="font-mono text-slate-400">${t.code}</span>
+                            <span class="flex-1">${escapeHtml(t.title)}</span>
+                            ${t.is_critical ? '<span class="text-amber-600">★</span>' : ''}
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </details>
           `;
         }).join('')}
       </div>
-
-      <!-- BODY -->
-      <div class="flex-1 overflow-y-auto">
-        ${eduState.tab === 'students' ? eduRenderStudents() :
-          eduState.tab === 'plan' ? eduRenderPlan() :
-          eduState.tab === 'progress' ? eduRenderProgress() :
-          eduState.tab === 'resources' ? eduRenderResources() :
-          eduState.tab === 'calls' ? eduRenderCalls() :
-          eduState.tab === 'alerts' ? eduRenderAlerts() :
-          eduRenderConfig()}
-      </div>
-    </div>
-  `;
-}
-
-// ─── TAB: ESTUDIANTES ───
-function eduRenderStudents() {
-  const students = eduMyStudents();
-  const m = eduCurrentMentorship();
-  const search = (eduState.searchQuery||'').toLowerCase();
-
-  let filtered = students;
-  if (search) filtered = filtered.filter(s => ((s.full_name||'') + ' ' + (s.email||'') + ' ' + (s.city||'')).toLowerCase().includes(search));
-  if (eduState.stageFilter !== 'all') filtered = filtered.filter(s => s.current_stage === eduState.stageFilter);
-  if (eduState.statusFilter !== 'all') filtered = filtered.filter(s => s.status === eduState.statusFilter);
-
-  // KPIs
-  const total = students.length;
-  const active = students.filter(s => s.status === 'active').length;
-  const atRisk = students.filter(s => s.status === 'at_risk').length;
-  const graduated = students.filter(s => s.status === 'graduated').length;
-  const expiringSoon = students.filter(s => {
-    const d = eduDaysToExpiry(s);
-    return d != null && d >= 0 && d <= 30;
-  }).length;
-  const overdue = students.filter(s => eduIsStageOverdue(s)).length;
-
-  // Análisis
-  const insights = [];
-  if (total === 0) insights.push(`📭 Sin estudiantes en ${m?.name}. Configurá Airtable + Sync, o agregá manual.`);
-  else {
-    if (expiringSoon > 0) insights.push(`⏰ <strong>${expiringSoon}</strong> estudiante${expiringSoon>1?'s':''} con mentoría que vence en ≤30 días. Pasar a comercial.`);
-    if (atRisk > 0) insights.push(`⚠️ <strong>${atRisk}</strong> en estado at_risk. Revisar progreso individual.`);
-    if (overdue > 0) insights.push(`🐢 <strong>${overdue}</strong> estudiante${overdue>1?'s':''} llevan más tiempo del target en su etapa actual. Posible 1-on-1.`);
-  }
-
-  return `
-    <div class="space-y-3">
-      <!-- KPIs -->
-      <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <div class="bg-slate-900 text-white rounded-xl p-3"><div class="text-[10px] text-slate-400 uppercase font-bold">Total</div><div class="text-3xl font-bold">${total}</div></div>
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div class="text-[10px] text-emerald-700 uppercase font-bold">Activos</div><div class="text-3xl font-bold text-emerald-900">${active}</div></div>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[10px] text-amber-700 uppercase font-bold">At risk</div><div class="text-3xl font-bold text-amber-900">${atRisk}</div></div>
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] text-blue-700 uppercase font-bold">Graduados</div><div class="text-3xl font-bold text-blue-900">${graduated}</div></div>
-        <div class="bg-red-50 border border-red-200 rounded-xl p-3"><div class="text-[10px] text-red-700 uppercase font-bold">Vence ≤30d</div><div class="text-3xl font-bold text-red-900">${expiringSoon}</div></div>
-        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3"><div class="text-[10px] text-violet-700 uppercase font-bold">Etapa lenta</div><div class="text-3xl font-bold text-violet-900">${overdue}</div></div>
-      </div>
-
-      ${insights.length ? `
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis</div>
-          <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
-        </div>
-      ` : ''}
-
-      <!-- Filtros -->
-      <div class="flex items-center gap-2 flex-wrap">
-        <input type="text" placeholder="Buscar nombre/email/ciudad..." value="${(eduState.searchQuery||'').replace(/"/g,'&quot;')}" onchange="eduState.searchQuery=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1 text-xs flex-1 min-w-[200px]" />
-        <select onchange="eduState.stageFilter=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1 text-xs">
-          <option value="all" ${eduState.stageFilter==='all'?'selected':''}>Todas las etapas</option>
-          ${(m?.stages || []).map(s => `<option value="${s.key}" ${eduState.stageFilter===s.key?'selected':''}>${s.name}</option>`).join('')}
-        </select>
-        <select onchange="eduState.statusFilter=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1 text-xs">
-          <option value="all" ${eduState.statusFilter==='all'?'selected':''}>Todos los status</option>
-          ${['active','at_risk','paused','graduated','dropped'].map(st => `<option value="${st}" ${eduState.statusFilter===st?'selected':''}>${st}</option>`).join('')}
-        </select>
-        <button onclick="eduAddStudent()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded">+ Estudiante manual</button>
-        <div class="text-[10px] text-slate-500">${filtered.length} de ${students.length}</div>
-      </div>
-
-      <!-- Lista de estudiantes -->
-      ${filtered.length === 0 ? `<div class="text-center py-12 text-slate-400 text-xs">Sin estudiantes con esos filtros.</div>` : `
-        <div class="border border-slate-200 rounded-xl overflow-hidden">
-          <table class="w-full text-xs">
-            <thead class="bg-slate-50">
-              <tr class="text-[10px] uppercase text-slate-600">
-                <th class="text-left p-2">Estudiante</th>
-                <th class="text-left p-2">Etapa</th>
-                <th class="text-center p-2">Días</th>
-                <th class="text-left p-2">Status</th>
-                <th class="text-center p-2">GLScore</th>
-                <th class="text-left p-2">Vence</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filtered.map(s => {
-                const daysInStage = eduDaysInStage(s);
-                const stage = eduStageObj(s.current_stage);
-                const overdue = eduIsStageOverdue(s);
-                const daysExp = eduDaysToExpiry(s);
-                const expCls = daysExp == null ? 'text-slate-400' : daysExp < 0 ? 'text-red-700 font-bold' : daysExp <= 30 ? 'text-amber-700 font-bold' : 'text-slate-700';
-                const expLbl = daysExp == null ? '—' : daysExp < 0 ? `Vencida ${Math.abs(daysExp)}d` : `${daysExp}d`;
-                const stCls = s.status === 'at_risk' ? 'bg-amber-100 text-amber-800' : s.status === 'active' ? 'bg-emerald-100 text-emerald-800' : s.status === 'graduated' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700';
-                return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-                  <td class="p-2"><div class="font-semibold">${s.full_name}</div><div class="text-[10px] text-slate-500">${s.email||''}${s.city?' · '+s.city:''}</div></td>
-                  <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${stage?.name || s.current_stage || '—'}</span></td>
-                  <td class="p-2 text-center ${overdue?'text-red-700 font-bold':'text-slate-600'}">${daysInStage != null ? daysInStage+'d' : '—'}${overdue?' 🐢':''}</td>
-                  <td class="p-2"><span class="text-[10px] ${stCls} px-1.5 py-0.5 rounded font-bold">${s.status}</span></td>
-                  <td class="p-2 text-center">
-                    <div class="text-sm font-bold ${s.glscore>=70?'text-emerald-700':s.glscore>=40?'text-amber-700':'text-red-700'}">${s.glscore||50}</div>
-                    <div class="bg-slate-100 rounded-full h-1 w-12 mx-auto"><div class="${s.glscore>=70?'bg-emerald-500':s.glscore>=40?'bg-amber-500':'bg-red-500'} h-1 rounded-full" style="width:${s.glscore||50}%"></div></div>
-                  </td>
-                  <td class="p-2 ${expCls}">${expLbl}</td>
-                  <td class="p-2"><button onclick="eduOpenStudent('${s.id}')" class="text-blue-600 text-[10px] hover:underline">ver detalle</button></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `}
-    </div>
-  `;
-}
-
-// ─── TAB: PLAN IA ───
-function eduRenderPlan() {
-  const m = eduCurrentMentorship();
-  const aiKey = `edu-plan-${eduState.mentorshipId}-${eduState.selectedStudentId || 'none'}`;
-  const ai = (window.aiState && window.aiState[aiKey]) || {};
-  const student = eduState.students.find(s => s.id === eduState.selectedStudentId);
-
-  if (!student) {
-    return `<div class="text-center py-12 text-slate-500">
-      <div class="text-5xl mb-3">🎯</div>
-      <div class="font-bold">Generador de Plan IA</div>
-      <div class="text-xs mt-2 max-w-md mx-auto">Seleccioná un estudiante en el tab Estudiantes (botón "ver detalle"), o eligí uno acá abajo:</div>
-      <select onchange="eduState.selectedStudentId=this.value; eduRender()" class="mt-4 border border-slate-300 rounded px-3 py-2 text-sm">
-        <option value="">— Seleccionar estudiante —</option>
-        ${eduMyStudents().map(s => `<option value="${s.id}">${s.full_name} · ${eduStageObj(s.current_stage)?.name || s.current_stage || 'sin etapa'}</option>`).join('')}
-      </select>
-    </div>`;
-  }
-
-  const stage = eduStageObj(student.current_stage);
-  const generatedPlan = ai.plan || null;
-
-  return `
-    <div class="space-y-3">
-      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3">
-        <div class="flex justify-between items-start gap-2 flex-wrap">
-          <div>
-            <div class="text-xs font-bold text-blue-900 uppercase">🎓 Estudiante seleccionado</div>
-            <div class="text-lg font-bold mt-1">${student.full_name}</div>
-            <div class="text-[11px] text-slate-600">
-              Etapa: <strong>${stage?.name || student.current_stage || 'sin etapa'}</strong> · ${eduDaysInStage(student) || 0}d en etapa · GLScore <strong>${student.glscore||50}</strong>
-            </div>
-          </div>
-          <button onclick="eduState.selectedStudentId=null; eduRender()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Cambiar</button>
-        </div>
-      </div>
-
-      <!-- Diagnóstico que el coach pasa para que IA genere el plan -->
-      <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📝 Diagnóstico de la sesión (input para IA)</div>
-        <textarea id="edu-plan-diagnostic" rows="4" placeholder="Describe rápidamente qué hicieron en la última sesión, qué objetivos tiene el estudiante para las próximas 2 semanas, y dónde está atascado. Ej: 'Ya tiene buybox definido en Austin SE. Le falta análisis de 5 comps. Quiere cerrar primera oferta en 30d.'" class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${student._lastDiagnostic||''}</textarea>
-        <div class="flex justify-between items-center mt-2">
-          <select id="edu-plan-horizon" class="border border-slate-300 rounded px-2 py-1 text-xs">
-            <option value="1">Plan para 1 semana</option>
-            <option value="2" selected>Plan para 2 semanas</option>
-            <option value="4">Plan para 1 mes</option>
-          </select>
-          <button onclick="eduGeneratePlan()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-4 py-2 rounded">🤖 Generar plan con IA</button>
-        </div>
-      </div>
-
-      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900 text-center"><span class="animate-pulse">🧠 Claude analizando el contexto y armando el plan...</span></div>` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
-
-      ${generatedPlan ? `
-        <div class="bg-white border-2 border-violet-300 rounded-xl overflow-hidden">
-          <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 flex justify-between items-center">
-            <div class="text-xs font-bold uppercase text-violet-900">🎯 Plan generado · listo para copiar y pegar al estudiante</div>
-            <div class="flex gap-1">
-              <button onclick="eduCopyPlan()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">📋 Copiar</button>
-              <button onclick="eduSavePlan()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2 py-1 rounded">💾 Guardar como tareas</button>
-            </div>
-          </div>
-          <div class="p-4" id="edu-plan-preview">
-            <div class="prose prose-sm max-w-none">
-              ${generatedPlan.message ? `<div class="bg-blue-50 border border-blue-200 rounded p-3 mb-3 text-xs whitespace-pre-wrap">${generatedPlan.message}</div>` : ''}
-              <h3 class="text-sm font-bold text-slate-900 mt-3">🎯 Objetivo de las próximas ${ai.horizon || 2} semanas</h3>
-              <p class="text-xs text-slate-700">${generatedPlan.objective || '—'}</p>
-              <h3 class="text-sm font-bold text-slate-900 mt-3">📋 Tareas concretas</h3>
-              <ol class="text-xs text-slate-700 space-y-1.5">
-                ${(generatedPlan.tasks || []).map(t => `<li><strong>${t.title}</strong>${t.description ? '<br><span class="text-slate-500">'+t.description+'</span>' : ''}${t.due_date ? '<br><em class="text-blue-700">Due: '+t.due_date+'</em>' : ''}</li>`).join('')}
-              </ol>
-              ${(generatedPlan.resources || []).length ? `
-                <h3 class="text-sm font-bold text-slate-900 mt-3">📚 Recursos recomendados</h3>
-                <ul class="text-xs text-slate-700 space-y-1">
-                  ${generatedPlan.resources.map(r => `<li>${r.title}${r.url ? ' · <a href="'+r.url+'" target="_blank" class="text-blue-600 underline">link</a>' : ''}</li>`).join('')}
-                </ul>
-              ` : ''}
-              ${(generatedPlan.success_criteria || []).length ? `
-                <h3 class="text-sm font-bold text-slate-900 mt-3">✅ Criterios de éxito</h3>
-                <ul class="text-xs text-slate-700 space-y-1">${generatedPlan.success_criteria.map(s => `<li>• ${s}</li>`).join('')}</ul>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-async function eduGeneratePlan() {
-  const student = eduState.students.find(s => s.id === eduState.selectedStudentId);
-  if (!student) return alert('Seleccioná un estudiante primero');
-  const diagnostic = document.getElementById('edu-plan-diagnostic').value.trim();
-  const horizon = +document.getElementById('edu-plan-horizon').value || 2;
-  const m = eduCurrentMentorship();
-  const stage = eduStageObj(student.current_stage);
-  const aiKey = `edu-plan-${eduState.mentorshipId}-${student.id}`;
-  window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { loading: true, horizon };
-  eduRender();
-  try {
-    const { data, error } = await sb.functions.invoke('ai-deep-analyze', {
-      body: {
-        system: 'edu-plan',
-        context: {
-          mentorship: m.name,
-          mentorship_slug: m.id,
-          stages: m.stages,
-          current_stage: stage?.name || student.current_stage,
-          stage_target_weeks: stage?.target_weeks,
-          days_in_stage: eduDaysInStage(student),
-          student: {
-            name: student.full_name,
-            enrolled_at: student.enrolled_at,
-            expires_at: student.expires_at,
-            glscore: student.glscore,
-            goals: student.goals,
-            notes: student.notes
-          },
-          coach_diagnostic: diagnostic,
-          horizon_weeks: horizon
-        },
-        force: true
-      }
-    });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    window.aiState[aiKey] = { loading: false, plan: data, horizon };
-  } catch (e) {
-    window.aiState[aiKey] = { loading: false, error: e.message || String(e) };
-  }
-  eduRender();
-}
-
-function eduCopyPlan() {
-  const el = document.getElementById('edu-plan-preview');
-  if (!el) return;
-  const text = el.innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    toast ? toast('Plan copiado al portapapeles', 'success') : alert('✓ Copiado');
-  });
-}
-
-async function eduSavePlan() {
-  const aiKey = `edu-plan-${eduState.mentorshipId}-${eduState.selectedStudentId}`;
-  const plan = window.aiState[aiKey]?.plan;
-  if (!plan?.tasks?.length) return alert('Sin tareas para guardar');
-  const rows = plan.tasks.map(t => ({
-    student_id: eduState.selectedStudentId,
-    stage_key: eduState.students.find(s => s.id === eduState.selectedStudentId)?.current_stage,
-    title: t.title,
-    description: t.description || null,
-    resources: plan.resources || [],
-    generated_by: 'ai',
-    due_date: t.due_date || null,
-    status: 'pending'
-  }));
-  const { error } = await sb.from('edu_student_tasks').insert(rows);
-  if (error) return alert('Error: ' + error.message);
-  alert(`✓ ${rows.length} tareas guardadas en el plan del estudiante.`);
-}
-
-// ─── TAB: PROGRESO ───
-function eduRenderProgress() {
-  const students = eduMyStudents();
-  // Distribución por etapa
-  const m = eduCurrentMentorship();
-  const byStage = {};
-  (m?.stages || []).forEach(st => byStage[st.key] = 0);
-  students.forEach(s => { if (s.current_stage) byStage[s.current_stage] = (byStage[s.current_stage]||0) + 1; });
-
-  // Distribución GLScore
-  const bands = { 'excelente':0, 'bueno':0, 'atención':0, 'crítico':0 };
-  students.forEach(s => {
-    const g = s.glscore || 50;
-    if (g >= 80) bands.excelente++;
-    else if (g >= 60) bands.bueno++;
-    else if (g >= 40) bands['atención']++;
-    else bands['crítico']++;
-  });
-
-  const avgScore = students.length ? Math.round(students.reduce((acc,s) => acc + (s.glscore||50), 0) / students.length) : 0;
-
-  return `
-    <div class="space-y-3">
-      <!-- KPIs -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div class="bg-slate-900 text-white rounded-xl p-3"><div class="text-[10px] text-slate-400 uppercase font-bold">GLScore prom</div><div class="text-3xl font-bold">${avgScore}</div></div>
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div class="text-[10px] text-emerald-700 uppercase font-bold">🏆 Excelente</div><div class="text-3xl font-bold text-emerald-900">${bands.excelente}</div><div class="text-[10px] text-emerald-700">≥80</div></div>
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] text-blue-700 uppercase font-bold">✅ Bueno</div><div class="text-3xl font-bold text-blue-900">${bands.bueno}</div><div class="text-[10px] text-blue-700">60-79</div></div>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[10px] text-amber-700 uppercase font-bold">⚠️ Atención</div><div class="text-3xl font-bold text-amber-900">${bands['atención']}</div><div class="text-[10px] text-amber-700">40-59</div></div>
-        <div class="bg-red-50 border border-red-200 rounded-xl p-3"><div class="text-[10px] text-red-700 uppercase font-bold">🔴 Crítico</div><div class="text-3xl font-bold text-red-900">${bands['crítico']}</div><div class="text-[10px] text-red-700">&lt;40</div></div>
-      </div>
-
-      <!-- Distribución por etapa (funnel-style) -->
-      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">🎯 Distribución por etapa</div>
-        <div class="p-3 space-y-1">
-          ${(m?.stages || []).map(st => {
-            const n = byStage[st.key] || 0;
-            const pct = students.length ? Math.round(n/students.length*100) : 0;
-            return `<div class="flex items-center gap-2 text-xs">
-              <div class="w-40 truncate">${st.name}</div>
-              <div class="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-                <div class="bg-blue-500 h-4 rounded-full flex items-center px-2 text-white text-[10px] font-bold" style="width:${Math.max(pct,3)}%">${n>0?n:''}</div>
-              </div>
-              <div class="w-10 text-right text-[10px] text-slate-600">${pct}%</div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>
-
-      <!-- Top performers + worst -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-white border border-emerald-200 rounded-xl overflow-hidden">
-          <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 text-xs font-bold uppercase text-emerald-900">🏆 Top 10 GLScore</div>
-          <table class="w-full text-xs">
-            <tbody>
-              ${[...students].sort((a,b) => (b.glscore||0)-(a.glscore||0)).slice(0,10).map(s => `<tr class="border-t border-slate-100"><td class="p-2 font-semibold">${s.full_name}</td><td class="p-2 text-right font-bold text-emerald-700">${s.glscore||50}</td><td class="p-2 text-[10px] text-slate-500">${eduStageObj(s.current_stage)?.name||'—'}</td></tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
-          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">🔴 Bottom 10 — necesitan atención</div>
-          <table class="w-full text-xs">
-            <tbody>
-              ${[...students].sort((a,b) => (a.glscore||0)-(b.glscore||0)).slice(0,10).map(s => `<tr class="border-t border-slate-100"><td class="p-2 font-semibold">${s.full_name}</td><td class="p-2 text-right font-bold text-red-700">${s.glscore||50}</td><td class="p-2 text-[10px] text-slate-500">${eduStageObj(s.current_stage)?.name||'—'}</td></tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// ─── TAB: RECURSOS ───
-function eduRenderResources() {
-  const resources = eduMyResources();
-  const m = eduCurrentMentorship();
-  const byStage = {};
-  resources.forEach(r => { const k = r.stage_key || '__all__'; (byStage[k] = byStage[k] || []).push(r); });
-
-  return `
-    <div class="space-y-3">
-      <div class="flex justify-between items-center">
-        <div class="text-xs text-slate-600">Slides, docs, videos, templates. Organizados por etapa.</div>
-        <button onclick="eduAddResource()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded">+ Recurso</button>
-      </div>
-      ${resources.length === 0 ? `<div class="text-center py-12 text-slate-400 text-xs">Sin recursos. Agregá slides, docs y links para que el plan IA los referencie automáticamente.</div>` : ''}
-
-      ${(m?.stages || []).concat([{key:'__all__', name:'📌 General (todas las etapas)'}]).map(st => {
-        const items = byStage[st.key] || [];
-        if (items.length === 0 && st.key !== '__all__') return '';
-        return `
-          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${st.name} ${items.length?`<span class="bg-slate-900 text-white text-[9px] px-1.5 rounded">${items.length}</span>`:''}</div>
-            ${items.length === 0 ? '' : `
-              <div class="divide-y divide-slate-100">
-                ${items.map(r => `
-                  <div class="p-2 flex justify-between items-center hover:bg-slate-50">
-                    <div class="flex-1 min-w-0">
-                      <div class="text-xs font-semibold">${r.type === 'slide'?'🎬':r.type==='video'?'📹':r.type==='doc'?'📄':r.type==='template'?'📋':r.type==='checklist'?'☑️':'🔗'} ${r.title}</div>
-                      ${r.description ? `<div class="text-[10px] text-slate-500">${r.description}</div>` : ''}
-                      ${r.tags?.length ? `<div class="flex gap-1 mt-1">${r.tags.map(t => `<span class="bg-slate-100 text-slate-700 text-[9px] px-1 rounded">${t}</span>`).join('')}</div>` : ''}
-                    </div>
-                    <div class="flex gap-1">
-                      ${r.url ? `<a href="${r.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir↗</a>` : ''}
-                      <button onclick="eduDeleteResource('${r.id}')" class="text-red-500 hover:text-red-700 text-[10px]">🗑</button>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            `}
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-}
-
-// ─── TAB: CALENDARIO / LLAMADAS ───
-function eduRenderCalls() {
-  const myStudents = eduMyStudents();
-  const ids = new Set(myStudents.map(s => s.id));
-  const calls = (eduState.calls || []).filter(c => ids.has(c.student_id));
-  const upcoming = calls.filter(c => new Date(c.scheduled_at) > new Date()).slice(0, 20);
-  const recent = calls.filter(c => new Date(c.scheduled_at) <= new Date()).slice(0, 20);
-
-  const studentName = (id) => myStudents.find(s => s.id === id)?.full_name || '—';
-
-  return `
-    <div class="space-y-3">
-      <div class="flex justify-between items-center">
-        <div class="text-xs text-slate-600">Llamadas programadas y completadas. Próximamente: integración con Google Calendar.</div>
-        <button onclick="eduAddCall()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded">+ Programar llamada</button>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-blue-50 border-b border-blue-200 px-3 py-2 text-xs font-bold uppercase text-blue-900">📅 Próximas (${upcoming.length})</div>
-          ${upcoming.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin llamadas programadas.</div>' : `
-            <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              ${upcoming.map(c => `
-                <div class="p-2 text-xs">
-                  <div class="font-semibold">${studentName(c.student_id)}</div>
-                  <div class="text-[10px] text-slate-500">${new Date(c.scheduled_at).toLocaleString('es-MX')} · ${c.duration_min}min · ${c.type}</div>
-                </div>
-              `).join('')}
-            </div>
-          `}
-        </div>
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">🕓 Recientes (${recent.length})</div>
-          ${recent.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin llamadas recientes.</div>' : `
-            <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              ${recent.slice(0,15).map(c => `
-                <div class="p-2 text-xs">
-                  <div class="font-semibold">${studentName(c.student_id)} ${c.attended===false?'❌':c.attended===true?'✓':''}</div>
-                  <div class="text-[10px] text-slate-500">${new Date(c.scheduled_at).toLocaleString('es-MX')} · ${c.type}</div>
-                  ${c.notes_md ? `<div class="text-[10px] text-slate-600 mt-1 line-clamp-2">${c.notes_md}</div>` : ''}
-                </div>
-              `).join('')}
-            </div>
-          `}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// ─── TAB: ALERTAS ───
-function eduRenderAlerts() {
-  const alerts = eduMyAlerts();
-  const myStudents = eduMyStudents();
-  const studentName = (id) => myStudents.find(s => s.id === id)?.full_name || '—';
-
-  // Auto-generar alertas si no hay (computed from data)
-  const computedAlerts = [];
-  myStudents.forEach(s => {
-    const daysExp = eduDaysToExpiry(s);
-    if (daysExp != null && daysExp >= 0 && daysExp <= 30) {
-      computedAlerts.push({ student_id: s.id, alert_type: 'expiring_soon', severity: daysExp <= 7 ? 'critical' : 'high', message: `Mentoría vence en ${daysExp} días`, detail: `Pasar a comercial para renovación.` });
-    }
-    if (daysExp != null && daysExp < 0) {
-      computedAlerts.push({ student_id: s.id, alert_type: 'expired', severity: 'critical', message: `Mentoría VENCIDA hace ${Math.abs(daysExp)} días`, detail: `Decidir: renovar, graduar o terminar.` });
-    }
-    if (s.payment_status === 'past_due') {
-      computedAlerts.push({ student_id: s.id, alert_type: 'payment_overdue', severity: 'high', message: 'Pago atrasado', detail: 'Coordinar con comercial.' });
-    }
-    if (eduIsStageOverdue(s)) {
-      const stage = eduStageObj(s.current_stage);
-      const days = eduDaysInStage(s);
-      computedAlerts.push({ student_id: s.id, alert_type: 'stage_overdue', severity: 'normal', message: `${days}d en etapa "${stage?.name}" (target ${stage?.target_weeks*7}d)`, detail: '1-on-1 para desbloquear.' });
-    }
-    if (s.glscore != null && s.glscore < 40) {
-      computedAlerts.push({ student_id: s.id, alert_type: 'low_glscore', severity: 'high', message: `GLScore crítico (${s.glscore})`, detail: 'Progreso lento. Intervenir.' });
-    }
-  });
-
-  const all = [...alerts, ...computedAlerts];
-  const grouped = { critical: [], high: [], normal: [], low: [] };
-  all.forEach(a => { (grouped[a.severity] || grouped.normal).push(a); });
-
-  return `
-    <div class="space-y-3">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="bg-red-600 text-white rounded-xl p-3"><div class="text-[10px] text-red-100 uppercase font-bold">Críticas</div><div class="text-3xl font-bold">${grouped.critical.length}</div></div>
-        <div class="bg-amber-50 border border-amber-300 rounded-xl p-3"><div class="text-[10px] text-amber-700 uppercase font-bold">High</div><div class="text-3xl font-bold text-amber-900">${grouped.high.length}</div></div>
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] text-blue-700 uppercase font-bold">Normal</div><div class="text-3xl font-bold text-blue-900">${grouped.normal.length}</div></div>
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><div class="text-[10px] text-slate-600 uppercase font-bold">Total</div><div class="text-3xl font-bold text-slate-700">${all.length}</div></div>
-      </div>
-
-      ${all.length === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">✅</div><div class="font-bold mt-2">Sin alertas activas</div><div class="text-xs text-slate-500 mt-1">Todos los estudiantes están al día.</div></div>` :
-        ['critical','high','normal','low'].map(sev => {
-          const items = grouped[sev];
-          if (items.length === 0) return '';
-          const c = sev === 'critical' ? 'red' : sev === 'high' ? 'amber' : sev === 'normal' ? 'blue' : 'slate';
-          return `
-            <div class="bg-white border border-${c}-200 rounded-xl overflow-hidden">
-              <div class="bg-${c}-50 border-b border-${c}-200 px-3 py-2 text-xs font-bold uppercase text-${c}-900">${sev} (${items.length})</div>
-              <div class="divide-y divide-slate-100">
-                ${items.map(a => `
-                  <div class="p-2 text-xs flex justify-between items-start gap-2">
-                    <div class="flex-1">
-                      <div class="font-semibold">${studentName(a.student_id)}</div>
-                      <div class="text-[11px]">${a.message}</div>
-                      ${a.detail ? `<div class="text-[10px] text-slate-500 mt-0.5">${a.detail}</div>` : ''}
-                    </div>
-                    <button onclick="eduOpenStudent('${a.student_id}')" class="text-blue-600 text-[10px] hover:underline whitespace-nowrap">ver estudiante</button>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        }).join('')
-      }
-    </div>
-  `;
-}
-
-// ─── TAB: CONFIG ───
-function eduRenderConfig() {
-  const m = eduCurrentMentorship();
-  if (!m) return '';
-  return `
-    <div class="space-y-3">
-      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        💡 <strong>Configurá esta mentoría</strong>: Airtable IDs para sync de estudiantes, etapas, weights del GLScore.
-      </div>
-
-      <!-- Airtable config -->
-      <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">🔗 Airtable</div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Base ID (ej. appXXX...)</label>
-            <input id="edu-cfg-base" value="${m.airtable_base_id||''}" placeholder="appXXXXXXXX" class="w-full border border-slate-300 rounded px-2 py-1.5 font-mono text-[11px]" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Tabla de estudiantes (nombre)</label>
-            <input id="edu-cfg-table" value="${m.airtable_students_table||''}" placeholder="Estudiantes" class="w-full border border-slate-300 rounded px-2 py-1.5 text-[11px]" />
-          </div>
-        </div>
-        <div class="text-[10px] text-slate-500 mt-2">💡 El Airtable API key se guarda en Supabase Vault, no acá. Decime cuando estés listo y te indico cómo agregarlo.</div>
-        <button onclick="eduSaveConfig()" class="mt-2 bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">💾 Guardar config</button>
-      </div>
-
-      <!-- Etapas -->
-      <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">🎯 Etapas del programa</div>
-        <div class="space-y-1">
-          ${(m.stages || []).map((s, i) => `
-            <div class="flex items-center gap-2 text-xs">
-              <span class="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded">#${i+1}</span>
-              <span class="flex-1 font-semibold">${s.name}</span>
-              <span class="text-[10px] text-slate-500">target: ${s.target_weeks||0} sem</span>
-              <code class="text-[9px] bg-slate-100 px-1 rounded text-slate-600">${s.key}</code>
-            </div>
-          `).join('')}
-        </div>
-        <div class="text-[10px] text-slate-500 mt-2 italic">Las etapas vienen con valores por defecto. Para editarlas se modifica el SQL.</div>
-      </div>
-
-      <!-- GLScore weights -->
-      <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 GLScore Weights (%)</div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-          ${Object.entries(m.glscore_weights || {}).map(([k,v]) => `
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">${k.replace(/_/g,' ')}</label>
-              <input type="number" min="0" max="100" value="${v}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs" disabled />
-            </div>
-          `).join('')}
-        </div>
-        <div class="text-[10px] text-slate-500 mt-2 italic">Configuración avanzada. Si querés cambiar los weights, decímelo.</div>
-      </div>
-    </div>
-  `;
-}
-
-async function eduSaveConfig() {
-  const m = eduCurrentMentorship();
-  if (!m) return;
-  const payload = {
-    airtable_base_id: document.getElementById('edu-cfg-base').value.trim() || null,
-    airtable_students_table: document.getElementById('edu-cfg-table').value.trim() || null
+    `;
   };
-  const { error } = await sb.from('edu_mentorships').update(payload).eq('id', m.id);
-  if (error) return alert('Error: ' + error.message);
-  alert('✓ Config guardada');
-  await eduLoadAll();
-  eduRender();
-}
 
-// ─── ACCIONES ───
-function eduOpenStudent(id) {
-  eduState.selectedStudentId = id;
-  eduState.tab = 'plan';
-  eduRender();
-}
-
-async function eduAddStudent() {
-  const m = eduCurrentMentorship();
-  const name = prompt(`Nombre completo del estudiante para ${m.name}:`);
-  if (!name) return;
-  const email = prompt('Email (opcional):', '');
-  const stage = (m.stages?.[0]?.key) || null;
-  const { error } = await sb.from('edu_students').insert({
-    mentorship_id: m.id,
-    full_name: name,
-    email: email || null,
-    enrolled_at: new Date().toISOString().split('T')[0],
-    current_stage: stage,
-    stage_started_at: new Date().toISOString().split('T')[0]
-  });
-  if (error) return alert('Error: ' + error.message);
-  await eduLoadAll(); eduRender();
-}
-
-async function eduAddResource() {
-  const m = eduCurrentMentorship();
-  const title = prompt('Título del recurso:');
-  if (!title) return;
-  const type = prompt('Tipo (slide/doc/video/link/template/checklist):', 'slide') || 'slide';
-  const url = prompt('URL (Drive/Notion/YouTube/etc.):', '') || null;
-  const stageOpts = (m.stages || []).map(s => `${s.key} = ${s.name}`).join('\n');
-  const stageKey = prompt(`Etapa (dejar vacío para "todas"):\n${stageOpts}`, '') || null;
-  const { error } = await sb.from('edu_resources').insert({
-    mentorship_id: m.id, title, type, url, stage_key: stageKey, created_by: state.user.id
-  });
-  if (error) return alert('Error: ' + error.message);
-  await eduLoadAll(); eduRender();
-}
-
-async function eduDeleteResource(id) {
-  if (!confirm('¿Eliminar recurso?')) return;
-  await sb.from('edu_resources').delete().eq('id', id);
-  await eduLoadAll(); eduRender();
-}
-
-async function eduAddCall() {
-  const myStudents = eduMyStudents();
-  if (!myStudents.length) return alert('Sin estudiantes en esta mentoría todavía');
-  const opts = myStudents.map((s,i) => `${i+1}. ${s.full_name}`).join('\n');
-  const idx = +prompt(`¿Con quién?\n${opts}\n\nNúmero:`, '1') - 1;
-  const student = myStudents[idx];
-  if (!student) return;
-  const date = prompt('Fecha y hora (YYYY-MM-DD HH:MM):');
-  if (!date) return;
-  const duration = +prompt('Duración (minutos):', '60') || 60;
-  const type = prompt('Tipo (mentoring/onboarding/followup/exit/group):', 'mentoring') || 'mentoring';
-  const { error } = await sb.from('edu_student_calls').insert({
-    student_id: student.id,
-    scheduled_at: new Date(date).toISOString(),
-    duration_min: duration,
-    type
-  });
-  if (error) return alert('Error: ' + error.message);
-  await eduLoadAll(); eduRender();
-}
-
-async function eduTriggerSync() {
-  const m = eduCurrentMentorship();
-  if (!m?.airtable_base_id) return alert('Configurá Airtable primero (tab Config)');
-  if (!confirm(`Sincronizar estudiantes de ${m.name} desde Airtable?\n\nEsto trae/actualiza estudiantes del Base ${m.airtable_base_id}.`)) return;
-  try {
-    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/sync-education-airtable`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ mentorship_id: m.id })
-    });
-    const r = await res.json();
-    if (!r.ok) throw new Error(r.error || 'falló');
-
-    // Diagnóstico detallado
-    let msg = `✅ Sync ejecutado\n\n`;
-    msg += `📥 De Airtable: ${r.fetched_from_airtable} records\n`;
-    msg += `💾 Guardados en DB: ${r.synced}\n`;
-    if (r.errors?.length) msg += `\n⚠️ Errores: ${r.errors.join('; ')}\n`;
-    if (r.debug?.airtable_field_names?.length) {
-      msg += `\n🔍 Columnas detectadas en Airtable (las primeras 12):\n${r.debug.airtable_field_names.slice(0,12).join(' · ')}\n`;
-    }
-    if (r.fetched_from_airtable === 0) {
-      msg += `\n⚠️ Airtable devolvió 0 records. Verificá:\n• Que la tabla tenga registros\n• Que el table_id sea el correcto\n`;
-    }
-    if (r.debug?.sample_mapped_record) {
-      const s = r.debug.sample_mapped_record;
-      msg += `\n📋 Primer registro mapeado:\n• full_name: ${s.full_name}\n• email: ${s.email||'(vacío)'}\n• enrolled_at: ${s.enrolled_at||'(vacío)'}\n• current_stage: ${s.current_stage||'(vacío)'}\n`;
-      if (s.full_name?.startsWith('Estudiante ')) {
-        msg += `\n⚠️ No detectó el campo NOMBRE. Decime cómo se llama la columna en Airtable y la mapeo.`;
-      }
-    }
-    alert(msg);
-    console.log('[Edu Sync Debug]', r);
-    await eduLoadAll(); eduRender();
-  } catch (e) {
-    alert('Error en sync: ' + e.message);
-  }
-}
-
-// Botón "🔍 Debug DB" — muestra estado real de la DB
-async function eduDebugDB() {
-  const m = eduCurrentMentorship();
-  if (!m) return;
-  const { data, error, count } = await sb.from('edu_students')
-    .select('id, full_name, email, current_stage, expires_at, status, airtable_record_id', { count: 'exact' })
-    .eq('mentorship_id', m.id)
-    .limit(5);
-  if (error) return alert('Error consultando DB: ' + error.message);
-  let msg = `📊 Estado en la DB Supabase\n\n`;
-  msg += `Mentoría: ${m.name}\n`;
-  msg += `Estudiantes guardados: ${count}\n\n`;
-  if (count === 0) {
-    msg += 'NO hay registros para esta mentoría.\n\nPosibles causas:\n• El sync nunca corrió correctamente\n• Falló el INSERT silenciosamente\n• El mentorship_id está mal seteado\n\nProbá:\n1. Click "🔄 Sync" otra vez\n2. Mirá si el alert de sync dice "synced > 0"';
-  } else {
-    msg += 'Primeros 5 estudiantes:\n';
-    data.forEach((s, i) => {
-      msg += `\n${i+1}. ${s.full_name}`;
-      msg += `\n   email: ${s.email||'—'} | etapa: ${s.current_stage||'—'} | status: ${s.status}`;
-      msg += `\n   airtable_id: ${s.airtable_record_id?.slice(0,15) || '—'}`;
-    });
-    msg += '\n\n✅ La DB tiene registros. Si el UI los muestra en 0, hard refresh.';
-  }
-  alert(msg);
-}
-
-// ============================================================
-// TAB: PRESENTACIONES IA — genera slides con web search live + descarga PPTX
-// ============================================================
-function eduRenderPresentations() {
-  const m = eduCurrentMentorship();
-  const presentations = (eduState.presentations || []).filter(p => p.mentorship_id === eduState.mentorshipId);
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
-  const ai = (window.aiState && window.aiState[aiKey]) || {};
-  const draft = ai.presentation;
-
-  return `
-    <div class="space-y-3">
-      <!-- Form de input -->
-      <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-violet-900 mb-3">🎬 Generar presentación con IA + web search live</div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Título de la presentación *</label>
-            <input id="edu-pres-title" placeholder="Ej. Clase 1 — Qué es Wholesale y cómo funciona" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Tipo</label>
-            <select id="edu-pres-type" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-              <option value="class">📚 Clase magistral</option>
-              <option value="workshop">🛠 Taller práctico</option>
-              <option value="webinar">📡 Webinar abierto</option>
-              <option value="keynote">🎤 Keynote / Pitch</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="mt-2">
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Tema / qué cubrir *</label>
-          <textarea id="edu-pres-topic" rows="2" placeholder="Ej. Wholesale en Texas: cómo encontrar deals off-market, contratos, asignación. Foco en Austin/Houston mercado 2026, números reales de margins, lista de cash buyers comunes." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1"># Clase</label>
-            <input id="edu-pres-class-number" type="number" placeholder="1" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Duración (min)</label>
-            <input id="edu-pres-duration" type="number" value="60" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1"># Slides aprox</label>
-            <input id="edu-pres-slides" type="number" value="15" min="5" max="40" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Idioma</label>
-            <select id="edu-pres-lang" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-              <option value="es">Español</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Dominio temático + foco geográfico — para que las fuentes se adapten -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Dominio temático *</label>
-            <select id="edu-pres-domain" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-              <option value="real-estate">🏠 Real Estate (Redfin, FRED, NAR, MLS)</option>
-              <option value="marketing">📣 Marketing / Growth (HubSpot, Statista, Pew)</option>
-              <option value="finance">💰 Finanzas / Inversión (SEC, FRED, Bloomberg)</option>
-              <option value="tech">💻 Tech / Software (Gartner, IDC, CB Insights)</option>
-              <option value="sales">🤝 Ventas / B2B (HubSpot Sales, Salesforce, Gong)</option>
-              <option value="leadership">👥 Liderazgo / Management (HBR, McKinsey, Bain)</option>
-              <option value="general">🌍 General / Otro tema</option>
-            </select>
-            <div class="text-[9px] text-slate-500 mt-0.5">Define qué fuentes prioriza la IA</div>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Foco geográfico (opcional)</label>
-            <input id="edu-pres-geo" placeholder="Ej. Texas · USA · LATAM · Global · México" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-            <div class="text-[9px] text-slate-500 mt-0.5">Default Real Estate: Texas. Vacío en otros dominios.</div>
-          </div>
-        </div>
-
-        <div class="mt-2">
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Outline sugerido (opcional)</label>
-          <textarea id="edu-pres-outline" rows="2" placeholder="Si tenés ya una estructura en mente, pegala acá. Si no, Claude la arma." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
-        </div>
-
-        <div class="mt-2">
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">🔍 Fuentes preferidas (opcional)</label>
-          <textarea id="edu-pres-sources" rows="2" placeholder="Si querés que la IA priorice fuentes específicas, listalas. Ej: 'Statista, Gartner, McKinsey 2024 report'. La IA igual usa las del dominio por default." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
-        </div>
-
-        <div class="mt-2">
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">Audiencia</label>
-          <input id="edu-pres-audience" value="${m?.name ? 'Estudiantes de ' + m.name : 'Estudiantes de la mentoría'}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-        </div>
-
-        <div class="flex flex-col gap-2 mt-3 pt-3 border-t border-violet-200">
-          <div class="flex items-center gap-4 flex-wrap">
-            <label class="flex items-center gap-2 text-xs">
-              <input type="checkbox" id="edu-pres-live" checked />
-              <span><strong>🌐 Web search live</strong> — datos verificables en vivo</span>
-            </label>
-            <label class="flex items-center gap-2 text-xs bg-amber-50 border border-amber-300 px-2 py-1 rounded">
-              <input type="checkbox" id="edu-pres-research" />
-              <span><strong>🔬 Investigación profunda</strong> — extended thinking + 25 búsquedas (3-5 min, +costo, insights no obvios)</span>
-            </label>
-          </div>
-          <button onclick="withLoading(this, eduGeneratePresentation)" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2.5 rounded">🤖 Generar con IA</button>
-        </div>
-        <div class="text-[10px] text-violet-700 mt-2 italic" id="edu-pres-time-hint">⚡ Modo normal: ~30-90 seg, 8 web searches. Modo investigación: ~3-5 min, 25 searches + thinking. Activá investigación para casos donde necesitás profundidad real (clase nueva, tema técnico, lanzamiento).</div>
-      </div>
-
-      ${ai.loading ? `
-        <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
-          <div class="text-3xl animate-pulse">🧠</div>
-          <div class="mt-2 font-bold text-violet-900">Claude analizando + buscando data live...</div>
-          <div class="text-[10px] text-violet-700 mt-1">Web searches en progreso. Esto puede tardar 60-90 segundos.</div>
-        </div>
-      ` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
-
-      ${draft ? `
-        <!-- Preview de la presentación generada -->
-        <div class="bg-white border-2 border-emerald-300 rounded-xl overflow-hidden">
-          <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 flex justify-between items-center flex-wrap gap-2">
-            <div class="text-xs font-bold uppercase text-emerald-900">✅ Generada · ${(draft.slides||[]).length} slides</div>
-            <div class="flex gap-1">
-              <button onclick="eduDownloadPPTX()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Descargar PPTX</button>
-              <button onclick="eduDownloadSpeakerNotes()" class="bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold px-3 py-1.5 rounded">📋 Speaker notes</button>
-            </div>
-          </div>
-          <div class="p-4 max-h-[60vh] overflow-y-auto">
-            <h2 class="text-lg font-bold mb-2">${draft.title}</h2>
-            ${draft.outline?.length ? `<div class="text-xs text-slate-600 mb-3"><strong>Outline:</strong> ${draft.outline.join(' → ')}</div>` : ''}
-            <div class="space-y-3">
-              ${(draft.slides || []).map(s => `
-                <div class="border border-slate-200 rounded-lg p-3 hover:shadow-sm">
-                  <div class="flex justify-between items-start gap-2 mb-1">
-                    <div>
-                      <span class="text-[10px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold">Slide ${s.number}</span>
-                      <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded ml-1">${s.layout || 'content'}</span>
-                    </div>
-                  </div>
-                  <div class="font-bold text-sm">${s.title || ''}</div>
-                  ${s.subtitle ? `<div class="text-xs text-slate-600 mt-0.5">${s.subtitle}</div>` : ''}
-                  ${(s.bullets || []).length ? `<ul class="text-xs text-slate-700 mt-2 ml-4 list-disc space-y-0.5">${s.bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
-                  ${(s.stats || []).length ? `
-                    <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-1">
-                      ${s.stats.map(st => `<div class="bg-blue-50 border border-blue-200 rounded p-1.5 text-[10px]"><strong>${st.label}</strong><div class="text-blue-700 font-bold">${st.value}</div>${st.source_name?`<div class="text-[9px] text-slate-500">📍 ${st.source_name}</div>`:''}</div>`).join('')}
-                    </div>
-                  ` : ''}
-                  ${s.speaker_notes ? `<details class="mt-2"><summary class="cursor-pointer text-[10px] text-slate-600 font-bold">🎙 Speaker notes</summary><div class="text-[11px] text-slate-700 mt-1 bg-slate-50 rounded p-2 whitespace-pre-wrap">${s.speaker_notes}</div></details>` : ''}
-                  ${(s.sources || []).length ? `<div class="text-[9px] text-slate-500 mt-2">Fuentes: ${s.sources.map(src => `<a href="${src.url}" target="_blank" class="text-blue-600 hover:underline">${src.title || src.url}</a>`).join(' · ')}</div>` : ''}
-                </div>
-              `).join('')}
-            </div>
-            ${(draft.all_sources || []).length ? `
-              <div class="mt-4 pt-3 border-t border-slate-200">
-                <div class="text-xs font-bold uppercase text-slate-700 mb-1">📚 Todas las fuentes citadas</div>
-                <ul class="text-[10px] text-slate-600 space-y-0.5">
-                  ${draft.all_sources.map(src => `<li>• <a href="${src.url}" target="_blank" class="text-blue-600 hover:underline">${src.title || src.url}</a></li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      ` : ''}
-
-      <!-- Historial de presentaciones -->
-      ${presentations.length > 0 ? `
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📚 Historial — ${presentations.length} presentaciones</div>
-          <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-            ${presentations.map(p => `
-              <div class="p-2 flex justify-between items-start gap-2 hover:bg-slate-50">
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs font-bold truncate">${p.title}</div>
-                  <div class="text-[10px] text-slate-500">${p.presentation_type}${p.class_number ? ' · Clase #'+p.class_number : ''} · ${(p.slides||[]).length} slides · ${new Date(p.created_at).toLocaleDateString('es-MX')}</div>
-                </div>
-                <div class="flex gap-1 flex-shrink-0">
-                  <button onclick="eduLoadPresentation('${p.id}')" class="text-blue-600 text-[10px] hover:underline">cargar</button>
-                  <button onclick="eduDeletePresentation('${p.id}')" class="text-red-500 hover:text-red-700 text-[10px]">🗑</button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-async function eduGeneratePresentation() {
-  const title = document.getElementById('edu-pres-title')?.value.trim();
-  const topic = document.getElementById('edu-pres-topic')?.value.trim();
-  if (!title || !topic) return alert('Título y tema son obligatorios');
-  const m = eduCurrentMentorship();
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
-  window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { loading: true };
-  eduRender();
-  try {
-    const payload = {
-      mentorship_id: m?.id,
-      title,
-      topic,
-      audience: document.getElementById('edu-pres-audience').value || undefined,
-      presentation_type: document.getElementById('edu-pres-type').value,
-      class_number: +document.getElementById('edu-pres-class-number').value || null,
-      duration_min: +document.getElementById('edu-pres-duration').value || 60,
-      slides_count: +document.getElementById('edu-pres-slides').value || 15,
-      language: document.getElementById('edu-pres-lang').value,
-      outline_hint: document.getElementById('edu-pres-outline').value || null,
-      domain: document.getElementById('edu-pres-domain')?.value || 'real-estate',
-      geographic_focus: document.getElementById('edu-pres-geo')?.value || null,
-      preferred_sources: document.getElementById('edu-pres-sources')?.value || null,
-      require_live_data: document.getElementById('edu-pres-live').checked,
-      research_mode: document.getElementById('edu-pres-research')?.checked || false,
-      user_id: state.user.id
-    };
-    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/generate-presentation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify(payload)
-    });
-    const r = await res.json();
-    if (!r.ok) throw new Error(r.error || 'falló');
-    window.aiState[aiKey] = { loading: false, presentation: r.presentation, saved_id: r.saved_id, web_searches: r.web_searches, tokens: r.tokens };
-    await eduLoadAll();
-  } catch (e) {
-    window.aiState[aiKey] = { loading: false, error: e.message };
-  }
-  eduRender();
-}
-
-// ─── DOWNLOAD PPTX usando PptxGenJS ───
-function eduDownloadPPTX() {
-  if (typeof PptxGenJS === 'undefined') return alert('Librería PptxGenJS no cargada. Refresh la página.');
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
-  const p = (window.aiState[aiKey] || {}).presentation;
-  if (!p) return alert('Sin presentación cargada');
-  eduBuildPPTX(p, { download: true });
-}
-
-// Builder de PPTX con layouts ricos estilo Flipping Rentals
-function eduBuildPPTX(p, opts = {}) {
-  const pres = new PptxGenJS();
-  pres.layout = 'LAYOUT_WIDE';
-  pres.title = p.title;
-  pres.company = 'Empresa OS';
-
-  // Branding
-  const BRAND = (p.brand || 'EMPRESA OS').toUpperCase();
-  const YEAR = String(new Date().getFullYear());
-  const NAV = '0F172A', NAV_LIGHT = '1E293B', ACCENT = '2563EB', GOLD = 'D97706';
-  const GRAY_LIGHT = 'F1F5F9', GRAY_MED = '64748B', WHITE = 'FFFFFF';
-
-  // Master con header + footer branding
-  pres.defineSlideMaster({
-    title: 'BRAND',
-    background: { color: WHITE },
-    objects: [
-      // Header: marca + año en esquina superior izquierda
-      { text: { text: BRAND, options: { x: 0.4, y: 0.18, w: 5, h: 0.25, color: GRAY_MED, fontSize: 9, bold: true, charSpacing: 2 } } },
-      { text: { text: YEAR, options: { x: 12.4, y: 0.18, w: 0.6, h: 0.25, color: GRAY_MED, fontSize: 9, bold: true, align: 'right' } } },
-      // Línea divisoria
-      { rect: { x: 0.4, y: 0.45, w: 12.5, h: 0.02, fill: { color: GRAY_LIGHT } } },
-      // Footer
-      { rect: { x: 0, y: 7.1, w: 13.333, h: 0.4, fill: { color: NAV } } },
-      { text: { text: `${BRAND} · ${(p.title || '').slice(0, 60)}`, options: { x: 0.4, y: 7.15, w: 10, h: 0.3, color: WHITE, fontSize: 9 } } }
-    ],
-    slideNumber: { x: 12.6, y: 7.15, color: WHITE, fontSize: 10 }
-  });
-
-  // Master sin chrome (para covers)
-  pres.defineSlideMaster({ title: 'BARE', background: { color: NAV } });
-
-  const slides = p.slides || [];
-  slides.forEach((s, idx) => {
-    const isCover = s.layout === 'cover' || (idx === 0 && !s.layout);
-    const slide = pres.addSlide({ masterName: isCover ? 'BARE' : 'BRAND' });
-
-    if (isCover) return renderCover(slide, s, p, { BRAND, YEAR, ACCENT, GOLD, WHITE, GRAY_MED });
-
-    // Título de slide
-    slide.addText(s.title || `Slide ${s.number}`, { x: 0.4, y: 0.7, w: 12.5, h: 0.6, fontSize: 26, bold: true, color: NAV });
-    if (s.subtitle) slide.addText(s.subtitle, { x: 0.4, y: 1.3, w: 12.5, h: 0.4, fontSize: 14, color: GRAY_MED, italic: true });
-
-    switch (s.layout) {
-      case 'agenda':           renderAgenda(slide, s, { ACCENT, NAV, NAV_LIGHT, GRAY_LIGHT, WHITE }); break;
-      case 'comparison':       renderComparison(slide, s, { NAV, ACCENT, GRAY_LIGHT }); break;
-      case 'benefits':         renderBenefits(slide, s, { NAV, ACCENT, GOLD, GRAY_LIGHT }); break;
-      case 'case-study':       renderCaseStudy(slide, s, { NAV, ACCENT, GOLD, GRAY_LIGHT, GRAY_MED }); break;
-      case 'framework':        renderFramework(slide, s, { NAV, ACCENT, GRAY_LIGHT }); break;
-      case 'checklist':        renderChecklist(slide, s, { NAV, ACCENT, GRAY_LIGHT }); break;
-      case 'strategy-grid':    renderStrategyGrid(slide, s, { NAV, ACCENT, GOLD, GRAY_LIGHT }); break;
-      case 'metrics-dashboard': renderMetricsDashboard(slide, s, { NAV, ACCENT, GOLD }); break;
-      case 'quote':            renderQuote(slide, s, { NAV, ACCENT, GRAY_MED }); break;
-      case 'closing':          renderClosing(slide, s, p, { BRAND, NAV, ACCENT, GOLD, WHITE }); break;
-      default:                 renderDefault(slide, s, { NAV, ACCENT, GRAY_LIGHT });
-    }
-
-    // Speaker notes
-    if (s.speaker_notes) {
-      slide.addNotes(s.speaker_notes + ((s.sources||[]).length ? '\n\nFuentes:\n' + s.sources.map(src => '• ' + (src.title||'') + ' — ' + (src.url||'')).join('\n') : ''));
-    }
-  });
-
-  // Slide final con fuentes
-  if ((p.all_sources || []).length) {
-    const sld = pres.addSlide({ masterName: 'BRAND' });
-    sld.addText('Fuentes citadas', { x: 0.4, y: 0.7, w: 12.5, h: 0.6, fontSize: 26, bold: true, color: NAV });
-    const list = p.all_sources.slice(0, 30).map((src, i) => ({
-      text: `${i+1}. ${src.title || src.url}\n`,
-      options: { fontSize: 10, color: ACCENT, breakLine: true }
-    }));
-    sld.addText(list, { x: 0.4, y: 1.5, w: 12.5, h: 5.3 });
-  }
-
-  if (opts.download !== false) {
-    const safeName = (p.title || 'presentacion').replace(/[^a-z0-9]/gi, '_').slice(0, 60);
-    pres.writeFile({ fileName: `${new Date().toISOString().split('T')[0]}_${safeName}.pptx` });
-  }
-  return pres;
-}
-
-// ─── LAYOUT RENDERERS ───
-function renderCover(slide, s, p, c) {
-  // Marca arriba
-  slide.addText(c.BRAND, { x: 0.5, y: 0.5, w: 12.3, h: 0.4, color: c.GOLD, fontSize: 13, bold: true, charSpacing: 4 });
-  slide.addText(c.YEAR, { x: 12.3, y: 0.5, w: 0.6, h: 0.4, color: c.GRAY_MED, fontSize: 13, align: 'right' });
-  // Título central
-  slide.addText(s.title || p.title, { x: 0.5, y: 2.0, w: 12.3, h: 1.6, fontSize: 46, bold: true, color: c.WHITE, align: 'center' });
-  if (s.subtitle) {
-    slide.addShape('rect', { x: 1, y: 3.8, w: 11.3, h: 0.04, fill: { color: c.GOLD } });
-    slide.addText(`"${s.subtitle}"`, { x: 0.5, y: 4.0, w: 12.3, h: 0.8, fontSize: 18, color: 'CBD5E1', align: 'center', italic: true });
-  }
-  // 3 KPIs grandes
-  const kpis = s.metric_cards || s.stats || [];
-  if (kpis.length) {
-    const top3 = kpis.slice(0, 3);
-    const totalW = 12;
-    const cardW = totalW / top3.length;
-    top3.forEach((k, i) => {
-      const x = 0.7 + i * cardW;
-      slide.addText(String(k.value || ''), { x, y: 5.2, w: cardW - 0.2, h: 0.7, fontSize: 36, bold: true, color: c.GOLD, align: 'center' });
-      slide.addText(String(k.label || ''), { x, y: 5.95, w: cardW - 0.2, h: 0.4, fontSize: 12, color: 'CBD5E1', align: 'center' });
-    });
-  }
-}
-
-function renderAgenda(slide, s, c) {
-  const steps = s.agenda_steps || (s.bullets || []).map(b => ({ step: b, label: '' }));
-  if (!steps.length) return;
-  const n = Math.min(steps.length, 6);
-  const totalW = 12;
-  const cardW = totalW / n;
-  const y = 2.6;
-  steps.slice(0, n).forEach((st, i) => {
-    const x = 0.7 + i * cardW;
-    // Círculo con número
-    slide.addShape('ellipse', { x: x + cardW/2 - 0.4, y, w: 0.8, h: 0.8, fill: { color: c.ACCENT }, line: { color: c.ACCENT } });
-    slide.addText(String(i+1), { x: x + cardW/2 - 0.4, y, w: 0.8, h: 0.8, fontSize: 24, bold: true, color: c.WHITE, align: 'center', valign: 'middle' });
-    // Step name
-    slide.addText(String(st.step || st.title || ''), { x: x + 0.1, y: y + 1.0, w: cardW - 0.2, h: 0.5, fontSize: 16, bold: true, color: c.NAV, align: 'center' });
-    // Label
-    if (st.label) slide.addText(String(st.label), { x: x + 0.1, y: y + 1.5, w: cardW - 0.2, h: 0.7, fontSize: 10, color: c.NAV_LIGHT, align: 'center' });
-    // Flecha conectora
-    if (i < n - 1) {
-      slide.addText('→', { x: x + cardW - 0.3, y: y + 0.2, w: 0.4, h: 0.5, fontSize: 20, color: c.NAV_LIGHT, align: 'center' });
-    }
-  });
-}
-
-function renderComparison(slide, s, c) {
-  const cmp = s.comparison || { left: { title: 'A', items: [] }, right: { title: 'B', items: [] } };
-  const y0 = 2.0;
-  const w = 5.9, h = 4.7;
-  // LEFT card
-  slide.addShape('roundRect', { x: 0.5, y: y0, w, h, fill: { color: 'FEE2E2' }, line: { color: 'F87171', width: 2 }, rectRadius: 0.15 });
-  slide.addText(cmp.left?.title || 'Opción A', { x: 0.7, y: y0 + 0.2, w: w - 0.4, h: 0.5, fontSize: 18, bold: true, color: 'B91C1C' });
-  const leftItems = (cmp.left?.items || []).map(t => ({ text: '✗ ' + t, options: { fontSize: 13, color: '7F1D1D', breakLine: true } }));
-  slide.addText(leftItems, { x: 0.8, y: y0 + 0.9, w: w - 0.5, h: h - 1.1 });
-  // RIGHT card
-  slide.addShape('roundRect', { x: 6.95, y: y0, w, h, fill: { color: 'DCFCE7' }, line: { color: '4ADE80', width: 2 }, rectRadius: 0.15 });
-  slide.addText(cmp.right?.title || 'Opción B', { x: 7.15, y: y0 + 0.2, w: w - 0.4, h: 0.5, fontSize: 18, bold: true, color: '14532D' });
-  const rightItems = (cmp.right?.items || []).map(t => ({ text: '✓ ' + t, options: { fontSize: 13, color: '14532D', breakLine: true } }));
-  slide.addText(rightItems, { x: 7.25, y: y0 + 0.9, w: w - 0.5, h: h - 1.1 });
-}
-
-function renderBenefits(slide, s, c) {
-  const items = (s.bullets || []).slice(0, 6);
-  if (!items.length) return;
-  const cols = items.length > 3 ? 2 : 1;
-  const rows = Math.ceil(items.length / cols);
-  const cardW = (12 / cols) - 0.3;
-  const cardH = (4.5 / rows) - 0.2;
-  items.forEach((b, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = 0.5 + col * (cardW + 0.3);
-    const y = 2.0 + row * (cardH + 0.2);
-    slide.addShape('roundRect', { x, y, w: cardW, h: cardH, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
-    // Número en círculo
-    slide.addShape('ellipse', { x: x + 0.2, y: y + 0.2, w: 0.6, h: 0.6, fill: { color: c.ACCENT }, line: { color: c.ACCENT } });
-    slide.addText(String(i+1), { x: x + 0.2, y: y + 0.2, w: 0.6, h: 0.6, fontSize: 18, bold: true, color: c.WHITE, align: 'center', valign: 'middle' });
-    slide.addText(b, { x: x + 1.0, y: y + 0.2, w: cardW - 1.2, h: cardH - 0.4, fontSize: 13, color: c.NAV, valign: 'middle' });
-  });
-}
-
-function renderCaseStudy(slide, s, c) {
-  const cs = s.case_study;
-  if (!cs) return renderDefault(slide, s, c);
-  // Banner del caso
-  slide.addShape('roundRect', { x: 0.4, y: 1.8, w: 12.5, h: 0.7, fill: { color: c.NAV }, line: { color: c.NAV }, rectRadius: 0.1 });
-  slide.addText(`📍 ${cs.name}${cs.location ? ' · ' + cs.location : ''}`, { x: 0.7, y: 1.85, w: 8, h: 0.6, fontSize: 18, bold: true, color: 'FFFFFF', valign: 'middle' });
-  if (cs.estrategia) slide.addText(cs.estrategia, { x: 8.7, y: 1.85, w: 4, h: 0.6, fontSize: 13, color: c.GOLD, valign: 'middle', align: 'right', italic: true });
-
-  // 4 KPI cards
-  const kpis = [
-    { label: 'Compra', value: cs.compra ? '$' + Math.round(cs.compra).toLocaleString() : '—', color: '64748B' },
-    { label: 'Remodelación', value: cs.remodelacion ? '$' + Math.round(cs.remodelacion).toLocaleString() : '—', color: '64748B' },
-    { label: 'ARV', value: cs.arv ? '$' + Math.round(cs.arv).toLocaleString() : '—', color: c.ACCENT },
-    { label: 'ROI Anual', value: cs.roi_anual ? cs.roi_anual + '%' : '—', color: c.GOLD }
-  ];
-  kpis.forEach((k, i) => {
-    const x = 0.4 + i * 3.15;
-    slide.addShape('roundRect', { x, y: 2.8, w: 3.0, h: 1.6, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
-    slide.addText(k.label, { x: x + 0.15, y: 2.9, w: 2.7, h: 0.3, fontSize: 10, color: '64748B', bold: true });
-    slide.addText(k.value, { x: x + 0.15, y: 3.25, w: 2.7, h: 0.9, fontSize: 28, bold: true, color: k.color, valign: 'middle' });
-  });
-
-  // Cash flow mensual destacado
-  if (cs.cash_flow_monthly) {
-    slide.addShape('roundRect', { x: 0.4, y: 4.6, w: 6.05, h: 1.5, fill: { color: 'ECFDF5' }, line: { color: '6EE7B7', width: 2 }, rectRadius: 0.1 });
-    slide.addText('💰 Cash Flow Mensual', { x: 0.6, y: 4.7, w: 5.8, h: 0.3, fontSize: 11, color: '047857', bold: true });
-    slide.addText('$' + Math.round(cs.cash_flow_monthly).toLocaleString() + ' /mes', { x: 0.6, y: 5.05, w: 5.8, h: 1.0, fontSize: 36, bold: true, color: '047857', valign: 'middle' });
-  }
-  // Duración
-  if (cs.duracion_meses) {
-    slide.addShape('roundRect', { x: 6.55, y: 4.6, w: 6.4, h: 1.5, fill: { color: 'EFF6FF' }, line: { color: '93C5FD', width: 2 }, rectRadius: 0.1 });
-    slide.addText('⏱ Duración del proyecto', { x: 6.75, y: 4.7, w: 6.0, h: 0.3, fontSize: 11, color: '1E40AF', bold: true });
-    slide.addText(cs.duracion_meses + ' meses', { x: 6.75, y: 5.05, w: 6.0, h: 1.0, fontSize: 36, bold: true, color: '1E40AF', valign: 'middle' });
-  }
-
-  // Key takeaway
-  if (cs.key_takeaway) {
-    slide.addText(`"${cs.key_takeaway}"`, { x: 0.4, y: 6.25, w: 12.5, h: 0.7, fontSize: 13, color: c.NAV, italic: true, align: 'center' });
-  }
-}
-
-function renderFramework(slide, s, c) {
-  const items = s.framework_items || (s.bullets || []).map(b => ({ label: b, value: '' }));
-  if (!items.length) return;
-  const cols = 2, rows = Math.ceil(items.length / cols);
-  const cardW = 5.9, cardH = 0.7;
-  items.forEach((it, i) => {
-    const col = i % cols, row = Math.floor(i / cols);
-    const x = 0.5 + col * 6.3;
-    const y = 2.0 + row * (cardH + 0.15);
-    slide.addShape('rect', { x, y, w: 0.08, h: cardH, fill: { color: c.ACCENT } });
-    slide.addShape('rect', { x: x + 0.08, y, w: cardW - 0.08, h: cardH, fill: { color: c.GRAY_LIGHT }, line: { color: 'E2E8F0' } });
-    slide.addText(it.label || '', { x: x + 0.3, y, w: cardW - 2.0, h: cardH, fontSize: 13, color: c.NAV, valign: 'middle', bold: true });
-    if (it.value) slide.addText(String(it.value), { x: x + cardW - 1.8, y, w: 1.6, h: cardH, fontSize: 14, bold: true, color: c.ACCENT, align: 'right', valign: 'middle' });
-  });
-}
-
-function renderChecklist(slide, s, c) {
-  const items = s.checklist_items || (s.bullets || []).map(b => ({ title: b, detail: '' }));
-  if (!items.length) return;
-  items.slice(0, 6).forEach((it, i) => {
-    const y = 1.95 + i * 0.78;
-    // Checkbox
-    slide.addShape('rect', { x: 0.5, y: y + 0.1, w: 0.5, h: 0.5, fill: { color: '10B981' }, line: { color: '10B981' } });
-    slide.addText('✓', { x: 0.5, y: y + 0.1, w: 0.5, h: 0.5, fontSize: 22, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
-    // Title
-    slide.addText(it.title || '', { x: 1.2, y, w: 11.5, h: 0.35, fontSize: 15, bold: true, color: c.NAV });
-    // Detail
-    if (it.detail) slide.addText(it.detail, { x: 1.2, y: y + 0.35, w: 11.5, h: 0.35, fontSize: 11, color: '64748B' });
-  });
-}
-
-function renderStrategyGrid(slide, s, c) {
-  const opts = s.strategy_options || [];
-  if (!opts.length) return;
-  const cols = Math.min(opts.length, 4);
-  const cardW = (12.5 / cols) - 0.2;
-  opts.slice(0, cols).forEach((op, i) => {
-    const x = 0.4 + i * (cardW + 0.2);
-    const y = 1.9;
-    const h = 4.5;
-    slide.addShape('roundRect', { x, y, w: cardW, h, fill: { color: 'FFFFFF' }, line: { color: 'E2E8F0', width: 1 }, rectRadius: 0.1 });
-    // Header colorido
-    slide.addShape('rect', { x, y, w: cardW, h: 0.7, fill: { color: c.NAV }, line: { color: c.NAV } });
-    slide.addText(op.name || `Opción ${i+1}`, { x: x + 0.1, y: y + 0.1, w: cardW - 0.2, h: 0.5, fontSize: 15, bold: true, color: 'FFFFFF', align: 'center' });
-    // Métricas
-    const metrics = [
-      { k: 'Cash Flow', v: op.cash_flow || '—' },
-      { k: 'Escalabilidad', v: op.scalability || '—' },
-      { k: 'Operación', v: op.operation || '—' }
-    ];
-    metrics.forEach((m, mi) => {
-      const my = y + 0.85 + mi * 0.85;
-      slide.addText(m.k, { x: x + 0.2, y: my, w: cardW - 0.4, h: 0.25, fontSize: 9, color: '64748B', bold: true });
-      slide.addText(m.v, { x: x + 0.2, y: my + 0.25, w: cardW - 0.4, h: 0.4, fontSize: 18, bold: true, color: c.ACCENT });
-    });
-    if (op.ideal_for) {
-      slide.addText(op.ideal_for, { x: x + 0.2, y: y + h - 0.8, w: cardW - 0.4, h: 0.6, fontSize: 9, color: c.NAV_LIGHT, italic: true, align: 'center' });
-    }
-  });
-}
-
-function renderMetricsDashboard(slide, s, c) {
-  const cards = s.metric_cards || s.stats || [];
-  if (!cards.length) return;
-  const cols = Math.min(cards.length, 4);
-  const cardW = (12.5 / cols) - 0.2;
-  cards.slice(0, 8).forEach((m, i) => {
-    const col = i % cols, row = Math.floor(i / cols);
-    const x = 0.4 + col * (cardW + 0.2);
-    const y = 2.0 + row * 2.2;
-    slide.addShape('roundRect', { x, y, w: cardW, h: 2.0, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
-    slide.addText(m.label || '', { x: x + 0.15, y: y + 0.15, w: cardW - 0.3, h: 0.3, fontSize: 11, color: c.NAV_LIGHT, bold: true });
-    slide.addText(String(m.value || ''), { x: x + 0.15, y: y + 0.5, w: cardW - 0.3, h: 1.0, fontSize: 36, bold: true, color: c.ACCENT, valign: 'middle' });
-    if (m.trend) slide.addText(m.trend, { x: x + 0.15, y: y + 1.55, w: cardW - 0.3, h: 0.35, fontSize: 11, color: '10B981', bold: true });
-    if (m.source_name) slide.addText(`📍 ${m.source_name}`, { x: x + 0.15, y: y + 1.7, w: cardW - 0.3, h: 0.25, fontSize: 8, color: c.GRAY_MED, italic: true });
-  });
-}
-
-function renderQuote(slide, s, c) {
-  const txt = s.quote_text || s.title || '';
-  // Comillas decorativas grandes
-  slide.addText('"', { x: 0.5, y: 1.8, w: 1.5, h: 1.2, fontSize: 80, bold: true, color: c.ACCENT, valign: 'top' });
-  slide.addText(txt, { x: 1.8, y: 2.4, w: 10.8, h: 2.6, fontSize: 28, bold: true, color: c.NAV, italic: true, valign: 'middle' });
-  if (s.quote_author) {
-    slide.addShape('rect', { x: 1.8, y: 5.2, w: 2, h: 0.04, fill: { color: c.ACCENT } });
-    slide.addText('— ' + s.quote_author, { x: 1.8, y: 5.4, w: 10.8, h: 0.4, fontSize: 14, color: c.GRAY_MED, italic: true });
-  }
-  // Stats decorativas si las hay
-  if ((s.stats || []).length) renderMetricsDashboard(slide, { ...s, metric_cards: s.stats.slice(0, 3) }, c);
-}
-
-function renderClosing(slide, s, p, c) {
-  slide.background = { color: c.NAV };
-  slide.addText(c.BRAND, { x: 0.5, y: 0.5, w: 12.3, h: 0.4, color: c.GOLD, fontSize: 13, bold: true, charSpacing: 4 });
-  // Quote central
-  const q = s.quote_text || s.title || 'Gracias';
-  slide.addText('"' + q + '"', { x: 1, y: 2.0, w: 11.3, h: 1.8, fontSize: 32, bold: true, color: c.WHITE, italic: true, align: 'center', valign: 'middle' });
-  if (s.quote_author) {
-    slide.addText('— ' + s.quote_author, { x: 1, y: 4.0, w: 11.3, h: 0.5, fontSize: 14, color: 'CBD5E1', align: 'center', italic: true });
-  }
-  // 3 stats finales
-  const stats = s.metric_cards || s.stats || [];
-  if (stats.length) {
-    const top3 = stats.slice(0, 3);
-    const cardW = 12 / top3.length;
-    top3.forEach((k, i) => {
-      const x = 0.7 + i * cardW;
-      slide.addText(String(k.value || ''), { x, y: 5.0, w: cardW - 0.2, h: 0.8, fontSize: 40, bold: true, color: c.GOLD, align: 'center' });
-      slide.addText(String(k.label || ''), { x, y: 5.85, w: cardW - 0.2, h: 0.4, fontSize: 12, color: 'CBD5E1', align: 'center' });
-    });
-  }
-}
-
-function renderDefault(slide, s, c) {
-  let y = 2.0;
-  if ((s.bullets || []).length) {
-    const txt = s.bullets.map(b => ({ text: b, options: { bullet: { code: '25CF' }, fontSize: 16, color: c.NAV, breakLine: true, paraSpaceAfter: 8 } }));
-    slide.addText(txt, { x: 0.6, y, w: 12.2, h: 4.5 });
-  }
-  if ((s.stats || []).length) {
-    renderMetricsDashboard(slide, { ...s, metric_cards: s.stats }, c);
-  }
-}
-
-function eduDownloadSpeakerNotes() {
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
-  const p = (window.aiState[aiKey] || {}).presentation;
-  if (!p) return;
-  const text = `${p.title}\n${'='.repeat(p.title.length)}\n\n${(p.slides||[]).map(s => `--- Slide ${s.number}: ${s.title} ---\n${s.subtitle ? s.subtitle + '\n' : ''}${(s.bullets||[]).map(b => '• ' + b).join('\n')}\n\n🎙 NOTAS:\n${s.speaker_notes || '(sin notas)'}\n`).join('\n')}`;
-  const blob = new Blob([text], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${p.title.replace(/[^a-z0-9]/gi,'_')}_speaker_notes.txt`;
-  a.click();
-}
-
-function eduLoadPresentation(id) {
-  const p = (eduState.presentations || []).find(x => x.id === id);
-  if (!p) return alert('Presentación no encontrada');
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
-  window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { presentation: { title: p.title, outline: p.outline, slides: p.slides, all_sources: p.sources } };
-  eduRender();
-}
-
-async function eduDeletePresentation(id) {
-  if (!confirm('¿Eliminar esta presentación del historial?')) return;
-  await sb.from('edu_presentations').delete().eq('id', id);
-  await eduLoadAll(); eduRender();
-}
-
-// ============================================================
-// TAB: INFORMES IA (stub)
-// ============================================================
-function eduRenderReports() {
-  const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
-  return `
-    <div class="space-y-3">
-      <div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900">
-        💡 <strong>Informes IA</strong> — generá reportes semanales/quincenales/mensuales con análisis de cartera, progreso de estudiantes y notas de clases.
-      </div>
-      <div class="text-center py-8 text-slate-500">
-        <div class="text-3xl mb-2">📈</div>
-        <div class="text-sm font-bold">Sección en construcción</div>
-        <div class="text-xs mt-1">La generación de informes con IA se conecta en el siguiente turno.</div>
-      </div>
-      ${reports.length ? `
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">Informes guardados (${reports.length})</div>
-          <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-            ${reports.map(r => `<div class="p-2 text-xs"><strong>${r.title || r.period_type}</strong> · ${r.period_start} → ${r.period_end}</div>`).join('')}
-          </div>
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-// ============================================================
-// SISTEMA INDEPENDIENTE: GENERADOR DE PRESENTACIONES
-// Reusa eduState + eduRenderPresentations pero abre su propio modal
-// con selector de mentoría arriba.
-// ============================================================
-async function openEduPresentationsSystem(sys) {
-  eduState.sys = sys;
-  // Por default arranca con la primera mentoría activa
-  openModal(`🎬 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
-  document.querySelector('#modal > div').classList.remove('max-w-3xl');
-  document.querySelector('#modal > div').classList.add('max-w-7xl');
-  await eduLoadAll();
-  if (!eduState.mentorshipId && eduState.mentorships.length) {
-    const firstActive = eduState.mentorships.find(m => m.active);
-    if (firstActive) eduState.mentorshipId = firstActive.id;
-  }
-  eduState.tab = '__presentations_only__';  // marker para el render custom
-  eduRenderPresentationsStandalone();
-}
-
-function eduRenderPresentationsStandalone() {
-  const root = document.getElementById('edu-root');
-  if (!root) return;
-  const cur = eduCurrentMentorship();
-  root.innerHTML = `
-    <div class="flex flex-col h-full max-h-[84vh]">
-      <!-- Selector mentoría -->
-      <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200 flex-wrap">
-        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Mentoría:</span>
-        ${eduState.mentorships.filter(m => m.active).map(m => `
-          <button onclick="eduState.mentorshipId='${m.id}'; eduRenderPresentationsStandalone()"
-            class="px-3 py-1.5 rounded-lg text-xs font-bold ${eduState.mentorshipId===m.id?'bg-slate-900 text-white shadow':'bg-slate-100 hover:bg-slate-200'}">
-            ${m.icon} ${m.name}
-          </button>
-        `).join('')}
-        <div class="ml-auto text-[10px] text-slate-500">${cur ? cur.name : 'Sin mentoría seleccionada'}</div>
-      </div>
-      <!-- Reusa el render existente -->
-      <div class="flex-1 overflow-y-auto">
-        ${eduRenderPresentations()}
-      </div>
-    </div>
-  `;
-}
-
-// Sobreescribir eduRender para volver acá cuando estamos en standalone
-const _eduRenderOrig = eduRender;
-window.eduRender = function() {
-  if (eduState.tab === '__presentations_only__') return eduRenderPresentationsStandalone();
-  if (eduState.tab === '__reports_only__') return eduRenderReportsStandalone();
-  return _eduRenderOrig();
-};
-
-// ============================================================
-// SISTEMA INDEPENDIENTE: INFORMES EJECUTIVOS
-// ============================================================
-async function openEduReportsSystem(sys) {
-  eduState.sys = sys;
-  openModal(`📈 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
-  document.querySelector('#modal > div').classList.remove('max-w-3xl');
-  document.querySelector('#modal > div').classList.add('max-w-6xl');
-  await eduLoadAll();
-  if (!eduState.mentorshipId && eduState.mentorships.length) {
-    const firstActive = eduState.mentorships.find(m => m.active);
-    if (firstActive) eduState.mentorshipId = firstActive.id;
-  }
-  eduState.tab = '__reports_only__';
-  eduRenderReportsStandalone();
-}
-
-function eduRenderReportsStandalone() {
-  const root = document.getElementById('edu-root');
-  if (!root) return;
-  const cur = eduCurrentMentorship();
-  const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
-  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
-  const ai = (window.aiState && window.aiState[aiKey]) || {};
-
-  const today = new Date();
-  const period = eduState._reportPeriod || 'weekly';
-  const periodDays = period === 'weekly' ? 7 : period === 'biweekly' ? 14 : 30;
-  const periodStart = new Date(today); periodStart.setDate(periodStart.getDate() - periodDays);
-
-  root.innerHTML = `
-    <div class="flex flex-col h-full max-h-[84vh]">
-      <!-- Selector mentoría -->
-      <div class="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200 flex-wrap">
-        <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Mentoría:</span>
-        ${eduState.mentorships.filter(m => m.active).map(m => `
-          <button onclick="eduState.mentorshipId='${m.id}'; eduRenderReportsStandalone()"
-            class="px-3 py-1.5 rounded-lg text-xs font-bold ${eduState.mentorshipId===m.id?'bg-slate-900 text-white shadow':'bg-slate-100 hover:bg-slate-200'}">
-            ${m.icon} ${m.name}
-          </button>
-        `).join('')}
-        <div class="ml-auto text-[10px] text-slate-500">${cur ? cur.name : 'Sin mentoría'}</div>
-      </div>
-
-      <div class="flex-1 overflow-y-auto space-y-3">
-        <!-- Form de generación -->
-        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-violet-900 mb-3">📈 Generar informe ejecutivo con IA</div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Período</label>
-              <select onchange="eduState._reportPeriod=this.value; eduRenderReportsStandalone()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-                <option value="weekly" ${period==='weekly'?'selected':''}>📅 Semanal (últimos 7 días)</option>
-                <option value="biweekly" ${period==='biweekly'?'selected':''}>📆 Quincenal (últimos 14 días)</option>
-                <option value="monthly" ${period==='monthly'?'selected':''}>🗓 Mensual (últimos 30 días)</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Desde</label>
-              <input id="edu-rep-start" type="date" value="${periodStart.toISOString().split('T')[0]}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-600 mb-1">Hasta</label>
-              <input id="edu-rep-end" type="date" value="${today.toISOString().split('T')[0]}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-            </div>
-          </div>
-
-          <div class="mt-2">
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">📝 Notas de las clases grabadas (opcional)</label>
-            <textarea id="edu-rep-classes" rows="4" placeholder="Pega un resumen de las clases dadas en el período: temas cubiertos, dudas frecuentes, casos discutidos. Claude lo incluye en el análisis pedagógico." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
-          </div>
-
-          <button onclick="withLoading(this, eduGenerateReport)" class="mt-3 w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded">🤖 Generar informe con IA</button>
-          <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~20-40 seg. Claude analiza estudiantes + cartera + progreso + tus notas de clase.</div>
-        </div>
-
-        ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-3xl animate-pulse">🧠</div><div class="mt-2 font-bold text-violet-900">Generando informe...</div></div>` : ''}
-        ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
-
-        ${ai.report ? `
-          <div class="bg-white border-2 border-emerald-300 rounded-xl overflow-hidden">
-            <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 flex justify-between items-center">
-              <div class="text-xs font-bold uppercase text-emerald-900">✅ Informe generado</div>
-              <div class="flex gap-1">
-                <button onclick="eduCopyReport()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📋 Copiar markdown</button>
-                <button onclick="eduDownloadReport()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 .md</button>
-              </div>
-            </div>
-            <div class="p-4 max-h-[55vh] overflow-y-auto">
-              <h2 class="text-lg font-bold">${ai.report.title || 'Informe'}</h2>
-              <!-- KPIs -->
-              ${ai.report.kpis ? `
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-                  ${Object.entries(ai.report.kpis).map(([k,v]) => `<div class="bg-blue-50 border border-blue-200 rounded p-2"><div class="text-[10px] text-blue-700 uppercase font-bold">${k.replace(/_/g,' ')}</div><div class="text-xl font-bold text-blue-900">${v}</div></div>`).join('')}
-                </div>
-              ` : ''}
-              <!-- Summary md -->
-              <div id="edu-rep-md" class="text-xs whitespace-pre-wrap mt-4 prose prose-sm max-w-none">${(ai.report.summary_md || '').replace(/##\s/g,'\n## ').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}</div>
-              <!-- Highlights -->
-              ${(ai.report.highlights||[]).length ? `
-                <div class="mt-4 pt-3 border-t border-slate-200">
-                  <div class="text-xs font-bold uppercase mb-2">⭐ Highlights del período</div>
-                  ${ai.report.highlights.map(h => `<div class="text-xs mb-1"><span class="bg-${h.type==='win'?'emerald':h.type==='risk'?'red':'amber'}-100 text-${h.type==='win'?'emerald':h.type==='risk'?'red':'amber'}-800 px-1.5 py-0.5 rounded font-bold text-[10px]">${h.type}</span> <strong>${h.student_name}</strong>: ${h.detail}</div>`).join('')}
-                </div>
-              ` : ''}
-              <!-- Recommendations -->
-              ${(ai.report.recommendations||[]).length ? `
-                <div class="mt-4 pt-3 border-t border-slate-200">
-                  <div class="text-xs font-bold uppercase mb-2">🎯 Acciones recomendadas</div>
-                  <ul class="text-xs space-y-1.5">
-                    ${ai.report.recommendations.map(r => `<li>• <strong>[${r.priority||'med'}]</strong> ${r.action} <span class="text-slate-500">(${r.owner||'?'}, en ${r.due_in_days||7}d)</span></li>`).join('')}
-                  </ul>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- Historial -->
-        ${reports.length ? `
-          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">📚 Historial (${reports.length})</div>
-            <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              ${reports.map(r => `
-                <div class="p-2 flex justify-between items-center hover:bg-slate-50">
-                  <div class="flex-1 min-w-0">
-                    <div class="text-xs font-bold truncate">${r.title || r.period_type}</div>
-                    <div class="text-[10px] text-slate-500">${r.period_type} · ${r.period_start} → ${r.period_end}</div>
-                  </div>
-                  <div class="flex gap-1 flex-shrink-0">
-                    <button onclick="eduLoadReport('${r.id}')" class="text-blue-600 text-[10px] hover:underline">cargar</button>
-                    <button onclick="eduDeleteReport('${r.id}')" class="text-red-500 text-[10px]">🗑</button>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-      </div>
-    </div>
-  `;
-}
-
-async function eduGenerateReport() {
-  const cur = eduCurrentMentorship();
-  if (!cur) return alert('Seleccioná una mentoría');
-  const periodType = eduState._reportPeriod || 'weekly';
-  const startDate = document.getElementById('edu-rep-start').value;
-  const endDate = document.getElementById('edu-rep-end').value;
-  const classesNotes = document.getElementById('edu-rep-classes').value;
-  if (!startDate || !endDate) return alert('Seleccioná fechas');
-
-  const aiKey = `edu-report-${eduState.mentorshipId}-${periodType}`;
-  window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { loading: true };
-  eduRenderReportsStandalone();
-
-  try {
-    // Construir contexto operativo
-    const myStudents = eduMyStudents();
-    const start = new Date(startDate); const end = new Date(endDate);
-    const newEnrolled = myStudents.filter(s => s.enrolled_at && new Date(s.enrolled_at) >= start && new Date(s.enrolled_at) <= end).length;
-    const expiring = myStudents.filter(s => { const d = eduDaysToExpiry(s); return d != null && d >= 0 && d <= 30; }).length;
-    const expired = myStudents.filter(s => { const d = eduDaysToExpiry(s); return d != null && d < 0; }).length;
-    const byStage = {}; myStudents.forEach(s => { if (s.current_stage) byStage[s.current_stage] = (byStage[s.current_stage]||0)+1; });
-    const avgScore = myStudents.length ? Math.round(myStudents.reduce((a,s) => a+(s.glscore||50),0)/myStudents.length) : 0;
-    const bands = { excelente:0, bueno:0, atencion:0, critico:0 };
-    myStudents.forEach(s => { const g=s.glscore||50; if(g>=80)bands.excelente++; else if(g>=60)bands.bueno++; else if(g>=40)bands.atencion++; else bands.critico++; });
-    const topStudents = [...myStudents].sort((a,b)=>(b.glscore||0)-(a.glscore||0)).slice(0,5).map(s => ({name:s.full_name, stage:eduStageObj(s.current_stage)?.name, glscore:s.glscore}));
-    const atRisk = myStudents.filter(s => s.status === 'at_risk' || (s.glscore && s.glscore < 40) || (eduDaysToExpiry(s) || 999) < 30).slice(0,8).map(s => ({name:s.full_name, glscore:s.glscore, days_to_expiry:eduDaysToExpiry(s), stage:eduStageObj(s.current_stage)?.name}));
-
-    const { data, error } = await sb.functions.invoke('ai-deep-analyze', {
-      body: {
-        system: 'edu-report',
-        context: {
-          mentorship: cur.name,
-          mentorship_slug: cur.id,
-          period_type: periodType,
-          period_start: startDate,
-          period_end: endDate,
-          snapshot: {
-            total_students: myStudents.length,
-            active: myStudents.filter(s=>s.status==='active').length,
-            at_risk: myStudents.filter(s=>s.status==='at_risk').length,
-            graduated: myStudents.filter(s=>s.status==='graduated').length,
-            paused: myStudents.filter(s=>s.status==='paused').length
-          },
-          movements: { new_enrolled: newEnrolled, calls_done: 0, calls_total: 0, tasks_created: 0, tasks_done: 0, stage_changes: 0 },
-          cartera: {
-            active: myStudents.filter(s=>s.payment_status==='active').length,
-            past_due: myStudents.filter(s=>s.payment_status==='past_due').length,
-            expired,
-            expiring_soon: expiring
-          },
-          by_stage: byStage,
-          avg_glscore: avgScore,
-          glscore_bands: bands,
-          top_students: topStudents,
-          at_risk_students: atRisk,
-          classes_notes: classesNotes
-        },
-        force: true
-      }
-    });
-    // Mejor manejo de errores
-    if (error) {
-      const detailed = error.message || JSON.stringify(error);
-      let hint = '';
-      if (detailed.includes('non-2xx')) {
-        hint = '\n\nDiagnóstico:\n• Verificá que ANTHROPIC_API_KEY esté en Supabase secrets\n• Probá redeploy: npx supabase functions deploy ai-deep-analyze';
-      }
-      throw new Error(detailed + hint);
-    }
-    if (data?.error) throw new Error(data.error);
-    if (!data?.summary_md) throw new Error('Claude devolvió respuesta vacía. Probá de nuevo.');
-
-    // Guardar en DB
-    const { data: saved } = await sb.from('edu_reports').insert({
-      mentorship_id: cur.id,
-      period_type: periodType,
-      period_start: startDate,
-      period_end: endDate,
-      title: data.title,
-      summary_md: data.summary_md,
-      kpis: data.kpis || {},
-      insights: data.insights || [],
-      recommendations: data.recommendations || [],
-      highlights: data.highlights || [],
-      classes_notes: classesNotes || null,
-      generated_by: state.user.id
-    }).select().single().then(r => r).catch(() => ({}));
-
-    window.aiState[aiKey] = { loading: false, report: data, saved_id: saved?.id };
-    await eduLoadAll();
-  } catch (e) {
-    window.aiState[aiKey] = { loading: false, error: e.message };
-  }
-  eduRenderReportsStandalone();
-}
-
-function eduCopyReport() {
-  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
-  const r = (window.aiState[aiKey] || {}).report;
-  if (!r) return;
-  const text = `# ${r.title}\n\n${r.summary_md}\n\n## Recomendaciones\n${(r.recommendations||[]).map(x => `- [${x.priority||'med'}] ${x.action} (${x.owner||'?'}, ${x.due_in_days||7}d)`).join('\n')}`;
-  navigator.clipboard.writeText(text).then(() => alert('✓ Copiado al portapapeles'));
-}
-
-function eduDownloadReport() {
-  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
-  const r = (window.aiState[aiKey] || {}).report;
-  if (!r) return;
-  const text = `# ${r.title}\n\n${r.summary_md}\n\n## Recomendaciones\n${(r.recommendations||[]).map(x => `- **[${x.priority||'med'}]** ${x.action} (${x.owner||'?'}, en ${x.due_in_days||7}d)`).join('\n')}`;
-  const blob = new Blob([text], { type: 'text/markdown' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${r.title.replace(/[^a-z0-9]/gi,'_')}.md`;
-  a.click();
-}
-
-function eduLoadReport(id) {
-  const r = (eduState.reports || []).find(x => x.id === id);
-  if (!r) return;
-  const aiKey = `edu-report-${r.mentorship_id}-${r.period_type}`;
-  window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { report: { title: r.title, summary_md: r.summary_md, kpis: r.kpis, recommendations: r.recommendations, highlights: r.highlights } };
-  eduState.mentorshipId = r.mentorship_id;
-  eduState._reportPeriod = r.period_type;
-  eduRenderReportsStandalone();
-}
-
-async function eduDeleteReport(id) {
-  if (!confirm('¿Eliminar este informe?')) return;
-  await sb.from('edu_reports').delete().eq('id', id);
-  await eduLoadAll(); eduRenderReportsStandalone();
-}
+})();
