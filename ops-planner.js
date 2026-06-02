@@ -17,8 +17,11 @@ const opState = {
   draggedScheduledId: null,
   draggedTemplateId: null,
   leftTab: 'backlog',   // backlog | templates | recurrentes
-  view: 'day',          // day | week
+  view: 'day',          // day | week | casas
   weekTasks: [],        // tareas de la semana actual (cuando view='week')
+  allUpcoming: [],      // tareas con fecha >= hoy (cuando view='casas')
+  casasSearch: '',      // filtro de búsqueda en vista casas
+  casasExpanded: {},    // { 'p:uuid':true, 'j:uuid':false } — qué cards están abiertas
   libBusinessFilter: 'all',
   zonaFilter: 'all',
   backlogZonaFilter: 'all',
@@ -125,6 +128,15 @@ async function opLoadAll() {
   opState.recurring = rRes.data || [];
   opState.properties = pRes.data || [];
   opState.projects = projRes.data || [];
+
+  // Si estamos en vista 'casas', cargar TODO lo upcoming (hoy + futuro)
+  if (opState.view === 'casas') {
+    const { data: up } = await sb.from('ops_day_tasks')
+      .select('*')
+      .gte('date', opDateOnly(new Date()))
+      .order('date').order('start_time');
+    opState.allUpcoming = up || [];
+  }
 
   // Auto-rollback + generación recurrentes (silenciosas, no bloquean)
   await opAutoRollback();
@@ -235,6 +247,7 @@ function opRender() {
           <div class="flex bg-slate-100 rounded p-0.5">
             <button onclick="opSetView('day')" class="px-2 py-1 rounded text-xs font-bold ${opState.view==='day'?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-200'}">📅 Día</button>
             <button onclick="opSetView('week')" class="px-2 py-1 rounded text-xs font-bold ${opState.view==='week'?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-200'}">📊 Semana</button>
+            <button onclick="opSetView('casas')" class="px-2 py-1 rounded text-xs font-bold ${opState.view==='casas'?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-200'}" title="Tareas agrupadas por casa, como checklist">🏠 Por casa</button>
           </div>
           <button onclick="opNav(-1)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">←</button>
           <input type="date" value="${opState.date}" onchange="opGoToDate(this.value)" class="border border-slate-300 rounded px-2 py-1 text-sm font-bold" />
@@ -277,9 +290,9 @@ function opRender() {
           ${opState.leftTab === 'backlog' ? opRenderBacklogPanel(backlogByZona) : opState.leftTab === 'templates' ? opRenderTemplatesPanel() : opRenderRecurrentesPanel()}
         </div>
 
-        <!-- DERECHA: Día o Semana -->
+        <!-- DERECHA: Día / Semana / Casas -->
         <div class="flex-1 overflow-hidden border border-slate-200 rounded-lg flex flex-col">
-          ${opState.view === 'week' ? opRenderWeek() : `
+          ${opState.view === 'casas' ? opRenderCasas() : opState.view === 'week' ? opRenderWeek() : `
             <div class="sticky top-0 bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between z-10">
               <div class="text-xs font-bold uppercase text-slate-700">📅 Itinerario ${opState.zonaFilter !== 'all' ? `· <span class="${opZonaColor(opState.zonaFilter)} px-1.5 rounded">${opState.zonaFilter}</span>` : ''}</div>
               <div class="flex gap-1">
@@ -787,6 +800,165 @@ function opRenderMaterialsSummary(filteredDay) {
   `;
 }
 
+// ─── Vista CASAS — checklist agrupado por propiedad/obra ───
+function opRenderCasas() {
+  const today = opDateOnly(new Date());
+  const search = (opState.casasSearch || '').toLowerCase().trim();
+
+  // Unir backlog + upcoming + recurrentes y agrupar por casa
+  const all = [
+    ...opState.backlog.map(t => ({...t, _bucket: 'backlog'})),
+    ...opState.allUpcoming.map(t => ({...t, _bucket: t.date === today ? 'hoy' : 'futuro'}))
+  ];
+  const recurringByKey = {};
+  (opState.recurring || []).forEach(r => {
+    const k = r.property_id ? 'p:'+r.property_id : r.project_id ? 'j:'+r.project_id : '__sin__';
+    (recurringByKey[k] = recurringByKey[k] || []).push(r);
+  });
+  const byKey = {};
+  all.forEach(t => {
+    const k = t.property_id ? 'p:'+t.property_id : t.project_id ? 'j:'+t.project_id : '__sin__';
+    (byKey[k] = byKey[k] || []).push(t);
+  });
+
+  // Construir lista de casas (todas, aunque no tengan tareas)
+  const casas = [];
+  opState.properties.forEach(p => casas.push({
+    key: 'p:'+p.id, kind: '🏠', name: p.nickname || p.address || 'Casa sin nombre',
+    addr: p.address || '', tipo: p.property_type || ''
+  }));
+  opState.projects.forEach(p => casas.push({
+    key: 'j:'+p.id, kind: '🏗️', name: p.name || p.address || 'Obra',
+    addr: p.address || '', tipo: 'Obra activa'
+  }));
+  casas.push({ key: '__sin__', kind: '❓', name: 'Sin casa asignada', addr: '—', tipo: '' });
+
+  // Filtrar por search
+  const filtered = search
+    ? casas.filter(c => (c.name + ' ' + c.addr).toLowerCase().includes(search))
+    : casas;
+
+  // Render
+  return `
+    <div class="sticky top-0 bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between z-10 gap-2">
+      <div class="text-xs font-bold uppercase text-slate-700 flex-shrink-0">🏠 Tareas por casa</div>
+      <input type="text" placeholder="Buscar casa..." value="${(opState.casasSearch||'').replace(/"/g,'&quot;')}"
+             oninput="opSetCasasSearch(this.value)"
+             class="flex-1 max-w-xs border border-slate-300 rounded px-2 py-1 text-xs" />
+      <div class="text-[10px] text-slate-500">${filtered.length} casas</div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2 space-y-2">
+      ${filtered.map(c => {
+        const tasks = byKey[c.key] || [];
+        const recs = recurringByKey[c.key] || [];
+        const open = tasks.filter(t => t.status !== 'done');
+        const done = tasks.filter(t => t.status === 'done').length;
+        const noTasks = !tasks.length && !recs.length;
+        const expanded = opState.casasExpanded[c.key] !== false; // default abierto
+        const colorCls = c.key === '__sin__' ? 'bg-slate-50 border-slate-300'
+                        : c.key.startsWith('p:') ? opPropColor(c.key.slice(2))
+                        : opPropColor(c.key.slice(2));
+        return `
+          <div class="border ${colorCls} rounded-lg overflow-hidden">
+            <div class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-white/50"
+                 onclick="opToggleCasaExpand('${c.key}')">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="text-lg">${c.kind}</span>
+                <div class="min-w-0">
+                  <div class="text-sm font-bold truncate">${c.name}</div>
+                  ${c.addr && c.addr !== c.name ? `<div class="text-[10px] text-slate-500 truncate">${c.addr}</div>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                ${open.length ? `<span class="bg-amber-200 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded">${open.length} abiertas</span>` : ''}
+                ${done ? `<span class="bg-emerald-200 text-emerald-900 text-[10px] font-bold px-1.5 py-0.5 rounded">${done} hechas</span>` : ''}
+                ${recs.length ? `<span class="bg-violet-200 text-violet-900 text-[10px] font-bold px-1.5 py-0.5 rounded">🔁${recs.length}</span>` : ''}
+                ${noTasks ? `<span class="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded">⚠️ sin tareas</span>` : ''}
+                <button onclick="event.stopPropagation(); opOpenAddLoose('${c.key === '__sin__' ? '' : c.key}')"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded">+ Tarea</button>
+                <span class="text-slate-400 text-xs">${expanded ? '▼' : '▶'}</span>
+              </div>
+            </div>
+            ${expanded ? `
+              <div class="bg-white/70 border-t border-slate-200 p-2 space-y-1">
+                ${tasks.length === 0 && recs.length === 0 ? `
+                  <div class="text-[11px] text-slate-500 italic py-2 text-center">Sin tareas. ¿Agregar la primera?</div>
+                ` : ''}
+                ${tasks.sort((a,b) => {
+                  if (a.status === 'done' && b.status !== 'done') return 1;
+                  if (b.status === 'done' && a.status !== 'done') return -1;
+                  const ad = a.date || '9999-99-99', bd = b.date || '9999-99-99';
+                  if (ad !== bd) return ad.localeCompare(bd);
+                  return (a.start_time || '').localeCompare(b.start_time || '');
+                }).map(t => {
+                  const isDone = t.status === 'done';
+                  const dateLbl = t._bucket === 'backlog' ? '📥 backlog'
+                                : t._bucket === 'hoy' ? '📅 hoy' + (t.start_time ? ' ' + opFmt12(t.start_time) : '')
+                                : '📆 ' + (t.date || '') + (t.start_time ? ' ' + opFmt12(t.start_time) : '');
+                  return `
+                    <div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 ${isDone ? 'opacity-60' : ''}">
+                      <input type="checkbox" ${isDone ? 'checked' : ''} onchange="opToggleDoneFromCasas('${t.id}', this.checked)"
+                             class="w-4 h-4 cursor-pointer" />
+                      <div class="flex-1 min-w-0 cursor-pointer" onclick="opEditFromCasas('${t.id}', '${t._bucket}')">
+                        <div class="text-xs font-semibold ${isDone ? 'line-through text-slate-400' : 'text-slate-900'} truncate">${t.title || '(sin título)'}</div>
+                        <div class="text-[10px] text-slate-500">${dateLbl} · ${t.duration_min || 0}m${t.zona ? ' · '+t.zona : ''}</div>
+                      </div>
+                      <button onclick="event.stopPropagation(); opEditFromCasas('${t.id}', '${t._bucket}')" class="text-[10px] text-slate-400 hover:text-slate-900" title="Editar">✏️</button>
+                    </div>
+                  `;
+                }).join('')}
+                ${recs.map(r => {
+                  const base = opState.tasks.find(x => x.id === r.base_task_id);
+                  return `
+                    <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-violet-50 border border-violet-200">
+                      <span class="text-violet-600 text-sm">🔁</span>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-xs font-semibold text-violet-900 truncate">${r.custom_title || base?.name || '(recurrente)'}</div>
+                        <div class="text-[10px] text-violet-600">Cada ${r.interval_days}d · próx ${r.next_due || '?'}</div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('')}
+      ${filtered.length === 0 ? `<div class="text-center text-sm text-slate-500 py-10">Ninguna casa coincide con "${(opState.casasSearch||'').replace(/</g,'&lt;')}"</div>` : ''}
+    </div>
+  `;
+}
+function opSetCasasSearch(v) {
+  opState.casasSearch = v;
+  // Solo re-render del panel derecho (no recargar data)
+  opRender();
+  // Re-focus al input
+  setTimeout(() => {
+    const inp = document.querySelector('input[oninput^="opSetCasasSearch"]');
+    if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
+  }, 0);
+}
+function opToggleCasaExpand(key) {
+  opState.casasExpanded[key] = !(opState.casasExpanded[key] !== false);
+  opRender();
+}
+async function opToggleDoneFromCasas(id, isDone) {
+  await sb.from('ops_day_tasks').update({
+    status: isDone ? 'done' : 'planned',
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await opLoadAll();
+  opRender();
+}
+function opEditFromCasas(id, bucket) {
+  // Buscar la tarea en backlog o upcoming
+  const t = (bucket === 'backlog'
+    ? opState.backlog.find(x => x.id === id)
+    : opState.allUpcoming.find(x => x.id === id) || opState.dayTasks.find(x => x.id === id));
+  if (!t) return;
+  _opOpenEditModal(t, bucket === 'backlog');
+}
+
 // ─── Navegación / filtros ───
 function opNav(delta) {
   const step = opState.view === 'week' ? 7 : 1;
@@ -1253,9 +1425,11 @@ async function opClearDay() {
 }
 
 // ─── Tarea libre (atajo: crea + agenda en un paso) ───
-function opOpenAddLoose() {
-  const propsOpts = opState.properties.map(p => `<option value="prop:${p.id}">🏠 ${p.nickname || p.address}</option>`).join('');
-  const projsOpts = opState.projects.map(p => `<option value="proj:${p.id}">🏗️ ${p.name || p.address}</option>`).join('');
+function opOpenAddLoose(presetTarget) {
+  // presetTarget viene de la vista casas como 'p:uuid' o 'j:uuid'. Convertir al formato del select 'prop:'/'proj:'
+  const preset = presetTarget ? (presetTarget.startsWith('p:') ? 'prop:'+presetTarget.slice(2) : presetTarget.startsWith('j:') ? 'proj:'+presetTarget.slice(2) : '') : '';
+  const propsOpts = opState.properties.map(p => `<option value="prop:${p.id}" ${preset === 'prop:'+p.id ? 'selected' : ''}>🏠 ${p.nickname || p.address}</option>`).join('');
+  const projsOpts = opState.projects.map(p => `<option value="proj:${p.id}" ${preset === 'proj:'+p.id ? 'selected' : ''}>🏗️ ${p.name || p.address}</option>`).join('');
   const tmplOpts = opState.tasks.map(t => `<option value="${t.id}" data-emoji="${t.emoji}" data-dur="${t.default_duration_min}" data-mats='${JSON.stringify(t.default_materials||[])}' data-checklist='${JSON.stringify(t.default_checklist||[])}'>${t.emoji} ${t.name} (${t.default_duration_min}m)</option>`).join('');
   const today = opDateOnly(new Date());
 

@@ -574,6 +574,9 @@ const RM_LEAD_TIMES = {
 const rmFmt = n => '$' + Math.round(n || 0).toLocaleString('en-US');
 const rmFmt2 = n => '$' + (n || 0).toFixed(2);
 
+// Escape HTML para usar en value="..." (evita que & " < rompan el atributo)
+const rmEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 function rmFmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('es-MX', {day:'numeric', month:'short'}); }
 function rmAddDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 
@@ -1924,10 +1927,10 @@ function rmRenderEditor(body) {
         <div class="bg-white rounded-xl p-4 border border-slate-200">
           <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Información del proyecto</h3>
           <div class="grid grid-cols-3 gap-2">
-            <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Nombre *</label><input value="${rmState.editName}" oninput="rmState.editName=this.value" placeholder="Ej: 1308 Denfield" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-semibold" /></div>
+            <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Nombre *</label><input value="${rmEsc(rmState.editName)}" oninput="rmState.editName=this.value" placeholder="Ej: 1308 Denfield" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-semibold" /></div>
             <div><label class="block text-[10px] text-slate-500 mb-0.5">Sqft</label><input type="number" value="${rmState.editSqft}" oninput="rmState.editSqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
-            <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Dirección</label><input value="${rmState.editAddress}" oninput="rmState.editAddress=this.value" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
-            <div><label class="block text-[10px] text-slate-500 mb-0.5">Fecha inicio</label><input type="date" value="${rmState.editStartDate}" onchange="rmState.editStartDate=this.value; rmRenderTabPreservingFocus()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
+            <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Dirección</label><input value="${rmEsc(rmState.editAddress)}" oninput="rmState.editAddress=this.value" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
+            <div><label class="block text-[10px] text-slate-500 mb-0.5">Fecha inicio</label><input type="date" value="${rmEsc(rmState.editStartDate)}" onchange="rmState.editStartDate=this.value; rmRenderTabPreservingFocus()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
           </div>
           <!-- QW4 — Tags chips -->
           <div class="mt-3">
@@ -3458,9 +3461,9 @@ function rmRenderAssets() {
           <div class="flex-1 min-w-0">
             <div class="text-sm font-bold text-blue-900">Tour 360° vinculado ✓</div>
             ${modelId ? `<div class="text-[10px] text-slate-500 font-mono">Model ID: ${modelId}</div>` : ''}
-            <div class="text-[10px] text-blue-700 truncate">${cleanUrl}</div>
+            <div class="text-[10px] text-blue-700 truncate">${rmEsc(cleanUrl)}</div>
           </div>
-          <a href="${cleanUrl}" target="_blank" rel="noopener" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">🚀 Abrir tour</a>
+          <a href="${rmEsc(cleanUrl)}" target="_blank" rel="noopener" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">🚀 Abrir tour</a>
         </div>
         <p class="text-[10px] text-slate-500 mt-2">⚠️ Matterport bloquea embed inline. Abre en nueva pestaña para medir. Claude SÍ puede analizarlo cuando ejecutes 🤖 IA.</p>
       </div>
@@ -3474,7 +3477,7 @@ function rmRenderAssets() {
       <!-- Matterport -->
       <div class="mb-4">
         <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">🌐 Tour 360° Matterport (URL)</label>
-        <input value="${rmState.matterportUrl}" oninput="rmState.matterportUrl=this.value" onblur="rmRenderTabPreservingFocus()" placeholder="https://my.matterport.com/show/?m=XXXXX" class="w-full border ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? 'border-amber-400' : 'border-slate-300'} rounded px-3 py-2 text-sm" />
+        <input value="${rmEsc(rmState.matterportUrl)}" oninput="rmState.matterportUrl=this.value.trim()" onchange="rmRenderTabPreservingFocus()" placeholder="https://my.matterport.com/show/?m=XXXXX" class="w-full border ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? 'border-amber-400' : 'border-slate-300'} rounded px-3 py-2 text-sm" />
         ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? `
           <p class="text-[10px] text-amber-700 mt-0.5 flex items-start gap-1"><span>⚠️</span><span>URL no parece de Matterport (esperado <code class="bg-amber-50 px-1 rounded">my.matterport.com/show/?m=…</code> o <code class="bg-amber-50 px-1 rounded">matterport.com/discover/space/…</code>). Se guarda igual.</span></p>
         ` : `
