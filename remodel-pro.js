@@ -2146,9 +2146,12 @@ function rmRenderEditor(body) {
           <canvas id="rm-chart-bar" height="190"></canvas>
         </div>
 
-        <!-- EXPORT EXCEL -->
-        <button onclick="rmExportEditorExcel()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
-          📥 Descargar Excel (Config · Presupuesto · Cronograma)
+        <!-- EXPORT EXCEL — 12 hojas formato Denfield -->
+        <button onclick="rmExportEditorExcelDenfield()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
+          📥 Descargar Excel completo (12 hojas estilo Denfield)
+        </button>
+        <button onclick="rmExportEditorExcel()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-1.5 rounded-lg" title="Versión vieja, 3 hojas, sin estilos">
+          📄 Excel simple (legacy 3 hojas)
         </button>
 
         <!-- S5-G11: PROPUESTA CLIENTE PDF -->
@@ -4848,4 +4851,389 @@ async function rmShowPhotoGallery(activityCode) {
   const div = document.createElement('div');
   div.innerHTML = html;
   document.body.appendChild(div.firstElementChild);
+}
+
+// ============================================================
+// EXPORT EXCEL DENFIELD — 12 hojas con ExcelJS (estilo + fórmulas)
+// Usa los datos REALES del Editor Detallado (qty + vu por actividad).
+// ============================================================
+async function rmExportEditorExcelDenfield() {
+  if (typeof ExcelJS === 'undefined') return alert('Librería Excel aún cargando, reintentá en 1 seg.');
+  const e = rmCalcProject();
+  if (!e.activities.length) return alert('Agrega actividades antes de exportar.');
+
+  const proj = {
+    name: rmState.editName || 'Proyecto',
+    address: rmState.editAddress || '',
+    sqft: +rmState.editSqft || 0,
+    start_date: rmState.editStartDate || new Date().toISOString().split('T')[0],
+    activities: e.activities,
+    totalDays: e.totalDays || 0,
+    pricing: e.pricing || {}
+  };
+
+  // Estilos
+  const COLOR = {
+    headerBg:'FF1F2937', headerText:'FFFFFFFF', sectionBg:'FF374151',
+    subBg:'FFE5E7EB', editable:'FFD1FAE5', calc:'FFF3F4F6',
+    totalRow:'FFFEF3C7', border:'FF9CA3AF'
+  };
+  const thinBorder = { top:{style:'thin',color:{argb:COLOR.border}}, left:{style:'thin',color:{argb:COLOR.border}}, bottom:{style:'thin',color:{argb:COLOR.border}}, right:{style:'thin',color:{argb:COLOR.border}} };
+  const fill = (argb) => ({ type:'pattern', pattern:'solid', fgColor:{argb} });
+  const styleHeader = { font:{bold:true,color:{argb:COLOR.headerText},size:11}, fill:fill(COLOR.headerBg), alignment:{horizontal:'center',vertical:'middle'}, border:thinBorder };
+  const styleSection = { font:{bold:true,color:{argb:COLOR.headerText},size:10}, fill:fill(COLOR.sectionBg), alignment:{horizontal:'left',vertical:'middle'} };
+  const styleSub = { font:{bold:true,size:10}, fill:fill(COLOR.subBg), alignment:{horizontal:'left'}, border:thinBorder };
+  const styleEditable = { fill:fill(COLOR.editable), border:thinBorder, alignment:{horizontal:'right'} };
+  const styleCalc = { fill:fill(COLOR.calc), border:thinBorder, alignment:{horizontal:'right'} };
+  const styleTotal = { font:{bold:true,size:11}, fill:fill(COLOR.totalRow), border:thinBorder, alignment:{horizontal:'right'} };
+  const FMT_CURRENCY = '"$"#,##0;[Red]"-$"#,##0';
+  const FMT_PCT = '0.0%;[Red]-0.0%';
+  const FMT_DATE = 'yyyy-mm-dd';
+  const FMT_INT = '#,##0';
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Empresa OS — Editor Detallado';
+  wb.created = new Date();
+
+  // Totales por fase
+  const phaseTotals = { '1':{mat:0,labor:0,eq:0,total:0,days:0}, '2':{mat:0,labor:0,eq:0,total:0,days:0}, '3':{mat:0,labor:0,eq:0,total:0,days:0}, '4':{mat:0,labor:0,eq:0,total:0,days:0}, '5':{mat:0,labor:0,eq:0,total:0,days:0}, '6':{mat:0,labor:0,eq:0,total:0,days:0} };
+  proj.activities.forEach(a => {
+    const p = a.phase;
+    if (!phaseTotals[p]) return;
+    phaseTotals[p].mat += +a.material||0;
+    phaseTotals[p].labor += +a.labor||0;
+    phaseTotals[p].eq += +a.equipment||0;
+    phaseTotals[p].total += +a.total||0;
+    phaseTotals[p].days = Math.max(phaseTotals[p].days, (+a.start_offset||0) + (+a.days||0));
+  });
+  const grandTotal = Object.values(phaseTotals).reduce((s,p) => ({ mat:s.mat+p.mat, labor:s.labor+p.labor, eq:s.eq+p.eq, total:s.total+p.total }), {mat:0,labor:0,eq:0,total:0});
+  const totalDays = proj.totalDays;
+
+  // ════════ HOJA 1: INFORMACION GENERAL ════════
+  const ws1 = wb.addWorksheet('INFORMACION GENERAL', { views:[{state:'frozen',ySplit:13}] });
+  ws1.columns = [{width:5},{width:25},{width:12},{width:8},{width:12},{width:14},{width:13},{width:13},{width:13},{width:12},{width:12},{width:12},{width:13},{width:11},{width:22}];
+  ws1.mergeCells('A1:O1');
+  ws1.getCell('A1').value = `CRONOGRAMA Y PRESUPUESTO — ${proj.name}`;
+  ws1.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+  ws1.getRow(1).height = 24;
+  ws1.mergeCells('A2:O2');
+  ws1.getCell('A2').value = 'Celdas VERDES = editables. Grises = calculadas. Hojas detalladas por fase abajo.';
+  ws1.getCell('A2').style = { font:{italic:true,color:{argb:'FF6B7280'},size:9} };
+
+  ws1.mergeCells('A4:O4');
+  ws1.getCell('A4').value = 'INFORMACIÓN GENERAL';
+  ws1.getCell('A4').style = styleSection;
+  const infoRows = [
+    ['Nombre', proj.name],
+    ['Dirección', proj.address],
+    ['Tipo', 'Fix & Flip'],
+    ['Precio Cliente', proj.pricing.clientPrice || 0, FMT_CURRENCY],
+    ['Superficie ft²', proj.sqft, FMT_INT],
+    ['Fecha Inicio Obra', new Date(proj.start_date), FMT_DATE]
+  ];
+  infoRows.forEach((row, i) => {
+    const r0 = 5 + i;
+    ws1.getCell(`A${r0}`).value = row[0];
+    ws1.getCell(`A${r0}`).style = { font:{bold:true}, alignment:{horizontal:'left'} };
+    ws1.getCell(`C${r0}`).value = row[1];
+    ws1.getCell(`C${r0}`).style = { ...styleEditable, numFmt:row[2]||undefined };
+  });
+
+  ws1.mergeCells('A12:O12');
+  ws1.getCell('A12').value = 'TABLA DE ETAPAS';
+  ws1.getCell('A12').style = styleSection;
+  ['#','Etapa','Inicio','Días','Fin','Presup. Total','P. Material','P. M.Obra','P. Equipo','Real Mat.','Real M.O.','Real Eq.','Real Total','% Margen','Estado'].forEach((h,i) => {
+    const c = ws1.getCell(13,i+1); c.value=h; c.style=styleHeader;
+  });
+  ws1.getRow(13).height = 28;
+
+  let cursor = new Date(proj.start_date);
+  const PHASE_NAMES = { '1':'Demolición','2':'Cimentación','3':'Exterior','4':'Estructura','5':'Interno','6':'Limpieza' };
+  ['1','2','3','4','5','6'].forEach((p, i) => {
+    const pt = phaseTotals[p];
+    const row = 14 + i;
+    const dias = Math.round(pt.days || 0);
+    const inicioEtapa = new Date(cursor);
+    ws1.getCell(`A${row}`).value = i+1;
+    ws1.getCell(`A${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+    ws1.getCell(`B${row}`).value = PHASE_NAMES[p];
+    ws1.getCell(`B${row}`).style = { font:{bold:true}, border:thinBorder, alignment:{horizontal:'left'} };
+    ws1.getCell(`C${row}`).value = dias > 0 ? inicioEtapa : '';
+    ws1.getCell(`C${row}`).style = { ...styleEditable, numFmt:FMT_DATE };
+    ws1.getCell(`D${row}`).value = dias;
+    ws1.getCell(`D${row}`).style = { ...styleEditable, numFmt:FMT_INT, alignment:{horizontal:'center'} };
+    ws1.getCell(`E${row}`).value = { formula:`IF(OR(C${row}="",D${row}=0),"",C${row}+D${row}-1)` };
+    ws1.getCell(`E${row}`).style = { ...styleCalc, numFmt:FMT_DATE };
+    ws1.getCell(`F${row}`).value = Math.round(pt.total);
+    ws1.getCell(`F${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+    ws1.getCell(`G${row}`).value = Math.round(pt.mat);
+    ws1.getCell(`G${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+    ws1.getCell(`H${row}`).value = Math.round(pt.labor);
+    ws1.getCell(`H${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+    ws1.getCell(`I${row}`).value = Math.round(pt.eq);
+    ws1.getCell(`I${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+    ['J','K','L'].forEach(col => {
+      ws1.getCell(`${col}${row}`).value = null;
+      ws1.getCell(`${col}${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+    });
+    ws1.getCell(`M${row}`).value = { formula:`SUM(J${row}:L${row})` };
+    ws1.getCell(`M${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY, font:{bold:true} };
+    ws1.getCell(`N${row}`).value = { formula:`IFERROR((F${row}-M${row})/F${row},0)` };
+    ws1.getCell(`N${row}`).style = { ...styleCalc, numFmt:FMT_PCT };
+    ws1.getCell(`O${row}`).value = { formula:`IF(M${row}=0,"○ Sin gasto",IF(N${row}>=0.1,"◐ Dentro",IF(N${row}>=0,"⚠ Apretado","● Sobre presup.")))` };
+    ws1.getCell(`O${row}`).style = { ...styleCalc, alignment:{horizontal:'left'} };
+    if (dias > 0) cursor.setDate(cursor.getDate() + dias);
+  });
+  const totalRow = 14 + 6;
+  ws1.getCell(`B${totalRow}`).value = 'TOTALES';
+  ws1.getCell(`B${totalRow}`).style = { ...styleTotal, alignment:{horizontal:'left'} };
+  ws1.getCell(`D${totalRow}`).value = { formula:`SUM(D14:D${totalRow-1})` };
+  ws1.getCell(`D${totalRow}`).style = { ...styleTotal, numFmt:FMT_INT, alignment:{horizontal:'center'} };
+  ['F','G','H','I','J','K','L','M'].forEach(col => {
+    ws1.getCell(`${col}${totalRow}`).value = { formula:`SUM(${col}14:${col}${totalRow-1})` };
+    ws1.getCell(`${col}${totalRow}`).style = { ...styleTotal, numFmt:FMT_CURRENCY };
+  });
+  ws1.getCell(`N${totalRow}`).value = { formula:`IFERROR((F${totalRow}-M${totalRow})/F${totalRow},0)` };
+  ws1.getCell(`N${totalRow}`).style = { ...styleTotal, numFmt:FMT_PCT };
+
+  // ════════ HOJA 2: PRESUPUESTO GENERAL ════════
+  const ws2 = wb.addWorksheet('PRESUPUESTO GENERAL', { views:[{state:'frozen',ySplit:4}] });
+  ws2.columns = [{width:24},{width:14},{width:14},{width:14},{width:14},{width:14}];
+  ws2.mergeCells('A1:F1');
+  ws2.getCell('A1').value = `PRESUPUESTO — ${proj.name}`;
+  ws2.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+  ws2.getRow(1).height = 24;
+  ['Etapa','Material','Mano obra','Equipo','TOTAL','% del total'].forEach((h,i) => {
+    const c = ws2.getCell(4,i+1); c.value=h; c.style=styleHeader;
+  });
+  ws2.getRow(4).height = 24;
+  ['1','2','3','4','5','6'].forEach((p, i) => {
+    const pt = phaseTotals[p];
+    const row = 5+i;
+    ws2.getCell(`A${row}`).value = `${p}. ${PHASE_NAMES[p]}`;
+    ws2.getCell(`A${row}`).style = { font:{bold:true}, border:thinBorder, alignment:{horizontal:'left'} };
+    ws2.getCell(`B${row}`).value = Math.round(pt.mat);
+    ws2.getCell(`B${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+    ws2.getCell(`C${row}`).value = Math.round(pt.labor);
+    ws2.getCell(`C${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+    ws2.getCell(`D${row}`).value = Math.round(pt.eq);
+    ws2.getCell(`D${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+    ws2.getCell(`E${row}`).value = { formula:`B${row}+C${row}+D${row}` };
+    ws2.getCell(`E${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY, font:{bold:true} };
+    ws2.getCell(`F${row}`).value = { formula:`IFERROR(E${row}/E12,0)` };
+    ws2.getCell(`F${row}`).style = { ...styleCalc, numFmt:FMT_PCT };
+  });
+  ws2.getCell('A12').value = 'TOTAL';
+  ws2.getCell('A12').style = { ...styleTotal, alignment:{horizontal:'left'} };
+  ['B','C','D','E'].forEach(col => {
+    ws2.getCell(`${col}12`).value = { formula:`SUM(${col}5:${col}10)` };
+    ws2.getCell(`${col}12`).style = { ...styleTotal, numFmt:FMT_CURRENCY };
+  });
+
+  // ════════ HOJA 3: CRONOGRAMA ════════
+  const ws3 = wb.addWorksheet('CRONOGRAMA', { views:[{state:'frozen',ySplit:4}] });
+  ws3.columns = [{width:22},{width:14},{width:14},{width:10},{width:18}];
+  ws3.mergeCells('A1:E1');
+  ws3.getCell('A1').value = `CRONOGRAMA — ${proj.name}`;
+  ws3.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+  ws3.getRow(1).height = 24;
+  ['Etapa','Inicio','Fin','Días','# Actividades'].forEach((h,i) => {
+    const c = ws3.getCell(4,i+1); c.value=h; c.style=styleHeader;
+  });
+  let cur2 = new Date(proj.start_date);
+  ['1','2','3','4','5','6'].forEach((p, i) => {
+    const pt = phaseTotals[p];
+    const row = 5+i;
+    const dias = Math.round(pt.days || 0);
+    const fin = new Date(cur2); if (dias > 0) fin.setDate(fin.getDate() + dias - 1);
+    const inPhase = proj.activities.filter(a => a.phase === p);
+    ws3.getCell(`A${row}`).value = `${p}. ${PHASE_NAMES[p]}`;
+    ws3.getCell(`A${row}`).style = { font:{bold:true}, border:thinBorder };
+    ws3.getCell(`B${row}`).value = dias > 0 ? new Date(cur2) : '';
+    ws3.getCell(`B${row}`).style = { ...styleCalc, numFmt:FMT_DATE };
+    ws3.getCell(`C${row}`).value = dias > 0 ? fin : '';
+    ws3.getCell(`C${row}`).style = { ...styleCalc, numFmt:FMT_DATE };
+    ws3.getCell(`D${row}`).value = dias;
+    ws3.getCell(`D${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+    ws3.getCell(`E${row}`).value = inPhase.length;
+    ws3.getCell(`E${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+    if (dias > 0) cur2.setDate(cur2.getDate() + dias);
+  });
+  ws3.getCell('A12').value = 'TOTAL DÍAS';
+  ws3.getCell('A12').style = { ...styleTotal };
+  ws3.getCell('D12').value = { formula:'SUM(D5:D10)' };
+  ws3.getCell('D12').style = { ...styleTotal, alignment:{horizontal:'center'} };
+
+  // ════════ HOJA 4: GANTT ════════
+  const ws4 = wb.addWorksheet('GANTT', { views:[{state:'frozen',xSplit:4,ySplit:4}] });
+  const totalWeeks = Math.ceil(totalDays / 7) || 1;
+  ws4.columns = [{width:22},{width:11},{width:11},{width:7}, ...Array.from({length:totalWeeks}, () => ({width:6}))];
+  ws4.mergeCells('A1:D1');
+  ws4.getCell('A1').value = `GANTT — ${proj.name}`;
+  ws4.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+  ws4.getRow(1).height = 24;
+  ['Etapa','Inicio','Fin','Días', ...Array.from({length:totalWeeks}, (_,i) => `S${i+1}`)].forEach((h,i) => {
+    const c = ws4.getCell(4,i+1); c.value=h; c.style=styleHeader;
+  });
+  let cur3 = new Date(proj.start_date);
+  ['1','2','3','4','5','6'].forEach((p, i) => {
+    const pt = phaseTotals[p];
+    const row = 5+i;
+    const dias = Math.round(pt.days || 0);
+    const fin = new Date(cur3); if (dias>0) fin.setDate(fin.getDate() + dias - 1);
+    ws4.getCell(`A${row}`).value = `${p}. ${PHASE_NAMES[p]}`;
+    ws4.getCell(`A${row}`).style = { font:{bold:true}, border:thinBorder };
+    ws4.getCell(`B${row}`).value = dias>0 ? new Date(cur3) : '';
+    ws4.getCell(`B${row}`).style = { ...styleCalc, numFmt:FMT_DATE };
+    ws4.getCell(`C${row}`).value = dias>0 ? fin : '';
+    ws4.getCell(`C${row}`).style = { ...styleCalc, numFmt:FMT_DATE };
+    ws4.getCell(`D${row}`).value = dias;
+    ws4.getCell(`D${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+    // Barras
+    if (dias > 0) {
+      const startDay = Math.floor((cur3 - new Date(proj.start_date)) / 86400000);
+      const weekStart = Math.floor(startDay / 7);
+      const weekEnd = Math.floor((startDay + dias - 1) / 7);
+      for (let w = weekStart; w <= weekEnd; w++) {
+        const cell = ws4.getCell(row, 5 + w);
+        cell.value = '█';
+        cell.style = { fill:fill('FF60A5FA'), font:{color:{argb:'FFFFFFFF'},bold:true}, alignment:{horizontal:'center'} };
+      }
+      cur3.setDate(cur3.getDate() + dias);
+    }
+  });
+
+  // ════════ HOJAS 5-10: DETALLE POR FASE (1-6) ════════
+  const ETAPA_NAMES = { '1':'1. DEMOLICION','2':'2. CIMENTACION','3':'3. EXTERNO','4':'4. ESTRUCTURA','5':'5. INTERNO','6':'6. LIMPIEZA' };
+  ['1','2','3','4','5','6'].forEach(p => {
+    const sheetName = ETAPA_NAMES[p];
+    const acts = proj.activities.filter(a => a.phase === p);
+    const ws = wb.addWorksheet(sheetName, { views:[{state:'frozen',ySplit:3}] });
+    ws.columns = [{width:4},{width:22},{width:10},{width:50},{width:11},{width:10},{width:13},{width:13},{width:13},{width:10},{width:14},{width:14},{width:14},{width:14},{width:11}];
+    ws.mergeCells('A1:O1');
+    ws.getCell('A1').value = sheetName;
+    ws.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+    ws.getRow(1).height = 24;
+    const pt = phaseTotals[p];
+    ws.mergeCells('A2:O2');
+    ws.getCell('A2').value = `Presupuesto fase: $${Math.round(pt.total).toLocaleString()} · Material $${Math.round(pt.mat).toLocaleString()} · MO $${Math.round(pt.labor).toLocaleString()} · Equipo $${Math.round(pt.eq).toLocaleString()} · ${acts.length} actividades`;
+    ws.getCell('A2').style = { font:{italic:true,color:{argb:'FF6B7280'},size:9} };
+    ws.getRow(2).height = 18;
+    ['#','Subcategoría','Código','Descripción','Unidad','Cantidad','VU Total ($)','VU Mat ($)','VU MO ($)','% Mat','Total Mat','Total MO','Total ($)','Real ($)','% Margen'].forEach((h,i) => {
+      const c = ws.getCell(3,i+1); c.value=h; c.style=styleHeader;
+    });
+    ws.getRow(3).height = 28;
+
+    // Agrupar por subcat
+    let row = 4;
+    let lastSub = null;
+    let n = 0;
+    const sorted = [...acts].sort((a,b) => (a.code||'').localeCompare(b.code||''));
+    sorted.forEach(a => {
+      if (a.subcat !== lastSub) {
+        ws.mergeCells(`A${row}:O${row}`);
+        ws.getCell(`A${row}`).value = `▸ ${a.subcat || '(sin subcategoría)'}`;
+        ws.getCell(`A${row}`).style = styleSub;
+        row++;
+        lastSub = a.subcat;
+      }
+      n++;
+      const qty = +a.qty || 0;
+      const vuMat = qty > 0 ? (+a.material||0)/qty : 0;
+      const vuMo = qty > 0 ? (+a.labor||0)/qty : 0;
+      ws.getCell(`A${row}`).value = n; ws.getCell(`A${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+      ws.getCell(`B${row}`).value = a.subcat || ''; ws.getCell(`B${row}`).style = { border:thinBorder, font:{size:9,color:{argb:'FF6B7280'}} };
+      ws.getCell(`C${row}`).value = a.code; ws.getCell(`C${row}`).style = { ...styleCalc, font:{bold:true}, alignment:{horizontal:'center'} };
+      ws.getCell(`D${row}`).value = a.desc || ''; ws.getCell(`D${row}`).style = { border:thinBorder, alignment:{horizontal:'left',wrapText:true} };
+      ws.getCell(`E${row}`).value = a.unit || ''; ws.getCell(`E${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
+      ws.getCell(`F${row}`).value = qty; ws.getCell(`F${row}`).style = { ...styleEditable, numFmt:FMT_INT };
+      ws.getCell(`G${row}`).value = +a.vu || 0; ws.getCell(`G${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+      ws.getCell(`H${row}`).value = Math.round(vuMat*100)/100; ws.getCell(`H${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+      ws.getCell(`I${row}`).value = Math.round(vuMo*100)/100; ws.getCell(`I${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+      ws.getCell(`J${row}`).value = { formula:`IFERROR(H${row}/G${row},0)` }; ws.getCell(`J${row}`).style = { ...styleCalc, numFmt:FMT_PCT };
+      ws.getCell(`K${row}`).value = { formula:`IFERROR(F${row}*H${row},0)` }; ws.getCell(`K${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+      ws.getCell(`L${row}`).value = { formula:`IFERROR(F${row}*I${row},0)` }; ws.getCell(`L${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY };
+      ws.getCell(`M${row}`).value = { formula:`K${row}+L${row}` }; ws.getCell(`M${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY, font:{bold:true} };
+      ws.getCell(`N${row}`).value = null; ws.getCell(`N${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+      ws.getCell(`O${row}`).value = { formula:`IFERROR((M${row}-N${row})/M${row},0)` }; ws.getCell(`O${row}`).style = { ...styleCalc, numFmt:FMT_PCT };
+      row++;
+    });
+    // Fila TOTAL si hubo actividades
+    if (n > 0) {
+      ws.getCell(`D${row}`).value = 'TOTAL FASE';
+      ws.getCell(`D${row}`).style = { ...styleTotal, alignment:{horizontal:'right'} };
+      ['K','L','M','N'].forEach(col => {
+        ws.getCell(`${col}${row}`).value = { formula:`SUM(${col}4:${col}${row-1})` };
+        ws.getCell(`${col}${row}`).style = { ...styleTotal, numFmt:FMT_CURRENCY };
+      });
+      ws.getCell(`O${row}`).value = { formula:`IFERROR((M${row}-N${row})/M${row},0)` };
+      ws.getCell(`O${row}`).style = { ...styleTotal, numFmt:FMT_PCT };
+    } else {
+      ws.mergeCells(`A4:O4`);
+      ws.getCell('A4').value = '(Sin actividades en esta fase. Agregalas en el Editor detallado de la app.)';
+      ws.getCell('A4').style = { font:{italic:true,color:{argb:'FF6B7280'},size:10}, alignment:{horizontal:'center'} };
+    }
+  });
+
+  // ════════ HOJA 11: MATERIALES ════════
+  const wsMat = wb.addWorksheet('MATERIALES', { views:[{state:'frozen',ySplit:2}] });
+  wsMat.columns = [{width:8},{width:50},{width:14},{width:18},{width:10},{width:14},{width:14},{width:14},{width:14}];
+  wsMat.mergeCells('A1:I1');
+  wsMat.getCell('A1').value = `MATERIALES — ${proj.name}`;
+  wsMat.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+  wsMat.getRow(1).height = 24;
+  ['ITEM','Descripción','Fase','Sub etapa','Cantidad','Unidad / SQFT c/u','Precio unit (USD)','Subtotal (USD)','Vendor'].forEach((h,i) => {
+    const c = wsMat.getCell(2,i+1); c.value=h; c.style=styleHeader;
+  });
+  wsMat.getRow(2).height = 28;
+  for (let i = 0; i < 200; i++) {
+    const row = 3+i;
+    ['A','B','C','D','E','F','G','I'].forEach(col => {
+      wsMat.getCell(`${col}${row}`).style = { ...styleEditable, alignment:{horizontal: col==='B'?'left':col==='G'?'right':'center'} };
+    });
+    wsMat.getCell(`G${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+    wsMat.getCell(`H${row}`).value = { formula:`IFERROR(E${row}*G${row},0)` };
+    wsMat.getCell(`H${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY, font:{bold:true} };
+  }
+  wsMat.getCell('G203').value = 'TOTAL';
+  wsMat.getCell('G203').style = { ...styleTotal, alignment:{horizontal:'right'} };
+  wsMat.getCell('H203').value = { formula:'SUM(H3:H202)' };
+  wsMat.getCell('H203').style = { ...styleTotal, numFmt:FMT_CURRENCY };
+
+  // ════════ HOJA 12: ACTIVIDADES DIARIAS ════════
+  const wsAct = wb.addWorksheet('ACTIVIDADES DIARIAS', { views:[{state:'frozen',ySplit:2}] });
+  wsAct.columns = [{width:4},{width:18},{width:16},{width:12},{width:50},{width:14},{width:14},{width:14},{width:50}];
+  wsAct.mergeCells('A1:I1');
+  wsAct.getCell('A1').value = `BITÁCORA DIARIA — ${proj.name}`;
+  wsAct.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font,size:14} };
+  wsAct.getRow(1).height = 24;
+  ['','ITEM','SUBITEM','FECHA','MATERIALES','COSTO DE MATERIAL','HORAS TRABAJADAS','OTROS COSTOS','OBSERVACIONES'].forEach((h,i) => {
+    const c = wsAct.getCell(2,i+1); c.value=h; c.style=styleHeader;
+  });
+  wsAct.getRow(2).height = 28;
+  for (let i = 0; i < 300; i++) {
+    const row = 3+i;
+    ['B','C','D','E','F','G','H','I'].forEach(col => {
+      wsAct.getCell(`${col}${row}`).style = { ...styleEditable, alignment:{horizontal:(col==='E'||col==='I')?'left':(col==='F'||col==='G'||col==='H')?'right':'center'} };
+    });
+    wsAct.getCell(`D${row}`).style = { ...styleEditable, numFmt:FMT_DATE };
+    wsAct.getCell(`F${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+    wsAct.getCell(`G${row}`).style = { ...styleEditable, numFmt:FMT_INT };
+    wsAct.getCell(`H${row}`).style = { ...styleEditable, numFmt:FMT_CURRENCY };
+  }
+  wsAct.getCell('E304').value = 'TOTALES';
+  wsAct.getCell('E304').style = { ...styleTotal, alignment:{horizontal:'right'} };
+  ['F','G','H'].forEach(col => {
+    wsAct.getCell(`${col}304`).value = { formula:`SUM(${col}3:${col}303)` };
+    wsAct.getCell(`${col}304`).style = { ...styleTotal, numFmt: col==='G'?FMT_INT:FMT_CURRENCY };
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  const safe = (proj.name||'proyecto').replace(/[^a-z0-9]/gi,'_');
+  const today = new Date().toISOString().split('T')[0].replace(/-/g,'');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${today}_Seguimiento_${safe}.xlsx`;
+  a.click();
 }
