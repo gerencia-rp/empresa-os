@@ -625,8 +625,114 @@ function pmRenderRisks() {
   const risks = pmFilterByArea(pmState.risks || []);
   const aiKey = 'pm-risks-' + pmState.currentCompany;
   const ai = (window.aiState && window.aiState[aiKey]) || {};
+
+  // KPIs Risks
+  const critical = risks.filter(r => r.score >= 15);
+  const high = risks.filter(r => r.score >= 10 && r.score < 15);
+  const medium = risks.filter(r => r.score >= 5 && r.score < 10);
+  const low = risks.filter(r => r.score < 5);
+  const mitigating = risks.filter(r => r.status === 'mitigating');
+
+  // Matrix prob × impact
+  const matrix = {};
+  for (let p = 1; p <= 5; p++) {
+    matrix[p] = {};
+    for (let i = 1; i <= 5; i++) matrix[p][i] = [];
+  }
+  risks.forEach(r => {
+    if (r.probability && r.impact && r.status !== 'closed') {
+      matrix[r.probability][r.impact].push(r);
+    }
+  });
+
+  // Por categoría
+  const byCategory = {};
+  risks.forEach(r => { const c = r.category || 'sin categoría'; byCategory[c] = (byCategory[c]||0) + 1; });
+
+  // Análisis
+  const insights = [];
+  if (critical.length > 0) insights.push(`🚨 <strong>${critical.length} riesgo${critical.length>1?'s':''} crítico${critical.length>1?'s':''}</strong> (score ≥15). Necesitan mitigation plan AHORA.`);
+  if (high.length > 0) insights.push(`⚠️ <strong>${high.length}</strong> riesgos en zona high (score 10-14). Owner asignado y plan documentado.`);
+  if (mitigating.length === 0 && (critical.length + high.length) > 0) insights.push(`📋 <strong>Cero riesgos en estado "mitigating"</strong> aunque hay críticos/altos. ¿Hay un plan activo para cada uno?`);
+  const noOwner = risks.filter(r => !r.owner && r.score >= 10);
+  if (noOwner.length > 0) insights.push(`👤 <strong>${noOwner.length}</strong> riesgos high/critical SIN owner. Asignar responsable.`);
+
   return `
     <div class="space-y-3">
+      <!-- KPIs Riesgos -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-red-600 text-white rounded-xl p-3">
+          <div class="text-[10px] text-red-100 uppercase font-bold">Críticos</div>
+          <div class="text-3xl font-bold">${critical.length}</div>
+          <div class="text-[10px] text-red-100">score ≥15</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-300 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">High</div>
+          <div class="text-3xl font-bold text-amber-900">${high.length}</div>
+          <div class="text-[10px] text-amber-700">score 10-14</div>
+        </div>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+          <div class="text-[10px] text-yellow-700 uppercase font-bold">Medium</div>
+          <div class="text-3xl font-bold text-yellow-900">${medium.length}</div>
+          <div class="text-[10px] text-yellow-700">score 5-9</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-[10px] text-emerald-700 uppercase font-bold">Low</div>
+          <div class="text-3xl font-bold text-emerald-900">${low.length}</div>
+          <div class="text-[10px] text-emerald-700">score &lt;5</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Mitigating</div>
+          <div class="text-3xl font-bold text-blue-900">${mitigating.length}</div>
+          <div class="text-[10px] text-blue-700">en gestión activa</div>
+        </div>
+      </div>
+
+      ${insights.length > 0 ? `
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-red-900 mb-2">🤖 Análisis del risk register</div>
+          <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
+      <!-- Risk Matrix 5x5 -->
+      ${risks.filter(r => r.status !== 'closed').length > 0 ? `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Risk Matrix (Probabilidad × Impacto)</div>
+          <div class="p-3">
+            <table class="w-full text-xs">
+              <tbody>
+                ${[5,4,3,2,1].map(p => `
+                  <tr>
+                    <td class="text-[9px] text-right pr-2 font-bold text-slate-500">P${p}</td>
+                    ${[1,2,3,4,5].map(i => {
+                      const cell = matrix[p][i];
+                      const score = p * i;
+                      const bg = score >= 15 ? 'bg-red-500' : score >= 10 ? 'bg-orange-300' : score >= 5 ? 'bg-yellow-200' : 'bg-emerald-100';
+                      const tc = score >= 15 ? 'text-white' : score >= 10 ? 'text-orange-900' : 'text-slate-700';
+                      const tooltip = cell.length ? cell.map(r => '• '+r.title).join('\n') : '';
+                      return `<td class="${bg} ${tc} text-center font-bold p-3 border border-white/40" title="${tooltip}">${cell.length || ''}</td>`;
+                    }).join('')}
+                  </tr>
+                `).join('')}
+                <tr><td></td>${[1,2,3,4,5].map(i => `<td class="text-[9px] text-center text-slate-500 font-bold pt-1">I${i}</td>`).join('')}</tr>
+              </tbody>
+            </table>
+            <div class="text-[10px] text-slate-500 mt-2 italic">P=Probabilidad · I=Impacto · score = P×I · Hover celdas con número para ver títulos</div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Por categoría -->
+      ${Object.keys(byCategory).length > 0 ? `
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">📁 Por categoría</div>
+          <div class="flex flex-wrap gap-2">
+            ${Object.entries(byCategory).sort((a,b) => b[1]-a[1]).map(([c,n]) => `<span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded"><strong>${c}</strong>: ${n}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">Risk register. Score = probabilidad × impacto. Score ≥ 12 = atender.</div>
         <div class="flex gap-2">
@@ -702,8 +808,70 @@ function pmRenderCompliance() {
   const today = new Date(); today.setHours(0,0,0,0);
   const aiKey = 'pm-compliance-' + pmState.currentCompany;
   const ai = (window.aiState && window.aiState[aiKey]) || {};
+
+  // KPIs Compliance
+  const daysTo = (d) => d ? Math.round((new Date(d) - today) / 86400000) : null;
+  const vencidos = items.filter(c => c.expiry_date && daysTo(c.expiry_date) < 0);
+  const venceMes = items.filter(c => c.expiry_date && daysTo(c.expiry_date) >= 0 && daysTo(c.expiry_date) <= 30);
+  const venceTrim = items.filter(c => c.expiry_date && daysTo(c.expiry_date) > 30 && daysTo(c.expiry_date) <= 90);
+  const ok = items.filter(c => !c.expiry_date || daysTo(c.expiry_date) > 90);
+
+  // Por tipo
+  const byType = {};
+  items.forEach(c => { const t = c.type || 'other'; byType[t] = (byType[t]||0) + 1; });
+
+  // Análisis
+  const insights = [];
+  if (vencidos.length > 0) insights.push(`🚨 <strong>${vencidos.length} item${vencidos.length>1?'s':''} VENCIDO${vencidos.length>1?'S':''}</strong>. Renovar urgente — pueden generar multa o paralizar operación.`);
+  if (venceMes.length > 0) insights.push(`⚠️ <strong>${venceMes.length}</strong> vence${venceMes.length>1?'n':''} en los próximos 30 días. Empezá trámite ya.`);
+  if (items.length === 0) insights.push(`📭 Sin compliance items registrados. Click "🤖 Análisis IA" para que Claude sugiera lo que probablemente te falte.`);
+  if (items.length > 0 && venceMes.length === 0 && vencidos.length === 0) insights.push(`✅ Sin items próximos a vencer. Compliance al día.`);
+
   return `
     <div class="space-y-3">
+      <!-- KPIs Compliance -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-red-600 text-white rounded-xl p-3">
+          <div class="text-[10px] text-red-100 uppercase font-bold">Vencidos</div>
+          <div class="text-3xl font-bold">${vencidos.length}</div>
+          <div class="text-[10px] text-red-100">renovar ya</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-300 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">Vence ≤30d</div>
+          <div class="text-3xl font-bold text-amber-900">${venceMes.length}</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Vence ≤90d</div>
+          <div class="text-3xl font-bold text-blue-900">${venceTrim.length}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-[10px] text-emerald-700 uppercase font-bold">OK</div>
+          <div class="text-3xl font-bold text-emerald-900">${ok.length}</div>
+          <div class="text-[10px] text-emerald-700">&gt;90d o sin vencimiento</div>
+        </div>
+        <div class="bg-slate-900 text-white rounded-xl p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-bold">Total</div>
+          <div class="text-3xl font-bold">${items.length}</div>
+          <div class="text-[10px] text-slate-400">items activos</div>
+        </div>
+      </div>
+
+      ${insights.length > 0 ? `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis de compliance</div>
+          <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
+      ${Object.keys(byType).length > 0 ? `
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">📁 Por tipo</div>
+          <div class="flex flex-wrap gap-2">
+            ${Object.entries(byType).sort((a,b) => b[1]-a[1]).map(([t,n]) => `<span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded"><strong>${t}</strong>: ${n}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">Permisos, licencias, seguros con fecha de vencimiento.</div>
         <div class="flex gap-2">
@@ -928,8 +1096,60 @@ function pmRenderOKRs() {
   const okrs = pmFilterByCompany(pmState.okrs || []);
   const aiKey = 'pm-okrs-' + pmState.currentCompany;
   const ai = (window.aiState && window.aiState[aiKey]) || {};
+
+  // KPIs OKRs
+  const active = okrs.filter(o => o.status === 'active');
+  const atRisk = okrs.filter(o => o.status === 'at_risk');
+  const avgProgress = okrs.length ? Math.round(okrs.reduce((s,o) => s + (o.progress_pct||0), 0) / okrs.length) : 0;
+  const onTrack = okrs.filter(o => (o.progress_pct||0) >= 70).length;
+  const behind = okrs.filter(o => (o.progress_pct||0) < 30).length;
+
+  // Análisis automático
+  const insights = [];
+  if (okrs.length === 0) insights.push(`📭 Sin OKRs definidos. Click "🤖 Sugerir con IA" para arrancar.`);
+  else {
+    if (atRisk.length > 0) insights.push(`🚨 <strong>${atRisk.length} OKR${atRisk.length>1?'s':''} at-risk</strong> — review urgente. Considerá re-scope o más recursos.`);
+    if (avgProgress < 30 && okrs.length > 0) insights.push(`📉 Progreso promedio bajo (${avgProgress}%). Si estamos a mitad de quarter, revisar targets — son muy ambiciosos o falta foco.`);
+    if (avgProgress >= 70) insights.push(`✅ Excelente progreso (${avgProgress}% prom). Validá que los targets no fueran muy bajos (debe ser stretch).`);
+    if (behind > 0) insights.push(`⚠️ <strong>${behind} OKR${behind>1?'s':''}</strong> con <30% progreso. Identificá blockers en próximo 1-on-1.`);
+  }
+
   return `
     <div class="space-y-3">
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-slate-900 text-white rounded-xl p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-bold">OKRs activos</div>
+          <div class="text-3xl font-bold">${okrs.length}</div>
+          <div class="text-[10px] text-slate-400">${active.length} active · ${atRisk.length} at_risk</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Progreso prom</div>
+          <div class="text-3xl font-bold ${avgProgress>=70?'text-emerald-700':avgProgress>=40?'text-blue-900':'text-red-700'}">${avgProgress}%</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-[10px] text-emerald-700 uppercase font-bold">On track</div>
+          <div class="text-3xl font-bold text-emerald-900">${onTrack}</div>
+          <div class="text-[10px] text-emerald-700">≥70% progreso</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">Behind</div>
+          <div class="text-3xl font-bold text-amber-900">${behind}</div>
+          <div class="text-[10px] text-amber-700">&lt;30% progreso</div>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="text-[10px] text-red-700 uppercase font-bold">At risk</div>
+          <div class="text-3xl font-bold text-red-900">${atRisk.length}</div>
+        </div>
+      </div>
+
+      ${insights.length > 0 ? `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis automático</div>
+          <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
       <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">OKRs trimestrales por empresa o persona. Objetivos + Key Results medibles.</div>
         <div class="flex gap-2">
@@ -1010,13 +1230,111 @@ async function pmAddOKR() {
 // ─── 1-on-1s ───
 function pmRenderOneOnOnes() {
   const list = pmState.oneOnOnes || [];
+  const now = Date.now();
+
+  // KPIs
+  const upcoming = list.filter(o => o.status === 'scheduled' && o.scheduled_date && new Date(o.scheduled_date).getTime() > now);
+  const upcoming7d = upcoming.filter(o => (new Date(o.scheduled_date).getTime() - now) <= 7*86400000);
+  const completed30d = list.filter(o => o.status === 'completed' && o.completed_at && (now - new Date(o.completed_at).getTime()) < 30*86400000);
+  const overdueScheduled = list.filter(o => o.status === 'scheduled' && o.scheduled_date && new Date(o.scheduled_date).getTime() < now);
+  const actionItems = list.flatMap(o => (o.action_items || []).map(ai => ({...ai, person: o.pm_whatsapp_recipients?.full_name || '?'})));
+  const openActions = actionItems.filter(ai => !ai.completed_at);
+
+  // Persons sin 1-on-1 reciente
+  const recipients = pmState.recipients || [];
+  const lastBy = {};
+  list.forEach(o => {
+    const rid = o.recipient_id;
+    if (!rid) return;
+    const d = o.completed_at || o.scheduled_date;
+    if (d && (!lastBy[rid] || new Date(d) > new Date(lastBy[rid]))) lastBy[rid] = d;
+  });
+  const overdue1on1 = recipients.filter(r => r.active && (r.role === 'crew_leader' || r.role === 'pm')).filter(r => {
+    const last = lastBy[r.id];
+    if (!last) return true;
+    return (now - new Date(last).getTime()) > 14*86400000;
+  });
+
+  // Análisis
+  const insights = [];
+  if (overdueScheduled.length > 0) insights.push(`📅 <strong>${overdueScheduled.length}</strong> 1-on-1${overdueScheduled.length>1?'s':''} pasaron sin marcarse como completados. Actualizá el estado.`);
+  if (overdue1on1.length > 0) insights.push(`👤 <strong>${overdue1on1.length}</strong> líder${overdue1on1.length>1?'es':''} sin 1-on-1 en los últimos 14 días: ${overdue1on1.map(r => r.full_name).join(', ')}.`);
+  if (openActions.length > 0) insights.push(`📋 <strong>${openActions.length}</strong> action items pendientes de 1-on-1s previos.`);
+  if (upcoming7d.length > 0) insights.push(`📆 ${upcoming7d.length} 1-on-1${upcoming7d.length>1?'s':''} esta semana. Considerá usar "🧠 Preparar IA" para tener data lista.`);
+
   return `
     <div class="space-y-3">
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Próximos</div>
+          <div class="text-3xl font-bold text-blue-900">${upcoming.length}</div>
+          <div class="text-[10px] text-blue-700">${upcoming7d.length} esta semana</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-[10px] text-emerald-700 uppercase font-bold">Completados 30d</div>
+          <div class="text-3xl font-bold text-emerald-900">${completed30d.length}</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">Atrasados</div>
+          <div class="text-3xl font-bold text-amber-900">${overdueScheduled.length}</div>
+          <div class="text-[10px] text-amber-700">scheduled pero pasados</div>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="text-[10px] text-red-700 uppercase font-bold">Sin 1-on-1 14d+</div>
+          <div class="text-3xl font-bold text-red-900">${overdue1on1.length}</div>
+          <div class="text-[10px] text-red-700">líderes desatendidos</div>
+        </div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+          <div class="text-[10px] text-violet-700 uppercase font-bold">Action items</div>
+          <div class="text-3xl font-bold text-violet-900">${openActions.length}</div>
+          <div class="text-[10px] text-violet-700">abiertos</div>
+        </div>
+      </div>
+
+      ${insights.length > 0 ? `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis</div>
+          <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
+      ${overdue1on1.length > 0 ? `
+        <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">👤 Líderes sin 1-on-1 reciente (>14 días)</div>
+          <div class="divide-y divide-slate-100">
+            ${overdue1on1.map(r => {
+              const last = lastBy[r.id];
+              const daysAgo = last ? Math.round((now - new Date(last).getTime())/86400000) : null;
+              return `<div class="p-2 flex justify-between text-xs">
+                <span><strong>${r.full_name}</strong> · ${r.role}</span>
+                <span class="text-slate-500">${daysAgo ? `último hace ${daysAgo}d` : 'nunca'}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${openActions.length > 0 ? `
+        <div class="bg-white border border-violet-200 rounded-xl overflow-hidden">
+          <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 text-xs font-bold uppercase text-violet-900">📋 Action items pendientes de 1-on-1s</div>
+          <div class="divide-y divide-slate-100 max-h-48 overflow-y-auto">
+            ${openActions.slice(0, 20).map(ai => `
+              <div class="p-2 text-xs">
+                <div class="font-semibold">${ai.title || ai.item || '(sin título)'}</div>
+                <div class="text-[10px] text-slate-500">${ai.person} ${ai.due_date ? '· vence '+ai.due_date : ''} ${ai.owner ? '· @'+ai.owner : ''}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="flex justify-between items-center">
-        <div class="text-xs text-slate-600">Coaching 1-on-1 con cada líder. Claude prepara la agenda con la data real.</div>
+        <div class="text-xs text-slate-600">Coaching 1-on-1 con cada líder. Claude prepara la agenda con data real.</div>
         <button onclick="pmAddOneOnOne()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">+ Programar 1-on-1</button>
       </div>
-      ${list.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin 1-on-1s programados.</div>` : list.map(o => `
+
+      ${list.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin 1-on-1s programados. Click "+ Programar" para empezar.</div>` : list.map(o => `
         <div class="bg-white border border-slate-200 rounded-xl p-3">
           <div class="flex justify-between gap-2 flex-wrap">
             <div>
@@ -1692,20 +2010,49 @@ function pmRenderClickUpTasks() {
 function pmRenderTeam() {
   const co = pmCurrentCompanyObj();
   const tasks = pmFilterByCompany(pmState.clickupTasks);
-  // Solo ACTIVAS (excluye backlog) — el workload del equipo
   const active = tasks.filter(pmIsActive);
+  const closed = tasks.filter(pmIsClosed);
 
-  // Workload por persona — solo activas, NO backlog
+  // Workload por persona — solo activas, NO backlog. Tracking de cycle time histórico también.
   const byPerson = {};
   active.forEach(t => {
     const p = t.primary_assignee;
-    if (!p) return; // safety — pmIsActive ya garantiza assignee
-    if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0, byStatus: {} };
+    if (!p) return;
+    if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0, byStatus: {}, stale15: 0 };
     byPerson[p].total++;
     if (pmIsOverdue(t)) byPerson[p].overdue++;
+    if ((Date.now() - new Date(t.date_updated||t.date_created))/86400000 > 14) byPerson[p].stale15++;
     byPerson[p].byStatus[t.status||'?'] = (byPerson[p].byStatus[t.status||'?']||0) + 1;
   });
+  // Agregar cycle time histórico desde cerradas
+  closed.forEach(t => {
+    const p = t.primary_assignee;
+    if (!p || !t.date_closed || !t.due_date) return;
+    if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0, byStatus: {}, stale15: 0 };
+    byPerson[p].closedCount = (byPerson[p].closedCount||0) + 1;
+    byPerson[p].cycleSum = (byPerson[p].cycleSum||0) + pmDaysLate(t);
+  });
+  Object.values(byPerson).forEach(s => {
+    s.avgCycle = s.closedCount ? Math.round(s.cycleSum / s.closedCount) : null;
+  });
   const list = Object.entries(byPerson).sort((a,b) => b[1].total - a[1].total);
+
+  // KPIs equipo
+  const totalActive = active.length;
+  const peopleCount = list.length;
+  const avgWorkload = peopleCount ? Math.round(totalActive / peopleCount) : 0;
+  const overloaded = list.filter(([_, s]) => s.total >= 15).length;
+  const totalOverdueByTeam = list.reduce((sum, [_, s]) => sum + s.overdue, 0);
+  const totalStaleByTeam = list.reduce((sum, [_, s]) => sum + s.stale15, 0);
+
+  // Análisis automático
+  const insights = [];
+  if (overloaded > 0) insights.push(`🔥 <strong>${overloaded}</strong> persona${overloaded>1?'s':''} sobrecargada${overloaded>1?'s':''} (≥15 tareas). Considerá rebalancear.`);
+  if (totalOverdueByTeam > totalActive * 0.2) insights.push(`🚨 ${Math.round(totalOverdueByTeam/totalActive*100)}% del backlog activo está vencido. El equipo no llega — revisar capacidad o priorización.`);
+  const topPerformer = list[0];
+  if (topPerformer && topPerformer[1].overdue === 0 && topPerformer[1].total >= 5) insights.push(`✅ <strong>${topPerformer[0]}</strong> tiene ${topPerformer[1].total} activas y 0 vencidas. Reconocer públicamente.`);
+  const slowest = [...list].sort((a,b) => (b[1].avgCycle||-999) - (a[1].avgCycle||-999))[0];
+  if (slowest && slowest[1].avgCycle > 5) insights.push(`⏱ <strong>${slowest[0]}</strong> cierra en promedio ${slowest[1].avgCycle}d después del due. Posible 1-on-1 sobre planning.`);
 
   // Performance leaderboard filtrado
   const lb = (pmState.leaderboard || []).filter(p => pmState.currentCompany === 'holding' || p.company_name === co?.name);
@@ -1715,23 +2062,68 @@ function pmRenderTeam() {
 
   return `
     <div class="space-y-4">
-      <!-- Workload real desde ClickUp -->
+      <!-- KPIs Equipo -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-slate-900 text-white rounded-xl p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-bold">Activos</div>
+          <div class="text-3xl font-bold">${peopleCount}</div>
+          <div class="text-[10px] text-slate-400">personas con tareas</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">Tareas/persona</div>
+          <div class="text-3xl font-bold text-blue-900">${avgWorkload}</div>
+          <div class="text-[10px] text-blue-700">promedio</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">Sobrecargados</div>
+          <div class="text-3xl font-bold text-amber-900">${overloaded}</div>
+          <div class="text-[10px] text-amber-700">≥15 tareas</div>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="text-[10px] text-red-700 uppercase font-bold">Vencidas equipo</div>
+          <div class="text-3xl font-bold text-red-900">${totalOverdueByTeam}</div>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] text-slate-600 uppercase font-bold">Stale 15d+</div>
+          <div class="text-3xl font-bold text-slate-700">${totalStaleByTeam}</div>
+          <div class="text-[10px] text-slate-600">sin update</div>
+        </div>
+      </div>
+
+      <!-- Análisis automático -->
+      ${insights.length > 0 ? `
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis del equipo</div>
+          <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+
+      <!-- Workload detallado -->
       <div>
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 Carga de trabajo (ClickUp en vivo)</div>
-        ${list.length === 0 ? '<div class="text-center py-8 text-slate-400">Sin gente asignada.</div>' : `
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 Carga real por persona (solo activas, excluye backlog)</div>
+        ${list.length === 0 ? '<div class="text-center py-8 text-slate-400">Sin gente asignada todavía. Sincronizá ClickUp.</div>' : `
           <div class="border border-slate-200 rounded-xl overflow-hidden">
             <table class="w-full text-xs">
               <thead class="bg-slate-50">
-                <tr><th class="text-left p-2">Persona</th><th class="text-right p-2">Tasks abiertas</th><th class="text-right p-2">Vencidas</th><th class="text-left p-2">Status mix</th></tr>
+                <tr class="text-[10px] uppercase text-slate-600">
+                  <th class="text-left p-2">Persona</th>
+                  <th class="text-right p-2">Activas</th>
+                  <th class="text-right p-2">Vencidas</th>
+                  <th class="text-right p-2" title="Sin update +15d">Stale</th>
+                  <th class="text-right p-2" title="Avg días vs due al cerrar (negativo = a tiempo)">Cycle Δ</th>
+                  <th class="text-left p-2">Status mix</th>
+                </tr>
               </thead>
               <tbody>
                 ${list.map(([p, s]) => {
                   const overPct = s.total > 0 ? Math.round(s.overdue/s.total*100) : 0;
                   const isOverloaded = s.total >= 15;
-                  return `<tr class="border-t border-slate-100 ${isOverloaded?'bg-amber-50':''}">
+                  return `<tr class="border-t border-slate-100 ${isOverloaded?'bg-amber-50':''} hover:bg-slate-50">
                     <td class="p-2 font-semibold">${p} ${isOverloaded?'🔥':''}</td>
                     <td class="p-2 text-right font-bold ${s.total>=15?'text-amber-700':''}">${s.total}</td>
-                    <td class="p-2 text-right ${s.overdue>0?'text-red-700 font-bold':'text-slate-400'}">${s.overdue} (${overPct}%)</td>
+                    <td class="p-2 text-right ${s.overdue>0?'text-red-700 font-bold':'text-slate-400'}">${s.overdue} ${s.overdue?`(${overPct}%)`:''}</td>
+                    <td class="p-2 text-right ${s.stale15>0?'text-amber-700':'text-slate-400'}">${s.stale15||''}</td>
+                    <td class="p-2 text-right ${s.avgCycle == null ? 'text-slate-400' : s.avgCycle <= 0 ? 'text-emerald-700 font-bold' : s.avgCycle <= 5 ? 'text-amber-700' : 'text-red-700 font-bold'}">${s.avgCycle == null ? '—' : (s.avgCycle > 0 ? '+' : '') + s.avgCycle + 'd'}</td>
                     <td class="p-2 text-[10px] text-slate-600">${Object.entries(s.byStatus).map(([k,v]) => `<span class="bg-slate-100 px-1 rounded mr-1">${k}:${v}</span>`).join('')}</td>
                   </tr>`;
                 }).join('')}
