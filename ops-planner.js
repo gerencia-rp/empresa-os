@@ -541,18 +541,25 @@ function opRenderTemplatesPanel() {
     <div class="flex-1 overflow-y-auto p-1.5 space-y-1">
       ${Object.entries(byCat).map(([cat, items]) => `
         <details open class="border border-slate-100 rounded">
-          <summary class="cursor-pointer px-2 py-1 bg-slate-50 text-[10px] font-bold uppercase text-slate-700 hover:bg-slate-100">${cat} <span class="text-slate-400">(${items.length})</span></summary>
+          <summary class="cursor-pointer px-2 py-1 bg-slate-50 text-[10px] font-bold uppercase text-slate-700 hover:bg-slate-100 flex justify-between items-center">
+            <span>${cat} <span class="text-slate-400">(${items.length})</span></span>
+            <button onclick="event.preventDefault(); event.stopPropagation(); opOpenNewTemplate('${cat}')" class="text-[10px] text-emerald-600 hover:text-emerald-800 font-bold" title="Crear plantilla en esta categoría">+</button>
+          </summary>
           <div class="p-1 space-y-1">
             ${items.map(t => `
               <div draggable="true"
                    ondragstart="opTemplateDragStart('${t.id}')"
                    ondragend="opState.draggedTemplateId=null"
-                   class="bg-white border-2 ${t.business==='rentas'?'border-blue-200 hover:border-blue-500':t.business==='remodelacion'?'border-amber-200 hover:border-amber-500':'border-slate-200 hover:border-slate-500'} rounded p-1.5 cursor-grab active:cursor-grabbing">
+                   class="bg-white border-2 ${t.business==='rentas'?'border-blue-200 hover:border-blue-500':t.business==='remodelacion'?'border-amber-200 hover:border-amber-500':'border-slate-200 hover:border-slate-500'} rounded p-1.5 cursor-grab active:cursor-grabbing group/tpl relative">
                 <div class="flex items-start gap-1.5">
                   <span class="text-base leading-none">${t.emoji||'🧰'}</span>
                   <div class="flex-1 min-w-0">
                     <div class="text-xs font-bold leading-tight">${t.name}</div>
                     <div class="text-[9px] text-slate-500 mt-0.5">⏱ ${t.default_duration_min}m</div>
+                  </div>
+                  <div class="flex flex-col gap-0.5 opacity-0 group-hover/tpl:opacity-100">
+                    <button onclick="event.stopPropagation(); opOpenEditTemplate('${t.id}')" class="text-[10px] text-slate-400 hover:text-slate-900" title="Editar plantilla">✏️</button>
+                    <button onclick="event.stopPropagation(); opDeleteTemplateConfirm('${t.id}','${(t.name||'').replace(/'/g,'\\\'')}')" class="text-[10px] text-slate-400 hover:text-red-600" title="Eliminar plantilla">✕</button>
                   </div>
                 </div>
               </div>
@@ -560,6 +567,13 @@ function opRenderTemplatesPanel() {
           </div>
         </details>
       `).join('')}
+    </div>
+    <!-- Botón crear nueva plantilla — siempre visible al fondo -->
+    <div class="border-t border-slate-200 bg-slate-50 p-2">
+      <button onclick="opOpenNewTemplate()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1">
+        <span>+ Nueva plantilla de tarea</span>
+      </button>
+      <div class="text-[9px] text-slate-500 text-center mt-1">Quedan disponibles para reusar todos los días</div>
     </div>
   `;
 }
@@ -2850,4 +2864,143 @@ async function opShiftTasksAfter(dateStr, fromStartMin, shiftMin, excludeIds = [
   if (movedToBacklog > 0) {
     setTimeout(() => alert(`⚠️ ${movedToBacklog} tarea${movedToBacklog>1?'s':''} no cupo${movedToBacklog>1?'n':''} en el día y fue${movedToBacklog>1?'ron':''} enviada${movedToBacklog>1?'s':''} al backlog.`), 200);
   }
+}
+
+// ============================================================
+// PLANTILLAS DE TAREAS — CRUD desde el panel Tareas
+// ============================================================
+
+function opOpenNewTemplate(prefilledCategory) {
+  opOpenTemplateModal(null, prefilledCategory);
+}
+
+function opOpenEditTemplate(id) {
+  const tmpl = opState.tasks.find(t => t.id === id);
+  if (!tmpl) return alert('Plantilla no encontrada');
+  opOpenTemplateModal(tmpl);
+}
+
+function opOpenTemplateModal(tmpl, prefilledCategory) {
+  const isEdit = !!tmpl;
+  const t = tmpl || {};
+  // Categorías existentes para sugerir
+  const existingCats = Array.from(new Set(opState.tasks.map(x => x.category).filter(Boolean))).sort();
+  const catOptions = existingCats.map(c => `<option value="${c}" ${(t.category===c||prefilledCategory===c)?'selected':''}>${c}</option>`).join('');
+  const mats = Array.isArray(t.default_materials) ? t.default_materials.join(', ') : '';
+  const checklist = Array.isArray(t.default_checklist) ? t.default_checklist.join('\n') : '';
+
+  const html = `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-500">${isEdit ? 'Editar plantilla existente.' : 'Las plantillas quedan disponibles para arrastrar al horario en cualquier día.'}</div>
+
+      <div class="grid grid-cols-4 gap-2">
+        <div class="col-span-3">
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Nombre *</label>
+          <input id="op-tpl-name" value="${(t.name||'').replace(/"/g,'&quot;')}" placeholder="Ej. Cambio de filtros A/C" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Emoji</label>
+          <input id="op-tpl-emoji" value="${t.emoji||'🧰'}" maxlength="2" class="w-full border border-slate-300 rounded px-3 py-2 text-lg text-center" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Categoría *</label>
+          <input id="op-tpl-category" list="op-tpl-cat-list" value="${(t.category||prefilledCategory||'').replace(/"/g,'&quot;')}" placeholder="Ej. mantenimiento" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          <datalist id="op-tpl-cat-list">${catOptions}</datalist>
+          <div class="text-[9px] text-slate-500 mt-0.5">Existentes: ${existingCats.join(', ') || '—'}</div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Empresa</label>
+          <select id="op-tpl-business" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="both" ${t.business==='both'?'selected':''}>Ambas</option>
+            <option value="rentas" ${t.business==='rentas'?'selected':''}>Rentas</option>
+            <option value="remodelacion" ${t.business==='remodelacion'?'selected':''}>Remodelación</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración default (min)</label>
+          <input id="op-tpl-duration" type="number" value="${t.default_duration_min||30}" min="5" step="5" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Materiales default (separados por coma)</label>
+        <input id="op-tpl-materials" value="${mats.replace(/"/g,'&quot;')}" placeholder="taladro, brochas, lija 80" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        <div class="text-[9px] text-slate-500 mt-0.5">Se cargan automático al arrastrar la plantilla al horario</div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📋 Checklist default (1 item por línea)</label>
+        <textarea id="op-tpl-checklist" rows="3" placeholder="Pisos trapeados&#10;Baños desinfectados&#10;Foto del resultado" class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${checklist}</textarea>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas</label>
+        <textarea id="op-tpl-notes" rows="2" placeholder="Detalles, herramientas especiales, riesgos..." class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${t.notes||''}</textarea>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys),100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        ${isEdit ? `<button onclick="opDeleteTemplateConfirm('${t.id}','${(t.name||'').replace(/'/g,"\\'")}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 px-4 rounded">🗑️</button>` : ''}
+        <button onclick="opSaveTemplate('${t.id||''}')" class="flex-1 ${isEdit?'bg-blue-600 hover:bg-blue-700':'bg-emerald-600 hover:bg-emerald-700'} text-white text-sm font-bold py-2 rounded">${isEdit?'💾 Guardar cambios':'+ Crear plantilla'}</button>
+      </div>
+    </div>
+  `;
+  openModal(isEdit ? '✏️ Editar plantilla' : '+ Nueva plantilla de tarea', html);
+}
+
+async function opSaveTemplate(id) {
+  const name = document.getElementById('op-tpl-name').value.trim();
+  if (!name) return alert('El nombre es obligatorio');
+  const category = document.getElementById('op-tpl-category').value.trim() || 'otros';
+  const business = document.getElementById('op-tpl-business').value;
+  const emoji = document.getElementById('op-tpl-emoji').value.trim() || '🧰';
+  const default_duration_min = +document.getElementById('op-tpl-duration').value || 30;
+  const default_materials = (document.getElementById('op-tpl-materials').value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const checklistItems = (document.getElementById('op-tpl-checklist').value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const notes = document.getElementById('op-tpl-notes').value.trim() || null;
+
+  const payload = {
+    name, category, business, emoji,
+    default_duration_min,
+    default_materials,
+    default_checklist: checklistItems,
+    notes,
+    active: true
+  };
+
+  let error;
+  if (id) {
+    ({ error } = await sb.from('ops_tasks').update(payload).eq('id', id));
+  } else {
+    ({ error } = await sb.from('ops_tasks').insert(payload));
+  }
+  if (error) {
+    // Si default_checklist no existe como columna, reintenta sin ese campo
+    if (error.message?.includes('default_checklist')) {
+      delete payload.default_checklist;
+      if (id) ({ error } = await sb.from('ops_tasks').update(payload).eq('id', id));
+      else ({ error } = await sb.from('ops_tasks').insert(payload));
+    }
+  }
+  if (error) return alert('Error: ' + error.message);
+  closeModal();
+  setTimeout(async () => {
+    await openOpsPlanner(opState.sys);
+    opSetLeftTab('templates');
+  }, 100);
+}
+
+async function opDeleteTemplateConfirm(id, name) {
+  if (!confirm(`¿Eliminar plantilla "${name}"?\n\nLas tareas que YA fueron creadas usando esta plantilla NO se eliminan, solo no aparece más en el panel.`)) return;
+  // Soft delete: marcar active=false
+  const { error } = await sb.from('ops_tasks').update({ active: false }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  closeModal();
+  setTimeout(async () => {
+    await openOpsPlanner(opState.sys);
+    opSetLeftTab('templates');
+  }, 100);
 }
