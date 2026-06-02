@@ -19,13 +19,15 @@ const eduState = {
 };
 
 const EDU_TABS = [
-  { key: 'students',  label: '👥 Estudiantes' },
-  { key: 'plan',      label: '🎯 Plan IA' },
-  { key: 'progress',  label: '📊 Progreso & GLScore' },
-  { key: 'resources', label: '📑 Recursos' },
-  { key: 'calls',     label: '📅 Calendario' },
-  { key: 'alerts',    label: '🔔 Alertas' },
-  { key: 'config',    label: '⚙️ Config' }
+  { key: 'students',     label: '👥 Estudiantes' },
+  { key: 'plan',         label: '🎯 Plan IA' },
+  { key: 'progress',     label: '📊 Progreso & GLScore' },
+  { key: 'presentations', label: '🎬 Presentaciones IA' },
+  { key: 'reports',      label: '📈 Informes IA' },
+  { key: 'resources',    label: '📑 Recursos' },
+  { key: 'calls',        label: '📅 Calendario' },
+  { key: 'alerts',       label: '🔔 Alertas' },
+  { key: 'config',       label: '⚙️ Config' }
 ];
 
 async function openEduManager(sys) {
@@ -40,18 +42,24 @@ async function openEduManager(sys) {
 async function eduLoadAll() {
   eduState.loading = true;
   try {
-    const [mRes, sRes, rRes, aRes, cRes] = await Promise.all([
+    const [mRes, sRes, rRes, aRes, cRes, repRes, tRes, presRes] = await Promise.all([
       sb.from('edu_mentorships').select('*').order('position'),
       sb.from('edu_students').select('*').order('updated_at', { ascending: false }),
       sb.from('edu_resources').select('*').order('updated_at', { ascending: false }),
       sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false }),
-      sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(200)
+      sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(200),
+      sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
+      sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500).then(r => r).catch(() => ({ data: [] })),
+      sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] }))
     ]);
     eduState.mentorships = mRes.data || [];
     eduState.students = sRes.data || [];
     eduState.resources = rRes.data || [];
     eduState.alerts = aRes.data || [];
     eduState.calls = cRes.data || [];
+    eduState.reports = repRes.data || [];
+    eduState.tasks = tRes.data || [];
+    eduState.presentations = presRes.data || [];
   } catch (e) {
     console.error('eduLoadAll', e);
   }
@@ -151,6 +159,8 @@ function eduRender() {
         ${eduState.tab === 'students' ? eduRenderStudents() :
           eduState.tab === 'plan' ? eduRenderPlan() :
           eduState.tab === 'progress' ? eduRenderProgress() :
+          eduState.tab === 'presentations' ? eduRenderPresentations() :
+          eduState.tab === 'reports' ? eduRenderReports() :
           eduState.tab === 'resources' ? eduRenderResources() :
           eduState.tab === 'calls' ? eduRenderCalls() :
           eduState.tab === 'alerts' ? eduRenderAlerts() :
@@ -829,4 +839,346 @@ async function eduTriggerSync() {
   } catch (e) {
     alert('Error: ' + e.message + '\n\n(La edge function sync-education-airtable se desplegará en la próxima fase.)');
   }
+}
+
+// ============================================================
+// TAB: PRESENTACIONES IA — genera slides con web search live + descarga PPTX
+// ============================================================
+function eduRenderPresentations() {
+  const m = eduCurrentMentorship();
+  const presentations = (eduState.presentations || []).filter(p => p.mentorship_id === eduState.mentorshipId);
+  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  const ai = (window.aiState && window.aiState[aiKey]) || {};
+  const draft = ai.presentation;
+
+  return `
+    <div class="space-y-3">
+      <!-- Form de input -->
+      <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+        <div class="text-xs font-bold uppercase text-violet-900 mb-3">🎬 Generar presentación con IA + web search live</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Título de la presentación *</label>
+            <input id="edu-pres-title" placeholder="Ej. Clase 1 — Qué es Wholesale y cómo funciona" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Tipo</label>
+            <select id="edu-pres-type" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+              <option value="class">📚 Clase magistral</option>
+              <option value="workshop">🛠 Taller práctico</option>
+              <option value="webinar">📡 Webinar abierto</option>
+              <option value="keynote">🎤 Keynote / Pitch</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Tema / qué cubrir *</label>
+          <textarea id="edu-pres-topic" rows="2" placeholder="Ej. Wholesale en Texas: cómo encontrar deals off-market, contratos, asignación. Foco en Austin/Houston mercado 2026, números reales de margins, lista de cash buyers comunes." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1"># Clase</label>
+            <input id="edu-pres-class-number" type="number" placeholder="1" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Duración (min)</label>
+            <input id="edu-pres-duration" type="number" value="60" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1"># Slides aprox</label>
+            <input id="edu-pres-slides" type="number" value="15" min="5" max="40" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Idioma</label>
+            <select id="edu-pres-lang" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Outline sugerido (opcional)</label>
+          <textarea id="edu-pres-outline" rows="2" placeholder="Si tenés ya una estructura en mente, pegala acá. Si no, Claude la arma." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+        </div>
+
+        <div class="mt-2">
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Audiencia</label>
+          <input id="edu-pres-audience" value="${m?.name ? 'Estudiantes de ' + m.name : 'Estudiantes de la mentoría'}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        </div>
+
+        <div class="flex items-center gap-3 mt-3 pt-3 border-t border-violet-200">
+          <label class="flex items-center gap-2 text-xs">
+            <input type="checkbox" id="edu-pres-live" checked />
+            <span><strong>🌐 Web search live</strong> — datos verificables en vivo</span>
+          </label>
+          <button onclick="withLoading(this, eduGeneratePresentation)" class="ml-auto bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2 rounded">🤖 Generar con IA</button>
+        </div>
+        <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~30-90 seg. Claude busca data en vivo (Redfin, FRED, Freddie Mac, NAR) y arma slides con fuentes citadas.</div>
+      </div>
+
+      ${ai.loading ? `
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
+          <div class="text-3xl animate-pulse">🧠</div>
+          <div class="mt-2 font-bold text-violet-900">Claude analizando + buscando data live...</div>
+          <div class="text-[10px] text-violet-700 mt-1">Web searches en progreso. Esto puede tardar 60-90 segundos.</div>
+        </div>
+      ` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+
+      ${draft ? `
+        <!-- Preview de la presentación generada -->
+        <div class="bg-white border-2 border-emerald-300 rounded-xl overflow-hidden">
+          <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 flex justify-between items-center flex-wrap gap-2">
+            <div class="text-xs font-bold uppercase text-emerald-900">✅ Generada · ${(draft.slides||[]).length} slides</div>
+            <div class="flex gap-1">
+              <button onclick="eduDownloadPPTX()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Descargar PPTX</button>
+              <button onclick="eduDownloadSpeakerNotes()" class="bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold px-3 py-1.5 rounded">📋 Speaker notes</button>
+            </div>
+          </div>
+          <div class="p-4 max-h-[60vh] overflow-y-auto">
+            <h2 class="text-lg font-bold mb-2">${draft.title}</h2>
+            ${draft.outline?.length ? `<div class="text-xs text-slate-600 mb-3"><strong>Outline:</strong> ${draft.outline.join(' → ')}</div>` : ''}
+            <div class="space-y-3">
+              ${(draft.slides || []).map(s => `
+                <div class="border border-slate-200 rounded-lg p-3 hover:shadow-sm">
+                  <div class="flex justify-between items-start gap-2 mb-1">
+                    <div>
+                      <span class="text-[10px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold">Slide ${s.number}</span>
+                      <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded ml-1">${s.layout || 'content'}</span>
+                    </div>
+                  </div>
+                  <div class="font-bold text-sm">${s.title || ''}</div>
+                  ${s.subtitle ? `<div class="text-xs text-slate-600 mt-0.5">${s.subtitle}</div>` : ''}
+                  ${(s.bullets || []).length ? `<ul class="text-xs text-slate-700 mt-2 ml-4 list-disc space-y-0.5">${s.bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
+                  ${(s.stats || []).length ? `
+                    <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-1">
+                      ${s.stats.map(st => `<div class="bg-blue-50 border border-blue-200 rounded p-1.5 text-[10px]"><strong>${st.label}</strong><div class="text-blue-700 font-bold">${st.value}</div>${st.source_name?`<div class="text-[9px] text-slate-500">📍 ${st.source_name}</div>`:''}</div>`).join('')}
+                    </div>
+                  ` : ''}
+                  ${s.speaker_notes ? `<details class="mt-2"><summary class="cursor-pointer text-[10px] text-slate-600 font-bold">🎙 Speaker notes</summary><div class="text-[11px] text-slate-700 mt-1 bg-slate-50 rounded p-2 whitespace-pre-wrap">${s.speaker_notes}</div></details>` : ''}
+                  ${(s.sources || []).length ? `<div class="text-[9px] text-slate-500 mt-2">Fuentes: ${s.sources.map(src => `<a href="${src.url}" target="_blank" class="text-blue-600 hover:underline">${src.title || src.url}</a>`).join(' · ')}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+            ${(draft.all_sources || []).length ? `
+              <div class="mt-4 pt-3 border-t border-slate-200">
+                <div class="text-xs font-bold uppercase text-slate-700 mb-1">📚 Todas las fuentes citadas</div>
+                <ul class="text-[10px] text-slate-600 space-y-0.5">
+                  ${draft.all_sources.map(src => `<li>• <a href="${src.url}" target="_blank" class="text-blue-600 hover:underline">${src.title || src.url}</a></li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Historial de presentaciones -->
+      ${presentations.length > 0 ? `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📚 Historial — ${presentations.length} presentaciones</div>
+          <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+            ${presentations.map(p => `
+              <div class="p-2 flex justify-between items-start gap-2 hover:bg-slate-50">
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-bold truncate">${p.title}</div>
+                  <div class="text-[10px] text-slate-500">${p.presentation_type}${p.class_number ? ' · Clase #'+p.class_number : ''} · ${(p.slides||[]).length} slides · ${new Date(p.created_at).toLocaleDateString('es-MX')}</div>
+                </div>
+                <div class="flex gap-1 flex-shrink-0">
+                  <button onclick="eduLoadPresentation('${p.id}')" class="text-blue-600 text-[10px] hover:underline">cargar</button>
+                  <button onclick="eduDeletePresentation('${p.id}')" class="text-red-500 hover:text-red-700 text-[10px]">🗑</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+async function eduGeneratePresentation() {
+  const title = document.getElementById('edu-pres-title')?.value.trim();
+  const topic = document.getElementById('edu-pres-topic')?.value.trim();
+  if (!title || !topic) return alert('Título y tema son obligatorios');
+  const m = eduCurrentMentorship();
+  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  window.aiState = window.aiState || {};
+  window.aiState[aiKey] = { loading: true };
+  eduRender();
+  try {
+    const payload = {
+      mentorship_id: m?.id,
+      title,
+      topic,
+      audience: document.getElementById('edu-pres-audience').value || undefined,
+      presentation_type: document.getElementById('edu-pres-type').value,
+      class_number: +document.getElementById('edu-pres-class-number').value || null,
+      duration_min: +document.getElementById('edu-pres-duration').value || 60,
+      slides_count: +document.getElementById('edu-pres-slides').value || 15,
+      language: document.getElementById('edu-pres-lang').value,
+      outline_hint: document.getElementById('edu-pres-outline').value || null,
+      require_live_data: document.getElementById('edu-pres-live').checked,
+      user_id: state.user.id
+    };
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/generate-presentation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify(payload)
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'falló');
+    window.aiState[aiKey] = { loading: false, presentation: r.presentation, saved_id: r.saved_id, web_searches: r.web_searches, tokens: r.tokens };
+    await eduLoadAll();
+  } catch (e) {
+    window.aiState[aiKey] = { loading: false, error: e.message };
+  }
+  eduRender();
+}
+
+// ─── DOWNLOAD PPTX usando PptxGenJS ───
+function eduDownloadPPTX() {
+  if (typeof PptxGenJS === 'undefined') return alert('Librería PptxGenJS no cargada. Refresh la página.');
+  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  const p = (window.aiState[aiKey] || {}).presentation;
+  if (!p) return alert('Sin presentación cargada');
+
+  const pres = new PptxGenJS();
+  pres.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5
+  pres.title = p.title;
+  pres.company = 'Empresa OS';
+
+  // Define master con branding
+  pres.defineSlideMaster({
+    title: 'MASTER',
+    background: { color: 'FFFFFF' },
+    objects: [
+      { rect: { x: 0, y: 7.0, w: 13.333, h: 0.5, fill: { color: '0F172A' } } },
+      { text: { text: 'Empresa OS · Educación', options: { x: 0.4, y: 7.05, w: 5, h: 0.4, color: 'FFFFFF', fontSize: 10 } } }
+    ],
+    slideNumber: { x: 12.5, y: 7.1, color: 'FFFFFF', fontSize: 10 }
+  });
+
+  (p.slides || []).forEach((s, idx) => {
+    const slide = pres.addSlide({ masterName: 'MASTER' });
+
+    // PORTADA (slide 1 con layout 'title')
+    if (s.layout === 'title' || idx === 0) {
+      slide.background = { color: '0F172A' };
+      slide.addText(s.title || p.title, { x: 0.5, y: 2.5, w: 12.3, h: 1.5, fontSize: 44, bold: true, color: 'FFFFFF', align: 'center' });
+      if (s.subtitle) slide.addText(s.subtitle, { x: 0.5, y: 4.2, w: 12.3, h: 0.6, fontSize: 22, color: '94A3B8', align: 'center' });
+      slide.addText(`${new Date().toLocaleDateString('es-MX', {year:'numeric',month:'long',day:'numeric'})}`, { x: 0.5, y: 5.5, w: 12.3, h: 0.4, fontSize: 14, color: '64748B', align: 'center' });
+      return;
+    }
+
+    // CONTENT slides
+    slide.addText(s.title || `Slide ${s.number}`, { x: 0.5, y: 0.4, w: 12.3, h: 0.7, fontSize: 28, bold: true, color: '0F172A' });
+    if (s.subtitle) slide.addText(s.subtitle, { x: 0.5, y: 1.05, w: 12.3, h: 0.4, fontSize: 16, color: '475569', italic: true });
+
+    let yOffset = s.subtitle ? 1.7 : 1.4;
+
+    // BULLETS
+    if ((s.bullets || []).length) {
+      const bulletText = s.bullets.map(b => ({ text: b, options: { bullet: true, fontSize: 18, color: '1E293B' } }));
+      slide.addText(bulletText, { x: 0.7, y: yOffset, w: 12, h: 4.5 });
+      yOffset += Math.max(s.bullets.length * 0.5, 2);
+    }
+
+    // STATS
+    if ((s.stats || []).length) {
+      const startY = yOffset;
+      const cols = Math.min(s.stats.length, 3);
+      const cardW = 12 / cols;
+      s.stats.forEach((st, i) => {
+        const x = 0.7 + (i % cols) * cardW;
+        const y = startY + Math.floor(i / cols) * 1.3;
+        slide.addShape('rect', { x, y, w: cardW - 0.15, h: 1.1, fill: { color: 'DBEAFE' }, line: { color: '93C5FD', width: 1 } });
+        slide.addText(st.value, { x: x + 0.1, y: y + 0.1, w: cardW - 0.35, h: 0.5, fontSize: 24, bold: true, color: '1E3A8A' });
+        slide.addText(st.label, { x: x + 0.1, y: y + 0.55, w: cardW - 0.35, h: 0.3, fontSize: 11, color: '1E40AF' });
+        if (st.source_name) slide.addText(`📍 ${st.source_name}`, { x: x + 0.1, y: y + 0.85, w: cardW - 0.35, h: 0.2, fontSize: 8, color: '64748B', italic: true });
+      });
+    }
+
+    // Speaker notes
+    if (s.speaker_notes) {
+      slide.addNotes(s.speaker_notes + (s.sources?.length ? '\n\nFuentes: ' + s.sources.map(src => src.title + ' (' + src.url + ')').join('; ') : ''));
+    }
+
+    // SOURCES strip al pie
+    if ((s.sources || []).length) {
+      const sources = s.sources.map(src => src.title || src.url).slice(0, 3).join(' · ');
+      slide.addText(`Fuentes: ${sources}`, { x: 0.5, y: 6.5, w: 12.3, h: 0.4, fontSize: 9, color: '64748B', italic: true });
+    }
+  });
+
+  // Slide de cierre con todas las fuentes
+  if ((p.all_sources || []).length) {
+    const slide = pres.addSlide({ masterName: 'MASTER' });
+    slide.addText('📚 Fuentes citadas', { x: 0.5, y: 0.4, w: 12.3, h: 0.7, fontSize: 28, bold: true, color: '0F172A' });
+    const srcText = p.all_sources.slice(0, 25).map((src, i) => ({
+      text: `${i+1}. ${src.title || src.url}`,
+      options: { fontSize: 11, color: '1E40AF', breakLine: true }
+    }));
+    slide.addText(srcText, { x: 0.7, y: 1.3, w: 12, h: 5.5 });
+  }
+
+  const safeName = (p.title || 'presentacion').replace(/[^a-z0-9]/gi, '_').slice(0, 50);
+  pres.writeFile({ fileName: `${new Date().toISOString().split('T')[0]}_${safeName}.pptx` });
+}
+
+function eduDownloadSpeakerNotes() {
+  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  const p = (window.aiState[aiKey] || {}).presentation;
+  if (!p) return;
+  const text = `${p.title}\n${'='.repeat(p.title.length)}\n\n${(p.slides||[]).map(s => `--- Slide ${s.number}: ${s.title} ---\n${s.subtitle ? s.subtitle + '\n' : ''}${(s.bullets||[]).map(b => '• ' + b).join('\n')}\n\n🎙 NOTAS:\n${s.speaker_notes || '(sin notas)'}\n`).join('\n')}`;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${p.title.replace(/[^a-z0-9]/gi,'_')}_speaker_notes.txt`;
+  a.click();
+}
+
+function eduLoadPresentation(id) {
+  const p = (eduState.presentations || []).find(x => x.id === id);
+  if (!p) return alert('Presentación no encontrada');
+  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  window.aiState = window.aiState || {};
+  window.aiState[aiKey] = { presentation: { title: p.title, outline: p.outline, slides: p.slides, all_sources: p.sources } };
+  eduRender();
+}
+
+async function eduDeletePresentation(id) {
+  if (!confirm('¿Eliminar esta presentación del historial?')) return;
+  await sb.from('edu_presentations').delete().eq('id', id);
+  await eduLoadAll(); eduRender();
+}
+
+// ============================================================
+// TAB: INFORMES IA (stub)
+// ============================================================
+function eduRenderReports() {
+  const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
+  return `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900">
+        💡 <strong>Informes IA</strong> — generá reportes semanales/quincenales/mensuales con análisis de cartera, progreso de estudiantes y notas de clases.
+      </div>
+      <div class="text-center py-8 text-slate-500">
+        <div class="text-3xl mb-2">📈</div>
+        <div class="text-sm font-bold">Sección en construcción</div>
+        <div class="text-xs mt-1">La generación de informes con IA se conecta en el siguiente turno.</div>
+      </div>
+      ${reports.length ? `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">Informes guardados (${reports.length})</div>
+          <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+            ${reports.map(r => `<div class="p-2 text-xs"><strong>${r.title || r.period_type}</strong> · ${r.period_start} → ${r.period_end}</div>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
 }

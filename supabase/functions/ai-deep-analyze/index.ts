@@ -340,6 +340,68 @@ Devolvé SOLO JSON válido:
   "summary": "1 párrafo del nivel de riesgo agregado"
 }`,
 
+  'edu-report': (ctx, today) => `Eres COO de empresa de educación inmobiliaria. Hoy es ${today}.
+
+CONTEXTO DEL PERÍODO:
+- Mentoría: ${ctx.mentorship}
+- Tipo de informe: ${ctx.period_type} (${ctx.period_start} → ${ctx.period_end})
+- Total estudiantes hoy: ${ctx.snapshot?.total_students}
+- Activos: ${ctx.snapshot?.active}, At-risk: ${ctx.snapshot?.at_risk}, Graduados: ${ctx.snapshot?.graduated}, Pausados: ${ctx.snapshot?.paused}
+
+MOVIMIENTOS DEL PERÍODO:
+- Nuevos ingresos: ${ctx.movements?.new_enrolled || 0}
+- Cambios de etapa: ${ctx.movements?.stage_changes || 0}
+- Llamadas completadas: ${ctx.movements?.calls_done || 0} / ${ctx.movements?.calls_total || 0}
+- Tareas creadas: ${ctx.movements?.tasks_created || 0}, completadas: ${ctx.movements?.tasks_done || 0}
+
+CARTERA (PAGOS):
+- Pagos activos: ${ctx.cartera?.active}
+- Atrasados (past_due): ${ctx.cartera?.past_due}
+- Vencidos (expired): ${ctx.cartera?.expired}
+- Vencen ≤30d: ${ctx.cartera?.expiring_soon}
+
+DISTRIBUCIÓN POR ETAPA:
+${JSON.stringify(ctx.by_stage || {}, null, 2)}
+
+GLSCORE PROMEDIO: ${ctx.avg_glscore || '?'}/100
+- Excelente (≥80): ${ctx.glscore_bands?.excelente || 0}
+- Bueno (60-79): ${ctx.glscore_bands?.bueno || 0}
+- Atención (40-59): ${ctx.glscore_bands?.atencion || 0}
+- Crítico (<40): ${ctx.glscore_bands?.critico || 0}
+
+TOP 5 ESTUDIANTES (mejor GLScore + activos):
+${JSON.stringify(ctx.top_students || [], null, 2)}
+
+ESTUDIANTES EN RIESGO (bottom GLScore o vencimiento próximo):
+${JSON.stringify(ctx.at_risk_students || [], null, 2)}
+
+NOTAS DE CLASES GRABADAS DEL COACH (free-form, opcional):
+${ctx.classes_notes || '(el coach no agregó notas de clases)'}
+
+Tu trabajo: escribir un informe ejecutivo para la reunión de management. Tono profesional pero claro (no corporate aburrido). Markdown limpio.
+
+DEBE incluir:
+1. **Resumen ejecutivo** (3-4 oraciones) — el estado general
+2. **Highlights del período** — qué movió la aguja (positivo y negativo)
+3. **Análisis de cartera** — qué pasa con los pagos, quién vence pronto, cuánto MRR se va si no renuevan
+4. **Análisis pedagógico** — quién está progresando bien, quién atascado, en qué etapa hay más cuello de botella
+5. **Análisis de las clases** (si el coach pasó notas) — qué temas funcionaron, qué dudas surgieron, qué hay que reforzar
+6. **Acciones recomendadas** — 3-5 acciones concretas para la próxima semana/quincena/mes
+
+Devolvé SOLO JSON válido:
+{
+  "title": "Informe ${ctx.period_type} ${ctx.period_start} → ${ctx.period_end} · ${ctx.mentorship}",
+  "summary_md": "## Resumen ejecutivo\\n...\\n\\n## Highlights del período\\n...\\n\\n## Cartera\\n...\\n\\n## Análisis pedagógico\\n...\\n\\n## Análisis de clases\\n...\\n\\n## Acciones recomendadas\\n...",
+  "kpis": { "total_active": número, "at_risk": número, "avg_glscore": número, "expiring_soon": número, "completion_rate": número },
+  "insights": ["insight 1 concreto", "insight 2", "insight 3"],
+  "recommendations": [
+    { "action": "Qué hacer", "owner": "Coach/Comercial/Operaciones", "priority": "high/medium/low", "due_in_days": número }
+  ],
+  "highlights": [
+    { "type": "win/risk/milestone", "student_name": "nombre o 'general'", "detail": "qué pasó" }
+  ]
+}`,
+
   'edu-plan': (ctx, today) => `Eres mentor experto en real estate (${ctx.mentorship}). Hoy es ${today}.
 
 CONTEXTO DEL ESTUDIANTE:
