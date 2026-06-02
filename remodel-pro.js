@@ -3170,9 +3170,16 @@ function rmAutoPermitsAustin() {
 }
 
 // QW6 — Validación URL Matterport (no bloqueante)
+// Acepta los 3 formatos oficiales: /show/?m=, /discover/space/, /models/
 function rmIsValidMatterport(url) {
   if (!url) return true; // vacío es válido (opcional)
-  return /(?:my\.matterport\.com\/show\/\?m=|matterport\.com\/discover\/space\/)[A-Za-z0-9]+/.test(url);
+  return /(?:my\.matterport\.com\/show\/\?m=|matterport\.com\/discover\/space\/|my\.matterport\.com\/models\/)[A-Za-z0-9]+/.test(url);
+}
+// Extrae el modelId desde cualquiera de los 3 formatos
+function rmExtractMatterportId(url) {
+  if (!url) return null;
+  const m = url.match(/(?:my\.matterport\.com\/show\/\?m=|matterport\.com\/discover\/space\/|my\.matterport\.com\/models\/)([A-Za-z0-9]+)/);
+  return m ? m[1] : null;
 }
 
 // ─── TAB: GANTT (mejorado con inspecciones + lead times) ───
@@ -3451,7 +3458,7 @@ function rmRenderAssets() {
   // Matterport bloquea iframe (X-Frame-Options). Usar link clickable + thumbnail.
   let matterportPreview = '';
   if (rmState.matterportUrl) {
-    const match = rmState.matterportUrl.match(/(?:my\.matterport\.com\/show\/\?m=|matterport\.com\/discover\/space\/)([A-Za-z0-9]+)/);
+    const match = rmState.matterportUrl.match(/(?:my\.matterport\.com\/show\/\?m=|matterport\.com\/discover\/space\/|my\.matterport\.com\/models\/)([A-Za-z0-9]+)/);
     const modelId = match ? match[1] : null;
     const cleanUrl = modelId ? `https://my.matterport.com/show/?m=${modelId}` : rmState.matterportUrl;
     matterportPreview = `
@@ -3479,7 +3486,7 @@ function rmRenderAssets() {
         <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">🌐 Tour 360° Matterport (URL)</label>
         <input value="${rmEsc(rmState.matterportUrl)}" oninput="rmState.matterportUrl=this.value.trim()" onchange="rmRenderTabPreservingFocus()" placeholder="https://my.matterport.com/show/?m=XXXXX" class="w-full border ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? 'border-amber-400' : 'border-slate-300'} rounded px-3 py-2 text-sm" />
         ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? `
-          <p class="text-[10px] text-amber-700 mt-0.5 flex items-start gap-1"><span>⚠️</span><span>URL no parece de Matterport (esperado <code class="bg-amber-50 px-1 rounded">my.matterport.com/show/?m=…</code> o <code class="bg-amber-50 px-1 rounded">matterport.com/discover/space/…</code>). Se guarda igual.</span></p>
+          <p class="text-[10px] text-amber-700 mt-0.5 flex items-start gap-1"><span>⚠️</span><span>URL no parece de Matterport (esperado <code class="bg-amber-50 px-1 rounded">/show/?m=…</code>, <code class="bg-amber-50 px-1 rounded">/models/…</code> o <code class="bg-amber-50 px-1 rounded">/discover/space/…</code>). Se guarda igual.</span></p>
         ` : `
           <p class="text-[10px] text-slate-400 mt-0.5">Pega el link y click fuera del campo para preview.</p>
         `}
