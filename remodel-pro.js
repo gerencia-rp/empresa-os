@@ -1820,6 +1820,14 @@ async function rmDeleteProject(id) {
   rmRender();
 }
 
+// Helper: cargar un proyecto guardado por id (desde el picker del editor)
+function rmPickSavedProject(id) {
+  if (!id) return;
+  const p = rmState.projects.find(x => x.id === id);
+  if (!p) return alert('Proyecto no encontrado');
+  rmLoadProject(p);
+}
+
 // ─── TAB: EDITOR ───
 async function rmLoadFromForecast(forecastId) {
   if (!forecastId) return;
@@ -1860,8 +1868,8 @@ function rmRenderEditor(body) {
   const forecasts = (typeof fcState !== 'undefined' && fcState.forecasts) ? fcState.forecasts : [];
   const isEmpty = !rmState.currentProject && !linked && !rmState.editName;
 
-  // GATE: si está vacío y no hay pronósticos, forzá el flujo Taskade→Pronóstico→Editor
-  if (isEmpty && forecasts.length === 0) {
+  // GATE: si está vacío y no hay NI pronósticos NI proyectos, forzá el flujo Taskade→Pronóstico→Editor
+  if (isEmpty && forecasts.length === 0 && (rmState.projects || []).length === 0) {
     body.innerHTML = `
       <div class="max-w-md mx-auto text-center py-16">
         <div class="text-5xl mb-3">🔮</div>
@@ -1872,34 +1880,59 @@ function rmRenderEditor(body) {
     return;
   }
 
-  // GATE: si está vacío pero hay pronósticos guardados, mostrá el picker prominente
-  if (isEmpty && forecasts.length > 0) {
+  // GATE: si está vacío pero hay pronósticos o proyectos guardados, mostrá los pickers prominentes
+  const savedProjectsForGate = rmState.projects || [];
+  if (isEmpty && (forecasts.length > 0 || savedProjectsForGate.length > 0)) {
     body.innerHTML = `
-      <div class="max-w-2xl mx-auto">
-        <div class="bg-gradient-to-br from-blue-50 to-violet-50 border-2 border-blue-300 rounded-2xl p-6">
-          <div class="text-center mb-4">
-            <div class="text-4xl mb-2">🔮</div>
-            <h3 class="text-lg font-bold text-blue-900">Cargá un pronóstico para empezar el detalle</h3>
-            <p class="text-xs text-blue-800 mt-1">El Editor detallado parte de un pronóstico previo (Taskade + Pronosticador). Elegí la casa:</p>
+      <div class="max-w-2xl mx-auto space-y-4">
+        ${savedProjectsForGate.length > 0 ? `
+          <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-400 rounded-2xl p-6">
+            <div class="text-center mb-4">
+              <div class="text-4xl mb-2">📂</div>
+              <h3 class="text-lg font-bold text-emerald-900">Tenés ${savedProjectsForGate.length} proyecto${savedProjectsForGate.length>1?'s':''} ya guardado${savedProjectsForGate.length>1?'s':''}</h3>
+              <p class="text-xs text-emerald-800 mt-1">Continuá donde dejaste: actividades, qty, vu, todo el detalle.</p>
+            </div>
+            <select onchange="rmPickSavedProject(this.value)" class="w-full border-2 border-emerald-300 rounded-lg px-3 py-3 text-sm font-semibold bg-white">
+              <option value="">— Seleccionar proyecto guardado —</option>
+              ${savedProjectsForGate.map(p => `<option value="${p.id}">${p.name||'(sin nombre)'} · ${p.sqft||'?'}sqft · ${p.budget_total?'$'+Math.round(p.budget_total).toLocaleString():''} · ${new Date(p.updated_at).toLocaleDateString('es-MX')}</option>`).join('')}
+            </select>
           </div>
-          <select onchange="rmLoadFromForecast(this.value)" class="w-full border-2 border-blue-300 rounded-lg px-3 py-3 text-sm font-semibold bg-white">
-            <option value="">— Seleccionar pronóstico (${forecasts.length} guardados) —</option>
-            ${forecasts.map(f => `<option value="${f.id}">${f.propiedad} · ${f.sqft||'?'}sqft · ${f.presupuesto_total?'$'+Math.round(f.presupuesto_total).toLocaleString():''} · ${new Date(f.created_at).toLocaleDateString('es-MX')}</option>`).join('')}
-          </select>
-          <div class="text-center text-[11px] text-blue-700 mt-3">
-            ¿No está la casa que buscás? <button onclick="rmSetTab('forecast')" class="underline font-bold hover:text-blue-900">→ Hacer pronóstico nuevo</button>
+        ` : ''}
+        ${forecasts.length > 0 ? `
+          <div class="bg-gradient-to-br from-blue-50 to-violet-50 border-2 border-blue-300 rounded-2xl p-6">
+            <div class="text-center mb-4">
+              <div class="text-4xl mb-2">🔮</div>
+              <h3 class="text-lg font-bold text-blue-900">${savedProjectsForGate.length > 0 ? 'O empezá uno nuevo desde un pronóstico' : 'Cargá un pronóstico para empezar el detalle'}</h3>
+              <p class="text-xs text-blue-800 mt-1">El Editor detallado parte de un pronóstico previo (Taskade + Pronosticador).</p>
+            </div>
+            <select onchange="rmLoadFromForecast(this.value)" class="w-full border-2 border-blue-300 rounded-lg px-3 py-3 text-sm font-semibold bg-white">
+              <option value="">— Seleccionar pronóstico (${forecasts.length} guardados) —</option>
+              ${forecasts.map(f => `<option value="${f.id}">${f.propiedad} · ${f.sqft||'?'}sqft · ${f.presupuesto_total?'$'+Math.round(f.presupuesto_total).toLocaleString():''} · ${new Date(f.created_at).toLocaleDateString('es-MX')}</option>`).join('')}
+            </select>
+            <div class="text-center text-[11px] text-blue-700 mt-3">
+              ¿No está la casa? <button onclick="rmSetTab('forecast')" class="underline font-bold hover:text-blue-900">→ Hacer pronóstico nuevo</button>
+            </div>
           </div>
-        </div>
+        ` : ''}
       </div>`;
     return;
   }
 
   // Picker discreto cuando ya hay algo cargado (siempre disponible para cambiar de casa)
+  const savedProjects = rmState.projects || [];
+  const projectPicker = savedProjects.length > 0 ? `
+    <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-2 flex items-center gap-2">
+      <label class="text-[10px] font-bold uppercase text-emerald-900 whitespace-nowrap">📂 Abrir proyecto guardado:</label>
+      <select onchange="rmPickSavedProject(this.value)" class="flex-1 border border-emerald-300 rounded px-2 py-1 text-xs">
+        <option value="">— ${savedProjects.length} proyectos guardados —</option>
+        ${savedProjects.map(p => `<option value="${p.id}" ${rmState.currentProject?.id===p.id?'selected':''}>${p.name||'(sin nombre)'} · ${p.sqft||'?'}sqft · ${p.budget_total?'$'+Math.round(p.budget_total).toLocaleString():''} · ${new Date(p.updated_at).toLocaleDateString('es-MX')}</option>`).join('')}
+      </select>
+    </div>` : '';
   const forecastPicker = forecasts.length > 0 ? `
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center gap-2">
       <label class="text-[10px] font-bold uppercase text-blue-900 whitespace-nowrap">🔮 Cargar otro pronóstico:</label>
       <select onchange="if(this.value && confirm('Esto reemplaza el proyecto actual. ¿Continuar?'))rmLoadFromForecast(this.value); else this.value=''" class="flex-1 border border-blue-300 rounded px-2 py-1 text-xs">
-        <option value="">— ${forecasts.length} disponibles —</option>
+        <option value="">— ${forecasts.length} pronósticos disponibles —</option>
         ${forecasts.map(f => `<option value="${f.id}">${f.propiedad} · ${f.sqft||'?'}sqft · ${new Date(f.created_at).toLocaleDateString('es-MX')}</option>`).join('')}
       </select>
     </div>` : '';
@@ -1921,6 +1954,7 @@ function rmRenderEditor(body) {
   body.innerHTML = `
     <div class="grid lg:grid-cols-12 gap-4">
       <div class="lg:col-span-8 space-y-3">
+        ${projectPicker}
         ${forecastPicker}
         ${taskadeBanner}
         <!-- Info -->
