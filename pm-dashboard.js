@@ -115,15 +115,33 @@ function pmSetCompany(id) { pmState.currentCompany = id; pmRender(); }
 function pmSetTab(t) { pmState.tab = t; pmRender(); }
 
 // ─── Definiciones operativas ───
-// BACKLOG: tarea abierta SIN persona asignada — está esperando que alguien la tome.
-//          NO debe contar como "activa/abierta/vencida" en métricas operativas.
-// ACTIVA: tarea abierta CON persona asignada — alguien está/debería trabajar en ella.
-// CERRADA: status_type === 'closed' o status === 'completado'.
+// BACKLOG: tarea pendiente de asignar / esperando el momento de entrar al sprint.
+//   NO cuenta como "activa/vencida/atrasada" en NINGUNA métrica operativa.
+//   Se detecta por CUALQUIERA de estas señales:
+//   1) Sin persona asignada (primary_assignee null)
+//   2) Status contiene "backlog" / "por asignar" / "pendiente" / "sin asignar" / "ideas" / "icebox" / "todo" / "to do"
+//   3) Lista (list_name) contiene esos mismos términos
+//   4) Tag "backlog"
+// ACTIVA: tarea abierta + asignada + NO en backlog (alguien debería estar trabajándola)
+// CERRADA: status_type === 'closed' o status === 'completado'
+const PM_BACKLOG_KEYWORDS = ['backlog', 'por asignar', 'pendiente', 'sin asignar', 'ideas', 'icebox', 'to do', 'todo'];
+function pmContainsBacklogKeyword(s) {
+  if (!s) return false;
+  const t = String(s).toLowerCase().trim();
+  return PM_BACKLOG_KEYWORDS.some(k => t === k || t.includes(k));
+}
 function pmIsClosed(t) { return t.status_type === 'closed' || t.status === 'completado'; }
-function pmIsBacklog(t) { return !pmIsClosed(t) && !t.primary_assignee; }
-function pmIsActive(t)  { return !pmIsClosed(t) && !!t.primary_assignee; }
+function pmIsBacklog(t) {
+  if (pmIsClosed(t)) return false;
+  if (!t.primary_assignee) return true;
+  if (pmContainsBacklogKeyword(t.status)) return true;
+  if (pmContainsBacklogKeyword(t.list_name)) return true;
+  if (Array.isArray(t.tags) && t.tags.some(tag => pmContainsBacklogKeyword(tag))) return true;
+  return false;
+}
+function pmIsActive(t)  { return !pmIsClosed(t) && !pmIsBacklog(t); }
 function pmIsOverdue(t) {
-  // Solo cuenta vencida si está ASIGNADA y tiene due_date pasado
+  // Solo cuenta vencida si es ACTIVA (asignada + no en backlog) y tiene due_date pasado
   return pmIsActive(t) && t.due_date && new Date(t.due_date) < new Date();
 }
 // Contexto completo de la tarea para drill-down
@@ -1269,11 +1287,12 @@ function pmRenderHoldingPulse() {
   const tasks = pmState.clickupTasks || [];
   const now = Date.now();
 
-  // Totales cross-empresa
-  const totalOpen = tasks.filter(t => t.status_type !== 'closed').length;
-  const totalOverdue = tasks.filter(t => t.status_type !== 'closed' && t.due_date && new Date(t.due_date) < new Date()).length;
-  const totalClosed7d = tasks.filter(t => t.status_type === 'closed' && t.date_closed && (now - new Date(t.date_closed).getTime()) < 7*86400000).length;
-  const totalPeople = new Set(tasks.filter(t => t.status_type !== 'closed').map(t => t.primary_assignee).filter(Boolean)).size;
+  // Totales cross-empresa — usar helpers para EXCLUIR backlog
+  const totalActive = tasks.filter(pmIsActive).length;
+  const totalBacklog = tasks.filter(pmIsBacklog).length;
+  const totalOverdue = tasks.filter(pmIsOverdue).length;
+  const totalClosed7d = tasks.filter(t => pmIsClosed(t) && t.date_closed && (now - new Date(t.date_closed).getTime()) < 7*86400000).length;
+  const totalPeople = new Set(tasks.filter(pmIsActive).map(t => t.primary_assignee).filter(Boolean)).size;
 
   if (exec.length === 0) {
     return `<div class="text-center py-12 text-slate-500">
@@ -1288,26 +1307,35 @@ function pmRenderHoldingPulse() {
       <!-- KPIs totales del holding -->
       <div class="bg-slate-900 text-white rounded-xl p-4">
         <div class="text-xs text-slate-400 uppercase font-bold mb-2">🏛️ Holding Total</div>
-        <div class="grid grid-cols-4 gap-3">
-          <div><div class="text-[10px] text-slate-400 uppercase">Open</div><div class="text-3xl font-bold">${totalOpen}</div></div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div><div class="text-[10px] text-slate-400 uppercase" title="Tareas asignadas + no en backlog">Activas</div><div class="text-3xl font-bold">${totalActive}</div></div>
           <div><div class="text-[10px] text-slate-400 uppercase">Vencidas</div><div class="text-3xl font-bold ${totalOverdue>10?'text-red-300':'text-amber-300'}">${totalOverdue}</div></div>
           <div><div class="text-[10px] text-slate-400 uppercase">Cerradas 7d</div><div class="text-3xl font-bold text-emerald-300">${totalClosed7d}</div></div>
           <div><div class="text-[10px] text-slate-400 uppercase">Personas activas</div><div class="text-3xl font-bold">${totalPeople}</div></div>
+          <div><div class="text-[10px] text-slate-400 uppercase" title="Backlog NO se cuenta en activas/vencidas">📥 Backlog</div><div class="text-3xl font-bold text-violet-300">${totalBacklog}</div></div>
         </div>
       </div>
 
-      <!-- Cards por empresa -->
+      <!-- Cards por empresa — métricas recomputadas client-side para EXCLUIR backlog -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         ${exec.map(e => {
-          const tone = e.tasks_overdue > 10 ? 'border-red-300 bg-red-50' : e.tasks_overdue > 3 ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50';
+          // Recomputar contadores excluyendo backlog (el VIEW de SQL no sabe de nuestra def de backlog)
+          const myTasks = tasks.filter(t => t.company_id === e.company_id);
+          const myActive = myTasks.filter(pmIsActive).length;
+          const myBacklog = myTasks.filter(pmIsBacklog).length;
+          const myOverdue = myTasks.filter(pmIsOverdue).length;
+          const myClosed7d = myTasks.filter(t => pmIsClosed(t) && t.date_closed && (now - new Date(t.date_closed).getTime()) < 7*86400000).length;
+          const myPeople = new Set(myTasks.filter(pmIsActive).map(t => t.primary_assignee).filter(Boolean)).size;
+          const tone = myOverdue > 10 ? 'border-red-300 bg-red-50' : myOverdue > 3 ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50';
           return `
             <button onclick="pmSetCompany('${e.company_id}')" class="text-left bg-white border-2 ${tone} rounded-xl p-3 hover:shadow-lg transition-shadow">
               <div class="text-base font-bold">${e.icon} ${e.company_name}</div>
               <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
-                <div><div class="text-[10px] text-slate-500 uppercase">Open</div><div class="text-2xl font-bold">${e.tasks_open || 0}</div></div>
-                <div><div class="text-[10px] text-slate-500 uppercase">Vencidas</div><div class="text-2xl font-bold ${(e.tasks_overdue||0)>5?'text-red-700':'text-slate-700'}">${e.tasks_overdue || 0}</div></div>
-                <div><div class="text-[10px] text-slate-500 uppercase">Cerradas 7d</div><div class="text-2xl font-bold text-emerald-700">${e.tasks_closed_7d || 0}</div></div>
-                <div><div class="text-[10px] text-slate-500 uppercase">Personas</div><div class="text-2xl font-bold">${e.active_people || 0}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase" title="Asignadas + no en backlog">Activas</div><div class="text-2xl font-bold">${myActive}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase">Vencidas</div><div class="text-2xl font-bold ${myOverdue>5?'text-red-700':'text-slate-700'}">${myOverdue}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase">Cerradas 7d</div><div class="text-2xl font-bold text-emerald-700">${myClosed7d}</div></div>
+                <div><div class="text-[10px] text-slate-500 uppercase">Personas</div><div class="text-2xl font-bold">${myPeople}</div></div>
+                <div class="col-span-2"><div class="text-[10px] text-violet-600 uppercase font-bold">📥 Backlog (no cuenta como activa)</div><div class="text-xl font-bold text-violet-700">${myBacklog}</div></div>
               </div>
               ${e.avg_score_this_week ? `<div class="mt-2 pt-2 border-t border-slate-200"><div class="text-[10px] text-slate-500 uppercase">Score equipo (semana)</div><div class="text-xl font-bold ${e.avg_score_this_week>=80?'text-emerald-700':e.avg_score_this_week>=60?'text-amber-700':'text-red-700'}">${e.avg_score_this_week}/100</div></div>` : ''}
               ${e.okrs_active > 0 ? `<div class="mt-1 text-[11px]"><strong>${e.okrs_active}</strong> OKRs · ${e.okrs_avg_progress||0}% progreso</div>` : ''}
@@ -1664,15 +1692,17 @@ function pmRenderClickUpTasks() {
 function pmRenderTeam() {
   const co = pmCurrentCompanyObj();
   const tasks = pmFilterByCompany(pmState.clickupTasks);
-  const open = tasks.filter(t => t.status_type !== 'closed');
+  // Solo ACTIVAS (excluye backlog) — el workload del equipo
+  const active = tasks.filter(pmIsActive);
 
-  // Workload por persona (de ClickUp, real data)
+  // Workload por persona — solo activas, NO backlog
   const byPerson = {};
-  open.forEach(t => {
-    const p = t.primary_assignee || 'Sin asignar';
+  active.forEach(t => {
+    const p = t.primary_assignee;
+    if (!p) return; // safety — pmIsActive ya garantiza assignee
     if (!byPerson[p]) byPerson[p] = { total: 0, overdue: 0, byStatus: {} };
     byPerson[p].total++;
-    if (t.due_date && new Date(t.due_date) < new Date()) byPerson[p].overdue++;
+    if (pmIsOverdue(t)) byPerson[p].overdue++;
     byPerson[p].byStatus[t.status||'?'] = (byPerson[p].byStatus[t.status||'?']||0) + 1;
   });
   const list = Object.entries(byPerson).sort((a,b) => b[1].total - a[1].total);
