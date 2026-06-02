@@ -222,6 +222,7 @@ function opRender() {
   const done = filteredDay.filter(t => t.status === 'done').length;
   const plannedMin = filteredDay.reduce((s,t) => s + (t.duration_min||0), 0);
   const travelMin = filteredDay.reduce((s,t) => s + (t.travel_min||0), 0);
+  const totalMin = plannedMin + travelMin;
   const sorted = [...filteredDay].sort((a,b) => opTimeToMin(a.start_time) - opTimeToMin(b.start_time));
   let gapMin = 0;
   for (let i = 1; i < sorted.length; i++) {
@@ -257,8 +258,9 @@ function opRender() {
         </div>
         <div class="flex items-center gap-1.5 flex-wrap">
           <span class="text-xs bg-slate-900 text-white px-2 py-1 rounded font-bold" title="Avance del día">✅ ${done}/${total}</span>
-          <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">⏱ ${Math.floor(plannedMin/60)}h ${plannedMin%60}m</span>
-          ${travelMin ? `<span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">🚗 ${travelMin}m</span>` : ''}
+          <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded" title="Tareas + viaje = total del día">⏱ ${Math.floor(totalMin/60)}h ${totalMin%60}m total</span>
+          <span class="text-[10px] text-slate-500" title="Solo trabajo (sin viaje)">(${Math.floor(plannedMin/60)}h${plannedMin%60?' '+(plannedMin%60)+'m':''} trabajo)</span>
+          ${travelMin ? `<span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded" title="Tiempo de viaje sumado">🚗 ${travelMin}m</span>` : ''}
           ${gapMin > 30 ? `<span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold" title="Tiempo muerto">⚠️ ${gapMin}m muertos</span>` : ''}
           <div class="flex gap-0.5 items-center bg-slate-50 rounded px-1 py-0.5 border border-slate-200">
             <span class="text-[9px] text-slate-500 uppercase font-bold mr-1">Zona</span>
@@ -551,60 +553,106 @@ function opRenderTemplatesPanel() {
 }
 
 // ─── Timeline ───
+// Altura visual: 1 minuto = OP_PX_PER_MIN px → 30min slot = 36px, 1h = 72px, 2h = 144px
+const OP_PX_PER_MIN = 1.2;
+
 function opRenderTimeline(filteredDay) {
-  // Slots de 30 min
+  // Slots de 30 min para drop targets + labels
   const slots = [];
   for (let h = OP_START_HOUR; h < OP_END_HOUR; h++) {
-    slots.push({ time: `${opPad(h)}:00`, isHour: true });
-    slots.push({ time: `${opPad(h)}:30`, isHour: false });
+    slots.push({ time: `${opPad(h)}:00`, isHour: true, idx: slots.length });
+    slots.push({ time: `${opPad(h)}:30`, isHour: false, idx: slots.length });
   }
+  const dayStartMin = OP_START_HOUR * 60;
+  const totalMin = (OP_END_HOUR - OP_START_HOUR) * 60;
+  const totalPx = totalMin * OP_PX_PER_MIN;
+  const SLOT_PX = 30 * OP_PX_PER_MIN; // 36px
 
-  // Agrupar tareas por slot
-  const byStart = {};
-  filteredDay.forEach(t => {
-    const k = (t.start_time||'').substring(0,5);
-    (byStart[k] = byStart[k] || []).push(t);
-  });
-
-  // Detectar cambios de casa para visual
+  // Sorted para detectar cambios de casa + gaps + travel
   const sorted = [...filteredDay].sort((a,b) => opTimeToMin(a.start_time) - opTimeToMin(b.start_time));
-  const propChanges = {};
-  let lastProp = null;
-  sorted.forEach(t => {
-    const propKey = t.property_id || t.project_id || null;
-    if (propKey !== lastProp) {
-      propChanges[t.start_time?.substring(0,5)] = { from: lastProp, to: propKey, name: opPropName(t) };
-      lastProp = propKey;
-    }
-  });
 
-  // Gaps
-  const gaps = {};
-  for (let i = 1; i < sorted.length; i++) {
-    const prevEnd = opTimeToMin(sorted[i-1].start_time) + (sorted[i-1].duration_min||0);
-    const thisStart = opTimeToMin(sorted[i].start_time);
-    if (thisStart > prevEnd) gaps[opMinToTime(prevEnd).substring(0,5)] = thisStart - prevEnd;
+  // Gaps (huecos) y cambios de casa
+  const gaps = [];
+  let lastProp = null;
+  for (let i = 0; i < sorted.length; i++) {
+    const t = sorted[i];
+    const propKey = t.property_id || t.project_id || null;
+    if (i > 0) {
+      const prev = sorted[i-1];
+      const prevEnd = opTimeToMin(prev.start_time) + (prev.duration_min||0) + (prev.travel_min||0);
+      const thisStart = opTimeToMin(t.start_time);
+      if (thisStart > prevEnd) {
+        gaps.push({ startMin: prevEnd, durMin: thisStart - prevEnd });
+      }
+    }
+    lastProp = propKey;
   }
+
+  // Computar carriles (lanes) para tasks que se solapan visualmente
+  const placed = sorted.map(t => {
+    const startMin = opTimeToMin(t.start_time);
+    const endMin = startMin + (t.duration_min || 0);
+    return { task: t, startMin, endMin, lane: 0 };
+  });
+  // Asignar lanes (greedy)
+  placed.forEach((p, i) => {
+    const overlapping = placed.slice(0, i).filter(q => q.endMin > p.startMin && q.startMin < p.endMin);
+    const usedLanes = new Set(overlapping.map(q => q.lane));
+    let lane = 0;
+    while (usedLanes.has(lane)) lane++;
+    p.lane = lane;
+  });
+  const maxLane = placed.reduce((m, p) => Math.max(m, p.lane), 0);
 
   return `
-    <div class="divide-y divide-slate-100">
-      ${slots.map(slot => {
-        const acts = byStart[slot.time] || [];
-        const gapHere = gaps[slot.time];
-        const propChange = propChanges[slot.time];
+    <div class="relative" style="height: ${totalPx}px;">
+      <!-- Grid de slots (background + drop targets) -->
+      ${slots.map((slot) => {
+        const top = (opTimeToMin(slot.time) - dayStartMin) * OP_PX_PER_MIN;
         return `
-          <div class="flex group ${slot.isHour?'bg-slate-50/50':''}"
-               ondragover="event.preventDefault(); this.classList.add('bg-blue-50')"
-               ondragleave="this.classList.remove('bg-blue-50')"
-               ondrop="this.classList.remove('bg-blue-50'); opDropOnSlot('${slot.time}', event)">
-            <div class="w-16 flex-shrink-0 text-right pr-2 py-1.5 text-[11px] font-bold ${slot.isHour?'text-slate-900':'text-slate-400'} border-r border-slate-100">
+          <div class="absolute left-0 right-0 flex ${slot.isHour?'border-t border-slate-300':'border-t border-slate-100 border-dashed'} hover:bg-blue-50/40"
+               style="top: ${top}px; height: ${SLOT_PX}px;"
+               ondragover="event.preventDefault(); this.classList.add('bg-blue-100')"
+               ondragleave="this.classList.remove('bg-blue-100')"
+               ondrop="this.classList.remove('bg-blue-100'); opDropOnSlot('${slot.time}', event)">
+            <div class="w-16 flex-shrink-0 text-right pr-2 pt-0.5 text-[11px] font-bold ${slot.isHour?'text-slate-900':'text-slate-300'}">
               ${slot.isHour ? opFmt12(slot.time) : ''}
             </div>
-            <div class="flex-1 py-0.5 px-2 min-h-[36px]">
-              ${propChange && propChange.from && propChange.to && propChange.from !== propChange.to ? `<div class="text-[10px] text-amber-700 italic mb-1 flex items-center gap-1"><span>🚗</span><span>cambio a 🏠 ${propChange.name}</span></div>` : ''}
-              ${gapHere ? `<div class="text-[10px] text-red-500 italic mb-1">⏳ ${gapHere}m de hueco</div>` : ''}
-              ${acts.length === 0 ? `<div class="text-[10px] text-slate-300 opacity-0 group-hover:opacity-100">arrastra del backlog →</div>` : acts.map(t => opRenderScheduledTask(t)).join('')}
+            <div class="flex-1 border-l border-slate-100"></div>
+          </div>
+        `;
+      }).join('')}
+
+      <!-- Indicadores de gaps -->
+      ${gaps.filter(g => g.durMin >= 15).map(g => {
+        const top = (g.startMin - dayStartMin) * OP_PX_PER_MIN;
+        const height = g.durMin * OP_PX_PER_MIN;
+        return `
+          <div class="absolute pointer-events-none flex items-center justify-center bg-red-50/60 border-l-4 border-red-300"
+               style="top: ${top}px; height: ${height}px; left: 64px; right: 8px;">
+            <span class="text-[10px] text-red-600 font-bold italic">⏳ ${g.durMin}m hueco</span>
+          </div>
+        `;
+      }).join('')}
+
+      <!-- Tasks (absolutely positioned con altura proporcional) -->
+      ${placed.map(p => {
+        const t = p.task;
+        const top = (p.startMin - dayStartMin) * OP_PX_PER_MIN;
+        const height = Math.max(24, (t.duration_min || 30) * OP_PX_PER_MIN);
+        const travelHeight = (t.travel_min || 0) * OP_PX_PER_MIN;
+        const laneWidth = 100 / (maxLane + 1);
+        const laneLeft = p.lane * laneWidth;
+        return `
+          ${travelHeight > 0 ? `
+            <div class="absolute bg-amber-100 border border-amber-300 border-dashed rounded text-[9px] text-amber-800 px-1 italic overflow-hidden"
+                 style="top: ${top + height}px; height: ${travelHeight}px; left: calc(64px + ${laneLeft}% + 4px); width: calc(${laneWidth}% - 8px);">
+              🚗 ${t.travel_min}m viaje
             </div>
+          ` : ''}
+          <div class="absolute"
+               style="top: ${top}px; height: ${height}px; left: calc(64px + ${laneLeft}% + 4px); width: calc(${laneWidth}% - 8px);">
+            ${opRenderScheduledTask(t, height)}
           </div>
         `;
       }).join('')}
@@ -728,7 +776,7 @@ async function opDropOnWeekDay(dateStr, ev) {
   opRender();
 }
 
-function opRenderScheduledTask(t) {
+function opRenderScheduledTask(t, blockHeight) {
   const endTime = opAddMin(t.start_time, t.duration_min);
   const locText = opPropName(t);
   const propCls = opPropColor(t.property_id || t.project_id);
@@ -741,39 +789,44 @@ function opRenderScheduledTask(t) {
                    isSkipped ? 'bg-slate-50 border-slate-200 opacity-50' :
                    propCls;
   const prio = t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : '';
+  // Si el bloque es chico, mostrar menos info
+  const isCompact = blockHeight && blockHeight < 50;
+  const isMedium = blockHeight && blockHeight < 90;
+  const heightStyle = blockHeight ? `style="height: 100%;"` : '';
 
   return `
     <div draggable="true"
          ondragstart="opSchedDragStart('${t.id}')"
          ondragend="opState.draggedScheduledId=null"
-         class="${statusBg} border-2 rounded-lg p-1.5 mb-1 group/task hover:shadow-sm cursor-grab active:cursor-grabbing">
-      <div class="flex items-start gap-1.5">
-        <input type="checkbox" ${isDone?'checked':''} onclick="event.stopPropagation(); opToggleDone('${t.id}')" class="mt-0.5 cursor-pointer" />
-        <div class="flex-1 min-w-0" onclick="opEditScheduled('${t.id}')">
+         onclick="opEditScheduled('${t.id}')"
+         class="${statusBg} border-2 rounded-lg p-1.5 group/task hover:shadow-md cursor-pointer overflow-hidden flex flex-col"
+         ${heightStyle}>
+      <div class="flex items-start gap-1.5 flex-1 min-h-0">
+        <input type="checkbox" ${isDone?'checked':''} onclick="event.stopPropagation(); opToggleDone('${t.id}')" class="mt-0.5 cursor-pointer flex-shrink-0" />
+        <div class="flex-1 min-w-0 overflow-hidden">
           <div class="flex items-center gap-1 flex-wrap">
-            <span class="text-xs font-bold ${isDone?'line-through opacity-60':''}">${prio}${t.title}</span>
-            <span class="text-[10px] text-slate-500">${opFmt12(t.start_time)}→${opFmt12(endTime)} · ${t.duration_min}m</span>
-            ${t.zona ? `<span class="text-[9px] ${opZonaColor(t.zona)} border px-1 rounded font-bold">${t.zona}</span>` : ''}
-            ${t.travel_min ? `<span class="text-[9px] bg-slate-200 text-slate-700 px-1 rounded">🚗 ${t.travel_min}m</span>` : ''}
-            ${t.recurring_id ? '<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded font-bold" title="Tarea recurrente auto-generada">🔁</span>' : ''}
+            <span class="text-xs font-bold ${isDone?'line-through opacity-60':''} truncate">${prio}${t.title}</span>
+            ${isCompact ? '' : `<span class="text-[10px] text-slate-600 whitespace-nowrap">${opFmt12(t.start_time)}→${opFmt12(endTime)} · ${t.duration_min}m</span>`}
+            ${t.zona ? `<span class="text-[9px] ${opZonaColor(t.zona)} border px-1 rounded font-bold">${t.zona[0]}</span>` : ''}
+            ${t.recurring_id ? '<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded font-bold" title="Recurrente">🔁</span>' : ''}
           </div>
-          ${locText ? `<div class="text-[10px] text-slate-700 mt-0.5 font-semibold">🏠 ${locText}</div>` : ''}
-          ${mats.length ? `<div class="flex flex-wrap gap-0.5 mt-1">${mats.slice(0,5).map(m => `<span class="text-[9px] bg-white border border-slate-300 px-1 rounded">${m}</span>`).join('')}${mats.length > 5 ? `<span class="text-[9px] text-slate-400">+${mats.length-5}</span>`:''}</div>` : ''}
+          ${isCompact ? '' : (locText ? `<div class="text-[10px] text-slate-700 mt-0.5 font-semibold truncate">🏠 ${locText}</div>` : '')}
+          ${isMedium ? '' : (mats.length ? `<div class="flex flex-wrap gap-0.5 mt-1">${mats.slice(0,3).map(m => `<span class="text-[9px] bg-white border border-slate-300 px-1 rounded">${m}</span>`).join('')}${mats.length > 3 ? `<span class="text-[9px] text-slate-400">+${mats.length-3}</span>`:''}</div>` : '')}
           ${(t.checklist || []).length ? (() => {
             const cl = t.checklist;
             const cd = cl.filter(x => x.done).length;
             const pct = Math.round(cd/cl.length*100);
-            return `<div class="mt-1 cursor-pointer" onclick="event.stopPropagation(); opOpenChecklist('${t.id}')" title="Click para revisar entregables">
+            return `<div class="mt-1 cursor-pointer" onclick="event.stopPropagation(); opOpenChecklist('${t.id}')" title="Checklist">
               <div class="flex items-center gap-1">
-                <span class="text-[10px] font-bold ${cd===cl.length?'text-emerald-700':'text-slate-600'}">📋 ${cd}/${cl.length} entregables</span>
+                <span class="text-[10px] font-bold ${cd===cl.length?'text-emerald-700':'text-slate-600'}">📋 ${cd}/${cl.length}</span>
                 <div class="flex-1 bg-slate-100 rounded-full h-1 overflow-hidden"><div class="${cd===cl.length?'bg-emerald-500':'bg-blue-500'} h-full" style="width:${pct}%"></div></div>
               </div>
             </div>`;
           })() : ''}
-          ${t.notes ? `<div class="text-[10px] text-slate-500 italic mt-0.5">📝 ${t.notes}</div>` : ''}
+          ${isMedium ? '' : (t.notes ? `<div class="text-[10px] text-slate-500 italic mt-0.5 truncate">📝 ${t.notes}</div>` : '')}
         </div>
-        <div class="flex flex-col gap-0.5 opacity-0 group-hover/task:opacity-100">
-          <button onclick="event.stopPropagation(); opSendToBacklog('${t.id}')" class="text-[10px] text-slate-400 hover:text-slate-900" title="Devolver al backlog">↩</button>
+        <div class="flex flex-col gap-0.5 opacity-0 group-hover/task:opacity-100 flex-shrink-0">
+          <button onclick="event.stopPropagation(); opSendToBacklog('${t.id}')" class="text-[10px] text-slate-400 hover:text-slate-900" title="Backlog">↩</button>
           <button onclick="event.stopPropagation(); opDeleteScheduled('${t.id}')" class="text-[10px] text-slate-400 hover:text-red-600" title="Eliminar">✕</button>
         </div>
       </div>
@@ -877,6 +930,7 @@ function opRenderCasas() {
                 ${noTasks ? `<span class="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded">⚠️ sin tareas</span>` : ''}
                 <button onclick="event.stopPropagation(); opOpenAddLoose('${c.key === '__sin__' ? '' : c.key}')"
                         class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded">+ Tarea</button>
+                ${c.key.startsWith('p:') ? `<button onclick="event.stopPropagation(); opOpenAddCasa('${c.key.slice(2)}')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold px-2 py-1 rounded" title="Editar casa">✏️</button>` : ''}
                 <span class="text-slate-400 text-xs">${expanded ? '▼' : '▶'}</span>
               </div>
             </div>
@@ -951,29 +1005,33 @@ async function opToggleDoneFromCasas(id, isDone) {
   await opLoadAll();
   opRender();
 }
-// ─── Crear casa rápida desde Ops Planner ───
-function opOpenAddCasa() {
+// ─── Crear/editar casa desde Ops Planner ───
+function opOpenAddCasa(propId) {
+  const isEdit = !!propId;
+  const p = isEdit ? opState.properties.find(x => x.id === propId) : {};
+  const v = k => (p && p[k] != null ? String(p[k]).replace(/"/g,'&quot;') : '');
+  const sel = (k, val) => (p && p[k] === val ? 'selected' : '');
   const html = `
     <div class="space-y-3">
-      <div class="text-xs text-slate-500">Crea una propiedad para asignarle tareas. La verás de inmediato en la vista "Por casa".</div>
+      <div class="text-xs text-slate-500">${isEdit ? 'Editar propiedad existente.' : 'Crea una propiedad para asignarle tareas. La verás de inmediato en la vista "Por casa".'}</div>
 
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Dirección *</label>
-        <input id="op-casa-address" placeholder="Ej. 5320 Wellington Dr, Austin TX" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        <input id="op-casa-address" value="${v('address')}" placeholder="Ej. 5320 Wellington Dr, Austin TX" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
       </div>
 
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Apodo (corto, opcional)</label>
-          <input id="op-casa-nickname" placeholder="Ej. Wellington" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          <input id="op-casa-nickname" value="${v('nickname')}" placeholder="Ej. Wellington" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
         </div>
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tipo</label>
           <select id="op-casa-type" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-            <option value="rental">🏠 Renta</option>
-            <option value="flip">🔄 Fix & Flip</option>
-            <option value="own">🏡 Propia</option>
-            <option value="airbnb">🛏️ Airbnb / Mid-term</option>
+            <option value="rental" ${sel('property_type','rental')}>🏠 Renta</option>
+            <option value="flip" ${sel('property_type','flip')}>🔄 Fix & Flip</option>
+            <option value="own" ${sel('property_type','own')}>🏡 Propia</option>
+            <option value="airbnb" ${sel('property_type','airbnb')}>🛏️ Airbnb / Mid-term</option>
           </select>
         </div>
       </div>
@@ -981,37 +1039,37 @@ function opOpenAddCasa() {
       <div class="grid grid-cols-3 gap-2">
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">City</label>
-          <input id="op-casa-city" value="Austin" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+          <input id="op-casa-city" value="${v('city') || 'Austin'}" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">State</label>
-          <input id="op-casa-state" value="TX" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+          <input id="op-casa-state" value="${v('state') || 'TX'}" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
         <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">ZIP (opcional)</label>
-          <input id="op-casa-zip" placeholder="78745" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">ZIP</label>
+          <input id="op-casa-zip" value="${v('zip')}" placeholder="78745" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas (opcional)</label>
-        <textarea id="op-casa-notes" rows="2" placeholder="Detalles, observaciones..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas</label>
+        <textarea id="op-casa-notes" rows="2" placeholder="Detalles, observaciones..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${v('notes')}</textarea>
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="opSaveCasa()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Crear casa</button>
+        ${isEdit ? `<button onclick="opDeleteCasa('${propId}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 px-4 rounded" title="Eliminar casa (no se eliminan tareas)">🗑️</button>` : ''}
+        <button onclick="opSaveCasa('${propId || ''}')" class="flex-1 ${isEdit?'bg-blue-600 hover:bg-blue-700':'bg-emerald-600 hover:bg-emerald-700'} text-white text-sm font-bold py-2 rounded">${isEdit ? '💾 Guardar cambios' : '+ Crear casa'}</button>
       </div>
     </div>
   `;
-  openModal('+ Nueva casa', html);
+  openModal(isEdit ? '✏️ Editar casa' : '+ Nueva casa', html);
 }
 
-async function opSaveCasa() {
+async function opSaveCasa(propId) {
   const address = document.getElementById('op-casa-address').value.trim();
   if (!address) return alert('La dirección es obligatoria');
   const payload = {
-    user_id: state.user.id,
     address,
     nickname: document.getElementById('op-casa-nickname').value.trim() || null,
     property_type: document.getElementById('op-casa-type').value,
@@ -1019,17 +1077,35 @@ async function opSaveCasa() {
     state: document.getElementById('op-casa-state').value.trim() || 'TX',
     zip: document.getElementById('op-casa-zip').value.trim() || null,
     notes: document.getElementById('op-casa-notes').value.trim() || null,
-    status: 'evaluating',
     updated_at: new Date().toISOString()
   };
-  const { error } = await sb.from('properties').insert(payload);
+
+  let error;
+  if (propId) {
+    ({ error } = await sb.from('properties').update(payload).eq('id', propId));
+  } else {
+    payload.user_id = state.user.id;
+    payload.status = 'evaluating';
+    ({ error } = await sb.from('properties').insert(payload));
+  }
   if (error) {
-    // Si falla por columnas que no existen, dar pista clara
     if (error.message.includes('nickname') || error.message.includes('property_type')) {
       return alert('Falta correr la migración SQL. Pegá en Supabase SQL Editor:\n\nalter table public.properties add column if not exists nickname text;\nalter table public.properties add column if not exists property_type text;');
     }
     return alert('Error al guardar: ' + error.message);
   }
+  closeModal();
+  setTimeout(async () => {
+    await openOpsPlanner(opState.sys);
+    opState.view = 'casas';
+    opRender();
+  }, 100);
+}
+
+async function opDeleteCasa(propId) {
+  if (!confirm('¿Eliminar esta casa?\n\nLas tareas asignadas a ella NO se eliminan — quedan como "Sin casa".')) return;
+  const { error } = await sb.from('properties').delete().eq('id', propId);
+  if (error) return alert('Error: ' + error.message);
   closeModal();
   setTimeout(async () => {
     await openOpsPlanner(opState.sys);
@@ -1377,36 +1453,53 @@ function _opOpenEditModal(t, isBacklog) {
     <div class="space-y-3">
       ${isBacklog ? '<div class="text-xs bg-amber-50 border border-amber-200 rounded p-2">📥 Esta tarea está en el <strong>backlog</strong> (sin fecha). Arrastrala a un slot del horario para agendarla.</div>' : ''}
       <input id="op-e-title" value="${(t.title||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
-      <div class="grid grid-cols-${isBacklog?'2':'4'} gap-2">
-        ${!isBacklog ? `
+      ${!isBacklog ? `
+        <div class="grid grid-cols-4 gap-2">
           <div>
             <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Inicio</label>
-            <input id="op-e-start" type="time" value="${(t.start_time||'').substring(0,5)}" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+            <input id="op-e-start" type="time" value="${(t.start_time||'').substring(0,5)}" oninput="opSyncTimesEdit()" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
           </div>
-        ` : ''}
-        <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Dur (min)</label>
-          <input id="op-e-dur" type="number" value="${t.duration_min}" min="5" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
-        </div>
-        ${!isBacklog ? `
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración (min)</label>
+            <input id="op-e-dur" type="number" value="${t.duration_min}" min="5" step="5" oninput="opSyncTimesEdit()" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-emerald-600 mb-1">Cierre · auto</label>
+            <input id="op-e-end" type="time" value="${opAddMin((t.start_time||'08:00').substring(0,5), t.duration_min||30)}" readonly class="w-full border border-emerald-300 bg-emerald-50 rounded px-2 py-2 text-sm font-bold text-emerald-700 cursor-not-allowed" title="Se calcula desde inicio + duración" />
+          </div>
           <div>
             <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje (min)</label>
-            <input id="op-e-travel" type="number" value="${t.travel_min||0}" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+            <input id="op-e-travel" type="number" value="${t.travel_min||0}" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" title="Se suma al total del día" />
           </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Status</label>
             <select id="op-e-status" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
               ${['planned','in_progress','done','skipped'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
             </select>
           </div>
-        ` : ''}
-        <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Prioridad</label>
-          <select id="op-e-priority" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-            ${['low','normal','high','urgent'].map(p => `<option value="${p}" ${t.priority===p?'selected':''}>${p}</option>`).join('')}
-          </select>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Prioridad</label>
+            <select id="op-e-priority" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+              ${['low','normal','high','urgent'].map(p => `<option value="${p}" ${t.priority===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
         </div>
-      </div>
+      ` : `
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración (min)</label>
+            <input id="op-e-dur" type="number" value="${t.duration_min}" min="5" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Prioridad</label>
+            <select id="op-e-priority" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+              ${['low','normal','high','urgent'].map(p => `<option value="${p}" ${t.priority===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      `}
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Empresa</label>
@@ -1549,16 +1642,16 @@ function opOpenAddLoose(presetTarget) {
 
       <input id="op-l-title" placeholder="Título *" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
 
-      <!-- Tiempos: 3 campos auto-sincronizados -->
+      <!-- Tiempos: Inicio + Duración manuales · Cierre se calcula solo -->
       <div id="op-l-times-ocasional" class="grid grid-cols-4 gap-2">
         <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora inicio</label>
-          <input id="op-l-start" type="time" value="08:00" onchange="opSyncTimesLoose('start')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
-        <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora cierre</label>
-          <input id="op-l-end" type="time" value="08:30" onchange="opSyncTimesLoose('end')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+          <input id="op-l-start" type="time" value="08:00" oninput="opSyncTimesLoose('start')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
         <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración (min)</label>
-          <input id="op-l-dur" type="number" value="30" min="5" step="5" onchange="opSyncTimesLoose('dur')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+          <input id="op-l-dur" type="number" value="30" min="5" step="5" oninput="opSyncTimesLoose('dur')" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+        <div><label class="block text-[10px] font-bold uppercase text-emerald-600 mb-1">Hora cierre · auto</label>
+          <input id="op-l-end" type="time" value="08:30" readonly class="w-full border border-emerald-300 bg-emerald-50 rounded px-2 py-2 text-sm font-bold text-emerald-700 cursor-not-allowed" title="Se calcula desde inicio + duración" /></div>
         <div><label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Viaje (min)</label>
-          <input id="op-l-travel" type="number" value="0" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" /></div>
+          <input id="op-l-travel" type="number" value="0" min="0" step="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" title="Tiempo de desplazamiento — se suma al total del día" /></div>
       </div>
 
       <!-- Campos solo para recurrente -->
@@ -1621,21 +1714,26 @@ function opLooseFromTemplate(sel) {
   } catch {}
 }
 
-// Sincroniza start/end/dur (cuando cambia uno, los otros se ajustan)
+// Sincroniza start/end/dur — end siempre se calcula desde start + dur (read-only)
 function opSyncTimesLoose(changed) {
   const startEl = document.getElementById('op-l-start');
   const endEl = document.getElementById('op-l-end');
   const durEl = document.getElementById('op-l-dur');
   if (!startEl || !endEl || !durEl) return;
-  if (changed === 'start' || changed === 'dur') {
-    const startMin = opTimeToMin(startEl.value);
-    const dur = +durEl.value || 0;
-    endEl.value = opMinToTime(startMin + dur);
-  } else if (changed === 'end') {
-    const startMin = opTimeToMin(startEl.value);
-    const endMin = opTimeToMin(endEl.value);
-    durEl.value = Math.max(5, endMin - startMin);
-  }
+  const startMin = opTimeToMin(startEl.value);
+  const dur = +durEl.value || 0;
+  endEl.value = opMinToTime(startMin + dur);
+}
+
+// Mismo sync para el modal de edit
+function opSyncTimesEdit() {
+  const startEl = document.getElementById('op-e-start');
+  const endEl = document.getElementById('op-e-end');
+  const durEl = document.getElementById('op-e-dur');
+  if (!startEl || !endEl || !durEl) return;
+  const startMin = opTimeToMin(startEl.value);
+  const dur = +durEl.value || 0;
+  endEl.value = opMinToTime(startMin + dur);
 }
 
 // Toggle entre ocasional/recurrente: oculta/muestra campos
