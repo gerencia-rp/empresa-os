@@ -32,6 +32,10 @@ const EDU_TABS = [
 
 async function openEduManager(sys) {
   eduState.sys = sys;
+  // CRÍTICO: reset del tab a uno válido del Manager (no quedar en marker de otro sistema)
+  if (!EDU_TABS.find(t => t.key === eduState.tab)) {
+    eduState.tab = 'students';
+  }
   openModal(`🎓 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
@@ -1516,8 +1520,17 @@ async function eduGenerateReport() {
         force: true
       }
     });
-    if (error) throw error;
+    // Mejor manejo de errores
+    if (error) {
+      const detailed = error.message || JSON.stringify(error);
+      let hint = '';
+      if (detailed.includes('non-2xx')) {
+        hint = '\n\nDiagnóstico:\n• Verificá que ANTHROPIC_API_KEY esté en Supabase secrets\n• Probá redeploy: npx supabase functions deploy ai-deep-analyze';
+      }
+      throw new Error(detailed + hint);
+    }
     if (data?.error) throw new Error(data.error);
+    if (!data?.summary_md) throw new Error('Claude devolvió respuesta vacía. Probá de nuevo.');
 
     // Guardar en DB
     const { data: saved } = await sb.from('edu_reports').insert({

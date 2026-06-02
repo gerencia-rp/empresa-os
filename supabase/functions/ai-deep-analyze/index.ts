@@ -340,65 +340,125 @@ Devolvé SOLO JSON válido:
   "summary": "1 párrafo del nivel de riesgo agregado"
 }`,
 
-  'edu-report': (ctx, today) => `Eres COO de empresa de educación inmobiliaria. Hoy es ${today}.
+  'edu-report': (ctx, today) => `Eres COO + Head of Education de una empresa de educación inmobiliaria con experiencia 10+ años escalando programas de mentoría. Hoy es ${today}.
+
+Vas a escribir un INFORME EJECUTIVO PROFUNDO para la reunión semanal de management. Este informe debe ser de calidad consultora top-tier (McKinsey-level): datos crudos + insights no obvios + recomendaciones específicas con dueño y deadline.
 
 CONTEXTO DEL PERÍODO:
 - Mentoría: ${ctx.mentorship}
-- Tipo de informe: ${ctx.period_type} (${ctx.period_start} → ${ctx.period_end})
-- Total estudiantes hoy: ${ctx.snapshot?.total_students}
-- Activos: ${ctx.snapshot?.active}, At-risk: ${ctx.snapshot?.at_risk}, Graduados: ${ctx.snapshot?.graduated}, Pausados: ${ctx.snapshot?.paused}
+- Período: ${ctx.period_type} (${ctx.period_start} → ${ctx.period_end})
+
+SNAPSHOT ESTUDIANTES:
+- Total: ${ctx.snapshot?.total_students}
+- Activos: ${ctx.snapshot?.active}
+- At-risk: ${ctx.snapshot?.at_risk}
+- Graduados: ${ctx.snapshot?.graduated}
+- Pausados: ${ctx.snapshot?.paused}
 
 MOVIMIENTOS DEL PERÍODO:
 - Nuevos ingresos: ${ctx.movements?.new_enrolled || 0}
 - Cambios de etapa: ${ctx.movements?.stage_changes || 0}
-- Llamadas completadas: ${ctx.movements?.calls_done || 0} / ${ctx.movements?.calls_total || 0}
-- Tareas creadas: ${ctx.movements?.tasks_created || 0}, completadas: ${ctx.movements?.tasks_done || 0}
 
-CARTERA (PAGOS):
+CARTERA (CRÍTICO PARA NEGOCIO):
 - Pagos activos: ${ctx.cartera?.active}
 - Atrasados (past_due): ${ctx.cartera?.past_due}
 - Vencidos (expired): ${ctx.cartera?.expired}
 - Vencen ≤30d: ${ctx.cartera?.expiring_soon}
 
-DISTRIBUCIÓN POR ETAPA:
+DISTRIBUCIÓN POR ETAPA DEL PROGRAMA:
 ${JSON.stringify(ctx.by_stage || {}, null, 2)}
 
-GLSCORE PROMEDIO: ${ctx.avg_glscore || '?'}/100
-- Excelente (≥80): ${ctx.glscore_bands?.excelente || 0}
-- Bueno (60-79): ${ctx.glscore_bands?.bueno || 0}
-- Atención (40-59): ${ctx.glscore_bands?.atencion || 0}
-- Crítico (<40): ${ctx.glscore_bands?.critico || 0}
+GLSCORE (0-100, indicador de progreso):
+- Promedio: ${ctx.avg_glscore || '?'}/100
+- 🏆 Excelente ≥80: ${ctx.glscore_bands?.excelente || 0}
+- ✅ Bueno 60-79: ${ctx.glscore_bands?.bueno || 0}
+- ⚠️  Atención 40-59: ${ctx.glscore_bands?.atencion || 0}
+- 🔴 Crítico <40: ${ctx.glscore_bands?.critico || 0}
 
-TOP 5 ESTUDIANTES (mejor GLScore + activos):
+TOP PERFORMERS (5):
 ${JSON.stringify(ctx.top_students || [], null, 2)}
 
-ESTUDIANTES EN RIESGO (bottom GLScore o vencimiento próximo):
+ESTUDIANTES EN RIESGO:
 ${JSON.stringify(ctx.at_risk_students || [], null, 2)}
 
-NOTAS DE CLASES GRABADAS DEL COACH (free-form, opcional):
-${ctx.classes_notes || '(el coach no agregó notas de clases)'}
+NOTAS DE CLASES GRABADAS DEL COACH (esto es ORO si lo pasó):
+${ctx.classes_notes || '(el coach no agregó notas de clases — pedí en recomendaciones que las pase la próxima)'}
 
-Tu trabajo: escribir un informe ejecutivo para la reunión de management. Tono profesional pero claro (no corporate aburrido). Markdown limpio.
+EL INFORME DEBE SER PROFUNDO. Estructura obligatoria (cada sección con análisis real, no genérico):
 
-DEBE incluir:
-1. **Resumen ejecutivo** (3-4 oraciones) — el estado general
-2. **Highlights del período** — qué movió la aguja (positivo y negativo)
-3. **Análisis de cartera** — qué pasa con los pagos, quién vence pronto, cuánto MRR se va si no renuevan
-4. **Análisis pedagógico** — quién está progresando bien, quién atascado, en qué etapa hay más cuello de botella
-5. **Análisis de las clases** (si el coach pasó notas) — qué temas funcionaron, qué dudas surgieron, qué hay que reforzar
-6. **Acciones recomendadas** — 3-5 acciones concretas para la próxima semana/quincena/mes
+### 1. RESUMEN EJECUTIVO (4-6 oraciones)
+- Estado general del programa con UNA conclusión clara
+- ¿Vamos bien o mal? Por qué
+- 1 número clave que importa esta semana
 
-Devolvé SOLO JSON válido:
+### 2. HIGHLIGHTS DEL PERÍODO
+- 3-5 cosas que movieron la aguja
+- Mix de wins (graduación, milestone alcanzado, top performer) y risks (estudiante saliendo, etapa atascada)
+- Cada uno con nombre y dato concreto
+
+### 3. ANÁLISIS DE CARTERA Y CASH (sección crítica)
+- Cuántos vencen en próximos 30 días → estimación de MRR en juego
+- Patrón de churn detectado (si lo hay): ¿quién se está yendo y por qué?
+- Renovaciones esperadas vs históricas (si hay data histórica)
+- ALERTA si past_due > 5% del total
+- 💰 RECOMENDACIÓN ESPECÍFICA para comercial: lista de quiénes contactar YA
+
+### 4. ANÁLISIS PEDAGÓGICO PROFUNDO
+- Distribución por etapa: ¿el funnel está sano o hay cuello de botella?
+- Cuál es la etapa con MAYOR tiempo promedio (data lenta)
+- Cuál es la etapa donde más estudiantes se atascan
+- Top performers: qué tienen en común (analiza patrones)
+- At-risk: qué tienen en común (común denominador)
+- Brecha entre top y bottom: ¿el programa está creando 2 velocidades?
+
+### 5. ANÁLISIS DE CLASES (si hay notas del coach)
+- Temas que funcionaron (engagement alto, dudas constructivas)
+- Temas confusos (dudas repetidas, baja participación)
+- Temas que faltan según el patrón de preguntas
+- Recomendación de contenido para próximas clases
+Si NO hay notas: pedir al coach que las pase con un template específico
+
+### 6. DEEP INSIGHTS (lo que un COO experto vería que no es obvio)
+3 insights no obvios cruzando datos:
+- Correlaciones (ej. "todos los at_risk están en la etapa X — el problema es ahí, no en ellos")
+- Patrones temporales (ej. "el 80% del churn pasa en mes 3 — algo cambia ahí")
+- Oportunidades ocultas (ej. "los graduados del Q anterior podrían ser ambassadors")
+
+### 7. ACCIONES RECOMENDADAS (jerárquicas)
+Lista de 5-8 acciones con:
+- Acción específica (no "mejorar X" sino "hacer Y específico")
+- Dueño: Coach / Comercial / Operaciones / Marketing
+- Prioridad: high / medium / low
+- Due in days: realista
+- Métrica de éxito: cómo saber si funcionó
+
+Tono: profesional, directo, sin corporate-speak. Hablás castellano neutro/rioplatense. NO inventes números — todo viene de la data que te di.
+
+Devolvé SOLO JSON válido (sin markdown wrapper, sin comentarios):
 {
-  "title": "Informe ${ctx.period_type} ${ctx.period_start} → ${ctx.period_end} · ${ctx.mentorship}",
-  "summary_md": "## Resumen ejecutivo\\n...\\n\\n## Highlights del período\\n...\\n\\n## Cartera\\n...\\n\\n## Análisis pedagógico\\n...\\n\\n## Análisis de clases\\n...\\n\\n## Acciones recomendadas\\n...",
-  "kpis": { "total_active": número, "at_risk": número, "avg_glscore": número, "expiring_soon": número, "completion_rate": número },
-  "insights": ["insight 1 concreto", "insight 2", "insight 3"],
+  "title": "Informe ${ctx.period_type === 'weekly' ? 'Semanal' : ctx.period_type === 'biweekly' ? 'Quincenal' : 'Mensual'} · ${ctx.period_start} → ${ctx.period_end} · ${ctx.mentorship}",
+  "summary_md": "## Resumen Ejecutivo\\n\\n[4-6 oraciones, una conclusión clara]\\n\\n## Highlights del Período\\n\\n[3-5 highlights con nombre y dato]\\n\\n## 💰 Análisis de Cartera y Cash\\n\\n[Profundidad, cifras, MRR en riesgo]\\n\\n## 📚 Análisis Pedagógico Profundo\\n\\n[Cuello de botella, patrones top vs bottom]\\n\\n## 🎙 Análisis de Clases\\n\\n[Si hay notas, análisis. Si no, qué pedir al coach]\\n\\n## 🔍 Deep Insights (no obvios)\\n\\n1. [insight 1]\\n2. [insight 2]\\n3. [insight 3]\\n\\n## 🎯 Acciones Recomendadas\\n\\n[Lista numerada con dueño y deadline]",
+  "kpis": {
+    "active_students": number,
+    "at_risk": number,
+    "avg_glscore": number,
+    "expiring_30d": number,
+    "mrr_at_risk_estimated": "monto en USD si tenés precio del programa, sino null",
+    "completion_velocity": "ranking de velocidad de avance"
+  },
+  "insights": [
+    "insight 1 con número específico",
+    "insight 2 con correlación detectada",
+    "insight 3 con patrón temporal o cross-cohort"
+  ],
   "recommendations": [
-    { "action": "Qué hacer", "owner": "Coach/Comercial/Operaciones", "priority": "high/medium/low", "due_in_days": número }
+    { "action": "Llamada inmediata con [nombre estudiante] que vence en X días", "owner": "Comercial", "priority": "high", "due_in_days": 3, "success_metric": "estudiante renovado o cerrado oficialmente" },
+    { "action": "Sesión grupal sobre [tema] que el 60% de estudiantes pregunta", "owner": "Coach", "priority": "medium", "due_in_days": 14, "success_metric": "60% de los at_risk avanzan de etapa en 30d" }
   ],
   "highlights": [
-    { "type": "win/risk/milestone", "student_name": "nombre o 'general'", "detail": "qué pasó" }
+    { "type": "win", "student_name": "[nombre]", "detail": "alcanzó [milestone] esta semana, primer estudiante en [N] meses" },
+    { "type": "risk", "student_name": "[nombre]", "detail": "lleva 45d en etapa con target de 14d, ya consumió 60% del programa" },
+    { "type": "milestone", "student_name": "general", "detail": "MRR de cohort llegó a $X, +Y% vs período anterior" }
   ]
 }`,
 
@@ -534,8 +594,9 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-5-20250929",
-        max_tokens: 8000,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 }],
+        max_tokens: system === 'edu-report' ? 16000 : 8000,
+        // edu-report no necesita web search (es análisis interno), las demás sí
+        tools: system === 'edu-report' ? undefined : [{ type: "web_search_20250305", name: "web_search", max_uses: 10 }],
         messages: [{ role: "user", content: prompt }]
       })
     });
