@@ -917,41 +917,10 @@ function openInternalSystem(sys) {
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
-  // Educación: envolver en try/catch para que errores se vean en pantalla
-  const eduMap = {
-    'education-student': window.openEducationStudent,
-    'education-library': window.openEducationLibrary,
-    'education-qa': window.openEducationQA,
-    'education-mentor': window.openEducationMentor,
-    'education-curriculum': window.openEducationCurriculum,
-    'education-students-mgr': window.openEducationStudentsMgr,
-    'education-reports': window.openEducationReports,
-    'education-materials': window.openEducationMaterials,
-  };
-  if (eduMap[sys.type]) {
-    return (async () => {
-      try {
-        await eduMap[sys.type](sys);
-      } catch (err) {
-        console.error('[Educación] Vista falló:', err);
-        const root = document.getElementById('content');
-        if (root) {
-          root.innerHTML = `
-            <div class="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-xl p-6 mt-8">
-              <h2 class="text-lg font-bold text-red-900 mb-2">⚠️ Error al abrir el sistema</h2>
-              <pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${String(err?.message || err?.details || JSON.stringify(err) || err)}</pre>
-              <p class="text-xs text-slate-600 mt-3">Tipo: <code>${sys.type}</code></p>
-              <p class="text-xs text-slate-600">Si el error menciona una tabla <code>edu_*</code> o función <code>is_mentor_or_admin</code>, esa parte del SQL no se aplicó. Mándame el texto.</p>
-            </div>
-          `;
-        }
-      }
-    })();
-  }
-  // Legacy types (education.js viejo) → redirigen al gestor o portal estudiante
-  if (sys.type === 'edu-manager' || sys.type === 'mentorship-mgr') return openEducationStudentsMgr(sys);
-  if (sys.type === 'edu-presentations') return openEducationMaterials(sys);
-  if (sys.type === 'edu-reports') return openEducationReports(sys);
+  // Educación — 3 sistemas (Mentorías Manager, Presentaciones IA, Informes)
+  if (sys.type === 'edu-manager' || sys.type === 'mentorship-mgr') return openEduManager(sys);
+  if (sys.type === 'edu-presentations') return openEduPresentationsSystem(sys);
+  if (sys.type === 'edu-reports') return openEduReportsSystem(sys);
 }
 
 // ============================================================
