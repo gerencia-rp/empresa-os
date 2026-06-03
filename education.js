@@ -757,4 +757,397 @@
     `;
   };
 
+  // =========================================================================
+  // VISTA 6 · GESTOR DE ESTUDIANTES (CRUD admin)
+  // =========================================================================
+  window.openEducationStudentsMgr = async function () {
+    const root = document.getElementById('content');
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido.</div>`; return; }
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando gestor…</div>`;
+
+    const [{ data: students }, { data: cohorts }, { data: enrollments }] = await Promise.all([
+      supabase.from('edu_students').select('*').order('joined_at', { ascending: false }),
+      supabase.from('edu_cohorts').select('*').order('starts_on', { ascending: false }),
+      supabase.from('edu_enrollments').select('*, edu_students(full_name), edu_cohorts(code,name)'),
+    ]);
+
+    const enrollmentsByStudent = {};
+    (enrollments || []).forEach(e => {
+      enrollmentsByStudent[e.student_id] = e;
+    });
+
+    root.innerHTML = `
+      <div class="max-w-6xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-3xl font-bold">🧑‍🎓 Gestor de Estudiantes</h1>
+          <div class="flex gap-2">
+            <button onclick="addStudentModal()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">+ Estudiante</button>
+            <button onclick="addCohortModal()" class="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">+ Cohorte</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Estudiantes registrados</div>
+            <div class="text-3xl font-bold">${students?.length || 0}</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Cohortes</div>
+            <div class="text-3xl font-bold">${cohorts?.length || 0}</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Activos en cohorte</div>
+            <div class="text-3xl font-bold">${(enrollments || []).filter(e => e.status === 'active').length}</div>
+          </div>
+        </div>
+
+        <h2 class="text-lg font-semibold mb-2">Cohortes</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+          ${(cohorts || []).map(c => {
+            const cnt = (enrollments || []).filter(e => e.cohort_id === c.id).length;
+            return `
+              <div class="bg-white border border-slate-200 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-mono text-slate-400">${escapeHtml(c.code)}</span>
+                  <span class="text-xs bg-${c.status === 'active' ? 'green' : 'slate'}-100 text-${c.status === 'active' ? 'green' : 'slate'}-700 px-2 py-0.5 rounded">${c.status}</span>
+                </div>
+                <div class="font-semibold">${escapeHtml(c.name)}</div>
+                <div class="text-xs text-slate-500 mt-1">Inicio: ${c.starts_on || '—'} · ${cnt}/${c.capacity || 20} alumnos</div>
+              </div>
+            `;
+          }).join('') || '<div class="text-sm text-slate-400 col-span-3">Aún no hay cohortes. Crea la primera.</div>'}
+        </div>
+
+        <h2 class="text-lg font-semibold mb-2">Estudiantes</h2>
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="text-left p-3">Nombre</th>
+                <th class="text-left p-3">Estado inv.</th>
+                <th class="text-left p-3">Capital</th>
+                <th class="text-left p-3">Cohorte</th>
+                <th class="text-left p-3">Status</th>
+                <th class="text-left p-3">Unido</th>
+                <th class="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(students || []).map(s => {
+                const enr = enrollmentsByStudent[s.id];
+                return `
+                  <tr class="border-t border-slate-100 hover:bg-slate-50">
+                    <td class="p-3 font-medium">${escapeHtml(s.full_name)}</td>
+                    <td class="p-3 text-xs">${escapeHtml(s.state_invest || '—')}</td>
+                    <td class="p-3 text-xs">$${(s.capital_available || 0).toLocaleString()}</td>
+                    <td class="p-3 text-xs">${enr?.edu_cohorts?.code || '<span class="text-amber-700">sin cohorte</span>'}</td>
+                    <td class="p-3 text-xs"><span class="bg-${s.status === 'active' ? 'green' : 'slate'}-100 text-${s.status === 'active' ? 'green' : 'slate'}-700 px-2 py-0.5 rounded">${s.status}</span></td>
+                    <td class="p-3 text-xs text-slate-500">${fmtDate(s.joined_at)}</td>
+                    <td class="p-3 text-right">
+                      <button onclick="openStudentDetail(${s.id})" class="text-xs text-blue-600 hover:underline">Ver</button>
+                      <button onclick="editStudentModal(${s.id})" class="text-xs text-slate-600 hover:underline ml-2">Editar</button>
+                    </td>
+                  </tr>
+                `;
+              }).join('') || '<tr><td colspan="7" class="p-6 text-center text-slate-400">No hay estudiantes aún.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  };
+
+  window.editStudentModal = async function (studentId) {
+    const { data: s } = await supabase.from('edu_students').select('*').eq('id', studentId).single();
+    openModal('Editar estudiante', `
+      <div class="space-y-3">
+        <input id="es-name" placeholder="Nombre completo" value="${escapeHtml(s.full_name || '')}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="es-phone" placeholder="Teléfono" value="${escapeHtml(s.phone || '')}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <input id="es-wa" placeholder="WhatsApp (+57...)" value="${escapeHtml(s.whatsapp || '')}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="es-city" placeholder="Ciudad inversión" value="${escapeHtml(s.city_invest || '')}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+          <input id="es-state" placeholder="Estado (FL...)" value="${escapeHtml(s.state_invest || '')}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        </div>
+        <input id="es-capital" type="number" placeholder="Capital disponible USD" value="${s.capital_available || 0}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <textarea id="es-why" rows="2" placeholder="Big Why" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">${escapeHtml(s.big_why || '')}</textarea>
+        <select id="es-status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="lead" ${s.status === 'lead' ? 'selected' : ''}>Lead</option>
+          <option value="active" ${s.status === 'active' ? 'selected' : ''}>Active</option>
+          <option value="paused" ${s.status === 'paused' ? 'selected' : ''}>Paused</option>
+          <option value="graduated" ${s.status === 'graduated' ? 'selected' : ''}>Graduated</option>
+          <option value="dropped" ${s.status === 'dropped' ? 'selected' : ''}>Dropped</option>
+        </select>
+        <button onclick="saveStudent(${studentId})" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">Guardar</button>
+      </div>
+    `);
+  };
+
+  window.saveStudent = async function (studentId) {
+    const payload = {
+      full_name: document.getElementById('es-name').value.trim(),
+      phone: document.getElementById('es-phone').value.trim() || null,
+      whatsapp: document.getElementById('es-wa').value.trim() || null,
+      city_invest: document.getElementById('es-city').value.trim() || null,
+      state_invest: document.getElementById('es-state').value.trim() || null,
+      capital_available: parseFloat(document.getElementById('es-capital').value || '0'),
+      big_why: document.getElementById('es-why').value.trim() || null,
+      status: document.getElementById('es-status').value,
+    };
+    const { error } = await supabase.from('edu_students').update(payload).eq('id', studentId);
+    if (error) return alert(error.message);
+    toast('Guardado ✓');
+    closeModal();
+    window.openEducationStudentsMgr();
+  };
+
+  // =========================================================================
+  // VISTA 7 · REPORTES & KPIs
+  // =========================================================================
+  window.openEducationReports = async function () {
+    const root = document.getElementById('content');
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido.</div>`; return; }
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Calculando reportes…</div>`;
+    await loadCurriculum();
+
+    const [{ data: scorecard }, { data: progressAll }, { data: enrollments }] = await Promise.all([
+      supabase.from('edu_scorecard').select('*').order('pct_complete', { ascending: false }),
+      supabase.from('edu_student_progress').select('task_id, status, enrollment_id'),
+      supabase.from('edu_enrollments').select('id, current_stage, status'),
+    ]);
+
+    // Embudo por etapa: % de estudiantes que han tocado tareas de cada etapa
+    const totalStudents = (enrollments || []).filter(e => e.status === 'active').length || 1;
+    const stageDistribution = {};
+    CURRICULUM.stages.forEach(s => stageDistribution[s.code] = 0);
+    (enrollments || []).forEach(e => {
+      if (e.status === 'active' && e.current_stage) {
+        stageDistribution[e.current_stage] = (stageDistribution[e.current_stage] || 0) + 1;
+      }
+    });
+
+    // Top 3 tareas más completadas
+    const taskCounts = {};
+    (progressAll || []).forEach(p => {
+      if (['approved', 'submitted'].includes(p.status)) {
+        taskCounts[p.task_id] = (taskCounts[p.task_id] || 0) + 1;
+      }
+    });
+    const topTasks = Object.entries(taskCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([tid, count]) => {
+        const t = CURRICULUM.tasks.find(x => x.id === parseInt(tid));
+        return { code: t?.code, title: t?.title, count };
+      });
+
+    // Tareas más bloqueadas
+    const blocked = {};
+    (progressAll || []).forEach(p => {
+      if (p.status === 'blocked') blocked[p.task_id] = (blocked[p.task_id] || 0) + 1;
+    });
+    const topBlocked = Object.entries(blocked).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([tid, count]) => {
+        const t = CURRICULUM.tasks.find(x => x.id === parseInt(tid));
+        return { code: t?.code, title: t?.title, count };
+      });
+
+    const avg = (scorecard?.length ? Math.round(scorecard.reduce((a, s) => a + (s.pct_complete || 0), 0) / scorecard.length) : 0);
+
+    root.innerHTML = `
+      <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold mb-2">📊 Reportes & KPIs</h1>
+        <p class="text-sm text-slate-500 mb-6">Métricas agregadas del programa · Actualizado: ${new Date().toLocaleString()}</p>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Estudiantes activos</div>
+            <div class="text-3xl font-bold">${totalStudents}</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Avance promedio</div>
+            <div class="text-3xl font-bold">${avg}%</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Tareas total programa</div>
+            <div class="text-3xl font-bold">${CURRICULUM.tasks.length}</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="text-xs text-slate-500">Aprobadas (todas)</div>
+            <div class="text-3xl font-bold">${(progressAll || []).filter(p => p.status === 'approved').length}</div>
+          </div>
+        </div>
+
+        <!-- Embudo por etapa -->
+        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+          <h2 class="font-semibold mb-3">🌊 Embudo: dónde están los estudiantes</h2>
+          ${CURRICULUM.stages.map(s => {
+            const cnt = stageDistribution[s.code] || 0;
+            const pct = Math.round(100 * cnt / totalStudents);
+            return `
+              <div class="mb-2">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="font-mono text-xs text-slate-400">${s.code}</span>
+                  <span>${s.emoji} ${escapeHtml(s.title)}</span>
+                  <span class="text-xs font-semibold">${cnt} (${pct}%)</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-3 mt-1">
+                  <div class="bg-amber-500 h-3 rounded-full" style="width:${pct}%"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <h2 class="font-semibold mb-3">🏆 Top estudiantes</h2>
+            ${(scorecard || []).slice(0, 10).map((s, i) => `
+              <div class="flex items-center gap-2 text-sm py-1 border-b border-slate-100 last:border-0">
+                <span class="text-slate-400 font-mono w-6">${i + 1}.</span>
+                <span class="flex-1 truncate">${escapeHtml(s.full_name)}</span>
+                <span class="text-xs font-semibold">${s.pct_complete || 0}%</span>
+              </div>
+            `).join('') || '<div class="text-sm text-slate-400">Sin datos aún.</div>'}
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-5">
+            <h2 class="font-semibold mb-3">⚠️ Tareas más bloqueadas</h2>
+            ${topBlocked.length ? topBlocked.map(t => `
+              <div class="flex items-center gap-2 text-sm py-1 border-b border-slate-100 last:border-0">
+                <span class="font-mono text-xs text-slate-400">${t.code}</span>
+                <span class="flex-1 truncate">${escapeHtml(t.title || '')}</span>
+                <span class="text-xs font-semibold text-red-600">${t.count}</span>
+              </div>
+            `).join('') : '<div class="text-sm text-slate-400">✨ Nadie atascado</div>'}
+          </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <h2 class="font-semibold mb-3">✅ Tareas más completadas</h2>
+          ${topTasks.length ? topTasks.map(t => `
+            <div class="flex items-center gap-2 text-sm py-1 border-b border-slate-100 last:border-0">
+              <span class="font-mono text-xs text-slate-400">${t.code}</span>
+              <span class="flex-1 truncate">${escapeHtml(t.title || '')}</span>
+              <span class="text-xs font-semibold text-green-700">${t.count} alumnos</span>
+            </div>
+          `).join('') : '<div class="text-sm text-slate-400">Sin completions todavía.</div>'}
+        </div>
+      </div>
+    `;
+  };
+
+  // =========================================================================
+  // VISTA 8 · MATERIAL & PRESENTACIONES
+  // =========================================================================
+  window.openEducationMaterials = async function () {
+    const root = document.getElementById('content');
+    root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando material…</div>`;
+    await loadCurriculum();
+
+    const { data: materials } = await supabase.from('edu_materials').select('*').order('uploaded_at', { ascending: false });
+
+    const byStage = {};
+    (materials || []).forEach(m => {
+      const key = m.stage_code || 'transversal';
+      (byStage[key] = byStage[key] || []).push(m);
+    });
+
+    root.innerHTML = `
+      <div class="max-w-6xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-3xl font-bold">🎤 Material & Presentaciones</h1>
+            <p class="text-sm text-slate-500 mt-1">${materials?.length || 0} recursos · PDFs, decks, videos del programa</p>
+          </div>
+          ${isMentor() ? `<button onclick="addMaterialModal()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">+ Subir material</button>` : ''}
+        </div>
+
+        ${CURRICULUM.stages.map(s => {
+          const items = byStage[s.code] || [];
+          if (!items.length) return '';
+          return `
+            <div class="mb-6">
+              <h2 class="text-lg font-semibold mb-2">${s.emoji} <span class="font-mono text-sm text-slate-400">${s.code}</span> ${escapeHtml(s.title)}</h2>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                ${items.map(m => `
+                  <div class="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition">
+                    <div class="text-xs text-slate-400 mb-1">${m.kind.toUpperCase()}</div>
+                    <div class="font-semibold text-slate-900">${escapeHtml(m.title)}</div>
+                    <div class="text-xs text-slate-600 mt-1">${escapeHtml(m.description || '')}</div>
+                    ${m.file_url ? `<a href="${m.file_url}" target="_blank" class="inline-block mt-3 text-xs text-blue-600 hover:underline">Abrir →</a>` : '<div class="text-xs text-slate-400 mt-3">Sin archivo subido</div>'}
+                    ${isMentor() ? `<button onclick="deleteMaterial(${m.id})" class="text-xs text-red-500 hover:underline ml-2">Borrar</button>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+
+        ${(byStage['transversal'] || []).length ? `
+          <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">📂 Transversal</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              ${byStage['transversal'].map(m => `
+                <div class="bg-white border border-slate-200 rounded-xl p-4">
+                  <div class="text-xs text-slate-400 mb-1">${m.kind.toUpperCase()}</div>
+                  <div class="font-semibold">${escapeHtml(m.title)}</div>
+                  <div class="text-xs text-slate-600 mt-1">${escapeHtml(m.description || '')}</div>
+                  ${m.file_url ? `<a href="${m.file_url}" target="_blank" class="inline-block mt-3 text-xs text-blue-600 hover:underline">Abrir →</a>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${!materials?.length ? '<div class="text-center text-slate-400 py-12">Aún no hay materiales subidos.</div>' : ''}
+      </div>
+    `;
+  };
+
+  window.addMaterialModal = function () {
+    openModal('Subir material', `
+      <div class="space-y-3">
+        <input id="mat-title" placeholder="Título" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <select id="mat-kind" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="pdf">📄 PDF</option>
+          <option value="deck">🎤 Presentación</option>
+          <option value="video">🎥 Video</option>
+          <option value="doc">📝 Documento</option>
+          <option value="other">Otro</option>
+        </select>
+        <select id="mat-stage" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">— Transversal —</option>
+          ${CURRICULUM.stages.map(s => `<option value="${s.code}">${s.emoji} ${s.code} — ${escapeHtml(s.title)}</option>`).join('')}
+        </select>
+        <textarea id="mat-desc" rows="2" placeholder="Descripción" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+        <input id="mat-url" type="url" placeholder="URL del archivo (Drive, Dropbox, YouTube...)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+        <button onclick="saveMaterial()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700">Guardar</button>
+      </div>
+    `);
+  };
+
+  window.saveMaterial = async function () {
+    const payload = {
+      title: document.getElementById('mat-title').value.trim(),
+      kind: document.getElementById('mat-kind').value,
+      stage_code: document.getElementById('mat-stage').value || null,
+      description: document.getElementById('mat-desc').value.trim() || null,
+      file_url: document.getElementById('mat-url').value.trim() || null,
+      uploaded_by: user().id,
+    };
+    if (!payload.title) return alert('Título requerido');
+    const { error } = await supabase.from('edu_materials').insert(payload);
+    if (error) return alert(error.message);
+    toast('Material guardado ✓');
+    closeModal();
+    window.openEducationMaterials();
+  };
+
+  window.deleteMaterial = async function (id) {
+    if (!confirm('¿Borrar este material?')) return;
+    const { error } = await supabase.from('edu_materials').delete().eq('id', id);
+    if (error) return alert(error.message);
+    toast('Borrado ✓');
+    window.openEducationMaterials();
+  };
+
 })();

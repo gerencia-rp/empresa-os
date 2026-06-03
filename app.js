@@ -922,9 +922,13 @@ function openInternalSystem(sys) {
   if (sys.type === 'education-qa')         return openEducationQA(sys);
   if (sys.type === 'education-mentor')     return openEducationMentor(sys);
   if (sys.type === 'education-curriculum') return openEducationCurriculum(sys);
-  if (sys.type === 'edu-manager') return openEduManager(sys);
-  if (sys.type === 'edu-presentations') return openEduPresentationsSystem(sys);
-  if (sys.type === 'edu-reports') return openEduReportsSystem(sys);
+  if (sys.type === 'education-students-mgr') return openEducationStudentsMgr(sys);
+  if (sys.type === 'education-reports')      return openEducationReports(sys);
+  if (sys.type === 'education-materials')    return openEducationMaterials(sys);
+  // Legacy types (education.js viejo) → redirigen al gestor o portal estudiante
+  if (sys.type === 'edu-manager' || sys.type === 'mentorship-mgr') return openEducationStudentsMgr(sys);
+  if (sys.type === 'edu-presentations') return openEducationMaterials(sys);
+  if (sys.type === 'edu-reports') return openEducationReports(sys);
 }
 
 // ============================================================
