@@ -21,13 +21,14 @@ const eduState = {
 };
 
 const EDU_TABS = [
+  { key: 'dashboard',    label: '📊 Dashboard' },
   { key: 'students',     label: '👥 Estudiantes' },
   { key: 'student_plan', label: '🎯 Plan Acción' },
+  { key: 'alerts',       label: '🚨 Alertas' },
   { key: 'plan',         label: '🤖 Plan IA' },
-  { key: 'progress',     label: '📊 Progreso' },
+  { key: 'progress',     label: '📈 Progreso' },
   { key: 'resources',    label: '📑 Recursos' },
   { key: 'calls',        label: '📅 Calendario' },
-  { key: 'alerts',       label: '🔔 Alertas' },
   { key: 'config',       label: '⚙️ Config' }
 ];
 // NOTA: Presentaciones e Informes son sistemas INDEPENDIENTES ahora
@@ -37,7 +38,7 @@ async function openEduManager(sys) {
   eduState.sys = sys;
   // CRÍTICO: reset del tab a uno válido del Manager (no quedar en marker de otro sistema)
   if (!EDU_TABS.find(t => t.key === eduState.tab)) {
-    eduState.tab = 'students';
+    eduState.tab = 'dashboard';
   }
   openModal(`🎓 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
@@ -164,7 +165,8 @@ function eduRender() {
 
       <!-- BODY -->
       <div class="flex-1 overflow-y-auto">
-        ${eduState.tab === 'students' ? eduRenderStudents() :
+        ${eduState.tab === 'dashboard' ? eduRenderDashboard() :
+          eduState.tab === 'students' ? eduRenderStudents() :
           eduState.tab === 'student_plan' ? eduRenderStudentPlan() :
           eduState.tab === 'plan' ? eduRenderPlan() :
           eduState.tab === 'progress' ? eduRenderProgress() :
@@ -628,6 +630,11 @@ function eduRenderCalls() {
 
 // ─── TAB: ALERTAS ───
 function eduRenderAlerts() {
+  // Usar versión avanzada (calculadas en runtime, no de DB)
+  return eduRenderAlertsAvanzado();
+}
+
+function eduRenderAlertsLegacy() {
   const alerts = eduMyAlerts();
   const myStudents = eduMyStudents();
   const studentName = (id) => myStudents.find(s => s.id === id)?.full_name || '—';
@@ -5049,6 +5056,441 @@ function eduRenderStudentPlan() {
       }).join('')}
 
       ${blocksList.length === 0 ? `<div class="text-center py-8 text-slate-500 text-sm">Plan vacío. Click "Regenerar" para crear bloques.</div>` : ''}
+    </div>
+  `;
+}
+
+// ============================================================
+// 📊 DASHBOARD EJECUTIVO + SISTEMA DE ALERTAS INTELIGENTES
+// Análisis avanzado para detectar cuellos de botella y estancamientos
+// Optimización: cerrar deals lo antes posible siguiendo metodología
+// ============================================================
+
+// Calcular alertas avanzadas por estudiante
+// Cada alerta tiene: severity (critical/high/medium/low), tipo, mensaje, accion_sugerida
+function eduCalcularAlertasEstudiante(s) {
+  const alertas = [];
+  const now = new Date();
+  const ms_per_day = 86400000;
+
+  // 1) Mentoría por vencer ≤ 30 días
+  if (s.expires_at) {
+    const exp = new Date(s.expires_at);
+    const daysToExp = Math.floor((exp - now) / ms_per_day);
+    if (daysToExp < 0) {
+      alertas.push({
+        severity: 'critical', tipo: 'mentoria_vencida',
+        mensaje: `Mentoría VENCIDA hace ${Math.abs(daysToExp)} días`,
+        accion: 'Contactar para renovación urgente. NO asignar nuevo plan hasta renovar.'
+      });
+    } else if (daysToExp <= 14) {
+      alertas.push({
+        severity: 'critical', tipo: 'mentoria_por_vencer',
+        mensaje: `Mentoría vence en ${daysToExp} días`,
+        accion: 'Pasar a comercial AHORA. Preparar pitch de renovación.'
+      });
+    } else if (daysToExp <= 30) {
+      alertas.push({
+        severity: 'high', tipo: 'mentoria_por_vencer',
+        mensaje: `Mentoría vence en ${daysToExp} días`,
+        accion: 'Agendar llamada de renovación esta semana.'
+      });
+    }
+  }
+
+  // 2) Pago atrasado / vencido
+  if (s.payment_status === 'expired' || s.payment_status === 'cancelled') {
+    alertas.push({
+      severity: 'critical', tipo: 'pago_vencido',
+      mensaje: `Pago ${s.payment_status === 'expired' ? 'VENCIDO' : 'CANCELADO'}`,
+      accion: 'Suspender acceso hasta regularizar. NO asignar nuevo plan de acción.'
+    });
+  } else if (s.payment_status === 'past_due') {
+    alertas.push({
+      severity: 'high', tipo: 'pago_atrasado',
+      mensaje: 'Pago atrasado',
+      accion: 'Contactar para gestionar pago antes de avanzar con el plan.'
+    });
+  }
+
+  // 3) Estancado en etapa (sin avance > 60 días)
+  if (s.stage_started_at) {
+    const stageStart = new Date(s.stage_started_at);
+    const daysInStage = Math.floor((now - stageStart) / ms_per_day);
+    if (daysInStage > 90) {
+      alertas.push({
+        severity: 'critical', tipo: 'estancado_etapa',
+        mensaje: `${daysInStage} días en etapa "${s.current_stage}"`,
+        accion: 'Sesión 1-on-1 urgente. Revisar si necesita cambiar de estrategia.'
+      });
+    } else if (daysInStage > 60) {
+      alertas.push({
+        severity: 'high', tipo: 'estancado_etapa',
+        mensaje: `${daysInStage} días en etapa "${s.current_stage}" (excede 60)`,
+        accion: 'Asignar plan de acción específico para destrabar.'
+      });
+    }
+  }
+
+  // 4) Sin actividad reciente (último seguimiento > 30 días)
+  if (s.ultima_fecha_seguimiento) {
+    const lastFollow = new Date(s.ultima_fecha_seguimiento);
+    const daysSince = Math.floor((now - lastFollow) / ms_per_day);
+    if (daysSince > 45) {
+      alertas.push({
+        severity: 'high', tipo: 'sin_seguimiento',
+        mensaje: `Sin contacto hace ${daysSince} días`,
+        accion: 'Llamada urgente. Riesgo de abandono.'
+      });
+    } else if (daysSince > 30) {
+      alertas.push({
+        severity: 'medium', tipo: 'sin_seguimiento',
+        mensaje: `Sin contacto hace ${daysSince} días`,
+        accion: 'Programar seguimiento esta semana.'
+      });
+    }
+  } else if (s.enrolled_at) {
+    // Sin seguimiento desde inicio (>30 días enrolled)
+    const enrolledDays = Math.floor((now - new Date(s.enrolled_at)) / ms_per_day);
+    if (enrolledDays > 30) {
+      alertas.push({
+        severity: 'high', tipo: 'sin_seguimiento_inicial',
+        mensaje: 'Nunca recibió seguimiento desde el ingreso',
+        accion: 'Llamada de onboarding obligatoria HOY.'
+      });
+    }
+  }
+
+  // 5) Status at_risk o dropped
+  if (s.status === 'at_risk') {
+    alertas.push({
+      severity: 'high', tipo: 'status_at_risk',
+      mensaje: 'Marcado at_risk',
+      accion: 'Plan de retención urgente. Sesión emocional + técnica.'
+    });
+  } else if (s.status === 'dropped') {
+    alertas.push({
+      severity: 'medium', tipo: 'status_dropped',
+      mensaje: 'Marcado como abandonado',
+      accion: 'Decisión: re-engagement o cerrar el caso.'
+    });
+  }
+
+  return alertas;
+}
+
+// Stats agregadas del manager
+function eduCalcularStats(students) {
+  const now = new Date();
+  const ms_per_day = 86400000;
+  const stats = {
+    total: students.length,
+    activos: 0, expirados: 0, pausados: 0, graduados: 0,
+    pago_atrasado: 0, pago_vencido: 0,
+    vence_30d: 0, vence_14d: 0,
+    estancados: 0, sin_actividad_30d: 0,
+    avanzando_bien: 0,
+    sin_plan: 0
+  };
+  students.forEach(s => {
+    if (s.status === 'active') stats.activos++;
+    else if (s.status === 'dropped') stats.expirados++;
+    else if (s.status === 'paused') stats.pausados++;
+    else if (s.status === 'graduated') stats.graduados++;
+
+    if (s.payment_status === 'past_due') stats.pago_atrasado++;
+    if (s.payment_status === 'expired' || s.payment_status === 'cancelled') stats.pago_vencido++;
+
+    if (s.expires_at) {
+      const d = Math.floor((new Date(s.expires_at) - now) / ms_per_day);
+      if (d >= 0 && d <= 14) stats.vence_14d++;
+      else if (d >= 0 && d <= 30) stats.vence_30d++;
+    }
+
+    if (s.stage_started_at) {
+      const days = Math.floor((now - new Date(s.stage_started_at)) / ms_per_day);
+      if (days > 60) stats.estancados++;
+    }
+
+    if (s.ultima_fecha_seguimiento) {
+      const d = Math.floor((now - new Date(s.ultima_fecha_seguimiento)) / ms_per_day);
+      if (d > 30) stats.sin_actividad_30d++;
+    } else if (s.enrolled_at) {
+      const d = Math.floor((now - new Date(s.enrolled_at)) / ms_per_day);
+      if (d > 30) stats.sin_actividad_30d++;
+    }
+
+    // Avanzando bien: active + sin alertas críticas
+    if (s.status === 'active' && (!s.payment_status || s.payment_status === 'active')) {
+      const inStage = s.stage_started_at ? Math.floor((now - new Date(s.stage_started_at)) / ms_per_day) : 0;
+      if (inStage < 45) stats.avanzando_bien++;
+    }
+  });
+  return stats;
+}
+
+// Distribución de estudiantes por etapa actual
+function eduDistribucionEtapas(students) {
+  const dist = {};
+  students.forEach(s => {
+    const k = s.current_stage || 'Sin etapa';
+    if (!dist[k]) dist[k] = { stage: k, total: 0, estancados: 0, dias_promedio: 0, _sum_dias: 0 };
+    dist[k].total++;
+    if (s.stage_started_at) {
+      const days = Math.floor((Date.now() - new Date(s.stage_started_at)) / 86400000);
+      dist[k]._sum_dias += days;
+      if (days > 60) dist[k].estancados++;
+    }
+  });
+  return Object.values(dist).map(d => ({
+    ...d,
+    dias_promedio: d.total > 0 ? Math.round(d._sum_dias / d.total) : 0
+  })).sort((a, b) => b.total - a.total);
+}
+
+// Identificar cuellos de botella: etapas con > 30% estancados
+function eduCuellosBotella(distribucion) {
+  return distribucion
+    .filter(d => d.total >= 3 && d.estancados / d.total > 0.3)
+    .sort((a, b) => (b.estancados / b.total) - (a.estancados / a.total))
+    .slice(0, 5);
+}
+
+// Render del dashboard
+function eduRenderDashboard() {
+  const students = eduMyStudents();
+  if (students.length === 0) {
+    return `<div class="p-8 text-center"><div class="text-6xl mb-2">📭</div><p class="text-slate-500">Sin estudiantes en esta mentoría. Sincronizá con Airtable o agregá manualmente.</p></div>`;
+  }
+
+  const stats = eduCalcularStats(students);
+  const distribucion = eduDistribucionEtapas(students);
+  const cuellos = eduCuellosBotella(distribucion);
+
+  // Recolectar todas las alertas críticas y high
+  const alertasAll = [];
+  students.forEach(s => {
+    const aS = eduCalcularAlertasEstudiante(s);
+    aS.forEach(a => alertasAll.push({ ...a, student: s }));
+  });
+  const criticas = alertasAll.filter(a => a.severity === 'critical').sort((a,b) => a.student.full_name.localeCompare(b.student.full_name));
+  const altas = alertasAll.filter(a => a.severity === 'high');
+  const medias = alertasAll.filter(a => a.severity === 'medium');
+
+  // Top 10 estudiantes que necesitan atención urgente
+  const urgentes = {};
+  alertasAll.forEach(a => {
+    if (a.severity === 'critical' || a.severity === 'high') {
+      const id = a.student.id;
+      if (!urgentes[id]) urgentes[id] = { student: a.student, alertas: [], score: 0 };
+      urgentes[id].alertas.push(a);
+      urgentes[id].score += a.severity === 'critical' ? 10 : 3;
+    }
+  });
+  const topUrgentes = Object.values(urgentes).sort((a,b) => b.score - a.score).slice(0, 10);
+
+  return `
+    <div class="space-y-4">
+
+      <!-- KPIs ejecutivos -->
+      <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
+        <div class="bg-slate-900 text-white rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-slate-400">Total</div><div class="text-2xl font-bold">${stats.total}</div></div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-emerald-700">Activos</div><div class="text-2xl font-bold text-emerald-900">${stats.activos}</div></div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-blue-700">Avanzando</div><div class="text-2xl font-bold text-blue-900">${stats.avanzando_bien}</div></div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-amber-700">Estancados</div><div class="text-2xl font-bold text-amber-900">${stats.estancados}</div></div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-red-700">Vence ≤30d</div><div class="text-2xl font-bold text-red-900">${stats.vence_30d + stats.vence_14d}</div></div>
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-rose-700">Pago vencido</div><div class="text-2xl font-bold text-rose-900">${stats.pago_vencido + stats.pago_atrasado}</div></div>
+      </div>
+
+      <!-- Alertas resumen -->
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-300 rounded-xl p-4">
+          <div class="text-[10px] uppercase font-bold text-red-700 mb-1">🚨 Críticas</div>
+          <div class="text-3xl font-bold text-red-900">${criticas.length}</div>
+          <div class="text-xs text-red-700 mt-1">Acción HOY</div>
+        </div>
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
+          <div class="text-[10px] uppercase font-bold text-amber-700 mb-1">⚠️ Altas</div>
+          <div class="text-3xl font-bold text-amber-900">${altas.length}</div>
+          <div class="text-xs text-amber-700 mt-1">Esta semana</div>
+        </div>
+        <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+          <div class="text-[10px] uppercase font-bold text-blue-700 mb-1">📌 Medias</div>
+          <div class="text-3xl font-bold text-blue-900">${medias.length}</div>
+          <div class="text-xs text-blue-700 mt-1">Este mes</div>
+        </div>
+      </div>
+
+      <!-- Top urgentes -->
+      ${topUrgentes.length > 0 ? `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-900 text-white px-4 py-2 flex items-center justify-between">
+            <div class="text-xs font-bold uppercase">🎯 Top 10 que necesitan tu atención AHORA</div>
+            <button onclick="eduSetTab('alerts')" class="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Ver todas las alertas →</button>
+          </div>
+          <ul class="divide-y divide-slate-100">
+            ${topUrgentes.map((u, i) => `
+              <li class="px-4 py-2.5 hover:bg-slate-50 cursor-pointer" onclick="eduOpenStudent('${u.student.id}')">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <div class="w-6 h-6 rounded-full bg-red-100 text-red-900 font-bold text-xs flex items-center justify-center flex-shrink-0">${i+1}</div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-semibold text-sm">${u.student.full_name}</div>
+                      <div class="text-[11px] text-slate-500">${u.student.grupo || u.student.current_stage || '—'}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                    ${u.alertas.slice(0, 3).map(a => `<span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${a.severity === 'critical' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}">${a.mensaje}</span>`).join('')}
+                    ${u.alertas.length > 3 ? `<span class="text-[10px] text-slate-500">+${u.alertas.length - 3}</span>` : ''}
+                  </div>
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      ` : ''}
+
+      <!-- Distribución por etapa + cuellos de botella -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl p-4">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-3">📊 Distribución por etapa</div>
+          <div class="space-y-2">
+            ${distribucion.slice(0, 8).map(d => {
+              const pct = stats.total > 0 ? (d.total / stats.total * 100) : 0;
+              const stalled = d.estancados > 0;
+              return `
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <span class="text-slate-700 truncate">${d.stage}</span>
+                    <span class="font-bold text-slate-900 flex-shrink-0 ml-2">${d.total} · ${d.dias_promedio}d avg ${stalled ? `· <span class="text-red-700">${d.estancados} 🐢</span>` : ''}</span>
+                  </div>
+                  <div class="bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div class="${stalled && d.estancados/d.total > 0.3 ? 'bg-red-500' : 'bg-blue-500'} h-full transition-all" style="width: ${pct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-4">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-3">🚧 Cuellos de botella</div>
+          ${cuellos.length === 0 ? `
+            <div class="text-center py-6 text-emerald-600 text-sm">✅ Sin cuellos de botella detectados</div>
+          ` : `
+            <ul class="space-y-2 text-xs">
+              ${cuellos.map(c => `
+                <li class="bg-red-50 border border-red-200 rounded-lg p-2.5">
+                  <div class="font-bold text-red-900">${c.stage}</div>
+                  <div class="text-red-700 mt-0.5">${c.estancados} de ${c.total} estancados (${Math.round(c.estancados/c.total*100)}%) · avg ${c.dias_promedio}d</div>
+                  <div class="text-slate-700 mt-1.5 text-[11px]">💡 ${eduSugerenciaCuello(c.stage)}</div>
+                </li>
+              `).join('')}
+            </ul>
+          `}
+        </div>
+      </div>
+
+      <!-- Resumen análisis -->
+      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+        <div class="text-xs font-bold uppercase text-blue-700 mb-2">🤖 Análisis automático</div>
+        <ul class="space-y-1 text-sm text-slate-700">
+          ${eduGenerarInsights(stats, distribucion, cuellos, criticas.length, altas.length).map(i => `<li class="flex gap-2"><span>•</span><span>${i}</span></li>`).join('')}
+        </ul>
+      </div>
+
+    </div>
+  `;
+}
+
+// Sugerencia accionable según etapa donde hay cuello
+function eduSugerenciaCuello(etapa) {
+  const e = (etapa || '').toLowerCase();
+  if (e.includes('mentalidad') || e.includes('onboard')) return 'Sesión grupal de mindset + accountability partner asignado.';
+  if (e.includes('credit') || e.includes('crédito')) return 'Webinar de reconstrucción de crédito + plan paralelo de wholesaling.';
+  if (e.includes('analisis') || e.includes('análisis')) return 'Forzar volumen: 10 ofertas/semana durante 30 días + revisión semanal.';
+  if (e.includes('negocia')) return 'Role-play de negociación grupal + scripts de discovery del seller.';
+  if (e.includes('gestion') || e.includes('gestionando')) return 'PM asignado o sesiones extra de seguimiento de obra. Validar draw schedule.';
+  if (e.includes('empresa')) return 'Sprint de estructura corporativa: LLC, CPA, bookkeeping + SOPs.';
+  return 'Sesión 1-on-1 para identificar bloqueo específico y crear plan de 30 días.';
+}
+
+// Insights generados con reglas
+function eduGenerarInsights(stats, distribucion, cuellos, criticasN, altasN) {
+  const insights = [];
+  if (criticasN > 0) insights.push(`<strong>${criticasN} alertas críticas</strong> que requieren acción HOY. Revisá la lista del top 10.`);
+  if (stats.pago_vencido + stats.pago_atrasado > 0) insights.push(`<strong>${stats.pago_vencido + stats.pago_atrasado} estudiantes</strong> con problemas de pago. Pasar a comercial antes de continuar con planes.`);
+  if (stats.vence_30d + stats.vence_14d > 0) insights.push(`<strong>${stats.vence_30d + stats.vence_14d} mentorías</strong> vencen en próximos 30 días — preparar pitch de renovación.`);
+  if (stats.estancados > stats.total * 0.2) insights.push(`<strong>${Math.round(stats.estancados / stats.total * 100)}% de los estudiantes estancados >60d</strong>. Posible problema sistémico: revisar metodología de esa etapa.`);
+  if (cuellos.length > 0) insights.push(`Cuello principal: <strong>${cuellos[0].stage}</strong> con ${cuellos[0].estancados} estancados. ${eduSugerenciaCuello(cuellos[0].stage)}`);
+  if (stats.sin_actividad_30d > 0) insights.push(`<strong>${stats.sin_actividad_30d} estudiantes</strong> sin contacto >30 días. Riesgo alto de churn.`);
+  const ratioAvanzando = stats.total > 0 ? stats.avanzando_bien / stats.total : 0;
+  if (ratioAvanzando > 0.6) insights.push(`✅ <strong>${Math.round(ratioAvanzando*100)}% avanzando bien</strong> — métricas saludables.`);
+  else if (ratioAvanzando < 0.3) insights.push(`⚠️ Solo <strong>${Math.round(ratioAvanzando*100)}% avanzando bien</strong>. Mayoría estancada/en riesgo — revisar capacidad del equipo de mentores.`);
+  if (insights.length === 0) insights.push('Sin alertas significativas. Mantener cadencia de seguimientos semanales.');
+  return insights;
+}
+
+// Reemplazar render alerts con versión mejorada
+function eduRenderAlertsAvanzado() {
+  const students = eduMyStudents();
+  if (students.length === 0) return `<div class="p-8 text-center text-slate-500">Sin estudiantes.</div>`;
+  const all = [];
+  students.forEach(s => {
+    const aS = eduCalcularAlertasEstudiante(s);
+    aS.forEach(a => all.push({ ...a, student: s }));
+  });
+  const critical = all.filter(a => a.severity === 'critical');
+  const high = all.filter(a => a.severity === 'high');
+  const medium = all.filter(a => a.severity === 'medium');
+  const totalCount = all.length;
+
+  if (totalCount === 0) return `<div class="p-8 text-center"><div class="text-5xl mb-2">✅</div><p class="text-slate-500">Sin alertas activas. Todo bajo control.</p></div>`;
+
+  const renderGroup = (alerts, title, color, icon) => {
+    if (!alerts.length) return '';
+    return `
+      <div class="bg-white border border-${color}-200 rounded-xl overflow-hidden">
+        <div class="bg-${color}-50 px-4 py-2 border-b border-${color}-200 flex items-center justify-between">
+          <div class="text-sm font-bold text-${color}-900">${icon} ${title} (${alerts.length})</div>
+        </div>
+        <ul class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+          ${alerts.map(a => `
+            <li class="px-4 py-3 hover:bg-slate-50 cursor-pointer" onclick="eduOpenStudent('${a.student.id}')">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span class="font-semibold text-sm">${a.student.full_name}</span>
+                    <span class="text-[10px] text-slate-500">${a.student.grupo || ''}</span>
+                  </div>
+                  <div class="text-xs text-${color}-800 font-medium">${a.mensaje}</div>
+                  <div class="text-[11px] text-slate-600 mt-1">💡 ${a.accion}</div>
+                </div>
+                <button class="text-xs text-blue-600 hover:underline flex-shrink-0">ver →</button>
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `;
+  };
+
+  return `
+    <div class="space-y-3">
+      <div class="bg-slate-900 text-white rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <div class="text-xs uppercase text-slate-400 font-bold">Alertas Activas</div>
+          <div class="text-3xl font-bold">${totalCount}</div>
+        </div>
+        <div class="flex gap-2 text-xs">
+          <div class="bg-red-500/20 px-3 py-1.5 rounded"><span class="font-bold text-red-300">${critical.length}</span> críticas</div>
+          <div class="bg-amber-500/20 px-3 py-1.5 rounded"><span class="font-bold text-amber-300">${high.length}</span> altas</div>
+          <div class="bg-blue-500/20 px-3 py-1.5 rounded"><span class="font-bold text-blue-300">${medium.length}</span> medias</div>
+        </div>
+      </div>
+      ${renderGroup(critical, 'Críticas — acción HOY', 'red', '🚨')}
+      ${renderGroup(high, 'Altas — esta semana', 'amber', '⚠️')}
+      ${renderGroup(medium, 'Medias — este mes', 'blue', '📌')}
     </div>
   `;
 }
