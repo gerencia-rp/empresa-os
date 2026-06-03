@@ -917,10 +917,11 @@ function openInternalSystem(sys) {
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
-  // Educación — 3 sistemas (Mentorías Manager, Presentaciones IA, Informes)
+  // Educación — 4 sistemas (Mentorías Manager, Presentaciones IA, Informes, Metodología FlipMentoría)
   if (sys.type === 'edu-manager' || sys.type === 'mentorship-mgr') return openEduManager(sys);
   if (sys.type === 'edu-presentations') return openEduPresentationsSystem(sys);
   if (sys.type === 'edu-reports') return openEduReportsSystem(sys);
+  if (sys.type === 'edu-methodology') return openEduMethodologySystem(sys);
 }
 
 // ============================================================

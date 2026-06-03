@@ -2011,3 +2011,233 @@ async function eduDeleteReport(id) {
   await sb.from('edu_reports').delete().eq('id', id);
   await eduLoadAll(); eduRenderReportsStandalone();
 }
+
+// ============================================================
+// FLIPMENTORÍA — Biblioteca Metodológica (Sistema 4 de Educación)
+// 14 documentos: índice, E0-E5 tareas, anexos A/B/C, contactos, procesos, extras
+// ============================================================
+
+const fmState = {
+  sys: null,
+  docs: [],
+  activeEtapa: 'INDICE',
+  activeDocId: null,
+  searchQuery: '',
+  loading: false
+};
+
+const FM_ETAPAS = [
+  { id: 'INDICE',  label: '📘 Índice',         color: 'slate' },
+  { id: 'E0',      label: '🏛️ E0 · Fundación', color: 'amber' },
+  { id: 'E1',      label: '🔍 E1 · Evaluar',    color: 'blue' },
+  { id: 'E2',      label: '🏗️ E2 · Estructurar', color: 'indigo' },
+  { id: 'E3',      label: '🔨 E3 · Ejecutar',   color: 'purple' },
+  { id: 'E4',      label: '💰 E4 · Salida',     color: 'emerald' },
+  { id: 'E5',      label: '🚀 E5 · Escalar',    color: 'rose' },
+  { id: 'TODOS',   label: '📇 Stack Completo',  color: 'slate' },
+  { id: 'ANEXO_A', label: '📚 Anexo A · Caso',  color: 'teal' },
+  { id: 'ANEXO_B', label: '🧮 Anexo B · Calc',  color: 'cyan' },
+  { id: 'ANEXO_C', label: '🧠 Anexo C · Mind',  color: 'fuchsia' }
+];
+
+async function openEduMethodologySystem(sys) {
+  fmState.sys = sys;
+  fmState.loading = true;
+  fmRender();
+  const { data, error } = await sb.from('fm_documents')
+    .select('id,etapa,categoria,codigo,titulo,subtitulo,posicion,tags')
+    .order('posicion');
+  if (error) {
+    document.getElementById('content').innerHTML = `<div class="p-8 text-red-600">Error cargando biblioteca: ${error.message}<br><br>¿Corriste el SQL <code>supabase/fm-methodology-schema.sql</code> y <code>supabase/fm-methodology-seed.sql</code>?</div>`;
+    return;
+  }
+  fmState.docs = data || [];
+  fmState.loading = false;
+  // Default al primer documento de la etapa activa
+  const firstDoc = fmState.docs.find(d => d.etapa === fmState.activeEtapa);
+  if (firstDoc) fmState.activeDocId = firstDoc.id;
+  fmRender();
+}
+
+function fmDocsForEtapa(etapaId) {
+  if (etapaId === 'TODOS') return fmState.docs.filter(d => d.etapa === 'TODOS');
+  return fmState.docs.filter(d => d.etapa === etapaId);
+}
+
+function fmSetEtapa(etapaId) {
+  fmState.activeEtapa = etapaId;
+  const docs = fmDocsForEtapa(etapaId);
+  fmState.activeDocId = docs[0]?.id || null;
+  fmRender();
+}
+
+async function fmSetDoc(docId) {
+  fmState.activeDocId = docId;
+  fmRender();
+}
+
+function fmRender() {
+  const root = document.getElementById('content');
+  if (!root) return;
+  if (fmState.loading) {
+    root.innerHTML = '<div class="p-8 text-slate-500">Cargando biblioteca metodológica...</div>';
+    return;
+  }
+  if (!fmState.docs.length) {
+    root.innerHTML = `<div class="p-8 max-w-2xl"><div class="bg-amber-50 border border-amber-200 rounded-xl p-6"><h3 class="font-bold text-amber-900 mb-2">⚠️ Biblioteca vacía</h3><p class="text-sm text-amber-800">Corré primero <code class="bg-amber-100 px-2 py-1 rounded">supabase/fm-methodology-schema.sql</code> y luego <code class="bg-amber-100 px-2 py-1 rounded">supabase/fm-methodology-seed.sql</code> en Supabase SQL Editor.</p></div></div>`;
+    return;
+  }
+
+  const activeDoc = fmState.docs.find(d => d.id === fmState.activeDocId);
+
+  root.innerHTML = `
+    <div class="flex h-full">
+      <!-- Sidebar izquierda: etapas + lista docs -->
+      <aside class="w-72 bg-white border-r border-slate-200 flex flex-col">
+        <div class="p-4 border-b border-slate-200">
+          <h2 class="font-bold text-slate-900 mb-1">📘 ${fmState.sys.name}</h2>
+          <p class="text-xs text-slate-500">71 tareas · 400+ contactos · 3 anexos</p>
+          <input id="fm-search" type="text" placeholder="🔎 Buscar en biblioteca..." value="${fmState.searchQuery}"
+            class="mt-3 w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+            oninput="fmSearch(this.value)"/>
+        </div>
+        <nav class="flex-1 overflow-y-auto scrollbar-thin p-2">
+          ${FM_ETAPAS.map(e => {
+            const docs = fmDocsForEtapa(e.id);
+            const isActive = e.id === fmState.activeEtapa;
+            return `
+              <div class="mb-1">
+                <button onclick="fmSetEtapa('${e.id}')"
+                  class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition ${isActive ? 'bg-blue-50 text-blue-900' : 'text-slate-700 hover:bg-slate-100'}">
+                  ${e.label}
+                  <span class="text-xs text-slate-400 ml-1">(${docs.length})</span>
+                </button>
+                ${isActive ? `
+                  <div class="ml-3 mt-1 space-y-0.5">
+                    ${docs.map(d => `
+                      <button onclick="fmSetDoc('${d.id}')"
+                        class="w-full text-left px-3 py-1.5 text-xs rounded transition ${d.id === fmState.activeDocId ? 'bg-blue-100 text-blue-900 font-medium' : 'text-slate-600 hover:bg-slate-50'}">
+                        ${d.titulo.replace(/^[🏛️🔍🏗️🔨💰🚀📚🧮🧠📘📇🛠️⚙️📋]\s*/, '').slice(0, 50)}${d.titulo.length > 50 ? '…' : ''}
+                      </button>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </nav>
+      </aside>
+
+      <!-- Main: render del documento activo -->
+      <main class="flex-1 overflow-y-auto bg-slate-50">
+        <div class="max-w-5xl mx-auto px-8 py-6">
+          ${activeDoc ? fmRenderDoc(activeDoc) : `
+            <div class="text-center py-20 text-slate-500">
+              <div class="text-6xl mb-4">📘</div>
+              <p>Seleccioná un documento del menú izquierdo</p>
+            </div>
+          `}
+        </div>
+      </main>
+    </div>
+  `;
+
+  if (activeDoc) fmRenderMarkdown(activeDoc);
+}
+
+function fmRenderDoc(doc) {
+  return `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-6">
+      <div class="flex items-start gap-4">
+        <div class="flex-1">
+          <div class="text-xs font-bold text-blue-600 tracking-wider mb-1">${doc.etapa} · ${doc.categoria.toUpperCase()}</div>
+          <h1 class="text-2xl font-bold text-slate-900 mb-2">${doc.titulo}</h1>
+          ${doc.subtitulo ? `<p class="text-slate-600 italic">${doc.subtitulo}</p>` : ''}
+          ${(doc.tags || []).length ? `
+            <div class="mt-3 flex flex-wrap gap-1">
+              ${doc.tags.map(t => `<span class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">${t}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+        <button onclick="fmCopyDoc('${doc.id}')" class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700">📋 Copiar md</button>
+      </div>
+    </div>
+    <article id="fm-doc-content" class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 prose prose-slate max-w-none">
+      <div class="text-slate-400">Cargando contenido...</div>
+    </article>
+  `;
+}
+
+async function fmRenderMarkdown(doc) {
+  const container = document.getElementById('fm-doc-content');
+  if (!container) return;
+  // Cargar contenido_md de la DB
+  const { data, error } = await sb.from('fm_documents').select('contenido_md').eq('id', doc.id).single();
+  if (error) {
+    container.innerHTML = `<p class="text-red-600">Error: ${error.message}</p>`;
+    return;
+  }
+  if (typeof marked === 'undefined') {
+    container.innerHTML = '<pre class="text-xs whitespace-pre-wrap">' + (data.contenido_md || '').replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;') + '</pre>';
+    return;
+  }
+  marked.setOptions({ gfm: true, breaks: false });
+  const html = marked.parse(data.contenido_md || '');
+  const clean = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html, { ADD_ATTR: ['target','rel'] }) : html;
+  container.innerHTML = `<style>
+    #fm-doc-content h1{font-size:1.875rem;font-weight:700;margin:1.5rem 0 1rem;color:#0F172A;border-bottom:2px solid #E2E8F0;padding-bottom:0.5rem}
+    #fm-doc-content h2{font-size:1.5rem;font-weight:700;margin:1.5rem 0 0.75rem;color:#1E293B}
+    #fm-doc-content h3{font-size:1.25rem;font-weight:600;margin:1.25rem 0 0.5rem;color:#334155}
+    #fm-doc-content h4{font-size:1rem;font-weight:600;margin:1rem 0 0.5rem;color:#475569}
+    #fm-doc-content p{margin:0.75rem 0;line-height:1.65;color:#334155}
+    #fm-doc-content ul,#fm-doc-content ol{margin:0.75rem 0 0.75rem 1.5rem}
+    #fm-doc-content li{margin:0.35rem 0;line-height:1.55;color:#334155}
+    #fm-doc-content code{background:#F1F5F9;padding:0.15rem 0.4rem;border-radius:0.25rem;font-size:0.875rem;color:#0F172A;font-family:ui-monospace,monospace}
+    #fm-doc-content pre{background:#0F172A;color:#F1F5F9;padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0;font-size:0.875rem}
+    #fm-doc-content pre code{background:transparent;padding:0;color:#F1F5F9}
+    #fm-doc-content blockquote{border-left:4px solid #2563EB;padding:0.5rem 1rem;background:#EFF6FF;color:#1E40AF;font-style:italic;margin:1rem 0}
+    #fm-doc-content table{border-collapse:collapse;margin:1rem 0;font-size:0.875rem;width:100%}
+    #fm-doc-content th{background:#F1F5F9;border:1px solid #CBD5E1;padding:0.5rem 0.75rem;text-align:left;font-weight:600;color:#0F172A}
+    #fm-doc-content td{border:1px solid #E2E8F0;padding:0.5rem 0.75rem;color:#334155}
+    #fm-doc-content a{color:#2563EB;text-decoration:underline}
+    #fm-doc-content strong{color:#0F172A;font-weight:600}
+    #fm-doc-content hr{border:none;border-top:1px solid #E2E8F0;margin:1.5rem 0}
+  </style>${clean}`;
+  // Open external links in new tab
+  container.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
+}
+
+async function fmCopyDoc(docId) {
+  const { data } = await sb.from('fm_documents').select('titulo,contenido_md').eq('id', docId).single();
+  if (!data) return;
+  await navigator.clipboard.writeText(`# ${data.titulo}\n\n${data.contenido_md}`);
+  alert('Copiado al clipboard');
+}
+
+let fmSearchTimer = null;
+function fmSearch(query) {
+  fmState.searchQuery = query;
+  clearTimeout(fmSearchTimer);
+  fmSearchTimer = setTimeout(async () => {
+    if (!query.trim()) {
+      // Reset a vista normal
+      const { data } = await sb.from('fm_documents').select('id,etapa,categoria,codigo,titulo,subtitulo,posicion,tags').order('posicion');
+      fmState.docs = data || [];
+      fmRender();
+      return;
+    }
+    const q = query.trim();
+    const { data, error } = await sb.from('fm_documents')
+      .select('id,etapa,categoria,codigo,titulo,subtitulo,posicion,tags')
+      .or(`titulo.ilike.%${q}%,subtitulo.ilike.%${q}%,contenido_md.ilike.%${q}%`)
+      .order('posicion');
+    if (!error) {
+      fmState.docs = data || [];
+      if (data && data.length && !data.find(d => d.id === fmState.activeDocId)) {
+        fmState.activeDocId = data[0].id;
+        fmState.activeEtapa = data[0].etapa;
+      }
+      fmRender();
+    }
+  }, 400);
+}
