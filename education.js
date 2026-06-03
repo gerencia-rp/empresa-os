@@ -2033,43 +2033,116 @@ const fmState = {
   diagResult: null        // perfil identificado + plan
 };
 
-// ─── CONFIG WIZARD DE DIAGNÓSTICO ───
+// ─── CONFIG WIZARD DE DIAGNÓSTICO (18 preguntas en 6 bloques) ───
 const FM_DIAG_QUESTIONS = [
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // BLOQUE A — Resultado y objetivo
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    id: 'objetivo',
+    id: 'objetivo', bloque: 'A · Objetivo',
     pregunta: '¿Cuál es tu resultado objetivo en los próximos 12 meses?',
     opciones: [
       { val: 'flip',         label: '🏠 Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
       { val: 'hold',         label: '🏘️ Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
       { val: 'wholesale',    label: '📋 Hacer wholesaling (asignar contratos sin remodelar)' },
       { val: 'hibrido',      label: '🔀 Mix flips + holds' },
-      { val: 'escalar',      label: '🚀 Escalar un negocio que ya tengo (sistemas, equipo, múltiples deals)' },
+      { val: 'escalar',      label: '🚀 Escalar negocio existente (sistemas, equipo, múltiples deals)' },
       { val: 'lender',       label: '💰 Ser private money lender (prestar capital, no operar)' }
     ]
   },
   {
-    id: 'capital',
-    pregunta: '¿Cuánto capital propio disponible HOY para invertir?',
+    id: 'mercado_estado', bloque: 'A · Objetivo',
+    pregunta: '¿En qué estado/región vas a invertir?',
+    tipo: 'text', placeholder: 'Ej: Texas (Austin/Houston), Florida (Miami), Georgia (Atlanta)...'
+  },
+  {
+    id: 'estrategia_renta', bloque: 'A · Objetivo',
+    pregunta: 'Si vas por Fix & Hold, ¿qué modelo de renta?',
     opciones: [
-      { val: 'menos_20k',    label: '< $20K' },
-      { val: '20_50k',       label: '$20K – $50K' },
-      { val: '50_100k',      label: '$50K – $100K' },
-      { val: 'mas_100k',     label: '> $100K' }
+      { val: 'tradicional',  label: '🏠 Renta tradicional (12 meses, familia)' },
+      { val: 'coliving',     label: '🛏️ Coliving / room-by-room (PadSplit, SpareRoom)' },
+      { val: 'airbnb',       label: '🌴 Short-Term Rental (Airbnb/VRBO)' },
+      { val: 'corporate',    label: '💼 Corporate housing / Furnished Finder' },
+      { val: 'na',           label: 'No aplica — voy por Flip' }
+    ],
+    skipIf: (a) => a.objetivo === 'flip' || a.objetivo === 'wholesale' || a.objetivo === 'lender'
+  },
+  {
+    id: 'meta_deals', bloque: 'A · Objetivo',
+    pregunta: '¿Cuántos deals querés cerrar en los próximos 12 meses?',
+    opciones: [
+      { val: '1',            label: '1 deal — primero quiero validar' },
+      { val: '2_3',          label: '2-3 deals — empezar con cadencia' },
+      { val: '4_6',          label: '4-6 deals — escalar rápido' },
+      { val: '7_mas',        label: '7+ deals — full operación con equipo' }
+    ]
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // BLOQUE B — Capital y financiamiento
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    id: 'capital', bloque: 'B · Capital',
+    pregunta: '¿Cuánto capital propio disponible HOY (líquido, sin tocar reserva personal)?',
+    opciones: [
+      { val: 'menos_20k',    label: '< $20K — limitado para flip directo' },
+      { val: '20_50k',       label: '$20K – $50K — apenas para 1 deal con HML' },
+      { val: '50_100k',      label: '$50K – $100K — cómodo con buffer' },
+      { val: '100_250k',     label: '$100K – $250K — multi-deal posible' },
+      { val: 'mas_250k',     label: '> $250K — capital robusto' }
     ]
   },
   {
-    id: 'credit',
+    id: 'credit', bloque: 'B · Capital',
     pregunta: '¿Tu credit score (FICO) actual?',
     opciones: [
-      { val: 'mas_720',      label: '> 720 (excelente)' },
+      { val: 'mas_780',      label: '> 780 (top tier)' },
+      { val: '720_780',      label: '720 – 780 (excelente)' },
       { val: '660_720',      label: '660 – 720 (bueno, califica HML estándar)' },
-      { val: '600_660',      label: '600 – 660 (limitado, solo HMLs flexibles)' },
-      { val: 'menos_600',    label: '< 600 (reconstruir antes de empezar)' },
-      { val: 'sin_historial',label: 'No tengo historial crediticio en USA' }
+      { val: '600_660',      label: '600 – 660 (limitado, HMLs flexibles)' },
+      { val: 'menos_600',    label: '< 600 (reconstruir antes)' },
+      { val: 'sin_historial',label: 'Sin historial crediticio en USA' }
     ]
   },
   {
-    id: 'llc',
+    id: 'fuentes_capital', bloque: 'B · Capital',
+    pregunta: '¿Qué fuentes de capital adicional tenés acceso? (multi-select mental — elegí la principal)',
+    opciones: [
+      { val: 'solo_propio',  label: 'Solo capital propio' },
+      { val: 'heloc',        label: 'HELOC sobre vivienda principal disponible' },
+      { val: 'private_fam',  label: 'Private money familiar/cercano disponible' },
+      { val: 'socio_capital',label: 'Tengo socio de capital identificado' },
+      { val: 'business_credit', label: 'Business credit / líneas de crédito activas' },
+      { val: 'a_construir',  label: 'Tengo que construirlo durante el proceso' }
+    ]
+  },
+  {
+    id: 'hml_status', bloque: 'B · Capital',
+    pregunta: '¿Tenés Hard Money Lender (HML) pre-aprobado?',
+    opciones: [
+      { val: 'primario_backup', label: '✅ Sí, primario + backup' },
+      { val: 'solo_primario',   label: '✅ Sí, solo primario' },
+      { val: 'hablado',         label: '🟡 He hablado con HMLs pero sin pre-aprobación formal' },
+      { val: 'investigando',    label: '🟠 Estoy investigando opciones' },
+      { val: 'ninguno',         label: '❌ Ningún contacto con HML todavía' }
+    ]
+  },
+  {
+    id: 'capital_real', bloque: 'B · Capital',
+    pregunta: 'Sobre el capital que dijiste tener: ¿cuánto está LÍQUIDO HOY (acceso 24-48h)?',
+    opciones: [
+      { val: 'todo',         label: '100% líquido — disponible inmediato' },
+      { val: 'mitad',        label: '~50% líquido, resto requiere 1-2 semanas' },
+      { val: 'minimo',       label: 'Mínimo líquido, mayoría requiere vender activos / sacar HELOC' },
+      { val: 'teorico',      label: 'Mayoritariamente teórico — todavía no lo tengo en mano' }
+    ]
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // BLOQUE C — Fundación legal y experiencia
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    id: 'llc', bloque: 'C · Fundación',
     pregunta: '¿Tenés LLC formada?',
     opciones: [
       { val: 'si_mismo',     label: '✅ Sí, en el estado donde planeo invertir' },
@@ -2079,7 +2152,21 @@ const FM_DIAG_QUESTIONS = [
     ]
   },
   {
-    id: 'deals_cerrados',
+    id: 'setup_legal', bloque: 'C · Fundación',
+    pregunta: '¿Cuáles de estos tenés activos hoy?',
+    multiSelect: true,
+    opciones: [
+      { val: 'ein',          label: 'EIN del IRS' },
+      { val: 'operating',    label: 'Operating Agreement firmado' },
+      { val: 'banco',        label: 'Cuenta bancaria de negocio + tarjeta crédito' },
+      { val: 'contabilidad', label: 'Software contabilidad activo (QuickBooks/Stessa)' },
+      { val: 'cpa',          label: 'CPA de real estate identificado' },
+      { val: 'abogado',      label: 'Abogado de real estate identificado' },
+      { val: 'ninguno',      label: 'Ninguno todavía' }
+    ]
+  },
+  {
+    id: 'deals_cerrados', bloque: 'C · Fundación',
     pregunta: '¿Cuántos deals exitosos has cerrado en real estate?',
     opciones: [
       { val: '0',            label: 'Ninguno todavía' },
@@ -2089,7 +2176,100 @@ const FM_DIAG_QUESTIONS = [
     ]
   },
   {
-    id: 'tiempo',
+    id: 'experiencia_previa', bloque: 'C · Fundación',
+    pregunta: '¿Tenés experiencia previa en algo relacionado?',
+    opciones: [
+      { val: 'cero',         label: 'Cero — completamente nuevo' },
+      { val: 'construccion', label: 'Construcción / remodelación (contratista o similar)' },
+      { val: 'real_estate_otro', label: 'Real estate en otro país' },
+      { val: 'corporativo',  label: 'Background corporativo (finanzas, ventas, ops)' },
+      { val: 'mixto',        label: 'Mix de varios' }
+    ]
+  },
+  {
+    id: 'inmigracion', bloque: 'C · Fundación',
+    pregunta: 'Tu situación en USA:',
+    opciones: [
+      { val: 'residente',    label: '🇺🇸 Ciudadano o residente USA con SSN' },
+      { val: 'itin',         label: '📋 Tengo ITIN (sin SSN)' },
+      { val: 'internacional',label: '🌎 Internacional sin ITIN (visito USA)' }
+    ]
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // BLOQUE D — Mercado y conocimiento
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    id: 'buybox', bloque: 'D · Mercado',
+    pregunta: '¿Tenés Buy Box (perfil de propiedad ideal) definido?',
+    opciones: [
+      { val: 'completo',     label: '✅ 5+ Buy Box por estrategia con criterios numéricos documentados' },
+      { val: 'parcial',      label: '🟡 1-2 Buy Box parciales, faltan validar números' },
+      { val: 'mental',       label: '🟠 Sé qué quiero pero no está documentado' },
+      { val: 'cero',         label: '❌ No tengo Buy Box' }
+    ]
+  },
+  {
+    id: 'arv_skill', bloque: 'D · Mercado',
+    pregunta: '¿Sabés calcular ARV y MAO de una propiedad?',
+    opciones: [
+      { val: 'experto',      label: '✅ Sí, lo hago con 5+ comps y ajustes documentados' },
+      { val: 'basico',       label: '🟡 Conozco la fórmula básica (ARV × 75% - rehab)' },
+      { val: 'concepto',     label: '🟠 Sé qué significan pero no lo he practicado' },
+      { val: 'no',           label: '❌ No estoy familiarizado con estos términos' }
+    ]
+  },
+  {
+    id: 'ofertas_mes', bloque: 'D · Mercado',
+    pregunta: '¿Cuántas ofertas formales has enviado en los últimos 30 días?',
+    opciones: [
+      { val: '10_mas',       label: '10+ ofertas' },
+      { val: '1_9',          label: '1-9 ofertas' },
+      { val: 'analisis_no_oferta', label: '0 ofertas pero analizo deals regularmente' },
+      { val: 'cero',         label: 'Ni siquiera analizo deals todavía' }
+    ]
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // BLOQUE E — Red operativa actual
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    id: 'wholesalers', bloque: 'E · Red operativa',
+    pregunta: '¿Cuántos wholesalers tenés en tu buyer list activa enviándote deals?',
+    opciones: [
+      { val: '10_mas',       label: '10+ wholesalers activos' },
+      { val: '3_9',          label: '3-9 wholesalers' },
+      { val: '1_2',          label: '1-2 wholesalers ocasionales' },
+      { val: 'cero',         label: 'Ninguno' }
+    ]
+  },
+  {
+    id: 'gc_status', bloque: 'E · Red operativa',
+    pregunta: '¿Tenés General Contractor (GC) primario identificado y validado?',
+    opciones: [
+      { val: 'primario_backup',label: '✅ Sí, primario + backup con licencia/seguros verificados' },
+      { val: 'primario',     label: '✅ Sí, solo primario' },
+      { val: 'hablado',      label: '🟡 He hablado con varios pero sin elegir' },
+      { val: 'cero',         label: '❌ No tengo contactos de GC' }
+    ]
+  },
+  {
+    id: 'deal_activo', bloque: 'E · Red operativa',
+    pregunta: '¿Tenés deal activo ahora mismo?',
+    opciones: [
+      { val: 'no',           label: 'No, todavía no cierro mi primer deal' },
+      { val: 'busqueda',     label: 'En búsqueda — analizando deals' },
+      { val: 'pre_obra',     label: 'Sí, en preparación pre-obra (E2)' },
+      { val: 'obra',         label: 'Sí, en obra (E3)' },
+      { val: 'salida',       label: 'Sí, en salida / listing (E4)' }
+    ]
+  },
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // BLOQUE F — Mindset y disponibilidad
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    id: 'tiempo', bloque: 'F · Disponibilidad',
     pregunta: '¿Cuántas horas/semana podés dedicarle al negocio?',
     opciones: [
       { val: 'mas_30',       label: '> 30 horas (full-time o casi)' },
@@ -2098,25 +2278,17 @@ const FM_DIAG_QUESTIONS = [
     ]
   },
   {
-    id: 'inmigracion',
-    pregunta: 'Sobre tu situación en USA:',
+    id: 'mayor_obstaculo', bloque: 'F · Disponibilidad',
+    pregunta: '¿Cuál es tu MAYOR obstáculo percibido hoy?',
     opciones: [
-      { val: 'residente',    label: 'Soy ciudadano o residente USA con SSN' },
-      { val: 'itin',         label: 'Tengo ITIN pero no SSN' },
-      { val: 'internacional',label: 'Soy internacional sin ITIN (visito USA)' }
+      { val: 'capital',      label: '💰 Capital — me siento sin recursos suficientes' },
+      { val: 'conocimiento', label: '📚 Conocimiento — no sé por dónde empezar' },
+      { val: 'red',          label: '🤝 Red — no tengo contactos' },
+      { val: 'tiempo',       label: '⏰ Tiempo — estoy ocupado con otras cosas' },
+      { val: 'miedo',        label: '😰 Miedo / parálisis — no me animo a ofertar' },
+      { val: 'mercado',      label: '🏘️ Mercado — no encuentro deals buenos' },
+      { val: 'equipo',       label: '👥 Equipo — necesito gente que ejecute conmigo' }
     ]
-  },
-  {
-    id: 'deal_activo',
-    pregunta: '¿Tenés deal activo ahora mismo?',
-    opciones: [
-      { val: 'no',           label: 'No, todavía no cierro mi primer deal' },
-      { val: 'pre_obra',     label: 'Sí, en preparación pre-obra (E2)' },
-      { val: 'obra',         label: 'Sí, en obra (E3)' },
-      { val: 'salida',       label: 'Sí, en salida / listing (E4)' }
-    ],
-    // Solo mostrar si dijo que cerró ≥ 1 deals O dijo que ya está en pipeline
-    skipIf: (a) => a.deals_cerrados === '0' && (a.objetivo === 'wholesale' || a.objetivo === 'lender')
   }
 ];
 
@@ -2301,10 +2473,8 @@ function fmRenderBuscadorIA() {
 }
 
 function fmRenderDiagnostico() {
-  // Si ya hay resultado, mostrar plan
   if (fmState.diagResult) return fmRenderDiagPlan();
 
-  // Filtrar preguntas según respuestas previas (skipIf)
   const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
   const total = activeQuestions.length;
   const step = Math.min(fmState.diagStep, total - 1);
@@ -2312,16 +2482,36 @@ function fmRenderDiagnostico() {
 
   if (!q) return `<div class="p-8">Calculando...</div>`;
 
-  const answered = Object.keys(fmState.diagAnswers).length;
+  const answered = Object.keys(fmState.diagAnswers).filter(k => fmState.diagAnswers[k] != null && fmState.diagAnswers[k] !== '').length;
   const progress = Math.round((answered / total) * 100);
+
+  // Agrupar preguntas por bloque para mostrar contexto
+  const bloques = [...new Set(activeQuestions.map(q => q.bloque))];
+  const bloqueActual = q.bloque;
 
   return `
     <div class="h-full overflow-y-auto bg-gradient-to-br from-amber-50 via-white to-orange-50">
-      <div class="max-w-2xl mx-auto px-6 py-8">
+      <div class="max-w-3xl mx-auto px-6 py-8">
         <!-- Header -->
         <div class="bg-white rounded-xl border border-amber-200 p-5 mb-6 shadow-sm">
-          <h3 class="font-bold text-slate-900 mb-1">🎯 Diagnóstico Inicial — Plan Personalizado</h3>
-          <p class="text-sm text-slate-600">Respondé ${total} preguntas rápidas para identificar tu perfil y recibir un plan accionable con tareas, contactos y plataformas específicas.</p>
+          <h3 class="font-bold text-slate-900 mb-1">🎯 Análisis Profundo del Cliente</h3>
+          <p class="text-sm text-slate-600">${total} preguntas en 6 bloques para análisis completo: objetivo, capital, fundación, mercado, red operativa y mindset. Al final recibís un plan estructurado por bloques con observación del mentor, tiempo, actividad, entregable, pasos, recursos y errores.</p>
+        </div>
+
+        <!-- Bloques navegación -->
+        <div class="mb-4 bg-white rounded-xl border border-slate-200 p-3">
+          <div class="flex items-center gap-1 overflow-x-auto text-xs">
+            ${bloques.map(b => {
+              const qsEnBloque = activeQuestions.filter(qq => qq.bloque === b);
+              const respondidasEnBloque = qsEnBloque.filter(qq => {
+                const v = fmState.diagAnswers[qq.id];
+                return v != null && v !== '' && !(Array.isArray(v) && v.length === 0);
+              }).length;
+              const isActive = b === bloqueActual;
+              const done = respondidasEnBloque === qsEnBloque.length;
+              return `<span class="px-3 py-1.5 rounded-full font-medium whitespace-nowrap ${isActive ? 'bg-amber-500 text-white' : done ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">${b} <span class="ml-1 opacity-70">${respondidasEnBloque}/${qsEnBloque.length}</span></span>`;
+            }).join('')}
+          </div>
         </div>
 
         <!-- Progress -->
@@ -2337,24 +2527,9 @@ function fmRenderDiagnostico() {
 
         <!-- Pregunta -->
         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-xs font-bold text-amber-600 tracking-wider mb-2">PREGUNTA ${step + 1}</div>
+          <div class="text-xs font-bold text-amber-600 tracking-wider mb-2">${q.bloque || ''} · PREGUNTA ${step + 1}</div>
           <h4 class="text-xl font-bold text-slate-900 mb-5">${q.pregunta}</h4>
-          <div class="space-y-2">
-            ${q.opciones.map(o => {
-              const selected = fmState.diagAnswers[q.id] === o.val;
-              return `
-                <button onclick="fmDiagAnswer('${q.id}', '${o.val}')"
-                  class="w-full text-left px-4 py-3 rounded-lg border-2 transition ${selected ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50'}">
-                  <div class="flex items-center gap-3">
-                    <div class="w-5 h-5 rounded-full border-2 ${selected ? 'border-amber-600 bg-amber-600' : 'border-slate-300'} flex items-center justify-center flex-shrink-0">
-                      ${selected ? '<div class="w-2 h-2 rounded-full bg-white"></div>' : ''}
-                    </div>
-                    <span class="text-sm">${o.label}</span>
-                  </div>
-                </button>
-              `;
-            }).join('')}
-          </div>
+          ${fmRenderQuestionInput(q)}
         </div>
 
         <!-- Navegación -->
@@ -2363,6 +2538,9 @@ function fmRenderDiagnostico() {
             class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed">
             ← Atrás
           </button>
+          ${q.tipo === 'text' || q.multiSelect ? `
+            <button onclick="fmDiagNext()" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600">Siguiente →</button>
+          ` : ''}
           <button onclick="fmDiagReset()" class="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">🔄 Reiniciar</button>
         </div>
       </div>
@@ -2370,15 +2548,86 @@ function fmRenderDiagnostico() {
   `;
 }
 
+function fmRenderQuestionInput(q) {
+  if (q.tipo === 'text') {
+    const val = fmState.diagAnswers[q.id] || '';
+    return `
+      <input type="text" value="${escapeHtml(val)}" placeholder="${q.placeholder || ''}"
+        oninput="fmState.diagAnswers['${q.id}'] = this.value"
+        onkeydown="if(event.key==='Enter'){fmDiagNext();}"
+        class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-amber-500"/>
+    `;
+  }
+  if (q.multiSelect) {
+    const vals = Array.isArray(fmState.diagAnswers[q.id]) ? fmState.diagAnswers[q.id] : [];
+    return `
+      <div class="space-y-2">
+        ${q.opciones.map(o => {
+          const selected = vals.includes(o.val);
+          return `
+            <button onclick="fmDiagToggle('${q.id}', '${o.val}')"
+              class="w-full text-left px-4 py-3 rounded-lg border-2 transition ${selected ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50'}">
+              <div class="flex items-center gap-3">
+                <div class="w-5 h-5 rounded border-2 ${selected ? 'border-amber-600 bg-amber-600' : 'border-slate-300'} flex items-center justify-center flex-shrink-0">
+                  ${selected ? '<span class="text-white text-xs leading-none">✓</span>' : ''}
+                </div>
+                <span class="text-sm">${o.label}</span>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <p class="text-xs text-slate-500 mt-3">Podés seleccionar varios. Cuando termines, hacé click en "Siguiente →"</p>
+    `;
+  }
+  // Default: single-select radio
+  return `
+    <div class="space-y-2">
+      ${q.opciones.map(o => {
+        const selected = fmState.diagAnswers[q.id] === o.val;
+        return `
+          <button onclick="fmDiagAnswer('${q.id}', '${o.val}')"
+            class="w-full text-left px-4 py-3 rounded-lg border-2 transition ${selected ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50'}">
+            <div class="flex items-center gap-3">
+              <div class="w-5 h-5 rounded-full border-2 ${selected ? 'border-amber-600 bg-amber-600' : 'border-slate-300'} flex items-center justify-center flex-shrink-0">
+                ${selected ? '<div class="w-2 h-2 rounded-full bg-white"></div>' : ''}
+              </div>
+              <span class="text-sm">${o.label}</span>
+            </div>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function fmDiagToggle(qid, val) {
+  const cur = Array.isArray(fmState.diagAnswers[qid]) ? fmState.diagAnswers[qid] : [];
+  if (cur.includes(val)) {
+    fmState.diagAnswers[qid] = cur.filter(v => v !== val);
+  } else {
+    fmState.diagAnswers[qid] = [...cur, val];
+  }
+  fmRender();
+}
+
+function fmDiagNext() {
+  const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
+  if (fmState.diagStep < activeQuestions.length - 1) {
+    fmState.diagStep++;
+  } else {
+    fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
+  }
+  fmRender();
+}
+
 function fmDiagAnswer(qid, val) {
   fmState.diagAnswers[qid] = val;
-  // Avanzar a siguiente pregunta o calcular resultado
   const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
   const currentIdx = activeQuestions.findIndex(q => q.id === qid);
   if (currentIdx < activeQuestions.length - 1) {
     fmState.diagStep = currentIdx + 1;
   } else {
-    // Última pregunta → calcular perfil
     fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
   }
   fmRender();
@@ -2399,8 +2648,12 @@ function fmDiagReset() {
   fmRender();
 }
 
-// ─── LÓGICA DE CATEGORIZACIÓN ───
+// ─── LÓGICA DE CATEGORIZACIÓN ROBUSTA ───
 function fmCalcularPerfil(a) {
+  return fmAnalizarPerfilCompleto(a);
+}
+
+function fmAnalizarPerfilCompleto(a) {
   // Ordenado de más específico a más general
   let perfil, etapa, cronograma;
 
@@ -2509,7 +2762,649 @@ function fmCalcularPerfil(a) {
   return { perfil, etapa, cronograma, fortalezas, gaps, answers: a };
 }
 
-function fmRenderDiagPlan() {
+// ─── BIBLIOTECA DE BLOQUES TIPO MIGUEL GUZMÁN ───
+// Cada bloque tiene: aplicaA, etapa, subetapa, observacion, tiempo, actividad,
+//                    entregable, pasos[], recursos[{nombre, url, desc}], errores[]
+const FM_BLOQUES = [
+  // ━━━━━━━━━━ E0 — FUNDACIÓN ━━━━━━━━━━
+  {
+    id: 'llc_setup',
+    aplicaA: (p, a) => a.llc === 'no',
+    etapa: 'E0', subetapa: 'LLC y fundación legal',
+    observacion: 'No se ofertan propiedades sin LLC. Es la diferencia entre proteger tu patrimonio personal y arriesgarlo en cada deal. Esto se hace ANTES de buscar deals — toma 1-4 semanas según el estado, así que se arranca paralelo al estudio de mercado.',
+    tiempo: '8-12 horas + tiempo de procesamiento estatal (1-4 semanas)',
+    actividad: (p, a) => `Formar LLC en el estado donde se va a invertir (${p.mercado || 'estado de inversión'}), obtener EIN del IRS, firmar Operating Agreement, abrir cuenta bancaria de negocio + tarjeta crédito, configurar software contable y identificar CPA + abogado de real estate.`,
+    entregable: 'LLC aprobada + EIN + Operating Agreement firmado + cuenta bancaria activa + software contable conectado + CPA y abogado en lista de contactos.',
+    pasos: [
+      'Decidir el estado donde se invertirá (NO donde vive — el estado de la propiedad).',
+      'Verificar disponibilidad del nombre de la LLC en el portal del Secretary of State.',
+      'Contratar Registered Agent profesional ($99-$300/año) o ser propio si vive en el estado.',
+      'Llenar Certificate of Formation + pagar filing fee ($50-$425 según estado).',
+      'Solicitar EIN gratis al IRS (10 minutos online, inmediato).',
+      'Descargar template de Operating Agreement (LLC University) y firmarlo.',
+      'Abrir cuenta bancaria de negocio (Chase Business / Bluevine / Mercury) + tarjeta crédito.',
+      'Conectar cuenta a software contable (Stessa gratis para 1-2 props, QuickBooks si escala).',
+      'Entrevistar 2-3 CPAs y 2-3 abogados de real estate. Elegir 1 primario de cada uno.'
+    ],
+    recursos: [
+      { nombre: 'Northwest Registered Agent', url: 'https://www.northwestregisteredagent.com', desc: 'LLC formation + RA ($39 + state fee)' },
+      { nombre: 'IRS EIN Application', url: 'https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online', desc: 'EIN gratis online' },
+      { nombre: 'LLC University Template', url: 'https://www.llcuniversity.com/llc-operating-agreement', desc: 'Operating Agreement gratis' },
+      { nombre: 'Stessa', url: 'https://www.stessa.com', desc: 'Contabilidad real estate gratis' },
+      { nombre: 'BiggerPockets Find a Tax Pro', url: 'https://www.biggerpockets.com/professionals/tax-pros', desc: 'CPAs de real estate' }
+    ],
+    errores: [
+      'Formar LLC en Delaware/Nevada por "protección extra" (genera foreign filing + costo doble).',
+      'Usar cuenta personal "temporalmente" para el negocio — destruye protección legal.',
+      'Operar sin Operating Agreement (vulnerable a pierce the corporate veil).',
+      'Buscar CPA en abril (deadline taxes) — pagás 2-3x más y servicio mediocre.',
+      'No verificar Registered Agent (no puede ser PO Box, debe ser dirección física).'
+    ]
+  },
+  {
+    id: 'big_why_mindset',
+    aplicaA: (p, a) => a.deals_cerrados === '0' && (a.mayor_obstaculo === 'miedo' || !a.setup_legal?.includes('cpa')),
+    etapa: 'E0', subetapa: 'Big Why + bloque diario + Quick Win',
+    observacion: 'El 80% de los que abandonan no es por falta de información — es por falta de claridad de propósito y disciplina. El Big Why escrito, el bloque diario no negociable y un Quick Win en semana 1 son los predictores #1 de NO abandono.',
+    tiempo: '4-6 horas (setup) + cadencia diaria sostenida',
+    actividad: 'Documentar Big Why personal por escrito (1-2 páginas), bloquear 90 min diarios no negociables en el calendario, ejecutar un Quick Win medible en la primera semana del programa.',
+    entregable: 'Big Why firmado + bloque diario activo en calendario + Quick Win documentado con evidencia (screenshot, foto, email).',
+    pasos: [
+      'Bloquear 2-3 horas sin interrupciones para escribir Big Why (template del Anexo C).',
+      'Llenar template: situación actual, visión a 5 años, lo que pierdo si no lo logro, por qué ahora, compromisos no negociables.',
+      'Firmar + imprimir + colocar en lugar visible (escritorio o espejo).',
+      'Compartir con coach + 2 personas cercanas (accountability público).',
+      'Bloquear 90 min diarios mismo horario en Google Calendar como "FLIPPING NEGOCIO - NO DISPONIBLE".',
+      'Elegir 1 Quick Win de las 4 opciones (oferta en vivo / wholesaler en buyer list / evento REIA / term sheet HML).',
+      'Ejecutar + documentar con evidencia.',
+      'Compartir Quick Win con coach y comunidad para refuerzo social.'
+    ],
+    recursos: [
+      { nombre: 'Anexo C — Mindset y Top 20 errores', url: '#', desc: 'Template Big Why + sistema accountability' },
+      { nombre: 'Google Calendar', url: 'https://calendar.google.com', desc: 'Bloque diario recurrente' },
+      { nombre: 'Toggl Track', url: 'https://toggl.com', desc: 'Medir tiempo real del bloque' },
+      { nombre: 'National REIA Directory', url: 'https://nationalreia.org/find-a-reia/', desc: 'Encontrar evento local para Quick Win' }
+    ],
+    errores: [
+      'Big Why genérico ("quiero ser libre financieramente") — sin pierde fuerza.',
+      'No compartir con nadie — sin accountability.',
+      'Bloque flexible ("a veces en la mañana, a veces en la noche") — nunca se convierte en hábito.',
+      'Saltarse el Quick Win — semana 1 sin victoria mata la motivación.',
+      'Esperar a "sentir ganas" para trabajar — nunca llegan.'
+    ]
+  },
+
+  // ━━━━━━━━━━ E1 — EVALUAR ━━━━━━━━━━
+  {
+    id: 'buybox_operativo',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && (a.buybox === 'cero' || a.buybox === 'mental' || a.buybox === 'parcial'),
+    etapa: 'E1', subetapa: 'Buy Box operativo',
+    observacion: 'Crear 5 Buy Boxes porque un solo ZIP puede engañar. Comparar 5 zonas le permite ver dónde hay mejor ARV, velocidad de salida, inventario y margen. No es para comprar en todas; es para escoger con datos y no por intuición.',
+    tiempo: 'Aproximadamente 6 a 8 horas totales.',
+    actividad: (p, a) => `Definir exactamente qué compra, dónde compra, con qué estrategia y bajo qué condiciones mínimas. La estrategia principal será ${p.estrategiaLabel || 'Fix & Flip'}; ${a.objetivo === 'hibrido' ? 'Fix & Hold se revisa como segunda lectura' : 'una estrategia secundaria se revisa solo si los números lo justifican'}, pero no debe distraer el foco inicial.`,
+    entregable: 'Buy Box Resumen de 1 página listo para enviar a wholesalers, realtors, lenders e inversionistas.',
+    pasos: [
+      `Definir estrategia principal: ${p.estrategiaLabel || 'Fix & Flip'} como base.`,
+      `Elegir máximo 5 ZIP codes objetivo en ${p.mercado || '[tu mercado]'}. No abrir más zonas hasta dominar estas primeras.`,
+      'Por cada ZIP definir: tipo de propiedad, ARV objetivo, precio máximo de compra, rehab aceptado, DOM máximo y perfil del comprador final.',
+      'Crear lista de red flags: foundation severa, flood zone, liens, HOA alta, DOM excesivo, zona sin compradores o rehab fuera de control.',
+      'Reducir a un Buy Box de 1 página con lenguaje claro y profesional.',
+      'Practicar el pitch en voz alta hasta explicarlo en menos de 60 segundos.'
+    ],
+    recursos: [
+      { nombre: 'Zillow', url: 'https://www.zillow.com', desc: 'Validar precios, activos y vendidos' },
+      { nombre: 'Redfin', url: 'https://www.redfin.com', desc: 'Validar vendidos y DOM' },
+      { nombre: 'Realtor.com', url: 'https://www.realtor.com', desc: 'Validación adicional del mercado' },
+      { nombre: 'GreatSchools', url: 'https://www.greatschools.org', desc: 'Validar perfil familiar del comprador final' },
+      { nombre: 'FEMA Flood Map', url: 'https://msc.fema.gov/portal/home', desc: 'Validar flood zones' },
+      { nombre: 'Google Drive', url: 'https://drive.google.com', desc: 'Organizar Buy Box, tareas y evidencia' }
+    ],
+    errores: [
+      'Hacer un Buy Box tan amplio que cualquier propiedad parece oportunidad.',
+      'Mezclar Fix & Flip y Fix & Hold en el mismo criterio sin separar números.',
+      'Elegir ZIPs porque "se ven buenos" y no porque tienen ventas reales.',
+      'No incluir cómo cierra: HML, cash, días de cierre y capacidad real.',
+      'Enviar a wholesalers un documento largo que nadie lee.'
+    ]
+  },
+  {
+    id: 'arv_comparables',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && (a.arv_skill !== 'experto'),
+    etapa: 'E1', subetapa: 'Validación de mercado y comparables',
+    observacion: 'El ARV no se toma del wholesaler ni de una plataforma sin validar. El ARV se prueba con vendidos reales, fotos, condición, ubicación y similitud. Un ARV inflado destruye el deal desde el día uno.',
+    tiempo: 'Aproximadamente 8 a 10 horas totales.',
+    actividad: 'Validar los 5 ZIP codes del Buy Box con comparables vendidos y comportamiento real del mercado.',
+    entregable: 'Mapa de ARV por ZIP con ARV conservador, ARV agresivo, DOM promedio, riesgo principal y decisión final: usar, observar o descartar.',
+    pasos: [
+      'Tomar los 5 ZIP codes definidos en el Bloque 1.',
+      'Buscar mínimo 3 flips vendidos recientemente por cada ZIP.',
+      'Buscar propiedades activas y pendientes similares para entender competencia.',
+      'Comparar sqft, habitaciones, baños, año, lote, condición y ubicación.',
+      'Revisar DOM promedio y velocidad de venta.',
+      'Definir ARV conservador por ZIP y eliminar zonas donde el ARV dependa de un solo comparable bonito.'
+    ],
+    recursos: [
+      { nombre: 'Zillow Sold', url: 'https://www.zillow.com', desc: 'Filtro Sold y últimos 6 a 12 meses' },
+      { nombre: 'Redfin Data Center', url: 'https://www.redfin.com/news/data-center', desc: 'Datos de DOM, sale-to-list ratio y mercado' },
+      { nombre: 'Realtor.com Research', url: 'https://www.realtor.com/research/data', desc: 'Tendencias de mercado' },
+      { nombre: 'NeighborhoodScout', url: 'https://www.neighborhoodscout.com', desc: 'Perfil de zona, crimen y demografía' },
+      { nombre: 'U.S. Census QuickFacts', url: 'https://www.census.gov/quickfacts', desc: 'Datos poblacionales y económicos' },
+      { nombre: 'PropStream', url: 'https://www.propstream.com', desc: 'Comps y datos de propiedades (si tiene acceso)' }
+    ],
+    errores: [
+      'Usar listados activos como prueba de ARV. Los activos son expectativas, no ventas.',
+      'Elegir el comparable más alto para justificar una oferta emocional.',
+      'Ignorar DOM alto porque "la casa está barata".',
+      'Comparar contra casas con remodelación superior, mejor lote o ubicación premium.',
+      'No guardar screenshots ni evidencia.'
+    ]
+  },
+  {
+    id: 'analisis_mao',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && (a.ofertas_mes === 'cero' || a.ofertas_mes === 'analisis_no_oferta' || a.ofertas_mes === '1_9'),
+    etapa: 'E1', subetapa: 'Sistema de análisis, MAO y descarte',
+    observacion: 'Repetición. La habilidad no se forma con una propiedad perfecta; se forma analizando varias, descartando rápido y justificando con números. Si no analiza volumen, no desarrolla criterio.',
+    tiempo: 'Aproximadamente 6 a 9 horas totales.',
+    actividad: 'Crear una plantilla única de análisis y analizar mínimo 10 propiedades, aunque no todas sean buenas. La meta no es encontrar el deal perfecto; es entrenar criterio.',
+    entregable: 'Tabla con 10 propiedades analizadas con ARV, rehab, holding costs, closing costs, MAO, decisión y evidencia.',
+    pasos: [
+      'Crear una plantilla en Google Sheets, Airtable o Taskade.',
+      'Por cada propiedad registrar dirección, ZIP, fuente, asking price, ARV, rehab, holding costs, closing costs, fees, profit mínimo, MAO y decisión.',
+      'Calcular MAO base: ARV × 75% − Rehab.',
+      'Ajustar el MAO por holding costs, closing costs, lender fees, wholesale fee, contingencia y riesgo.',
+      'Clasificar cada propiedad: ofertar, negociar o descartar.',
+      'Guardar screenshots de comps, fotos relevantes y cálculo final.'
+    ],
+    recursos: [
+      { nombre: 'Airtable', url: 'https://www.airtable.com', desc: 'Tracking de deals y contactos' },
+      { nombre: 'Google Sheets', url: 'https://docs.google.com/spreadsheets', desc: 'Plantilla de análisis' },
+      { nombre: 'BiggerPockets Flip Calculator', url: 'https://www.biggerpockets.com/fix-and-flip-calculator', desc: 'Calculadora Fix & Flip' },
+      { nombre: 'Flipper Force', url: 'https://www.flipperforce.com', desc: 'Deal analyzer y scope of work' },
+      { nombre: 'Zillow', url: 'https://www.zillow.com', desc: 'Comps gratuitos' },
+      { nombre: 'Redfin', url: 'https://www.redfin.com', desc: 'Validación cruzada' }
+    ],
+    errores: [
+      'Cambiar la fórmula para que el deal "cuadre".',
+      'No incluir holding costs, utilities, insurance, taxes e intereses.',
+      'Usar rehab "a ojo" sin rango ni contingencia.',
+      'No descartar rápido propiedades malas.',
+      'Enamorarse de una propiedad porque se ve remodelable.'
+    ]
+  },
+
+  // ━━━━━━━━━━ E2 — ESTRUCTURAR ━━━━━━━━━━
+  {
+    id: 'capital_stack',
+    aplicaA: (p, a) => a.objetivo !== 'lender',
+    etapa: 'E2', subetapa: 'Capital Stack real',
+    observacion: 'Este es el punto más delicado. No puede decir que está listo si no sabe cuánto earnest money puede poner, cuánto gap puede cubrir y cuánto debe dejar de reserva. El capital teórico no se usa para ofertar.',
+    tiempo: 'Aproximadamente 4 a 6 horas totales.',
+    actividad: 'Documentar cuánto capital real tiene disponible y separar lo líquido, lo probable y lo teórico.',
+    entregable: 'Capital Stack documentado con cash, crédito personal, crédito comercial, dinero familiar, capital privado, earnest money, reserva mínima y capacidad real de cierre.',
+    pasos: [
+      'Listar todas las fuentes de capital actuales.',
+      'Clasificar cada fuente como líquida inmediata, probable o teórica.',
+      'Definir cuánto puede usar para earnest money en 24 a 48 horas.',
+      'Definir cuánto puede usar para gap sin comprometer su estabilidad.',
+      'Definir reserva mínima que no se toca.',
+      'Crear una tabla con monto, tiempo de acceso, costo, riesgo y uso permitido.'
+    ],
+    recursos: [
+      { nombre: 'Google Sheets', url: 'https://docs.google.com/spreadsheets', desc: 'Tabla Capital Stack' },
+      { nombre: 'Bank of America Business', url: 'https://www.bankofamerica.com/smallbusiness', desc: 'Banca y tarjetas de negocio' },
+      { nombre: 'Chase Business', url: 'https://www.chase.com/business', desc: 'Banca y tarjetas de negocio' },
+      { nombre: 'Bluevine', url: 'https://www.bluevine.com', desc: 'Online business banking, sin fees' }
+    ],
+    errores: [
+      'Usar todo el crédito para EMD y quedarse sin reserva.',
+      'No separar dinero de cierre, rehab, holding y contingencia.',
+      'No calcular el gap antes de hablar con HMLs.',
+      'Asumir que el HML cubre el 100% — siempre hay equity del estudiante (10-20%).',
+      'Contar como capital el HELOC sin haberlo aplicado todavía.'
+    ]
+  },
+  {
+    id: 'hml_documentos',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.objetivo !== 'wholesale' && (a.hml_status === 'ninguno' || a.hml_status === 'investigando' || a.hml_status === 'hablado'),
+    etapa: 'E2', subetapa: 'HMLs con documentos',
+    observacion: 'Las llamadas no cierran propiedades. Los documentos sí. El estudiante puede hablar con 10 HMLs, pero si no tiene términos comparados ni term sheets, todavía no tiene estructura de financiamiento.',
+    tiempo: 'Aproximadamente 8 a 10 horas totales.',
+    actividad: 'Construir base de 10 HMLs, comparar términos y solicitar term sheets oficiales a mínimo 6.',
+    entregable: 'HML Database con 10 fichas + 5 term sheets oficiales + HML primario y backup identificados.',
+    pasos: [
+      'Armar lista de 10 HMLs: 5 nacionales y 5 locales.',
+      'Llamar o escribir a cada uno usando un script profesional.',
+      'Documentar tasa, puntos, LTV, LTC, plazo, draw schedule, experiencia requerida y tiempo de cierre.',
+      'Preguntar si hacen hard inquiry o soft pull.',
+      'Preguntar si aceptan primer flip y si financian rehab.',
+      'Solicitar term sheet oficial en PDF a los 5 mejores.',
+      'Elegir HML primario y HML backup.'
+    ],
+    recursos: [
+      { nombre: 'Kiavi', url: 'https://www.kiavi.com', desc: 'Cotización HML rápida (32+ estados)' },
+      { nombre: 'Lima One Capital', url: 'https://www.limaone.com', desc: 'HML nacional (40+ estados)' },
+      { nombre: 'RCN Capital', url: 'https://www.rcncapital.com', desc: 'HML nacional' },
+      { nombre: 'Easy Street Capital', url: 'https://www.easystreetcap.com', desc: 'HML y DSCR' },
+      { nombre: 'Visio Lending', url: 'https://www.visiolending.com', desc: 'DSCR / rental loans' },
+      { nombre: 'HardMoneyHome', url: 'https://hardmoneyhome.com', desc: 'Directorio de hard money por estado' },
+      { nombre: 'Scotsman Guide', url: 'https://www.scotsmanguide.com/Profiles/Search', desc: 'Directorio de lenders' }
+    ],
+    errores: [
+      'Aceptar términos verbales sin term sheet.',
+      'Solo preguntar tasa e ignorar puntos, fees, draw schedule y prepayment penalty.',
+      'No preguntar si aceptan first-time flipper.',
+      'No tener HML backup.',
+      'Aplicar con todos sin controlar hard inquiries (dañan score).'
+    ]
+  },
+  {
+    id: 'base_contactos',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.wholesalers !== '10_mas',
+    etapa: 'E2', subetapa: 'Base mínima de contactos',
+    observacion: 'Sin flujo no hay criterio. Si solo recibe 1 o 2 propiedades ocasionales, cualquier deal regular parece bueno. La red debe alimentar el análisis semanal.',
+    tiempo: 'Aproximadamente 6 a 8 horas totales.',
+    actividad: 'Construir la base mínima del mercado para no depender de 2 o 3 wholesalers.',
+    entregable: 'Base de contactos con: 25 wholesalers, 10 realtors investor-friendly, 5 agentes distressed, 5 REIA/networking, 5 private lenders, 10 HMLs, 5 contratistas, 2 title companies.',
+    pasos: [
+      'Crear tabla maestra de contactos en Airtable, Google Sheets o Taskade.',
+      'Buscar y registrar 25 wholesalers activos.',
+      'Buscar 10 realtors investor-friendly y 5 agentes que trabajen distressed properties.',
+      'Identificar 5 contactos de REIA o networking local.',
+      'Listar 5 posibles private lenders del círculo cercano o red profesional.',
+      'Agregar los 10 HMLs del bloque anterior.',
+      'Agregar 5 contratistas y 2 title companies investor-friendly.',
+      'Clasificar cada contacto: nuevo, contactado, respondió, activo o descartado.'
+    ],
+    recursos: [
+      { nombre: 'BiggerPockets Marketplace', url: 'https://www.biggerpockets.com/marketplace', desc: 'Contactos REI y deals' },
+      { nombre: 'Connected Investors', url: 'https://connectedinvestors.com', desc: 'Red nacional de inversionistas' },
+      { nombre: 'InvestorLift', url: 'https://www.investorlift.com', desc: 'Deals de wholesalers' },
+      { nombre: 'New Western', url: 'https://newwestern.com', desc: 'Wholesaler nacional' },
+      { nombre: 'NetWorth Realty', url: 'https://networthrealty.com', desc: 'Wholesaler nacional' },
+      { nombre: 'National REIA', url: 'https://nationalreia.org/find-a-reia/', desc: 'Encontrar REIA local' },
+      { nombre: 'Meetup', url: 'https://www.meetup.com', desc: 'Eventos de real estate' },
+      { nombre: 'Eventbrite', url: 'https://www.eventbrite.com', desc: 'Eventos locales' }
+    ],
+    errores: [
+      'Guardar nombres sin contactar a nadie.',
+      'Tener wholesalers fuera de los ZIPs del Buy Box.',
+      'No registrar fecha de último contacto.',
+      'No pedir referidos a cada contacto.',
+      'No distinguir contactos activos de contactos muertos.'
+    ]
+  },
+  {
+    id: 'wholesalers_pitch',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.wholesalers !== '10_mas',
+    etapa: 'E2/E1', subetapa: 'Wholesalers y pitch de comprador',
+    observacion: 'El estudiante debe sonar como comprador serio, no como estudiante explorando. El wholesaler manda primero el deal al buyer que entiende rápido, responde rápido y puede cerrar.',
+    tiempo: '5 a 7 horas totales.',
+    actividad: 'Enviar el Buy Box a 25 wholesalers y construir un pipeline con calidad de respuesta, EMD típico y flujo real de deals.',
+    entregable: 'Wholesaler Pipeline con 25 contactos enviados, mínimo 10 activos y clasificación A/B/C.',
+    pasos: [
+      'Enviar mensaje inicial con Buy Box de 1 página.',
+      'Pedir que lo agreguen a buyer list.',
+      'Preguntar ZIPs que cubren, deals por mes, EMD típico y tiempo de cierre.',
+      'Preguntar si aceptan inspection period y qué title company usan.',
+      'Clasificar A/B/C según calidad y respuesta.',
+      'Hacer follow-up a los que no respondan en 48 horas.'
+    ],
+    recursos: [
+      { nombre: 'InvestorLift', url: 'https://www.investorlift.com', desc: 'Deals y wholesalers' },
+      { nombre: 'Facebook Groups', url: 'https://www.facebook.com', desc: 'Grupos locales de real estate investors' },
+      { nombre: 'BiggerPockets', url: 'https://www.biggerpockets.com', desc: 'Networking y marketplace' },
+      { nombre: 'HouseCashin Directory', url: 'https://www.housecashin.com', desc: 'Directorio de wholesalers' },
+      { nombre: 'Google Drive', url: 'https://drive.google.com', desc: 'Guardar Buy Box PDF y evidencias' },
+      { nombre: 'WhatsApp Business', url: 'https://business.whatsapp.com', desc: 'Seguimiento rápido' }
+    ],
+    errores: [
+      'Escribir mensajes genéricos sin Buy Box.',
+      'No decir cómo cierra ni cuánto tarda.',
+      'No preguntar EMD antes de ofertar.',
+      'No hacer seguimiento en 48 horas.',
+      'Creer que por estar en una buyer list ya tiene flujo real.'
+    ]
+  },
+  {
+    id: 'contratistas_filtrados',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.objetivo !== 'wholesale' && a.gc_status !== 'primario_backup' && a.gc_status !== 'primario',
+    etapa: 'E2', subetapa: 'Contratistas filtrados antes del deal',
+    observacion: 'No necesitás llevar contratistas a casas que no son serias, pero sí necesitás tenerlos filtrados antes. Cuando aparece el deal no hay tiempo para empezar a buscar quién cotiza.',
+    tiempo: 'Aproximadamente 6 a 8 horas totales.',
+    actividad: 'Identificar 10 contratistas o GCs, entrevistarlos, validar licencia/seguro y elegir top 3 para cotizar rápido cuando aparezca un deal.',
+    entregable: 'Contractor Database con 10 contratistas filtrados + top 3 clasificados A/B/C.',
+    pasos: [
+      'Buscar 10 contratistas o GCs en su mercado.',
+      'Llamarlos y preguntar si trabajan Fix & Flip.',
+      'Validar licencia, General Liability y Workers Comp si aplica.',
+      'Pedir 2 proyectos recientes con fotos o dirección.',
+      'Preguntar tiempos típicos para rehab de $50K, $75K y $100K.',
+      'Preguntar si trabajan con contrato y draw schedule.',
+      'Clasificar A/B/C y dejar top 3 listos para cotizar.'
+    ],
+    recursos: [
+      { nombre: 'Better Business Bureau', url: 'https://www.bbb.org', desc: 'Revisar quejas y reputación' },
+      { nombre: 'Angi', url: 'https://www.angi.com', desc: 'Buscar contratistas' },
+      { nombre: 'Thumbtack', url: 'https://www.thumbtack.com', desc: 'Buscar contratistas locales' },
+      { nombre: 'Google Business Profile', url: 'https://www.google.com/business/', desc: 'Reviews y reputación' },
+      { nombre: 'HomeAdvisor', url: 'https://www.homeadvisor.com', desc: 'Contratistas con rating' }
+    ],
+    errores: [
+      'Contratar al más barato sin verificar licencia ni seguro.',
+      'No pedir proyectos recientes.',
+      'No preguntar capacidad actual.',
+      'No usar draw schedule.',
+      'Confundir subcontratista bueno con GC capaz de manejar un flip completo.'
+    ]
+  },
+  {
+    id: 'ofertas_justificadas',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.ofertas_mes !== '10_mas',
+    etapa: 'E1/E2', subetapa: 'Ofertas justificadas por números',
+    observacion: 'Sí puede ofrecer bajo, pero no puede ofrecer bajo sin justificar. La oferta no se negocia desde "quiero pagar menos"; se negocia desde ARV, rehab, costos, riesgo y MAO.',
+    tiempo: 'Aproximadamente 5 a 7 horas totales.',
+    actividad: 'Preparar 3 paquetes de oferta con números completos y justificación para wholesaler.',
+    entregable: '3 ofertas justificadas por MAO, con comps, ARV, rehab, costos, margen y explicación escrita.',
+    pasos: [
+      'Elegir 3 propiedades con potencial de las 10 analizadas.',
+      'Preparar 3 comparables vendidos por propiedad.',
+      'Definir ARV conservador, rehab realista, holding costs, closing costs y profit mínimo.',
+      'Calcular MAO y oferta máxima.',
+      'Redactar explicación breve para el wholesaler.',
+      'Enviar oferta o dejarla lista para revisión del mentor.'
+    ],
+    recursos: [
+      { nombre: 'Zillow', url: 'https://www.zillow.com', desc: 'Comps vendidos' },
+      { nombre: 'Redfin', url: 'https://www.redfin.com', desc: 'Comps vendidos y DOM' },
+      { nombre: 'BiggerPockets Calculator', url: 'https://www.biggerpockets.com/fix-and-flip-calculator', desc: 'Validación de números' },
+      { nombre: 'Google Sheets', url: 'https://docs.google.com/spreadsheets', desc: 'Paquete de oferta' },
+      { nombre: 'DocuSign', url: 'https://www.docusign.com', desc: 'Firma de LOI o documentos' },
+      { nombre: 'PandaDoc', url: 'https://www.pandadoc.com', desc: 'Alternativa para documentos' }
+    ],
+    errores: [
+      'Ofertar alto por miedo a ofender al wholesaler.',
+      'No explicar la oferta con números.',
+      'No incluir holding y closing costs.',
+      'Usar profit mínimo demasiado bajo.',
+      'No guardar evidencia de los comps que respaldan la oferta.'
+    ]
+  },
+
+  // ━━━━━━━━━━ E5 — ESCALAR ━━━━━━━━━━
+  {
+    id: 'post_mortem',
+    aplicaA: (p, a) => a.deals_cerrados === '1',
+    etapa: 'E5', subetapa: 'Post-mortem del primer flip',
+    observacion: 'Sin análisis del primer flip, los errores se repiten. El post-mortem convierte experiencia en aprendizaje sistemático. NO empezar el segundo deal sin este documento completo.',
+    tiempo: '6-10 horas totales',
+    actividad: 'Hacer post-mortem detallado del primer flip: presupuesto real vs plan, cronograma real vs plan, ROI obtenido vs esperado, qué funcionó bien (top 5), qué falló (top 5), 3 procesos a sistematizar.',
+    entregable: 'Documento de post-mortem completo + identificación de top 3 SOPs prioritarios para crear antes del próximo deal.',
+    pasos: [
+      'Reunir bitácoras semanales, budget tracker, fotos antes/después, todas las decisiones registradas.',
+      'Análisis financiero: completar tabla presupuesto vs real con variación % por categoría.',
+      'Análisis cronograma: comparar fechas planeadas vs reales por hito.',
+      'Análisis ROI: ROI esperado vs obtenido + razón principal de variación.',
+      'Listar TOP 5 cosas que funcionaron bien (replicar).',
+      'Listar TOP 5 cosas que fallaron (corregir).',
+      'Identificar 3 procesos críticos que deben sistematizarse en SOPs.',
+      'Presentar al coach en sesión 1-a-1.'
+    ],
+    recursos: [
+      { nombre: 'Plantilla Post-Mortem (Anexo C)', url: '#', desc: '10 secciones estructuradas' },
+      { nombre: 'Google Sheets', url: 'https://docs.google.com/spreadsheets', desc: 'Comparativo plan vs real' },
+      { nombre: 'Notion', url: 'https://www.notion.so', desc: 'Documentación organizada' }
+    ],
+    errores: [
+      'Saltarse el post-mortem por la urgencia del próximo deal.',
+      'Post-mortem solo cualitativo sin números.',
+      'No presentar al coach (perdés perspectiva externa).',
+      'Identificar errores sin diseñar cómo evitarlos en próximo deal.',
+      'Empezar segundo deal sin SOPs.'
+    ]
+  },
+  {
+    id: 'sops',
+    aplicaA: (p, a) => a.deals_cerrados === '1' || a.deals_cerrados === '2_4',
+    etapa: 'E5', subetapa: 'SOPs (Standard Operating Procedures)',
+    observacion: 'Los SOPs son lo que permite delegar. Sin SOPs todo el conocimiento está en tu cabeza y el negocio no puede crecer. Cada SOP documenta cómo hacer una tarea sin que la haga el dueño.',
+    tiempo: '4-6 horas por SOP (total 12-30 horas para top 3-5 SOPs)',
+    actividad: 'Crear Standard Operating Procedures escritos para los procesos críticos identificados en el post-mortem.',
+    entregable: '3-5 SOPs documentados en Taskade/Notion + validados con prueba real por terceros.',
+    pasos: [
+      'Tomar los 3-5 procesos priorizados en el post-mortem.',
+      'Por cada proceso escribir el SOP con plantilla de 8 secciones (objetivo, responsable, cuándo, herramientas, pasos, criterios éxito, excepciones, checklist).',
+      'Validar SOP con prueba real: que una persona DIFERENTE ejecute el proceso solo con el documento.',
+      'Ajustar el SOP según fricciones encontradas en la prueba.',
+      'Versionar (1.0, 1.1, etc.) y subir a Taskade en sección "SOPs del Negocio".'
+    ],
+    recursos: [
+      { nombre: 'Notion', url: 'https://www.notion.so', desc: 'SOPs con estructura potente' },
+      { nombre: 'Tango', url: 'https://www.tango.us', desc: 'Graba pasos en pantalla automáticamente' },
+      { nombre: 'Loom', url: 'https://www.loom.com', desc: 'Videos tutoriales para SOPs visuales' },
+      { nombre: 'Process Street', url: 'https://www.process.st', desc: 'SOPs en formato checklist' }
+    ],
+    errores: [
+      'SOPs genéricos sin pasos específicos accionables.',
+      'No validar con tercero (asume claridad que no existe).',
+      'No versionar (el SOP se desactualiza sin trazabilidad).',
+      'Documentar TODO al mismo tiempo (prioriza top 3-5 primero).',
+      'No actualizar SOPs cuando aprendés algo nuevo.'
+    ]
+  },
+  {
+    id: 'project_manager',
+    aplicaA: (p, a) => a.deals_cerrados === '2_4' || a.deals_cerrados === '5_mas' || (a.objetivo === 'escalar' && a.meta_deals !== '1'),
+    etapa: 'E5', subetapa: 'Contratar Project Manager',
+    observacion: 'La trampa del flipper es quedarse atrapado en E3 (ejecución) y nunca volver a E1 (evaluación). Sin PM hacés 2-3 flips al año. Con PM hacés 8-12. Es el cuello de botella más importante para escalar.',
+    tiempo: '20-30 horas (proceso completo de contratación)',
+    actividad: 'Contratar Project Manager que asuma ejecución diaria de obra mientras te enfocás en buscar deals y construir relaciones.',
+    entregable: 'PM contratado con contrato firmado + 1 obra delegada totalmente + estudiante reduce 60%+ tiempo en obra.',
+    pasos: [
+      'Definir perfil del PM (job description con experiencia, hard skills, soft skills).',
+      'Publicar vacante en LinkedIn Jobs + Indeed + ZipRecruiter + red de referidos.',
+      'Screening + entrevista técnica con mínimo 5 candidatos.',
+      'Prueba pagada de 2 semanas con el finalista usando los SOPs.',
+      'Contratar formalmente con contrato escrito (KPIs, salario base, bonos por proyecto).',
+      'Onboarding con los SOPs + acompañamiento primeras 4 semanas.'
+    ],
+    recursos: [
+      { nombre: 'LinkedIn Jobs', url: 'https://www.linkedin.com/jobs', desc: 'Calidad alta' },
+      { nombre: 'Indeed', url: 'https://www.indeed.com', desc: 'Volumen de candidatos' },
+      { nombre: 'ZipRecruiter', url: 'https://www.ziprecruiter.com', desc: 'Posting rápido' },
+      { nombre: 'AngelList', url: 'https://wellfound.com', desc: 'Para startups y proyectos pequeños' }
+    ],
+    errores: [
+      'Contratar sin prueba pagada (descubrís fit después de 3 meses).',
+      'No tener SOPs antes de contratar (PM no tiene cómo operar).',
+      'Micromanage al PM (anula el propósito de contratarlo).',
+      'Compensación solo base sin bonos por proyecto.',
+      'No definir KPIs medibles para el PM.'
+    ]
+  },
+
+  // ━━━━━━━━━━ WHOLESALING ESPECÍFICO ━━━━━━━━━━
+  {
+    id: 'wholesaling_setup',
+    aplicaA: (p, a) => a.objetivo === 'wholesale',
+    etapa: 'E1+E2', subetapa: 'Setup de Wholesaling',
+    observacion: 'Wholesaling NO es legal en todos los estados sin licencia. Antes de invertir tiempo, validar legalidad en tu estado. Y aunque sea legal, requiere LLC para proteger patrimonio personal.',
+    tiempo: '15-20 horas (setup) + cadencia continua de lead gen',
+    actividad: 'Setup completo de negocio wholesaling: LLC, lead generation activa (1 canal primario), buyer list de 50+ cash buyers, sistema de assignment contracts.',
+    entregable: 'LLC formada + 1 canal lead gen activo + buyer list 50+ + 5 plantillas de contratos listas.',
+    pasos: [
+      'Verificar legalidad de wholesaling en tu estado (algunos requieren licencia).',
+      'Formar LLC (E0.1.1) + EIN + cuenta bancaria.',
+      'Elegir 1 canal lead generation: Direct Mail / Driving for Dollars / Cold Calling / Facebook Ads.',
+      'Implementar el canal con 100 contactos iniciales.',
+      'Construir buyer list: 50+ cash buyers identificados (BiggerPockets, REIA local, Facebook Groups).',
+      'Comprar/adaptar templates legales: Purchase Agreement + Assignment Contract.',
+      'Crear sistema de tracking: leads → contactos → ofertas → contratos firmados → assignments cerrados.'
+    ],
+    recursos: [
+      { nombre: 'PropStream', url: 'https://www.propstream.com', desc: 'Lead generation + comps' },
+      { nombre: 'BatchLeads', url: 'https://batchleads.io', desc: 'Cold calling + skip tracing' },
+      { nombre: 'DealMachine', url: 'https://www.dealmachine.com', desc: 'Driving for Dollars app' },
+      { nombre: 'Carrot', url: 'https://www.oncarrot.com', desc: 'Website + SEO para investors' },
+      { nombre: 'BiggerPockets Wholesaling Forum', url: 'https://www.biggerpockets.com/forums/93-wholesaling', desc: 'Comunidad activa + templates' }
+    ],
+    errores: [
+      'Empezar sin verificar legalidad (puede generar problemas legales).',
+      'Probar 5 canales a la vez (no se domina ninguno).',
+      'No tener buyer list antes de buscar deals.',
+      'Usar contratos genéricos sin adaptar a tu estado.',
+      'Cobrar assignment fee sin disclosure al seller (puede ser ilegal según estado).'
+    ]
+  },
+
+  // ━━━━━━━━━━ LENDER PASIVO ━━━━━━━━━━
+  {
+    id: 'lender_due_diligence',
+    aplicaA: (p, a) => a.objetivo === 'lender',
+    etapa: 'E1+E5', subetapa: 'Due diligence + estructura legal del préstamo',
+    observacion: 'Como lender pasivo no operás el negocio, pero TU plata está en juego. La calidad del operador y la estructura legal del préstamo determinan si recuperás capital + intereses o perdés todo.',
+    tiempo: '10-15 horas (proceso completo de evaluación + estructura)',
+    actividad: 'Construir framework para evaluar operadores + estructurar legalmente el préstamo con Note + Deed of Trust + 1st lien position.',
+    entregable: 'Framework de evaluación de operadores + abogado + title company + 1 deal piloto cerrado con documentación legal correcta.',
+    pasos: [
+      'Aprender a evaluar deals (ARV, MAO, rehab estimate) — leer Anexo A caso de estudio.',
+      'Identificar 3-5 operadores activos (vía REIA local, BiggerPockets, FlipMentoría).',
+      'Validar track record de cada operador: cuántos deals cerrados, ROI promedio, referencias.',
+      'Contratar abogado de real estate (preparar Note, Deed of Trust, Loan Agreement).',
+      'Contratar title company para recording del 1st lien.',
+      'Para primer préstamo: empezar con $50K-$100K (no todo el capital).',
+      'Establecer cadencia: estados mensuales del operador + visita a propiedad opcional.',
+      'Diversificar entre 3-5 operadores en próximos 12 meses.'
+    ],
+    recursos: [
+      { nombre: 'BiggerPockets Lender Forum', url: 'https://www.biggerpockets.com/forums/65-private-lending', desc: 'Comunidad y casos' },
+      { nombre: 'AAPL (American Association of Private Lenders)', url: 'https://aaplonline.com', desc: 'Industria y estándares' },
+      { nombre: 'PrivateLenderLink', url: 'https://privatelenderlink.com', desc: 'Network + recursos' }
+    ],
+    errores: [
+      'Prestar sin abogado y title company (sin protección legal real).',
+      'Aceptar 2nd lien en lugar de 1st lien (mayor riesgo).',
+      'No verificar insurance coverage de la propiedad.',
+      'No diversificar (todo el capital con 1 operador).',
+      'No establecer mecanismo de salida si el operador no paga (judicial foreclosure).'
+    ]
+  },
+
+  // ━━━━━━━━━━ INTERNACIONAL ━━━━━━━━━━
+  {
+    id: 'internacional_setup',
+    aplicaA: (p, a) => a.inmigracion === 'internacional' || (a.inmigracion === 'itin' && a.deals_cerrados === '0'),
+    etapa: 'E0', subetapa: 'Setup específico internacional',
+    observacion: 'Inversores internacionales tienen 3 capas extra de complejidad: estructura legal cross-border, tax treaties, financiamiento sin SSN. Estos NO son opcionales — son el setup base.',
+    tiempo: '20-30 horas + tiempos de tramitación',
+    actividad: 'Setup legal/fiscal completo para invertir desde fuera de USA: LLC USA + ITIN + CPA bilingüe + abogado tax internacional + HMLs que financian non-residents.',
+    entregable: 'LLC USA + ITIN obtenido + CPA y abogado bilingües + lista de 3 HMLs que financian non-residents + entender treaties de doble tributación.',
+    pasos: [
+      'Solicitar ITIN al IRS (Form W-7) — toma 6-11 semanas si lo hacés desde fuera USA.',
+      'Formar LLC USA (puede ser single-member, con foreign owner).',
+      'Identificar CPA bilingüe especializado en investors internacionales.',
+      'Verificar treaty de doble tributación entre tu país y USA.',
+      'Investigar HMLs que financian non-residents (algunos lo hacen con 30-40% down).',
+      'Considerar estructura holding offshore si el capital lo justifica (consultar abogado).',
+      'Aprender glosario técnico en inglés (Anexo C.6).',
+      'Decidir si vas a viajar a USA para closings o usar power of attorney.'
+    ],
+    recursos: [
+      { nombre: 'IRS Form W-7 (ITIN)', url: 'https://www.irs.gov/forms-pubs/about-form-w-7', desc: 'Aplicación ITIN' },
+      { nombre: 'Northwest Registered Agent', url: 'https://www.northwestregisteredagent.com', desc: 'LLC formation para foreign owners' },
+      { nombre: 'America\'s Best Tax Lenders', url: 'https://www.americasbest.com', desc: 'CPAs internacional' },
+      { nombre: 'Investopedia 1031 Exchange', url: 'https://www.investopedia.com/terms/s/section1031.asp', desc: 'Concepto USA fundamental' }
+    ],
+    errores: [
+      'Asumir que las reglas de tu país aplican igual en USA.',
+      'No obtener ITIN antes de necesitarlo (toma 6-11 semanas).',
+      'CPA generalista que no entiende treaties internacionales.',
+      'Cerrar deals sin entender tax implications (FIRPTA, withholding 15%).',
+      'No considerar que la repatriación de capital tiene reglas específicas.'
+    ]
+  },
+
+  // ━━━━━━━━━━ RECONSTRUIR CRÉDITO ━━━━━━━━━━
+  {
+    id: 'reconstruir_credito',
+    aplicaA: (p, a) => a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial',
+    etapa: 'PRE-E0', subetapa: 'Reconstruir / construir crédito',
+    observacion: 'Sin crédito sólido, los HMLs te rechazan o te cobran tasas 3-5 puntos arriba del mercado. El crédito se reconstruye en 6-12 meses con disciplina. Track paralelo al estudio del negocio.',
+    tiempo: '2-4 horas setup + cadencia mensual durante 6-12 meses',
+    actividad: 'Reconstruir credit score a 660+ FICO en paralelo al setup del negocio (E0). Aplicar herramientas específicas de credit building.',
+    entregable: 'Credit score subiendo +50-100 puntos en 6 meses + acceso a HMLs estándar al mes 12.',
+    pasos: [
+      'Pedir reporte gratis en annualcreditreport.com (las 3 agencias).',
+      'Disputar cualquier error en los reportes.',
+      'Aplicar a 1 secured credit card (Discover It Secured o Capital One Platinum).',
+      'Usar la tarjeta < 30% utilization + pagar 100% a tiempo cada mes.',
+      'Pedirle a familiar con buen score que te agregue como authorized user.',
+      'Si tenés deudas en colecciones, negociar pay-for-delete con coleccionistas.',
+      'Considerar Self Credit Builder Loan ($25-50/mes builds credit history).',
+      'Monitor mensual con Credit Karma o Experian Boost.'
+    ],
+    recursos: [
+      { nombre: 'AnnualCreditReport.com', url: 'https://www.annualcreditreport.com', desc: 'Reporte gratis 3 agencias (única página legítima)' },
+      { nombre: 'Discover It Secured', url: 'https://www.discover.com/credit-cards/secured', desc: 'Secured card que reporta a 3 agencias' },
+      { nombre: 'Capital One Platinum Secured', url: 'https://www.capitalone.com/credit-cards/platinum-secured', desc: 'Alternativa secured card' },
+      { nombre: 'Self Credit Builder Loan', url: 'https://www.self.inc', desc: 'Loan que construye historial' },
+      { nombre: 'Credit Karma', url: 'https://www.creditkarma.com', desc: 'Monitor mensual gratis' },
+      { nombre: 'Experian Boost', url: 'https://www.experian.com/consumer-products/score-boost.html', desc: 'Reportar pagos de utilities' }
+    ],
+    errores: [
+      'Aplicar a 5+ tarjetas a la vez (hard inquiries dañan score).',
+      'Cerrar tarjetas viejas (acorta credit history).',
+      'Maxing out la tarjeta secured (>30% utilization).',
+      'Pagar el balance "casi a tiempo" (1 pago tardío = -60 a -100 puntos).',
+      'No disputar errores en los reportes (35% de los reportes tienen errores).'
+    ]
+  },
+
+  // ━━━━━━━━━━ REVISIÓN MENTOR (siempre) ━━━━━━━━━━
+  {
+    id: 'revision_mentor',
+    aplicaA: (p, a) => true, // Aplica a todos
+    etapa: 'Revisión', subetapa: 'Preparación para sesión con mentor',
+    observacion: 'La reunión con mentor debe usarse para tomar decisiones, no para organizar información básica. El estudiante debe llegar con evidencia, números y preguntas puntuales.',
+    tiempo: 'Aproximadamente 4 a 6 horas totales.',
+    actividad: 'Consolidar todo el trabajo en un resumen ejecutivo para revisión con el mentor.',
+    entregable: 'Resumen + carpetas/evidencias organizadas en Taskade, Drive o plataforma.',
+    pasos: [
+      'Consolidar Buy Box final.',
+      'Adjuntar Capital Stack y gap máximo disponible.',
+      'Adjuntar HML primario, backup y term sheets.',
+      'Adjuntar top 10 wholesalers y top 3 contratistas.',
+      'Adjuntar 3 paquetes de oferta.',
+      'Escribir preguntas puntuales para el mentor.',
+      'Subir evidencias a plataforma antes de la sesión.'
+    ],
+    recursos: [
+      { nombre: 'Taskade / FlipTrack', url: 'https://www.taskade.com', desc: 'Subir tareas y evidencias' },
+      { nombre: 'Google Drive', url: 'https://drive.google.com', desc: 'Carpeta del caso' },
+      { nombre: 'Google Meet', url: 'https://meet.google.com', desc: 'Sesión con mentor' },
+      { nombre: 'Google Calendar', url: 'https://calendar.google.com', desc: 'Agendar próximos hitos' }
+    ],
+    errores: [
+      'Llegar a la sesión con dudas generales y sin documentos.',
+      'No subir evidencia antes de pedir revisión.',
+      'No priorizar una propiedad o caso concreto.',
+      'Pedir validación de estrategia sin tener capital y HML claros.',
+      'No convertir la reunión en próximos pasos medibles.'
+    ]
+  }
+];
+
+function fmGenerarBloques(p, a) {
+  // Filtrar bloques que aplican al perfil
+  const bloques = FM_BLOQUES.filter(b => b.aplicaA(p, a));
+  // Ordenar por etapa
+  const ordenEtapas = { 'PRE-E0': 0, 'E0': 1, 'E1': 2, 'E2': 3, 'E1+E2': 3.5, 'E1+E5': 4, 'E2/E1': 4, 'E1/E2': 4.5, 'E3': 5, 'E4': 6, 'E5': 7, 'Revisión': 99 };
+  bloques.sort((a, b) => (ordenEtapas[a.etapa] || 50) - (ordenEtapas[b.etapa] || 50));
+  return bloques;
+}
+
+function fmRenderDiagPlanLegacyHelpers() { /* placeholder */ }
+
+function fmRenderDiagPlanLegacy() {
   const r = fmState.diagResult;
   const a = r.answers;
 
@@ -2686,10 +3581,410 @@ function fmRenderDiagPlan() {
   `;
 }
 
+// ─── NUEVA VISTA: Plan robusto tipo Miguel Guzmán ───
+function fmRenderDiagPlan() {
+  const r = fmState.diagResult;
+  const a = r.answers;
+  const p = r.perfil;
+
+  // Generar perfil enriquecido con datos del usuario
+  const userProfile = {
+    mercado: a.mercado_estado || 'tu mercado',
+    estrategiaLabel: a.objetivo === 'flip' ? 'Fix & Flip' :
+                     a.objetivo === 'hold' ? 'Fix & Hold' :
+                     a.objetivo === 'wholesale' ? 'Wholesaling' :
+                     a.objetivo === 'hibrido' ? 'Mix Flip + Hold' :
+                     a.objetivo === 'escalar' ? 'Escala de negocio' :
+                     a.objetivo === 'lender' ? 'Private Money Lending' : 'Fix & Flip'
+  };
+
+  const bloques = fmGenerarBloques(userProfile, a);
+  const analisisProfundo = fmGenerarAnalisisProfundo(p, r, a, userProfile);
+  const objetivoOperativo = fmGenerarObjetivoOperativo(userProfile, a);
+  const reglaPlan = fmGenerarReglaPlan(p, a);
+  const checklistFinal = fmGenerarChecklistFinal(bloques, a);
+
+  return `
+    <div class="h-full overflow-y-auto bg-slate-50" id="fm-plan-print">
+      <!-- Header del plan -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white print:bg-white print:text-slate-900">
+        <div class="max-w-5xl mx-auto px-8 py-8">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <div class="text-xs font-bold text-amber-400 tracking-wider mb-2 print:text-amber-700">FLIPMENTORÍA · PLAN DE TRABAJO PERSONALIZADO</div>
+              <h1 class="text-3xl font-bold mb-2">${p.emoji} Plan de Trabajo · ${p.nombre}</h1>
+              <p class="text-sm text-slate-300 print:text-slate-600">Perfil #${p.num} · ${r.etapa} · ${r.cronograma}</p>
+            </div>
+            <div class="flex gap-2 print:hidden">
+              <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">🖨️ Imprimir</button>
+              <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">📋 Copiar</button>
+              <button onclick="fmDiagReset()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">🔄 Repetir</button>
+            </div>
+          </div>
+          <div class="mt-6 bg-blue-900 bg-opacity-50 print:bg-blue-50 rounded-lg p-4 border border-blue-700 print:border-blue-200">
+            <div class="text-xs font-bold text-blue-300 print:text-blue-700 tracking-wider mb-1">OBJETIVO OPERATIVO</div>
+            <p class="text-sm font-medium print:text-slate-900">${objetivoOperativo}</p>
+          </div>
+          <div class="mt-3 bg-amber-900 bg-opacity-50 print:bg-amber-50 rounded-lg p-3 border border-amber-700 print:border-amber-200">
+            <span class="text-xs font-bold text-amber-300 print:text-amber-700 tracking-wider">REGLA DEL PLAN: </span>
+            <span class="text-sm">${reglaPlan}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Análisis profundo del cliente -->
+      <div class="max-w-5xl mx-auto px-8 py-8">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span>🔬</span> Análisis Profundo del Cliente
+          </h2>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+            <div class="bg-slate-50 rounded-lg p-3">
+              <div class="text-xs font-bold text-slate-500 tracking-wider mb-1">PERFIL</div>
+              <div class="font-bold text-slate-900">#${p.num} ${p.nombre}</div>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3">
+              <div class="text-xs font-bold text-slate-500 tracking-wider mb-1">ETAPA ACTUAL</div>
+              <div class="font-bold text-slate-900">${r.etapa}</div>
+            </div>
+            <div class="bg-slate-50 rounded-lg p-3">
+              <div class="text-xs font-bold text-slate-500 tracking-wider mb-1">CRONOGRAMA</div>
+              <div class="font-bold text-slate-900 text-sm">${r.cronograma}</div>
+            </div>
+          </div>
+
+          <div class="space-y-4 text-sm text-slate-700 leading-relaxed">
+            ${analisisProfundo.map(parrafo => `<p>${parrafo}</p>`).join('')}
+          </div>
+
+          <!-- Fortalezas + Riesgos lado a lado -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <h4 class="text-sm font-bold text-emerald-900 mb-2">✅ Fortalezas identificadas</h4>
+              <ul class="space-y-1 text-xs text-emerald-900">
+                ${r.fortalezas.length ? r.fortalezas.map(f => `<li class="flex gap-1.5"><span>•</span><span>${f}</span></li>`).join('') : '<li class="italic text-emerald-700">Estás empezando — esa es tu primera fortaleza: claridad para construir desde cero.</li>'}
+              </ul>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h4 class="text-sm font-bold text-red-900 mb-2">⚠️ Riesgos críticos a mitigar</h4>
+              <ul class="space-y-1 text-xs text-red-900">
+                ${fmGenerarRiesgos(a, p).map(r => `<li class="flex gap-1.5"><span>•</span><span>${r}</span></li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOC de Bloques -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+          <h2 class="text-xl font-bold text-slate-900 mb-3">📋 Plan de Acción · ${bloques.length} Bloques</h2>
+          <p class="text-sm text-slate-600 mb-4">Estos bloques se ejecutan de manera secuencial (E0 → E1 → E2 → ...) aunque varios pueden trabajarse en paralelo. Cada bloque tiene observación del mentor, tiempo, actividad, entregable, paso a paso, recursos y errores comunes.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            ${bloques.map((b, i) => `
+              <a href="#bloque-${b.id}" class="px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center gap-3 text-sm transition">
+                <div class="w-7 h-7 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">${i + 1}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-bold text-amber-700">${b.etapa}</div>
+                  <div class="text-sm font-medium text-slate-900 truncate">${b.subetapa}</div>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Bloques completos -->
+        ${bloques.map((b, i) => fmRenderBloque(b, i, userProfile, a)).join('')}
+
+        <!-- Checklist Final -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-sm p-6 mb-6 print:bg-white print:text-slate-900 print:border print:border-slate-300">
+          <h2 class="text-xl font-bold mb-2 flex items-center gap-2"><span>✅</span> Checklist Final</h2>
+          <p class="text-sm text-slate-300 print:text-slate-600 mb-4">Vas a estar listo para tu primer (o próximo) deal cuando todos estos ítems estén ✓:</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            ${checklistFinal.map(item => `
+              <div class="flex items-start gap-2 text-sm">
+                <span class="text-amber-400 print:text-amber-700 mt-0.5">☐</span>
+                <span>${item}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Frase final -->
+        <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-2xl p-6 mb-6">
+          <div class="text-xs font-bold text-amber-700 tracking-wider mb-2">FRASE FINAL QUE DEBÉS PODER SOSTENER</div>
+          <p class="text-lg italic text-slate-900 font-medium leading-relaxed">${fmGenerarFraseFinal(userProfile, a)}</p>
+        </div>
+
+        <!-- Botones acción al final -->
+        <div class="flex gap-3 print:hidden">
+          <button onclick="fmDiagOpenLibrary()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">📚 Abrir Biblioteca</button>
+          <button onclick="fmDiagPrintPlan()" class="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800">🖨️ Imprimir Plan</button>
+          <button onclick="fmDiagReset()" class="px-4 py-3 bg-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-300">🔄 Nuevo diagnóstico</button>
+        </div>
+
+      </div>
+    </div>
+
+    <style>
+      @media print {
+        #fm-plan-print { background: white !important; }
+        .print\\:hidden { display: none !important; }
+        .print\\:bg-white { background: white !important; }
+        .print\\:text-slate-900 { color: #0F172A !important; }
+        .print\\:border { border: 1px solid #E2E8F0 !important; }
+        .print\\:bg-blue-50 { background: #EFF6FF !important; }
+        .print\\:bg-amber-50 { background: #FFFBEB !important; }
+        .print\\:text-amber-700 { color: #B45309 !important; }
+        .print\\:text-blue-700 { color: #1D4ED8 !important; }
+      }
+    </style>
+  `;
+}
+
+function fmRenderBloque(b, idx, p, a) {
+  const actividadStr = typeof b.actividad === 'function' ? b.actividad(p, a) : b.actividad;
+  return `
+    <div id="bloque-${b.id}" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+      <!-- Header del bloque -->
+      <div class="bg-slate-900 text-white px-6 py-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-amber-500 text-slate-900 font-bold text-lg flex items-center justify-center flex-shrink-0">${idx + 1}</div>
+        <div class="flex-1">
+          <div class="text-xs font-bold text-amber-300 tracking-wider">BLOQUE ${idx + 1} · ${b.etapa}</div>
+          <div class="text-lg font-bold">${b.subetapa}</div>
+        </div>
+      </div>
+
+      <!-- Observación del mentor -->
+      <div class="px-6 pt-5">
+        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-r-lg p-4">
+          <div class="text-xs font-bold text-blue-700 tracking-wider mb-1">OBSERVACIÓN DEL MENTOR</div>
+          <p class="text-sm text-slate-800 leading-relaxed">${b.observacion}</p>
+        </div>
+      </div>
+
+      <!-- Tabla del bloque -->
+      <div class="p-6">
+        <table class="w-full border border-slate-300 text-sm">
+          <tbody>
+            <tr class="border-b border-slate-300">
+              <th class="bg-slate-800 text-white text-left p-3 w-1/3 align-top font-bold text-sm">⏱️ Tiempo estimado</th>
+              <td class="p-3 align-top">${b.tiempo}</td>
+            </tr>
+            <tr class="border-b border-slate-300">
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🎯 Actividad</th>
+              <td class="p-3 align-top">${actividadStr}</td>
+            </tr>
+            <tr class="border-b border-slate-300">
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">📦 Entregable</th>
+              <td class="p-3 align-top font-medium">${b.entregable}</td>
+            </tr>
+            <tr class="border-b border-slate-300">
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🪜 Paso a paso</th>
+              <td class="p-3 align-top">
+                <ol class="space-y-1.5 list-decimal list-inside text-slate-800">
+                  ${b.pasos.map(paso => `<li>${paso}</li>`).join('')}
+                </ol>
+              </td>
+            </tr>
+            <tr class="border-b border-slate-300">
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🧰 Recursos y herramientas</th>
+              <td class="p-3 align-top">
+                <ul class="space-y-1.5">
+                  ${b.recursos.map(r => `
+                    <li class="text-sm">
+                      <a href="${r.url}" target="_blank" rel="noopener" class="text-blue-600 hover:underline font-medium">${r.nombre}</a>
+                      <span class="text-slate-600">— ${r.desc}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </td>
+            </tr>
+            <tr>
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">⚠️ Errores reales que veo todo el tiempo</th>
+              <td class="p-3 align-top">
+                <ul class="space-y-1 text-slate-800">
+                  ${b.errores.map(e => `<li class="flex gap-2"><span class="text-red-500">•</span><span>${e}</span></li>`).join('')}
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function fmGenerarObjetivoOperativo(p, a) {
+  if (a.objetivo === 'lender') {
+    return `Soy private money lender. Presto capital con Note + Deed of Trust en 1st lien position, evalúo operadores con framework propio, diversifico entre 3-5 operadores, y obtengo 8-12% anual sobre capital prestado.`;
+  }
+  if (a.objetivo === 'wholesale') {
+    return `Hago wholesaling en ${p.mercado}, encuentro deals off-market con lead gen propio (1 canal dominado), cierro 1-2 assignments/mes con fee promedio $10K-$20K, y construyo capital para hacer mi primer flip propio en 12 meses.`;
+  }
+  const estrategiaTxt = a.objetivo === 'hold' ? 'Fix & Hold' : a.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip';
+  const metaTxt = a.meta_deals === '1' ? '1 deal' : a.meta_deals === '2_3' ? '2-3 deals' : a.meta_deals === '4_6' ? '4-6 deals' : '7+ deals';
+  return `Compro propiedades en ${p.mercado}, con estrategia ${estrategiaTxt}, ${metaTxt} en los próximos 12 meses, con capital de ${fmCapitalRange(a.capital)}, HML primario pre-aprobado y red operativa de 25+ wholesalers, 3 GCs y CPA/abogado activos.`;
+}
+
+function fmCapitalRange(c) {
+  return ({ 'menos_20k': '< $20K', '20_50k': '$20K-$50K', '50_100k': '$50K-$100K', '100_250k': '$100K-$250K', 'mas_250k': '> $250K' })[c] || 'definido';
+}
+
+function fmGenerarReglaPlan(p, a) {
+  if (a.objetivo === 'lender') return 'Due diligence sólida + estructura legal correcta + diversificación entre operadores.';
+  if (a.objetivo === 'wholesale') return 'Lead gen propio + buyer list activa + contratos legales en paralelo.';
+  if (p.num === 2) return 'Reconstruir crédito + LLC + ofertas en paralelo. Cada track tiene su propio ritmo, ninguno bloquea al otro.';
+  if (p.num === 4 && (a.deals_cerrados === '5_mas')) return 'SOPs documentados + capital diversificado + equipo construido ANTES de escalar a múltiples deals simultáneos.';
+  return 'Crédito en paralelo + deals en paralelo + contactos en paralelo. No esperás a tener todo perfecto; trabajás los 3 frentes a la vez.';
+}
+
+function fmGenerarAnalisisProfundo(p, r, a, userProfile) {
+  const parrafos = [];
+
+  // Párrafo 1: contexto general
+  parrafos.push(`Sos un perfil <strong>#${p.num} ${p.nombre}</strong>, ubicado en etapa <strong>${r.etapa}</strong> de la metodología FlipMentoría. Tu cronograma esperado para llegar al primer hito mayor es de <strong>${r.cronograma}</strong>. Trabajás con <strong>${a.tiempo === 'mas_30' ? 'tiempo full-time' : a.tiempo === '15_30' ? 'medio tiempo (15-30h/sem)' : 'tiempo limitado (<15h/sem)'}</strong>, lo cual ${a.tiempo === 'menos_15' ? 'extiende el cronograma — vas a tener que ser brutal con prioridades' : 'te permite avanzar a buen ritmo si la disciplina se sostiene'}.`);
+
+  // Párrafo 2: capital
+  const capitalTxt = fmCapitalRange(a.capital);
+  const liquidoTxt = a.capital_real === 'todo' ? '100% líquido' : a.capital_real === 'mitad' ? '~50% líquido' : a.capital_real === 'minimo' ? 'mínimo líquido' : 'mayoritariamente teórico';
+  parrafos.push(`Tu capital reportado es <strong>${capitalTxt}</strong> y está <strong>${liquidoTxt}</strong>. ${a.capital_real === 'teorico' || a.capital_real === 'minimo' ? 'Esto es un riesgo crítico — el capital teórico no se usa para ofertar. Antes de hacer cualquier oferta formal, tenés que convertir ese capital en líquido real (acceso 24-48h). Sin esto, los HMLs no te van a aprobar y los wholesalers no te van a tomar en serio.' : 'Esto te da capacidad real de cerrar deals con HML cuando aparezca la oportunidad correcta.'} ${a.fuentes_capital === 'a_construir' ? 'Además, mencionaste que tenés que CONSTRUIR fuentes de capital adicional — esto va en paralelo al estudio de mercado (Bloques de E2).' : ''}`);
+
+  // Párrafo 3: crédito
+  if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
+    parrafos.push(`Tu credit score (<strong>${({ 'menos_600': '< 600', '600_660': '600-660', 'sin_historial': 'sin historial USA' })[a.credit]}</strong>) es el segundo riesgo crítico. Los HMLs estándar (Kiavi, Lima One, RCN) requieren FICO 660+. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'En tu caso necesitás reconstruir crédito 6-12 meses ANTES de aplicar, o ir por opciones alternativas: HMLs flexibles con FICO 600+ (Easy Street Capital), partnership con socio que tenga crédito, o empezar con wholesaling.' : 'Tu score está en zona limítrofe — algunos HMLs te aceptan pero con tasas 2-3 puntos arriba. Vale la pena trabajar para subirlo a 720+ en paralelo.'} Este es un track paralelo: no bloquea avanzar con E0 ni con análisis de mercado.`);
+  } else {
+    parrafos.push(`Tu credit score (<strong>${({ 'mas_780': '> 780', '720_780': '720-780', '660_720': '660-720' })[a.credit]}</strong>) te da acceso a los HMLs estándar nacionales (Kiavi, Lima One, RCN, Easy Street). Esto significa que el cuello de botella NO va a ser financiamiento — va a ser encontrar el deal correcto al precio correcto.`);
+  }
+
+  // Párrafo 4: setup legal
+  if (a.llc === 'no') {
+    parrafos.push(`<strong>No tenés LLC formada</strong>. Esto es la tarea #1 del Bloque E0 — sin LLC no se ofertan propiedades porque arriesgás tu patrimonio personal completo (casa, ahorros, autos) en cada transacción. La LLC toma 1-4 semanas dependiendo del estado, así que se inicia hoy mismo en paralelo al estudio de mercado.`);
+  } else if (a.llc === 'si_otro') {
+    parrafos.push(`Tenés LLC formada pero <strong>en otro estado al de inversión</strong>. Esto genera "foreign LLC registration" — costo doble (filing fee del estado original + del estado de inversión), compliance doble. La solución más limpia: formar segunda LLC en el estado donde vas a invertir, o consultar con abogado de real estate para foreign registration formal.`);
+  } else if (a.llc === 'si_mismo') {
+    const setupItems = Array.isArray(a.setup_legal) ? a.setup_legal : [];
+    const completo = setupItems.includes('ein') && setupItems.includes('operating') && setupItems.includes('banco') && setupItems.includes('contabilidad') && setupItems.includes('cpa');
+    parrafos.push(`Tu setup legal está ${completo ? '<strong>completo</strong> (LLC + EIN + OA + banco + contabilidad + CPA). Esta es una fortaleza importante — la mayoría de los novatos se traban acá durante meses.' : `<strong>parcial</strong> — falta(n): ${['ein','operating','banco','contabilidad','cpa','abogado'].filter(x => !setupItems.includes(x)).map(x => ({ein:'EIN',operating:'Operating Agreement',banco:'Cuenta bancaria',contabilidad:'Contabilidad activa',cpa:'CPA',abogado:'Abogado'})[x]).join(', ')}. Completar lo que falta es prerequisito antes de cerrar deal.`}`);
+  }
+
+  // Párrafo 5: red operativa y momentum
+  const ofertasTxt = a.ofertas_mes === '10_mas' ? '10+ ofertas/mes' : a.ofertas_mes === '1_9' ? '1-9 ofertas/mes' : a.ofertas_mes === 'analisis_no_oferta' ? 'analizando deals pero sin ofertar' : 'sin ofertar todavía';
+  const wsTxt = a.wholesalers === '10_mas' ? '10+ wholesalers activos' : a.wholesalers === '3_9' ? '3-9 wholesalers' : a.wholesalers === '1_2' ? '1-2 wholesalers ocasionales' : 'ningún wholesaler activo';
+  parrafos.push(`Sobre tu momentum actual: <strong>${ofertasTxt}</strong> y <strong>${wsTxt}</strong>. ${a.ofertas_mes === 'cero' || a.ofertas_mes === 'analisis_no_oferta' ? 'El cuello de botella crítico es pasar de análisis a oferta. Sin volumen de ofertas (target 10+/mes) no hay deals cerrados. Los Bloques E1 (Buy Box, ARV, MAO) y E2 (HML, wholesalers) están diseñados para resolver esto en paralelo.' : 'Estás generando volumen. Foco ahora: mejorar tasa de aceptación con mejor pain identification del vendedor y closing más rápido.'}`);
+
+  // Párrafo 6: obstáculo principal
+  const obstaculoTxt = ({
+    'capital': 'capital insuficiente o no líquido',
+    'conocimiento': 'falta de conocimiento técnico (ARV, MAO, contratos)',
+    'red': 'red de contactos inexistente o débil',
+    'tiempo': 'tiempo limitado por otras responsabilidades',
+    'miedo': 'parálisis por análisis / miedo a ofertar',
+    'mercado': 'dificultad encontrando deals que pasen el filtro',
+    'equipo': 'necesidad de equipo para escalar'
+  })[a.mayor_obstaculo];
+  if (obstaculoTxt) {
+    parrafos.push(`Tu mayor obstáculo percibido es <strong>${obstaculoTxt}</strong>. El plan que sigue prioriza específicamente este obstáculo en los primeros bloques. ${a.mayor_obstaculo === 'miedo' ? 'Para parálisis, la solución NO es más información — es forzar volumen de ofertas. 10 ofertas/semana durante 30 días rompe el bloqueo.' : a.mayor_obstaculo === 'red' ? 'Para red débil, el Bloque "Base mínima de contactos" + "Wholesalers y pitch" te llevan de 0 a 25 contactos activos en 30-45 días.' : a.mayor_obstaculo === 'capital' ? 'Para capital, el Bloque "Capital Stack real" + opciones alternativas (private money, partnership, HELOC, wholesaling como bridge) está diseñado para resolver esto sin esperar años.' : 'El plan tiene bloques específicos para atacar este obstáculo directamente.'}`);
+  }
+
+  return parrafos;
+}
+
+function fmGenerarRiesgos(a, p) {
+  const riesgos = [];
+  if (a.capital_real === 'teorico') riesgos.push('Capital declarado es teórico — no se puede ofertar con esto.');
+  if (a.capital_real === 'minimo') riesgos.push('Mayoría del capital no líquido — convertir a líquido es prerequisito.');
+  if (a.credit === 'menos_600') riesgos.push('Credit score <600 bloquea HMLs estándar — track de reconstrucción 6-12 meses.');
+  if (a.credit === 'sin_historial') riesgos.push('Sin historial credit USA — necesita build credit desde cero o partnership.');
+  if (a.llc === 'no' && a.deals_cerrados !== '0') riesgos.push('Operar sin LLC con deals activos es riesgo legal alto.');
+  if (a.hml_status === 'ninguno' && a.objetivo !== 'wholesale' && a.objetivo !== 'lender') riesgos.push('Sin HML pre-aprobado, las ofertas se rechazan automáticamente (90%).');
+  if (a.deals_cerrados === '0' && a.ofertas_mes === 'cero') riesgos.push('Sin ofertas formales en último mes — riesgo de parálisis por análisis.');
+  if (a.wholesalers === 'cero' && a.objetivo !== 'lender') riesgos.push('Sin wholesalers activos = dependencia única en MLS (poco margen).');
+  if (a.deals_cerrados === '5_mas' && a.gc_status !== 'primario_backup') riesgos.push('5+ deals sin GC primario+backup es riesgo operativo crítico.');
+  if (a.tiempo === 'menos_15' && a.meta_deals !== '1') riesgos.push('Tiempo limitado + meta agresiva = cronograma irreal — ajustar meta o tiempo.');
+  if (a.inmigracion === 'internacional' && a.deals_cerrados === '0') riesgos.push('Inversor internacional sin ITIN obtenido — agregar 6-11 semanas al cronograma.');
+  if (riesgos.length === 0) riesgos.push('Sin riesgos críticos identificados — momentum positivo, mantener disciplina de hábitos.');
+  return riesgos;
+}
+
+function fmGenerarChecklistFinal(bloques, a) {
+  const items = [];
+
+  // Items base por etapa de bloques activos
+  const etapas = new Set(bloques.map(b => b.etapa));
+  if (etapas.has('PRE-E0')) {
+    items.push('Credit score subiendo (mínimo +50 puntos en 6 meses).');
+    items.push('Secured credit card activa con pagos 100% on-time.');
+  }
+  if (etapas.has('E0')) {
+    items.push('LLC aprobada por el Secretary of State.');
+    items.push('EIN del IRS obtenido.');
+    items.push('Operating Agreement firmado.');
+    items.push('Cuenta bancaria de negocio + tarjeta crédito activas.');
+    items.push('Software de contabilidad conectado al banco.');
+    items.push('CPA + abogado de real estate identificados.');
+    items.push('Big Why escrito + bloque diario 90 min en calendario.');
+    items.push('Quick Win semana 1 completado + documentado.');
+  }
+  if (etapas.has('E1') || etapas.has('E1+E2') || etapas.has('E2/E1') || etapas.has('E1/E2')) {
+    items.push('Buy Box de 1 página listo para enviar.');
+    items.push('5 ZIP codes definidos y validados con investigación de mercado.');
+    items.push('Lista de 20 SÍ y 20 NO (red flags) documentada.');
+    items.push('50 ARVs calculados con ARV conservador por ZIP.');
+    items.push('10+ propiedades analizadas con MAO en planilla.');
+    items.push('Ofertas formales enviadas: 10+/mes con LOI + Proof of Funds.');
+  }
+  if (etapas.has('E2') || etapas.has('E2/E1') || etapas.has('E1/E2')) {
+    items.push('Capital Stack documentado (líquido / probable / teórico).');
+    items.push('Earnest money máximo definido.');
+    items.push('Gap máximo definido.');
+    items.push('Reserva mínima definida que no se toca.');
+    items.push('10 HMLs entrevistados + 5 term sheets oficiales en PDF.');
+    items.push('HML primario pre-aprobado + HML backup.');
+    items.push('25 wholesalers en base + 10 activos enviando deals.');
+    items.push('10 realtors investor-friendly + 5 distressed agents.');
+    items.push('5 contactos REIA/networking activos.');
+    items.push('5 posibles private lenders en pipeline.');
+    items.push('10 contratistas filtrados + top 3 listos para cotizar.');
+    items.push('2 title companies investor-friendly identificadas.');
+    items.push('3 ofertas justificadas por MAO listas para presentar.');
+  }
+  if (etapas.has('E5')) {
+    items.push('Post-mortem del primer deal completo + presentado al coach.');
+    items.push('3-5 SOPs documentados y validados con prueba real.');
+    items.push('Project Manager contratado + 1 obra delegada.');
+    items.push('Red de private money en construcción (5+ contactos).');
+    items.push('Sistema de lead gen propio activo (1 canal).');
+    items.push('Plan anual documentado con metas trimestrales.');
+  }
+  if (a.objetivo === 'wholesale') {
+    items.push('Buyer list de 50+ cash buyers activos.');
+    items.push('1 canal de lead gen funcionando con métricas semanales.');
+    items.push('5 templates de contratos legales adaptados a tu estado.');
+  }
+  if (a.objetivo === 'lender') {
+    items.push('Framework de evaluación de operadores documentado.');
+    items.push('Abogado + title company para 1st lien recording.');
+    items.push('1 deal piloto con Note + Deed of Trust firmados.');
+    items.push('Diversificación entre 3+ operadores planeada.');
+  }
+  items.push('1 caso listo para revisión profunda con mentor.');
+  return items;
+}
+
+function fmGenerarFraseFinal(p, a) {
+  if (a.objetivo === 'lender') {
+    return `"Presto capital con Note + Deed of Trust en 1st lien position, evalúo operadores con framework propio, diversifico entre 3-5 operadores activos, y obtengo 8-12% anual sobre capital prestado en plazos de 6-12 meses."`;
+  }
+  if (a.objetivo === 'wholesale') {
+    return `"Encuentro deals off-market en ${p.mercado} con lead gen propio dominado, mantengo buyer list de 50+ cash buyers activos, y cierro 1-2 assignments/mes con fee promedio $10K-$20K mientras construyo capital para mi primer flip propio."`;
+  }
+  const estrategia = a.objetivo === 'hold' ? 'Fix & Hold' : a.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip';
+  return `"Compro propiedades tipo [SFH/Duplex], en ZIP codes [tus 5 ZIPs], para estrategia ${estrategia}, con ARV entre [$X-$Y], rehab máximo de [$X], cierre estimado en [14-21 días], usando [HML primario] + [$X de capital líquido + gap disponible]."`;
+}
+
 function fmDiagOpenLibrary() {
   fmState.activeTab = 'biblioteca';
   fmState.activeEtapa = 'INDICE';
-  // Buscar doc "Estados del Estudiante" si existe
   const estadosDoc = fmState.docs.find(d => d.categoria === 'perfiles');
   if (estadosDoc) {
     fmState.activeDocId = estadosDoc.id;
