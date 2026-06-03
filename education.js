@@ -2023,7 +2023,12 @@ const fmState = {
   activeEtapa: 'INDICE',
   activeDocId: null,
   searchQuery: '',
-  loading: false
+  loading: false,
+  activeTab: 'biblioteca',  // biblioteca | buscador | diagnostico
+  searchChat: [],
+  searchLoading: false,
+  diagnoseChat: [],
+  diagnoseLoading: false
 };
 
 const FM_ETAPAS = [
@@ -2088,17 +2093,52 @@ function fmRender() {
     return;
   }
 
-  const activeDoc = fmState.docs.find(d => d.id === fmState.activeDocId);
-
   root.innerHTML = `
+    <div class="h-full flex flex-col">
+      <!-- Header con tabs -->
+      <div class="bg-white border-b border-slate-200 px-6 pt-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="font-bold text-slate-900 text-lg">📘 ${fmState.sys.name}</h2>
+            <p class="text-xs text-slate-500">71 tareas · 400+ contactos · 3 anexos · IA Coach</p>
+          </div>
+          <button onclick="window.history.back()" class="text-sm text-slate-500 hover:text-slate-700">← Volver</button>
+        </div>
+        <div class="flex gap-1 -mb-px">
+          <button onclick="fmSetTab('biblioteca')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'biblioteca' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">📚 Biblioteca</button>
+          <button onclick="fmSetTab('buscador')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'buscador' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">🔍 Buscador IA</button>
+          <button onclick="fmSetTab('diagnostico')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'diagnostico' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">🎯 Diagnóstico</button>
+        </div>
+      </div>
+
+      <!-- Contenido del tab activo -->
+      <div class="flex-1 overflow-hidden">
+        ${fmState.activeTab === 'biblioteca' ? fmRenderBiblioteca() : ''}
+        ${fmState.activeTab === 'buscador' ? fmRenderBuscadorIA() : ''}
+        ${fmState.activeTab === 'diagnostico' ? fmRenderDiagnostico() : ''}
+      </div>
+    </div>
+  `;
+
+  if (fmState.activeTab === 'biblioteca') {
+    const activeDoc = fmState.docs.find(d => d.id === fmState.activeDocId);
+    if (activeDoc) fmRenderMarkdown(activeDoc);
+  }
+}
+
+function fmSetTab(tab) {
+  fmState.activeTab = tab;
+  fmRender();
+}
+
+function fmRenderBiblioteca() {
+  const activeDoc = fmState.docs.find(d => d.id === fmState.activeDocId);
+  return `
     <div class="flex h-full">
-      <!-- Sidebar izquierda: etapas + lista docs -->
       <aside class="w-72 bg-white border-r border-slate-200 flex flex-col">
         <div class="p-4 border-b border-slate-200">
-          <h2 class="font-bold text-slate-900 mb-1">📘 ${fmState.sys.name}</h2>
-          <p class="text-xs text-slate-500">71 tareas · 400+ contactos · 3 anexos</p>
           <input id="fm-search" type="text" placeholder="🔎 Buscar en biblioteca..." value="${fmState.searchQuery}"
-            class="mt-3 w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+            class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
             oninput="fmSearch(this.value)"/>
         </div>
         <nav class="flex-1 overflow-y-auto scrollbar-thin p-2">
@@ -2117,7 +2157,7 @@ function fmRender() {
                     ${docs.map(d => `
                       <button onclick="fmSetDoc('${d.id}')"
                         class="w-full text-left px-3 py-1.5 text-xs rounded transition ${d.id === fmState.activeDocId ? 'bg-blue-100 text-blue-900 font-medium' : 'text-slate-600 hover:bg-slate-50'}">
-                        ${d.titulo.replace(/^[🏛️🔍🏗️🔨💰🚀📚🧮🧠📘📇🛠️⚙️📋]\s*/, '').slice(0, 50)}${d.titulo.length > 50 ? '…' : ''}
+                        ${d.titulo.replace(/^[🏛️🔍🏗️🔨💰🚀📚🧮🧠📘📇🛠️⚙️📋🎯🗺️]\s*/, '').slice(0, 50)}${d.titulo.length > 50 ? '…' : ''}
                       </button>
                     `).join('')}
                   </div>
@@ -2127,22 +2167,192 @@ function fmRender() {
           }).join('')}
         </nav>
       </aside>
-
-      <!-- Main: render del documento activo -->
       <main class="flex-1 overflow-y-auto bg-slate-50">
         <div class="max-w-5xl mx-auto px-8 py-6">
-          ${activeDoc ? fmRenderDoc(activeDoc) : `
-            <div class="text-center py-20 text-slate-500">
-              <div class="text-6xl mb-4">📘</div>
-              <p>Seleccioná un documento del menú izquierdo</p>
-            </div>
-          `}
+          ${activeDoc ? fmRenderDoc(activeDoc) : `<div class="text-center py-20 text-slate-500"><div class="text-6xl mb-4">📘</div><p>Seleccioná un documento del menú izquierdo</p></div>`}
         </div>
       </main>
     </div>
   `;
+}
 
-  if (activeDoc) fmRenderMarkdown(activeDoc);
+function fmRenderBuscadorIA() {
+  return `
+    <div class="h-full flex flex-col bg-slate-50">
+      <div class="max-w-4xl mx-auto w-full flex-1 flex flex-col p-6 overflow-hidden">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4 flex-shrink-0">
+          <h3 class="font-bold text-slate-900 mb-1">🤖 Buscador IA — Coach Asistente</h3>
+          <p class="text-sm text-slate-600">Hacé cualquier pregunta sobre la metodología. La IA responde basándose ÚNICAMENTE en los 71 tareas, 400+ contactos, calculadoras y mindset de FlipMentoría — con citas a códigos específicos (E0.1.1, B.3, etc).</p>
+          <div class="mt-3 flex flex-wrap gap-2 text-xs">
+            <button onclick="fmSearchQuickAsk('¿Cuáles son los 5 errores más comunes que matan un primer flip?')" class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100">5 errores comunes que matan un flip</button>
+            <button onclick="fmSearchQuickAsk('¿Cómo calculo el MAO de una propiedad?')" class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100">Cómo calcular MAO</button>
+            <button onclick="fmSearchQuickAsk('¿Qué HMLs recomiendas si tengo credit score 660?')" class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100">HMLs con FICO 660</button>
+            <button onclick="fmSearchQuickAsk('¿Cuántas ofertas debo enviar al mes?')" class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100">Ofertas/mes target</button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto bg-white rounded-xl border border-slate-200 p-6 mb-4 space-y-4 scrollbar-thin">
+          ${fmState.searchChat.length === 0 ? `<div class="text-center text-slate-400 py-12"><div class="text-5xl mb-2">💬</div><p>Empezá la conversación con una pregunta</p></div>` : ''}
+          ${fmState.searchChat.map((m, i) => fmRenderChatMessage(m, i, 'search')).join('')}
+          ${fmState.searchLoading ? `<div class="flex items-start gap-3"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">🤖</div><div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600 italic">Pensando<span class="animate-pulse">...</span></div></div>` : ''}
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-3 flex gap-2 flex-shrink-0">
+          <input id="fm-search-input" type="text" placeholder="Hacé una pregunta sobre la metodología..."
+            class="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fmSearchSend();}"
+            ${fmState.searchLoading ? 'disabled' : ''} />
+          <button onclick="fmSearchSend()" ${fmState.searchLoading ? 'disabled' : ''}
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            ${fmState.searchLoading ? '⏳' : '→'}
+          </button>
+          ${fmState.searchChat.length > 0 ? `<button onclick="fmSearchReset()" class="px-3 py-2 text-slate-500 hover:text-slate-700 text-sm">🔄</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function fmRenderDiagnostico() {
+  return `
+    <div class="h-full flex flex-col bg-slate-50">
+      <div class="max-w-4xl mx-auto w-full flex-1 flex flex-col p-6 overflow-hidden">
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4 mb-4 flex-shrink-0">
+          <h3 class="font-bold text-amber-900 mb-1">🎯 Diagnóstico Inicial — Plan Personalizado</h3>
+          <p class="text-sm text-amber-800">La IA te va a hacer 6-10 preguntas para ubicarte en la metodología E0-E5 y generar un plan accionable con tareas, contactos, plataformas y calculadoras específicas para tu situación.</p>
+          ${fmState.diagnoseChat.length === 0 ? `
+            <button onclick="fmDiagnoseStart()" class="mt-3 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
+              🚀 Iniciar Diagnóstico
+            </button>
+          ` : ''}
+        </div>
+        <div class="flex-1 overflow-y-auto bg-white rounded-xl border border-slate-200 p-6 mb-4 space-y-4 scrollbar-thin">
+          ${fmState.diagnoseChat.length === 0 ? `<div class="text-center text-slate-400 py-12"><div class="text-5xl mb-2">🎯</div><p>Click "Iniciar Diagnóstico" para empezar</p></div>` : ''}
+          ${fmState.diagnoseChat.map((m, i) => fmRenderChatMessage(m, i, 'diagnose')).join('')}
+          ${fmState.diagnoseLoading ? `<div class="flex items-start gap-3"><div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">🤖</div><div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600 italic">Analizando<span class="animate-pulse">...</span></div></div>` : ''}
+        </div>
+        ${fmState.diagnoseChat.length > 0 ? `
+          <div class="bg-white rounded-xl border border-slate-200 p-3 flex gap-2 flex-shrink-0">
+            <input id="fm-diagnose-input" type="text" placeholder="Respondé la pregunta..."
+              class="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fmDiagnoseSend();}"
+              ${fmState.diagnoseLoading ? 'disabled' : ''} />
+            <button onclick="fmDiagnoseSend()" ${fmState.diagnoseLoading ? 'disabled' : ''}
+              class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">
+              ${fmState.diagnoseLoading ? '⏳' : '→'}
+            </button>
+            <button onclick="fmDiagnoseReset()" class="px-3 py-2 text-slate-500 hover:text-slate-700 text-sm">🔄</button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function fmRenderChatMessage(m, i, mode) {
+  if (m.role === 'user') {
+    return `<div class="flex justify-end"><div class="bg-slate-900 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-2xl">${escapeHtml(m.content)}</div></div>`;
+  }
+  const color = mode === 'diagnose' ? 'amber' : 'blue';
+  const html = typeof marked !== 'undefined' ? marked.parse(m.content) : escapeHtml(m.content);
+  const safe = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
+  return `
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-full bg-${color}-100 flex items-center justify-center flex-shrink-0 text-lg">🤖</div>
+      <div class="bg-slate-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm max-w-3xl flex-1">
+        <div class="prose prose-sm prose-slate max-w-none [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:rounded [&_pre]:p-3 [&_code]:bg-slate-200 [&_code]:px-1 [&_code]:rounded [&_h1]:text-base [&_h2]:text-base [&_h3]:text-sm [&_strong]:text-slate-900 [&_blockquote]:border-l-4 [&_blockquote]:border-${color}-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-700">${safe}</div>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ─── BUSCADOR IA ───
+function fmSearchQuickAsk(q) {
+  const input = document.getElementById('fm-search-input');
+  if (input) input.value = q;
+  fmSearchSend(q);
+}
+
+async function fmSearchSend(forcedQuery = null) {
+  const input = document.getElementById('fm-search-input');
+  const query = forcedQuery || (input ? input.value.trim() : '');
+  if (!query || fmState.searchLoading) return;
+  fmState.searchChat.push({ role: 'user', content: query });
+  fmState.searchLoading = true;
+  if (input) input.value = '';
+  fmRender();
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/fm-ai-coach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ mode: 'search', messages: fmState.searchChat.map(m => ({ role: m.role, content: m.content })) })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'falló');
+    fmState.searchChat.push({ role: 'assistant', content: r.response });
+  } catch (e) {
+    fmState.searchChat.push({ role: 'assistant', content: `❌ Error: ${e.message}\n\n¿Está deployada la edge function \`fm-ai-coach\`?` });
+  }
+  fmState.searchLoading = false;
+  fmRender();
+  // Scroll al final
+  setTimeout(() => {
+    const containers = document.querySelectorAll('.scrollbar-thin');
+    containers.forEach(c => c.scrollTop = c.scrollHeight);
+  }, 50);
+}
+
+function fmSearchReset() {
+  fmState.searchChat = [];
+  fmRender();
+}
+
+// ─── DIAGNÓSTICO ───
+async function fmDiagnoseStart() {
+  fmState.diagnoseChat = [{ role: 'user', content: 'Hola, quiero hacer un diagnóstico para identificar mi etapa en la metodología y obtener mi plan personalizado.' }];
+  fmState.diagnoseLoading = true;
+  fmRender();
+  await fmDiagnoseSubmit();
+}
+
+async function fmDiagnoseSend() {
+  const input = document.getElementById('fm-diagnose-input');
+  const query = input ? input.value.trim() : '';
+  if (!query || fmState.diagnoseLoading) return;
+  fmState.diagnoseChat.push({ role: 'user', content: query });
+  fmState.diagnoseLoading = true;
+  if (input) input.value = '';
+  fmRender();
+  await fmDiagnoseSubmit();
+}
+
+async function fmDiagnoseSubmit() {
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/fm-ai-coach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ mode: 'diagnose', messages: fmState.diagnoseChat.map(m => ({ role: m.role, content: m.content })) })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'falló');
+    fmState.diagnoseChat.push({ role: 'assistant', content: r.response });
+  } catch (e) {
+    fmState.diagnoseChat.push({ role: 'assistant', content: `❌ Error: ${e.message}\n\n¿Está deployada la edge function \`fm-ai-coach\`?` });
+  }
+  fmState.diagnoseLoading = false;
+  fmRender();
+  setTimeout(() => {
+    const containers = document.querySelectorAll('.scrollbar-thin');
+    containers.forEach(c => c.scrollTop = c.scrollHeight);
+  }, 50);
+}
+
+function fmDiagnoseReset() {
+  if (!confirm('¿Reiniciar el diagnóstico? Se perderá la conversación actual.')) return;
+  fmState.diagnoseChat = [];
+  fmRender();
 }
 
 function fmRenderDoc(doc) {
