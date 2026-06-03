@@ -2343,6 +2343,18 @@ async function fmSetDoc(docId) {
 }
 
 function fmRender() {
+  try {
+    return fmRenderInner();
+  } catch (err) {
+    console.error('[fmRender]', err);
+    const root = document.getElementById('content');
+    if (root) {
+      root.innerHTML = `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">⚠️ Error de render</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${String(err?.message || err).replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;')}</pre><div class="text-xs text-slate-600 mt-3">Stack: <pre class="bg-white p-2 rounded mt-1 text-xs overflow-x-auto">${String(err?.stack || '').replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;')}</pre></div><button onclick="fmDiagReset();" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">🔄 Reiniciar diagnóstico</button></div></div>`;
+    }
+  }
+}
+
+function fmRenderInner() {
   const root = document.getElementById('content');
   if (!root) return;
   if (fmState.loading) {
@@ -2622,15 +2634,21 @@ function fmDiagNext() {
 }
 
 function fmDiagAnswer(qid, val) {
-  fmState.diagAnswers[qid] = val;
-  const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
-  const currentIdx = activeQuestions.findIndex(q => q.id === qid);
-  if (currentIdx < activeQuestions.length - 1) {
-    fmState.diagStep = currentIdx + 1;
-  } else {
-    fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
+  try {
+    fmState.diagAnswers[qid] = val;
+    const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
+    const currentIdx = activeQuestions.findIndex(q => q.id === qid);
+    if (currentIdx < activeQuestions.length - 1) {
+      fmState.diagStep = currentIdx + 1;
+    } else {
+      // Última pregunta → calcular perfil + generar plan
+      fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
+    }
+    fmRender();
+  } catch (err) {
+    console.error('[fmDiagAnswer]', err);
+    alert('Error procesando la respuesta:\n\n' + (err?.message || err) + '\n\nMirá la consola del navegador (F12) para más detalles.');
   }
-  fmRender();
 }
 
 function fmDiagBack() {
@@ -3583,26 +3601,33 @@ function fmRenderDiagPlanLegacy() {
 
 // ─── NUEVA VISTA: Plan robusto tipo Miguel Guzmán ───
 function fmRenderDiagPlan() {
-  const r = fmState.diagResult;
-  const a = r.answers;
-  const p = r.perfil;
+  let r, a, p, userProfile, bloques, analisisProfundo, objetivoOperativo, reglaPlan, checklistFinal;
+  try {
+    r = fmState.diagResult;
+    a = r.answers || {};
+    p = r.perfil || { num: 1, nombre: 'Sin definir', emoji: '🏁', color: 'blue' };
+    if (!Array.isArray(r.fortalezas)) r.fortalezas = [];
+    if (!Array.isArray(r.gaps)) r.gaps = [];
 
-  // Generar perfil enriquecido con datos del usuario
-  const userProfile = {
-    mercado: a.mercado_estado || 'tu mercado',
-    estrategiaLabel: a.objetivo === 'flip' ? 'Fix & Flip' :
-                     a.objetivo === 'hold' ? 'Fix & Hold' :
-                     a.objetivo === 'wholesale' ? 'Wholesaling' :
-                     a.objetivo === 'hibrido' ? 'Mix Flip + Hold' :
-                     a.objetivo === 'escalar' ? 'Escala de negocio' :
-                     a.objetivo === 'lender' ? 'Private Money Lending' : 'Fix & Flip'
-  };
+    userProfile = {
+      mercado: a.mercado_estado || 'tu mercado',
+      estrategiaLabel: a.objetivo === 'flip' ? 'Fix & Flip' :
+                       a.objetivo === 'hold' ? 'Fix & Hold' :
+                       a.objetivo === 'wholesale' ? 'Wholesaling' :
+                       a.objetivo === 'hibrido' ? 'Mix Flip + Hold' :
+                       a.objetivo === 'escalar' ? 'Escala de negocio' :
+                       a.objetivo === 'lender' ? 'Private Money Lending' : 'Fix & Flip'
+    };
 
-  const bloques = fmGenerarBloques(userProfile, a);
-  const analisisProfundo = fmGenerarAnalisisProfundo(p, r, a, userProfile);
-  const objetivoOperativo = fmGenerarObjetivoOperativo(userProfile, a);
-  const reglaPlan = fmGenerarReglaPlan(p, a);
-  const checklistFinal = fmGenerarChecklistFinal(bloques, a);
+    bloques = fmGenerarBloques(userProfile, a);
+    analisisProfundo = fmGenerarAnalisisProfundo(p, r, a, userProfile);
+    objetivoOperativo = fmGenerarObjetivoOperativo(userProfile, a);
+    reglaPlan = fmGenerarReglaPlan(p, a);
+    checklistFinal = fmGenerarChecklistFinal(bloques, a);
+  } catch (err) {
+    console.error('[fmRenderDiagPlan setup]', err);
+    return `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">⚠️ Error generando plan</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${escapeHtml(String(err?.message || err))}</pre><button onclick="fmDiagReset()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">🔄 Reiniciar diagnóstico</button></div></div>`;
+  }
 
   return `
     <div class="h-full overflow-y-auto bg-slate-50" id="fm-plan-print">
