@@ -152,6 +152,50 @@ Deno.serve(async (req) => {
     const notes = normalize(findField(f, ['Notas','Notes','Comentarios','Observaciones','Próximo seguimiento']));
     const goals = normalize(findField(f, ['Metas','Goals','Objetivos','Objetivo','Compromiso']));
 
+    // ─── TBL SEGUIMIENTO (CRM principal) ──────────────────────
+    const grupo = normalize(findField(f, [
+      'Grupo','Mentoría','Mentoria','Programa','Tipo Mentoria',
+      'Grupo Mentoria','Tipo de Mentoría','Mentoría Tipo'
+    ]));
+    const ultimaFechaSeguimiento = parseDate(findField(f, [
+      'Última fecha de seguimiento','Ultima fecha de seguimiento','Última fecha',
+      'Ultima fecha','Last Follow-up','Última Sesión','Fecha último seguimiento',
+      'Fecha de seguimiento','Last Check-in'
+    ]));
+    // "Observaciones..." (principal del seguimiento — qué pasó en la última sesión)
+    const observacionesSeguimiento = normalize(findField(f, [
+      'Observaciones de seguimiento','Observaciones Seguimiento','Seguimiento',
+      'Observaciones (Seguimiento)','Notas de seguimiento','Notas Seguimiento',
+      'Observaciones'   // fallback — debe ser el primer match
+    ]));
+    // Capital actual $80,000.00
+    const capitalRaw = findField(f, [
+      'Capital actual','Capital Actual','Capital','Capital disponible',
+      'Capital Disponible','Capital del estudiante'
+    ]);
+    let capitalActual: number | null = null;
+    if (capitalRaw != null) {
+      if (typeof capitalRaw === 'number') capitalActual = capitalRaw;
+      else {
+        const s = String(capitalRaw).replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(/,/g, '.');
+        const n = parseFloat(s);
+        if (!isNaN(n)) capitalActual = n;
+      }
+    }
+    // ¿Se construye empresa? (Sí / No / En construcción)
+    const seConstruyeEmpresa = normalize(findField(f, [
+      'Se construye empresa','Se construye empresa?','¿Se construye empresa?',
+      'Se construye...','Construcción de empresa','Empresa construida'
+    ]));
+    // Observaciones... (segunda — sobre la empresa)
+    const observacionesEmpresa = normalize(findField(f, [
+      'Observaciones empresa','Observaciones Empresa','Observaciones (Empresa)',
+      'Notas empresa','Notas Empresa'
+    ]));
+    const evidenciaUrl = normalize(findField(f, [
+      'Evidencia','Evidence','Link evidencia','URL Evidencia','Documentos','Archivo'
+    ]));
+
     const stageKey = stageRaw ? detectStage(stageRaw, stages) : null;
     const paymentStatus = paymentRaw ? (() => {
       const p = paymentRaw.toLowerCase();
@@ -176,6 +220,7 @@ Deno.serve(async (req) => {
     return {
       mentorship_id: mentorshipId,
       airtable_record_id: rec.id,
+      airtable_record_id_seguimiento: rec.id,  // mismo ID — la tabla es Seguimiento
       full_name: (fullName || `Estudiante ${rec.id.slice(-6)}`).slice(0, 200),
       email: email ? email.slice(0, 200) : null,
       phone: phone ? phone.slice(0, 50) : null,
@@ -189,6 +234,14 @@ Deno.serve(async (req) => {
       status,
       notes: notes ? notes.slice(0, 2000) : null,
       goals: goals ? goals.slice(0, 2000) : null,
+      // ─── NUEVO: campos del TBL Seguimiento ───
+      grupo: grupo ? grupo.slice(0, 200) : null,
+      ultima_fecha_seguimiento: ultimaFechaSeguimiento,
+      observaciones_seguimiento: observacionesSeguimiento ? observacionesSeguimiento.slice(0, 4000) : null,
+      capital_actual: capitalActual,
+      se_construye_empresa: seConstruyeEmpresa ? seConstruyeEmpresa.slice(0, 100) : null,
+      observaciones_empresa: observacionesEmpresa ? observacionesEmpresa.slice(0, 4000) : null,
+      evidencia_url: evidenciaUrl ? evidenciaUrl.slice(0, 1000) : null,
       updated_at: new Date().toISOString()
     };
   });
