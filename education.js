@@ -1176,6 +1176,56 @@ function eduDownloadPPTX() {
   eduBuildPPTX(p, { download: true });
 }
 
+// ──────────────────────────────────────────────────────────────────
+// HELPERS DE ENRIQUECIMIENTO VISUAL (Unsplash + QuickChart auto)
+// ──────────────────────────────────────────────────────────────────
+function eduUnsplashUrl(query, w = 1600, h = 900) {
+  // Unsplash Source: fotos pro gratis sin auth · descarga al embeber
+  const q = encodeURIComponent(String(query || 'business success').replace(/[^\w\s,áéíóúñü-]/gi, '').slice(0, 80));
+  return `https://source.unsplash.com/${w}x${h}/?${q}`;
+}
+function eduQuickChartUrl(config, w = 900, h = 500) {
+  // QuickChart.io: gráficos Chart.js renderizados server-side, sin auth
+  const c = encodeURIComponent(JSON.stringify(config));
+  return `https://quickchart.io/chart?bkg=white&w=${w}&h=${h}&c=${c}`;
+}
+function eduSlideToImageQuery(slide, presTitle) {
+  if (slide.image_query) return slide.image_query;
+  const txt = `${slide.title || ''} ${slide.subtitle || ''} ${presTitle || ''}`.toLowerCase();
+  if (/real estate|casa|inmobili|flip|wholesa|propiedad/.test(txt)) return 'modern suburban home neighborhood';
+  if (/dinero|hard money|financ|loan|invest/.test(txt)) return 'finance investment money charts';
+  if (/equipo|team|contratist|networking/.test(txt)) return 'business team meeting professional';
+  if (/remodel|obra|construc/.test(txt)) return 'home renovation construction worker';
+  if (/buy box|análisis|deal|underwrit/.test(txt)) return 'real estate analysis data charts';
+  if (/vend|sale|listing|stagi/.test(txt)) return 'beautiful staged living room';
+  if (/cierre|escritu|legal/.test(txt)) return 'business contract signing handshake';
+  if (/escal|crec|sistem/.test(txt)) return 'business growth strategy success';
+  return 'professional business meeting modern office';
+}
+function eduStatsToChartUrl(stats, brand = '2563EB') {
+  if (!stats || !stats.length) return null;
+  const numericStats = stats.filter(s => {
+    const v = String(s.value || '').replace(/[$,%kKmMxX\s]/g, '');
+    return !isNaN(parseFloat(v));
+  });
+  if (numericStats.length < 2) return null;
+  return eduQuickChartUrl({
+    type: 'bar',
+    data: {
+      labels: numericStats.map(s => String(s.label || '').slice(0, 18)),
+      datasets: [{
+        data: numericStats.map(s => parseFloat(String(s.value).replace(/[$,%kKmMxX\s]/g, ''))),
+        backgroundColor: '#' + brand,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false }, title: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#e5e7eb' } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
 // Builder de PPTX con layouts ricos estilo Flipping Rentals
 function eduBuildPPTX(p, opts = {}) {
   const pres = new PptxGenJS();
@@ -1231,6 +1281,15 @@ function eduBuildPPTX(p, opts = {}) {
     if (s.subtitle) slide.addText(s.subtitle, { x: 0.4, y: titleY + 0.6, w: 12.5, h: 0.4, fontSize: 14, color: GRAY_MED, italic: true });
 
     const C = { NAV, NAV_LIGHT, ACCENT, GOLD, GRAY_LIGHT, GRAY_MED, WHITE, BRAND };
+
+    // ─── ENRIQUECIMIENTO AUTO: si no hay image_url ni chart_url, genera ───
+    if (!s.image_url && !s.chart_url && ['hero-image','split-image','chart-spotlight','image-grid'].includes(s.layout)) {
+      s.image_url = eduUnsplashUrl(eduSlideToImageQuery(s, p.title));
+    }
+    if (s.layout === 'chart-spotlight' && !s.chart_url && (s.stats || s.metric_cards)?.length) {
+      s.chart_url = eduStatsToChartUrl(s.stats || s.metric_cards, ACCENT);
+    }
+
     switch (s.layout) {
       case 'agenda':              renderAgenda(slide, s, C); break;
       case 'comparison':          renderComparison(slide, s, C); break;
@@ -1247,6 +1306,11 @@ function eduBuildPPTX(p, opts = {}) {
       case 'transfer-activity':   renderTransferActivity(slide, s, C); break;
       case 'goldbox':             renderGoldbox(slide, s, C); break;
       case 'highlight':           renderHighlight(slide, s, C); break;
+      // ─── NUEVOS LAYOUTS VISUALES PREMIUM ───
+      case 'hero-image':          renderHeroImage(slide, s, C); break;
+      case 'split-image':         renderSplitImage(slide, s, C); break;
+      case 'chart-spotlight':     renderChartSpotlight(slide, s, C); break;
+      case 'image-grid':          renderImageGrid(slide, s, C); break;
       default:                    renderDefault(slide, s, C);
     }
 
@@ -1276,11 +1340,19 @@ function eduBuildPPTX(p, opts = {}) {
 
 // ─── LAYOUT RENDERERS ───
 function renderCover(slide, s, p, c) {
+  // Background image hero opcional (auto-generada si no se especifica)
+  const heroUrl = s.image_url || eduUnsplashUrl(eduSlideToImageQuery({title: s.title || p.title, subtitle: s.subtitle}, p.title));
+  try {
+    slide.addImage({ path: heroUrl, x: 0, y: 0, w: 13.333, h: 7.5, sizing: { type: 'cover', w: 13.333, h: 7.5 } });
+    // Overlay oscuro para que el texto se lea
+    slide.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: '0F172A', transparency: 35 }, line: { type: 'none' } });
+  } catch(e) { /* si la imagen falla, fondo navy normal */ }
+
   // Marca arriba
   slide.addText(c.BRAND, { x: 0.5, y: 0.5, w: 12.3, h: 0.4, color: c.GOLD, fontSize: 13, bold: true, charSpacing: 4 });
   slide.addText(c.YEAR, { x: 12.3, y: 0.5, w: 0.6, h: 0.4, color: c.GRAY_MED, fontSize: 13, align: 'right' });
   // Título central
-  slide.addText(s.title || p.title, { x: 0.5, y: 2.0, w: 12.3, h: 1.6, fontSize: 46, bold: true, color: c.WHITE, align: 'center' });
+  slide.addText(s.title || p.title, { x: 0.5, y: 2.0, w: 12.3, h: 1.6, fontSize: 50, bold: true, color: c.WHITE, align: 'center' });
   if (s.subtitle) {
     slide.addShape('rect', { x: 1, y: 3.8, w: 11.3, h: 0.04, fill: { color: c.GOLD } });
     slide.addText(`"${s.subtitle}"`, { x: 0.5, y: 4.0, w: 12.3, h: 0.8, fontSize: 18, color: 'CBD5E1', align: 'center', italic: true });
@@ -1633,6 +1705,114 @@ function renderHighlight(slide, s, c) {
       slide.addText(itemsR, { x: x + 0.15, y: yc + 0.65, w: cardW - 0.3, h: 1.75 });
     });
   }
+}
+
+// ─── LAYOUTS PREMIUM VISUALES ───
+function renderHeroImage(slide, s, c) {
+  // Full-bleed hero image + título overlay grande (magazine cover style)
+  const url = s.image_url || eduUnsplashUrl(eduSlideToImageQuery(s));
+  try {
+    slide.addImage({ path: url, x: 0, y: 0, w: 13.333, h: 7.5, sizing: { type: 'cover', w: 13.333, h: 7.5 } });
+    // Gradient overlay desde abajo (gradient se simula con 2 rects)
+    slide.addShape('rect', { x: 0, y: 4.5, w: 13.333, h: 3.0, fill: { color: '0F172A', transparency: 25 }, line: { type: 'none' } });
+    slide.addShape('rect', { x: 0, y: 5.5, w: 13.333, h: 2.0, fill: { color: '0F172A', transparency: 10 }, line: { type: 'none' } });
+  } catch(e) {}
+
+  // Block label arriba a la izquierda
+  if (s.block_label) {
+    slide.addShape('roundRect', { x: 0.5, y: 0.6, w: 3.5, h: 0.5, rectRadius: 0.05, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+    slide.addText(String(s.block_label).toUpperCase(), { x: 0.5, y: 0.6, w: 3.5, h: 0.5, fontSize: 12, bold: true, color: c.NAV, align: 'center', valign: 'middle', charSpacing: 2 });
+  }
+  // Título abajo grande sobre el gradient
+  slide.addText(s.title || '', { x: 0.6, y: 5.0, w: 12.2, h: 1.4, fontSize: 44, bold: true, color: c.WHITE, valign: 'bottom' });
+  if (s.subtitle) {
+    slide.addShape('rect', { x: 0.6, y: 6.5, w: 1.5, h: 0.05, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+    slide.addText(s.subtitle, { x: 0.6, y: 6.6, w: 12.2, h: 0.6, fontSize: 16, color: 'E2E8F0', italic: true });
+  }
+}
+
+function renderSplitImage(slide, s, c) {
+  // 50/50: imagen izquierda + contenido derecha
+  const url = s.image_url || eduUnsplashUrl(eduSlideToImageQuery(s));
+  try {
+    slide.addImage({ path: url, x: 0, y: 0.55, w: 6.5, h: 6.55, sizing: { type: 'cover', w: 6.5, h: 6.55 } });
+  } catch(e) {
+    slide.addShape('rect', { x: 0, y: 0.55, w: 6.5, h: 6.55, fill: { color: c.NAV }, line: { type: 'none' } });
+  }
+  // Banda dorada vertical entre imagen y texto
+  slide.addShape('rect', { x: 6.5, y: 0.55, w: 0.08, h: 6.55, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+
+  // Contenido derecha
+  const xT = 6.95, wT = 12.5 - xT;
+  if (s.block_label) {
+    slide.addText(String(s.block_label).toUpperCase(), { x: xT, y: 0.85, w: wT, h: 0.3, fontSize: 11, bold: true, color: c.GOLD, charSpacing: 3 });
+  }
+  slide.addText(s.title || '', { x: xT, y: s.block_label ? 1.25 : 1.0, w: wT, h: 1.0, fontSize: 28, bold: true, color: c.NAV });
+  if (s.subtitle) {
+    slide.addText(s.subtitle, { x: xT, y: s.block_label ? 2.3 : 2.05, w: wT, h: 0.5, fontSize: 14, color: c.GRAY_MED, italic: true });
+  }
+  const yC = s.block_label ? 2.95 : 2.7;
+  // Bullets como cards mini
+  const items = s.bullets || [];
+  items.slice(0, 5).forEach((b, i) => {
+    const y = yC + i * 0.75;
+    slide.addShape('ellipse', { x: xT, y: y + 0.1, w: 0.4, h: 0.4, fill: { color: c.ACCENT }, line: { color: c.ACCENT } });
+    slide.addText(String(i+1), { x: xT, y: y + 0.1, w: 0.4, h: 0.4, fontSize: 14, bold: true, color: c.WHITE, align: 'center', valign: 'middle' });
+    slide.addText(b, { x: xT + 0.55, y, w: wT - 0.55, h: 0.6, fontSize: 13, color: c.NAV, valign: 'middle' });
+  });
+}
+
+function renderChartSpotlight(slide, s, c) {
+  // Chart grande 65% del slide + 3 insights laterales
+  const chartUrl = s.chart_url || eduStatsToChartUrl(s.stats || s.metric_cards || [], c.ACCENT);
+  if (chartUrl) {
+    try {
+      slide.addImage({ path: chartUrl, x: 0.4, y: 1.4, w: 8.2, h: 5.3 });
+    } catch(e) {}
+  } else {
+    // Fallback: bullets en card grande
+    slide.addShape('roundRect', { x: 0.4, y: 1.4, w: 8.2, h: 5.3, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
+    slide.addText('Sin chart_url ni stats numéricos para graficar', { x: 0.6, y: 4.0, w: 7.8, h: 0.5, fontSize: 14, color: c.GRAY_MED, italic: true, align: 'center' });
+  }
+
+  // Panel derecho con 3 insights
+  const insights = s.insights || (s.bullets || []).slice(0, 3).map(b => ({ title: '💡', body: b }));
+  const xI = 8.85, wI = 4.05;
+  insights.slice(0, 3).forEach((ins, i) => {
+    const y = 1.4 + i * 1.8;
+    slide.addShape('roundRect', { x: xI, y, w: wI, h: 1.6, fill: { color: c.WHITE }, line: { color: c.ACCENT, width: 1.5 }, rectRadius: 0.1 });
+    slide.addShape('rect', { x: xI, y, w: 0.1, h: 1.6, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+    slide.addText(String(ins.title || '💡'), { x: xI + 0.2, y: y + 0.15, w: wI - 0.4, h: 0.4, fontSize: 16, bold: true, color: c.ACCENT });
+    slide.addText(String(ins.body || ''), { x: xI + 0.2, y: y + 0.55, w: wI - 0.4, h: 1.0, fontSize: 11, color: c.NAV, valign: 'top' });
+  });
+}
+
+function renderImageGrid(slide, s, c) {
+  // Grid de 2x2 o 1x3 con imágenes + captions
+  const items = s.image_grid || (s.bullets || []).slice(0, 4).map(b => ({ caption: b, image_query: b }));
+  const n = Math.min(items.length, 4);
+  if (!n) return renderDefault(slide, s, c);
+  const cols = n <= 2 ? n : 2;
+  const rows = Math.ceil(n / cols);
+  const baseY = s.block_label ? 1.9 : 1.7;
+  const totalH = 5.0;
+  const cardW = (12.5 / cols) - 0.15;
+  const cardH = (totalH / rows) - 0.15;
+  items.slice(0, n).forEach((item, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const x = 0.4 + col * (cardW + 0.15);
+    const y = baseY + row * (cardH + 0.15);
+    const url = item.image_url || eduUnsplashUrl(item.image_query || item.caption || 'business');
+    try {
+      slide.addImage({ path: url, x, y, w: cardW, h: cardH * 0.72, sizing: { type: 'cover', w: cardW, h: cardH * 0.72 } });
+    } catch(e) {
+      slide.addShape('rect', { x, y, w: cardW, h: cardH * 0.72, fill: { color: c.NAV_LIGHT }, line: { type: 'none' } });
+    }
+    // Caption card abajo
+    slide.addShape('rect', { x, y: y + cardH * 0.72, w: cardW, h: cardH * 0.28, fill: { color: c.NAV }, line: { color: c.NAV } });
+    slide.addShape('rect', { x, y: y + cardH * 0.72, w: 0.06, h: cardH * 0.28, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+    slide.addText(item.caption || '', { x: x + 0.15, y: y + cardH * 0.72, w: cardW - 0.25, h: cardH * 0.28, fontSize: 11, bold: true, color: c.WHITE, valign: 'middle' });
+  });
 }
 
 function eduDownloadSpeakerNotes() {

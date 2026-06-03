@@ -187,8 +187,20 @@ Devolvé SOLO JSON válido (sin markdown wrapper, sin comentarios):
       "title": "...",
       "subtitle": "opcional",
       "block_label": "BLOQUE 1 · CONTEXTO",
-      "layout": "cover | agenda | comparison | benefits | case-study | framework | checklist | strategy-grid | metrics-dashboard | quote | closing | learning-objectives | reflection-recap | transfer-activity | goldbox | highlight | content",
+      "layout": "cover | agenda | comparison | benefits | case-study | framework | checklist | strategy-grid | metrics-dashboard | quote | closing | learning-objectives | reflection-recap | transfer-activity | goldbox | highlight | hero-image | split-image | chart-spotlight | image-grid | content",
       "bullets": ["bullet 1 max 12 palabras", "bullet 2"],
+
+      "image_query": "2-5 palabras en INGLÉS para buscar foto profesional en Unsplash (ej: 'modern texas suburban home aerial', 'business team meeting'). USA layouts hero-image y split-image para máximo impacto visual.",
+      "image_grid": [
+        {"image_query": "modern home exterior", "caption": "Antes"},
+        {"image_query": "renovated kitchen luxury", "caption": "Después"},
+        {"image_query": "happy family front porch", "caption": "Resultado"}
+      ],
+      "insights": [
+        {"title": "💡 Insight #1", "body": "Frase corta de impacto sobre el chart"},
+        {"title": "🎯 Insight #2", "body": "Lo importante a notar"},
+        {"title": "⚡ Insight #3", "body": "El takeaway accionable"}
+      ],
 
       "learning_objectives": [
         {"number": "01", "title": "¿Qué es una patología?", "body": "Definición + por qué muchas veces no se ve."},
@@ -274,7 +286,15 @@ NOTAS IMPORTANTES:
 - Para "case-study" siempre incluí "case_study" con números reales (busca casos REALES vía web search si require_live_data).
 - Para "comparison" incluí "comparison" con left/right.
 - Para "agenda" incluí "agenda_steps".
-- "speaker_notes" SIEMPRE — son el guion para el coach.`;
+- "speaker_notes" SIEMPRE — son el guion para el coach.
+
+🎨 NUEVOS LAYOUTS VISUALES PREMIUM (USAR MÍNIMO 4 EN LA PRESENTACIÓN):
+- **"hero-image"**: foto full-bleed estilo magazine + título overlay. USAR para slides de transición/sección/impacto emocional. REQUIERE "image_query".
+- **"split-image"**: imagen 50% izquierda + 5 bullets numerados 50% derecha. USAR para slides que explican proceso o concepto con apoyo visual. REQUIERE "image_query" + "bullets".
+- **"chart-spotlight"**: chart gigante 65% + 3 insights laterales. USAR cuando tengas stats numéricos comparativos (NO porcentajes mezclados con dólares). REQUIERE "stats" o "metric_cards" con números puros + "insights" array.
+- **"image-grid"**: 2x2 o 1x3 fotos con captions. USAR para "antes/después", "tipos de zonas", "perfiles de inversor", "casos del portfolio". REQUIERE "image_grid" array con {image_query, caption}.
+
+REGLA: para cada slide CONSIDERA siempre agregar "image_query" en inglés (2-5 palabras). El sistema auto-genera foto profesional de Unsplash. Slides sin imagen se sienten BÁSICOS — usa imagen siempre que el layout lo soporte. NO uses image_query para slides puramente de texto tipo quote/goldbox/highlight.`;
 
   // ────────────────────────────────────────────────────────────
   // BACKGROUND JOB PATTERN — evita timeout 150s de edge function
@@ -378,15 +398,39 @@ NOTAS IMPORTANTES:
     }
   };
 
-  // EdgeRuntime.waitUntil() permite que la function devuelva la respuesta
-  // mientras `work()` sigue corriendo hasta 400s en background
-  // @ts-ignore  EdgeRuntime es global en Supabase
-  EdgeRuntime.waitUntil(work());
+  // ────────────────────────────────────────────────────────────
+  // MODO SÍNCRONO (default): ejecuta dentro del request, sin polling.
+  // Funciona para modo normal (60-90s, 8 web searches) dentro del límite de 150s.
+  // Para `research_mode` (3-5min) sí usamos waitUntil + polling.
+  // ────────────────────────────────────────────────────────────
+  if (research_mode) {
+    // @ts-ignore  EdgeRuntime es global en Supabase
+    EdgeRuntime.waitUntil(work());
+    return json({
+      ok: true,
+      async: true,
+      job_id: job.id,
+      message: 'Trabajo iniciado en background (research mode). Hacé polling de edu_pres_jobs por id.'
+    });
+  }
+
+  // Modo normal: await directo. Si Claude tarda < 150s, devolvemos resultado completo.
+  await work();
+
+  // Releer el job actualizado para devolver el resultado
+  const { data: finishedJob } = await supabase.from("edu_pres_jobs").select('*').eq('id', job.id).single();
+  if (!finishedJob) return json({ ok: false, error: 'Job desapareció después de ejecutarse' }, 500);
+  if (finishedJob.status === 'error') return json({ ok: false, error: finishedJob.error_message || 'Error desconocido' }, 500);
+  if (finishedJob.status !== 'done')  return json({ ok: true, async: true, job_id: job.id, message: 'Job aún corriendo, hacé polling' });
 
   return json({
     ok: true,
-    async: true,
-    job_id: job.id,
-    message: 'Trabajo iniciado en background. Hacé polling de edu_pres_jobs por id.'
+    async: false,
+    presentation: finishedJob.result,
+    saved_id: finishedJob.saved_pres_id,
+    tokens: finishedJob.tokens_used,
+    web_searches: finishedJob.web_searches,
+    duration_ms: finishedJob.duration_ms,
+    job_id: job.id
   });
 });
