@@ -15,17 +15,20 @@ const eduState = {
   searchQuery: '',
   stageFilter: 'all',
   statusFilter: 'all',
-  loading: false
+  loading: false,
+  studentPlan: null,        // plan activo del estudiante seleccionado
+  studentPlanTasks: []      // tareas marcables del plan
 };
 
 const EDU_TABS = [
-  { key: 'students',  label: '👥 Estudiantes' },
-  { key: 'plan',      label: '🎯 Plan IA' },
-  { key: 'progress',  label: '📊 Progreso & GLScore' },
-  { key: 'resources', label: '📑 Recursos' },
-  { key: 'calls',     label: '📅 Calendario' },
-  { key: 'alerts',    label: '🔔 Alertas' },
-  { key: 'config',    label: '⚙️ Config' }
+  { key: 'students',     label: '👥 Estudiantes' },
+  { key: 'student_plan', label: '🎯 Plan Acción' },
+  { key: 'plan',         label: '🤖 Plan IA' },
+  { key: 'progress',     label: '📊 Progreso' },
+  { key: 'resources',    label: '📑 Recursos' },
+  { key: 'calls',        label: '📅 Calendario' },
+  { key: 'alerts',       label: '🔔 Alertas' },
+  { key: 'config',       label: '⚙️ Config' }
 ];
 // NOTA: Presentaciones e Informes son sistemas INDEPENDIENTES ahora
 // (openEduPresentationsSystem y openEduReportsSystem abren modales propios)
@@ -162,6 +165,7 @@ function eduRender() {
       <!-- BODY -->
       <div class="flex-1 overflow-y-auto">
         ${eduState.tab === 'students' ? eduRenderStudents() :
+          eduState.tab === 'student_plan' ? eduRenderStudentPlan() :
           eduState.tab === 'plan' ? eduRenderPlan() :
           eduState.tab === 'progress' ? eduRenderProgress() :
           eduState.tab === 'resources' ? eduRenderResources() :
@@ -767,9 +771,11 @@ async function eduSaveConfig() {
 }
 
 // ─── ACCIONES ───
-function eduOpenStudent(id) {
+async function eduOpenStudent(id) {
   eduState.selectedStudentId = id;
-  eduState.tab = 'plan';
+  eduState.tab = 'student_plan';
+  eduRender();  // pinta loading
+  await eduLoadStudentPlan(id);
   eduRender();
 }
 
@@ -4721,4 +4727,328 @@ function fmSearch(query) {
       fmRender();
     }
   }, 400);
+}
+
+// ============================================================
+// 🎯 PLAN DE ACCIÓN POR ESTUDIANTE
+// Vincula Mentorías Manager con Metodología FlipMentoría
+// ============================================================
+
+// Inferir respuestas del wizard desde campos del estudiante
+function eduInferirDiagnostico(student) {
+  const grupo = (student.grupo || '').toLowerCase();
+  const stage = (student.current_stage || '').toLowerCase();
+  const capital = student.capital_actual;
+  const ans = {};
+
+  // OBJETIVO
+  if (grupo.includes('flipping') || grupo.includes('flip')) ans.objetivo = 'flip';
+  else if (grupo.includes('rental') || grupo.includes('hold') || grupo.includes('coliving') || grupo.includes('inversor')) ans.objetivo = 'hold';
+  else if (grupo.includes('wholesale')) ans.objetivo = 'wholesale';
+  else if (grupo.includes('empresa') || grupo.includes('gestor de prop')) ans.objetivo = 'hibrido';
+  else if (grupo.includes('inversor')) ans.objetivo = 'lender';
+  else ans.objetivo = 'flip';
+
+  // MERCADO
+  ans.mercado_estado = student.state || student.city || 'USA';
+
+  // META DEALS
+  if (stage.includes('gestion') || stage.includes('gestionando')) ans.meta_deals = '4_6';
+  else if (stage.includes('empresa') || stage.includes('escalar')) ans.meta_deals = '7_mas';
+  else ans.meta_deals = '2_3';
+
+  // CAPITAL
+  if (capital == null) ans.capital = '20_50k';
+  else if (capital < 20000) ans.capital = 'menos_20k';
+  else if (capital < 50000) ans.capital = '20_50k';
+  else if (capital < 100000) ans.capital = '50_100k';
+  else if (capital < 250000) ans.capital = '100_250k';
+  else ans.capital = 'mas_250k';
+
+  // CAPITAL REAL (asumir todo líquido por default)
+  ans.capital_real = 'todo';
+
+  // CREDIT — default desconocido
+  ans.credit = '660_720';
+
+  // FUENTES CAPITAL
+  ans.fuentes_capital = 'solo_propio';
+
+  // HML STATUS — heurística por etapa
+  if (stage.includes('credito') || stage.includes('crédito')) ans.hml_status = 'hablado';
+  else if (stage.includes('negocia') || stage.includes('gestion')) ans.hml_status = 'primario_backup';
+  else ans.hml_status = 'investigando';
+
+  // LLC — heurística por etapa empresa
+  if (stage.includes('empresa') || stage.includes('gestion')) ans.llc = 'si_mismo';
+  else ans.llc = 'no';
+
+  // SETUP LEGAL
+  ans.setup_legal = ans.llc === 'si_mismo' ? ['ein','banco','contabilidad'] : [];
+
+  // DEALS CERRADOS — heurística por etapa
+  if (stage.includes('gestionando') || stage.includes('gestion de prop')) ans.deals_cerrados = '1';
+  else if (stage.includes('escalar') || stage.includes('empresa')) ans.deals_cerrados = '2_4';
+  else ans.deals_cerrados = '0';
+
+  // EXPERIENCIA PREVIA
+  ans.experiencia_previa = 'cero';
+
+  // INMIGRACIÓN — default residente USA
+  ans.inmigracion = 'residente';
+
+  // BUY BOX
+  if (stage.includes('analisis') || stage.includes('análisis')) ans.buybox = 'parcial';
+  else if (stage.includes('gestion') || stage.includes('negocia')) ans.buybox = 'completo';
+  else ans.buybox = 'cero';
+
+  // ARV SKILL
+  if (stage.includes('analisis') || stage.includes('análisis') || stage.includes('negocia')) ans.arv_skill = 'basico';
+  else if (stage.includes('gestion')) ans.arv_skill = 'experto';
+  else ans.arv_skill = 'no';
+
+  // OFERTAS MES
+  if (stage.includes('negocia')) ans.ofertas_mes = '10_mas';
+  else if (stage.includes('analisis') || stage.includes('análisis')) ans.ofertas_mes = '1_9';
+  else ans.ofertas_mes = 'cero';
+
+  // WHOLESALERS
+  ans.wholesalers = stage.includes('analisis') ? '3_9' : 'cero';
+
+  // GC STATUS
+  ans.gc_status = stage.includes('gestion') ? 'primario' : 'cero';
+
+  // DEAL ACTIVO
+  if (stage.includes('gestionando') || stage.includes('gestion de prop')) ans.deal_activo = 'obra';
+  else if (stage.includes('negocia')) ans.deal_activo = 'busqueda';
+  else ans.deal_activo = 'no';
+
+  // TIEMPO — default medio tiempo
+  ans.tiempo = '15_30';
+
+  // MAYOR OBSTÁCULO
+  if (stage.includes('credito') || stage.includes('crédito')) ans.mayor_obstaculo = 'capital';
+  else if (stage.includes('analisis') || stage.includes('análisis')) ans.mayor_obstaculo = 'mercado';
+  else if (stage.includes('mentalidad')) ans.mayor_obstaculo = 'miedo';
+  else ans.mayor_obstaculo = 'conocimiento';
+
+  return ans;
+}
+
+// Crear plan ligado al estudiante
+async function eduCrearPlanEstudiante(studentId) {
+  const student = eduState.students.find(s => s.id === studentId);
+  if (!student) return alert('Estudiante no encontrado');
+
+  if (!confirm(`Generar plan de acción para ${student.full_name}?\n\nVoy a inferir el perfil desde los datos del estudiante y crear un plan con tareas marcables.`)) return;
+
+  // 1) Inferir respuestas del wizard
+  const answers = eduInferirDiagnostico(student);
+
+  // 2) Calcular perfil + bloques (reusa funciones del sistema metodología)
+  if (typeof fmCalcularPerfil !== 'function' || typeof fmGenerarBloques !== 'function') {
+    return alert('Error: sistema Metodología no cargado. Recargá la página.');
+  }
+  const perfilResult = fmCalcularPerfil(answers);
+  const userProfile = {
+    mercado: answers.mercado_estado,
+    estrategiaLabel: answers.objetivo === 'flip' ? 'Fix & Flip' :
+                     answers.objetivo === 'hold' ? 'Fix & Hold' :
+                     answers.objetivo === 'wholesale' ? 'Wholesaling' :
+                     answers.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip'
+  };
+  const bloques = fmGenerarBloques(userProfile, answers);
+
+  // 3) Archivar plan anterior si existe
+  await sb.from('edu_student_plans')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('student_id', studentId)
+    .eq('status', 'active');
+
+  // 4) Crear nuevo plan
+  const { data: plan, error: planErr } = await sb.from('edu_student_plans').insert({
+    student_id: studentId,
+    mentorship_id: student.mentorship_id,
+    diagnostico: answers,
+    perfil: { ...perfilResult, userProfile },
+    bloques_ids: bloques.map(b => b.id),
+    modo: 'completo',
+    status: 'active'
+  }).select().single();
+
+  if (planErr) return alert('Error creando plan: ' + planErr.message);
+
+  // 5) Insertar tasks (un row por paso de cada bloque)
+  const tasks = [];
+  bloques.forEach((b, bIdx) => {
+    const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
+    pasos.forEach((paso, pIdx) => {
+      tasks.push({
+        plan_id: plan.id,
+        student_id: studentId,
+        bloque_id: b.id,
+        bloque_etapa: b.etapa,
+        bloque_subetapa: b.subetapa,
+        bloque_orden: bIdx,
+        paso_index: pIdx,
+        paso_text: paso,
+        completed: false
+      });
+    });
+  });
+
+  if (tasks.length) {
+    const { error: tErr } = await sb.from('edu_student_plan_tasks').insert(tasks);
+    if (tErr) console.error('[tasks insert]', tErr);
+  }
+
+  alert(`✅ Plan creado para ${student.full_name}\n\n${bloques.length} bloques · ${tasks.length} tareas accionables`);
+  await eduLoadStudentPlan(studentId);
+  eduRender();
+}
+
+// Cargar plan + tasks de un estudiante
+async function eduLoadStudentPlan(studentId) {
+  const { data: plan } = await sb.from('edu_student_plans')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!plan) {
+    eduState.studentPlan = null;
+    eduState.studentPlanTasks = [];
+    return;
+  }
+  const { data: tasks } = await sb.from('edu_student_plan_tasks')
+    .select('*')
+    .eq('plan_id', plan.id)
+    .order('bloque_orden')
+    .order('paso_index');
+  eduState.studentPlan = plan;
+  eduState.studentPlanTasks = tasks || [];
+}
+
+// Toggle check de una tarea
+async function eduToggleTaskCompleted(taskId) {
+  const t = (eduState.studentPlanTasks || []).find(x => x.id === taskId);
+  if (!t) return;
+  const newVal = !t.completed;
+  t.completed = newVal;  // optimistic update
+  t.completed_at = newVal ? new Date().toISOString() : null;
+  eduRender();
+  await sb.from('edu_student_plan_tasks').update({
+    completed: newVal,
+    completed_at: newVal ? new Date().toISOString() : null,
+    completed_by: state.user?.id || null
+  }).eq('id', taskId);
+}
+
+// Eliminar plan (archivar)
+async function eduArchivarPlanEstudiante(studentId) {
+  if (!confirm('¿Archivar plan actual? Vas a poder generar uno nuevo después.')) return;
+  await sb.from('edu_student_plans')
+    .update({ status: 'archived' })
+    .eq('student_id', studentId)
+    .eq('status', 'active');
+  eduState.studentPlan = null;
+  eduState.studentPlanTasks = [];
+  eduRender();
+}
+
+// Render del tab "Plan Acción" en el detalle del estudiante
+function eduRenderStudentPlan() {
+  const student = eduState.students.find(s => s.id === eduState.selectedStudentId);
+  if (!student) return `<div class="p-4 text-slate-500">Seleccioná un estudiante.</div>`;
+
+  const plan = eduState.studentPlan;
+  const tasks = eduState.studentPlanTasks || [];
+
+  if (!plan) {
+    return `
+      <div class="p-6">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+          <div class="text-4xl mb-2">🎯</div>
+          <h3 class="font-bold text-slate-900 mb-1">Sin plan de acción activo</h3>
+          <p class="text-sm text-slate-600 mb-4">Generá un plan personalizado para <strong>${student.full_name}</strong>.<br>El sistema va a inferir el perfil desde su etapa actual, capital, grupo, etc.</p>
+          <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-5 py-2.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700">🎯 Generar plan de acción</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Agrupar tasks por bloque
+  const blocks = {};
+  tasks.forEach(t => {
+    if (!blocks[t.bloque_id]) blocks[t.bloque_id] = { id: t.bloque_id, etapa: t.bloque_etapa, subetapa: t.bloque_subetapa, orden: t.bloque_orden, tasks: [] };
+    blocks[t.bloque_id].tasks.push(t);
+  });
+  const blocksList = Object.values(blocks).sort((a,b) => a.orden - b.orden);
+
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const progressPct = totalTasks > 0 ? Math.round(100 * completedTasks / totalTasks) : 0;
+  const perfil = plan.perfil?.perfil || {};
+  const cronograma = plan.perfil?.cronograma || '—';
+
+  return `
+    <div class="p-4 space-y-4">
+      <!-- Header del plan -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-bold text-amber-300 tracking-wider mb-1">PLAN DE ACCIÓN · ${student.full_name}</div>
+            <div class="text-lg font-bold">${perfil.emoji || '🎯'} ${perfil.nombre || 'Plan personalizado'}</div>
+            <div class="text-xs text-slate-300 mt-1">${cronograma}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-3xl font-bold text-amber-400">${progressPct}%</div>
+            <div class="text-xs text-slate-400">${completedTasks}/${totalTasks} tareas</div>
+          </div>
+        </div>
+        <div class="mt-3 bg-slate-700 rounded-full h-2 overflow-hidden">
+          <div class="h-full bg-amber-500 transition-all" style="width: ${progressPct}%"></div>
+        </div>
+        <div class="mt-3 flex gap-2 text-xs">
+          <button onclick="eduArchivarPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">🗄 Archivar plan</button>
+          <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">🔄 Regenerar</button>
+        </div>
+      </div>
+
+      <!-- Bloques con checklist -->
+      ${blocksList.map((b, idx) => {
+        const blockCompleted = b.tasks.filter(t => t.completed).length;
+        const blockProgress = b.tasks.length > 0 ? Math.round(100 * blockCompleted / b.tasks.length) : 0;
+        const allDone = blockCompleted === b.tasks.length;
+        return `
+          <div class="bg-white rounded-xl border ${allDone ? 'border-emerald-300' : 'border-slate-200'} overflow-hidden">
+            <div class="${allDone ? 'bg-emerald-50' : 'bg-slate-50'} px-4 py-3 flex items-center justify-between border-b ${allDone ? 'border-emerald-200' : 'border-slate-200'}">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full ${allDone ? 'bg-emerald-500' : 'bg-slate-900'} text-white font-bold text-xs flex items-center justify-center">${allDone ? '✓' : (idx+1)}</div>
+                <div>
+                  <div class="text-[10px] font-bold text-amber-700 tracking-wider">${b.etapa}</div>
+                  <div class="text-sm font-bold text-slate-900">${b.subetapa}</div>
+                </div>
+              </div>
+              <div class="text-xs text-slate-600 font-medium">${blockCompleted}/${b.tasks.length} · ${blockProgress}%</div>
+            </div>
+            <ul class="divide-y divide-slate-100">
+              ${b.tasks.map(t => `
+                <li class="px-4 py-2.5 hover:bg-slate-50 flex items-start gap-3 cursor-pointer" onclick="eduToggleTaskCompleted('${t.id}')">
+                  <input type="checkbox" ${t.completed ? 'checked' : ''} class="mt-1 w-4 h-4 rounded cursor-pointer" onclick="event.stopPropagation(); eduToggleTaskCompleted('${t.id}')" />
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${t.paso_text}</div>
+                    ${t.completed && t.completed_at ? `<div class="text-[10px] text-emerald-600 mt-0.5">✓ ${new Date(t.completed_at).toLocaleDateString('es')}</div>` : ''}
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }).join('')}
+
+      ${blocksList.length === 0 ? `<div class="text-center py-8 text-slate-500 text-sm">Plan vacío. Click "Regenerar" para crear bloques.</div>` : ''}
+    </div>
+  `;
 }
