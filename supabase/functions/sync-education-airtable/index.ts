@@ -281,6 +281,29 @@ async function handleSync(req: Request): Promise<Response> {
     }
   }
 
+  // 5) Limpiar huérfanos: estudiantes en DB que YA NO están en Airtable
+  //    (excepto los agregados manualmente que tienen airtable_record_id = null)
+  let deleted = 0;
+  try {
+    const recordIdsActuales = new Set(allRecords.map((r: any) => r.id));
+    const { data: existentes } = await supabase
+      .from("edu_students")
+      .select("id, airtable_record_id")
+      .eq("mentorship_id", mentorshipId)
+      .not("airtable_record_id", "is", null);
+    const huerfanos = (existentes || []).filter(
+      (s: any) => s.airtable_record_id && !recordIdsActuales.has(s.airtable_record_id)
+    );
+    if (huerfanos.length) {
+      const ids = huerfanos.map((h: any) => h.id);
+      const { error: delErr } = await supabase.from("edu_students").delete().in("id", ids);
+      if (!delErr) deleted = ids.length;
+      else errors.push("Delete huérfanos: " + delErr.message);
+    }
+  } catch (e: any) {
+    errors.push("Cleanup huérfanos: " + e.message);
+  }
+
   // Debug info
   const fieldNamesInAirtable = allRecords.length > 0 ? Object.keys(allRecords[0].fields || {}) : [];
   const sampleMapped = rows.slice(0, 2);
@@ -290,6 +313,7 @@ async function handleSync(req: Request): Promise<Response> {
     mentorship: m.name,
     fetched_from_airtable: allRecords.length,
     synced,
+    deleted_huerfanos: deleted,
     errors: errors.length ? errors : undefined,
     debug: {
       airtable_field_names: fieldNamesInAirtable,
