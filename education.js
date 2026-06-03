@@ -1208,22 +1208,38 @@ function eduBuildPPTX(p, opts = {}) {
 
     if (isCover) return renderCover(slide, s, p, { BRAND, YEAR, ACCENT, GOLD, WHITE, GRAY_MED });
 
-    // Título de slide
-    slide.addText(s.title || `Slide ${s.number}`, { x: 0.4, y: 0.7, w: 12.5, h: 0.6, fontSize: 26, bold: true, color: NAV });
-    if (s.subtitle) slide.addText(s.subtitle, { x: 0.4, y: 1.3, w: 12.5, h: 0.4, fontSize: 14, color: GRAY_MED, italic: true });
+    // Block label (BLOQUE N · TEMA) sobre el título — pedagogía estilo Borja Ramírez
+    if (s.block_label) {
+      slide.addText(String(s.block_label).toUpperCase(), {
+        x: 0.4, y: 0.6, w: 12.5, h: 0.3,
+        fontSize: 11, bold: true, color: GOLD, charSpacing: 3
+      });
+      slide.addShape('rect', { x: 0.4, y: 0.92, w: 0.9, h: 0.045, fill: { color: GOLD } });
+    }
 
+    // Título de slide (más abajo si hay block_label)
+    const titleY = s.block_label ? 1.05 : 0.7;
+    slide.addText(s.title || `Slide ${s.number}`, { x: 0.4, y: titleY, w: 12.5, h: 0.6, fontSize: 26, bold: true, color: NAV });
+    if (s.subtitle) slide.addText(s.subtitle, { x: 0.4, y: titleY + 0.6, w: 12.5, h: 0.4, fontSize: 14, color: GRAY_MED, italic: true });
+
+    const C = { NAV, NAV_LIGHT, ACCENT, GOLD, GRAY_LIGHT, GRAY_MED, WHITE, BRAND };
     switch (s.layout) {
-      case 'agenda':           renderAgenda(slide, s, { ACCENT, NAV, NAV_LIGHT, GRAY_LIGHT, WHITE }); break;
-      case 'comparison':       renderComparison(slide, s, { NAV, ACCENT, GRAY_LIGHT }); break;
-      case 'benefits':         renderBenefits(slide, s, { NAV, ACCENT, GOLD, GRAY_LIGHT }); break;
-      case 'case-study':       renderCaseStudy(slide, s, { NAV, ACCENT, GOLD, GRAY_LIGHT, GRAY_MED }); break;
-      case 'framework':        renderFramework(slide, s, { NAV, ACCENT, GRAY_LIGHT }); break;
-      case 'checklist':        renderChecklist(slide, s, { NAV, ACCENT, GRAY_LIGHT }); break;
-      case 'strategy-grid':    renderStrategyGrid(slide, s, { NAV, ACCENT, GOLD, GRAY_LIGHT }); break;
-      case 'metrics-dashboard': renderMetricsDashboard(slide, s, { NAV, ACCENT, GOLD }); break;
-      case 'quote':            renderQuote(slide, s, { NAV, ACCENT, GRAY_MED }); break;
-      case 'closing':          renderClosing(slide, s, p, { BRAND, NAV, ACCENT, GOLD, WHITE }); break;
-      default:                 renderDefault(slide, s, { NAV, ACCENT, GRAY_LIGHT });
+      case 'agenda':              renderAgenda(slide, s, C); break;
+      case 'comparison':          renderComparison(slide, s, C); break;
+      case 'benefits':            renderBenefits(slide, s, C); break;
+      case 'case-study':          renderCaseStudy(slide, s, C); break;
+      case 'framework':           renderFramework(slide, s, C); break;
+      case 'checklist':           renderChecklist(slide, s, C); break;
+      case 'strategy-grid':       renderStrategyGrid(slide, s, C); break;
+      case 'metrics-dashboard':   renderMetricsDashboard(slide, s, C); break;
+      case 'quote':               renderQuote(slide, s, C); break;
+      case 'closing':             renderClosing(slide, s, p, C); break;
+      case 'learning-objectives': renderLearningObjectives(slide, s, C); break;
+      case 'reflection-recap':    renderReflectionRecap(slide, s, C); break;
+      case 'transfer-activity':   renderTransferActivity(slide, s, C); break;
+      case 'goldbox':             renderGoldbox(slide, s, C); break;
+      case 'highlight':           renderHighlight(slide, s, C); break;
+      default:                    renderDefault(slide, s, C);
     }
 
     // Speaker notes
@@ -1496,6 +1512,118 @@ function renderDefault(slide, s, c) {
   }
   if ((s.stats || []).length) {
     renderMetricsDashboard(slide, { ...s, metric_cards: s.stats }, c);
+  }
+}
+
+// ─── LAYOUTS PEDAGÓGICOS (Borja Ramírez / metacognición) ───
+function renderLearningObjectives(slide, s, c) {
+  // 4 cards navy con número gold grande + título + body
+  const items = (s.learning_objectives || []).slice(0, 4);
+  if (!items.length) return;
+  const baseY = s.block_label ? 2.05 : 1.85;
+  const cardW = (12.4 / 4) - 0.15;
+  const cardH = 2.6;
+  items.forEach((o, i) => {
+    const x = 0.4 + i * (cardW + 0.15);
+    slide.addShape('roundRect', { x, y: baseY, w: cardW, h: cardH, fill: { color: '16263F' }, line: { color: c.GOLD, width: 0.75 }, rectRadius: 0.1 });
+    slide.addText(String(o.number || (i+1).toString().padStart(2, '0')), { x: x + 0.2, y: baseY + 0.2, w: cardW - 0.4, h: 0.6, fontSize: 26, bold: true, color: c.GOLD });
+    slide.addText(String(o.title || ''), { x: x + 0.2, y: baseY + 0.95, w: cardW - 0.4, h: 0.5, fontSize: 14, bold: true, color: c.WHITE });
+    slide.addText(String(o.body || ''), { x: x + 0.2, y: baseY + 1.45, w: cardW - 0.4, h: 1.05, fontSize: 11, color: 'CBD5E1', valign: 'top' });
+  });
+  // Goldbox al final si hay
+  if (s.goldbox_runs || s.footer_rule) {
+    const y = baseY + cardH + 0.3;
+    slide.addShape('roundRect', { x: 0.4, y, w: 12.5, h: 0.85, rectRadius: 0.08, fill: { color: '1C2A40' }, line: { color: c.GOLD, width: 1 } });
+    const runs = s.goldbox_runs || [{ text: 'Regla: ', bold: true }, { text: s.footer_rule }];
+    slide.addText(runs.map(r => ({ text: r.text, options: { bold: !!r.bold, color: r.bold ? c.GOLD : 'EAFFF3', fontSize: 13 } })), { x: 0.7, y: y + 0.1, w: 12.0, h: 0.65, valign: 'middle' });
+  }
+}
+
+function renderReflectionRecap(slide, s, c) {
+  // 3 cards "Aprendiste a..." con check verde
+  const items = (s.reflection_items || []).slice(0, 3);
+  if (!items.length) return renderDefault(slide, s, c);
+  const baseY = s.block_label ? 2.5 : 2.3;
+  const cardW = (12.4 / 3) - 0.15;
+  const cardH = 2.2;
+  items.forEach((it, i) => {
+    const x = 0.4 + i * (cardW + 0.15);
+    const accent = i === items.length - 1 ? '10B981' : c.ACCENT;
+    slide.addShape('roundRect', { x, y: baseY, w: cardW, h: cardH, fill: { color: c.WHITE }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
+    slide.addShape('rect', { x, y: baseY, w: cardW, h: 0.08, fill: { color: accent } });
+    // Check verde grande
+    slide.addShape('ellipse', { x: x + 0.25, y: baseY + 0.25, w: 0.55, h: 0.55, fill: { color: '10B981' }, line: { color: '10B981' } });
+    slide.addText('✓', { x: x + 0.25, y: baseY + 0.25, w: 0.55, h: 0.55, fontSize: 22, bold: true, color: c.WHITE, align: 'center', valign: 'middle' });
+    slide.addText(String(it.title || 'Aprendiste a'), { x: x + 1.0, y: baseY + 0.3, w: cardW - 1.2, h: 0.4, fontSize: 13, bold: true, color: c.GOLD, charSpacing: 2 });
+    slide.addText(String(it.body || ''), { x: x + 0.25, y: baseY + 0.95, w: cardW - 0.45, h: cardH - 1.1, fontSize: 14, color: c.NAV, valign: 'top', bold: true });
+  });
+}
+
+function renderTransferActivity(slide, s, c) {
+  // 2 cards (reto + entregable) + highlight verde al pie
+  const ta = s.transfer_activity || {};
+  const baseY = s.block_label ? 2.0 : 1.85;
+  const cardW = 5.95, cardH = 2.6;
+  // RETO
+  slide.addShape('roundRect', { x: 0.4, y: baseY, w: cardW, h: cardH, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
+  slide.addShape('rect', { x: 0.4, y: baseY, w: cardW, h: 0.07, fill: { color: c.ACCENT } });
+  slide.addText('EL RETO', { x: 0.6, y: baseY + 0.2, w: cardW - 0.4, h: 0.3, fontSize: 11, bold: true, color: c.ACCENT, charSpacing: 3 });
+  slide.addText(String(ta.challenge || ''), { x: 0.6, y: baseY + 0.55, w: cardW - 0.4, h: cardH - 0.7, fontSize: 14, color: c.NAV, valign: 'top' });
+  // ENTREGABLE
+  slide.addShape('roundRect', { x: 6.95, y: baseY, w: cardW, h: cardH, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
+  slide.addShape('rect', { x: 6.95, y: baseY, w: cardW, h: 0.07, fill: { color: '10B981' } });
+  slide.addText('ENTREGABLE', { x: 7.15, y: baseY + 0.2, w: cardW - 0.4, h: 0.3, fontSize: 11, bold: true, color: '047857', charSpacing: 3 });
+  if (ta.deliverable) slide.addText(String(ta.deliverable), { x: 7.15, y: baseY + 0.55, w: cardW - 0.4, h: 0.5, fontSize: 13, bold: true, color: c.NAV });
+  const items = (ta.deliverable_items || []).map(t => ({ text: t, options: { bullet: { code: '25CF' }, fontSize: 12, color: c.NAV, breakLine: true, paraSpaceAfter: 6 } }));
+  slide.addText(items, { x: 7.25, y: baseY + 1.1, w: cardW - 0.5, h: cardH - 1.2 });
+  // HIGHLIGHT verde abajo
+  if (ta.rule) {
+    const y = baseY + cardH + 0.25;
+    slide.addShape('roundRect', { x: 0.4, y, w: 12.5, h: 0.95, rectRadius: 0.08, fill: { color: '143726' }, line: { color: '10B981', width: 1 } });
+    slide.addShape('rect', { x: 0.4, y, w: 0.08, h: 0.95, fill: { color: '10B981' } });
+    slide.addText(String(ta.rule), { x: 0.7, y: y + 0.12, w: 12.2, h: 0.75, fontSize: 13, color: 'EAFFF3', valign: 'middle' });
+  }
+}
+
+function renderGoldbox(slide, s, c) {
+  // Caja navy con borde dorado + texto rich (runs alternando bold/regular)
+  const baseY = s.block_label ? 2.0 : 1.85;
+  const boxH = 1.4;
+  slide.addShape('roundRect', { x: 0.4, y: baseY, w: 12.5, h: boxH, rectRadius: 0.1, fill: { color: '1C2A40' }, line: { color: c.GOLD, width: 1.5 } });
+  const runs = (s.goldbox_runs || (s.bullets || []).map(b => ({ text: b }))).map(r => ({
+    text: r.text, options: { bold: !!r.bold, color: r.bold ? c.GOLD : 'EAFFF3', fontSize: 18 }
+  }));
+  slide.addText(runs, { x: 0.7, y: baseY + 0.15, w: 12.0, h: boxH - 0.3, valign: 'middle' });
+  // Si hay bullets adicionales debajo
+  if ((s.bullets || []).length && !s.goldbox_runs) return;
+  if ((s.bullets || []).length) {
+    const items = s.bullets.map(b => ({ text: b, options: { bullet: { code: '25CF' }, fontSize: 14, color: c.NAV, breakLine: true, paraSpaceAfter: 8, indent: 14 } }));
+    slide.addText(items, { x: 0.6, y: baseY + boxH + 0.3, w: 12.2, h: 7 - baseY - boxH - 0.5 });
+  }
+}
+
+function renderHighlight(slide, s, c) {
+  // Caja navy oscura con borde verde + texto destacado grande
+  const baseY = s.block_label ? 2.05 : 1.85;
+  const text = s.highlight_text || s.title || '';
+  const runs = s.highlight_runs || [{ text }];
+  slide.addShape('roundRect', { x: 0.4, y: baseY, w: 12.5, h: 1.5, rectRadius: 0.1, fill: { color: '143726' }, line: { color: '10B981', width: 1.25 } });
+  slide.addShape('rect', { x: 0.4, y: baseY, w: 0.1, h: 1.5, fill: { color: '10B981' } });
+  const rich = runs.map(r => ({ text: r.text, options: { bold: !!r.bold, color: r.bold ? c.GOLD : 'EAFFF3', fontSize: 17 } }));
+  slide.addText(rich, { x: 0.75, y: baseY + 0.15, w: 12.0, h: 1.2, valign: 'middle', lineSpacingMultiple: 1.15 });
+  // Cards "Antes de X" abajo
+  const cards = s.cards || [];
+  if (cards.length) {
+    const yc = baseY + 1.75;
+    const cardW = (12.4 / cards.length) - 0.15;
+    cards.slice(0, 4).forEach((card, i) => {
+      const x = 0.4 + i * (cardW + 0.15);
+      slide.addShape('roundRect', { x, y: yc, w: cardW, h: 2.5, fill: { color: c.WHITE }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
+      slide.addShape('rect', { x, y: yc, w: cardW, h: 0.06, fill: { color: c.GOLD } });
+      slide.addText(String(card.title || ''), { x: x + 0.15, y: yc + 0.2, w: cardW - 0.3, h: 0.4, fontSize: 13, bold: true, color: c.NAV });
+      const itemsR = (card.items || []).map(t => ({ text: t, options: { fontSize: 12, color: c.NAV, breakLine: true, paraSpaceAfter: 6 } }));
+      slide.addText(itemsR, { x: x + 0.15, y: yc + 0.65, w: cardW - 0.3, h: 1.75 });
+    });
   }
 }
 

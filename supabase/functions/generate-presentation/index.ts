@@ -96,23 +96,60 @@ ${research_mode ? `🔬 MODO INVESTIGACIÓN PROFUNDA ACTIVADO
 - La clase debe sentirse curada por un EXPERTO que pasó horas investigando, no Wikipedia copy-paste.
 - Incluí "deep_insights" que un coach junior NO sabría.
 
-` : ''}ESTRUCTURA OBLIGATORIA DE LA PRESENTACIÓN (estilo deck profesional con arco pedagógico completo):
+` : ''}METODOLOGÍA PEDAGÓGICA OBLIGATORIA — ESCALERA METACOGNITIVA:
 
-1. PORTADA — title + subtitle/quote + 3 KPIs grandes destacados (layout: "cover")
-2. AGENDA — 4-6 pasos del proceso visualmente (layout: "agenda")
-3-4. CONTEXTO / DEFINICIÓN — qué es + por qué importa, con comparativa side-by-side si aplica (layout: "comparison")
-5. BENEFICIOS PRINCIPALES — 4-6 beneficios concretos (layout: "benefits")
-6. **STACK DE CAPITAL / COSTOS REALES** — desglose claro del dinero necesario, lo que recuperás vs lo que perdés (layout: "metrics-dashboard" con 6-8 cards)
-7-8. **CASOS REALES (2 mínimo)** — con dirección, números antes/después, estrategia, ROI, key_takeaway. Si require_live_data, BUSCALOS en web (zillow, redfin, news). Si no, inventá realistas pero plausibles para el mercado actual. (layout: "case-study")
-9. BUY BOX / FRAMEWORK — parámetros no negociables con valores numéricos (layout: "framework")
-10. **CONCEPTO TÉCNICO IMPORTANTE EXPLICADO** — comparación de lo viejo vs lo nuevo (ej: loan tradicional vs DSCR, w-2 vs LLC, etc.) ANTES de mostrar números técnicos (layout: "comparison")
-11. DETALLE TÉCNICO — fórmulas, ratios, números específicos (layout: "framework")
-12. ESTRATEGIAS / OPCIONES — comparativa de 3-4 opciones con métricas (layout: "strategy-grid")
-13. METRICS DASHBOARD DE MERCADO — 6-8 KPIs actualizados con fuentes (layout: "metrics-dashboard")
-14. **ERRORES COMUNES / PITFALLS** — 5-6 errores que matan el proyecto + cómo evitarlos (layout: "checklist")
-15. QUOTE memorable de mindset (layout: "quote")
-16. **RECURSOS DESCARGABLES + PRE-WORK** — calculadoras, templates, lecturas, tarea para próxima clase (layout: "checklist")
-17. CIERRE / CTA — quote final + 3 stats grandes + call to action específico medible (layout: "closing")
+Cada clase está diseñada para que un alumno NO EXPERTO salga PUDIENDO HACER algo específico.
+Aplicamos la **Escalera de Metacognición** de Borja Ramírez en estos 4 momentos del deck:
+
+1. ¿QUÉ voy a aprender? → slide #3 (learning-objectives)
+2. ¿CÓMO lo voy a aprender? → bloques numerados secuenciales (Bloque 1, 2, 3...)
+3. ¿PARA QUÉ me sirve? → slide cierre #N-2 (reflection-recap "Aprendiste a...")
+4. ¿DÓNDE más aplico? → slide actividad #N (transfer-activity)
+
+ORGANIZACIÓN EN BLOQUES NUMERADOS (estilo Borja Ramírez / FlipMentoría):
+Cada slide tiene una etiqueta de bloque en mayúsculas pequeñas, ej:
+- "BLOQUE 1 · CONTEXTO"
+- "BLOQUE 2 · FUNDAMENTO"
+- "BLOQUE 3 · CLASIFICACIÓN"
+- "BLOQUE 4 · METODOLOGÍA"
+- "BLOQUE 5 · ASPECTOS CRÍTICOS"
+- "BLOQUE 6 · ERRORES COMUNES"
+- "BLOQUE 7 · CASO PRÁCTICO"
+- "BLOQUE 8 · HERRAMIENTAS"
+- "BLOQUE 9 · CIERRE"
+
+DIFICULTAD CRECIENTE: cada bloque construye sobre el anterior. NO empezar por números o tasas. Empezar por POR QUÉ IMPORTA + DEFINICIÓN, después clasificación, después método, después caso real, después errores, después herramientas, después transferencia.
+
+ESTRUCTURA OBLIGATORIA (${slides_count} slides):
+
+1. PORTADA (layout: "cover") — title + subtitle/quote + 3 KPIs gold
+2. CONTEXTO — Por qué importa (layout: "highlight" con 3 cards "Antes de X" + footer) — el DOLOR del problema
+3. **QUÉ VAS A APRENDER HOY** (layout: "learning-objectives") — 4 objetivos numerados "01...02...03...04" en cards navy con gold accent. CRUCIAL — esto es el "¿Qué voy a aprender?" de metacognición.
+4. FUNDAMENTO — Definición del concepto central (layout: "goldbox" con la definición técnica)
+5. INVISIBLE / NO OBVIO — Lo que el ojo no ve / el error de percepción típico (layout: "comparison" Lo visible vs Lo oculto)
+6. CLASIFICACIÓN — Los 5 tipos/categorías del concepto (layout: "framework" o "strategy-grid" con 4-5 opciones)
+7-8. DESGLOSE — 2 slides con sub-conceptos detallados, cada uno con benefits/cards
+9. METODOLOGÍA — orden lógico paso a paso (layout: "agenda" con 5 steps)
+10-11. ZONAS / DOMINIOS — slides con cards específicas por zona (layout: "checklist" o "framework")
+12. ASPECTOS CRÍTICOS / RED FLAGS — 6-8 puntos rojos no negociables (layout: "checklist" o "metrics-dashboard")
+13. TABLA DE DECISIÓN — qué hacer ante cada red flag (layout: "framework" con label+value)
+14. ERRORES COMUNES — 4-6 errores que cuestan dinero (layout: "checklist")
+15. CASO PRÁCTICO REAL — con números completos (layout: "case-study")
+16. HERRAMIENTAS — cómo documentar/medir (layout: "checklist")
+17. **APRENDISTE A...** (layout: "reflection-recap") — slide pedagógico de cierre, 3 cards "Aprendiste a..." con verbo en infinitivo. CRUCIAL — esto es "¿Para qué me sirve?" de metacognición.
+18. CHECKLIST FINAL (layout: "checklist") — qué se llevan accionable
+19. QUOTE memorable de cierre (layout: "quote")
+20. **ACTIVIDAD PARA PRÓXIMA CLASE** (layout: "transfer-activity") — 1 reto + 1 entregable + 1 highlight con regla. CRUCIAL — esto es "¿Dónde más aplico?" de metacognición.
+
+NOTA: si slides_count = 15-17, condensar bloques. Pero NUNCA omitir los 4 slides metacognitivos (#3, #17, #19/20, y #20).
+
+ELEMENTOS VISUALES OBLIGATORIOS:
+- "block_label": cada slide (excepto portada) DEBE tener un campo "block_label" string en MAYÚSCULAS tipo "BLOQUE 3 · CLASIFICACIÓN"
+- "goldbox_text": para reglas / insights clave usar slide con layout "goldbox" + array "goldbox_runs" alternando bold/regular
+- "highlight_text": para frases de impacto, layout "highlight" con texto principal grande color blanco
+- "learning_objectives" en slide #3: array de 4 objetos `{number: "01", title: "...", body: "..."}`
+- "reflection_items" en slide reflection-recap: array de 3 objetos `{title: "Aprendiste a", body: "verbo + qué"}`
+- "transfer_activity" en slide final: `{challenge: "...", deliverable: "...", deliverable_items: ["...", "..."], rule: "..."}`
 
 REGLAS CRÍTICAS:
 1. **TODA estadística, tasa, precio, número o dato DEBE venir de web search en VIVO**.
@@ -149,8 +186,36 @@ Devolvé SOLO JSON válido (sin markdown wrapper, sin comentarios):
       "number": 1,
       "title": "...",
       "subtitle": "opcional",
-      "layout": "cover | agenda | comparison | benefits | case-study | framework | checklist | strategy-grid | metrics-dashboard | quote | closing | content",
+      "block_label": "BLOQUE 1 · CONTEXTO",
+      "layout": "cover | agenda | comparison | benefits | case-study | framework | checklist | strategy-grid | metrics-dashboard | quote | closing | learning-objectives | reflection-recap | transfer-activity | goldbox | highlight | content",
       "bullets": ["bullet 1 max 12 palabras", "bullet 2"],
+
+      "learning_objectives": [
+        {"number": "01", "title": "¿Qué es una patología?", "body": "Definición + por qué muchas veces no se ve."},
+        {"number": "02", "title": "Cómo inspeccionar", "body": "Orden lógico: exterior, interior, zona por zona."},
+        {"number": "03", "title": "Red flags críticas", "body": "Las que nunca se pueden ignorar."},
+        {"number": "04", "title": "Documentación accionable", "body": "Cómo documentar y volverlo presupuesto."}
+      ],
+
+      "reflection_items": [
+        {"title": "Aprendiste a", "body": "Reconocer 5 tipos de patología y dónde se esconden."},
+        {"title": "Aprendiste a", "body": "Inspeccionar en orden y detectar las red flags."},
+        {"title": "Aprendiste a", "body": "Documentar y volverlo decisión."}
+      ],
+
+      "transfer_activity": {
+        "challenge": "En tu próxima propiedad realiza una inspección completa siguiendo el flujo de la clase.",
+        "deliverable": "Documenta mínimo 8 hallazgos siguiendo el flujo de la clase",
+        "deliverable_items": ["Al menos 1 hallazgo por tipo.", "Cada uno con foto, zona, riesgo e impacto $.", "Decisión final: comprar / negociar / descartar."],
+        "rule": "Trae tu reporte a la próxima sesión: revisaremos cómo tus hallazgos se convierten en scope of work y en tu oferta."
+      },
+
+      "goldbox_runs": [
+        {"text": "Patología constructiva: ", "bold": true},
+        {"text": "cualquier daño, deterioro o defecto que afecta el funcionamiento, la seguridad o el valor de una vivienda."}
+      ],
+
+      "highlight_text": "El inversionista no pierde dinero solo por remodelar mal. Pierde por no saber inspeccionar.",
 
       "stats": [{"label": "Median home price Austin", "value": "$469,500", "source_name": "Redfin May 2026"}],
 
