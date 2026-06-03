@@ -28,20 +28,50 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Cargar TODOS los documentos de fm_documents (la metodología completa)
-  const { data: docs, error: docsErr } = await supabase.from("fm_documents")
-    .select("etapa,categoria,codigo,titulo,subtitulo,contenido_md")
-    .order("posicion");
-  if (docsErr) return json({ ok: false, error: "No pude cargar metodología: " + docsErr.message }, 500);
+  // Modo búsqueda: usar full-text search SQL para traer SOLO docs relevantes (max 3)
+  // Modo diagnose: ya no se usa IA (wizard JS lo reemplaza)
+  let docs: any[] = [];
+  if (mode === 'search') {
+    // Extraer query del último mensaje user
+    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+    const query = (lastUser?.content || '').slice(0, 300);
 
-  // Construir context con todos los documentos
+    // Búsqueda con ilike (más simple que tsvector y suficiente para 14 docs)
+    const { data: searchData } = await supabase.from("fm_documents")
+      .select("etapa,categoria,codigo,titulo,subtitulo,contenido_md,posicion")
+      .or(`titulo.ilike.%${query.replace(/[%_]/g, '')}%,subtitulo.ilike.%${query.replace(/[%_]/g, '')}%,contenido_md.ilike.%${query.replace(/[%_]/g, '')}%`)
+      .order("posicion")
+      .limit(3);
+    docs = searchData || [];
+
+    // Si no encontró nada con ilike, traer índice + 1 doc por etapa más probable
+    if (!docs.length) {
+      const { data: fallback } = await supabase.from("fm_documents")
+        .select("etapa,categoria,codigo,titulo,subtitulo,contenido_md,posicion")
+        .in('categoria', ['indice', 'lista_tareas', 'mindset'])
+        .order("posicion")
+        .limit(3);
+      docs = fallback || [];
+    }
+  } else {
+    // diagnose mode (legacy — no se usa) — traer solo diagnostico + perfiles
+    const { data: diagDocs } = await supabase.from("fm_documents")
+      .select("etapa,categoria,codigo,titulo,subtitulo,contenido_md,posicion")
+      .in('categoria', ['diagnostico', 'perfiles'])
+      .order("posicion");
+    docs = diagDocs || [];
+  }
+
+  // Construir context COMPACTO con solo los docs relevantes
   let contextStr = "";
   for (const d of docs) {
     contextStr += `\n\n═══════════════════════════════════════════════════════════\n`;
     contextStr += `[DOCUMENTO · etapa=${d.etapa} · categoria=${d.categoria}${d.codigo ? ` · codigo=${d.codigo}` : ''}]\n`;
     contextStr += `TÍTULO: ${d.titulo}\n`;
     if (d.subtitulo) contextStr += `SUBTÍTULO: ${d.subtitulo}\n`;
-    contextStr += `\n${d.contenido_md}\n`;
+    // Truncar a 40KB por doc max (suficiente para responder con citas)
+    const truncated = (d.contenido_md || '').length > 40000 ? (d.contenido_md || '').slice(0, 40000) + '\n\n...[truncado por tamaño]' : (d.contenido_md || '');
+    contextStr += `\n${truncated}\n`;
   }
   const contextChars = contextStr.length;
 

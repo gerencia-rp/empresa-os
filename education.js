@@ -2027,9 +2027,98 @@ const fmState = {
   activeTab: 'biblioteca',  // biblioteca | buscador | diagnostico
   searchChat: [],
   searchLoading: false,
-  diagnoseChat: [],
-  diagnoseLoading: false
+  // Wizard de diagnóstico (sin IA — categorización por reglas)
+  diagAnswers: {},        // q_id → answer value
+  diagStep: 0,            // pregunta actual
+  diagResult: null        // perfil identificado + plan
 };
+
+// ─── CONFIG WIZARD DE DIAGNÓSTICO ───
+const FM_DIAG_QUESTIONS = [
+  {
+    id: 'objetivo',
+    pregunta: '¿Cuál es tu resultado objetivo en los próximos 12 meses?',
+    opciones: [
+      { val: 'flip',         label: '🏠 Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
+      { val: 'hold',         label: '🏘️ Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
+      { val: 'wholesale',    label: '📋 Hacer wholesaling (asignar contratos sin remodelar)' },
+      { val: 'hibrido',      label: '🔀 Mix flips + holds' },
+      { val: 'escalar',      label: '🚀 Escalar un negocio que ya tengo (sistemas, equipo, múltiples deals)' },
+      { val: 'lender',       label: '💰 Ser private money lender (prestar capital, no operar)' }
+    ]
+  },
+  {
+    id: 'capital',
+    pregunta: '¿Cuánto capital propio disponible HOY para invertir?',
+    opciones: [
+      { val: 'menos_20k',    label: '< $20K' },
+      { val: '20_50k',       label: '$20K – $50K' },
+      { val: '50_100k',      label: '$50K – $100K' },
+      { val: 'mas_100k',     label: '> $100K' }
+    ]
+  },
+  {
+    id: 'credit',
+    pregunta: '¿Tu credit score (FICO) actual?',
+    opciones: [
+      { val: 'mas_720',      label: '> 720 (excelente)' },
+      { val: '660_720',      label: '660 – 720 (bueno, califica HML estándar)' },
+      { val: '600_660',      label: '600 – 660 (limitado, solo HMLs flexibles)' },
+      { val: 'menos_600',    label: '< 600 (reconstruir antes de empezar)' },
+      { val: 'sin_historial',label: 'No tengo historial crediticio en USA' }
+    ]
+  },
+  {
+    id: 'llc',
+    pregunta: '¿Tenés LLC formada?',
+    opciones: [
+      { val: 'si_mismo',     label: '✅ Sí, en el estado donde planeo invertir' },
+      { val: 'si_otro',      label: '⚠️ Sí, pero en otro estado distinto al de inversión' },
+      { val: 'no',           label: '❌ No, todavía no la formé' },
+      { val: 'otra_entidad', label: 'Tengo otra entidad (S-Corp, INC)' }
+    ]
+  },
+  {
+    id: 'deals_cerrados',
+    pregunta: '¿Cuántos deals exitosos has cerrado en real estate?',
+    opciones: [
+      { val: '0',            label: 'Ninguno todavía' },
+      { val: '1',            label: '1 deal' },
+      { val: '2_4',          label: '2 – 4 deals' },
+      { val: '5_mas',        label: '5+ deals' }
+    ]
+  },
+  {
+    id: 'tiempo',
+    pregunta: '¿Cuántas horas/semana podés dedicarle al negocio?',
+    opciones: [
+      { val: 'mas_30',       label: '> 30 horas (full-time o casi)' },
+      { val: '15_30',        label: '15 – 30 horas (medio tiempo serio)' },
+      { val: 'menos_15',     label: '< 15 horas (paralelo a trabajo)' }
+    ]
+  },
+  {
+    id: 'inmigracion',
+    pregunta: 'Sobre tu situación en USA:',
+    opciones: [
+      { val: 'residente',    label: 'Soy ciudadano o residente USA con SSN' },
+      { val: 'itin',         label: 'Tengo ITIN pero no SSN' },
+      { val: 'internacional',label: 'Soy internacional sin ITIN (visito USA)' }
+    ]
+  },
+  {
+    id: 'deal_activo',
+    pregunta: '¿Tenés deal activo ahora mismo?',
+    opciones: [
+      { val: 'no',           label: 'No, todavía no cierro mi primer deal' },
+      { val: 'pre_obra',     label: 'Sí, en preparación pre-obra (E2)' },
+      { val: 'obra',         label: 'Sí, en obra (E3)' },
+      { val: 'salida',       label: 'Sí, en salida / listing (E4)' }
+    ],
+    // Solo mostrar si dijo que cerró ≥ 1 deals O dijo que ya está en pipeline
+    skipIf: (a) => a.deals_cerrados === '0' && (a.objetivo === 'wholesale' || a.objetivo === 'lender')
+  }
+];
 
 const FM_ETAPAS = [
   { id: 'INDICE',  label: '📘 Índice',         color: 'slate' },
@@ -2212,39 +2301,422 @@ function fmRenderBuscadorIA() {
 }
 
 function fmRenderDiagnostico() {
+  // Si ya hay resultado, mostrar plan
+  if (fmState.diagResult) return fmRenderDiagPlan();
+
+  // Filtrar preguntas según respuestas previas (skipIf)
+  const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
+  const total = activeQuestions.length;
+  const step = Math.min(fmState.diagStep, total - 1);
+  const q = activeQuestions[step];
+
+  if (!q) return `<div class="p-8">Calculando...</div>`;
+
+  const answered = Object.keys(fmState.diagAnswers).length;
+  const progress = Math.round((answered / total) * 100);
+
   return `
-    <div class="h-full flex flex-col bg-slate-50">
-      <div class="max-w-4xl mx-auto w-full flex-1 flex flex-col p-6 overflow-hidden">
-        <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4 mb-4 flex-shrink-0">
-          <h3 class="font-bold text-amber-900 mb-1">🎯 Diagnóstico Inicial — Plan Personalizado</h3>
-          <p class="text-sm text-amber-800">La IA te va a hacer 6-10 preguntas para ubicarte en la metodología E0-E5 y generar un plan accionable con tareas, contactos, plataformas y calculadoras específicas para tu situación.</p>
-          ${fmState.diagnoseChat.length === 0 ? `
-            <button onclick="fmDiagnoseStart()" class="mt-3 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
-              🚀 Iniciar Diagnóstico
-            </button>
-          ` : ''}
+    <div class="h-full overflow-y-auto bg-gradient-to-br from-amber-50 via-white to-orange-50">
+      <div class="max-w-2xl mx-auto px-6 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-xl border border-amber-200 p-5 mb-6 shadow-sm">
+          <h3 class="font-bold text-slate-900 mb-1">🎯 Diagnóstico Inicial — Plan Personalizado</h3>
+          <p class="text-sm text-slate-600">Respondé ${total} preguntas rápidas para identificar tu perfil y recibir un plan accionable con tareas, contactos y plataformas específicas.</p>
         </div>
-        <div class="flex-1 overflow-y-auto bg-white rounded-xl border border-slate-200 p-6 mb-4 space-y-4 scrollbar-thin">
-          ${fmState.diagnoseChat.length === 0 ? `<div class="text-center text-slate-400 py-12"><div class="text-5xl mb-2">🎯</div><p>Click "Iniciar Diagnóstico" para empezar</p></div>` : ''}
-          ${fmState.diagnoseChat.map((m, i) => fmRenderChatMessage(m, i, 'diagnose')).join('')}
-          ${fmState.diagnoseLoading ? `<div class="flex items-start gap-3"><div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">🤖</div><div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600 italic">Analizando<span class="animate-pulse">...</span></div></div>` : ''}
-        </div>
-        ${fmState.diagnoseChat.length > 0 ? `
-          <div class="bg-white rounded-xl border border-slate-200 p-3 flex gap-2 flex-shrink-0">
-            <input id="fm-diagnose-input" type="text" placeholder="Respondé la pregunta..."
-              class="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-amber-500"
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fmDiagnoseSend();}"
-              ${fmState.diagnoseLoading ? 'disabled' : ''} />
-            <button onclick="fmDiagnoseSend()" ${fmState.diagnoseLoading ? 'disabled' : ''}
-              class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">
-              ${fmState.diagnoseLoading ? '⏳' : '→'}
-            </button>
-            <button onclick="fmDiagnoseReset()" class="px-3 py-2 text-slate-500 hover:text-slate-700 text-sm">🔄</button>
+
+        <!-- Progress -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between text-xs text-slate-600 mb-1">
+            <span>Pregunta ${step + 1} de ${total}</span>
+            <span>${progress}% completado</span>
           </div>
-        ` : ''}
+          <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+            <div class="h-full bg-amber-500 transition-all" style="width: ${progress}%"></div>
+          </div>
+        </div>
+
+        <!-- Pregunta -->
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-xs font-bold text-amber-600 tracking-wider mb-2">PREGUNTA ${step + 1}</div>
+          <h4 class="text-xl font-bold text-slate-900 mb-5">${q.pregunta}</h4>
+          <div class="space-y-2">
+            ${q.opciones.map(o => {
+              const selected = fmState.diagAnswers[q.id] === o.val;
+              return `
+                <button onclick="fmDiagAnswer('${q.id}', '${o.val}')"
+                  class="w-full text-left px-4 py-3 rounded-lg border-2 transition ${selected ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50'}">
+                  <div class="flex items-center gap-3">
+                    <div class="w-5 h-5 rounded-full border-2 ${selected ? 'border-amber-600 bg-amber-600' : 'border-slate-300'} flex items-center justify-center flex-shrink-0">
+                      ${selected ? '<div class="w-2 h-2 rounded-full bg-white"></div>' : ''}
+                    </div>
+                    <span class="text-sm">${o.label}</span>
+                  </div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Navegación -->
+        <div class="flex items-center justify-between mt-6">
+          <button onclick="fmDiagBack()" ${step === 0 ? 'disabled' : ''}
+            class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed">
+            ← Atrás
+          </button>
+          <button onclick="fmDiagReset()" class="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">🔄 Reiniciar</button>
+        </div>
       </div>
     </div>
   `;
+}
+
+function fmDiagAnswer(qid, val) {
+  fmState.diagAnswers[qid] = val;
+  // Avanzar a siguiente pregunta o calcular resultado
+  const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
+  const currentIdx = activeQuestions.findIndex(q => q.id === qid);
+  if (currentIdx < activeQuestions.length - 1) {
+    fmState.diagStep = currentIdx + 1;
+  } else {
+    // Última pregunta → calcular perfil
+    fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
+  }
+  fmRender();
+}
+
+function fmDiagBack() {
+  if (fmState.diagStep > 0) {
+    fmState.diagStep--;
+    fmRender();
+  }
+}
+
+function fmDiagReset() {
+  if (Object.keys(fmState.diagAnswers).length && !confirm('¿Reiniciar el diagnóstico?')) return;
+  fmState.diagAnswers = {};
+  fmState.diagStep = 0;
+  fmState.diagResult = null;
+  fmRender();
+}
+
+// ─── LÓGICA DE CATEGORIZACIÓN ───
+function fmCalcularPerfil(a) {
+  // Ordenado de más específico a más general
+  let perfil, etapa, cronograma;
+
+  // Perfil 8: Lender pasivo
+  if (a.objetivo === 'lender') {
+    perfil = { num: 8, nombre: 'Lender Pasivo (Private Money)', emoji: '💰', color: 'emerald' };
+    etapa = 'E5';
+    cronograma = 'Inmediato — no opera el negocio';
+  }
+  // Perfil 4: Escalar (ya cerró deals)
+  else if (a.deals_cerrados === '5_mas' || a.objetivo === 'escalar') {
+    perfil = { num: 4, nombre: 'Cerró deals y quiere escalar', emoji: '🚀', color: 'rose' };
+    etapa = 'E5';
+    cronograma = 'Continuo — sistemas, equipo, expansión';
+  }
+  else if (a.deals_cerrados === '2_4') {
+    perfil = { num: 4, nombre: 'Cerró 1+ deals y quiere escalar', emoji: '🚀', color: 'rose' };
+    etapa = 'E5';
+    cronograma = '3-6 meses para infraestructura de escala';
+  }
+  else if (a.deals_cerrados === '1') {
+    perfil = { num: 4, nombre: 'Primer deal cerrado, post-mortem pendiente', emoji: '📊', color: 'purple' };
+    etapa = 'E5.1';
+    cronograma = '1-2 meses post-mortem + SOPs antes del siguiente';
+  }
+  // Perfil 7: Internacional
+  else if (a.inmigracion === 'internacional' || (a.inmigracion === 'itin' && a.deals_cerrados === '0')) {
+    perfil = { num: 7, nombre: 'Internacional / nuevo en USA', emoji: '🌎', color: 'cyan' };
+    etapa = 'E0';
+    cronograma = '9-12 meses al primer deal (curva legal/fiscal mayor)';
+  }
+  // Perfil 5: Fix & Hold
+  else if (a.objetivo === 'hold') {
+    perfil = { num: 5, nombre: 'Fix & Hold (rentas long-term)', emoji: '🏘️', color: 'teal' };
+    etapa = 'E0';
+    cronograma = '9-15 meses al primer deal rentado';
+  }
+  // Perfil 6: Wholesaling (capital bajo o eligió wholesale)
+  else if (a.objetivo === 'wholesale' || a.capital === 'menos_20k') {
+    perfil = { num: 6, nombre: 'Wholesaling primero (capital bajo)', emoji: '📋', color: 'indigo' };
+    etapa = 'E0+E1';
+    cronograma = '3-6 meses al primer assignment';
+  }
+  // Perfil 2: Capital pero sin crédito
+  else if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
+    perfil = { num: 2, nombre: 'Capital pero sin crédito sólido', emoji: '🏗️', color: 'amber' };
+    etapa = 'E0';
+    cronograma = '6-12 meses (track paralelo: reconstruir crédito + LLC)';
+  }
+  // Perfil 1: Cero absoluto (default)
+  else if (a.llc === 'no' && a.deals_cerrados === '0') {
+    perfil = { num: 1, nombre: 'Cero absoluto', emoji: '🏁', color: 'blue' };
+    etapa = 'E0';
+    cronograma = a.tiempo === 'mas_30' ? '6-9 meses' : a.tiempo === '15_30' ? '9-12 meses' : '12-18 meses';
+  }
+  // Perfil 3: Atascado en evaluación
+  else if ((a.llc === 'si_mismo' || a.llc === 'si_otro') && a.deals_cerrados === '0') {
+    perfil = { num: 3, nombre: 'Atascado en evaluación', emoji: '🔄', color: 'orange' };
+    etapa = 'E1+E2';
+    cronograma = '30 días breakthrough (forzar volumen de ofertas)';
+  }
+  else {
+    perfil = { num: 1, nombre: 'Cero absoluto', emoji: '🏁', color: 'blue' };
+    etapa = 'E0';
+    cronograma = '6-12 meses';
+  }
+
+  // Identificar fortalezas y gaps
+  const fortalezas = [];
+  const gaps = [];
+
+  if (a.llc === 'si_mismo') fortalezas.push('LLC formada en estado de inversión');
+  else if (a.llc === 'no') gaps.push({ codigo: 'E0.1.1', titulo: 'Formar LLC en el estado donde se invertirá', prioridad: 'CRÍTICA' });
+  else if (a.llc === 'si_otro') gaps.push({ codigo: 'E0.1.1', titulo: 'Considerar segunda LLC o foreign registration', prioridad: 'ALTA' });
+
+  if (a.credit === 'menos_600') gaps.push({ codigo: 'PRE-E0', titulo: 'Reconstruir crédito 6-12 meses antes de aplicar a HML', prioridad: 'CRÍTICA' });
+  if (a.credit === 'sin_historial') gaps.push({ codigo: 'PRE-E0', titulo: 'Build credit history (secured card + authorized user)', prioridad: 'CRÍTICA' });
+
+  if (a.deals_cerrados === '0' && a.objetivo !== 'wholesale' && a.objetivo !== 'lender') {
+    if (a.llc !== 'no') gaps.push({ codigo: 'E1.1.1', titulo: 'Construir 5 Buy Box', prioridad: 'ALTA' });
+    gaps.push({ codigo: 'E2.1.5', titulo: 'HML primario pre-aprobado + backup', prioridad: 'ALTA' });
+    gaps.push({ codigo: 'E1.4.1', titulo: 'Enviar mínimo 10 ofertas formales al mes', prioridad: 'ALTA' });
+  }
+
+  if (a.capital === 'menos_20k' && a.objetivo === 'flip') {
+    gaps.push({ codigo: 'E2.1.3', titulo: 'Conseguir Private Money o partnership (capital propio insuficiente)', prioridad: 'CRÍTICA' });
+  }
+
+  if (a.deals_cerrados === '1') {
+    gaps.push({ codigo: 'E5.1.1', titulo: 'Post-mortem detallado del primer deal', prioridad: 'CRÍTICA' });
+    gaps.push({ codigo: 'E5.1.2', titulo: 'Crear top 3 SOPs antes del siguiente deal', prioridad: 'ALTA' });
+  }
+
+  if (a.deals_cerrados === '2_4' || a.deals_cerrados === '5_mas') {
+    gaps.push({ codigo: 'E5.2.1', titulo: 'Red de private money en construcción', prioridad: 'ALTA' });
+    if (a.deals_cerrados === '5_mas') gaps.push({ codigo: 'E5.3.1', titulo: 'Contratar Project Manager', prioridad: 'ALTA' });
+  }
+
+  if (a.deals_cerrados === '0') {
+    fortalezas.push('Estás empezando con claridad — usá Anexo C como brújula');
+  }
+  if (a.tiempo === 'mas_30') fortalezas.push('Tiempo full-time — cronograma optimista');
+  if (a.capital === 'mas_100k') fortalezas.push('Capital cómodo para absorber sorpresas');
+  if (a.credit === 'mas_720') fortalezas.push('Credit score excelente — acceso a mejores tasas HML');
+
+  return { perfil, etapa, cronograma, fortalezas, gaps, answers: a };
+}
+
+function fmRenderDiagPlan() {
+  const r = fmState.diagResult;
+  const a = r.answers;
+
+  // Contactos clave según perfil (referenciados al Documento A)
+  const contactosPorPerfil = {
+    1: ['Northwest Registered Agent (LLC)', 'Stessa o QuickBooks (contabilidad)', 'Kiavi (HML nacional)', 'Lima One Capital (HML)', '1 REIA local — buscar en nationalreia.org'],
+    2: ['Discover It Secured (reconstruir crédito)', 'Easy Street Capital (HML flexible FICO 600+)', 'Anchor Loans (HML)', 'Partnership con socio con crédito'],
+    3: ['Coach asignado (sesión emergencia)', 'Accountability partner del programa', 'Kiavi o Lima One (HML pre-aprobación)', '3-5 wholesalers locales activos'],
+    4: ['CPA de real estate (S-Corp election si gana >$80K)', 'Visio Lending (DSCR refi)', 'Private money lenders (5-10 nuevos)', 'Project Manager (cuando llega a 3 deals simultáneos)'],
+    5: ['Visio Lending (DSCR loans)', 'PadSplit (coliving si aplica)', 'Furnished Finder (corporate housing)', 'Zillow Rentals + Apartments.com'],
+    6: ['PropStream (lead generation)', 'BatchSkipTracing (encontrar owners)', 'DealMachine (driving for dollars)', 'Carrot (website + SEO investor)'],
+    7: ['CPA bilingüe internacional', 'Abogado de tax internacional', 'HMLs que financian non-residents', 'Anexo C.6 — glosario términos en inglés'],
+    8: ['Operadores activos de FlipMentoría', 'Abogado de real estate (Note + Deed of Trust)', 'Title company para 1st lien recording', 'CPA para estructura del préstamo']
+  };
+
+  // Plataformas (referenciadas al Documento B — Stack)
+  const plataformasPorPerfil = {
+    1: ['Taskade (portal del programa)', 'Stessa (contabilidad real estate gratis)', 'Zillow + Redfin (research)', 'BiggerPockets (network + foros)', 'Calendly (agendar reuniones)'],
+    2: ['Credit Karma (monitor de crédito)', 'Experian Boost', 'Taskade', 'Stessa', 'Bluevine o Mercury (online business bank)'],
+    3: ['Calendly (forzar reuniones con wholesalers)', 'PropStream (más deal flow)', 'BatchLeads (cold outreach)', 'Loom (videos para coach)'],
+    4: ['QuickBooks Online (S-Corp ready)', 'ClickUp o Notion (PM software)', 'Airtable (portfolio tracking)', 'DocuSign (contratos)'],
+    5: ['AppFolio o Buildium (PM software)', 'TurboTenant (tenant screening)', 'Rent Manager', 'TransUnion SmartMove (screening)'],
+    6: ['PropStream', 'BatchLeads', 'DealMachine', 'Carrot website', 'Mojo Dialer (cold calling)'],
+    7: ['Anexo C.6 — glosario', 'Taskade en español + inglés', 'WhatsApp Business para coach', 'Zoom para sesiones remotas'],
+    8: ['DocuSign (Notes + Deed of Trust)', 'Title company online portal', 'Excel para tracking de préstamos', 'Calendly para due diligence calls']
+  };
+
+  // Calculadoras (Anexo B)
+  const calculadorasPorPerfil = {
+    1: ['B.1 Deal Analyzer (1-página)', 'B.2 ARV Calculator', 'B.3 MAO Calculator', 'B.4 Rehab Estimator'],
+    2: ['B.1 Deal Analyzer', 'B.5 Breakeven Calculator', 'B.10 Cash Flow Projection'],
+    3: ['B.1 Deal Analyzer', 'B.3 MAO Calculator', 'B.8 Pipeline Tracker (forzar tracking)'],
+    4: ['B.7 Budget Tracker', 'B.8 Pipeline Tracker', 'B.9 KPI Dashboard', 'B.10 Cash Flow Projection'],
+    5: ['B.1 Deal Analyzer', 'B.2 ARV', 'Cash-on-Cash custom (no en anexo B — pedir a coach)'],
+    6: ['B.3 MAO (para presentar a buyers)', 'B.1 Deal Analyzer simplificado'],
+    7: ['Las 10 (B.1 a B.10) — full set, aprovechá todo'],
+    8: ['B.5 Breakeven (entender el proyecto que financiás)', 'LTV calculator (custom)']
+  };
+
+  // Quick Win por perfil
+  const quickWinPorPerfil = {
+    1: 'E0.2.3 Opción A: Primera oferta en vivo a una propiedad de Zillow esta semana (con MAO calculado, aunque sea baja)',
+    2: 'Track 1: Aplicar a 1 secured credit card HOY (Discover It Secured) + Track 2: Iniciar E0.1.1',
+    3: 'Romper la parálisis: enviar 10 ofertas formales esta semana — el volumen elimina el miedo',
+    4: 'Bloquear 6-10h este fin de semana para hacer el post-mortem del primer deal',
+    5: 'Definir el modelo de renta (tradicional / coliving / Airbnb si aplica zoning) — esto define toda la estrategia',
+    6: 'Buscar 3 wholesalers activos en Facebook Groups de tu ciudad + agregarse a sus buyer lists',
+    7: 'Conseguir CPA bilingüe especializado en investors internacionales esta semana',
+    8: 'Conectar con 1 operador activo (vía REIA local o referido) y pedir ver sus últimos 2 deals'
+  };
+
+  // Documentos para profundizar
+  const docsPorPerfil = {
+    1: ['📘 Índice Maestro', '🏛️ E0 Fundación (TODO)', '📚 Anexo A (caso de estudio)', '🧠 Anexo C (mindset + Top 20 errores)'],
+    2: ['🏛️ E0 Fundación (foco 0.1)', '🧠 Anexo C (mindset crítico)', '🗺️ Estados del Estudiante (Perfil #2)'],
+    3: ['🧠 Anexo C.7 (plan acción bloqueado)', '🔍 E1.4 (ofertas y negociación)', '🗺️ Estados (Perfil #3)'],
+    4: ['🚀 E5 completo (escalar)', '🧠 Anexo C (FAQ E5)', '🗺️ Estados (Perfil #4)'],
+    5: ['🔍 E1.1.1 (Buy Box renta)', '🏗️ E2.1 (HML + DSCR refi)', '🗺️ Estados (Perfil #5)'],
+    6: ['🚀 E5.2.2 (sistema lead gen)', '🏗️ E2.3 (wholesalers)', '🗺️ Estados (Perfil #6)'],
+    7: ['🧠 Anexo C.6 (glosario)', '🏛️ E0 (foco legal/fiscal)', '🗺️ Estados (Perfil #7)'],
+    8: ['🏗️ E2.1.3 (private money)', '🧠 Anexo C (mindset del lender)', '🗺️ Estados (Perfil #8)']
+  };
+
+  const p = r.perfil;
+  const tareasAhora = (r.gaps || []).slice(0, 5);
+
+  return `
+    <div class="h-full overflow-y-auto bg-slate-50">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+
+        <!-- Header con perfil identificado -->
+        <div class="bg-gradient-to-br from-${p.color}-50 to-${p.color}-100 rounded-2xl border-2 border-${p.color}-200 p-6 mb-6">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="text-xs font-bold text-${p.color}-700 tracking-wider mb-1">PERFIL IDENTIFICADO · #${p.num}</div>
+              <h2 class="text-2xl font-bold text-slate-900">${p.emoji} ${p.nombre}</h2>
+            </div>
+            <button onclick="fmDiagReset()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-700 hover:bg-slate-50">🔄 Repetir</button>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="bg-white bg-opacity-60 rounded-lg p-3">
+              <div class="text-xs text-slate-600 font-medium">ETAPA ACTUAL</div>
+              <div class="text-lg font-bold text-slate-900">${r.etapa}</div>
+            </div>
+            <div class="bg-white bg-opacity-60 rounded-lg p-3">
+              <div class="text-xs text-slate-600 font-medium">CRONOGRAMA</div>
+              <div class="text-sm font-bold text-slate-900">${r.cronograma}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fortalezas -->
+        ${r.fortalezas.length ? `
+          <div class="bg-white rounded-xl border border-emerald-200 p-5 mb-4">
+            <h3 class="font-bold text-emerald-900 mb-3">✅ Fortalezas que ya tenés</h3>
+            <ul class="space-y-1.5 text-sm text-slate-700">
+              ${r.fortalezas.map(f => `<li class="flex items-start gap-2"><span class="text-emerald-600 mt-0.5">✓</span><span>${f}</span></li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+
+        <!-- Gaps prioritarios -->
+        ${tareasAhora.length ? `
+          <div class="bg-white rounded-xl border border-amber-200 p-5 mb-4">
+            <h3 class="font-bold text-amber-900 mb-3">⚡ Gaps prioritarios (próximas 4 semanas)</h3>
+            <div class="space-y-2">
+              ${tareasAhora.map((g, i) => `
+                <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
+                  <div class="w-7 h-7 rounded-full bg-amber-600 text-white font-bold text-sm flex items-center justify-center flex-shrink-0">${i + 1}</div>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <code class="text-xs bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-bold">${g.codigo}</code>
+                      <span class="text-xs font-bold ${g.prioridad === 'CRÍTICA' ? 'text-red-700' : 'text-amber-700'}">${g.prioridad}</span>
+                    </div>
+                    <div class="text-sm text-slate-800">${g.titulo}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Quick Win -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-5 mb-4">
+          <h3 class="font-bold text-blue-900 mb-2">🎯 Quick Win — Semana 1</h3>
+          <p class="text-sm text-blue-900">${quickWinPorPerfil[p.num]}</p>
+        </div>
+
+        <!-- 4 columnas: Contactos / Plataformas / Calculadoras / Lectura -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">📇 Contactos a activar <span class="text-xs font-normal text-slate-500">(Documento A)</span></h3>
+            <ul class="space-y-1.5 text-sm text-slate-700">
+              ${(contactosPorPerfil[p.num] || []).map(c => `<li class="flex items-start gap-2"><span class="text-blue-600 mt-0.5">•</span><span>${c}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">🛠️ Plataformas a setupear <span class="text-xs font-normal text-slate-500">(Documento B)</span></h3>
+            <ul class="space-y-1.5 text-sm text-slate-700">
+              ${(plataformasPorPerfil[p.num] || []).map(s => `<li class="flex items-start gap-2"><span class="text-indigo-600 mt-0.5">•</span><span>${s}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">🧮 Calculadoras <span class="text-xs font-normal text-slate-500">(Anexo B)</span></h3>
+            <ul class="space-y-1.5 text-sm text-slate-700">
+              ${(calculadorasPorPerfil[p.num] || []).map(c => `<li class="flex items-start gap-2"><span class="text-cyan-600 mt-0.5">•</span><span>${c}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">📚 Lectura recomendada</h3>
+            <ul class="space-y-1.5 text-sm text-slate-700">
+              ${(docsPorPerfil[p.num] || []).map(d => `<li class="flex items-start gap-2"><span class="text-fuchsia-600 mt-0.5">•</span><span>${d}</span></li>`).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <!-- Acciones finales -->
+        <div class="bg-slate-900 text-white rounded-xl p-5">
+          <h3 class="font-bold mb-2">📝 Resumen ejecutivo</h3>
+          <p class="text-sm text-slate-200 mb-4">
+            Sos perfil <strong>#${p.num} (${p.nombre})</strong>, ubicado en etapa <strong>${r.etapa}</strong>.
+            Tu cronograma esperado es de <strong>${r.cronograma}</strong>.
+            Empezá por el Quick Win esta semana y los ${tareasAhora.length} gaps prioritarios en el próximo mes.
+          </p>
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="fmDiagOpenLibrary()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">📚 Abrir Biblioteca</button>
+            <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700">🖨️ Imprimir Plan</button>
+            <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700">📋 Copiar Plan</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+function fmDiagOpenLibrary() {
+  fmState.activeTab = 'biblioteca';
+  fmState.activeEtapa = 'INDICE';
+  // Buscar doc "Estados del Estudiante" si existe
+  const estadosDoc = fmState.docs.find(d => d.categoria === 'perfiles');
+  if (estadosDoc) {
+    fmState.activeDocId = estadosDoc.id;
+  }
+  fmRender();
+}
+
+function fmDiagPrintPlan() {
+  window.print();
+}
+
+function fmDiagCopyPlan() {
+  const r = fmState.diagResult;
+  if (!r) return;
+  const text = `PLAN PERSONALIZADO — FlipMentoría
+Perfil: #${r.perfil.num} ${r.perfil.nombre}
+Etapa actual: ${r.etapa}
+Cronograma: ${r.cronograma}
+
+FORTALEZAS:
+${r.fortalezas.map(f => '- ' + f).join('\n')}
+
+GAPS PRIORITARIOS:
+${r.gaps.map((g, i) => `${i+1}. [${g.codigo}] ${g.titulo} (${g.prioridad})`).join('\n')}
+`;
+  navigator.clipboard.writeText(text);
+  alert('Plan copiado al clipboard');
 }
 
 function fmRenderChatMessage(m, i, mode) {
