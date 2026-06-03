@@ -2030,7 +2030,9 @@ const fmState = {
   // Wizard de diagnóstico (sin IA — categorización por reglas)
   diagAnswers: {},        // q_id → answer value
   diagStep: 0,            // pregunta actual
-  diagResult: null        // perfil identificado + plan
+  diagResult: null,       // perfil identificado + plan
+  diagModo: 'medio',      // panorama | foco | corto | medio | completo
+  diagExpandidos: {}      // { bloque_id: true } — bloques expandidos individualmente
 };
 
 // ─── CONFIG WIZARD DE DIAGNÓSTICO (18 preguntas en 6 bloques) ───
@@ -3377,6 +3379,217 @@ const FM_BLOQUES = [
     ]
   },
 
+  // ━━━━━━━━━━ E3 — EJECUCIÓN DE OBRA ━━━━━━━━━━
+  {
+    id: 'deal_closing',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.objetivo !== 'wholesale' && a.objetivo !== 'escalar',
+    etapa: 'E3', subetapa: 'Closing del primer deal',
+    observacion: 'Closing es donde se concretan todos los meses de evaluación. El estudiante que llega acá sin documentación completa pierde el deal o paga 2-3x más en sorpresas. El día del closing NO se improvisa — todo se prepara con 2 semanas de anticipación.',
+    tiempo: '8-12 horas (preparación) + 2-3 horas (día del closing)',
+    actividad: 'Coordinar HML, title company, inspector y abogado para cerrar el deal en 14-21 días desde aceptación de oferta. Cumplir el contingency period sin perder leverage ni earnest money.',
+    entregable: 'Title transferida a la LLC + HML fundeado + propiedad lista para iniciar obra.',
+    pasos: [
+      'Día 1-3 post aceptación: abrir escrow con title company + enviar earnest money.',
+      'Día 3-7: inspección general profesional ($400-600). Hallazgos → renegociar o seguir.',
+      'Día 7-10: HML completa underwriting. Subir: bank statements 2 meses, credit report, LLC docs, plan del deal.',
+      'Día 10-14: HML completa appraisal. Si appraisal viene bajo, renegociar precio o salir.',
+      'Día 14-18: title company hace title search. Verificar liens, easements, encumbrances.',
+      'Día 18-20: revisar Closing Disclosure (HUD-1) — todos los números, fees, prorrateos.',
+      'Día 21: Closing. Firmar 40-60 documentos. Wire del down payment. Recibir keys.',
+      'Mismo día: cambiar locks, contratar insurance (Builder\'s Risk policy).'
+    ],
+    recursos: [
+      { nombre: 'Kiavi Borrower Portal', url: 'https://www.kiavi.com', desc: 'Subir docs underwriting' },
+      { nombre: 'First American Title', url: 'https://www.firstam.com', desc: 'Title company nacional' },
+      { nombre: 'Old Republic Title', url: 'https://www.oldrepublictitle.com', desc: 'Title alternativa' },
+      { nombre: 'InterNACHI', url: 'https://www.nachi.org/find-an-inspector', desc: 'Buscar inspector certificado' },
+      { nombre: 'Steadily Insurance', url: 'https://www.steadily.com', desc: 'Builder\'s Risk + Vacant insurance' }
+    ],
+    errores: [
+      'No abrir escrow inmediatamente (perder 3-5 días al inicio).',
+      'Saltarse inspección general "porque la casa se ve bien".',
+      'No leer Closing Disclosure → firmar con $500-2000 en fees inesperados.',
+      'No tener Builder\'s Risk insurance el día del closing (riesgo total).',
+      'Olvidar cambiar locks el mismo día (el seller puede tener copia).'
+    ]
+  },
+  {
+    id: 'obra_kickoff',
+    aplicaA: (p, a) => a.objetivo !== 'lender' && a.objetivo !== 'wholesale' && a.objetivo !== 'escalar',
+    etapa: 'E3', subetapa: 'Inicio de obra y draw schedule',
+    observacion: 'La obra avanza al ritmo de la supervisión. Si el GC sabe que el estudiante visita poco, los tiempos se extienden y la calidad baja. Esta etapa NO se delega completa al GC — el estudiante es el Project Manager.',
+    tiempo: '10-15 horas/semana durante 3-6 meses de obra',
+    actividad: (p, a) => `Gerenciar activamente la obra como Project Manager: visitas 3x/semana, draw schedule respetado, budget tracker semanal, bitácoras documentadas, change orders firmados. Coordinar permisos e inspecciones con Building Department de ${p.mercado || 'tu ciudad'}.`,
+    entregable: 'Obra completa con CO (Certificate of Occupancy) + presupuesto cumplido ±15% + cronograma cumplido ±20% + galería de fotos antes/durante/después.',
+    pasos: [
+      'Firmar contrato con GC + draw schedule de 6 hitos (10/15/20/20/25/10%).',
+      'Aplicar permits en Building Department (Express si <$25K, Standard si más).',
+      'Pagar Draw #1 (10%) al firmar — máximo 10% adelantado, nunca más.',
+      'Visitar la obra Lun-Mie-Vie. Llevar checklist de fase + 10 fotos por visita.',
+      'Reunión semanal con GC: agenda 15min avance + 15min budget + 15min issues + 15min próx semana.',
+      'Actualizar Budget Tracker cada lunes con gastos reales por categoría.',
+      'Coordinar inspecciones (rough plumbing, electrical, framing, drywall, final).',
+      'Documentar TODO change order por escrito antes de aprobar costo extra.',
+      'Bitácora semanal cada viernes con KPIs + fotos + decisiones + próx hitos.'
+    ],
+    recursos: [
+      { nombre: 'Asana / ClickUp', url: 'https://asana.com', desc: 'PM software para tracking' },
+      { nombre: 'Google Sheets', url: 'https://docs.google.com/spreadsheets', desc: 'Budget Tracker semanal' },
+      { nombre: 'Magicplan', url: 'https://www.magicplan.app', desc: 'Medir y documentar obra desde celular' },
+      { nombre: 'Home Depot Pro', url: 'https://www.homedepot.com/c/PRO_Services', desc: 'Cuenta pro para materiales + descuentos' },
+      { nombre: 'Permit portal de tu ciudad', url: '#', desc: 'Buscar "[tu ciudad] building permits" en Google' },
+      { nombre: 'Loom', url: 'https://www.loom.com', desc: 'Videos rápidos para coach y GC' }
+    ],
+    errores: [
+      'Pagar > 10% adelantado al GC (perdés leverage).',
+      'No documentar change orders → GC factura $5K-$15K extras "sin haberlo acordado".',
+      'Visitar la obra 1x/semana → cronograma se atrasa 2-3 semanas sin que te enteres.',
+      'No cumplir cronograma de inspecciones → drywall encima del rough work = retrabajo.',
+      'No mantener Builder\'s Risk insurance durante toda la obra.'
+    ]
+  },
+
+  // ━━━━━━━━━━ E4 — SALIDA (Fix & Flip) ━━━━━━━━━━
+  {
+    id: 'salida_flip',
+    aplicaA: (p, a) => (a.objetivo === 'flip' || a.objetivo === 'hibrido') && a.objetivo !== 'escalar',
+    etapa: 'E4', subetapa: 'Listing + venta del primer flip',
+    observacion: 'El listing es donde se materializa todo el trabajo. Listing equivocado = 60-90 días en mercado = $5K-$15K en holding extra. Listing bien hecho = venta en 14-30 días sobre asking.',
+    tiempo: '20-30 horas (preparación) + 2-6 semanas de listing activo',
+    actividad: (p, a) => `Preparar producto final (staging + fotografía) + listing en 4+ plataformas + open house primera semana + negociación de ofertas + closing del comprador final. Objetivo: vender en 14-30 días al precio target.`,
+    entregable: 'Propiedad vendida + cheque al banco + HML cancelado + ganancia neta documentada.',
+    pasos: [
+      'Día 1-3: contratar stager profesional ($2K-$6K) + fotógrafo real estate ($500-$1K).',
+      'Día 4-7: sesión de fotos profesionales con drone + video tour 60-90 seg.',
+      'Día 8-10: entrevistar 3 agentes investor-friendly. Elegir 1 con DOM promedio <30 días.',
+      'Día 10-12: definir precio con CMA + walking number (precio mínimo no negociable).',
+      'Día 12-14: activar listing simultáneo en MLS + Zillow + Realtor.com + Facebook.',
+      'Día 14-16: open house sábado y domingo (1-4pm). Promover en Facebook + Nextdoor.',
+      'Recibir ofertas + negociar con disciplina (NUNCA bajar del walking number).',
+      'Closing del comprador: title transfer + payoff HML + ganancia neta a LLC.',
+      'Después del closing: archivar TODO en Taskade para post-mortem (E5).'
+    ],
+    recursos: [
+      { nombre: 'RESA Find a Stager', url: 'https://www.realestatestagingassociation.com/Find-a-Stager', desc: 'Stagers certificados' },
+      { nombre: 'HomeJab', url: 'https://www.homejab.com', desc: 'Fotografía real estate nacional' },
+      { nombre: 'BiggerPockets Agent Finder', url: 'https://www.biggerpockets.com/agents', desc: 'Agentes investor-friendly' },
+      { nombre: 'Zillow Listing', url: 'https://www.zillow.com/post-for-sale/', desc: 'Listing directo si tenés license' },
+      { nombre: 'Facebook Marketplace', url: 'https://www.facebook.com/marketplace', desc: 'Listing local importante' },
+      { nombre: 'Open Home Pro', url: 'https://www.openhomepro.com', desc: 'App para registrar visitantes' }
+    ],
+    errores: [
+      'Listar sin staging (DOM se duplica, precio baja 3-5%).',
+      'Fotos con celular en lugar de fotógrafo pro (CTR cae 60%).',
+      'No definir walking number ANTES de listar → aceptás primera oferta sin saber si era buena.',
+      'Agente generalista que no entiende flips → marketing pobre.',
+      'No hacer open house primera semana (perdés momentum crítico).'
+    ]
+  },
+
+  // ━━━━━━━━━━ E4 — SALIDA (Fix & Hold con DSCR refi) ━━━━━━━━━━
+  {
+    id: 'salida_hold',
+    aplicaA: (p, a) => (a.objetivo === 'hold' || a.objetivo === 'hibrido') && a.objetivo !== 'escalar',
+    etapa: 'E4', subetapa: 'Rentar + refinanciar con DSCR loan',
+    observacion: 'En Fix & Hold, la "salida" es: rentar + refinanciar con DSCR loan para sacar el HML caro y dejar capital trabajando long-term. El DSCR loan se prepara DURANTE la obra para activarse al mes 1 de renta.',
+    tiempo: '15-25 horas (proceso completo de leasing + refi)',
+    actividad: (p, a) => `Listar propiedad como renta en plataformas según modelo (${a.estrategia_renta || 'tradicional'}), screening de inquilinos, lease firmado, primer mes de renta cobrado, aplicar a DSCR loan para refinanciar el HML.`,
+    entregable: 'Propiedad rentada + cash flow mensual positivo + DSCR loan aprobado + HML pagado + capital recuperado para próximo deal.',
+    pasos: [
+      'Pre-DSCR: aplicar al DSCR lender 4-6 semanas ANTES de terminar obra (Visio, Kiavi, Lima One).',
+      'Listar renta en plataformas según modelo (Zillow Rentals + Apartments.com o PadSplit si coliving).',
+      'Screening profesional con TurboTenant o TransUnion SmartMove ($30-50).',
+      'Firmar lease (template del estado) + cobrar primer mes + security deposit.',
+      'Una vez rentada, DSCR completa underwriting: appraisal + rent verification.',
+      'Closing del DSCR refi: paga el HML, deja equity en la propiedad, libera capital sobrante.',
+      'Establecer cadencia mensual: cobro renta + paga mortgage + categorizar gasto en Stessa.',
+      'Considerar property manager (8-10% renta) si vas a escalar a 3+ propiedades.'
+    ],
+    recursos: [
+      { nombre: 'Visio Lending', url: 'https://www.visiolending.com', desc: 'DSCR loan especializado en investors' },
+      { nombre: 'Zillow Rental Manager', url: 'https://www.zillow.com/rental-manager', desc: 'Listing renta gratis' },
+      { nombre: 'Apartments.com', url: 'https://www.apartments.com', desc: 'Listing renta + screening' },
+      { nombre: 'TurboTenant', url: 'https://www.turbotenant.com', desc: 'Screening + leases gratis' },
+      { nombre: 'PadSplit', url: 'https://www.padsplit.com', desc: 'Plataforma coliving room-by-room' },
+      { nombre: 'Buildium / AppFolio', url: 'https://www.buildium.com', desc: 'PM software cuando escales' }
+    ],
+    errores: [
+      'Esperar a terminar obra para aplicar DSCR → 6-8 semanas extras de holding HML caro.',
+      'Aceptar primer inquilino sin screening profesional (eviction cuesta $3K-$8K + 6 meses).',
+      'No verificar regulación STR si vas por Airbnb (muchas ciudades USA restringen).',
+      'DSCR loan a tasa mala porque no comparaste 3 lenders.',
+      'No establecer cash reserves de 6 meses PITI antes de cerrar refi.'
+    ]
+  },
+
+  // ━━━━━━━━━━ E5 — SISTEMA Y SEGUNDO DEAL ━━━━━━━━━━
+  {
+    id: 'segundo_deal',
+    aplicaA: (p, a) => (a.objetivo === 'flip' || a.objetivo === 'hold' || a.objetivo === 'hibrido') && (a.meta_deals === '2_3' || a.meta_deals === '4_6' || a.meta_deals === '7_mas'),
+    etapa: 'E5', subetapa: 'Segundo deal con todo el sistema activado',
+    observacion: 'El segundo deal es donde se valida si tenés un negocio o un evento aleatorio. Usá TODO lo aprendido en el post-mortem. NO hagas un segundo deal sin documentar el primero — los errores se repiten.',
+    tiempo: '4-7 meses (paralelo: post-mortem del primero + búsqueda del segundo)',
+    actividad: 'Aplicar lecciones del post-mortem del primer deal + buscar segundo deal con criterios refinados + ejecutar con SOPs creados.',
+    entregable: 'Segundo deal cerrado y completado con ROI ≥ primer deal + 2-3 SOPs validados + capital recuperado disponible para deal #3.',
+    pasos: [
+      'Completar post-mortem E5.1.1 del primer deal (NO empezar segundo sin esto).',
+      'Identificar las 3-5 lecciones críticas a aplicar (errores que NO repetir).',
+      'Refinar Buy Box con datos reales del primer deal (ZIPs que funcionaron, los que no).',
+      'Crear 2-3 SOPs prioritarios (Evaluación de deal / Manejo de obra / Listing).',
+      'Activar pipeline: 25 wholesalers + 5 contactos directos + lead gen propio.',
+      'Aplicar criterios MAO más estrictos (margen mínimo 25% vs 20% del primer deal).',
+      'Cerrar segundo deal con cronograma ajustado (-15% del primer deal).',
+      'Documentar comparativo deal 1 vs deal 2: ROI, tiempo, sorpresas, equipo.'
+    ],
+    recursos: [
+      { nombre: 'Notion / Taskade', url: 'https://www.notion.so', desc: 'Documentar SOPs validados' },
+      { nombre: 'BiggerPockets Forum', url: 'https://www.biggerpockets.com/forums', desc: 'Aprender de otros flippers' },
+      { nombre: 'Anexo C (Mindset)', url: '#', desc: 'Releer Top 20 errores antes de cada deal nuevo' }
+    ],
+    errores: [
+      'Empezar segundo deal antes de cerrar post-mortem del primero.',
+      'No documentar SOPs entre deal 1 y 2 (repetís errores).',
+      'No subir el margen mínimo (deal 2 debería tener mejor ROI que deal 1).',
+      'No diversificar wholesalers (depender de 1 wholesaler que envió el primer deal).',
+      'Hacer deal 2 en mismo ZIP que deal 1 sin validar que el mercado siga igual.'
+    ]
+  },
+
+  // ━━━━━━━━━━ E5 — META FINAL (5+ deals + equipo) ━━━━━━━━━━
+  {
+    id: 'sistema_escala',
+    aplicaA: (p, a) => a.meta_deals === '4_6' || a.meta_deals === '7_mas' || a.objetivo === 'escalar',
+    etapa: 'E5', subetapa: 'Sistema completo para 4+ deals/año',
+    observacion: 'Llegar a 4+ deals al año NO es hacer 4 veces más esfuerzo — es construir un sistema donde múltiples deals corren simultáneos sin que vos seas el cuello de botella. Sin PM + SOPs + capital diversificado, te quemás al deal #3.',
+    tiempo: '6-12 meses (paralelo a deals activos)',
+    actividad: 'Construir infraestructura completa: 5 SOPs documentados + PM contratado + lead gen propio + capital diversificado (HML + Private + DSCR) + dashboard de portfolio.',
+    entregable: 'Sistema operativo donde 3 deals corren simultáneos sin descarrilar + estudiante dedica <30% tiempo a obra + cashflow / capital reinvertible cada 60-90 días.',
+    pasos: [
+      'Crear 5 SOPs maestros: Deal Evaluation, HML Process, Obra Management, Listing & Marketing, Post-Closing.',
+      'Validar cada SOP con prueba real (otra persona ejecuta el proceso solo con el doc).',
+      'Contratar Project Manager con prueba pagada 2 semanas ($65K-$95K total package).',
+      'Construir buyer list propia con lead gen (1 canal dominado: Direct Mail / DfD / FB Ads).',
+      'Conseguir 3-5 private money lenders comprometidos ($50K-$250K cada uno).',
+      'Implementar dashboard de portfolio (Airtable o Notion) con KPIs por deal.',
+      'Reunión semanal de portfolio (1h): estado de 3 deals + bottlenecks + decisiones.',
+      'Trimestral: revisar plan anual con coach, ajustar metas, evaluar expansión a segundo mercado.'
+    ],
+    recursos: [
+      { nombre: 'Airtable', url: 'https://www.airtable.com', desc: 'Dashboard de portfolio multi-deal' },
+      { nombre: 'Notion', url: 'https://www.notion.so', desc: 'SOPs versionados' },
+      { nombre: 'LinkedIn Jobs', url: 'https://www.linkedin.com/jobs', desc: 'Contratar PM' },
+      { nombre: 'PropStream', url: 'https://www.propstream.com', desc: 'Lead gen propio' },
+      { nombre: 'BiggerPockets PRO', url: 'https://www.biggerpockets.com/pro', desc: 'Tools para investors escalando' }
+    ],
+    errores: [
+      'Escalar a 3 deals sin SOPs (te quemás + calidad cae).',
+      'Contratar PM sin prueba pagada (descubrís fit después de 3 meses caros).',
+      'Mantener todo el capital en HML (limita escala — diversificar a private + DSCR).',
+      'Reunión de portfolio que se vuelve operativa en lugar de estratégica.',
+      'Saltar la revisión trimestral con coach (perdés perspectiva externa).'
+    ]
+  },
+
   // ━━━━━━━━━━ REVISIÓN MENTOR (siempre) ━━━━━━━━━━
   {
     id: 'revision_mentor',
@@ -3624,6 +3837,9 @@ function fmRenderDiagPlan() {
     objetivoOperativo = fmGenerarObjetivoOperativo(userProfile, a);
     reglaPlan = fmGenerarReglaPlan(p, a);
     checklistFinal = fmGenerarChecklistFinal(bloques, a);
+
+    // Filtrar bloques según modo de detalle elegido
+    var bloquesVisibles = fmFiltrarBloquesPorModo(bloques, fmState.diagModo);
   } catch (err) {
     console.error('[fmRenderDiagPlan setup]', err);
     return `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">⚠️ Error generando plan</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${escapeHtml(String(err?.message || err))}</pre><button onclick="fmDiagReset()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">🔄 Reiniciar diagnóstico</button></div></div>`;
@@ -3700,25 +3916,64 @@ function fmRenderDiagPlan() {
           </div>
         </div>
 
+        <!-- Selector de modo de detalle -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6 print:hidden">
+          <h3 class="font-bold text-slate-900 mb-2">📐 ¿Cuánto detalle querés ver del plan?</h3>
+          <p class="text-xs text-slate-600 mb-3">El plan completo tiene ${bloques.length} bloques (~${fmTotalHoras(bloques)} horas de trabajo total). Elegí el nivel de detalle según para qué lo necesitás.</p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            ${[
+              { id: 'panorama', label: '🗺️ Panorama', desc: 'Lista de bloques sin detalle', count: '0 bloques abiertos' },
+              { id: 'foco', label: '🎯 Foco', desc: 'Solo el bloque actual', count: '1 bloque' },
+              { id: 'medio', label: '📋 Trimestre', desc: 'Próximos 3-4 bloques', count: `${Math.min(4, bloques.length)} bloques` },
+              { id: 'completo', label: '📚 Completo', desc: 'TODO hasta meta final', count: `${bloques.length} bloques` }
+            ].map(m => {
+              const active = fmState.diagModo === m.id;
+              return `<button onclick="fmDiagSetModo('${m.id}')" class="text-left px-3 py-3 rounded-lg border-2 transition ${active ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300'}">
+                <div class="text-sm font-bold ${active ? 'text-amber-900' : 'text-slate-900'} mb-0.5">${m.label}</div>
+                <div class="text-xs text-slate-600">${m.desc}</div>
+                <div class="text-xs ${active ? 'text-amber-700' : 'text-slate-400'} mt-1">${m.count}</div>
+              </button>`;
+            }).join('')}
+          </div>
+        </div>
+
         <!-- TOC de Bloques -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
-          <h2 class="text-xl font-bold text-slate-900 mb-3">📋 Plan de Acción · ${bloques.length} Bloques</h2>
-          <p class="text-sm text-slate-600 mb-4">Estos bloques se ejecutan de manera secuencial (E0 → E1 → E2 → ...) aunque varios pueden trabajarse en paralelo. Cada bloque tiene observación del mentor, tiempo, actividad, entregable, paso a paso, recursos y errores comunes.</p>
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h2 class="text-xl font-bold text-slate-900">📋 Plan de Acción · ${bloques.length} Bloques</h2>
+              <p class="text-sm text-slate-600 mt-1">Camino completo desde hoy hasta tu meta final. Cada bloque incluye qué hacer paso por paso, qué entregar, qué herramientas usar y errores comunes.</p>
+            </div>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            ${bloques.map((b, i) => `
-              <a href="#bloque-${b.id}" class="px-3 py-2 bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center gap-3 text-sm transition">
-                <div class="w-7 h-7 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">${i + 1}</div>
+            ${bloques.map((b, i) => {
+              const visible = bloquesVisibles.includes(b);
+              const expandido = fmState.diagExpandidos[b.id] === true;
+              return `
+              <a href="#bloque-${b.id}" onclick="fmDiagExpandirBloque('${b.id}'); event.preventDefault(); setTimeout(() => document.getElementById('bloque-${b.id}')?.scrollIntoView({behavior:'smooth'}), 50);" class="px-3 py-2 ${visible || expandido ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50 border border-transparent hover:bg-slate-100'} rounded-lg flex items-center gap-3 text-sm transition cursor-pointer">
+                <div class="w-7 h-7 rounded-full ${visible || expandido ? 'bg-amber-500' : 'bg-slate-700'} text-white font-bold text-xs flex items-center justify-center flex-shrink-0">${i + 1}</div>
                 <div class="flex-1 min-w-0">
                   <div class="text-xs font-bold text-amber-700">${b.etapa}</div>
                   <div class="text-sm font-medium text-slate-900 truncate">${b.subetapa}</div>
                 </div>
+                <div class="text-xs text-slate-500 flex-shrink-0">${visible || expandido ? '▼' : '▶'}</div>
               </a>
-            `).join('')}
+            `;}).join('')}
           </div>
         </div>
 
-        <!-- Bloques completos -->
-        ${bloques.map((b, i) => fmRenderBloque(b, i, userProfile, a)).join('')}
+        <!-- Bloques visibles según modo -->
+        ${bloques.filter(b => bloquesVisibles.includes(b) || fmState.diagExpandidos[b.id]).map((b, i) => {
+          const realIdx = bloques.indexOf(b);
+          return fmRenderBloque(b, realIdx, userProfile, a);
+        }).join('')}
+
+        ${fmState.diagModo !== 'completo' && bloques.length > bloquesVisibles.length ? `
+          <div class="bg-amber-50 border-2 border-dashed border-amber-300 rounded-2xl p-6 text-center mb-6 print:hidden">
+            <p class="text-sm text-amber-900 mb-3">Hay <strong>${bloques.length - bloquesVisibles.length} bloques más</strong> en el plan completo hasta tu meta final.</p>
+            <button onclick="fmDiagSetModo('completo')" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700">📚 Ver plan completo</button>
+          </div>
+        ` : ''}
 
         <!-- Checklist Final -->
         <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-sm p-6 mb-6 print:bg-white print:text-slate-900 print:border print:border-slate-300">
@@ -4016,6 +4271,41 @@ function fmDiagOpenLibrary() {
     fmState.activeDocId = estadosDoc.id;
   }
   fmRender();
+}
+
+function fmDiagSetModo(modo) {
+  fmState.diagModo = modo;
+  fmState.diagExpandidos = {}; // reset expansions individuales
+  fmRender();
+  setTimeout(() => document.querySelector('#fm-plan-print')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+
+function fmDiagExpandirBloque(id) {
+  fmState.diagExpandidos[id] = !fmState.diagExpandidos[id];
+  fmRender();
+}
+
+function fmFiltrarBloquesPorModo(bloques, modo) {
+  if (modo === 'completo') return bloques;
+  if (modo === 'panorama') return [];
+  if (modo === 'foco') return bloques.slice(0, 1);
+  if (modo === 'medio') return bloques.slice(0, 4);
+  return bloques.slice(0, 4);
+}
+
+function fmTotalHoras(bloques) {
+  // Estimación grosera: extraer número aproximado del campo `tiempo` y sumar
+  let total = 0;
+  bloques.forEach(b => {
+    const t = String(b.tiempo || '');
+    const m = t.match(/(\d+)\s*[-a–]\s*(\d+)/);
+    if (m) total += (parseInt(m[1]) + parseInt(m[2])) / 2;
+    else {
+      const single = t.match(/(\d+)/);
+      if (single) total += parseInt(single[1]);
+    }
+  });
+  return Math.round(total);
 }
 
 function fmDiagPrintPlan() {
