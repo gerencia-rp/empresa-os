@@ -4,7 +4,13 @@
 // Reescrito desde cero para Sprint E1 — usa schema edu_* y RLS por rol
 // =============================================================================
 (function () {
-  const supabase = window.supabaseClient || window.sb || window.supabase;
+  // CRÍTICO: `sb` y `state` viven como const globales en app.js (NO en window).
+  // Los <script> clásicos comparten el realm global, así que education.js los puede
+  // leer por nombre. window.supabase es la LIBRERÍA del CDN, no el cliente.
+  const supabase = (typeof sb !== 'undefined') ? sb : (window.sb || window.supabaseClient);
+  if (!supabase || typeof supabase.from !== 'function') {
+    console.error('[Educación] Cliente Supabase no disponible. typeof sb=', typeof sb);
+  }
 
   // -------------------------------------------------------------------------
   // Auth helpers — leer rol del DOM (donde app.js lo escribe) y user de Supabase
@@ -22,9 +28,13 @@
   const user = () => _cachedUser || {};
 
   const role = () => {
-    // 1. Si app.js expuso un global
-    if (window.state?.role) return String(window.state.role).toLowerCase();
-    // 2. Leer del span #user-role que app.js rellena
+    // 1. `state` es global desde app.js (let state = {...})
+    try {
+      if (typeof state !== 'undefined' && state?.role) {
+        return String(state.role).toLowerCase();
+      }
+    } catch (e) { /* state no accesible */ }
+    // 2. Fallback: leer del span #user-role que app.js rellena
     const el = document.getElementById('user-role');
     if (el && el.textContent && el.textContent.trim()) {
       return el.textContent.trim().toLowerCase();
