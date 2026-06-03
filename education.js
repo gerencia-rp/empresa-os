@@ -58,14 +58,23 @@
   let CURRICULUM = null;
   async function loadCurriculum(force = false) {
     if (CURRICULUM && !force) return CURRICULUM;
-    const [{ data: stages }, { data: blocks }, { data: tasks }, { data: deps }] =
-      await Promise.all([
-        supabase.from('edu_curriculum_stages').select('*').order('order_idx'),
-        supabase.from('edu_curriculum_blocks').select('*').order('order_idx'),
-        supabase.from('edu_curriculum_tasks').select('*').order('order_idx'),
-        supabase.from('edu_curriculum_deps').select('*'),
-      ]);
-    CURRICULUM = { stages: stages || [], blocks: blocks || [], tasks: tasks || [], deps: deps || [] };
+    const [stages, blocks, tasks, deps] = await Promise.all([
+      supabase.from('edu_curriculum_stages').select('*').order('order_idx'),
+      supabase.from('edu_curriculum_blocks').select('*').order('order_idx'),
+      supabase.from('edu_curriculum_tasks').select('*').order('order_idx'),
+      supabase.from('edu_curriculum_deps').select('*'),
+    ]);
+    // Si alguna falla, logueamos pero seguimos con arrays vacíos para no colgar
+    if (stages.error) console.error('[Educación] edu_curriculum_stages:', stages.error);
+    if (blocks.error) console.error('[Educación] edu_curriculum_blocks:', blocks.error);
+    if (tasks.error)  console.error('[Educación] edu_curriculum_tasks:', tasks.error);
+    if (deps.error)   console.error('[Educación] edu_curriculum_deps:', deps.error);
+    CURRICULUM = {
+      stages: stages.data || [],
+      blocks: blocks.data || [],
+      tasks:  tasks.data  || [],
+      deps:   deps.data   || []
+    };
     return CURRICULUM;
   }
 
@@ -111,29 +120,32 @@
     return enr;
   }
 
-  // Wrap para mostrar errores en la UI en vez de fallar silenciosamente
-  function withErrorBoundary(fn) {
-    return async function (...args) {
-      try { return await fn.apply(this, args); }
-      catch (err) {
-        console.error('[Educación] Error en vista:', err);
-        const root = document.getElementById('content');
-        if (root) {
-          root.innerHTML = `
-            <div class="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-xl p-6 mt-8">
-              <h2 class="text-lg font-bold text-red-900 mb-2">⚠️ Error al abrir la vista</h2>
-              <pre class="text-xs text-red-700 bg-white p-3 rounded border border-red-100 overflow-x-auto whitespace-pre-wrap">${String(err?.message || err)}</pre>
-              <p class="text-xs text-slate-600 mt-3">Abre la consola del navegador (F12) y comparte el detalle. Posibles causas:</p>
-              <ul class="text-xs text-slate-600 mt-1 list-disc ml-5">
-                <li>El SQL <code>sE1-education-area.sql</code> no se aplicó completo (faltan tablas <code>edu_*</code>)</li>
-                <li>La función <code>is_mentor_or_admin()</code> no existe (corre <code>sE1-fix-function-profiles.sql</code>)</li>
-                <li>Tu profile no tiene <code>role='admin'</code> en la tabla <code>profiles</code></li>
-              </ul>
-            </div>
-          `;
-        }
-      }
-    };
+  // Mostrar error en pantalla en vez de quedar pegado en "Cargando…"
+  function showError(err, hint = '') {
+    console.error('[Educación]', err);
+    const root = document.getElementById('content');
+    if (root) {
+      root.innerHTML = `
+        <div class="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-xl p-6 mt-8">
+          <h2 class="text-lg font-bold text-red-900 mb-2">⚠️ Error al cargar</h2>
+          <pre class="text-xs text-red-700 bg-white p-3 rounded border border-red-100 overflow-x-auto whitespace-pre-wrap">${String(err?.message || err?.details || JSON.stringify(err) || err)}</pre>
+          ${hint ? `<p class="text-xs text-slate-700 mt-3"><strong>Posible causa:</strong> ${hint}</p>` : ''}
+          <p class="text-xs text-slate-600 mt-3">Si el error menciona una tabla o función, esa parte del SQL no se aplicó. Mándame este texto y te paso el fix exacto.</p>
+        </div>
+      `;
+    }
+  }
+
+  // Wrap para Promise.all defensivo: si una query falla, devolver objeto con error info
+  async function safeQuery(promise) {
+    try {
+      const r = await promise;
+      if (r?.error) throw r.error;
+      return { data: r?.data || [], error: null };
+    } catch (e) {
+      console.error('[Educación] Query falló:', e);
+      return { data: [], error: e };
+    }
   }
 
   // =========================================================================
@@ -839,11 +851,15 @@
     if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido. Rol detectado: <strong>${role()}</strong></div>`; return; }
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando gestor…</div>`;
 
-    const [{ data: students }, { data: cohorts }, { data: enrollments }] = await Promise.all([
-      supabase.from('edu_students').select('*').order('joined_at', { ascending: false }),
-      supabase.from('edu_cohorts').select('*').order('starts_on', { ascending: false }),
-      supabase.from('edu_enrollments').select('*, edu_students(full_name), edu_cohorts(code,name)'),
+    const [stRes, coRes, enRes] = await Promise.all([
+      safeQuery(supabase.from('edu_students').select('*').order('joined_at', { ascending: false })),
+      safeQuery(supabase.from('edu_cohorts').select('*').order('starts_on', { ascending: false })),
+      safeQuery(supabase.from('edu_enrollments').select('*, edu_students(full_name), edu_cohorts(code,name)')),
     ]);
+    if (stRes.error) return showError(stRes.error, 'Tabla edu_students o RLS. Verifica que sE1-education-area.sql se aplicó completo.');
+    if (coRes.error) return showError(coRes.error, 'Tabla edu_cohorts. Verifica que sE1-education-area.sql se aplicó completo.');
+    if (enRes.error) return showError(enRes.error, 'Tabla edu_enrollments o join roto. Verifica FK edu_enrollments.student_id → edu_students.');
+    const students = stRes.data, cohorts = coRes.data, enrollments = enRes.data;
 
     const enrollmentsByStudent = {};
     (enrollments || []).forEach(e => {
