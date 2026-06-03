@@ -2861,7 +2861,7 @@ const FM_BLOQUES = [
     tiempo: 'Aproximadamente 6 a 8 horas totales.',
     actividad: (p, a) => `Definir exactamente qué compra, dónde compra, con qué estrategia y bajo qué condiciones mínimas. La estrategia principal será ${p.estrategiaLabel || 'Fix & Flip'}; ${a.objetivo === 'hibrido' ? 'Fix & Hold se revisa como segunda lectura' : 'una estrategia secundaria se revisa solo si los números lo justifican'}, pero no debe distraer el foco inicial.`,
     entregable: 'Buy Box Resumen de 1 página listo para enviar a wholesalers, realtors, lenders e inversionistas.',
-    pasos: [
+    pasos: (p, a) => [
       `Definir estrategia principal: ${p.estrategiaLabel || 'Fix & Flip'} como base.`,
       `Elegir máximo 5 ZIP codes objetivo en ${p.mercado || '[tu mercado]'}. No abrir más zonas hasta dominar estas primeras.`,
       'Por cada ZIP definir: tipo de propiedad, ARV objetivo, precio máximo de compra, rehab aceptado, DOM máximo y perfil del comprador final.',
@@ -3768,6 +3768,7 @@ function fmRenderDiagPlan() {
 
 function fmRenderBloque(b, idx, p, a) {
   const actividadStr = typeof b.actividad === 'function' ? b.actividad(p, a) : b.actividad;
+  const pasos = typeof b.pasos === 'function' ? b.pasos(p, a) : (b.pasos || []);
   return `
     <div id="bloque-${b.id}" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
       <!-- Header del bloque -->
@@ -3807,7 +3808,7 @@ function fmRenderBloque(b, idx, p, a) {
               <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🪜 Paso a paso</th>
               <td class="p-3 align-top">
                 <ol class="space-y-1.5 list-decimal list-inside text-slate-800">
-                  ${b.pasos.map(paso => `<li>${paso}</li>`).join('')}
+                  ${pasos.map(paso => `<li>${paso}</li>`).join('')}
                 </ol>
               </td>
             </tr>
