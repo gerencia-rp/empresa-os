@@ -238,41 +238,49 @@ function eduRenderStudents() {
         <div class="text-[10px] text-slate-500">${filtered.length} de ${students.length}</div>
       </div>
 
-      <!-- Lista de estudiantes -->
+      <!-- Lista CRM simplificada: Nombre / Etapa / Fecha mod etapa / Fecha entrada / Activo / Pago -->
       ${filtered.length === 0 ? `<div class="text-center py-12 text-slate-400 text-xs">Sin estudiantes con esos filtros.</div>` : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50">
               <tr class="text-[10px] uppercase text-slate-600">
-                <th class="text-left p-2">Estudiante</th>
-                <th class="text-left p-2">Etapa</th>
-                <th class="text-center p-2">Días</th>
-                <th class="text-left p-2">Status</th>
-                <th class="text-center p-2">GLScore</th>
-                <th class="text-left p-2">Vence</th>
+                <th class="text-left p-2">Nombre</th>
+                <th class="text-left p-2">Etapa actual</th>
+                <th class="text-left p-2">Última actualización</th>
+                <th class="text-left p-2">Entrada mentoría</th>
+                <th class="text-center p-2">Activo</th>
+                <th class="text-left p-2">Pago</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               ${filtered.map(s => {
-                const daysInStage = eduDaysInStage(s);
                 const stage = eduStageObj(s.current_stage);
-                const overdue = eduIsStageOverdue(s);
-                const daysExp = eduDaysToExpiry(s);
-                const expCls = daysExp == null ? 'text-slate-400' : daysExp < 0 ? 'text-red-700 font-bold' : daysExp <= 30 ? 'text-amber-700 font-bold' : 'text-slate-700';
-                const expLbl = daysExp == null ? '—' : daysExp < 0 ? `Vencida ${Math.abs(daysExp)}d` : `${daysExp}d`;
-                const stCls = s.status === 'at_risk' ? 'bg-amber-100 text-amber-800' : s.status === 'active' ? 'bg-emerald-100 text-emerald-800' : s.status === 'graduated' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700';
-                return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-                  <td class="p-2"><div class="font-semibold">${s.full_name}</div><div class="text-[10px] text-slate-500">${s.email||''}${s.city?' · '+s.city:''}</div></td>
-                  <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${stage?.name || s.current_stage || '—'}</span></td>
-                  <td class="p-2 text-center ${overdue?'text-red-700 font-bold':'text-slate-600'}">${daysInStage != null ? daysInStage+'d' : '—'}${overdue?' 🐢':''}</td>
-                  <td class="p-2"><span class="text-[10px] ${stCls} px-1.5 py-0.5 rounded font-bold">${s.status}</span></td>
-                  <td class="p-2 text-center">
-                    <div class="text-sm font-bold ${s.glscore>=70?'text-emerald-700':s.glscore>=40?'text-amber-700':'text-red-700'}">${s.glscore||50}</div>
-                    <div class="bg-slate-100 rounded-full h-1 w-12 mx-auto"><div class="${s.glscore>=70?'bg-emerald-500':s.glscore>=40?'bg-amber-500':'bg-red-500'} h-1 rounded-full" style="width:${s.glscore||50}%"></div></div>
+                const fmtDate = (d) => {
+                  if (!d) return '—';
+                  const date = new Date(d);
+                  if (isNaN(date)) return '—';
+                  return date.toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' });
+                };
+                // "Última actualización" = ultima_fecha_seguimiento si existe, sino stage_started_at
+                const ultimaFecha = s.ultima_fecha_seguimiento || s.stage_started_at;
+                const activo = s.status === 'active' && s.payment_status !== 'expired' && s.payment_status !== 'cancelled';
+                const pagoLbl = ({ active: '✓ Al día', past_due: '⚠️ Atrasado', expired: '🚫 Vencido', paused: '⏸ Pausado', cancelled: '❌ Cancelado' })[s.payment_status] || '—';
+                const pagoCls = s.payment_status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                                s.payment_status === 'past_due' ? 'bg-amber-100 text-amber-800' :
+                                s.payment_status === 'expired' || s.payment_status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-700';
+                return `<tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="eduOpenStudent('${s.id}')">
+                  <td class="p-2">
+                    <div class="font-semibold">${s.full_name||'—'}</div>
+                    ${s.grupo ? `<div class="text-[10px] text-slate-500">${s.grupo}</div>` : ''}
                   </td>
-                  <td class="p-2 ${expCls}">${expLbl}</td>
-                  <td class="p-2"><button onclick="eduOpenStudent('${s.id}')" class="text-blue-600 text-[10px] hover:underline">ver detalle</button></td>
+                  <td class="p-2"><span class="text-[11px] bg-slate-100 px-2 py-0.5 rounded font-medium">${stage?.name || s.current_stage || '—'}</span></td>
+                  <td class="p-2 text-slate-700">${fmtDate(ultimaFecha)}</td>
+                  <td class="p-2 text-slate-700">${fmtDate(s.enrolled_at)}</td>
+                  <td class="p-2 text-center">${activo ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>' : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"></span>'}</td>
+                  <td class="p-2"><span class="text-[10px] ${pagoCls} px-1.5 py-0.5 rounded font-bold">${pagoLbl}</span></td>
+                  <td class="p-2"><span class="text-blue-600 text-[10px] hover:underline">ver →</span></td>
                 </tr>`;
               }).join('')}
             </tbody>
