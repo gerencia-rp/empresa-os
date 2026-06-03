@@ -1117,8 +1117,42 @@ async function eduGeneratePresentation() {
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');
-    window.aiState[aiKey] = { loading: false, presentation: r.presentation, saved_id: r.saved_id, web_searches: r.web_searches, tokens: r.tokens };
-    await eduLoadAll();
+
+    // Pattern async: job_id devuelto → polling cada 5s hasta done/error
+    if (r.async && r.job_id) {
+      window.aiState[aiKey] = { loading: true, job_id: r.job_id, status: 'running', started_at: Date.now() };
+      eduRender();
+      const pollStart = Date.now();
+      const maxWait = 8 * 60 * 1000; // 8 min máximo
+      while (Date.now() - pollStart < maxWait) {
+        await new Promise(r => setTimeout(r, 5000));
+        const { data: job } = await sb.from('edu_pres_jobs').select('*').eq('id', r.job_id).single();
+        if (!job) { window.aiState[aiKey] = { loading: false, error: 'Job desapareció' }; break; }
+        window.aiState[aiKey].status = job.status;
+        window.aiState[aiKey].elapsed_sec = Math.round((Date.now() - pollStart) / 1000);
+        eduRender();
+        if (job.status === 'done') {
+          window.aiState[aiKey] = {
+            loading: false, presentation: job.result, saved_id: job.saved_pres_id,
+            web_searches: job.web_searches, tokens: { total: job.tokens_used },
+            duration_ms: job.duration_ms
+          };
+          await eduLoadAll();
+          break;
+        }
+        if (job.status === 'error') {
+          window.aiState[aiKey] = { loading: false, error: job.error_message };
+          break;
+        }
+      }
+      if (window.aiState[aiKey].loading) {
+        window.aiState[aiKey] = { loading: false, error: 'Timeout polling (>8min). Verificá en DB job ' + r.job_id };
+      }
+    } else {
+      // Backward compat (respuesta sincrónica vieja)
+      window.aiState[aiKey] = { loading: false, presentation: r.presentation, saved_id: r.saved_id, web_searches: r.web_searches, tokens: r.tokens };
+      await eduLoadAll();
+    }
   } catch (e) {
     window.aiState[aiKey] = { loading: false, error: e.message };
   }

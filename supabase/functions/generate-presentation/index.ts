@@ -211,89 +211,117 @@ NOTAS IMPORTANTES:
 - Para "agenda" incluí "agenda_steps".
 - "speaker_notes" SIEMPRE — son el guion para el coach.`;
 
-  // Llamar a Anthropic con web_search habilitado
-  // Modo investigación profunda: extended thinking + 25 web searches + más tokens
-  const requestBody: any = {
-    model: "claude-sonnet-4-5",
-    max_tokens: research_mode ? 32000 : 16000,
-    tools: require_live_data
-      ? [{ type: "web_search_20250305", name: "web_search", max_uses: research_mode ? 25 : 8 }]
-      : undefined,
-    messages: [{ role: "user", content: prompt }]
+  // ────────────────────────────────────────────────────────────
+  // BACKGROUND JOB PATTERN — evita timeout 150s de edge function
+  // 1. Crear job inmediato → devolver job_id
+  // 2. EdgeRuntime.waitUntil() corre el trabajo de Anthropic en background
+  // 3. Frontend hace polling de edu_pres_jobs por id
+  // ────────────────────────────────────────────────────────────
+  const { data: job, error: jobErr } = await supabase.from("edu_pres_jobs").insert({
+    user_id: user_id || null,
+    mentorship_id,
+    status: 'running',
+    params: body
+  }).select().single();
+  if (jobErr) return json({ ok: false, error: 'No pude crear job: ' + jobErr.message }, 500);
+
+  // Trabajo pesado en background (no bloquea la respuesta)
+  const work = async () => {
+    const startMs = Date.now();
+    try {
+      const requestBody: any = {
+        model: "claude-sonnet-4-5",
+        max_tokens: research_mode ? 32000 : 16000,
+        tools: require_live_data
+          ? [{ type: "web_search_20250305", name: "web_search", max_uses: research_mode ? 25 : 8 }]
+          : undefined,
+        messages: [{ role: "user", content: prompt }]
+      };
+      if (research_mode) requestBody.thinking = { type: "enabled", budget_tokens: 12000 };
+
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify(requestBody)
+      });
+      const durationMs = Date.now() - startMs;
+
+      if (!r.ok) {
+        const txt = await r.text();
+        await supabase.from("edu_pres_jobs").update({
+          status: 'error', error_message: `Anthropic ${r.status}: ${txt.slice(0, 800)}`,
+          finished_at: new Date().toISOString(), duration_ms: durationMs
+        }).eq('id', job.id);
+        return;
+      }
+
+      const result: any = await r.json();
+      const tokensIn = result.usage?.input_tokens || 0;
+      const tokensOut = result.usage?.output_tokens || 0;
+      const webSearchUses = result.usage?.server_tool_use?.web_search_requests || 0;
+      const lastText = (result.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
+
+      let parsed: any = null;
+      try {
+        const jsonMatch = lastText.match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : lastText);
+      } catch (e) {
+        await supabase.from("edu_pres_jobs").update({
+          status: 'error', error_message: "Parse JSON falló. Raw: " + lastText.slice(0, 800),
+          finished_at: new Date().toISOString(), duration_ms: durationMs,
+          tokens_used: tokensIn + tokensOut, web_searches: webSearchUses
+        }).eq('id', job.id);
+        return;
+      }
+
+      // Guardar en edu_presentations
+      let savedPresId: string | null = null;
+      if (mentorship_id) {
+        const { data: saved } = await supabase.from("edu_presentations").insert({
+          mentorship_id, title, topic, audience, presentation_type, class_number,
+          duration_min, language,
+          outline: parsed.outline || [],
+          slides: parsed.slides || [],
+          sources: parsed.all_sources || [],
+          status: "generated",
+          cost_tokens_used: tokensIn + tokensOut,
+          web_searches_used: webSearchUses,
+          generated_by: user_id || null
+        }).select().single();
+        savedPresId = saved?.id || null;
+      }
+
+      // Marcar job como done
+      await supabase.from("edu_pres_jobs").update({
+        status: 'done',
+        result: parsed,
+        saved_pres_id: savedPresId,
+        tokens_used: tokensIn + tokensOut,
+        web_searches: webSearchUses,
+        duration_ms: durationMs,
+        finished_at: new Date().toISOString()
+      }).eq('id', job.id);
+    } catch (e: any) {
+      await supabase.from("edu_pres_jobs").update({
+        status: 'error', error_message: 'Excepción: ' + (e?.message || String(e)),
+        finished_at: new Date().toISOString(), duration_ms: Date.now() - startMs
+      }).eq('id', job.id);
+    }
   };
-  // Extended thinking solo en research mode (más caro, más profundo)
-  if (research_mode) {
-    requestBody.thinking = { type: "enabled", budget_tokens: 12000 };
-  }
 
-  const startMs = Date.now();
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify(requestBody)
-  });
-  const durationMs = Date.now() - startMs;
-
-  if (!r.ok) {
-    const txt = await r.text();
-    return json({ ok: false, error: `Anthropic ${r.status}: ${txt.slice(0,400)}` }, 500);
-  }
-
-  const result: any = await r.json();
-  const tokensIn = result.usage?.input_tokens || 0;
-  const tokensOut = result.usage?.output_tokens || 0;
-  const webSearchUses = result.usage?.server_tool_use?.web_search_requests || 0;
-
-  // Extraer el último bloque de texto (el JSON final)
-  const lastText = (result.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
-
-  // Parse JSON
-  let parsed: any = null;
-  try {
-    const jsonMatch = lastText.match(/\{[\s\S]*\}/);
-    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : lastText);
-  } catch (e) {
-    return json({
-      ok: false,
-      error: "No pude parsear JSON de Claude. Raw output: " + lastText.slice(0, 500),
-      raw: lastText
-    }, 500);
-  }
-
-  // Guardar en DB
-  let saved: any = null;
-  if (mentorship_id) {
-    const { data, error } = await supabase.from("edu_presentations").insert({
-      mentorship_id,
-      title,
-      topic,
-      audience,
-      presentation_type,
-      class_number,
-      duration_min,
-      language,
-      outline: parsed.outline || [],
-      slides: parsed.slides || [],
-      sources: parsed.all_sources || [],
-      status: "generated",
-      cost_tokens_used: tokensIn + tokensOut,
-      web_searches_used: webSearchUses,
-      generated_by: user_id || null
-      // Nota: domain + preferred_sources + geographic_focus quedan en el outline/slides metadata
-    }).select().single();
-    if (!error) saved = data;
-  }
+  // EdgeRuntime.waitUntil() permite que la function devuelva la respuesta
+  // mientras `work()` sigue corriendo hasta 400s en background
+  // @ts-ignore  EdgeRuntime es global en Supabase
+  EdgeRuntime.waitUntil(work());
 
   return json({
     ok: true,
-    presentation: parsed,
-    saved_id: saved?.id,
-    tokens: { input: tokensIn, output: tokensOut, total: tokensIn + tokensOut },
-    web_searches: webSearchUses,
-    duration_ms: durationMs
+    async: true,
+    job_id: job.id,
+    message: 'Trabajo iniciado en background. Hacé polling de edu_pres_jobs por id.'
   });
 });
