@@ -35,13 +35,17 @@ function normalize(v: any): string | null {
   if (v == null) return null;
   if (Array.isArray(v)) {
     if (v.length === 0) return null;
-    // Array de strings (linked record names) o de objetos {name, id}
-    const first = v[0];
+    const first = v.find(x => x != null);  // primer elemento no-null
+    if (first == null) return null;
     if (typeof first === 'string') return first;
-    if (typeof first === 'object') return first.name || first.value || String(first);
+    if (typeof first === 'object') return first.name || first.value || JSON.stringify(first);
     return String(first);
   }
-  if (typeof v === 'object') return v.name || v.value || JSON.stringify(v);
+  if (typeof v === 'object') {
+    if (v.name) return String(v.name);
+    if (v.value) return String(v.value);
+    return JSON.stringify(v);
+  }
   return String(v);
 }
 
@@ -66,6 +70,15 @@ function detectStage(text: string, stages: any[]): string | null {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  try {
+    return await handleSync(req);
+  } catch (err: any) {
+    console.error("[sync-education-airtable] Uncaught:", err);
+    return json({ ok: false, error: "Excepción: " + (err?.message || String(err)), stack: err?.stack?.slice(0, 800) }, 500);
+  }
+});
+
+async function handleSync(req: Request): Promise<Response> {
   if (!AIRTABLE_KEY) return json({ ok: false, error: "Falta AIRTABLE_API_KEY en Supabase secrets" }, 500);
 
   let body: any = {};
@@ -123,33 +136,34 @@ Deno.serve(async (req) => {
     const email = normalize(findField(f, ['Email','Correo','Correo electrónico','e-mail','Mail','correo electronico']));
     const phone = normalize(findField(f, ['Phone','Teléfono','Telefono','Celular','WhatsApp','Tel']));
     const city = normalize(findField(f, ['City','Ciudad']));
-    const state = normalize(findField(f, ['State','Estado','Provincia']));
+    // Quitar 'Estado' del state — colisiona con "Estado del Estudiante" en Airtable
+    const stateUS = normalize(findField(f, ['State','Provincia']));
     const country = normalize(findField(f, ['Country','País','Pais']));
 
-    // FECHAS — más variantes
+    // FECHAS
     const enrolledRaw = findField(f, [
-      'Fecha inicio','Fecha de inicio','Inicio','Fecha de inscripción','Fecha inscripción',
+      'Fecha de Inscripción','Fecha inscripción','Fecha de inscripcion',
+      'Fecha inicio','Fecha de inicio','Inicio',
       'Enrolled','Start Date','Fecha ingreso','Ingreso','Fecha de Compra','Fecha compra'
     ]);
     const expiresRaw = findField(f, [
+      'Fecha de Finalización','Fecha finalización','Fecha de finalizacion',
       'Vence','Fecha vencimiento','Fecha de vencimiento','Vencimiento',
-      'Fecha de finalización','Fecha finalización','Fecha fin','Termina',
-      'Expires','Expiration','End Date'
+      'Fecha fin','Termina','Expires','Expiration','End Date'
     ]);
 
-    // STAGE — ampliado a "Proceso", "Estado del Estudiante", "Estado"
+    // STAGE — match estricto solo a "Etapa actual" (sin contains que rompe)
     const stageRaw = normalize(findField(f, [
-      'Etapa','Etapa actual','Stage','Current Stage',
-      'Proceso','Estado del Estudiante','Estado Estudiante',
-      'Progreso','Fase','Estado Renovación','ONBOARDING'
+      'Etapa actual','Etapa Actual','Etapa','Stage','Current Stage','Fase'
     ]));
 
     const paymentRaw = normalize(findField(f, [
-      'Estado de pago','Estado pago','Payment Status','Status de Pago',
-      'Pago','Payment','Estado de vigencia','Estado de Cuotas Visual','Estado Cuotas'
+      'Estado de Pago','Estado de pago','Estado pago','Payment Status','Status de Pago',
+      'Pago','Payment','Estado de Vigencia','Estado de vigencia','Estado de Cuotas Visual','Estado Cuotas'
     ]));
 
-    const notes = normalize(findField(f, ['Notas','Notes','Comentarios','Observaciones','Próximo seguimiento']));
+    // Notes = Observaciones Generales (NO confundir con Observaciones Seguimiento)
+    const notes = normalize(findField(f, ['Observaciones Generales','Notas Generales','Notas','Notes','Comentarios']));
     const goals = normalize(findField(f, ['Metas','Goals','Objetivos','Objetivo','Compromiso']));
 
     // ─── TBL SEGUIMIENTO (CRM principal) ──────────────────────
@@ -160,14 +174,15 @@ Deno.serve(async (req) => {
     const ultimaFechaSeguimiento = parseDate(findField(f, [
       'Última fecha de seguimiento','Ultima fecha de seguimiento','Última fecha',
       'Ultima fecha','Last Follow-up','Última Sesión','Fecha último seguimiento',
-      'Fecha de seguimiento','Last Check-in'
+      'Fecha de seguimiento','Last Check-in',
+      'Fecha de actualizacion','Fecha de actualización','Próximo seguimiento'  // Rental Profits
     ]));
-    // "Observaciones..." (principal del seguimiento — qué pasó en la última sesión)
+    // "Observaciones..." (qué pasó en la última sesión)
+    // ATENCIÓN: no usar 'Observaciones' como fallback — matchea con 'Observaciones Generales'
     const observacionesSeguimiento = normalize(findField(f, [
-      'Observaciones de seguimiento','Observaciones Seguimiento','Seguimiento',
-      'Observaciones (Seguimiento)','Notas de seguimiento','Notas Seguimiento',
-      'Observaciones'   // fallback — debe ser el primer match
-    ]));
+      'Observaciones de Seguimiento','Observaciones de seguimiento','Observaciones Seguimiento',
+      'Observaciones (Seguimiento)','Notas de Seguimiento','Notas Seguimiento'
+    ])) || notes;  // fallback: si no hay específica, usar notes (Observaciones Generales)
     // Capital actual $80,000.00
     const capitalRaw = findField(f, [
       'Capital actual','Capital Actual','Capital','Capital disponible',
@@ -196,7 +211,10 @@ Deno.serve(async (req) => {
       'Evidencia','Evidence','Link evidencia','URL Evidencia','Documentos','Archivo'
     ]));
 
-    const stageKey = stageRaw ? detectStage(stageRaw, stages) : null;
+    // Guardar valor crudo del "Etapa actual" — NO mapearlo a un key porque los nombres
+    // del Airtable (Gestión Propiedades / Análisis / Negociando / Empresa / Crédito) son
+    // mucho más útiles que keys genéricos del schema edu_mentorships.stages.
+    const stageKey = stageRaw || null;
     const paymentStatus = paymentRaw ? (() => {
       const p = paymentRaw.toLowerCase();
       if (p.includes('vencid') || p.includes('expired') || p.includes('inactiv') || p.includes('bloque')) return 'expired';
@@ -225,7 +243,7 @@ Deno.serve(async (req) => {
       email: email ? email.slice(0, 200) : null,
       phone: phone ? phone.slice(0, 50) : null,
       city: city ? city.slice(0, 100) : null,
-      state: state ? state.slice(0, 100) : null,
+      state: stateUS ? stateUS.slice(0, 100) : null,
       country: country ? country.slice(0, 100) : null,
       enrolled_at: parseDate(enrolledRaw),
       expires_at: parseDate(expiresRaw),
@@ -283,4 +301,4 @@ Deno.serve(async (req) => {
           : "Sin records ni errores — la tabla Airtable está vacía."
     }
   });
-});
+}
