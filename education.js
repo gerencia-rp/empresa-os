@@ -5,8 +5,32 @@
 // =============================================================================
 (function () {
   const supabase = window.supabaseClient || window.sb || window.supabase;
-  const user = () => window.currentUser || window.user || {};
-  const role = () => (user()?.role || 'student');
+
+  // -------------------------------------------------------------------------
+  // Auth helpers — leer rol del DOM (donde app.js lo escribe) y user de Supabase
+  // -------------------------------------------------------------------------
+  let _cachedUser = null;
+  async function getCurrentUser() {
+    if (_cachedUser) return _cachedUser;
+    try {
+      const { data } = await supabase.auth.getUser();
+      _cachedUser = data?.user || {};
+    } catch (e) { _cachedUser = {}; }
+    return _cachedUser;
+  }
+  // Función síncrona para compatibilidad con renders
+  const user = () => _cachedUser || {};
+
+  const role = () => {
+    // 1. Si app.js expuso un global
+    if (window.state?.role) return String(window.state.role).toLowerCase();
+    // 2. Leer del span #user-role que app.js rellena
+    const el = document.getElementById('user-role');
+    if (el && el.textContent && el.textContent.trim()) {
+      return el.textContent.trim().toLowerCase();
+    }
+    return 'student';
+  };
   const isMentor = () => ['admin', 'mentor'].includes(role());
   const openModal = window.openModal || ((title, html) => {
     const m = document.getElementById('modal');
@@ -45,33 +69,68 @@
   }
 
   async function ensureMyStudent() {
-    const u = user();
-    if (!u?.id) return null;
-    const { data } = await supabase.from('edu_students').select('*').eq('user_id', u.id).maybeSingle();
+    const u = await getCurrentUser();
+    if (!u?.id) {
+      console.error('[Educación] No hay usuario autenticado');
+      return null;
+    }
+    const { data, error: e1 } = await supabase.from('edu_students')
+      .select('*').eq('user_id', u.id).maybeSingle();
+    if (e1) { console.error('[Educación] Error leyendo edu_students:', e1); throw e1; }
     if (data) return data;
-    const { data: created } = await supabase.from('edu_students').insert({
-      user_id: u.id, full_name: u.email?.split('@')[0] || 'Estudiante'
+    const { data: created, error: e2 } = await supabase.from('edu_students').insert({
+      user_id: u.id,
+      full_name: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Estudiante'
     }).select('*').single();
+    if (e2) { console.error('[Educación] Error creando edu_students:', e2); throw e2; }
     return created;
   }
 
   async function ensureMyEnrollment() {
     const me = await ensureMyStudent();
     if (!me) return null;
-    const { data } = await supabase.from('edu_enrollments')
+    const { data, error: e1 } = await supabase.from('edu_enrollments')
       .select('*, edu_cohorts(*)').eq('student_id', me.id).maybeSingle();
+    if (e1) { console.error('[Educación] Error leyendo edu_enrollments:', e1); throw e1; }
     if (data) return data;
     const { data: cohort } = await supabase.from('edu_cohorts').select('*').eq('status', 'active').limit(1).maybeSingle();
-    const { data: enr } = await supabase.from('edu_enrollments').insert({
+    const { data: enr, error: e2 } = await supabase.from('edu_enrollments').insert({
       student_id: me.id, cohort_id: cohort?.id || null, current_stage: 'E0', status: 'active'
     }).select('*').single();
+    if (e2) { console.error('[Educación] Error creando enrollment:', e2); throw e2; }
     return enr;
+  }
+
+  // Wrap para mostrar errores en la UI en vez de fallar silenciosamente
+  function withErrorBoundary(fn) {
+    return async function (...args) {
+      try { return await fn.apply(this, args); }
+      catch (err) {
+        console.error('[Educación] Error en vista:', err);
+        const root = document.getElementById('content');
+        if (root) {
+          root.innerHTML = `
+            <div class="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-xl p-6 mt-8">
+              <h2 class="text-lg font-bold text-red-900 mb-2">⚠️ Error al abrir la vista</h2>
+              <pre class="text-xs text-red-700 bg-white p-3 rounded border border-red-100 overflow-x-auto whitespace-pre-wrap">${String(err?.message || err)}</pre>
+              <p class="text-xs text-slate-600 mt-3">Abre la consola del navegador (F12) y comparte el detalle. Posibles causas:</p>
+              <ul class="text-xs text-slate-600 mt-1 list-disc ml-5">
+                <li>El SQL <code>sE1-education-area.sql</code> no se aplicó completo (faltan tablas <code>edu_*</code>)</li>
+                <li>La función <code>is_mentor_or_admin()</code> no existe (corre <code>sE1-fix-function-profiles.sql</code>)</li>
+                <li>Tu profile no tiene <code>role='admin'</code> en la tabla <code>profiles</code></li>
+              </ul>
+            </div>
+          `;
+        }
+      }
+    };
   }
 
   // =========================================================================
   // VISTA 1 · MI RUTA 90 DÍAS (Portal Estudiante)
   // =========================================================================
   window.openEducationStudent = async function (sys) {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando tu ruta…</div>`;
 
@@ -304,7 +363,7 @@
       payload.mentor_notes = mentor_notes;
       if (status === 'approved') {
         payload.reviewed_at = new Date().toISOString();
-        payload.reviewer_id = user().id;
+        payload.reviewer_id = (await getCurrentUser()).id;
       }
     }
 
@@ -323,6 +382,7 @@
   // VISTA 2 · BIBLIOTECA
   // =========================================================================
   window.openEducationLibrary = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando biblioteca…</div>`;
     await loadCurriculum();
@@ -398,6 +458,7 @@
   // VISTA 3 · PREGUNTAS AL MENTOR (Q&A)
   // =========================================================================
   window.openEducationQA = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando Q&A…</div>`;
     const enr = await ensureMyEnrollment();
@@ -465,8 +526,9 @@
   // VISTA 4 · PANEL MENTOR
   // =========================================================================
   window.openEducationMentor = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
-    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido (mentor/admin).</div>`; return; }
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido (mentor/admin). Rol detectado: <strong>${role()}</strong></div>`; return; }
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando panel mentor…</div>`;
 
     const [{ data: scorecard }, { data: alerts }, { data: pendingReviews }, { data: pendingQs }] = await Promise.all([
@@ -613,7 +675,7 @@
 
   window.approveProgress = async function (progressId) {
     const { error } = await supabase.from('edu_student_progress')
-      .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewer_id: user().id })
+      .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewer_id: (await getCurrentUser()).id })
       .eq('id', progressId);
     if (error) return alert(error.message);
     toast('Aprobada ✓');
@@ -625,7 +687,7 @@
     const is_published = document.getElementById('pub-' + qid).checked;
     if (!answer) return alert('Escribe la respuesta');
     const { error } = await supabase.from('edu_questions')
-      .update({ answer, is_published, answered_at: new Date().toISOString(), answered_by: user().id })
+      .update({ answer, is_published, answered_at: new Date().toISOString(), answered_by: (await getCurrentUser()).id })
       .eq('id', qid);
     if (error) return alert(error.message);
     toast('Respondida ✓');
@@ -717,8 +779,9 @@
   // VISTA 5 · CURRICULUM (admin edita)
   // =========================================================================
   window.openEducationCurriculum = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
-    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido.</div>`; return; }
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido. Rol detectado: <strong>${role()}</strong></div>`; return; }
     await loadCurriculum(true);
     root.innerHTML = `
       <div class="max-w-5xl mx-auto">
@@ -761,8 +824,9 @@
   // VISTA 6 · GESTOR DE ESTUDIANTES (CRUD admin)
   // =========================================================================
   window.openEducationStudentsMgr = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
-    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido.</div>`; return; }
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido. Rol detectado: <strong>${role()}</strong></div>`; return; }
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando gestor…</div>`;
 
     const [{ data: students }, { data: cohorts }, { data: enrollments }] = await Promise.all([
@@ -904,8 +968,9 @@
   // VISTA 7 · REPORTES & KPIs
   // =========================================================================
   window.openEducationReports = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
-    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido.</div>`; return; }
+    if (!isMentor()) { root.innerHTML = `<div class="text-center text-red-600 py-12">Acceso restringido. Rol detectado: <strong>${role()}</strong></div>`; return; }
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Calculando reportes…</div>`;
     await loadCurriculum();
 
@@ -1039,6 +1104,7 @@
   // VISTA 8 · MATERIAL & PRESENTACIONES
   // =========================================================================
   window.openEducationMaterials = async function () {
+    try { await getCurrentUser(); } catch(e){}
     const root = document.getElementById('content');
     root.innerHTML = `<div class="text-center text-slate-500 py-12">Cargando material…</div>`;
     await loadCurriculum();
@@ -1132,7 +1198,7 @@
       stage_code: document.getElementById('mat-stage').value || null,
       description: document.getElementById('mat-desc').value.trim() || null,
       file_url: document.getElementById('mat-url').value.trim() || null,
-      uploaded_by: user().id,
+      uploaded_by: (await getCurrentUser()).id,
     };
     if (!payload.title) return alert('Título requerido');
     const { error } = await supabase.from('edu_materials').insert(payload);
@@ -1149,5 +1215,8 @@
     toast('Borrado ✓');
     window.openEducationMaterials();
   };
+
+  // Preload del user en background apenas carga el script (mejora primer click)
+  getCurrentUser().catch(() => {});
 
 })();
