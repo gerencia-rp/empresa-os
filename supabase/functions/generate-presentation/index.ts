@@ -147,9 +147,9 @@ ELEMENTOS VISUALES OBLIGATORIOS:
 - "block_label": cada slide (excepto portada) DEBE tener un campo "block_label" string en MAYÚSCULAS tipo "BLOQUE 3 · CLASIFICACIÓN"
 - "goldbox_text": para reglas / insights clave usar slide con layout "goldbox" + array "goldbox_runs" alternando bold/regular
 - "highlight_text": para frases de impacto, layout "highlight" con texto principal grande color blanco
-- "learning_objectives" en slide #3: array de 4 objetos `{number: "01", title: "...", body: "..."}`
-- "reflection_items" en slide reflection-recap: array de 3 objetos `{title: "Aprendiste a", body: "verbo + qué"}`
-- "transfer_activity" en slide final: `{challenge: "...", deliverable: "...", deliverable_items: ["...", "..."], rule: "..."}`
+- "learning_objectives" en slide #3: array de 4 objetos {number, title, body}
+- "reflection_items" en slide reflection-recap: array de 3 objetos {title: "Aprendiste a", body}
+- "transfer_activity" en slide final: {challenge, deliverable, deliverable_items, rule}
 
 REGLAS CRÍTICAS:
 1. **TODA estadística, tasa, precio, número o dato DEBE venir de web search en VIVO**.
