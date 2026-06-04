@@ -177,16 +177,17 @@ function eduRender() {
   `;
 }
 
-// ─── TAB: ESTUDIANTES ───
+// ─── TAB: ESTUDIANTES (con buscador inteligente lenguaje natural) ───
 function eduRenderStudents() {
   const students = eduMyStudents();
   const m = eduCurrentMentorship();
-  const search = (eduState.searchQuery||'').toLowerCase();
+  const search = (eduState.searchQuery||'');
 
-  let filtered = students;
-  if (search) filtered = filtered.filter(s => ((s.full_name||'') + ' ' + (s.email||'') + ' ' + (s.city||'')).toLowerCase().includes(search));
-  if (eduState.stageFilter !== 'all') filtered = filtered.filter(s => s.current_stage === eduState.stageFilter);
-  if (eduState.statusFilter !== 'all') filtered = filtered.filter(s => s.status === eduState.statusFilter);
+  // Buscador inteligente: parser de lenguaje natural
+  let filtered = eduAplicarBusquedaInteligente(students, search);
+  // Filtros legacy (dropdown) si están seteados
+  if (eduState.stageFilter && eduState.stageFilter !== 'all') filtered = filtered.filter(s => s.current_stage === eduState.stageFilter);
+  if (eduState.statusFilter && eduState.statusFilter !== 'all') filtered = filtered.filter(s => s.status === eduState.statusFilter);
 
   // KPIs
   const total = students.length;
@@ -229,7 +230,10 @@ function eduRenderStudents() {
 
       <!-- Filtros -->
       <div class="flex items-center gap-2 flex-wrap">
-        <input type="text" placeholder="Buscar nombre/email/ciudad..." value="${(eduState.searchQuery||'').replace(/"/g,'&quot;')}" onchange="eduState.searchQuery=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1 text-xs flex-1 min-w-[200px]" />
+        <div class="flex-1 min-w-[260px] relative">
+          <input type="text" placeholder="🔍 Ej: 'inactivos en etapa Crédito' / 'pago vencido privada' / 'estancados sin contacto'" value="${(eduState.searchQuery||'').replace(/"/g,'&quot;')}" oninput="eduState.searchQuery=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs w-full" />
+          ${eduState.searchQuery ? `<div class="absolute -bottom-4 left-0 text-[10px] text-slate-500">🤖 Detecté: ${eduDescribirFiltros(eduState.searchQuery)}</div>` : ''}
+        </div>
         <select onchange="eduState.stageFilter=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1 text-xs">
           <option value="all" ${eduState.stageFilter==='all'?'selected':''}>Todas las etapas</option>
           ${(m?.stages || []).map(s => `<option value="${s.key}" ${eduState.stageFilter===s.key?'selected':''}>${s.name}</option>`).join('')}
@@ -4073,6 +4077,7 @@ function fmRenderDiagPlan() {
               <p class="text-sm text-slate-300 print:text-slate-600">Perfil #${p.num} · ${r.etapa} · ${r.cronograma}</p>
             </div>
             <div class="flex gap-2 print:hidden">
+              <button onclick="fmAbrirVincularEstudiante()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-sm font-bold">💾 Vincular a estudiante (CRM)</button>
               <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">🖨️ Imprimir</button>
               <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">📋 Copiar</button>
               <button onclick="fmDiagReset()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">🔄 Repetir</button>
@@ -4857,8 +4862,8 @@ function eduInferirDiagnostico(student) {
   return ans;
 }
 
-// Crear plan ligado al estudiante
-async function eduCrearPlanEstudiante(studentId) {
+// LEGACY: Crear plan auto-inferido (sin wizard). Reemplazado por eduCrearPlanEstudiante (wizard).
+async function eduCrearPlanEstudianteAuto(studentId) {
   const student = eduState.students.find(s => s.id === studentId);
   if (!student) return alert('Estudiante no encontrado');
 
@@ -6010,4 +6015,414 @@ function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
     }
   }
   window.location.reload();
+}
+
+// ============================================================
+// 🎓 WIZARD DE CUALIFICACIÓN PARA PLAN DE ACCIÓN (embed en CRM)
+// Reusa FM_DIAG_QUESTIONS y fmCalcularPerfil de Metodología
+// State separado de fmState para no colisionar
+// ============================================================
+
+const eduWiz = {
+  active: false,
+  studentId: null,
+  answers: {},
+  step: 0
+};
+
+// Override de eduCrearPlanEstudiante — ahora abre wizard
+async function eduCrearPlanEstudiante(studentId) {
+  const s = eduState.students.find(x => x.id === studentId);
+  if (!s) return alert('Estudiante no encontrado');
+  // Pre-llenar respuestas inferibles
+  eduWiz.answers = eduInferirDiagnostico(s);
+  eduWiz.studentId = studentId;
+  eduWiz.step = 0;
+  eduWiz.active = true;
+  eduMostrarWizard();
+}
+
+function eduMostrarWizard() {
+  let modal = document.getElementById('edu-wizard-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'edu-wizard-modal';
+    modal.className = 'fixed inset-0 z-[110] bg-slate-900/80 overflow-y-auto';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = eduRenderWizard();
+}
+
+function eduCerrarWizard() {
+  eduWiz.active = false;
+  const m = document.getElementById('edu-wizard-modal');
+  if (m) m.remove();
+}
+
+function eduRenderWizard() {
+  const s = eduState.students.find(x => x.id === eduWiz.studentId);
+  const sName = s?.full_name || 'estudiante';
+
+  // Filtrar preguntas activas (respetar skipIf)
+  const activeQs = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(eduWiz.answers));
+  const total = activeQs.length;
+  const step = Math.min(eduWiz.step, total - 1);
+  const q = activeQs[step];
+
+  if (!q) return `<div class="p-8 text-white">Calculando...</div>`;
+
+  const answered = Object.keys(eduWiz.answers).filter(k => {
+    const v = eduWiz.answers[k];
+    return v != null && v !== '' && !(Array.isArray(v) && v.length === 0);
+  }).length;
+  const progress = Math.round((answered / total) * 100);
+
+  return `
+    <div class="min-h-screen p-4">
+      <div class="max-w-3xl mx-auto bg-white rounded-2xl my-4 shadow-2xl overflow-hidden">
+        <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-5 py-3 flex items-center justify-between text-white">
+          <div>
+            <div class="text-xs font-bold opacity-90">🎯 CUALIFICACIÓN PARA PLAN DE ACCIÓN</div>
+            <div class="text-base font-bold">${sName}</div>
+          </div>
+          <button onclick="eduCerrarWizard()" class="text-white/80 hover:text-white text-2xl leading-none">×</button>
+        </div>
+
+        <div class="p-5">
+          <!-- Progress -->
+          <div class="mb-3">
+            <div class="flex justify-between text-xs text-slate-600 mb-1">
+              <span>Pregunta ${step + 1} de ${total}</span>
+              <span>${progress}% completado · ${answered} respondidas</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div class="h-full bg-amber-500 transition-all" style="width: ${progress}%"></div>
+            </div>
+          </div>
+
+          <!-- Pregunta -->
+          <div class="border border-slate-200 rounded-xl p-5 mt-3">
+            <div class="text-xs font-bold text-amber-700 tracking-wider mb-2">${q.bloque||''} · PREGUNTA ${step + 1}</div>
+            <h4 class="text-xl font-bold text-slate-900 mb-4">${q.pregunta}</h4>
+            ${eduRenderWizardInput(q)}
+          </div>
+
+          <!-- Navegación -->
+          <div class="flex items-center justify-between mt-5">
+            <button onclick="eduWizBack()" ${step === 0 ? 'disabled' : ''} class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-30">← Atrás</button>
+            ${q.tipo === 'text' || q.multiSelect ? `
+              <button onclick="eduWizNext()" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold">Siguiente →</button>
+            ` : ''}
+            <div class="text-xs text-slate-500">💡 Respuestas pre-llenadas según datos del CRM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function eduRenderWizardInput(q) {
+  if (q.tipo === 'text') {
+    const val = eduWiz.answers[q.id] || '';
+    return `<input type="text" value="${escapeHtml(val)}" placeholder="${q.placeholder||''}" oninput="eduWiz.answers['${q.id}']=this.value" onkeydown="if(event.key==='Enter')eduWizNext()" class="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-amber-500" />`;
+  }
+  if (q.multiSelect) {
+    const vals = Array.isArray(eduWiz.answers[q.id]) ? eduWiz.answers[q.id] : [];
+    return `<div class="space-y-2">${q.opciones.map(o => {
+      const sel = vals.includes(o.val);
+      return `<button onclick="eduWizToggle('${q.id}','${o.val}')" class="w-full text-left px-4 py-3 rounded-lg border-2 transition ${sel?'border-amber-500 bg-amber-50':'border-slate-200 hover:border-amber-300'}">
+        <div class="flex items-center gap-3">
+          <div class="w-5 h-5 rounded border-2 ${sel?'border-amber-600 bg-amber-600':'border-slate-300'} flex items-center justify-center flex-shrink-0">${sel?'<span class="text-white text-xs">✓</span>':''}</div>
+          <span class="text-sm">${o.label}</span>
+        </div>
+      </button>`;
+    }).join('')}</div><p class="text-xs text-slate-500 mt-3">Podés seleccionar varios. Click "Siguiente →"</p>`;
+  }
+  // Single radio
+  return `<div class="space-y-2">${q.opciones.map(o => {
+    const sel = eduWiz.answers[q.id] === o.val;
+    return `<button onclick="eduWizAnswer('${q.id}','${o.val}')" class="w-full text-left px-4 py-3 rounded-lg border-2 transition ${sel?'border-amber-500 bg-amber-50':'border-slate-200 hover:border-amber-300'}">
+      <div class="flex items-center gap-3">
+        <div class="w-5 h-5 rounded-full border-2 ${sel?'border-amber-600 bg-amber-600':'border-slate-300'} flex items-center justify-center flex-shrink-0">${sel?'<div class="w-2 h-2 rounded-full bg-white"></div>':''}</div>
+        <span class="text-sm">${o.label}</span>
+      </div>
+    </button>`;
+  }).join('')}</div>`;
+}
+
+function eduWizAnswer(qid, val) {
+  eduWiz.answers[qid] = val;
+  const active = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(eduWiz.answers));
+  const idx = active.findIndex(q => q.id === qid);
+  if (idx < active.length - 1) eduWiz.step = idx + 1;
+  else return eduWizFinish();
+  eduMostrarWizard();
+}
+
+function eduWizToggle(qid, val) {
+  const cur = Array.isArray(eduWiz.answers[qid]) ? eduWiz.answers[qid] : [];
+  eduWiz.answers[qid] = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
+  eduMostrarWizard();
+}
+
+function eduWizNext() {
+  const active = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(eduWiz.answers));
+  if (eduWiz.step < active.length - 1) { eduWiz.step++; eduMostrarWizard(); }
+  else eduWizFinish();
+}
+
+function eduWizBack() {
+  if (eduWiz.step > 0) { eduWiz.step--; eduMostrarWizard(); }
+}
+
+async function eduWizFinish() {
+  // Crear plan con respuestas del wizard
+  const studentId = eduWiz.studentId;
+  const student = eduState.students.find(s => s.id === studentId);
+  if (!student) return alert('Estudiante perdido');
+  const answers = eduWiz.answers;
+  const perfilResult = fmCalcularPerfil(answers);
+  const userProfile = {
+    mercado: answers.mercado_estado || student.state || student.city || 'USA',
+    estrategiaLabel: answers.objetivo === 'flip' ? 'Fix & Flip' :
+                     answers.objetivo === 'hold' ? 'Fix & Hold' :
+                     answers.objetivo === 'wholesale' ? 'Wholesaling' :
+                     answers.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip'
+  };
+  const bloques = fmGenerarBloques(userProfile, answers);
+
+  // Archivar plan anterior
+  await sb.from('edu_student_plans').update({ status: 'archived' }).eq('student_id', studentId).eq('status', 'active');
+
+  // Crear nuevo
+  const { data: plan, error } = await sb.from('edu_student_plans').insert({
+    student_id: studentId,
+    mentorship_id: student.mentorship_id,
+    diagnostico: answers,
+    perfil: { ...perfilResult, userProfile },
+    bloques_ids: bloques.map(b => b.id),
+    modo: 'completo',
+    status: 'active'
+  }).select().single();
+  if (error) { alert('Error: '+error.message); return; }
+
+  // Tasks
+  const tasks = [];
+  bloques.forEach((b, bIdx) => {
+    const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
+    pasos.forEach((paso, pIdx) => {
+      tasks.push({
+        plan_id: plan.id, student_id: studentId,
+        bloque_id: b.id, bloque_etapa: b.etapa, bloque_subetapa: b.subetapa,
+        bloque_orden: bIdx, paso_index: pIdx, paso_text: paso, completed: false
+      });
+    });
+  });
+  if (tasks.length) await sb.from('edu_student_plan_tasks').insert(tasks);
+
+  eduCerrarWizard();
+  alert(`✅ Plan creado para ${student.full_name}\n\n${bloques.length} bloques · ${tasks.length} tareas`);
+  await eduLoadStudentPlan(studentId);
+  eduRender();
+}
+
+// ============================================================
+// 🔍 BUSCADOR INTELIGENTE (lenguaje natural)
+// ============================================================
+function eduParseSearchQuery(q) {
+  const filters = { text: '', status: null, payment: null, stage: null, group: null, only: [] };
+  if (!q || typeof q !== 'string') return filters;
+  let text = q.toLowerCase();
+
+  // STATUS
+  if (/\b(inactiv|expirad|abandonad|dropped)\b/.test(text)) { filters.status = 'dropped'; text = text.replace(/\b(inactiv\w*|expirad\w*|abandonad\w*|dropped)\b/g, ''); }
+  if (/\bactiv\w*\b/.test(text) && !/\binactiv\w*\b/.test(q.toLowerCase())) { filters.status = 'active'; text = text.replace(/\bactiv\w*\b/g, ''); }
+  if (/\b(paus\w*|pause)\b/.test(text)) { filters.status = 'paused'; text = text.replace(/\b(paus\w*|pause)\b/g, ''); }
+  if (/\b(graduad\w*)\b/.test(text)) { filters.status = 'graduated'; text = text.replace(/\b(graduad\w*)\b/g, ''); }
+  if (/\b(en\s+riesgo|at\s*risk|riesgo)\b/.test(text)) { filters.status = 'at_risk'; text = text.replace(/\b(en\s+riesgo|at\s*risk|riesgo)\b/g, ''); }
+
+  // PAYMENT
+  if (/\b(pago\s+(vencid|atrasad|cancelad)|impagos?|sin\s+pagar)\b/.test(text)) {
+    if (/\bvencid\w*\b/.test(text)) filters.payment = 'expired';
+    else if (/\batrasad\w*\b/.test(text)) filters.payment = 'past_due';
+    else filters.payment = 'expired';
+    text = text.replace(/\b(pago\s+(vencid|atrasad|cancelad)\w*|impagos?|sin\s+pagar)\b/g, '');
+  }
+  if (/\b(al\s+d[ií]a|pago\s+ok)\b/.test(text)) { filters.payment = 'active'; text = text.replace(/\b(al\s+d[ií]a|pago\s+ok)\b/g, ''); }
+
+  // ETAPA: "etapa X" / "en X"
+  const stageMatch = text.match(/\b(etapa|en)\s+([a-záéíóúñ][\wáéíóúñ\s]{2,30}?)(?:\s+(?:con|y|de|que)|$|,)/);
+  if (stageMatch) { filters.stage = stageMatch[2].trim(); text = text.replace(stageMatch[0], ''); }
+
+  // GROUP / MENTORÍA: "mentoría X" o nombres tipo "privada", "inversores"
+  const groupMatch = text.match(/\b(mentor[ií]a|grupo)\s+([a-záéíóúñ][\wáéíóúñ\s]{2,30}?)(?:\s+(?:con|y|de|que)|$|,)/);
+  if (groupMatch) { filters.group = groupMatch[2].trim(); text = text.replace(groupMatch[0], ''); }
+  if (/\b(privada)\b/.test(text)) { filters.group = filters.group || 'Privada'; text = text.replace(/\bprivada\b/g, ''); }
+  if (/\b(inversor\w*)\b/.test(text) && !filters.group) { filters.group = 'Inversor'; text = text.replace(/\binversor\w*\b/g, ''); }
+
+  // SIN CONTACTO / SIN SEGUIMIENTO
+  if (/\b(sin\s+contacto|sin\s+seguimiento)\b/.test(text)) { filters.only.push('sin_contacto_30d'); text = text.replace(/\bsin\s+(contacto|seguimiento)\b/g, ''); }
+  if (/\bestancad\w*\b/.test(text)) { filters.only.push('estancado'); text = text.replace(/\bestancad\w*\b/g, ''); }
+  if (/\b(vence|por\s+vencer)\b/.test(text)) { filters.only.push('vence_30d'); text = text.replace(/\b(vence|por\s+vencer)\b/g, ''); }
+
+  filters.text = text.replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+  return filters;
+}
+
+function eduAplicarBusquedaInteligente(students, query) {
+  if (!query) return students;
+  const f = eduParseSearchQuery(query);
+  const now = Date.now();
+  const dayMs = 86400000;
+  return students.filter(s => {
+    if (f.status && s.status !== f.status) return false;
+    if (f.payment) {
+      if (f.payment === 'expired' && !['expired','cancelled','past_due'].includes(s.payment_status)) return false;
+      else if (f.payment !== 'expired' && s.payment_status !== f.payment) return false;
+    }
+    if (f.stage && !(s.current_stage||'').toLowerCase().includes(f.stage.toLowerCase())) return false;
+    if (f.group && !(s.grupo||'').toLowerCase().includes(f.group.toLowerCase())) return false;
+    if (f.only.includes('sin_contacto_30d')) {
+      const last = s.ultima_fecha_seguimiento || s.enrolled_at;
+      if (!last || Math.floor((now - new Date(last).getTime()) / dayMs) <= 30) return false;
+    }
+    if (f.only.includes('estancado')) {
+      if (!s.stage_started_at) return false;
+      if (Math.floor((now - new Date(s.stage_started_at).getTime()) / dayMs) < 60) return false;
+    }
+    if (f.only.includes('vence_30d')) {
+      if (!s.expires_at) return false;
+      const d = Math.floor((new Date(s.expires_at).getTime() - now) / dayMs);
+      if (d < 0 || d > 30) return false;
+    }
+    if (f.text) {
+      const blob = `${s.full_name||''} ${s.email||''} ${s.city||''} ${s.grupo||''} ${s.current_stage||''}`.toLowerCase();
+      const words = f.text.split(/\s+/).filter(w => w.length > 1);
+      for (const w of words) if (!blob.includes(w)) return false;
+    }
+    return true;
+  });
+}
+
+// Mostrar los filtros detectados (debug visual)
+function eduDescribirFiltros(query) {
+  if (!query) return '';
+  const f = eduParseSearchQuery(query);
+  const parts = [];
+  if (f.status) parts.push(`status=<b>${f.status}</b>`);
+  if (f.payment) parts.push(`pago=<b>${f.payment}</b>`);
+  if (f.stage) parts.push(`etapa contiene "<b>${f.stage}</b>"`);
+  if (f.group) parts.push(`grupo contiene "<b>${f.group}</b>"`);
+  f.only.forEach(o => parts.push(`<b>${o}</b>`));
+  if (f.text) parts.push(`texto: "<b>${f.text}</b>"`);
+  return parts.length ? parts.join(' · ') : 'sin filtros detectados';
+}
+
+// ─── Vincular plan generado en Metodología → estudiante del CRM ───
+async function fmAbrirVincularEstudiante() {
+  // Cargar todos los estudiantes (todas las mentorías)
+  const { data: students } = await sb.from('edu_students')
+    .select('id,full_name,grupo,mentorship_id,current_stage,email')
+    .order('full_name');
+  if (!students?.length) return alert('Sin estudiantes en el CRM. Sincronizá primero.');
+
+  // Modal con buscador + lista
+  const modal = document.createElement('div');
+  modal.id = 'fm-link-student-modal';
+  modal.className = 'fixed inset-0 z-[120] bg-slate-900/80 overflow-y-auto';
+  modal.innerHTML = `
+    <div class="min-h-screen p-4 flex items-start justify-center">
+      <div class="max-w-2xl w-full bg-white rounded-2xl my-4 shadow-2xl overflow-hidden">
+        <div class="bg-amber-500 px-5 py-3 flex items-center justify-between text-slate-900">
+          <div class="font-bold text-sm">💾 Vincular plan a estudiante del CRM</div>
+          <button onclick="document.getElementById('fm-link-student-modal').remove()" class="text-2xl leading-none">×</button>
+        </div>
+        <div class="p-4">
+          <input id="fm-link-search" type="text" placeholder="🔍 Buscar por nombre, email o grupo..." oninput="fmLinkSearchFilter()" class="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 text-sm" />
+          <div id="fm-link-results" class="mt-3 max-h-[60vh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg">
+            ${students.slice(0, 30).map(s => `
+              <div onclick="fmLinkPlanAStudiante('${s.id}', '${s.mentorship_id}')" class="p-3 hover:bg-amber-50 cursor-pointer">
+                <div class="font-semibold text-sm text-slate-900">${s.full_name}</div>
+                <div class="text-[11px] text-slate-500">${s.grupo||''} ${s.current_stage?'· '+s.current_stage:''} ${s.email?'· '+s.email:''}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="mt-2 text-[10px] text-slate-500">Mostrando primeros 30. Escribí para filtrar.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  // Guardar lista global para filtrar
+  window._fmLinkStudents = students;
+}
+
+function fmLinkSearchFilter() {
+  const q = (document.getElementById('fm-link-search').value || '').toLowerCase().trim();
+  const all = window._fmLinkStudents || [];
+  const filtered = q ? all.filter(s => `${s.full_name||''} ${s.email||''} ${s.grupo||''} ${s.current_stage||''}`.toLowerCase().includes(q)) : all;
+  const container = document.getElementById('fm-link-results');
+  if (!container) return;
+  container.innerHTML = filtered.slice(0, 50).map(s => `
+    <div onclick="fmLinkPlanAStudiante('${s.id}', '${s.mentorship_id}')" class="p-3 hover:bg-amber-50 cursor-pointer">
+      <div class="font-semibold text-sm text-slate-900">${s.full_name}</div>
+      <div class="text-[11px] text-slate-500">${s.grupo||''} ${s.current_stage?'· '+s.current_stage:''} ${s.email?'· '+s.email:''}</div>
+    </div>
+  `).join('') || '<div class="p-4 text-center text-slate-400 text-xs">Sin resultados</div>';
+}
+
+async function fmLinkPlanAStudiante(studentId, mentorshipId) {
+  if (!fmState.diagResult) return alert('Sin resultado del diagnóstico');
+  if (!confirm('¿Vincular este plan al estudiante seleccionado? Si ya tenía plan activo, se archivará.')) return;
+
+  const r = fmState.diagResult;
+  const answers = r.answers || {};
+
+  // Calcular bloques
+  const userProfile = {
+    mercado: answers.mercado_estado || 'tu mercado',
+    estrategiaLabel: answers.objetivo === 'flip' ? 'Fix & Flip' :
+                     answers.objetivo === 'hold' ? 'Fix & Hold' :
+                     answers.objetivo === 'wholesale' ? 'Wholesaling' :
+                     answers.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip'
+  };
+  const bloques = fmGenerarBloques(userProfile, answers);
+
+  // Archivar plan previo activo
+  await sb.from('edu_student_plans').update({ status: 'archived' })
+    .eq('student_id', studentId).eq('status', 'active');
+
+  // Crear plan
+  const { data: plan, error } = await sb.from('edu_student_plans').insert({
+    student_id: studentId,
+    mentorship_id: mentorshipId,
+    diagnostico: answers,
+    perfil: { ...r, userProfile },
+    bloques_ids: bloques.map(b => b.id),
+    modo: 'completo',
+    status: 'active'
+  }).select().single();
+  if (error) return alert('Error: '+error.message);
+
+  // Insertar tasks
+  const tasks = [];
+  bloques.forEach((b, bIdx) => {
+    const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
+    pasos.forEach((paso, pIdx) => {
+      tasks.push({
+        plan_id: plan.id, student_id: studentId,
+        bloque_id: b.id, bloque_etapa: b.etapa, bloque_subetapa: b.subetapa,
+        bloque_orden: bIdx, paso_index: pIdx, paso_text: paso, completed: false
+      });
+    });
+  });
+  if (tasks.length) await sb.from('edu_student_plan_tasks').insert(tasks);
+
+  // Cerrar modal y notificar
+  document.getElementById('fm-link-student-modal')?.remove();
+  const student = (window._fmLinkStudents || []).find(s => s.id === studentId);
+  alert(`✅ Plan vinculado a ${student?.full_name || 'estudiante'}\n\n${bloques.length} bloques · ${tasks.length} tareas\n\nLo podés ver en Mentorías Manager → ${student?.full_name} → Plan Acción`);
+
+  // Refrescar cache de planes guardados
+  fmSavedPlansCache = null;
 }
