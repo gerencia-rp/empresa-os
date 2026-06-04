@@ -5208,6 +5208,7 @@ function eduRenderStudentPlan() {
           <div class="h-full bg-amber-500 transition-all" style="width: ${progressPct}%"></div>
         </div>
         <div class="mt-3 flex gap-2 text-xs flex-wrap">
+          <button onclick="eduAbrirAnalisisProfundoFM('${student.id}')" class="px-3 py-1.5 bg-violet-500 hover:bg-violet-400 rounded text-white font-bold" title="Abre el análisis profundo completo en Metodología FlipMentoría (objetivo operativo, regla del plan, análisis profundo del cliente, fortalezas/gaps, bloques con tiempo/entregable/errores/recursos)">🎯 Ver análisis profundo (FlipMentoría)</button>
           <button onclick="eduDescargarPlan('pdf')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 rounded text-slate-900 font-bold">📄 Descargar PDF</button>
           <button onclick="eduDescargarPlan('md')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">📝 Markdown</button>
           ${student.phone ? `<a href="https://wa.me/${student.phone.replace(/\D/g,'')}?text=${encodeURIComponent('Hola ' + student.full_name + '! Te comparto tu plan de acción personalizado de FlipMentoría. Vamos paso a paso 💪')}" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-white">💬 WhatsApp</a>` : ''}
@@ -5215,6 +5216,7 @@ function eduRenderStudentPlan() {
           <button onclick="eduArchivarPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">🗄 Archivar</button>
           <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">🔄 Regenerar</button>
         </div>
+        <div class="mt-2 text-[10px] text-amber-200 italic">💡 Si querés el análisis profundo del cliente con bloques completos, click "🎯 Ver análisis profundo".</div>
       </div>
 
       <!-- Bloques con checklist -->
@@ -6263,17 +6265,18 @@ async function eduAgendarCallNueva(presetStudentId) {
   const now = new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours() + 1);
   const defaultDate = now.toISOString().slice(0,16);
   const coachDefault = (state.user && state.user.email) || '';
-  const studentOpts = students.map(s => `<option value="${s.id}" ${presetStudentId===s.id?'selected':''}>${(s.full_name||'').replace(/</g,'&lt;')}${s.email?' · '+s.email:''}</option>`).join('');
+  const studentOpts = students.map(s => `<option value="${s.id}" ${presetStudentId===s.id?'selected':''} data-email="${(s.email||'').replace(/"/g,'&quot;')}">${(s.full_name||'').replace(/</g,'&lt;')}${s.email?' · '+s.email:''}</option>`).join('');
   const motivoOpts = motivos.map(m => `<option value="${m.id}">${m.emoji||''} ${m.label}</option>`).join('');
 
   const html = `
     <div class="space-y-3">
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Estudiante *</label>
-        <select id="ec-student" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        <select id="ec-student" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" onchange="eduCallOnStudentChange()">
           <option value="">— Selecciona —</option>
           ${studentOpts}
         </select>
+        <div id="ec-student-email-hint" class="text-[10px] text-slate-500 mt-1"></div>
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div>
@@ -6296,23 +6299,52 @@ async function eduAgendarCallNueva(presetStudentId) {
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tema específico (texto libre)</label>
         <input id="ec-topic" type="text" placeholder="Ej. Revisión buybox Austin SE + 3 comps" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
       </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Coach que atiende</label>
-          <input id="ec-coach" type="text" value="${coachDefault.replace(/"/g,'&quot;')}" placeholder="email del coach" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+
+      <!-- ── ASISTENTES Y UBICACIÓN ── -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+        <div class="text-[10px] font-bold uppercase text-blue-800">📧 Asistentes que reciben invitación</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Coach que atiende (email) *</label>
+            <input id="ec-coach" type="email" value="${coachDefault.replace(/"/g,'&quot;')}" placeholder="coach@empresa.com" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Status inicial</label>
+            <select id="ec-status" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+              <option value="pendiente">⏳ Pendiente</option>
+              <option value="confirmado">✅ Confirmado</option>
+            </select>
+          </div>
         </div>
         <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Status inicial</label>
-          <select id="ec-status" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-            <option value="pendiente">⏳ Pendiente</option>
-            <option value="confirmado">✅ Confirmado</option>
-          </select>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">Asistentes adicionales (emails separados por coma)</label>
+          <textarea id="ec-attendees" rows="2" placeholder="otro_coach@empresa.com, partner@empresa.com, observador@empresa.com" class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+          <div class="text-[10px] text-slate-500 mt-0.5">El estudiante (su email) + el coach se agregan automáticamente. Aquí agregás extras.</div>
         </div>
       </div>
+
+      <!-- ── LUGAR / VIDEO LLAMADA ── -->
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Lugar / plataforma</label>
+          <input id="ec-location" type="text" placeholder="Zoom, Google Meet, Oficina..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">URL de la reunión</label>
+          <input id="ec-meeting-url" type="url" placeholder="https://meet.google.com/..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+      </div>
+
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas / Agenda (opcional)</label>
         <textarea id="ec-notes" rows="3" placeholder="Puntos a tratar..." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
       </div>
+
+      <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded p-2">
+        <input type="checkbox" id="ec-send-invites" checked />
+        <label for="ec-send-invites" class="text-xs text-slate-700"><strong>📤 Enviar invitaciones por correo al guardar</strong> (abre tu cliente de email con .ics adjunto y todos los emails como destinatarios)</label>
+      </div>
+
       <div class="flex gap-2">
         <button onclick="eduCallSave()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-bold py-2.5 rounded-lg">💾 Agendar sesión</button>
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
@@ -6320,6 +6352,22 @@ async function eduAgendarCallNueva(presetStudentId) {
     </div>
   `;
   openModal('📅 Nueva sesión', html);
+  if (presetStudentId) setTimeout(eduCallOnStudentChange, 50);
+}
+
+function eduCallOnStudentChange() {
+  const sel = document.getElementById('ec-student');
+  const opt = sel.options[sel.selectedIndex];
+  const email = opt ? opt.getAttribute('data-email') : '';
+  const hint = document.getElementById('ec-student-email-hint');
+  if (!hint) return;
+  if (email) {
+    hint.innerHTML = `✓ Email del estudiante: <strong>${email}</strong> — recibirá invitación automáticamente.`;
+    hint.className = 'text-[10px] text-emerald-700 mt-1';
+  } else {
+    hint.innerHTML = `⚠️ Este estudiante <strong>no tiene email en el CRM</strong>. Editalo primero o agregalo manualmente en "asistentes adicionales" abajo.`;
+    hint.className = 'text-[10px] text-amber-700 mt-1';
+  }
 }
 
 async function eduCallSave() {
@@ -6331,11 +6379,19 @@ async function eduCallSave() {
   const coach = document.getElementById('ec-coach').value.trim();
   const status = document.getElementById('ec-status').value;
   const notes = document.getElementById('ec-notes').value.trim();
+  const attendeesRaw = document.getElementById('ec-attendees').value.trim();
+  const location = document.getElementById('ec-location').value.trim();
+  const meetingUrl = document.getElementById('ec-meeting-url').value.trim();
+  const sendInvites = document.getElementById('ec-send-invites').checked;
+
   if (!studentId) return alert('Falta estudiante.');
   if (!datetime) return alert('Falta fecha y hora.');
   if (!motivo) return alert('Falta motivo.');
 
-  const { error } = await sb.from('edu_student_calls').insert({
+  // Parsear asistentes
+  const extraEmails = attendeesRaw.split(/[,;\s\n]+/).map(s => s.trim()).filter(s => s && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
+
+  const { data: inserted, error } = await sb.from('edu_student_calls').insert({
     mentorship_id: eduState.mentorshipId,
     student_id: studentId,
     scheduled_at: new Date(datetime).toISOString(),
@@ -6345,12 +6401,21 @@ async function eduCallSave() {
     attended_by: coach || null,
     status_attendance: status,
     notes_md: notes || null,
+    attendee_emails: extraEmails,
+    location: location || null,
+    meeting_url: meetingUrl || null,
     type: 'mentoring'
-  });
+  }).select().single();
+
   if (error) return alert('Error: '+error.message);
   closeModal();
   await eduLoadAll();
   eduRender();
+
+  if (sendInvites && inserted) {
+    // Disparar envío de invitación multi-destinatario
+    setTimeout(() => eduCallSendInvite(inserted.id, true), 200);
+  }
 }
 
 // ─── Modal: marcar resultado (status + motivo + evidencia + resumen) ───
@@ -6486,16 +6551,33 @@ async function eduCallUpdate(id) {
   eduRender();
 }
 
-// ─── Invitación por correo: ICS + mailto ───
+// ─── Invitación por correo: ICS + mailto (multi-destinatario) ───
+
+// Recolecta todos los emails de asistentes (estudiante + coach + extras), únicos.
+function eduCallCollectAttendees(c, student) {
+  const set = new Set();
+  if (student && student.email) set.add(student.email.toLowerCase().trim());
+  if (c.attended_by && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.attended_by)) set.add(c.attended_by.toLowerCase().trim());
+  (c.attendee_emails || []).forEach(e => { if (e && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) set.add(e.toLowerCase().trim()); });
+  return [...set];
+}
+
 function eduCallBuildICS(c, student, motivo) {
   const start = new Date(c.scheduled_at);
   const end = new Date(start.getTime() + (c.duration_min || 60) * 60000);
   const fmt = d => d.toISOString().replace(/[-:]/g,'').replace(/\.\d+/, '');
   const uid = (c.id || ('uid-'+Date.now())) + '@empresa-os';
   const summary = (motivo ? motivo.label : c.motivo || 'Sesión') + (c.topic ? ' · ' + c.topic : '');
-  const desc = (c.notes_md || c.topic || '').replace(/\n/g, '\\n').replace(/,/g, '\\,');
-  return [
-    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//EmpresaOS//Edu//ES','METHOD:REQUEST',
+  const descParts = [];
+  if (c.topic) descParts.push(c.topic);
+  if (c.notes_md) descParts.push(c.notes_md);
+  if (c.meeting_url) descParts.push('Link: ' + c.meeting_url);
+  if (c.attended_by) descParts.push('Coach: ' + c.attended_by);
+  const desc = descParts.join('\\n\\n').replace(/\n/g, '\\n').replace(/,/g, '\\,');
+  const allAttendees = eduCallCollectAttendees(c, student);
+
+  const lines = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//EmpresaOS//Edu//ES','METHOD:REQUEST','CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
     'UID:'+uid,
     'DTSTAMP:'+fmt(new Date()),
@@ -6503,11 +6585,19 @@ function eduCallBuildICS(c, student, motivo) {
     'DTEND:'+fmt(end),
     'SUMMARY:'+summary,
     desc ? 'DESCRIPTION:'+desc : '',
-    student && student.email ? 'ATTENDEE;CN='+ (student.full_name||'') +';RSVP=TRUE:mailto:'+student.email : '',
-    c.attended_by ? 'ORGANIZER:mailto:'+c.attended_by : '',
+    c.location ? 'LOCATION:'+ (c.meeting_url ? (c.location + ' ' + c.meeting_url) : c.location) : (c.meeting_url ? 'LOCATION:'+c.meeting_url : ''),
+    c.meeting_url ? 'URL:'+c.meeting_url : '',
+    c.attended_by ? 'ORGANIZER;CN='+c.attended_by+':mailto:'+c.attended_by : '',
+    ...allAttendees.map(em => {
+      const role = (em === (c.attended_by||'').toLowerCase()) ? 'CHAIR' : 'REQ-PARTICIPANT';
+      const cn = (student && student.email && em === student.email.toLowerCase()) ? (student.full_name || '') : '';
+      return `ATTENDEE;CN=${cn};ROLE=${role};RSVP=TRUE;PARTSTAT=NEEDS-ACTION:mailto:${em}`;
+    }),
     'STATUS:CONFIRMED',
+    'SEQUENCE:0',
     'END:VEVENT','END:VCALENDAR'
-  ].filter(Boolean).join('\r\n');
+  ].filter(Boolean);
+  return lines.join('\r\n');
 }
 
 function eduCallDownloadICS(id) {
@@ -6523,25 +6613,54 @@ function eduCallDownloadICS(id) {
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-function eduCallSendInvite(id) {
+function eduCallSendInvite(id, silent) {
   const c = (eduState.calls || []).find(x => x.id === id);
   if (!c) return;
   const student = (eduState.students || []).find(s => s.id === c.student_id);
   if (!student) return alert('Estudiante no encontrado');
-  if (!student.email) return alert('Este estudiante no tiene email en el CRM. Editalo primero.');
+  const attendees = eduCallCollectAttendees(c, student);
+  if (!attendees.length) {
+    if (!silent) alert('No hay emails de destinatarios. Agregalos en el modal de edición.');
+    return;
+  }
   const motivo = eduGetMotivos().find(m => m.id === c.motivo);
   const d = new Date(c.scheduled_at);
   const dateStr = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const timeStr = d.toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
   const subject = `Sesión ${motivo?motivo.label:''} — ${dateStr}`;
-  const body = `Hola ${student.full_name||''},\n\nTe confirmo nuestra sesión:\n\n📅 ${dateStr}\n🕐 ${timeStr} (${c.duration_min||60} minutos)\n📋 ${motivo?motivo.label:''}${c.topic?' · '+c.topic:''}\n${c.attended_by?'\n👤 Te atiende: '+c.attended_by:''}\n\nAdjunto la invitación .ics para que se agregue a tu calendario.\n\nNos vemos!\n${(state.user&&state.user.email)||''}`;
-  // Disparar download del ICS + abrir mailto
+  const body =
+`Hola,
+
+Te confirmo la sesión:
+
+📅 ${dateStr}
+🕐 ${timeStr} (${c.duration_min||60} minutos)
+📋 ${motivo?motivo.label:''}${c.topic?' · '+c.topic:''}
+👤 Estudiante: ${student.full_name||''}${c.attended_by?'\n🎯 Coach: '+c.attended_by:''}
+${c.location ? '📍 Lugar: '+c.location : ''}${c.meeting_url ? '\n🔗 Link: '+c.meeting_url : ''}
+
+${c.notes_md ? 'Agenda:\n'+c.notes_md+'\n\n' : ''}Adjunto la invitación .ics para que se agregue automáticamente a tu calendario (Google/Outlook/Apple).
+
+Nos vemos.
+${(state.user&&state.user.email)||''}`;
+
+  // 1) Descargar ICS (con todos los attendees como ATTENDEE) para adjuntarlo manualmente
   eduCallDownloadICS(id);
+
+  // 2) Abrir mailto con todos los destinatarios
+  // mailto: TO acepta multi-emails separados por coma
   setTimeout(() => {
-    window.location.href = `mailto:${student.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const to = encodeURIComponent(attendees.join(','));
+    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }, 300);
-  // Marcar email_sent_at
-  sb.from('edu_student_calls').update({ email_sent_at: new Date().toISOString() }).eq('id', id).then(() => {});
+
+  // 3) Marcar email_sent_at + invite_meta
+  sb.from('edu_student_calls').update({
+    email_sent_at: new Date().toISOString(),
+    invite_meta: { sent_to: attendees, count: attendees.length, at: new Date().toISOString() }
+  }).eq('id', id).then(() => {});
+
+  if (!silent) alert(`📧 Invitación preparada para ${attendees.length} persona(s):\n${attendees.join('\n')}\n\nSe abrió tu cliente de email con el asunto + cuerpo + lista de destinatarios. ADJUNTÁ EL .ics QUE SE DESCARGÓ y enviá.`);
 }
 
 // ─── METODOLOGÍA: Planes guardados (de estudiantes del CRM) ───
@@ -7967,4 +8086,72 @@ function eduExportKpisCsv() {
   a.href = URL.createObjectURL(blob);
   a.download = `kpis-postventa-${eduState.mentorshipId}-${eduReportMesAnchor()}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ════════════════════════════════════════════════════════════
+// Plan acción del CRM ↔ Análisis Profundo de Metodología FlipMentoría
+// Cierra Mentorías Manager, abre FlipMentoría → tab Diagnóstico
+// con el plan guardado reconstruido en fmState.diagResult.
+// ════════════════════════════════════════════════════════════
+async function eduAbrirAnalisisProfundoFM(studentId) {
+  const plan = eduState.studentPlan;
+  if (!plan) return alert('Este estudiante no tiene un plan activo todavía. Generá uno primero.');
+
+  // Reconstruir fmState.diagResult desde el plan guardado
+  const answers = plan.diagnostico || {};
+  if (!answers || Object.keys(answers).length === 0) {
+    return alert('El plan guardado no tiene las respuestas del diagnóstico (formato viejo).\n\nRegenerá el plan desde el botón "🔄 Regenerar" para tener el análisis profundo.');
+  }
+
+  // Recalcular usando los mismos motores de FM para garantizar consistencia
+  let result;
+  try {
+    if (typeof fmCalcularPerfil === 'function') {
+      result = fmCalcularPerfil(answers);
+    } else {
+      // Fallback: usar el perfil del plan tal cual
+      result = plan.perfil || { answers, perfil: { num:1, nombre:'Plan', emoji:'🎯' } };
+    }
+    result.answers = answers;
+  } catch (e) {
+    console.error('Recalcular perfil:', e);
+    result = plan.perfil || { answers };
+    result.answers = answers;
+  }
+
+  // Setear estado de FM
+  fmState.diagAnswers = answers;
+  fmState.diagResult = result;
+  fmState.diagStudentId = studentId;
+  fmState.activeTab = 'diagnostico';
+  fmState.diagStep = (FM_DIAG_QUESTIONS || []).length - 1;
+  fmState.diagModo = 'completo';
+
+  // Buscar el sistema 'edu-methodology' y abrirlo
+  // Cerrar el modal del Manager
+  if (typeof closeModal === 'function') closeModal();
+
+  // Recolectar todos los sistemas conocidos
+  const allSystems = (typeof state !== 'undefined' && Array.isArray(state.systems)) ? state.systems
+    : (window._allSystems || []);
+  let sys = allSystems.find(s => s.type === 'edu-methodology');
+
+  // Si no está en cache, cargar desde DB
+  if (!sys) {
+    const { data } = await sb.from('systems').select('*').eq('type', 'edu-methodology').limit(1).maybeSingle();
+    sys = data;
+  }
+  if (!sys) {
+    alert('No se encontró el sistema "Metodología FlipMentoría" en esta cuenta.\nVerificá que esté habilitado en el área de Educación.');
+    return;
+  }
+
+  if (typeof openEduMethodologySystem === 'function') {
+    await openEduMethodologySystem(sys);
+    // Asegurar que el tab quede en diagnostico tras el load
+    fmState.activeTab = 'diagnostico';
+    fmRender();
+  } else {
+    alert('Función openEduMethodologySystem no disponible. Refresh la página.');
+  }
 }
