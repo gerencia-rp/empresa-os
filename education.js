@@ -49,15 +49,16 @@ async function openEduManager(sys) {
 async function eduLoadAll() {
   eduState.loading = true;
   try {
-    const [mRes, sRes, rRes, aRes, cRes, repRes, tRes, presRes] = await Promise.all([
+    const [mRes, sRes, rRes, aRes, cRes, repRes, tRes, presRes, motRes] = await Promise.all([
       sb.from('edu_mentorships').select('*').order('position'),
       sb.from('edu_students').select('*').order('updated_at', { ascending: false }),
       sb.from('edu_resources').select('*').order('updated_at', { ascending: false }),
       sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false }),
-      sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(200),
+      sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(500),
       sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
       sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500).then(r => r).catch(() => ({ data: [] })),
-      sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] }))
+      sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
+      sb.from('edu_call_motivos').select('*').eq('active', true).order('orden').then(r => r).catch(() => ({ data: [] }))
     ]);
     eduState.mentorships = mRes.data || [];
     eduState.students = sRes.data || [];
@@ -67,6 +68,7 @@ async function eduLoadAll() {
     eduState.reports = repRes.data || [];
     eduState.tasks = tRes.data || [];
     eduState.presentations = presRes.data || [];
+    eduState.callMotivos = motRes.data || [];
   } catch (e) {
     console.error('eduLoadAll', e);
   }
@@ -5987,71 +5989,497 @@ function eduRenderResourcesIntegrated() {
 }
 
 // ─── CALENDARIO LIGADO A ESTUDIANTE + PLAN ───
+// ════════════════════════════════════════════════════════════
+// 📅 CALENDARIO DE SESIONES (postventa)
+// Filtros: mes, status, estudiante, coach, motivo
+// KPIs: asistencia, no-shows, reprogramadas
+// Modal nueva sesión + modal de resultado (status + motivo + evidencia)
+// Export ICS + mailto para invitación por correo
+// ════════════════════════════════════════════════════════════
+
+// Estado local del calendario
+const eduCallsState = {
+  monthAnchor: null,          // ISO string del primer día del mes visible
+  statusFilter: 'all',
+  motivoFilter: 'all',
+  studentFilter: 'all',
+  coachFilter: 'all',
+  view: 'list',               // list | month
+  showAttendModalFor: null    // call.id si está abierto el modal de marcar resultado
+};
+
+// Catálogo cargado en eduLoadAll (si no, default)
+const EDU_CALL_MOTIVOS_DEFAULT = [
+  { id:'bienvenida', label:'Bienvenida / Onboarding', emoji:'👋' },
+  { id:'diagnostico', label:'Diagnóstico inicial', emoji:'🎯' },
+  { id:'plan_review', label:'Revisión Plan de Acción', emoji:'📋' },
+  { id:'coaching', label:'Coaching 1-on-1', emoji:'💬' },
+  { id:'credito', label:'Diagnóstico / Coaching crédito', emoji:'💳' },
+  { id:'buybox', label:'Buy Box / Análisis mercado', emoji:'🏘️' },
+  { id:'deal_review', label:'Revisión de deal específico', emoji:'🔍' },
+  { id:'cierre', label:'Cierre / Celebración deal', emoji:'🎉' },
+  { id:'crisis', label:'Crisis / Bloqueo', emoji:'🚨' },
+  { id:'renovacion', label:'Renovación / Renewal', emoji:'🔄' },
+  { id:'exit', label:'Exit / Despedida', emoji:'👋' },
+  { id:'grupal', label:'Sesión grupal', emoji:'👥' },
+  { id:'otro', label:'Otro', emoji:'📌' }
+];
+function eduGetMotivos() {
+  return (eduState.callMotivos && eduState.callMotivos.length) ? eduState.callMotivos : EDU_CALL_MOTIVOS_DEFAULT;
+}
+
+function eduCallsMonthAnchor() {
+  if (!eduCallsState.monthAnchor) {
+    const d = new Date(); d.setDate(1); d.setHours(0,0,0,0);
+    eduCallsState.monthAnchor = d.toISOString().slice(0,10);
+  }
+  return eduCallsState.monthAnchor;
+}
+function eduCallsNavMonth(delta) {
+  const a = new Date(eduCallsMonthAnchor() + 'T00:00:00');
+  a.setMonth(a.getMonth() + delta);
+  a.setDate(1);
+  eduCallsState.monthAnchor = a.toISOString().slice(0,10);
+  eduRender();
+}
+
 function eduRenderCallsEnhanced() {
-  const calls = eduState.calls || [];
+  const allCalls = eduState.calls || [];
   const students = eduMyStudents();
+  const motivos = eduGetMotivos();
+
+  // Filtrar por mes visible
+  const anchor = new Date(eduCallsMonthAnchor() + 'T00:00:00');
+  const monthStart = new Date(anchor); monthStart.setDate(1);
+  const monthEnd = new Date(anchor); monthEnd.setMonth(monthEnd.getMonth() + 1); monthEnd.setDate(0);
+  monthEnd.setHours(23,59,59,999);
+
+  let calls = allCalls.filter(c => {
+    const d = new Date(c.scheduled_at);
+    return d >= monthStart && d <= monthEnd && (!c.mentorship_id || c.mentorship_id === eduState.mentorshipId);
+  });
+  if (eduCallsState.statusFilter !== 'all') calls = calls.filter(c => (c.status_attendance || 'pendiente') === eduCallsState.statusFilter);
+  if (eduCallsState.motivoFilter !== 'all') calls = calls.filter(c => c.motivo === eduCallsState.motivoFilter);
+  if (eduCallsState.studentFilter !== 'all') calls = calls.filter(c => c.student_id === eduCallsState.studentFilter);
+  if (eduCallsState.coachFilter !== 'all') calls = calls.filter(c => (c.attended_by || '') === eduCallsState.coachFilter);
+
+  // KPIs del mes
+  const total = calls.length;
+  const asist = calls.filter(c => c.status_attendance === 'asistio').length;
+  const noShow = calls.filter(c => c.status_attendance === 'no_asistio').length;
+  const reprog = calls.filter(c => c.status_attendance === 'reprogramo').length;
+  const cancel = calls.filter(c => c.status_attendance === 'cancelo').length;
+  const pend = calls.filter(c => !c.status_attendance || ['pendiente','confirmado'].includes(c.status_attendance)).length;
+  const pctAsistencia = (asist + noShow) > 0 ? Math.round(100 * asist / (asist + noShow)) : null;
+
+  // Coach options de los datos
+  const coachSet = new Set(allCalls.map(c => c.attended_by).filter(Boolean));
+
+  const monthLabel = anchor.toLocaleDateString('es', { month:'long', year:'numeric' });
+
   return `
     <div class="space-y-3">
-      <div class="bg-slate-900 text-white rounded-xl p-4 flex items-center justify-between">
-        <div>
-          <div class="text-xs font-bold uppercase text-slate-400">📅 Calendario de sesiones</div>
-          <div class="text-2xl font-bold">${calls.length} sesiones agendadas</div>
+      <!-- Header: nav mes + KPIs -->
+      <div class="bg-slate-900 text-white rounded-xl p-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div class="text-xs font-bold uppercase text-slate-400">📅 Calendario de sesiones</div>
+            <div class="flex items-center gap-2 mt-1">
+              <button onclick="eduCallsNavMonth(-1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">←</button>
+              <div class="text-xl font-bold capitalize">${monthLabel}</div>
+              <button onclick="eduCallsNavMonth(1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">→</button>
+              <button onclick="eduCallsNavMonth(0); eduCallsState.monthAnchor=null; eduRender();" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">Hoy</button>
+            </div>
+          </div>
+          <button onclick="eduAgendarCallNueva()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-bold px-4 py-2 rounded">+ Nueva sesión</button>
         </div>
-        <button onclick="eduAgendarCallNueva()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva sesión</button>
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mt-4">
+          <div class="bg-white/10 rounded p-2"><div class="text-[10px] opacity-80">Total mes</div><div class="text-xl font-bold">${total}</div></div>
+          <div class="bg-emerald-500/30 rounded p-2"><div class="text-[10px] opacity-90">Asistió</div><div class="text-xl font-bold">${asist}</div></div>
+          <div class="bg-red-500/30 rounded p-2"><div class="text-[10px] opacity-90">No asistió</div><div class="text-xl font-bold">${noShow}</div></div>
+          <div class="bg-amber-500/30 rounded p-2"><div class="text-[10px] opacity-90">Reprogramó</div><div class="text-xl font-bold">${reprog}</div></div>
+          <div class="bg-slate-500/30 rounded p-2"><div class="text-[10px] opacity-90">Canceló</div><div class="text-xl font-bold">${cancel}</div></div>
+          <div class="bg-blue-500/30 rounded p-2"><div class="text-[10px] opacity-90">% asistencia</div><div class="text-xl font-bold">${pctAsistencia != null ? pctAsistencia+'%' : '—'}</div></div>
+        </div>
       </div>
-      ${calls.length === 0 ? `<div class="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-xl">Sin sesiones agendadas. Click "+ Nueva sesión".</div>` : `
+
+      <!-- Filtros -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center gap-2 text-xs">
+        <span class="font-bold text-slate-700 mr-1">Filtrar:</span>
+        <select onchange="eduCallsState.statusFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
+          <option value="all" ${eduCallsState.statusFilter==='all'?'selected':''}>Todos los status</option>
+          <option value="pendiente" ${eduCallsState.statusFilter==='pendiente'?'selected':''}>⏳ Pendiente</option>
+          <option value="confirmado" ${eduCallsState.statusFilter==='confirmado'?'selected':''}>✅ Confirmado</option>
+          <option value="asistio" ${eduCallsState.statusFilter==='asistio'?'selected':''}>✓ Asistió</option>
+          <option value="no_asistio" ${eduCallsState.statusFilter==='no_asistio'?'selected':''}>✗ No asistió</option>
+          <option value="reprogramo" ${eduCallsState.statusFilter==='reprogramo'?'selected':''}>🔄 Reprogramó</option>
+          <option value="cancelo" ${eduCallsState.statusFilter==='cancelo'?'selected':''}>✕ Canceló</option>
+        </select>
+        <select onchange="eduCallsState.motivoFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
+          <option value="all" ${eduCallsState.motivoFilter==='all'?'selected':''}>Todos los motivos</option>
+          ${motivos.map(m => `<option value="${m.id}" ${eduCallsState.motivoFilter===m.id?'selected':''}>${m.emoji||''} ${m.label}</option>`).join('')}
+        </select>
+        <select onchange="eduCallsState.studentFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
+          <option value="all" ${eduCallsState.studentFilter==='all'?'selected':''}>Todos los estudiantes</option>
+          ${students.map(s => `<option value="${s.id}" ${eduCallsState.studentFilter===s.id?'selected':''}>${(s.full_name||'').replace(/</g,'&lt;')}</option>`).join('')}
+        </select>
+        ${coachSet.size > 0 ? `<select onchange="eduCallsState.coachFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
+          <option value="all" ${eduCallsState.coachFilter==='all'?'selected':''}>Todos los coaches</option>
+          ${[...coachSet].map(c => `<option value="${c}" ${eduCallsState.coachFilter===c?'selected':''}>${c.replace(/</g,'&lt;')}</option>`).join('')}
+        </select>` : ''}
+      </div>
+
+      <!-- Tabla de sesiones -->
+      ${calls.length === 0 ? `<div class="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-xl">Sin sesiones que coincidan con los filtros del mes.</div>` : `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <table class="w-full text-xs">
-            <thead class="bg-slate-50">
-              <tr class="text-[10px] uppercase text-slate-600">
-                <th class="text-left p-2">Fecha</th>
-                <th class="text-left p-2">Estudiante</th>
-                <th class="text-left p-2">Tipo</th>
-                <th class="text-left p-2">Duración</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${calls.sort((a,b) => new Date(b.scheduled_at)-new Date(a.scheduled_at)).map(c => {
-                const st = students.find(s => s.id === c.student_id);
-                return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-                  <td class="p-2">${new Date(c.scheduled_at).toLocaleString('es', {dateStyle:'short', timeStyle:'short'})}</td>
-                  <td class="p-2"><button onclick="eduShowStudentDetail('${c.student_id}')" class="text-blue-600 hover:underline">${st?.full_name || '—'}</button></td>
-                  <td class="p-2">${c.type || '—'}</td>
-                  <td class="p-2">${c.duration_min||60}min</td>
-                  <td class="p-2 text-right"><button onclick="eduOpenStudent('${c.student_id}')" class="text-[10px] text-amber-700 hover:underline">Ver plan →</button></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-slate-50">
+                <tr class="text-[10px] uppercase text-slate-600">
+                  <th class="text-left p-2">Fecha y hora</th>
+                  <th class="text-left p-2">Estudiante</th>
+                  <th class="text-left p-2">Motivo · Tema</th>
+                  <th class="text-left p-2">Coach</th>
+                  <th class="text-left p-2">Status</th>
+                  <th class="text-left p-2">Evidencia</th>
+                  <th class="text-right p-2">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${calls.sort((a,b) => new Date(a.scheduled_at) - new Date(b.scheduled_at)).map(c => {
+                  const st = students.find(s => s.id === c.student_id);
+                  const mot = motivos.find(m => m.id === c.motivo);
+                  const stat = c.status_attendance || 'pendiente';
+                  const statBadge = {
+                    pendiente: '<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">⏳ PEND</span>',
+                    confirmado: '<span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold">✅ CONF</span>',
+                    asistio: '<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✓ ASIS</span>',
+                    no_asistio: '<span class="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✗ NO ASIS</span>',
+                    reprogramo: '<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">🔄 REPROG</span>',
+                    cancelo: '<span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">✕ CANC</span>'
+                  }[stat] || stat;
+                  const d = new Date(c.scheduled_at);
+                  const isFuture = d >= new Date();
+                  return `<tr class="border-t border-slate-100 hover:bg-slate-50">
+                    <td class="p-2 whitespace-nowrap">
+                      <div class="font-bold">${d.toLocaleDateString('es', {weekday:'short', day:'numeric', month:'short'})}</div>
+                      <div class="text-[10px] text-slate-500">${d.toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})} · ${c.duration_min||60}min</div>
+                    </td>
+                    <td class="p-2 max-w-[150px]"><button onclick="eduShowStudentDetail('${c.student_id}')" class="text-blue-600 hover:underline truncate text-left block">${(st?.full_name||'—').replace(/</g,'&lt;')}</button></td>
+                    <td class="p-2 max-w-[220px]">
+                      <div class="font-medium">${mot ? mot.emoji+' '+mot.label : (c.motivo || c.type || '—')}</div>
+                      ${c.topic ? `<div class="text-[10px] text-slate-500 truncate" title="${(c.topic||'').replace(/"/g,'&quot;')}">${(c.topic||'').replace(/</g,'&lt;')}</div>` : ''}
+                    </td>
+                    <td class="p-2 max-w-[120px]"><div class="truncate">${(c.attended_by||'—').replace(/</g,'&lt;')}</div></td>
+                    <td class="p-2">${statBadge}${c.status_reason ? `<div class="text-[9px] text-slate-500 truncate max-w-[100px]" title="${(c.status_reason||'').replace(/"/g,'&quot;')}">${(c.status_reason||'').replace(/</g,'&lt;')}</div>` : ''}</td>
+                    <td class="p-2">${c.evidence_url ? `<a href="${c.evidence_url}" target="_blank" class="text-[10px] text-blue-600 hover:underline">📎 ver</a>` : '<span class="text-[10px] text-slate-300">—</span>'}</td>
+                    <td class="p-2 text-right whitespace-nowrap">
+                      ${isFuture ? `
+                        <button onclick="eduCallSendInvite('${c.id}')" class="text-[10px] text-blue-700 hover:underline mr-1" title="Enviar invitación por correo">📧</button>
+                        <button onclick="eduCallDownloadICS('${c.id}')" class="text-[10px] text-violet-700 hover:underline mr-1" title="Descargar invitación .ics">📅</button>
+                      ` : ''}
+                      <button onclick="eduCallOpenResult('${c.id}')" class="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold mr-1">Marcar</button>
+                      <button onclick="eduCallEdit('${c.id}')" class="text-[10px] text-slate-600 hover:text-slate-900 mr-1" title="Editar">✏️</button>
+                      <button onclick="eduCallDelete('${c.id}')" class="text-[10px] text-red-600 hover:text-red-800" title="Eliminar">🗑️</button>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
       `}
     </div>
   `;
 }
 
-async function eduAgendarCallNueva() {
+// ─── Modal: agendar nueva sesión ───
+async function eduAgendarCallNueva(presetStudentId) {
   const students = eduMyStudents();
-  if (!students.length) return alert('Sin estudiantes.');
-  const studentList = students.map((s,i) => `${i+1}) ${s.full_name}`).join('\n');
-  const idx = prompt(`Estudiante (número):\n${studentList}`);
-  const sIdx = parseInt(idx) - 1;
-  if (isNaN(sIdx) || !students[sIdx]) return;
-  const s = students[sIdx];
-  const date = prompt('Fecha y hora (YYYY-MM-DD HH:MM):', new Date().toISOString().slice(0,16).replace('T',' '));
-  if (!date) return;
-  const type = prompt('Tipo (1-on-1 / Grupal / Diagnóstico / Revisión Plan):', '1-on-1');
-  const dur = parseInt(prompt('Duración (minutos):', '60')) || 60;
+  if (!students.length) return alert('Sin estudiantes en la mentoría. Sincronizá primero.');
+  const motivos = eduGetMotivos();
+  const now = new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours() + 1);
+  const defaultDate = now.toISOString().slice(0,16);
+  const coachDefault = (state.user && state.user.email) || '';
+  const studentOpts = students.map(s => `<option value="${s.id}" ${presetStudentId===s.id?'selected':''}>${(s.full_name||'').replace(/</g,'&lt;')}${s.email?' · '+s.email:''}</option>`).join('');
+  const motivoOpts = motivos.map(m => `<option value="${m.id}">${m.emoji||''} ${m.label}</option>`).join('');
+
+  const html = `
+    <div class="space-y-3">
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Estudiante *</label>
+        <select id="ec-student" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">— Selecciona —</option>
+          ${studentOpts}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Fecha y hora *</label>
+          <input id="ec-datetime" type="datetime-local" value="${defaultDate}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Duración (min)</label>
+          <input id="ec-duration" type="number" value="60" min="15" step="15" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Motivo *</label>
+        <select id="ec-motivo" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">— Categoría —</option>
+          ${motivoOpts}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tema específico (texto libre)</label>
+        <input id="ec-topic" type="text" placeholder="Ej. Revisión buybox Austin SE + 3 comps" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Coach que atiende</label>
+          <input id="ec-coach" type="text" value="${coachDefault.replace(/"/g,'&quot;')}" placeholder="email del coach" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Status inicial</label>
+          <select id="ec-status" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="pendiente">⏳ Pendiente</option>
+            <option value="confirmado">✅ Confirmado</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas / Agenda (opcional)</label>
+        <textarea id="ec-notes" rows="3" placeholder="Puntos a tratar..." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="eduCallSave()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-bold py-2.5 rounded-lg">💾 Agendar sesión</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `;
+  openModal('📅 Nueva sesión', html);
+}
+
+async function eduCallSave() {
+  const studentId = document.getElementById('ec-student').value;
+  const datetime = document.getElementById('ec-datetime').value;
+  const duration = +document.getElementById('ec-duration').value || 60;
+  const motivo = document.getElementById('ec-motivo').value;
+  const topic = document.getElementById('ec-topic').value.trim();
+  const coach = document.getElementById('ec-coach').value.trim();
+  const status = document.getElementById('ec-status').value;
+  const notes = document.getElementById('ec-notes').value.trim();
+  if (!studentId) return alert('Falta estudiante.');
+  if (!datetime) return alert('Falta fecha y hora.');
+  if (!motivo) return alert('Falta motivo.');
+
   const { error } = await sb.from('edu_student_calls').insert({
     mentorship_id: eduState.mentorshipId,
-    student_id: s.id,
-    scheduled_at: new Date(date.replace(' ','T')).toISOString(),
-    duration_min: dur,
-    type
+    student_id: studentId,
+    scheduled_at: new Date(datetime).toISOString(),
+    duration_min: duration,
+    motivo,
+    topic: topic || null,
+    attended_by: coach || null,
+    status_attendance: status,
+    notes_md: notes || null,
+    type: 'mentoring'
   });
   if (error) return alert('Error: '+error.message);
+  closeModal();
   await eduLoadAll();
   eduRender();
+}
+
+// ─── Modal: marcar resultado (status + motivo + evidencia + resumen) ───
+function eduCallOpenResult(callId) {
+  const c = (eduState.calls || []).find(x => x.id === callId);
+  if (!c) return;
+  const motivos = eduGetMotivos();
+  const motivoOpts = motivos.map(m => `<option value="${m.id}" ${c.motivo===m.id?'selected':''}>${m.emoji||''} ${m.label}</option>`).join('');
+
+  const html = `
+    <div class="space-y-3">
+      <div class="bg-slate-50 border border-slate-200 rounded p-2 text-xs">
+        <div class="font-bold">${new Date(c.scheduled_at).toLocaleString('es', {dateStyle:'full', timeStyle:'short'})}</div>
+        <div class="text-slate-600">${c.topic || 'Sin tema'}</div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Status de asistencia *</label>
+        <div class="grid grid-cols-2 gap-1">
+          ${['asistio','no_asistio','reprogramo','cancelo','confirmado','pendiente'].map(s => {
+            const labels = { asistio:'✓ Asistió', no_asistio:'✗ No asistió', reprogramo:'🔄 Reprogramó', cancelo:'✕ Canceló', confirmado:'✅ Confirmado', pendiente:'⏳ Pendiente' };
+            const sel = (c.status_attendance || 'pendiente') === s;
+            return `<button type="button" onclick="document.getElementById('ec-r-status').value='${s}'; document.querySelectorAll('.ec-r-stat-btn').forEach(b=>b.classList.remove('bg-amber-500','text-white')); this.classList.add('bg-amber-500','text-white');" class="ec-r-stat-btn px-3 py-1.5 rounded border border-slate-300 text-xs font-bold ${sel?'bg-amber-500 text-white':'bg-white hover:bg-slate-50'}">${labels[s]}</button>`;
+          }).join('')}
+        </div>
+        <input type="hidden" id="ec-r-status" value="${c.status_attendance||'pendiente'}"/>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Motivo si no asistió / reprogramó / canceló</label>
+        <input id="ec-r-reason" type="text" value="${(c.status_reason||'').replace(/"/g,'&quot;')}" placeholder="Ej. Conflicto laboral · Falta de preparación · Emergencia familiar" class="w-full border border-slate-300 rounded px-3 py-2 text-xs"/>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Atendió (coach)</label>
+          <input id="ec-r-coach" type="text" value="${(c.attended_by||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Motivo (categoría)</label>
+          <select id="ec-r-motivo" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="">—</option>
+            ${motivoOpts}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Evidencia (URL — Drive, Zoom recording, Notion, etc.)</label>
+        <input id="ec-r-evidence" type="url" value="${(c.evidence_url||'').replace(/"/g,'&quot;')}" placeholder="https://..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Resumen post-sesión (qué se cubrió / próximos pasos)</label>
+        <textarea id="ec-r-summary" rows="4" class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${escapeHtml(c.summary || c.notes_md || '')}</textarea>
+      </div>
+      <div class="bg-blue-50 border border-blue-200 rounded p-2 text-[11px] text-blue-800">
+        💡 Si el status es "reprogramó", al guardar te ofrezco crear la nueva sesión vinculada.
+      </div>
+      <div class="flex gap-2">
+        <button onclick="eduCallSaveResult('${callId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar resultado</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `;
+  openModal('📋 Marcar resultado de la sesión', html);
+}
+
+async function eduCallSaveResult(callId) {
+  const c = (eduState.calls || []).find(x => x.id === callId);
+  if (!c) return;
+  const update = {
+    status_attendance: document.getElementById('ec-r-status').value,
+    status_reason: document.getElementById('ec-r-reason').value.trim() || null,
+    attended_by: document.getElementById('ec-r-coach').value.trim() || null,
+    motivo: document.getElementById('ec-r-motivo').value || c.motivo,
+    evidence_url: document.getElementById('ec-r-evidence').value.trim() || null,
+    summary: document.getElementById('ec-r-summary').value.trim() || null,
+    attended: document.getElementById('ec-r-status').value === 'asistio',
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('edu_student_calls').update(update).eq('id', callId);
+  if (error) return alert('Error: '+error.message);
+
+  // Si reprogramó, ofrecer crear nueva sesión
+  if (update.status_attendance === 'reprogramo' && confirm('¿Crear la nueva sesión reprogramada?')) {
+    closeModal();
+    setTimeout(() => eduAgendarCallNueva(c.student_id), 100);
+  } else {
+    closeModal();
+  }
+  await eduLoadAll();
+  eduRender();
+}
+
+async function eduCallDelete(id) {
+  if (!confirm('¿Eliminar esta sesión? No se puede deshacer.')) return;
+  await sb.from('edu_student_calls').delete().eq('id', id);
+  await eduLoadAll();
+  eduRender();
+}
+
+async function eduCallEdit(id) {
+  const c = (eduState.calls || []).find(x => x.id === id);
+  if (!c) return;
+  // Reusa el modal nuevo pero pre-llena valores
+  await eduAgendarCallNueva(c.student_id);
+  setTimeout(() => {
+    document.getElementById('ec-datetime').value = new Date(c.scheduled_at).toISOString().slice(0,16);
+    document.getElementById('ec-duration').value = c.duration_min || 60;
+    if (c.motivo) document.getElementById('ec-motivo').value = c.motivo;
+    if (c.topic) document.getElementById('ec-topic').value = c.topic;
+    if (c.attended_by) document.getElementById('ec-coach').value = c.attended_by;
+    if (c.status_attendance) document.getElementById('ec-status').value = c.status_attendance;
+    if (c.notes_md) document.getElementById('ec-notes').value = c.notes_md;
+    // Cambia el botón a "Actualizar"
+    const btn = document.querySelector('#modal-body button[onclick="eduCallSave()"]');
+    if (btn) { btn.textContent = '💾 Actualizar sesión'; btn.setAttribute('onclick', `eduCallUpdate('${id}')`); }
+  }, 50);
+}
+
+async function eduCallUpdate(id) {
+  const update = {
+    student_id: document.getElementById('ec-student').value,
+    scheduled_at: new Date(document.getElementById('ec-datetime').value).toISOString(),
+    duration_min: +document.getElementById('ec-duration').value || 60,
+    motivo: document.getElementById('ec-motivo').value,
+    topic: document.getElementById('ec-topic').value.trim() || null,
+    attended_by: document.getElementById('ec-coach').value.trim() || null,
+    status_attendance: document.getElementById('ec-status').value,
+    notes_md: document.getElementById('ec-notes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('edu_student_calls').update(update).eq('id', id);
+  if (error) return alert('Error: '+error.message);
+  closeModal();
+  await eduLoadAll();
+  eduRender();
+}
+
+// ─── Invitación por correo: ICS + mailto ───
+function eduCallBuildICS(c, student, motivo) {
+  const start = new Date(c.scheduled_at);
+  const end = new Date(start.getTime() + (c.duration_min || 60) * 60000);
+  const fmt = d => d.toISOString().replace(/[-:]/g,'').replace(/\.\d+/, '');
+  const uid = (c.id || ('uid-'+Date.now())) + '@empresa-os';
+  const summary = (motivo ? motivo.label : c.motivo || 'Sesión') + (c.topic ? ' · ' + c.topic : '');
+  const desc = (c.notes_md || c.topic || '').replace(/\n/g, '\\n').replace(/,/g, '\\,');
+  return [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//EmpresaOS//Edu//ES','METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    'UID:'+uid,
+    'DTSTAMP:'+fmt(new Date()),
+    'DTSTART:'+fmt(start),
+    'DTEND:'+fmt(end),
+    'SUMMARY:'+summary,
+    desc ? 'DESCRIPTION:'+desc : '',
+    student && student.email ? 'ATTENDEE;CN='+ (student.full_name||'') +';RSVP=TRUE:mailto:'+student.email : '',
+    c.attended_by ? 'ORGANIZER:mailto:'+c.attended_by : '',
+    'STATUS:CONFIRMED',
+    'END:VEVENT','END:VCALENDAR'
+  ].filter(Boolean).join('\r\n');
+}
+
+function eduCallDownloadICS(id) {
+  const c = (eduState.calls || []).find(x => x.id === id);
+  if (!c) return;
+  const student = (eduState.students || []).find(s => s.id === c.student_id);
+  const motivo = eduGetMotivos().find(m => m.id === c.motivo);
+  const ics = eduCallBuildICS(c, student, motivo);
+  const blob = new Blob([ics], { type:'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `sesion-${(student?.full_name||'estudiante').replace(/\s+/g,'_')}-${new Date(c.scheduled_at).toISOString().slice(0,10)}.ics`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function eduCallSendInvite(id) {
+  const c = (eduState.calls || []).find(x => x.id === id);
+  if (!c) return;
+  const student = (eduState.students || []).find(s => s.id === c.student_id);
+  if (!student) return alert('Estudiante no encontrado');
+  if (!student.email) return alert('Este estudiante no tiene email en el CRM. Editalo primero.');
+  const motivo = eduGetMotivos().find(m => m.id === c.motivo);
+  const d = new Date(c.scheduled_at);
+  const dateStr = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const timeStr = d.toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+  const subject = `Sesión ${motivo?motivo.label:''} — ${dateStr}`;
+  const body = `Hola ${student.full_name||''},\n\nTe confirmo nuestra sesión:\n\n📅 ${dateStr}\n🕐 ${timeStr} (${c.duration_min||60} minutos)\n📋 ${motivo?motivo.label:''}${c.topic?' · '+c.topic:''}\n${c.attended_by?'\n👤 Te atiende: '+c.attended_by:''}\n\nAdjunto la invitación .ics para que se agregue a tu calendario.\n\nNos vemos!\n${(state.user&&state.user.email)||''}`;
+  // Disparar download del ICS + abrir mailto
+  eduCallDownloadICS(id);
+  setTimeout(() => {
+    window.location.href = `mailto:${student.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }, 300);
+  // Marcar email_sent_at
+  sb.from('edu_student_calls').update({ email_sent_at: new Date().toISOString() }).eq('id', id).then(() => {});
 }
 
 // ─── METODOLOGÍA: Planes guardados (de estudiantes del CRM) ───
