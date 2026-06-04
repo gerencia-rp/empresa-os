@@ -1,5 +1,5 @@
 // ============================================================
-// EDUCACIÓN — Gestor de Mentorías (Flipping / Rental Profits / Wholesale)
+// EDUCACIÓN — Gestor de Mentorías (Flipping Rentals / Rental Profits)
 // ============================================================
 
 const eduState = {
@@ -934,7 +934,7 @@ function eduRenderPresentations() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Título de la presentación *</label>
-            <input id="edu-pres-title" placeholder="Ej. Clase 1 — Qué es Wholesale y cómo funciona" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
+            <input id="edu-pres-title" placeholder="Ej. Clase 1 — Buy Box, ARV y MAO en Texas 2026" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold" />
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Tipo</label>
@@ -949,7 +949,7 @@ function eduRenderPresentations() {
 
         <div class="mt-2">
           <label class="block text-[10px] font-bold text-slate-600 mb-1">Tema / qué cubrir *</label>
-          <textarea id="edu-pres-topic" rows="2" placeholder="Ej. Wholesale en Texas: cómo encontrar deals off-market, contratos, asignación. Foco en Austin/Houston mercado 2026, números reales de margins, lista de cash buyers comunes." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+          <textarea id="edu-pres-topic" rows="2" placeholder="Ej. Buy Box en Texas: cómo definirla, ARV con comps validados, MAO con holding costs. Foco Austin/Houston 2026, números reales y casos." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
@@ -1982,18 +1982,91 @@ async function openEduReportsSystem(sys) {
   eduRenderReportsStandalone();
 }
 
+// Cache de KPIs cargados (se recarga al cambiar mentoría o mes)
+let eduKpisCache = { key: null, data: null, loading: false };
+
+async function eduLoadKPIs(mentorshipId, mesIso) {
+  if (!mentorshipId) return null;
+  const key = `${mentorshipId}|${mesIso}`;
+  if (eduKpisCache.key === key && eduKpisCache.data) return eduKpisCache.data;
+  if (eduKpisCache.loading) return null;
+  eduKpisCache.loading = true;
+  try {
+    const mesPrev = (() => {
+      const d = new Date(mesIso + 'T00:00:00'); d.setMonth(d.getMonth() - 1);
+      return d.toISOString().slice(0,10);
+    })();
+    const [resumen, prevResumen, tiempoEtapa, conPlan, inactivos, avancePlan, primerDeal, noShows, motivos, renChurn] = await Promise.all([
+      sb.from('edu_kpi_resumen_mensual').select('*').eq('mentorship_id', mentorshipId).eq('mes', mesIso).maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('edu_kpi_resumen_mensual').select('*').eq('mentorship_id', mentorshipId).eq('mes', mesPrev).maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('edu_kpi_tiempo_por_etapa').select('*').eq('mentorship_id', mentorshipId).then(r => r.data || []).catch(() => []),
+      sb.from('edu_kpi_estudiantes_con_plan').select('*').eq('mentorship_id', mentorshipId).maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('edu_kpi_inactivos_30d').select('*').eq('mentorship_id', mentorshipId).order('dias_inactivo', { ascending: false }).then(r => r.data || []).catch(() => []),
+      sb.from('edu_kpi_avance_plan').select('*').eq('mentorship_id', mentorshipId).maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('edu_kpi_primer_deal').select('*').eq('mentorship_id', mentorshipId).maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('edu_kpi_noshows_coach').select('*').eq('mentorship_id', mentorshipId).eq('mes', mesIso).then(r => r.data || []).catch(() => []),
+      sb.from('edu_kpi_motivos_no_asistencia').select('*').eq('mentorship_id', mentorshipId).eq('mes', mesIso).then(r => r.data || []).catch(() => []),
+      sb.from('edu_kpi_renovaciones_churn').select('*').eq('mentorship_id', mentorshipId).eq('mes', mesIso).maybeSingle().then(r => r.data).catch(() => null)
+    ]);
+    eduKpisCache = {
+      key, loading: false,
+      data: { resumen, prevResumen, tiempoEtapa, conPlan, inactivos, avancePlan, primerDeal, noShows, motivos, renChurn }
+    };
+    return eduKpisCache.data;
+  } catch (e) {
+    console.error('eduLoadKPIs', e);
+    eduKpisCache.loading = false;
+    return null;
+  }
+}
+
+function eduKpiDelta(now, prev) {
+  if (now == null || prev == null) return null;
+  const d = +now - +prev;
+  if (d === 0) return { txt: '=', cls: 'text-slate-400' };
+  if (d > 0) return { txt: '+'+d.toFixed(1).replace(/\.0$/,''), cls: 'text-emerald-700' };
+  return { txt: d.toFixed(1).replace(/\.0$/,''), cls: 'text-red-700' };
+}
+
+function eduReportMesAnchor() {
+  if (!eduState._reportMonth) {
+    const d = new Date(); d.setDate(1); d.setHours(0,0,0,0);
+    eduState._reportMonth = d.toISOString().slice(0,10);
+  }
+  return eduState._reportMonth;
+}
+function eduReportNavMes(delta) {
+  const a = new Date(eduReportMesAnchor() + 'T00:00:00');
+  a.setMonth(a.getMonth() + delta); a.setDate(1);
+  eduState._reportMonth = a.toISOString().slice(0,10);
+  eduKpisCache = { key: null, data: null, loading: false };
+  eduRenderReportsStandalone();
+}
+
 function eduRenderReportsStandalone() {
   const root = document.getElementById('edu-root');
   if (!root) return;
   const cur = eduCurrentMentorship();
   const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
-  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'weekly'}`;
+  const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'monthly'}`;
   const ai = (window.aiState && window.aiState[aiKey]) || {};
 
   const today = new Date();
-  const period = eduState._reportPeriod || 'weekly';
+  const period = eduState._reportPeriod || 'monthly';
   const periodDays = period === 'weekly' ? 7 : period === 'biweekly' ? 14 : 30;
   const periodStart = new Date(today); periodStart.setDate(periodStart.getDate() - periodDays);
+
+  const mes = eduReportMesAnchor();
+  const mesLabel = new Date(mes+'T00:00:00').toLocaleDateString('es', { month:'long', year:'numeric' });
+
+  // Lanzar carga de KPIs (asincrónico)
+  let kpis = null;
+  if (cur && eduState.mentorshipId) {
+    kpis = (eduKpisCache.key === `${eduState.mentorshipId}|${mes}`) ? eduKpisCache.data : null;
+    if (!kpis && !eduKpisCache.loading) {
+      eduLoadKPIs(eduState.mentorshipId, mes).then(() => eduRenderReportsStandalone());
+    }
+  }
 
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
@@ -2010,17 +2083,41 @@ function eduRenderReportsStandalone() {
       </div>
 
       <div class="flex-1 overflow-y-auto space-y-3">
-        <!-- Form de generación -->
-        <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-violet-900 mb-3">📈 Generar informe ejecutivo con IA</div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- KPIs dashboard (auto desde DB) -->
+        <div class="bg-slate-900 text-white rounded-xl p-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div class="text-xs font-bold uppercase text-slate-400">📊 KPIs Postventa</div>
+              <div class="flex items-center gap-2 mt-1">
+                <button onclick="eduReportNavMes(-1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">←</button>
+                <div class="text-xl font-bold capitalize">${mesLabel}</div>
+                <button onclick="eduReportNavMes(1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">→</button>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="withLoading(this, eduGenerateReport)" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">🤖 Generar narrativa con IA</button>
+              <button onclick="eduExportKpisCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Export CSV</button>
+            </div>
+          </div>
+          ${!cur ? `<div class="mt-3 text-amber-300 text-xs">Seleccioná una mentoría arriba.</div>` : ''}
+          ${cur && !kpis ? `<div class="mt-3 text-slate-400 text-xs">⏳ Cargando KPIs del mes...</div>` : ''}
+          ${cur && kpis ? eduRenderKpisDashboard(kpis) : ''}
+        </div>
+
+        ${cur && kpis ? eduRenderKpiDetalles(kpis) : ''}
+
+        <!-- Form de generación con IA (opcional, abajo) -->
+        <details class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+          <summary class="cursor-pointer font-bold text-violet-900 text-xs uppercase">🤖 Generar narrativa ejecutiva con IA (opcional)</summary>
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label class="block text-[10px] font-bold text-slate-600 mb-1">Período</label>
               <select onchange="eduState._reportPeriod=this.value; eduRenderReportsStandalone()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-                <option value="weekly" ${period==='weekly'?'selected':''}>📅 Semanal (últimos 7 días)</option>
-                <option value="biweekly" ${period==='biweekly'?'selected':''}>📆 Quincenal (últimos 14 días)</option>
-                <option value="monthly" ${period==='monthly'?'selected':''}>🗓 Mensual (últimos 30 días)</option>
+                <option value="weekly" ${period==='weekly'?'selected':''}>📅 Semanal</option>
+                <option value="biweekly" ${period==='biweekly'?'selected':''}>📆 Quincenal</option>
+                <option value="monthly" ${period==='monthly'?'selected':''}>🗓 Mensual</option>
+                <option value="quarterly" ${period==='quarterly'?'selected':''}>📊 Trimestral</option>
               </select>
             </div>
             <div>
@@ -2032,15 +2129,13 @@ function eduRenderReportsStandalone() {
               <input id="edu-rep-end" type="date" value="${today.toISOString().split('T')[0]}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
             </div>
           </div>
-
           <div class="mt-2">
             <label class="block text-[10px] font-bold text-slate-600 mb-1">📝 Notas de las clases grabadas (opcional)</label>
-            <textarea id="edu-rep-classes" rows="4" placeholder="Pega un resumen de las clases dadas en el período: temas cubiertos, dudas frecuentes, casos discutidos. Claude lo incluye en el análisis pedagógico." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+            <textarea id="edu-rep-classes" rows="3" placeholder="Pega un resumen de las clases del período: temas cubiertos, dudas frecuentes, casos discutidos." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
           </div>
-
-          <button onclick="withLoading(this, eduGenerateReport)" class="mt-3 w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded">🤖 Generar informe con IA</button>
-          <div class="text-[10px] text-violet-700 mt-2 italic">⚡ Tarda ~20-40 seg. Claude analiza estudiantes + cartera + progreso + tus notas de clase.</div>
-        </div>
+          <button onclick="withLoading(this, eduGenerateReport)" class="mt-3 w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded">🤖 Generar narrativa con IA</button>
+          <div class="text-[10px] text-violet-700 mt-2 italic">Los KPIs ya están arriba (números reales del DB). La IA agrega narrativa, highlights y recomendaciones.</div>
+        </details>
 
         ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-3xl animate-pulse">🧠</div><div class="mt-2 font-bold text-violet-900">Generando informe...</div></div>` : ''}
         ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
@@ -2317,7 +2412,6 @@ const FM_DIAG_QUESTIONS = [
     opciones: [
       { val: 'flip',         label: '🏠 Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
       { val: 'hold',         label: '🏘️ Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
-      { val: 'wholesale',    label: '📋 Hacer wholesaling (asignar contratos sin remodelar)' },
       { val: 'hibrido',      label: '🔀 Mix flips + holds' },
       { val: 'escalar',      label: '🚀 Escalar negocio existente (sistemas, equipo, múltiples deals)' },
       { val: 'lender',       label: '💰 Ser private money lender (prestar capital, no operar)' }
@@ -2338,7 +2432,7 @@ const FM_DIAG_QUESTIONS = [
       { val: 'corporate',    label: '💼 Corporate housing / Furnished Finder' },
       { val: 'na',           label: 'No aplica — voy por Flip' }
     ],
-    skipIf: (a) => a.objetivo === 'flip' || a.objetivo === 'wholesale' || a.objetivo === 'lender'
+    skipIf: (a) => a.objetivo === 'flip' || a.objetivo === 'lender'
   },
   {
     id: 'meta_deals', bloque: 'A · Objetivo',
@@ -3035,12 +3129,6 @@ function fmAnalizarPerfilCompleto(a) {
     etapa = 'E0';
     cronograma = '9-15 meses al primer deal rentado';
   }
-  // Perfil 6: Wholesaling (capital bajo o eligió wholesale)
-  else if (a.objetivo === 'wholesale' || a.capital === 'menos_20k') {
-    perfil = { num: 6, nombre: 'Wholesaling primero (capital bajo)', emoji: '📋', color: 'indigo' };
-    etapa = 'E0+E1';
-    cronograma = '3-6 meses al primer assignment';
-  }
   // Perfil 2: Capital pero sin crédito
   else if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
     perfil = { num: 2, nombre: 'Capital pero sin crédito sólido', emoji: '🏗️', color: 'amber' };
@@ -3076,7 +3164,7 @@ function fmAnalizarPerfilCompleto(a) {
   if (a.credit === 'menos_600') gaps.push({ codigo: 'PRE-E0', titulo: 'Reconstruir crédito 6-12 meses antes de aplicar a HML', prioridad: 'CRÍTICA' });
   if (a.credit === 'sin_historial') gaps.push({ codigo: 'PRE-E0', titulo: 'Build credit history (secured card + authorized user)', prioridad: 'CRÍTICA' });
 
-  if (a.deals_cerrados === '0' && a.objetivo !== 'wholesale' && a.objetivo !== 'lender') {
+  if (a.deals_cerrados === '0' && a.objetivo !== 'lender') {
     if (a.llc !== 'no') gaps.push({ codigo: 'E1.1.1', titulo: 'Construir 5 Buy Box', prioridad: 'ALTA' });
     gaps.push({ codigo: 'E2.1.5', titulo: 'HML primario pre-aprobado + backup', prioridad: 'ALTA' });
     gaps.push({ codigo: 'E1.4.1', titulo: 'Enviar mínimo 10 ofertas formales al mes', prioridad: 'ALTA' });
@@ -3309,7 +3397,7 @@ const FM_BLOQUES = [
   },
   {
     id: 'hml_documentos',
-    aplicaA: (p, a) => a.objetivo !== 'lender' && a.objetivo !== 'wholesale' && (a.hml_status === 'ninguno' || a.hml_status === 'investigando' || a.hml_status === 'hablado'),
+    aplicaA: (p, a) => a.objetivo !== 'lender' && (a.hml_status === 'ninguno' || a.hml_status === 'investigando' || a.hml_status === 'hablado'),
     etapa: 'E2', subetapa: 'HMLs con documentos',
     observacion: 'Las llamadas no cierran propiedades. Los documentos sí. El estudiante puede hablar con 10 HMLs, pero si no tiene términos comparados ni term sheets, todavía no tiene estructura de financiamiento.',
     tiempo: 'Aproximadamente 8 a 10 horas totales.',
@@ -3566,38 +3654,13 @@ const FM_BLOQUES = [
     ]
   },
 
-  // ━━━━━━━━━━ WHOLESALING ESPECÍFICO ━━━━━━━━━━
+  // ━━━━━━━━━━ (Wholesaling removido del programa) ━━━━━━━━━━
   {
-    id: 'wholesaling_setup',
-    aplicaA: (p, a) => a.objetivo === 'wholesale',
-    etapa: 'E1+E2', subetapa: 'Setup de Wholesaling',
-    observacion: 'Wholesaling NO es legal en todos los estados sin licencia. Antes de invertir tiempo, validar legalidad en tu estado. Y aunque sea legal, requiere LLC para proteger patrimonio personal.',
-    tiempo: '15-20 horas (setup) + cadencia continua de lead gen',
-    actividad: 'Setup completo de negocio wholesaling: LLC, lead generation activa (1 canal primario), buyer list de 50+ cash buyers, sistema de assignment contracts.',
-    entregable: 'LLC formada + 1 canal lead gen activo + buyer list 50+ + 5 plantillas de contratos listas.',
-    pasos: [
-      'Verificar legalidad de wholesaling en tu estado (algunos requieren licencia).',
-      'Formar LLC (E0.1.1) + EIN + cuenta bancaria.',
-      'Elegir 1 canal lead generation: Direct Mail / Driving for Dollars / Cold Calling / Facebook Ads.',
-      'Implementar el canal con 100 contactos iniciales.',
-      'Construir buyer list: 50+ cash buyers identificados (BiggerPockets, REIA local, Facebook Groups).',
-      'Comprar/adaptar templates legales: Purchase Agreement + Assignment Contract.',
-      'Crear sistema de tracking: leads → contactos → ofertas → contratos firmados → assignments cerrados.'
-    ],
-    recursos: [
-      { nombre: 'PropStream', url: 'https://www.propstream.com', desc: 'Lead generation + comps' },
-      { nombre: 'BatchLeads', url: 'https://batchleads.io', desc: 'Cold calling + skip tracing' },
-      { nombre: 'DealMachine', url: 'https://www.dealmachine.com', desc: 'Driving for Dollars app' },
-      { nombre: 'Carrot', url: 'https://www.oncarrot.com', desc: 'Website + SEO para investors' },
-      { nombre: 'BiggerPockets Wholesaling Forum', url: 'https://www.biggerpockets.com/forums/93-wholesaling', desc: 'Comunidad activa + templates' }
-    ],
-    errores: [
-      'Empezar sin verificar legalidad (puede generar problemas legales).',
-      'Probar 5 canales a la vez (no se domina ninguno).',
-      'No tener buyer list antes de buscar deals.',
-      'Usar contratos genéricos sin adaptar a tu estado.',
-      'Cobrar assignment fee sin disclosure al seller (puede ser ilegal según estado).'
-    ]
+    id: '_deprecated_wholesale',
+    aplicaA: () => false,  // No se aplica nunca — kept para evitar romper índices
+    etapa: '',  subetapa: '',
+    observacion: '', tiempo: '', actividad: '', entregable: '',
+    pasos: [], recursos: [], errores: []
   },
 
   // ━━━━━━━━━━ LENDER PASIVO ━━━━━━━━━━
@@ -4150,7 +4213,6 @@ function fmRenderDiagPlan() {
       mercado: a.mercado_estado || 'tu mercado',
       estrategiaLabel: a.objetivo === 'flip' ? 'Fix & Flip' :
                        a.objetivo === 'hold' ? 'Fix & Hold' :
-                       a.objetivo === 'wholesale' ? 'Wholesaling' :
                        a.objetivo === 'hibrido' ? 'Mix Flip + Hold' :
                        a.objetivo === 'escalar' ? 'Escala de negocio' :
                        a.objetivo === 'lender' ? 'Private Money Lending' : 'Fix & Flip'
@@ -4461,7 +4523,7 @@ function fmGenerarAnalisisProfundo(p, r, a, userProfile) {
 
   // Párrafo 3: crédito
   if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
-    parrafos.push(`Tu credit score (<strong>${({ 'menos_600': '< 600', '600_660': '600-660', 'sin_historial': 'sin historial USA' })[a.credit]}</strong>) es el segundo riesgo crítico. Los HMLs estándar (Kiavi, Lima One, RCN) requieren FICO 660+. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'En tu caso necesitás reconstruir crédito 6-12 meses ANTES de aplicar, o ir por opciones alternativas: HMLs flexibles con FICO 600+ (Easy Street Capital), partnership con socio que tenga crédito, o empezar con wholesaling.' : 'Tu score está en zona limítrofe — algunos HMLs te aceptan pero con tasas 2-3 puntos arriba. Vale la pena trabajar para subirlo a 720+ en paralelo.'} Este es un track paralelo: no bloquea avanzar con E0 ni con análisis de mercado.`);
+    parrafos.push(`Tu credit score (<strong>${({ 'menos_600': '< 600', '600_660': '600-660', 'sin_historial': 'sin historial USA' })[a.credit]}</strong>) es el segundo riesgo crítico. Los HMLs estándar (Kiavi, Lima One, RCN) requieren FICO 660+. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'En tu caso necesitás reconstruir crédito 6-12 meses ANTES de aplicar, o ir por opciones alternativas: HMLs flexibles con FICO 600+ (Easy Street Capital), partnership con socio que tenga crédito, o empezar como buyer secundario de wholesalers (no como operador propio).' : 'Tu score está en zona limítrofe — algunos HMLs te aceptan pero con tasas 2-3 puntos arriba. Vale la pena trabajar para subirlo a 720+ en paralelo.'} Este es un track paralelo: no bloquea avanzar con E0 ni con análisis de mercado.`);
   } else {
     parrafos.push(`Tu credit score (<strong>${({ 'mas_780': '> 780', '720_780': '720-780', '660_720': '660-720' })[a.credit]}</strong>) te da acceso a los HMLs estándar nacionales (Kiavi, Lima One, RCN, Easy Street). Esto significa que el cuello de botella NO va a ser financiamiento — va a ser encontrar el deal correcto al precio correcto.`);
   }
@@ -7721,4 +7783,188 @@ async function fmCreditSavePlan() {
     c.saving = false;
     alert('Error guardando: ' + (e.message || e));
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// 📊 DASHBOARD DE KPIs (consume las vistas SQL edu-kpis-views.sql)
+// ════════════════════════════════════════════════════════════
+
+function eduRenderKpisDashboard(kpis) {
+  const r = kpis.resumen || {};
+  const pr = kpis.prevResumen || {};
+  const cp = kpis.conPlan || {};
+  const ap = kpis.avancePlan || {};
+  const pd = kpis.primerDeal || {};
+  const ren = kpis.renChurn || {};
+
+  const card = (label, value, deltaFn, suffix) => {
+    const v = value == null ? '—' : (value + (suffix||''));
+    const d = deltaFn ? eduKpiDelta(value, deltaFn) : null;
+    return `<div class="bg-white/10 rounded p-2">
+      <div class="text-[10px] opacity-80">${label}</div>
+      <div class="text-xl font-bold">${v}</div>
+      ${d ? `<div class="text-[10px] ${d.cls}">${d.txt} vs mes ant.</div>` : ''}
+    </div>`;
+  };
+
+  return `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+      ${card('Sesiones del mes', r.sesiones_total, pr.sesiones_total)}
+      ${card('% Asistencia', r.pct_asistencia, pr.pct_asistencia, '%')}
+      ${card('Asistidas', r.asistidas, pr.asistidas)}
+      ${card('No asistidas', r.no_asistidas, pr.no_asistidas)}
+      ${card('Reprogramadas', r.reprogramadas, pr.reprogramadas)}
+      ${card('Canceladas', r.canceladas, pr.canceladas)}
+      ${card('Estudiantes con sesión', r.estudiantes_con_sesion, pr.estudiantes_con_sesion)}
+      ${card('Sesiones por estudiante', r.sesiones_promedio_por_estudiante, pr.sesiones_promedio_por_estudiante)}
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+      <div class="bg-white/10 rounded p-2">
+        <div class="text-[10px] opacity-80">% Estudiantes con plan</div>
+        <div class="text-xl font-bold">${cp.pct_con_plan != null ? cp.pct_con_plan+'%' : '—'}</div>
+        <div class="text-[10px] opacity-60">${cp.con_plan_activo||0}/${cp.estudiantes_total||0}</div>
+      </div>
+      <div class="bg-white/10 rounded p-2">
+        <div class="text-[10px] opacity-80">% Avance plan</div>
+        <div class="text-xl font-bold">${ap.pct_avance != null ? ap.pct_avance+'%' : '—'}</div>
+        <div class="text-[10px] opacity-60">${ap.tareas_completadas||0}/${ap.tareas_total||0} tareas</div>
+      </div>
+      <div class="bg-white/10 rounded p-2">
+        <div class="text-[10px] opacity-80">Inactivos >30d</div>
+        <div class="text-xl font-bold ${(kpis.inactivos||[]).length>0?'text-amber-300':''}">${(kpis.inactivos||[]).length}</div>
+        <div class="text-[10px] opacity-60">sin sesión asistida</div>
+      </div>
+      <div class="bg-white/10 rounded p-2">
+        <div class="text-[10px] opacity-80">% Cerró primer deal</div>
+        <div class="text-xl font-bold">${pd.pct_cerro_deal != null ? pd.pct_cerro_deal+'%' : '—'}</div>
+        <div class="text-[10px] opacity-60">${pd.dias_promedio_a_deal ? '~'+pd.dias_promedio_a_deal+'d promedio' : '—'}</div>
+      </div>
+    </div>
+  `;
+}
+
+function eduRenderKpiDetalles(kpis) {
+  return `
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <!-- Tiempo por etapa -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">⏱ Tiempo promedio en cada etapa</div>
+        <div class="p-2">
+          ${(kpis.tiempoEtapa||[]).length === 0 ? `<div class="text-xs text-slate-400 italic p-3 text-center">Sin historial todavía. A medida que cambies estudiantes de etapa, se irá llenando.</div>` : `
+            <table class="w-full text-xs">
+              <thead><tr class="text-[10px] uppercase text-slate-500"><th class="text-left p-1">Etapa</th><th class="text-right p-1">Promedio</th><th class="text-right p-1">Mediana</th><th class="text-right p-1">Máx</th><th class="text-right p-1">N</th></tr></thead>
+              <tbody>
+                ${kpis.tiempoEtapa.map(t => `<tr class="border-t border-slate-100">
+                  <td class="p-1 font-medium">${t.stage}</td>
+                  <td class="p-1 text-right">${t.promedio_dias||'—'}d</td>
+                  <td class="p-1 text-right">${t.mediana_dias||'—'}d</td>
+                  <td class="p-1 text-right">${t.max_dias||'—'}d</td>
+                  <td class="p-1 text-right text-slate-500">${t.ingresos_a_etapa}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+
+      <!-- No-shows por coach -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">👤 No-shows por coach (este mes)</div>
+        <div class="p-2">
+          ${(kpis.noShows||[]).length === 0 ? `<div class="text-xs text-slate-400 italic p-3 text-center">Sin datos del mes.</div>` : `
+            <table class="w-full text-xs">
+              <thead><tr class="text-[10px] uppercase text-slate-500"><th class="text-left p-1">Coach</th><th class="text-right p-1">Asistencias</th><th class="text-right p-1">No-shows</th><th class="text-right p-1">% No-show</th></tr></thead>
+              <tbody>
+                ${kpis.noShows.map(n => `<tr class="border-t border-slate-100">
+                  <td class="p-1 truncate max-w-[180px]">${(n.coach||'?').replace(/</g,'&lt;')}</td>
+                  <td class="p-1 text-right text-emerald-700">${n.asistencias}</td>
+                  <td class="p-1 text-right text-red-700">${n.no_shows}</td>
+                  <td class="p-1 text-right font-bold ${n.pct_noshow>30?'text-red-700':n.pct_noshow>15?'text-amber-700':'text-emerald-700'}">${n.pct_noshow != null ? n.pct_noshow+'%' : '—'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+
+      <!-- Top motivos no-asistencia -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">🚨 Top motivos no-asistencia</div>
+        <div class="p-2">
+          ${(kpis.motivos||[]).length === 0 ? `<div class="text-xs text-slate-400 italic p-3 text-center">Sin no-asistencias registradas.</div>` : `
+            <ul class="text-xs space-y-1">
+              ${kpis.motivos.slice(0,8).map(m => `<li class="flex justify-between p-1 hover:bg-slate-50 rounded">
+                <span class="truncate">${(m.motivo||'').replace(/</g,'&lt;')}</span>
+                <span class="font-bold text-slate-700 ml-2">${m.conteo}</span>
+              </li>`).join('')}
+            </ul>
+          `}
+        </div>
+      </div>
+
+      <!-- Estudiantes inactivos >30d -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase text-red-700">⚠️ Inactivos >30d (top 10)</div>
+        <div class="p-2 max-h-64 overflow-y-auto">
+          ${(kpis.inactivos||[]).length === 0 ? `<div class="text-xs text-emerald-700 italic p-3 text-center">✅ Todos tuvieron sesión en últimos 30 días.</div>` : `
+            <table class="w-full text-xs">
+              <thead><tr class="text-[10px] uppercase text-slate-500"><th class="text-left p-1">Estudiante</th><th class="text-left p-1">Etapa</th><th class="text-right p-1">Días</th><th></th></tr></thead>
+              <tbody>
+                ${kpis.inactivos.slice(0,10).map(i => `<tr class="border-t border-slate-100">
+                  <td class="p-1 truncate max-w-[140px]"><button onclick="eduShowStudentDetail('${i.student_id}')" class="text-blue-600 hover:underline text-left">${(i.full_name||'?').replace(/</g,'&lt;')}</button></td>
+                  <td class="p-1 truncate max-w-[100px] text-slate-600">${i.current_stage||'—'}</td>
+                  <td class="p-1 text-right font-bold ${i.dias_inactivo>60?'text-red-700':'text-amber-700'}">${i.dias_inactivo}d</td>
+                  <td class="p-1 text-right">${i.email ? `<a href="mailto:${i.email}" class="text-blue-600 text-[10px]">📧</a>` : ''}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function eduExportKpisCsv() {
+  if (!eduKpisCache.data) return alert('Esperá a que carguen los KPIs.');
+  const k = eduKpisCache.data;
+  const r = k.resumen || {};
+  const pr = k.prevResumen || {};
+  const cp = k.conPlan || {};
+  const ap = k.avancePlan || {};
+  const pd = k.primerDeal || {};
+  const lines = [
+    'KPI,Valor mes actual,Valor mes anterior',
+    `Sesiones del mes,${r.sesiones_total||0},${pr.sesiones_total||0}`,
+    `% Asistencia,${r.pct_asistencia||0},${pr.pct_asistencia||0}`,
+    `Asistidas,${r.asistidas||0},${pr.asistidas||0}`,
+    `No asistidas,${r.no_asistidas||0},${pr.no_asistidas||0}`,
+    `Reprogramadas,${r.reprogramadas||0},${pr.reprogramadas||0}`,
+    `Canceladas,${r.canceladas||0},${pr.canceladas||0}`,
+    `Estudiantes con sesión,${r.estudiantes_con_sesion||0},${pr.estudiantes_con_sesion||0}`,
+    `Sesiones por estudiante,${r.sesiones_promedio_por_estudiante||0},${pr.sesiones_promedio_por_estudiante||0}`,
+    `% Con plan activo,${cp.pct_con_plan||0},`,
+    `% Avance plan promedio,${ap.pct_avance||0},`,
+    `Inactivos >30d,${(k.inactivos||[]).length},`,
+    `% Cerró primer deal,${pd.pct_cerro_deal||0},`,
+    `Días promedio a primer deal,${pd.dias_promedio_a_deal||0},`,
+    '',
+    'Tiempo por etapa,Promedio días,Mediana,Máx,N',
+    ...(k.tiempoEtapa||[]).map(t => `${t.stage},${t.promedio_dias||0},${t.mediana_dias||0},${t.max_dias||0},${t.ingresos_a_etapa}`),
+    '',
+    'No-shows por coach,Asistencias,No-shows,% No-show',
+    ...(k.noShows||[]).map(n => `${(n.coach||'').replace(/,/g,';')},${n.asistencias||0},${n.no_shows||0},${n.pct_noshow||0}`),
+    '',
+    'Top motivos no-asistencia,Conteo',
+    ...(k.motivos||[]).map(m => `${(m.motivo||'').replace(/,/g,';')},${m.conteo}`),
+    '',
+    'Estudiantes inactivos >30d,Etapa,Días,Email',
+    ...(k.inactivos||[]).map(i => `${(i.full_name||'').replace(/,/g,';')},${(i.current_stage||'').replace(/,/g,';')},${i.dias_inactivo},${i.email||''}`)
+  ];
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kpis-postventa-${eduState.mentorshipId}-${eduReportMesAnchor()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
 }
