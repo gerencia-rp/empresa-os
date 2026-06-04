@@ -239,11 +239,129 @@ const RM_MARKET_AUSTIN_MAX = 90;
 // ─── S2-G4: Catálogo dinámico (DB con fallback al hardcoded RM_CATALOG) ───
 // rmActiveCatalog se setea desde DB en rmLoadCatalog(). Si null → usar RM_CATALOG hardcodeado.
 let rmActiveCatalog = null;
+// Override en español para catálogo del DB que pueda estar en inglés.
+// Mapeo por código → { desc, subcat, unit } en español.
+// Se aplica automáticamente en rmGetCatalog() y rmGetCatalogTranslated().
+const RM_ES_OVERRIDES = {
+  '1.1.1':  { desc:'Demolición de pisos - hasta la estructura', unit:'ft²', subcat:'Demoliciones' },
+  '1.1.3':  { desc:'Desmonte de cocina (gabinetes, mesones, electrodomésticos)', unit:'unidad', subcat:'Demoliciones' },
+  '1.1.4':  { desc:'Desmonte de baño (demolición completa)', unit:'unidad', subcat:'Demoliciones' },
+  '1.1.6':  { desc:'Retiro de drywall', unit:'ft²', subcat:'Demoliciones' },
+  '1.1.7':  { desc:'Demolición superior de concreto (entrada/patio)', unit:'ft²', subcat:'Demoliciones' },
+  '1.1.8':  { desc:'Retiro de muro - estructural', unit:'ft²', subcat:'Demoliciones' },
+  '1.1.9':  { desc:'Alquiler de contenedor (por carga)', unit:'carga', subcat:'Disposición' },
+  '1.1.10': { desc:'Acarreo de escombros', unit:'proyecto', subcat:'Disposición' },
+  '1.1.11': { desc:'Protección de sitio, plástico, señalización', unit:'proyecto', subcat:'Preliminares' },
+  '1.1.12': { desc:'Tarifas de disposición/vertedero por carga', unit:'carga', subcat:'Disposición' },
+  '1.1.13': { desc:'Retiro de basura existente', unit:'ft²', subcat:'Disposición' },
+  '2.1.1':  { desc:'Evaluación e inspección de cimentación', unit:'proyecto', subcat:'Reparación' },
+  '2.1.4':  { desc:'Reparación de grietas en cimentación (asentamiento básico)', unit:'proyecto', subcat:'Reparación' },
+  '2.2.1':  { desc:'Excavación y nivelación del terreno', unit:'proyecto', subcat:'Concreto' },
+  '2.2.6':  { desc:'Reparación de losa de concreto', unit:'unidad', subcat:'Concreto' },
+  '2.2.9':  { desc:'Sistema de impermeabilización (cimentación)', unit:'proyecto', subcat:'Concreto' },
+  '3.1.1':  { desc:'Reemplazo de techo (tejas arquitectónicas)', unit:'techo', subcat:'Cubierta' },
+  '3.1.2':  { desc:'Membrana y tapajuntas de techo', unit:'techo', subcat:'Cubierta' },
+  '3.1.3':  { desc:'Canaletas y bajantes', unit:'ft lineal', subcat:'Cubierta' },
+  '3.2.1':  { desc:'Reemplazo de cerramiento', unit:'techo', subcat:'Cerramiento' },
+  '3.3.1':  { desc:'Reemplazo de revestimiento (fibrocemento Hardieboard)', unit:'ft²', subcat:'Fachada' },
+  '3.3.2':  { desc:'Acento de piedra (manufacturada)', unit:'ft²', subcat:'Fachada' },
+  '3.3.3':  { desc:'Pintura exterior (casa completa, preparación total)', unit:'casa', subcat:'Fachada' },
+  '3.4.1':  { desc:'Reemplazo de revestimiento (fibrocemento Hardieboard)', unit:'ft²', subcat:'Fachada' },
+  '3.4.2':  { desc:'Acento de piedra (manufacturada)', unit:'ft²', subcat:'Fachada' },
+  '3.4.3':  { desc:'Pintura exterior (casa completa, preparación total)', unit:'casa', subcat:'Fachada' },
+  '3.5.1':  { desc:'Puerta principal de entrada (premium)', unit:'unidad', subcat:'Puertas' },
+  '3.5.2':  { desc:'Puertas exteriores secundarias (atrás/lateral)', unit:'unidad', subcat:'Puertas' },
+  '3.6.1':  { desc:'Instalación de patio de concreto', unit:'ft²', subcat:'Urbanismo' },
+  '3.6.2':  { desc:'Construcción de deck de madera', unit:'ft²', subcat:'Urbanismo' },
+  '3.6.3':  { desc:'Reparación/repavimentación de entrada vehicular', unit:'ft²', subcat:'Urbanismo' },
+  '3.6.4':  { desc:'Paisajismo y césped (renovación total)', unit:'proyecto', subcat:'Urbanismo' },
+  '3.7.1':  { desc:'Reemplazo de ventanas (eficiencia energética, todas)', unit:'casa', subcat:'Fachada' },
+  '3.13':   { desc:'Reparación/repavimentación de entrada vehicular', unit:'proyecto', subcat:'Urbanismo' },
+  '3.13.1': { desc:'Reparación/repavimentación de entrada vehicular', unit:'proyecto', subcat:'Urbanismo' },
+  '3.14':   { desc:'Cerca de madera (perímetro)', unit:'ft lineal', subcat:'Urbanismo' },
+  '3.14.1': { desc:'Cerca de madera (perímetro)', unit:'ft lineal', subcat:'Urbanismo' },
+  '3.15':   { desc:'Paisajismo y césped (renovación total)', unit:'proyecto', subcat:'Urbanismo' },
+  '3.15.1': { desc:'Paisajismo y césped (renovación total)', unit:'proyecto', subcat:'Urbanismo' },
+  '3.16':   { desc:'Reemplazo de columnas de madera', unit:'unidad', subcat:'Fachada' },
+  '3.16.1': { desc:'Reemplazo de columnas de madera', unit:'unidad', subcat:'Fachada' },
+  '4.1.2':  { desc:'Enmarcado de madera (carpintería estructural, casa completa)', unit:'ft²', subcat:'Estructura' },
+  '4.1.3':  { desc:'Viga de acero / modificación de muro estructural', unit:'unidad', subcat:'Estructura' },
+  '4.1.4':  { desc:'Enmarcado de techo / reparación de cerchas', unit:'ft²', subcat:'Estructura' },
+  '4.1.5':  { desc:'Instalación de subpiso (nuevo)', unit:'ft²', subcat:'Estructura' },
+  '4.2.1':  { desc:'Permisos de construcción (remodelación casa completa)', unit:'proyecto', subcat:'Permisos' },
+  '4.2.2':  { desc:'Honorarios de arquitecto / ingeniero estructural', unit:'proyecto', subcat:'Permisos' },
+  '4.2.3':  { desc:'Gestión de contratista general (overhead)', unit:'proyecto', subcat:'Permisos' },
+  '5.1.1':  { desc:'Instalación/reemplazo de drywall', unit:'ft²', subcat:'Muros' },
+  '5.1.2':  { desc:'Pintura interior (casa completa)', unit:'ft²', subcat:'Muros' },
+  '5.1.3':  { desc:'Aislamiento - paneles de muro', unit:'ft²', subcat:'Muros' },
+  '5.1.4':  { desc:'Tomacorrientes e interruptores (interior)', unit:'casa', subcat:'Redes Eléctricas' },
+  '5.1.5':  { desc:'Actualización de panel eléctrico', unit:'unidad', subcat:'Redes Eléctricas' },
+  '5.1.6':  { desc:'Recableado de toda la casa', unit:'casa', subcat:'Redes Eléctricas' },
+  '5.1.7':  { desc:'Luminarias + ventiladores de techo', unit:'casa', subcat:'Redes Eléctricas' },
+  '5.1.9':  { desc:'Detectores de humo y CO (cableados)', unit:'casa', subcat:'Redes Eléctricas' },
+  '5.2.1':  { desc:'Instalación de molduras de techo', unit:'ft lineal', subcat:'Techo' },
+  '5.2.1p': { desc:'Recambio de tubería de toda la casa (PEX)', unit:'casa', subcat:'Plomería' },
+  '5.2.2p': { desc:'Reemplazo de tubería principal de aguas residuales', unit:'casa', subcat:'Plomería' },
+  '5.2.3':  { desc:'Aislamiento - soplado en ático', unit:'ft²', subcat:'Techo' },
+  '5.2.3p': { desc:'Reemplazo de calentador de agua', unit:'unidad', subcat:'Plomería' },
+  '5.2.4':  { desc:'Instalación/reemplazo de drywall (techo)', unit:'ft²', subcat:'Techo' },
+  '5.2.4p': { desc:'Aparatos sanitarios (lavamanos, grifería, etc.)', unit:'casa', subcat:'Plomería' },
+  '5.3.1':  { desc:'Enchape de baño (piso + muros)', unit:'ft²', subcat:'Baños' },
+  '5.3.2':  { desc:'Instalación de ducha a medida', unit:'unidad', subcat:'Baños' },
+  '5.3.3':  { desc:'Cerramiento de ducha en vidrio', unit:'unidad', subcat:'Baños' },
+  '5.3.4':  { desc:'Accesorios de baño (botiquín, espejo, toalleros)', unit:'juego', subcat:'Baños' },
+  '5.3.5':  { desc:'Mueble de lavamanos + mesón', unit:'unidad', subcat:'Baños' },
+  '5.3.6':  { desc:'Reemplazo de inodoro', unit:'unidad', subcat:'Baños' },
+  '5.4.1':  { desc:'Gabinetes de cocina (semi a medida)', unit:'ft lineal', subcat:'Cocina' },
+  '5.4.2':  { desc:'Mesones de cocina (cuarzo)', unit:'ft²', subcat:'Cocina' },
+  '5.4.3':  { desc:'Salpicadero de azulejo', unit:'ft²', subcat:'Cocina' },
+  '5.4.4':  { desc:'Lavaplatos + grifería', unit:'unidad', subcat:'Cocina' },
+  '5.4.5':  { desc:'Construcción de isla de cocina', unit:'unidad', subcat:'Cocina' },
+  '5.4.6':  { desc:'Electrodomésticos (estufa/nevera/lavavajillas/microondas)', unit:'juego', subcat:'Cocina' },
+  '5.4.7':  { desc:'Lavaplatos + grifería', unit:'juego', subcat:'Cocina' },
+  '5.4.8':  { desc:'Construcción de isla de cocina', unit:'ft lineal', subcat:'Cocina' },
+  '5.5.1':  { desc:'Reemplazo de puertas interiores', unit:'unidad', subcat:'Carpintería' },
+  '5.5.1h': { desc:'Reemplazo de sistema HVAC (AC + caldera + ductos)', unit:'casa', subcat:'HVAC' },
+  '5.5.2':  { desc:'Sistemas de closet', unit:'unidad', subcat:'Carpintería' },
+  '5.5.2h': { desc:'Reparación HVAC / solo 1 unidad', unit:'unidad', subcat:'HVAC' },
+  '5.6.1':  { desc:'Recableado de toda la casa', unit:'proyecto', subcat:'Eléctrico' },
+  '5.6.3':  { desc:'Instalación de circuitos nuevos', unit:'unidad', subcat:'Eléctrico' },
+  '5.6.4':  { desc:'Tomacorrientes e interruptores (interior)', unit:'unidad', subcat:'Eléctrico' },
+  '5.6.6':  { desc:'Instalación de luminarias', unit:'unidad', subcat:'Eléctrico' },
+  '5.6.7':  { desc:'Iluminación empotrada (set de 6)', unit:'unidad', subcat:'Eléctrico' },
+  '5.6.9':  { desc:'Detectores de humo y CO (cableados)', unit:'unidad', subcat:'Eléctrico' },
+  '5.7.1':  { desc:'Sistema HVAC nuevo (AC + caldera alta eficiencia)', unit:'proyecto', subcat:'HVAC' },
+  '5.7.2':  { desc:'Instalación/reemplazo de ductos', unit:'ft lineal', subcat:'HVAC' },
+  '5.8.1':  { desc:'Recambio de tubería de toda la casa (PEX)', unit:'unidad', subcat:'Carpintería' },
+  '5.8.2':  { desc:'Reemplazo de tubería principal de aguas residuales', unit:'unidad', subcat:'Carpintería' },
+  '5.8.3':  { desc:'Calentador de agua tipo tanque', unit:'unidad', subcat:'Hidrosanitario' },
+  '5.9.1':  { desc:'Piso de madera (hardwood)', unit:'ft²', subcat:'Pisos' },
+  '5.9.2':  { desc:'Instalación de zócalos', unit:'ft lineal', subcat:'Pisos' },
+  '5.9.3':  { desc:'Nivelación de piso con concreto', unit:'ft²', subcat:'Pisos' },
+  '5.6.1':  { desc:'Instalación de pisos (LVP)', unit:'ft²', subcat:'Pisos' },
+  '5.6.2':  { desc:'Instalación de alfombra (dormitorios)', unit:'ft²', subcat:'Pisos' },
+  '5.6.3':  { desc:'Instalación de zócalos', unit:'ft lineal', subcat:'Pisos' },
+  '5.8.1':  { desc:'Reemplazo de puertas interiores', unit:'unidad', subcat:'Carpintería' },
+  '5.8.2':  { desc:'Estantería de closet', unit:'unidad', subcat:'Carpintería' },
+  '5.10.1': { desc:'Mobiliario (dormitorios, cocina, baños, sala)', unit:'juego', subcat:'Mobiliario' },
+  '6.1.1':  { desc:'Pintura de retoque y reparaciones', unit:'proyecto', subcat:'Acabados finales' },
+  '6.2.1':  { desc:'Completar lista de pendientes (punch list)', unit:'proyecto', subcat:'Cierre' },
+  '6.2.2':  { desc:'Tarifas de inspección final municipal', unit:'unidad', subcat:'Cierre' },
+  '6.2.3':  { desc:'Limpieza profunda previa a entrega', unit:'casa', subcat:'Cierre' },
+  '6.3.1':  { desc:'Limpieza final de construcción', unit:'ft²', subcat:'Limpieza final' },
+  '6.3.2':  { desc:'Limpieza profunda (interior + exterior)', unit:'casa', subcat:'Limpieza final' }
+};
+
 function rmGetCatalog() {
   // Base catalog + custom items para que los selectedActivities tengan definición
-  // Normaliza unidades a español si vienen del DB en inglés (sqft → ft², unit → unidad, etc)
+  // Si el item está en RM_ES_OVERRIDES, se sobrescribe desc/unit/subcat con la versión en español
   const rawBase = rmActiveCatalog || RM_CATALOG;
-  const base = rawBase.map(c => ({ ...c, unit: rmNormalizeUnit(c.unit) }));
+  const base = rawBase.map(c => {
+    const o = RM_ES_OVERRIDES[c.code];
+    return o
+      ? { ...c, desc: o.desc, unit: o.unit, subcat: o.subcat }
+      : { ...c, unit: rmNormalizeUnit(c.unit) };
+  });
   const customs = Object.values((typeof rmState !== 'undefined' && rmState.customActivities) || {});
   return customs.length ? [...base, ...customs] : base;
 }

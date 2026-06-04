@@ -1315,52 +1315,49 @@ async function fcExportXLSX() {
     }
     cronRow++;
 
-    // Sub-actividades de esta etapa (las seleccionadas en el estimador detallado)
+    // Sub-actividades: 1) las del estimador detallado si existen; 2) fallback FC_DETAIL_ITEMS
     const phaseId = Object.keys(phaseToFcStage).find(k => phaseToFcStage[k] === et.etapa);
+    let subRows = [];
     if (phaseId) {
-      const subActs = Object.entries(selectedActs)
-        .map(([code, sel]) => ({ code, sel, def: catByCode[code] }))
-        .filter(x => x.def && x.def.phase === phaseId);
+      subRows = Object.entries(selectedActs)
+        .map(([code, sel]) => ({ code, days: Math.max(1, Math.round(sel.days || 1)), desc: (catByCode[code] && catByCode[code].desc) || code, phase: catByCode[code] && catByCode[code].phase }))
+        .filter(x => x.phase === phaseId);
+    }
+    // Fallback: si no hay seleccionadas, usar TODAS las del FC_DETAIL_ITEMS de esa etapa
+    if (subRows.length === 0 && Array.isArray(FC_DETAIL_ITEMS[et.etapa])) {
+      const items = FC_DETAIL_ITEMS[et.etapa];
+      const diasPorItem = Math.max(1, Math.floor((dias || 1) / Math.max(1, items.length)));
+      subRows = items.map(it => ({ code: it.code || '', desc: it.desc || it.activity || '', days: diasPorItem }));
+    }
 
-      if (subActs.length > 0) {
-        // Distribuir sub-actividades dentro del rango de la etapa secuencialmente
-        const diasEtapa = Math.max(1, dias);
-        let subOffset = 0;
-        subActs.forEach(({ code, sel, def }) => {
-          const subDias = Math.max(1, Math.round(sel.days || 1));
-          const subInicio = new Date(inicioEtapa);
-          subInicio.setDate(inicioEtapa.getDate() + Math.min(subOffset, Math.max(0, diasEtapa - subDias)));
-          const subFin = new Date(subInicio);
-          subFin.setDate(subInicio.getDate() + subDias - 1);
+    if (subRows.length > 0 && dias > 0) {
+      const diasEtapa = Math.max(1, dias);
+      let subOffset = 0;
+      subRows.forEach(({ code, days: subDias, desc }) => {
+        const subInicio = new Date(inicioEtapa);
+        subInicio.setDate(inicioEtapa.getDate() + Math.min(subOffset, Math.max(0, diasEtapa - subDias)));
+        const subFin = new Date(subInicio);
+        subFin.setDate(subInicio.getDate() + subDias - 1);
 
-          ws3.getCell(`A${cronRow}`).value = code;
-          ws3.getCell(`A${cronRow}`).style = { font:{size:9, color:{argb:'FF475569'}}, alignment:{horizontal:'center'}, border:thinBorder };
-          ws3.getCell(`B${cronRow}`).value = def.desc;
-          ws3.getCell(`B${cronRow}`).style = { font:{size:9}, alignment:{horizontal:'left'}, border:thinBorder };
-          ws3.getCell(`C${cronRow}`).value = subInicio;
-          ws3.getCell(`C${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{size:9} };
-          ws3.getCell(`D${cronRow}`).value = subDias;
-          ws3.getCell(`D${cronRow}`).style = { ...styleCalc, numFmt: FMT_INT, alignment:{horizontal:'center'}, font:{size:9} };
-          ws3.getCell(`E${cronRow}`).value = subFin;
-          ws3.getCell(`E${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{size:9} };
-          // Pintar barra Gantt de la sub-actividad
-          for (let d = 0; d < totDiasCron; d++) {
-            const dateD = new Date(baseDate); dateD.setDate(baseDate.getDate() + d);
-            if (dateD >= subInicio && dateD <= subFin) {
-              ws3.getCell(cronRow, 6 + d).style = { fill: fill('FF3B82F6'), border:thinBorder };
-            }
+        ws3.getCell(`A${cronRow}`).value = code || '';
+        ws3.getCell(`A${cronRow}`).style = { font:{size:9, color:{argb:'FF475569'}}, alignment:{horizontal:'center'}, border:thinBorder };
+        ws3.getCell(`B${cronRow}`).value = desc;
+        ws3.getCell(`B${cronRow}`).style = { font:{size:9}, alignment:{horizontal:'left',wrapText:true}, border:thinBorder };
+        ws3.getCell(`C${cronRow}`).value = subInicio;
+        ws3.getCell(`C${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{size:9} };
+        ws3.getCell(`D${cronRow}`).value = subDias;
+        ws3.getCell(`D${cronRow}`).style = { ...styleCalc, numFmt: FMT_INT, alignment:{horizontal:'center'}, font:{size:9} };
+        ws3.getCell(`E${cronRow}`).value = subFin;
+        ws3.getCell(`E${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{size:9} };
+        for (let d = 0; d < totDiasCron; d++) {
+          const dateD = new Date(baseDate); dateD.setDate(baseDate.getDate() + d);
+          if (dateD >= subInicio && dateD <= subFin) {
+            ws3.getCell(cronRow, 6 + d).style = { fill: fill('FF3B82F6'), border:thinBorder };
           }
-          subOffset = Math.min(subOffset + Math.max(1, Math.floor(subDias / 2)), Math.max(0, diasEtapa - 1));
-          cronRow++;
-        });
-      } else if (dias === 0) {
-        // Sin actividades y sin días → línea de espacio
-        ws3.getCell(`A${cronRow}`).value = '—';
-        ws3.getCell(`A${cronRow}`).style = { font:{size:9, color:{argb:'FF94A3B8'}}, alignment:{horizontal:'center'} };
-        ws3.getCell(`B${cronRow}`).value = '—';
-        ws3.getCell(`B${cronRow}`).style = { font:{size:9, color:{argb:'FF94A3B8',italic:true}} };
+        }
+        subOffset = Math.min(subOffset + Math.max(1, Math.floor(subDias / 2)), Math.max(0, diasEtapa - 1));
         cronRow++;
-      }
+      });
     }
 
     offsetDias += dias;
