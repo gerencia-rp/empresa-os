@@ -31,94 +31,119 @@ const RM_UNIDADES = [
 ];
 
 // Actividades reales del template Denfield. Cada una con su default vu_total ($/unit típico).
+// Catálogo en ESPAÑOL — descripciones y unidades alineadas con los Excel de ejemplo
+// (Neans, Wellington) usados por Empresa OS.
 const RM_CATALOG = [
   // ─── 1. DEMOLICIÓN ───
-  { code:'1.1.1', phase:'1', subcat:'Demoliciones', desc:'Floor demolition - gut to studs', unit:'sqft', vu:0.50, mat_pct:0.10, days_per_qty:0.005 },
-  { code:'1.1.3', phase:'1', subcat:'Demoliciones', desc:'Kitchen tearout (cabinets, countertops, appliances)', unit:'unit', vu:600, mat_pct:0.10, days_per_qty:1 },
-  { code:'1.1.4', phase:'1', subcat:'Demoliciones', desc:'Bathroom tearout (full demolition)', unit:'unit', vu:500, mat_pct:0.10, days_per_qty:1 },
-  { code:'1.1.6', phase:'1', subcat:'Demoliciones', desc:'Drywall removal', unit:'sqft', vu:0.40, mat_pct:0.10, days_per_qty:0.0015 },
-  { code:'1.1.7', phase:'1', subcat:'Demoliciones', desc:'Top demolition concrete (entrance/backyard)', unit:'sqft', vu:1.50, mat_pct:0.15, days_per_qty:0.005 },
-  { code:'1.1.8', phase:'1', subcat:'Demoliciones', desc:'Wall removal - load bearing', unit:'sqft', vu:25, mat_pct:0.15, days_per_qty:0.05 },
-  { code:'1.1.9', phase:'1', subcat:'Disposición', desc:'Dumpster rental (per load)', unit:'load', vu:450, mat_pct:1.0, days_per_qty:0 },
-  { code:'1.1.12', phase:'1', subcat:'Disposición', desc:'Disposal/dump fees per truckload', unit:'load', vu:150, mat_pct:1.0, days_per_qty:0 },
-  { code:'1.1.11', phase:'1', subcat:'Preliminares', desc:'Site protection, plastic, signage', unit:'project', vu:300, mat_pct:0.50, days_per_qty:1 },
-  { code:'1.1.10', phase:'1', subcat:'Disposición', desc:'Debris hauling', unit:'project', vu:600, mat_pct:0.20, days_per_qty:3 },
+  { code:'1.1.1', phase:'1', subcat:'Demoliciones', desc:'Demolición de pisos - hasta la estructura', unit:'ft²', vu:0.50, mat_pct:0.10, days_per_qty:0.005 },
+  { code:'1.1.3', phase:'1', subcat:'Demoliciones', desc:'Desmonte de cocina (gabinetes, mesones, electrodomésticos)', unit:'unidad', vu:600, mat_pct:0.10, days_per_qty:1 },
+  { code:'1.1.4', phase:'1', subcat:'Demoliciones', desc:'Desmonte de baño (demolición completa)', unit:'unidad', vu:500, mat_pct:0.10, days_per_qty:1 },
+  { code:'1.1.6', phase:'1', subcat:'Demoliciones', desc:'Retiro de drywall', unit:'ft²', vu:0.40, mat_pct:0.10, days_per_qty:0.0015 },
+  { code:'1.1.7', phase:'1', subcat:'Demoliciones', desc:'Demolición superior de concreto (entrada/patio)', unit:'ft²', vu:1.50, mat_pct:0.15, days_per_qty:0.005 },
+  { code:'1.1.8', phase:'1', subcat:'Demoliciones', desc:'Retiro de muro - estructural', unit:'ft²', vu:25, mat_pct:0.15, days_per_qty:0.05 },
+  { code:'1.1.9', phase:'1', subcat:'Disposición', desc:'Alquiler de contenedor (por carga)', unit:'carga', vu:450, mat_pct:1.0, days_per_qty:0 },
+  { code:'1.1.12', phase:'1', subcat:'Disposición', desc:'Tarifas de disposición/vertedero por carga', unit:'carga', vu:150, mat_pct:1.0, days_per_qty:0 },
+  { code:'1.1.11', phase:'1', subcat:'Preliminares', desc:'Protección de sitio, plástico, señalización', unit:'proyecto', vu:300, mat_pct:0.50, days_per_qty:1 },
+  { code:'1.1.10', phase:'1', subcat:'Disposición', desc:'Acarreo de escombros', unit:'proyecto', vu:600, mat_pct:0.20, days_per_qty:3 },
 
   // ─── 2. CIMENTACIÓN ───
-  { code:'2.1.4', phase:'2', subcat:'Reparación', desc:'Foundation crack repair (basic settling)', unit:'project', vu:10000, mat_pct:0.10, days_per_qty:5 },
-  { code:'2.2.6', phase:'2', subcat:'Concreto', desc:'Concrete slab repair (per unit)', unit:'unit', vu:71.43, mat_pct:0.60, days_per_qty:0.5 },
-  { code:'2.2.1', phase:'2', subcat:'Concreto', desc:'Site excavation and grading', unit:'project', vu:1800, mat_pct:0.20, days_per_qty:2 },
-  { code:'2.1.1', phase:'2', subcat:'Reparación', desc:'Foundation evaluation and inspection', unit:'project', vu:500, mat_pct:0.0, days_per_qty:2 },
-  { code:'2.2.9', phase:'2', subcat:'Concreto', desc:'Waterproofing system (foundation)', unit:'project', vu:2200, mat_pct:0.55, days_per_qty:4 },
+  { code:'2.1.4', phase:'2', subcat:'Reparación', desc:'Reparación de grietas en cimentación (asentamiento básico)', unit:'proyecto', vu:10000, mat_pct:0.10, days_per_qty:5 },
+  { code:'2.2.6', phase:'2', subcat:'Concreto', desc:'Reparación de losa de concreto (por unidad)', unit:'unidad', vu:71.43, mat_pct:0.60, days_per_qty:0.5 },
+  { code:'2.2.1', phase:'2', subcat:'Concreto', desc:'Excavación y nivelación del terreno', unit:'proyecto', vu:1800, mat_pct:0.20, days_per_qty:2 },
+  { code:'2.1.1', phase:'2', subcat:'Reparación', desc:'Evaluación e inspección de cimentación', unit:'proyecto', vu:500, mat_pct:0.0, days_per_qty:2 },
+  { code:'2.2.9', phase:'2', subcat:'Concreto', desc:'Sistema de impermeabilización (cimentación)', unit:'proyecto', vu:2200, mat_pct:0.55, days_per_qty:4 },
 
-  // ─── 3. EXTERIOR ───
-  { code:'3.1.1', phase:'3', subcat:'Cubierta', desc:'Roof replacement (architectural shingles)', unit:'roof', vu:14000, mat_pct:0.50, days_per_qty:4 },
-  { code:'3.1.2', phase:'3', subcat:'Cubierta', desc:'Roof underlayment and flashing', unit:'roof', vu:2200, mat_pct:0.60, days_per_qty:1 },
-  { code:'3.1.3', phase:'3', subcat:'Cubierta', desc:'Gutters and downspouts', unit:'lin_ft', vu:12, mat_pct:0.55, days_per_qty:0.02 },
-  { code:'3.4.1', phase:'3', subcat:'Fachada', desc:'Siding replacement (Hardieboard fiber cement)', unit:'sqft', vu:8.50, mat_pct:0.55, days_per_qty:0.01 },
-  { code:'3.4.3', phase:'3', subcat:'Fachada', desc:'Exterior paint (whole house, full prep)', unit:'house', vu:5500, mat_pct:0.30, days_per_qty:5 },
-  { code:'3.5.1', phase:'3', subcat:'Puertas', desc:'Front entry door (premium)', unit:'door', vu:1800, mat_pct:0.70, days_per_qty:1 },
-  { code:'3.5.2', phase:'3', subcat:'Puertas', desc:'Secondary exterior doors (back/side)', unit:'door', vu:900, mat_pct:0.70, days_per_qty:1 },
-  { code:'3.6.1', phase:'3', subcat:'Urbanismo', desc:'Concrete patio installation', unit:'sqft', vu:18, mat_pct:0.50, days_per_qty:0.04 },
-  { code:'3.13.1', phase:'3', subcat:'Urbanismo', desc:'Driveway repair/resurfacing', unit:'project', vu:5500, mat_pct:0.50, days_per_qty:3 },
-  { code:'3.14.1', phase:'3', subcat:'Urbanismo', desc:'Wood fence (perimeter)', unit:'lin_ft', vu:35, mat_pct:0.50, days_per_qty:0.04 },
-  { code:'3.15.1', phase:'3', subcat:'Urbanismo', desc:'Landscaping and sod (full refresh)', unit:'project', vu:3500, mat_pct:0.35, days_per_qty:2 },
-  { code:'3.7.1', phase:'3', subcat:'Fachada', desc:'Window replacement (energy-efficient, all)', unit:'house', vu:9000, mat_pct:0.70, days_per_qty:3 },
-  { code:'3.16.1', phase:'3', subcat:'Fachada', desc:'Wood replacement columns', unit:'unit', vu:300, mat_pct:0.55, days_per_qty:0.5 },
+  // ─── 3. EXTERNO ───
+  { code:'3.1.1', phase:'3', subcat:'Cubierta', desc:'Reemplazo de techo (tejas arquitectónicas)', unit:'techo', vu:14000, mat_pct:0.50, days_per_qty:4 },
+  { code:'3.1.2', phase:'3', subcat:'Cubierta', desc:'Membrana y tapajuntas de techo', unit:'techo', vu:2200, mat_pct:0.60, days_per_qty:1 },
+  { code:'3.1.3', phase:'3', subcat:'Cubierta', desc:'Canaletas y bajantes', unit:'ft lineal', vu:12, mat_pct:0.55, days_per_qty:0.02 },
+  { code:'3.4.1', phase:'3', subcat:'Fachada', desc:'Reemplazo de revestimiento (fibrocemento Hardieboard)', unit:'ft²', vu:8.50, mat_pct:0.55, days_per_qty:0.01 },
+  { code:'3.4.3', phase:'3', subcat:'Fachada', desc:'Pintura exterior (casa completa, preparación total)', unit:'casa', vu:5500, mat_pct:0.30, days_per_qty:5 },
+  { code:'3.5.1', phase:'3', subcat:'Puertas', desc:'Puerta principal de entrada (premium)', unit:'unidad', vu:1800, mat_pct:0.70, days_per_qty:1 },
+  { code:'3.5.2', phase:'3', subcat:'Puertas', desc:'Puertas exteriores secundarias (atrás/lateral)', unit:'unidad', vu:900, mat_pct:0.70, days_per_qty:1 },
+  { code:'3.6.1', phase:'3', subcat:'Urbanismo', desc:'Instalación de patio de concreto', unit:'ft²', vu:18, mat_pct:0.50, days_per_qty:0.04 },
+  { code:'3.13.1', phase:'3', subcat:'Urbanismo', desc:'Reparación/repavimentación de entrada vehicular', unit:'proyecto', vu:5500, mat_pct:0.50, days_per_qty:3 },
+  { code:'3.14.1', phase:'3', subcat:'Urbanismo', desc:'Cerca de madera (perímetro)', unit:'ft lineal', vu:35, mat_pct:0.50, days_per_qty:0.04 },
+  { code:'3.15.1', phase:'3', subcat:'Urbanismo', desc:'Paisajismo y césped (renovación total)', unit:'proyecto', vu:3500, mat_pct:0.35, days_per_qty:2 },
+  { code:'3.7.1', phase:'3', subcat:'Fachada', desc:'Reemplazo de ventanas (eficiencia energética, todas)', unit:'casa', vu:9000, mat_pct:0.70, days_per_qty:3 },
+  { code:'3.16.1', phase:'3', subcat:'Fachada', desc:'Reemplazo de columnas de madera', unit:'unidad', vu:300, mat_pct:0.55, days_per_qty:0.5 },
 
   // ─── 4. ESTRUCTURA ───
-  { code:'4.1.2', phase:'4', subcat:'Estructura', desc:'Wood framing (structural carpentry, whole house)', unit:'sqft', vu:6, mat_pct:0.55, days_per_qty:0.005 },
-  { code:'4.1.3', phase:'4', subcat:'Estructura', desc:'Steel beam / load-bearing modification', unit:'beam', vu:3500, mat_pct:0.55, days_per_qty:2 },
-  { code:'4.1.4', phase:'4', subcat:'Estructura', desc:'Roof framing / truss repair', unit:'sqft', vu:8, mat_pct:0.55, days_per_qty:0.005 },
-  { code:'4.1.5', phase:'4', subcat:'Estructura', desc:'Sub-floor installation (new)', unit:'sqft', vu:4.5, mat_pct:0.60, days_per_qty:0.003 },
-  { code:'4.2.1', phase:'4', subcat:'Permisos', desc:'Building permits (whole house remodel)', unit:'project', vu:1500, mat_pct:0.0, days_per_qty:0 },
-  { code:'4.2.2', phase:'4', subcat:'Permisos', desc:'Architect / structural engineer fees', unit:'project', vu:2500, mat_pct:0.0, days_per_qty:0 },
-  { code:'4.2.3', phase:'4', subcat:'Permisos', desc:'General contractor management (overhead)', unit:'project', vu:0, mat_pct:0.0, days_per_qty:0 },
+  { code:'4.1.2', phase:'4', subcat:'Estructura', desc:'Enmarcado de madera (carpintería estructural, casa completa)', unit:'ft²', vu:6, mat_pct:0.55, days_per_qty:0.005 },
+  { code:'4.1.3', phase:'4', subcat:'Estructura', desc:'Viga de acero / modificación de muro estructural', unit:'unidad', vu:3500, mat_pct:0.55, days_per_qty:2 },
+  { code:'4.1.4', phase:'4', subcat:'Estructura', desc:'Enmarcado de techo / reparación de cerchas', unit:'ft²', vu:8, mat_pct:0.55, days_per_qty:0.005 },
+  { code:'4.1.5', phase:'4', subcat:'Estructura', desc:'Instalación de subpiso (nuevo)', unit:'ft²', vu:4.5, mat_pct:0.60, days_per_qty:0.003 },
+  { code:'4.2.1', phase:'4', subcat:'Permisos', desc:'Permisos de construcción (remodelación casa completa)', unit:'proyecto', vu:1500, mat_pct:0.0, days_per_qty:0 },
+  { code:'4.2.2', phase:'4', subcat:'Permisos', desc:'Honorarios de arquitecto / ingeniero estructural', unit:'proyecto', vu:2500, mat_pct:0.0, days_per_qty:0 },
+  { code:'4.2.3', phase:'4', subcat:'Permisos', desc:'Gestión de contratista general (overhead)', unit:'proyecto', vu:0, mat_pct:0.0, days_per_qty:0 },
 
   // ─── 5. INTERNO ───
-  { code:'5.1.1', phase:'5', subcat:'Muros', desc:'Drywall installation/replacement', unit:'sqft', vu:3.50, mat_pct:0.45, days_per_qty:0.005 },
-  { code:'5.1.2', phase:'5', subcat:'Muros', desc:'Interior painting (whole house)', unit:'sqft', vu:1.40, mat_pct:0.25, days_per_qty:0.012 },
-  { code:'5.1.3', phase:'5', subcat:'Muros', desc:'Insulation - wall batts', unit:'sqft', vu:1.80, mat_pct:0.55, days_per_qty:0.004 },
-  { code:'5.2.1', phase:'5', subcat:'Techo', desc:'Crown molding installation', unit:'lin_ft', vu:8, mat_pct:0.50, days_per_qty:0.02 },
-  { code:'5.2.3', phase:'5', subcat:'Techo', desc:'Insulation - blown-in attic', unit:'sqft', vu:1.50, mat_pct:0.55, days_per_qty:0.002 },
-  { code:'5.3.1', phase:'5', subcat:'Baños', desc:'Bathroom tile (floor + walls)', unit:'sqft', vu:18, mat_pct:0.50, days_per_qty:0.04, multiplicable:true },
-  { code:'5.3.2', phase:'5', subcat:'Baños', desc:'Custom shower install', unit:'unit', vu:2800, mat_pct:0.55, days_per_qty:2, multiplicable:true },
-  { code:'5.3.3', phase:'5', subcat:'Baños', desc:'Glass enclosure shower', unit:'unit', vu:1200, mat_pct:0.70, days_per_qty:1, multiplicable:true },
-  { code:'5.3.4', phase:'5', subcat:'Baños', desc:'Bathroom accessories (medicine cabinet, mirror, towel bars)', unit:'set', vu:400, mat_pct:0.85, days_per_qty:0.5, multiplicable:true },
-  { code:'5.3.5', phase:'5', subcat:'Baños', desc:'Vanity + countertop', unit:'unit', vu:1100, mat_pct:0.75, days_per_qty:1, multiplicable:true },
-  { code:'5.3.6', phase:'5', subcat:'Baños', desc:'Toilet replacement', unit:'unit', vu:380, mat_pct:0.70, days_per_qty:0.5, multiplicable:true },
-  { code:'5.4.1', phase:'5', subcat:'Cocina', desc:'Kitchen cabinets (semi-custom)', unit:'lin_ft', vu:280, mat_pct:0.70, days_per_qty:0.15 },
-  { code:'5.4.2', phase:'5', subcat:'Cocina', desc:'Kitchen countertops (quartz)', unit:'sqft', vu:75, mat_pct:0.75, days_per_qty:0.05 },
-  { code:'5.4.3', phase:'5', subcat:'Cocina', desc:'Tile backsplash', unit:'sqft', vu:22, mat_pct:0.50, days_per_qty:0.05 },
-  { code:'5.4.4', phase:'5', subcat:'Cocina', desc:'Kitchen sink + faucet', unit:'unit', vu:550, mat_pct:0.80, days_per_qty:0.5 },
-  { code:'5.4.5', phase:'5', subcat:'Cocina', desc:'Kitchen island construction', unit:'unit', vu:2200, mat_pct:0.55, days_per_qty:2 },
-  { code:'5.4.6', phase:'5', subcat:'Cocina', desc:'Appliances (stove/fridge/dishwasher/microwave)', unit:'set', vu:4500, mat_pct:0.95, days_per_qty:0.5 },
-  { code:'5.6.1', phase:'5', subcat:'Pisos', desc:'Flooring installation (LVP)', unit:'sqft', vu:5.50, mat_pct:0.60, days_per_qty:0.008 },
-  { code:'5.6.2', phase:'5', subcat:'Pisos', desc:'Carpet installation (bedrooms)', unit:'sqft', vu:3.50, mat_pct:0.55, days_per_qty:0.005 },
-  { code:'5.6.3', phase:'5', subcat:'Pisos', desc:'Baseboards installation', unit:'lin_ft', vu:5, mat_pct:0.50, days_per_qty:0.015 },
-  { code:'5.8.1', phase:'5', subcat:'Carpintería', desc:'Interior doors replacement', unit:'door', vu:380, mat_pct:0.65, days_per_qty:0.5 },
-  { code:'5.8.2', phase:'5', subcat:'Carpintería', desc:'Closet shelving', unit:'closet', vu:300, mat_pct:0.60, days_per_qty:0.5 },
-  // Redes (plumbing, electrical, HVAC) — categorizadas en interno
-  { code:'5.1.4', phase:'5', subcat:'Redes Eléctricas', desc:'Outlets and switches (interior)', unit:'house', vu:900, mat_pct:0.40, days_per_qty:1 },
-  { code:'5.1.5', phase:'5', subcat:'Redes Eléctricas', desc:'Electrical panel upgrade', unit:'panel', vu:3500, mat_pct:0.50, days_per_qty:2 },
-  { code:'5.1.6', phase:'5', subcat:'Redes Eléctricas', desc:'Rewire whole house', unit:'house', vu:9000, mat_pct:0.35, days_per_qty:5 },
-  { code:'5.1.7', phase:'5', subcat:'Redes Eléctricas', desc:'Light fixtures + ceiling fans', unit:'house', vu:1200, mat_pct:0.55, days_per_qty:1 },
-  { code:'5.1.9', phase:'5', subcat:'Redes Eléctricas', desc:'Smoke and CO detectors (hardwired)', unit:'house', vu:350, mat_pct:0.55, days_per_qty:1 },
-  { code:'5.2.1p', phase:'5', subcat:'Plomería', desc:'Whole-house repipe (PEX)', unit:'house', vu:11000, mat_pct:0.40, days_per_qty:6 },
-  { code:'5.2.2p', phase:'5', subcat:'Plomería', desc:'Sewer line replacement (main)', unit:'house', vu:6500, mat_pct:0.40, days_per_qty:5 },
-  { code:'5.2.3p', phase:'5', subcat:'Plomería', desc:'Water heater replacement', unit:'unit', vu:2200, mat_pct:0.70, days_per_qty:1 },
-  { code:'5.2.4p', phase:'5', subcat:'Plomería', desc:'Plumbing fixtures (sinks, faucets, etc.)', unit:'house', vu:1200, mat_pct:0.55, days_per_qty:2 },
-  { code:'5.5.1h', phase:'5', subcat:'HVAC', desc:'HVAC system replacement (AC + furnace + ducts)', unit:'house', vu:13000, mat_pct:0.70, days_per_qty:4 },
-  { code:'5.5.2h', phase:'5', subcat:'HVAC', desc:'HVAC repair / 1 unit only', unit:'unit', vu:6500, mat_pct:0.70, days_per_qty:2 },
+  { code:'5.1.1', phase:'5', subcat:'Muros', desc:'Instalación/reemplazo de drywall', unit:'ft²', vu:3.50, mat_pct:0.45, days_per_qty:0.005 },
+  { code:'5.1.2', phase:'5', subcat:'Muros', desc:'Pintura interior (casa completa)', unit:'ft²', vu:1.40, mat_pct:0.25, days_per_qty:0.012 },
+  { code:'5.1.3', phase:'5', subcat:'Muros', desc:'Aislamiento - paneles de muro', unit:'ft²', vu:1.80, mat_pct:0.55, days_per_qty:0.004 },
+  { code:'5.2.1', phase:'5', subcat:'Techo', desc:'Instalación de molduras de techo', unit:'ft lineal', vu:8, mat_pct:0.50, days_per_qty:0.02 },
+  { code:'5.2.3', phase:'5', subcat:'Techo', desc:'Aislamiento - soplado en ático', unit:'ft²', vu:1.50, mat_pct:0.55, days_per_qty:0.002 },
+  { code:'5.3.1', phase:'5', subcat:'Baños', desc:'Enchape de baño (piso + muros)', unit:'ft²', vu:18, mat_pct:0.50, days_per_qty:0.04, multiplicable:true },
+  { code:'5.3.2', phase:'5', subcat:'Baños', desc:'Instalación de ducha a medida', unit:'unidad', vu:2800, mat_pct:0.55, days_per_qty:2, multiplicable:true },
+  { code:'5.3.3', phase:'5', subcat:'Baños', desc:'Cerramiento de ducha en vidrio', unit:'unidad', vu:1200, mat_pct:0.70, days_per_qty:1, multiplicable:true },
+  { code:'5.3.4', phase:'5', subcat:'Baños', desc:'Accesorios de baño (botiquín, espejo, toalleros)', unit:'juego', vu:400, mat_pct:0.85, days_per_qty:0.5, multiplicable:true },
+  { code:'5.3.5', phase:'5', subcat:'Baños', desc:'Mueble de lavamanos + mesón', unit:'unidad', vu:1100, mat_pct:0.75, days_per_qty:1, multiplicable:true },
+  { code:'5.3.6', phase:'5', subcat:'Baños', desc:'Reemplazo de inodoro', unit:'unidad', vu:380, mat_pct:0.70, days_per_qty:0.5, multiplicable:true },
+  { code:'5.4.1', phase:'5', subcat:'Cocina', desc:'Gabinetes de cocina (semi a medida)', unit:'ft lineal', vu:280, mat_pct:0.70, days_per_qty:0.15 },
+  { code:'5.4.2', phase:'5', subcat:'Cocina', desc:'Mesones de cocina (cuarzo)', unit:'ft²', vu:75, mat_pct:0.75, days_per_qty:0.05 },
+  { code:'5.4.3', phase:'5', subcat:'Cocina', desc:'Salpicadero de azulejo', unit:'ft²', vu:22, mat_pct:0.50, days_per_qty:0.05 },
+  { code:'5.4.4', phase:'5', subcat:'Cocina', desc:'Lavaplatos + grifería', unit:'unidad', vu:550, mat_pct:0.80, days_per_qty:0.5 },
+  { code:'5.4.5', phase:'5', subcat:'Cocina', desc:'Construcción de isla de cocina', unit:'unidad', vu:2200, mat_pct:0.55, days_per_qty:2 },
+  { code:'5.4.6', phase:'5', subcat:'Cocina', desc:'Electrodomésticos (estufa/nevera/lavavajillas/microondas)', unit:'juego', vu:4500, mat_pct:0.95, days_per_qty:0.5 },
+  { code:'5.6.1', phase:'5', subcat:'Pisos', desc:'Instalación de pisos (LVP)', unit:'ft²', vu:5.50, mat_pct:0.60, days_per_qty:0.008 },
+  { code:'5.6.2', phase:'5', subcat:'Pisos', desc:'Instalación de alfombra (dormitorios)', unit:'ft²', vu:3.50, mat_pct:0.55, days_per_qty:0.005 },
+  { code:'5.6.3', phase:'5', subcat:'Pisos', desc:'Instalación de zócalos', unit:'ft lineal', vu:5, mat_pct:0.50, days_per_qty:0.015 },
+  { code:'5.8.1', phase:'5', subcat:'Carpintería', desc:'Reemplazo de puertas interiores', unit:'unidad', vu:380, mat_pct:0.65, days_per_qty:0.5 },
+  { code:'5.8.2', phase:'5', subcat:'Carpintería', desc:'Estantería de closet', unit:'unidad', vu:300, mat_pct:0.60, days_per_qty:0.5 },
+  // Redes (plomería, eléctrica, HVAC) — categorizadas en interno
+  { code:'5.1.4', phase:'5', subcat:'Redes Eléctricas', desc:'Tomacorrientes e interruptores (interior)', unit:'casa', vu:900, mat_pct:0.40, days_per_qty:1 },
+  { code:'5.1.5', phase:'5', subcat:'Redes Eléctricas', desc:'Actualización de panel eléctrico', unit:'unidad', vu:3500, mat_pct:0.50, days_per_qty:2 },
+  { code:'5.1.6', phase:'5', subcat:'Redes Eléctricas', desc:'Recableado de toda la casa', unit:'casa', vu:9000, mat_pct:0.35, days_per_qty:5 },
+  { code:'5.1.7', phase:'5', subcat:'Redes Eléctricas', desc:'Luminarias + ventiladores de techo', unit:'casa', vu:1200, mat_pct:0.55, days_per_qty:1 },
+  { code:'5.1.9', phase:'5', subcat:'Redes Eléctricas', desc:'Detectores de humo y CO (cableados)', unit:'casa', vu:350, mat_pct:0.55, days_per_qty:1 },
+  { code:'5.2.1p', phase:'5', subcat:'Plomería', desc:'Recambio de tubería de toda la casa (PEX)', unit:'casa', vu:11000, mat_pct:0.40, days_per_qty:6 },
+  { code:'5.2.2p', phase:'5', subcat:'Plomería', desc:'Reemplazo de tubería principal de aguas residuales', unit:'casa', vu:6500, mat_pct:0.40, days_per_qty:5 },
+  { code:'5.2.3p', phase:'5', subcat:'Plomería', desc:'Reemplazo de calentador de agua', unit:'unidad', vu:2200, mat_pct:0.70, days_per_qty:1 },
+  { code:'5.2.4p', phase:'5', subcat:'Plomería', desc:'Aparatos sanitarios (lavamanos, grifería, etc.)', unit:'casa', vu:1200, mat_pct:0.55, days_per_qty:2 },
+  { code:'5.5.1h', phase:'5', subcat:'HVAC', desc:'Reemplazo de sistema HVAC (AC + caldera + ductos)', unit:'casa', vu:13000, mat_pct:0.70, days_per_qty:4 },
+  { code:'5.5.2h', phase:'5', subcat:'HVAC', desc:'Reparación HVAC / solo 1 unidad', unit:'unidad', vu:6500, mat_pct:0.70, days_per_qty:2 },
 
   // ─── 6. LIMPIEZA ───
-  { code:'6.1.1', phase:'6', subcat:'Acabados finales', desc:'Touch-up painting and repairs', unit:'project', vu:800, mat_pct:0.30, days_per_qty:1 },
-  { code:'6.2.1', phase:'6', subcat:'Cierre', desc:'Punch list completion', unit:'project', vu:600, mat_pct:0.10, days_per_qty:2 },
-  { code:'6.2.2', phase:'6', subcat:'Cierre', desc:'City final inspection fees', unit:'inspection', vu:250, mat_pct:0.0, days_per_qty:1 },
-  { code:'6.2.3', phase:'6', subcat:'Cierre', desc:'Move-in deep clean', unit:'house', vu:600, mat_pct:0.10, days_per_qty:2 },
-  { code:'6.3.1', phase:'6', subcat:'Limpieza final', desc:'Final construction cleanup', unit:'sqft', vu:0.45, mat_pct:0.10, days_per_qty:0.001 },
-  { code:'6.3.2', phase:'6', subcat:'Limpieza final', desc:'Deep cleaning (interior + exterior)', unit:'house', vu:800, mat_pct:0.10, days_per_qty:1 }
+  { code:'6.1.1', phase:'6', subcat:'Acabados finales', desc:'Pintura de retoque y reparaciones', unit:'proyecto', vu:800, mat_pct:0.30, days_per_qty:1 },
+  { code:'6.2.1', phase:'6', subcat:'Cierre', desc:'Completar lista de pendientes (punch list)', unit:'proyecto', vu:600, mat_pct:0.10, days_per_qty:2 },
+  { code:'6.2.2', phase:'6', subcat:'Cierre', desc:'Tarifas de inspección final municipal', unit:'unidad', vu:250, mat_pct:0.0, days_per_qty:1 },
+  { code:'6.2.3', phase:'6', subcat:'Cierre', desc:'Limpieza profunda previa a entrega', unit:'casa', vu:600, mat_pct:0.10, days_per_qty:2 },
+  { code:'6.3.1', phase:'6', subcat:'Limpieza final', desc:'Limpieza final de construcción', unit:'ft²', vu:0.45, mat_pct:0.10, days_per_qty:0.001 },
+  { code:'6.3.2', phase:'6', subcat:'Limpieza final', desc:'Limpieza profunda (interior + exterior)', unit:'casa', vu:800, mat_pct:0.10, days_per_qty:1 }
 ];
+
+// Diccionario de traducción de unidades viejas (inglés) → nuevas (español)
+// Aplica al cargar catalog del DB que pueda tener unidades en inglés
+const RM_UNIT_TRANSLATIONS = {
+  'sqft': 'ft²',
+  'unit': 'unidad',
+  'project': 'proyecto',
+  'load': 'carga',
+  'house': 'casa',
+  'roof': 'techo',
+  'set': 'juego',
+  'lin_ft': 'ft lineal',
+  'lf': 'ft lineal',
+  'door': 'unidad',
+  'beam': 'unidad',
+  'panel': 'unidad',
+  'closet': 'unidad',
+  'inspection': 'unidad'
+};
+function rmNormalizeUnit(u) {
+  if (!u) return u;
+  return RM_UNIT_TRANSLATIONS[u.toLowerCase()] || u;
+}
 
 // ─── ESTADO ───
 const rmState = {
@@ -216,7 +241,9 @@ const RM_MARKET_AUSTIN_MAX = 90;
 let rmActiveCatalog = null;
 function rmGetCatalog() {
   // Base catalog + custom items para que los selectedActivities tengan definición
-  const base = rmActiveCatalog || RM_CATALOG;
+  // Normaliza unidades a español si vienen del DB en inglés (sqft → ft², unit → unidad, etc)
+  const rawBase = rmActiveCatalog || RM_CATALOG;
+  const base = rawBase.map(c => ({ ...c, unit: rmNormalizeUnit(c.unit) }));
   const customs = Object.values((typeof rmState !== 'undefined' && rmState.customActivities) || {});
   return customs.length ? [...base, ...customs] : base;
 }

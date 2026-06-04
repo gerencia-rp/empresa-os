@@ -14,91 +14,92 @@ const FC_STAGE_GROUP = { 'Demolición':'1','Cimentación':'2','Externo':'3','Est
 // El usuario llena cantidades + VU; el Excel calcula totales con fórmulas.
 const FC_DETAIL_ITEMS = {
   'Demolición': [
-    { sub:'Demoliciones', cod:'1.1.1', desc:'Floor demolition - gut to studs (whole house)', unit:'Sq ft' },
-    { sub:'Demoliciones', cod:'1.1.3', desc:'Kitchen tearout (cabinets, countertops, appliances)', unit:'Unit' },
-    { sub:'Demoliciones', cod:'1.1.4', desc:'Bathroom tearout (full demolition)', unit:'Unit' },
-    { sub:'Demoliciones', cod:'1.1.6', desc:'Drywall removal', unit:'Sq ft' },
-    { sub:'Demoliciones', cod:'1.1.7', desc:'Top demolition concrete. Entrance/BackYard', unit:'Sq ft' },
-    { sub:'Demoliciones', cod:'1.1.8', desc:'Wall removal - load bearing (incl. structural engineer)', unit:'Sq ft' },
-    { sub:'Disposición',  cod:'1.1.9', desc:'Dumpster rental and debris hauling 40 yards', unit:'Unit' },
-    { sub:'Disposición',  cod:'1.1.13', desc:'Trash removal existing', unit:'Sq ft' },
-    { sub:'Disposición',  cod:'1.1.12', desc:'Disposal and dump fees per truckload', unit:'Load' },
-    { sub:'Preliminares', cod:'1.1.11', desc:'Site protection, workers protection and prep', unit:'Project' }
+    { sub:'Demoliciones', cod:'1.1.1', desc:'Demolición de pisos - hasta la estructura (casa completa)', unit:'ft²' },
+    { sub:'Demoliciones', cod:'1.1.3', desc:'Desmonte de cocina (gabinetes, mesones, electrodomésticos)', unit:'unidad' },
+    { sub:'Demoliciones', cod:'1.1.4', desc:'Desmonte de baño (demolición completa)', unit:'unidad' },
+    { sub:'Demoliciones', cod:'1.1.6', desc:'Retiro de drywall', unit:'ft²' },
+    { sub:'Demoliciones', cod:'1.1.7', desc:'Demolición superior de concreto (entrada/patio)', unit:'ft²' },
+    { sub:'Demoliciones', cod:'1.1.8', desc:'Retiro de muro - estructural (incl. ing. estructural)', unit:'ft²' },
+    { sub:'Disposición',  cod:'1.1.9', desc:'Alquiler de contenedor (por carga)', unit:'carga' },
+    { sub:'Disposición',  cod:'1.1.13', desc:'Retiro de basura existente', unit:'ft²' },
+    { sub:'Disposición',  cod:'1.1.12', desc:'Tarifas de disposición/vertedero por carga', unit:'carga' },
+    { sub:'Disposición',  cod:'1.1.10', desc:'Acarreo de escombros', unit:'proyecto' },
+    { sub:'Preliminares', cod:'1.1.11', desc:'Protección de sitio, plástico, señalización', unit:'proyecto' }
   ],
   'Cimentación': [
-    { sub:'Reparación', cod:'2.1.4', desc:'Foundation crack repair (basic settling)', unit:'Project' },
-    { sub:'Concreto',   cod:'2.2.6', desc:'Concrete slab repair', unit:'Unit' }
+    { sub:'Reparación', cod:'2.1.1', desc:'Evaluación e inspección de cimentación', unit:'proyecto' },
+    { sub:'Reparación', cod:'2.1.4', desc:'Reparación de grietas en cimentación (asentamiento básico)', unit:'proyecto' },
+    { sub:'Concreto',   cod:'2.2.1', desc:'Excavación y nivelación del terreno', unit:'proyecto' },
+    { sub:'Concreto',   cod:'2.2.6', desc:'Reparación de losa de concreto', unit:'unidad' },
+    { sub:'Concreto',   cod:'2.2.9', desc:'Sistema de impermeabilización (cimentación)', unit:'proyecto' }
   ],
   'Externo': [
-    { sub:'Cubierta',    cod:'3.1.1', desc:'Roof replacement (architectural shingle)', unit:'Roof' },
-    { sub:'Cubierta',    cod:'3.1.2', desc:'Roof underlayment and flashing', unit:'Roof' },
-    { sub:'Cubierta',    cod:'3.1.3', desc:'Gutters and downspouts', unit:'Lin ft' },
-    { sub:'Cerramiento', cod:'3.2.1', desc:'Enclosure replacement', unit:'Roof' },
-    { sub:'Redes',       cod:'3.3.1', desc:'Siding replacement (Hardieboard fiber cement)', unit:'Sq ft' },
-    { sub:'Redes',       cod:'3.3.2', desc:'Stone veneer accent (manufactured)', unit:'Sq ft' },
-    { sub:'Redes',       cod:'3.3.3', desc:'Exterior paint (whole house, full prep)', unit:'House' },
-    { sub:'Fachada',     cod:'3.4.1', desc:'Siding replacement (Hardieboard fiber cement)', unit:'Sq ft' },
-    { sub:'Fachada',     cod:'3.4.3', desc:'Exterior paint (whole house, full prep)', unit:'House' },
-    { sub:'Puertas',     cod:'3.5.1', desc:'Front entry door (premium)', unit:'Door' },
-    { sub:'Puertas',     cod:'3.5.2', desc:'Secondary exterior doors (back / side)', unit:'Door' },
-    { sub:'Urbanismo',   cod:'3.6.1', desc:'Concrete patio installation', unit:'Sq ft' },
-    { sub:'Urbanismo',   cod:'3.6.2', desc:'Wood deck construction', unit:'Sq ft' },
-    { sub:'Urbanismo',   cod:'3.6.3', desc:'Driveway repair / resurfacing', unit:'Sq ft' },
-    { sub:'Urbanismo',   cod:'3.6.4', desc:'Landscaping and sod (full refresh)', unit:'Project' },
-    { sub:'Ventanería',  cod:'3.7.1', desc:'Window replacement (energy-efficient)', unit:'Window' }
+    { sub:'Cubierta',    cod:'3.1.1', desc:'Reemplazo de techo (tejas arquitectónicas)', unit:'techo' },
+    { sub:'Cubierta',    cod:'3.1.2', desc:'Membrana y tapajuntas de techo', unit:'techo' },
+    { sub:'Cubierta',    cod:'3.1.3', desc:'Canaletas y bajantes', unit:'ft lineal' },
+    { sub:'Cerramiento', cod:'3.2.1', desc:'Reemplazo de cerramiento', unit:'techo' },
+    { sub:'Fachada',     cod:'3.4.1', desc:'Reemplazo de revestimiento (fibrocemento Hardieboard)', unit:'ft²' },
+    { sub:'Fachada',     cod:'3.4.2', desc:'Acento de piedra (manufacturada)', unit:'ft²' },
+    { sub:'Fachada',     cod:'3.4.3', desc:'Pintura exterior (casa completa, preparación total)', unit:'casa' },
+    { sub:'Puertas',     cod:'3.5.1', desc:'Puerta principal de entrada (premium)', unit:'unidad' },
+    { sub:'Puertas',     cod:'3.5.2', desc:'Puertas exteriores secundarias (atrás/lateral)', unit:'unidad' },
+    { sub:'Urbanismo',   cod:'3.6.1', desc:'Instalación de patio de concreto', unit:'ft²' },
+    { sub:'Urbanismo',   cod:'3.6.2', desc:'Construcción de deck de madera', unit:'ft²' },
+    { sub:'Urbanismo',   cod:'3.13', desc:'Reparación/repavimentación de entrada vehicular', unit:'ft²' },
+    { sub:'Urbanismo',   cod:'3.14', desc:'Cerca de madera (perímetro)', unit:'ft lineal' },
+    { sub:'Urbanismo',   cod:'3.15', desc:'Paisajismo y césped (renovación total)', unit:'proyecto' },
+    { sub:'Ventanería',  cod:'3.7', desc:'Reemplazo de ventanas (eficiencia energética)', unit:'unidad' },
+    { sub:'Fachada',     cod:'3.16', desc:'Reemplazo de columnas de madera', unit:'unidad' }
   ],
   'Estructura': [
-    { sub:'Estructura', cod:'4.1.2', desc:'Wood framing (structural carpentry whole house)', unit:'Sq ft' },
-    { sub:'Estructura', cod:'4.1.3', desc:'Steel beam / load-bearing modification', unit:'Beam' },
-    { sub:'Estructura', cod:'4.1.4', desc:'Roof framing / truss repair', unit:'Sq ft' },
-    { sub:'Estructura', cod:'4.1.5', desc:'Sub-floor installation (new)', unit:'Sq ft' },
-    { sub:'Permisos y diseño', cod:'4.2.1', desc:'Building permits (whole house remodel)', unit:'Unit' },
-    { sub:'Permisos y diseño', cod:'4.2.2', desc:'Architect / structural engineer fees', unit:'Project' },
-    { sub:'Permisos y diseño', cod:'4.2.3', desc:'General contractor management (overhead 10%)', unit:'Project' }
+    { sub:'Estructura', cod:'4.1.2', desc:'Enmarcado de madera (carpintería estructural, casa completa)', unit:'ft²' },
+    { sub:'Estructura', cod:'4.1.3', desc:'Viga de acero / modificación de muro estructural', unit:'unidad' },
+    { sub:'Estructura', cod:'4.1.4', desc:'Enmarcado de techo / reparación de cerchas', unit:'ft²' },
+    { sub:'Estructura', cod:'4.1.5', desc:'Instalación de subpiso (nuevo)', unit:'ft²' },
+    { sub:'Permisos', cod:'4.2.1', desc:'Permisos de construcción (remodelación casa completa)', unit:'proyecto' },
+    { sub:'Permisos', cod:'4.2.2', desc:'Honorarios de arquitecto / ingeniero estructural', unit:'proyecto' },
+    { sub:'Permisos', cod:'4.2.3', desc:'Gestión de contratista general (overhead 10%)', unit:'proyecto' }
   ],
   'Interno': [
-    { sub:'Muros', cod:'5.1.1', desc:'Drywall installation/replacement', unit:'Sq ft' },
-    { sub:'Muros', cod:'5.1.2', desc:'Interior painting (whole house)', unit:'Sq ft' },
-    { sub:'Muros', cod:'5.1.3', desc:'Insulation - wall batts', unit:'Sq ft' },
-    { sub:'Techo', cod:'5.2.1', desc:'Crown molding installation', unit:'Lin ft' },
-    { sub:'Techo', cod:'5.2.3', desc:'Insulation - blown-in attic', unit:'Sq ft' },
-    { sub:'Techo', cod:'5.2.4', desc:'Drywall installation/replacement (techo)', unit:'Sq ft' },
-    { sub:'Baños', cod:'5.3.1', desc:'Bathroom tile (floor + walls)', unit:'Sq ft' },
-    { sub:'Baños', cod:'5.3.2', desc:'Custom shower', unit:'Unit' },
-    { sub:'Baños', cod:'5.3.3', desc:'Glass enclosure', unit:'Unit' },
-    { sub:'Baños', cod:'5.3.4', desc:'Bathroom accessories (medicine cabinets, towel bars)', unit:'Set' },
-    { sub:'Cocina', cod:'5.4.1', desc:'Kitchen cabinets (semi-custom)', unit:'Lin ft' },
-    { sub:'Cocina', cod:'5.4.2', desc:'Countertops (quartz)', unit:'Unit' },
-    { sub:'Cocina', cod:'5.4.3', desc:'Tile backsplash', unit:'Sq ft' },
-    { sub:'Cocina', cod:'5.4.6', desc:'Kitchen tile (floor + walls)', unit:'Sq ft' },
-    { sub:'Cocina', cod:'5.4.4', desc:'Kitchen appliances package (mid-range)', unit:'Package' },
-    { sub:'Cocina', cod:'5.4.7', desc:'Kitchen sink and faucet', unit:'Package' },
-    { sub:'Cocina', cod:'5.4.8', desc:'Kitchen island construction', unit:'Lin ft' },
-    { sub:'Carpintería', cod:'5.5.1', desc:'Interior doors', unit:'Unit' },
-    { sub:'Carpintería', cod:'5.5.2', desc:'Closet systems', unit:'Unit' },
-    { sub:'Eléctrico', cod:'5.6.1', desc:'Whole-house rewiring', unit:'Project' },
-    { sub:'Eléctrico', cod:'5.6.3', desc:'New circuits installation', unit:'Circuit' },
-    { sub:'Eléctrico', cod:'5.6.4', desc:'Outlets and switches (interior)', unit:'Unit' },
-    { sub:'Eléctrico', cod:'5.6.6', desc:'Light fixtures installation', unit:'Unit' },
-    { sub:'Eléctrico', cod:'5.6.7', desc:'Recessed can lighting (set of 6)', unit:'Unit' },
-    { sub:'Eléctrico', cod:'5.6.9', desc:'Smoke and CO detectors (hardwired)', unit:'Unit' },
-    { sub:'HVAC', cod:'5.7.1', desc:'New HVAC system (AC + furnace high-efficiency)', unit:'Project' },
-    { sub:'HVAC', cod:'5.7.2', desc:'Ductwork installation/replacement', unit:'Lin ft' },
-    { sub:'Hidrosanitario', cod:'5.8.1', desc:'Whole-house potable water repipe (PEX)', unit:'Lin ft' },
-    { sub:'Hidrosanitario', cod:'5.8.2', desc:'Sewer line replacement (main)', unit:'Lin ft' },
-    { sub:'Hidrosanitario', cod:'5.8.3', desc:'Tank water heater', unit:'Unit' },
-    { sub:'Pisos', cod:'5.9.1', desc:'Hardwood flooring', unit:'Sq ft' },
-    { sub:'Pisos', cod:'5.9.3', desc:'Floor leveling concrete', unit:'Sq ft' },
-    { sub:'Pisos', cod:'5.9.2', desc:'Baseboards installation', unit:'Lin ft' },
-    { sub:'Mobiliario', cod:'5.10.1', desc:'Furniture (bedrooms, kitchen, bathrooms, lounge)', unit:'Package' }
+    { sub:'Muros', cod:'5.1.1', desc:'Instalación/reemplazo de drywall', unit:'ft²' },
+    { sub:'Muros', cod:'5.1.2', desc:'Pintura interior (casa completa)', unit:'ft²' },
+    { sub:'Muros', cod:'5.1.3', desc:'Aislamiento - paneles de muro', unit:'ft²' },
+    { sub:'Redes Eléctricas', cod:'5.1.4', desc:'Tomacorrientes e interruptores (interior)', unit:'casa' },
+    { sub:'Redes Eléctricas', cod:'5.1.6', desc:'Recableado de toda la casa', unit:'casa' },
+    { sub:'Redes Eléctricas', cod:'5.1.7', desc:'Luminarias + ventiladores de techo', unit:'casa' },
+    { sub:'Redes Eléctricas', cod:'5.1.9', desc:'Detectores de humo y CO (cableados)', unit:'casa' },
+    { sub:'Techo', cod:'5.2.1', desc:'Instalación de molduras de techo', unit:'ft lineal' },
+    { sub:'Techo', cod:'5.2.3', desc:'Aislamiento - soplado en ático', unit:'ft²' },
+    { sub:'Plomería', cod:'5.2.1p', desc:'Recambio de tubería de toda la casa (PEX)', unit:'casa' },
+    { sub:'Plomería', cod:'5.2.2p', desc:'Reemplazo de tubería principal de aguas residuales', unit:'casa' },
+    { sub:'Plomería', cod:'5.2.3p', desc:'Reemplazo de calentador de agua', unit:'unidad' },
+    { sub:'Baños', cod:'5.3.1', desc:'Enchape de baño (piso + muros)', unit:'ft²' },
+    { sub:'Baños', cod:'5.3.2', desc:'Instalación de ducha a medida', unit:'unidad' },
+    { sub:'Baños', cod:'5.3.3', desc:'Cerramiento de ducha en vidrio', unit:'unidad' },
+    { sub:'Baños', cod:'5.3.4', desc:'Accesorios de baño (botiquín, espejo, toalleros)', unit:'juego' },
+    { sub:'Baños', cod:'5.3.5', desc:'Mueble de lavamanos + mesón', unit:'unidad' },
+    { sub:'Baños', cod:'5.3.6', desc:'Reemplazo de inodoro', unit:'unidad' },
+    { sub:'Cocina', cod:'5.4.1', desc:'Gabinetes de cocina (semi a medida)', unit:'ft lineal' },
+    { sub:'Cocina', cod:'5.4.2', desc:'Mesones de cocina (cuarzo)', unit:'ft²' },
+    { sub:'Cocina', cod:'5.4.3', desc:'Salpicadero de azulejo', unit:'ft²' },
+    { sub:'Cocina', cod:'5.4.4', desc:'Lavaplatos + grifería', unit:'unidad' },
+    { sub:'Cocina', cod:'5.4.5', desc:'Construcción de isla de cocina', unit:'unidad' },
+    { sub:'Cocina', cod:'5.4.6', desc:'Electrodomésticos (estufa/nevera/lavavajillas/microondas)', unit:'juego' },
+    { sub:'HVAC', cod:'5.5.1h', desc:'Reemplazo de sistema HVAC (AC + caldera + ductos)', unit:'casa' },
+    { sub:'HVAC', cod:'5.5.2h', desc:'Reparación HVAC / solo 1 unidad', unit:'unidad' },
+    { sub:'Pisos', cod:'5.6.1', desc:'Instalación de pisos (LVP)', unit:'ft²' },
+    { sub:'Pisos', cod:'5.6.2', desc:'Instalación de alfombra (dormitorios)', unit:'ft²' },
+    { sub:'Pisos', cod:'5.6.3', desc:'Instalación de zócalos', unit:'ft lineal' },
+    { sub:'Carpintería', cod:'5.8.1', desc:'Reemplazo de puertas interiores', unit:'unidad' },
+    { sub:'Carpintería', cod:'5.8.2', desc:'Estantería de closet', unit:'unidad' }
   ],
   'Limpieza': [
-    { sub:'Acabados finales', cod:'6.1.1', desc:'Touch-up painting and repairs', unit:'Project' },
-    { sub:'Cierre', cod:'6.2.1', desc:'Punch list completion', unit:'Project' },
-    { sub:'Cierre', cod:'6.2.2', desc:'City final inspection fees', unit:'Inspection' },
-    { sub:'Cierre', cod:'6.2.3', desc:'Move-in deep clean', unit:'House' },
-    { sub:'Limpieza final', cod:'6.3.1', desc:'Final construction cleanup', unit:'Sq ft' },
-    { sub:'Limpieza final', cod:'6.3.2', desc:'Deep cleaning (interior + exterior)', unit:'House' }
+    { sub:'Acabados finales', cod:'6.1.1', desc:'Pintura de retoque y reparaciones', unit:'proyecto' },
+    { sub:'Cierre', cod:'6.2.1', desc:'Completar lista de pendientes (punch list)', unit:'proyecto' },
+    { sub:'Cierre', cod:'6.2.2', desc:'Tarifas de inspección final municipal', unit:'unidad' },
+    { sub:'Cierre', cod:'6.2.3', desc:'Limpieza profunda previa a entrega', unit:'casa' },
+    { sub:'Limpieza final', cod:'6.3.1', desc:'Limpieza final de construcción', unit:'ft²' },
+    { sub:'Limpieza final', cod:'6.3.2', desc:'Limpieza profunda (interior + exterior)', unit:'casa' }
   ]
 };
 
@@ -1224,51 +1225,146 @@ async function fcExportXLSX() {
   }
 
   // ════════════════════════════════════════════════════════════
-  // HOJA 3: CRONOGRAMA (resumen por etapa)
+  // HOJA 3: CRONOGRAMA (jerárquico: etapa → sub-actividades + Gantt por día)
+  // Estructura espejo de los Excels de referencia (Neans, Wellington)
   // ════════════════════════════════════════════════════════════
-  const ws3 = wb.addWorksheet('CRONOGRAMA', { views: [{ state: 'frozen', ySplit: 4 }] });
-  ws3.columns = [{width:5},{width:18},{width:12},{width:8},{width:12},{width:14},{width:11}];
+  const baseDate = new Date(f.fechaInicio);
+  // Calcular total días para el Gantt (sum de duraciones máximas + buffer)
+  const totDiasCron = Math.max(7, Math.ceil(r.duracionDias || 60));
+  const totSemanasCron = Math.ceil(totDiasCron / 7);
 
-  ws3.mergeCells('A1:G1');
+  const ws3 = wb.addWorksheet('CRONOGRAMA', { views: [{ state: 'frozen', xSplit: 5, ySplit: 2 }] });
+  // Columnas: Item · Actividad · Día inicio · Duración · Día Fin · [dias del proyecto...]
+  ws3.columns = [
+    { width: 10 },  // A: Item / código
+    { width: 50 },  // B: Actividad
+    { width: 12 },  // C: Día inicio
+    { width: 10 },  // D: Duración
+    { width: 12 },  // E: Día Fin
+    ...Array(totDiasCron).fill({ width: 4 })  // F+: días del Gantt
+  ];
+
+  // Título fila 1
+  ws3.mergeCells(1, 1, 1, 5 + totDiasCron);
   ws3.getCell('A1').value = `CRONOGRAMA — ${f.propiedad || 'Proyecto'}`;
   ws3.getCell('A1').style = { ...styleHeader, font:{...styleHeader.font, size:14} };
   ws3.getRow(1).height = 24;
-  ws3.mergeCells('A2:G2');
-  ws3.getCell('A2').value = 'Fechas y días pull de INFORMACION GENERAL.';
-  ws3.getCell('A2').style = { font:{italic:true,color:{argb:'FF6B7280'},size:9} };
 
-  ['#','Etapa','Inicio','Días','Fin','Presup. Total','% Avance'].forEach((h, i) => {
-    const c = ws3.getCell(4, i+1);
-    c.value = h; c.style = styleHeader;
+  // Header fila 2: Item | Actividad | Día inicio | Duración | Día Fin | Semana 1, 2, ...
+  const cronHeaders = ['Item','Actividad','Día inicio','Duración','Día Fin'];
+  cronHeaders.forEach((h, i) => {
+    const c = ws3.getCell(2, i+1); c.value = h; c.style = styleHeader;
   });
-  ws3.getRow(4).height = 24;
+  // Headers de semanas (cada 7 días)
+  for (let s = 0; s < totSemanasCron; s++) {
+    const colStart = 6 + s * 7;
+    const colEnd = Math.min(colStart + 6, 5 + totDiasCron);
+    if (colEnd >= colStart) {
+      ws3.mergeCells(2, colStart, 2, colEnd);
+      ws3.getCell(2, colStart).value = `Semana ${s+1}`;
+      ws3.getCell(2, colStart).style = { ...styleHeader, font:{...styleHeader.font, size:9}, alignment:{horizontal:'center'} };
+    }
+  }
+  ws3.getRow(2).height = 22;
+
+  // Fila 3: fechas individuales (cada día) — leve gris
+  for (let d = 0; d < totDiasCron; d++) {
+    const date = new Date(baseDate); date.setDate(baseDate.getDate() + d);
+    const c = ws3.getCell(3, 6 + d);
+    c.value = `${date.getDate()}/${date.getMonth()+1}`;
+    c.style = { font:{size:8,color:{argb:'FF6B7280'}}, alignment:{horizontal:'center',vertical:'middle'}, fill:fill('FFF1F5F9'), border:thinBorder };
+  }
+  ws3.getRow(3).height = 18;
+
+  // Filas de etapas + sub-actividades
+  let cronRow = 4;
+  let offsetDias = 0;  // acumulado de días previos
+  // selectedActivities desde rmState si está disponible (estimador detallado)
+  const selectedActs = (typeof rmState !== 'undefined' && rmState.selectedActivities) ? rmState.selectedActivities : {};
+  // Catálogo completo de actividades
+  const catGlobal = (typeof rmGetCatalog === 'function') ? rmGetCatalog() : [];
+  const catByCode = {}; catGlobal.forEach(c => { catByCode[c.code] = c; });
+  // mapa fase id (1..6) → label FC_STAGES
+  const phaseToFcStage = { '1':'Demolición','2':'Cimentación','3':'Externo','4':'Estructura','5':'Interno','6':'Limpieza' };
 
   r.etapas.forEach((et, i) => {
-    const row = 5 + i;
-    const srcRow = 14 + i;
-    ws3.getCell(`A${row}`).value = i + 1;
-    ws3.getCell(`A${row}`).style = { ...styleCalc, alignment:{horizontal:'center'} };
-    ws3.getCell(`B${row}`).value = { formula: `${igSheet}!B${srcRow}` };
-    ws3.getCell(`B${row}`).style = { font:{bold:true}, border:thinBorder };
-    ws3.getCell(`C${row}`).value = { formula: `${igSheet}!C${srcRow}` };
-    ws3.getCell(`C${row}`).style = { ...styleCalc, numFmt: FMT_DATE };
-    ws3.getCell(`D${row}`).value = { formula: `${igSheet}!D${srcRow}` };
-    ws3.getCell(`D${row}`).style = { ...styleCalc, numFmt: FMT_INT, alignment:{horizontal:'center'} };
-    ws3.getCell(`E${row}`).value = { formula: `${igSheet}!E${srcRow}` };
-    ws3.getCell(`E${row}`).style = { ...styleCalc, numFmt: FMT_DATE };
-    ws3.getCell(`F${row}`).value = { formula: `${igSheet}!F${srcRow}` };
-    ws3.getCell(`F${row}`).style = { ...styleCalc, numFmt: FMT_CURRENCY };
-    ws3.getCell(`G${row}`).value = { formula: `IFERROR(${igSheet}!M${srcRow}/${igSheet}!F${srcRow},0)` };
-    ws3.getCell(`G${row}`).style = { ...styleCalc, numFmt: FMT_PCT };
+    const dias = Math.max(0, Math.round(et.dias));
+    const inicioEtapa = new Date(baseDate); inicioEtapa.setDate(baseDate.getDate() + offsetDias);
+    const finEtapa = new Date(inicioEtapa);
+    if (dias > 0) finEtapa.setDate(finEtapa.getDate() + dias - 1);
+
+    // Fila etapa (header)
+    ws3.getCell(`A${cronRow}`).value = `${i+1}. ${et.etapa}`;
+    ws3.getCell(`A${cronRow}`).style = { font:{bold:true,color:{argb:COLOR.sectionText},size:11}, fill:fill(COLOR.sectionBg), alignment:{horizontal:'left',vertical:'middle'}, border:thinBorder };
+    // Merge columna B en etapa header
+    ws3.getCell(`B${cronRow}`).style = { fill:fill(COLOR.sectionBg), border:thinBorder };
+    ws3.getCell(`C${cronRow}`).value = dias > 0 ? inicioEtapa : '';
+    ws3.getCell(`C${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{bold:true,size:10} };
+    ws3.getCell(`D${cronRow}`).value = dias;
+    ws3.getCell(`D${cronRow}`).style = { ...styleCalc, numFmt: FMT_INT, alignment:{horizontal:'center'}, font:{bold:true,size:10} };
+    ws3.getCell(`E${cronRow}`).value = dias > 0 ? finEtapa : '';
+    ws3.getCell(`E${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{bold:true,size:10} };
+    // Pintar barra Gantt de toda la etapa
+    if (dias > 0) {
+      for (let d = 0; d < totDiasCron; d++) {
+        const dateD = new Date(baseDate); dateD.setDate(baseDate.getDate() + d);
+        if (dateD >= inicioEtapa && dateD <= finEtapa) {
+          ws3.getCell(cronRow, 6 + d).style = { fill: fill('FF1F2937'), border:thinBorder };
+        }
+      }
+    }
+    cronRow++;
+
+    // Sub-actividades de esta etapa (las seleccionadas en el estimador detallado)
+    const phaseId = Object.keys(phaseToFcStage).find(k => phaseToFcStage[k] === et.etapa);
+    if (phaseId) {
+      const subActs = Object.entries(selectedActs)
+        .map(([code, sel]) => ({ code, sel, def: catByCode[code] }))
+        .filter(x => x.def && x.def.phase === phaseId);
+
+      if (subActs.length > 0) {
+        // Distribuir sub-actividades dentro del rango de la etapa secuencialmente
+        const diasEtapa = Math.max(1, dias);
+        let subOffset = 0;
+        subActs.forEach(({ code, sel, def }) => {
+          const subDias = Math.max(1, Math.round(sel.days || 1));
+          const subInicio = new Date(inicioEtapa);
+          subInicio.setDate(inicioEtapa.getDate() + Math.min(subOffset, Math.max(0, diasEtapa - subDias)));
+          const subFin = new Date(subInicio);
+          subFin.setDate(subInicio.getDate() + subDias - 1);
+
+          ws3.getCell(`A${cronRow}`).value = code;
+          ws3.getCell(`A${cronRow}`).style = { font:{size:9, color:{argb:'FF475569'}}, alignment:{horizontal:'center'}, border:thinBorder };
+          ws3.getCell(`B${cronRow}`).value = def.desc;
+          ws3.getCell(`B${cronRow}`).style = { font:{size:9}, alignment:{horizontal:'left'}, border:thinBorder };
+          ws3.getCell(`C${cronRow}`).value = subInicio;
+          ws3.getCell(`C${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{size:9} };
+          ws3.getCell(`D${cronRow}`).value = subDias;
+          ws3.getCell(`D${cronRow}`).style = { ...styleCalc, numFmt: FMT_INT, alignment:{horizontal:'center'}, font:{size:9} };
+          ws3.getCell(`E${cronRow}`).value = subFin;
+          ws3.getCell(`E${cronRow}`).style = { ...styleCalc, numFmt: FMT_DATE, font:{size:9} };
+          // Pintar barra Gantt de la sub-actividad
+          for (let d = 0; d < totDiasCron; d++) {
+            const dateD = new Date(baseDate); dateD.setDate(baseDate.getDate() + d);
+            if (dateD >= subInicio && dateD <= subFin) {
+              ws3.getCell(cronRow, 6 + d).style = { fill: fill('FF3B82F6'), border:thinBorder };
+            }
+          }
+          subOffset = Math.min(subOffset + Math.max(1, Math.floor(subDias / 2)), Math.max(0, diasEtapa - 1));
+          cronRow++;
+        });
+      } else if (dias === 0) {
+        // Sin actividades y sin días → línea de espacio
+        ws3.getCell(`A${cronRow}`).value = '—';
+        ws3.getCell(`A${cronRow}`).style = { font:{size:9, color:{argb:'FF94A3B8'}}, alignment:{horizontal:'center'} };
+        ws3.getCell(`B${cronRow}`).value = '—';
+        ws3.getCell(`B${cronRow}`).style = { font:{size:9, color:{argb:'FF94A3B8',italic:true}} };
+        cronRow++;
+      }
+    }
+
+    offsetDias += dias;
   });
-  // Totales
-  const cronTotal = 5 + r.etapas.length;
-  ws3.getCell(`B${cronTotal}`).value = 'TOTAL';
-  ws3.getCell(`B${cronTotal}`).style = { ...styleTotal, alignment:{horizontal:'left'} };
-  ws3.getCell(`D${cronTotal}`).value = { formula: `SUM(D5:D${cronTotal-1})` };
-  ws3.getCell(`D${cronTotal}`).style = { ...styleTotal, numFmt: FMT_INT };
-  ws3.getCell(`F${cronTotal}`).value = { formula: `SUM(F5:F${cronTotal-1})` };
-  ws3.getCell(`F${cronTotal}`).style = { ...styleTotal, numFmt: FMT_CURRENCY };
 
   // ════════════════════════════════════════════════════════════
   // HOJA 4: GANTT (etapas × semanas)
@@ -1287,8 +1383,7 @@ async function fcExportXLSX() {
     const c = ws4.getCell(4, i+1);
     c.value = h; c.style = styleHeader;
   });
-  // Headers de semanas con fecha
-  const baseDate = new Date(f.fechaInicio);
+  // Headers de semanas con fecha (baseDate ya declarado arriba en CRONOGRAMA)
   for (let s = 0; s < totalSemanas; s++) {
     const wkDate = new Date(baseDate); wkDate.setDate(baseDate.getDate() + s * 7);
     const c = ws4.getCell(4, 5 + s);
