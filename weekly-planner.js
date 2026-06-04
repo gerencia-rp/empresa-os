@@ -1517,10 +1517,42 @@ function wpOpenImportExcel() {
 
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Proyecto destino *</label>
-        <select id="wp-imp-proj" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        <select id="wp-imp-proj" onchange="wpImpOnProjChange(this.value)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
           <option value="">— Selecciona —</option>
           ${projOpts}
+          <option value="__new__" class="font-bold text-emerald-700">➕ Crear casa nueva...</option>
         </select>
+      </div>
+
+      <!-- Form inline para crear casa nueva (oculto por default) -->
+      <div id="wp-imp-newcasa" class="hidden bg-emerald-50 border-2 border-emerald-300 rounded-lg p-3 space-y-2">
+        <div class="text-xs font-bold uppercase text-emerald-800">➕ Nueva casa / proyecto</div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nombre / alias *</label>
+          <input id="wp-newcasa-name" type="text" placeholder="Ej. Wellington · Neans · 1133 Denfield" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Dirección</label>
+          <input id="wp-newcasa-addr" type="text" placeholder="Ej. 1133 Denfield Dr, Austin TX 78721" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-0.5">SqFt</label>
+            <input id="wp-newcasa-sqft" type="number" min="0" placeholder="1800" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Inicio de obra</label>
+            <input id="wp-newcasa-start" type="date" value="${wpDateOnly(new Date())}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Presupuesto total (USD opcional)</label>
+          <input id="wp-newcasa-budget" type="number" min="0" placeholder="125000" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="wpImpCreateNewCasa()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded">💾 Crear y seleccionar</button>
+          <button onclick="wpImpCancelNewCasa()" class="bg-slate-100 hover:bg-slate-200 text-xs py-2 px-3 rounded">Cancelar</button>
+        </div>
       </div>
 
       <div>
@@ -2364,4 +2396,77 @@ function wpOpenPrintView(dateStr) {
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
+}
+
+// ─── Crear casa nueva desde el modal de import ───
+function wpImpOnProjChange(value) {
+  const form = document.getElementById('wp-imp-newcasa');
+  if (!form) return;
+  if (value === '__new__') {
+    form.classList.remove('hidden');
+    setTimeout(() => document.getElementById('wp-newcasa-name')?.focus(), 50);
+  } else {
+    form.classList.add('hidden');
+  }
+}
+
+function wpImpCancelNewCasa() {
+  const sel = document.getElementById('wp-imp-proj');
+  if (sel) sel.value = '';
+  const form = document.getElementById('wp-imp-newcasa');
+  if (form) form.classList.add('hidden');
+}
+
+async function wpImpCreateNewCasa() {
+  const name = document.getElementById('wp-newcasa-name').value.trim();
+  const address = document.getElementById('wp-newcasa-addr').value.trim();
+  const sqft = +document.getElementById('wp-newcasa-sqft').value || null;
+  const startDate = document.getElementById('wp-newcasa-start').value || null;
+  const budget = +document.getElementById('wp-newcasa-budget').value || null;
+  if (!name && !address) { alert('Ingresá al menos nombre o dirección.'); return; }
+
+  const payload = {
+    name: name || address,
+    address: address || null,
+    sqft,
+    start_date: startDate,
+    budget_total: budget,
+    status: 'active',
+    created_by: state.user.id
+  };
+  const { data, error } = await sb.from('remodel_projects').insert(payload).select().single();
+  if (error) { alert('Error creando casa: ' + error.message); return; }
+
+  // Recargar lista de proyectos
+  const { data: projs } = await sb.from('remodel_projects')
+    .select('id,name,address,status,sqft,budget_total,activities,start_date,end_date_estimated,completed_at')
+    .order('created_at', { ascending: false });
+  wpState.projects = projs || [];
+
+  // Refrescar el dropdown agregando la nueva opción al final (antes del +Crear) y seleccionarla
+  const sel = document.getElementById('wp-imp-proj');
+  if (sel) {
+    // Quitar la opción ➕ Crear
+    const newOpt = sel.querySelector('option[value="__new__"]');
+    if (newOpt) newOpt.remove();
+    // Agregar la casa nueva
+    const opt = document.createElement('option');
+    opt.value = data.id;
+    opt.textContent = data.name || data.address || '?';
+    sel.appendChild(opt);
+    // Re-agregar la opción de crear
+    const optNew = document.createElement('option');
+    optNew.value = '__new__';
+    optNew.textContent = '➕ Crear casa nueva...';
+    optNew.className = 'font-bold text-emerald-700';
+    sel.appendChild(optNew);
+    sel.value = data.id;
+  }
+
+  // Ocultar form
+  const form = document.getElementById('wp-imp-newcasa');
+  if (form) form.classList.add('hidden');
+
+  // Toast confirmación
+  alert(`✓ Casa "${data.name || data.address}" creada y seleccionada.\n\nAhora subí el Excel y clic Importar.`);
 }
