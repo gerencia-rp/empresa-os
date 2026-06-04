@@ -922,6 +922,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'edu-presentations') return openEduPresentationsSystem(sys);
   if (sys.type === 'edu-reports') return openEduReportsSystem(sys);
   if (sys.type === 'edu-methodology') return openEduMethodologySystem(sys);
+  if (sys.type === 'edu-whatsapp') return openEduWhatsappSystem(sys);
 }
 
 // ============================================================
