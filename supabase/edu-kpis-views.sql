@@ -2,6 +2,19 @@
 -- Se consumen desde el frontend con sb.from('view_name').select(...)
 
 -- ════════════════════════════════════════════════════════════
+-- 0) PREP: columnas necesarias en edu_students (idempotente)
+-- Debe ir ANTES de las vistas que las referencian.
+-- ════════════════════════════════════════════════════════════
+alter table public.edu_students
+  add column if not exists first_deal_at timestamptz,
+  add column if not exists first_deal_type text,
+  add column if not exists first_deal_value numeric,
+  add column if not exists active boolean default true,
+  add column if not exists churned_at timestamptz,
+  add column if not exists renewed_at timestamptz,
+  add column if not exists nps_score int;
+
+-- ════════════════════════════════════════════════════════════
 -- 1) % asistencia mensual por mentoría
 -- ════════════════════════════════════════════════════════════
 create or replace view public.edu_kpi_asistencia_mensual as
@@ -155,18 +168,8 @@ group by 1;
 
 -- ════════════════════════════════════════════════════════════
 -- 7) % estudiantes con primer deal cerrado
--- Asume: edu_students.first_deal_at (timestamp del primer deal).
--- Si no existe, crear columna.
+-- (las columnas ya se crearon en la sección 0 al inicio)
 -- ════════════════════════════════════════════════════════════
-alter table public.edu_students
-  add column if not exists first_deal_at timestamptz,
-  add column if not exists first_deal_type text,
-  add column if not exists first_deal_value numeric,
-  add column if not exists active boolean default true,
-  add column if not exists churned_at timestamptz,
-  add column if not exists renewed_at timestamptz,
-  add column if not exists nps_score int;
-
 create or replace view public.edu_kpi_primer_deal as
 select
   mentorship_id,
