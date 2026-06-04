@@ -794,19 +794,30 @@ async function fcUploadTaskadeFile(file) {
       created_by: state.user.id,
       updated_at: new Date().toISOString()
     };
-    // Si tiene taskade_id, upsert por ese; sino por (propiedad, sqft)
+    // Buscar fila existente con prioridad:
+    //   1) match por taskade_id (si lo tiene)
+    //   2) match por (propiedad, sqft) — evita violar UNIQUE constraint
+    //   3) insert nuevo
     let saveErr = null;
+    let existingId = null;
     if (parsed.taskade_id) {
-      const { data: existing } = await sb.from('remodel_forecast_diagnoses').select('id').eq('taskade_id', parsed.taskade_id).maybeSingle();
-      if (existing) {
-        const { error } = await sb.from('remodel_forecast_diagnoses').update(payload).eq('id', existing.id);
-        saveErr = error;
-      } else {
-        const { error } = await sb.from('remodel_forecast_diagnoses').insert(payload);
-        saveErr = error;
-      }
+      const { data: byTid } = await sb.from('remodel_forecast_diagnoses')
+        .select('id').eq('taskade_id', parsed.taskade_id).maybeSingle();
+      if (byTid) existingId = byTid.id;
+    }
+    if (!existingId) {
+      // Fallback: buscar por (propiedad, sqft) — clave del UNIQUE constraint
+      const { data: byPropSqft } = await sb.from('remodel_forecast_diagnoses')
+        .select('id').eq('propiedad', payload.propiedad).eq('sqft', payload.sqft).maybeSingle();
+      if (byPropSqft) existingId = byPropSqft.id;
+    }
+    if (existingId) {
+      // UPDATE (sobrescribe taskade_id viejo con el nuevo)
+      const { error } = await sb.from('remodel_forecast_diagnoses').update(payload).eq('id', existingId);
+      saveErr = error;
     } else {
-      const { error } = await sb.from('remodel_forecast_diagnoses').upsert(payload, { onConflict: 'propiedad,sqft' });
+      // INSERT nuevo
+      const { error } = await sb.from('remodel_forecast_diagnoses').insert(payload);
       saveErr = error;
     }
     if (saveErr) throw new Error('Error guardando diagnóstico: ' + saveErr.message);
