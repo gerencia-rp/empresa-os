@@ -7,8 +7,8 @@
 // ============================================================
 
 // Las 6 etapas macro (alineadas con RM_PHASES: 1..6)
-const FC_STAGES = ['Demolición','Cimentación','Exterior','Estructura','Interior','Limpieza'];
-const FC_STAGE_GROUP = { 'Demolición':'1','Cimentación':'2','Exterior':'3','Estructura':'4','Interior':'5','Limpieza':'6' };
+const FC_STAGES = ['Demolición','Cimentación','Externo','Estructura','Interno','Limpieza'];
+const FC_STAGE_GROUP = { 'Demolición':'1','Cimentación':'2','Externo':'3','Estructura':'4','Interno':'5','Limpieza':'6' };
 
 // Catálogo de sub-items por etapa — replica el template Denfield para el export Excel.
 // El usuario llena cantidades + VU; el Excel calcula totales con fórmulas.
@@ -29,7 +29,7 @@ const FC_DETAIL_ITEMS = {
     { sub:'Reparación', cod:'2.1.4', desc:'Foundation crack repair (basic settling)', unit:'Project' },
     { sub:'Concreto',   cod:'2.2.6', desc:'Concrete slab repair', unit:'Unit' }
   ],
-  'Exterior': [
+  'Externo': [
     { sub:'Cubierta',    cod:'3.1.1', desc:'Roof replacement (architectural shingle)', unit:'Roof' },
     { sub:'Cubierta',    cod:'3.1.2', desc:'Roof underlayment and flashing', unit:'Roof' },
     { sub:'Cubierta',    cod:'3.1.3', desc:'Gutters and downspouts', unit:'Lin ft' },
@@ -56,7 +56,7 @@ const FC_DETAIL_ITEMS = {
     { sub:'Permisos y diseño', cod:'4.2.2', desc:'Architect / structural engineer fees', unit:'Project' },
     { sub:'Permisos y diseño', cod:'4.2.3', desc:'General contractor management (overhead 10%)', unit:'Project' }
   ],
-  'Interior': [
+  'Interno': [
     { sub:'Muros', cod:'5.1.1', desc:'Drywall installation/replacement', unit:'Sq ft' },
     { sub:'Muros', cod:'5.1.2', desc:'Interior painting (whole house)', unit:'Sq ft' },
     { sub:'Muros', cod:'5.1.3', desc:'Insulation - wall batts', unit:'Sq ft' },
@@ -107,9 +107,9 @@ const FC_DETAIL_ITEMS = {
 const FC_SEED_COEF = {
   'Demolición':  { mo: 1.09,  mat: 0.23,  tiempo: 8  },
   'Cimentación': { mo: 0.00,  mat: 0.00,  tiempo: 4  },
-  'Exterior':    { mo: 5.69,  mat: 4.19,  tiempo: 22 },
+  'Externo':    { mo: 5.69,  mat: 4.19,  tiempo: 22 },
   'Estructura':  { mo: 3.21,  mat: 1.03,  tiempo: 18 },
-  'Interior':    { mo: 16.72, mat: 11.29, tiempo: 40 },
+  'Interno':    { mo: 16.72, mat: 11.29, tiempo: 40 },
   'Limpieza':    { mo: 1.27,  mat: 0.60,  tiempo: 8  }
 };
 
@@ -314,14 +314,14 @@ fcState.form = {
   precioCompra: 0,                // para el análisis financiero del Excel
   fechaInicio: new Date().toISOString().split('T')[0],
   sqft: 1500,
-  afectacion: { 'Demolición':100, 'Cimentación':0, 'Exterior':100, 'Estructura':100, 'Interior':100, 'Limpieza':100 },
+  afectacion: { 'Demolición':100, 'Cimentación':0, 'Externo':100, 'Estructura':100, 'Interno':100, 'Limpieza':100 },
   duracionDias: 0,
   otrosCostosPctOverride: null,  // si el usuario edita el % manualmente
   crewSize: 1,
   costoHora: 0
 };
 
-const FC_STAGE_ICON = { 'Demolición':'⛏️','Cimentación':'🏗️','Exterior':'🏠','Estructura':'🪵','Interior':'🛏️','Limpieza':'🧹' };
+const FC_STAGE_ICON = { 'Demolición':'⛏️','Cimentación':'🏗️','Externo':'🏠','Estructura':'🪵','Interno':'🛏️','Limpieza':'🧹' };
 
 // ─── RENDER PRINCIPAL DE LA TAB ───
 function fcRenderTab(body) {
@@ -646,8 +646,8 @@ function fcRenderTaskadePreview(t) {
 const FC_TASKADE_MAP = {
   'Estructura':  ['estructura'],
   'Cimentación': ['placa'],
-  'Exterior':    ['techo', 'acceso_externo'],
-  'Interior':    ['muros', 'piso', 'redes', 'carpinteria']
+  'Externo':    ['techo', 'acceso_externo'],
+  'Interno':    ['muros', 'piso', 'redes', 'carpinteria']
 };
 
 // Mapeo etapa v2 → macro grupo del Pronosticador
@@ -655,8 +655,8 @@ const FC_V2_ETAPAS_MAP = {
   'demolicion':  'Demolición',
   'cimentacion': 'Cimentación',
   'estructura':  'Estructura',
-  'externo':     'Exterior',
-  'interno':     'Interior',
+  'externo':     'Externo',
+  'interno':     'Interno',
   'limpieza':    'Limpieza'
 };
 
@@ -1336,9 +1336,9 @@ async function fcExportXLSX() {
   const ETAPA_NAMES = {
     'Demolición': '1. DEMOLICION',
     'Cimentación': '2. CIMENTACION',
-    'Exterior': '3. EXTERNO',
+    'Externo': '3. EXTERNO',
     'Estructura': '4. ESTRUCTURA',
-    'Interior': '5. INTERNO',
+    'Interno': '5. INTERNO',
     'Limpieza': '6. LIMPIEZA'
   };
 
@@ -1711,7 +1711,7 @@ function fcSelfTest() {
   const ejemplo = {
     propiedad: 'Casa de prueba',
     sqft: 1500,
-    afectacion: { 'Demolición':100, 'Cimentación':0, 'Exterior':80, 'Estructura':100, 'Interior':100, 'Limpieza':100 }
+    afectacion: { 'Demolición':100, 'Cimentación':0, 'Externo':80, 'Estructura':100, 'Interno':100, 'Limpieza':100 }
   };
   const errores = fcValidarDiagnostico(ejemplo);
   if (errores.length) { console.error('fcSelfTest validación falló:', errores); return { ok:false, errores }; }
@@ -1721,7 +1721,7 @@ function fcSelfTest() {
     subtotal: Math.round(r.subtotal),            // esperado 65016
     ppsfDirecto: +r.ppsfDirecto.toFixed(2),        // esperado 43.34
     sumaDias: Math.round(sumaDias),                // esperado 80
-    interior_sub: Math.round(r.etapas.find(e=>e.etapa==='Interior').subtotal), // 42015
+    interior_sub: Math.round(r.etapas.find(e=>e.etapa==='Interno').subtotal), // 42015
     cimentacion_sub: Math.round(r.etapas.find(e=>e.etapa==='Cimentación').subtotal) // 0
   };
   const ok = checks.subtotal === 65016 && checks.sumaDias === 80 && checks.cimentacion_sub === 0;

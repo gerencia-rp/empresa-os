@@ -7,11 +7,28 @@
 const RM_PHASES = {
   '1': { name: 'Demolición', icon: '⛏️', color: '#dc2626' },
   '2': { name: 'Cimentación', icon: '🏗️', color: '#ea580c' },
-  '3': { name: 'Exterior', icon: '🏠', color: '#d97706' },
+  '3': { name: 'Externo',     icon: '🏠', color: '#d97706' },
   '4': { name: 'Estructura', icon: '🪵', color: '#65a30d' },
-  '5': { name: 'Interno', icon: '🛏️', color: '#0891b2' },
-  '6': { name: 'Limpieza', icon: '🧹', color: '#7c3aed' }
+  '5': { name: 'Interno',    icon: '🛏️', color: '#0891b2' },
+  '6': { name: 'Limpieza',   icon: '🧹', color: '#7c3aed' }
 };
+
+// Unidades disponibles para items custom (en español)
+const RM_UNIDADES = [
+  { val: 'ft²',       label: 'ft² (Pie cuadrado)',        en: 'sqft' },
+  { val: 'ft lineal', label: 'ft lineal (Pie lineal)',    en: 'lf' },
+  { val: 'unidad',    label: 'unidad',                    en: 'unit' },
+  { val: 'proyecto',  label: 'proyecto (Lump sum)',        en: 'project' },
+  { val: 'carga',     label: 'carga (Truck/Dumpster)',     en: 'load' },
+  { val: 'casa',      label: 'casa (Casa completa)',       en: 'house' },
+  { val: 'techo',     label: 'techo (Techo completo)',     en: 'roof' },
+  { val: 'juego',     label: 'juego (Set/Kit)',            en: 'set' },
+  { val: 'm²',        label: 'm² (Metro cuadrado)',        en: 'sqm' },
+  { val: 'm lineal',  label: 'm lineal (Metro lineal)',    en: 'lm' },
+  { val: 'galón',     label: 'galón',                      en: 'gal' },
+  { val: 'hora',      label: 'hora',                       en: 'hour' },
+  { val: 'día',       label: 'día',                        en: 'day' }
+];
 
 // Actividades reales del template Denfield. Cada una con su default vu_total ($/unit típico).
 const RM_CATALOG = [
@@ -113,6 +130,7 @@ const rmState = {
   // Editor state
   editName: '', editAddress: '', editSqft: 1500, editStartDate: new Date().toISOString().split('T')[0],
   selectedActivities: {},
+  customActivities: {},  // items custom agregados por etapa: { code: { phase, subcat, desc, unit, qty, vu, days, mat_pct } }
   // Pricing (estándar industria)
   contingencyPct: 15,
   overheadPct: 10,
@@ -196,7 +214,12 @@ const RM_MARKET_AUSTIN_MAX = 90;
 // ─── S2-G4: Catálogo dinámico (DB con fallback al hardcoded RM_CATALOG) ───
 // rmActiveCatalog se setea desde DB en rmLoadCatalog(). Si null → usar RM_CATALOG hardcodeado.
 let rmActiveCatalog = null;
-function rmGetCatalog() { return rmActiveCatalog || RM_CATALOG; }
+function rmGetCatalog() {
+  // Base catalog + custom items para que los selectedActivities tengan definición
+  const base = rmActiveCatalog || RM_CATALOG;
+  const customs = Object.values((typeof rmState !== 'undefined' && rmState.customActivities) || {});
+  return customs.length ? [...base, ...customs] : base;
+}
 
 async function rmLoadCatalog() {
   try {
@@ -2074,6 +2097,14 @@ function rmRenderEditor(body) {
                     </div>
                   `;
                 }).join('')}
+
+                <!-- ITEMS CUSTOM de esta etapa -->
+                ${rmRenderCustomItemsForPhase(p)}
+
+                <!-- BOTÓN: + Agregar item custom -->
+                <div class="pt-2 mt-2 border-t border-dashed border-slate-300">
+                  <button onclick="rmShowAddCustom('${p}')" class="text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-bold">+ Agregar item nuevo a esta etapa</button>
+                </div>
               </div>
             </details>
           `;
@@ -3706,7 +3737,7 @@ const RM_SOW_CATEGORIES = [
     { sow_name: 'Plumbing Final / Fixtures', codes: ['5.2.3p','5.2.4p'] },
     { sow_name: 'Other - Systems', codes: [] }
   ]},
-  { section: 'Interior', items: [
+  { section: 'Interno', items: [
     { sow_name: 'Windows', codes: ['3.7.1'] },
     { sow_name: 'Interior Doors', codes: ['5.8.1'] },
     { sow_name: 'Interior Trim', codes: ['5.2.1','5.6.3'] },
@@ -3728,7 +3759,7 @@ const RM_SOW_CATEGORIES = [
     { sow_name: 'Closet Shelving', codes: ['5.8.2'] },
     { sow_name: 'Other - Interior', codes: [] }
   ]},
-  { section: 'Exterior', items: [
+  { section: 'Externo', items: [
     { sow_name: 'Masonry / Stucco', codes: [] },
     { sow_name: 'Roofing', codes: ['3.1.1','3.1.2'] },
     { sow_name: 'Framing', codes: ['4.1.2','4.1.3','4.1.4','4.1.5'] },
@@ -3808,8 +3839,8 @@ function rmDistributeAutoDraws() {
   const drawMap = {
     'Soft Costs': 1, 'Demo, Foundation': 1,
     'HVAC, Plumbing, Electrical': 1,
-    'Interior': 2,
-    'Exterior': 3
+    'Interno': 2,
+    'Externo': 3
   };
   const sow = rmComputeSow();
   sow.sections.forEach(sec => {
@@ -4982,7 +5013,7 @@ async function rmExportEditorExcelDenfield() {
   ws1.getRow(13).height = 28;
 
   let cursor = new Date(proj.start_date);
-  const PHASE_NAMES = { '1':'Demolición','2':'Cimentación','3':'Exterior','4':'Estructura','5':'Interno','6':'Limpieza' };
+  const PHASE_NAMES = { '1':'Demolición','2':'Cimentación','3':'Externo','4':'Estructura','5':'Interno','6':'Limpieza' };
   ['1','2','3','4','5','6'].forEach((p, i) => {
     const pt = phaseTotals[p];
     const row = 14 + i;
@@ -5270,4 +5301,159 @@ async function rmExportEditorExcelDenfield() {
   a.href = URL.createObjectURL(blob);
   a.download = `${today}_Seguimiento_${safe}.xlsx`;
   a.click();
+}
+
+// ============================================================
+// ITEMS CUSTOM POR ETAPA — agregar items que no están en el catálogo
+// ============================================================
+
+// Render de items custom de una etapa específica (dentro del editor)
+function rmRenderCustomItemsForPhase(phaseId) {
+  const items = Object.entries(rmState.customActivities || {}).filter(([_, it]) => it.phase === phaseId);
+  if (!items.length) return '';
+  return `
+    <div class="mt-2 pt-2 border-t border-emerald-200">
+      <div class="text-[10px] font-bold uppercase text-emerald-700 mb-1.5">✨ Items personalizados (${items.length})</div>
+      ${items.map(([code, it]) => {
+        const total = (+it.qty || 0) * (+it.vu || 0);
+        return `
+          <div class="grid grid-cols-[20px_1fr_80px_90px_90px_30px_20px] gap-2 items-center text-xs py-1 bg-emerald-50 rounded mb-1">
+            <div class="text-center text-emerald-700">✓</div>
+            <div>
+              <div class="font-mono text-[10px] text-emerald-600">${code}</div>
+              <div class="font-semibold">${it.desc}</div>
+              <div class="text-[10px] text-emerald-700">${it.subcat || '—'} · ${it.unit}</div>
+            </div>
+            <input type="number" step="0.01" value="${it.qty || ''}" onchange="rmCustomSet('${code}','qty',this.value)" placeholder="Cant." class="border border-emerald-300 rounded px-2 py-1 text-xs bg-white" />
+            <input type="number" step="0.01" value="${it.vu || ''}" onchange="rmCustomSet('${code}','vu',this.value)" placeholder="$/u" class="border border-emerald-300 rounded px-2 py-1 text-xs bg-white" />
+            <div class="text-right font-bold ${total?'text-emerald-900':'text-slate-300'}">${rmFmt(total)}</div>
+            <input type="number" value="${it.days || ''}" onchange="rmCustomSet('${code}','days',this.value)" placeholder="d" class="border border-emerald-300 rounded px-1 py-1 text-[10px] text-center bg-white" />
+            <button onclick="rmCustomDelete('${code}')" title="Eliminar" class="text-red-500 hover:text-red-700 text-sm">×</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// Mostrar modal para agregar item custom a una etapa
+function rmShowAddCustom(phaseId) {
+  const phase = RM_PHASES[phaseId];
+  const existing = document.getElementById('rm-custom-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rm-custom-modal';
+  modal.className = 'fixed inset-0 z-[120] bg-slate-900/80 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+      <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-3 flex items-center justify-between">
+        <div>
+          <div class="text-[10px] font-bold uppercase opacity-90">Agregar item personalizado</div>
+          <div class="text-base font-bold">${phase?.icon} ${phaseId}. ${phase?.name}</div>
+        </div>
+        <button onclick="document.getElementById('rm-custom-modal').remove()" class="text-2xl leading-none">×</button>
+      </div>
+      <div class="p-4 space-y-3 text-sm">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Descripción del item *</label>
+          <input id="rm-cust-desc" type="text" placeholder="Ej: Instalación de mesón de cuarzo premium" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Subcategoría</label>
+          <input id="rm-cust-subcat" type="text" placeholder="Ej: Cocina · Baños · Estructura · Fachada..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Unidad de medida *</label>
+            <select id="rm-cust-unit" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+              ${RM_UNIDADES.map(u => `<option value="${u.val}">${u.label}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Cantidad *</label>
+            <input id="rm-cust-qty" type="number" step="0.01" placeholder="0" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Valor por unidad ($) *</label>
+            <input id="rm-cust-vu" type="number" step="0.01" placeholder="0.00" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-0.5">% Material (resto = MO)</label>
+            <input id="rm-cust-mat" type="number" step="1" min="0" max="100" value="50" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 mb-0.5">Días (duración)</label>
+          <input id="rm-cust-days" type="number" step="0.5" placeholder="0" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        </div>
+        <div class="pt-2 flex gap-2 border-t border-slate-200">
+          <button onclick="rmCustomAdd('${phaseId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded">💾 Agregar al estimado</button>
+          <button onclick="document.getElementById('rm-custom-modal').remove()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('rm-cust-desc')?.focus(), 50);
+}
+
+// Agregar item custom al estado
+function rmCustomAdd(phaseId) {
+  const desc = document.getElementById('rm-cust-desc')?.value?.trim();
+  if (!desc) return alert('Descripción es obligatoria');
+  const subcat = document.getElementById('rm-cust-subcat')?.value?.trim() || 'Custom';
+  const unit = document.getElementById('rm-cust-unit')?.value || 'unidad';
+  const qty = parseFloat(document.getElementById('rm-cust-qty')?.value) || 0;
+  const vu = parseFloat(document.getElementById('rm-cust-vu')?.value) || 0;
+  const matPct = (parseFloat(document.getElementById('rm-cust-mat')?.value) || 50) / 100;
+  const days = parseFloat(document.getElementById('rm-cust-days')?.value) || 0;
+  if (!qty || !vu) return alert('Cantidad y Valor por unidad son obligatorios');
+
+  // Generar código único: C.{phase}.{n}
+  const existing = Object.keys(rmState.customActivities || {}).filter(k => k.startsWith(`C.${phaseId}.`));
+  const nextN = existing.length + 1;
+  const code = `C.${phaseId}.${nextN}`;
+
+  rmState.customActivities = rmState.customActivities || {};
+  rmState.customActivities[code] = {
+    code, phase: phaseId, subcat, desc, unit, qty, vu, days, mat_pct: matPct,
+    is_custom: true,
+    created_at: new Date().toISOString()
+  };
+  // También al estado de selectedActivities para que entre en cálculos
+  rmState.selectedActivities[code] = { qty, vu, days };
+
+  document.getElementById('rm-custom-modal')?.remove();
+  if (typeof rmRenderTab === 'function') rmRenderTab();
+  else if (typeof rmRender === 'function') rmRender();
+}
+
+function rmCustomSet(code, field, value) {
+  const it = rmState.customActivities?.[code];
+  if (!it) return;
+  const v = field === 'qty' || field === 'vu' || field === 'days' ? (parseFloat(value) || 0) : value;
+  it[field] = v;
+  // Sync selectedActivities también
+  if (rmState.selectedActivities[code]) {
+    rmState.selectedActivities[code] = { qty: it.qty, vu: it.vu, days: it.days };
+  }
+  if (typeof rmRenderTabDebounced === 'function') rmRenderTabDebounced();
+  else if (typeof rmRender === 'function') rmRender();
+}
+
+function rmCustomDelete(code) {
+  if (!confirm('¿Eliminar este item personalizado?')) return;
+  delete rmState.customActivities?.[code];
+  delete rmState.selectedActivities[code];
+  if (typeof rmRenderTab === 'function') rmRenderTab();
+  else if (typeof rmRender === 'function') rmRender();
+}
+
+// Helper para que el catálogo (rmGetCatalog) incluya custom activities en cálculos
+function rmGetAllActivitiesIncludingCustom() {
+  const base = (typeof rmGetCatalog === 'function') ? rmGetCatalog() : [];
+  const customs = Object.values(rmState.customActivities || {});
+  return [...base, ...customs];
 }
