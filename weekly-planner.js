@@ -1575,6 +1575,7 @@ function wpParseExcelDate(v) {
   return null;
 }
 
+// PASO 1: parsea el Excel y muestra preview. NO publica todavía.
 async function wpDoImportExcel() {
   const projId = document.getElementById('wp-imp-proj').value;
   const fileInp = document.getElementById('wp-imp-file');
@@ -1589,29 +1590,176 @@ async function wpDoImportExcel() {
   let parsed;
   try { parsed = wpParseCronogramaSheet(workbook); }
   catch (e) { alert('Error: ' + e.message); return; }
-
   if (!parsed.items.length) { alert('No se encontraron actividades en la hoja CRONOGRAMA.'); return; }
 
   const proj = wpState.projects.find(p => p.id === projId);
   const propertyName = proj ? (proj.name || proj.address || 'Proyecto') : '';
+
+  // Guardar en estado para el preview
+  wpState.importPreview = {
+    projId, propertyName, clear, expand, fileName: file.name,
+    items: parsed.items.map((it, i) => ({
+      ...it, id: 'p' + i,
+      include: !!it.date,           // si no tiene fecha, default off
+      _dateOriginal: it.date,
+      _durationOriginal: it.duration_days
+    })),
+    projectStart: parsed.projectStart
+  };
+  wpRenderImportPreview();
+}
+
+// PASO 2: render del preview editable
+function wpRenderImportPreview() {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const total = p.items.length;
+  const included = p.items.filter(x => x.include).length;
+  const conFecha = p.items.filter(x => x.date).length;
+
+  // Agrupar por etapa para vista organizada
+  const byStage = {};
+  p.items.forEach(it => {
+    const key = it.stage || '(sin etapa)';
+    if (!byStage[key]) byStage[key] = [];
+    byStage[key].push(it);
+  });
+
+  const html = `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border-2 border-amber-300 rounded p-3 text-xs">
+        <div class="font-bold text-amber-900 mb-1">👀 Vista previa antes de publicar</div>
+        <div class="text-amber-800">Detecté <strong>${total}</strong> actividad(es) en <code>${p.fileName.replace(/</g,'&lt;')}</code>. Revisá, ajustá fechas si necesitás y desmarcá las que NO querés publicar. Al final hacé click en <strong>Aprobar y publicar</strong>.</div>
+        <div class="mt-2 flex items-center gap-3 text-amber-900">
+          <span><strong>Proyecto destino:</strong> ${(p.propertyName||'').replace(/</g,'&lt;')}</span>
+          <span class="bg-amber-200 px-2 py-0.5 rounded font-bold">${included} de ${total} marcadas</span>
+          ${conFecha < total ? `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">⚠️ ${total - conFecha} sin fecha</span>` : ''}
+          ${p.clear ? `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">🗑️ Borrará actividades existentes</span>` : ''}
+          ${p.expand ? `<span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded font-bold">📅 Expandir N días → N filas</span>` : ''}
+        </div>
+      </div>
+
+      <div class="flex gap-2 text-xs">
+        <button onclick="wpImportPreviewToggleAll(true)" class="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded">✓ Marcar todas</button>
+        <button onclick="wpImportPreviewToggleAll(false)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Desmarcar todas</button>
+        <button onclick="wpImportPreviewToggleEtapa('Externo')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" title="Toggle solo las de etapa Externo">Toggle Externo</button>
+        <button onclick="wpImportPreviewToggleEtapa('Interno')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Toggle Interno</button>
+      </div>
+
+      <div class="border border-slate-200 rounded-lg max-h-[55vh] overflow-y-auto">
+        ${Object.entries(byStage).map(([stage, items]) => `
+          <div class="border-b border-slate-200">
+            <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700 sticky top-0">${stage.replace(/</g,'&lt;')} <span class="bg-slate-900 text-white px-1.5 py-0.5 rounded ml-1">${items.length}</span></div>
+            <table class="w-full text-xs">
+              <thead><tr class="text-[10px] uppercase text-slate-500 bg-slate-50">
+                <th class="p-1 w-8"></th>
+                <th class="text-left p-1 w-16">Código</th>
+                <th class="text-left p-1">Actividad</th>
+                <th class="text-left p-1 w-32">Fecha inicio</th>
+                <th class="text-right p-1 w-20">Días</th>
+              </tr></thead>
+              <tbody>
+                ${items.map(it => `
+                  <tr class="border-t border-slate-100 ${!it.date?'bg-red-50':it.include?'hover:bg-emerald-50':'bg-slate-100 opacity-60'}">
+                    <td class="p-1 text-center">
+                      <input type="checkbox" ${it.include?'checked':''} ${!it.date?'disabled':''} onchange="wpImportPreviewToggle('${it.id}')" class="cursor-pointer"/>
+                    </td>
+                    <td class="p-1 font-mono text-slate-600">${(it.code||'—').replace(/</g,'&lt;')}</td>
+                    <td class="p-1">${(it.activity_name||'?').replace(/</g,'&lt;')}</td>
+                    <td class="p-1">
+                      <input type="date" value="${it.date||''}" onchange="wpImportPreviewSetDate('${it.id}', this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[11px]"/>
+                    </td>
+                    <td class="p-1 text-right">
+                      <input type="number" min="1" max="365" value="${it.duration_days||1}" onchange="wpImportPreviewSetDuration('${it.id}', +this.value)" class="w-14 border border-slate-300 rounded px-1 py-0.5 text-[11px] text-right"/>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="wpApproveImport()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg" ${included===0?'disabled':''}>✓ Aprobar y publicar (${included} actividades)</button>
+        <button onclick="wpCancelImport()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `;
+  // Reemplazar el contenido del modal manteniendo el modal abierto
+  const body = document.getElementById('modal-body');
+  if (body) body.innerHTML = html;
+  const title = document.getElementById('modal-title');
+  if (title) title.innerHTML = '👀 Revisá las actividades antes de publicar';
+}
+
+function wpImportPreviewToggle(id) {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const it = p.items.find(x => x.id === id);
+  if (it) it.include = !it.include;
+  wpRenderImportPreview();
+}
+function wpImportPreviewToggleAll(val) {
+  const p = wpState.importPreview;
+  if (!p) return;
+  p.items.forEach(it => { if (it.date) it.include = val; });
+  wpRenderImportPreview();
+}
+function wpImportPreviewToggleEtapa(stage) {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const all = p.items.filter(x => x.stage === stage && x.date);
+  const allOn = all.every(x => x.include);
+  all.forEach(x => x.include = !allOn);
+  wpRenderImportPreview();
+}
+function wpImportPreviewSetDate(id, newDate) {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const it = p.items.find(x => x.id === id);
+  if (it) {
+    it.date = newDate || null;
+    if (newDate && !it.include) it.include = true;
+  }
+  wpRenderImportPreview();
+}
+function wpImportPreviewSetDuration(id, d) {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const it = p.items.find(x => x.id === id);
+  if (it) it.duration_days = Math.max(1, +d || 1);
+  wpRenderImportPreview();
+}
+function wpCancelImport() {
+  wpState.importPreview = null;
+  closeModal();
+}
+
+// PASO 3: ya aprobado, hace el INSERT real
+async function wpApproveImport() {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const aprobadas = p.items.filter(x => x.include && x.date);
+  if (!aprobadas.length) { alert('Ninguna actividad marcada con fecha válida.'); return; }
+  if (!confirm(`¿Publicar ${aprobadas.length} actividad(es) al proyecto "${p.propertyName}"?\n\nEsto las creará en el calendario semanal.${p.clear?'\n\n⚠️ Las actividades existentes del proyecto se BORRARÁN primero.':''}`)) return;
+
   const importBatch = 'imp_' + Date.now();
 
-  // 1) Borrar previas si pidió clear
-  if (clear) {
-    if (!confirm(`Esto eliminará TODAS las actividades del proyecto "${propertyName}". ¿Seguir?`)) return;
-    await sb.from('weekly_activities').delete().eq('project_id', projId);
+  // Borrar previas si lo pidió
+  if (p.clear) {
+    await sb.from('weekly_activities').delete().eq('project_id', p.projId);
   }
 
-  // 2) Construir filas a insertar
+  // Construir filas
   const rows = [];
-  for (const it of parsed.items) {
-    if (!it.date) continue;
-    if (expand && it.duration_days > 1) {
+  for (const it of aprobadas) {
+    if (p.expand && it.duration_days > 1) {
       for (let d = 0; d < it.duration_days; d++) {
         const day = wpAddDays(new Date(it.date + 'T00:00:00'), d);
         rows.push({
-          project_id: projId,
-          property_name: propertyName,
+          project_id: p.projId,
+          property_name: p.propertyName,
           date: wpDateOnly(day),
           activity_name: it.activity_name + (it.duration_days > 1 ? ` (día ${d+1}/${it.duration_days})` : ''),
           activity_code: it.code,
@@ -1624,8 +1772,8 @@ async function wpDoImportExcel() {
       }
     } else {
       rows.push({
-        project_id: projId,
-        property_name: propertyName,
+        project_id: p.projId,
+        property_name: p.propertyName,
         date: it.date,
         activity_name: it.activity_name,
         activity_code: it.code,
@@ -1637,9 +1785,8 @@ async function wpDoImportExcel() {
       });
     }
   }
-  if (!rows.length) { alert('Ninguna actividad tenía fecha válida.'); return; }
 
-  // 3) Insertar en chunks de 100
+  // Insertar en chunks
   const chunks = [];
   for (let i = 0; i < rows.length; i += 100) chunks.push(rows.slice(i, i+100));
   for (const c of chunks) {
@@ -1647,6 +1794,7 @@ async function wpDoImportExcel() {
     if (error) { alert('Error guardando: ' + error.message); return; }
   }
 
+  wpState.importPreview = null;
   closeModal();
   await wpLoadAll();
   wpRender();
