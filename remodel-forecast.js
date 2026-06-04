@@ -563,6 +563,14 @@ function fcSetAfect(stage, value) {
   if (body) fcRenderTab(body);
 }
 
+// Helper compat v1/v2: lee dano_pct con o sin ñ
+function fcDpct(obj) {
+  if (obj == null) return null;
+  if (obj.dano_pct != null) return +obj.dano_pct;
+  if (obj['daño_pct'] != null) return +obj['daño_pct'];
+  return null;
+}
+
 // Renderiza el panel de preview del detalle Taskade (debajo del upload)
 function fcRenderTaskadePreview(t) {
   if (!t || !t.detalle) return '';
@@ -570,23 +578,25 @@ function fcRenderTaskadePreview(t) {
   const veredictoBg = t.dano_global_pct >= 70 ? 'bg-red-100 text-red-800' : t.dano_global_pct >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
   const grupos = d.grupos || {};
   const pats = d.patologias || {};
+  const etapasRen = d.etapas_renovacion || {};
+  const isV2 = d.version === '2.0' || d._export === 'taskade_visita_previa_v2';
   return `
     <div class="mt-2 bg-white border border-violet-200 rounded p-2 text-xs">
       <div class="flex items-center justify-between mb-2">
-        <div class="font-bold text-violet-900">📊 Detalle Taskade: ${d.propiedad?.nombre || ''}</div>
+        <div class="font-bold text-violet-900">📊 Detalle Taskade: ${d.propiedad?.nombre || ''} ${isV2?'<span class="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded">v2</span>':''}</div>
         <span class="${veredictoBg} px-2 py-0.5 rounded text-[10px] font-bold">${t.veredicto || '—'} · ${t.dano_global_pct?.toFixed(1)}%</span>
       </div>
 
       <div class="grid grid-cols-2 gap-2">
         <!-- 8 Grupos Taskade -->
         <div>
-          <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Grupos (daño % × peso)</div>
+          <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Grupos (${Object.keys(grupos).length})</div>
           ${Object.entries(grupos).map(([k, v]) => {
-            const dp = v['daño_pct'];
-            const dpStr = dp == null ? '—' : `${(+dp).toFixed(0)}%`;
+            const dp = fcDpct(v);
+            const dpStr = dp == null ? '—' : `${dp.toFixed(0)}%`;
             const color = dp == null ? 'text-slate-400' : dp >= 70 ? 'text-red-600' : dp >= 40 ? 'text-amber-600' : 'text-emerald-600';
             return `<div class="flex justify-between text-[11px] py-0.5">
-              <span class="text-slate-700 capitalize">${k}</span>
+              <span class="text-slate-700 capitalize">${v.label || k}</span>
               <span><strong class="${color}">${dpStr}</strong> <span class="text-slate-400">(w ${v.peso_pct||0})</span></span>
             </div>`;
           }).join('')}
@@ -596,7 +606,7 @@ function fcRenderTaskadePreview(t) {
         <div>
           <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Patologías</div>
           ${Object.entries(pats).map(([k, v]) => {
-            const dp = +(v['daño_pct'] || 0);
+            const dp = fcDpct(v) || 0;
             const color = dp >= 70 ? 'text-red-600' : dp >= 40 ? 'text-amber-600' : 'text-emerald-600';
             return `<div class="flex justify-between text-[11px] py-0.5">
               <span class="text-slate-700 capitalize">${k}</span>
@@ -605,6 +615,22 @@ function fcRenderTaskadePreview(t) {
           }).join('')}
         </div>
       </div>
+
+      ${Object.keys(etapasRen).length ? `
+        <div class="mt-2 pt-2 border-t border-violet-100">
+          <div class="text-[10px] font-bold text-violet-700 uppercase mb-1">📋 Etapas de renovación (calculadas en visita previa)</div>
+          <div class="grid grid-cols-3 gap-1">
+            ${Object.entries(etapasRen).map(([k, v]) => {
+              const dp = fcDpct(v) || 0;
+              const color = dp >= 70 ? 'text-red-600' : dp >= 40 ? 'text-amber-600' : 'text-emerald-600';
+              return `<div class="bg-violet-50 rounded p-1.5 text-[10px]">
+                <div class="text-slate-700 capitalize">${v.label || k}</div>
+                <div class="font-bold ${color}">${dp.toFixed(0)}%</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <div class="mt-2 pt-2 border-t border-violet-100 text-[10px] text-slate-500 flex justify-between">
         <span>ID: <code>${t.taskade_id?.slice(0,8) || '—'}</code></span>
@@ -616,59 +642,100 @@ function fcRenderTaskadePreview(t) {
 
 // ─── TASKADE: parser + upload ───
 
-// Mapeo Taskade grupos → 6 macro grupos del Pronosticador
+// Mapeo Taskade grupos → 6 macro grupos del Pronosticador (FALLBACK v1)
 const FC_TASKADE_MAP = {
   'Estructura':  ['estructura'],
   'Cimentación': ['placa'],
   'Exterior':    ['techo', 'acceso_externo'],
   'Interior':    ['muros', 'piso', 'redes', 'carpinteria']
-  // Demolición y Limpieza se calculan heurísticamente
 };
 
-// Parsea un JSON de Taskade Visita Previa al formato del Pronosticador
+// Mapeo etapa v2 → macro grupo del Pronosticador
+const FC_V2_ETAPAS_MAP = {
+  'demolicion':  'Demolición',
+  'cimentacion': 'Cimentación',
+  'estructura':  'Estructura',
+  'externo':     'Exterior',
+  'interno':     'Interior',
+  'limpieza':    'Limpieza'
+};
+
+// Parsea un JSON de Taskade Visita Previa (v1 o v2) al formato del Pronosticador
 function fcParseTaskadeJSON(data) {
   if (!data || typeof data !== 'object') throw new Error('JSON inválido');
   if (!data.grupos || !data.resultado_global) throw new Error('No parece ser un export de Taskade Visita Previa (faltan claves "grupos"/"resultado_global")');
 
-  // Afectación por macro grupo: promedio ponderado de los grupos Taskade asignados
+  // Detectar versión
+  const isV2 = data._version === '2.0' || data._export === 'taskade_visita_previa_v2' || !!data.etapas_renovacion;
+  const danoGlobal = fcDpct(data.resultado_global) || 0;
+
   const afectacion = {};
-  for (const [macro, sources] of Object.entries(FC_TASKADE_MAP)) {
-    let sumDanoXPeso = 0, sumPeso = 0;
-    sources.forEach(src => {
-      const g = data.grupos[src];
-      if (g && g['daño_pct'] != null && !isNaN(g['daño_pct'])) {
-        const w = +g.peso_pct || 1;
-        sumDanoXPeso += (+g['daño_pct']) * w;
-        sumPeso += w;
-      }
-    });
-    afectacion[macro] = sumPeso > 0 ? Math.round(sumDanoXPeso / sumPeso) : 0;
+
+  if (isV2 && data.etapas_renovacion) {
+    // v2: usar etapas_renovacion directo (más preciso, viene pre-calculado en visita previa)
+    for (const [etapaKey, macroLabel] of Object.entries(FC_V2_ETAPAS_MAP)) {
+      const et = data.etapas_renovacion[etapaKey];
+      const dp = fcDpct(et);
+      afectacion[macroLabel] = dp != null ? Math.round(dp) : 0;
+    }
+    // Limpieza siempre 100 si no vino o vino baja (toda obra termina con limpieza)
+    if ((afectacion['Limpieza']||0) < 50) afectacion['Limpieza'] = 100;
+    // Demolición: si no vino o vino 0, usar heurística sobre daño global
+    if (!afectacion['Demolición']) {
+      afectacion['Demolición'] = danoGlobal >= 50 ? Math.round(danoGlobal) : Math.round(danoGlobal * 0.5);
+    }
+  } else {
+    // v1: promedio ponderado de los grupos Taskade asignados
+    for (const [macro, sources] of Object.entries(FC_TASKADE_MAP)) {
+      let sumDanoXPeso = 0, sumPeso = 0;
+      sources.forEach(src => {
+        const g = data.grupos[src];
+        const dp = fcDpct(g);
+        if (dp != null && !isNaN(dp)) {
+          const w = +g.peso_pct || 1;
+          sumDanoXPeso += dp * w;
+          sumPeso += w;
+        }
+      });
+      afectacion[macro] = sumPeso > 0 ? Math.round(sumDanoXPeso / sumPeso) : 0;
+    }
+    afectacion['Demolición'] = danoGlobal >= 50 ? Math.round(danoGlobal) : Math.round(danoGlobal * 0.5);
+    afectacion['Limpieza'] = 100;
   }
-  // Heurísticas para Demolición y Limpieza
-  const danoGlobal = +data.resultado_global['daño_pct'] || 0;
-  afectacion['Demolición'] = danoGlobal >= 50 ? Math.round(danoGlobal) : Math.round(danoGlobal * 0.5);
-  afectacion['Limpieza'] = 100; // toda obra termina con limpieza
 
   // Detalle estructurado para guardar en remodel_forecast_diagnoses.detalle
   const detalle = {
+    version: data._version || (isV2 ? '2.0' : '1.0'),
+    _export: data._export || null,
+    _generado: data._generado || null,
     propiedad: data.propiedad || {},
     resultado_global: data.resultado_global || {},
     grupos: data.grupos || {},
     patologias: data.patologias || {},
+    etapas_renovacion: data.etapas_renovacion || {},
     scores_raw: data.scores_raw || {},
-    respuestas_raw: data.respuestas_raw || {},
-    meta: data.meta || {}
+    checklist: data.checklist || null,
+    limpieza: data.limpieza || null,
+    // v1 compat
+    respuestas_raw: data.respuestas_raw || null,
+    meta: data.meta || null
   };
+
+  // ID: en v2 no hay meta.id_evaluacion, usar _generado + nombre como pseudo-id
+  const taskadeId = data.meta?.id_evaluacion
+    || (isV2 ? `v2-${(data.propiedad?.nombre||'').replace(/[^a-z0-9]/gi,'_')}-${(data._generado||data.propiedad?.fecha_evaluacion||'').slice(0,10)}` : null);
 
   return {
     propiedad: data.propiedad?.nombre || '',
     direccion: data.propiedad?.direccion || '',
     afectacion,
     detalle,
-    taskade_id: data.meta?.id_evaluacion || null,
+    taskade_id: taskadeId,
     veredicto: data.resultado_global?.veredicto || null,
+    veredicto_id: data.resultado_global?.veredicto_id || null,
     dano_global_pct: danoGlobal,
-    fecha_evaluacion: data.propiedad?.fecha_evaluacion || null
+    fecha_evaluacion: data.propiedad?.fecha_evaluacion || data._generado || null,
+    is_v2: isV2
   };
 }
 
