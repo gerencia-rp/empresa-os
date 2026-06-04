@@ -2261,8 +2261,48 @@ const fmState = {
   diagStep: 0,            // pregunta actual
   diagResult: null,       // perfil identificado + plan
   diagModo: 'medio',      // panorama | foco | corto | medio | completo
-  diagExpandidos: {}      // { bloque_id: true } — bloques expandidos individualmente
+  diagExpandidos: {},     // { bloque_id: true } — bloques expandidos individualmente
+  diagStudentId: null,    // estudiante vinculado al diagnóstico activo
+  diagStudentSearch: ''   // filtro búsqueda del dropdown
 };
+
+// ── Estudiantes disponibles para el Diagnóstico ──
+// Filtra por mentoría activa de FM (que viene del sistema padre eduState.mentorshipId
+// si está disponible, o el primer mentorship cargado).
+function fmGetStudentsForDiag() {
+  const list = (eduState && eduState.students) || [];
+  const mid = (eduState && eduState.mentorshipId) || null;
+  return mid ? list.filter(s => s.mentorship_id === mid) : list;
+}
+
+// Cuando el coach elige un estudiante: prellena respuestas con eduInferirDiagnostico
+// y deja el wizard listo para revisar/ajustar antes de generar el plan.
+function fmSelectStudentForDiag(studentId) {
+  if (!studentId) {
+    fmState.diagStudentId = null;
+    fmState.diagAnswers = {};
+    fmState.diagStep = 0;
+    fmRender();
+    return;
+  }
+  const s = (eduState.students || []).find(x => x.id === studentId);
+  if (!s) { alert('Estudiante no encontrado en el cache. Refrescá Mentorías Manager.'); return; }
+  fmState.diagStudentId = studentId;
+  try { fmState.diagAnswers = eduInferirDiagnostico(s) || {}; }
+  catch (e) { fmState.diagAnswers = {}; console.warn('inferir falló', e); }
+  fmState.diagStep = 0;
+  fmState.diagResult = null;
+  fmRender();
+}
+
+function fmSetDiagStudentSearch(v) {
+  fmState.diagStudentSearch = v || '';
+  fmRender();
+  setTimeout(() => {
+    const inp = document.getElementById('fm-diag-student-search');
+    if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
+  }, 0);
+}
 
 // ─── CONFIG WIZARD DE DIAGNÓSTICO (18 preguntas en 6 bloques) ───
 const FM_DIAG_QUESTIONS = [
@@ -2722,6 +2762,50 @@ function fmRenderDiagnostico() {
   // (los datos vienen de eduState.studentPlans si están sincronizados)
   const savedPlansSection = fmRenderSavedPlansSection();
 
+  // ── Selector de estudiante ──
+  const students = fmGetStudentsForDiag();
+  const filter = (fmState.diagStudentSearch || '').toLowerCase().trim();
+  const filtered = filter
+    ? students.filter(s => ((s.full_name||'') + ' ' + (s.email||'') + ' ' + (s.current_stage||'')).toLowerCase().includes(filter))
+    : students;
+  const selStudent = fmState.diagStudentId ? students.find(s => s.id === fmState.diagStudentId) : null;
+  const studentSelector = `
+    <div class="bg-white border border-amber-300 rounded-xl p-3 mb-4">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div class="text-xs font-bold uppercase text-amber-800">👤 Diagnóstico para estudiante</div>
+        ${selStudent ? `<button onclick="fmSelectStudentForDiag(null)" class="text-[10px] text-slate-500 hover:text-red-700">✕ Limpiar selección</button>` : ''}
+      </div>
+      ${selStudent ? `
+        <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <div class="min-w-0">
+            <div class="font-bold text-sm text-slate-900 truncate">${(selStudent.full_name||'').replace(/</g,'&lt;')}</div>
+            <div class="text-[11px] text-slate-600">
+              ${selStudent.current_stage || 'Sin etapa'} ${selStudent.grupo ? '· '+selStudent.grupo : ''} ${selStudent.email ? '· '+selStudent.email : ''}
+            </div>
+            <div class="text-[10px] text-emerald-700 mt-1">✓ Respuestas pre-llenadas desde el CRM. Revisá y ajustá lo que necesites.</div>
+          </div>
+        </div>
+      ` : `
+        <div class="text-[11px] text-slate-600 mb-2">Elegí un estudiante para auto-rellenar respuestas desde el CRM y vincular el plan generado al estudiante.</div>
+        <input id="fm-diag-student-search" type="text" placeholder="🔍 Buscar por nombre, email o etapa..." value="${(fmState.diagStudentSearch||'').replace(/"/g,'&quot;')}"
+          oninput="fmSetDiagStudentSearch(this.value)"
+          class="w-full border border-slate-300 rounded px-3 py-1.5 text-xs mb-2"/>
+        <div class="max-h-44 overflow-y-auto scrollbar-thin border border-slate-200 rounded">
+          ${filtered.length === 0 ? `
+            <div class="px-3 py-3 text-center text-[11px] text-slate-500">${students.length === 0 ? 'No hay estudiantes cargados. Abrí Mentorías Manager y haz Sync.' : 'Sin resultados para "'+filter+'"'}</div>
+          ` : filtered.slice(0, 50).map(s => `
+            <button onclick="fmSelectStudentForDiag('${s.id}')" class="w-full text-left px-3 py-2 hover:bg-amber-50 border-b border-slate-100 last:border-b-0">
+              <div class="font-medium text-xs text-slate-900 truncate">${(s.full_name||'?').replace(/</g,'&lt;')}</div>
+              <div class="text-[10px] text-slate-500 truncate">${(s.current_stage || '—')} ${s.grupo ? '· '+s.grupo : ''}</div>
+            </button>
+          `).join('')}
+          ${filtered.length > 50 ? `<div class="px-3 py-1 text-[10px] text-slate-500 text-center italic">+${filtered.length - 50} más (refiná búsqueda)</div>` : ''}
+        </div>
+        <div class="text-[10px] text-slate-500 mt-2 italic">O continuá sin estudiante para diagnóstico anónimo.</div>
+      `}
+    </div>
+  `;
+
   const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
   const total = activeQuestions.length;
   const step = Math.min(fmState.diagStep, total - 1);
@@ -2745,6 +2829,7 @@ function fmRenderDiagnostico() {
           <p class="text-sm text-slate-600">${total} preguntas en 6 bloques para análisis completo: objetivo, capital, fundación, mercado, red operativa y mindset. Al final recibís un plan estructurado por bloques.</p>
         </div>
 
+        ${studentSelector}
         ${savedPlansSection}
 
         <!-- Bloques navegación -->
@@ -4092,7 +4177,11 @@ function fmRenderDiagPlan() {
               <p class="text-sm text-slate-300 print:text-slate-600">Perfil #${p.num} · ${r.etapa} · ${r.cronograma}</p>
             </div>
             <div class="flex gap-2 print:hidden">
-              <button onclick="fmAbrirVincularEstudiante()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-sm font-bold">💾 Vincular a estudiante (CRM)</button>
+              ${fmState.diagStudentId ? (() => {
+                const sel = (eduState.students||[]).find(s => s.id === fmState.diagStudentId);
+                const name = sel ? (sel.full_name || 'estudiante') : 'estudiante';
+                return `<button onclick="fmLinkPlanAStudiante('${fmState.diagStudentId}', '${sel?.mentorship_id||''}')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-bold" title="Guardar y vincular directo a ${name.replace(/"/g,'&quot;')}">💾 Guardar plan para ${name.replace(/</g,'&lt;')}</button>`;
+              })() : `<button onclick="fmAbrirVincularEstudiante()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-sm font-bold">💾 Vincular a estudiante (CRM)</button>`}
               <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">🖨️ Imprimir</button>
               <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">📋 Copiar</button>
               <button onclick="fmDiagReset()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">🔄 Repetir</button>
