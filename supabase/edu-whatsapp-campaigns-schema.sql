@@ -63,8 +63,21 @@ end$$;
 grant execute on function public.increment_campaign_responded(uuid) to authenticated;
 
 -- Sistema visible en el área de Educación
-insert into public.systems (id, area_id, type, name, icon, description, config, data, position) values
-  ('edu-whatsapp-mgr', 'educacion', 'edu-whatsapp', 'WhatsApp Masivo IA', '💬',
-   'Mensajes masivos personalizados con IA basados en etapa y plan del estudiante. Captura respuestas y actualiza el plan.',
-   '{}'::jsonb, '{}'::jsonb, 5)
-on conflict (id) do nothing;
+-- Detecta automáticamente el id real del area (puede ser 'education' o 'educacion')
+do $$
+declare
+  edu_area_id text;
+begin
+  select id into edu_area_id from public.areas
+    where id in ('education','educacion') or lower(name) like 'educaci%'
+    limit 1;
+  if edu_area_id is null then
+    raise notice 'No existe area de Educación. Saltando insert del sistema.';
+    return;
+  end if;
+  insert into public.systems (id, area_id, type, name, icon, description, config, data, position)
+  values ('edu-whatsapp-mgr', edu_area_id, 'edu-whatsapp', 'WhatsApp Masivo IA', '💬',
+    'Mensajes masivos personalizados con IA basados en etapa y plan del estudiante. Captura respuestas y actualiza el plan.',
+    '{}'::jsonb, '{}'::jsonb, 5)
+  on conflict (id) do nothing;
+end$$;
