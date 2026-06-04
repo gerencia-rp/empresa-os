@@ -18,7 +18,18 @@ const wpState = {
   // S6-U3: drag de actividad entre celdas
   draggedActivityId: null,
   // S6-U4: vista Crew × Hora
-  crewHourViewDate: null // null o YYYY-MM-DD
+  crewHourViewDate: null, // null o YYYY-MM-DD
+  // V2 — portado de ops-planner Juan Austin
+  backlog: [],                  // activities con date=null
+  taskTemplates: [],            // wp_task_templates (catálogo)
+  dayTemplates: [],             // wp_day_templates
+  recurring: [],                // wp_recurring
+  sidePanelTab: 'resources',    // resources | backlog | templates | daytemplates | recurring
+  draggedTemplateId: null,
+  draggedBacklogId: null,
+  draggedDayTemplateId: null,
+  showChecklistFor: null,       // activityId si está abierto modal checklist
+  printDate: null               // si está set, se muestra vista print en lugar de grilla
 };
 
 function wpFmtDate(d) {
@@ -40,16 +51,29 @@ async function wpLoadAll() {
   if (!wpState.weekStart) wpState.weekStart = wpMondayOf(new Date());
   const start = wpDateOnly(wpState.weekStart);
   const end = wpDateOnly(wpAddDays(wpState.weekStart, 6)); // domingo (7 días lun-dom)
-  const [{ data: resources }, { data: activities }, { data: projects }, catRes] = await Promise.all([
+  const [
+    resRes, actRes, projRes, catRes,
+    // V2 — backlog, plantillas, recurrentes, all activities globales
+    blRes, ttRes, dtRes, rcRes, allActsRes
+  ] = await Promise.all([
     sb.from('resources').select('*').eq('active', true).order('type').order('name'),
     sb.from('weekly_activities').select('*').gte('date', start).lte('date', end).order('date'),
     sb.from('remodel_projects').select('id,name,address,status,sqft,budget_total,activities,start_date,end_date_estimated,completed_at').order('created_at', { ascending: false }),
-    sb.from('remodel_catalog_items').select('code,description,depends_on').then(r => r.data || []).catch(() => [])
+    sb.from('remodel_catalog_items').select('code,description,depends_on').then(r => r.data || []).catch(() => []),
+    sb.from('weekly_activities').select('*').is('date', null).order('priority', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
+    sb.from('wp_task_templates').select('*').eq('active', true).order('category').order('name').then(r => r).catch(() => ({ data: [] })),
+    sb.from('wp_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
+    sb.from('wp_recurring').select('*').eq('active', true).then(r => r).catch(() => ({ data: [] })),
+    sb.from('weekly_activities').select('*').then(r => r).catch(() => ({ data: [] }))
   ]);
-  wpState.resources = resources || [];
-  wpState.activities = activities || [];
-  wpState.projects = projects || [];
-  wpState.catalog = catRes || [];
+  wpState.resources = resRes.data || [];
+  wpState.activities = allActsRes.data || actRes.data || [];  // usamos TODAS para soportar overdue global
+  wpState.projects = projRes.data || [];
+  wpState.catalog = Array.isArray(catRes) ? catRes : (catRes.data || []);
+  wpState.backlog = blRes.data || [];
+  wpState.taskTemplates = ttRes.data || [];
+  wpState.dayTemplates = dtRes.data || [];
+  wpState.recurring = rcRes.data || [];
 }
 
 // ─── S6-U2: CPM helpers ───
@@ -91,6 +115,8 @@ function wpCheckDeps(act, allHomeActs) {
 async function openWeeklyPlanner(sys) {
   wpState.sys = sys;
   await wpLoadAll();
+  // Generar tareas recurrentes vencidas (silencioso)
+  try { await wpGenerateRecurringDue(); await wpLoadAll(); } catch(e) { console.warn('recurring', e); }
   openModal(`📅 ${sys.name}`, '<div id="wp-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
@@ -191,25 +217,38 @@ function wpRender() {
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
+          <button onclick="wpOpenPrintView(prompt('Día a imprimir (YYYY-MM-DD):', wpDateOnly(new Date())))" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Vista entregable imprimible del día">🖨️ Imprimir día</button>
           <button onclick="wpToggleResourceForm()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">+ Recurso</button>
         </div>
       </div>
 
-      <!-- BODY: Sidebar resources + Grid calendario -->
+      <!-- BODY: Sidebar tabbed + Grid calendario -->
       <div class="flex gap-3 flex-1 min-h-0 overflow-hidden">
-        <!-- SIDEBAR agrupado por tipo (acordeón) -->
-        <div class="w-60 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
-          <div class="p-2 bg-slate-50 border-b border-slate-200">
-            <div class="text-[10px] font-bold uppercase text-slate-600">Recursos · arrastra a un día</div>
+        <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) -->
+        <div class="w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+          <!-- Tabs -->
+          <div class="flex border-b border-slate-200 bg-slate-50 text-[10px] font-bold">
+            <button onclick="wpSetSideTab('resources')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='resources'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">👷 Recursos</button>
+            <button onclick="wpSetSideTab('backlog')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='backlog'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">📥 Backlog <span class="bg-slate-900 text-white px-1 rounded">${(wpState.backlog||[]).length}</span></button>
+            <button onclick="wpSetSideTab('templates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">📚 Tareas</button>
+            <button onclick="wpSetSideTab('daytemplates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='daytemplates'?'bg-white border-b-2 border-blue-600':'text-slate-500 hover:bg-slate-100'}">🗂️ Días <span class="bg-blue-600 text-white px-1 rounded">${(wpState.dayTemplates||[]).length}</span></button>
+            <button onclick="wpSetSideTab('recurring')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='recurring'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">🔁 Recur <span class="bg-violet-600 text-white px-1 rounded">${(wpState.recurring||[]).length}</span></button>
           </div>
           <div class="flex-1 overflow-y-auto">
-            ${wpRenderResourceGroup('crew', '👷 Equipos / Crews', 'border-blue-200 hover:border-blue-500')}
-            ${wpRenderResourceGroup('specialist', '👨‍🔧 Especialistas / Subs', 'border-purple-200 hover:border-purple-500')}
-            ${wpRenderResourceGroup('tool', '🔧 Herramientas / Equipos', 'border-amber-200 hover:border-amber-500')}
-            ${wpRenderResourceGroup('vehicle', '🚚 Vehículos', 'border-slate-200 hover:border-slate-500')}
-            ${wpRenderResourceGroup('other', '📦 Otros', 'border-slate-200 hover:border-slate-500')}
+            ${wpState.sidePanelTab === 'resources' ? `
+              <div class="p-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">Recursos · arrastra a un día</div>
+              ${wpRenderResourceGroup('crew', '👷 Equipos / Crews', 'border-blue-200 hover:border-blue-500')}
+              ${wpRenderResourceGroup('specialist', '👨‍🔧 Especialistas / Subs', 'border-purple-200 hover:border-purple-500')}
+              ${wpRenderResourceGroup('tool', '🔧 Herramientas / Equipos', 'border-amber-200 hover:border-amber-500')}
+              ${wpRenderResourceGroup('vehicle', '🚚 Vehículos', 'border-slate-200 hover:border-slate-500')}
+              ${wpRenderResourceGroup('other', '📦 Otros', 'border-slate-200 hover:border-slate-500')}
+            ` : ''}
+            ${wpState.sidePanelTab === 'backlog' ? wpRenderBacklogPanel() : ''}
+            ${wpState.sidePanelTab === 'templates' ? wpRenderTaskTemplatesPanel() : ''}
+            ${wpState.sidePanelTab === 'daytemplates' ? wpRenderDayTemplatesPanel() : ''}
+            ${wpState.sidePanelTab === 'recurring' ? wpRenderRecurringPanel() : ''}
           </div>
-          ${wpState.showResourceForm ? wpRenderResourceForm() : ''}
+          ${wpState.sidePanelTab === 'resources' && wpState.showResourceForm ? wpRenderResourceForm() : ''}
         </div>
 
         <!-- GRID -->
@@ -310,6 +349,8 @@ function wpRenderCell(home, date, conflicts) {
                     ${(a.notes||'').startsWith('[Estimador]') ? '<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded font-bold">📐 EST</span>' : ''}
                     ${isLate ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded font-bold">⏰ ATRASADA</span>' : ''}
                     ${hasDepIssue ? `<span class="text-[9px] bg-amber-600 text-white px-1 rounded font-bold" title="Dependencias no listas: ${depCheck.blockers.map(b => b.code).join(', ')}">🔗 ${depCheck.blockers.length} dep</span>` : ''}
+                    ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold hover:bg-emerald-200" title="Checklist + materiales">✅ ${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="text-[9px] text-slate-400 hover:text-slate-700" title="Agregar checklist + materiales">+ ✅</button>`}
+                    ${(a.materials||[]).length > 0 ? `<span class="text-[9px] bg-slate-100 text-slate-700 px-1 rounded" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
                   </div>
                   ${acts.length ? `<div class="flex flex-wrap gap-0.5 mt-1">${acts.map(r => `<span class="text-[10px] bg-white border border-slate-300 px-1 rounded" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}</div>` : ''}
                   ${hasConflict ? '<div class="text-[9px] text-red-600 font-bold mt-0.5">⚠️ Conflicto recurso</div>' : ''}
@@ -1799,4 +1840,528 @@ async function wpApproveImport() {
   await wpLoadAll();
   wpRender();
   alert(`✅ Importadas ${rows.length} actividad(es) en ${parsed.items.length} bloque(s).`);
+}
+
+// ════════════════════════════════════════════════════════════
+// V2 — Portado de ops-planner (Juan Austin) adaptado a obra:
+// Backlog · Catálogo de tareas · Plantillas de día · Recurrentes
+// Checklist + materiales · Vista print
+// ════════════════════════════════════════════════════════════
+
+function wpSetSideTab(t) { wpState.sidePanelTab = t; wpRender(); }
+
+// ─── Panel: BACKLOG (activities con date=null) ───
+function wpRenderBacklogPanel() {
+  const bl = wpState.backlog || [];
+  return `
+    <div class="p-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">
+      📥 Backlog · ${bl.length} sin fecha · arrastra a un día
+    </div>
+    ${bl.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin actividades en backlog. Las que no tengan fecha aparecen acá.</div>` : `
+      <div class="p-2 space-y-1.5">
+        ${bl.map(b => `
+          <div draggable="true" ondragstart="wpBacklogDragStart('${b.id}')"
+               class="bg-white border border-amber-200 hover:border-amber-500 rounded p-2 cursor-move shadow-sm">
+            <div class="font-bold text-[11px] text-slate-900 truncate">${(b.activity_name||'?').replace(/</g,'&lt;')}</div>
+            <div class="text-[9px] text-slate-500 truncate">${(b.property_name||b.stage||'—').replace(/</g,'&lt;')}</div>
+            ${b.priority && b.priority !== 'normal' ? `<span class="text-[8px] font-bold px-1 rounded ${b.priority==='urgent'?'bg-red-100 text-red-700':b.priority==='high'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}">${b.priority.toUpperCase()}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+// ─── Panel: CATÁLOGO TAREAS (wp_task_templates) ───
+function wpRenderTaskTemplatesPanel() {
+  const tt = wpState.taskTemplates || [];
+  // Agrupar por categoría
+  const byCat = {};
+  tt.forEach(t => { const k = t.category || '(otros)'; if (!byCat[k]) byCat[k] = []; byCat[k].push(t); });
+  return `
+    <div class="p-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">
+      📚 Catálogo · ${tt.length} tareas · arrastra a un día
+    </div>
+    ${tt.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin plantillas. Corré weekly-planner-advanced-schema.sql para semilla.</div>` : `
+      <div class="p-2 space-y-2">
+        ${Object.entries(byCat).map(([cat, items]) => `
+          <div>
+            <div class="text-[9px] font-bold uppercase text-slate-500 mb-1">${cat}</div>
+            <div class="space-y-1">
+              ${items.map(t => `
+                <div draggable="true" ondragstart="wpTaskTemplateDragStart('${t.id}')"
+                     class="bg-white border border-emerald-200 hover:border-emerald-500 rounded p-1.5 cursor-move text-[11px]">
+                  <span class="font-bold">${t.emoji||'🔨'} ${(t.name||'?').replace(/</g,'&lt;')}</span>
+                  <span class="text-[9px] text-slate-500 ml-1">${t.default_duration_days}d</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+// ─── Panel: PLANTILLAS DE DÍA (wp_day_templates) ───
+function wpRenderDayTemplatesPanel() {
+  const dt = wpState.dayTemplates || [];
+  return `
+    <div class="p-2 bg-slate-50 border-b border-slate-200">
+      <div class="text-[10px] font-bold uppercase text-slate-600">🗂️ Plantillas de día · ${dt.length}</div>
+      <button onclick="wpSaveCurrentDayAsTemplate()" class="text-[10px] mt-1 w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-1 rounded">💾 Guardar día actual como plantilla</button>
+    </div>
+    ${dt.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin plantillas. Guardá un día con tareas como plantilla reusable.</div>` : `
+      <div class="p-2 space-y-1.5">
+        ${dt.map(d => `
+          <div class="bg-white border border-blue-200 hover:border-blue-500 rounded p-2 group">
+            <div class="font-bold text-[11px] text-slate-900 truncate">${(d.name||'?').replace(/</g,'&lt;')}</div>
+            <div class="text-[9px] text-slate-500">${(d.tasks||[]).length} tareas</div>
+            <div class="flex gap-1 mt-1">
+              <button onclick="wpApplyDayTemplate('${d.id}')" class="flex-1 text-[10px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-0.5 rounded">📋 Aplicar</button>
+              <button onclick="wpDeleteDayTemplate('${d.id}')" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 rounded" title="Eliminar">🗑️</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+// ─── Panel: RECURRENTES (wp_recurring) ───
+function wpRenderRecurringPanel() {
+  const rc = wpState.recurring || [];
+  return `
+    <div class="p-2 bg-slate-50 border-b border-slate-200">
+      <div class="text-[10px] font-bold uppercase text-slate-600">🔁 Recurrentes · ${rc.length}</div>
+      <button onclick="wpOpenNewRecurring()" class="text-[10px] mt-1 w-full bg-violet-100 hover:bg-violet-200 text-violet-800 font-bold py-1 rounded">+ Nueva recurrente</button>
+    </div>
+    ${rc.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin recurrentes. Ej: "Limpieza diaria cada 1d", "Inspección semanal".</div>` : `
+      <div class="p-2 space-y-1.5">
+        ${rc.map(r => {
+          const tt = (wpState.taskTemplates||[]).find(t => t.id === r.base_task_id);
+          const proj = (wpState.projects||[]).find(p => p.id === r.project_id);
+          return `
+            <div class="bg-white border border-violet-200 rounded p-2">
+              <div class="font-bold text-[11px] text-slate-900 truncate">${r.custom_name || (tt && tt.name) || 'Recurrente'}</div>
+              <div class="text-[9px] text-slate-500">${proj ? proj.name : r.property_name || '—'} · cada ${r.interval_days}d · próx: ${r.next_due}</div>
+              <button onclick="wpDeleteRecurring('${r.id}')" class="text-[10px] mt-1 text-red-600 hover:underline">eliminar</button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `}
+  `;
+}
+
+// ─── DRAG handlers ───
+function wpBacklogDragStart(id) {
+  wpState.draggedBacklogId = id;
+  wpState.draggedResource = null;
+  wpState.draggedTemplateId = null;
+}
+function wpTaskTemplateDragStart(id) {
+  wpState.draggedTemplateId = id;
+  wpState.draggedBacklogId = null;
+  wpState.draggedResource = null;
+}
+
+// Extiende wpDropOnCell para aceptar backlog y plantillas
+// (la función original solo manejaba recursos — la wrappeamos)
+if (typeof wpDropOnCell === 'function' && !wpDropOnCell._wrapped) {
+  const _wpDropOnCellOrig = wpDropOnCell;
+  window.wpDropOnCell = async function(homeId, homeName, dateStr, ev) {
+    ev.preventDefault();
+    // Backlog item → asignar fecha y casa
+    if (wpState.draggedBacklogId) {
+      const id = wpState.draggedBacklogId;
+      wpState.draggedBacklogId = null;
+      const updates = { date: dateStr, status: 'planned', updated_at: new Date().toISOString() };
+      if (!homeId.startsWith('name:')) updates.project_id = homeId;
+      if (homeName) updates.property_name = homeName;
+      await sb.from('weekly_activities').update(updates).eq('id', id);
+      await wpLoadAll(); wpRender();
+      return;
+    }
+    // Task template → crear nueva actividad
+    if (wpState.draggedTemplateId) {
+      const id = wpState.draggedTemplateId;
+      wpState.draggedTemplateId = null;
+      const tt = (wpState.taskTemplates||[]).find(t => t.id === id);
+      if (!tt) return;
+      const newActivity = {
+        date: dateStr,
+        activity_name: tt.name,
+        stage: tt.category,
+        duration_days: tt.default_duration_days || 1,
+        checklist: (tt.default_checklist||[]).map(c => ({ item: c, done: false })),
+        materials: tt.default_materials || [],
+        template_task_id: id,
+        status: 'planned',
+        created_by: state.user.id
+      };
+      if (!homeId.startsWith('name:')) newActivity.project_id = homeId;
+      if (homeName) newActivity.property_name = homeName;
+      await sb.from('weekly_activities').insert(newActivity);
+      await wpLoadAll(); wpRender();
+      return;
+    }
+    // Fallback: handler original (recursos)
+    return _wpDropOnCellOrig.call(this, homeId, homeName, dateStr, ev);
+  };
+  window.wpDropOnCell._wrapped = true;
+}
+
+// ─── Plantillas de día ───
+async function wpSaveCurrentDayAsTemplate() {
+  // Toma todas las actividades del lunes (primer día visible) como template
+  const targetDate = wpDateOnly(wpState.weekStart);
+  const acts = (wpState.activities||[]).filter(a => a.date === targetDate);
+  if (!acts.length) { alert(`Sin actividades en ${targetDate}. Agregá actividades primero.`); return; }
+  const name = prompt(`Nombre de la plantilla:`, `Día tipo · ${targetDate}`);
+  if (!name) return;
+  const tasks = acts.map(a => ({
+    activity_name: a.activity_name,
+    stage: a.stage,
+    duration_days: a.duration_days || 1,
+    checklist: a.checklist || [],
+    materials: a.materials || [],
+    priority: a.priority || 'normal',
+    notes: a.notes || ''
+  }));
+  const { error } = await sb.from('wp_day_templates').insert({
+    name, tasks, created_by: state.user.id
+  });
+  if (error) return alert('Error: '+error.message);
+  await wpLoadAll(); wpRender();
+}
+
+async function wpApplyDayTemplate(templateId) {
+  const t = (wpState.dayTemplates||[]).find(x => x.id === templateId);
+  if (!t) return;
+  const dateStr = prompt(`Aplicar "${t.name}" a qué fecha? (YYYY-MM-DD)`, wpDateOnly(wpState.weekStart));
+  if (!dateStr) return;
+  // Necesita casa destino — pedirla
+  const projs = wpState.projects.filter(p => p.status !== 'cancelled');
+  if (!projs.length) return alert('Sin proyectos. Creá uno primero.');
+  const choices = projs.map((p,i) => `${i+1}) ${p.name||p.address}`).join('\n');
+  const idx = prompt(`Casa destino:\n${choices}`);
+  const sel = projs[parseInt(idx)-1];
+  if (!sel) return;
+  const rows = (t.tasks||[]).map(task => ({
+    project_id: sel.id,
+    property_name: sel.name || sel.address,
+    date: dateStr,
+    activity_name: task.activity_name,
+    stage: task.stage,
+    duration_days: task.duration_days || 1,
+    checklist: task.checklist || [],
+    materials: task.materials || [],
+    priority: task.priority || 'normal',
+    notes: task.notes || null,
+    day_template_id: templateId,
+    status: 'planned',
+    created_by: state.user.id
+  }));
+  if (!rows.length) return alert('Plantilla vacía.');
+  const { error } = await sb.from('weekly_activities').insert(rows);
+  if (error) return alert('Error: '+error.message);
+  await wpLoadAll(); wpRender();
+  alert(`✓ ${rows.length} actividad(es) creadas en ${sel.name||sel.address} para ${dateStr}`);
+}
+
+async function wpDeleteDayTemplate(id) {
+  if (!confirm('Eliminar esta plantilla? Las actividades ya creadas no se borran.')) return;
+  await sb.from('wp_day_templates').delete().eq('id', id);
+  await wpLoadAll(); wpRender();
+}
+
+// ─── Recurrentes ───
+function wpOpenNewRecurring() {
+  const tt = wpState.taskTemplates || [];
+  const projs = wpState.projects.filter(p => p.status !== 'cancelled');
+  if (!tt.length) return alert('Sin plantillas de tarea. Corré weekly-planner-advanced-schema.sql.');
+  if (!projs.length) return alert('Sin proyectos activos.');
+
+  const html = `
+    <div class="space-y-3">
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tarea base *</label>
+        <select id="wp-rec-tt" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">— Elegí una plantilla —</option>
+          ${tt.map(t => `<option value="${t.id}">${t.emoji||'🔨'} ${t.name} (${t.default_duration_days}d)</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Proyecto / casa *</label>
+        <select id="wp-rec-proj" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">— Elegí proyecto —</option>
+          ${projs.map(p => `<option value="${p.id}">${(p.name||p.address||'?').replace(/</g,'&lt;')}</option>`).join('')}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Cada N días *</label>
+          <input id="wp-rec-int" type="number" min="1" max="365" value="7" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Próxima fecha *</label>
+          <input id="wp-rec-next" type="date" value="${wpDateOnly(new Date())}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Nombre personalizado (opcional)</label>
+        <input id="wp-rec-name" type="text" placeholder="Ej. Limpieza diaria Wellington" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="wpSaveRecurring()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 rounded">💾 Crear recurrente</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cancelar</button>
+      </div>
+    </div>
+  `;
+  openModal('🔁 Nueva tarea recurrente', html);
+}
+
+async function wpSaveRecurring() {
+  const ttId = document.getElementById('wp-rec-tt').value;
+  const projId = document.getElementById('wp-rec-proj').value;
+  const interval = +document.getElementById('wp-rec-int').value || 7;
+  const next = document.getElementById('wp-rec-next').value;
+  const customName = document.getElementById('wp-rec-name').value.trim();
+  if (!ttId || !projId || !next) return alert('Completá los campos requeridos.');
+  const proj = wpState.projects.find(p => p.id === projId);
+  const tt = wpState.taskTemplates.find(t => t.id === ttId);
+  const { error } = await sb.from('wp_recurring').insert({
+    base_task_id: ttId,
+    project_id: projId,
+    property_name: proj?.name || proj?.address || null,
+    custom_name: customName || null,
+    stage: tt?.category || null,
+    duration_days: tt?.default_duration_days || 1,
+    interval_days: interval,
+    next_due: next
+  });
+  if (error) return alert('Error: '+error.message);
+  closeModal();
+  await wpLoadAll(); wpRender();
+}
+
+async function wpDeleteRecurring(id) {
+  if (!confirm('Eliminar esta recurrente?')) return;
+  await sb.from('wp_recurring').update({ active: false }).eq('id', id);
+  await wpLoadAll(); wpRender();
+}
+
+// Genera actividades de recurrentes vencidas (llamar después de wpLoadAll en cada apertura)
+async function wpGenerateRecurringDue() {
+  const today = wpDateOnly(new Date());
+  const due = (wpState.recurring||[]).filter(r => r.next_due <= today);
+  if (!due.length) return 0;
+  const rows = [];
+  for (const r of due) {
+    const tt = (wpState.taskTemplates||[]).find(t => t.id === r.base_task_id);
+    rows.push({
+      project_id: r.project_id,
+      property_name: r.property_name,
+      date: today,
+      activity_name: r.custom_name || (tt && tt.name) || 'Recurrente',
+      stage: r.stage,
+      duration_days: r.duration_days || 1,
+      checklist: (tt?.default_checklist || []).map(c => ({ item: c, done: false })),
+      materials: tt?.default_materials || [],
+      recurring_id: r.id,
+      status: 'planned',
+      created_by: state.user.id
+    });
+  }
+  if (rows.length) await sb.from('weekly_activities').insert(rows);
+  // Actualizar next_due
+  for (const r of due) {
+    const next = new Date(today + 'T00:00:00');
+    next.setDate(next.getDate() + r.interval_days);
+    await sb.from('wp_recurring').update({
+      last_generated: today, next_due: wpDateOnly(next)
+    }).eq('id', r.id);
+  }
+  return rows.length;
+}
+
+// ─── Checklist modal por actividad ───
+function wpOpenChecklist(activityId) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  wpState.showChecklistFor = activityId;
+  const checklist = a.checklist || [];
+  const materials = a.materials || [];
+  const html = `
+    <div class="space-y-4">
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">✅ Checklist de pasos</div>
+        <ul class="space-y-1 mb-2">
+          ${checklist.map((item, idx) => `
+            <li class="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5">
+              <input type="checkbox" ${item.done?'checked':''} onchange="wpToggleChecklistItem('${activityId}', ${idx})" class="cursor-pointer"/>
+              <input type="text" value="${(item.item||'').replace(/"/g,'&quot;')}" onchange="wpEditChecklistItem('${activityId}', ${idx}, this.value)" class="flex-1 border-none text-sm ${item.done?'line-through text-slate-400':''} bg-transparent focus:outline-none focus:bg-slate-50 rounded px-1"/>
+              <button onclick="wpRemoveChecklistItem('${activityId}', ${idx})" class="text-red-500 hover:text-red-700 text-xs">✕</button>
+            </li>
+          `).join('')}
+        </ul>
+        <div class="flex gap-1">
+          <input type="text" id="wp-new-checklist" placeholder="Nuevo paso..." onkeydown="if(event.key==='Enter'){wpAddChecklistItem('${activityId}', this.value, this);}" class="flex-1 border border-slate-300 rounded px-2 py-1 text-sm"/>
+          <button onclick="wpAddChecklistItem('${activityId}', document.getElementById('wp-new-checklist').value, document.getElementById('wp-new-checklist'))" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm">+</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📦 Materiales</div>
+        <ul class="space-y-1 mb-2">
+          ${materials.map((m, idx) => `
+            <li class="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs">
+              <input type="text" value="${(m.nombre||'').replace(/"/g,'&quot;')}" onchange="wpEditMaterial('${activityId}', ${idx}, 'nombre', this.value)" class="flex-1 border-none bg-transparent focus:outline-none focus:bg-slate-50 rounded px-1" placeholder="Nombre"/>
+              <input type="number" value="${m.cantidad||1}" onchange="wpEditMaterial('${activityId}', ${idx}, 'cantidad', this.value)" class="w-20 border border-slate-200 rounded px-1 text-right"/>
+              <input type="text" value="${(m.unidad||'').replace(/"/g,'&quot;')}" onchange="wpEditMaterial('${activityId}', ${idx}, 'unidad', this.value)" class="w-20 border border-slate-200 rounded px-1" placeholder="ud"/>
+              <button onclick="wpRemoveMaterial('${activityId}', ${idx})" class="text-red-500 hover:text-red-700">✕</button>
+            </li>
+          `).join('')}
+        </ul>
+        <button onclick="wpAddMaterial('${activityId}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded">+ Material</button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">📝 Notas</label>
+        <textarea id="wp-notes-${activityId}" rows="2" onchange="wpUpdateNotes('${activityId}', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">${(a.notes||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cerrar</button>
+      </div>
+    </div>
+  `;
+  openModal(`✅ ${a.activity_name}`, html);
+}
+
+async function wpToggleChecklistItem(activityId, idx) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const cl = [...(a.checklist||[])];
+  cl[idx] = { ...cl[idx], done: !cl[idx].done };
+  await sb.from('weekly_activities').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+  wpOpenChecklist(activityId);
+}
+async function wpEditChecklistItem(activityId, idx, value) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const cl = [...(a.checklist||[])];
+  cl[idx] = { ...cl[idx], item: value };
+  await sb.from('weekly_activities').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+}
+async function wpRemoveChecklistItem(activityId, idx) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const cl = [...(a.checklist||[])];
+  cl.splice(idx, 1);
+  await sb.from('weekly_activities').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+  wpOpenChecklist(activityId);
+}
+async function wpAddChecklistItem(activityId, value, input) {
+  const v = (value||'').trim(); if (!v) return;
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const cl = [...(a.checklist||[]), { item: v, done: false }];
+  await sb.from('weekly_activities').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+  if (input) input.value = '';
+  wpOpenChecklist(activityId);
+}
+async function wpAddMaterial(activityId) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const mat = [...(a.materials||[]), { nombre: '', cantidad: 1, unidad: 'ud' }];
+  await sb.from('weekly_activities').update({ materials: mat, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+  wpOpenChecklist(activityId);
+}
+async function wpEditMaterial(activityId, idx, field, value) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const mat = [...(a.materials||[])];
+  mat[idx] = { ...mat[idx], [field]: field === 'cantidad' ? +value : value };
+  await sb.from('weekly_activities').update({ materials: mat, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+}
+async function wpRemoveMaterial(activityId, idx) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const mat = [...(a.materials||[])];
+  mat.splice(idx, 1);
+  await sb.from('weekly_activities').update({ materials: mat, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+  wpOpenChecklist(activityId);
+}
+async function wpUpdateNotes(activityId, value) {
+  await sb.from('weekly_activities').update({ notes: value, updated_at: new Date().toISOString() }).eq('id', activityId);
+  await wpLoadAll();
+}
+
+// ─── Vista print del día / entregable para el crew ───
+function wpOpenPrintView(dateStr) {
+  const acts = (wpState.activities||[]).filter(a => a.date === dateStr);
+  if (!acts.length) return alert(`Sin actividades en ${dateStr}.`);
+  const byHome = {};
+  acts.forEach(a => {
+    const key = a.project_id || ('name:'+a.property_name);
+    if (!byHome[key]) byHome[key] = { name: a.property_name || '?', acts: [] };
+    byHome[key].acts.push(a);
+  });
+  const d = new Date(dateStr + 'T00:00:00');
+  const dateLbl = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  const html = `
+    <!DOCTYPE html><html><head><title>Día de obra · ${dateStr}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>@media print { .no-print{display:none!important;} body{font-size:11pt;margin:1cm;} }</style>
+    </head><body class="p-6 bg-white">
+      <div class="no-print mb-4 flex gap-2">
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded">🖨️ Imprimir</button>
+        <button onclick="window.close()" class="bg-slate-100 px-4 py-2 rounded">Cerrar</button>
+      </div>
+      <div class="border-b-2 border-slate-900 pb-3 mb-4">
+        <h1 class="text-2xl font-bold capitalize">${dateLbl}</h1>
+        <div class="text-sm text-slate-600">${Object.keys(byHome).length} casa(s) · ${acts.length} actividad(es)</div>
+      </div>
+      ${Object.entries(byHome).map(([key, h]) => `
+        <div class="mb-6 break-inside-avoid">
+          <h2 class="text-lg font-bold border-b border-slate-300 mb-2">🏠 ${h.name.replace(/</g,'&lt;')}</h2>
+          ${h.acts.map(a => `
+            <div class="mb-3 pl-4 border-l-2 ${a.status==='done'?'border-emerald-500':'border-blue-400'}">
+              <div class="flex items-center gap-2">
+                <div class="text-base font-bold ${a.status==='done'?'line-through text-slate-500':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                ${a.stage ? `<span class="text-xs bg-slate-100 px-2 py-0.5 rounded">${a.stage.replace(/</g,'&lt;')}</span>` : ''}
+                ${a.duration_days > 1 ? `<span class="text-xs text-slate-500">(${a.duration_days} días)</span>` : ''}
+              </div>
+              ${(a.checklist||[]).length > 0 ? `
+                <ul class="mt-1 text-sm">
+                  ${a.checklist.map(it => `<li class="${it.done?'line-through text-slate-400':''}">${it.done?'☑':'☐'} ${(it.item||'').replace(/</g,'&lt;')}</li>`).join('')}
+                </ul>
+              ` : ''}
+              ${(a.materials||[]).length > 0 ? `
+                <div class="mt-1 text-xs">
+                  <strong>Materiales:</strong> ${a.materials.map(m => `${m.nombre} (${m.cantidad} ${m.unidad||''})`).join(', ').replace(/</g,'&lt;')}
+                </div>
+              ` : ''}
+              ${a.notes ? `<div class="mt-1 text-xs italic text-slate-600">📝 ${a.notes.replace(/</g,'&lt;')}</div>` : ''}
+              ${a.assignee ? `<div class="mt-1 text-xs">👤 ${a.assignee.replace(/</g,'&lt;')}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `).join('')}
+      <div class="mt-8 pt-3 border-t border-slate-300 text-xs text-slate-500">Empresa OS · ${new Date().toLocaleString('es')}</div>
+    </body></html>
+  `;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
