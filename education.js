@@ -1106,40 +1106,55 @@ function eduRenderPresentations() {
 }
 
 async function eduGeneratePresentation() {
-  const title = document.getElementById('edu-pres-title')?.value.trim();
-  const topic = document.getElementById('edu-pres-topic')?.value.trim();
+  const title = (document.getElementById('edu-pres-title')?.value || '').trim();
+  const topic = (document.getElementById('edu-pres-topic')?.value || '').trim();
   if (!title || !topic) return alert('Título y tema son obligatorios');
+  if (!state || !state.user || !state.user.id) {
+    return alert('No hay sesión activa. Refresh la página y volvé a iniciar sesión.');
+  }
   const m = eduCurrentMentorship();
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  if (!m && !eduState.mentorshipId) {
+    return alert('Seleccioná una mentoría primero (los botones arriba del formulario).');
+  }
+  const aiKey = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
   window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { loading: true };
+  window.aiState[aiKey] = { loading: true, status: 'starting', started_at: Date.now() };
   eduRender();
   try {
     const payload = {
       mentorship_id: m?.id,
       title,
       topic,
-      audience: document.getElementById('edu-pres-audience').value || undefined,
-      presentation_type: document.getElementById('edu-pres-type').value,
-      class_number: +document.getElementById('edu-pres-class-number').value || null,
-      duration_min: +document.getElementById('edu-pres-duration').value || 60,
-      slides_count: +document.getElementById('edu-pres-slides').value || 15,
-      language: document.getElementById('edu-pres-lang').value,
-      outline_hint: document.getElementById('edu-pres-outline').value || null,
+      audience: document.getElementById('edu-pres-audience')?.value || undefined,
+      presentation_type: document.getElementById('edu-pres-type')?.value || 'class',
+      class_number: +document.getElementById('edu-pres-class-number')?.value || null,
+      duration_min: +document.getElementById('edu-pres-duration')?.value || 60,
+      slides_count: +document.getElementById('edu-pres-slides')?.value || 15,
+      language: document.getElementById('edu-pres-lang')?.value || 'es',
+      outline_hint: document.getElementById('edu-pres-outline')?.value || null,
       domain: document.getElementById('edu-pres-domain')?.value || 'real-estate',
       geographic_focus: document.getElementById('edu-pres-geo')?.value || null,
       preferred_sources: document.getElementById('edu-pres-sources')?.value || null,
-      require_live_data: document.getElementById('edu-pres-live').checked,
+      require_live_data: document.getElementById('edu-pres-live')?.checked ?? true,
       research_mode: document.getElementById('edu-pres-research')?.checked || false,
       user_id: state.user.id
     };
-    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/generate-presentation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify(payload)
-    });
-    const r = await res.json();
-    if (!r.ok) throw new Error(r.error || 'falló');
+    console.log('[edu-pres] POST →', payload);
+    let res, r;
+    try {
+      res = await fetch(`${window.SUPABASE_URL}/functions/v1/generate-presentation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+        body: JSON.stringify(payload)
+      });
+    } catch (netErr) {
+      throw new Error('Sin conexión a la edge function: ' + netErr.message);
+    }
+    const txt = await res.text();
+    try { r = JSON.parse(txt); }
+    catch { throw new Error(`HTTP ${res.status}: respuesta no-JSON: ${txt.slice(0,300)}`); }
+    console.log('[edu-pres] response →', r);
+    if (!r.ok) throw new Error(r.error || `HTTP ${res.status}: falló sin mensaje`);
 
     // Pattern async: job_id devuelto → polling cada 5s hasta done/error
     if (r.async && r.job_id) {

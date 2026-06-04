@@ -146,21 +146,41 @@ async function opLoadAll() {
   await opGenerateRecurring();
 }
 
-// Mueve tareas no-hechas de días pasados → backlog (date=null)
+// Carga las tareas vencidas (pasadas no hechas). NO las devuelve al backlog —
+// se quedan en su día y aparecen como "atrasadas / reprogramables" en el header.
 async function opAutoRollback() {
   const today = opDateOnly(new Date());
-  if (opState.date < today) return; // solo si vemos hoy o futuro
-  const { data: stale } = await sb.from('ops_day_tasks')
-    .select('id')
+  const { data: overdue } = await sb.from('ops_day_tasks')
+    .select('*')
     .lt('date', today)
-    .in('status', ['planned','in_progress']);
-  if (stale && stale.length) {
-    const ids = stale.map(x => x.id);
-    await sb.from('ops_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).in('id', ids);
-    // Recargar backlog
-    const { data: b } = await sb.from('ops_day_tasks').select('*').is('date', null).order('created_at');
-    opState.backlog = b || [];
-  }
+    .in('status', ['planned','in_progress'])
+    .order('date');
+  opState.overdue = overdue || [];
+}
+
+// Reprograma una tarea atrasada a otra fecha (default: hoy).
+async function opReprogramTask(id, newDate) {
+  const target = newDate || opDateOnly(new Date());
+  await sb.from('ops_day_tasks').update({
+    date: target,
+    status: 'planned',
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await opLoadAll();
+  opRender();
+}
+
+// Reprograma TODAS las atrasadas al día indicado (default hoy).
+async function opReprogramAllOverdue(newDate) {
+  const target = newDate || opDateOnly(new Date());
+  const ids = (opState.overdue || []).map(t => t.id);
+  if (!ids.length) return;
+  if (!confirm(`Mover ${ids.length} tarea(s) atrasada(s) al ${target}?`)) return;
+  await sb.from('ops_day_tasks').update({
+    date: target, status: 'planned', updated_at: new Date().toISOString()
+  }).in('id', ids);
+  await opLoadAll();
+  opRender();
 }
 
 // Genera tareas pendientes a partir de recurrentes que ya vencieron
@@ -242,8 +262,46 @@ function opRender() {
   const backlogByZona = {};
   opState.backlog.forEach(t => { const z = t.zona || '∅'; backlogByZona[z] = (backlogByZona[z]||0) + 1; });
 
+  // ── Tareas atrasadas (días pasados sin completar) ──
+  const overdue = (opState.overdue || []);
+  const todayStr = opDateOnly(new Date());
+  const tomorrow = opAddDays(todayStr, 1);
+  const overdueBanner = overdue.length ? `
+    <div class="bg-red-50 border border-red-300 rounded-lg px-3 py-2 mb-2 flex items-start gap-2">
+      <div class="text-xl">⚠️</div>
+      <div class="flex-1">
+        <div class="flex items-center justify-between flex-wrap gap-1">
+          <div class="text-xs font-bold text-red-800">${overdue.length} tarea(s) atrasada(s) sin completar</div>
+          <div class="flex gap-1">
+            <button onclick="opReprogramAllOverdue('${todayStr}')" class="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded font-bold">Reprogramar todas → Hoy</button>
+            <button onclick="opReprogramAllOverdue('${tomorrow}')" class="text-[10px] bg-amber-600 hover:bg-amber-700 text-white px-2 py-0.5 rounded font-bold">→ Mañana</button>
+            <button onclick="opToggleOverdueDetails()" class="text-[10px] bg-white border border-red-300 text-red-700 px-2 py-0.5 rounded">${opState.showOverdueDetails?'▴ Ocultar':'▾ Ver'}</button>
+          </div>
+        </div>
+        ${opState.showOverdueDetails ? `
+          <div class="mt-2 space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
+            ${overdue.map(t => `
+              <div class="flex items-center justify-between bg-white border border-red-200 rounded px-2 py-1 text-[11px]">
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-slate-900 truncate">${(t.title||'').replace(/</g,'&lt;')}</div>
+                  <div class="text-[9px] text-slate-500">${t.date} · ${t.start_time||''} · ${t.duration_min||0}m${t.zona?' · '+t.zona:''}${opPropName(t)?' · '+opPropName(t):''}</div>
+                </div>
+                <div class="flex gap-0.5 ml-2">
+                  <input type="date" value="${todayStr}" onchange="opReprogramTask('${t.id}', this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[10px]" title="Reprogramar a fecha">
+                  <button onclick="opMarkDone('${t.id}', true).then(() => opLoadAll().then(opRender))" class="bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 py-0.5 rounded text-[10px] font-bold" title="Marcar como hecha">✓</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  ` : '';
+
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
+
+      ${overdueBanner}
 
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-200 flex-wrap gap-2">
@@ -1024,13 +1082,68 @@ function opToggleCasaExpand(key) {
   opState.casasExpanded[key] = !(opState.casasExpanded[key] !== false);
   opRender();
 }
+function opToggleOverdueDetails() {
+  opState.showOverdueDetails = !opState.showOverdueDetails;
+  opRender();
+}
 async function opToggleDoneFromCasas(id, isDone) {
-  await sb.from('ops_day_tasks').update({
-    status: isDone ? 'done' : 'planned',
-    updated_at: new Date().toISOString()
-  }).eq('id', id);
+  await opMarkDone(id, isDone);
   await opLoadAll();
   opRender();
+}
+
+// Núcleo: marca done/planned, captura tiempo real, ajusta default del template.
+async function opMarkDone(id, isDone) {
+  // Busca en cualquier bucket cargado (día, semana, backlog, upcoming, overdue)
+  const buckets = [opState.dayTasks, opState.weekTasks, opState.backlog, opState.allUpcoming, opState.overdue];
+  let t = null;
+  for (const b of buckets) { if (!b) continue; t = b.find(x => x.id === id); if (t) break; }
+  const now = new Date().toISOString();
+  if (isDone) {
+    // Calcular actual_duration_min si tenemos started_at y hoy es la fecha planeada
+    let started = t && t.started_at;
+    if (!started) started = t && t.date && t.start_time ? new Date(t.date + 'T' + t.start_time).toISOString() : null;
+    let actual = t && t.actual_duration_min;
+    if (started && !actual) {
+      const ms = new Date(now) - new Date(started);
+      const mins = Math.max(1, Math.round(ms / 60000));
+      actual = mins;
+    }
+    // Pedir feedback rápido si no hay actual o si difiere >30%
+    let fb = null;
+    if (t && t.task_id) {
+      const planned = t.duration_min || 0;
+      if (!actual) {
+        // sin started: pedir tiempo manualmente
+        const ans = prompt(`¿Cuánto te tomó realmente "${t.title}"? (minutos, planeado: ${planned})`, planned);
+        if (ans && !isNaN(+ans)) actual = Math.max(1, Math.round(+ans));
+      }
+      if (actual && planned) {
+        const ratio = actual / planned;
+        if (ratio < 0.7) fb = 'short';
+        else if (ratio > 1.3) fb = 'long';
+        else fb = 'ok';
+      }
+    }
+    await sb.from('ops_day_tasks').update({
+      status: 'done',
+      completed_at: now,
+      started_at: t && t.started_at ? t.started_at : (t && t.date && t.start_time ? new Date(t.date+'T'+t.start_time).toISOString() : now),
+      actual_duration_min: actual || null,
+      duration_feedback: fb,
+      updated_at: now
+    }).eq('id', id);
+    // Ajustar default del template (promedio rodante via RPC)
+    if (t && t.task_id && actual) {
+      await sb.rpc('fn_ops_register_actual', { p_task_id: t.task_id, p_actual: actual }).catch(() => {});
+    }
+  } else {
+    await sb.from('ops_day_tasks').update({
+      status: 'planned',
+      completed_at: null,
+      updated_at: now
+    }).eq('id', id);
+  }
 }
 // ─── Crear/editar casa desde Ops Planner ───
 function opOpenAddCasa(propId) {
@@ -1786,8 +1899,7 @@ async function opDeleteScheduled(id, fromModal) {
 async function opToggleDone(id) {
   const t = opState.dayTasks.find(x => x.id === id);
   if (!t) return;
-  const newStatus = t.status === 'done' ? 'planned' : 'done';
-  await sb.from('ops_day_tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+  await opMarkDone(id, t.status !== 'done');
   await opLoadAll();
   opRender();
 }

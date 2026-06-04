@@ -134,12 +134,48 @@ function wpRender() {
   const totalThisWeek = visibleActs.length;
   const doneThisWeek = visibleActs.filter(a => a.status === 'done').length;
   const progressPct = totalThisWeek ? Math.round(doneThisWeek/totalThisWeek*100) : 0;
-  const overdueCount = visibleActs.filter(a =>
-    a.status !== 'done' && a.status !== 'cancelled' && new Date(a.date) < new Date(wpDateOnly(new Date()))
-  ).length;
+  // S7 — Overdue (atrasadas globales, no solo de la semana visible)
+  const todayIso = wpDateOnly(new Date());
+  const overdueAll = wpState.activities.filter(a =>
+    a.status !== 'done' && a.status !== 'cancelled' && a.date && a.date < todayIso
+  );
+  const overdueCount = overdueAll.length;
+  const tomorrowIso = wpDateOnly(wpAddDays(new Date(), 1));
+  const overdueBanner = overdueCount ? `
+    <div class="bg-red-50 border border-red-300 rounded-lg px-3 py-2 mb-2 flex items-start gap-2">
+      <div class="text-xl">⚠️</div>
+      <div class="flex-1">
+        <div class="flex items-center justify-between flex-wrap gap-1">
+          <div class="text-xs font-bold text-red-800">${overdueCount} actividad(es) atrasada(s) sin completar</div>
+          <div class="flex gap-1">
+            <button onclick="wpReprogramAllOverdue('${todayIso}')" class="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded font-bold">Reprog. todas → Hoy</button>
+            <button onclick="wpReprogramAllOverdue('${tomorrowIso}')" class="text-[10px] bg-amber-600 hover:bg-amber-700 text-white px-2 py-0.5 rounded font-bold">→ Mañana</button>
+            <button onclick="wpToggleOverdueDetails()" class="text-[10px] bg-white border border-red-300 text-red-700 px-2 py-0.5 rounded">${wpState.showOverdueDetails?'▴ Ocultar':'▾ Ver'}</button>
+          </div>
+        </div>
+        ${wpState.showOverdueDetails ? `
+          <div class="mt-2 space-y-1 max-h-40 overflow-y-auto scrollbar-thin">
+            ${overdueAll.map(t => `
+              <div class="flex items-center justify-between bg-white border border-red-200 rounded px-2 py-1 text-[11px]">
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-slate-900 truncate">${(t.activity_name||'').replace(/</g,'&lt;')} <span class="text-slate-500">— ${(t.property_name||'').replace(/</g,'&lt;')}</span></div>
+                  <div class="text-[9px] text-slate-500">${t.date}${t.stage?' · '+t.stage:''}${t.activity_code?' · '+t.activity_code:''}</div>
+                </div>
+                <div class="flex gap-0.5 ml-2">
+                  <input type="date" value="${todayIso}" onchange="wpReprogramTask('${t.id}', this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[10px]" title="Reprogramar">
+                  <button onclick="wpMarkActivityDone('${t.id}', true).then(() => wpLoadAll().then(wpRender))" class="bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 py-0.5 rounded text-[10px] font-bold" title="Marcar como hecha">✓</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  ` : '';
 
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[80vh]">
+      ${overdueBanner}
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
         <div class="flex items-center gap-2">
@@ -154,6 +190,7 @@ function wpRender() {
           ${conflicts.length ? `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold">⚠️ ${conflicts.length} conflictos</span>` : '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">✓ Sin conflictos</span>'}
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
+          <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
           <button onclick="wpToggleResourceForm()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">+ Recurso</button>
         </div>
       </div>
@@ -583,9 +620,67 @@ async function wpQuickToggleDone(id, ev) {
   ev.stopPropagation();
   const a = wpState.activities.find(x => x.id === id);
   if (!a) return;
-  const newStatus = a.status === 'done' ? 'planned' : 'done';
-  await sb.from('weekly_activities').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+  await wpMarkActivityDone(id, a.status !== 'done');
   await wpLoadAll();
+  wpRender();
+}
+
+// Núcleo: marca done/planned + captura tiempo real (días) si aplica.
+async function wpMarkActivityDone(id, isDone) {
+  const a = wpState.activities.find(x => x.id === id);
+  const now = new Date().toISOString();
+  if (isDone) {
+    let actualDays = null;
+    if (a) {
+      const startStr = a.started_at ? a.started_at.slice(0,10) : a.date;
+      if (startStr) {
+        const diff = Math.max(1, Math.round((new Date(now.slice(0,10)) - new Date(startStr)) / 86400000) + 1);
+        actualDays = diff;
+      }
+    }
+    await sb.from('weekly_activities').update({
+      status: 'done',
+      completed_at: now,
+      started_at: a && a.started_at ? a.started_at : (a && a.date ? new Date(a.date+'T00:00:00').toISOString() : now),
+      actual_days: actualDays,
+      updated_at: now
+    }).eq('id', id);
+  } else {
+    await sb.from('weekly_activities').update({
+      status: 'planned',
+      completed_at: null,
+      updated_at: now
+    }).eq('id', id);
+  }
+}
+
+// Reprograma una actividad a nuevo día
+async function wpReprogramTask(id, newDate) {
+  if (!newDate) return;
+  await sb.from('weekly_activities').update({
+    date: newDate, status: 'planned', updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await wpLoadAll();
+  wpRender();
+}
+
+// Reprograma TODAS las atrasadas
+async function wpReprogramAllOverdue(newDate) {
+  const todayIso = wpDateOnly(new Date());
+  const ids = wpState.activities
+    .filter(a => a.status !== 'done' && a.status !== 'cancelled' && a.date && a.date < todayIso)
+    .map(a => a.id);
+  if (!ids.length) return;
+  if (!confirm(`Mover ${ids.length} actividad(es) atrasada(s) al ${newDate}?`)) return;
+  await sb.from('weekly_activities').update({
+    date: newDate, status: 'planned', updated_at: new Date().toISOString()
+  }).in('id', ids);
+  await wpLoadAll();
+  wpRender();
+}
+
+function wpToggleOverdueDetails() {
+  wpState.showOverdueDetails = !wpState.showOverdueDetails;
   wpRender();
 }
 
@@ -1360,4 +1455,200 @@ async function wpHouseAnalysis(projectId, name) {
   openModal(`📊 ${name}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl','max-w-7xl');
   document.querySelector('#modal > div').classList.add('max-w-5xl');
+}
+
+// ════════════════════════════════════════════════════════════
+// IMPORTAR CRONOGRAMA EXCEL (del Estimador Pro / remodel-forecast)
+// Lee la hoja "CRONOGRAMA" con estructura: Item | Actividad | Día inicio | Duración | Día Fin
+// Crea/actualiza filas en weekly_activities asociadas a un project_id elegido.
+// ════════════════════════════════════════════════════════════
+function wpOpenImportExcel() {
+  const projOpts = wpState.projects.filter(p => p.status !== 'cancelled').map(p =>
+    `<option value="${p.id}">${(p.name || p.address || '?').replace(/</g,'&lt;')}</option>`
+  ).join('');
+  const html = `
+    <div class="space-y-4">
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-800">
+        📥 Sube el Excel del cronograma (generado por el Estimador Pro). Leemos la hoja
+        <code class="bg-white px-1 rounded">CRONOGRAMA</code> y creamos cada actividad como
+        una entrada en este calendario, asignada al proyecto que elijas.
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Proyecto destino *</label>
+        <select id="wp-imp-proj" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">— Selecciona —</option>
+          ${projOpts}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Archivo Excel (.xlsx) *</label>
+        <input id="wp-imp-file" type="file" accept=".xlsx,.xls"
+               class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 rounded p-2 text-[11px] text-slate-700">
+        <strong>Opciones:</strong>
+        <label class="flex items-center gap-2 mt-1"><input type="checkbox" id="wp-imp-clear" /> Borrar actividades existentes del proyecto antes de importar</label>
+        <label class="flex items-center gap-2 mt-1"><input type="checkbox" id="wp-imp-expand" checked /> Si la actividad dura N días, crear N filas (una por día)</label>
+      </div>
+
+      <div id="wp-imp-preview" class="hidden bg-white border border-slate-200 rounded p-3 max-h-64 overflow-y-auto"></div>
+
+      <div class="flex gap-2">
+        <button onclick="wpDoImportExcel()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2.5 rounded-lg">📥 Importar</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `;
+  openModal('📥 Importar cronograma desde Excel', html);
+}
+
+// Parser robusto: lee la hoja CRONOGRAMA con XLSX, devuelve { rows, projectStart }
+function wpParseCronogramaSheet(workbook) {
+  const sheetName = workbook.SheetNames.find(n => /CRONOGRAMA/i.test(n));
+  if (!sheetName) throw new Error('No se encontró la hoja "CRONOGRAMA" en el Excel.');
+  const ws = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false });
+  // Estructura esperada:
+  //  fila 1: título
+  //  fila 2: headers (Item, Actividad, Día inicio, Duración, Día Fin, Semana 1, ...)
+  //  fila 3: fechas individuales (DD/MM)
+  //  fila 4+: etapas (sin código en B vacío) o sub-actividades (código en A, desc en B)
+  let projectStart = null;
+  // Intento detectar fecha base en fila 3 col F (6)
+  const headerDateRow = rows[2] || [];
+  // Estado: la etapa actual
+  let currentStage = null;
+  const items = [];
+  for (let i = 3; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const codeOrTitle = (r[0] || '').toString().trim();
+    const activity = (r[1] || '').toString().trim();
+    const startCell = r[2];
+    const durCell = r[3];
+    const finCell = r[4];
+
+    // Etapa header: tiene formato "N. ETAPA" en col A
+    if (/^\d+\.\s*[A-Za-zÁÉÍÓÚñÑáéíóú]/.test(codeOrTitle) && !activity) {
+      currentStage = codeOrTitle.replace(/^\d+\.\s*/, '').trim();
+      continue;
+    }
+    // Sub-actividad: tiene desc en col B
+    if (activity) {
+      const startD = wpParseExcelDate(startCell);
+      const finD = wpParseExcelDate(finCell);
+      const duration = Number(durCell) || (startD && finD ? Math.max(1, Math.round((finD - startD) / 86400000) + 1) : 1);
+      if (startD && !projectStart) projectStart = startD;
+      items.push({
+        code: codeOrTitle || null,
+        activity_name: activity,
+        stage: currentStage,
+        date: startD ? wpDateOnly(startD) : null,
+        duration_days: duration,
+        end_date: finD ? wpDateOnly(finD) : null
+      });
+    }
+  }
+  return { items, projectStart };
+}
+
+// Convierte celda de fecha de Excel (puede venir como Date, string DD/MM/YYYY, o serial number)
+function wpParseExcelDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') {
+    // Excel serial date (días desde 1900-01-01)
+    return new Date(Math.round((v - 25569) * 86400 * 1000));
+  }
+  const s = String(v).trim();
+  // ISO YYYY-MM-DD
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  // DD/MM/YYYY o DD-MM-YYYY
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) {
+    const y = +m[3]; const yyyy = y < 100 ? 2000+y : y;
+    return new Date(yyyy, +m[2]-1, +m[1]);
+  }
+  return null;
+}
+
+async function wpDoImportExcel() {
+  const projId = document.getElementById('wp-imp-proj').value;
+  const fileInp = document.getElementById('wp-imp-file');
+  const clear = document.getElementById('wp-imp-clear').checked;
+  const expand = document.getElementById('wp-imp-expand').checked;
+  if (!projId) { alert('Selecciona un proyecto destino.'); return; }
+  if (!fileInp.files || !fileInp.files[0]) { alert('Sube un archivo .xlsx'); return; }
+
+  const file = fileInp.files[0];
+  const buf = await file.arrayBuffer();
+  const workbook = XLSX.read(buf, { type: 'array', cellDates: true });
+  let parsed;
+  try { parsed = wpParseCronogramaSheet(workbook); }
+  catch (e) { alert('Error: ' + e.message); return; }
+
+  if (!parsed.items.length) { alert('No se encontraron actividades en la hoja CRONOGRAMA.'); return; }
+
+  const proj = wpState.projects.find(p => p.id === projId);
+  const propertyName = proj ? (proj.name || proj.address || 'Proyecto') : '';
+  const importBatch = 'imp_' + Date.now();
+
+  // 1) Borrar previas si pidió clear
+  if (clear) {
+    if (!confirm(`Esto eliminará TODAS las actividades del proyecto "${propertyName}". ¿Seguir?`)) return;
+    await sb.from('weekly_activities').delete().eq('project_id', projId);
+  }
+
+  // 2) Construir filas a insertar
+  const rows = [];
+  for (const it of parsed.items) {
+    if (!it.date) continue;
+    if (expand && it.duration_days > 1) {
+      for (let d = 0; d < it.duration_days; d++) {
+        const day = wpAddDays(new Date(it.date + 'T00:00:00'), d);
+        rows.push({
+          project_id: projId,
+          property_name: propertyName,
+          date: wpDateOnly(day),
+          activity_name: it.activity_name + (it.duration_days > 1 ? ` (día ${d+1}/${it.duration_days})` : ''),
+          activity_code: it.code,
+          stage: it.stage,
+          duration_days: it.duration_days,
+          status: 'planned',
+          import_batch: importBatch,
+          created_by: state.user.id
+        });
+      }
+    } else {
+      rows.push({
+        project_id: projId,
+        property_name: propertyName,
+        date: it.date,
+        activity_name: it.activity_name,
+        activity_code: it.code,
+        stage: it.stage,
+        duration_days: it.duration_days,
+        status: 'planned',
+        import_batch: importBatch,
+        created_by: state.user.id
+      });
+    }
+  }
+  if (!rows.length) { alert('Ninguna actividad tenía fecha válida.'); return; }
+
+  // 3) Insertar en chunks de 100
+  const chunks = [];
+  for (let i = 0; i < rows.length; i += 100) chunks.push(rows.slice(i, i+100));
+  for (const c of chunks) {
+    const { error } = await sb.from('weekly_activities').insert(c);
+    if (error) { alert('Error guardando: ' + error.message); return; }
+  }
+
+  closeModal();
+  await wpLoadAll();
+  wpRender();
+  alert(`✅ Importadas ${rows.length} actividad(es) en ${parsed.items.length} bloque(s).`);
 }
