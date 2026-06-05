@@ -333,17 +333,24 @@
     }
     return { error: new Error('safeInsert: demasiados reintentos') };
   };
-  window.safeUpdate = async function(qb, payload) {
-    let p = { ...payload };
-    let tries = 0;
-    while (tries < 8) {
-      const res = await qb.update(p);
+  // builderFn(p) debe devolver el query ya armado: sb.from('t').update(p).eq('id', id)
+  // (o equivalente para .in, .match, etc.). Recibe el payload (posiblemente
+  // ya sin columnas faltantes) y debe armar la query fresca cada vez.
+  window.safeUpdate = async function(builderFn, payload) {
+    let p = Array.isArray(payload) ? payload.map(r => ({ ...r })) : { ...payload };
+    if (typeof builderFn !== 'function') {
+      // Compat antiguo: si recibimos un qb directo, asumimos que .update se
+      // aplica encima y filtros se aplicaron antes.
+      const qb = builderFn;
+      builderFn = (pp) => qb.update(pp);
+    }
+    for (let tries = 0; tries < 8; tries++) {
+      const res = await builderFn(p);
       if (!res.error) return res;
       const fix = window._stripMissingCol(res.error, p);
       if (!fix) return res;
-      console.warn('[safeUpdate] columna faltante:', fix.col, '→ reintentando sin ella');
+      console.warn('[safeUpdate] columna faltante:', fix.col, '→ retry sin ella');
       p = fix.payload;
-      tries++;
     }
     return { error: new Error('safeUpdate: demasiados reintentos') };
   };

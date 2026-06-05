@@ -396,9 +396,13 @@ function wpRenderCell(home, date, conflicts) {
           const allHomeActs = wpState.activities.filter(x => x.project_id === home.id || (!x.project_id && home.id.startsWith('name:') && x.property_name === home.id.slice(5)));
           const depCheck = a.status === 'done' ? { satisfied: true, blockers: [], minDate: null } : wpCheckDeps(a, allHomeActs);
           const hasDepIssue = !depCheck.satisfied;
+          const isCritical = a.priority === 'critical' || a.priority === 'urgent';
+          const isPostponed = (a.notes || '').includes('[APLAZADA');
           const statusColor = a.status === 'done' ? 'bg-emerald-50 border-emerald-300' :
                               a.status === 'in_progress' ? 'bg-blue-50 border-blue-300' :
                               a.status === 'cancelled' ? 'bg-slate-50 border-slate-200 opacity-60' :
+                              isCritical && a.status !== 'done' ? 'bg-rose-50 border-rose-500 border-l-4' :
+                              isPostponed ? 'bg-amber-50 border-amber-400 border-l-4' :
                               hasConflict ? 'bg-red-50 border-red-300' :
                               hasDepIssue ? 'bg-amber-50 border-amber-300' :
                               'bg-white border-slate-200';
@@ -416,6 +420,8 @@ function wpRenderCell(home, date, conflicts) {
                     ${a.stage ? `<div class="text-[10px] text-slate-500">${a.stage}</div>` : ''}
                     ${(a.notes||'').startsWith('[Estimador]') ? '<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded font-bold">📐 EST</span>' : ''}
                     ${isLate ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded font-bold">⏰ ATRASADA</span>' : ''}
+                    ${isCritical && a.status !== 'done' ? '<span class="text-[9px] bg-rose-700 text-white px-1 rounded font-bold" title="Ruta crítica">⚠️ CRÍTICA</span>' : ''}
+                    ${isPostponed ? '<span class="text-[9px] bg-amber-600 text-white px-1 rounded font-bold" title="Tarea aplazada con motivo">🟡 APLAZADA</span>' : ''}
                     ${hasDepIssue ? `<span class="text-[9px] bg-amber-600 text-white px-1 rounded font-bold" title="Dependencias no listas: ${depCheck.blockers.map(b => b.code).join(', ')}">🔗 ${depCheck.blockers.length} dep</span>` : ''}
                     ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold hover:bg-emerald-200" title="Checklist + materiales">✅ ${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="text-[9px] text-slate-400 hover:text-slate-700" title="Agregar checklist + materiales">+ ✅</button>`}
                     ${(a.materials||[]).length > 0 ? `<span class="text-[9px] bg-slate-100 text-slate-700 px-1 rounded" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
@@ -720,11 +726,15 @@ function wpEditActivity(id) {
         </div>` : ''}
 
         <!-- Acciones rápidas -->
-        <div class="flex gap-2 pt-2 border-t border-slate-200">
-          ${!isDone ? `<button onclick="wpMarkActivityDone('${id}', true).then(()=>wpBackToPlanner({reload:true}))" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Marcar como hecha</button>` : `<button onclick="wpMarkActivityDone('${id}', false).then(()=>wpBackToPlanner({reload:true}))" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">↺ Desmarcar</button>`}
-          <input type="date" id="wpe-quick-date" value="${a.date}" class="border border-slate-300 rounded px-2 py-1 text-xs" />
-          <button onclick="wpReprogramTask('${id}', document.getElementById('wpe-quick-date').value).then(()=>wpBackToPlanner())" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">📅 Mover</button>
+        <div class="flex gap-2 pt-2 border-t border-slate-200 flex-wrap">
+          ${!isDone ? `<button onclick="wpMarkActivityDone('${id}', true).then(()=>wpBackToPlanner({reload:true})).catch(e=>alert(e.message))" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Marcar como hecha</button>` : `<button onclick="wpMarkActivityDone('${id}', false).then(()=>wpBackToPlanner({reload:true})).catch(e=>alert(e.message))" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">↺ Desmarcar</button>`}
+          <button onclick="wpOpenPostpone('${id}')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded" title="Aplazar con motivo">🟡 Aplazar con motivo</button>
         </div>
+        ${a.notes && a.notes.includes('[APLAZADA') ? `
+        <div class="border-l-4 border-amber-500 bg-amber-50 p-2 rounded-r text-[11px]">
+          <div class="font-bold text-amber-900">🟡 Esta tarea fue aplazada</div>
+          <div class="text-amber-800 mt-0.5">${(a.notes.match(/\[APLAZADA[^\]]*\]/g)||[]).slice(-1)[0]||''}</div>
+        </div>` : ''}
       </div>
 
       <!-- TAB: EDITAR (form completo) -->
@@ -843,43 +853,103 @@ async function wpeDelete(id) {
   await wpLoadAll();
   wpBackToPlanner();
 }
-// Quick toggle done desde el grid (sin abrir modal)
+// Quick toggle done desde el grid (sin abrir modal). Optimistic update:
+// cambia el state local YA, re-renderiza, y dispara el update a DB en paralelo.
 async function wpQuickToggleDone(id, ev) {
-  ev.stopPropagation();
+  if (ev) ev.stopPropagation();
   const a = wpState.activities.find(x => x.id === id);
   if (!a) return;
-  await wpMarkActivityDone(id, a.status !== 'done');
-  await wpLoadAll();
+  const newStatus = a.status === 'done' ? 'planned' : 'done';
+  // Optimistic UI: actualizar state local YA
+  a.status = newStatus;
+  a.completed_at = newStatus === 'done' ? new Date().toISOString() : null;
   wpRender();
+  // Persistir async (sin bloquear UI)
+  try {
+    await wpMarkActivityDone(id, newStatus === 'done');
+  } catch (e) {
+    // Rollback
+    a.status = newStatus === 'done' ? 'planned' : 'done';
+    a.completed_at = newStatus === 'done' ? null : new Date().toISOString();
+    wpRender();
+    alert('No se pudo guardar el cambio: ' + (e?.message || e));
+  }
 }
 
-// Núcleo: marca done/planned + captura tiempo real (días) si aplica.
+// Núcleo: marca done/planned + captura tiempo real (días) si la columna existe.
+// Usa safeUpdate para que las columnas opcionales (started_at, actual_days)
+// no rompan si todavía no se migraron.
 async function wpMarkActivityDone(id, isDone) {
   const a = wpState.activities.find(x => x.id === id);
   const now = new Date().toISOString();
+  let payload;
   if (isDone) {
-    let actualDays = null;
+    payload = { status: 'done', completed_at: now, updated_at: now };
     if (a) {
       const startStr = a.started_at ? a.started_at.slice(0,10) : a.date;
       if (startStr) {
-        const diff = Math.max(1, Math.round((new Date(now.slice(0,10)) - new Date(startStr)) / 86400000) + 1);
-        actualDays = diff;
+        payload.actual_days = Math.max(1, Math.round((new Date(now.slice(0,10)) - new Date(startStr)) / 86400000) + 1);
+        payload.started_at = a.started_at || new Date(a.date+'T00:00:00').toISOString();
       }
     }
-    await sb.from('weekly_activities').update({
-      status: 'done',
-      completed_at: now,
-      started_at: a && a.started_at ? a.started_at : (a && a.date ? new Date(a.date+'T00:00:00').toISOString() : now),
-      actual_days: actualDays,
-      updated_at: now
-    }).eq('id', id);
   } else {
-    await sb.from('weekly_activities').update({
-      status: 'planned',
-      completed_at: null,
-      updated_at: now
-    }).eq('id', id);
+    payload = { status: 'planned', completed_at: null, updated_at: now };
   }
+  const { error } = await window.safeUpdate(
+    p => sb.from('weekly_activities').update(p).eq('id', id),
+    payload
+  );
+  if (error) throw new Error(error.message || 'Error guardando');
+}
+
+// ─── APLAZAR con motivo obligatorio ───
+function wpOpenPostpone(id) {
+  const a = wpState.activities.find(x => x.id === id);
+  if (!a) return;
+  const tomorrowIso = wpDateOnly(wpAddDays(new Date(a.date+'T00:00:00'), 1));
+  openModal('🟡 Aplazar tarea — motivo obligatorio', `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border border-amber-300 rounded p-2 text-xs text-amber-900">
+        <strong>Tarea:</strong> ${(a.activity_name||'').replace(/</g,'&lt;')}<br>
+        <strong>Fecha actual:</strong> ${a.date}
+      </div>
+      <div>
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nueva fecha *</label>
+        <input id="wp-postpone-date" type="date" value="${tomorrowIso}" min="${a.date}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div>
+        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">¿Por qué se aplaza? *<span class="text-red-600 ml-1">(obligatorio, mín 10 caracteres)</span></label>
+        <textarea id="wp-postpone-reason" rows="3" minlength="10" required class="w-full border border-amber-400 rounded px-3 py-2 text-sm" placeholder="Ej: Falta de material, lluvia, falta de mano de obra, cambio de prioridad..."></textarea>
+        <div class="text-[10px] text-slate-500 mt-1">El motivo queda registrado en las notas con fecha. La tarea se marca en amarillo en el calendario.</div>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="wpConfirmPostpone('${id}')" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded">🟡 Confirmar aplazamiento</button>
+      </div>
+    </div>
+  `);
+}
+
+async function wpConfirmPostpone(id) {
+  const a = wpState.activities.find(x => x.id === id);
+  if (!a) return;
+  const newDate = document.getElementById('wp-postpone-date').value;
+  const reason = (document.getElementById('wp-postpone-reason').value || '').trim();
+  if (!newDate) { alert('Seleccioná una fecha'); return; }
+  if (reason.length < 10) { alert('El motivo debe tener al menos 10 caracteres. Explicá brevemente por qué se aplaza.'); return; }
+
+  const today = wpDateOnly(new Date());
+  const tag = `[APLAZADA ${today} de ${a.date} → ${newDate}: ${reason}]`;
+  const prevNotes = (a.notes || '').trim();
+  const newNotes = prevNotes ? prevNotes + '\n' + tag : tag;
+
+  const { error } = await window.safeUpdate(
+    p => sb.from('weekly_activities').update(p).eq('id', id),
+    { date: newDate, status: 'planned', priority: 'high', notes: newNotes, updated_at: new Date().toISOString() }
+  );
+  if (error) return alert('Error: ' + error.message);
+  await wpLoadAll();
+  wpBackToPlanner();
 }
 
 // Reprograma una actividad a nuevo día
@@ -1952,11 +2022,19 @@ function wpRenderImportPreview() {
         </div>
       </div>
 
-      <div class="flex gap-2 text-xs">
+      <div class="flex gap-2 text-xs flex-wrap items-center">
         <button onclick="wpImportPreviewToggleAll(true)" class="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded">✓ Marcar todas</button>
         <button onclick="wpImportPreviewToggleAll(false)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Desmarcar todas</button>
         <button onclick="wpImportPreviewToggleEtapa('Externo')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" title="Toggle solo las de etapa Externo">Toggle Externo</button>
         <button onclick="wpImportPreviewToggleEtapa('Interno')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Toggle Interno</button>
+        <div class="h-5 border-l border-slate-300"></div>
+        <button onclick="wpImportPreviewMarkAllCritical()" class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-bold" title="Sugerir críticas: marca como Ruta Crítica las actividades estructurales (Cimentación, Estructura, Eléctrico, Plomería)">🎯 Sugerir ruta crítica</button>
+        <button onclick="wpImportPreviewClearCritical()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Quitar críticas</button>
+        <span class="text-[10px] text-rose-700 font-bold">${p.items.filter(it=>it.is_critical).length} marcadas críticas</span>
+      </div>
+
+      <div class="bg-rose-50 border border-rose-200 rounded p-2 text-[11px] text-rose-900">
+        <strong>🎯 Ruta crítica:</strong> Marcá las actividades que NO pueden retrasarse sin afectar la fecha de entrega. Si una crítica se atrasa 1 día, se alertará automáticamente. Si se adelanta, se resaltará en verde como ganancia. Las críticas tienen borde rojo grueso en el calendario.
       </div>
 
       <div class="border border-slate-200 rounded-lg max-h-[55vh] overflow-y-auto">
@@ -1965,7 +2043,8 @@ function wpRenderImportPreview() {
             <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700 sticky top-0">${stage.replace(/</g,'&lt;')} <span class="bg-slate-900 text-white px-1.5 py-0.5 rounded ml-1">${items.length}</span></div>
             <table class="w-full text-xs">
               <thead><tr class="text-[10px] uppercase text-slate-500 bg-slate-50">
-                <th class="p-1 w-8"></th>
+                <th class="p-1 w-8" title="Incluir en publicación">✓</th>
+                <th class="p-1 w-8" title="Ruta crítica">⚠️</th>
                 <th class="text-left p-1 w-16">Código</th>
                 <th class="text-left p-1">Actividad</th>
                 <th class="text-left p-1 w-32">Fecha inicio</th>
@@ -1973,12 +2052,15 @@ function wpRenderImportPreview() {
               </tr></thead>
               <tbody>
                 ${items.map(it => `
-                  <tr class="border-t border-slate-100 ${!it.date?'bg-red-50':it.include?'hover:bg-emerald-50':'bg-slate-100 opacity-60'}">
+                  <tr class="border-t border-slate-100 ${!it.date?'bg-red-50':it.is_critical?'bg-rose-50 border-l-4 border-l-rose-500':it.include?'hover:bg-emerald-50':'bg-slate-100 opacity-60'}">
                     <td class="p-1 text-center">
                       <input type="checkbox" ${it.include?'checked':''} ${!it.date?'disabled':''} onchange="wpImportPreviewToggle('${it.id}')" class="cursor-pointer"/>
                     </td>
+                    <td class="p-1 text-center">
+                      <input type="checkbox" ${it.is_critical?'checked':''} onchange="wpImportPreviewToggleCritical('${it.id}')" class="cursor-pointer accent-rose-600" title="Marcar como ruta crítica"/>
+                    </td>
                     <td class="p-1 font-mono text-slate-600">${(it.code||'—').replace(/</g,'&lt;')}</td>
-                    <td class="p-1">${(it.activity_name||'?').replace(/</g,'&lt;')}</td>
+                    <td class="p-1">${it.is_critical?'<span class="text-rose-700 font-bold">⚠️ </span>':''}${(it.activity_name||'?').replace(/</g,'&lt;')}</td>
                     <td class="p-1">
                       <input type="date" value="${it.date||''}" onchange="wpImportPreviewSetDate('${it.id}', this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[11px]"/>
                     </td>
@@ -2044,6 +2126,32 @@ function wpImportPreviewSetDuration(id, d) {
   if (it) it.duration_days = Math.max(1, +d || 1);
   wpRenderImportPreview();
 }
+function wpImportPreviewToggleCritical(id) {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const it = p.items.find(x => x.id === id);
+  if (it) it.is_critical = !it.is_critical;
+  wpRenderImportPreview();
+}
+// Heurística: marca como críticas las etapas/códigos típicamente estructurales.
+// Ruta crítica clásica de remodelación: cimentación → estructura → instalaciones
+// rough → drywall → acabados. Los acabados rara vez son críticos.
+function wpImportPreviewMarkAllCritical() {
+  const p = wpState.importPreview;
+  if (!p) return;
+  const criticalKeywords = ['cimentaci','estructur','techo','demolicion','eléctric','electrico','plomeria','plomería','rough','permiso','inspecci','foundation','framing'];
+  p.items.forEach(it => {
+    const txt = ((it.stage||'') + ' ' + (it.activity_name||'')).toLowerCase();
+    if (criticalKeywords.some(k => txt.includes(k))) it.is_critical = true;
+  });
+  wpRenderImportPreview();
+}
+function wpImportPreviewClearCritical() {
+  const p = wpState.importPreview;
+  if (!p) return;
+  p.items.forEach(it => it.is_critical = false);
+  wpRenderImportPreview();
+}
 function wpCancelImport() {
   wpState.importPreview = null;
   wpBackToPlanner();
@@ -2078,6 +2186,7 @@ async function wpApproveImport() {
           activity_code: it.code,
           stage: it.stage,
           duration_days: it.duration_days,
+          priority: it.is_critical ? 'critical' : 'normal',
           status: 'planned',
           import_batch: importBatch,
           created_by: state.user.id
@@ -2740,6 +2849,20 @@ function wpOpenPrintPicker() {
         <div class="text-[10px] text-slate-500 mt-1">Por default usa el filtro actual del calendario.</div>
       </div>
 
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Formato</label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-start gap-2">
+            <input type="radio" name="wp-print-format" value="worker" checked class="mt-0.5"/>
+            <div><div class="font-bold text-sm">👷 Para obreros</div><div class="text-[10px] text-slate-500">Tipografía grande, checkboxes enormes, sin tecnicismos</div></div>
+          </label>
+          <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-start gap-2">
+            <input type="radio" name="wp-print-format" value="tech" class="mt-0.5"/>
+            <div><div class="font-bold text-sm">📋 Ejecutivo</div><div class="text-[10px] text-slate-500">Compacto, con detalle técnico</div></div>
+          </label>
+        </div>
+      </div>
+
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
@@ -2756,18 +2879,232 @@ function wpOpenPrintPicker() {
 function wpDoPrint() {
   const scope = document.querySelector('input[name="wp-print-scope"]:checked')?.value || 'day';
   const house = document.getElementById('wp-print-house').value;
+  const format = document.querySelector('input[name="wp-print-format"]:checked')?.value || 'worker';
   if (scope === 'day') {
     const d = document.getElementById('wp-print-date').value;
     if (!d) return;
     wpBackToPlanner();
-    wpOpenPrintView(d, house);
+    if (format === 'worker') wpOpenPrintViewWorker(d, house);
+    else wpOpenPrintView(d, house);
   } else {
     const from = document.getElementById('wp-print-from').value;
     const to = document.getElementById('wp-print-to').value;
     if (!from || !to) return;
     wpBackToPlanner();
-    wpOpenPrintRange(from, to, house);
+    if (format === 'worker') wpOpenPrintRangeWorker(from, to, house);
+    else wpOpenPrintRange(from, to, house);
   }
+}
+
+// ─── Print SUPER simple para obreros — día único ───
+// Tipografía grande, iconos enormes, checkbox interactivo en pantalla,
+// 1 actividad por card grande, sin jerga técnica.
+function wpOpenPrintViewWorker(dateStr, homeFilter) {
+  let acts = (wpState.activities||[]).filter(a => a.date === dateStr);
+  acts = wpFilterActsByHouse(acts, homeFilter || 'all');
+  if (!acts.length) return alert(`Sin actividades en ${dateStr}.`);
+  const byHome = {};
+  acts.forEach(a => {
+    const key = a.project_id || ('name:'+a.property_name);
+    if (!byHome[key]) byHome[key] = { name: a.property_name || '?', acts: [] };
+    byHome[key].acts.push(a);
+  });
+  const d = new Date(dateStr + 'T00:00:00');
+  const dateLbl = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+
+  const html = `
+    <!DOCTYPE html><html><head><title>Tareas del día · ${dateStr}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; }
+      @media print { .no-print{display:none!important;} body{margin:1cm;} .card{page-break-inside:avoid;} }
+    </style>
+    </head><body class="p-6 bg-white">
+      <div class="no-print mb-4 flex gap-2 sticky top-0 bg-white z-10 py-2">
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold text-lg px-6 py-3 rounded-lg">🖨️ Imprimir</button>
+        <button onclick="window.close()" class="bg-slate-100 text-lg px-6 py-3 rounded-lg">✕ Cerrar</button>
+      </div>
+
+      <!-- Header gigante -->
+      <div class="border-b-4 border-slate-900 pb-4 mb-6 text-center">
+        <div class="text-2xl font-bold text-slate-500 uppercase">Tareas para</div>
+        <div class="text-5xl font-black capitalize mt-1">${dateLbl}</div>
+        <div class="text-xl text-slate-700 mt-2">${acts.length} tareas · ${Object.keys(byHome).length} casa(s)</div>
+      </div>
+
+      ${Object.entries(byHome).map(([key, h]) => `
+        <div class="mb-8">
+          <div class="bg-slate-900 text-white text-3xl font-bold px-5 py-3 rounded-t-2xl">🏠 ${h.name.replace(/</g,'&lt;')}</div>
+          <div class="space-y-3 mt-3">
+            ${h.acts.map((a, idx) => {
+              const isDone = a.status === 'done';
+              const isCritical = a.priority === 'critical' || a.priority === 'urgent';
+              const isPostponed = (a.notes||'').includes('[APLAZADA');
+              const cardBg = isDone ? 'bg-emerald-50 border-emerald-400' :
+                             isCritical ? 'bg-rose-50 border-rose-500' :
+                             isPostponed ? 'bg-amber-50 border-amber-400' :
+                             'bg-white border-slate-300';
+              return `
+              <div class="card border-4 ${cardBg} rounded-2xl p-5 shadow-sm">
+                <div class="flex items-start gap-4">
+                  <!-- Checkbox enorme -->
+                  <label class="flex-shrink-0 cursor-pointer no-print" style="margin-top:2px">
+                    <input type="checkbox" ${isDone?'checked':''}
+                      onchange="window.opener && window.opener.wpQuickToggleDone && window.opener.wpQuickToggleDone('${a.id}'); this.parentElement.parentElement.parentElement.classList.toggle('bg-emerald-50'); this.parentElement.parentElement.parentElement.classList.toggle('border-emerald-400');"
+                      class="w-10 h-10 accent-emerald-600"/>
+                  </label>
+                  <!-- Cuadrito impreso (no-screen) -->
+                  <div class="hidden print:block flex-shrink-0 w-12 h-12 border-4 border-slate-900 rounded ${isDone?'bg-slate-900':''}" style="margin-top:2px">
+                    ${isDone?'<div class="text-white text-4xl text-center leading-none">✓</div>':''}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <!-- Número de tarea -->
+                    <div class="flex items-center gap-3 flex-wrap mb-1">
+                      <div class="bg-slate-900 text-white text-xl font-bold px-3 py-1 rounded-full">${idx+1}</div>
+                      ${isCritical && !isDone ? '<div class="bg-rose-700 text-white text-lg font-bold px-3 py-1 rounded">⚠️ IMPORTANTE</div>' : ''}
+                      ${isPostponed ? '<div class="bg-amber-500 text-white text-lg font-bold px-3 py-1 rounded">🟡 APLAZADA</div>' : ''}
+                    </div>
+                    <!-- Título XL -->
+                    <div class="text-3xl font-bold ${isDone?'line-through text-slate-500':'text-slate-900'} leading-tight">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                    ${a.stage ? `<div class="text-xl text-slate-600 mt-1">📂 ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
+                    ${a.start_hour || a.end_hour ? `<div class="text-xl text-slate-700 mt-1">⏰ ${a.start_hour||7}:00 a ${a.end_hour||17}:00</div>` : ''}
+
+                    ${(a.materials||[]).length > 0 ? `
+                      <div class="mt-3 bg-amber-100 border-2 border-amber-400 rounded-xl p-3">
+                        <div class="text-lg font-bold text-amber-900">📦 MATERIALES QUE NECESITAS</div>
+                        <ul class="mt-1 text-xl space-y-0.5">
+                          ${a.materials.map(m => `<li>• <strong>${(m.nombre||'').replace(/</g,'&lt;')}</strong>: ${m.cantidad||1} ${(m.unidad||'unidades').replace(/</g,'&lt;')}</li>`).join('')}
+                        </ul>
+                      </div>` : ''}
+
+                    ${(a.checklist||[]).length > 0 ? `
+                      <div class="mt-3">
+                        <div class="text-lg font-bold text-slate-700">✅ PASOS A SEGUIR</div>
+                        <ul class="text-xl space-y-1.5 mt-1">
+                          ${a.checklist.map(it => `
+                            <li class="flex items-start gap-2 ${it.done?'line-through text-slate-400':''}">
+                              <span class="inline-block w-6 h-6 border-2 border-slate-700 rounded text-center leading-5">${it.done?'✓':''}</span>
+                              <span>${(it.item||'').replace(/</g,'&lt;')}</span>
+                            </li>`).join('')}
+                        </ul>
+                      </div>` : ''}
+
+                    ${a.notes ? `
+                      <div class="mt-3 bg-yellow-100 border-l-8 border-yellow-500 p-3 rounded-r-xl">
+                        <div class="text-lg font-bold text-yellow-900">📝 INSTRUCCIONES IMPORTANTES</div>
+                        <div class="text-xl text-slate-900 mt-1 whitespace-pre-wrap">${a.notes.replace(/</g,'&lt;')}</div>
+                      </div>` : ''}
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `).join('')}
+
+      <!-- Pie de página para firma -->
+      <div class="mt-12 pt-6 border-t-2 border-slate-300 hidden print:block">
+        <div class="grid grid-cols-2 gap-12">
+          <div>
+            <div class="border-b-2 border-slate-900 h-16"></div>
+            <div class="text-base mt-1">Firma del responsable</div>
+          </div>
+          <div>
+            <div class="border-b-2 border-slate-900 h-16"></div>
+            <div class="text-base mt-1">Fecha de finalización</div>
+          </div>
+        </div>
+      </div>
+    </body></html>
+  `;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
+// ─── Print SUPER simple para obreros — rango/semana ───
+function wpOpenPrintRangeWorker(fromStr, toStr, homeFilter) {
+  let acts = (wpState.activities||[]).filter(a => a.date >= fromStr && a.date <= toStr);
+  acts = wpFilterActsByHouse(acts, homeFilter || 'all');
+  if (!acts.length) return alert(`Sin actividades entre ${fromStr} y ${toStr}.`);
+
+  // Agrupar por DÍA primero (vista del crew por día)
+  const byDay = {};
+  acts.forEach(a => {
+    if (!byDay[a.date]) byDay[a.date] = [];
+    byDay[a.date].push(a);
+  });
+  const days = Object.keys(byDay).sort();
+
+  const html = `
+    <!DOCTYPE html><html><head><title>Plan de la semana · ${fromStr} → ${toStr}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; }
+      @media print { .no-print{display:none!important;} body{margin:1cm;} .day-page{page-break-after:always;} .day-page:last-child{page-break-after:auto;} }
+    </style>
+    </head><body class="p-6 bg-white">
+      <div class="no-print mb-4 flex gap-2 sticky top-0 bg-white z-10 py-2">
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold text-lg px-6 py-3 rounded-lg">🖨️ Imprimir</button>
+        <button onclick="window.close()" class="bg-slate-100 text-lg px-6 py-3 rounded-lg">✕ Cerrar</button>
+      </div>
+
+      <div class="border-b-4 border-slate-900 pb-4 mb-6 text-center">
+        <div class="text-xl font-bold text-slate-500 uppercase">Plan de obra</div>
+        <div class="text-4xl font-black mt-1">${fromStr} → ${toStr}</div>
+        <div class="text-lg text-slate-700 mt-2">${acts.length} tareas en ${days.length} días</div>
+      </div>
+
+      ${days.map((dayIso, dayIdx) => {
+        const d = new Date(dayIso + 'T00:00:00');
+        const dayLbl = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+        const dayActs = byDay[dayIso];
+        const byHome = {};
+        dayActs.forEach(a => {
+          const key = a.property_name || a.project_id || '?';
+          if (!byHome[key]) byHome[key] = [];
+          byHome[key].push(a);
+        });
+        return `
+        <div class="day-page mb-8">
+          <div class="bg-slate-900 text-white px-5 py-3 rounded-xl">
+            <div class="text-sm uppercase tracking-wider opacity-70">Día ${dayIdx+1} de ${days.length}</div>
+            <div class="text-4xl font-black capitalize">${dayLbl}</div>
+            <div class="text-base opacity-90 mt-1">${dayActs.length} tareas para hoy</div>
+          </div>
+          ${Object.entries(byHome).map(([home, hActs]) => `
+            <div class="mt-3">
+              <div class="text-2xl font-bold border-b-2 border-slate-300 pb-1 mb-2">🏠 ${(home||'').replace(/</g,'&lt;')}</div>
+              <div class="space-y-2">
+                ${hActs.map((a, i) => {
+                  const isDone = a.status === 'done';
+                  const isCritical = a.priority === 'critical' || a.priority === 'urgent';
+                  const isPostponed = (a.notes||'').includes('[APLAZADA');
+                  return `
+                  <div class="flex items-start gap-3 p-3 rounded-xl border-2 ${isDone?'bg-emerald-50 border-emerald-400':isCritical?'bg-rose-50 border-rose-500':isPostponed?'bg-amber-50 border-amber-400':'bg-white border-slate-300'}">
+                    <div class="flex-shrink-0 w-10 h-10 border-4 border-slate-900 rounded ${isDone?'bg-slate-900 text-white':''} text-2xl text-center leading-8">${isDone?'✓':''}</div>
+                    <div class="flex-1">
+                      <div class="text-xl font-bold ${isDone?'line-through text-slate-500':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                      ${isCritical && !isDone ? '<span class="bg-rose-700 text-white text-sm font-bold px-2 py-0.5 rounded">⚠️ IMPORTANTE</span>' : ''}
+                      ${isPostponed ? '<span class="bg-amber-500 text-white text-sm font-bold px-2 py-0.5 rounded">🟡 APLAZADA</span>' : ''}
+                      ${a.stage ? `<div class="text-base text-slate-600">📂 ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
+                      ${(a.materials||[]).length > 0 ? `<div class="text-sm text-slate-700 mt-1">📦 ${a.materials.map(m=>`${m.nombre} (${m.cantidad} ${m.unidad||'ud'})`).join(', ').replace(/</g,'&lt;')}</div>` : ''}
+                      ${a.notes ? `<div class="text-sm mt-1 bg-yellow-100 border-l-4 border-yellow-500 p-2 rounded-r whitespace-pre-wrap">${a.notes.replace(/</g,'&lt;')}</div>` : ''}
+                    </div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>`;
+      }).join('')}
+
+      <div class="mt-8 pt-3 border-t border-slate-300 text-sm text-slate-500 text-center">Empresa OS · Plan de obra · ${new Date().toLocaleString('es')}</div>
+    </body></html>
+  `;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 // helper: filtra actividades por casa (homeId puede ser projectId, 'name:Foo' o 'all')
