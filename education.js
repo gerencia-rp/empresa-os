@@ -48,21 +48,28 @@ async function openEduManager(sys) {
 
 async function eduLoadAll() {
   eduState.loading = true;
-  // Catches individuales para que UNA query rota no rompa TODO el load.
-  // Antes: si edu_call_motivos no existía (SQL no corrido), Promise.all rechazaba
-  // y el modal quedaba en "Cargando..." indefinido.
-  const safe = (p, fallback = []) => p.then(r => r).catch(e => { console.warn('[eduLoadAll]', e?.message || e); return { data: fallback }; });
+  // Cada query con catch + TIMEOUT por query (8s max). Si una query cuelga
+  // (sesión expirada con refresh token vencido, RLS bloqueando, red caída),
+  // Promise.all NUNCA resolvía y el modal de Informes quedaba en "Cargando...".
+  const TIMEOUT_MS = 8000;
+  const withTimeout = (p, label) => Promise.race([
+    p.then(r => r).catch(e => { console.warn('[eduLoadAll]', label, e?.message || e); return { data: null }; }),
+    new Promise(resolve => setTimeout(() => {
+      console.warn(`[eduLoadAll] TIMEOUT (${TIMEOUT_MS/1000}s) en ${label} — probablemente sesión expirada`);
+      resolve({ data: null });
+    }, TIMEOUT_MS))
+  ]);
   try {
     const [mRes, sRes, rRes, aRes, cRes, repRes, tRes, presRes, motRes] = await Promise.all([
-      safe(sb.from('edu_mentorships').select('*').order('position')),
-      safe(sb.from('edu_students').select('*').order('updated_at', { ascending: false })),
-      safe(sb.from('edu_resources').select('*').order('updated_at', { ascending: false })),
-      safe(sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false })),
-      safe(sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(500)),
-      safe(sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50)),
-      safe(sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500)),
-      safe(sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50)),
-      safe(sb.from('edu_call_motivos').select('*').eq('active', true).order('orden'))
+      withTimeout(sb.from('edu_mentorships').select('*').order('position'), 'mentorships'),
+      withTimeout(sb.from('edu_students').select('*').order('updated_at', { ascending: false }), 'students'),
+      withTimeout(sb.from('edu_resources').select('*').order('updated_at', { ascending: false }), 'resources'),
+      withTimeout(sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false }), 'alerts'),
+      withTimeout(sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(500), 'calls'),
+      withTimeout(sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50), 'reports'),
+      withTimeout(sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500), 'tasks'),
+      withTimeout(sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50), 'presentations'),
+      withTimeout(sb.from('edu_call_motivos').select('*').eq('active', true).order('orden'), 'callMotivos')
     ]);
     eduState.mentorships = mRes.data || [];
     eduState.students = sRes.data || [];
@@ -932,16 +939,40 @@ async function eduDebugDB() {
 // ============================================================
 async function openEduReportsSystem(sys) {
   eduState.sys = sys;
-  openModal(`📈 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
+  openModal(`📈 ${sys.name}`, '<div id="edu-root"><div class="p-6 text-center"><div class="text-2xl animate-pulse">📊</div><div class="text-xs text-slate-500 mt-2">Cargando datos del informe...</div><div class="text-[10px] text-slate-400 mt-1">Si se queda colgado > 10s, refrescá la página (sesión puede haber expirado).</div></div></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-6xl');
-  await eduLoadAll();
-  if (!eduState.mentorshipId && eduState.mentorships.length) {
-    const firstActive = eduState.mentorships.find(m => m.active);
-    if (firstActive) eduState.mentorshipId = firstActive.id;
+  try {
+    await eduLoadAll();
+    if (!eduState.mentorshipId && eduState.mentorships.length) {
+      const firstActive = eduState.mentorships.find(m => m.active);
+      if (firstActive) eduState.mentorshipId = firstActive.id;
+    }
+    eduState.tab = '__reports_only__';
+    eduRenderReportsStandalone();
+  } catch (err) {
+    console.error('[openEduReportsSystem]', err);
+    const root = document.getElementById('edu-root');
+    if (root) {
+      root.innerHTML = `
+        <div class="p-6">
+          <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+            <h3 class="font-bold text-red-900 mb-2">⚠️ No pude abrir el informe</h3>
+            <pre class="text-xs text-red-700 bg-white p-3 rounded border whitespace-pre-wrap">${(window.esc||((s)=>s))(err?.message || String(err))}</pre>
+            <div class="text-xs text-slate-600 mt-3">
+              Posibles causas:
+              <ul class="list-disc list-inside mt-1">
+                <li>Sesión expirada — <strong>cerrá sesión y volvé a entrar.</strong></li>
+                <li>Tablas SQL no existen — correr scripts en supabase/.</li>
+                <li>Red caída.</li>
+              </ul>
+            </div>
+            <button onclick="closeModal(); location.reload();" class="mt-3 w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 rounded">Refrescar página</button>
+          </div>
+        </div>
+      `;
+    }
   }
-  eduState.tab = '__reports_only__';
-  eduRenderReportsStandalone();
 }
 
 // Cache de KPIs cargados (se recarga al cambiar mentoría o mes)
