@@ -6690,7 +6690,8 @@ function eduCallBuildICS(c, student, motivo) {
     desc ? 'DESCRIPTION:'+desc : '',
     c.location ? 'LOCATION:'+ (c.meeting_url ? (c.location + ' ' + c.meeting_url) : c.location) : (c.meeting_url ? 'LOCATION:'+c.meeting_url : ''),
     c.meeting_url ? 'URL:'+c.meeting_url : '',
-    c.attended_by ? 'ORGANIZER;CN='+c.attended_by+':mailto:'+c.attended_by : '',
+    // Validar email del coach antes de meterlo como ORGANIZER (un valor "Daniel" sin @ rompe el ICS)
+    (c.attended_by && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.attended_by)) ? 'ORGANIZER;CN='+c.attended_by+':mailto:'+c.attended_by : '',
     ...allAttendees.map(em => {
       const role = (em === (c.attended_by||'').toLowerCase()) ? 'CHAIR' : 'REQ-PARTICIPANT';
       const cn = (student && student.email && em === student.email.toLowerCase()) ? (student.full_name || '') : '';
@@ -6716,54 +6717,69 @@ function eduCallDownloadICS(id) {
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
+// Construye URL de Google Calendar TEMPLATE — abre Google Calendar con el evento
+// pre-llenado y los emails como guests. El user solo da "Save" y Google manda
+// las invitaciones nativas (que SÍ funcionan en Gmail/Outlook/Apple, no como
+// el mailto+ICS attach que falla en Gmail web).
+function eduCallGoogleCalendarUrl(c, student, motivo, attendees) {
+  const start = new Date(c.scheduled_at);
+  const end = new Date(start.getTime() + (c.duration_min || 60) * 60000);
+  const fmt = d => d.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+  const title = (motivo ? motivo.label : c.motivo || 'Sesión') + (c.topic ? ' · ' + c.topic : '');
+  const detailParts = [];
+  if (c.topic) detailParts.push('Tema: ' + c.topic);
+  if (student) detailParts.push('Estudiante: ' + (student.full_name || ''));
+  if (c.attended_by) detailParts.push('Coach: ' + c.attended_by);
+  if (c.meeting_url) detailParts.push('Link: ' + c.meeting_url);
+  if (c.notes_md) detailParts.push('\n' + c.notes_md);
+  const details = detailParts.join('\n');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details
+  });
+  if (c.location || c.meeting_url) params.set('location', c.location || c.meeting_url || '');
+  if (attendees && attendees.length) params.set('add', attendees.join(','));
+  return 'https://calendar.google.com/calendar/render?' + params.toString();
+}
+
 function eduCallSendInvite(id, silent) {
   const c = (eduState.calls || []).find(x => x.id === id);
   if (!c) return;
   const student = (eduState.students || []).find(s => s.id === c.student_id);
-  if (!student) return alert('Estudiante no encontrado');
-  const attendees = eduCallCollectAttendees(c, student);
-  if (!attendees.length) {
-    if (!silent) alert('No hay emails de destinatarios. Agregalos en el modal de edición.');
+  if (!student) {
+    if (window.toast) toast('Estudiante no encontrado', 'error');
+    else alert('Estudiante no encontrado');
     return;
   }
+  const attendees = eduCallCollectAttendees(c, student);
+  if (!attendees.length) {
+    if (!silent) {
+      if (window.toast) toast('No hay emails de destinatarios. Editá la sesión y agregalos.', 'warning');
+      else alert('No hay emails de destinatarios. Agregalos en el modal de edición.');
+    }
+    return;
+  }
+
   const motivo = eduGetMotivos().find(m => m.id === c.motivo);
-  const d = new Date(c.scheduled_at);
-  const dateStr = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  const timeStr = d.toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
-  const subject = `Sesión ${motivo?motivo.label:''} — ${dateStr}`;
-  const body =
-`Hola,
+  const gcalUrl = eduCallGoogleCalendarUrl(c, student, motivo, attendees);
 
-Te confirmo la sesión:
+  // Abrir Google Calendar con el evento pre-llenado + guests. El user da "Save"
+  // y Google manda las invitaciones nativas a cada attendee.
+  window.open(gcalUrl, '_blank');
 
-📅 ${dateStr}
-🕐 ${timeStr} (${c.duration_min||60} minutos)
-📋 ${motivo?motivo.label:''}${c.topic?' · '+c.topic:''}
-👤 Estudiante: ${student.full_name||''}${c.attended_by?'\n🎯 Coach: '+c.attended_by:''}
-${c.location ? '📍 Lugar: '+c.location : ''}${c.meeting_url ? '\n🔗 Link: '+c.meeting_url : ''}
-
-${c.notes_md ? 'Agenda:\n'+c.notes_md+'\n\n' : ''}Adjunto la invitación .ics para que se agregue automáticamente a tu calendario (Google/Outlook/Apple).
-
-Nos vemos.
-${(state.user&&state.user.email)||''}`;
-
-  // 1) Descargar ICS (con todos los attendees como ATTENDEE) para adjuntarlo manualmente
-  eduCallDownloadICS(id);
-
-  // 2) Abrir mailto con todos los destinatarios
-  // mailto: TO acepta multi-emails separados por coma
-  setTimeout(() => {
-    const to = encodeURIComponent(attendees.join(','));
-    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  }, 300);
-
-  // 3) Marcar email_sent_at + invite_meta
+  // Marcar email_sent_at + invite_meta
   sb.from('edu_student_calls').update({
     email_sent_at: new Date().toISOString(),
-    invite_meta: { sent_to: attendees, count: attendees.length, at: new Date().toISOString() }
+    invite_meta: { sent_to: attendees, count: attendees.length, at: new Date().toISOString(), method: 'gcal' }
   }).eq('id', id).then(() => {});
 
-  if (!silent) alert(`📧 Invitación preparada para ${attendees.length} persona(s):\n${attendees.join('\n')}\n\nSe abrió tu cliente de email con el asunto + cuerpo + lista de destinatarios. ADJUNTÁ EL .ics QUE SE DESCARGÓ y enviá.`);
+  if (!silent) {
+    const msg = `📅 Se abrió Google Calendar con la invitación para ${attendees.length} persona(s).\n\nRevisá los datos y dale "Guardar" — Google manda las invitaciones automáticamente.`;
+    if (window.toast) toast(msg, 'info');
+    else alert(msg);
+  }
 }
 
 // ─── METODOLOGÍA: Planes guardados (de estudiantes del CRM) ───

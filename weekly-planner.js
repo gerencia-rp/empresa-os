@@ -226,7 +226,7 @@ function wpRender() {
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
-          <button onclick="wpOpenPrintView(prompt('Día a imprimir (YYYY-MM-DD):', wpDateOnly(new Date())))" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Vista entregable imprimible del día">🖨️ Imprimir día</button>
+          <button onclick="wpOpenPrintPicker()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Vista entregable imprimible del día">🖨️ Imprimir día</button>
           <button onclick="wpToggleResourceForm()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">+ Recurso</button>
         </div>
       </div>
@@ -2054,65 +2054,129 @@ if (typeof wpDropOnCell === 'function' && !wpDropOnCell._wrapped) {
 }
 
 // ─── Plantillas de día ───
-async function wpSaveCurrentDayAsTemplate() {
-  // Toma todas las actividades del lunes (primer día visible) como template
+function wpSaveCurrentDayAsTemplate() {
   const targetDate = wpDateOnly(wpState.weekStart);
   const acts = (wpState.activities||[]).filter(a => a.date === targetDate);
-  if (!acts.length) { alert(`Sin actividades en ${targetDate}. Agregá actividades primero.`); return; }
-  const name = prompt(`Nombre de la plantilla:`, `Día tipo · ${targetDate}`);
-  if (!name) return;
-  const tasks = acts.map(a => ({
-    activity_name: a.activity_name,
-    stage: a.stage,
-    duration_days: a.duration_days || 1,
-    checklist: a.checklist || [],
-    materials: a.materials || [],
-    priority: a.priority || 'normal',
-    notes: a.notes || ''
-  }));
-  const { error } = await sb.from('wp_day_templates').insert({
-    name, tasks, created_by: state.user.id
-  });
-  if (error) return alert('Error: '+error.message);
-  await wpLoadAll(); wpRender();
+  if (!acts.length) {
+    if (window.toast) toast(`Sin actividades en ${targetDate}. Agregá actividades primero.`, 'warning');
+    else alert(`Sin actividades en ${targetDate}. Agregá actividades primero.`);
+    return;
+  }
+  openModal('💾 Guardar día como plantilla', `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-600">Se guardarán las <strong>${acts.length}</strong> actividad(es) del ${targetDate} como plantilla reusable.</div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Nombre de la plantilla *</label>
+        <input id="wp-dt-name" type="text" value="${(window.esc?esc('Día tipo · '+targetDate):'Día tipo · '+targetDate)}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Descripción (opcional)</label>
+        <textarea id="wp-dt-desc" rows="2" placeholder="Cuándo usar esta plantilla..." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="wpConfirmSaveDayTemplate('${targetDate}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar plantilla</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `);
 }
 
-async function wpApplyDayTemplate(templateId) {
+async function wpConfirmSaveDayTemplate(targetDate) {
+  const name = (document.getElementById('wp-dt-name').value || '').trim();
+  const description = (document.getElementById('wp-dt-desc').value || '').trim();
+  if (!name) { (window.toast?toast:alert)('Falta nombre de la plantilla', 'warning'); return; }
+  const acts = (wpState.activities||[]).filter(a => a.date === targetDate);
+  const tasks = acts.map(a => ({
+    activity_name: a.activity_name, stage: a.stage,
+    duration_days: a.duration_days || 1,
+    checklist: a.checklist || [], materials: a.materials || [],
+    priority: a.priority || 'normal', notes: a.notes || ''
+  }));
+  const { error } = await sb.from('wp_day_templates').insert({
+    name, description: description || null, tasks, created_by: state.user.id
+  });
+  if (error) {
+    (window.toast?toast:alert)('Error: '+error.message, 'error');
+    return;
+  }
+  closeModal();
+  await wpLoadAll(); wpRender();
+  if (window.toast) toast(`✓ Plantilla "${name}" guardada con ${tasks.length} actividad(es)`, 'success');
+}
+
+function wpApplyDayTemplate(templateId) {
   const t = (wpState.dayTemplates||[]).find(x => x.id === templateId);
   if (!t) return;
-  const dateStr = prompt(`Aplicar "${t.name}" a qué fecha? (YYYY-MM-DD)`, wpDateOnly(wpState.weekStart));
-  if (!dateStr) return;
-  // Necesita casa destino — pedirla
   const projs = wpState.projects.filter(p => p.status !== 'cancelled');
-  if (!projs.length) return alert('Sin proyectos. Creá uno primero.');
-  const choices = projs.map((p,i) => `${i+1}) ${p.name||p.address}`).join('\n');
-  const idx = prompt(`Casa destino:\n${choices}`);
-  const sel = projs[parseInt(idx)-1];
+  if (!projs.length) {
+    (window.toast?toast:alert)('Sin proyectos. Creá uno primero.', 'warning');
+    return;
+  }
+  openModal(`📋 Aplicar "${(window.esc?esc(t.name):t.name)}"`, `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-600">Se crearán <strong>${(t.tasks||[]).length}</strong> actividad(es) en la casa y fecha que elijas.</div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Casa destino *</label>
+        <select id="wp-at-proj" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">— Seleccioná —</option>
+          ${projs.map(p => `<option value="${p.id}">${(window.esc?esc(p.name||p.address||'?'):p.name||p.address||'?')}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Fecha *</label>
+        <input id="wp-at-date" type="date" value="${wpDateOnly(wpState.weekStart)}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="wpConfirmApplyDayTemplate('${templateId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">📋 Aplicar plantilla</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `);
+}
+
+async function wpConfirmApplyDayTemplate(templateId) {
+  const t = (wpState.dayTemplates||[]).find(x => x.id === templateId);
+  if (!t) return;
+  const projId = document.getElementById('wp-at-proj').value;
+  const dateStr = document.getElementById('wp-at-date').value;
+  if (!projId || !dateStr) {
+    (window.toast?toast:alert)('Completá casa y fecha', 'warning');
+    return;
+  }
+  const sel = wpState.projects.find(p => p.id === projId);
   if (!sel) return;
   const rows = (t.tasks||[]).map(task => ({
     project_id: sel.id,
     property_name: sel.name || sel.address,
     date: dateStr,
-    activity_name: task.activity_name,
-    stage: task.stage,
+    activity_name: task.activity_name, stage: task.stage,
     duration_days: task.duration_days || 1,
-    checklist: task.checklist || [],
-    materials: task.materials || [],
+    checklist: task.checklist || [], materials: task.materials || [],
     priority: task.priority || 'normal',
     notes: task.notes || null,
     day_template_id: templateId,
     status: 'planned',
     created_by: state.user.id
   }));
-  if (!rows.length) return alert('Plantilla vacía.');
+  if (!rows.length) { (window.toast?toast:alert)('Plantilla vacía.', 'warning'); return; }
   const { error } = await sb.from('weekly_activities').insert(rows);
-  if (error) return alert('Error: '+error.message);
+  if (error) { (window.toast?toast:alert)('Error: '+error.message, 'error'); return; }
+  closeModal();
   await wpLoadAll(); wpRender();
-  alert(`✓ ${rows.length} actividad(es) creadas en ${sel.name||sel.address} para ${dateStr}`);
+  if (window.toast) toast(`✓ ${rows.length} actividad(es) creadas en ${sel.name||sel.address} para ${dateStr}`, 'success');
 }
 
 async function wpDeleteDayTemplate(id) {
-  if (!confirm('Eliminar esta plantilla? Las actividades ya creadas no se borran.')) return;
+  if (window.confirmDialog) {
+    const ok = await confirmDialog({
+      title: 'Eliminar plantilla',
+      message: '¿Eliminar esta plantilla? Las actividades ya creadas no se borran.',
+      okText: 'Eliminar', okClass: 'bg-red-600 hover:bg-red-700'
+    });
+    if (!ok) return;
+  } else {
+    if (!confirm('Eliminar esta plantilla? Las actividades ya creadas no se borran.')) return;
+  }
   await sb.from('wp_day_templates').delete().eq('id', id);
   await wpLoadAll(); wpRender();
 }
@@ -2377,6 +2441,25 @@ async function wpRemoveMaterial(activityId, idx) {
 async function wpUpdateNotes(activityId, value) {
   await sb.from('weekly_activities').update({ notes: value, updated_at: new Date().toISOString() }).eq('id', activityId);
   await wpLoadAll();
+}
+
+// Modal con date picker en lugar de prompt() para elegir el día a imprimir.
+function wpOpenPrintPicker() {
+  const today = wpDateOnly(new Date());
+  // Reusa el modal global de la app
+  openModal('🖨️ Imprimir día', `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-600">Elegí el día que querés imprimir como entregable para el crew.</div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Fecha *</label>
+        <input id="wp-print-date" type="date" value="${today}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="(function(){var d=document.getElementById('wp-print-date').value;if(!d){return;}closeModal();setTimeout(()=>wpOpenPrintView(d),100);})()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar vista de impresión</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+      </div>
+    </div>
+  `);
 }
 
 // ─── Vista print del día / entregable para el crew ───

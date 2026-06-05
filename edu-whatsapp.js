@@ -350,8 +350,11 @@ function wpsRenderMessage(m) {
   }[stat] || stat;
 
   const phone = s.phone || m.phone || '';
-  const phoneClean = (phone || '').replace(/\D/g,'');
-  const waUrl = phoneClean ? `https://wa.me/${phoneClean}?text=${encodeURIComponent(m.message_text)}` : null;
+  // Validar phone: necesita country code + número (10-15 dígitos, default US/CA si vienen 10)
+  let phoneClean = (phone || '').replace(/\D/g,'');
+  if (phoneClean.length === 10) phoneClean = '1' + phoneClean; // US/CA default
+  const phoneValid = phoneClean.length >= 11 && phoneClean.length <= 15;
+  const waUrl = phoneValid ? `https://wa.me/${phoneClean}?text=${encodeURIComponent(m.message_text)}` : null;
 
   return `
     <div class="bg-white border border-slate-200 rounded-lg p-3">
