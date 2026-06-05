@@ -47,6 +47,7 @@ const BUNDLE_FILES = [
   "edu/edu-credit.js",
   "edu/edu-calendar.js",
   "edu/edu-reports.js",
+  "edu/edu-ceo-dashboard.js",
   "edu-whatsapp.js"
 ];
 

@@ -48,17 +48,21 @@ async function openEduManager(sys) {
 
 async function eduLoadAll() {
   eduState.loading = true;
+  // Catches individuales para que UNA query rota no rompa TODO el load.
+  // Antes: si edu_call_motivos no existía (SQL no corrido), Promise.all rechazaba
+  // y el modal quedaba en "Cargando..." indefinido.
+  const safe = (p, fallback = []) => p.then(r => r).catch(e => { console.warn('[eduLoadAll]', e?.message || e); return { data: fallback }; });
   try {
     const [mRes, sRes, rRes, aRes, cRes, repRes, tRes, presRes, motRes] = await Promise.all([
-      sb.from('edu_mentorships').select('*').order('position'),
-      sb.from('edu_students').select('*').order('updated_at', { ascending: false }),
-      sb.from('edu_resources').select('*').order('updated_at', { ascending: false }),
-      sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false }),
-      sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(500),
-      sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
-      sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500).then(r => r).catch(() => ({ data: [] })),
-      sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
-      sb.from('edu_call_motivos').select('*').eq('active', true).order('orden').then(r => r).catch(() => ({ data: [] }))
+      safe(sb.from('edu_mentorships').select('*').order('position')),
+      safe(sb.from('edu_students').select('*').order('updated_at', { ascending: false })),
+      safe(sb.from('edu_resources').select('*').order('updated_at', { ascending: false })),
+      safe(sb.from('edu_alerts').select('*').is('resolved_at', null).order('triggered_at', { ascending: false })),
+      safe(sb.from('edu_student_calls').select('*').order('scheduled_at', { ascending: false }).limit(500)),
+      safe(sb.from('edu_reports').select('*').order('period_start', { ascending: false }).limit(50)),
+      safe(sb.from('edu_student_tasks').select('*').order('created_at', { ascending: false }).limit(500)),
+      safe(sb.from('edu_presentations').select('*').order('updated_at', { ascending: false }).limit(50)),
+      safe(sb.from('edu_call_motivos').select('*').eq('active', true).order('orden'))
     ]);
     eduState.mentorships = mRes.data || [];
     eduState.students = sRes.data || [];
@@ -1048,6 +1052,31 @@ function eduReportNavMes(delta) {
 function eduRenderReportsStandalone() {
   const root = document.getElementById('edu-root');
   if (!root) return;
+  try {
+    return _eduRenderReportsStandaloneInner(root);
+  } catch (err) {
+    console.error('[eduRenderReportsStandalone]', err);
+    root.innerHTML = `
+      <div class="p-6">
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6">
+          <h3 class="font-bold text-red-900 mb-2">⚠️ Error renderizando informe</h3>
+          <pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap mt-2">${(window.esc||((s)=>s))(err?.message || String(err))}</pre>
+          ${err?.stack ? `<details class="mt-2"><summary class="text-xs text-slate-600 cursor-pointer">Stack trace</summary><pre class="text-[10px] bg-white p-2 rounded mt-1 overflow-x-auto">${(window.esc||((s)=>s))(err.stack)}</pre></details>` : ''}
+          <div class="text-xs text-slate-600 mt-3">
+            Causas comunes:
+            <ul class="list-disc list-inside mt-1 space-y-0.5">
+              <li>SQL views no creadas: correr <code class="bg-white px-1 rounded">supabase/edu-kpis-views.sql</code> + <code class="bg-white px-1 rounded">edu-kpis-views-v2.sql</code></li>
+              <li>Sin mentoría activa en DB.</li>
+              <li>Sesión expirada — refrescá la página.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function _eduRenderReportsStandaloneInner(root) {
   const cur = eduCurrentMentorship();
   const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
   const aiKey = `edu-report-${eduState.mentorshipId}-${eduState._reportPeriod || 'monthly'}`;
@@ -1067,6 +1096,10 @@ function eduRenderReportsStandalone() {
     kpis = (eduKpisCache.key === `${eduState.mentorshipId}|${mes}`) ? eduKpisCache.data : null;
     if (!kpis && !eduKpisCache.loading) {
       eduLoadKPIs(eduState.mentorshipId, mes).then(() => eduRenderReportsStandalone());
+    }
+    // 🆕 Cargar dashboard CEO en paralelo (no bloquea el render principal)
+    if (typeof eduRenderCeoSectionAsync === 'function') {
+      setTimeout(() => eduRenderCeoSectionAsync(eduState.mentorshipId, 'edu-ceo-section'), 50);
     }
   }
 
@@ -1106,6 +1139,9 @@ function eduRenderReportsStandalone() {
           ${cur && !kpis ? `<div class="mt-3 text-slate-400 text-xs">⏳ Cargando KPIs del mes...</div>` : ''}
           ${cur && kpis ? eduRenderKpisDashboard(kpis) : ''}
         </div>
+
+        <!-- 🆕 Dashboard CEO — vista ejecutiva (Health Score + OKRs + funnel + cuellos botella) -->
+        <div id="edu-ceo-section"></div>
 
         ${cur && kpis ? eduRenderInformeProfundo(kpis) : ''}
         ${cur && kpis ? eduRenderKpiDetalles(kpis) : ''}
