@@ -104,6 +104,10 @@
      config.js carga después (gitignored, override local opcional). -->
 <script src="config.public.js"></script>
 <script src="config.js" onerror="this.remove()"></script>
+<!-- Bundle único generado por scripts/build.js (concatena los .js en orden
+     y agrega hash). En dev local (sin build), index.html sigue cargando los
+     scripts uno por uno mediante el fallback abajo si "bundle" no existe. -->
+<!--[BUNDLE]-->
 <script src="ui-toolkit.js"></script>
 <script src="lib/deal-rules.js?v=20260604p"></script>
 <script src="app.js"></script>
@@ -120,5 +124,6 @@
 <script src="pm-dashboard.js"></script>
 <script src="education.js?v=20260604o"></script>
 <script src="edu-whatsapp.js?v=20260604l"></script>
+<!--[/BUNDLE]-->
 </body>
 </html>
