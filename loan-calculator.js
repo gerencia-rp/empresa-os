@@ -21,7 +21,8 @@ const loanState = {
   convLtvPct: 75,          // LTV del ARV
   convRatePct: 7.5,        // tasa 30y investor 2026
   convTermMonths: 360,
-  convClosingPct: 4,       // % del loan (ya lo viste en tus closing statements)
+  convClosingPct: 6,       // % del loan (incluye escrow/title — tu data real ~6-8%)
+  hmlInterestReserveMonths: 0,  // HMLs flexibles típicamente retienen 0-6m de interés upfront
   // Impuestos + seguro — para calcular PITI real (lo que el dueño paga mensual)
   propertyTaxAnnualPct: 2.2,  // % del ARV. Austin/Travis: 2.0-2.5% típico
   insuranceAnnual: 1900,     // $/año. Single family Texas ~$1.5k-2.2k típico
@@ -37,7 +38,9 @@ function loanCalc() {
   const hmlMonthlyInt = hmlLoan * ((+loanState.hmlRatePct || 0) / 100) / 12; // interest only
   const hmlOrigination = hmlLoan * ((+loanState.hmlPointsPct || 0) / 100);
   const hmlTotalInt = hmlMonthlyInt * (+loanState.hmlTermMonths || 0);
-  const hmlTotalCost = hmlOrigination + hmlTotalInt + (+loanState.hmlClosingFlat || 0);
+  // CORRECCIÓN: muchos HMLs retienen N meses de interés upfront — descuenta cash neto en cierre.
+  const hmlInterestReserve = hmlMonthlyInt * (+loanState.hmlInterestReserveMonths || 0);
+  const hmlTotalCost = hmlOrigination + hmlTotalInt + (+loanState.hmlClosingFlat || 0) + hmlInterestReserve;
 
   // Conv 30yr (P&I amortizado)
   const convLoan = (+loanState.arv || 0) * ((+loanState.convLtvPct || 0) / 100);
@@ -47,8 +50,9 @@ function loanCalc() {
   const convTotalPaid = convMonthly * n;
   const convTotalInt = convTotalPaid - convLoan;
   const convClosingCost = convLoan * ((+loanState.convClosingPct || 0) / 100);
-  // Cash-out al refi: lo que sobra después de pagar el HML
-  const convCashOut = convLoan - hmlLoan - convClosingCost;
+  // Cash-out al refi: lo que sobra después de pagar el HML.
+  // CORRECCIÓN: descontar también los intereses acumulados durante el hold y el reserve.
+  const convCashOut = convLoan - hmlLoan - convClosingCost - hmlTotalInt - hmlInterestReserve;
 
   // PITI: lo que el dueño realmente paga mensual (P&I + Tax + Insurance)
   const propertyTaxAnnual = (+loanState.arv || 0) * ((+loanState.propertyTaxAnnualPct || 0) / 100);

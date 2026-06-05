@@ -118,9 +118,20 @@ function parseCloseIntent(text: string, buttonId: string | null): { kind: 'index
   return null;
 }
 
+// Fecha en zona horaria de Austin/Texas (CST/CDT). Si Juan responde 11pm CST,
+// new Date().toISOString() devolvía el día siguiente UTC y buscaba el día equivocado.
+function todayInTexas(): string {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  // en-CA da formato YYYY-MM-DD directo
+  return fmt.format(new Date());
+}
+
 async function handleTaskClose(sb: ReturnType<typeof createClient>, recipient: Record<string, unknown>, intent: { kind: string; index?: number; id?: string }, from: string) {
-  // Buscar asignación del día más reciente
-  const today = new Date().toISOString().split('T')[0];
+  // Buscar asignación del día más reciente (fecha local Texas, no UTC)
+  const today = todayInTexas();
   const { data: daily } = await sb.from('pm_daily_assignments')
     .select('*')
     .eq('recipient_id', recipient.id as string)

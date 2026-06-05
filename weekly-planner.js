@@ -1228,14 +1228,25 @@ async function wpDeleteHouse(homeId, homeName) {
 async function wpCompleteHouse(homeId, homeName) {
   const isNameOnly = homeId.startsWith('name:');
 
-  // Cargar TODAS las actividades de la casa (no solo de esta semana)
+  // Cargar TODAS las actividades de la casa (no solo de esta semana).
+  // BUG FIX: para UUID también incluir las que matchean por property_name
+  // (huérfanas del project_id por drag desde backlog / plantillas).
   let allActs = [];
   if (isNameOnly) {
-    const { data } = await sb.from('weekly_activities').select('*').eq('property_name', homeId.slice(5)).is('project_id', null).order('date');
+    const nameOnly = homeId.slice(5);
+    const { data } = await sb.from('weekly_activities').select('*').eq('property_name', nameOnly).is('project_id', null).order('date');
     allActs = data || [];
   } else {
-    const { data } = await sb.from('weekly_activities').select('*').eq('project_id', homeId).order('date');
-    allActs = data || [];
+    const [byProj, byName] = await Promise.all([
+      sb.from('weekly_activities').select('*').eq('project_id', homeId).order('date'),
+      homeName ? sb.from('weekly_activities').select('*').is('project_id', null).eq('property_name', homeName).order('date') : Promise.resolve({ data: [] })
+    ]);
+    const seen = new Set();
+    allActs = [...(byProj.data||[]), ...(byName.data||[])].filter(a => {
+      if (seen.has(a.id)) return false;
+      seen.add(a.id);
+      return true;
+    });
   }
 
   if (!allActs.length) return alert('Esta casa no tiene actividades. Eliminala con 🗑️ si querés sacarla del planner.');

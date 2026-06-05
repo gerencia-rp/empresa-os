@@ -483,13 +483,19 @@ function eduRenderProgress() {
     else bands['crítico']++;
   });
 
-  const avgScore = students.length ? Math.round(students.reduce((acc,s) => acc + (s.glscore||50), 0) / students.length) : 0;
+  // CORRECCIÓN: si <30% de estudiantes tiene glscore real, no calcular promedio (era ruido puro).
+  const withScore = students.filter(s => s.glscore != null && s.glscore > 0);
+  const coverage = students.length ? withScore.length / students.length : 0;
+  const avgScore = (coverage >= 0.3 && withScore.length)
+    ? Math.round(withScore.reduce((acc,s) => acc + s.glscore, 0) / withScore.length)
+    : null;
+  const avgScoreDisplay = avgScore != null ? avgScore : '—';
 
   return `
     <div class="space-y-3">
       <!-- KPIs -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div class="bg-slate-900 text-white rounded-xl p-3"><div class="text-[10px] text-slate-400 uppercase font-bold">GLScore prom</div><div class="text-3xl font-bold">${avgScore}</div></div>
+        <div class="bg-slate-900 text-white rounded-xl p-3"><div class="text-[10px] text-slate-400 uppercase font-bold">GLScore prom</div><div class="text-3xl font-bold">${avgScoreDisplay}</div>${avgScore==null?'<div class="text-[9px] text-slate-500 mt-0.5">cobertura <30%</div>':''}</div>
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div class="text-[10px] text-emerald-700 uppercase font-bold">🏆 Excelente</div><div class="text-3xl font-bold text-emerald-900">${bands.excelente}</div><div class="text-[10px] text-emerald-700">≥80</div></div>
         <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] text-blue-700 uppercase font-bold">✅ Bueno</div><div class="text-3xl font-bold text-blue-900">${bands.bueno}</div><div class="text-[10px] text-blue-700">60-79</div></div>
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[10px] text-amber-700 uppercase font-bold">⚠️ Atención</div><div class="text-3xl font-bold text-amber-900">${bands['atención']}</div><div class="text-[10px] text-amber-700">40-59</div></div>
@@ -5412,20 +5418,23 @@ function eduCalcularAlertasEstudiante(s) {
     });
   }
 
-  // 3) Estancado en etapa (sin avance > 60 días)
+  // 3) Estancado en etapa — comparar contra target_weeks REAL de la etapa, no días absolutos.
+  // Antes: 60d en E0 (target 2 sem) = 4x → alerta. 60d en E3 (target 12 sem) = normal.
   if (s.stage_started_at) {
     const stageStart = new Date(s.stage_started_at);
     const daysInStage = Math.floor((now - stageStart) / ms_per_day);
-    if (daysInStage > 90) {
+    const stageObj = typeof eduStageObj === 'function' ? eduStageObj(s.current_stage) : null;
+    const targetDays = stageObj && stageObj.target_weeks ? stageObj.target_weeks * 7 : 60;
+    if (daysInStage > targetDays * 2) {
       alertas.push({
         severity: 'critical', tipo: 'estancado_etapa',
-        mensaje: `${daysInStage} días en etapa "${s.current_stage}"`,
+        mensaje: `${daysInStage} días en etapa "${s.current_stage}" (target ${targetDays}d × 2)`,
         accion: 'Sesión 1-on-1 urgente. Revisar si necesita cambiar de estrategia.'
       });
-    } else if (daysInStage > 60) {
+    } else if (daysInStage > targetDays * 1.5) {
       alertas.push({
         severity: 'high', tipo: 'estancado_etapa',
-        mensaje: `${daysInStage} días en etapa "${s.current_stage}" (excede 60)`,
+        mensaje: `${daysInStage} días en etapa "${s.current_stage}" (target ${targetDays}d × 1.5)`,
         accion: 'Asignar plan de acción específico para destrabar.'
       });
     }
