@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Viral Studio · Generador de Contenido</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .scrollbar-thin::-webkit-scrollbar { width: 7px; height: 7px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+  .glow { box-shadow: 0 0 0 1px rgba(168,85,247,.25), 0 8px 40px -12px rgba(168,85,247,.45); }
+  @keyframes pulse-dot { 0%,100%{opacity:.3} 50%{opacity:1} }
+  .typing span { animation: pulse-dot 1.2s infinite; }
+  .typing span:nth-child(2){animation-delay:.2s}
+  .typing span:nth-child(3){animation-delay:.4s}
+</style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+
+<!-- Top bar -->
+<header class="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur border-b border-zinc-800">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-8 w-8 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center font-bold text-sm">V</div>
+      <div>
+        <h1 class="font-bold leading-tight">Viral Studio</h1>
+        <p class="text-[11px] text-zinc-500 -mt-0.5">Marca personal · Bienes raíces & negocios</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="key-status" class="text-[11px] px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">Sin API key</span>
+      <button id="settings-btn" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">⚙ Ajustes</button>
+    </div>
+  </div>
+  <!-- Tabs -->
+  <nav class="max-w-6xl mx-auto px-5 flex gap-1 text-sm">
+    <button data-tab="reels" class="tab-btn px-4 py-2 border-b-2 border-fuchsia-500 text-white font-medium">🎬 Reels</button>
+    <button data-tab="carruseles" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">🖼️ Carruseles</button>
+    <button data-tab="youtube" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">▶️ YouTube</button>
+    <button data-tab="calendario" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">📅 Calendario</button>
+  </nav>
+</header>
+
+<main class="max-w-6xl mx-auto px-5 py-6">
+
+  <!-- ===== REELS TAB ===== -->
+  <section id="tab-reels" class="tab-panel">
+    <div class="grid md:grid-cols-[380px_1fr] gap-6">
+      <!-- Controls -->
+      <div class="space-y-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <select id="r-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+              <option value="">— Todas las categorías —</option>
+            </select>
+            <select id="r-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+              <option value="">— Elige un dolor específico (opcional) —</option>
+            </select>
+            <p id="r-dolor-hint" class="text-[11px] text-emerald-400/80 mt-1 hidden"></p>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">Tema / ángulo libre (opcional si elegiste dolor)</label>
+            <textarea id="r-tema" rows="2" placeholder="Ej: por qué el criterio importa más que el capital" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-semibold text-zinc-400">Formato</label>
+              <select id="r-formato" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+                <option value="auto">Automático (mejor)</option>
+                <option>Manita</option>
+                <option>Doble</option>
+                <option>Ranking</option>
+                <option>Sketch</option>
+                <option>Mano arriba</option>
+                <option>Entrevista en calle</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-400">Variantes</label>
+              <select id="r-variantes" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+                <option>1</option><option selected>3</option><option>5</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">CTA / palabra clave (opcional)</label>
+            <input id="r-cta" placeholder="Ej: comenta TERRENO" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
+          </div>
+          <button id="r-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar reels</button>
+        </div>
+        <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
+          Cada reel sale con la fórmula de Julio: <b>hook → chisme → valor oculto → CTA</b>, formato, guion palabra-por-palabra con tomas e indicaciones de edición.
+        </div>
+      </div>
+      <!-- Output -->
+      <div id="r-output" class="min-h-[300px]">
+        <div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-20">
+          <div>
+            <div class="text-4xl mb-2">🎬</div>
+            <p class="text-sm">Tus reels aparecerán acá.<br>Pon un tema y dale a Generar.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CARRUSELES TAB ===== -->
+  <section id="tab-carruseles" class="tab-panel hidden">
+    <div class="grid md:grid-cols-[380px_1fr] gap-6">
+      <div class="space-y-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <select id="c-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+              <option value="">— Todas las categorías —</option>
+            </select>
+            <select id="c-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+              <option value="">— Elige un dolor específico (opcional) —</option>
+            </select>
+            <p id="c-dolor-hint" class="text-[11px] text-emerald-400/80 mt-1 hidden"></p>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">Tema / ángulo libre (opcional si elegiste dolor)</label>
+            <textarea id="c-tema" rows="2" placeholder="Ej: cómo construir patrimonio con tu primer flip" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-semibold text-zinc-400">Plantilla</label>
+              <select id="c-plantilla" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+                <option value="auto">Automático (mejor)</option>
+                <option>Referente famoso</option>
+                <option>Antes y después</option>
+                <option>Educativo</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-400">Variantes</label>
+              <select id="c-variantes" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+                <option selected>2</option><option>1</option><option>3</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">CTA / palabra clave (opcional)</label>
+            <input id="c-cta" placeholder="Ej: comenta PATRIMONIO" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
+          </div>
+          <button id="c-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar carruseles</button>
+        </div>
+        <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
+          Plantillas validadas de Julio: <b>Referente famoso</b> y <b>Antes/después</b>, más la estructura <b>Educativa</b> (hook→problema→solución→prueba→CTA).
+        </div>
+      </div>
+      <div id="c-output" class="min-h-[300px]">
+        <div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-20">
+          <div>
+            <div class="text-4xl mb-2">🖼️</div>
+            <p class="text-sm">Tus carruseles aparecerán acá.<br>Elige un dolor o tema y dale a Generar.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== YOUTUBE TAB ===== -->
+  <section id="tab-youtube" class="tab-panel hidden">
+    <div class="grid md:grid-cols-[380px_1fr] gap-6">
+      <div class="space-y-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <select id="y-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+              <option value="">— Todas las categorías —</option>
+            </select>
+            <select id="y-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+              <option value="">— Elige un dolor específico (opcional) —</option>
+            </select>
+            <p id="y-dolor-hint" class="text-[11px] text-emerald-400/80 mt-1 hidden"></p>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">Tema / ángulo libre (opcional si elegiste dolor)</label>
+            <textarea id="y-tema" rows="2" placeholder="Ej: cómo analizar tu primera propiedad sin perder dinero" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-semibold text-zinc-400">Videos</label>
+              <select id="y-variantes" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+                <option selected>2</option><option>1</option><option>3</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-400">CTA (opcional)</label>
+              <input id="y-cta" placeholder="Ej: link en descripción" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
+            </div>
+          </div>
+          <button id="y-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar videos</button>
+        </div>
+        <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
+          Método Richard/One of 10: <b>idea = remix</b> (formato + tema + vector viral), <b>títulos</b> por las 3 palancas (miedo/curiosidad/deseo), <b>miniatura por capas</b> y cortes a reels.
+        </div>
+      </div>
+      <div id="y-output" class="min-h-[300px]">
+        <div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-20">
+          <div>
+            <div class="text-4xl mb-2">▶️</div>
+            <p class="text-sm">Tus conceptos de YouTube aparecerán acá.<br>Elige un dolor o tema y dale a Generar.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CALENDARIO TAB ===== -->
+  <section id="tab-calendario" class="tab-panel hidden">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5">
+      <div class="grid sm:grid-cols-4 gap-3 items-end">
+        <div>
+          <label class="text-xs font-semibold text-zinc-400">Días</label>
+          <select id="cal-dias" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+            <option selected>7</option><option>5</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-zinc-400">Posts por día</label>
+          <select id="cal-posts" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+            <option>2</option><option selected>3</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-zinc-400">Fase del mes</label>
+          <select id="cal-fase" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+            <option value="auto">Automático</option>
+            <option value="siembra">Siembra (días 1-20)</option>
+            <option value="cosecha">Cosecha (días 21-27)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-zinc-400">Foco de la semana (opcional)</label>
+          <input id="cal-foco" placeholder="Ej: criterio y búsqueda de propiedades" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
+        </div>
+      </div>
+      <button id="cal-generate" class="mt-3 w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar calendario</button>
+      <p class="text-[11px] text-zinc-600 mt-2">Mezcla viral + autoridad + hand-raisers + venta, con ritmo siembra/cosecha. Historias: 1 secuencia/día (hook 14h, secuencia 16h).</p>
+    </div>
+    <div id="cal-output" class="min-h-[200px]">
+      <div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-20">
+        <div>
+          <div class="text-4xl mb-2">📅</div>
+          <p class="text-sm">Tu plan semanal aparecerá acá.<br>Configura y dale a Generar.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+  <div class="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="font-bold text-lg">Ajustes</h3>
+      <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="text-zinc-500 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div>
+      <label class="text-xs font-semibold text-zinc-400">Anthropic API Key</label>
+      <input id="s-key" type="password" placeholder="sk-ant-..." class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
+      <p class="text-[11px] text-zinc-600 mt-1">Se guarda solo en este navegador (localStorage). Consíguela en console.anthropic.com.</p>
+    </div>
+    <div>
+      <label class="text-xs font-semibold text-zinc-400">Modelo</label>
+      <select id="s-model" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
+        <option value="claude-sonnet-4-5">Sonnet 4.5 (rápido, recomendado)</option>
+        <option value="claude-sonnet-4-6">Sonnet 4.6 (más nuevo)</option>
+        <option value="claude-opus-4-1">Opus 4.1 (máxima calidad)</option>
+        <option value="claude-opus-4-8">Opus 4.8 (más nuevo)</option>
+        <option value="claude-3-5-haiku-latest">Haiku (más barato)</option>
+      </select>
+      <p class="text-[11px] text-zinc-600 mt-1">Si el modelo da error, prueba otro o escribe el ID exacto que soporte tu cuenta.</p>
+      <input id="s-model-custom" placeholder="o ID personalizado: claude-..." class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
+    </div>
+    <button id="s-save" class="w-full bg-fuchsia-600 hover:bg-fuchsia-500 font-semibold py-2 rounded-lg">Guardar</button>
+  </div>
+</div>
+
+<script src="viral.js"></script>
+</body>
+</html>

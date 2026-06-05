@@ -1,0 +1,381 @@
+{
+  "meta": {
+    "nombre": "FlipMentoría - Base de Conocimiento",
+    "version": "1.0",
+    "descripcion": "Conocimiento estructurado para resolver dudas de estudiantes de fix and flip / fix and hold para latinos en USA",
+    "marca": "Flipping Rentals",
+    "tono": "Cercano, en español/spanglish, directo, con criterio. Habla de tú/usted según el estudiante. Nunca promete riqueza fácil. Siempre enfoca en criterio sobre capital.",
+    "principio_central": "La gente cree que el problema es la plata. El problema real es el criterio para encontrar propiedades que no hagan perder la plata."
+  },
+  "categorias": [
+    {
+      "id": "capital",
+      "nombre": "Capital y Financiamiento",
+      "icono": "dollar",
+      "descripcion": "Todo sobre cómo conseguir el dinero, préstamos y down payment",
+      "color": "#2E5266"
+    },
+    {
+      "id": "credito",
+      "nombre": "Crédito y Acceso (ITIN/DSCR)",
+      "icono": "credit-card",
+      "descripcion": "Crédito, préstamos sin SSN, DSCR, opciones para self-employed",
+      "color": "#3B7A8C"
+    },
+    {
+      "id": "criterio",
+      "nombre": "Criterio y Análisis",
+      "icono": "search",
+      "descripcion": "Buy Box, los 4 números, cómo analizar una propiedad",
+      "color": "#7B68A6"
+    },
+    {
+      "id": "sourcing",
+      "nombre": "Búsqueda de Propiedades",
+      "icono": "home",
+      "descripcion": "Cómo encontrar deals, wholesalers, fuentes de propiedades",
+      "color": "#C9772E"
+    },
+    {
+      "id": "equipo",
+      "nombre": "El Equipo del Negocio",
+      "icono": "users",
+      "descripcion": "Roles: wholesaler, realtor, GC, arquitecto, prestamista",
+      "color": "#C0392B"
+    },
+    {
+      "id": "remodelacion",
+      "nombre": "Remodelación y Contratistas",
+      "icono": "tool",
+      "descripcion": "Cómo contratar, presupuestar y supervisar la obra",
+      "color": "#B8860B"
+    },
+    {
+      "id": "geografia",
+      "nombre": "Mercados y Estados",
+      "icono": "map",
+      "descripcion": "Dónde invertir, mercados latinos, mover capital",
+      "color": "#27746A"
+    },
+    {
+      "id": "mentalidad",
+      "nombre": "Mentalidad de Inversionista",
+      "icono": "brain",
+      "descripcion": "Miedo a la deuda, mentalidad de empleado vs inversionista",
+      "color": "#8E6E53"
+    },
+    {
+      "id": "familia",
+      "nombre": "Familia y Decisiones",
+      "icono": "heart",
+      "descripcion": "Convencer a la pareja, padres, sociedades familiares",
+      "color": "#C0568E"
+    },
+    {
+      "id": "legado",
+      "nombre": "Patrimonio y Legado",
+      "icono": "award",
+      "descripcion": "Construir herencia, plan de retiro, primera generación",
+      "color": "#C9A227"
+    },
+    {
+      "id": "proceso",
+      "nombre": "El Proceso Paso a Paso",
+      "icono": "list",
+      "descripcion": "Las 5 E, cronograma, primeras victorias, qué hacer cada mes",
+      "color": "#34495E"
+    }
+  ],
+  "preguntas": [
+    {
+      "id": "q001",
+      "categoria": "capital",
+      "pregunta": "¿Necesito tener todo el capital antes de empezar?",
+      "respuesta_corta": "No. Lo más importante NO es tener toda la plata, es tener el criterio para encontrar la propiedad correcta. El down payment promedio para empezar está entre $20,000 y $100,000, pero hay estudiantes que arrancaron con socios o prestamistas privados.",
+      "respuesta_detallada": "Este es el error #1 de mentalidad. La gente cree que primero hay que juntar todo el capital y después buscar la propiedad. Es al revés. Tenemos estudiantes con $100,000 en la mano que llevan meses sin comprar nada, y otros que con socio o prestamista privado cerraron su primer flip en 90 días. La diferencia no es la plata: es el criterio. El capital se puede conseguir de varias formas (socios, prestamistas privados, tarjetas 0% interés, Harmony Lender). Lo que NO se consigue afuera es el criterio para saber qué propiedad asegura que no vas a perder tu inversión. Por eso el orden correcto es: primero desarrollar el criterio (Buy Box + análisis), después conseguir el capital para la propiedad correcta.",
+      "tags": ["capital", "down payment", "empezar", "dinero", "criterio"],
+      "pilar": "Criterio",
+      "relacionadas": ["q002", "q010", "q030"]
+    },
+    {
+      "id": "q002",
+      "categoria": "capital",
+      "pregunta": "¿Cuánto down payment necesito para mi primer flip?",
+      "respuesta_corta": "El rango típico al empezar está entre $20,000 y $100,000, dependiendo del estado y del precio de la propiedad. Con el sistema de Flipping Rentals y condiciones preferenciales, la necesidad de capital puede ser menor que haciéndolo por fuera.",
+      "respuesta_detallada": "El down payment depende del estado, el precio de la casa y el tipo de préstamo. En general, un préstamo de inversión pide entre 20% y 25% de down payment. Hay una diferencia importante: cuando haces el negocio con el sistema y las condiciones preferenciales de Flipping Rentals, la necesidad de capital puede ser menor que si lo haces por fuera sin esas condiciones (la diferencia puede ser de hasta un 10% más de capital necesario si vas solo). En casas, un 10% siempre es mucho dinero. La clave: el préstamo de inversión se basa en la CASA, no en ti, así que mientras mejores sean los números de la propiedad, mejores condiciones consigues.",
+      "tags": ["down payment", "capital", "porcentaje", "prestamo"],
+      "pilar": "Números",
+      "relacionadas": ["q001", "q011", "q012"]
+    },
+    {
+      "id": "q003",
+      "categoria": "capital",
+      "pregunta": "¿Cómo levanto capital si no tengo todo el dinero?",
+      "respuesta_corta": "Hay varias rutas: socios (capital + operador), prestamistas privados, tarjetas de crédito al 0% de interés, y el Harmony Lender. Muchos estudiantes combinan varias fuentes.",
+      "respuesta_detallada": "El capital se puede levantar de varias maneras, y muchos estudiantes combinan más de una: 1) Socios — uno pone capital, otro pone operación. Estructuras tipo 'mi socio y yo tenemos $100,000 juntos'. 2) Prestamistas privados — personas que prestan dinero a cambio de un retorno, basándose en el deal. 3) Tarjetas de crédito al 0% de interés — para cubrir gastos iniciales sin pagar intereses. 4) Harmony Lender — préstamo basado en la propiedad, no en tu perfil personal. Varios estudiantes han levantado su capital DENTRO de la mentoría, no antes. No necesitas llegar con toda la plata.",
+      "tags": ["levantar capital", "socios", "prestamista privado", "tarjetas", "0 interes"],
+      "pilar": "Acceso",
+      "relacionadas": ["q001", "q013", "q020"]
+    },
+    {
+      "id": "q010",
+      "categoria": "credito",
+      "pregunta": "El banco me dijo que necesito 2 años de antigüedad con mi LLC. ¿Es verdad?",
+      "respuesta_corta": "No para préstamos de inversión. Esa regla es para préstamos tradicionales de vivienda. En un préstamo de inversión (como el Harmony Lender), la empresa puede tener menos de una semana. De hecho, normalmente creamos la LLC el mismo día que nos van a soltar el préstamo.",
+      "respuesta_detallada": "Esta es una de las confusiones más comunes y desactiva a mucha gente sin razón. Cuando vas al banco a pedir un préstamo TRADICIONAL para comprar una casa para vivir, sí te piden cosas como 2 años de antigüedad con la empresa, que tus gastos no superen tus ingresos, historial, etc. PERO el préstamo de inversión es completamente diferente. Es un préstamo basado en la CASA, no en la persona. La empresa (LLC) puede tener menos de una semana cuando te aprueban el préstamo. De hecho, lo normal es crear la LLC el mismo día del cierre del préstamo. Lo que el banco revisa en un préstamo de inversión es qué tan buenos están los números de la casa, no la antigüedad de tu empresa.",
+      "tags": ["banco", "LLC", "2 años", "antiguedad", "prestamo tradicional", "mito"],
+      "pilar": "Mitos",
+      "relacionadas": ["q011", "q012", "q014"]
+    },
+    {
+      "id": "q011",
+      "categoria": "credito",
+      "pregunta": "¿Qué es el Harmony Lender y en qué se diferencia de un banco normal?",
+      "respuesta_corta": "Es un préstamo de inversión basado en la propiedad, no en tu perfil personal. No te piden 2 años de LLC ni revisan tu vida financiera como un banco tradicional. Lo que importa es qué tan bueno es el negocio que traes a la mesa.",
+      "respuesta_detallada": "El Harmony Lender es un tipo de préstamo de inversión. La diferencia clave con un banco tradicional: el banco tradicional presta basándose en TI (tu score, tu antigüedad laboral, tu relación ingresos/gastos). El Harmony Lender presta basándose en la CASA (qué tan buenos son los números del negocio). Esto significa que: no necesitas 2 años de historial con tu LLC, tu situación crediticia personal pesa menos, lo que importa es el deal que llevas. Con las condiciones preferenciales de Flipping Rentals, además, la necesidad de capital puede ser menor que yendo por fuera. Si necesitas, en la mentoría se puede traer al prestamista para explicar el caso específico.",
+      "tags": ["harmony lender", "prestamo inversion", "banco", "diferencia"],
+      "pilar": "Acceso",
+      "relacionadas": ["q010", "q012", "q020"]
+    },
+    {
+      "id": "q012",
+      "categoria": "credito",
+      "pregunta": "No tengo Social Security. ¿Puedo invertir igual?",
+      "respuesta_corta": "Sí. Existen préstamos ITIN diseñados para personas sin Social Security Number. La mayoría de latinos no sabe que existen. También hay opciones como DSCR que se basan en el flujo de la propiedad, no en tu perfil personal.",
+      "respuesta_detallada": "Este es uno de los temas peor explicados en todo el mercado latino. SÍ se puede invertir sin Social Security. Existen los préstamos ITIN (Individual Taxpayer Identification Number), diseñados específicamente para personas sin SSN. Hay lenders que se especializan en esto. Además existen los préstamos DSCR, que se basan en el flujo de renta de la propiedad y no piden W-2 ni tax returns. La oportunidad es estructural: cada año un millón de latinos cumple 18 años en USA y muchos usan ITIN. IMPORTANTE: este es un tema técnico que conviene revisar caso por caso con el equipo, porque las condiciones cambian. Lo central que debes saber: tu estatus migratorio NO es automáticamente una barrera para invertir.",
+      "tags": ["ITIN", "sin SSN", "social security", "indocumentado", "estatus"],
+      "pilar": "Acceso",
+      "relacionadas": ["q013", "q014", "q011"]
+    },
+    {
+      "id": "q013",
+      "categoria": "credito",
+      "pregunta": "¿Qué es un préstamo DSCR?",
+      "respuesta_corta": "Es un préstamo de inversión que se aprueba según el flujo de renta de la propiedad, NO según tu W-2 o tus tax returns. Ideal para self-employed o gente con ingresos complejos. La propiedad se paga sola con la renta que genera.",
+      "respuesta_detallada": "DSCR significa Debt Service Coverage Ratio. Es un préstamo non-QM (no calificado) diseñado para inversionistas. Lo más importante: NO piden tax returns, NO piden W-2, NO verifican empleo. Lo que miran es si la propiedad genera suficiente flujo de renta para cubrir el pago de la hipoteca. Es perfecto para el latino self-employed, dueño de negocio, o con ingresos que en papel se ven complicados. Generalmente piden entre 20-25% de down payment. Se puede tomar a nombre de una LLC para proteger tus bienes personales. Nota: el DSCR es para propiedades de renta (no para fix and flip puro), pero entra en juego en estrategias como BRRRR donde refinancias después de rentar.",
+      "tags": ["DSCR", "self employed", "sin W2", "flujo de renta", "non-QM"],
+      "pilar": "Acceso",
+      "relacionadas": ["q012", "q011", "q014"]
+    },
+    {
+      "id": "q014",
+      "categoria": "credito",
+      "pregunta": "Tengo crédito bajo o pocas tarjetas. ¿Eso me bloquea?",
+      "respuesta_corta": "No necesariamente. Para préstamos de inversión el crédito pesa menos que el deal. Y si tu crédito está en construcción, hay un proceso para mejorarlo. Varios estudiantes están reparando su crédito DENTRO de la mentoría mientras avanzan en lo demás.",
+      "respuesta_detallada": "El crédito importa, pero no es el factor decisivo que la gente cree. Casos comunes: 1) Gente con buen score (720+) pero tarjetas pequeñas ($200, $500) — se puede trabajar el aumento de límites. 2) Gente sin capital aún — hay rutas de levantamiento. 3) Gente reparando crédito — actualmente varios estudiantes lo están haciendo dentro de la mentoría. La clave de mentalidad: no esperes a tener el crédito 'perfecto' para empezar a desarrollar criterio. El crédito se trabaja en paralelo. Mientras reparas crédito, puedes estar analizando propiedades, construyendo tu Buy Box y armando tu red de contactos.",
+      "tags": ["credito bajo", "score", "tarjetas", "reparar credito", "720"],
+      "pilar": "Acceso",
+      "relacionadas": ["q012", "q013", "q030"]
+    },
+    {
+      "id": "q020",
+      "categoria": "criterio",
+      "pregunta": "¿Cuáles son los 4 números que definen si una casa es buen negocio?",
+      "respuesta_corta": "Los 4 números clave son: 1) Precio máximo de compra (MAO), 2) Costo estimado de remodelación, 3) ARV (valor después de reparar), 4) Margen objetivo. Con estos 4 sabes si una casa es negocio o trampa.",
+      "respuesta_detallada": "Estos son los números que necesitas para evaluar CUALQUIER propiedad rápidamente: 1) MAO (Maximum Allowable Offer) — el precio máximo que puedes ofrecer. La fórmula central es MAO = (ARV × 0.75) − rehab. 2) Costo de remodelación — cuánto te va a costar dejar la casa lista. 3) ARV (After Repair Value) — cuánto va a valer la casa una vez remodelada. 4) Margen objetivo — cuánto quieres ganar. Si tienes estos 4 claros, ya estás más adelante que el 90% de la gente que quiere hacer flipping. Hay más números puntuales que se revisan después, pero la decisión de SI es buen negocio o no, se toma con estos cuatro. En la plataforma tienes calculadoras que automatizan esto.",
+      "tags": ["4 numeros", "MAO", "ARV", "margen", "remodelacion", "analisis"],
+      "pilar": "Números",
+      "relacionadas": ["q021", "q022", "q001"]
+    },
+    {
+      "id": "q021",
+      "categoria": "criterio",
+      "pregunta": "¿Qué es un Buy Box y cómo lo construyo?",
+      "respuesta_corta": "El Buy Box son tus criterios de búsqueda: qué tipo de propiedad, en qué zona, a qué precio, en qué condición y con qué margen estás dispuesto a comprar. Es lo primero que defines, antes de salir a buscar. No es complicado, se puede armar paso a paso.",
+      "respuesta_detallada": "El Buy Box es tu filtro de decisión. Define qué propiedades te sirven y cuáles no, para que no pierdas tiempo analizando casas que nunca te van a funcionar. Variables clave del Buy Box: 1) Estado/ciudad donde vas a comprar. 2) Rango de precio. 3) Tipo de propiedad. 4) Condición (qué tanto rehab estás dispuesto a hacer). 5) ARV objetivo. 6) Margen mínimo aceptable. 7) Timing. 8) Estrategia de salida (flip, hold, BRRRR). Construir un buen Buy Box es lo que separa al que compra casas al azar del que construye un portafolio. Lo bueno: armar un Buy Box inicial no es del otro mundo. Se puede definir en pasos simples para empezar, y se va refinando con la experiencia.",
+      "tags": ["buy box", "criterios", "busqueda", "filtro"],
+      "pilar": "Criterio",
+      "relacionadas": ["q020", "q022", "q030"]
+    },
+    {
+      "id": "q022",
+      "categoria": "criterio",
+      "pregunta": "¿Cómo inspecciono una casa antes de hacer una oferta?",
+      "respuesta_corta": "Revisa los puntos que más impactan el costo: cimentación (grietas = costo alto), techo, plomería, sistema eléctrico, y daños estructurales. Estos definen si el rehab te conviene o te quiebra. Lo visual (pintura, pisos) es lo barato; lo estructural es lo que importa.",
+      "respuesta_detallada": "La inspección previa es clave para no comprarte un problema. Los puntos críticos que más afectan tu presupuesto: 1) Cimentación — si ves grietas, eso puede costar mucho. Es de lo primero que miras. 2) Techo — reemplazarlo es caro. 3) Plomería — tuberías viejas o dañadas. 4) Sistema eléctrico — actualizar paneles antiguos. 5) Daño estructural general. La regla mental: lo cosmético (pintura, pisos, cocina) es relativamente barato y predecible. Lo estructural y de sistemas es lo que se sale de presupuesto. Una casa que se ve fea pero está estructuralmente sana puede ser excelente negocio. Una casa bonita con problemas de cimentación puede ser una trampa.",
+      "tags": ["inspeccion", "cimentacion", "grietas", "estructura", "rehab"],
+      "pilar": "Criterio",
+      "relacionadas": ["q020", "q040", "q041"]
+    },
+    {
+      "id": "q030",
+      "categoria": "sourcing",
+      "pregunta": "¿Cómo encuentro propiedades sin ser realtor?",
+      "respuesta_corta": "No necesitas ser realtor ni tener uno de cabecera. Las 4 fuentes principales son: wholesalers, plataformas (Zillow, Redfin, MLS), marketing directo y networking local. La búsqueda de propiedades es el cuello de botella #1, así que hay que ampliar la red de fuentes.",
+      "respuesta_detallada": "Mucha gente cree que necesita ser realtor o tener un realtor de cabecera para conseguir propiedades. Falso. Las fuentes reales: 1) Wholesalers — personas que consiguen propiedades off-market y te las pasan. Los mejores wholesalers son locales. 2) Plataformas — Zillow, Redfin, MLS y similares. 3) Marketing directo — llegar directo a dueños. 4) Networking local. IMPORTANTE: la búsqueda de propiedades es el cuello de botella #1 de la mayoría de estudiantes. No dependas de una sola fuente. El error común es analizar en silo en una sola plataforma. La solución es ampliar la red de contactos, especialmente wholesalers en tu mercado objetivo. Esto es algo que se entrena dentro de la mentoría.",
+      "tags": ["sourcing", "wholesaler", "realtor", "encontrar propiedades", "cuello de botella"],
+      "pilar": "El juego",
+      "relacionadas": ["q031", "q050", "q051"]
+    },
+    {
+      "id": "q031",
+      "categoria": "sourcing",
+      "pregunta": "Los wholesalers me mandan propiedades pero no me sirven. ¿Qué hago?",
+      "respuesta_corta": "Es normal al principio. La clave es tener tu Buy Box bien definido para filtrar rápido, y comunicarles tus criterios exactos a los wholesalers. También amplía tu red: no dependas de uno solo. La consistencia en el análisis hace que con el tiempo te lleguen mejores deals.",
+      "respuesta_detallada": "Esto le pasa a casi todos al inicio. Los wholesalers te mandan propiedades que no entran en tu Buy Box, o la remodelación es muy pesada, o coincide una cosa pero no la otra. Qué hacer: 1) Ten tu Buy Box clarísimo para descartar rápido sin perder tiempo. 2) Comunícales a los wholesalers tus criterios EXACTOS (zona, precio, condición) para que filtren ellos. 3) Amplía tu red — mientras más wholesalers y fuentes, más probabilidad de que llegue el deal correcto. 4) Sé consistente analizando: el criterio mejora con volumen (analiza 5 al día, luego 10, luego 15). Con el tiempo desarrollas el ojo para descartar en segundos y los wholesalers aprenden qué mandarte.",
+      "tags": ["wholesaler", "filtrar", "buy box", "deals", "red de contactos"],
+      "pilar": "Sourcing",
+      "relacionadas": ["q030", "q021", "q063"]
+    },
+    {
+      "id": "q040",
+      "categoria": "remodelacion",
+      "pregunta": "¿Cómo consigo una buena empresa de remodelación que no me robe?",
+      "respuesta_corta": "Busca empresas con experiencia comprobada en el negocio de inversión (no solo remodelación residencial), que manejen permisos, y que tengan referencias. La remodelación es local, así que la red de contratistas se construye en tu mercado específico.",
+      "respuesta_detallada": "Conseguir un buen general contractor (GC) es una de las dudas más grandes y legítimas. Qué buscar: 1) Experiencia en el negocio de inversión, no solo en remodelaciones comunes — un GC que entiende flips trabaja distinto. 2) Que maneje permisos o te ayude con ellos. 3) Referencias verificables de otros inversionistas. 4) Que te dé un Scope of Work detallado ANTES de empezar (así sabes cuánto vas a gastar). La realidad importante: la remodelación es MUY local. Los mejores contratistas se consiguen en tu mercado específico. Por eso en la mentoría se te enseña a construir tu propia red de contratistas en tu zona, en vez de depender de una lista genérica que puede no funcionar en tu estado.",
+      "tags": ["contratista", "GC", "remodelacion", "permisos", "scope of work"],
+      "pilar": "Equipo",
+      "relacionadas": ["q041", "q042", "q051"]
+    },
+    {
+      "id": "q041",
+      "categoria": "remodelacion",
+      "pregunta": "¿Por qué la remodelación me cuesta más de lo que presupuesté?",
+      "respuesta_corta": "Las causas típicas: no hiciste un Scope of Work detallado, aparecieron problemas estructurales no detectados en la inspección, o no incluiste un colchón para imprevistos. La remodelación es el músculo económico más fuerte del negocio, así que el presupuesto debe ser riguroso.",
+      "respuesta_detallada": "El sobrecosto de remodelación es uno de los errores que más margen se come. Causas comunes: 1) No tener un Scope of Work detallado antes de empezar (acuerdo claro de qué se hace y cuánto cuesta). 2) Problemas estructurales que no detectaste en la inspección previa (de nuevo: cimentación, plomería, eléctrico). 3) No presupuestar un colchón para imprevistos. 4) Cambios sobre la marcha sin renegociar. La remodelación es el músculo económico más fuerte del negocio — ahí se gana o se pierde el margen. Por eso el análisis de los 4 números debe tener un costo de remodelación realista, idealmente validado por tu GC con Scope of Work, no un estimado al aire.",
+      "tags": ["sobrecosto", "remodelacion", "presupuesto", "scope of work", "imprevistos"],
+      "pilar": "Números",
+      "relacionadas": ["q040", "q020", "q022"]
+    },
+    {
+      "id": "q042",
+      "categoria": "remodelacion",
+      "pregunta": "¿Necesito sacar muchos permisos? Me da miedo ese tema.",
+      "respuesta_corta": "Depende del alcance de la obra, pero el tema de permisos es más manejable de lo que crees. Lo importante no es la cantidad de permisos, sino entender el proceso. Es algo que se enseña y se aprende; no es la barrera que la gente imagina.",
+      "respuesta_detallada": "El miedo a los permisos detiene a mucha gente sin razón. La verdad: el problema no es la cantidad de permisos (muchos o pocos), el problema es que la persona CREE que necesita un montón de conocimiento especializado para hacerlo. Realidad: el proceso de permisos se entiende y se enseña. No todos los proyectos requieren los mismos permisos, y se aprende a navegar el sistema en tu jurisdicción. Lo importante es no dejar que el miedo a un tema técnico-administrativo te paralice antes de empezar. Es algo que se resuelve en la fase correspondiente del proyecto, con guía. No es lo primero que debes resolver ni la barrera principal.",
+      "tags": ["permisos", "miedo", "proceso", "obra"],
+      "pilar": "Mitos",
+      "relacionadas": ["q040", "q060"]
+    },
+    {
+      "id": "q050",
+      "categoria": "equipo",
+      "pregunta": "¿Quiénes son los jugadores que necesito en mi equipo de flipping?",
+      "respuesta_corta": "Tu equipo es como un equipo de fútbol: wholesalers y realtors (te traen las propiedades), prestamistas y socios (el capital), general contractor, arquitectos e inspectores (la obra), y tú (las decisiones y el criterio). Si te falta un jugador, el partido se complica.",
+      "respuesta_detallada": "Hacer un flip NO es tú contra el mundo. Es jugar un partido con un equipo completo. Los jugadores: 1) DELANTEROS (consiguen las oportunidades): wholesalers y realtors. 2) MEDIOCAMPO (mueven el capital): prestamistas privados, Harmony Lender, socios. 3) DEFENSA (ejecutan y protegen el proyecto): general contractor, arquitectos, inspectores. 4) ARQUERO (tú): las decisiones, el criterio, la estrategia. Cada uno cumple un rol y si te falta uno, el negocio se traba. La confusión más común es no saber la diferencia entre un wholesaler (consigue propiedades off-market), un realtor (agente licenciado que opera en el MLS), y un GC (ejecuta la remodelación). Entender quién hace qué es clave para saber a quién buscar en cada fase.",
+      "tags": ["equipo", "roles", "wholesaler", "realtor", "GC", "futbol"],
+      "pilar": "El juego",
+      "relacionadas": ["q030", "q051", "q040"]
+    },
+    {
+      "id": "q051",
+      "categoria": "equipo",
+      "pregunta": "¿Cuál es la diferencia entre un wholesaler, un realtor y un general contractor?",
+      "respuesta_corta": "Wholesaler: consigue propiedades off-market (fuera del mercado público) y te las pasa. Realtor: agente licenciado que opera en el MLS. General Contractor (GC): ejecuta la remodelación de la casa. Son tres roles distintos que se confunden mucho.",
+      "respuesta_detallada": "Esta confusión cuesta tiempo y dinero. Las diferencias: WHOLESALER — no es agente licenciado; su trabajo es encontrar propiedades off-market (que no están en el mercado público), ponerlas bajo contrato y pasártelas a cambio de una comisión. Son tu mejor fuente de deals con descuento, y son LOCALES. REALTOR — agente inmobiliario licenciado que opera en el MLS (el sistema oficial de listados). Útil pero las propiedades del MLS suelen estar a precio de mercado. GENERAL CONTRACTOR (GC) — el que ejecuta físicamente la remodelación, coordina a los trabajadores, maneja la obra. No te consigue propiedades; ejecuta la transformación. Saber esto te dice a quién buscar: para deals, wholesalers; para la obra, un buen GC.",
+      "tags": ["wholesaler", "realtor", "GC", "diferencia", "roles"],
+      "pilar": "El juego",
+      "relacionadas": ["q050", "q030", "q040"]
+    },
+    {
+      "id": "q060",
+      "categoria": "proceso",
+      "pregunta": "¿Qué debo hacer en mi primer mes en la mentoría?",
+      "respuesta_corta": "El primer mes NO es para comprar una casa. Es para desarrollar criterio: definir tu Buy Box y empezar a analizar propiedades (5 al día, luego 10, luego 15). Las micro-victorias del primer mes son el análisis consistente, no la propiedad comprada.",
+      "respuesta_detallada": "Expectativa clara para no frustrarte: en 30 días NO vas a comprar la casa. Vas a construir la base. El cronograma típico de primeras victorias: PRIMER MES — definir tu Buy Box (tus criterios) y empezar a analizar propiedades con consistencia. La meta es analizar 5 propiedades al día, luego subir a 10, luego a 15, registrando cada avance. Esto te da velocidad y criterio. SIGUIENTES MESES — ampliar tu red de contactos (wholesalers), refinar el análisis, y empezar a hacer ofertas cuando aparezca el deal correcto. La clave mental: las micro-victorias (analizar X propiedades, definir tu Buy Box, crear tu LLC, armar tu red) son los logros reales del proceso, no solo el flip cerrado. El ritmo depende de ti: si ves las clases y haces los ejercicios, avanzas rápido.",
+      "tags": ["primer mes", "cronograma", "buy box", "micro victorias", "empezar"],
+      "pilar": "Proceso",
+      "relacionadas": ["q061", "q021", "q030"]
+    },
+    {
+      "id": "q061",
+      "categoria": "proceso",
+      "pregunta": "¿Cuál es la metodología completa del negocio?",
+      "respuesta_corta": "La metodología son las 5 E: E1 Evaluación → E2 Estructura → E3 Ejecución → E4 Salida → E5 Escalabilidad. Es el camino completo desde analizar una propiedad hasta escalar tu portafolio.",
+      "respuesta_detallada": "El sistema de Flipping Rentals se estructura en 5 etapas (las 5 E): E1 EVALUACIÓN — analizar la propiedad, los 4 números, el Buy Box. Decidir si es buen negocio. E2 ESTRUCTURA — armar el financiamiento, la LLC, el equipo, la estructura legal y financiera del deal. E3 EJECUCIÓN — la compra, la remodelación, la gestión de la obra. E4 SALIDA — vender (flip) o rentar/refinanciar (hold/BRRRR). Concretar la ganancia. E5 ESCALABILIDAD — usar lo aprendido y el capital generado para hacer el siguiente deal, construir portafolio, escalar. Cada etapa tiene sus herramientas, fórmulas y procesos dentro de la plataforma. La fórmula central que atraviesa todo: MAO = (ARV × 0.75) − rehab.",
+      "tags": ["5 E", "metodologia", "sistema", "etapas", "proceso"],
+      "pilar": "Proceso",
+      "relacionadas": ["q060", "q020", "q062"]
+    },
+    {
+      "id": "q062",
+      "categoria": "proceso",
+      "pregunta": "¿Cuáles son los modelos de negocio que puedo hacer?",
+      "respuesta_corta": "Hay varios modelos: Fix & Flip (comprar, remodelar, vender), Fix & Hold (comprar, remodelar, rentar), BRRRR (comprar, remodelar, rentar, refinanciar, repetir) y Rental Arbitrage (subarriendo). No hay una sola forma; depende de tu perfil y capital.",
+      "respuesta_detallada": "No hay una única forma de hacer bienes raíces. Los modelos principales: 1) FIX & FLIP — compras una casa infravalorada, la remodelas y la vendes para obtener ganancia rápida. 2) FIX & HOLD — compras, remodelas y rentas para flujo de caja a largo plazo. 3) BRRRR (Buy, Rehab, Rent, Refinance, Repeat) — compras, remodelas, rentas, refinancias para sacar tu capital, y repites. 4) RENTAL ARBITRAGE (subrenta) — rentas una propiedad y la subarriendas (sin comprarla). Cada modelo encaja con un perfil distinto de inversionista, capital y objetivos. Parte del trabajo inicial es identificar cuál modelo te conviene según tu situación. En la mentoría se enseñan los modelos que operamos activamente.",
+      "tags": ["modelos", "fix and flip", "fix and hold", "BRRRR", "arbitrage"],
+      "pilar": "El juego",
+      "relacionadas": ["q061", "q070", "q060"]
+    },
+    {
+      "id": "q063",
+      "categoria": "proceso",
+      "pregunta": "¿Qué hago si en mi estado las propiedades están muy caras?",
+      "respuesta_corta": "No tienes que invertir donde vives. Si tu estado (California, Miami) tiene precios muy altos para tu capital, puedes mover tu inversión a estados más accesibles como Texas, Phoenix o Atlanta, donde tu mismo down payment rinde mucho más.",
+      "respuesta_detallada": "Este es un cambio de mentalidad importante. Mucha gente cree que solo puede invertir en su propia ciudad, y si ahí está caro, se rinde. La realidad: no es lo mismo comprar en Florida o California que en Texas. Si tu down payment no da para tu estado, puedes invertir en otro estado más accesible. Mercados con buena relación precio/oportunidad para inversionistas latinos: Texas (Houston, Austin, Dallas), Arizona (Phoenix), Florida en ciertos segmentos, Atlanta. Lo que debes considerar al invertir fuera de tu estado: el dinero y el préstamo se pueden mover, pero la remodelación y los wholesalers son LOCALES. Por eso es clave aprender a construir red de contactos en el mercado destino, o apoyarte en mercados donde la mentoría ya tiene presencia (expansión a Houston, Phoenix, Miami).",
+      "tags": ["estado caro", "california", "texas", "mover capital", "geografia"],
+      "pilar": "Geografía",
+      "relacionadas": ["q030", "q040", "q062"]
+    },
+    {
+      "id": "q070",
+      "categoria": "mentalidad",
+      "pregunta": "Me da miedo endeudarme. ¿Es normal?",
+      "respuesta_corta": "Sí, es normal, especialmente si vienes de mentalidad de empleado. La clave es distinguir deuda mala (consumo) de deuda buena (la que produce). En un préstamo de inversión bien estructurado, la propiedad genera el flujo que paga la deuda.",
+      "respuesta_detallada": "El miedo a la deuda es uno de los bloqueos más comunes y es completamente entendible, sobre todo si creciste con mentalidad de empleado o vienes de una familia donde la deuda era peligro. La clave es distinguir dos tipos de deuda: DEUDA MALA — la de consumo (cosas que pierden valor, que no generan ingreso). DEUDA BUENA — la que produce: un préstamo para una propiedad que genera ganancia o flujo de renta. En un negocio bien estructurado, la propiedad misma genera el dinero que paga la deuda. No estás 'debiendo' en el sentido tradicional; estás usando apalancamiento para que un activo trabaje para ti. El miedo se reduce cuando entiendes los números y tienes un plan B. La mentalidad de inversionista se construye; no se nace con ella.",
+      "tags": ["miedo deuda", "endeudarse", "deuda buena", "apalancamiento", "mentalidad"],
+      "pilar": "Mentalidad",
+      "relacionadas": ["q071", "q072", "q003"]
+    },
+    {
+      "id": "q071",
+      "categoria": "mentalidad",
+      "pregunta": "Siento que no tengo la mentalidad de inversionista. ¿Cómo la desarrollo?",
+      "respuesta_corta": "La mentalidad de inversionista se construye, no se nace con ella. Empieza por entender que tu entorno influye (ley de proximidad), rodéate de gente que ya invierte, y enfócate en pequeñas victorias consistentes en lugar del resultado final.",
+      "respuesta_detallada": "Casi nadie entra con mentalidad de inversionista ya formada; se desarrolla. Claves para construirla: 1) LEY DE PROXIMIDAD — tu círculo más cercano influye en tus resultados. Si te rodeas de gente que invierte, lo difícil se vuelve normal. Es como el gimnasio: cuesta solo, pero deja de costar cuando te juntas con gente que va todos los días. Por eso la comunidad de la mentoría importa tanto. 2) MICRO-VICTORIAS — enfócate en avances pequeños y consistentes (analizar propiedades, definir tu Buy Box) en lugar de obsesionarte con el flip cerrado. 3) PENSAR EN GRANDE — empezar a verte construyendo algo grande (portafolio, patrimonio), no solo una casa. La transición de empleado a inversionista es un proceso, y el acompañamiento acelera ese cambio de chip.",
+      "tags": ["mentalidad inversionista", "ley de proximidad", "comunidad", "micro victorias"],
+      "pilar": "Mentalidad",
+      "relacionadas": ["q070", "q072", "q080"]
+    },
+    {
+      "id": "q072",
+      "categoria": "mentalidad",
+      "pregunta": "Llevo tiempo investigando pero no tomo acción. ¿Qué me pasa?",
+      "respuesta_corta": "Es parálisis por análisis: consumes información gratis (YouTube, webinars) pero eso no te lleva a hacer un flip. Lo que falta no es más información, es acompañamiento, sistema y un proceso claro que te diga 'por aquí sí, por aquí no'.",
+      "respuesta_detallada": "Este patrón es clarísimo: gente que lleva 2-3 años viendo videos, metiéndose a webinars y lanzamientos, investigando sin parar, pero sin hacer su primer flip. El problema NO es falta de información. De información gratis hay de sobra. El problema es que la información sin sistema no se convierte en acción. Lo que realmente necesitas: 1) ACOMPAÑAMIENTO — alguien que te diga por aquí sí, por aquí no. 2) SISTEMA — procesos y herramientas probadas, no improvisar. 3) PROCESO CLARO — un mapa de qué hacer en cada etapa. 4) CRITERIO — saber distinguir la información correcta de la incorrecta. Has consumido suficiente. Lo que falta es ejecutar con guía. Por eso el valor no está en más contenido, sino en el acompañamiento estructurado.",
+      "tags": ["paralisis por analisis", "no tomar accion", "informacion", "acompañamiento", "sistema"],
+      "pilar": "Mentalidad",
+      "relacionadas": ["q071", "q070", "q081"]
+    },
+    {
+      "id": "q080",
+      "categoria": "familia",
+      "pregunta": "Mi pareja/familia no me apoya. ¿Cómo los convenzo?",
+      "respuesta_corta": "Lo más efectivo no es discutir, es mostrar números. La desconfianza de tu pareja casi siempre es miedo a lo desconocido, no negatividad. Muéstrales el plan concreto, los números reales y el plan B. La decisión en familias latinas suele ser compartida, así que incluirlos es clave.",
+      "respuesta_detallada": "En las familias latinas, la decisión de invertir rara vez es individual: la pareja, los padres y hasta los hermanos pesan. Y eso está bien. La desconfianza de tu pareja casi nunca es por negatividad; es por miedo a lo desconocido y por falta de información. Cómo abordarlo: 1) NO discutas con emoción, MUESTRA con números. Enséñales los 4 números de un deal concreto. 2) Explica el plan B — qué pasa si algo sale mal reduce el miedo. 3) Inclúyelos en el proceso en lugar de imponer la decisión. 4) Muéstrales el acompañamiento que tienes (que no estás solo). Un dato real del mercado: las 'familia mortgages' (compras donde la familia pone capital en conjunto) están creciendo entre latinos en USA. La familia puede pasar de ser freno a ser tu primer socio.",
+      "tags": ["pareja", "familia", "convencer", "apoyo", "numeros"],
+      "pilar": "Familia",
+      "relacionadas": ["q081", "q070", "q090"]
+    },
+    {
+      "id": "q081",
+      "categoria": "familia",
+      "pregunta": "¿Puedo hacer el negocio en sociedad con mi familia?",
+      "respuesta_corta": "Sí, y es cada vez más común entre latinos. Las 'familia mortgages' (juntar capital entre miembros de la familia) son una tendencia fuerte. Lo importante es estructurar bien la sociedad: roles claros, aportes definidos y acuerdos por escrito.",
+      "respuesta_detallada": "Hacer el negocio en sociedad familiar es una estrategia válida y creciente. Muchos estudiantes operan así: 'mi socio y yo tenemos $100,000', donde el socio es un hermano, primo o pareja. Las 'familia mortgages' (pooling de capital familiar) son una de las tendencias más fuertes en el mercado latino de USA. Para que funcione: 1) ROLES CLAROS — quién pone capital, quién opera, quién decide. 2) APORTES DEFINIDOS — cuánto pone cada uno y qué porcentaje le corresponde. 3) ACUERDOS POR ESCRITO — para evitar problemas familiares después. 4) EXPECTATIVAS ALINEADAS — que todos entiendan los tiempos y riesgos. La familia puede ser tu mejor fuente de capital inicial, pero la informalidad es el mayor riesgo. Estructúralo como un negocio, aunque sea con tu hermano.",
+      "tags": ["sociedad familiar", "familia mortgage", "socios", "capital familiar"],
+      "pilar": "Familia",
+      "relacionadas": ["q080", "q003", "q090"]
+    },
+    {
+      "id": "q090",
+      "categoria": "legado",
+      "pregunta": "¿Para qué hago esto realmente? ¿Vale la pena?",
+      "respuesta_corta": "Para la mayoría de inversionistas latinos, esto no es solo plata: es construir patrimonio para los hijos, dejar herencia tangible, asegurar el retiro y romper un ciclo. Eres posiblemente la primera generación de inversionistas en tu familia, y eso tiene un peso enorme.",
+      "respuesta_detallada": "Esta es la pregunta más profunda y la más importante. Para el inversionista latino, la riqueza no es solo dinero: incluye familia, seguridad, comunidad y legado. Las razones reales por las que vale la pena: 1) PATRIMONIO PARA LOS HIJOS — que no empiecen donde tú empezaste. 2) HERENCIA TANGIBLE — propiedades que puedes dejar, no solo números en una cuenta. 3) PLAN DE RETIRO REAL — flujo de renta que te sostiene sin depender de nadie. 4) ROMPER EL CICLO — ser la primera generación de inversionistas/propietarios en tu familia. 5) DIGNIDAD — no tener que pedirle nada a nadie. Si eres el primero en tu familia en construir patrimonio, llevas un peso especial, pero también una oportunidad histórica: el momento del mercado latino en USA es el mejor en décadas. No es solo para ti; es para los que vienen después.",
+      "tags": ["proposito", "legado", "patrimonio", "herencia", "retiro", "primera generacion"],
+      "pilar": "Legado",
+      "relacionadas": ["q091", "q080", "q071"]
+    },
+    {
+      "id": "q091",
+      "categoria": "legado",
+      "pregunta": "¿Cómo construyo patrimonio a largo plazo, no solo un flip?",
+      "respuesta_corta": "Un flip genera capital; el patrimonio se construye reinvirtiendo. La ruta típica: fix and flip para generar capital → fix and hold o BRRRR para construir portafolio de rentas → flujo de caja que sostiene tu retiro y se hereda. La E5 (Escalabilidad) es justamente esto.",
+      "respuesta_detallada": "Un flip aislado es una ganancia única; el patrimonio se construye con estrategia a largo plazo. La ruta de construcción de patrimonio: 1) GENERAR CAPITAL — los primeros flips te dan dinero y experiencia. 2) CONSTRUIR PORTAFOLIO — con BRRRR o fix and hold, conviertes capital en propiedades que generan renta mensual. 3) FLUJO PASIVO — el portafolio de rentas genera ingreso que no depende de tu trabajo activo. 4) HERENCIA — esas propiedades son patrimonio tangible que se transfiere a la siguiente generación. Esto es exactamente la E5 (Escalabilidad) de la metodología. La clave: no te quedes solo en flips. Reinvierte estratégicamente. El objetivo no es ganar una vez, es construir una máquina de patrimonio que sostenga a tu familia por generaciones.",
+      "tags": ["patrimonio", "largo plazo", "BRRRR", "portafolio", "escalabilidad", "rentas"],
+      "pilar": "Legado",
+      "relacionadas": ["q090", "q062", "q061"]
+    }
+  ]
+}

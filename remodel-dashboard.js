@@ -797,13 +797,11 @@ async function rdRenderTendencias() {
 // 📑 INFORME EJECUTIVO — replica el formato del PDF interno
 // ════════════════════════════════════════════════════════════
 function rdRenderInforme(active, finalizada) {
-  // Calcular KPIs avanzados de todas las obras activas
   const activeKpis = active.map(p => ({ p, k: rdAdvancedKPIs(p), acciones: rdAccionesRequeridas(p, rdAdvancedKPIs(p)) }));
   const criticas = activeKpis.filter(x => x.k.estado === 'critico');
   const advertencias = activeKpis.filter(x => x.k.estado === 'advertencia');
   const sanas = activeKpis.filter(x => x.k.estado === 'sano');
 
-  // Portfolio totals
   const totalReal = active.reduce((s,p) => s + (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0), 0);
   const totalMat = active.reduce((s,p) => s + (+p.gasto_materiales||0), 0);
   const totalLab = active.reduce((s,p) => s + (+p.gasto_trabajadores||0), 0);
@@ -815,7 +813,6 @@ function rdRenderInforme(active, finalizada) {
   const ejecucionGlobal = totalPresup > 0 ? Math.round(totalReal / totalPresup * 100 * 10) / 10 : 0;
   const gananciaHistorica = finalizada.reduce((s,p) => s + (+p.ganancia||0), 0);
 
-  // Métricas operativas
   const enPlazo = activeKpis.filter(x => (x.k.dias_retraso||0) <= 0).length;
   const vencidos = activeKpis.filter(x => (x.k.dias_retraso||0) > 0).length;
   const sobrecosto = activeKpis.filter(x => x.k.sobre_presupuesto_pct > 0).length;
@@ -824,97 +821,242 @@ function rdRenderInforme(active, finalizada) {
   const hoy = new Date();
   const fechaStr = hoy.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Resumen ejecutivo automático
-  let estadoPortfolio = '✅ PORTAFOLIO RENTABLE';
-  if (margenGlobal < BENCHMARKS_AUSTIN.margen_critico) estadoPortfolio = '🔴 PORTAFOLIO EN RIESGO';
-  else if (criticas.length > 0) estadoPortfolio = '⚠️ PORTAFOLIO CON ALERTAS CRÍTICAS';
-  let prioridad1 = 'Mantener disciplina de registro semanal';
-  let accionSistemica = 'Mantener registro diario en Airtable';
-  if (criticas.length > 0) {
-    const peor = criticas[0];
-    prioridad1 = `Atender ${peor.p.address} (${peor.k.flags.join(', ')})`;
+  // Estado portfolio
+  let estadoPortfolio, estadoColor, estadoIcon, estadoMsg;
+  if (margenGlobal < BENCHMARKS_AUSTIN.margen_critico) {
+    estadoPortfolio = 'PORTAFOLIO EN RIESGO';
+    estadoColor = 'from-red-600 to-red-800'; estadoIcon = '🔴';
+    estadoMsg = 'Margen global por debajo del umbral crítico. Decisión hoy.';
+  } else if (criticas.length > 0) {
+    estadoPortfolio = 'ALERTAS CRÍTICAS ACTIVAS';
+    estadoColor = 'from-amber-500 to-orange-700'; estadoIcon = '⚠️';
+    estadoMsg = `${criticas.length} proyecto${criticas.length>1?'s':''} requiere${criticas.length>1?'n':''} tu intervención.`;
+  } else if (advertencias.length > 0) {
+    estadoPortfolio = 'OPERACIÓN ESTABLE CON SEÑALES';
+    estadoColor = 'from-amber-400 to-amber-600'; estadoIcon = '🟡';
+    estadoMsg = `${advertencias.length} señal${advertencias.length>1?'es':''} de advertencia. Vigilar de cerca.`;
+  } else {
+    estadoPortfolio = 'PORTAFOLIO SANO';
+    estadoColor = 'from-emerald-500 to-emerald-700'; estadoIcon = '✅';
+    estadoMsg = 'Todos los proyectos dentro de parámetros. Mantener ritmo.';
   }
-  if (ratioLaborGlobal > BENCHMARKS_AUSTIN.labor_ratio_max) {
-    accionSistemica = `Reducir ratio labor portfolio (${ratioLaborGlobal}% vs ${BENCHMARKS_AUSTIN.labor_ratio_max}% benchmark)`;
+
+  // Top 3 decisiones priorizadas
+  const decisiones = [];
+  criticas.slice(0, 2).forEach(x => {
+    decisiones.push({
+      tipo: 'CRÍTICO',
+      titulo: x.p.address,
+      detalle: x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · '),
+      cta: 'Abrir obra',
+      action: `rdOpenObra('${x.p.airtable_id}')`,
+      color: 'red'
+    });
+  });
+  if (decisiones.length < 3 && ratioLaborGlobal > BENCHMARKS_AUSTIN.labor_ratio_max) {
+    decisiones.push({
+      tipo: 'SISTÉMICO',
+      titulo: 'Ratio labor del portfolio elevado',
+      detalle: `${ratioLaborGlobal}% vs benchmark ${BENCHMARKS_AUSTIN.labor_ratio_max}% — revisar cuadrillas`,
+      cta: 'Ver detalle líderes',
+      action: `rdState.tab='lideres'; rdRender()`,
+      color: 'amber'
+    });
   }
+  advertencias.slice(0, 3 - decisiones.length).forEach(x => {
+    decisiones.push({
+      tipo: 'ADVERTENCIA',
+      titulo: x.p.address,
+      detalle: x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · ') || 'Revisar variables',
+      cta: 'Abrir obra',
+      action: `rdOpenObra('${x.p.airtable_id}')`,
+      color: 'amber'
+    });
+  });
+  if (decisiones.length === 0) {
+    decisiones.push({
+      tipo: 'TODO OK',
+      titulo: 'Sin alertas activas',
+      detalle: 'Mantener disciplina de registro semanal en Airtable',
+      cta: null, action: null, color: 'emerald'
+    });
+  }
+
+  // Anillo SVG salud portfolio
+  const total = active.length || 1;
+  const pctSano = (sanas.length / total) * 100;
+  const pctAdv = (advertencias.length / total) * 100;
+  const pctCrit = (criticas.length / total) * 100;
 
   return `
-    <div id="rd-informe-print" class="space-y-3">
-      <!-- Toolbar print -->
-      <div class="flex justify-end gap-2 print:hidden">
-        <button onclick="rdPrintInforme()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">🖨️ Imprimir / Guardar PDF</button>
+    <div id="rd-informe-print" class="space-y-4">
+      <!-- Toolbar -->
+      <div class="flex justify-between items-center print:hidden">
+        <div class="text-xs text-slate-500 capitalize">${fechaStr} · Agua Construction Group · Structure One · Flipping Rentals</div>
+        <button onclick="rdPrintInforme()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">🖨️ Imprimir / PDF</button>
       </div>
 
-      <!-- Header -->
-      <div class="border-2 border-slate-900 rounded-lg p-4 bg-white">
-        <div class="text-lg font-bold tracking-wide">INFORME EJECUTIVO DE REMODELACIÓN</div>
-        <div class="text-xs text-slate-600 capitalize">${fechaStr}</div>
-        <div class="text-xs text-slate-500 mt-1">Agua Construction Group · Structure One · Flipping Rentals</div>
-      </div>
-
-      <!-- Semáforo ejecutivo -->
-      <div class="border-t-2 border-slate-200 pt-3">
-        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ SEMÁFORO EJECUTIVO ━━</div>
-        <div class="flex gap-4 text-sm font-bold">
-          <span class="text-red-700">🔴 CRÍTICAS: ${criticas.length}</span>
-          <span class="text-amber-700">🟡 ADVERTENCIAS: ${advertencias.length}</span>
-          <span class="text-emerald-700">✅ SANOS: ${sanas.length}</span>
+      <!-- HERO: Estado del portfolio + mensaje CEO -->
+      <div class="bg-gradient-to-br ${estadoColor} text-white rounded-2xl p-6 shadow-lg">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <div class="text-[10px] uppercase tracking-widest opacity-80 font-bold">Estado del portafolio · ${active.length} obra${active.length!==1?'s':''} activa${active.length!==1?'s':''}</div>
+            <div class="text-2xl md:text-3xl font-bold mt-1">${estadoIcon} ${estadoPortfolio}</div>
+            <div class="text-sm mt-2 opacity-95">${estadoMsg}</div>
+          </div>
+          <!-- Donut SVG -->
+          <div class="hidden md:block">
+            ${rdRingSVG(pctSano, pctAdv, pctCrit, total)}
+          </div>
         </div>
-        ${criticas.length ? `<div class="mt-2 space-y-0.5 text-xs">${criticas.map(x => `<div>🔴 <strong>${x.p.address}</strong> — ${x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · ')}</div>`).join('')}</div>` : ''}
-      </div>
-
-      <!-- KPIs Globales -->
-      <div class="border-t-2 border-slate-200 pt-3">
-        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ KPIs GLOBALES ━━</div>
-        <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-          <div>Proyectos activos: <strong>${active.length}</strong> | Finalizados: <strong>${finalizada.length}</strong></div>
-          <div>Ratio labor/costo: <strong>${ratioLaborGlobal}% ${ratioLaborGlobal <= BENCHMARKS_AUSTIN.labor_ratio_max ? '✅ OK' : '⚠️ ALTO'}</strong></div>
-          <div>Costo total ejecutado: <strong>$${Math.round(totalReal).toLocaleString()}</strong> (Mat: $${Math.round(totalMat).toLocaleString()} · Lab: $${Math.round(totalLab).toLocaleString()})</div>
-          <div>Presupuesto total: <strong>$${Math.round(totalPresup).toLocaleString()}</strong> → Ejecución: <strong>${ejecucionGlobal}%</strong></div>
-          <div>Valor total cliente: <strong>$${Math.round(totalCliente).toLocaleString()}</strong></div>
-          <div>Margen global real: <strong>${margenGlobal > 0 ? '+' : ''}${margenGlobal}%</strong> ($${Math.round(gananciaPipeline).toLocaleString()} ganancia)</div>
-          <div>Ganancia histórica acum.: <strong>$${Math.round(gananciaHistorica).toLocaleString()}</strong> (${finalizada.length} proyectos cerrados)</div>
+        <!-- KPIs hero -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+          ${rdHeroKpi('💰', 'Ganancia pipeline', '$'+Math.round(gananciaPipeline).toLocaleString(), `${margenGlobal>0?'+':''}${margenGlobal}% margen`)}
+          ${rdHeroKpi('🏗️', 'Presupuesto ejecutado', `${ejecucionGlobal}%`, `$${Math.round(totalReal).toLocaleString()} / $${Math.round(totalPresup).toLocaleString()}`)}
+          ${rdHeroKpi('👷', 'Labor/Costo', `${ratioLaborGlobal}%`, `Bench ${BENCHMARKS_AUSTIN.labor_ratio_gut}–${BENCHMARKS_AUSTIN.labor_ratio_max}%`)}
+          ${rdHeroKpi('🏁', 'Histórico cerrado', '$'+Math.round(gananciaHistorica).toLocaleString(), `${finalizada.length} flips finalizados`)}
         </div>
       </div>
 
-      <!-- Métricas operativas -->
-      <div class="border-t-2 border-slate-200 pt-3">
-        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ MÉTRICAS OPERATIVAS ━━</div>
-        <div class="grid grid-cols-4 gap-2 text-xs">
-          <div>En plazo: <strong class="text-emerald-700">${enPlazo}/${active.length}</strong></div>
-          <div>Vencidos: <strong class="${vencidos>0?'text-red-700':''}">${vencidos} ${vencidos>0?'⚠️':''}</strong></div>
-          <div>En sobrecosto: <strong class="${sobrecosto>0?'text-amber-700':''}">${sobrecosto}</strong></div>
-          <div>En pérdida: <strong class="${enPerdida>0?'text-red-700':''}">${enPerdida}</strong></div>
+      <!-- DECISIONES PRIORITARIAS -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="text-xl">🎯</div>
+          <div class="font-bold text-slate-900">Hoy decide</div>
+          <div class="text-xs text-slate-500">— top ${decisiones.length} prioridades del CEO</div>
+        </div>
+        <div class="space-y-2">
+          ${decisiones.map((d,i) => `
+            <div class="flex items-center gap-3 p-3 rounded-xl border-l-4 ${d.color==='red'?'border-red-500 bg-red-50':d.color==='amber'?'border-amber-500 bg-amber-50':'border-emerald-500 bg-emerald-50'}">
+              <div class="text-2xl font-black ${d.color==='red'?'text-red-700':d.color==='amber'?'text-amber-700':'text-emerald-700'}">${i+1}</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] uppercase tracking-wider font-bold ${d.color==='red'?'text-red-700':d.color==='amber'?'text-amber-700':'text-emerald-700'}">${d.tipo}</div>
+                <div class="font-semibold text-sm text-slate-900 truncate">${d.titulo}</div>
+                <div class="text-xs text-slate-600 truncate">${d.detalle}</div>
+              </div>
+              ${d.cta ? `<button onclick="${d.action}" class="print:hidden text-xs px-3 py-1.5 rounded-lg font-semibold ${d.color==='red'?'bg-red-600 hover:bg-red-700 text-white':d.color==='amber'?'bg-amber-600 hover:bg-amber-700 text-white':'bg-emerald-600 text-white'}">${d.cta} →</button>` : ''}
+            </div>
+          `).join('')}
         </div>
       </div>
 
-      <!-- Benchmarks vs industria -->
-      <div class="border-t-2 border-slate-200 pt-3">
-        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ BENCHMARKS vs INDUSTRIA AUSTIN TX ━━</div>
-        <div class="grid grid-cols-1 gap-1 text-xs">
-          <div>${margenGlobal >= BENCHMARKS_AUSTIN.margen_min ? '✅' : '🔴'} Margen neto objetivo — Referencia: ${BENCHMARKS_AUSTIN.margen_min}–${BENCHMARKS_AUSTIN.margen_max}% — Actual: <strong>${margenGlobal > 0 ? '+' : ''}${margenGlobal}%</strong></div>
-          <div>${ratioLaborGlobal <= BENCHMARKS_AUSTIN.labor_ratio_max ? '✅' : '🔴'} Labor/costo máximo — Referencia: ≤${BENCHMARKS_AUSTIN.labor_ratio_max}% — Actual: <strong>${ratioLaborGlobal}%</strong></div>
-          <div>${ejecucionGlobal <= BENCHMARKS_AUSTIN.ejecucion_max ? '✅' : '🔴'} Ejecución presupuestal — Referencia: ≤${BENCHMARKS_AUSTIN.ejecucion_max}% — Actual: <strong>${ejecucionGlobal}%</strong></div>
-          <div>${enPerdida === 0 ? '✅' : '🔴'} Proyectos en pérdida — Referencia: 0 — Actual: <strong>${enPerdida}</strong></div>
-          <div>${vencidos === 0 ? '✅' : (vencidos <= 1 ? '⚠️' : '🔴')} Proyectos vencidos — Referencia: ≤1 — Actual: <strong>${vencidos}</strong></div>
+      <!-- KPIs OPERATIVOS — píldoras -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        ${rdOpsPill('🟢', 'En plazo', `${enPlazo}/${active.length}`, 'emerald')}
+        ${rdOpsPill('⏰', 'Vencidos', vencidos, vencidos>0?'red':'slate')}
+        ${rdOpsPill('💸', 'En sobrecosto', sobrecosto, sobrecosto>0?'amber':'slate')}
+        ${rdOpsPill('🔻', 'En pérdida', enPerdida, enPerdida>0?'red':'slate')}
+      </div>
+
+      <!-- BENCHMARKS — barras visuales con marcador -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="text-xl">📐</div>
+          <div class="font-bold text-slate-900">Benchmarks Austin TX</div>
+          <div class="text-xs text-slate-500">— vs industria fix & flip</div>
+        </div>
+        <div class="space-y-4">
+          ${rdBenchBar('Margen neto', margenGlobal, BENCHMARKS_AUSTIN.margen_min, BENCHMARKS_AUSTIN.margen_max, 50, '%', 'high')}
+          ${rdBenchBar('Labor / Costo total', ratioLaborGlobal, BENCHMARKS_AUSTIN.labor_ratio_gut, BENCHMARKS_AUSTIN.labor_ratio_max, 100, '%', 'low')}
+          ${rdBenchBar('Ejecución presupuestal', ejecucionGlobal, 0, BENCHMARKS_AUSTIN.ejecucion_max, 130, '%', 'low')}
         </div>
       </div>
 
-      <!-- Análisis detallado por proyecto -->
-      <div class="border-t-2 border-slate-200 pt-3">
-        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ ANÁLISIS DETALLADO POR PROYECTO ━━</div>
-        ${activeKpis.length === 0 ? '<div class="text-xs text-slate-400">Sin proyectos activos</div>' :
-          activeKpis.map((x, i) => rdRenderProyectoBloque(x, i+1)).join('')}
-      </div>
-
-      <!-- Resumen ejecutivo -->
-      <div class="border-t-2 border-slate-200 pt-3">
-        <div class="text-xs font-bold uppercase tracking-wide mb-2">━━ RESUMEN EJECUTIVO ━━</div>
-        <div class="text-xs space-y-1">
-          <div>Estado: <strong>${estadoPortfolio}</strong></div>
-          <div>Prioridad #1: <strong>${prioridad1}</strong></div>
-          <div>Acción sistémica: <strong>${accionSistemica}</strong></div>
+      <!-- PROYECTOS — cards visuales -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-2">
+            <div class="text-xl">🏠</div>
+            <div class="font-bold text-slate-900">Análisis por proyecto</div>
+          </div>
+          <div class="text-xs text-slate-500">${activeKpis.length} obras · click para detalle</div>
         </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          ${activeKpis.length === 0
+            ? '<div class="col-span-2 text-sm text-slate-400 text-center py-8">Sin proyectos activos</div>'
+            : activeKpis
+                .sort((a,b) => ({critico:0,advertencia:1,sano:2}[a.k.estado] - ({critico:0,advertencia:1,sano:2}[b.k.estado])))
+                .map((x, i) => rdRenderProyectoBloque(x, i+1)).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── helpers visuales del informe ───
+function rdHeroKpi(icon, label, value, sub) {
+  return `
+    <div class="bg-white/15 backdrop-blur rounded-xl p-3 border border-white/20">
+      <div class="text-[10px] uppercase tracking-wider opacity-80 font-semibold">${icon} ${label}</div>
+      <div class="text-xl md:text-2xl font-bold mt-1 leading-tight">${value}</div>
+      <div class="text-[11px] opacity-85 mt-0.5">${sub}</div>
+    </div>
+  `;
+}
+
+function rdOpsPill(icon, label, value, color) {
+  const colorMap = {
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    red: 'bg-red-50 border-red-200 text-red-700',
+    amber: 'bg-amber-50 border-amber-200 text-amber-700',
+    slate: 'bg-slate-50 border-slate-200 text-slate-700'
+  };
+  return `
+    <div class="rounded-xl border ${colorMap[color]} p-3 flex items-center gap-3">
+      <div class="text-2xl">${icon}</div>
+      <div>
+        <div class="text-[10px] uppercase tracking-wider font-bold opacity-80">${label}</div>
+        <div class="text-2xl font-bold leading-none">${value}</div>
+      </div>
+    </div>
+  `;
+}
+
+// Anillo SVG estado proyectos
+function rdRingSVG(pctSano, pctAdv, pctCrit, total) {
+  const R = 38, C = 2*Math.PI*R;
+  const sSan = (pctSano/100)*C, sAdv = (pctAdv/100)*C, sCrit = (pctCrit/100)*C;
+  return `
+    <svg width="110" height="110" viewBox="0 0 100 100" class="transform -rotate-90">
+      <circle cx="50" cy="50" r="${R}" stroke="rgba(255,255,255,0.18)" stroke-width="10" fill="none"/>
+      <circle cx="50" cy="50" r="${R}" stroke="#10b981" stroke-width="10" fill="none"
+        stroke-dasharray="${sSan} ${C-sSan}" stroke-dashoffset="0"/>
+      <circle cx="50" cy="50" r="${R}" stroke="#f59e0b" stroke-width="10" fill="none"
+        stroke-dasharray="${sAdv} ${C-sAdv}" stroke-dashoffset="${-sSan}"/>
+      <circle cx="50" cy="50" r="${R}" stroke="#ef4444" stroke-width="10" fill="none"
+        stroke-dasharray="${sCrit} ${C-sCrit}" stroke-dashoffset="${-(sSan+sAdv)}"/>
+      <g class="transform rotate-90" style="transform-origin: 50px 50px;">
+        <text x="50" y="48" text-anchor="middle" fill="white" font-size="20" font-weight="900">${total}</text>
+        <text x="50" y="62" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="8" font-weight="600">OBRAS</text>
+      </g>
+    </svg>
+  `;
+}
+
+// Barra de benchmark con marcador de objetivo
+function rdBenchBar(label, actual, min, max, scale, unit, dir) {
+  // dir = 'high' (más alto mejor, margen) | 'low' (más bajo mejor, labor, ejecución)
+  const pctActual = Math.max(0, Math.min(100, (actual / scale) * 100));
+  const pctMin = (min / scale) * 100;
+  const pctMax = (max / scale) * 100;
+  let ok;
+  if (dir === 'high') ok = actual >= min;
+  else ok = actual <= max;
+  const colorBar = ok ? 'bg-emerald-500' : (Math.abs(actual - (dir==='high'?min:max)) < scale*0.05 ? 'bg-amber-500' : 'bg-red-500');
+  const dot = ok ? '✅' : '🔴';
+  return `
+    <div>
+      <div class="flex items-center justify-between text-xs mb-1">
+        <div class="font-semibold text-slate-700">${dot} ${label}</div>
+        <div class="text-slate-500">Actual <strong class="text-slate-900">${actual>0&&dir==='high'?'+':''}${actual}${unit}</strong> · Objetivo <strong>${dir==='high'?'≥'+min:'≤'+max}${unit}</strong></div>
+      </div>
+      <div class="relative h-3 bg-slate-100 rounded-full overflow-hidden">
+        <!-- zona objetivo -->
+        <div class="absolute top-0 bottom-0 bg-emerald-100" style="left:${pctMin}%; width:${Math.max(0,pctMax-pctMin)}%;"></div>
+        <!-- barra actual -->
+        <div class="absolute top-0 bottom-0 ${colorBar}" style="left:0; width:${pctActual}%;"></div>
+        <!-- marcador objetivo principal -->
+        <div class="absolute top-0 bottom-0 w-0.5 bg-slate-900" style="left:${dir==='high'?pctMin:pctMax}%;"></div>
       </div>
     </div>
   `;
@@ -933,40 +1075,84 @@ function rdFlagLabel(flag, k) {
 
 function rdRenderProyectoBloque(x, num) {
   const p = x.p, k = x.k;
-  const estadoLabel = k.estado === 'critico' ? '🔴 ' + (k.dias_retraso>0?'VENCIDO':'CRÍTICO') :
-                      k.estado === 'advertencia' ? '🟡 ADVERTENCIA' : '✅ SANO';
-  const finInicio = p.fecha_inicio && p.fecha_estimada_fin
-    ? `Inicio: ${p.fecha_inicio} → Entrega: ${p.fecha_estimada_fin} ${k.dias_retraso > 0 ? `(${k.dias_retraso} días de RETRASO)` : k.dias_retraso != null && k.dias_retraso < 0 ? `(${-k.dias_retraso} días restantes)` : ''}`
-    : '';
+  const estadoLabel = k.estado === 'critico' ? (k.dias_retraso>0?'VENCIDO':'CRÍTICO') :
+                      k.estado === 'advertencia' ? 'ADVERTENCIA' : 'SANO';
+  const estadoBg = k.estado==='critico' ? 'bg-red-500' : k.estado==='advertencia' ? 'bg-amber-500' : 'bg-emerald-500';
+  const cardBorder = k.estado==='critico' ? 'border-red-200' : k.estado==='advertencia' ? 'border-amber-200' : 'border-emerald-200';
+  const avance = p.avance_pct || 0;
+  const avanceColor = avance >= 75 ? 'bg-emerald-500' : avance >= 40 ? 'bg-blue-500' : avance > 0 ? 'bg-amber-500' : 'bg-slate-300';
 
+  const diasInfo = k.dias_retraso != null
+    ? (k.dias_retraso > 0
+        ? `<span class="text-red-700 font-semibold">⏰ ${k.dias_retraso}d retraso</span>`
+        : `<span class="text-emerald-700">${-k.dias_retraso}d restantes</span>`)
+    : '<span class="text-slate-400">—</span>';
+
+  const margenColor = k.margen_venta == null ? 'text-slate-400'
+    : k.margen_venta >= BENCHMARKS_AUSTIN.margen_min ? 'text-emerald-700'
+    : k.margen_venta >= BENCHMARKS_AUSTIN.margen_critico ? 'text-amber-700' : 'text-red-700';
+
+  const accId = `rd-acc-${p.airtable_id}`;
   return `
-    <div class="border border-slate-300 rounded-lg p-3 mb-2 ${k.estado==='critico'?'bg-red-50':k.estado==='advertencia'?'bg-amber-50':'bg-emerald-50/30'}">
-      <div class="font-bold text-sm">┌─ PROYECTO ${num}: ${p.address?.toUpperCase() || '—'} ${estadoLabel}</div>
-      <div class="text-xs text-slate-700 ml-2">│ Líder: ${p.lider || '—'} · ${p.city || ''}</div>
-      ${finInicio ? `<div class="text-xs text-slate-700 ml-2">│ ${finInicio}</div>` : ''}
-      <div class="ml-2 mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-        <div>│ AVANCE: <strong>${rdBar(p.avance_pct || 0)} ${p.avance_pct || 0}%</strong></div>
-        <div>│ Eficiencia gasto: <strong>${k.eficiencia_gasto != null ? k.eficiencia_gasto + '% del esperado' : '—'}</strong> ${k.eficiencia_gasto != null && k.eficiencia_gasto <= 100 ? '✅' : k.eficiencia_gasto > 120 ? '🔴' : ''}</div>
-        <div class="col-span-2 border-t border-slate-200 my-1"></div>
-        <div>│ Gasto Materiales: <strong>$${Math.round(p.gasto_materiales||0).toLocaleString()}</strong> (${k.materiales_ratio||0}% del costo)</div>
-        <div>│ Gasto Trabajadores: <strong>$${Math.round(p.gasto_trabajadores||0).toLocaleString()}</strong> (${k.labor_ratio||0}% del costo)</div>
-        <div class="col-span-2 border-t border-slate-200 my-1"></div>
-        <div>│ Valor Interno (costo): <strong>$${Math.round(k.totalCost).toLocaleString()}</strong></div>
-        <div>│ Presupuesto Interno: <strong>$${Math.round(p.presupuesto_interno||0).toLocaleString()}</strong></div>
-        <div>│ Ejecución presupuestal: <strong>${k.ejecucion_pct != null ? k.ejecucion_pct + '%' : '—'}</strong> ${k.ejecucion_pct != null && k.ejecucion_pct <= 100 ? '✅' : '🔴'}</div>
-        <div>│ Faltante por gastar: <strong>$${Math.round(k.faltante_por_gastar).toLocaleString()}</strong> ${k.faltante_por_gastar > 0 ? '✅ disponible' : '🔴 excedido'}</div>
-        <div class="col-span-2 border-t border-slate-200 my-1"></div>
-        <div>│ Valor Cliente: <strong>$${Math.round(p.valor_cliente||0).toLocaleString()}</strong></div>
-        <div>│ Ganancia Real: <strong class="${k.ganancia>=0?'text-emerald-700':'text-red-700'}">$${Math.round(k.ganancia).toLocaleString()}</strong> ${k.ganancia >= 0 ? '✅ GANANCIA' : '🔴 PÉRDIDA'}</div>
-        <div>│ Margen sobre Venta: <strong>${k.margen_venta != null ? (k.margen_venta>0?'+':'') + k.margen_venta + '%' : '—'}</strong> ${k.margen_venta >= BENCHMARKS_AUSTIN.margen_min ? '✅ EXCELENTE' : k.margen_venta >= BENCHMARKS_AUSTIN.margen_critico ? '🟡 BAJO' : '🔴 CRÍTICO'}</div>
-        ${k.discrepancia != null && Math.abs(k.discrepancia) > BENCHMARKS_AUSTIN.discrepancia_min ? `<div class="col-span-2">│ <strong class="text-amber-700">⚠️ Discrepancia valor interno vs costo real: $${k.discrepancia > 0 ? '+' : ''}${k.discrepancia.toLocaleString()}</strong></div>` : ''}
+    <div class="bg-white border ${cardBorder} rounded-xl shadow-sm overflow-hidden hover:shadow-md transition">
+      <!-- header card -->
+      <div class="flex items-center gap-3 p-3 border-b border-slate-100">
+        <div class="${estadoBg} text-white text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded">${estadoLabel}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-slate-900 truncate">${p.address || '—'}</div>
+          <div class="text-[11px] text-slate-500 truncate">${p.lider || 'Sin líder'} · ${p.city || ''}</div>
+        </div>
+        <button onclick="rdOpenObra('${p.airtable_id}')" class="print:hidden text-xs px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-700 text-white font-semibold">Abrir →</button>
       </div>
+
+      <!-- avance + fechas -->
+      <div class="px-3 pt-3">
+        <div class="flex items-center justify-between text-[11px] text-slate-600 mb-1">
+          <span class="font-semibold">Avance ${avance}%</span>
+          <span>${diasInfo}</span>
+        </div>
+        <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div class="${avanceColor} h-full transition-all" style="width:${avance}%"></div>
+        </div>
+        ${p.fecha_inicio || p.fecha_estimada_fin ? `<div class="text-[10px] text-slate-400 mt-1">${p.fecha_inicio||'—'} → ${p.fecha_estimada_fin||'—'}</div>` : ''}
+      </div>
+
+      <!-- 4 mini KPIs -->
+      <div class="grid grid-cols-4 gap-0 mt-3 border-t border-slate-100">
+        <div class="p-2.5 border-r border-slate-100">
+          <div class="text-[9px] uppercase text-slate-500 font-bold">Ganancia</div>
+          <div class="text-sm font-bold ${k.ganancia>=0?'text-emerald-700':'text-red-700'}">$${Math.round(k.ganancia/1000)}k</div>
+        </div>
+        <div class="p-2.5 border-r border-slate-100">
+          <div class="text-[9px] uppercase text-slate-500 font-bold">Margen</div>
+          <div class="text-sm font-bold ${margenColor}">${k.margen_venta!=null?(k.margen_venta>0?'+':'')+k.margen_venta+'%':'—'}</div>
+        </div>
+        <div class="p-2.5 border-r border-slate-100">
+          <div class="text-[9px] uppercase text-slate-500 font-bold">Ejecución</div>
+          <div class="text-sm font-bold ${k.ejecucion_pct!=null&&k.ejecucion_pct<=100?'text-slate-900':'text-red-700'}">${k.ejecucion_pct!=null?k.ejecucion_pct+'%':'—'}</div>
+        </div>
+        <div class="p-2.5">
+          <div class="text-[9px] uppercase text-slate-500 font-bold">Labor</div>
+          <div class="text-sm font-bold ${k.labor_ratio!=null&&k.labor_ratio<=BENCHMARKS_AUSTIN.labor_ratio_max?'text-slate-900':'text-red-700'}">${k.labor_ratio!=null?k.labor_ratio+'%':'—'}</div>
+        </div>
+      </div>
+
+      <!-- línea financiera -->
+      <div class="px-3 py-2 bg-slate-50 text-[11px] text-slate-600 flex items-center justify-between border-t border-slate-100">
+        <div>Costo <strong class="text-slate-900">$${Math.round(k.totalCost/1000)}k</strong> / Presup. <strong>$${Math.round((p.presupuesto_interno||0)/1000)}k</strong></div>
+        <div>Venta <strong class="text-slate-900">$${Math.round((p.valor_cliente||0)/1000)}k</strong></div>
+      </div>
+
       ${x.acciones.length ? `
-        <div class="ml-2 mt-2 pt-2 border-t border-slate-200">
-          <div class="text-xs font-bold">│ ALERTAS ACTIVAS (${x.acciones.length})</div>
-          ${k.flags.map(f => `<div class="text-xs ml-2 text-red-700">│ 🔴 ${rdFlagLabel(f, k)}</div>`).join('')}
-          <div class="text-xs font-bold mt-1">│ ACCIONES REQUERIDAS</div>
-          ${x.acciones.map((a, i) => `<div class="text-xs ml-2">│ ${i+1}. <strong>${a.titulo}</strong> — ${a.responsable} <span class="text-slate-500">(${a.razon})</span></div>`).join('')}
+        <div class="px-3 py-2.5 bg-red-50/60 border-t border-red-100">
+          <button onclick="document.getElementById('${accId}').classList.toggle('hidden')" class="print:hidden w-full flex items-center justify-between text-xs font-bold text-red-800">
+            <span>🚨 ${x.acciones.length} acción${x.acciones.length>1?'es':''} requerida${x.acciones.length>1?'s':''}</span>
+            <span class="text-[10px] font-normal">click ▾</span>
+          </button>
+          <div id="${accId}" class="hidden mt-2 space-y-1">
+            ${k.flags.map(f => `<div class="text-[11px] text-red-700">🔴 ${rdFlagLabel(f, k)}</div>`).join('')}
+            ${x.acciones.map((a, i) => `<div class="text-[11px] text-slate-700"><strong>${i+1}.</strong> ${a.titulo} <span class="text-slate-500">— ${a.responsable}</span></div>`).join('')}
+          </div>
         </div>
       ` : ''}
     </div>

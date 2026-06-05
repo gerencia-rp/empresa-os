@@ -323,10 +323,11 @@ ALTER TABLE edu_curriculum_deps   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE edu_resources         ENABLE ROW LEVEL SECURITY;
 
 -- Helper function: ¿el usuario es mentor o admin?
+-- (usa la tabla `profiles` que es la que tiene la columna role en este proyecto)
 CREATE OR REPLACE FUNCTION is_mentor_or_admin() RETURNS BOOLEAN
 LANGUAGE SQL STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (
-    SELECT 1 FROM users
+    SELECT 1 FROM profiles
     WHERE id = auth.uid()
       AND role IN ('admin','mentor')
   );

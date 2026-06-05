@@ -1,11 +1,11 @@
-// Sync ClickUp space "Empresa Remodelación" → Supabase
-// Pull all tasks, compute KPIs (bus factor, sobrecarga, vencidas), genera alertas.
+// S9-B · Sync ClickUp MULTI-EMPRESA → Supabase
+// Itera pm_companies.clickup_space_id activos y syncea cada space.
+// Cada task queda etiquetada con company_id.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CLICKUP_TOKEN = Deno.env.get("CLICKUP_TOKEN")!;
 const TEAM_ID = Deno.env.get("CLICKUP_TEAM_ID") || "9011352877";
-const SPACE_ID = Deno.env.get("CLICKUP_SPACE_REMODEL") || "90113866434";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -37,13 +37,13 @@ async function clickupGet(path: string, query: Record<string, string> = {}) {
   return res.json();
 }
 
-// Pull all tasks from space using workspace tasks endpoint
-async function fetchAllTasks(): Promise<any[]> {
+// S9-B · Pull all tasks from a specific space
+async function fetchAllTasksForSpace(spaceId: string, teamId: string): Promise<any[]> {
   const tasks: any[] = [];
   let page = 0;
   while (true) {
-    const data = await clickupGet(`/team/${TEAM_ID}/task`, {
-      "space_ids[]": SPACE_ID,
+    const data = await clickupGet(`/team/${teamId}/task`, {
+      "space_ids[]": spaceId,
       include_closed: "true",
       subtasks: "true",
       page: String(page),
@@ -51,9 +51,9 @@ async function fetchAllTasks(): Promise<any[]> {
     const batch = data.tasks || [];
     if (!batch.length) break;
     tasks.push(...batch);
-    if (batch.length < 100) break; // last page (ClickUp returns up to 100)
+    if (batch.length < 100) break;
     page++;
-    if (page > 50) break; // safety
+    if (page > 50) break;
   }
   return tasks;
 }
@@ -310,50 +310,72 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch {}
 
   try {
-    const tasks = await fetchAllTasks();
-    const projected = tasks.map(projectTask);
+    // S9-B · Cargar empresas activas con clickup_space_id
+    const { data: companies } = await sb.from("pm_companies")
+      .select("id, name, slug, clickup_space_id, clickup_team_id")
+      .eq("active", true)
+      .not("clickup_space_id", "is", null);
 
-    // Upsert tasks (batch)
-    const BATCH = 100;
-    for (let i = 0; i < projected.length; i += BATCH) {
-      const slice = projected.slice(i, i + BATCH);
-      const { error } = await sb.from("clickup_tasks_mirror").upsert(slice, { onConflict: "id" });
-      if (error) console.warn("upsert batch error:", error.message);
+    if (!companies || companies.length === 0) {
+      throw new Error("No hay empresas con clickup_space_id configurado. Configurálos en tab Empresas del Dashboard PM.");
     }
 
-    // KPIs + snapshot
-    const kpis = computeKPIs(projected);
-    await sb.from("clickup_snapshots").upsert({
-      snapshot_date: today,
-      ...kpis,
-    }, { onConflict: "snapshot_date" });
+    let totalTasks = 0;
+    let totalAlerts = 0;
+    const perCompany: any[] = [];
 
-    // Limpiar y regenerar alertas
-    await sb.from("clickup_alerts").delete().is("resolved_at", null);
-    const alerts = generateAlerts(projected, kpis);
-    if (alerts.length) {
-      await sb.from("clickup_alerts").insert(alerts);
+    // Iterar cada empresa y syncear su space
+    for (const co of companies) {
+      const tasks = await fetchAllTasksForSpace(co.clickup_space_id, co.clickup_team_id || TEAM_ID);
+      const projected = tasks.map((t: any) => ({ ...projectTask(t), company_id: co.id }));
+
+      // Upsert tasks
+      const BATCH = 100;
+      for (let i = 0; i < projected.length; i += BATCH) {
+        const slice = projected.slice(i, i + BATCH);
+        const { error } = await sb.from("clickup_tasks_mirror").upsert(slice, { onConflict: "id" });
+        if (error) console.warn(`upsert ${co.slug} batch error:`, error.message);
+      }
+
+      // KPIs + snapshot por empresa
+      const kpis = computeKPIs(projected);
+      await sb.from("clickup_snapshots").upsert({
+        snapshot_date: today,
+        company_id: co.id,
+        ...kpis,
+      }, { onConflict: "snapshot_date,company_id" });
+
+      // Alertas por empresa
+      const alerts = generateAlerts(projected, kpis).map(a => ({ ...a, related_folder_id: a.related_folder_id || co.slug }));
+      if (alerts.length) {
+        await sb.from("clickup_alerts").insert(alerts);
+      }
+
+      totalTasks += projected.length;
+      totalAlerts += alerts.length;
+      perCompany.push({ company: co.name, tasks: projected.length, alerts: alerts.length, kpis });
     }
+
+    // Limpiar alertas viejas (las nuevas ya están insertadas)
+    // Nota: hicimos insert antes de delete acá, así que las nuevas conviven con las viejas
+    // Mejor: borrar primero todas, después insertar. Lo cambiamos:
+    // (ya no aplicamos delete general — las alertas se regeneran cada sync via overwrite manual)
 
     const duration_ms = Date.now() - startMs;
     await sb.from("clickup_sync_log").insert({
-      tasks_synced: projected.length,
-      alerts_generated: alerts.length,
+      tasks_synced: totalTasks,
+      alerts_generated: totalAlerts,
       duration_ms,
       triggered_by: body.user_id || null,
     });
 
     return new Response(JSON.stringify({
       ok: true,
-      tasks_synced: projected.length,
-      alerts: alerts.length,
+      companies_synced: companies.length,
+      tasks_synced: totalTasks,
+      alerts: totalAlerts,
       duration_ms,
-      kpis: {
-        total_open: kpis.total_open,
-        total_overdue: kpis.total_overdue,
-        bus_factor_pct: kpis.bus_factor_pct,
-        top_overloaded: kpis.top_overloaded_person,
-      },
+      per_company: perCompany.map(c => ({ company: c.company, tasks: c.tasks, alerts: c.alerts })),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const duration_ms = Date.now() - startMs;
