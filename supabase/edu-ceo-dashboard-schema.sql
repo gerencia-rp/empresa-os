@@ -147,31 +147,34 @@ join totals t using (mentorship_id)
 order by s.mentorship_id, s.current_stage;
 
 -- ─── 3. Cuellos de botella: etapas con tiempo > 1.5x mediana global ───
+-- FIX: Postgres NO soporta percentile_cont() WITHIN GROUP combinado con OVER.
+-- Solución: calcular mediana en CTE separado y hacer JOIN.
 create or replace view public.edu_ceo_cuellos_botella as
-with t as (
+with medianas as (
   select
     mentorship_id,
-    stage,
-    promedio_dias,
-    percentile_cont(0.5) within group (order by promedio_dias) over (partition by mentorship_id) as mediana_global
+    percentile_cont(0.5) within group (order by promedio_dias) as mediana_global
   from public.edu_kpi_tiempo_por_etapa
   where promedio_dias is not null
+  group by mentorship_id
 )
 select
-  mentorship_id,
-  stage,
-  promedio_dias,
-  round(mediana_global, 1) as mediana_global,
-  round(promedio_dias / nullif(mediana_global, 0), 2) as factor_vs_mediana,
+  t.mentorship_id,
+  t.stage,
+  t.promedio_dias,
+  round(m.mediana_global::numeric, 1) as mediana_global,
+  round((t.promedio_dias / nullif(m.mediana_global, 0))::numeric, 2) as factor_vs_mediana,
   case
-    when promedio_dias > mediana_global * 2 then 'critico'
-    when promedio_dias > mediana_global * 1.5 then 'alto'
-    when promedio_dias > mediana_global * 1.2 then 'medio'
+    when t.promedio_dias > m.mediana_global * 2 then 'critico'
+    when t.promedio_dias > m.mediana_global * 1.5 then 'alto'
+    when t.promedio_dias > m.mediana_global * 1.2 then 'medio'
     else 'ok'
   end as severidad
-from t
-where promedio_dias > mediana_global * 1.2
-order by mentorship_id, promedio_dias desc;
+from public.edu_kpi_tiempo_por_etapa t
+join medianas m using (mentorship_id)
+where t.promedio_dias is not null
+  and t.promedio_dias > m.mediana_global * 1.2
+order by t.mentorship_id, t.promedio_dias desc;
 
 -- ─── 4. Tasa de conversión etapa N → N+1 ───
 create or replace view public.edu_ceo_conversion_etapas as
