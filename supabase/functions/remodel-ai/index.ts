@@ -17,6 +17,8 @@
 // ============================================================
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+import { requireAuth } from "../_shared/auth.ts";
+import { callAnthropic } from "../_shared/anthropic.ts";
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +101,14 @@ REGLAS:
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
+  // Auth — IA con web_search es costosa, no anónimos
+  const auth = await requireAuth(req);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: auth.error }), {
+      status: auth.status || 401, headers: { ...CORS, 'content-type': 'application/json' }
+    });
+  }
+
   try {
     const body = await req.json();
     const { messages, project_context } = body;
@@ -121,31 +131,25 @@ serve(async (req: Request) => {
       ...messages.slice(1)
     ];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        system: SYSTEM_PROMPT,
-        tools: TOOLS,
-        messages: enrichedMessages
-      })
+    const callResult = await callAnthropic({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      tools: TOOLS,
+      messages: enrichedMessages,
+      user_id: auth.user_id,
+      feature: 'remodel-ai',
+      timeoutMs: 120000,
+      maxRetries: 1
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return new Response(JSON.stringify({ error: 'Anthropic error: ' + errText }), {
-        status: response.status, headers: { ...CORS, 'content-type': 'application/json' }
+    if (!callResult.ok) {
+      return new Response(JSON.stringify({ error: callResult.error }), {
+        status: callResult.status || 500, headers: { ...CORS, 'content-type': 'application/json' }
       });
     }
 
-    const data = await response.json();
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(callResult.data), {
       headers: { ...CORS, 'content-type': 'application/json' }
     });
 

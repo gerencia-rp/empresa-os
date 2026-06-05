@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { mao as calcMao, brrrrCheck } from "../_shared/deal-rules.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { callAnthropic, extractText } from "../_shared/anthropic.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -74,29 +75,19 @@ Deno.serve(async (req) => {
       analysis, inputs, relatedProperty, histCases: histCases || [], zonalAppraisals, today
     });
 
-    // Llamar a Claude con web_search
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 16000,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 15 }],
-        messages: [{ role: "user", content: prompt }]
-      })
+    // Llamar a Claude con web_search vía helper centralizado
+    const callResult = await callAnthropic({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 16000,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 15 }],
+      messages: [{ role: "user", content: prompt }],
+      user_id: auth.user_id,
+      feature: "deep-property",
+      timeoutMs: 480000,  // 8 min — análisis profundo con web_search es lento
+      maxRetries: 1
     });
-
-    if (!claudeResp.ok) throw new Error("Claude API: " + await claudeResp.text());
-
-    const claudeData = await claudeResp.json();
-    const allText = (claudeData.content || [])
-      .filter((b: any) => b.type === "text")
-      .map((b: any) => b.text)
-      .join("\n");
+    if (!callResult.ok) throw new Error("Claude API: " + callResult.error);
+    const allText = extractText(callResult.data);
 
     // Extraer JSON final
     let result;

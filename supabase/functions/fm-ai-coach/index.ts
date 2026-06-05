@@ -5,6 +5,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { callAnthropic, extractText } from "../_shared/anthropic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -210,29 +211,27 @@ REGLAS CRÍTICAS:
     messages: messages
   };
 
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-beta": "prompt-caching-2024-07-31"
-    },
-    body: JSON.stringify(requestBody)
+  const callResult = await callAnthropic({
+    model: requestBody.model,
+    max_tokens: requestBody.max_tokens,
+    system: requestBody.system,
+    messages: requestBody.messages,
+    user_id: auth.user_id,
+    feature: `fm-coach-${mode}`,
+    timeoutMs: 60000,
+    maxRetries: 2
   });
-  const durationMs = Date.now() - startMs;
+  const durationMs = callResult.duration_ms || (Date.now() - startMs);
 
-  if (!r.ok) {
-    const txt = await r.text();
-    return json({ ok: false, error: `Anthropic ${r.status}: ${txt.slice(0, 600)}` }, 500);
+  if (!callResult.ok) {
+    return json({ ok: false, error: callResult.error }, callResult.status || 500);
   }
 
-  const result: any = await r.json();
-  const tokensIn = result.usage?.input_tokens || 0;
-  const tokensOut = result.usage?.output_tokens || 0;
-  const cacheCreate = result.usage?.cache_creation_input_tokens || 0;
-  const cacheRead = result.usage?.cache_read_input_tokens || 0;
-  const responseText = (result.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
+  const tokensIn = callResult.tokens_in || 0;
+  const tokensOut = callResult.tokens_out || 0;
+  const cacheCreate = callResult.cache_creation || 0;
+  const cacheRead = callResult.cache_read || 0;
+  const responseText = extractText(callResult.data);
 
   return json({
     ok: true,

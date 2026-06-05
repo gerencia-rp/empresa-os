@@ -3,6 +3,8 @@
 // Output: { ok, generated, errors }
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
+import { callAnthropic, extractText } from "../_shared/anthropic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -30,6 +32,10 @@ interface Student {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (!ANTHROPIC_KEY) return json({ ok: false, error: "Falta ANTHROPIC_API_KEY" }, 500);
+
+  // Auth — la campaña dispara N llamadas a Anthropic, hay que validar JWT
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
 
   const body = await req.json().catch(() => ({}));
   const { campaign_id, student_ids, prompt_template, mentorship_id } = body;
@@ -94,18 +100,17 @@ INSTRUCCIONES:
 - NO uses emojis en exceso (máximo 1-2).
 - Devolvé SOLO el mensaje, sin comillas ni preámbulo.`;
 
-        const r = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-5",
-            max_tokens: 400,
-            messages: [{ role: "user", content: prompt }]
-          })
+        const callResult = await callAnthropic({
+          model: "claude-sonnet-4-5",
+          max_tokens: 400,
+          messages: [{ role: "user", content: prompt }],
+          user_id: auth.user_id,
+          feature: "whatsapp-generate",
+          timeoutMs: 60000,
+          maxRetries: 1
         });
-        if (!r.ok) { errors++; continue; }
-        const result: any = await r.json();
-        const text = (result.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n").trim();
+        if (!callResult.ok) { errors++; continue; }
+        const text = extractText(callResult.data).trim();
         if (!text) { errors++; continue; }
 
         await sb.from("edu_whatsapp_messages").insert({

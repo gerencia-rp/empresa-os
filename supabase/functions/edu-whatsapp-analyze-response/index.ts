@@ -3,6 +3,8 @@
 // Input: { message_id, response_text }
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
+import { callAnthropic, extractText } from "../_shared/anthropic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,6 +20,9 @@ const json = (b: any, s = 200) => new Response(JSON.stringify(b), { status: s, h
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (!ANTHROPIC_KEY) return json({ ok: false, error: "Falta ANTHROPIC_API_KEY" }, 500);
+
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
 
   const body = await req.json().catch(() => ({}));
   const { message_id, response_text } = body;
@@ -70,21 +75,17 @@ DEVOLVÉ JSON ESTRICTO con esta estructura:
   "respuesta_sugerida": "string con un mensaje breve que el coach podría enviarle de vuelta"
 }`;
 
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }]
-    })
+  const callResult = await callAnthropic({
+    model: "claude-sonnet-4-5",
+    max_tokens: 1500,
+    messages: [{ role: "user", content: prompt }],
+    user_id: auth.user_id,
+    feature: "whatsapp-analyze",
+    timeoutMs: 60000,
+    maxRetries: 1
   });
-  if (!r.ok) {
-    const txt = await r.text();
-    return json({ ok: false, error: `Anthropic ${r.status}: ${txt.slice(0, 400)}` }, 500);
-  }
-  const result: any = await r.json();
-  const lastText = (result.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
+  if (!callResult.ok) return json({ ok: false, error: callResult.error }, callResult.status || 500);
+  const lastText = extractText(callResult.data);
   let parsed: any = null;
   try {
     const m = lastText.match(/\{[\s\S]*\}/);
