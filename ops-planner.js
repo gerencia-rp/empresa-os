@@ -809,24 +809,90 @@ function opRenderWeekTaskCard(t) {
   const locText = opPropName(t) || '';
   const propCls = opPropColor(t.property_id || t.project_id);
   const isDone = t.status === 'done';
+  const isSkipped = t.status === 'skipped';
+  const today = opDateOnly(new Date());
+  const isOverdue = !isDone && !isSkipped && t.date && t.date < today;
   const cl = t.checklist || [];
   const clDone = cl.filter(x => x.done).length;
+
+  // Estado visual: completada / atrasada / normal
+  const cardCls = isDone
+    ? 'bg-emerald-50 border-emerald-400 opacity-80'
+    : isSkipped
+      ? 'bg-slate-100 border-slate-300 opacity-60'
+      : isOverdue
+        ? 'bg-red-50 border-red-400 border-2 ring-1 ring-red-300'
+        : propCls;
+
   return `
     <div draggable="true"
          ondragstart="opSchedDragStart('${t.id}')"
          ondragend="opState.draggedScheduledId=null"
-         onclick="opEditScheduled('${t.id}')"
-         class="${isDone?'bg-emerald-50 border-emerald-300 opacity-70':propCls} border rounded p-1 cursor-grab text-[10px] hover:shadow-sm">
-      <div class="flex items-center gap-1">
-        <span class="font-bold text-slate-900">${opFmt12(t.start_time).replace(' ','')}</span>
-        ${t.zona ? `<span class="${opZonaColor(t.zona)} px-1 rounded text-[8px] font-bold">${t.zona[0]}</span>` : ''}
-        ${isDone ? '<span class="text-emerald-700">✓</span>' : ''}
+         class="${cardCls} border rounded p-1 cursor-grab text-[10px] hover:shadow-sm relative">
+      ${isOverdue ? `<div class="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold px-1 rounded-sm shadow z-10">⚠️ ATRASADA</div>` : ''}
+      <div onclick="opEditScheduled('${t.id}')" class="cursor-pointer">
+        <div class="flex items-center gap-1">
+          <span class="font-bold text-slate-900">${opFmt12(t.start_time).replace(' ','')}</span>
+          ${t.zona ? `<span class="${opZonaColor(t.zona)} px-1 rounded text-[8px] font-bold">${t.zona[0]}</span>` : ''}
+          ${isDone ? '<span class="text-emerald-700">✓</span>' : ''}
+          ${isSkipped ? '<span class="text-slate-500">⊘</span>' : ''}
+        </div>
+        <div class="font-semibold truncate ${isDone||isSkipped?'line-through':''} ${isOverdue?'text-red-900':''}">${t.title}</div>
+        ${locText ? `<div class="text-slate-600 truncate">🏠 ${locText}</div>` : ''}
+        ${cl.length ? `<div class="text-slate-500 text-[9px]">📋 ${clDone}/${cl.length}</div>` : ''}
       </div>
-      <div class="font-semibold truncate ${isDone?'line-through':''}">${t.title}</div>
-      ${locText ? `<div class="text-slate-600 truncate">🏠 ${locText}</div>` : ''}
-      ${cl.length ? `<div class="text-slate-500 text-[9px]">📋 ${clDone}/${cl.length}</div>` : ''}
+      <!-- Acciones rápidas in-card -->
+      <div class="flex gap-1 mt-1 pt-1 border-t border-slate-200/60">
+        ${!isDone ? `<button onclick="event.stopPropagation(); opQuickComplete('${t.id}')" title="Marcar completada" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-bold py-0.5 rounded">✓ Hecha</button>` : `<button onclick="event.stopPropagation(); opQuickUndo('${t.id}')" title="Volver a planificar" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[9px] font-bold py-0.5 rounded">↩ Deshacer</button>`}
+        ${isOverdue ? `<button onclick="event.stopPropagation(); opQuickReprogramToday('${t.id}')" title="Mover a hoy" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-bold py-0.5 rounded">→ Hoy</button>` : ''}
+        ${isOverdue ? `<button onclick="event.stopPropagation(); opQuickSkip('${t.id}')" title="Marcar como no realizada (skip)" class="flex-1 bg-slate-400 hover:bg-slate-500 text-white text-[9px] font-bold py-0.5 rounded">⊘ Skip</button>` : ''}
+      </div>
     </div>
   `;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Acciones rápidas in-card (1 click, sin modal)
+// ──────────────────────────────────────────────────────────────
+async function opQuickComplete(id) {
+  await sb.from('ops_day_tasks').update({
+    status: 'done',
+    completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await opLoadAll();
+  opRender();
+}
+
+async function opQuickUndo(id) {
+  await sb.from('ops_day_tasks').update({
+    status: 'planned',
+    completed_at: null,
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await opLoadAll();
+  opRender();
+}
+
+async function opQuickSkip(id) {
+  if (!confirm('¿Marcar esta tarea como NO REALIZADA (skip)? Queda en el histórico pero no se reasigna.')) return;
+  await sb.from('ops_day_tasks').update({
+    status: 'skipped',
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await opLoadAll();
+  opRender();
+}
+
+async function opQuickReprogramToday(id) {
+  const today = opDateOnly(new Date());
+  await sb.from('ops_day_tasks').update({
+    date: today,
+    status: 'planned',
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  await opLoadAll();
+  opRender();
 }
 
 async function opDropOnWeekDay(dateStr, ev) {
