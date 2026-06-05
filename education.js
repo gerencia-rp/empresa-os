@@ -981,7 +981,10 @@ let eduKpisCache = { key: null, data: null, loading: false };
 async function eduLoadKPIs(mentorshipId, mesIso) {
   if (!mentorshipId) return null;
   const key = `${mentorshipId}|${mesIso}`;
-  if (eduKpisCache.key === key && eduKpisCache.data) return eduKpisCache.data;
+  // BUG FIX CRÍTICO: si ya intentamos y falló, NO reintentar (causaba loop
+  // infinito → 80K+ errors → bundle.f565...js:9635 spam → page crash).
+  // Comparar por key sola (no por data), así un fallo también cachea.
+  if (eduKpisCache.key === key) return eduKpisCache.data;
   if (eduKpisCache.loading) return null;
   eduKpisCache.loading = true;
   try {
@@ -1052,7 +1055,9 @@ async function eduLoadKPIs(mentorshipId, mesIso) {
     return eduKpisCache.data;
   } catch (e) {
     console.error('eduLoadKPIs', e);
-    eduKpisCache.loading = false;
+    // BUG FIX: marcar key como "intentado" con data:null para que NO se
+    // reintente cada render → loop infinito → 80K+ errors en consola.
+    eduKpisCache = { key, loading: false, data: null };
     return null;
   }
 }
@@ -1121,12 +1126,20 @@ function _eduRenderReportsStandaloneInner(root) {
   const mes = eduReportMesAnchor();
   const mesLabel = new Date(mes+'T00:00:00').toLocaleDateString('es', { month:'long', year:'numeric' });
 
-  // Lanzar carga de KPIs (asincrónico)
+  // Lanzar carga de KPIs (asincrónico).
+  // BUG FIX: solo dispara load si la key NO está en cache (incluso si data=null
+  // por fallo previo) — evita loop infinito de retries que crashea la página.
   let kpis = null;
+  const wantedKey = `${eduState.mentorshipId}|${mes}`;
   if (cur && eduState.mentorshipId) {
-    kpis = (eduKpisCache.key === `${eduState.mentorshipId}|${mes}`) ? eduKpisCache.data : null;
-    if (!kpis && !eduKpisCache.loading) {
-      eduLoadKPIs(eduState.mentorshipId, mes).then(() => eduRenderReportsStandalone());
+    kpis = (eduKpisCache.key === wantedKey) ? eduKpisCache.data : null;
+    if (eduKpisCache.key !== wantedKey && !eduKpisCache.loading) {
+      eduLoadKPIs(eduState.mentorshipId, mes).then((result) => {
+        // Re-render solo si efectivamente obtuvimos data Y la mentoría sigue siendo la actual
+        if (result != null && `${eduState.mentorshipId}|${eduReportMesAnchor()}` === wantedKey) {
+          eduRenderReportsStandalone();
+        }
+      });
     }
     // 🆕 Cargar dashboard CEO en paralelo (no bloquea el render principal)
     if (typeof eduRenderCeoSectionAsync === 'function') {
