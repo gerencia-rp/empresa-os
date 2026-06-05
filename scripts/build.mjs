@@ -32,6 +32,8 @@ const BUNDLE_FILES = [
   "clickup-dashboard.js",
   "pm-dashboard.js",
   "education.js",
+  "edu/edu-credit.js",
+  "edu/edu-reports.js",
   "edu-whatsapp.js"
 ];
 
