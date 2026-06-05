@@ -8,22 +8,35 @@ let eduCeoCache = { key: null, data: null, loading: false };
 
 async function eduCeoLoad(mentorshipId) {
   if (!mentorshipId) return null;
-  if (eduCeoCache.key === mentorshipId && eduCeoCache.data) return eduCeoCache.data;
+  // FIX: comparar por key sola (no por data) para no re-cargar si ya falló.
+  if (eduCeoCache.key === mentorshipId) return eduCeoCache.data;
   if (eduCeoCache.loading) return null;
   eduCeoCache.loading = true;
-  const safe = (p, fallback) => p.then(r => r).catch(e => { console.warn('[ceo]', e?.message || e); return { data: fallback }; });
+  const TIMEOUT_MS = 6000;
+  const safe = (p, fallback, label) => Promise.race([
+    p.then(r => r).catch(e => { console.warn('[ceo]', label, e?.message || e); return { data: fallback }; }),
+    new Promise(resolve => setTimeout(() => resolve({ data: fallback }), TIMEOUT_MS))
+  ]);
   try {
-    const [snapshot, funnel, cuellos, conversion, motivos, revenue, health, tendencia, okrs, retencion] = await Promise.all([
-      safe(sb.from('edu_ceo_snapshot').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null),
-      safe(sb.from('edu_ceo_funnel').select('*').eq('mentorship_id', mentorshipId), []),
-      safe(sb.from('edu_ceo_cuellos_botella').select('*').eq('mentorship_id', mentorshipId), []),
-      safe(sb.from('edu_ceo_conversion_etapas').select('*').eq('mentorship_id', mentorshipId), []),
-      safe(sb.from('edu_ceo_motivos_desercion').select('*').eq('mentorship_id', mentorshipId).limit(10), []),
-      safe(sb.from('edu_ceo_revenue').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null),
-      safe(sb.from('edu_ceo_health_score').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null),
-      safe(sb.from('edu_ceo_tendencia_6m').select('*').eq('mentorship_id', mentorshipId).order('mes'), []),
-      safe(sb.from('edu_okr_targets').select('*').or(`mentorship_id.eq.${mentorshipId},mentorship_id.is.null`).eq('active', true), []),
-      safe(sb.from('edu_kpi_retencion_cohort').select('*').eq('mentorship_id', mentorshipId).order('cohort_mes', { ascending: false }).limit(6), [])
+    const [snapshot, funnel, cuellos, conversion, motivos, revenue, health, tendencia, okrs, retencion,
+           planResumen, planDistribucion, planBloques, planVelocity, planRiesgo, planTop] = await Promise.all([
+      safe(sb.from('edu_ceo_snapshot').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null, 'snapshot'),
+      safe(sb.from('edu_ceo_funnel').select('*').eq('mentorship_id', mentorshipId), [], 'funnel'),
+      safe(sb.from('edu_ceo_cuellos_botella').select('*').eq('mentorship_id', mentorshipId), [], 'cuellos'),
+      safe(sb.from('edu_ceo_conversion_etapas').select('*').eq('mentorship_id', mentorshipId), [], 'conversion'),
+      safe(sb.from('edu_ceo_motivos_desercion').select('*').eq('mentorship_id', mentorshipId).limit(10), [], 'motivos'),
+      safe(sb.from('edu_ceo_revenue').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null, 'revenue'),
+      safe(sb.from('edu_ceo_health_score').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null, 'health'),
+      safe(sb.from('edu_ceo_tendencia_6m').select('*').eq('mentorship_id', mentorshipId).order('mes'), [], 'tendencia'),
+      safe(sb.from('edu_okr_targets').select('*').or(`mentorship_id.eq.${mentorshipId},mentorship_id.is.null`).eq('active', true), [], 'okrs'),
+      safe(sb.from('edu_kpi_retencion_cohort').select('*').eq('mentorship_id', mentorshipId).order('cohort_mes', { ascending: false }).limit(6), [], 'retencion'),
+      // 🆕 PLAN TRACKING (conecta con diagnóstico FlipMentoría)
+      safe(sb.from('edu_plan_resumen_ejecutivo').select('*').eq('mentorship_id', mentorshipId).maybeSingle(), null, 'planResumen'),
+      safe(sb.from('edu_plan_distribucion_avance').select('*').eq('mentorship_id', mentorshipId), [], 'planDist'),
+      safe(sb.from('edu_plan_bloques_lentos').select('*').eq('mentorship_id', mentorshipId).limit(10), [], 'planBloques'),
+      safe(sb.from('edu_plan_velocity_semanal').select('*').eq('mentorship_id', mentorshipId).order('semana'), [], 'planVelocity'),
+      safe(sb.from('edu_plan_estudiantes_en_riesgo').select('*').eq('mentorship_id', mentorshipId).in('riesgo', ['critico','estancado','sin_arrancar']).order('dias_sin_actividad', { ascending: false }).limit(15), [], 'planRiesgo'),
+      safe(sb.from('edu_plan_top_estudiantes').select('*').eq('mentorship_id', mentorshipId).limit(10), [], 'planTop')
     ]);
     eduCeoCache = {
       key: mentorshipId, loading: false,
@@ -37,13 +50,20 @@ async function eduCeoLoad(mentorshipId) {
         health: health?.data || null,
         tendencia: tendencia?.data || [],
         okrs: okrs?.data || [],
-        retencion: retencion?.data || []
+        retencion: retencion?.data || [],
+        // 🆕 Plan tracking
+        planResumen: planResumen?.data || null,
+        planDistribucion: planDistribucion?.data || [],
+        planBloques: planBloques?.data || [],
+        planVelocity: planVelocity?.data || [],
+        planRiesgo: planRiesgo?.data || [],
+        planTop: planTop?.data || []
       }
     };
     return eduCeoCache.data;
   } catch (e) {
     console.error('eduCeoLoad', e);
-    eduCeoCache.loading = false;
+    eduCeoCache = { key: mentorshipId, loading: false, data: null };
     return null;
   }
 }
@@ -62,6 +82,13 @@ function eduRenderCeoDashboard(d) {
       ${eduCeoRenderCuellos(d)}
       ${eduCeoRenderMotivosDesercion(d)}
       ${eduCeoRenderRevenue(d)}
+      <!-- 🆕 Seguimiento de planes (conectado al diagnóstico FlipMentoría) -->
+      ${eduCeoRenderPlanResumen(d)}
+      ${eduCeoRenderPlanDistribucion(d)}
+      ${eduCeoRenderPlanVelocity(d)}
+      ${eduCeoRenderPlanRiesgo(d)}
+      ${eduCeoRenderPlanBloquesLentos(d)}
+      ${eduCeoRenderPlanTop(d)}
       ${eduCeoRenderTendencia(d)}
       ${eduCeoRenderRetencionCohort(d)}
     </section>
@@ -388,4 +415,218 @@ async function eduRenderCeoSectionAsync(mentorshipId, containerId) {
   container.innerHTML = eduRenderCeoDashboard(null);
   const data = await eduCeoLoad(mentorshipId);
   if (container) container.innerHTML = eduRenderCeoDashboard(data);
+}
+
+// ════════════════════════════════════════════════════════════
+// 🆕 Seguimiento de planes — conecta con Diagnóstico FlipMentoría
+// ════════════════════════════════════════════════════════════
+
+// ─── A. Resumen ejecutivo del seguimiento ───
+function eduCeoRenderPlanResumen(d) {
+  const r = d.planResumen || {};
+  if (!r.planes_activos) {
+    return `<div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800">
+      💡 <strong>Sin planes activos.</strong> Generá planes desde Metodología FlipMentoría → Diagnóstico → Vincular a estudiante.
+    </div>`;
+  }
+  const pctActivosUltimaSemana = r.planes_activos ? Math.round(100 * r.activos_ultima_semana / r.planes_activos) : 0;
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="bg-violet-600 text-white px-4 py-3">
+        <h3 class="font-bold text-sm">📋 Seguimiento de Planes — Conectado con Diagnóstico FlipMentoría</h3>
+        <p class="text-[11px] opacity-80 mt-0.5">Métricas de avance de los estudiantes que tienen plan generado.</p>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-3">
+        <div class="bg-violet-50 rounded p-2"><div class="text-[10px] uppercase font-bold text-violet-700">Planes activos</div><div class="text-2xl font-bold text-violet-900">${r.planes_activos}</div><div class="text-[9px] text-violet-700">${r.pct_con_plan != null ? r.pct_con_plan + '% de la cartera' : ''}</div></div>
+        <div class="bg-emerald-50 rounded p-2"><div class="text-[10px] uppercase font-bold text-emerald-700">Avance promedio</div><div class="text-2xl font-bold text-emerald-900">${r.avance_promedio || 0}%</div></div>
+        <div class="bg-blue-50 rounded p-2"><div class="text-[10px] uppercase font-bold text-blue-700">Activos esta semana</div><div class="text-2xl font-bold text-blue-900">${r.activos_ultima_semana || 0}</div><div class="text-[9px] text-blue-700">${pctActivosUltimaSemana}% del total</div></div>
+        <div class="bg-red-50 rounded p-2"><div class="text-[10px] uppercase font-bold text-red-700">Estancados >14d</div><div class="text-2xl font-bold text-red-900">${r.estancados || 0}</div></div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 px-3 pb-3 text-xs">
+        <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-600">Completados (100%)</div><div class="text-lg font-bold">${r.completados || 0}</div></div>
+        <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-600">En etapa inicial (<25%)</div><div class="text-lg font-bold">${r.lejos || 0}</div></div>
+        <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-600">Tareas completadas</div><div class="text-lg font-bold">${r.tareas_completadas_total || 0}</div></div>
+        <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-600">Tareas pendientes</div><div class="text-lg font-bold">${r.tareas_pendientes_total || 0}</div></div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── B. Distribución de avance ───
+function eduCeoRenderPlanDistribucion(d) {
+  const dist = d.planDistribucion || [];
+  if (!dist.length) return '';
+  const labels = {
+    sin_data: ['📭 Sin tareas', 'slate'],
+    sin_empezar: ['⏳ Sin empezar', 'slate'],
+    lejos: ['🔴 Lejos (<25%)', 'red'],
+    avanzando: ['🟡 Avanzando (25-50%)', 'amber'],
+    mitad: ['🔵 A la mitad (50-75%)', 'blue'],
+    finalizando: ['🟢 Finalizando (75-99%)', 'emerald'],
+    completado: ['🏆 Completado (100%)', 'violet']
+  };
+  const total = dist.reduce((s, x) => s + (+x.estudiantes || 0), 0);
+  // Ordenar por nivel de avance
+  const orden = ['sin_data','sin_empezar','lejos','avanzando','mitad','finalizando','completado'];
+  const sorted = [...dist].sort((a,b) => orden.indexOf(a.bucket) - orden.indexOf(b.bucket));
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">📊 Distribución del avance del plan</h3></div>
+      <div class="p-3 space-y-2">
+        ${sorted.map(b => {
+          const [lbl, color] = labels[b.bucket] || [b.bucket, 'slate'];
+          const pct = Math.round(100 * (+b.estudiantes) / total);
+          return `
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span>${lbl}</span>
+                <span class="font-bold">${b.estudiantes} (${pct}%)</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                <div class="bg-${color}-500 h-full" style="width:${pct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ─── C. Velocity semanal (mini bar chart con divs) ───
+function eduCeoRenderPlanVelocity(d) {
+  const v = d.planVelocity || [];
+  if (!v.length) return '';
+  const max = Math.max(...v.map(x => +x.tareas_completadas || 0), 1);
+  const totalSemana = v.length ? Math.round(v.reduce((s,x) => s + +x.tareas_completadas, 0) / v.length) : 0;
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="bg-slate-900 text-white px-4 py-3 flex justify-between items-center">
+        <h3 class="font-bold text-sm">⚡ Velocity — Tareas completadas por semana</h3>
+        <span class="text-xs">Promedio: <strong>${totalSemana}</strong>/sem</span>
+      </div>
+      <div class="p-3">
+        <div class="flex items-end gap-1 h-32">
+          ${v.map(w => {
+            const h = Math.round(100 * (+w.tareas_completadas) / max);
+            const date = new Date(w.semana).toLocaleDateString('es', { day:'numeric', month:'short' });
+            return `
+              <div class="flex-1 flex flex-col items-center justify-end group relative" title="${date}: ${w.tareas_completadas} tareas, ${w.estudiantes_activos} estudiantes">
+                <div class="w-full bg-violet-500 rounded-t hover:bg-violet-600 transition-all min-h-[4px]" style="height:${h}%"></div>
+                <div class="text-[8px] text-slate-500 mt-1 rotate-45 origin-left whitespace-nowrap">${date}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── D. Estudiantes en riesgo (alerta crítica) ───
+function eduCeoRenderPlanRiesgo(d) {
+  const r = d.planRiesgo || [];
+  if (!r.length) return `<div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs text-emerald-800">✓ Todos los planes tienen actividad reciente. Sin estudiantes en riesgo.</div>`;
+  const colors = { sin_arrancar:'slate', critico:'red', estancado:'amber', lento:'blue' };
+  return `
+    <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
+      <div class="bg-red-50 px-4 py-3 border-b border-red-200">
+        <h3 class="font-bold text-sm text-red-900">⚠️ Estudiantes en riesgo de abandono (plan sin avance)</h3>
+        <p class="text-[11px] text-red-700">Estos estudiantes no han marcado tareas del plan en mucho tiempo. Contactar urgente.</p>
+      </div>
+      <div class="max-h-80 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50 sticky top-0"><tr class="text-[10px] uppercase text-slate-500">
+            <th class="text-left p-2">Estudiante</th>
+            <th class="text-left p-2">Etapa</th>
+            <th class="text-right p-2">% Avance</th>
+            <th class="text-right p-2">Días sin actividad</th>
+            <th class="text-left p-2">Riesgo</th>
+            <th class="text-right p-2">Acción</th>
+          </tr></thead>
+          <tbody>
+            ${r.map(s => {
+              const c = colors[s.riesgo] || 'slate';
+              return `<tr class="border-t border-slate-100">
+                <td class="p-2"><button onclick="typeof eduShowStudentDetail==='function' && eduShowStudentDetail('${s.student_id}')" class="text-blue-600 hover:underline text-left font-medium">${(window.esc||((x)=>x))(s.full_name)}</button>${s.email?`<div class="text-[9px] text-slate-500">${(window.esc||((x)=>x))(s.email)}</div>`:''}</td>
+                <td class="p-2 text-slate-700">${(window.esc||((x)=>x))(s.current_stage || '—')}</td>
+                <td class="p-2 text-right font-bold">${s.pct_avance != null ? s.pct_avance+'%' : '—'}</td>
+                <td class="p-2 text-right font-bold ${s.dias_sin_actividad > 30 ? 'text-red-700' : 'text-amber-700'}">${s.dias_sin_actividad != null ? s.dias_sin_actividad+'d' : 'nunca'}</td>
+                <td class="p-2"><span class="bg-${c}-100 text-${c}-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${s.riesgo}</span></td>
+                <td class="p-2 text-right">${s.email ? `<a href="mailto:${(window.esc||((x)=>x))(s.email)}" class="text-blue-600 text-[10px] hover:underline">📧 contactar</a>` : ''}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ─── E. Bloques del plan con menor completion (cuellos del plan) ───
+function eduCeoRenderPlanBloquesLentos(d) {
+  const b = d.planBloques || [];
+  if (!b.length) return '';
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="bg-amber-500 text-white px-4 py-3">
+        <h3 class="font-bold text-sm">🐌 Bloques del plan donde más se atascan</h3>
+        <p class="text-[11px] opacity-90 mt-0.5">Identificá si hay contenido confuso o pasos donde necesitan ayuda extra.</p>
+      </div>
+      <div class="max-h-72 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50 sticky top-0"><tr class="text-[10px] uppercase text-slate-500">
+            <th class="text-left p-2">Bloque</th>
+            <th class="text-left p-2">Etapa</th>
+            <th class="text-right p-2">Completadas</th>
+            <th class="text-right p-2">% completado</th>
+            <th class="text-right p-2">Estudiantes</th>
+          </tr></thead>
+          <tbody>
+            ${b.map(x => {
+              const c = x.pct_completado < 30 ? 'red' : x.pct_completado < 60 ? 'amber' : 'emerald';
+              return `<tr class="border-t border-slate-100">
+                <td class="p-2 font-medium">${(window.esc||((s)=>s))(x.bloque_subetapa || x.bloque_id)}</td>
+                <td class="p-2 text-slate-600">${(window.esc||((s)=>s))(x.bloque_etapa || '—')}</td>
+                <td class="p-2 text-right">${x.completadas}/${x.tareas_total}</td>
+                <td class="p-2 text-right"><span class="bg-${c}-100 text-${c}-800 px-2 py-0.5 rounded font-bold">${x.pct_completado}%</span></td>
+                <td class="p-2 text-right text-slate-700">${x.estudiantes_afectados}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ─── F. Top estudiantes (líderes) ───
+function eduCeoRenderPlanTop(d) {
+  const t = d.planTop || [];
+  if (!t.length) return '';
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="bg-emerald-600 text-white px-4 py-3"><h3 class="font-bold text-sm">🏆 Top estudiantes con mejor avance</h3></div>
+      <div class="max-h-64 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50 sticky top-0"><tr class="text-[10px] uppercase text-slate-500">
+            <th class="text-left p-2">Estudiante</th>
+            <th class="text-left p-2">Etapa</th>
+            <th class="text-left p-2">Perfil</th>
+            <th class="text-right p-2">% Avance</th>
+            <th class="text-right p-2">Última actividad</th>
+          </tr></thead>
+          <tbody>
+            ${t.slice(0,10).map(s => `<tr class="border-t border-slate-100">
+              <td class="p-2"><button onclick="typeof eduShowStudentDetail==='function' && eduShowStudentDetail('${s.student_id}')" class="text-blue-600 hover:underline text-left font-medium">${(window.esc||((x)=>x))(s.full_name)}</button></td>
+              <td class="p-2 text-slate-700">${(window.esc||((x)=>x))(s.current_stage || '—')}</td>
+              <td class="p-2 text-slate-600">${(window.esc||((x)=>x))(s.perfil_nombre || '—')}</td>
+              <td class="p-2 text-right font-bold text-emerald-700">${s.pct_avance}%</td>
+              <td class="p-2 text-right text-slate-600">${s.ultima_completion ? new Date(s.ultima_completion).toLocaleDateString('es') : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
