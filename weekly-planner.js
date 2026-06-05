@@ -1901,7 +1901,7 @@ async function wpApproveImport() {
   const chunks = [];
   for (let i = 0; i < rows.length; i += 100) chunks.push(rows.slice(i, i+100));
   for (const c of chunks) {
-    const { error } = await sb.from('weekly_activities').insert(c);
+    const { error } = await window.safeInsert(() => sb.from('weekly_activities'), c, { select: false });
     if (error) { alert('Error guardando: ' + error.message); return; }
   }
 
@@ -2598,7 +2598,7 @@ async function wpImpCreateNewCasa() {
     status: 'active',
     created_by: state.user.id
   };
-  const { data, error } = await sb.from('remodel_projects').insert(payload).select().single();
+  const { data, error } = await window.safeInsert(() => sb.from('remodel_projects'), payload, { single: true });
   if (error) { alert('Error creando casa: ' + error.message); return; }
 
   // Recargar lista de proyectos

@@ -291,6 +291,63 @@
     return '$' + Number(fixed).toLocaleString('en-US', { minimumFractionDigits: o.decimals || 0, maximumFractionDigits: o.decimals || 0 });
   };
 
+  // ─── safeInsert / safeUpdate ───
+  // Wrapper sobre supabase .insert/.update que detecta error
+  // "Could not find the 'X' column of 'Y' in the schema cache"
+  // y reintenta sin esa columna. Evita romper cuando un SQL de migración
+  // todavía no se corrió en el ambiente del usuario.
+  // Uso: await window.safeInsert(sb.from('tabla'), payload, { returning: 'single' })
+  window._stripMissingCol = function(error, payload) {
+    if (!error || !error.message) return null;
+    const m = error.message.match(/Could not find the '([^']+)' column/i);
+    if (!m) return null;
+    const col = m[1];
+    if (Array.isArray(payload)) {
+      if (payload.length === 0 || !(col in payload[0])) return null;
+      const next = payload.map(row => { const r = { ...row }; delete r[col]; return r; });
+      return { col, payload: next };
+    }
+    if (!(col in payload)) return null;
+    const next = { ...payload };
+    delete next[col];
+    return { col, payload: next };
+  };
+  // Pasale una función que devuelva el qb fresco: () => sb.from('tabla')
+  // o pasale directamente el qb (intenta reutilizarlo).
+  window.safeInsert = async function(qbOrFn, payload, opts) {
+    opts = opts || {};
+    let p = { ...payload };
+    const getQb = typeof qbOrFn === 'function' ? qbOrFn : () => qbOrFn;
+    for (let tries = 0; tries < 8; tries++) {
+      let q = getQb().insert(p);
+      if (opts.select !== false) {
+        q = q.select(opts.select || '*');
+        if (opts.single) q = q.single();
+      }
+      const res = await q;
+      if (!res.error) return res;
+      const fix = window._stripMissingCol(res.error, p);
+      if (!fix) return res;
+      console.warn('[safeInsert] columna faltante:', fix.col, '→ retry sin ella');
+      p = fix.payload;
+    }
+    return { error: new Error('safeInsert: demasiados reintentos') };
+  };
+  window.safeUpdate = async function(qb, payload) {
+    let p = { ...payload };
+    let tries = 0;
+    while (tries < 8) {
+      const res = await qb.update(p);
+      if (!res.error) return res;
+      const fix = window._stripMissingCol(res.error, p);
+      if (!fix) return res;
+      console.warn('[safeUpdate] columna faltante:', fix.col, '→ reintentando sin ella');
+      p = fix.payload;
+      tries++;
+    }
+    return { error: new Error('safeUpdate: demasiados reintentos') };
+  };
+
   // ─── safeEvalFormula(expr, vars) ───
   // Evaluador whitelisted que reemplaza new Function() (RCE).
   // Acepta: identificadores de vars, números, paréntesis, + - * / %,
