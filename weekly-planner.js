@@ -280,6 +280,7 @@ function wpRender() {
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
+          <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
             <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
             ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
@@ -2992,4 +2993,454 @@ async function wpImpCreateNewCasa() {
 
   // Toast confirmación
   alert(`✓ Casa "${data.name || data.address}" creada y seleccionada.\n\nAhora subí el Excel y clic Importar.`);
+}
+
+// ════════════════════════════════════════════════════════════
+// 📊 ANALYTICS / REPORTES DEL PLANNER
+// Métricas para tomar decisiones operativas:
+// cumplimiento, atrasos, reagendamientos, velocidad, etapas lentas
+// ════════════════════════════════════════════════════════════
+
+// Estado del filtro del reporte
+const wpAnState = { from: null, to: null, house: 'all', rangeLabel: 'Esta semana' };
+
+function wpOpenAnalytics() {
+  // Default: la semana visible
+  if (!wpAnState.from) {
+    wpAnState.from = wpDateOnly(wpState.weekStart || new Date());
+    wpAnState.to = wpDateOnly(wpAddDays(wpState.weekStart || new Date(), 6));
+    wpAnState.house = wpState.houseFilter || 'all';
+  }
+  wpRenderAnalytics();
+}
+
+function wpAnSetRange(preset) {
+  const today = new Date();
+  const todayIso = wpDateOnly(today);
+  if (preset === 'today') {
+    wpAnState.from = todayIso; wpAnState.to = todayIso; wpAnState.rangeLabel = 'Hoy';
+  } else if (preset === 'week') {
+    wpAnState.from = wpDateOnly(wpMondayOf(today));
+    wpAnState.to = wpDateOnly(wpAddDays(wpMondayOf(today), 6));
+    wpAnState.rangeLabel = 'Esta semana';
+  } else if (preset === 'last7') {
+    wpAnState.from = wpDateOnly(wpAddDays(today, -6));
+    wpAnState.to = todayIso;
+    wpAnState.rangeLabel = 'Últimos 7 días';
+  } else if (preset === 'last30') {
+    wpAnState.from = wpDateOnly(wpAddDays(today, -29));
+    wpAnState.to = todayIso;
+    wpAnState.rangeLabel = 'Últimos 30 días';
+  } else if (preset === 'mtd') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    wpAnState.from = wpDateOnly(first); wpAnState.to = todayIso;
+    wpAnState.rangeLabel = 'Mes en curso';
+  }
+  wpRenderAnalytics();
+}
+
+function wpAnSetCustomRange() {
+  const f = document.getElementById('wp-an-from')?.value;
+  const t = document.getElementById('wp-an-to')?.value;
+  if (!f || !t) return;
+  wpAnState.from = f; wpAnState.to = t; wpAnState.rangeLabel = `${f} → ${t}`;
+  wpRenderAnalytics();
+}
+
+function wpAnSetHouse(value) {
+  wpAnState.house = value || 'all';
+  wpRenderAnalytics();
+}
+
+// Calcula todas las métricas del rango
+function wpCalcAnalytics(fromIso, toIso, houseFilter) {
+  const all = wpState.activities || [];
+  const todayIso = wpDateOnly(new Date());
+
+  // Filtrar por rango (date) + casa
+  let inRange = all.filter(a => a.date && a.date >= fromIso && a.date <= toIso);
+  inRange = wpFilterActsByHouse(inRange, houseFilter);
+
+  const total = inRange.length;
+  const done = inRange.filter(a => a.status === 'done').length;
+  const inProgress = inRange.filter(a => a.status === 'in_progress').length;
+  const planned = inRange.filter(a => a.status === 'planned' || !a.status).length;
+  const cancelled = inRange.filter(a => a.status === 'cancelled').length;
+
+  // Atrasadas activas dentro del rango: date<hoy && no done && no cancelled
+  const overdue = inRange.filter(a => a.status !== 'done' && a.status !== 'cancelled' && a.date < todayIso);
+
+  // Heurística reagendadas: updated_at - created_at > 1 día Y date > created_at (date)
+  const movidas = inRange.filter(a => {
+    if (!a.created_at || !a.updated_at) return false;
+    const c = new Date(a.created_at).getTime();
+    const u = new Date(a.updated_at).getTime();
+    return (u - c) > 24*3600*1000;
+  });
+
+  // Velocidad: tareas done / días del rango
+  const daysSpan = Math.max(1, Math.round((new Date(toIso+'T00:00:00') - new Date(fromIso+'T00:00:00'))/86400000)+1);
+  const velocityDay = Math.round((done / daysSpan) * 10) / 10;
+
+  // Tiempo promedio para completar (días entre created_at y completed_at)
+  const completedWithTime = inRange.filter(a => a.status === 'done' && a.created_at && a.completed_at);
+  const avgCompletionDays = completedWithTime.length === 0 ? null
+    : Math.round(completedWithTime.reduce((s,a) => s + (new Date(a.completed_at) - new Date(a.created_at))/86400000, 0) / completedWithTime.length * 10) / 10;
+
+  // Cumplimiento por casa
+  const byHouse = {};
+  inRange.forEach(a => {
+    const key = a.project_id || ('name:' + (a.property_name||'Sin asignar'));
+    const p = wpState.projects.find(x => x.id === a.project_id);
+    const name = p?.name || a.property_name || 'Sin asignar';
+    if (!byHouse[key]) byHouse[key] = { name, total: 0, done: 0, overdue: 0, planned: 0 };
+    byHouse[key].total++;
+    if (a.status === 'done') byHouse[key].done++;
+    if (a.status !== 'done' && a.status !== 'cancelled' && a.date < todayIso) byHouse[key].overdue++;
+    if (a.status === 'planned' || !a.status) byHouse[key].planned++;
+  });
+  const houseList = Object.values(byHouse).map(h => ({
+    ...h,
+    pct: h.total ? Math.round(h.done/h.total*100) : 0
+  })).sort((a,b) => b.total - a.total);
+
+  // Cumplimiento por etapa
+  const byStage = {};
+  inRange.forEach(a => {
+    const k = a.stage || 'sin etapa';
+    if (!byStage[k]) byStage[k] = { name: k, total: 0, done: 0, overdue: 0 };
+    byStage[k].total++;
+    if (a.status === 'done') byStage[k].done++;
+    if (a.status !== 'done' && a.status !== 'cancelled' && a.date < todayIso) byStage[k].overdue++;
+  });
+  const stageList = Object.values(byStage).map(s => ({
+    ...s, pct: s.total ? Math.round(s.done/s.total*100) : 0
+  })).sort((a,b) => a.pct - b.pct);
+
+  // Cumplimiento por día de la semana (heatmap)
+  const dows = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const byDow = dows.map((d, i) => ({ dow: d, idx: i, total: 0, done: 0 }));
+  inRange.forEach(a => {
+    if (!a.date) return;
+    const dt = new Date(a.date + 'T00:00:00');
+    const idx = dt.getDay();
+    byDow[idx].total++;
+    if (a.status === 'done') byDow[idx].done++;
+  });
+  byDow.forEach(d => { d.pct = d.total ? Math.round(d.done/d.total*100) : 0; });
+  // Reorder: lun-dom para humanos
+  const dowSorted = [byDow[1],byDow[2],byDow[3],byDow[4],byDow[5],byDow[6],byDow[0]];
+
+  // Top atrasadas críticas (top 10 por días)
+  const overdueTop = overdue.map(a => ({
+    ...a,
+    daysLate: Math.round((new Date(todayIso+'T00:00:00') - new Date(a.date+'T00:00:00'))/86400000),
+    houseName: (wpState.projects.find(p => p.id === a.project_id)?.name) || a.property_name || '?'
+  })).sort((a,b) => b.daysLate - a.daysLate).slice(0, 10);
+
+  // Tareas movidas — top 10 más recientes
+  const movidasTop = movidas.map(a => ({
+    ...a,
+    diffDays: Math.round((new Date(a.updated_at) - new Date(a.created_at))/86400000),
+    houseName: (wpState.projects.find(p => p.id === a.project_id)?.name) || a.property_name || '?'
+  })).sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 10);
+
+  return {
+    total, done, inProgress, planned, cancelled,
+    overdueCount: overdue.length, overdueTop,
+    movidasCount: movidas.length, movidasTop,
+    pctCumplimiento: total ? Math.round((done/total)*100) : 0,
+    daysSpan, velocityDay, avgCompletionDays,
+    houseList, stageList, dowSorted
+  };
+}
+
+function wpRenderAnalytics() {
+  const metrics = wpCalcAnalytics(wpAnState.from, wpAnState.to, wpAnState.house);
+  // Opciones de casa
+  const hidden = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
+  const activeProj = wpState.projects.filter(p => !hidden.has(p.id));
+  const extra = new Set();
+  wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
+  const houseOpts = [
+    `<option value="all" ${wpAnState.house==='all'?'selected':''}>🏘️ Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${wpAnState.house===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${wpAnState.house==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+  ].join('');
+
+  // Color del KPI principal según cumplimiento
+  const m = metrics;
+  const colorCumpl = m.pctCumplimiento >= 80 ? 'from-emerald-600 to-emerald-800'
+                   : m.pctCumplimiento >= 60 ? 'from-amber-500 to-orange-600'
+                   : 'from-red-600 to-red-800';
+
+  // Insights automáticos en lenguaje natural
+  const insights = [];
+  if (m.total === 0) insights.push({ icon: 'ℹ️', text: 'No hay actividades planeadas en este rango. Probá un período más amplio o cambiá la casa.' });
+  else {
+    if (m.pctCumplimiento >= 80) insights.push({ icon: '✅', text: `Excelente cumplimiento: ${m.pctCumplimiento}% de las tareas se completaron.`, color:'emerald' });
+    else if (m.pctCumplimiento >= 60) insights.push({ icon: '🟡', text: `Cumplimiento medio (${m.pctCumplimiento}%). Hay margen para optimizar.`, color:'amber' });
+    else insights.push({ icon: '🔴', text: `Cumplimiento bajo (${m.pctCumplimiento}%). Revisá causas de los atrasos.`, color:'red' });
+
+    if (m.overdueCount > 0) insights.push({ icon:'⏰', text:`${m.overdueCount} tarea${m.overdueCount>1?'s':''} atrasada${m.overdueCount>1?'s':''} sin completar. Considerá reagendar o reasignar recursos.`, color:'red' });
+    if (m.movidasCount > 0) insights.push({ icon:'🔄', text:`${m.movidasCount} tarea${m.movidasCount>1?'s fueron':' fue'} reagendada${m.movidasCount>1?'s':''} durante el período. Patrón a investigar si es alto.`, color:'amber' });
+    if (m.velocityDay > 0) insights.push({ icon:'⚡', text:`Velocidad promedio: ${m.velocityDay} tarea${m.velocityDay!==1?'s':''} ejecutada${m.velocityDay!==1?'s':''} por día.` });
+    if (m.avgCompletionDays != null) insights.push({ icon:'⏳', text:`Tiempo promedio entre crear y completar una tarea: ${m.avgCompletionDays} día${m.avgCompletionDays!==1?'s':''}.` });
+
+    // Casa con peor cumplimiento
+    const peorCasa = m.houseList.slice().sort((a,b)=>a.pct-b.pct)[0];
+    if (peorCasa && m.houseList.length > 1 && peorCasa.pct < 60) {
+      insights.push({ icon:'🏠', text:`Casa que más atrás va: "${peorCasa.name}" (${peorCasa.pct}% completadas, ${peorCasa.overdue} atrasadas).`, color:'red' });
+    }
+    // Etapa más lenta
+    const peorStage = m.stageList[0];
+    if (peorStage && peorStage.total >= 3 && peorStage.pct < 50) {
+      insights.push({ icon:'🔧', text:`Etapa más lenta: "${peorStage.name}" con ${peorStage.pct}% de cumplimiento. Cuello de botella probable.`, color:'amber' });
+    }
+    // Mejor día de la semana
+    const mejorDow = m.dowSorted.slice().filter(d=>d.total>0).sort((a,b)=>b.pct-a.pct)[0];
+    if (mejorDow && mejorDow.total >= 3) {
+      insights.push({ icon:'📅', text:`Día más productivo: ${mejorDow.dow} con ${mejorDow.pct}% de cumplimiento.` });
+    }
+  }
+
+  // Heatmap dow
+  const heatColor = pct => pct >= 80 ? 'bg-emerald-500 text-white' : pct >= 60 ? 'bg-emerald-300' : pct >= 40 ? 'bg-amber-300' : pct > 0 ? 'bg-red-300' : 'bg-slate-100 text-slate-400';
+
+  const html = `
+    <div id="wp-an-root" class="space-y-3">
+      <!-- Toolbar de filtros -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="flex flex-wrap items-end gap-2">
+          <div class="flex gap-1">
+            <button onclick="wpAnSetRange('today')" class="text-xs px-2.5 py-1.5 rounded font-bold ${wpAnState.rangeLabel==='Hoy'?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">Hoy</button>
+            <button onclick="wpAnSetRange('week')" class="text-xs px-2.5 py-1.5 rounded font-bold ${wpAnState.rangeLabel==='Esta semana'?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">Semana</button>
+            <button onclick="wpAnSetRange('last7')" class="text-xs px-2.5 py-1.5 rounded font-bold ${wpAnState.rangeLabel==='Últimos 7 días'?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">7d</button>
+            <button onclick="wpAnSetRange('last30')" class="text-xs px-2.5 py-1.5 rounded font-bold ${wpAnState.rangeLabel==='Últimos 30 días'?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">30d</button>
+            <button onclick="wpAnSetRange('mtd')" class="text-xs px-2.5 py-1.5 rounded font-bold ${wpAnState.rangeLabel==='Mes en curso'?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">MTD</button>
+          </div>
+          <div class="h-6 border-l border-slate-300"></div>
+          <div class="flex items-end gap-1">
+            <div>
+              <label class="block text-[9px] font-bold uppercase text-slate-500">Desde</label>
+              <input id="wp-an-from" type="date" value="${wpAnState.from}" class="border border-slate-300 rounded px-2 py-1 text-xs"/>
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold uppercase text-slate-500">Hasta</label>
+              <input id="wp-an-to" type="date" value="${wpAnState.to}" class="border border-slate-300 rounded px-2 py-1 text-xs"/>
+            </div>
+            <button onclick="wpAnSetCustomRange()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1.5 rounded">Aplicar</button>
+          </div>
+          <div class="h-6 border-l border-slate-300"></div>
+          <div>
+            <label class="block text-[9px] font-bold uppercase text-slate-500">Casa</label>
+            <select onchange="wpAnSetHouse(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1 font-bold">${houseOpts}</select>
+          </div>
+          <div class="flex-1"></div>
+          <button onclick="wpPrintAnalytics()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold">🖨️ Imprimir reporte</button>
+        </div>
+      </div>
+
+      <!-- HERO: KPI cumplimiento -->
+      <div class="bg-gradient-to-br ${colorCumpl} text-white rounded-2xl p-5 shadow-lg">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div class="text-[10px] uppercase tracking-widest opacity-80 font-bold">${wpAnState.rangeLabel} · ${wpAnState.house==='all'?'todas las casas':(activeProj.find(p=>p.id===wpAnState.house)?.name || (wpAnState.house.startsWith('name:')?wpAnState.house.slice(5):'') || '—')}</div>
+            <div class="text-3xl font-bold mt-1">${m.pctCumplimiento}% cumplimiento</div>
+            <div class="text-sm mt-1 opacity-90">${m.done} de ${m.total} tarea${m.total!==1?'s':''} completadas en ${m.daysSpan} día${m.daysSpan!==1?'s':''}</div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 min-w-[260px]">
+            <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
+              <div class="text-[10px] uppercase opacity-80 font-bold">⚡ Velocidad</div>
+              <div class="text-xl font-bold">${m.velocityDay}<span class="text-xs opacity-80"> /día</span></div>
+            </div>
+            <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
+              <div class="text-[10px] uppercase opacity-80 font-bold">⏳ Lead time</div>
+              <div class="text-xl font-bold">${m.avgCompletionDays!=null?m.avgCompletionDays+' d':'—'}</div>
+            </div>
+            <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
+              <div class="text-[10px] uppercase opacity-80 font-bold">⏰ Atrasadas</div>
+              <div class="text-xl font-bold">${m.overdueCount}</div>
+            </div>
+            <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
+              <div class="text-[10px] uppercase opacity-80 font-bold">🔄 Movidas</div>
+              <div class="text-xl font-bold">${m.movidasCount}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distribución de estados -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">Estado de las tareas</div>
+        <div class="flex h-8 rounded-lg overflow-hidden border border-slate-200">
+          ${m.done > 0 ? `<div class="bg-emerald-500 flex items-center justify-center text-white text-xs font-bold" style="width:${m.done/m.total*100}%" title="${m.done} hechas">${m.done}</div>` : ''}
+          ${m.inProgress > 0 ? `<div class="bg-blue-500 flex items-center justify-center text-white text-xs font-bold" style="width:${m.inProgress/m.total*100}%" title="${m.inProgress} en curso">${m.inProgress}</div>` : ''}
+          ${m.planned > 0 ? `<div class="bg-amber-400 flex items-center justify-center text-white text-xs font-bold" style="width:${m.planned/m.total*100}%" title="${m.planned} planeadas">${m.planned}</div>` : ''}
+          ${m.cancelled > 0 ? `<div class="bg-slate-400 flex items-center justify-center text-white text-xs font-bold" style="width:${m.cancelled/m.total*100}%" title="${m.cancelled} canceladas">${m.cancelled}</div>` : ''}
+          ${m.total === 0 ? '<div class="bg-slate-100 w-full flex items-center justify-center text-slate-400 text-xs">Sin actividades</div>' : ''}
+        </div>
+        <div class="flex flex-wrap gap-3 mt-2 text-[11px]">
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-500 rounded-sm"></span> ✅ Hechas: <strong>${m.done}</strong></span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-sm"></span> 🔵 En curso: <strong>${m.inProgress}</strong></span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-400 rounded-sm"></span> 🟠 Planeadas: <strong>${m.planned}</strong></span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-slate-400 rounded-sm"></span> ⚫ Canceladas: <strong>${m.cancelled}</strong></span>
+        </div>
+      </div>
+
+      <!-- Insights automáticos -->
+      <div class="bg-violet-50 border border-violet-200 rounded-xl p-4">
+        <div class="text-xs font-bold uppercase text-violet-900 mb-2">💡 Insights para tomar decisiones</div>
+        <div class="space-y-1.5">
+          ${insights.map(i => `
+            <div class="flex items-start gap-2 text-sm ${i.color==='red'?'text-red-800':i.color==='amber'?'text-amber-800':i.color==='emerald'?'text-emerald-800':'text-slate-700'}">
+              <span class="text-base leading-none">${i.icon}</span>
+              <span>${i.text}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-3">
+        <!-- Heatmap día de la semana -->
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">📅 Cumplimiento por día de la semana</div>
+          <div class="grid grid-cols-7 gap-1">
+            ${m.dowSorted.map(d => `
+              <div class="rounded ${heatColor(d.pct)} p-2 text-center">
+                <div class="text-[10px] font-bold">${d.dow}</div>
+                <div class="text-lg font-bold leading-tight">${d.total?d.pct+'%':'—'}</div>
+                <div class="text-[9px] opacity-80">${d.done}/${d.total}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Top etapas más lentas -->
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">🔧 Etapas — más lentas arriba</div>
+          ${m.stageList.length === 0 ? '<div class="text-xs text-slate-400 italic py-4 text-center">Sin etapas registradas</div>' : `
+            <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              ${m.stageList.slice(0, 8).map(s => `
+                <div>
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-semibold truncate">${(s.name||'').replace(/</g,'&lt;')}</span>
+                    <span class="text-slate-600 whitespace-nowrap">${s.done}/${s.total} (${s.pct}%) ${s.overdue?`<span class="text-red-700 font-bold">· ⏰${s.overdue}</span>`:''}</span>
+                  </div>
+                  <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="${s.pct>=80?'bg-emerald-500':s.pct>=60?'bg-amber-500':'bg-red-500'} h-full" style="width:${s.pct}%"></div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      </div>
+
+      <!-- Cumplimiento por casa -->
+      ${m.houseList.length > 1 ? `
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-50 px-3 py-2 text-xs font-bold uppercase text-slate-600">🏠 Cumplimiento por casa</div>
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr class="border-b border-slate-200">
+              <th class="text-left px-3 py-1.5">Casa</th>
+              <th class="text-right px-3 py-1.5">Total</th>
+              <th class="text-right px-3 py-1.5">Hechas</th>
+              <th class="text-right px-3 py-1.5">Atrasadas</th>
+              <th class="text-left px-3 py-1.5">Cumplimiento</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${m.houseList.map(h => `
+              <tr class="border-b border-slate-100">
+                <td class="px-3 py-1.5 font-medium">${(h.name||'').replace(/</g,'&lt;')}</td>
+                <td class="px-3 py-1.5 text-right">${h.total}</td>
+                <td class="px-3 py-1.5 text-right text-emerald-700 font-bold">${h.done}</td>
+                <td class="px-3 py-1.5 text-right ${h.overdue>0?'text-red-700 font-bold':'text-slate-400'}">${h.overdue}</td>
+                <td class="px-3 py-1.5">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div class="${h.pct>=80?'bg-emerald-500':h.pct>=60?'bg-amber-500':'bg-red-500'} h-full" style="width:${h.pct}%"></div>
+                    </div>
+                    <span class="text-[11px] font-bold w-10 text-right">${h.pct}%</span>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+
+      <div class="grid md:grid-cols-2 gap-3">
+        <!-- Top atrasadas críticas -->
+        <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
+          <div class="bg-red-50 px-3 py-2 text-xs font-bold uppercase text-red-800">⏰ Atrasadas críticas (${m.overdueCount})</div>
+          ${m.overdueTop.length === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin tareas atrasadas en este rango 🎉</div>' : `
+            <div class="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+              ${m.overdueTop.map(a => `
+                <div class="px-3 py-2 hover:bg-slate-50 cursor-pointer" onclick="wpEditActivity('${a.id}')">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="text-xs font-semibold truncate">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                      <div class="text-[10px] text-slate-500 truncate">🏠 ${(a.houseName||'').replace(/</g,'&lt;')}${a.stage?` · ${a.stage}`:''}</div>
+                    </div>
+                    <div class="text-[11px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">⏰ ${a.daysLate}d</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        <!-- Movidas / reagendadas -->
+        <div class="bg-white border border-amber-200 rounded-xl overflow-hidden">
+          <div class="bg-amber-50 px-3 py-2 text-xs font-bold uppercase text-amber-800">🔄 Reagendadas recientes (${m.movidasCount})</div>
+          ${m.movidasTop.length === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin reagendamientos en este rango</div>' : `
+            <div class="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+              ${m.movidasTop.map(a => `
+                <div class="px-3 py-2 hover:bg-slate-50 cursor-pointer" onclick="wpEditActivity('${a.id}')">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="text-xs font-semibold truncate">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                      <div class="text-[10px] text-slate-500 truncate">🏠 ${(a.houseName||'').replace(/</g,'&lt;')} · ahora ${a.date}</div>
+                    </div>
+                    <div class="text-[11px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">+${a.diffDays}d</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">← Volver al calendario</button>
+      </div>
+    </div>
+  `;
+  openModal(`📊 Reporte del planner · ${wpAnState.rangeLabel}`, html);
+  const inner = document.querySelector('#modal > div');
+  if (inner) {
+    ['max-w-3xl','max-w-5xl'].forEach(c => inner.classList.remove(c));
+    inner.classList.add('max-w-7xl');
+  }
+}
+
+function wpPrintAnalytics() {
+  const root = document.getElementById('wp-an-root');
+  if (!root) return;
+  const w = window.open('', '_blank', 'width=900,height=1200');
+  w.document.write(`<!DOCTYPE html><html><head><title>Reporte planner · ${wpAnState.rangeLabel}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>@media print { button { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>
+    </head><body class="p-6 bg-white">
+      <div class="mb-4 border-b-2 border-slate-900 pb-2">
+        <div class="text-xl font-bold">📊 Reporte semanal del planner</div>
+        <div class="text-xs text-slate-600">${wpAnState.rangeLabel} · ${new Date().toLocaleString('es')}</div>
+      </div>
+      ${root.innerHTML}
+    </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
 }
