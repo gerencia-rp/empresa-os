@@ -101,21 +101,41 @@ async function paLaunchAnalysis() {
 }
 
 let paPollTimer = null;
+let paPollStartedAt = 0;
 function paStartPolling(id) {
-  if (paPollTimer) clearInterval(paPollTimer);
+  paStopPolling();
+  paPollStartedAt = Date.now();
+  const MAX_POLL_MS = 10 * 60 * 1000; // 10 min
   paPollTimer = setInterval(async () => {
-    const { data } = await sb.from('property_analyses').select('*').eq('id', id).single();
+    // Timeout máximo para evitar polling infinito si el job nunca termina
+    if (Date.now() - paPollStartedAt > MAX_POLL_MS) {
+      paStopPolling();
+      return;
+    }
+    // Stop si el modal/sistema ya no está visible
+    if (!document.getElementById('pa-root')) {
+      paStopPolling();
+      return;
+    }
+    const { data } = await sb.from('property_analyses').select('*').eq('id', id).maybeSingle();
     if (!data) return;
     const idx = paState.analyses.findIndex(a => a.id === id);
     if (idx >= 0) paState.analyses[idx] = data;
     else paState.analyses.unshift(data);
     paRender();
     if (data.status === 'done' || data.status === 'error') {
-      clearInterval(paPollTimer);
-      paPollTimer = null;
+      paStopPolling();
     }
   }, 5000);
 }
+function paStopPolling() {
+  if (paPollTimer) {
+    clearInterval(paPollTimer);
+    paPollTimer = null;
+  }
+}
+// Cleanup global: si se cierra el modal o se cambia de sistema, parar polling
+window.addEventListener('beforeunload', paStopPolling);
 
 function paSetTab(t) { paState.tab = t; paRender(); }
 

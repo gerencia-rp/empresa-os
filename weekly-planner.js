@@ -434,22 +434,40 @@ function wpRenderResourceForm() {
 
 // ─── Conflicts ───
 function wpDetectConflicts() {
-  const map = {}; // `${resourceId}__${date}` -> [activities]
+  // CORRECCIÓN: dos actividades 7-12h y 13-17h con misma crew NO son conflicto
+  // (no se pisan). El check anterior solo agrupaba por día sin mirar horas
+  // y reportaba falsos positivos.
+  const byResourceDay = {};
   wpState.activities.forEach(a => {
     (a.resource_ids || []).forEach(rid => {
       const key = `${rid}__${a.date}`;
-      if (!map[key]) map[key] = [];
-      map[key].push(a);
+      if (!byResourceDay[key]) byResourceDay[key] = [];
+      byResourceDay[key].push(a);
     });
   });
+  const overlaps = (a, b) => {
+    const aStart = +a.start_hour || 0, aEnd = +a.end_hour || 24;
+    const bStart = +b.start_hour || 0, bEnd = +b.end_hour || 24;
+    return aStart < bEnd && bStart < aEnd;
+  };
   const conflicts = [];
-  Object.entries(map).forEach(([key, acts]) => {
-    if (acts.length > 1) {
-      const [rid, date] = key.split('__');
-      const res = wpState.resources.find(r => r.id === rid);
-      if (res && acts.length > (res.capacity || 1)) {
-        conflicts.push({ resourceId: rid, resourceName: res.name, date, activities: acts });
+  Object.entries(byResourceDay).forEach(([key, acts]) => {
+    if (acts.length < 2) return;
+    const [rid, date] = key.split('__');
+    const res = wpState.resources.find(r => r.id === rid);
+    if (!res) return;
+    const cap = res.capacity || 1;
+    // Cuenta el máximo de actividades simultáneas en cualquier hora
+    let maxOverlap = 1;
+    for (let i = 0; i < acts.length; i++) {
+      let count = 1;
+      for (let j = 0; j < acts.length; j++) {
+        if (i !== j && overlaps(acts[i], acts[j])) count++;
       }
+      maxOverlap = Math.max(maxOverlap, count);
+    }
+    if (maxOverlap > cap) {
+      conflicts.push({ resourceId: rid, resourceName: res.name, date, activities: acts });
     }
   });
   return conflicts;
@@ -2273,8 +2291,27 @@ async function wpGenerateRecurringDue() {
   const today = wpDateOnly(new Date());
   const due = (wpState.recurring||[]).filter(r => r.next_due <= today);
   if (!due.length) return 0;
-  const rows = [];
+
+  // LOCK con UPDATE condicional: solo procesa cada recurring SI nadie más lo
+  // movió ya. Antes 2 pestañas abiertas duplicaban actividades del día.
+  // Marcamos last_generated y next_due en un solo UPDATE que solo afecta
+  // si last_generated < today (la 2da pestaña no encuentra nada que mover).
+  const actuallyDue = [];
   for (const r of due) {
+    const next = new Date(today + 'T00:00:00');
+    next.setDate(next.getDate() + r.interval_days);
+    const { data } = await sb.from('wp_recurring')
+      .update({ last_generated: today, next_due: wpDateOnly(next) })
+      .eq('id', r.id)
+      .or(`last_generated.is.null,last_generated.lt.${today}`)
+      .select('id')
+      .maybeSingle();
+    if (data) actuallyDue.push(r);
+  }
+  if (!actuallyDue.length) return 0;
+
+  const rows = [];
+  for (const r of actuallyDue) {
     const tt = (wpState.taskTemplates||[]).find(t => t.id === r.base_task_id);
     rows.push({
       project_id: r.project_id,
@@ -2291,14 +2328,6 @@ async function wpGenerateRecurringDue() {
     });
   }
   if (rows.length) await sb.from('weekly_activities').insert(rows);
-  // Actualizar next_due
-  for (const r of due) {
-    const next = new Date(today + 'T00:00:00');
-    next.setDate(next.getDate() + r.interval_days);
-    await sb.from('wp_recurring').update({
-      last_generated: today, next_due: wpDateOnly(next)
-    }).eq('id', r.id);
-  }
   return rows.length;
 }
 

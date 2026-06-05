@@ -1172,6 +1172,8 @@ async function eduGeneratePresentation() {
 
     // Pattern async: job_id devuelto → polling cada 5s hasta done/error
     if (r.async && r.job_id) {
+      // Capturar mentorshipId al inicio para detectar si el user cambia mientras polleamos
+      const lockedMentorshipId = eduState.mentorshipId;
       window.aiState[aiKey] = { loading: true, job_id: r.job_id, status: 'running', started_at: Date.now(), missed_polls: 0 };
       eduRender();
       const pollStart = Date.now();
@@ -1179,6 +1181,11 @@ async function eduGeneratePresentation() {
       const MAX_CONSECUTIVE_MISSES = 6; // Si después de 30s no encontramos el job, abortamos
       while (Date.now() - pollStart < maxWait) {
         await new Promise(rs => setTimeout(rs, 5000));
+        // Si el user cambió de mentoría o cerró el modal, abortar
+        if (eduState.mentorshipId !== lockedMentorshipId || !document.getElementById('edu-root')) {
+          console.log('[edu-pres] polling abortado: cambio de mentoría o modal cerrado');
+          break;
+        }
         const pollRes = await sb.from('edu_pres_jobs').select('*').eq('id', r.job_id).maybeSingle();
         const job = pollRes && pollRes.data;
         const pollErr = pollRes && pollRes.error;

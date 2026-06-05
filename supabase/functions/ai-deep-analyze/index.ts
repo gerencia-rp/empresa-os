@@ -573,6 +573,19 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const contextHash = hashContext(context);
 
+    // Rate limit: max 10 calls / 15 min por user_id (defensa contra force=true loops)
+    const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { count: recentCalls } = await supabase
+      .from("ai_analyses")
+      .select("id", { count: "exact", head: true })
+      .eq("created_by", auth.user_id || "")
+      .gte("created_at", since);
+    if ((recentCalls || 0) >= 10) {
+      return new Response(JSON.stringify({ error: "Rate limit: máximo 10 análisis cada 15 minutos. Esperá un momento." }), {
+        status: 429, headers: { ...cors, "Content-Type": "application/json" }
+      });
+    }
+
     // Cache check
     if (!force) {
       const { data: cached } = await supabase
