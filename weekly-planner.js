@@ -128,11 +128,59 @@ async function openWeeklyPlanner(sys) {
   await wpLoadAll();
   // Generar tareas recurrentes vencidas (silencioso)
   try { await wpGenerateRecurringDue(); await wpLoadAll(); } catch(e) { console.warn('recurring', e); }
+  // Interceptar closeModal del sistema (X, ESC, backdrop) UNA sola vez por sesión:
+  // si seguimos dentro del planner y estamos en un sub-modal, volver al planner
+  // en lugar de cerrar todo. Solo cerrar de verdad si estamos en el root del planner.
+  if (!window._wpOriginalCloseModal) {
+    window._wpOriginalCloseModal = window.closeModal;
+    window.closeModal = function wpInterceptedCloseModal() {
+      // Si no hay planner activo, comportamiento normal
+      if (!wpState.sys) return window._wpOriginalCloseModal();
+      // ¿Estamos en el root del planner? (wp-root existe en el DOM)
+      const isRoot = !!document.getElementById('wp-root');
+      if (isRoot) {
+        // El usuario quiere salir del planner del todo
+        wpState.sys = null;
+        return window._wpOriginalCloseModal();
+      }
+      // Estamos en un sub-modal → volver al planner sin cerrar
+      wpBackToPlanner();
+    };
+  }
   openModal(`📅 ${sys.name}`, '<div id="wp-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   wpRender();
 }
+
+// Vuelve al planner desde cualquier sub-vista SIN cerrar el modal global ni
+// recargar la DB. Reemplaza el contenido del modal por el grid del planner
+// e invoca wpRender() en sincrónico. Si el sys no está cargado (raro), cae al
+// flujo full de openWeeklyPlanner.
+function wpBackToPlanner(opts) {
+  opts = opts || {};
+  if (!wpState.sys) return closeModal();
+  if (opts.reload) {
+    // recargar DB en background y re-render
+    openModal(`📅 ${wpState.sys.name}`, '<div id="wp-root"></div>');
+    const inner = document.querySelector('#modal > div');
+    if (inner) {
+      ['max-w-sm','max-w-md','max-w-lg','max-w-xl','max-w-2xl','max-w-3xl','max-w-4xl','max-w-5xl','max-w-6xl'].forEach(c => inner.classList.remove(c));
+      inner.classList.add('max-w-7xl');
+    }
+    document.getElementById('wp-root').innerHTML = '<div class="text-center text-slate-400 py-8 text-sm">Cargando…</div>';
+    wpLoadAll().then(wpRender);
+    return;
+  }
+  openModal(`📅 ${wpState.sys.name}`, '<div id="wp-root"></div>');
+  const inner = document.querySelector('#modal > div');
+  if (inner) {
+    ['max-w-sm','max-w-md','max-w-lg','max-w-xl','max-w-2xl','max-w-3xl','max-w-4xl','max-w-5xl','max-w-6xl'].forEach(c => inner.classList.remove(c));
+    inner.classList.add('max-w-7xl');
+  }
+  wpRender();
+}
+window.wpBackToPlanner = wpBackToPlanner;
 
 function wpRender() {
   const root = document.getElementById('wp-root');
@@ -639,7 +687,7 @@ function wpEditActivity(id) {
         <div class="border border-slate-200 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
             <div class="text-[10px] font-bold uppercase text-slate-600">📦 Materiales (${materials.length})</div>
-            <button onclick="closeModal(); setTimeout(()=>wpOpenChecklist('${id}'), 80)" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
+            <button onclick="wpOpenChecklist('${id}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
           </div>
           ${materials.length === 0
             ? '<div class="text-xs text-slate-400 italic">Sin materiales registrados.</div>'
@@ -655,7 +703,7 @@ function wpEditActivity(id) {
         <div class="border border-slate-200 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
             <div class="text-[10px] font-bold uppercase text-slate-600">✅ Checklist (${checklistDone}/${checklist.length})</div>
-            <button onclick="closeModal(); setTimeout(()=>wpOpenChecklist('${id}'), 80)" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
+            <button onclick="wpOpenChecklist('${id}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
           </div>
           ${checklist.length === 0
             ? '<div class="text-xs text-slate-400 italic">Sin checklist.</div>'
@@ -672,9 +720,9 @@ function wpEditActivity(id) {
 
         <!-- Acciones rápidas -->
         <div class="flex gap-2 pt-2 border-t border-slate-200">
-          ${!isDone ? `<button onclick="wpMarkActivityDone('${id}', true).then(()=>{closeModal(); wpLoadAll().then(wpRender);})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Marcar como hecha</button>` : `<button onclick="wpMarkActivityDone('${id}', false).then(()=>{closeModal(); wpLoadAll().then(wpRender);})" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">↺ Desmarcar</button>`}
+          ${!isDone ? `<button onclick="wpMarkActivityDone('${id}', true).then(()=>wpBackToPlanner({reload:true}))" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Marcar como hecha</button>` : `<button onclick="wpMarkActivityDone('${id}', false).then(()=>wpBackToPlanner({reload:true}))" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">↺ Desmarcar</button>`}
           <input type="date" id="wpe-quick-date" value="${a.date}" class="border border-slate-300 rounded px-2 py-1 text-xs" />
-          <button onclick="wpReprogramTask('${id}', document.getElementById('wpe-quick-date').value).then(()=>closeModal())" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">📅 Mover</button>
+          <button onclick="wpReprogramTask('${id}', document.getElementById('wpe-quick-date').value).then(()=>wpBackToPlanner())" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">📅 Mover</button>
         </div>
       </div>
 
@@ -743,7 +791,7 @@ function wpEditActivity(id) {
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpeDelete('${id}')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 rounded">🗑️ Eliminar</button>
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="wpeSave('${id}')" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
       </div>
       </div><!-- /wpe-tab-edit -->
@@ -760,8 +808,7 @@ async function wpeAddRes(rid) {
   const newIds = [...(a.resource_ids||[]), rid];
   await sb.from('weekly_activities').update({ resource_ids: newIds, updated_at: new Date().toISOString() }).eq('id', id);
   await wpLoadAll();
-  closeModal();
-  setTimeout(() => wpEditActivity(id), 50);
+  wpEditActivity(id);
 }
 async function wpeRemoveRes(rid) {
   const id = window._wpEditingId;
@@ -770,8 +817,7 @@ async function wpeRemoveRes(rid) {
   const newIds = (a.resource_ids||[]).filter(x => x !== rid);
   await sb.from('weekly_activities').update({ resource_ids: newIds, updated_at: new Date().toISOString() }).eq('id', id);
   await wpLoadAll();
-  closeModal();
-  setTimeout(() => wpEditActivity(id), 50);
+  wpEditActivity(id);
 }
 async function wpeSave(id) {
   const payload = {
@@ -788,15 +834,13 @@ async function wpeSave(id) {
   const { error } = await sb.from('weekly_activities').update(payload).eq('id', id);
   if (error) return alert(error.message);
   await wpLoadAll();
-  closeModal();
-  wpRender();
+  wpBackToPlanner();
 }
 async function wpeDelete(id) {
   if (!confirm('¿Eliminar esta actividad permanentemente?')) return;
   await sb.from('weekly_activities').delete().eq('id', id);
   await wpLoadAll();
-  closeModal();
-  wpRender();
+  wpBackToPlanner();
 }
 // Quick toggle done desde el grid (sin abrir modal)
 async function wpQuickToggleDone(id, ev) {
@@ -875,9 +919,8 @@ async function wpReprogramListToDate(ids, newDate) {
     date: newDate, status: 'planned', updated_at: new Date().toISOString()
   }).in('id', ids);
   if (error) return alert('Error reprogramando: ' + error.message);
-  closeModal();
   await wpLoadAll();
-  wpRender();
+  wpBackToPlanner();
 }
 
 function wpNavWeek(delta) {
@@ -953,8 +996,8 @@ function wpOpenDayView(dateStr, homeFilter) {
             <div class="text-xs text-slate-400 mt-1">${Object.keys(byHome).length} casa(s) · ${dayActs.length} actividad(es) · ${busyRes.length} recurso(s) ocupado(s)</div>
           </div>
           <div class="flex gap-2 items-center">
-            <select onchange="closeModal(); setTimeout(()=>wpOpenDayView('${dateStr}', this.value), 80)" class="bg-white text-slate-900 text-xs rounded px-2 py-1.5 font-bold">${houseOpts}</select>
-            <button onclick="closeModal(); setTimeout(()=>wpOpenPrintView('${dateStr}','${homeFilter}'), 80)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🖨️ Imprimir</button>
+            <select onchange="wpOpenDayView('${dateStr}', this.value)" class="bg-white text-slate-900 text-xs rounded px-2 py-1.5 font-bold">${houseOpts}</select>
+            <button onclick="wpOpenPrintView('${dateStr}','${homeFilter}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🖨️ Imprimir</button>
           </div>
         </div>
         ${pendientes.length > 0 ? `
@@ -982,7 +1025,7 @@ function wpOpenDayView(dateStr, homeFilter) {
                 const acts = (a.resource_ids || []).map(rid => wpState.resources.find(r => r.id === rid)).filter(Boolean);
                 const statusBg = a.status === 'done' ? 'bg-emerald-50' : a.status === 'in_progress' ? 'bg-blue-50' : a.status === 'cancelled' ? 'bg-slate-50' : 'bg-amber-50';
                 return `
-                  <div class="${statusBg} border border-slate-200 rounded p-2 text-xs cursor-pointer hover:border-slate-400" onclick="closeModal(); setTimeout(()=>wpEditActivity('${a.id}'), 100)">
+                  <div class="${statusBg} border border-slate-200 rounded p-2 text-xs cursor-pointer hover:border-slate-400" onclick="wpEditActivity('${a.id}')">
                     <div class="font-bold">${a.activity_name}</div>
                     <div class="text-[10px] text-slate-500">${a.stage || '—'} · ${a.start_hour||7}:00-${a.end_hour||17}:00 · ${a.status}</div>
                     ${acts.length ? `<div class="flex flex-wrap gap-1 mt-1">${acts.map(r => `<span class="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded" title="${r.name}">${r.emoji} ${r.name}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic">Sin recursos asignados</div>'}
@@ -1011,7 +1054,7 @@ function wpOpenDayView(dateStr, homeFilter) {
         </div>
       </div>
 
-      <button onclick="closeModal(); setTimeout(()=>openWeeklyPlanner(wpState.sys), 100)" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg">← Volver al calendario semanal</button>
+      <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg">← Volver al calendario semanal</button>
     </div>
   `;
   openModal(`📅 Día completo: ${wpFmtDate(d)}`, html);
@@ -1126,7 +1169,7 @@ async function wpOpenCrewByHour(dateStr) {
 
       <div class="flex gap-2">
         <button onclick="wpOpenCrewByHour('${wpDateOnly(wpAddDays(new Date(dateStr + 'T00:00:00'), -1))}')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← ${wpFmtDate(wpAddDays(new Date(dateStr + 'T00:00:00'), -1))}</button>
-        <button onclick="closeModal(); setTimeout(()=>openWeeklyPlanner(wpState.sys), 100)" class="flex-1 bg-slate-900 text-white text-sm font-bold py-2 rounded">← Volver al calendario</button>
+        <button onclick="wpBackToPlanner({reload:true})" class="flex-1 bg-slate-900 text-white text-sm font-bold py-2 rounded">← Volver al calendario</button>
         <button onclick="wpOpenCrewByHour('${wpDateOnly(wpAddDays(new Date(dateStr + 'T00:00:00'), 1))}')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">${wpFmtDate(wpAddDays(new Date(dateStr + 'T00:00:00'), 1))} →</button>
       </div>
     </div>
@@ -1197,14 +1240,14 @@ function wpOpenCellView(homeId, homeName, dateStr) {
                   ${aRes.length ? `<div class="flex flex-wrap gap-1 mt-2">${aRes.map(r => `<span class="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs">${r.emoji} ${r.name}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic mt-1">Sin recursos asignados — arrastra desde el sidebar</div>'}
                   ${a.notes ? `<div class="text-[10px] text-slate-600 mt-2 italic">📝 ${a.notes}</div>` : ''}
                 </div>
-                <button onclick="closeModal(); setTimeout(()=>wpEditActivity('${a.id}'), 100)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">✏️ Editar</button>
+                <button onclick="wpEditActivity('${a.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">✏️ Editar</button>
               </div>
             </div>
           `;
         }).join('')}
       </div>
 
-      <button onclick="closeModal(); setTimeout(()=>openWeeklyPlanner(wpState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
+      <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
     </div>
   `;
   openModal(`🏠 ${homeName} — ${wpFmtDate(d)}`, html);
@@ -1336,7 +1379,7 @@ async function wpOpenHouseView(homeId, homeName) {
                           <div class="${isDone?'line-through':''} font-semibold">${a.activity_name}${isLate?' <span class="text-red-600 font-bold">⏰</span>':''}</div>
                           ${aRes.length ? `<div class="flex gap-1 flex-wrap mt-0.5">${aRes.map(r => `<span class="text-[10px] bg-slate-100 px-1 rounded">${r.emoji}</span>`).join('')}</div>` : ''}
                         </div>
-                        <button onclick="closeModal(); setTimeout(()=>wpEditActivity('${a.id}'), 100)" class="text-[10px] text-slate-500 hover:text-slate-900">✏️</button>
+                        <button onclick="wpEditActivity('${a.id}')" class="text-[10px] text-slate-500 hover:text-slate-900">✏️</button>
                       </div>
                     `;
                   }).join('')}
@@ -1347,7 +1390,7 @@ async function wpOpenHouseView(homeId, homeName) {
         </div>
       </div>
 
-      <button onclick="closeModal(); setTimeout(()=>openWeeklyPlanner(wpState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
+      <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
     </div>
   `;
   openModal(`🏠 ${homeName} — Vista completa`, html);
@@ -1477,8 +1520,7 @@ async function wpCompleteHouse(homeId, homeName) {
   const created = await wpGenerateActuals(project, allActs);
 
   await wpLoadAll();
-  closeModal();
-  wpRender();
+  wpBackToPlanner();
   alert(`✅ "${homeName}" terminada.\n\n• ${pending} actividades cerradas\n• ${created} etapas enviadas al Estimador Pro\n\nLos tiempos reales ya están calibrando las próximas estimaciones (ver "📁 Terminadas" para ver el análisis).`);
 }
 
@@ -1586,7 +1628,7 @@ async function wpOpenCompletedHouses() {
         `;
       }).join('')}
 
-      <button onclick="closeModal(); setTimeout(()=>openWeeklyPlanner(wpState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
+      <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
     </div>
   `;
   openModal(`📁 Casas terminadas (${completed.length})`, html);
@@ -1599,8 +1641,7 @@ async function wpRestoreHouse(projectId, name) {
   await sb.from('remodel_projects').update({ status: 'active', completed_at: null }).eq('id', projectId);
   await sb.from('remodel_actuals').delete().eq('project_id', projectId);
   await wpLoadAll();
-  closeModal();
-  wpRender();
+  wpBackToPlanner();
 }
 
 async function wpDeleteCompletedHouse(projectId, name) {
@@ -1609,8 +1650,7 @@ async function wpDeleteCompletedHouse(projectId, name) {
   await sb.from('weekly_activities').delete().eq('project_id', projectId);
   await sb.from('remodel_projects').delete().eq('id', projectId);
   await wpLoadAll();
-  closeModal();
-  setTimeout(() => wpOpenCompletedHouses(), 100);
+  wpOpenCompletedHouses();
 }
 
 async function wpHouseAnalysis(projectId, name) {
@@ -1689,7 +1729,7 @@ async function wpHouseAnalysis(projectId, name) {
         ℹ️ Estos datos están en la tabla <code>remodel_actuals</code> y se promedian con los de otras casas en la vista <code>remodel_dynamic_benchmarks</code> que usa el Estimador Pro para sus cálculos.
       </div>
 
-      <button onclick="closeModal(); setTimeout(()=>wpOpenCompletedHouses(), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver a Terminadas</button>
+      <button onclick="wpOpenCompletedHouses()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver a Terminadas</button>
     </div>
   `;
   openModal(`📊 ${name}`, html);
@@ -1770,7 +1810,7 @@ function wpOpenImportExcel() {
 
       <div class="flex gap-2">
         <button onclick="wpDoImportExcel()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2.5 rounded-lg">📥 Importar</button>
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `;
@@ -2005,7 +2045,7 @@ function wpImportPreviewSetDuration(id, d) {
 }
 function wpCancelImport() {
   wpState.importPreview = null;
-  closeModal();
+  wpBackToPlanner();
 }
 
 // PASO 3: ya aprobado, hace el INSERT real
@@ -2067,9 +2107,8 @@ async function wpApproveImport() {
   }
 
   wpState.importPreview = null;
-  closeModal();
   await wpLoadAll();
-  wpRender();
+  wpBackToPlanner();
   alert(`✅ Importadas ${rows.length} actividad(es) (${aprobadas.length} bloque(s) aprobado(s)).`);
 }
 
@@ -2265,7 +2304,7 @@ function wpSaveCurrentDayAsTemplate() {
       </div>
       <div class="flex gap-2">
         <button onclick="wpConfirmSaveDayTemplate('${targetDate}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar plantilla</button>
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `);
@@ -2289,8 +2328,8 @@ async function wpConfirmSaveDayTemplate(targetDate) {
     (window.toast?toast:alert)('Error: '+error.message, 'error');
     return;
   }
-  closeModal();
-  await wpLoadAll(); wpRender();
+  await wpLoadAll();
+  wpBackToPlanner();
   if (window.toast) toast(`✓ Plantilla "${name}" guardada con ${tasks.length} actividad(es)`, 'success');
 }
 
@@ -2318,7 +2357,7 @@ function wpApplyDayTemplate(templateId) {
       </div>
       <div class="flex gap-2">
         <button onclick="wpConfirmApplyDayTemplate('${templateId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">📋 Aplicar plantilla</button>
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `);
@@ -2351,8 +2390,8 @@ async function wpConfirmApplyDayTemplate(templateId) {
   if (!rows.length) { (window.toast?toast:alert)('Plantilla vacía.', 'warning'); return; }
   const { error } = await sb.from('weekly_activities').insert(rows);
   if (error) { (window.toast?toast:alert)('Error: '+error.message, 'error'); return; }
-  closeModal();
-  await wpLoadAll(); wpRender();
+  await wpLoadAll();
+  wpBackToPlanner();
   if (window.toast) toast(`✓ ${rows.length} actividad(es) creadas en ${sel.name||sel.address} para ${dateStr}`, 'success');
 }
 
@@ -2410,7 +2449,7 @@ function wpOpenNewRecurring() {
       </div>
       <div class="flex gap-2">
         <button onclick="wpSaveRecurring()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 rounded">💾 Crear recurrente</button>
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cancelar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cancelar</button>
       </div>
     </div>
   `;
@@ -2437,8 +2476,8 @@ async function wpSaveRecurring() {
     next_due: next
   });
   if (error) return alert('Error: '+error.message);
-  closeModal();
-  await wpLoadAll(); wpRender();
+  await wpLoadAll();
+  wpBackToPlanner();
 }
 
 async function wpDeleteRecurring(id) {
@@ -2568,7 +2607,7 @@ function wpRenderChecklistBody(a) {
       </div>
 
       <div class="flex gap-2">
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cerrar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cerrar</button>
       </div>
     </div>
   `;
@@ -2702,7 +2741,7 @@ function wpOpenPrintPicker() {
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar</button>
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `);
@@ -2719,14 +2758,14 @@ function wpDoPrint() {
   if (scope === 'day') {
     const d = document.getElementById('wp-print-date').value;
     if (!d) return;
-    closeModal();
-    setTimeout(() => wpOpenPrintView(d, house), 100);
+    wpBackToPlanner();
+    wpOpenPrintView(d, house);
   } else {
     const from = document.getElementById('wp-print-from').value;
     const to = document.getElementById('wp-print-to').value;
     if (!from || !to) return;
-    closeModal();
-    setTimeout(() => wpOpenPrintRange(from, to, house), 100);
+    wpBackToPlanner();
+    wpOpenPrintRange(from, to, house);
   }
 }
 
