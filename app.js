@@ -61,8 +61,75 @@ document.getElementById('auth-login-btn').addEventListener('click', async () => 
   const password = document.getElementById('auth-password').value;
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) return showAuthError(error.message);
+
+  // MFA challenge si el user tiene factor verificado.
+  // sb.auth.mfa.getAuthenticatorAssuranceLevel(): {currentLevel: 'aal1'|'aal2', nextLevel}
+  // Si currentLevel != nextLevel, el user necesita verificar TOTP antes de entrar.
+  try {
+    const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
+      return await promptMfaChallenge(data.user);
+    }
+  } catch {}
+
   await onLogin(data.user);
 });
+
+// Reemplaza el formulario de auth por el de challenge MFA.
+async function promptMfaChallenge(user) {
+  const screen = document.getElementById('auth-screen');
+  if (!screen) return;
+  const { data: list } = await sb.auth.mfa.listFactors();
+  const factor = (list?.totp || []).find(f => f.status === 'verified');
+  if (!factor) {
+    // No hay factor verificado pero AAL pide aal2 — extraño, dejar entrar
+    return await onLogin(user);
+  }
+  screen.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-2">🛡️</div>
+        <h1 class="text-2xl font-bold">Verificación en dos pasos</h1>
+        <p class="text-sm text-slate-500 mt-1">Abrí tu app de autenticación e ingresá el código de 6 dígitos.</p>
+      </div>
+      <div class="space-y-3">
+        <input id="mfa-login-code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" class="w-full border border-slate-300 rounded-lg px-3 py-3 text-2xl text-center tracking-widest font-mono" />
+        <div id="mfa-login-err" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2"></div>
+        <button id="mfa-login-verify" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg">Verificar y entrar</button>
+        <button id="mfa-login-cancel" class="w-full text-xs text-slate-500 hover:text-slate-900">Cancelar</button>
+      </div>
+    </div>
+  `;
+  const codeInput = document.getElementById('mfa-login-code');
+  const errEl = document.getElementById('mfa-login-err');
+  codeInput.focus();
+  const verify = async () => {
+    const code = codeInput.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      errEl.textContent = 'Ingresá los 6 dígitos.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    try {
+      const { data: ch, error: cErr } = await sb.auth.mfa.challenge({ factorId: factor.id });
+      if (cErr) throw cErr;
+      const { error } = await sb.auth.mfa.verify({ factorId: factor.id, challengeId: ch.id, code });
+      if (error) throw error;
+      await onLogin(user);
+    } catch (e) {
+      errEl.textContent = 'Código incorrecto. Probá de nuevo.';
+      errEl.classList.remove('hidden');
+      codeInput.value = '';
+      codeInput.focus();
+    }
+  };
+  document.getElementById('mfa-login-verify').addEventListener('click', verify);
+  codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') verify(); });
+  document.getElementById('mfa-login-cancel').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    location.reload();
+  });
+}
 
 // Validación de complejidad de password. Debe pasar al menos 3 de 4 reglas
 // + longitud mínima 8 (consistente con admin-set-password edge function).
@@ -553,10 +620,123 @@ async function openMyProfile() {
         </div>
       </div>
 
+      <!-- MFA (autenticación de dos factores) -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-3">🛡️ Verificación en dos pasos (MFA)</div>
+        <div id="mp-mfa-body"><div class="text-xs text-slate-400 py-2">Cargando estado MFA...</div></div>
+      </div>
+
       <div class="text-[10px] text-slate-400 text-center">Cuenta creada: ${new Date(p.created_at).toLocaleString('es-MX')}</div>
     </div>
   `;
   openModal('⚙️ Mi perfil', html);
+  // Cargar estado MFA async
+  setTimeout(loadMfaStatus, 100);
+}
+
+// ─── MFA TOTP ────────────────────────────────────────────────
+// Usa la API auth.mfa de Supabase (TOTP estándar, compat Authy/Google
+// Auth/Authenticator/1Password). El admin tiene que habilitar MFA en
+// Supabase dashboard → Authentication → MFA primero.
+async function loadMfaStatus() {
+  const body = document.getElementById('mp-mfa-body');
+  if (!body) return;
+  try {
+    const { data, error } = await sb.auth.mfa.listFactors();
+    if (error) throw error;
+    const verifiedFactors = (data?.totp || []).filter(f => f.status === 'verified');
+    if (verifiedFactors.length > 0) {
+      const factor = verifiedFactors[0];
+      body.innerHTML = `
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
+          <div class="font-bold text-emerald-800 mb-1">✓ MFA activado</div>
+          <div class="text-emerald-700">Factor: ${(window.esc||((s)=>s))(factor.friendly_name || 'TOTP')}</div>
+          <div class="text-[10px] text-emerald-600 mt-1">Creado: ${new Date(factor.created_at).toLocaleDateString('es')}</div>
+          <button onclick="disableMfa('${factor.id}')" class="mt-2 w-full bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 rounded">🗑️ Desactivar MFA</button>
+        </div>
+      `;
+    } else {
+      body.innerHTML = `
+        <div class="text-xs text-slate-700 mb-2">
+          Agregá una capa extra de seguridad escaneando un código QR con tu app
+          de autenticación (Authy, Google Authenticator, 1Password, etc.).
+        </div>
+        <button onclick="startMfaEnroll()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">🛡️ Activar MFA</button>
+        <p class="text-[10px] text-slate-400 mt-2">Necesitarás el código de 6 dígitos cada vez que entres.</p>
+      `;
+    }
+  } catch (e) {
+    body.innerHTML = `<div class="text-xs text-amber-700">MFA no disponible en este proyecto Supabase. Pedí al admin que lo habilite en Dashboard → Auth → MFA.</div>`;
+  }
+}
+
+async function startMfaEnroll() {
+  const body = document.getElementById('mp-mfa-body');
+  if (!body) return;
+  body.innerHTML = '<div class="text-xs text-slate-500 py-2">⏳ Generando código QR...</div>';
+  try {
+    // Limpia factores en estado 'unverified' previos (signup interrumpido)
+    const { data: list } = await sb.auth.mfa.listFactors();
+    for (const f of (list?.totp || [])) {
+      if (f.status !== 'verified') await sb.auth.mfa.unenroll({ factorId: f.id });
+    }
+    const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Empresa OS · ' + new Date().toLocaleDateString('es') });
+    if (error) throw error;
+    body.innerHTML = `
+      <div class="space-y-3">
+        <div class="text-xs text-slate-700">
+          1. Abrí tu app de autenticación (Authy, Google Authenticator, etc.)
+        </div>
+        <div class="text-xs text-slate-700">
+          2. Escaneá este QR (o pegá el código manualmente):
+        </div>
+        <div class="bg-white border border-slate-300 rounded p-3 text-center">
+          <img src="${data.totp.qr_code}" alt="QR MFA" class="mx-auto" style="max-width:240px"/>
+        </div>
+        <div class="text-[10px] text-slate-500">
+          Código manual: <code class="bg-slate-100 px-1 rounded">${(window.esc||((s)=>s))(data.totp.secret)}</code>
+        </div>
+        <div class="text-xs text-slate-700">
+          3. Ingresá el código de 6 dígitos que muestra la app:
+        </div>
+        <input id="mp-mfa-code" type="text" placeholder="123456" inputmode="numeric" maxlength="6" class="w-full border border-slate-300 rounded px-3 py-2 text-center text-lg tracking-widest font-mono"/>
+        <div class="flex gap-2">
+          <button onclick="verifyMfaCode('${data.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Verificar y activar</button>
+          <button onclick="cancelMfaEnroll('${data.id}')" class="px-3 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        </div>
+      </div>
+    `;
+    setTimeout(() => document.getElementById('mp-mfa-code')?.focus(), 100);
+  } catch (e) {
+    body.innerHTML = `<div class="text-xs text-red-700">Error: ${(window.esc||((s)=>s))(e.message || e)}</div>`;
+  }
+}
+
+async function verifyMfaCode(factorId) {
+  const code = (document.getElementById('mp-mfa-code')?.value || '').trim();
+  if (!/^\d{6}$/.test(code)) return alert('Ingresá los 6 dígitos del código.');
+  try {
+    const { data: ch, error: cErr } = await sb.auth.mfa.challenge({ factorId });
+    if (cErr) throw cErr;
+    const { error } = await sb.auth.mfa.verify({ factorId, challengeId: ch.id, code });
+    if (error) throw error;
+    alert('✓ MFA activado. La próxima vez que entres te pediremos el código.');
+    loadMfaStatus();
+  } catch (e) {
+    alert('Código incorrecto. Probá de nuevo.\n\n' + (e.message || ''));
+  }
+}
+
+async function cancelMfaEnroll(factorId) {
+  await sb.auth.mfa.unenroll({ factorId }).catch(() => {});
+  loadMfaStatus();
+}
+
+async function disableMfa(factorId) {
+  if (!confirm('¿Desactivar MFA?\n\nVas a entrar solo con email + password (menos seguro).')) return;
+  const { error } = await sb.auth.mfa.unenroll({ factorId });
+  if (error) return alert('Error: ' + error.message);
+  loadMfaStatus();
 }
 
 async function saveMyProfile() {
