@@ -316,7 +316,7 @@
   // o pasale directamente el qb (intenta reutilizarlo).
   window.safeInsert = async function(qbOrFn, payload, opts) {
     opts = opts || {};
-    let p = { ...payload };
+    let p = Array.isArray(payload) ? payload.map(r => ({ ...r })) : { ...payload };
     const getQb = typeof qbOrFn === 'function' ? qbOrFn : () => qbOrFn;
     for (let tries = 0; tries < 8; tries++) {
       let q = getQb().insert(p);
