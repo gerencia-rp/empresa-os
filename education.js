@@ -3230,8 +3230,11 @@ function fmAnalizarPerfilCompleto(a) {
   }
   else if (a.deals_cerrados === '1') {
     perfil = { num: 4, nombre: 'Primer deal cerrado, post-mortem pendiente', emoji: '📊', color: 'purple' };
-    etapa = 'E5.1';
-    cronograma = '1-2 meses post-mortem + SOPs antes del siguiente';
+    // FIX: FM_ETAPAS solo tiene E0-E5. 'E5.1' nunca matcheaba en el render
+    // y los bloques quedaban invisibles. Asignar a E5 con la subetapa
+    // específica codificada en el cronograma.
+    etapa = 'E5';
+    cronograma = '1-2 meses post-mortem (Subetapa E5.1) + SOPs antes del siguiente';
   }
   // Perfil 7: Internacional
   else if (a.inmigracion === 'internacional' || (a.inmigracion === 'itin' && a.deals_cerrados === '0')) {
@@ -4639,7 +4642,7 @@ function fmGenerarAnalisisProfundo(p, r, a, userProfile) {
 
   // Párrafo 3: crédito
   if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
-    parrafos.push(`Tu credit score (<strong>${({ 'menos_600': '< 600', '600_660': '600-660', 'sin_historial': 'sin historial USA' })[a.credit]}</strong>) es el segundo riesgo crítico. Los HMLs estándar (Kiavi, Lima One, RCN) requieren FICO 660+. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'En tu caso necesitás reconstruir crédito 6-12 meses ANTES de aplicar, o ir por opciones alternativas: HMLs flexibles con FICO 600+ (Easy Street Capital), partnership con socio que tenga crédito, o empezar como buyer secundario de wholesalers (no como operador propio).' : 'Tu score está en zona limítrofe — algunos HMLs te aceptan pero con tasas 2-3 puntos arriba. Vale la pena trabajar para subirlo a 720+ en paralelo.'} Este es un track paralelo: no bloquea avanzar con E0 ni con análisis de mercado.`);
+    parrafos.push(`Tu credit score (<strong>${({ 'menos_600': '< 600', '600_660': '600-660', 'sin_historial': 'sin historial USA' })[a.credit]}</strong>) es el segundo riesgo crítico. Los HMLs nacionales 2026 (Kiavi, Lima One, RCN, Constructive Capital, Easy Street) aceptan 620+ con LTV reducido — el "660+ era duro" es la regla vieja. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'Aún así con < 600 necesitás reconstruir 6-12 meses ANTES de aplicar, o ir por: HMLs ITIN-friendly, partnership con socio con crédito, o empezar como buyer secundario.' : 'Tu score está en zona limítrofe — varios HMLs te aceptan pero con LTV 70-75% (vs 80% en 700+). Subir a 720+ destraba 5% más de LTV y baja tasa.'} Este es un track paralelo: no bloquea avanzar con E0 ni con análisis de mercado.`);
   } else {
     parrafos.push(`Tu credit score (<strong>${({ 'mas_780': '> 780', '720_780': '720-780', '660_720': '660-720' })[a.credit]}</strong>) te da acceso a los HMLs estándar nacionales (Kiavi, Lima One, RCN, Easy Street). Esto significa que el cuello de botella NO va a ser financiamiento — va a ser encontrar el deal correcto al precio correcto.`);
   }
@@ -7352,6 +7355,9 @@ const FM_CREDIT_QUESTIONS = [
   { id:'limite_total', bloque:'C · Uso',
     pregunta:'¿Cuál es el LÍMITE total combinado de todas tus tarjetas? (USD)',
     tipo:'number', placeholder:'Ej. 25000' },
+  { id:'balance_total', bloque:'C · Uso',
+    pregunta:'¿Cuál es el BALANCE actual combinado (deuda en tarjetas)? (USD)',
+    tipo:'number', placeholder:'Ej. 7500' },
 
   // ── BLOQUE D · Derogatorios / negativos ───────────────
   { id:'pagos_tarde', bloque:'D · Negativos',
@@ -7373,6 +7379,9 @@ const FM_CREDIT_QUESTIONS = [
       { val:'foreclosure', label:'🏚️ Foreclosure / short sale' },
       { val:'ninguno',     label:'✅ Ninguno' }
     ] },
+  { id:'collection_amount', bloque:'D · Negativos',
+    pregunta:'Si tenés cuentas en colección, ¿monto total de TODAS las collections activas? (USD)',
+    tipo:'number', placeholder:'Ej. 3500 — 0 si no tenés' },
   { id:'consultas', bloque:'D · Negativos',
     pregunta:'¿Cuántas hard inquiries (consultas duras) tenés en los últimos 12 meses?',
     opciones:[
@@ -7520,9 +7529,22 @@ function fmCalcularPerfilCredito(a) {
   const gaps = [];
   const strengths = [];
 
-  if (['50_74','mas_75'].includes(a.utilization)) gaps.push({ area:'utilization', gravedad:'alta', label:'Utilization > 50%' });
-  else if (a.utilization === '30_49') gaps.push({ area:'utilization', gravedad:'media', label:'Utilization 30-49%' });
-  else if (a.utilization === 'menos_10') strengths.push('Utilization óptimo (<10%)');
+  // Si tiene balance + límite reales, calcular utilization preciso. Si no, usa el banding.
+  const limReal = +a.limite_total || 0;
+  const balReal = +a.balance_total || 0;
+  if (limReal > 0 && balReal >= 0) {
+    const utilPct = (balReal / limReal) * 100;
+    if (utilPct >= 75) gaps.push({ area:'utilization', gravedad:'alta', label:`Utilization ${Math.round(utilPct)}% (real)` });
+    else if (utilPct >= 50) gaps.push({ area:'utilization', gravedad:'alta', label:`Utilization ${Math.round(utilPct)}% (real)` });
+    else if (utilPct >= 30) gaps.push({ area:'utilization', gravedad:'media', label:`Utilization ${Math.round(utilPct)}% (real)` });
+    else if (utilPct < 10) strengths.push(`Utilization óptimo (${Math.round(utilPct)}% real)`);
+  } else if (['50_74','mas_75'].includes(a.utilization)) {
+    gaps.push({ area:'utilization', gravedad:'alta', label:'Utilization > 50%' });
+  } else if (a.utilization === '30_49') {
+    gaps.push({ area:'utilization', gravedad:'media', label:'Utilization 30-49%' });
+  } else if (a.utilization === 'menos_10') {
+    strengths.push('Utilization óptimo (<10%)');
+  }
 
   if (a.pagos_tarde === 'mas_3') gaps.push({ area:'pagos', gravedad:'alta', label:'4+ pagos tarde 24m' });
   else if (a.pagos_tarde === '2_3') gaps.push({ area:'pagos', gravedad:'alta', label:'2-3 pagos tarde 24m' });
@@ -7582,6 +7604,34 @@ function fmCalcularPerfilCredito(a) {
 
 function fmGenerarPlanCredito(tier, a, gaps) {
   const acciones = [];
+
+  // Acción específica si reporta collection_amount > 0:
+  // pay-for-delete es preferible a "saldar y dejar reportado".
+  if (+a.collection_amount > 0) {
+    acciones.push({
+      prioridad:'alta', area:'derogatorios',
+      accion:`Tenés ~$${(+a.collection_amount).toLocaleString()} en colecciones activas. Negociar pay-for-delete (por escrito ANTES de pagar) o consolidar en una sola.`,
+      meta:'Collections removidas del reporte ($0 pendiente)',
+      plazo_dias:90
+    });
+  }
+
+  // Acción específica si balance/limite alto Y limite_total < $10K:
+  // pedir aumentos de límite es más eficiente que pagar deuda en ese rango.
+  const lim = +a.limite_total || 0;
+  const bal = +a.balance_total || 0;
+  if (lim > 0 && bal > 0) {
+    const ratio = (bal / lim) * 100;
+    if (ratio > 30 && lim < 10000) {
+      acciones.push({
+        prioridad:'media', area:'utilization',
+        accion:`Tu límite total es bajo ($${lim.toLocaleString()}). Pedí aumento de credit limit en TODAS las tarjetas (sin hard pull si tenés 6+ meses con el issuer). Subir el denominador baja utilization sin pagar.`,
+        meta:`Utilization (${Math.round(ratio)}% actual) bajar a < 30%`,
+        plazo_dias:14
+      });
+    }
+  }
+
   // Acciones por gap (no inventamos, mapeamos)
   gaps.forEach(g => {
     if (g.area === 'utilization') {
@@ -7724,7 +7774,7 @@ function fmGenerarPlanCredito(tier, a, gaps) {
   if (a.meta_uso === 'hml') {
     acciones.push({
       prioridad:'media', area:'meta',
-      accion:'HMLs típicos requieren FICO 660+. Si estás bajo, buscar HMLs flexibles (RCN, Kiavi, Constructive). Si 700+, pedir mejores tasas.',
+      accion:'HMLs típicos requieren FICO 660+ pero los flexibles 2026 (Kiavi, RCN, Constructive Capital, Easy Street) aceptan 620+ en primer flip con LTV reducido. Si 700+, negociar puntos.',
       meta:'Calificar HML con tasa <12%',
       plazo_dias:90
     });
