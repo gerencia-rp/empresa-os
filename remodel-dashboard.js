@@ -1175,6 +1175,82 @@ function rdPrintInforme() {
   setTimeout(() => { w.print(); }, 500);
 }
 
+// ─── FORECAST: calculadora rápida de proyección dentro del drill-down ───
+function rdForecastUpdate(airtableId) {
+  const p = rdState.properties.find(x => x.airtable_id === airtableId);
+  if (!p) return;
+  const matExtra = +document.getElementById('fc-mat-'+airtableId)?.value || 0;
+  const labExtra = +document.getElementById('fc-lab-'+airtableId)?.value || 0;
+  const daysExtra = +document.getElementById('fc-days-'+airtableId)?.value || 0;
+
+  const costActual = (+p.gasto_materiales||0) + (+p.gasto_trabajadores||0);
+  const presup = +p.presupuesto_interno || 0;
+  const venta = +p.valor_cliente || 0;
+  const costFinal = costActual + matExtra + labExtra;
+  const ganancia = venta - costFinal;
+  const margen = venta > 0 ? Math.round((ganancia/venta) * 1000) / 10 : 0;
+  const sobrePresup = presup > 0 ? Math.round((costFinal - presup) / presup * 100 * 10) / 10 : null;
+
+  const costEl = document.getElementById('fc-cost-'+airtableId);
+  const costDeltaEl = document.getElementById('fc-cost-delta-'+airtableId);
+  const gainEl = document.getElementById('fc-gain-'+airtableId);
+  const marginEl = document.getElementById('fc-margin-'+airtableId);
+  const marginBenchEl = document.getElementById('fc-margin-bench-'+airtableId);
+  const dateEl = document.getElementById('fc-date-'+airtableId);
+  const dateDeltaEl = document.getElementById('fc-date-delta-'+airtableId);
+
+  if (costEl) costEl.textContent = '$'+Math.round(costFinal).toLocaleString();
+  if (costDeltaEl) {
+    if (presup > 0) {
+      const txt = sobrePresup > 0
+        ? `+${sobrePresup}% sobre presup. ($${Math.round(costFinal-presup).toLocaleString()})`
+        : `${Math.abs(sobrePresup)}% bajo presup. ($${Math.round(presup-costFinal).toLocaleString()} libre)`;
+      costDeltaEl.textContent = txt;
+      costDeltaEl.className = `text-[9px] font-semibold ${sobrePresup > 10 ? 'text-red-700' : sobrePresup > 0 ? 'text-amber-700' : 'text-emerald-700'}`;
+    } else {
+      costDeltaEl.textContent = 'sin presupuesto cargado';
+    }
+  }
+  if (gainEl) {
+    gainEl.textContent = '$'+Math.round(ganancia).toLocaleString();
+    gainEl.className = `text-base font-bold ${ganancia >= 0 ? 'text-emerald-700' : 'text-red-700'}`;
+  }
+  if (marginEl) {
+    marginEl.textContent = (margen>0?'+':'')+margen+'%';
+    marginEl.className = `text-base font-bold ${margen >= BENCHMARKS_AUSTIN.margen_min ? 'text-emerald-700' : margen >= BENCHMARKS_AUSTIN.margen_critico ? 'text-amber-700' : 'text-red-700'}`;
+  }
+  if (marginBenchEl) {
+    marginBenchEl.textContent = margen >= BENCHMARKS_AUSTIN.margen_min ? '✅ sobre objetivo' :
+                                 margen >= BENCHMARKS_AUSTIN.margen_critico ? `⚠️ objetivo ≥${BENCHMARKS_AUSTIN.margen_min}%` :
+                                 `🔴 crítico (mín ${BENCHMARKS_AUSTIN.margen_critico}%)`;
+  }
+  if (dateEl && p.fecha_estimada_fin) {
+    if (daysExtra > 0) {
+      const newDate = new Date(p.fecha_estimada_fin + 'T00:00:00');
+      newDate.setDate(newDate.getDate() + daysExtra);
+      dateEl.textContent = newDate.toISOString().slice(0,10);
+      if (dateDeltaEl) {
+        dateDeltaEl.textContent = `+${daysExtra}d sobre ${p.fecha_estimada_fin}`;
+        dateDeltaEl.className = 'text-[9px] font-semibold text-amber-700';
+      }
+    } else {
+      dateEl.textContent = p.fecha_estimada_fin;
+      if (dateDeltaEl) {
+        dateDeltaEl.textContent = 'sin días extra';
+        dateDeltaEl.className = 'text-[9px] text-slate-500';
+      }
+    }
+  }
+}
+
+function rdForecastReset(airtableId) {
+  ['fc-mat-','fc-lab-','fc-days-'].forEach(prefix => {
+    const el = document.getElementById(prefix+airtableId);
+    if (el) el.value = 0;
+  });
+  rdForecastUpdate(airtableId);
+}
+
 // ─── DRILL-DOWN POR OBRA ───
 async function rdOpenObra(airtable_id) {
   const p = rdState.properties.find(x => x.airtable_id === airtable_id);
@@ -1222,6 +1298,57 @@ async function rdOpenObra(airtable_id) {
           </div>
         </div>
       </div>
+
+      <!-- Forecast / Calculadora rápida (colapsada por defecto) -->
+      <details class="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden" id="rd-forecast-${p.airtable_id}">
+        <summary class="cursor-pointer px-3 py-2 flex items-center justify-between hover:bg-violet-100">
+          <div class="text-xs font-bold uppercase text-violet-900">🔮 Calculadora rápida · proyectar números finales</div>
+          <div class="text-[10px] text-violet-700">click para abrir ▾</div>
+        </summary>
+        <div class="p-3 pt-2 border-t border-violet-200">
+          <div class="text-[10px] text-violet-800 mb-2">Sumá gastos que vas a hacer hasta cerrar la obra y mirá cómo quedan los números finales. No se guarda en DB — sólo para que te hagas una idea.</div>
+
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+            <div>
+              <label class="block text-[9px] uppercase font-bold text-violet-900 mb-0.5">$ Materiales extra</label>
+              <input id="fc-mat-${p.airtable_id}" type="number" min="0" step="100" value="0" oninput="rdForecastUpdate('${p.airtable_id}')" class="w-full border border-violet-300 rounded px-2 py-1 text-sm font-mono" placeholder="0"/>
+            </div>
+            <div>
+              <label class="block text-[9px] uppercase font-bold text-violet-900 mb-0.5">$ Mano de obra extra</label>
+              <input id="fc-lab-${p.airtable_id}" type="number" min="0" step="100" value="0" oninput="rdForecastUpdate('${p.airtable_id}')" class="w-full border border-violet-300 rounded px-2 py-1 text-sm font-mono" placeholder="0"/>
+            </div>
+            <div>
+              <label class="block text-[9px] uppercase font-bold text-violet-900 mb-0.5">Días extra <span class="font-normal opacity-70">(opcional)</span></label>
+              <input id="fc-days-${p.airtable_id}" type="number" min="0" step="1" value="0" oninput="rdForecastUpdate('${p.airtable_id}')" class="w-full border border-violet-300 rounded px-2 py-1 text-sm font-mono" placeholder="0"/>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-white border border-violet-200 rounded-lg p-2">
+            <div>
+              <div class="text-[9px] uppercase text-slate-500 font-bold">Costo final proy.</div>
+              <div id="fc-cost-${p.airtable_id}" class="text-base font-bold text-slate-900">$${Math.round(cost).toLocaleString()}</div>
+              <div id="fc-cost-delta-${p.airtable_id}" class="text-[9px] text-slate-500">vs presup. $${Math.round(presup).toLocaleString()}</div>
+            </div>
+            <div>
+              <div class="text-[9px] uppercase text-slate-500 font-bold">Ganancia final</div>
+              <div id="fc-gain-${p.airtable_id}" class="text-base font-bold ${(p.valor_cliente||0)-cost>=0?'text-emerald-700':'text-red-700'}">$${Math.round((p.valor_cliente||0)-cost).toLocaleString()}</div>
+              <div id="fc-gain-delta-${p.airtable_id}" class="text-[9px] text-slate-500">venta $${Math.round(p.valor_cliente||0).toLocaleString()}</div>
+            </div>
+            <div>
+              <div class="text-[9px] uppercase text-slate-500 font-bold">Margen final</div>
+              <div id="fc-margin-${p.airtable_id}" class="text-base font-bold">${(p.valor_cliente||0)>0 ? Math.round(((p.valor_cliente-cost)/p.valor_cliente)*1000)/10 : 0}%</div>
+              <div id="fc-margin-bench-${p.airtable_id}" class="text-[9px] text-slate-500">objetivo ≥${BENCHMARKS_AUSTIN.margen_min}%</div>
+            </div>
+            <div>
+              <div class="text-[9px] uppercase text-slate-500 font-bold">Entrega proy.</div>
+              <div id="fc-date-${p.airtable_id}" class="text-base font-bold text-slate-900">${p.fecha_estimada_fin || '—'}</div>
+              <div id="fc-date-delta-${p.airtable_id}" class="text-[9px] text-slate-500">sin días extra</div>
+            </div>
+          </div>
+
+          <button onclick="rdForecastReset('${p.airtable_id}')" class="mt-2 text-[10px] text-violet-700 hover:text-violet-900 font-semibold">↺ Reset</button>
+        </div>
+      </details>
 
       <!-- Costos breakdown -->
       <div class="grid md:grid-cols-2 gap-3">
