@@ -64,10 +64,29 @@ document.getElementById('auth-login-btn').addEventListener('click', async () => 
   await onLogin(data.user);
 });
 
+// Validación de complejidad de password. Debe pasar al menos 3 de 4 reglas
+// + longitud mínima 8 (consistente con admin-set-password edge function).
+function passwordStrength(pwd) {
+  const len = (pwd || '').length;
+  if (len < 8) return { ok: false, reason: 'Mínimo 8 caracteres' };
+  const hasLower = /[a-z]/.test(pwd);
+  const hasUpper = /[A-Z]/.test(pwd);
+  const hasDigit = /\d/.test(pwd);
+  const hasSpecial = /[^a-zA-Z0-9]/.test(pwd);
+  const passed = [hasLower, hasUpper, hasDigit, hasSpecial].filter(Boolean).length;
+  if (passed < 3) return { ok: false, reason: 'Usá al menos 3 de: minúscula, mayúscula, número, símbolo' };
+  // Bloquear passwords obvias
+  const blacklist = ['password','12345678','qwerty12','admin123','letmein','welcome1'];
+  if (blacklist.some(b => pwd.toLowerCase().includes(b))) return { ok: false, reason: 'Password muy común, elegí otra' };
+  return { ok: true };
+}
+
 document.getElementById('auth-signup-btn').addEventListener('click', async () => {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
-  if (!email || password.length < 6) return showAuthError('Email válido y password de 6+ caracteres');
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showAuthError('Email inválido');
+  const strength = passwordStrength(password);
+  if (!strength.ok) return showAuthError('Password débil: ' + strength.reason);
   const { data, error } = await sb.auth.signUp({ email, password });
   if (error) return showAuthError(error.message);
   if (!data.session) return showAuthError('Revisa tu email para confirmar la cuenta (o desactiva confirmación en Supabase → Auth → Providers).');
@@ -551,7 +570,8 @@ async function saveMyProfile() {
 async function changeMyPassword() {
   const p1 = document.getElementById('mp-pwd1').value;
   const p2 = document.getElementById('mp-pwd2').value;
-  if (!p1 || p1.length < 8) return alert('La contraseña debe tener al menos 8 caracteres');
+  const strength = (typeof passwordStrength === 'function') ? passwordStrength(p1) : { ok: p1 && p1.length >= 8 };
+  if (!strength.ok) return alert('Password débil: ' + (strength.reason || 'mínimo 8 caracteres'));
   if (p1 !== p2) return alert('Las contraseñas no coinciden');
   const { error } = await sb.auth.updateUser({ password: p1 });
   if (error) return alert('Error: ' + error.message);

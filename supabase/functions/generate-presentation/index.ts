@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
+import { callAnthropic, extractText } from "../_shared/anthropic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -382,31 +383,33 @@ REGLA: para cada slide CONSIDERA siempre agregar "image_query" en inglés (2-5 p
       };
       if (research_mode) requestBody.thinking = { type: "enabled", budget_tokens: 12000 };
 
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify(requestBody)
+      // Llamada con retry + log via helper centralizado
+      const callResult = await callAnthropic({
+        model: requestBody.model,
+        max_tokens: requestBody.max_tokens,
+        tools: requestBody.tools,
+        thinking: requestBody.thinking,
+        messages: requestBody.messages,
+        user_id: body.user_id,
+        feature: "presentation",
+        timeoutMs: research_mode ? 480000 : 240000,  // research mode necesita más
+        maxRetries: 2
       });
-      const durationMs = Date.now() - startMs;
+      const durationMs = callResult.duration_ms || (Date.now() - startMs);
 
-      if (!r.ok) {
-        const txt = await r.text();
+      if (!callResult.ok) {
         await supabase.from("edu_pres_jobs").update({
-          status: 'error', error_message: `Anthropic ${r.status}: ${txt.slice(0, 800)}`,
+          status: 'error', error_message: callResult.error || 'Anthropic falló',
           finished_at: new Date().toISOString(), duration_ms: durationMs
         }).eq('id', job.id);
         return;
       }
 
-      const result: any = await r.json();
-      const tokensIn = result.usage?.input_tokens || 0;
-      const tokensOut = result.usage?.output_tokens || 0;
-      const webSearchUses = result.usage?.server_tool_use?.web_search_requests || 0;
-      const lastText = (result.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
+      const result = callResult.data;
+      const tokensIn = callResult.tokens_in || 0;
+      const tokensOut = callResult.tokens_out || 0;
+      const webSearchUses = result?.usage?.server_tool_use?.web_search_requests || 0;
+      const lastText = extractText(result);
 
       let parsed: any = null;
       try {

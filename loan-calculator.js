@@ -62,14 +62,36 @@ function loanCalc() {
   // Vs renta mensual estimada (regla DSCR: rent / PITI >= 1.2 es saludable)
   const dscrTarget = convPITI > 0 ? convPITI * 1.2 : 0;  // renta mínima recomendada
 
+  // 70% Rule + BRRRR check usando lib central deal-rules.js
+  // (Si DealRules no está cargado, mostramos calc fallback inline.)
+  let rule70 = null, brrrr = null, mao = null;
+  if (typeof window !== 'undefined' && window.DealRules) {
+    rule70 = window.DealRules.rule70(loanState.arv, loanState.remodelCost, loanState.purchasePrice);
+    brrrr = window.DealRules.brrrrCheck({
+      purchasePrice: loanState.purchasePrice,
+      rehab: loanState.remodelCost,
+      arv: loanState.arv,
+      brrrrLtvPct: loanState.convLtvPct,
+      refiClosingPct: loanState.convClosingPct,
+      holdingTotal: hmlTotalInt + hmlInterestReserve
+    });
+    mao = window.DealRules.mao({
+      arv: loanState.arv,
+      rehab: loanState.remodelCost,
+      holdingMonths: (+loanState.hmlTermMonths || 6),
+      arvDiscountPct: 70
+    });
+  }
+
   return {
-    hml: { loan: hmlLoan, cash: hmlCash, monthlyInt: hmlMonthlyInt, origination: hmlOrigination, totalInt: hmlTotalInt, totalCost: hmlTotalCost, base: hmlBase },
+    hml: { loan: hmlLoan, cash: hmlCash, monthlyInt: hmlMonthlyInt, origination: hmlOrigination, totalInt: hmlTotalInt, totalCost: hmlTotalCost, base: hmlBase, interestReserve: hmlInterestReserve },
     conv: {
       loan: convLoan, monthly: convMonthly, totalPaid: convTotalPaid, totalInt: convTotalInt,
       closingCost: convClosingCost, cashOut: convCashOut,
       monthlyTax, monthlyInsurance, piti: convPITI,
       propertyTaxAnnual, dscrTarget
-    }
+    },
+    dealRules: { rule70, brrrr, mao }
   };
 }
 
