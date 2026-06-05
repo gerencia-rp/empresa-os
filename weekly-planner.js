@@ -29,7 +29,9 @@ const wpState = {
   draggedBacklogId: null,
   draggedDayTemplateId: null,
   showChecklistFor: null,       // activityId si está abierto modal checklist
-  printDate: null               // si está set, se muestra vista print en lugar de grilla
+  printDate: null,              // si está set, se muestra vista print en lugar de grilla
+  houseFilter: 'all',           // 'all' | projectId | 'name:Nombre' — filtra qué casa(s) ver en el calendario
+  openGroups: { crew:false, specialist:false, tool:false, vehicle:false, other:false } // sidebar colapsado por default
 };
 
 function wpFmtDate(d) {
@@ -162,6 +164,10 @@ function wpRender() {
   });
   extraNames.forEach(name => homes.push({ id: 'name:' + name, name, address: '' }));
 
+  // Filtro por casa (si está activo, sólo muestra esa)
+  const allHomes = homes.slice();
+  const filteredHomes = wpState.houseFilter === 'all' ? homes : homes.filter(h => h.id === wpState.houseFilter);
+
   // Detectar conflictos: misma resource en 2+ celdas el mismo día
   const conflicts = wpDetectConflicts();
 
@@ -226,6 +232,10 @@ function wpRender() {
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
+          <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
+            <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
+            ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+          </select>
           <button onclick="wpOpenPrintPicker()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Vista entregable imprimible del día">🖨️ Imprimir día</button>
           <button onclick="wpToggleResourceForm()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">+ Recurso</button>
         </div>
@@ -275,8 +285,8 @@ function wpRender() {
               </tr>
             </thead>
             <tbody>
-              ${homes.length === 0 ? `<tr><td colspan="7" class="text-center text-slate-400 py-8">No hay obras activas esta semana.<br>Agrega actividades en una casa o crea proyectos activos.</td></tr>` : ''}
-              ${homes.map(home => {
+              ${filteredHomes.length === 0 ? `<tr><td colspan="7" class="text-center text-slate-400 py-8">${wpState.houseFilter==='all'?'No hay obras activas esta semana.<br>Agrega actividades en una casa o crea proyectos activos.':'La casa filtrada no tiene actividades visibles esta semana.'}</td></tr>` : ''}
+              ${filteredHomes.map(home => {
                 const homeActs = wpState.activities.filter(a => a.project_id === home.id || (!a.project_id && home.id.startsWith('name:') && a.property_name === home.id.slice(5)));
                 const homeDone = homeActs.filter(a => a.status === 'done').length;
                 const homePct = homeActs.length ? Math.round(homeDone/homeActs.length*100) : 0;
@@ -383,10 +393,15 @@ function wpActivityDragStart(activityId, ev) {
   if (ev && ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
 }
 
+function wpSetHouseFilter(value) {
+  wpState.houseFilter = value || 'all';
+  wpRender();
+}
+
 function wpRenderResourceGroup(type, label, borderClass) {
   const items = wpState.resources.filter(r => r.type === type);
   if (items.length === 0) return '';
-  const isOpen = wpState.openGroups?.[type] !== false; // default abierto
+  const isOpen = wpState.openGroups?.[type] === true; // default cerrado
   return `
     <details ${isOpen?'open':''} ontoggle="if(!window.wpState.openGroups)window.wpState.openGroups={}; wpState.openGroups['${type}']=this.open">
       <summary class="cursor-pointer px-2 py-2 bg-slate-100 border-b border-slate-200 text-xs font-bold uppercase text-slate-700 hover:bg-slate-200 flex justify-between items-center">
@@ -563,9 +578,108 @@ function wpEditActivity(id) {
   if (!a) return;
   const assignedRes = (a.resource_ids || []).map(rid => wpState.resources.find(r => r.id === rid)).filter(Boolean);
   const availableRes = wpState.resources.filter(r => !(a.resource_ids||[]).includes(r.id));
+  const proj = wpState.projects.find(p => p.id === a.project_id);
+  const crews = assignedRes.filter(r => r.type === 'crew' || r.type === 'specialist');
+  const tools = assignedRes.filter(r => r.type === 'tool' || r.type === 'vehicle' || r.type === 'other');
+  const checklist = a.checklist || [];
+  const materials = a.materials || [];
+  const checklistDone = checklist.filter(c => c.done).length;
+  const isDone = a.status === 'done';
 
   const html = `
     <div class="space-y-3">
+      <!-- HEADER de desglose: contexto rápido para el operador -->
+      <div class="bg-gradient-to-br ${isDone?'from-emerald-700 to-emerald-900':'from-slate-800 to-slate-900'} text-white rounded-xl p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-70 font-bold">🏠 ${(proj?.name || a.property_name || 'Sin casa').replace(/</g,'&lt;')}${a.activity_code?` · ${a.activity_code}`:''}</div>
+            <div class="text-lg font-bold leading-tight ${isDone?'line-through opacity-75':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+            <div class="text-xs opacity-80 mt-1">${a.stage||'—'} · ${a.date} · ${a.start_hour||7}:00–${a.end_hour||17}:00${a.duration_days>1?` · ${a.duration_days}d`:''}</div>
+          </div>
+          <div class="flex flex-col items-end gap-1">
+            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded ${isDone?'bg-emerald-300/30':a.status==='in_progress'?'bg-blue-300/30':a.status==='cancelled'?'bg-slate-400/30':'bg-amber-300/30'}">${a.status||'planned'}</span>
+            ${a.priority && a.priority!=='normal' ? `<span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-400/30">${a.priority}</span>` : ''}
+          </div>
+        </div>
+        <!-- Tabs Desglose vs Editar -->
+        <div class="flex gap-1 mt-3">
+          <button onclick="document.getElementById('wpe-tab-detail').classList.remove('hidden'); document.getElementById('wpe-tab-edit').classList.add('hidden'); this.classList.add('bg-white/20'); document.getElementById('wpe-btn-edit').classList.remove('bg-white/20')" id="wpe-btn-detail" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-3 py-1 rounded">📋 Desglose</button>
+          <button onclick="document.getElementById('wpe-tab-edit').classList.remove('hidden'); document.getElementById('wpe-tab-detail').classList.add('hidden'); this.classList.add('bg-white/20'); document.getElementById('wpe-btn-detail').classList.remove('bg-white/20')" id="wpe-btn-edit" class="hover:bg-white/20 text-xs font-bold px-3 py-1 rounded">✏️ Editar</button>
+        </div>
+      </div>
+
+      <!-- TAB: DESGLOSE -->
+      <div id="wpe-tab-detail" class="space-y-3">
+        <!-- Equipo asignado -->
+        <div class="border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">👷 Equipo asignado (${crews.length})</div>
+          ${crews.length === 0
+            ? '<div class="text-xs text-slate-400 italic">Sin equipo asignado · arrastrá un crew o specialist desde el panel lateral.</div>'
+            : `<div class="flex flex-wrap gap-2">${crews.map(r => `
+                <div class="bg-blue-50 border border-blue-300 rounded-lg px-2.5 py-1.5 flex items-center gap-2">
+                  <span class="text-xl">${r.emoji}</span>
+                  <div>
+                    <div class="text-xs font-bold">${r.name}</div>
+                    <div class="text-[10px] text-slate-500">${r.category||r.type}${r.cost_per_day?` · $${r.cost_per_day}/d`:''}</div>
+                  </div>
+                </div>`).join('')}</div>`
+          }
+        </div>
+
+        <!-- Herramientas / activos -->
+        <div class="border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">🔧 Herramientas y activos (${tools.length})</div>
+          ${tools.length === 0
+            ? '<div class="text-xs text-slate-400 italic">Sin herramientas asignadas.</div>'
+            : `<div class="flex flex-wrap gap-2">${tools.map(r => `<span class="bg-amber-50 border border-amber-300 rounded px-2 py-1 text-xs font-medium" title="${r.category||''}">${r.emoji} ${r.name}</span>`).join('')}</div>`
+          }
+        </div>
+
+        <!-- Materiales necesarios -->
+        <div class="border border-slate-200 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] font-bold uppercase text-slate-600">📦 Materiales (${materials.length})</div>
+            <button onclick="closeModal(); setTimeout(()=>wpOpenChecklist('${id}'), 80)" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
+          </div>
+          ${materials.length === 0
+            ? '<div class="text-xs text-slate-400 italic">Sin materiales registrados.</div>'
+            : `<table class="w-full text-xs"><tbody>${materials.map(m => `
+                <tr class="border-b border-slate-100">
+                  <td class="py-1">${(m.nombre||'').replace(/</g,'&lt;')}</td>
+                  <td class="py-1 text-right text-slate-600">${m.cantidad||''} ${m.unidad||''}</td>
+                </tr>`).join('')}</tbody></table>`
+          }
+        </div>
+
+        <!-- Checklist -->
+        <div class="border border-slate-200 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] font-bold uppercase text-slate-600">✅ Checklist (${checklistDone}/${checklist.length})</div>
+            <button onclick="closeModal(); setTimeout(()=>wpOpenChecklist('${id}'), 80)" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
+          </div>
+          ${checklist.length === 0
+            ? '<div class="text-xs text-slate-400 italic">Sin checklist.</div>'
+            : `<ul class="space-y-0.5 text-xs">${checklist.map(c => `<li class="${c.done?'line-through text-slate-400':'text-slate-700'}">${c.done?'☑':'☐'} ${(c.item||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
+          }
+        </div>
+
+        <!-- Importantes (notas) -->
+        ${a.notes ? `
+        <div class="border-l-4 border-amber-500 bg-amber-50 p-3 rounded-r-xl">
+          <div class="text-[10px] font-bold uppercase text-amber-800 mb-1">📌 Importante / Notas</div>
+          <div class="text-xs text-slate-800 whitespace-pre-wrap">${a.notes.replace(/</g,'&lt;')}</div>
+        </div>` : ''}
+
+        <!-- Acciones rápidas -->
+        <div class="flex gap-2 pt-2 border-t border-slate-200">
+          ${!isDone ? `<button onclick="wpMarkActivityDone('${id}', true).then(()=>{closeModal(); wpLoadAll().then(wpRender);})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Marcar como hecha</button>` : `<button onclick="wpMarkActivityDone('${id}', false).then(()=>{closeModal(); wpLoadAll().then(wpRender);})" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">↺ Desmarcar</button>`}
+          <input type="date" id="wpe-quick-date" value="${a.date}" class="border border-slate-300 rounded px-2 py-1 text-xs" />
+          <button onclick="wpReprogramTask('${id}', document.getElementById('wpe-quick-date').value).then(()=>closeModal())" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">📅 Mover</button>
+        </div>
+      </div>
+
+      <!-- TAB: EDITAR (form completo) -->
+      <div id="wpe-tab-edit" class="hidden space-y-3">
       <div>
         <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Actividad</label>
         <input id="wpe-name" value="${(a.activity_name||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-semibold" />
@@ -632,10 +746,11 @@ function wpEditActivity(id) {
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="wpeSave('${id}')" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
       </div>
+      </div><!-- /wpe-tab-edit -->
     </div>
   `;
   window._wpEditingId = id;
-  openModal(`✏️ Editar actividad`, html);
+  openModal(`📋 Actividad`, html);
 }
 
 async function wpeAddRes(rid) {
@@ -752,6 +867,19 @@ function wpToggleOverdueDetails() {
   wpRender();
 }
 
+// Reprograma una lista específica de IDs (usado al cerrar el día)
+async function wpReprogramListToDate(ids, newDate) {
+  if (!Array.isArray(ids) || ids.length === 0 || !newDate) return;
+  if (!confirm(`Mover ${ids.length} tarea(s) pendiente(s) al ${newDate}?\n\nLas tareas NO se borran — sólo se mueven de fecha y quedan como "planned".`)) return;
+  const { error } = await sb.from('weekly_activities').update({
+    date: newDate, status: 'planned', updated_at: new Date().toISOString()
+  }).in('id', ids);
+  if (error) return alert('Error reprogramando: ' + error.message);
+  closeModal();
+  await wpLoadAll();
+  wpRender();
+}
+
 function wpNavWeek(delta) {
   if (delta === 0) wpState.weekStart = wpMondayOf(new Date());
   else wpState.weekStart = wpAddDays(wpState.weekStart, delta * 7);
@@ -781,9 +909,24 @@ async function wpAddQuickHouse(name) {
 }
 
 // ─── VISTA DÍA COMPLETO ───
-function wpOpenDayView(dateStr) {
+function wpOpenDayView(dateStr, homeFilter) {
   const d = new Date(dateStr + 'T00:00:00');
-  const dayActs = wpState.activities.filter(a => a.date === dateStr);
+  homeFilter = homeFilter || wpState.houseFilter || 'all';
+  let dayActs = wpState.activities.filter(a => a.date === dateStr);
+  dayActs = wpFilterActsByHouse(dayActs, homeFilter);
+  // Lista de casas activas para el filter del modal
+  const hidden = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
+  const activeProj = wpState.projects.filter(p => !hidden.has(p.id));
+  const extra = new Set();
+  wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
+  const houseOpts = [
+    `<option value="all" ${homeFilter==='all'?'selected':''}>🏘️ Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${homeFilter===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${homeFilter==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+  ].join('');
+  // Pendientes del día (para reagendar al final del día)
+  const pendientes = dayActs.filter(a => a.status !== 'done' && a.status !== 'cancelled');
+  const tomorrowIso = wpDateOnly(wpAddDays(d, 1));
   // Agrupar por casa
   const byHome = {};
   dayActs.forEach(a => {
@@ -803,9 +946,27 @@ function wpOpenDayView(dateStr) {
   const html = `
     <div class="space-y-3">
       <div class="bg-slate-900 text-white rounded-xl p-4">
-        <div class="text-sm text-slate-400 uppercase font-bold">Día completo</div>
-        <div class="text-2xl font-bold">${wpFmtDate(d)}</div>
-        <div class="text-xs text-slate-400 mt-1">${Object.keys(byHome).length} casa(s) activa(s) · ${dayActs.length} actividad(es) · ${busyRes.length} recurso(s) ocupado(s)</div>
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div class="text-sm text-slate-400 uppercase font-bold">Día completo</div>
+            <div class="text-2xl font-bold">${wpFmtDate(d)}</div>
+            <div class="text-xs text-slate-400 mt-1">${Object.keys(byHome).length} casa(s) · ${dayActs.length} actividad(es) · ${busyRes.length} recurso(s) ocupado(s)</div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <select onchange="closeModal(); setTimeout(()=>wpOpenDayView('${dateStr}', this.value), 80)" class="bg-white text-slate-900 text-xs rounded px-2 py-1.5 font-bold">${houseOpts}</select>
+            <button onclick="closeModal(); setTimeout(()=>wpOpenPrintView('${dateStr}','${homeFilter}'), 80)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🖨️ Imprimir</button>
+          </div>
+        </div>
+        ${pendientes.length > 0 ? `
+          <div class="mt-3 bg-amber-500/20 border border-amber-400/40 rounded-lg p-2 flex items-center justify-between gap-2 flex-wrap">
+            <div class="text-xs">⚠️ <strong>${pendientes.length}</strong> tarea(s) sin completar al cerrar el día.</div>
+            <div class="flex gap-1">
+              <button onclick="wpReprogramListToDate(${JSON.stringify(pendientes.map(p=>p.id)).replace(/"/g,'&quot;')}, '${tomorrowIso}')" class="bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold px-2 py-1 rounded">→ Mañana</button>
+              <input type="date" id="wp-day-reprog-date" value="${tomorrowIso}" class="bg-white text-slate-900 rounded px-1.5 py-1 text-[10px]"/>
+              <button onclick="wpReprogramListToDate(${JSON.stringify(pendientes.map(p=>p.id)).replace(/"/g,'&quot;')}, document.getElementById('wp-day-reprog-date').value)" class="bg-white text-slate-900 text-[10px] font-bold px-2 py-1 rounded">Mover</button>
+            </div>
+          </div>
+        ` : ''}
       </div>
 
       <!-- Casas con sus actividades -->
@@ -2486,26 +2647,104 @@ async function wpUpdateNotes(activityId, value) {
 // Modal con date picker en lugar de prompt() para elegir el día a imprimir.
 function wpOpenPrintPicker() {
   const today = wpDateOnly(new Date());
-  // Reusa el modal global de la app
-  openModal('🖨️ Imprimir día', `
+  // Lista de casas activas para el selector
+  const hiddenProjectIds = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
+  const activeProjects = wpState.projects.filter(p => !hiddenProjectIds.has(p.id));
+  const extraNames = new Set();
+  wpState.activities.forEach(a => {
+    if (!a.project_id && a.property_name) extraNames.add(a.property_name);
+  });
+  const houseOpts = [
+    `<option value="all">🏘️ Todas las casas</option>`,
+    ...activeProjects.map(p => `<option value="${p.id}">🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extraNames).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}">🏠 ${n.replace(/</g,'&lt;')}</option>`)
+  ].join('');
+
+  openModal('🖨️ Imprimir entregable', `
     <div class="space-y-3">
-      <div class="text-xs text-slate-600">Elegí el día que querés imprimir como entregable para el crew.</div>
+      <div class="text-xs text-slate-600">Generá un PDF para imprimir o enviar al equipo. Elegí el alcance.</div>
+
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Fecha *</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">¿Qué imprimir?</label>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center gap-2">
+            <input type="radio" name="wp-print-scope" value="day" checked onchange="document.getElementById('wp-print-range').classList.add('hidden'); document.getElementById('wp-print-day').classList.remove('hidden')"/>
+            <div><div class="font-bold text-sm">📅 Un día</div><div class="text-[10px] text-slate-500">Entregable diario para el crew</div></div>
+          </label>
+          <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center gap-2">
+            <input type="radio" name="wp-print-scope" value="range" onchange="document.getElementById('wp-print-day').classList.add('hidden'); document.getElementById('wp-print-range').classList.remove('hidden')"/>
+            <div><div class="font-bold text-sm">📆 Rango / Semana</div><div class="text-[10px] text-slate-500">Plan completo de la casa</div></div>
+          </label>
+        </div>
+      </div>
+
+      <div id="wp-print-day">
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Fecha</label>
         <input id="wp-print-date" type="date" value="${today}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
       </div>
-      <div class="flex gap-2">
-        <button onclick="(function(){var d=document.getElementById('wp-print-date').value;if(!d){return;}closeModal();setTimeout(()=>wpOpenPrintView(d),100);})()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar vista de impresión</button>
+
+      <div id="wp-print-range" class="hidden grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Desde</label>
+          <input id="wp-print-from" type="date" value="${wpDateOnly(wpState.weekStart||new Date())}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hasta</label>
+          <input id="wp-print-to" type="date" value="${wpDateOnly(wpAddDays(wpState.weekStart||new Date(),6))}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Casa</label>
+        <select id="wp-print-house" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${houseOpts}</select>
+        <div class="text-[10px] text-slate-500 mt-1">Por default usa el filtro actual del calendario.</div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar</button>
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `);
+  // Pre-seleccionar casa por filtro actual
+  setTimeout(() => {
+    const sel = document.getElementById('wp-print-house');
+    if (sel) sel.value = wpState.houseFilter || 'all';
+  }, 50);
+}
+
+function wpDoPrint() {
+  const scope = document.querySelector('input[name="wp-print-scope"]:checked')?.value || 'day';
+  const house = document.getElementById('wp-print-house').value;
+  if (scope === 'day') {
+    const d = document.getElementById('wp-print-date').value;
+    if (!d) return;
+    closeModal();
+    setTimeout(() => wpOpenPrintView(d, house), 100);
+  } else {
+    const from = document.getElementById('wp-print-from').value;
+    const to = document.getElementById('wp-print-to').value;
+    if (!from || !to) return;
+    closeModal();
+    setTimeout(() => wpOpenPrintRange(from, to, house), 100);
+  }
+}
+
+// helper: filtra actividades por casa (homeId puede ser projectId, 'name:Foo' o 'all')
+function wpFilterActsByHouse(acts, homeId) {
+  if (!homeId || homeId === 'all') return acts;
+  if (homeId.startsWith('name:')) {
+    const nm = homeId.slice(5);
+    return acts.filter(a => a.property_name === nm);
+  }
+  return acts.filter(a => a.project_id === homeId);
 }
 
 // ─── Vista print del día / entregable para el crew ───
-function wpOpenPrintView(dateStr) {
-  const acts = (wpState.activities||[]).filter(a => a.date === dateStr);
-  if (!acts.length) return alert(`Sin actividades en ${dateStr}.`);
+function wpOpenPrintView(dateStr, homeFilter) {
+  let acts = (wpState.activities||[]).filter(a => a.date === dateStr);
+  acts = wpFilterActsByHouse(acts, homeFilter || 'all');
+  if (!acts.length) return alert(`Sin actividades en ${dateStr}${homeFilter && homeFilter!=='all' ? ' para esa casa' : ''}.`);
   const byHome = {};
   acts.forEach(a => {
     const key = a.project_id || ('name:'+a.property_name);
@@ -2555,6 +2794,87 @@ function wpOpenPrintView(dateStr) {
         </div>
       `).join('')}
       <div class="mt-8 pt-3 border-t border-slate-300 text-xs text-slate-500">Empresa OS · ${new Date().toLocaleString('es')}</div>
+    </body></html>
+  `;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+
+// ─── Vista print por rango (semana / personalizado) ───
+function wpOpenPrintRange(fromStr, toStr, homeFilter) {
+  let acts = (wpState.activities||[]).filter(a => a.date >= fromStr && a.date <= toStr);
+  acts = wpFilterActsByHouse(acts, homeFilter || 'all');
+  if (!acts.length) return alert(`Sin actividades entre ${fromStr} y ${toStr}.`);
+
+  // Agrupar por casa, luego por día
+  const byHome = {};
+  acts.forEach(a => {
+    const key = a.project_id || ('name:'+a.property_name);
+    if (!byHome[key]) {
+      const p = wpState.projects.find(x => x.id === a.project_id);
+      byHome[key] = { name: p?.name || a.property_name || '?', address: p?.address || '', days: {} };
+    }
+    if (!byHome[key].days[a.date]) byHome[key].days[a.date] = [];
+    byHome[key].days[a.date].push(a);
+  });
+
+  const totalDone = acts.filter(a => a.status === 'done').length;
+  const totalPct = acts.length ? Math.round(totalDone/acts.length*100) : 0;
+
+  const html = `
+    <!DOCTYPE html><html><head><title>Plan de obra · ${fromStr} → ${toStr}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>@media print { .no-print{display:none!important;} body{font-size:10pt;margin:1cm;} .break-page{page-break-after:always;} }</style>
+    </head><body class="p-6 bg-white">
+      <div class="no-print mb-4 flex gap-2">
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded">🖨️ Imprimir</button>
+        <button onclick="window.close()" class="bg-slate-100 px-4 py-2 rounded">Cerrar</button>
+      </div>
+      <div class="border-b-2 border-slate-900 pb-3 mb-4">
+        <h1 class="text-2xl font-bold">📅 Plan de obra · ${fromStr} → ${toStr}</h1>
+        <div class="text-sm text-slate-600">${Object.keys(byHome).length} casa(s) · ${acts.length} actividad(es) · ${totalDone} ejecutadas (${totalPct}%)</div>
+      </div>
+      ${Object.entries(byHome).map(([key, h], idx) => {
+        const days = Object.keys(h.days).sort();
+        const homeActs = days.flatMap(d => h.days[d]);
+        const homeDone = homeActs.filter(a => a.status === 'done').length;
+        const homePct = homeActs.length ? Math.round(homeDone/homeActs.length*100) : 0;
+        return `
+          <div class="${idx>0?'break-page':''} mb-6">
+            <div class="bg-slate-900 text-white px-3 py-2 rounded-t-lg">
+              <h2 class="text-xl font-bold">🏠 ${h.name.replace(/</g,'&lt;')}</h2>
+              ${h.address ? `<div class="text-xs opacity-80">${h.address.replace(/</g,'&lt;')}</div>` : ''}
+              <div class="text-xs opacity-90 mt-1">${homeActs.length} actividades · ${homeDone} ejecutadas (${homePct}%)</div>
+            </div>
+            <div class="border border-slate-300 border-t-0 rounded-b-lg p-3 space-y-3">
+              ${days.map(d => {
+                const dLbl = new Date(d+'T00:00:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+                const dActs = h.days[d];
+                return `
+                  <div class="border-l-4 border-blue-400 pl-3">
+                    <div class="text-sm font-bold capitalize text-slate-700 mb-1">${dLbl}</div>
+                    ${dActs.map(a => `
+                      <div class="mb-2 ${a.status==='done'?'opacity-60':''}">
+                        <div class="flex items-center gap-2">
+                          <span class="text-base">${a.status==='done'?'☑':'☐'}</span>
+                          <div class="font-semibold ${a.status==='done'?'line-through':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                          ${a.stage ? `<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${a.stage.replace(/</g,'&lt;')}</span>` : ''}
+                          ${a.activity_code ? `<span class="text-[10px] text-slate-500 font-mono">${a.activity_code}</span>` : ''}
+                        </div>
+                        ${(a.checklist||[]).length > 0 ? `<ul class="text-xs ml-6 mt-0.5">${a.checklist.map(it => `<li class="${it.done?'line-through text-slate-400':''}">${it.done?'☑':'☐'} ${(it.item||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>` : ''}
+                        ${(a.materials||[]).length > 0 ? `<div class="text-[10px] ml-6 text-slate-600">📦 ${a.materials.map(m => `${m.nombre} (${m.cantidad} ${m.unidad||''})`).join(', ').replace(/</g,'&lt;')}</div>` : ''}
+                        ${a.notes ? `<div class="text-[10px] ml-6 italic text-slate-600">📝 ${a.notes.replace(/</g,'&lt;')}</div>` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+      <div class="mt-8 pt-3 border-t border-slate-300 text-xs text-slate-500">Empresa OS · Plan de obra · ${new Date().toLocaleString('es')}</div>
     </body></html>
   `;
   const win = window.open('', '_blank');
