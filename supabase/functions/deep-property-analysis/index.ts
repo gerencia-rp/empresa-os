@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { mao as calcMao, brrrrCheck } from "../_shared/deal-rules.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -12,6 +14,14 @@ Deno.serve(async (req) => {
     "Access-Control-Allow-Methods": "POST, OPTIONS"
   };
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
+  // Auth — previene DoS económico Anthropic (15 web_searches por call, costoso)
+  const auth = await requireAuth(req);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: auth.error }), {
+      status: auth.status || 401, headers: { ...cors, "Content-Type": "application/json" }
+    });
+  }
 
   let analysisId: string | undefined;
   try {
@@ -96,6 +106,34 @@ Deno.serve(async (req) => {
       result = JSON.parse(jsonMatch[1] || jsonMatch[0]);
     } catch (e) {
       throw new Error("JSON parse error: " + (e instanceof Error ? e.message : String(e)));
+    }
+
+    // CORRECCIÓN: override max_offer_price con cálculo determinístico de DealRules.
+    // El LLM podía inventar números. Ahora la fórmula es la misma que usa el
+    // cliente (loan-calculator + property-analyzer). El LLM solo justifica el
+    // razonamiento; el número final viene del cálculo.
+    const arvEst = +inputs.arv_estimate || +result.financial_analysis?.brrrr_check?.arv_75_pct * 100 / 75 || 0;
+    const rehabEst = +inputs.remodel_estimate || +result.financial_analysis?.rehab_breakdown?.total || 0;
+    if (arvEst > 0 && rehabEst >= 0) {
+      const maoCalc = calcMao({ arv: arvEst, rehab: rehabEst, holdingMonths: 6 });
+      const brrrr = brrrrCheck({
+        purchasePrice: maoCalc.mao, rehab: rehabEst, arv: arvEst,
+        holdingTotal: maoCalc.breakdown.holding
+      });
+      if (!result.recommendation) result.recommendation = {};
+      result.recommendation.max_offer_price = Math.round(maoCalc.mao);
+      result.recommendation.mao_breakdown = maoCalc.breakdown;
+      if (result.financial_analysis?.brrrr_check) {
+        result.financial_analysis.brrrr_check = {
+          ...result.financial_analysis.brrrr_check,
+          total_in: brrrr.allInBasis,
+          arv_75_pct: brrrr.refiLoan,
+          passes_brrrr_rule: brrrr.passes,
+          cash_left_in: brrrr.cashLeftIn,
+          ltv_required: brrrr.ltvRequired,
+          server_computed: true
+        };
+      }
     }
 
     // Persistir
