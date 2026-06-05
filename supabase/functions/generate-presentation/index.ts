@@ -2,6 +2,7 @@
 // Devuelve JSON con slides estructurados listos para que el frontend arme el PPTX.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,8 +19,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (!ANTHROPIC_KEY) return json({ ok: false, error: "Falta ANTHROPIC_API_KEY en Supabase secrets" }, 500);
 
+  // Auth: requiere user logueado (evita DoS económico de la cuenta Anthropic)
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
+
   let body: any = {};
   try { body = await req.json(); } catch { return json({ ok: false, error: "JSON inválido" }, 400); }
+  // Forzar user_id desde el JWT (no aceptar el del body por seguridad)
+  body.user_id = auth.user_id;
 
   const {
     mentorship_id,
@@ -96,7 +103,52 @@ ${research_mode ? `🔬 MODO INVESTIGACIÓN PROFUNDA ACTIVADO
 - La clase debe sentirse curada por un EXPERTO que pasó horas investigando, no Wikipedia copy-paste.
 - Incluí "deep_insights" que un coach junior NO sabría.
 
-` : ''}METODOLOGÍA PEDAGÓGICA OBLIGATORIA — ESCALERA METACOGNITIVA:
+` : ''}🧵 HILO CONDUCTOR (CRÍTICO — FEEDBACK DEL COACH):
+La presentación NO es una colección de slides sueltos. Es UNA HISTORIA con principio, desarrollo y cierre. Aplicar estilo CPL (Content Profit Loop) — cada slide se conecta naturalmente con el siguiente.
+
+REGLAS NO NEGOCIABLES:
+1. **CADA slide (excepto la portada) DEBE tener un campo "transition_in"** (1 oración corta) que conecta con el slide anterior. Ej: "Ahora que vimos POR QUÉ los inversionistas se mueven rápido, hablemos de cómo medir esa velocidad en el mercado."
+2. **CADA slide DEBE tener un campo "transition_out"** (1 oración) que abre la puerta al siguiente. Ej: "Pero saber la velocidad no basta — necesitas también saber DÓNDE concentrarla. Eso nos lleva a los ZIP codes."
+3. **PROHIBIDO repetir información** entre slides. Si un concepto ya se introdujo, no se vuelve a definir — se profundiza o se aplica.
+4. **Antes de introducir un concepto técnico nuevo (ej: ZIP codes, velocidad, ARV), ANTES debe haber 1 slide que explique POR QUÉ ese concepto importa**, ligado al concepto previo.
+5. **Arco narrativo** explícito: cada bloque (cada 3-5 slides) debe sentirse como un capítulo. La transición entre bloques DEBE ser visible (con block_label) y verbalizada en speaker_notes.
+
+EJEMPLO DE BUEN HILO:
+- Slide 5 (concepto): "El inversionista busca mover rápido" → transition_out: "Esa velocidad no es igual en todos lados. Algunos mercados se mueven rápido, otros se congelan."
+- Slide 6 (siguiente): transition_in: "Hablemos de cómo SE MIDE la velocidad de un mercado" → contenido: Days on Market, Sale-to-list ratio
+- Slide 6 → transition_out: "Pero estos números agregados ocultan algo: dentro de una ciudad hay ZIPs A, B y C totalmente diferentes."
+- Slide 7: transition_in: "Es ahí donde entra el análisis por ZIP code..."
+
+speaker_notes DEBE empezar con la transition_in dicha en palabras propias del coach, y cerrar con la transition_out preparando lo que sigue. NUNCA empezar speaker_notes con "En este slide vamos a hablar de..." — siempre conectar desde lo anterior.
+
+🎯 REGLA #1 ABSOLUTA — HILO CONDUCTOR (feedback explícito del coach Daniel Lara):
+La presentación DEBE sentirse como UNA RUTA que arranca en 0 y llega a destino, NO una pila de slides aislados.
+
+CADA slide tiene que estar EXPLÍCITAMENTE conectado al anterior y al siguiente. Si veo dos slides consecutivos donde no se entiende "por qué pasamos de X a Y", la presentación FALLÓ.
+
+CÓMO LOGRAR EL HILO CONDUCTOR:
+
+1) **Apertura de slide CONECTADA**: cada slide (a partir del #4) debe empezar con un mini-puente conceptual en su título o subtítulo que retome lo del slide anterior. Ej: si vengo de "cómo piensa el buyer final" y sigue "velocidad del mercado", el subtítulo debe decir "Porque el buyer rápido necesita un mercado que también lo sea".
+
+2) **Speaker notes con TRANSICIÓN explícita**: cada speaker_notes DEBE terminar con UNA oración tipo "Y por eso ahora vamos a ver X" o "Esto nos lleva directo a la pregunta de…". Esta es la frase que el coach dice antes de pasar de slide.
+
+3) **Bridge slides** entre bloques temáticos: cuando arranca un BLOQUE nuevo (Bloque 3, 4…), el PRIMER slide del bloque debe ser un "highlight" o "goldbox" que diga textualmente "Ya entendiste X. Ahora viene Y, que es lo que te permite Z". NO arranques un bloque nuevo con datos crudos sin contexto.
+
+4) **Ruta visual al inicio**: slide #2 SIEMPRE debe ser una agenda visual numerada con flechas (layout: "agenda") que muestre las 5-7 estaciones del recorrido — para que el alumno sepa dónde está parado en cada momento.
+
+5) **Callback en cierre**: en el slide de reflection-recap, los 3 "Aprendiste a…" deben SEGUIR el orden cronológico de los bloques, reforzando la ruta.
+
+6) **NO REPETIR información**: si un dato ya apareció en un slide anterior, NO lo repitas. Cada slide aporta info nueva. Si necesitas referenciar algo previo, dilo en el speaker_notes ("como vimos en el bloque 2…"), no lo metas como contenido visual de nuevo.
+
+7) **NO saltos abruptos de país, contexto o ejemplo**: si arrancaste hablando de Texas, no cambies a un ejemplo de otro país sin transición. Si arrancaste con un caso de fix & flip, no metas un caso de rentas sin puente.
+
+EJEMPLO DEL ERROR QUE DANIEL DETECTÓ:
+❌ Slide 5: "Cómo piensa el buyer final" → Slide 6: "Velocidad del mercado". No conectan. El alumno queda volando.
+✅ Slide 5: "Cómo piensa el buyer final · Quiere cerrar rápido" → Slide 6: "Velocidad del mercado · Por eso el buyer paga premium en zonas rápidas".
+
+ANTES DE ESCRIBIR CADA SLIDE, pregúntate: "¿el alumno entiende POR QUÉ paso de esta info a la siguiente?". Si no, agregá una oración puente.
+
+METODOLOGÍA PEDAGÓGICA OBLIGATORIA — ESCALERA METACOGNITIVA:
 
 Cada clase está diseñada para que un alumno NO EXPERTO salga PUDIENDO HACER algo específico.
 Aplicamos la **Escalera de Metacognición** de Borja Ramírez en estos 4 momentos del deck:
@@ -189,6 +241,9 @@ Devolvé SOLO JSON válido (sin markdown wrapper, sin comentarios):
       "block_label": "BLOQUE 1 · CONTEXTO",
       "layout": "cover | agenda | comparison | benefits | case-study | framework | checklist | strategy-grid | metrics-dashboard | quote | closing | learning-objectives | reflection-recap | transfer-activity | goldbox | highlight | hero-image | split-image | chart-spotlight | image-grid | content",
       "bullets": ["bullet 1 max 12 palabras", "bullet 2"],
+
+      "transition_in": "Conexión EXPLÍCITA con el slide anterior, 1 oración. OBLIGATORIO en TODOS los slides excepto portada. Ej: 'Ahora que entendemos por qué los inversionistas se mueven rápido, veamos cómo se MIDE esa velocidad.'",
+      "transition_out": "Frase que abre la puerta al siguiente slide, 1 oración. OBLIGATORIO. Ej: 'Pero conocer la velocidad agregada no basta — dentro de una ciudad hay ZIPs A, B y C totalmente diferentes. Eso lo desglosamos ahora.'",
 
       "image_query": "2-5 palabras en INGLÉS para buscar foto profesional en Unsplash (ej: 'modern texas suburban home aerial', 'business team meeting'). USA layouts hero-image y split-image para máximo impacto visual.",
       "image_grid": [
@@ -287,6 +342,8 @@ NOTAS IMPORTANTES:
 - Para "comparison" incluí "comparison" con left/right.
 - Para "agenda" incluí "agenda_steps".
 - "speaker_notes" SIEMPRE — son el guion para el coach.
+- **"transition_in" y "transition_out" SIEMPRE en cada slide (excepto portada)**. Es lo más importante para que la presentación fluya. Sin transiciones explícitas, los slides quedan desconectados como sucedió en el módulo anterior.
+- Antes de finalizar el JSON, REVISA: ¿hay información repetida entre slides? Si sí, elimina la repetición. Cada slide debe AGREGAR algo nuevo, no recordar lo ya dicho.
 
 🎨 NUEVOS LAYOUTS VISUALES PREMIUM (USAR MÍNIMO 4 EN LA PRESENTACIÓN):
 - **"hero-image"**: foto full-bleed estilo magazine + título overlay. USAR para slides de transición/sección/impacto emocional. REQUIERE "image_query".
@@ -316,9 +373,10 @@ REGLA: para cada slide CONSIDERA siempre agregar "image_query" en inglés (2-5 p
     try {
       const requestBody: any = {
         model: "claude-sonnet-4-5",
-        max_tokens: research_mode ? 32000 : 16000,
+        // OPTIMIZADO: reducido para terminar en 30-50s (antes timeout a los 150s)
+        max_tokens: research_mode ? 32000 : 8000,
         tools: require_live_data
-          ? [{ type: "web_search_20250305", name: "web_search", max_uses: research_mode ? 25 : 8 }]
+          ? [{ type: "web_search_20250305", name: "web_search", max_uses: research_mode ? 25 : 4 }]
           : undefined,
         messages: [{ role: "user", content: prompt }]
       };
@@ -398,39 +456,15 @@ REGLA: para cada slide CONSIDERA siempre agregar "image_query" en inglés (2-5 p
     }
   };
 
-  // ────────────────────────────────────────────────────────────
-  // MODO SÍNCRONO (default): ejecuta dentro del request, sin polling.
-  // Funciona para modo normal (60-90s, 8 web searches) dentro del límite de 150s.
-  // Para `research_mode` (3-5min) sí usamos waitUntil + polling.
-  // ────────────────────────────────────────────────────────────
-  if (research_mode) {
-    // @ts-ignore  EdgeRuntime es global en Supabase
-    EdgeRuntime.waitUntil(work());
-    return json({
-      ok: true,
-      async: true,
-      job_id: job.id,
-      message: 'Trabajo iniciado en background (research mode). Hacé polling de edu_pres_jobs por id.'
-    });
-  }
-
-  // Modo normal: await directo. Si Claude tarda < 150s, devolvemos resultado completo.
-  await work();
-
-  // Releer el job actualizado para devolver el resultado
-  const { data: finishedJob } = await supabase.from("edu_pres_jobs").select('*').eq('id', job.id).single();
-  if (!finishedJob) return json({ ok: false, error: 'Job desapareció después de ejecutarse' }, 500);
-  if (finishedJob.status === 'error') return json({ ok: false, error: finishedJob.error_message || 'Error desconocido' }, 500);
-  if (finishedJob.status !== 'done')  return json({ ok: true, async: true, job_id: job.id, message: 'Job aún corriendo, hacé polling' });
-
+  // ASYNC PATTERN siempre: devolver job_id rápido y waitUntil corre Claude en background.
+  // Frontend hace polling cada 5s a edu_pres_jobs por status='done'/'error'.
+  // Optimizado: 4 web searches + 8000 tokens → Claude termina en 30-50s.
+  // @ts-ignore  EdgeRuntime es global en Supabase
+  EdgeRuntime.waitUntil(work());
   return json({
     ok: true,
-    async: false,
-    presentation: finishedJob.result,
-    saved_id: finishedJob.saved_pres_id,
-    tokens: finishedJob.tokens_used,
-    web_searches: finishedJob.web_searches,
-    duration_ms: finishedJob.duration_ms,
-    job_id: job.id
+    async: true,
+    job_id: job.id,
+    message: 'Trabajo iniciado en background. Hacé polling de edu_pres_jobs por id.'
   });
 });

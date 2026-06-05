@@ -1237,10 +1237,21 @@ function eduDownloadPPTX() {
 // ──────────────────────────────────────────────────────────────────
 // HELPERS DE ENRIQUECIMIENTO VISUAL (Unsplash + QuickChart auto)
 // ──────────────────────────────────────────────────────────────────
+// NEGOCIO FIX: Unsplash Source API descontinuada en junio 2024 → 404/redirect.
+// Migrado a Picsum (gratis, sin auth, estable). Seed determinístico por query
+// para que el mismo slide siempre tenga la misma imagen.
+function eduPicsumUrl(query, w = 1600, h = 900) {
+  // Hash simple del query para seed estable
+  let h2 = 0;
+  for (let i = 0; i < String(query||'').length; i++) {
+    h2 = ((h2 << 5) - h2 + String(query).charCodeAt(i)) | 0;
+  }
+  const seed = Math.abs(h2) % 1000;
+  return `https://picsum.photos/seed/${seed}/${w}/${h}`;
+}
 function eduUnsplashUrl(query, w = 1600, h = 900) {
-  // Unsplash Source: fotos pro gratis sin auth · descarga al embeber
-  const q = encodeURIComponent(String(query || 'business success').replace(/[^\w\s,áéíóúñü-]/gi, '').slice(0, 80));
-  return `https://source.unsplash.com/${w}x${h}/?${q}`;
+  // Wrapper que delega a Picsum (Unsplash Source ya no existe).
+  return eduPicsumUrl(query, w, h);
 }
 function eduQuickChartUrl(config, w = 900, h = 500) {
   // QuickChart.io: gráficos Chart.js renderizados server-side, sin auth

@@ -4,6 +4,7 @@
 // Usa prompt caching de Anthropic para mantener costo bajo
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -19,6 +20,10 @@ const json = (b: any, s = 200) => new Response(JSON.stringify(b), { status: s, h
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (!ANTHROPIC_KEY) return json({ ok: false, error: "Falta ANTHROPIC_API_KEY" }, 500);
+
+  // Auth: previene DoS económico Anthropic
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
 
   let body: any = {};
   try { body = await req.json(); } catch { return json({ ok: false, error: "JSON inválido" }, 400); }
@@ -36,12 +41,19 @@ Deno.serve(async (req) => {
     const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
     const query = (lastUser?.content || '').slice(0, 300);
 
-    // Búsqueda con ilike (más simple que tsvector y suficiente para 14 docs)
-    const { data: searchData } = await supabase.from("fm_documents")
-      .select("etapa,categoria,codigo,titulo,subtitulo,contenido_md,posicion")
-      .or(`titulo.ilike.%${query.replace(/[%_]/g, '')}%,subtitulo.ilike.%${query.replace(/[%_]/g, '')}%,contenido_md.ilike.%${query.replace(/[%_]/g, '')}%`)
-      .order("posicion")
-      .limit(3);
+    // Sanitizar query para PostgREST .or() — coma, paréntesis y comilla rompen el parser
+    // y permiten exfiltración de filas. Solo alfanumérico + espacios + acentos básicos.
+    const safe = query.replace(/[^a-zA-Z0-9ñÑáéíóúÁÉÍÓÚüÜ\s]/g, ' ').trim().slice(0, 200);
+
+    let searchData: any[] | null = null;
+    if (safe) {
+      const r = await supabase.from("fm_documents")
+        .select("etapa,categoria,codigo,titulo,subtitulo,contenido_md,posicion")
+        .or(`titulo.ilike.%${safe}%,subtitulo.ilike.%${safe}%,contenido_md.ilike.%${safe}%`)
+        .order("posicion")
+        .limit(3);
+      searchData = r.data;
+    }
     docs = searchData || [];
 
     // Si no encontró nada con ilike, traer índice + 1 doc por etapa más probable

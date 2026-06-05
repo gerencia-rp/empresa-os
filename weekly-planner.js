@@ -35,7 +35,16 @@ const wpState = {
 function wpFmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { weekday:'short', day:'numeric', month:'short' });
 }
-function wpDateOnly(d) { return new Date(d).toISOString().split('T')[0]; }
+// CORRECTNESS: usar fecha LOCAL, no UTC. En Austin (UTC-5/6),
+// new Date('2026-06-04').toISOString() devolvía '2026-06-03' a medianoche
+// local — desfasaba 1 día todo el calendario (drag&drop, "Hoy", reprogramar).
+function wpDateOnly(d) {
+  const x = (d instanceof Date) ? d : new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, '0');
+  const day = String(x.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function wpAddDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function wpMondayOf(d) {
   const x = new Date(d);
@@ -1871,7 +1880,7 @@ async function wpApproveImport() {
   closeModal();
   await wpLoadAll();
   wpRender();
-  alert(`✅ Importadas ${rows.length} actividad(es) en ${parsed.items.length} bloque(s).`);
+  alert(`✅ Importadas ${rows.length} actividad(es) (${aprobadas.length} bloque(s) aprobado(s)).`);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2223,9 +2232,38 @@ function wpOpenChecklist(activityId) {
   const a = (wpState.activities||[]).find(x => x.id === activityId);
   if (!a) return;
   wpState.showChecklistFor = activityId;
+  openModal(`✅ ${a.activity_name}`, `<div id="wp-checklist-body">${wpRenderChecklistBody(a)}</div>`);
+}
+
+// Re-renderiza SOLO el body del modal de checklist sin reabrir todo.
+// Preserva el foco del input activo (escape XSS via esc()).
+function wpRefreshChecklistModalBody(activityId) {
+  const a = (wpState.activities||[]).find(x => x.id === activityId);
+  if (!a) return;
+  const body = document.getElementById('wp-checklist-body');
+  if (!body) return;
+  // Preservar foco
+  const activeEl = document.activeElement;
+  const activeAttr = activeEl && activeEl.getAttribute ? activeEl.getAttribute('data-wp-id') : null;
+  const cursorPos = activeEl && activeEl.selectionStart;
+  body.innerHTML = wpRenderChecklistBody(a);
+  if (activeAttr) {
+    const next = body.querySelector(`[data-wp-id="${activeAttr}"]`);
+    if (next) {
+      next.focus();
+      if (cursorPos != null && next.setSelectionRange) {
+        try { next.setSelectionRange(cursorPos, cursorPos); } catch {}
+      }
+    }
+  }
+}
+
+function wpRenderChecklistBody(a) {
+  const activityId = a.id;
   const checklist = a.checklist || [];
   const materials = a.materials || [];
-  const html = `
+  const e = (s) => (window.esc ? window.esc(s) : String(s||'').replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c])));
+  return `
     <div class="space-y-4">
       <div>
         <div class="text-xs font-bold uppercase text-slate-700 mb-2">✅ Checklist de pasos</div>
@@ -2233,13 +2271,13 @@ function wpOpenChecklist(activityId) {
           ${checklist.map((item, idx) => `
             <li class="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5">
               <input type="checkbox" ${item.done?'checked':''} onchange="wpToggleChecklistItem('${activityId}', ${idx})" class="cursor-pointer"/>
-              <input type="text" value="${(item.item||'').replace(/"/g,'&quot;')}" onchange="wpEditChecklistItem('${activityId}', ${idx}, this.value)" class="flex-1 border-none text-sm ${item.done?'line-through text-slate-400':''} bg-transparent focus:outline-none focus:bg-slate-50 rounded px-1"/>
+              <input type="text" data-wp-id="cl-${idx}" value="${e(item.item)}" onchange="wpEditChecklistItem('${activityId}', ${idx}, this.value)" class="flex-1 border-none text-sm ${item.done?'line-through text-slate-400':''} bg-transparent focus:outline-none focus:bg-slate-50 rounded px-1"/>
               <button onclick="wpRemoveChecklistItem('${activityId}', ${idx})" class="text-red-500 hover:text-red-700 text-xs">✕</button>
             </li>
           `).join('')}
         </ul>
         <div class="flex gap-1">
-          <input type="text" id="wp-new-checklist" placeholder="Nuevo paso..." onkeydown="if(event.key==='Enter'){wpAddChecklistItem('${activityId}', this.value, this);}" class="flex-1 border border-slate-300 rounded px-2 py-1 text-sm"/>
+          <input type="text" data-wp-id="new-cl" id="wp-new-checklist" placeholder="Nuevo paso..." onkeydown="if(event.key==='Enter'){wpAddChecklistItem('${activityId}', this.value, this);}" class="flex-1 border border-slate-300 rounded px-2 py-1 text-sm"/>
           <button onclick="wpAddChecklistItem('${activityId}', document.getElementById('wp-new-checklist').value, document.getElementById('wp-new-checklist'))" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm">+</button>
         </div>
       </div>
@@ -2249,9 +2287,9 @@ function wpOpenChecklist(activityId) {
         <ul class="space-y-1 mb-2">
           ${materials.map((m, idx) => `
             <li class="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs">
-              <input type="text" value="${(m.nombre||'').replace(/"/g,'&quot;')}" onchange="wpEditMaterial('${activityId}', ${idx}, 'nombre', this.value)" class="flex-1 border-none bg-transparent focus:outline-none focus:bg-slate-50 rounded px-1" placeholder="Nombre"/>
-              <input type="number" value="${m.cantidad||1}" onchange="wpEditMaterial('${activityId}', ${idx}, 'cantidad', this.value)" class="w-20 border border-slate-200 rounded px-1 text-right"/>
-              <input type="text" value="${(m.unidad||'').replace(/"/g,'&quot;')}" onchange="wpEditMaterial('${activityId}', ${idx}, 'unidad', this.value)" class="w-20 border border-slate-200 rounded px-1" placeholder="ud"/>
+              <input type="text" data-wp-id="mat-name-${idx}" value="${e(m.nombre)}" onchange="wpEditMaterial('${activityId}', ${idx}, 'nombre', this.value)" class="flex-1 border-none bg-transparent focus:outline-none focus:bg-slate-50 rounded px-1" placeholder="Nombre"/>
+              <input type="number" data-wp-id="mat-qty-${idx}" value="${m.cantidad||1}" onchange="wpEditMaterial('${activityId}', ${idx}, 'cantidad', this.value)" class="w-20 border border-slate-200 rounded px-1 text-right"/>
+              <input type="text" data-wp-id="mat-unit-${idx}" value="${e(m.unidad)}" onchange="wpEditMaterial('${activityId}', ${idx}, 'unidad', this.value)" class="w-20 border border-slate-200 rounded px-1" placeholder="ud"/>
               <button onclick="wpRemoveMaterial('${activityId}', ${idx})" class="text-red-500 hover:text-red-700">✕</button>
             </li>
           `).join('')}
@@ -2261,7 +2299,7 @@ function wpOpenChecklist(activityId) {
 
       <div>
         <label class="block text-xs font-bold uppercase text-slate-700 mb-1">📝 Notas</label>
-        <textarea id="wp-notes-${activityId}" rows="2" onchange="wpUpdateNotes('${activityId}', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">${(a.notes||'').replace(/</g,'&lt;')}</textarea>
+        <textarea data-wp-id="notes" rows="2" onchange="wpUpdateNotes('${activityId}', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">${e(a.notes)}</textarea>
       </div>
 
       <div class="flex gap-2">
@@ -2269,7 +2307,6 @@ function wpOpenChecklist(activityId) {
       </div>
     </div>
   `;
-  openModal(`✅ ${a.activity_name}`, html);
 }
 
 async function wpToggleChecklistItem(activityId, idx) {
@@ -2279,7 +2316,8 @@ async function wpToggleChecklistItem(activityId, idx) {
   cl[idx] = { ...cl[idx], done: !cl[idx].done };
   await sb.from('weekly_activities').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', activityId);
   await wpLoadAll();
-  wpOpenChecklist(activityId);
+  // UX: re-render del body en lugar de reabrir modal — preserva foco del input
+  wpRefreshChecklistModalBody(activityId);
 }
 async function wpEditChecklistItem(activityId, idx, value) {
   const a = (wpState.activities||[]).find(x => x.id === activityId);
@@ -2296,7 +2334,8 @@ async function wpRemoveChecklistItem(activityId, idx) {
   cl.splice(idx, 1);
   await sb.from('weekly_activities').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', activityId);
   await wpLoadAll();
-  wpOpenChecklist(activityId);
+  // UX: re-render del body en lugar de reabrir modal — preserva foco del input
+  wpRefreshChecklistModalBody(activityId);
 }
 async function wpAddChecklistItem(activityId, value, input) {
   const v = (value||'').trim(); if (!v) return;
@@ -2314,7 +2353,8 @@ async function wpAddMaterial(activityId) {
   const mat = [...(a.materials||[]), { nombre: '', cantidad: 1, unidad: 'ud' }];
   await sb.from('weekly_activities').update({ materials: mat, updated_at: new Date().toISOString() }).eq('id', activityId);
   await wpLoadAll();
-  wpOpenChecklist(activityId);
+  // UX: re-render del body en lugar de reabrir modal — preserva foco del input
+  wpRefreshChecklistModalBody(activityId);
 }
 async function wpEditMaterial(activityId, idx, field, value) {
   const a = (wpState.activities||[]).find(x => x.id === activityId);
@@ -2331,7 +2371,8 @@ async function wpRemoveMaterial(activityId, idx) {
   mat.splice(idx, 1);
   await sb.from('weekly_activities').update({ materials: mat, updated_at: new Date().toISOString() }).eq('id', activityId);
   await wpLoadAll();
-  wpOpenChecklist(activityId);
+  // UX: re-render del body en lugar de reabrir modal — preserva foco del input
+  wpRefreshChecklistModalBody(activityId);
 }
 async function wpUpdateNotes(activityId, value) {
   await sb.from('weekly_activities').update({ notes: value, updated_at: new Date().toISOString() }).eq('id', activityId);

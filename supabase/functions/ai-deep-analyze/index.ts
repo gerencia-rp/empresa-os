@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -554,6 +555,14 @@ Deno.serve(async (req) => {
     "Access-Control-Allow-Methods": "POST, OPTIONS"
   };
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+
+  // Auth: previene DoS económico Anthropic + bypass de cache con force=true por anónimos
+  const auth = await requireAuth(req);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: auth.error }), {
+      status: auth.status || 401, headers: { ...cors, "Content-Type": "application/json" }
+    });
+  }
 
   try {
     const { system, context, force } = await req.json();

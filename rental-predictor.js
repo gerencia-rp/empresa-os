@@ -192,7 +192,10 @@ function rpCalc() {
   // Returns
   const annualCashflow = netCashflow * 12;
   const cocReturn = rpState.cash_invested > 0 ? (annualCashflow / rpState.cash_invested) * 100 : null;
-  const annualNOI = (grossRent - vacancy - maintenance - capex - mgmt - platform - propertyTax - (+rpState.insurance_monthly||0) - (+rpState.hoa_monthly||0) - (+rpState.utilities_monthly||0) - (+rpState.cleaning_monthly||0) - (+rpState.other_monthly||0)) * 12;
+  // CORRECCIÓN NEGOCIO: cap rate estándar = NOI / Price con NOI SIN debt service
+  // y SIN capex reserve. Incluir capex bajaba el cap rate ~5% artificial y hacía
+  // que propiedades reales aparecieran como malas. Mantenemos capex en netCashflow.
+  const annualNOI = (grossRent - vacancy - maintenance - mgmt - platform - propertyTax - (+rpState.insurance_monthly||0) - (+rpState.hoa_monthly||0) - (+rpState.utilities_monthly||0) - (+rpState.cleaning_monthly||0) - (+rpState.other_monthly||0)) * 12;
   const capRate = rpState.arv > 0 ? (annualNOI / rpState.arv) * 100 : null;
 
   return {

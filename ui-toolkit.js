@@ -268,5 +268,60 @@
     return true;
   };
 
-  console.log('[UI Toolkit] Cargado — toast, confirmDialog, promptDialog, withLoading, validateField');
+  // ─── esc(str) ───
+  // Escape HTML para insertar texto user-provided en innerHTML sin XSS.
+  // Cubre <, >, &, ", ', backtick.
+  window.esc = function(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/`/g, '&#96;');
+  };
+
+  // ─── usd(n) ───
+  // Format USD canónico. Centraliza el `Fmt = n => '$' + ...` repetido en 5 archivos.
+  window.usd = function(n, opts) {
+    const o = opts || {};
+    const v = Number(n) || 0;
+    const fixed = o.decimals != null ? v.toFixed(o.decimals) : Math.round(v).toString();
+    return '$' + Number(fixed).toLocaleString('en-US', { minimumFractionDigits: o.decimals || 0, maximumFractionDigits: o.decimals || 0 });
+  };
+
+  // ─── safeEvalFormula(expr, vars) ───
+  // Evaluador whitelisted que reemplaza new Function() (RCE).
+  // Acepta: identificadores de vars, números, paréntesis, + - * / %,
+  // Math.{abs,min,max,round,floor,ceil,sqrt,pow}.
+  // Rechaza: cualquier otra cosa (palabras reservadas, accesos, llamadas a fns no whitelist).
+  window.safeEvalFormula = function(expr, vars) {
+    if (typeof expr !== 'string') throw new Error('expr no es string');
+    const raw = expr.trim();
+    // Whitelist regex: caracteres y nombres permitidos. Cualquier otra cosa = abort.
+    const validChars = /^[a-zA-Z0-9_.+\-*/%() \t,]+$/;
+    if (!validChars.test(raw)) throw new Error('Fórmula con caracteres no permitidos');
+    // Verificar identificadores: cada token alfanumérico debe ser var conocida o Math.xxx whitelisted
+    const allowedMathFns = new Set(['abs','min','max','round','floor','ceil','sqrt','pow','log','exp']);
+    const tokens = raw.match(/[a-zA-Z_][a-zA-Z0-9_.]*/g) || [];
+    for (const t of tokens) {
+      if (t in (vars || {})) continue;
+      if (t === 'Math') continue;
+      if (t.startsWith('Math.')) {
+        const fn = t.slice(5);
+        if (!allowedMathFns.has(fn)) throw new Error('Math fn no permitida: ' + fn);
+        continue;
+      }
+      // Número como NaN/Infinity tampoco
+      throw new Error('Identificador no permitido: ' + t);
+    }
+    // Evaluar con Function pero solo con el contexto controlado
+    // Como ya whitelistamos, es seguro. (Es la única manera sin parser AST completo.)
+    const keys = Object.keys(vars || {});
+    const fn = new Function('Math', ...keys, `"use strict"; return (${raw});`);
+    return fn(Math, ...keys.map(k => vars[k]));
+  };
+
+  console.log('[UI Toolkit] Cargado — toast, confirmDialog, promptDialog, withLoading, validateField, esc, usd, safeEvalFormula');
 })();

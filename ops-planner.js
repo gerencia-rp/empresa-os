@@ -76,7 +76,14 @@ function opPropColor(propId) {
 }
 
 // ─── Utilidades ───
-function opDateOnly(d) { return new Date(d).toISOString().split('T')[0]; }
+// CORRECTNESS: fecha LOCAL, no UTC. En Austin (UTC-5/6) ISO desfasaba 1 día.
+function opDateOnly(d) {
+  const x = (d instanceof Date) ? d : new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, '0');
+  const day = String(x.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function opFmtDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'short' }); }
 function opPad(n) { return n < 10 ? '0'+n : ''+n; }
 function opTimeToMin(t) { if (!t) return 0; const [h,m] = t.split(':').map(Number); return h*60 + (m||0); }
@@ -1570,14 +1577,14 @@ async function opEjecutarArmarDia() {
   let sameZoneCount = 0;
 
   propOrder.forEach(([propKey, info], idx) => {
-    // Insertar viaje entre casas — diferenciar misma zona vs cruzar zona
+    // BUG FIX: capturar isCross ANTES de actualizar lastZona, sino siempre evalúa false
+    // y todas las tareas de cruce de zona guardaban travel_min = travelSame.
+    const isCross = idx > 0 && info.zona && lastZona && info.zona !== lastZona;
     if (idx > 0) {
-      const isCross = info.zona && lastZona && info.zona !== lastZona;
       const travelHere = isCross ? travelCross : travelSame;
       cursor += travelHere;
       if (isCross) crossZoneCount++; else sameZoneCount++;
     }
-    lastZona = info.zona;
 
     info.tasks.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
     info.tasks.forEach((t, i) => {
@@ -1592,10 +1599,12 @@ async function opEjecutarArmarDia() {
         id: t.id,
         date: opState.date,
         start_time: opMinToTime(cursor),
-        travel_min: isFirstOfDay ? 0 : (isFirstOfHouse ? (info.zona !== lastZona ? travelCross : travelSame) : 0)
+        travel_min: isFirstOfDay ? 0 : (isFirstOfHouse ? (isCross ? travelCross : travelSame) : 0)
       });
       cursor += dur;
     });
+
+    lastZona = info.zona;  // Mover al final para que se use en la próxima iteración
   });
 
   // Ejecutar actualizaciones

@@ -1893,8 +1893,10 @@ function openCalculator(sys) {
     sys.data.values = vars;
     saveSystemData(sys);
     try {
-      const fn = new Function(...Object.keys(vars), `return (${sys.config.formula});`);
-      const res = fn(...Object.values(vars));
+      // SEGURIDAD: evaluador whitelisted en vez de new Function() (RCE).
+      // Solo permite vars del calc, números, paréntesis, operadores aritméticos
+      // y un set fijo de funciones Math.
+      const res = safeEvalFormula(sys.config.formula, vars);
       document.getElementById('calc-result').textContent = Number.isFinite(res) ? res.toLocaleString('es-MX', { maximumFractionDigits: 2 }) : '—';
     } catch { document.getElementById('calc-result').textContent = 'Error'; }
   };
