@@ -91,18 +91,22 @@ document.getElementById('auth-forgot-btn').addEventListener('click', async () =>
 (async function checkPasswordRecovery() {
   const hash = window.location.hash || '';
   if (hash.includes('type=recovery') || hash.includes('access_token')) {
+    // SIEMPRE limpiar el hash primero — si el user cancela, navega, etc. el hash
+    // ya no debe re-ejecutar este flow. Antes quedaba pegado y volvía a pedir
+    // password en cada navegación SPA.
+    history.replaceState(null, '', window.location.pathname);
+
     // Supabase ya restauró la sesión. Pedir nueva contraseña.
     setTimeout(async () => {
-      const newPwd = prompt('Recibiste un link de recuperación. Ingresá tu nueva contraseña (6+ caracteres):');
-      if (!newPwd || newPwd.length < 6) {
-        alert('Contraseña inválida. Refresh y volvé a clickear el link.');
+      const newPwd = prompt('Recibiste un link de recuperación. Ingresá tu nueva contraseña (8+ caracteres):');
+      if (!newPwd) return; // user canceló — no hacer nada (hash ya limpio)
+      if (newPwd.length < 8) {
+        alert('Contraseña debe tener 8+ caracteres. Refrescá el link del email y reintentá.');
         return;
       }
       const { error } = await sb.auth.updateUser({ password: newPwd });
       if (error) return alert('Error: ' + error.message);
       alert('✓ Contraseña actualizada. Ya estás logueado.');
-      // Limpiar el hash para que no se ejecute al refresh
-      history.replaceState(null, '', window.location.pathname);
     }, 500);
   }
 })();
@@ -298,13 +302,14 @@ function renderSidebar() {
   if (!isAdmin() && visibleAreas.length && !visibleAreas.find(a => a.id === state.currentAreaId)) {
     state.currentAreaId = visibleAreas[0].id;
   }
+  const e = window.esc || (s => String(s||'').replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c])));
   nav.innerHTML = visibleAreas.map(area => {
     const count = (state.systems[area.id] || []).length;
     return `
-      <button onclick="selectArea('${area.id}')"
+      <button onclick="selectArea('${e(area.id)}')"
         class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-sm transition ${state.currentAreaId === area.id ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/50'}">
-        <span class="text-lg">${area.icon}</span>
-        <span class="flex-1 truncate">${area.name}</span>
+        <span class="text-lg">${e(area.icon)}</span>
+        <span class="flex-1 truncate">${e(area.name)}</span>
         <span class="text-xs text-slate-500">${count}</span>
       </button>`;
   }).join('');
@@ -372,8 +377,8 @@ async function openTeamMgmt() {
                     <option value="admin" ${p.role==='admin'?'selected':''}>admin</option>
                   </select>
                   ${!isCurrent ? `
-                    <button onclick="adminSetUserPassword('${p.id}','${p.email.replace(/'/g,"\\'")}')" class="text-xs text-blue-600 hover:text-blue-800" title="Cambiar contraseña">🔑</button>
-                    <button onclick="deleteUser('${p.id}','${p.email.replace(/'/g,"\\'")}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario completamente">🗑</button>
+                    <button onclick="adminSetUserPassword('${(window.esc||((s)=>s))(p.id)}','${(window.esc||((s)=>s))(p.email)}')" class="text-xs text-blue-600 hover:text-blue-800" title="Cambiar contraseña">🔑</button>
+                    <button onclick="deleteUser('${(window.esc||((s)=>s))(p.id)}','${(window.esc||((s)=>s))(p.email)}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario completamente">🗑</button>
                   ` : ''}
                 </div>
                 ${p.role !== 'admin' ? `
@@ -390,18 +395,24 @@ async function openTeamMgmt() {
   openModal('👥 Gestión de equipo', html);
 }
 
-async function inviteUser() {
+async function inviteUser(event) {
   const email = document.getElementById('inv-email').value.trim();
   if (!email) return alert('Pon un email');
   const role = document.getElementById('inv-role').value;
   const areas = state.areas.filter(a => document.getElementById(`inv-area-${a.id}`)?.checked).map(a => a.id);
-  const btn = event.target;
-  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  // BUG FIX: capturar btn ANTES del await (event puede ser null al regresar
+  // del await en algunos browsers, lo que rompía el re-enable al fallar).
+  const btn = (event && event.target) || event || null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
   try {
+    // Usar el JWT real del user logueado para que la edge function pueda
+    // verificar admin server-side (sin esto, requireAuth rechaza con 401).
+    const session = await sb.auth.getSession();
+    const accessToken = session.data.session?.access_token || window.SUPABASE_ANON_KEY;
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/invite-user`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ email, role, allowed_areas: areas, inviter_id: state.user.id })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ email, role, allowed_areas: areas })
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');
@@ -409,8 +420,8 @@ async function inviteUser() {
     closeModal();
     setTimeout(openTeamMgmt, 200);
   } catch (e) {
-    alert('Error: ' + e.message + '\n\n(¿Está desplegada la edge function invite-user? `npx supabase functions deploy invite-user --no-verify-jwt`)');
-    btn.disabled = false; btn.textContent = '📧 Enviar invitación';
+    alert('Error: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar invitación'; }
   }
 }
 
@@ -431,10 +442,12 @@ async function updateUserRole(userId, role) {
 async function deleteUser(userId, email) {
   if (!confirm(`¿Eliminar usuario "${email}" completamente?\n\nEsto borra su PERFIL + CUENTA AUTH. Vas a poder volver a invitar el mismo email después.`)) return;
   try {
+    const session = await sb.auth.getSession();
+    const accessToken = session.data.session?.access_token || window.SUPABASE_ANON_KEY;
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/delete-user`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ user_id: userId, requester_id: state.user.id })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ user_id: userId })
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');
@@ -442,27 +455,29 @@ async function deleteUser(userId, email) {
     else alert('✓ Usuario eliminado completamente. Podés re-invitar el email cuando quieras.');
     closeModal(); setTimeout(openTeamMgmt, 200);
   } catch (e) {
-    alert('Error: ' + e.message + '\n\n(¿Está desplegada la edge function delete-user? `npx supabase functions deploy delete-user --no-verify-jwt`)');
+    alert('Error: ' + e.message);
   }
 }
 
 // Admin setea contraseña de otro usuario
 async function adminSetUserPassword(userId, email) {
-  const newPwd = prompt(`Nueva contraseña para ${email}:\n(mínimo 6 caracteres)`);
+  const newPwd = prompt(`Nueva contraseña para ${email}:\n(mínimo 8 caracteres)`);
   if (!newPwd) return;
-  if (newPwd.length < 6) return alert('La contraseña debe tener al menos 6 caracteres');
+  if (newPwd.length < 8) return alert('La contraseña debe tener al menos 8 caracteres');
   if (!confirm(`¿Cambiar contraseña de ${email}?\n\nEl usuario va a poder loguear con esta nueva contraseña inmediatamente.`)) return;
   try {
+    const session = await sb.auth.getSession();
+    const accessToken = session.data.session?.access_token || window.SUPABASE_ANON_KEY;
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/admin-set-password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ user_id: userId, new_password: newPwd, requester_id: state.user.id })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ user_id: userId, new_password: newPwd })
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');
     alert(`✓ Contraseña actualizada.\nAvisale a ${email} que su nueva contraseña es: ${newPwd}`);
   } catch (e) {
-    alert('Error: ' + e.message + '\n\n(¿Está desplegada admin-set-password? `npx supabase functions deploy admin-set-password --no-verify-jwt`)');
+    alert('Error: ' + e.message);
   }
 }
 
@@ -662,9 +677,9 @@ function systemCard(area, sys) {
         </div>
         ${adminBtns}
       </div>
-      <h4 class="font-semibold text-slate-900">${sys.name}</h4>
-      <p class="text-xs text-slate-500 mt-1 line-clamp-2">${sys.description || type.label}</p>
-      <button onclick="openSystem('${area.id}','${sys.id}')" class="mt-4 w-full text-sm bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-700 font-medium py-2 rounded-lg transition">
+      <h4 class="font-semibold text-slate-900">${(window.esc||((s)=>s))(sys.name)}</h4>
+      <p class="text-xs text-slate-500 mt-1 line-clamp-2">${(window.esc||((s)=>s))(sys.description || type.label)}</p>
+      <button onclick="openSystem('${(window.esc||((s)=>s))(area.id)}','${(window.esc||((s)=>s))(sys.id)}')" class="mt-4 w-full text-sm bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-700 font-medium py-2 rounded-lg transition">
         Abrir
       </button>
     </div>`;
