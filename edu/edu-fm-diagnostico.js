@@ -26,7 +26,7 @@ async function fmDiagnoseSubmit() {
   try {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/fm-ai-coach`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
       body: JSON.stringify({ mode: 'diagnose', messages: fmState.diagnoseChat.map(m => ({ role: m.role, content: m.content })) })
     });
     const r = await res.json();

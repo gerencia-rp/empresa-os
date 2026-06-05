@@ -242,7 +242,7 @@ async function eduGeneratePresentation() {
     try {
       res = await fetch(`${window.SUPABASE_URL}/functions/v1/generate-presentation`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
         body: JSON.stringify(payload)
       });
     } catch (netErr) {

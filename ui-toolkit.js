@@ -323,5 +323,21 @@
     return fn(Math, ...keys.map(k => vars[k]));
   };
 
-  console.log('[UI Toolkit] Cargado — toast, confirmDialog, promptDialog, withLoading, validateField, esc, usd, safeEvalFormula');
+  // ─── getAccessToken() ───
+  // Devuelve el JWT del user logueado (con `sub` claim) para llamar edge functions
+  // que requireAuth. Fallback a ANON_KEY si no hay sesión (compat con endpoints
+  // públicos antiguos). Las funciones con requireAuth van a rechazar con
+  // "missing sub claim" si solo reciben ANON_KEY — por eso este helper.
+  window.getAccessToken = async function() {
+    try {
+      const sbClient = window.sb;
+      if (!sbClient) return window.SUPABASE_ANON_KEY;
+      const { data } = await sbClient.auth.getSession();
+      return data?.session?.access_token || window.SUPABASE_ANON_KEY;
+    } catch {
+      return window.SUPABASE_ANON_KEY;
+    }
+  };
+
+  console.log('[UI Toolkit] Cargado — toast, confirmDialog, promptDialog, withLoading, validateField, esc, usd, safeEvalFormula, getAccessToken');
 })();

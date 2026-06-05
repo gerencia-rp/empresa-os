@@ -234,7 +234,7 @@ async function rdSync() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}`
+        'Authorization': `Bearer ${await getAccessToken()}`
       },
       body: JSON.stringify({ user_id: state.user.id })
     });

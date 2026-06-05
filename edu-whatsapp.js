@@ -256,7 +256,7 @@ async function wpsGenerateCampaign() {
   // Llamar edge function
   const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
     body: JSON.stringify({
       campaign_id: campaign.id,
       mentorship_id: eduState.mentorshipId,
@@ -468,7 +468,7 @@ async function wpsSubmitResponse(messageId) {
   try {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-analyze-response`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
       body: JSON.stringify({ message_id: messageId, response_text: text })
     });
     const r = await res.json();

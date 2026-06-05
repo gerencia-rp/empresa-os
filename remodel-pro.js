@@ -1082,7 +1082,7 @@ async function rmAgentSend(userText) {
       safetyCounter++;
       const resp = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-ai`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${await getAccessToken()}` },
         body: JSON.stringify({ messages, project_context: projectContext })
       });
       if (!resp.ok) {
