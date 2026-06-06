@@ -365,7 +365,23 @@ function wpsRenderDetail() {
         </div>
       ` : ''}
 
-      ${msgs.length === 0 && (c.status === 'ready' || c.status === 'completed') ? `<div class="p-6 text-center text-slate-500 bg-white border border-slate-200 rounded">Sin mensajes generados.</div>` : ''}
+      ${msgs.length === 0 && (c.status === 'ready' || c.status === 'completed') ? `
+        <div class="bg-red-50 border-2 border-red-300 rounded-xl p-4">
+          <div class="text-sm font-bold text-red-900 mb-2">⚠️ Campaña creada sin mensajes</div>
+          <div class="text-xs text-red-800 mb-3">El insert de mensajes falló silenciosamente. Posibles causas:
+            <ul class="list-disc list-inside mt-1 space-y-0.5">
+              <li>Restricción RLS sobre la tabla <code>edu_whatsapp_messages</code></li>
+              <li>Constraint NOT NULL en alguna columna del schema</li>
+              <li>Foreign key inválida (student_id apunta a un estudiante que no existe)</li>
+            </ul>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="wpsRetryInsertForCampaign('${c.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">🔄 Reintentar insertar mensaje</button>
+            <button onclick="wpsDeleteEmptyCampaign('${c.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded">🗑️ Eliminar esta campaña vacía</button>
+            <button onclick="wpsDiagnoseDB()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded">🔍 Diagnosticar DB</button>
+          </div>
+        </div>
+      ` : ''}
 
       ${msgs.length > 0 ? `
         <!-- 🚀 Envío automático con Cloud API (si está configurado) -->
@@ -1606,6 +1622,152 @@ async function wpsActuallyCreate(students, template, campaignName, opts) {
 }
 
 window.wpsCreateQuickTest = wpsCreateQuickTest;
+
+// ════════════════════════════════════════════════════════════
+// 🔍 Diagnóstico de DB cuando los inserts fallan silenciosamente
+// ════════════════════════════════════════════════════════════
+async function wpsDiagnoseDB() {
+  const log = [];
+  log.push('🔍 DIAGNÓSTICO de edu_whatsapp_messages');
+  log.push('=====================================\n');
+
+  // Test 1: ¿Existe la tabla? ¿Tengo SELECT?
+  try {
+    const { data, error, count } = await sb.from('edu_whatsapp_messages')
+      .select('*', { count: 'exact', head: true });
+    if (error) log.push('❌ SELECT falla: ' + error.message);
+    else log.push(`✓ SELECT OK (${count} filas totales en la tabla)`);
+  } catch (e) {
+    log.push('❌ SELECT throw: ' + e.message);
+  }
+
+  // Test 2: Intentar INSERT mínimo
+  log.push('\n📝 Intento INSERT mínimo (test, lo borro al final):');
+  const testPayload = {
+    phone: '15551234567',
+    message_text: '__diagnose_test__',
+    status: 'pending'
+  };
+  log.push('Payload: ' + JSON.stringify(testPayload, null, 2));
+
+  let insertedId = null;
+  try {
+    const { data, error } = await sb.from('edu_whatsapp_messages').insert(testPayload).select().single();
+    if (error) {
+      log.push('❌ INSERT falla: ' + error.message);
+      log.push('   Detalle: ' + JSON.stringify(error, null, 2));
+    } else {
+      log.push('✓ INSERT OK, id devuelto: ' + data.id);
+      insertedId = data.id;
+    }
+  } catch (e) {
+    log.push('❌ INSERT throw: ' + e.message);
+  }
+
+  // Limpiar el test
+  if (insertedId) {
+    try {
+      await sb.from('edu_whatsapp_messages').delete().eq('id', insertedId);
+      log.push('✓ Test row eliminada');
+    } catch (e) {
+      log.push('⚠ No pude eliminar test row id=' + insertedId);
+    }
+  }
+
+  // Test 3: Verificar schema columns
+  log.push('\n📋 Información de schema:');
+  try {
+    const { data: sample } = await sb.from('edu_whatsapp_messages').select('*').limit(1);
+    if (sample && sample[0]) {
+      log.push('Columnas existentes: ' + Object.keys(sample[0]).join(', '));
+    } else {
+      log.push('(Tabla vacía, no puedo inferir columnas)');
+    }
+  } catch (e) {
+    log.push('No pude inspeccionar: ' + e.message);
+  }
+
+  // Test 4: User actual
+  log.push('\n👤 Auth:');
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    log.push(`User ID: ${user?.id || '(no auth)'}`);
+    log.push(`Email: ${user?.email || '—'}`);
+  } catch (e) {
+    log.push('No auth: ' + e.message);
+  }
+
+  // Mostrar
+  const text = log.join('\n');
+  console.log(text);
+
+  openModal('🔍 Diagnóstico DB', `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-600">Resultados del diagnóstico de la tabla edu_whatsapp_messages.</div>
+      <pre class="bg-slate-900 text-emerald-300 p-3 rounded text-[10px] overflow-x-auto whitespace-pre-wrap max-h-[60vh]">${text.replace(/</g,'&lt;')}</pre>
+      <div class="flex gap-2">
+        <button onclick="navigator.clipboard.writeText(${JSON.stringify(text).replace(/</g,'&lt;')}); alert('Copiado')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">📋 Copiar para soporte</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+      </div>
+    </div>
+  `);
+}
+
+// Reintentar insertar el mensaje de la campaña vacía
+async function wpsRetryInsertForCampaign(campaignId) {
+  const c = wpsState.campaigns.find(x => x.id === campaignId);
+  if (!c) return alert('Campaña no encontrada');
+
+  // Construir el mensaje de prueba con el teléfono guardado
+  const testPhone = (localStorage.getItem('wps_test_phone') || '').replace(/\D/g, '');
+  if (!testPhone) return alert('No hay teléfono de prueba guardado. Andá a "Modo rápido" y configurá uno.');
+
+  const allStudents = (eduState.students || []);
+  const previewStudent = allStudents[0];
+
+  const tpl = WPS_WEEKLY_TEMPLATES.find(t => t.id === (c.target_filters?.template_id)) || WPS_WEEKLY_TEMPLATES.find(t => t.id === 'general');
+
+  const msgText = previewStudent
+    ? wpsFillTemplate(tpl.text, { ...previewStudent, phone: testPhone })
+    : `Hola, este es un mensaje de prueba desde Empresa OS.\n\nFecha: ${new Date().toLocaleString('es')}`;
+
+  // Probar UN MÍNIMO PAYLOAD
+  const payload = {
+    campaign_id: campaignId,
+    phone: testPhone,
+    message_text: msgText,
+    status: 'pending'
+  };
+
+  console.log('[wpsRetry] payload:', payload);
+
+  try {
+    const { data, error } = await sb.from('edu_whatsapp_messages').insert(payload).select().single();
+    if (error) {
+      console.error('[wpsRetry] error:', error);
+      return alert(`❌ Insert falló:\n\n${error.message}\n\nCodigo: ${error.code}\nDetalle: ${error.details||'—'}\n\nHint: ${error.hint||'—'}\n\nPosible solución según el error → revisar consola.`);
+    }
+    alert(`✅ Mensaje insertado!\n\nID: ${data.id}\n\nLo voy a cargar ahora.`);
+    await wpsLoad();
+    wpsRender();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function wpsDeleteEmptyCampaign(campaignId) {
+  if (!confirm('Eliminar esta campaña vacía?')) return;
+  await sb.from('edu_whatsapp_messages').delete().eq('campaign_id', campaignId);
+  await sb.from('edu_whatsapp_campaigns').delete().eq('id', campaignId);
+  wpsState.activeCampaignId = null;
+  wpsState.activeView = 'list';
+  await wpsLoad();
+  wpsRender();
+}
+
+window.wpsDiagnoseDB = wpsDiagnoseDB;
+window.wpsRetryInsertForCampaign = wpsRetryInsertForCampaign;
+window.wpsDeleteEmptyCampaign = wpsDeleteEmptyCampaign;
 
 // ────────────────────────────────────────────────────────────
 // 🔄 Re-sync de números desde Airtable
