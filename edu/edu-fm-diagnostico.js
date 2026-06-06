@@ -769,6 +769,34 @@ function eduRenderDashboard() {
         </div>
       ` : ''}
 
+      <!-- ⚠️ Estudiantes en riesgo por inactividad -->
+      ${(() => {
+        const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []).slice(0, 8);
+        if (enRiesgo.length === 0) return '';
+        return `
+        <div class="bg-white border-2 border-amber-300 rounded-xl overflow-hidden">
+          <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2 flex items-center justify-between">
+            <div class="text-xs font-bold uppercase">⚠️ ${enRiesgo.length} estudiante(s) en riesgo por inactividad</div>
+            <button onclick="eduState.tab='students'; eduState.searchQuery='sin_contacto_30d'; eduRender()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded">Ver todos →</button>
+          </div>
+          <ul class="divide-y divide-slate-100">
+            ${enRiesgo.map(s => `
+              <li class="px-4 py-2.5 hover:bg-slate-50 cursor-pointer flex items-center justify-between gap-3" onclick="eduOpenStudent('${s.id}')">
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold text-sm">${(s.full_name||'—').replace(/</g,'&lt;')}</div>
+                  <div class="text-[11px] text-slate-500">${(s.grupo || s.current_stage || '—').replace(/</g,'&lt;')}</div>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  <div class="text-[11px] font-bold ${s._daysWithoutContact > 30 ? 'text-red-700' : 'text-amber-700'}">${s._riskReason}</div>
+                  ${s.phone ? `<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" onclick="event.stopPropagation()" class="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded font-bold inline-block mt-0.5">💬 WhatsApp</a>` : ''}
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        `;
+      })()}
+
       <!-- Distribución por etapa + cuellos de botella -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-slate-200 rounded-xl p-4">

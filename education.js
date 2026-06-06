@@ -99,7 +99,15 @@ function eduMyAlerts() {
   const ids = new Set(eduMyStudents().map(s => s.id));
   return eduState.alerts.filter(a => ids.has(a.student_id));
 }
-function eduSetMentorship(id) { eduState.mentorshipId = id; eduState.selectedStudentId = null; eduRender(); }
+function eduSetMentorship(id) {
+  eduState.mentorshipId = id;
+  // Preservar selectedStudentId SI el estudiante existe en la nueva mentoría
+  if (eduState.selectedStudentId) {
+    const s = eduState.students.find(x => x.id === eduState.selectedStudentId);
+    if (!s || s.mentorship_id !== id) eduState.selectedStudentId = null;
+  }
+  eduRender();
+}
 function eduSetTab(t) { eduState.tab = t; eduRender(); }
 function eduStageObj(stageKey) {
   const m = eduCurrentMentorship();
@@ -255,6 +263,7 @@ function eduRenderStudents() {
           <option value="all" ${eduState.statusFilter==='all'?'selected':''}>Todos los status</option>
           ${['active','at_risk','paused','graduated','dropped'].map(st => `<option value="${st}" ${eduState.statusFilter===st?'selected':''}>${st}</option>`).join('')}
         </select>
+        <button onclick="eduExportStudentsCSV()" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 text-xs font-bold px-3 py-1 rounded" title="Descargar CSV con los filtros actuales">📥 CSV</button>
         <button onclick="eduAddStudent()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded">+ Estudiante manual</button>
         <div class="text-[10px] text-slate-500">${filtered.length} de ${students.length}</div>
       </div>
@@ -3187,4 +3196,87 @@ async function fmLinkPlanAStudiante(studentId, mentorshipId) {
 // Cargados después de education.js en index.html y scripts/build.mjs
 // para preservar el orden de inicialización.
 // ════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════
+// 📥 EXPORT CSV de estudiantes (respeta filtros actuales)
+// ════════════════════════════════════════════════════════════
+function eduExportStudentsCSV() {
+  const students = eduMyStudents();
+  let filtered = eduAplicarBusquedaInteligente(students, eduState.searchQuery||'');
+  if (eduState.stageFilter && eduState.stageFilter !== 'all') filtered = filtered.filter(s => s.current_stage === eduState.stageFilter);
+  if (eduState.statusFilter && eduState.statusFilter !== 'all') filtered = filtered.filter(s => s.status === eduState.statusFilter);
+  if (!filtered.length) { alert('Sin estudiantes con esos filtros.'); return; }
+
+  const m = eduCurrentMentorship();
+  const stageName = key => (m?.stages || []).find(s => s.key === key)?.name || key || '';
+
+  // Columnas estándar para outreach + análisis
+  const cols = [
+    { k: 'full_name', label: 'Nombre' },
+    { k: 'email', label: 'Email' },
+    { k: 'phone', label: 'Teléfono' },
+    { k: 'city', label: 'Ciudad' },
+    { k: 'grupo', label: 'Grupo' },
+    { k: 'current_stage', label: 'Etapa', map: stageName },
+    { k: 'status', label: 'Status' },
+    { k: 'payment_status', label: 'Pago' },
+    { k: 'enrolled_at', label: 'Inscripción' },
+    { k: 'stage_started_at', label: 'Inicio etapa' },
+    { k: 'expires_at', label: 'Vence' },
+    { k: 'ultima_fecha_seguimiento', label: 'Último contacto' }
+  ];
+
+  const escape = v => {
+    if (v == null) return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n\r]/.test(s) ? `"${s}"` : s;
+  };
+  const header = cols.map(c => c.label).join(',');
+  const rows = filtered.map(s => cols.map(c => escape(c.map ? c.map(s[c.k]) : s[c.k])).join(','));
+  const csv = [header, ...rows].join('\r\n');
+
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fecha = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `estudiantes-${(m?.name||'mentoria').replace(/\s+/g,'_').toLowerCase()}-${fecha}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════════════
+// ⚠️ Estudiantes en riesgo — heurística rápida
+// 7+ días sin actividad o stage_started_at > 60 días sin avance
+// ════════════════════════════════════════════════════════════
+function eduStudentsEnRiesgo() {
+  const students = eduMyStudents().filter(s => s.status === 'active' || s.status === 'at_risk');
+  const now = Date.now();
+  const dayMs = 86400000;
+  return students.filter(s => {
+    const last = s.ultima_fecha_seguimiento;
+    if (last) {
+      const dias = Math.floor((now - new Date(last).getTime()) / dayMs);
+      if (dias > 7) return true;
+    }
+    const stageStart = s.stage_started_at;
+    if (stageStart) {
+      const dias = Math.floor((now - new Date(stageStart).getTime()) / dayMs);
+      if (dias > 60) return true;
+    }
+    if (s.payment_status === 'past_due' || s.payment_status === 'expired') return true;
+    return false;
+  }).map(s => {
+    const last = s.ultima_fecha_seguimiento ? Math.floor((now - new Date(s.ultima_fecha_seguimiento).getTime()) / dayMs) : null;
+    const reason = !last ? 'Sin contacto registrado' :
+      last > 30 ? `${last}d sin contacto` :
+      last > 7 ? `${last}d sin contacto` :
+      s.payment_status === 'past_due' ? 'Pago atrasado' :
+      s.payment_status === 'expired' ? 'Pago vencido' :
+      'Estancado en etapa';
+    return { ...s, _riskReason: reason, _daysWithoutContact: last };
+  }).sort((a, b) => (b._daysWithoutContact || 0) - (a._daysWithoutContact || 0));
+}
 
