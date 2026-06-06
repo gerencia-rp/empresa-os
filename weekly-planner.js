@@ -313,6 +313,8 @@ function wpRender() {
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
           <button onclick="wpToggleSidebar()" class="lg:hidden text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1.5 rounded font-bold" title="Mostrar/ocultar panel lateral">${wpState.sidebarHidden?'📂':'📁'}</button>
+          <button onclick="wpOpenMonthView()" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-3 py-1.5 rounded font-bold" title="Vista mensual del calendario">📅 Mes</button>
+          <button onclick="wpOpenIcsExport()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Exportar tareas a Google Calendar / iCloud (.ics)">📥 Calendario</button>
           <button onclick="wpOpenWorkerMobile()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Vista del día optimizada para celular del líder/obrero">📱 Vista obrero</button>
           <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
@@ -4641,4 +4643,297 @@ if (typeof window !== 'undefined') {
       setTimeout(tryOpen, 1500);
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════
+// 📅 VISTA MENSUAL — calendario mes completo
+// Cada día es una celda con número de tareas, color por estado.
+// Click en un día abre la vista detallada de ese día.
+// ════════════════════════════════════════════════════════════
+const wpMonthState = { monthStart: null };
+
+function wpOpenMonthView() {
+  if (!wpMonthState.monthStart) {
+    const t = new Date();
+    wpMonthState.monthStart = new Date(t.getFullYear(), t.getMonth(), 1);
+  }
+  wpRenderMonthView();
+}
+
+function wpNavMonth(delta) {
+  const m = wpMonthState.monthStart;
+  if (delta === 0) {
+    const t = new Date();
+    wpMonthState.monthStart = new Date(t.getFullYear(), t.getMonth(), 1);
+  } else {
+    wpMonthState.monthStart = new Date(m.getFullYear(), m.getMonth() + delta, 1);
+  }
+  wpRenderMonthView();
+}
+
+function wpRenderMonthView() {
+  const ms = wpMonthState.monthStart;
+  const year = ms.getFullYear();
+  const month = ms.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startWeekday = firstDay.getDay(); // 0=Dom
+  // Empezar la grilla en lunes
+  const lead = startWeekday === 0 ? 6 : startWeekday - 1;
+  const monthLabel = ms.toLocaleDateString('es', { month:'long', year:'numeric' });
+
+  // Filtrar actividades del mes (respetando filtro de casa)
+  const houseFilter = wpState.houseFilter || 'all';
+  const fromIso = wpDateOnly(firstDay);
+  const toIso = wpDateOnly(lastDay);
+  let acts = (wpState.activities||[]).filter(a => a.date && a.date >= fromIso && a.date <= toIso);
+  acts = wpFilterActsByHouse(acts, houseFilter);
+
+  // Agrupar por día
+  const byDay = {};
+  acts.forEach(a => {
+    if (!byDay[a.date]) byDay[a.date] = { total:0, done:0, criticas:0, atrasadas:0, aplazadas:0, byHouse:{} };
+    byDay[a.date].total++;
+    if (a.status === 'done') byDay[a.date].done++;
+    if (a.priority === 'critical' || a.priority === 'urgent') byDay[a.date].criticas++;
+    if ((a.notes||'').includes('[APLAZADA')) byDay[a.date].aplazadas++;
+    const home = a.property_name || 'Sin asignar';
+    byDay[a.date].byHouse[home] = (byDay[a.date].byHouse[home] || 0) + 1;
+  });
+
+  const todayIso = wpDateOnly(new Date());
+  acts.forEach(a => {
+    if (a.status !== 'done' && a.status !== 'cancelled' && a.date < todayIso) {
+      if (byDay[a.date]) byDay[a.date].atrasadas++;
+    }
+  });
+
+  // KPIs del mes
+  const totalMes = acts.length;
+  const doneMes = acts.filter(a => a.status === 'done').length;
+  const pctMes = totalMes ? Math.round(doneMes/totalMes*100) : 0;
+
+  // Construir grilla 6 filas × 7 columnas
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const iso = wpDateOnly(date);
+    cells.push({ date, iso, day: d, info: byDay[iso] || null, isToday: iso === todayIso });
+  }
+  while (cells.length < 42) cells.push(null);
+
+  // Opciones de casa
+  const hidden = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
+  const activeProj = wpState.projects.filter(p => !hidden.has(p.id));
+  const extra = new Set();
+  wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
+  const houseOpts = [
+    `<option value="all" ${houseFilter==='all'?'selected':''}>🏘️ Todas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${houseFilter===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${houseFilter==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+  ].join('');
+
+  const html = `
+    <div class="space-y-3">
+      <!-- Header -->
+      <div class="bg-slate-900 text-white rounded-xl p-3 flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <button onclick="wpNavMonth(-1)" class="bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 text-sm font-bold">←</button>
+          <div class="text-base font-bold capitalize px-2">${monthLabel}</div>
+          <button onclick="wpNavMonth(1)" class="bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 text-sm font-bold">→</button>
+          <button onclick="wpNavMonth(0)" class="bg-emerald-500 hover:bg-emerald-600 rounded px-3 py-1.5 text-xs font-bold ml-2">Hoy</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <select onchange="wpSetHouseFilter(this.value); wpRenderMonthView();" class="bg-white text-slate-900 rounded px-2 py-1 text-xs font-bold">${houseOpts}</select>
+          <span class="text-xs bg-white/15 px-2 py-1 rounded font-bold">${doneMes}/${totalMes} (${pctMes}%)</span>
+        </div>
+      </div>
+
+      <!-- Grilla calendario -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="grid grid-cols-7 bg-slate-100 text-[10px] font-bold uppercase text-slate-600">
+          ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => `<div class="p-2 text-center border-r border-slate-200 last:border-r-0">${d}</div>`).join('')}
+        </div>
+        <div class="grid grid-cols-7">
+          ${cells.map((c, i) => {
+            if (!c) return `<div class="border-t border-r border-slate-100 last:border-r-0 bg-slate-50 min-h-[80px]"></div>`;
+            const info = c.info;
+            let bg = 'bg-white hover:bg-slate-50';
+            if (c.isToday) bg = 'bg-amber-50 hover:bg-amber-100';
+            if (info?.atrasadas > 0) bg = 'bg-red-50 hover:bg-red-100';
+            else if (info?.criticas > 0 && info.done < info.criticas) bg = 'bg-rose-50 hover:bg-rose-100';
+            const isWeekend = (i % 7) >= 5;
+            return `
+              <button onclick="wpOpenDayView('${c.iso}', '${houseFilter}')" class="border-t border-r border-slate-100 last:border-r-0 ${bg} ${isWeekend?'opacity-70':''} text-left p-1.5 min-h-[80px] flex flex-col">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs font-bold ${c.isToday?'bg-amber-600 text-white px-1.5 rounded':'text-slate-700'}">${c.day}</div>
+                  ${info?.criticas>0 ? `<span class="text-[9px] bg-rose-700 text-white font-bold px-1 rounded">⚠️${info.criticas}</span>` : ''}
+                </div>
+                ${info ? `
+                  <div class="mt-1 flex-1">
+                    <div class="text-[11px] font-bold ${info.done===info.total?'text-emerald-700':info.atrasadas>0?'text-red-700':'text-slate-700'}">${info.done}/${info.total}</div>
+                    ${info.atrasadas > 0 ? `<div class="text-[9px] text-red-700">⏰ ${info.atrasadas} atras.</div>` : ''}
+                    ${info.aplazadas > 0 ? `<div class="text-[9px] text-amber-700">🟡 ${info.aplazadas}</div>` : ''}
+                    ${Object.keys(info.byHouse).length === 1 ? `<div class="text-[9px] text-slate-500 truncate">${Object.keys(info.byHouse)[0]}</div>` : Object.keys(info.byHouse).length > 1 ? `<div class="text-[9px] text-slate-500">${Object.keys(info.byHouse).length} casas</div>` : ''}
+                  </div>
+                ` : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Leyenda -->
+      <div class="bg-slate-50 border border-slate-200 rounded p-3 text-[10px] text-slate-600 flex flex-wrap gap-3">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-100 border border-amber-300 rounded"></span> Hoy</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-rose-50 border border-rose-300 rounded"></span> Críticas pendientes</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-50 border border-red-300 rounded"></span> Atrasadas</span>
+        <span class="flex items-center gap-1">⚠️ Críticas del día · 🟡 Aplazadas · ⏰ Atrasadas</span>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">← Volver a semana</button>
+      </div>
+    </div>
+  `;
+  openModal(`📅 Vista mensual · ${monthLabel}`, html);
+  const inner = document.querySelector('#modal > div');
+  if (inner) { ['max-w-3xl','max-w-5xl'].forEach(c => inner.classList.remove(c)); inner.classList.add('max-w-6xl'); }
+}
+
+// ════════════════════════════════════════════════════════════
+// 📥 EXPORT ICS — calendario nativo (Google Calendar / iCloud)
+// Genera archivo .ics descargable con todas las tareas del rango.
+// El líder lo importa y se sincroniza con su calendario nativo.
+// ════════════════════════════════════════════════════════════
+function wpOpenIcsExport() {
+  const today = wpDateOnly(new Date());
+  const monthEnd = wpDateOnly(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
+
+  const hidden = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
+  const activeProj = wpState.projects.filter(p => !hidden.has(p.id));
+  const extra = new Set();
+  wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
+  const houseOpts = [
+    `<option value="all">🏘️ Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}">🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}">🏠 ${n.replace(/</g,'&lt;')}</option>`)
+  ].join('');
+
+  openModal('📥 Exportar a calendario (.ics)', `
+    <div class="space-y-3">
+      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
+        Descargá un archivo <code>.ics</code> con las tareas. Al abrirlo, tu calendario nativo
+        (Google Calendar, Apple Calendar, Outlook) las importa con <strong>recordatorios nativos</strong>.
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Desde</label>
+          <input id="ics-from" type="date" value="${today}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hasta</label>
+          <input id="ics-to" type="date" value="${monthEnd}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Casa</label>
+        <select id="ics-house" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${houseOpts}</select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Recordatorio (minutos antes)</label>
+        <select id="ics-reminder" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+          <option value="">Sin recordatorio</option>
+          <option value="15">15 minutos antes</option>
+          <option value="30" selected>30 minutos antes</option>
+          <option value="60">1 hora antes</option>
+          <option value="1440">1 día antes</option>
+        </select>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="wpDoIcsExport()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">📥 Descargar .ics</button>
+      </div>
+    </div>
+  `);
+}
+
+function wpDoIcsExport() {
+  const from = document.getElementById('ics-from').value;
+  const to = document.getElementById('ics-to').value;
+  const house = document.getElementById('ics-house').value;
+  const reminderMin = +document.getElementById('ics-reminder').value || 0;
+  if (!from || !to) return;
+
+  let acts = (wpState.activities||[]).filter(a => a.date && a.date >= from && a.date <= to);
+  acts = wpFilterActsByHouse(acts, house);
+  if (!acts.length) { alert('Sin tareas en ese rango.'); return; }
+
+  // Filtrar canceladas
+  acts = acts.filter(a => a.status !== 'cancelled');
+
+  // Construir ICS
+  const pad = n => String(n).padStart(2,'0');
+  const fmtDT = (dateStr, hour, min) => {
+    const d = new Date(dateStr+'T00:00:00');
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(hour||7)}${pad(min||0)}00`;
+  };
+  const nowUtc = (() => {
+    const d = new Date();
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+  })();
+  const esc = s => String(s||'').replace(/[\\;,]/g, m => '\\'+m).replace(/\n/g, '\\n');
+
+  let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Empresa OS//Weekly Planner//ES\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
+  acts.forEach(a => {
+    const startHour = a.start_hour || 7;
+    const endHour = a.end_hour || 17;
+    const title = a.activity_name || 'Tarea';
+    const home = a.property_name || '—';
+    const stage = a.stage ? ` · ${a.stage}` : '';
+    const critical = (a.priority === 'critical' || a.priority === 'urgent') ? ' ⚠️' : '';
+    const done = a.status === 'done' ? ' ✅' : '';
+    const summary = `${critical}${done} ${title} (${home})${stage}`.trim();
+
+    const materials = (a.materials||[]).map(m => `• ${m.nombre||''} ${m.cantidad||1} ${m.unidad||''}`).join('\n');
+    const checklist = (a.checklist||[]).map(c => `${c.done?'☑':'☐'} ${c.item||''}`).join('\n');
+    let desc = `Casa: ${home}\n${stage?`Etapa: ${a.stage}\n`:''}Estado: ${a.status||'planned'}`;
+    if (materials) desc += `\n\nMateriales:\n${materials}`;
+    if (checklist) desc += `\n\nChecklist:\n${checklist}`;
+    if (a.notes) desc += `\n\nNotas:\n${a.notes}`;
+
+    const uid = `wpa-${a.id}@empresa-os`;
+    ics += 'BEGIN:VEVENT\r\n';
+    ics += `UID:${uid}\r\n`;
+    ics += `DTSTAMP:${nowUtc}\r\n`;
+    ics += `DTSTART:${fmtDT(a.date, startHour)}\r\n`;
+    ics += `DTEND:${fmtDT(a.date, endHour)}\r\n`;
+    ics += `SUMMARY:${esc(summary)}\r\n`;
+    ics += `DESCRIPTION:${esc(desc)}\r\n`;
+    ics += `LOCATION:${esc(home)}\r\n`;
+    if (a.status === 'done') ics += 'STATUS:CONFIRMED\r\n';
+    if (reminderMin > 0) {
+      ics += 'BEGIN:VALARM\r\n';
+      ics += 'ACTION:DISPLAY\r\n';
+      ics += `DESCRIPTION:${esc(summary)}\r\n`;
+      ics += `TRIGGER:-PT${reminderMin}M\r\n`;
+      ics += 'END:VALARM\r\n';
+    }
+    ics += 'END:VEVENT\r\n';
+  });
+  ics += 'END:VCALENDAR\r\n';
+
+  // Descargar
+  const blob = new Blob([ics], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `empresa-os-planner-${from}-${to}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  wpBackToPlanner();
 }
