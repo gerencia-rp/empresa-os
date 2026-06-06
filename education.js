@@ -24,6 +24,7 @@ const EDU_TABS = [
   { key: 'dashboard',    label: '📊 Dashboard' },
   { key: 'students',     label: '👥 Estudiantes' },
   { key: 'student_plan', label: '🎯 Plan Acción' },
+  { key: 'tasks',        label: '✅ Tareas' },
   { key: 'alerts',       label: '🚨 Alertas' },
   { key: 'progress',     label: '📈 Progreso' },
   { key: 'resources',    label: '📑 Recursos' },
@@ -188,6 +189,7 @@ function eduRender() {
         ${eduState.tab === 'dashboard' ? eduRenderDashboard() :
           eduState.tab === 'students' ? eduRenderStudents() :
           eduState.tab === 'student_plan' ? eduRenderStudentPlan() :
+          eduState.tab === 'tasks' ? eduRenderTasksOverview() :
           eduState.tab === 'progress' ? eduRenderProgressFunnel() :
           eduState.tab === 'resources' ? eduRenderResourcesIntegrated() :
           eduState.tab === 'calls' ? eduRenderCallsEnhanced() :
@@ -2429,6 +2431,7 @@ function eduRenderStudentDetail(studentId) {
           <div class="flex gap-2 pt-2">
             <button onclick="eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
             <button onclick="eduState.tab='student_plan'; eduState.selectedStudentId='${s.id}'; eduCloseStudentDetail(); eduLoadStudentPlan('${s.id}').then(eduRender);" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700">🎯 Ir al plan</button>
+            <button onclick="eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
             ${s.airtable_record_id ? `<a href="https://airtable.com/${m?.airtable_base_id||''}/${m?.airtable_students_table||''}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
           </div>
 
@@ -3278,5 +3281,264 @@ function eduStudentsEnRiesgo() {
       'Estancado en etapa';
     return { ...s, _riskReason: reason, _daysWithoutContact: last };
   }).sort((a, b) => (b._daysWithoutContact || 0) - (a._daysWithoutContact || 0));
+}
+
+// ════════════════════════════════════════════════════════════
+// ✅ TAREAS — vista global de tareas de todos los estudiantes
+// Lee edu_student_plan_tasks de TODOS los planes activos del mentor.
+// Permite marcar/desmarcar inline y filtrar por estudiante/etapa/estado.
+// ════════════════════════════════════════════════════════════
+const eduTasksState = { loaded: false, all: [], filterStudent: 'all', filterStatus: 'pending', sortBy: 'bloque' };
+
+async function eduLoadAllTasks() {
+  const students = eduMyStudents();
+  if (!students.length) { eduTasksState.all = []; eduTasksState.loaded = true; return; }
+  const studentIds = students.map(s => s.id);
+  // Chunk si hay más de 50 estudiantes
+  const chunks = [];
+  for (let i = 0; i < studentIds.length; i += 50) chunks.push(studentIds.slice(i, i+50));
+  const allTasks = [];
+  for (const ids of chunks) {
+    const { data } = await sb.from('edu_student_plan_tasks')
+      .select('*')
+      .in('student_id', ids)
+      .order('completed', { ascending: true })
+      .order('bloque_orden')
+      .order('paso_index')
+      .limit(1000);
+    if (data) allTasks.push(...data);
+  }
+  eduTasksState.all = allTasks;
+  eduTasksState.loaded = true;
+}
+
+function eduRenderTasksOverview() {
+  if (!eduTasksState.loaded) {
+    eduLoadAllTasks().then(() => eduRender());
+    return '<div class="p-8 text-center text-slate-400">⏳ Cargando tareas...</div>';
+  }
+  const students = eduMyStudents();
+  const studentById = Object.fromEntries(students.map(s => [s.id, s]));
+  const myStudentIds = new Set(students.map(s => s.id));
+
+  let tasks = eduTasksState.all.filter(t => myStudentIds.has(t.student_id));
+
+  if (eduTasksState.filterStudent !== 'all') {
+    tasks = tasks.filter(t => t.student_id === eduTasksState.filterStudent);
+  }
+  if (eduTasksState.filterStatus === 'pending') tasks = tasks.filter(t => !t.completed);
+  else if (eduTasksState.filterStatus === 'done') tasks = tasks.filter(t => t.completed);
+
+  // KPIs
+  const total = eduTasksState.all.filter(t => myStudentIds.has(t.student_id)).length;
+  const done = eduTasksState.all.filter(t => myStudentIds.has(t.student_id) && t.completed).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+
+  // Agrupar por estudiante
+  const byStudent = {};
+  tasks.forEach(t => {
+    if (!byStudent[t.student_id]) byStudent[t.student_id] = [];
+    byStudent[t.student_id].push(t);
+  });
+
+  const studentOpts = `<option value="all">Todos los estudiantes</option>` + students.map(s => `<option value="${s.id}" ${eduTasksState.filterStudent===s.id?'selected':''}>${(s.full_name||'—').replace(/</g,'&lt;')}</option>`).join('');
+
+  return `
+    <div class="space-y-3">
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-slate-900 text-white rounded-xl p-3">
+          <div class="text-[10px] text-slate-400 uppercase font-bold">Total tareas</div>
+          <div class="text-2xl font-bold">${total}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-[10px] text-emerald-700 uppercase font-bold">Completadas</div>
+          <div class="text-2xl font-bold text-emerald-900">${done}</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div class="text-[10px] text-amber-700 uppercase font-bold">Pendientes</div>
+          <div class="text-2xl font-bold text-amber-900">${total - done}</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] text-blue-700 uppercase font-bold">% Avance global</div>
+          <div class="text-2xl font-bold text-blue-900">${pct}%</div>
+          <div class="h-1.5 bg-blue-200 rounded-full mt-1 overflow-hidden"><div class="h-full bg-blue-600" style="width:${pct}%"></div></div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <select onchange="eduTasksState.filterStudent=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs font-bold">${studentOpts}</select>
+        <div class="flex bg-slate-100 rounded p-0.5 text-xs font-bold">
+          <button onclick="eduTasksState.filterStatus='all'; eduRender()" class="px-2 py-1 rounded ${eduTasksState.filterStatus==='all'?'bg-white shadow':''}">Todas</button>
+          <button onclick="eduTasksState.filterStatus='pending'; eduRender()" class="px-2 py-1 rounded ${eduTasksState.filterStatus==='pending'?'bg-white shadow':''}">Pendientes</button>
+          <button onclick="eduTasksState.filterStatus='done'; eduRender()" class="px-2 py-1 rounded ${eduTasksState.filterStatus==='done'?'bg-white shadow':''}">Hechas</button>
+        </div>
+        <button onclick="eduTasksState.loaded=false; eduRender()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded font-bold">🔄 Refrescar</button>
+        <div class="ml-auto text-[10px] text-slate-500">${tasks.length} tarea(s) visible(s)</div>
+      </div>
+
+      <!-- Lista de tareas agrupadas por estudiante -->
+      ${Object.keys(byStudent).length === 0 ? `
+        <div class="text-center py-12 text-slate-400 text-sm">
+          ${eduTasksState.filterStatus==='pending' ? '🎉 Sin tareas pendientes con esos filtros.' : 'Sin tareas para mostrar.'}
+        </div>
+      ` : Object.entries(byStudent).map(([studentId, sTasks]) => {
+        const s = studentById[studentId];
+        if (!s) return '';
+        const sDone = sTasks.filter(t => t.completed).length;
+        const sPct = sTasks.length ? Math.round(sDone/sTasks.length*100) : 0;
+        // Agrupar por bloque dentro del estudiante
+        const byBloque = {};
+        sTasks.forEach(t => {
+          const key = `${t.bloque_orden}-${t.bloque_id}`;
+          if (!byBloque[key]) byBloque[key] = { etapa: t.bloque_etapa, subetapa: t.bloque_subetapa, tasks: [] };
+          byBloque[key].tasks.push(t);
+        });
+        return `
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-slate-50 px-3 py-2 flex items-center justify-between border-b border-slate-100">
+              <div class="flex-1 min-w-0">
+                <button onclick="eduOpenStudent('${s.id}')" class="font-bold text-sm hover:underline text-left">${(s.full_name||'—').replace(/</g,'&lt;')}</button>
+                <div class="text-[10px] text-slate-500">${(s.grupo || s.current_stage || '—').replace(/</g,'&lt;')}</div>
+              </div>
+              <div class="text-xs text-slate-600 whitespace-nowrap">${sDone}/${sTasks.length} (${sPct}%)</div>
+            </div>
+            <div class="divide-y divide-slate-100">
+              ${Object.values(byBloque).map(bg => `
+                <div class="px-3 py-2">
+                  <div class="text-[10px] font-bold uppercase text-slate-500 mb-1">${(bg.etapa||'').replace(/</g,'&lt;')}${bg.subetapa?` · ${bg.subetapa.replace(/</g,'&lt;')}`:''}</div>
+                  <ul class="space-y-1">
+                    ${bg.tasks.map(t => `
+                      <li class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" ${t.completed?'checked':''} onchange="eduToggleTaskCompletedOverview('${t.id}')" class="mt-0.5 cursor-pointer w-4 h-4"/>
+                        <span class="flex-1 ${t.completed?'line-through text-slate-400':'text-slate-800'}">${(t.paso_text||'').replace(/</g,'&lt;')}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+async function eduToggleTaskCompletedOverview(taskId) {
+  const t = eduTasksState.all.find(x => x.id === taskId);
+  if (!t) return;
+  const newVal = !t.completed;
+  t.completed = newVal;
+  t.completed_at = newVal ? new Date().toISOString() : null;
+  eduRender();
+  try {
+    await sb.from('edu_student_plan_tasks').update({
+      completed: newVal,
+      completed_at: newVal ? new Date().toISOString() : null,
+      completed_by: state.user?.id || null
+    }).eq('id', taskId);
+  } catch (e) {
+    // rollback
+    t.completed = !newVal;
+    eduRender();
+    alert('Error guardando: ' + e.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 🎓 CERTIFICADO de finalización — HTML imprimible (PDF via window.print)
+// ════════════════════════════════════════════════════════════
+function eduGenerateCertificate(studentId) {
+  const s = eduState.students.find(x => x.id === studentId);
+  if (!s) return alert('Estudiante no encontrado');
+  const m = (eduState.mentorships || []).find(x => x.id === s.mentorship_id);
+  const fechaHoy = new Date().toLocaleDateString('es-MX', { day:'numeric', month:'long', year:'numeric' });
+
+  // Determinar progreso
+  const tasks = (eduTasksState.all || []).filter(t => t.student_id === studentId);
+  const tasksDone = tasks.filter(t => t.completed).length;
+  const pctCompletion = tasks.length ? Math.round(tasksDone/tasks.length*100) : (s.status === 'graduated' ? 100 : 0);
+
+  const tituloMentoria = m?.name || 'Mentoría';
+  const nombreEstudiante = s.full_name || 'Estudiante';
+  const stageActual = (m?.stages||[]).find(st => st.key === s.current_stage)?.name || s.current_stage || '';
+  const fechaInicio = s.enrolled_at ? new Date(s.enrolled_at).toLocaleDateString('es-MX', { day:'numeric', month:'long', year:'numeric' }) : '—';
+  const tipo = pctCompletion >= 100 || s.status === 'graduated' ? 'FINALIZACIÓN' : (pctCompletion >= 50 ? 'AVANCE' : 'PARTICIPACIÓN');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Certificado · ${nombreEstudiante.replace(/</g,'&lt;')}</title>
+<script src="https://cdn.tailwindcss.com"><\/script>
+<style>
+  @page { size: landscape; margin: 0; }
+  @media print { body { margin: 0; } .no-print { display: none !important; } }
+  body { font-family: 'Georgia', serif; background: #f8fafc; }
+  .border-deco { border: 12px double #0f172a; }
+  .border-deco-inner { border: 2px solid #94a3b8; }
+  .seal { background: radial-gradient(circle at center, #fbbf24 0%, #f59e0b 60%, #d97706 100%); }
+</style>
+</head>
+<body class="bg-slate-50 p-8">
+  <div class="no-print mb-4 flex justify-center gap-2">
+    <button onclick="window.print()" class="bg-emerald-600 text-white text-lg font-bold px-6 py-3 rounded-xl">🖨️ Imprimir / PDF</button>
+    <button onclick="window.close()" class="bg-slate-100 text-lg px-6 py-3 rounded-xl">✕ Cerrar</button>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-2xl max-w-5xl mx-auto p-8 border-deco">
+    <div class="border-deco-inner p-12 text-center">
+      <div class="text-[10px] uppercase tracking-[0.4em] text-slate-500 font-bold">Rental Profitss · Empresa OS</div>
+
+      <div class="mt-6 text-5xl font-black text-slate-900 tracking-wide">CERTIFICADO</div>
+      <div class="mt-1 text-xl text-slate-600 tracking-wider">de ${tipo}</div>
+
+      <div class="mt-10 text-base text-slate-700">Se otorga el presente certificado a</div>
+
+      <div class="mt-3 text-6xl font-bold text-slate-900 italic" style="font-family: 'Georgia', serif;">${nombreEstudiante.replace(/</g,'&lt;')}</div>
+
+      <div class="mt-8 text-base text-slate-700 leading-relaxed max-w-3xl mx-auto">
+        Por su ${pctCompletion >= 100 ? 'culminación exitosa' : pctCompletion >= 50 ? 'avance significativo' : 'participación'} en el programa
+        <br><strong class="text-2xl text-slate-900">${tituloMentoria.replace(/</g,'&lt;')}</strong>
+        ${stageActual ? `<br>${pctCompletion >= 100 ? 'completando la etapa' : 'cursando actualmente la etapa'} <strong>${stageActual.replace(/</g,'&lt;')}</strong>` : ''}
+        ${tasks.length > 0 ? `<br>con un cumplimiento del <strong>${pctCompletion}%</strong> de las tareas asignadas (${tasksDone}/${tasks.length}).` : ''}
+      </div>
+
+      <div class="mt-10 grid grid-cols-3 gap-8 items-end">
+        <div>
+          <div class="border-b-2 border-slate-700 h-12"></div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-600 mt-1">Mentor / Directora</div>
+        </div>
+        <div class="flex justify-center">
+          <div class="seal w-32 h-32 rounded-full flex items-center justify-center shadow-xl">
+            <div class="bg-white rounded-full w-24 h-24 flex flex-col items-center justify-center">
+              <div class="text-3xl">🎓</div>
+              <div class="text-[8px] uppercase tracking-wider text-slate-700 font-bold">Verificado</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="border-b-2 border-slate-700 h-12"></div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-600 mt-1">Fecha de emisión</div>
+        </div>
+      </div>
+
+      <div class="mt-8 grid grid-cols-3 gap-8 text-[10px] uppercase tracking-wider text-slate-500">
+        <div>Inscripción: <strong>${fechaInicio}</strong></div>
+        <div>—</div>
+        <div>${fechaHoy}</div>
+      </div>
+
+      <div class="mt-6 text-[9px] text-slate-400">ID Certificado: ${s.id.slice(0,8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=1200,height=800');
+  win.document.write(html);
+  win.document.close();
 }
 

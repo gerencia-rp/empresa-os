@@ -418,6 +418,14 @@ function eduCallOpenResult(callId) {
         <input id="ec-r-evidence" type="url" value="${(c.evidence_url||'').replace(/"/g,'&quot;')}" placeholder="https://..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
       </div>
       <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">⭐ Calificación de la sesión (preparación + interés del estudiante)</label>
+        <div class="flex items-center gap-2">
+          ${[1,2,3,4,5].map(n => `<button type="button" onclick="document.getElementById('ec-r-rating').value=${n}; document.querySelectorAll('.ec-r-star').forEach((s,i)=>s.classList.toggle('text-amber-500', i<${n}));" class="ec-r-star text-3xl ${(+c.rating||0)>=n?'text-amber-500':'text-slate-300'}">★</button>`).join('')}
+          <input type="hidden" id="ec-r-rating" value="${c.rating||''}"/>
+          <span class="text-[10px] text-slate-500 ml-2">1=muy pobre · 5=excelente</span>
+        </div>
+      </div>
+      <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Resumen post-sesión (qué se cubrió / próximos pasos)</label>
         <textarea id="ec-r-summary" rows="4" class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${escapeHtml(c.summary || c.notes_md || '')}</textarea>
       </div>
@@ -436,6 +444,7 @@ function eduCallOpenResult(callId) {
 async function eduCallSaveResult(callId) {
   const c = (eduState.calls || []).find(x => x.id === callId);
   if (!c) return;
+  const ratingVal = +document.getElementById('ec-r-rating').value || null;
   const update = {
     status_attendance: document.getElementById('ec-r-status').value,
     status_reason: document.getElementById('ec-r-reason').value.trim() || null,
@@ -443,10 +452,14 @@ async function eduCallSaveResult(callId) {
     motivo: document.getElementById('ec-r-motivo').value || c.motivo,
     evidence_url: document.getElementById('ec-r-evidence').value.trim() || null,
     summary: document.getElementById('ec-r-summary').value.trim() || null,
+    rating: ratingVal,
     attended: document.getElementById('ec-r-status').value === 'asistio',
     updated_at: new Date().toISOString()
   };
-  const { error } = await sb.from('edu_student_calls').update(update).eq('id', callId);
+  // safeUpdate por si 'rating' no existe en el schema todavía
+  const { error } = await (window.safeUpdate
+    ? window.safeUpdate(p => sb.from('edu_student_calls').update(p).eq('id', callId), update)
+    : sb.from('edu_student_calls').update(update).eq('id', callId));
   if (error) return alert('Error: '+error.message);
 
   // Si reprogramó, ofrecer crear nueva sesión
