@@ -40,22 +40,55 @@ const BENCHMARKS_AUSTIN = {
 // activos de la empresa (camionetas, herramientas grandes, etc) para calcular
 // EBIT / EBITDA y margen neto después de impuestos.
 function rdGetFinCfg() {
+  let cfg;
   try {
     const raw = localStorage.getItem('rd_fin_cfg');
-    if (raw) return { ...rdFinCfgDefaults(), ...JSON.parse(raw) };
-  } catch {}
-  return rdFinCfgDefaults();
+    cfg = raw ? { ...rdFinCfgDefaults(), ...JSON.parse(raw) } : rdFinCfgDefaults();
+  } catch {
+    cfg = rdFinCfgDefaults();
+  }
+  // Si activos_auto, sobrescribir depreciacion_anual con el cálculo del catálogo
+  if (cfg.activos_auto) {
+    const depAuto = rdCalcDepreciacionFromActivos();
+    if (depAuto > 0) cfg.depreciacion_anual = depAuto;
+  }
+  return cfg;
 }
 function rdFinCfgDefaults() {
   return {
     tasa_impuestos_pct: 21,            // 21% corp USA federal (typical)
     overhead_anual: 60000,             // gastos generales empresa (oficina, seguros, software)
-    depreciacion_anual: 12000,         // depreciación equipos (camioneta 4Runner, etc)
+    depreciacion_anual: 12000,         // depreciación equipos (camioneta 4Runner, etc) — auto si hay activos
     amortizacion_anual: 0,             // amortización intangibles
     interes_prestamos_anual: 8000,     // gasto financiero anual estimado
     obras_activas_promedio: 3,         // # promedio de obras activas para prorrateo
-    crew_min_personas: 3               // tamaño mínimo de cuadrilla esperado
+    crew_min_personas: 3,              // tamaño mínimo de cuadrilla esperado
+    activos_auto: true                 // si true, calcula depreciacion_anual desde el catálogo de activos
   };
+}
+
+// ─── Catálogo de activos/herramientas (vehículos, equipos grandes) ───
+// Cada activo tiene costo inicial y vida útil. La depreciación anual se calcula
+// como sum(cost / vida_util). Si activos_auto está en true, se usa para EBITDA.
+function rdGetActivos() {
+  try {
+    const raw = localStorage.getItem('rd_activos');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+function rdSetActivos(list) {
+  try { localStorage.setItem('rd_activos', JSON.stringify(list)); } catch {}
+}
+function rdCalcDepreciacionFromActivos() {
+  const activos = rdGetActivos();
+  let total = 0;
+  activos.forEach(a => {
+    const cost = +a.cost_initial || 0;
+    const vida = +a.vida_util_anios || 1;
+    if (vida > 0 && cost > 0) total += cost / vida;
+  });
+  return Math.round(total);
 }
 function rdSetFinCfg(patch) {
   const cur = rdGetFinCfg();
@@ -342,9 +375,9 @@ function rdRender() {
 
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 flex-wrap gap-2">
-        <div class="flex items-center gap-1.5 flex-wrap">
+        <div class="flex items-center gap-1.5 flex-nowrap overflow-x-auto -mx-1 px-1 w-full lg:w-auto lg:flex-wrap">
           ${['portfolio','informe','obras','lideres','personal','comparar','finanzas','alertas','acciones','tendencias','insights'].map(t => `
-            <button onclick="rdSetTab('${t}')" class="px-2.5 py-1.5 rounded text-xs font-bold ${rdState.tab===t?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
+            <button onclick="rdSetTab('${t}')" class="px-2.5 py-1.5 rounded text-xs font-bold whitespace-nowrap flex-shrink-0 ${rdState.tab===t?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
               ${t==='portfolio'?'📊 Portfolio':t==='informe'?'📑 Informe':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='personal'?'🧑‍🔧 Personal':t==='comparar'?'🔍 Comparar':t==='finanzas'?'💼 Finanzas':t==='alertas'?'🚨 Alertas':t==='acciones'?'📋 Acciones':t==='tendencias'?'📈 Tendencias':'🧠 Insights IA'}
               ${t==='alertas' && rdState.alerts.length ? `<span class="ml-1 bg-red-600 text-white px-1.5 rounded">${rdState.alerts.length}</span>` : ''}
               ${t==='acciones' && rdState.requiredActions.length ? `<span class="ml-1 bg-amber-600 text-white px-1.5 rounded">${rdState.requiredActions.length}</span>` : ''}
@@ -1337,17 +1370,31 @@ async function rdOpenObra(airtable_id) {
   const p = rdState.properties.find(x => x.airtable_id === airtable_id);
   if (!p) return;
 
-  const { data: history } = await sb.from('remodel_snapshots')
-    .select('*')
-    .eq('airtable_id', airtable_id)
-    .order('snapshot_date', { ascending: true });
+  // Cargar histórico + ejecución real desde weekly_activities (cruza por address/property_name)
+  const [snapRes, wpRes] = await Promise.all([
+    sb.from('remodel_snapshots').select('*').eq('airtable_id', airtable_id).order('snapshot_date', { ascending: true }),
+    // Buscar por nombre/dirección — Airtable y weekly_activities suelen diferir en project_id
+    sb.from('weekly_activities').select('*').or(`property_name.ilike.%${(p.address||'').slice(0,30)}%,property_name.ilike.%${(p.name||p.address||'').slice(0,30)}%`)
+  ]);
+  const history = snapRes.data || [];
+  const wpActs = wpRes.data || [];
+
+  // KPIs de ejecución real
+  const ejecTotal = wpActs.length;
+  const ejecDone = wpActs.filter(a => a.status === 'done').length;
+  const ejecPct = ejecTotal ? Math.round(ejecDone/ejecTotal*100) : null;
+  const ejecCriticas = wpActs.filter(a => (a.priority==='critical'||a.priority==='urgent'));
+  const ejecCritDone = ejecCriticas.filter(a => a.status === 'done').length;
+  const todayIsoObra = new Date().toISOString().slice(0,10);
+  const ejecAtrasadas = wpActs.filter(a => a.status !== 'done' && a.status !== 'cancelled' && a.date && a.date < todayIsoObra);
+  const ejecAplazadas = wpActs.filter(a => (a.notes||'').includes('[APLAZADA'));
 
   const cost = (p.gasto_materiales||0) + (p.gasto_trabajadores||0);
   const presup = p.presupuesto_interno || 0;
   const remaining = presup - cost;
   const matPct = (p.gasto_materiales||0)+(p.gasto_trabajadores||0) > 0 ? Math.round((p.gasto_materiales||0) / ((p.gasto_materiales||0)+(p.gasto_trabajadores||0)) * 100) : 0;
 
-  const latestSnap = (history || [])[history.length-1];
+  const latestSnap = history[history.length-1];
   const obraAlerts = rdState.alerts.filter(a => a.airtable_id === airtable_id);
   const kpis = rdAdvancedKPIs(p);
   const acciones = rdAccionesRequeridas(p, kpis);
@@ -1379,6 +1426,45 @@ async function rdOpenObra(airtable_id) {
           </div>
         </div>
       </div>
+
+      <!-- 🔗 EJECUCIÓN REAL desde Weekly Planner -->
+      ${ejecTotal > 0 ? `
+      <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-300 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div class="text-xs font-bold uppercase text-blue-900">🔗 Ejecución real (Weekly Planner)</div>
+          <div class="text-[10px] text-blue-700">${ejecTotal} actividades cruzadas por dirección</div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div class="bg-white rounded-lg p-2.5 border border-blue-200">
+            <div class="text-[10px] uppercase text-slate-500 font-bold">% Plan ejecutado</div>
+            <div class="text-base font-bold ${ejecPct>=80?'text-emerald-700':ejecPct>=50?'text-amber-700':'text-red-700'}">${ejecPct!=null?ejecPct+'%':'—'}</div>
+            <div class="text-[10px] text-slate-500">${ejecDone}/${ejecTotal} hechas</div>
+          </div>
+          <div class="bg-white rounded-lg p-2.5 border border-blue-200">
+            <div class="text-[10px] uppercase text-slate-500 font-bold">Ruta crítica</div>
+            <div class="text-base font-bold ${ejecCriticas.length === 0 ? 'text-slate-400' : ejecCritDone === ejecCriticas.length ? 'text-emerald-700' : 'text-rose-700'}">${ejecCriticas.length>0?`${ejecCritDone}/${ejecCriticas.length}`:'—'}</div>
+            <div class="text-[10px] text-slate-500">${ejecCriticas.length>0?'críticas hechas':'sin críticas'}</div>
+          </div>
+          <div class="bg-white rounded-lg p-2.5 border border-blue-200">
+            <div class="text-[10px] uppercase text-slate-500 font-bold">Atrasadas</div>
+            <div class="text-base font-bold ${ejecAtrasadas.length>0?'text-red-700':'text-emerald-700'}">${ejecAtrasadas.length}</div>
+            <div class="text-[10px] text-slate-500">sin completar fecha</div>
+          </div>
+          <div class="bg-white rounded-lg p-2.5 border border-blue-200">
+            <div class="text-[10px] uppercase text-slate-500 font-bold">Aplazadas</div>
+            <div class="text-base font-bold ${ejecAplazadas.length>0?'text-amber-700':'text-slate-400'}">${ejecAplazadas.length}</div>
+            <div class="text-[10px] text-slate-500">con motivo registrado</div>
+          </div>
+        </div>
+        ${ejecAtrasadas.length > 0 || ejecAplazadas.length > 0 ? `
+        <div class="mt-2 text-[10px] text-blue-700 italic">
+          💡 Las cifras de avance del cronograma operativo pueden diferir del avance reportado en Airtable.
+          ${ejecAtrasadas.length>0?` Hay ${ejecAtrasadas.length} tareas atrasadas en el planner.`:''}
+        </div>` : ''}
+        <div class="mt-2 flex justify-end">
+          <button onclick="closeModal(); setTimeout(() => { const sys = rdState.sys; if (sys && typeof openWeeklyPlanner === 'function') { openWeeklyPlanner(sys); setTimeout(() => { if (typeof wpSetHouseFilter === 'function') wpSetHouseFilter('name:${(p.address||'').replace(/'/g,'')}'); }, 200); } }, 100)" class="text-[10px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded">📅 Ver cronograma de esta casa →</button>
+        </div>
+      </div>` : ''}
 
       <!-- 💼 ANÁLISIS FINANCIERO COMPLETO -->
       ${(() => {
@@ -1823,8 +1909,12 @@ function rdOpenFinCfg() {
           <input id="fc-crew" type="number" min="1" value="${cfg.crew_min_personas}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" title="Tamaño esperado del crew por obra activa"/>
         </div>
       </div>
-      <div class="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] text-amber-900">
-        💡 La camioneta 4Runner típica se deprecia ~$8,000-$12,000/año. Herramientas grandes (compresores, sierras industriales) ~$3,000-$5,000/año.
+      <div class="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] text-amber-900 flex items-start justify-between gap-2">
+        <div>
+          💡 La camioneta 4Runner típica se deprecia ~$8,000-$12,000/año. Herramientas grandes (compresores, sierras industriales) ~$3,000-$5,000/año.
+          <br><strong>Modo auto:</strong> si listás activos individuales, la depreciación se calcula sola.
+        </div>
+        <button onclick="rdOpenActivos()" class="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded whitespace-nowrap">📦 Catálogo activos</button>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
@@ -1846,6 +1936,168 @@ function rdSaveFinCfg() {
   });
   closeModal();
   rdRender();
+}
+
+// ─── Catálogo de activos: gestión visual ───
+function rdOpenActivos() {
+  const activos = rdGetActivos();
+  const cfg = rdGetFinCfg();
+  const depAuto = rdCalcDepreciacionFromActivos();
+  const fmt = n => '$' + Math.round(n).toLocaleString();
+
+  // Plantillas comunes para agregar rápido
+  const plantillas = [
+    { name: '🚙 Camioneta 4Runner / pickup', type: 'vehiculo', cost: 35000, vida: 5 },
+    { name: '🚛 Camión utility / dump', type: 'vehiculo', cost: 28000, vida: 6 },
+    { name: '🛠️ Compresor industrial', type: 'herramienta', cost: 2500, vida: 8 },
+    { name: '⚡ Generador grande', type: 'herramienta', cost: 3000, vida: 7 },
+    { name: '🪚 Sierra de mesa industrial', type: 'herramienta', cost: 1800, vida: 7 },
+    { name: '🔨 Set de herramientas eléctricas', type: 'herramienta', cost: 4500, vida: 5 },
+    { name: '📱 Software / licencias', type: 'intangible', cost: 5000, vida: 3 }
+  ];
+
+  openModal('📦 Catálogo de activos depreciables', `
+    <div class="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+        Registrá camionetas, herramientas grandes y equipos con su <strong>costo inicial</strong> y <strong>vida útil en años</strong>.
+        La depreciación anual se calcula automáticamente y se aplica al EBITDA de la empresa.
+      </div>
+
+      <!-- Resumen -->
+      <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-300 rounded-xl p-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <div class="text-[10px] uppercase font-bold text-amber-800">Total invertido</div>
+            <div class="text-xl font-bold text-amber-900">${fmt(activos.reduce((s,a) => s + (+a.cost_initial||0), 0))}</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase font-bold text-amber-800">Activos registrados</div>
+            <div class="text-xl font-bold text-amber-900">${activos.length}</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase font-bold text-amber-800">⚙️ Depreciación auto / año</div>
+            <div class="text-xl font-bold text-amber-900">${fmt(depAuto)}</div>
+          </div>
+        </div>
+        <label class="flex items-center gap-2 mt-2 text-xs cursor-pointer">
+          <input type="checkbox" ${cfg.activos_auto?'checked':''} onchange="rdToggleActivosAuto(this.checked)"/>
+          <span>Usar este valor automáticamente para EBITDA (modo auto). Si destildás, podés escribir un número manual en la config financiera.</span>
+        </label>
+      </div>
+
+      <!-- Plantillas rápidas -->
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">⚡ Agregar rápido (plantillas comunes)</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+          ${plantillas.map((t, i) => `
+            <button onclick='rdAddActivoFromTemplate(${i})' class="text-left border border-slate-200 hover:border-violet-400 hover:bg-violet-50 rounded p-2 text-xs">
+              <div class="font-semibold">${t.name}</div>
+              <div class="text-[10px] text-slate-500">${fmt(t.cost)} · ${t.vida}a vida útil · ≈${fmt(t.cost/t.vida)}/año</div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <script>window._rdActivosPlantillas = ${JSON.stringify(plantillas)};</script>
+
+      <!-- Tabla de activos -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase flex items-center justify-between">
+          <span>📋 Activos registrados</span>
+          <button onclick="rdAddActivoBlank()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded">+ Nuevo activo</button>
+        </div>
+        ${activos.length === 0 ? '<div class="p-6 text-center text-slate-400 text-sm">Sin activos registrados. Usá las plantillas o + Nuevo activo.</div>' : `
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr class="border-b border-slate-200">
+              <th class="text-left p-2">Nombre</th>
+              <th class="text-left p-2 w-24">Tipo</th>
+              <th class="text-right p-2 w-28">Costo</th>
+              <th class="text-right p-2 w-20">Vida</th>
+              <th class="text-right p-2 w-28">Dep./año</th>
+              <th class="p-2 w-12"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${activos.map((a, idx) => {
+              const depAnual = a.vida_util_anios > 0 ? (a.cost_initial || 0) / a.vida_util_anios : 0;
+              return `
+                <tr class="border-t border-slate-100">
+                  <td class="p-1"><input type="text" value="${(a.name||'').replace(/"/g,'&quot;')}" onchange="rdEditActivo(${idx}, 'name', this.value)" class="w-full border border-slate-200 rounded px-1.5 py-1 text-xs"/></td>
+                  <td class="p-1">
+                    <select onchange="rdEditActivo(${idx}, 'type', this.value)" class="w-full border border-slate-200 rounded px-1 py-1 text-xs">
+                      <option value="vehiculo" ${a.type==='vehiculo'?'selected':''}>🚙 Vehículo</option>
+                      <option value="herramienta" ${a.type==='herramienta'?'selected':''}>🔨 Herramienta</option>
+                      <option value="equipo" ${a.type==='equipo'?'selected':''}>⚙️ Equipo</option>
+                      <option value="intangible" ${a.type==='intangible'?'selected':''}>💾 Intangible</option>
+                      <option value="otro" ${a.type==='otro'?'selected':''}>📦 Otro</option>
+                    </select>
+                  </td>
+                  <td class="p-1"><input type="number" min="0" step="100" value="${a.cost_initial||0}" onchange="rdEditActivo(${idx}, 'cost_initial', this.value)" class="w-full border border-slate-200 rounded px-1.5 py-1 text-xs text-right"/></td>
+                  <td class="p-1"><input type="number" min="1" step="1" value="${a.vida_util_anios||5}" onchange="rdEditActivo(${idx}, 'vida_util_anios', this.value)" class="w-full border border-slate-200 rounded px-1.5 py-1 text-xs text-right"/></td>
+                  <td class="p-2 text-right text-slate-700 font-semibold">${fmt(depAnual)}</td>
+                  <td class="p-1 text-center"><button onclick="rdRemoveActivo(${idx})" class="text-red-600 hover:bg-red-100 px-1.5 py-0.5 rounded font-bold">✕</button></td>
+                </tr>`;
+            }).join('')}
+            <tr class="border-t-2 border-slate-300 bg-slate-50 font-bold">
+              <td colspan="2" class="p-2 text-right">TOTAL</td>
+              <td class="p-2 text-right">${fmt(activos.reduce((s,a) => s + (+a.cost_initial||0), 0))}</td>
+              <td></td>
+              <td class="p-2 text-right text-emerald-700">${fmt(depAuto)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>`}
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200 sticky bottom-0 bg-white">
+        <button onclick="rdOpenFinCfg()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver a config</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">✓ Listo</button>
+      </div>
+    </div>
+  `);
+}
+
+function rdAddActivoFromTemplate(i) {
+  const t = window._rdActivosPlantillas[i];
+  const activos = rdGetActivos();
+  activos.push({ name: t.name, type: t.type, cost_initial: t.cost, vida_util_anios: t.vida, fecha_compra: null });
+  rdSetActivos(activos);
+  rdOpenActivos();
+}
+
+function rdAddActivoBlank() {
+  const activos = rdGetActivos();
+  activos.push({ name: 'Nuevo activo', type: 'herramienta', cost_initial: 1000, vida_util_anios: 5, fecha_compra: null });
+  rdSetActivos(activos);
+  rdOpenActivos();
+}
+
+function rdEditActivo(idx, field, value) {
+  const activos = rdGetActivos();
+  if (!activos[idx]) return;
+  activos[idx][field] = ['cost_initial','vida_util_anios'].includes(field) ? Math.max(0, +value || 0) : value;
+  rdSetActivos(activos);
+  // Si modo auto está activo, refrescar el render del dashboard de fondo
+  if (rdGetFinCfg().activos_auto) {
+    // No re-abrir modal, solo refrescar el total
+    const depAuto = rdCalcDepreciacionFromActivos();
+    const tots = document.querySelectorAll('.font-bold.text-amber-900');
+    // Refrescar dashboard si está visible
+    if (typeof rdRender === 'function') setTimeout(() => rdRender(), 100);
+  }
+}
+
+function rdRemoveActivo(idx) {
+  if (!confirm('¿Eliminar este activo del catálogo?')) return;
+  const activos = rdGetActivos();
+  activos.splice(idx, 1);
+  rdSetActivos(activos);
+  rdOpenActivos();
+}
+
+function rdToggleActivosAuto(checked) {
+  rdSetFinCfg({ activos_auto: checked });
+  if (typeof rdRender === 'function') rdRender();
 }
 
 // ════════════════════════════════════════════════════════════
