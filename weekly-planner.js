@@ -313,6 +313,7 @@ function wpRender() {
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
           <button onclick="wpToggleSidebar()" class="lg:hidden text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1.5 rounded font-bold" title="Mostrar/ocultar panel lateral">${wpState.sidebarHidden?'📂':'📁'}</button>
+          <button onclick="wpOpenWorkerMobile()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Vista del día optimizada para celular del líder/obrero">📱 Vista obrero</button>
           <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
             <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
@@ -4364,4 +4365,280 @@ function wpPrintAnalytics() {
     </body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 500);
+}
+
+// ════════════════════════════════════════════════════════════
+// 📱 VISTA OBRERO MOBILE — pantalla full screen del día
+// Optimizada para celular: tipografía grande, checkboxes 44px (target táctil),
+// cards verticales con materiales + notas visibles. El líder de obra la
+// usa en su celular durante la jornada para marcar tareas en vivo.
+// ════════════════════════════════════════════════════════════
+const wpWorkerState = {
+  date: null,
+  house: 'all',
+  open: false,
+  openTaskId: null
+};
+
+function wpOpenWorkerMobile(dateStr, homeFilter) {
+  wpWorkerState.date = dateStr || wpDateOnly(new Date());
+  wpWorkerState.house = homeFilter || wpState.houseFilter || 'all';
+  wpWorkerState.open = true;
+  wpRenderWorkerMobile();
+}
+
+function wpRenderWorkerMobile() {
+  const dateStr = wpWorkerState.date;
+  const house = wpWorkerState.house;
+  let acts = (wpState.activities||[]).filter(a => a.date === dateStr);
+  acts = wpFilterActsByHouse(acts, house);
+
+  const d = new Date(dateStr+'T00:00:00');
+  const dateLbl = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+
+  // Opciones de casa para selector
+  const hidden = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
+  const activeProj = wpState.projects.filter(p => !hidden.has(p.id));
+  const extra = new Set();
+  wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
+  const houseOpts = [
+    `<option value="all" ${house==='all'?'selected':''}>🏘️ Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${house===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${house==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+  ].join('');
+
+  // Agrupar por casa
+  const byHome = {};
+  acts.forEach(a => {
+    const key = a.property_name || 'Sin asignar';
+    if (!byHome[key]) byHome[key] = [];
+    byHome[key].push(a);
+  });
+
+  const totalDone = acts.filter(a => a.status === 'done').length;
+  const pct = acts.length ? Math.round(totalDone/acts.length*100) : 0;
+  const prevIso = wpDateOnly(wpAddDays(d, -1));
+  const nextIso = wpDateOnly(wpAddDays(d, 1));
+
+  // Overlay full screen sin usar el modal estándar
+  let overlay = document.getElementById('wp-worker-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'wp-worker-overlay';
+    overlay.className = 'fixed inset-0 bg-slate-100 z-[60] overflow-y-auto';
+    document.body.appendChild(overlay);
+  }
+
+  overlay.innerHTML = `
+    <div class="min-h-full flex flex-col">
+      <!-- Header sticky -->
+      <div class="sticky top-0 z-10 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-3 shadow-md">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <button onclick="wpCloseWorkerMobile()" class="bg-white/15 hover:bg-white/25 rounded-lg px-3 py-2 text-sm font-bold">✕ Salir</button>
+          <div class="text-center flex-1">
+            <div class="text-[10px] uppercase opacity-75 font-bold tracking-wider">Vista obrero</div>
+            <div class="text-base font-bold capitalize leading-tight">${dateLbl}</div>
+          </div>
+          <button onclick="wpWorkerShare()" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-bold">📤</button>
+        </div>
+        <!-- Filtro casa y navegación día -->
+        <div class="flex items-center gap-1.5">
+          <button onclick="wpOpenWorkerMobile('${prevIso}', '${house}')" class="bg-white/15 hover:bg-white/25 rounded px-2 py-2 text-base font-bold">←</button>
+          <select onchange="wpOpenWorkerMobile('${dateStr}', this.value)" class="flex-1 bg-white text-slate-900 rounded px-2 py-2 text-sm font-bold">${houseOpts}</select>
+          <button onclick="wpOpenWorkerMobile('${nextIso}', '${house}')" class="bg-white/15 hover:bg-white/25 rounded px-2 py-2 text-base font-bold">→</button>
+        </div>
+        <!-- Progreso -->
+        <div class="mt-2 bg-white/15 backdrop-blur rounded-lg p-2 flex items-center gap-3">
+          <div class="flex-1">
+            <div class="text-[10px] uppercase opacity-75 font-bold">Avance del día</div>
+            <div class="h-2 bg-white/20 rounded-full overflow-hidden mt-0.5">
+              <div class="h-full bg-emerald-400 transition-all" style="width:${pct}%"></div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-black leading-none">${pct}%</div>
+            <div class="text-[10px] opacity-75">${totalDone}/${acts.length}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de tareas -->
+      <div class="flex-1 p-3 space-y-3 max-w-2xl mx-auto w-full">
+        ${acts.length === 0 ? `
+          <div class="bg-white rounded-2xl p-8 text-center text-slate-400 border border-slate-200">
+            <div class="text-5xl mb-2">📭</div>
+            <div class="text-base font-semibold">Sin tareas hoy</div>
+            <div class="text-xs mt-1">Probá otro día o casa</div>
+          </div>
+        ` : Object.entries(byHome).map(([home, hActs]) => `
+          <div>
+            <div class="text-xs uppercase tracking-wider font-bold text-slate-500 px-1 mb-1.5">🏠 ${home.replace(/</g,'&lt;')}</div>
+            <div class="space-y-2">
+              ${hActs.map(a => {
+                const isDone = a.status === 'done';
+                const isCritical = a.priority === 'critical' || a.priority === 'urgent';
+                const isPostponed = (a.notes||'').includes('[APLAZADA');
+                const cardBg = isDone ? 'bg-emerald-50 border-emerald-400'
+                  : isCritical ? 'bg-rose-50 border-rose-500'
+                  : isPostponed ? 'bg-amber-50 border-amber-400'
+                  : 'bg-white border-slate-200';
+                return `
+                  <div class="border-2 ${cardBg} rounded-2xl p-3 shadow-sm">
+                    <div class="flex items-start gap-3">
+                      <!-- Checkbox enorme táctil -->
+                      <button onclick="wpQuickToggleDone('${a.id}')" class="flex-shrink-0 w-12 h-12 rounded-xl border-4 ${isDone?'bg-emerald-600 border-emerald-700':'bg-white border-slate-400'} flex items-center justify-center" aria-label="Marcar hecha">
+                        ${isDone ? '<span class="text-white text-2xl font-black">✓</span>' : '<span class="text-2xl">⬜</span>'}
+                      </button>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap gap-1 mb-1">
+                          ${isCritical && !isDone ? '<span class="bg-rose-700 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">⚠️ Importante</span>' : ''}
+                          ${isPostponed ? '<span class="bg-amber-500 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">🟡 Aplazada</span>' : ''}
+                        </div>
+                        <div class="text-base font-bold leading-snug ${isDone?'line-through text-slate-500':'text-slate-900'}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                        ${a.stage ? `<div class="text-xs text-slate-500 mt-0.5">📂 ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
+                        ${a.start_hour || a.end_hour ? `<div class="text-xs text-slate-500 mt-0.5">⏰ ${a.start_hour||7}h - ${a.end_hour||17}h</div>` : ''}
+
+                        ${(a.materials||[]).length > 0 ? `
+                          <div class="mt-2 bg-amber-100 rounded-lg p-2">
+                            <div class="text-[10px] font-bold uppercase text-amber-900">📦 Materiales</div>
+                            <ul class="text-sm text-amber-900 mt-0.5">
+                              ${a.materials.map(m => `<li>• <strong>${(m.nombre||'').replace(/</g,'&lt;')}</strong> ${m.cantidad||1} ${(m.unidad||'').replace(/</g,'&lt;')}</li>`).join('')}
+                            </ul>
+                          </div>` : ''}
+
+                        ${a.notes && !a.notes.includes('[APLAZADA') ? `
+                          <div class="mt-2 bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg p-2">
+                            <div class="text-[10px] font-bold uppercase text-yellow-900">📝 Notas</div>
+                            <div class="text-sm text-slate-900 whitespace-pre-wrap mt-0.5">${a.notes.split('\n').filter(l=>!l.includes('[APLAZADA')).join('\n').replace(/</g,'&lt;')}</div>
+                          </div>` : ''}
+
+                        ${(a.checklist||[]).length > 0 ? `
+                          <div class="mt-2">
+                            <div class="text-[10px] font-bold uppercase text-slate-600">✅ Pasos (${(a.checklist||[]).filter(c=>c.done).length}/${a.checklist.length})</div>
+                            <ul class="text-sm mt-0.5 space-y-1">
+                              ${a.checklist.map((it, idx) => `
+                                <li class="flex items-start gap-2 ${it.done?'line-through text-slate-400':'text-slate-800'}">
+                                  <button onclick="wpToggleChecklistMobile('${a.id}', ${idx})" class="flex-shrink-0 w-6 h-6 rounded border-2 ${it.done?'bg-slate-700 border-slate-700':'bg-white border-slate-400'} flex items-center justify-center text-white text-sm font-bold">${it.done?'✓':''}</button>
+                                  <span>${(it.item||'').replace(/</g,'&lt;')}</span>
+                                </li>`).join('')}
+                            </ul>
+                          </div>` : ''}
+                      </div>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Footer sticky con acciones -->
+      <div class="sticky bottom-0 bg-white border-t-2 border-slate-200 p-3 grid grid-cols-2 gap-2 shadow-lg">
+        <button onclick="wpWorkerShare()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">📤 Compartir</button>
+        <button onclick="wpCloseWorkerMobile()" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-3 rounded-xl">✕ Cerrar</button>
+      </div>
+    </div>
+  `;
+}
+
+function wpCloseWorkerMobile() {
+  wpWorkerState.open = false;
+  const overlay = document.getElementById('wp-worker-overlay');
+  if (overlay) overlay.remove();
+}
+
+async function wpToggleChecklistMobile(actId, idx) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const cl = [...(a.checklist||[])];
+  cl[idx] = { ...cl[idx], done: !cl[idx].done };
+  a.checklist = cl;  // optimistic
+  wpRenderWorkerMobile();
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { checklist: cl, updated_at: new Date().toISOString() });
+}
+
+// Refrescar la vista cuando se toggle un check desde wpQuickToggleDone
+const _wpOriginalRender = wpRender;
+wpRender = function() {
+  _wpOriginalRender();
+  if (wpWorkerState.open) wpRenderWorkerMobile();
+};
+
+// ─── Share link de la vista del día ───
+// Genera URL con params para que el líder de obra abra directo en su celular
+// ej: https://empresa-os.vercel.app/?wp_day=2026-06-08&wp_house=name:Wellington
+function wpWorkerShare() {
+  const base = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams();
+  params.set('wp_day', wpWorkerState.date);
+  if (wpWorkerState.house && wpWorkerState.house !== 'all') params.set('wp_house', wpWorkerState.house);
+  params.set('wp_mode', 'worker');
+  const url = `${base}?${params.toString()}`;
+
+  // Construir mensaje WhatsApp con el link al final
+  let acts = (wpState.activities||[]).filter(a => a.date === wpWorkerState.date);
+  acts = wpFilterActsByHouse(acts, wpWorkerState.house);
+  const d = new Date(wpWorkerState.date+'T00:00:00');
+  const dateLbl = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+
+  const byHome = {};
+  acts.forEach(a => {
+    const key = a.property_name || 'Sin asignar';
+    if (!byHome[key]) byHome[key] = [];
+    byHome[key].push(a);
+  });
+
+  let msg = `📅 *PLAN DEL DÍA · ${dateLbl.toUpperCase()}*\n\n`;
+  Object.entries(byHome).forEach(([home, hActs]) => {
+    msg += `🏠 *${home}*\n`;
+    hActs.forEach(a => {
+      const isDone = a.status === 'done';
+      const tag = a.priority==='critical' || a.priority==='urgent' ? ' ⚠️' : (a.notes||'').includes('[APLAZADA') ? ' 🟡' : '';
+      msg += `${isDone?'✅':'☐'} ${a.activity_name}${tag}\n`;
+    });
+    msg += '\n';
+  });
+  msg += `📱 *Ver en celular y marcar tareas:*\n${url}\n\n_Tap el link y vas a la vista táctil del día._`;
+
+  openModal('📤 Compartir vista del día', `
+    <div class="space-y-3">
+      <div class="bg-emerald-50 border border-emerald-300 rounded p-3 text-xs">
+        <strong>Link al día (vista obrero):</strong>
+        <div class="mt-1 bg-white border border-slate-200 rounded p-2 text-[11px] font-mono break-all">${url}</div>
+        <button onclick="navigator.clipboard.writeText('${url}'); this.textContent='✓ Copiado'" class="mt-2 bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded">📋 Copiar link</button>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Mensaje WhatsApp (editable)</label>
+        <textarea id="wp-worker-share-msg" rows="10" class="w-full border border-emerald-300 rounded p-2 text-xs font-mono">${msg.replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional, con código país sin +)</label>
+        <input id="wp-worker-share-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="(()=>{ const m=document.getElementById('wp-worker-share-msg').value; const p=(document.getElementById('wp-worker-share-phone').value||'').replace(/[^0-9]/g,''); const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`; window.open(u,'_blank'); closeModal(); })()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Enviar WhatsApp</button>
+      </div>
+    </div>
+  `);
+}
+
+// Auto-abrir la vista obrero si la URL trae ?wp_mode=worker
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('wp_mode') === 'worker' && sp.get('wp_day')) {
+      // Esperar a que la app cargue y haya un sys (de remodelación) activo
+      const tryOpen = () => {
+        if (typeof wpLoadAll === 'function' && window.SUPABASE_URL) {
+          wpLoadAll().then(() => {
+            wpOpenWorkerMobile(sp.get('wp_day'), sp.get('wp_house') || 'all');
+          });
+        } else {
+          setTimeout(tryOpen, 500);
+        }
+      };
+      setTimeout(tryOpen, 1500);
+    }
+  });
 }
