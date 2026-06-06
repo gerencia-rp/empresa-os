@@ -25,6 +25,7 @@ const EDU_TABS = [
   { key: 'students',     label: '👥 Estudiantes' },
   { key: 'student_plan', label: '🎯 Plan Acción' },
   { key: 'tasks',        label: '✅ Tareas' },
+  { key: 'cohorts',      label: '👨‍👩‍👧‍👦 Cohortes' },
   { key: 'alerts',       label: '🚨 Alertas' },
   { key: 'progress',     label: '📈 Progreso' },
   { key: 'resources',    label: '📑 Recursos' },
@@ -164,6 +165,8 @@ function eduRender() {
         `).join('')}
         <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
           ${cur?.airtable_base_id ? `<span>🔗 Airtable: <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">${cur.airtable_base_id}</code></span>` : '<span class="text-amber-700">⚠️ Airtable no configurado</span>'}
+          <button onclick="eduOpenCeoMobile()" class="bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded font-bold" title="Vista CEO en formato celular">📱 CEO</button>
+          <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-bold" title="Análisis IA del rendimiento del mentor">🤖 IA</button>
           <button onclick="eduTriggerSync()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">🔄 Sync</button>
           <button onclick="eduDebugDB()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold" title="Ver qué hay en la DB">🔍 Debug DB</button>
         </div>
@@ -190,6 +193,7 @@ function eduRender() {
           eduState.tab === 'students' ? eduRenderStudents() :
           eduState.tab === 'student_plan' ? eduRenderStudentPlan() :
           eduState.tab === 'tasks' ? eduRenderTasksOverview() :
+          eduState.tab === 'cohorts' ? eduRenderCohorts() :
           eduState.tab === 'progress' ? eduRenderProgressFunnel() :
           eduState.tab === 'resources' ? eduRenderResourcesIntegrated() :
           eduState.tab === 'calls' ? eduRenderCallsEnhanced() :
@@ -791,7 +795,124 @@ function eduRenderConfig() {
         </div>
         <div class="text-[10px] text-slate-500 mt-2 italic">Configuración avanzada. Si querés cambiar los weights, decímelo.</div>
       </div>
+
+      <!-- 🩺 Health check de schema -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs font-bold uppercase text-slate-700">🩺 Health check de base de datos</div>
+          <button onclick="eduRunHealthCheck()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">▶️ Ejecutar diagnóstico</button>
+        </div>
+        <div class="text-[10px] text-slate-500 mb-2">Valida que todas las tablas críticas existan en Supabase. Si falta alguna, te muestro el SQL exacto a correr.</div>
+        <div id="edu-health-results" class="text-xs"></div>
+      </div>
     </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+// 🩺 Health check: valida tablas/columnas críticas de Educación
+// ════════════════════════════════════════════════════════════
+const EDU_CRITICAL_TABLES = [
+  { table: 'edu_mentorships', critical: true, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_students', critical: true, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_resources', critical: true, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_alerts', critical: true, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_student_calls', critical: true, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_reports', critical: false, sql_file: 'edu-reports-schema.sql' },
+  { table: 'edu_student_tasks', critical: false, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_presentations', critical: false, sql_file: 'sE2-load-content.sql' },
+  { table: 'edu_call_motivos', critical: false, sql_file: 'edu-calls-enhanced-schema.sql' },
+  { table: 'edu_student_plans', critical: false, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_student_plan_tasks', critical: false, sql_file: 'sE1-education-area.sql' },
+  { table: 'edu_kpi_tiempo_por_etapa', critical: false, sql_file: 'edu-kpis-views.sql', is_view: true },
+  { table: 'edu_plan_por_estudiante', critical: false, sql_file: 'edu-plan-tracking-views.sql', is_view: true },
+  { table: 'edu_whatsapp_campaigns', critical: false, sql_file: 'edu-whatsapp-campaigns-schema.sql' },
+  { table: 'edu_certificates', critical: false, sql_file: 'edu-batch-fixes.sql' }
+];
+
+async function eduRunHealthCheck() {
+  const container = document.getElementById('edu-health-results');
+  if (!container) return;
+  container.innerHTML = '<div class="text-slate-500">⏳ Chequeando ' + EDU_CRITICAL_TABLES.length + ' tablas/vistas...</div>';
+
+  const results = [];
+  for (const t of EDU_CRITICAL_TABLES) {
+    try {
+      // .select con head:true y limit 1 → mínimo overhead, devuelve error si tabla no existe
+      const { error, count } = await sb.from(t.table).select('*', { head: true, count: 'exact' }).limit(1);
+      if (error) {
+        const missing = /does not exist|relation .* does not exist/i.test(error.message) ||
+                       /Could not find the table/i.test(error.message) ||
+                       error.code === '42P01';
+        results.push({ ...t, ok: false, error: missing ? 'NO EXISTE' : error.message.slice(0, 60), count: null });
+      } else {
+        results.push({ ...t, ok: true, count });
+      }
+    } catch (e) {
+      results.push({ ...t, ok: false, error: e.message.slice(0, 60), count: null });
+    }
+  }
+
+  const okCount = results.filter(r => r.ok).length;
+  const failCount = results.length - okCount;
+  const criticalFails = results.filter(r => !r.ok && r.critical);
+
+  const missingSqls = new Set(results.filter(r => !r.ok).map(r => r.sql_file).filter(Boolean));
+
+  container.innerHTML = `
+    <div class="grid grid-cols-3 gap-2 mb-2">
+      <div class="bg-emerald-50 border border-emerald-200 rounded p-2 text-center">
+        <div class="text-[9px] uppercase font-bold text-emerald-700">OK</div>
+        <div class="text-lg font-bold text-emerald-900">${okCount}</div>
+      </div>
+      <div class="bg-red-50 border border-red-200 rounded p-2 text-center">
+        <div class="text-[9px] uppercase font-bold text-red-700">Faltantes</div>
+        <div class="text-lg font-bold text-red-900">${failCount}</div>
+      </div>
+      <div class="bg-slate-50 border border-slate-200 rounded p-2 text-center">
+        <div class="text-[9px] uppercase font-bold text-slate-600">Críticas</div>
+        <div class="text-lg font-bold ${criticalFails.length>0?'text-red-700':'text-emerald-700'}">${criticalFails.length === 0 ? '✓' : criticalFails.length + ' falta'}</div>
+      </div>
+    </div>
+
+    <div class="border border-slate-200 rounded overflow-hidden">
+      <table class="w-full text-[11px]">
+        <thead class="bg-slate-50">
+          <tr class="border-b border-slate-200 text-[9px] uppercase font-bold text-slate-600">
+            <th class="text-left p-1.5">Tabla / Vista</th>
+            <th class="text-center p-1.5 w-12">Tipo</th>
+            <th class="text-center p-1.5 w-16">Crítica</th>
+            <th class="text-right p-1.5 w-16">Rows</th>
+            <th class="text-left p-1.5 w-24">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results.map(r => `
+            <tr class="border-t border-slate-100 ${!r.ok && r.critical ? 'bg-red-50' : !r.ok ? 'bg-amber-50' : ''}">
+              <td class="p-1.5 font-mono">${r.table}</td>
+              <td class="p-1.5 text-center">${r.is_view ? '👁️' : '📋'}</td>
+              <td class="p-1.5 text-center">${r.critical ? '🔴' : '○'}</td>
+              <td class="p-1.5 text-right font-mono">${r.count ?? '—'}</td>
+              <td class="p-1.5 ${r.ok?'text-emerald-700':'text-red-700'} font-bold">${r.ok ? '✓ OK' : '✗ ' + r.error}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    ${missingSqls.size > 0 ? `
+      <div class="mt-3 bg-amber-50 border border-amber-300 rounded p-2">
+        <div class="text-[10px] font-bold uppercase text-amber-900 mb-1">📋 SQLs a correr en Supabase</div>
+        <div class="text-[10px] text-amber-800 mb-1.5">Encontré tablas faltantes. Corré estos archivos en orden desde el SQL Editor:</div>
+        <ul class="space-y-0.5 text-[11px] font-mono">
+          ${Array.from(missingSqls).map(s => `<li class="bg-white px-2 py-1 rounded border border-amber-200">📄 supabase/${s}</li>`).join('')}
+        </ul>
+      </div>
+    ` : `
+      <div class="mt-3 bg-emerald-50 border border-emerald-200 rounded p-2 text-[11px] text-emerald-900 text-center font-bold">
+        ✅ Todas las tablas críticas existen. Sistema saludable.
+      </div>
+    `}
   `;
 }
 
@@ -3540,5 +3661,487 @@ function eduGenerateCertificate(studentId) {
   const win = window.open('', '_blank', 'width=1200,height=800');
   win.document.write(html);
   win.document.close();
+}
+
+// ════════════════════════════════════════════════════════════
+// 📱 VISTA CEO MOBILE de Educación — full-screen, KPIs + en riesgo
+// ════════════════════════════════════════════════════════════
+function eduOpenCeoMobile() {
+  const students = eduMyStudents();
+  const m = eduCurrentMentorship();
+  const total = students.length;
+  const active = students.filter(s => s.status === 'active').length;
+  const atRisk = students.filter(s => s.status === 'at_risk').length;
+  const graduated = students.filter(s => s.status === 'graduated').length;
+  const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []).slice(0, 10);
+  const expiringSoon = students.filter(s => {
+    const d = eduDaysToExpiry(s);
+    return d != null && d >= 0 && d <= 30;
+  }).length;
+
+  // Estado general
+  let estado, color, icon, msg;
+  if (enRiesgo.length > 5 || atRisk > total*0.2) {
+    estado = 'ATENCIÓN REQUERIDA'; color = 'from-red-600 to-red-800'; icon = '🔴';
+    msg = `${enRiesgo.length} estudiante${enRiesgo.length>1?'s':''} en riesgo · ${atRisk} at_risk`;
+  } else if (enRiesgo.length > 0 || expiringSoon > 3) {
+    estado = 'OPERACIÓN ESTABLE'; color = 'from-amber-500 to-amber-700'; icon = '🟡';
+    msg = `${enRiesgo.length} en seguimiento · ${expiringSoon} vence pronto`;
+  } else {
+    estado = 'MENTORÍA SANA'; color = 'from-emerald-600 to-emerald-800'; icon = '✅';
+    msg = 'Todos los estudiantes activos en buen ritmo';
+  }
+
+  let overlay = document.getElementById('edu-ceo-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'edu-ceo-overlay';
+    overlay.className = 'fixed inset-0 bg-slate-100 z-[60] overflow-y-auto';
+    document.body.appendChild(overlay);
+  }
+
+  overlay.innerHTML = `
+    <div class="min-h-full flex flex-col">
+      <div class="bg-gradient-to-br ${color} text-white p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <button onclick="eduCloseCeoMobile()" class="bg-white/15 hover:bg-white/25 rounded-lg px-3 py-2 text-sm font-bold">✕ Salir</button>
+          <div class="text-center flex-1">
+            <div class="text-[10px] uppercase opacity-75 font-bold tracking-wider">${m?.name || 'Mentoría'}</div>
+            <div class="text-sm opacity-90">${new Date().toLocaleDateString('es', { day:'numeric', month:'long' })}</div>
+          </div>
+          <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-500 hover:bg-emerald-600 rounded-lg px-3 py-2 text-sm font-bold">🤖</button>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl">${icon}</div>
+          <div class="text-xl font-bold mt-1">${estado}</div>
+          <div class="text-sm opacity-90 mt-1">${msg}</div>
+        </div>
+        <div class="grid grid-cols-4 gap-2 mt-4">
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Total</div>
+            <div class="text-2xl font-bold">${total}</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Activos</div>
+            <div class="text-2xl font-bold">${active}</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">At risk</div>
+            <div class="text-2xl font-bold">${atRisk}</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Graduados</div>
+            <div class="text-2xl font-bold">${graduated}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 max-w-2xl mx-auto w-full space-y-3">
+        ${enRiesgo.length > 0 ? `
+          <div class="bg-white border-2 border-amber-300 rounded-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-3 py-2 text-xs font-bold uppercase">⚠️ Top en riesgo · contactar hoy</div>
+            <div class="divide-y divide-slate-100">
+              ${enRiesgo.map(s => `
+                <div class="px-3 py-2.5 flex items-center justify-between gap-2">
+                  <button onclick="eduCloseCeoMobile(); setTimeout(()=>eduShowStudentDetail('${s.id}'), 200)" class="flex-1 text-left min-w-0">
+                    <div class="font-semibold text-sm truncate">${(s.full_name||'—').replace(/</g,'&lt;')}</div>
+                    <div class="text-[11px] text-amber-700 font-bold">${s._riskReason}</div>
+                  </button>
+                  ${s.phone ? `<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg flex-shrink-0">💬</a>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : `
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+            <div class="text-3xl">🎉</div>
+            <div class="text-sm font-bold text-emerald-900 mt-1">Sin estudiantes en riesgo</div>
+          </div>
+        `}
+
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='students'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
+            <div class="text-2xl">👥</div>
+            <div class="text-sm font-bold mt-1">Estudiantes</div>
+            <div class="text-[10px] text-slate-500">${total} total</div>
+          </button>
+          <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='tasks'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
+            <div class="text-2xl">✅</div>
+            <div class="text-sm font-bold mt-1">Tareas</div>
+            <div class="text-[10px] text-slate-500">Plan global</div>
+          </button>
+          <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='calls'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
+            <div class="text-2xl">📅</div>
+            <div class="text-sm font-bold mt-1">Calendario</div>
+            <div class="text-[10px] text-slate-500">Sesiones</div>
+          </button>
+          <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='alerts'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
+            <div class="text-2xl">🚨</div>
+            <div class="text-sm font-bold mt-1">Alertas</div>
+            <div class="text-[10px] text-slate-500">${(eduState.alerts||[]).length} activas</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="sticky bottom-0 bg-white border-t-2 border-slate-200 p-3 grid grid-cols-2 gap-2 shadow-lg">
+        <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">🤖 Análisis IA</button>
+        <button onclick="eduCloseCeoMobile()" class="bg-slate-900 text-white text-sm font-bold py-3 rounded-xl">✕ Cerrar</button>
+      </div>
+    </div>
+  `;
+}
+
+function eduCloseCeoMobile() {
+  const o = document.getElementById('edu-ceo-overlay');
+  if (o) o.remove();
+}
+
+// ════════════════════════════════════════════════════════════
+// 🤖 Análisis IA del rendimiento del mentor (vía remodel-ai endpoint)
+// ════════════════════════════════════════════════════════════
+async function eduRunMentorAIAnalysis() {
+  const m = eduCurrentMentorship();
+  const students = eduMyStudents();
+  const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []);
+  const total = students.length;
+
+  // Datos compactos para Claude
+  const summary = {
+    mentoria: m?.name || 'mentoría',
+    total_estudiantes: total,
+    activos: students.filter(s => s.status === 'active').length,
+    at_risk: students.filter(s => s.status === 'at_risk').length,
+    graduados: students.filter(s => s.status === 'graduated').length,
+    dropped: students.filter(s => s.status === 'dropped').length,
+    paused: students.filter(s => s.status === 'paused').length,
+    en_riesgo_count: enRiesgo.length,
+    en_riesgo_top5: enRiesgo.slice(0, 5).map(s => ({
+      nombre: s.full_name, etapa: s.current_stage, dias_sin_contacto: s._daysWithoutContact, motivo: s._riskReason
+    })),
+    distribucion_etapas: (() => {
+      const d = {};
+      students.forEach(s => { d[s.current_stage || 'sin_etapa'] = (d[s.current_stage || 'sin_etapa'] || 0) + 1; });
+      return d;
+    })(),
+    pagos: (() => {
+      const p = {};
+      students.forEach(s => { p[s.payment_status || 'unknown'] = (p[s.payment_status || 'unknown'] || 0) + 1; });
+      return p;
+    })(),
+    vencen_30d: students.filter(s => { const d = eduDaysToExpiry(s); return d != null && d >= 0 && d <= 30; }).length
+  };
+
+  const prompt = `Sos consultor de mentorías financieras / Real Estate. Analizá esta mentoría y devolvé SOLO JSON sin markdown:
+{
+  "resumen": "1-2 frases del estado general",
+  "estado_general": "verde|amarillo|rojo",
+  "fortalezas": ["..."],
+  "alertas": ["..."],
+  "acciones_priorizadas": [{"titulo": "...", "detalle": "...", "impacto": "alto|medio|bajo"}],
+  "metricas_clave": {"retencion_pct": N, "graduacion_pct": N, "salud_general": "alta|media|baja"},
+  "foco_proxima_semana": "1-2 frases con la decisión clave del mentor"
+}
+Sé directo y accionable. Si en_riesgo_count > 20% del total → estado_general=rojo. Si hay 5+ vencen_30d → alerta sobre renovaciones.
+
+DATOS:
+${JSON.stringify(summary, null, 2)}`;
+
+  // Abrir modal de loading
+  openModal('🤖 Analizando con IA...', '<div class="p-8 text-center"><div class="text-4xl">⏳</div><div class="text-sm mt-2">Claude está analizando tu mentoría...</div></div>');
+
+  try {
+    const token = await window.getAccessToken();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        project_context: { feature: 'edu-mentor-analysis', mentoria: m?.name }
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    let raw = '';
+    if (Array.isArray(json.content)) raw = json.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+    else raw = json.text || JSON.stringify(json);
+    const match = raw.match(/\{[\s\S]*\}/);
+    const a = JSON.parse(match ? match[0] : raw);
+
+    const colorMap = { verde: 'from-emerald-600 to-emerald-800', amarillo: 'from-amber-500 to-orange-700', rojo: 'from-red-600 to-red-800' };
+    const color = colorMap[a.estado_general] || 'from-slate-700 to-slate-900';
+    const impColor = i => i === 'alto' ? 'bg-red-100 text-red-800 border-red-300' : i === 'medio' ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-300';
+
+    openModal('🤖 Análisis IA · ' + (m?.name || 'Mentoría'), `
+      <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+        <div class="bg-gradient-to-br ${color} text-white rounded-2xl p-4 shadow-lg">
+          <div class="text-[10px] uppercase tracking-widest opacity-80 font-bold">Estado · ${(a.estado_general||'').toUpperCase()}</div>
+          <div class="text-base mt-2 leading-relaxed">${(a.resumen||'').replace(/</g,'&lt;')}</div>
+          ${a.metricas_clave ? `
+          <div class="grid grid-cols-3 gap-2 mt-3">
+            <div class="bg-white/15 backdrop-blur rounded p-2 text-center">
+              <div class="text-[10px] opacity-80 font-bold">Retención</div>
+              <div class="text-lg font-bold">${a.metricas_clave.retencion_pct||0}%</div>
+            </div>
+            <div class="bg-white/15 backdrop-blur rounded p-2 text-center">
+              <div class="text-[10px] opacity-80 font-bold">Graduación</div>
+              <div class="text-lg font-bold">${a.metricas_clave.graduacion_pct||0}%</div>
+            </div>
+            <div class="bg-white/15 backdrop-blur rounded p-2 text-center">
+              <div class="text-[10px] opacity-80 font-bold">Salud</div>
+              <div class="text-lg font-bold">${a.metricas_clave.salud_general||'—'}</div>
+            </div>
+          </div>` : ''}
+        </div>
+
+        ${(a.fortalezas||[]).length > 0 ? `
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-emerald-900 mb-2">✅ Fortalezas</div>
+          <ul class="space-y-1 text-sm text-emerald-900">${a.fortalezas.map(f => `<li>• ${f.replace(/</g,'&lt;')}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        ${(a.alertas||[]).length > 0 ? `
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-red-900 mb-2">🚨 Alertas</div>
+          <ul class="space-y-1 text-sm text-red-900">${a.alertas.map(x => `<li>• ${x.replace(/</g,'&lt;')}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        ${(a.acciones_priorizadas||[]).length > 0 ? `
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-1.5">🎯 Acciones priorizadas</div>
+          <div class="space-y-2">
+            ${a.acciones_priorizadas.map((acc, i) => `
+              <div class="border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
+                <div class="bg-slate-900 text-white font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0">${i+1}</div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <div class="font-bold text-sm">${(acc.titulo||'').replace(/</g,'&lt;')}</div>
+                    ${acc.impacto ? `<span class="text-[10px] uppercase font-bold border px-1.5 py-0.5 rounded ${impColor(acc.impacto)}">${acc.impacto}</span>` : ''}
+                  </div>
+                  <div class="text-xs text-slate-600 mt-0.5">${(acc.detalle||'').replace(/</g,'&lt;')}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>` : ''}
+
+        ${a.foco_proxima_semana ? `
+        <div class="bg-violet-50 border-l-4 border-violet-600 rounded-r-xl p-3">
+          <div class="text-xs font-bold uppercase text-violet-900 mb-1">🎯 Foco próxima semana</div>
+          <div class="text-sm text-violet-900">${a.foco_proxima_semana.replace(/</g,'&lt;')}</div>
+        </div>` : ''}
+
+        <div class="flex gap-2 pt-2 border-t border-slate-200">
+          <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+          <button onclick="eduRunMentorAIAnalysis()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">🔄 Re-analizar</button>
+        </div>
+      </div>
+    `);
+  } catch (e) {
+    openModal('Error', `<div class="p-4"><div class="text-sm text-red-700">❌ ${e.message}</div><button onclick="closeModal()" class="mt-3 bg-slate-100 px-3 py-1.5 rounded text-sm">Cerrar</button></div>`);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 👨‍👩‍👧‍👦 COHORTES — comparativa por grupo
+// Agrupa estudiantes por campo "grupo" y compara métricas
+// ════════════════════════════════════════════════════════════
+function eduRenderCohorts() {
+  const students = eduMyStudents();
+  if (!students.length) return '<div class="p-8 text-center text-slate-400 text-sm">Sin estudiantes para comparar.</div>';
+
+  const now = Date.now();
+  const dayMs = 86400000;
+
+  // Agrupar por grupo (cohorte). Sin grupo → 'Sin asignar'
+  const byCohort = {};
+  students.forEach(s => {
+    const g = s.grupo || 'Sin asignar';
+    if (!byCohort[g]) byCohort[g] = [];
+    byCohort[g].push(s);
+  });
+
+  const cohortStats = Object.entries(byCohort).map(([name, list]) => {
+    const total = list.length;
+    const active = list.filter(s => s.status === 'active').length;
+    const graduated = list.filter(s => s.status === 'graduated').length;
+    const atRisk = list.filter(s => s.status === 'at_risk').length;
+    const dropped = list.filter(s => s.status === 'dropped').length;
+    const enRiesgo = list.filter(s => {
+      const last = s.ultima_fecha_seguimiento;
+      if (!last) return false;
+      return Math.floor((now - new Date(last).getTime()) / dayMs) > 14;
+    }).length;
+    const pagosOk = list.filter(s => s.payment_status === 'active').length;
+    const pagosVencidos = list.filter(s => ['past_due','expired','cancelled'].includes(s.payment_status)).length;
+    // Promedio días en mentoría
+    const diasEnMentoria = list.map(s => {
+      if (!s.enrolled_at) return null;
+      return Math.floor((now - new Date(s.enrolled_at).getTime()) / dayMs);
+    }).filter(x => x != null);
+    const avgDias = diasEnMentoria.length ? Math.round(diasEnMentoria.reduce((a,b)=>a+b,0) / diasEnMentoria.length) : 0;
+    // Etapa promedio (índice)
+    const m = eduCurrentMentorship();
+    const stageIdx = list.map(s => {
+      const i = (m?.stages || []).findIndex(st => st.key === s.current_stage);
+      return i >= 0 ? i : 0;
+    });
+    const avgStageIdx = stageIdx.length ? Math.round(stageIdx.reduce((a,b)=>a+b,0) / stageIdx.length * 10) / 10 : 0;
+
+    return {
+      name, total, active, graduated, atRisk, dropped, enRiesgo,
+      pagosOk, pagosVencidos, avgDias, avgStageIdx,
+      retencion: total ? Math.round(((total - dropped) / total) * 100) : 0,
+      graduacion: total ? Math.round(graduated / total * 100) : 0,
+      pagoSano: total ? Math.round(pagosOk / total * 100) : 0
+    };
+  }).sort((a,b) => b.total - a.total);
+
+  const m = eduCurrentMentorship();
+
+  return `
+    <div class="space-y-3">
+      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
+        👨‍👩‍👧‍👦 <strong>Cohortes</strong>: comparativa entre grupos. Detectá qué cohortes retienen mejor, gradúan más rápido y tienen mejor salud financiera.
+      </div>
+
+      <!-- Cards de cohortes -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        ${cohortStats.map(c => `
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition">
+            <div class="bg-slate-900 text-white px-3 py-2 flex items-center justify-between">
+              <div class="font-bold text-sm truncate">${c.name.replace(/</g,'&lt;')}</div>
+              <div class="text-xs bg-white/15 px-2 py-0.5 rounded">${c.total} estud.</div>
+            </div>
+            <div class="p-3 space-y-2">
+              <!-- Composición -->
+              <div class="flex h-6 rounded overflow-hidden border border-slate-200 text-[10px] font-bold">
+                ${c.active > 0 ? `<div class="bg-emerald-500 text-white flex items-center justify-center" style="width:${c.active/c.total*100}%">${c.active}</div>` : ''}
+                ${c.graduated > 0 ? `<div class="bg-blue-500 text-white flex items-center justify-center" style="width:${c.graduated/c.total*100}%">${c.graduated}</div>` : ''}
+                ${c.atRisk > 0 ? `<div class="bg-amber-500 text-white flex items-center justify-center" style="width:${c.atRisk/c.total*100}%">${c.atRisk}</div>` : ''}
+                ${c.dropped > 0 ? `<div class="bg-red-500 text-white flex items-center justify-center" style="width:${c.dropped/c.total*100}%">${c.dropped}</div>` : ''}
+              </div>
+              <div class="flex flex-wrap gap-2 text-[10px] text-slate-600">
+                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-emerald-500 rounded-sm"></span>Activos ${c.active}</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-sm"></span>Grad ${c.graduated}</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-amber-500 rounded-sm"></span>At risk ${c.atRisk}</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-sm"></span>Drop ${c.dropped}</span>
+              </div>
+
+              <!-- KPIs -->
+              <div class="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-slate-100">
+                <div>
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Retención</div>
+                  <div class="text-base font-bold ${c.retencion >= 80 ? 'text-emerald-700' : c.retencion >= 60 ? 'text-amber-700' : 'text-red-700'}">${c.retencion}%</div>
+                </div>
+                <div>
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Graduación</div>
+                  <div class="text-base font-bold ${c.graduacion >= 30 ? 'text-emerald-700' : c.graduacion >= 10 ? 'text-amber-700' : 'text-slate-700'}">${c.graduacion}%</div>
+                </div>
+                <div>
+                  <div class="text-[9px] uppercase text-slate-500 font-bold">Pagos OK</div>
+                  <div class="text-base font-bold ${c.pagoSano >= 90 ? 'text-emerald-700' : c.pagoSano >= 70 ? 'text-amber-700' : 'text-red-700'}">${c.pagoSano}%</div>
+                </div>
+              </div>
+
+              <div class="flex justify-between text-[10px] text-slate-500 pt-1">
+                <span>Avg días en mentoría: <strong>${c.avgDias}d</strong></span>
+                <span>Etapa promedio: <strong>#${Math.round(c.avgStageIdx)+1}</strong></span>
+                ${c.enRiesgo > 0 ? `<span class="text-amber-700 font-bold">⚠️ ${c.enRiesgo} sin contacto >14d</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Tabla comparativa -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">📊 Tabla comparativa</div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50">
+              <tr class="border-b border-slate-200">
+                <th class="text-left p-2">Cohorte</th>
+                <th class="text-right p-2">Total</th>
+                <th class="text-right p-2">Retención</th>
+                <th class="text-right p-2">Graduación</th>
+                <th class="text-right p-2">Pagos OK</th>
+                <th class="text-right p-2">Avg días</th>
+                <th class="text-right p-2">⚠️ Riesgo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${cohortStats.map(c => `
+                <tr class="border-t border-slate-100 hover:bg-slate-50">
+                  <td class="p-2 font-bold">${c.name.replace(/</g,'&lt;')}</td>
+                  <td class="p-2 text-right">${c.total}</td>
+                  <td class="p-2 text-right ${c.retencion>=80?'text-emerald-700':c.retencion>=60?'text-amber-700':'text-red-700'} font-bold">${c.retencion}%</td>
+                  <td class="p-2 text-right ${c.graduacion>=30?'text-emerald-700':'text-slate-700'} font-bold">${c.graduacion}%</td>
+                  <td class="p-2 text-right ${c.pagoSano>=90?'text-emerald-700':c.pagoSano>=70?'text-amber-700':'text-red-700'} font-bold">${c.pagoSano}%</td>
+                  <td class="p-2 text-right">${c.avgDias}d</td>
+                  <td class="p-2 text-right ${c.enRiesgo>0?'text-amber-700 font-bold':'text-slate-400'}">${c.enRiesgo}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      ${cohortStats.length >= 2 ? `
+        <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+          💡 <strong>Insight automático:</strong>
+          ${(() => {
+            const mejor = cohortStats.slice().sort((a,b) => b.retencion - a.retencion)[0];
+            const peor = cohortStats.slice().sort((a,b) => a.retencion - b.retencion)[0];
+            if (mejor.retencion === peor.retencion) return 'Todas las cohortes tienen retención similar.';
+            return `<strong>${mejor.name}</strong> tiene la mejor retención (${mejor.retencion}%) vs <strong>${peor.name}</strong> (${peor.retencion}%). Diferencia: ${mejor.retencion - peor.retencion}pp. Analizá qué hace distinto el grupo top para replicarlo.`;
+          })()}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+// 🔔 Notificaciones de inactividad (browser native)
+// Si la app está abierta y hay notifyState.enabled, chequea cada 30min
+// si hay estudiantes con +14 días sin contacto y notifica
+// ════════════════════════════════════════════════════════════
+async function eduCheckInactivityAlerts() {
+  if (!window.notifyState?.enabled) return;
+  try {
+    if (!eduState.students || eduState.students.length === 0) return;
+    const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []);
+    const lastCheck = +(localStorage.getItem('edu_last_inactivity_check') || '0');
+    const now = Date.now();
+    if (now - lastCheck < 30 * 60 * 1000) return; // 30 min cooldown
+    localStorage.setItem('edu_last_inactivity_check', String(now));
+
+    const criticosNuevos = enRiesgo.filter(s => (s._daysWithoutContact || 0) > 14);
+    if (criticosNuevos.length === 0) return;
+
+    const lastNotified = +(localStorage.getItem('edu_inactivity_last_count') || '0');
+    if (criticosNuevos.length <= lastNotified) return;
+
+    localStorage.setItem('edu_inactivity_last_count', String(criticosNuevos.length));
+
+    if (typeof notifySend === 'function') {
+      notifySend(`⚠️ ${criticosNuevos.length} estudiante(s) sin contacto >14d`, {
+        body: criticosNuevos.slice(0,3).map(s => `• ${s.full_name} (${s._daysWithoutContact}d)`).join('\n'),
+        tag: 'edu-inactivity',
+        persistent: true,
+        data: { url: '/?open_edu_ceo=1' }
+      });
+    }
+  } catch (e) {
+    console.warn('eduCheckInactivityAlerts failed:', e);
+  }
+}
+
+// Auto-check al cargar + cada 30 min mientras la app esté abierta
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    setTimeout(() => eduCheckInactivityAlerts(), 45000); // 45s después de load
+    setInterval(() => eduCheckInactivityAlerts(), 30 * 60 * 1000);
+  });
 }
 
