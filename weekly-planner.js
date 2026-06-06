@@ -31,7 +31,8 @@ const wpState = {
   showChecklistFor: null,       // activityId si está abierto modal checklist
   printDate: null,              // si está set, se muestra vista print en lugar de grilla
   houseFilter: 'all',           // 'all' | projectId | 'name:Nombre' — filtra qué casa(s) ver en el calendario
-  openGroups: { crew:false, specialist:false, tool:false, vehicle:false, other:false } // sidebar colapsado por default
+  openGroups: { crew:false, specialist:false, tool:false, vehicle:false, other:false }, // sidebar colapsado por default
+  sidebarHidden: typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 1023px)').matches : false // oculto por default en mobile
 };
 
 function wpFmtDate(d) {
@@ -311,6 +312,7 @@ function wpRender() {
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
+          <button onclick="wpToggleSidebar()" class="lg:hidden text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1.5 rounded font-bold" title="Mostrar/ocultar panel lateral">${wpState.sidebarHidden?'📂':'📁'}</button>
           <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
             <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
@@ -322,9 +324,9 @@ function wpRender() {
       </div>
 
       <!-- BODY: Sidebar tabbed + Grid calendario -->
-      <div class="flex gap-3 flex-1 min-h-0 overflow-hidden">
+      <div class="flex gap-3 flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
         <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) -->
-        <div class="w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+        <div class="${wpState.sidebarHidden?'hidden lg:flex':'flex'} w-full lg:w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden lg:flex-col max-h-[40vh] lg:max-h-none">
           <!-- Tabs -->
           <div class="flex border-b border-slate-200 bg-slate-50 text-[10px] font-bold">
             <button onclick="wpSetSideTab('resources')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='resources'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">👷 Recursos</button>
@@ -360,7 +362,7 @@ function wpRender() {
                   const isToday = wpDateOnly(d) === wpDateOnly(new Date());
                   const isSunday = d.getDay() === 0;
                   const ds = wpDateOnly(d);
-                  return `<th class="py-2 px-2 border-b border-r border-slate-200 min-w-[140px] ${isToday?'bg-amber-100':isSunday?'bg-slate-100':''} cursor-pointer hover:bg-slate-200" onclick="wpOpenDayView('${ds}')" title="Click para ver el día completo">${wpFmtDate(d)} <span class="text-[10px] text-slate-400">▤</span></th>`;
+                  return `<th class="py-2 px-2 border-b border-r border-slate-200 min-w-[110px] lg:min-w-[140px] ${isToday?'bg-amber-100':isSunday?'bg-slate-100':''} cursor-pointer hover:bg-slate-200" onclick="wpOpenDayView('${ds}')" title="Click para ver el día completo">${wpFmtDate(d)} <span class="text-[10px] text-slate-400">▤</span></th>`;
                 }).join('')}
               </tr>
             </thead>
@@ -481,6 +483,11 @@ function wpActivityDragStart(activityId, ev) {
 
 function wpSetHouseFilter(value) {
   wpState.houseFilter = value || 'all';
+  wpRender();
+}
+
+function wpToggleSidebar() {
+  wpState.sidebarHidden = !wpState.sidebarHidden;
   wpRender();
 }
 
@@ -1103,6 +1110,7 @@ function wpOpenDayView(dateStr, homeFilter) {
           </div>
           <div class="flex gap-2 items-center">
             <select onchange="wpOpenDayView('${dateStr}', this.value)" class="bg-white text-slate-900 text-xs rounded px-2 py-1.5 font-bold">${houseOpts}</select>
+            <button onclick="wpShareWhatsApp('${dateStr}', '${homeFilter}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded" title="Enviar día por WhatsApp">💬 WhatsApp</button>
             <button onclick="wpOpenPrintView('${dateStr}','${homeFilter}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🖨️ Imprimir</button>
           </div>
         </div>
@@ -2899,7 +2907,8 @@ function wpOpenPrintPicker() {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar</button>
+        <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar PDF</button>
+        <button onclick="wpDoWAFromPicker()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg">💬 Enviar WhatsApp</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
@@ -2909,6 +2918,18 @@ function wpOpenPrintPicker() {
     const sel = document.getElementById('wp-print-house');
     if (sel) sel.value = wpState.houseFilter || 'all';
   }, 50);
+}
+
+// Atajo: desde el print picker, ir directo a WhatsApp del día seleccionado
+function wpDoWAFromPicker() {
+  const scope = document.querySelector('input[name="wp-print-scope"]:checked')?.value || 'day';
+  const house = document.getElementById('wp-print-house').value;
+  const d = scope === 'day'
+    ? document.getElementById('wp-print-date').value
+    : document.getElementById('wp-print-from').value;
+  if (!d) return;
+  wpBackToPlanner();
+  wpShareWhatsApp(d, house);
 }
 
 function wpDoPrint() {
@@ -3853,6 +3874,7 @@ function wpRenderAnalytics() {
             <select onchange="wpAnSetHouse(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1 font-bold">${houseOpts}</select>
           </div>
           <div class="flex-1"></div>
+          <button onclick="wpAnalyticsAI()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white border border-violet-700 px-3 py-1.5 rounded font-bold" title="Claude analiza las métricas y sugiere acciones priorizadas">🤖 Análisis IA</button>
           <button onclick="wpPrintAnalytics()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold">🖨️ Imprimir reporte</button>
         </div>
       </div>
@@ -4095,6 +4117,235 @@ function wpRenderAnalytics() {
     ['max-w-3xl','max-w-5xl'].forEach(c => inner.classList.remove(c));
     inner.classList.add('max-w-7xl');
   }
+}
+
+// ─── 🤖 Análisis IA del reporte ───
+// Llama a remodel-ai (edge function genérica con callAnthropic) y le pasa
+// las métricas calculadas en JSON. Claude devuelve análisis priorizado.
+async function wpAnalyticsAI() {
+  const m = wpCalcAnalytics(wpAnState.from, wpAnState.to, wpAnState.house);
+  const houseLabel = wpAnState.house === 'all' ? 'todas las casas'
+    : (wpState.projects.find(p => p.id === wpAnState.house)?.name) || (wpAnState.house.startsWith('name:') ? wpAnState.house.slice(5) : wpAnState.house);
+
+  const btn = document.querySelector('[onclick="wpAnalyticsAI()"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Analizando...'; }
+
+  // Construir prompt compacto con los datos clave
+  const summary = {
+    rango: wpAnState.rangeLabel,
+    desde: wpAnState.from,
+    hasta: wpAnState.to,
+    casa: houseLabel,
+    total_tareas: m.total,
+    hechas: m.done,
+    en_curso: m.inProgress,
+    planeadas: m.planned,
+    canceladas: m.cancelled,
+    pct_cumplimiento: m.pctCumplimiento,
+    velocidad_tareas_dia: m.velocityDay,
+    lead_time_dias: m.avgCompletionDays,
+    atrasadas: m.overdueCount,
+    reagendadas: m.movidasCount,
+    criticas_total: m.criticasCount,
+    criticas_hechas: m.criticasDone,
+    criticas_atrasadas: m.criticasAtrasadasCount,
+    aplazadas_total: m.aplazadasCount,
+    motivos_aplazamiento: m.motivosTop || [],
+    cumplimiento_por_casa: m.houseList.map(h => ({ casa: h.name, total: h.total, hechas: h.done, atrasadas: h.overdue, pct: h.pct })),
+    etapas_lentas: m.stageList.slice(0,5).map(s => ({ etapa: s.name, pct: s.pct, total: s.total, atrasadas: s.overdue })),
+    dia_semana_mejor: m.dowSorted.slice().filter(d=>d.total>0).sort((a,b)=>b.pct-a.pct)[0],
+    dia_semana_peor: m.dowSorted.slice().filter(d=>d.total>0).sort((a,b)=>a.pct-b.pct)[0]
+  };
+
+  const prompt = `Sos un consultor de operaciones de remodelación residencial (fix & flip) en Austin TX.
+Analizá estos datos del weekly planner y devolvé un JSON con esta forma exacta (sin markdown, sin texto extra):
+{
+  "resumen": "1-2 frases describiendo cómo va el período",
+  "estado_general": "verde|amarillo|rojo",
+  "fortalezas": ["..."],
+  "alertas": ["..."],
+  "acciones_priorizadas": [{"titulo": "...", "detalle": "...", "impacto": "alto|medio|bajo"}],
+  "tendencia": "mejorando|estable|empeorando",
+  "foco_proxima_semana": "1-2 frases con la decisión clave"
+}
+Sé directo y accionable, sin clichés. Si el cumplimiento es <60% o hay críticas atrasadas, pasá estado a rojo.
+Si hay un motivo de aplazamiento que se repite 3+ veces, conviértelo en acción priorizada.
+
+DATOS:
+${JSON.stringify(summary, null, 2)}`;
+
+  try {
+    const token = await window.getAccessToken();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        project_context: { feature: 'wp-analytics', rango: wpAnState.rangeLabel }
+      })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('Error ' + res.status + ': ' + txt.slice(0, 200));
+    }
+    const json = await res.json();
+    // remodel-ai retorna shape de Anthropic API: { content: [{type:'text', text:'...'}], ... }
+    let raw = '';
+    if (Array.isArray(json.content)) {
+      raw = json.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+    } else {
+      raw = json.text || json.response || (typeof json.content === 'string' ? json.content : JSON.stringify(json));
+    }
+    // Intentar parsear JSON dentro de la respuesta
+    let analysis = null;
+    try {
+      const match = raw.match(/\{[\s\S]*\}/);
+      analysis = JSON.parse(match ? match[0] : raw);
+    } catch (e) {
+      analysis = { resumen: raw, estado_general: 'amarillo', fortalezas: [], alertas: [], acciones_priorizadas: [], tendencia: 'estable', foco_proxima_semana: '' };
+    }
+    wpShowAIAnalysis(analysis);
+  } catch (e) {
+    alert('Error IA: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '🤖 Análisis IA'; }
+  }
+}
+
+function wpShowAIAnalysis(a) {
+  const colorMap = { verde: 'from-emerald-600 to-emerald-800', amarillo: 'from-amber-500 to-orange-700', rojo: 'from-red-600 to-red-800' };
+  const trendIcon = { mejorando: '📈', estable: '➡️', empeorando: '📉' };
+  const impactoColor = { alto: 'bg-red-100 text-red-800 border-red-300', medio: 'bg-amber-100 text-amber-800 border-amber-300', bajo: 'bg-slate-100 text-slate-700 border-slate-300' };
+  const color = colorMap[a.estado_general] || 'from-slate-700 to-slate-900';
+  openModal('🤖 Análisis IA del período', `
+    <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+      <div class="bg-gradient-to-br ${color} text-white rounded-2xl p-4 shadow-lg">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="text-[10px] uppercase tracking-widest opacity-80 font-bold">Estado general · ${(a.estado_general||'').toUpperCase()}</div>
+          <div class="text-sm opacity-90">${trendIcon[a.tendencia]||''} Tendencia: ${a.tendencia||'—'}</div>
+        </div>
+        <div class="text-base mt-2 leading-relaxed">${(a.resumen||'').replace(/</g,'&lt;')}</div>
+      </div>
+
+      ${(a.fortalezas||[]).length > 0 ? `
+      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-emerald-900 mb-2">✅ Fortalezas</div>
+        <ul class="space-y-1 text-sm text-emerald-900">
+          ${a.fortalezas.map(f => `<li>• ${f.replace(/</g,'&lt;')}</li>`).join('')}
+        </ul>
+      </div>` : ''}
+
+      ${(a.alertas||[]).length > 0 ? `
+      <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-red-900 mb-2">🚨 Alertas</div>
+        <ul class="space-y-1 text-sm text-red-900">
+          ${a.alertas.map(x => `<li>• ${x.replace(/</g,'&lt;')}</li>`).join('')}
+        </ul>
+      </div>` : ''}
+
+      ${(a.acciones_priorizadas||[]).length > 0 ? `
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">🎯 Acciones priorizadas</div>
+        <div class="space-y-2">
+          ${a.acciones_priorizadas.map((acc, i) => `
+            <div class="border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
+              <div class="bg-slate-900 text-white font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0">${i+1}</div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="font-bold text-sm">${(acc.titulo||'').replace(/</g,'&lt;')}</div>
+                  ${acc.impacto ? `<span class="text-[10px] uppercase font-bold border px-1.5 py-0.5 rounded ${impactoColor[acc.impacto]||'bg-slate-100'}">${acc.impacto}</span>` : ''}
+                </div>
+                <div class="text-xs text-slate-600 mt-0.5">${(acc.detalle||'').replace(/</g,'&lt;')}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
+      ${a.foco_proxima_semana ? `
+      <div class="bg-violet-50 border-l-4 border-violet-600 rounded-r-xl p-3">
+        <div class="text-xs font-bold uppercase text-violet-900 mb-1">🎯 Foco próxima semana</div>
+        <div class="text-sm text-violet-900">${a.foco_proxima_semana.replace(/</g,'&lt;')}</div>
+      </div>` : ''}
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+        <button onclick="wpAnalyticsAI()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">🔄 Re-analizar</button>
+      </div>
+    </div>
+  `);
+}
+
+// ─── 💬 Compartir día por WhatsApp ───
+// Genera mensaje formateado con todas las tareas del día y abre wa.me
+function wpShareWhatsApp(dateStr, homeFilter) {
+  let acts = (wpState.activities||[]).filter(a => a.date === dateStr);
+  acts = wpFilterActsByHouse(acts, homeFilter || 'all');
+  if (!acts.length) { alert(`Sin actividades en ${dateStr}.`); return; }
+
+  const d = new Date(dateStr + 'T00:00:00');
+  const dateLbl = d.toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+
+  // Agrupar por casa
+  const byHome = {};
+  acts.forEach(a => {
+    const key = a.property_name || (wpState.projects.find(p => p.id === a.project_id)?.name) || 'Sin asignar';
+    if (!byHome[key]) byHome[key] = [];
+    byHome[key].push(a);
+  });
+
+  // Mensaje WhatsApp con emojis y formato compacto
+  let msg = `📅 *PLAN DE OBRA · ${dateLbl.toUpperCase()}*\n\n`;
+  Object.entries(byHome).forEach(([home, hActs]) => {
+    msg += `🏠 *${home}*\n`;
+    hActs.forEach((a, i) => {
+      const isDone = a.status === 'done';
+      const isCritical = a.priority === 'critical' || a.priority === 'urgent';
+      const isPostponed = (a.notes||'').includes('[APLAZADA');
+      const checkbox = isDone ? '✅' : '☐';
+      const tags = [];
+      if (isCritical && !isDone) tags.push('⚠️ IMPORTANTE');
+      if (isPostponed) tags.push('🟡 APLAZADA');
+      msg += `${checkbox} ${a.activity_name}${tags.length?' '+tags.join(' '):''}`;
+      if (a.start_hour || a.end_hour) msg += ` (${a.start_hour||7}h-${a.end_hour||17}h)`;
+      msg += '\n';
+      if ((a.materials||[]).length) {
+        msg += `   📦 ${a.materials.map(m => `${m.nombre} ${m.cantidad}${m.unidad||''}`).join(', ')}\n`;
+      }
+      if (a.notes && !a.notes.includes('[APLAZADA')) {
+        msg += `   📝 ${a.notes.split('\n')[0].slice(0,120)}\n`;
+      }
+    });
+    msg += '\n';
+  });
+  msg += `_Generado por Empresa OS · ${new Date().toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})}_`;
+
+  // Modal de preview con editor + botón enviar
+  openModal('💬 Enviar plan del día por WhatsApp', `
+    <div class="space-y-3">
+      <div class="text-xs text-slate-600">Revisá el mensaje. Podés editarlo antes de enviarlo. Al hacer clic en enviar, WhatsApp Web/App se abrirá con el mensaje listo.</div>
+      <textarea id="wp-wa-msg" rows="14" class="w-full border border-emerald-300 rounded p-3 text-xs font-mono">${msg.replace(/</g,'&lt;')}</textarea>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional · con código país, sin +)</label>
+        <input id="wp-wa-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        <div class="text-[10px] text-slate-500 mt-0.5">Si dejás vacío, WhatsApp pedirá elegir contacto.</div>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="wpDoWhatsAppShare()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Abrir WhatsApp</button>
+      </div>
+    </div>
+  `);
+}
+
+function wpDoWhatsAppShare() {
+  const msg = document.getElementById('wp-wa-msg').value;
+  const phone = (document.getElementById('wp-wa-phone').value || '').replace(/[^0-9]/g, '');
+  const url = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+  wpBackToPlanner();
 }
 
 function wpPrintAnalytics() {
