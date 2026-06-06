@@ -359,14 +359,35 @@ function wpsRenderDetail() {
       ${msgs.length === 0 && (c.status === 'ready' || c.status === 'completed') ? `<div class="p-6 text-center text-slate-500 bg-white border border-slate-200 rounded">Sin mensajes generados.</div>` : ''}
 
       ${msgs.length > 0 ? `
-        <!-- Toolbar de acciones masivas -->
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex flex-wrap items-center gap-2">
-          <div class="text-xs font-bold text-emerald-900">⚡ Acciones rápidas:</div>
-          <button onclick="wpsCheckAll(true)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☑ Marcar todos pendientes</button>
-          <button onclick="wpsCheckAll(false)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☐ Desmarcar</button>
-          <button onclick="wpsOpenSelected()" class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Abre 1 wa.me por cada seleccionado (con pausa de 1s entre cada uno para evitar bloqueo)">📤 Abrir WhatsApp de los seleccionados</button>
-          <button onclick="wpsMarkAllSent()" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold" title="Marca como enviados los seleccionados (asume que ya los enviaste)">✓ Marcar enviados</button>
-          <div class="ml-auto text-[10px] text-slate-500">💡 Tip: si el navegador bloquea los popups, autorizalos en la barra de URL.</div>
+        <!-- 🚀 Envío automático con Cloud API (si está configurado) -->
+        <div class="bg-gradient-to-br from-blue-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">⚡ Envío 100% automático</div>
+              <div class="text-base font-bold mt-0.5">Cloud API · sin abrir pestañas</div>
+              <div class="text-xs opacity-90 mt-1">Manda los mensajes directo desde el server con WhatsApp Business Cloud API (Meta). Setup de 30 min, 1000 msgs/mes gratis.</div>
+            </div>
+            <div class="flex gap-1.5">
+              <button onclick="wpsSendCloudAPI()" class="bg-white text-indigo-700 font-bold text-sm px-3 py-2 rounded shadow hover:bg-indigo-50 whitespace-nowrap">🚀 Enviar todos</button>
+              <button onclick="wpsShowCloudSetup()" class="bg-white/20 hover:bg-white/30 text-white font-bold text-xs px-3 py-2 rounded">⚙️ Setup</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toolbar manual (wa.me) -->
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-emerald-900 mb-2">📲 Envío manual (wa.me)</div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="wpsCheckAll(true)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☑ Marcar todos pendientes</button>
+            <button onclick="wpsCheckAll(false)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☐ Desmarcar</button>
+            <button onclick="wpsOpenSelected()" class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Abre 1 wa.me por cada seleccionado con pausa de 300ms">📤 Abrir seleccionados (lento)</button>
+            <button onclick="wpsOpenSelectedTurbo()" class="text-[11px] bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold" title="Abre TODOS al mismo tiempo (modo ráfaga). El browser puede pedir permitir popups la primera vez.">⚡ MODO RÁFAGA (todos)</button>
+            <button onclick="wpsMarkAllSent()" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold" title="Marca como enviados los seleccionados">✓ Marcar enviados</button>
+          </div>
+          <div class="mt-2 text-[10px] text-slate-600">
+            <strong>📲 wa.me</strong> abre WhatsApp Web/app con el mensaje listo — solo tap "enviar". El browser te pedirá permitir popups la primera vez.
+            <br><strong>🚀 Cloud API</strong> envía solo, sin abrir pestañas. Requiere setup de credenciales Meta (botón ⚙️ arriba).
+          </div>
         </div>
 
         <div class="space-y-2 max-h-[60vh] overflow-y-auto">
@@ -392,10 +413,17 @@ function wpsGetSelectedIds() {
 async function wpsOpenSelected() {
   const ids = wpsGetSelectedIds();
   if (!ids.length) return alert('Seleccioná al menos un mensaje (checkbox a la izquierda del nombre).');
-  if (!confirm(`Abrir ${ids.length} WhatsApp en pestañas separadas?\n\nEl navegador puede pedirte permitir popups. Si bloquea, autorizalos y reintentá.`)) return;
+  if (!confirm(`Abrir ${ids.length} WhatsApp en pestañas separadas con pausa de 300ms?\n\nEl navegador puede pedirte permitir popups la primera vez.`)) return;
+
+  // Crear toast de progreso
+  let progress = document.createElement('div');
+  progress.className = 'fixed top-4 right-4 z-[200] bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl';
+  document.body.appendChild(progress);
 
   let opened = 0, failed = 0, noPhone = 0;
-  for (const id of ids) {
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    progress.innerHTML = `<div class="text-xs uppercase opacity-70 font-bold">Enviando</div><div class="text-xl font-bold">${i+1}/${ids.length}</div><div class="text-[10px] opacity-70 mt-1">${opened} abiertos · ${failed} bloqueados</div>`;
     const m = wpsState.messages.find(x => x.id === id);
     if (!m) continue;
     const s = m.student || {};
@@ -405,16 +433,176 @@ async function wpsOpenSelected() {
     const win = window.open(url, '_blank');
     if (win) {
       opened++;
-      // marcar enviado en background
       wpsMarkSent(id).catch(() => {});
     } else {
       failed++;
     }
-    // Pausa de 800ms para no saturar y dar tiempo al browser
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 300)); // 300ms entre cada uno
   }
-  alert(`Resultado:\n✓ Abiertos: ${opened}\n⚠ Sin teléfono: ${noPhone}\n✗ Bloqueados (popup): ${failed}\n\n${failed > 0 ? 'Si hubo bloqueos: autorizá popups para este sitio y reintentá los faltantes.' : ''}`);
+  progress.remove();
+  alert(`Resultado:\n✓ Abiertos: ${opened}\n⚠ Sin teléfono: ${noPhone}\n✗ Bloqueados (popup): ${failed}\n\n${failed > 0 ? '⚡ Tip: para que no bloquee popups → click el ícono de candado en la URL → Permitir popups.' : ''}`);
 }
+
+// ⚡ MODO RÁFAGA — abre TODAS las pestañas simultáneamente (sin pausa)
+async function wpsOpenSelectedTurbo() {
+  const ids = wpsGetSelectedIds();
+  if (!ids.length) return alert('Seleccioná al menos un mensaje.');
+  if (!confirm(`⚡ MODO RÁFAGA: abrir ${ids.length} pestañas wa.me TODAS AL MISMO TIEMPO?\n\nEsto va a abrir todas las pestañas de golpe. El browser te va a pedir permitir popups la primera vez — autorizalo y reintentá.\n\nSi tenés muchos (>20), el browser podría volverse lento un momento.`)) return;
+
+  let opened = 0, failed = 0, noPhone = 0;
+  const messagesToSend = [];
+  for (const id of ids) {
+    const m = wpsState.messages.find(x => x.id === id);
+    if (!m) continue;
+    const s = m.student || {};
+    const phoneClean = typeof eduCleanPhone === 'function' ? eduCleanPhone(s.phone || m.phone) : (s.phone||m.phone||'').replace(/\D/g,'');
+    if (!phoneClean || phoneClean.length < 10) { noPhone++; continue; }
+    messagesToSend.push({ id, url: `https://wa.me/${phoneClean}?text=${encodeURIComponent(m.message_text)}` });
+  }
+
+  // Abrir todos al mismo tiempo
+  for (const item of messagesToSend) {
+    const win = window.open(item.url, '_blank');
+    if (win) {
+      opened++;
+      wpsMarkSent(item.id).catch(() => {});
+    } else {
+      failed++;
+    }
+  }
+
+  alert(`⚡ MODO RÁFAGA completado:\n\n✓ Abiertos: ${opened}\n⚠ Sin teléfono: ${noPhone}\n✗ Bloqueados (popup): ${failed}\n\n${failed > 5 ? '🚨 Muchos bloqueos. Necesitás autorizar popups para este sitio:\n1. Click el ícono de candado en la barra URL\n2. "Configuración del sitio"\n3. "Ventanas emergentes y redirecciones" → Permitir\n4. Recargá y reintentá.' : ''}`);
+}
+
+window.wpsOpenSelectedTurbo = wpsOpenSelectedTurbo;
+
+// ════════════════════════════════════════════════════════════
+// 🚀 ENVÍO VÍA CLOUD API DE META (WhatsApp Business)
+// Si está configurado: envía sin abrir pestañas.
+// Si no: muestra setup wizard.
+// ════════════════════════════════════════════════════════════
+async function wpsSendCloudAPI() {
+  const ids = wpsGetSelectedIds();
+  const targetIds = ids.length > 0 ? ids : wpsState.messages.filter(m => m.status === 'pending').map(m => m.id);
+  if (!targetIds.length) return alert('No hay mensajes pendientes para enviar.');
+
+  if (!confirm(`🚀 Enviar ${targetIds.length} mensajes vía Cloud API (sin abrir pestañas)?\n\nSe envían directo desde el server. Si no está configurada, te muestro el setup.`)) return;
+
+  // Mostrar progreso
+  const progress = document.createElement('div');
+  progress.className = 'fixed top-4 right-4 z-[200] bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-2xl';
+  progress.innerHTML = '<div class="text-xs uppercase font-bold">⏳ Enviando vía Cloud API...</div>';
+  document.body.appendChild(progress);
+
+  try {
+    const token = await window.getAccessToken();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-send-cloud`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ message_ids: targetIds })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      // Si la edge function no existe (404), mostrar setup
+      if (res.status === 404 || /not.found/i.test(txt)) {
+        progress.remove();
+        return wpsShowCloudSetup({ reason: 'function_not_deployed' });
+      }
+      throw new Error('HTTP ' + res.status + ': ' + txt.slice(0, 200));
+    }
+    const r = await res.json();
+    progress.remove();
+
+    if (r.needs_setup) {
+      return wpsShowCloudSetup({ reason: r.reason || 'missing_credentials' });
+    }
+
+    await wpsLoad();
+    wpsRender();
+    alert(`✅ Envío Cloud API completado:\n\n✓ Enviados: ${r.sent || 0}\n✗ Fallaron: ${r.failed || 0}\n\n${r.errors?.length ? 'Detalle:\n' + r.errors.slice(0,3).map(e => '• ' + e).join('\n') : ''}`);
+  } catch (e) {
+    progress.remove();
+    alert('Error: ' + e.message);
+  }
+}
+
+function wpsShowCloudSetup(opts) {
+  opts = opts || {};
+  openModal('⚙️ Setup · WhatsApp Cloud API (Meta)', `
+    <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+      ${opts.reason === 'function_not_deployed' ? `
+        <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
+          ⚠️ La edge function <code>edu-whatsapp-send-cloud</code> todavía no está deployada en tu Supabase. Sigue los pasos abajo y cuando termines, decime para hacer el deploy.
+        </div>
+      ` : ''}
+
+      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
+        Para enviar mensajes <strong>100% automáticos sin abrir pestañas</strong> tenés que usar la <strong>WhatsApp Cloud API oficial de Meta</strong>. Es gratis hasta 1000 mensajes/mes, después ~$0.01/mensaje. Es la única forma legal y confiable.
+      </div>
+
+      <!-- Pasos -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📋 Pasos para activarla (~30 minutos):</div>
+        <ol class="text-xs text-slate-700 space-y-2 list-decimal list-inside">
+          <li>
+            <strong>Crear cuenta WhatsApp Business</strong>
+            <div class="text-[11px] text-slate-500 ml-4">Andá a <a href="https://business.facebook.com/" target="_blank" class="text-blue-600 underline">business.facebook.com</a> y creá una Business Account si no tenés.</div>
+          </li>
+          <li>
+            <strong>Crear app en Meta for Developers</strong>
+            <div class="text-[11px] text-slate-500 ml-4"><a href="https://developers.facebook.com/apps/" target="_blank" class="text-blue-600 underline">developers.facebook.com/apps</a> → Crear app → Tipo: <strong>Business</strong> → Agregar producto: <strong>WhatsApp</strong></div>
+          </li>
+          <li>
+            <strong>Conseguir Phone Number ID + Access Token</strong>
+            <div class="text-[11px] text-slate-500 ml-4">Dentro de la app, en WhatsApp → API Setup verás:
+              <br>• Phone Number ID (15 dígitos)
+              <br>• Temporary access token (24h) — para probar
+              <br>• Permanent token (después) — para producción</div>
+          </li>
+          <li>
+            <strong>Crear plantillas de mensaje aprobadas</strong>
+            <div class="text-[11px] text-slate-500 ml-4">En Message Templates de WhatsApp Manager. Sin templates aprobadas solo podés mandar respuestas a usuarios que te escribieron en las últimas 24h. Para mensajes nuevos (como tu seguimiento semanal) necesitás templates.</div>
+          </li>
+          <li>
+            <strong>Guardar las credenciales en Supabase</strong>
+            <div class="text-[11px] text-slate-500 ml-4">En la terminal local de tu proyecto:
+              <pre class="bg-slate-900 text-emerald-300 p-2 rounded text-[10px] mt-1 overflow-x-auto">supabase secrets set META_WHATSAPP_PHONE_ID="123456789"
+supabase secrets set META_WHATSAPP_TOKEN="EAAxxxxx"
+supabase secrets set META_WHATSAPP_TEMPLATE_NAME="seguimiento_semanal"</pre>
+            </div>
+          </li>
+          <li>
+            <strong>Deployar la edge function</strong>
+            <pre class="bg-slate-900 text-emerald-300 p-2 rounded text-[10px] overflow-x-auto">supabase functions deploy edu-whatsapp-send-cloud --no-verify-jwt</pre>
+          </li>
+        </ol>
+      </div>
+
+      <!-- Alternativa: Twilio -->
+      <details class="bg-violet-50 border border-violet-200 rounded p-3">
+        <summary class="cursor-pointer text-xs font-bold text-violet-900">🔄 Alternativa más fácil: Twilio (click para ver)</summary>
+        <div class="mt-2 text-xs text-violet-900 space-y-1">
+          <div>Twilio simplifica el proceso. Setup en <strong>10 minutos</strong> pero cuesta ~$0.005/mensaje desde el inicio (sin tier gratis).</div>
+          <ol class="list-decimal list-inside ml-2 mt-1 space-y-1">
+            <li>Crear cuenta en <a href="https://www.twilio.com/" target="_blank" class="underline">twilio.com</a></li>
+            <li>Activar el WhatsApp Sender en consola</li>
+            <li>Guardar TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WA_FROM en Supabase secrets</li>
+            <li>Deployar la edge function (te puedo armar la versión Twilio si preferís)</li>
+          </ol>
+        </div>
+      </details>
+
+      <div class="bg-emerald-50 border border-emerald-300 rounded p-3 text-xs text-emerald-900">
+        💡 <strong>Sin Cloud API podés seguir usando los botones manuales</strong> (📤 lento o ⚡ ráfaga). Cloud API es para cuando querés automatizar el envío masivo recurrente sin click manual.
+      </div>
+
+      <button onclick="closeModal()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">Entendido</button>
+    </div>
+  `);
+}
+
+window.wpsSendCloudAPI = wpsSendCloudAPI;
+window.wpsShowCloudSetup = wpsShowCloudSetup;
 
 async function wpsMarkAllSent() {
   const ids = wpsGetSelectedIds();
