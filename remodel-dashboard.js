@@ -35,6 +35,81 @@ const BENCHMARKS_AUSTIN = {
   discrepancia_min: 500, // diferencia valor_interno vs (mat+lab) que dispara alerta
 };
 
+// ─── Config financiera editable (persistida en localStorage) ───
+// Tasa de impuestos + intereses sobre préstamos + depreciaciones anuales de
+// activos de la empresa (camionetas, herramientas grandes, etc) para calcular
+// EBIT / EBITDA y margen neto después de impuestos.
+function rdGetFinCfg() {
+  try {
+    const raw = localStorage.getItem('rd_fin_cfg');
+    if (raw) return { ...rdFinCfgDefaults(), ...JSON.parse(raw) };
+  } catch {}
+  return rdFinCfgDefaults();
+}
+function rdFinCfgDefaults() {
+  return {
+    tasa_impuestos_pct: 21,            // 21% corp USA federal (typical)
+    overhead_anual: 60000,             // gastos generales empresa (oficina, seguros, software)
+    depreciacion_anual: 12000,         // depreciación equipos (camioneta 4Runner, etc)
+    amortizacion_anual: 0,             // amortización intangibles
+    interes_prestamos_anual: 8000,     // gasto financiero anual estimado
+    obras_activas_promedio: 3,         // # promedio de obras activas para prorrateo
+    crew_min_personas: 3               // tamaño mínimo de cuadrilla esperado
+  };
+}
+function rdSetFinCfg(patch) {
+  const cur = rdGetFinCfg();
+  const next = { ...cur, ...patch };
+  try { localStorage.setItem('rd_fin_cfg', JSON.stringify(next)); } catch {}
+  return next;
+}
+
+// ─── Cálculo financiero completo por obra ───
+// Devuelve { revenue, costoDirecto, margenBruto, margenBrutoPct,
+//   overheadProrr, depreciacionProrr, interesesProrr,
+//   ebitda, ebit, utilidadAntesImp, impuestos, utilidadNeta,
+//   margenNetoPct, margenNetoDespuesImpPct }
+function rdFinanzas(p, cfg) {
+  cfg = cfg || rdGetFinCfg();
+  const mat = +p.gasto_materiales || 0;
+  const lab = +p.gasto_trabajadores || 0;
+  const costoDirecto = mat + lab;
+  const revenue = +p.valor_cliente || 0;
+  const margenBruto = revenue - costoDirecto;
+  const margenBrutoPct = revenue > 0 ? margenBruto / revenue * 100 : 0;
+
+  // Prorrateo: si la obra dura X días sobre 365 y hay N obras paralelas,
+  // le corresponde una fracción del overhead/dep/interés anual.
+  const dias = p.fecha_inicio && (p.fecha_real_fin || p.fecha_estimada_fin)
+    ? Math.max(1, Math.round((new Date(p.fecha_real_fin || p.fecha_estimada_fin) - new Date(p.fecha_inicio)) / 86400000))
+    : 90; // default 3 meses si no hay fechas
+  const fracAnual = (dias / 365) / Math.max(1, cfg.obras_activas_promedio);
+  const overheadProrr = cfg.overhead_anual * fracAnual;
+  const depreciacionProrr = cfg.depreciacion_anual * fracAnual;
+  const interesesProrr = cfg.interes_prestamos_anual * fracAnual;
+
+  // EBITDA = Margen Bruto − Overhead operativo (excluye dep, amort, intereses, impuestos)
+  const ebitda = margenBruto - overheadProrr;
+  // EBIT = EBITDA − depreciación − amortización
+  const ebit = ebitda - depreciacionProrr;
+  // Utilidad antes de impuestos = EBIT − intereses
+  const utilidadAntesImp = ebit - interesesProrr;
+  // Impuestos sobre utilidad positiva
+  const impuestos = utilidadAntesImp > 0 ? utilidadAntesImp * (cfg.tasa_impuestos_pct / 100) : 0;
+  const utilidadNeta = utilidadAntesImp - impuestos;
+
+  return {
+    revenue, costoDirecto, dias,
+    margenBruto, margenBrutoPct,
+    overheadProrr, depreciacionProrr, interesesProrr,
+    ebitda, ebitdaPct: revenue > 0 ? ebitda/revenue*100 : 0,
+    ebit, ebitPct: revenue > 0 ? ebit/revenue*100 : 0,
+    utilidadAntesImp, utilidadAntesImpPct: revenue > 0 ? utilidadAntesImp/revenue*100 : 0,
+    impuestos,
+    utilidadNeta, margenNetoDespuesImpPct: revenue > 0 ? utilidadNeta/revenue*100 : 0
+  };
+}
+
 // ─── KPIs avanzados por obra (replica el formato del informe ejecutivo) ───
 function rdAdvancedKPIs(p) {
   const mat = +p.gasto_materiales || 0;
@@ -268,9 +343,9 @@ function rdRender() {
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 flex-wrap gap-2">
         <div class="flex items-center gap-1.5 flex-wrap">
-          ${['portfolio','informe','obras','lideres','alertas','acciones','tendencias','insights'].map(t => `
+          ${['portfolio','informe','obras','lideres','personal','comparar','finanzas','alertas','acciones','tendencias','insights'].map(t => `
             <button onclick="rdSetTab('${t}')" class="px-2.5 py-1.5 rounded text-xs font-bold ${rdState.tab===t?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
-              ${t==='portfolio'?'📊 Portfolio':t==='informe'?'📑 Informe':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='alertas'?'🚨 Alertas':t==='acciones'?'📋 Acciones':t==='tendencias'?'📈 Tendencias':'🧠 Insights IA'}
+              ${t==='portfolio'?'📊 Portfolio':t==='informe'?'📑 Informe':t==='obras'?'🏗️ Obras':t==='lideres'?'👷 Líderes':t==='personal'?'🧑‍🔧 Personal':t==='comparar'?'🔍 Comparar':t==='finanzas'?'💼 Finanzas':t==='alertas'?'🚨 Alertas':t==='acciones'?'📋 Acciones':t==='tendencias'?'📈 Tendencias':'🧠 Insights IA'}
               ${t==='alertas' && rdState.alerts.length ? `<span class="ml-1 bg-red-600 text-white px-1.5 rounded">${rdState.alerts.length}</span>` : ''}
               ${t==='acciones' && rdState.requiredActions.length ? `<span class="ml-1 bg-amber-600 text-white px-1.5 rounded">${rdState.requiredActions.length}</span>` : ''}
               ${t==='insights' && rdState.weeklyInsights.length ? `<span class="ml-1 bg-violet-600 text-white px-1.5 rounded">${rdState.weeklyInsights.length}</span>` : ''}
@@ -291,6 +366,9 @@ function rdRender() {
           rdState.tab === 'informe' ? rdRenderInforme(active, finalizada) :
           rdState.tab === 'obras' ? rdRenderObras(active, finalizada, sinAsignar) :
           rdState.tab === 'lideres' ? rdRenderLideres() :
+          rdState.tab === 'personal' ? rdRenderPersonal(active) :
+          rdState.tab === 'comparar' ? rdRenderComparar(active, finalizada) :
+          rdState.tab === 'finanzas' ? rdRenderFinanzas(active, finalizada) :
           rdState.tab === 'alertas' ? rdRenderAlertas() :
           rdState.tab === 'acciones' ? rdRenderAcciones() :
           rdState.tab === 'insights' ? rdRenderInsights() :
@@ -893,7 +971,10 @@ function rdRenderInforme(active, finalizada) {
       <!-- Toolbar -->
       <div class="flex justify-between items-center print:hidden">
         <div class="text-xs text-slate-500 capitalize">${fechaStr} · Agua Construction Group · Structure One · Flipping Rentals</div>
-        <button onclick="rdPrintInforme()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">🖨️ Imprimir / PDF</button>
+        <div class="flex gap-2">
+          <button onclick="rdGeneratePPTX()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">📊 Generar presentación</button>
+          <button onclick="rdPrintInforme()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">🖨️ Imprimir / PDF</button>
+        </div>
       </div>
 
       <!-- HERO: Estado del portfolio + mensaje CEO -->
@@ -1299,6 +1380,70 @@ async function rdOpenObra(airtable_id) {
         </div>
       </div>
 
+      <!-- 💼 ANÁLISIS FINANCIERO COMPLETO -->
+      ${(() => {
+        const fin = rdFinanzas(p);
+        const cfg = rdGetFinCfg();
+        const colorMargen = (pct, hi, lo) => pct >= hi ? 'text-emerald-700' : pct >= lo ? 'text-amber-700' : 'text-red-700';
+        const fmt = n => '$' + Math.round(n).toLocaleString();
+        return `
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-300 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-xs font-bold uppercase text-slate-700">💼 Análisis financiero completo</div>
+            <button onclick="rdOpenFinCfg()" class="text-[10px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-semibold">⚙️ Editar tasas</button>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div class="bg-white rounded-lg p-2.5 border border-slate-200">
+              <div class="text-[10px] uppercase text-slate-500 font-bold">Margen Bruto</div>
+              <div class="text-base font-bold ${colorMargen(fin.margenBrutoPct, 25, 15)}">${fmt(fin.margenBruto)}</div>
+              <div class="text-[10px] text-slate-500">${fin.margenBrutoPct.toFixed(1)}% sobre venta</div>
+            </div>
+            <div class="bg-white rounded-lg p-2.5 border border-slate-200">
+              <div class="text-[10px] uppercase text-slate-500 font-bold">EBITDA</div>
+              <div class="text-base font-bold ${colorMargen(fin.ebitdaPct, 15, 5)}">${fmt(fin.ebitda)}</div>
+              <div class="text-[10px] text-slate-500">${fin.ebitdaPct.toFixed(1)}% · post-overhead</div>
+            </div>
+            <div class="bg-white rounded-lg p-2.5 border border-slate-200">
+              <div class="text-[10px] uppercase text-slate-500 font-bold">EBIT</div>
+              <div class="text-base font-bold ${colorMargen(fin.ebitPct, 12, 4)}">${fmt(fin.ebit)}</div>
+              <div class="text-[10px] text-slate-500">${fin.ebitPct.toFixed(1)}% · post-depreciación</div>
+            </div>
+            <div class="bg-white rounded-lg p-2.5 border border-slate-200">
+              <div class="text-[10px] uppercase text-slate-500 font-bold">Antes de impuestos</div>
+              <div class="text-base font-bold ${colorMargen(fin.utilidadAntesImpPct, 10, 3)}">${fmt(fin.utilidadAntesImp)}</div>
+              <div class="text-[10px] text-slate-500">${fin.utilidadAntesImpPct.toFixed(1)}% · post-intereses</div>
+            </div>
+            <div class="bg-white rounded-lg p-2.5 border border-slate-200">
+              <div class="text-[10px] uppercase text-slate-500 font-bold">Impuestos (${cfg.tasa_impuestos_pct}%)</div>
+              <div class="text-base font-bold text-red-700">−${fmt(fin.impuestos)}</div>
+              <div class="text-[10px] text-slate-500">sobre utilidad gravable</div>
+            </div>
+            <div class="rounded-lg p-2.5 border-2 ${fin.margenNetoDespuesImpPct >= 5 ? 'bg-emerald-50 border-emerald-400' : 'bg-red-50 border-red-400'}">
+              <div class="text-[10px] uppercase font-bold ${fin.margenNetoDespuesImpPct >= 5 ? 'text-emerald-800' : 'text-red-800'}">⭐ Neto post-impuestos</div>
+              <div class="text-base font-bold ${fin.margenNetoDespuesImpPct >= 5 ? 'text-emerald-700' : 'text-red-700'}">${fmt(fin.utilidadNeta)}</div>
+              <div class="text-[10px] ${fin.margenNetoDespuesImpPct >= 5 ? 'text-emerald-700' : 'text-red-700'}">${fin.margenNetoDespuesImpPct.toFixed(1)}% · objetivo 5-15% E.A.</div>
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-2 italic">
+            Overhead prorrateado: ${fmt(fin.overheadProrr)} · Depreciación: ${fmt(fin.depreciacionProrr)} · Intereses: ${fmt(fin.interesesProrr)} ·
+            Días de obra: ${fin.dias} de 365 sobre ${cfg.obras_activas_promedio} obras paralelas
+          </div>
+        </div>
+
+        <!-- 📋 Informes por hito de avance -->
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">📋 Informes por hito de avance</div>
+          <div class="text-[10px] text-slate-500 mb-2">Genera informe detallado con análisis de personal, gasto vs plan, ritmo y proyección al cierre.</div>
+          <div class="flex flex-wrap gap-1">
+            ${[10,25,50,75,90,100].map(h => {
+              const llego = (p.avance_pct||0) >= h;
+              return `<button onclick="rdOpenHitoReport('${p.airtable_id}', ${h})" class="text-xs px-2.5 py-1.5 rounded font-bold ${llego?'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300':'bg-slate-100 hover:bg-slate-200 text-slate-600'}">${llego?'✅':'·'} Hito ${h}%</button>`;
+            }).join('')}
+          </div>
+        </div>
+        `;
+      })()}
+
       <!-- Forecast / Calculadora rápida (colapsada por defecto) -->
       <details class="bg-violet-50 border border-violet-200 rounded-xl overflow-hidden" id="rd-forecast-${p.airtable_id}">
         <summary class="cursor-pointer px-3 py-2 flex items-center justify-between hover:bg-violet-100">
@@ -1527,4 +1672,534 @@ function rdRenderInsights() {
       `).join('')}
     </div>
   `;
+}
+
+// ════════════════════════════════════════════════════════════
+// 💼 TAB FINANZAS — EBITDA / EBIT / Neto post-impuestos empresa-wide
+// ════════════════════════════════════════════════════════════
+function rdRenderFinanzas(active, finalizada) {
+  const cfg = rdGetFinCfg();
+  const fmt = n => '$' + Math.round(n).toLocaleString();
+  // Suma agregada activas + finalizadas para vista empresa
+  const todas = [...active, ...finalizada];
+  let revenue=0, costoDirecto=0, margenBruto=0, ebitda=0, ebit=0, utilidadAntesImp=0, impuestos=0, utilidadNeta=0;
+  const perObra = todas.map(p => {
+    const f = rdFinanzas(p, cfg);
+    revenue += f.revenue; costoDirecto += f.costoDirecto; margenBruto += f.margenBruto;
+    ebitda += f.ebitda; ebit += f.ebit;
+    utilidadAntesImp += f.utilidadAntesImp; impuestos += f.impuestos; utilidadNeta += f.utilidadNeta;
+    return { p, f };
+  });
+  const margenBrutoPct = revenue > 0 ? margenBruto/revenue*100 : 0;
+  const ebitdaPct = revenue > 0 ? ebitda/revenue*100 : 0;
+  const ebitPct = revenue > 0 ? ebit/revenue*100 : 0;
+  const netoPct = revenue > 0 ? utilidadNeta/revenue*100 : 0;
+  const color = (pct, hi, lo) => pct >= hi ? 'from-emerald-600 to-emerald-800' : pct >= lo ? 'from-amber-500 to-orange-700' : 'from-red-600 to-red-800';
+
+  return `
+    <div class="space-y-3">
+      <!-- Hero EBITDA -->
+      <div class="bg-gradient-to-br ${color(ebitdaPct, 15, 5)} text-white rounded-2xl p-5 shadow-lg">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div class="text-[10px] uppercase tracking-widest opacity-80 font-bold">Empresa · ${todas.length} obra(s) analizadas</div>
+            <div class="text-3xl font-bold mt-1">${fmt(ebitda)} EBITDA</div>
+            <div class="text-sm opacity-90 mt-1">${ebitdaPct.toFixed(1)}% sobre ${fmt(revenue)} de ingresos</div>
+          </div>
+          <button onclick="rdOpenFinCfg()" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-3 py-2 rounded-lg backdrop-blur">⚙️ Editar tasas y supuestos</button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div class="bg-white/15 backdrop-blur rounded-xl p-3 border border-white/20">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Margen Bruto</div>
+            <div class="text-xl font-bold mt-1">${fmt(margenBruto)}</div>
+            <div class="text-[11px] opacity-85">${margenBrutoPct.toFixed(1)}%</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-3 border border-white/20">
+            <div class="text-[10px] uppercase opacity-80 font-bold">EBIT</div>
+            <div class="text-xl font-bold mt-1">${fmt(ebit)}</div>
+            <div class="text-[11px] opacity-85">${ebitPct.toFixed(1)}%</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-3 border border-white/20">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Impuestos (${cfg.tasa_impuestos_pct}%)</div>
+            <div class="text-xl font-bold mt-1">−${fmt(impuestos)}</div>
+            <div class="text-[11px] opacity-85">sobre utilidad gravable</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-3 border border-white/20">
+            <div class="text-[10px] uppercase opacity-80 font-bold">⭐ Neto post-imp</div>
+            <div class="text-xl font-bold mt-1">${fmt(utilidadNeta)}</div>
+            <div class="text-[11px] opacity-85">${netoPct.toFixed(1)}% (obj 5-15%)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Educación rápida -->
+      <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-900">
+        <strong>📚 Cómo leerlo:</strong>
+        Negocios EXCELENTES de fix & flip dan hasta <strong>25%</strong> de margen neto. Bien estructurado este negocio anda
+        en <strong>5–15% E.A.</strong> post-impuestos. Si tu Neto está bajo del 5% hay fugas: overhead, mano de obra mal medida,
+        o ventas bajas. EBITDA aísla la operación pura (sin depreciación, intereses, impuestos).
+      </div>
+
+      <!-- Detalle por obra -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">Detalle por obra</div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50">
+              <tr class="border-b border-slate-200">
+                <th class="text-left p-2">Obra</th>
+                <th class="text-right p-2">Revenue</th>
+                <th class="text-right p-2">M. Bruto</th>
+                <th class="text-right p-2">EBITDA</th>
+                <th class="text-right p-2">EBIT</th>
+                <th class="text-right p-2">Imp.</th>
+                <th class="text-right p-2 bg-emerald-50">Neto</th>
+                <th class="text-right p-2 bg-emerald-50">Neto %</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${perObra.map(({p, f}) => `
+                <tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="rdOpenObra('${p.airtable_id}')">
+                  <td class="p-2 font-medium truncate max-w-[180px]">${(p.address||'—').replace(/</g,'&lt;')}</td>
+                  <td class="p-2 text-right">${fmt(f.revenue)}</td>
+                  <td class="p-2 text-right">${fmt(f.margenBruto)}</td>
+                  <td class="p-2 text-right">${fmt(f.ebitda)}</td>
+                  <td class="p-2 text-right">${fmt(f.ebit)}</td>
+                  <td class="p-2 text-right text-red-700">−${fmt(f.impuestos)}</td>
+                  <td class="p-2 text-right font-bold bg-emerald-50 ${f.utilidadNeta>=0?'text-emerald-800':'text-red-700'}">${fmt(f.utilidadNeta)}</td>
+                  <td class="p-2 text-right font-bold bg-emerald-50 ${f.margenNetoDespuesImpPct>=5?'text-emerald-800':'text-red-700'}">${f.margenNetoDespuesImpPct.toFixed(1)}%</td>
+                </tr>
+              `).join('')}
+              <tr class="border-t-2 border-slate-300 font-bold bg-slate-50">
+                <td class="p-2">TOTAL EMPRESA</td>
+                <td class="p-2 text-right">${fmt(revenue)}</td>
+                <td class="p-2 text-right">${fmt(margenBruto)}</td>
+                <td class="p-2 text-right">${fmt(ebitda)}</td>
+                <td class="p-2 text-right">${fmt(ebit)}</td>
+                <td class="p-2 text-right text-red-700">−${fmt(impuestos)}</td>
+                <td class="p-2 text-right ${utilidadNeta>=0?'text-emerald-800':'text-red-700'}">${fmt(utilidadNeta)}</td>
+                <td class="p-2 text-right ${netoPct>=5?'text-emerald-800':'text-red-700'}">${netoPct.toFixed(1)}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function rdOpenFinCfg() {
+  const cfg = rdGetFinCfg();
+  openModal('⚙️ Configuración financiera empresa', `
+    <div class="space-y-3 text-sm">
+      <div class="text-xs text-slate-600">Estos parámetros afectan TODOS los cálculos de EBITDA, EBIT y margen neto post-impuestos. Se guardan en tu navegador.</div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Tasa impuestos (%)</label>
+          <input id="fc-tax" type="number" step="0.5" value="${cfg.tasa_impuestos_pct}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Obras paralelas promedio</label>
+          <input id="fc-obras" type="number" min="1" value="${cfg.obras_activas_promedio}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Overhead anual ($)</label>
+          <input id="fc-overhead" type="number" step="1000" value="${cfg.overhead_anual}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" title="Oficina, seguros, software, salarios admin"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Depreciación anual ($)</label>
+          <input id="fc-dep" type="number" step="500" value="${cfg.depreciacion_anual}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" title="Camionetas, herramientas grandes — vida útil 5-7 años"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Amortización anual ($)</label>
+          <input id="fc-amort" type="number" step="500" value="${cfg.amortizacion_anual}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" title="Intangibles (software, marca, licencias)"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Intereses préstamos anual ($)</label>
+          <input id="fc-int" type="number" step="500" value="${cfg.interes_prestamos_anual}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" title="Costo financiero de líneas de crédito y préstamos"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-0.5">Cuadrilla mínima (personas)</label>
+          <input id="fc-crew" type="number" min="1" value="${cfg.crew_min_personas}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" title="Tamaño esperado del crew por obra activa"/>
+        </div>
+      </div>
+      <div class="bg-amber-50 border border-amber-300 rounded p-2 text-[11px] text-amber-900">
+        💡 La camioneta 4Runner típica se deprecia ~$8,000-$12,000/año. Herramientas grandes (compresores, sierras industriales) ~$3,000-$5,000/año.
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="rdSaveFinCfg()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+      </div>
+    </div>
+  `);
+}
+
+function rdSaveFinCfg() {
+  rdSetFinCfg({
+    tasa_impuestos_pct: +document.getElementById('fc-tax').value || 21,
+    obras_activas_promedio: Math.max(1, +document.getElementById('fc-obras').value || 3),
+    overhead_anual: +document.getElementById('fc-overhead').value || 0,
+    depreciacion_anual: +document.getElementById('fc-dep').value || 0,
+    amortizacion_anual: +document.getElementById('fc-amort').value || 0,
+    interes_prestamos_anual: +document.getElementById('fc-int').value || 0,
+    crew_min_personas: Math.max(1, +document.getElementById('fc-crew').value || 3)
+  });
+  closeModal();
+  rdRender();
+}
+
+// ════════════════════════════════════════════════════════════
+// 🧑‍🔧 TAB PERSONAL — rendimiento de cuadrillas
+// Detecta cuadrillas incompletas (1-2 personas cuando deberían ser 3-4)
+// y mide productividad: avance/día/persona
+// ════════════════════════════════════════════════════════════
+function rdRenderPersonal(active) {
+  const cfg = rdGetFinCfg();
+  const min = cfg.crew_min_personas;
+  // Por cada obra activa: contar personas asignadas (lider + ayudantes)
+  const rows = active.map(p => {
+    // Heurística simple — Airtable suele tener un solo campo 'lider' + 'crew_count' o 'crew' jsonb
+    const lider = p.lider || null;
+    const crewSize = +p.crew_size || +p.crew_count || (lider ? 1 : 0) + (+p.ayudantes || 0);
+    const personas = Math.max(crewSize, lider ? 1 : 0);
+    const sqft = +p.sqft || 0;
+    const avance = +p.avance_pct || 0;
+    const dias = p.fecha_inicio
+      ? Math.max(1, Math.round((new Date() - new Date(p.fecha_inicio)) / 86400000))
+      : null;
+    // sqft de avance por persona-día (productividad)
+    const prod = dias && personas > 0
+      ? Math.round((sqft * avance/100) / (dias * personas) * 10) / 10
+      : null;
+    const okSize = personas >= min;
+    return { p, lider, personas, sqft, avance, dias, prod, okSize };
+  }).sort((a,b) => (a.okSize ? 1 : 0) - (b.okSize ? 1 : 0));
+
+  const incompletas = rows.filter(r => !r.okSize).length;
+
+  return `
+    <div class="space-y-3">
+      <div class="bg-gradient-to-br ${incompletas>0?'from-red-600 to-red-800':'from-emerald-600 to-emerald-800'} text-white rounded-xl p-4">
+        <div class="text-sm uppercase tracking-wider opacity-80 font-bold">Rendimiento del personal</div>
+        <div class="text-2xl font-bold mt-1">${incompletas>0 ? `⚠️ ${incompletas} obra(s) con cuadrilla incompleta` : `✅ Todas las cuadrillas en tamaño`}</div>
+        <div class="text-sm opacity-90 mt-1">Tamaño mínimo esperado: ${min} personas (configurable en ⚙️ tasas)</div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">Cuadrillas por obra</div>
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50">
+            <tr class="border-b border-slate-200">
+              <th class="text-left p-2">Obra</th>
+              <th class="text-left p-2">Líder</th>
+              <th class="text-center p-2">Personas</th>
+              <th class="text-right p-2">SqFt</th>
+              <th class="text-right p-2">Días</th>
+              <th class="text-right p-2">Avance</th>
+              <th class="text-right p-2">SqFt / pers / día</th>
+              <th class="text-left p-2">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr class="border-t border-slate-100 ${!r.okSize?'bg-red-50':''} hover:bg-slate-50 cursor-pointer" onclick="rdOpenObra('${r.p.airtable_id}')">
+                <td class="p-2 font-medium truncate max-w-[180px]">${(r.p.address||'—').replace(/</g,'&lt;')}</td>
+                <td class="p-2">${(r.lider||'—').replace(/</g,'&lt;')}</td>
+                <td class="p-2 text-center font-bold ${r.okSize?'text-emerald-700':'text-red-700'}">${r.personas} / ${min}</td>
+                <td class="p-2 text-right">${r.sqft||'—'}</td>
+                <td class="p-2 text-right">${r.dias||'—'}</td>
+                <td class="p-2 text-right">${r.avance}%</td>
+                <td class="p-2 text-right">${r.prod!=null?r.prod:'—'}</td>
+                <td class="p-2">${r.okSize?'<span class="text-emerald-700 font-bold">✅ OK</span>':'<span class="text-red-700 font-bold">⚠️ Incompleta · agregar '+(min-r.personas)+' persona(s)</span>'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900">
+        <strong>💡 Cómo leer:</strong> La columna SqFt/persona/día mide productividad real. Un equipo balanceado en obras
+        medianas hace ~50-80 SqFt/persona/día. Si un crew rinde menos de 30, hay sobreasignación o líder solo.
+        Si un crew tiene 1-2 personas en una obra grande, suelen aparecer atrasos y sobrecostos en mano de obra.
+      </div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+// 🔍 TAB COMPARAR — comparativa de 2 obras lado a lado
+// Compara $/sqft, días, productividad, márgenes
+// ════════════════════════════════════════════════════════════
+function rdRenderComparar(active, finalizada) {
+  const todas = [...active, ...finalizada].sort((a,b) => (a.address||'').localeCompare(b.address||''));
+  if (!rdState.cmpA) rdState.cmpA = todas[0]?.airtable_id || null;
+  if (!rdState.cmpB) rdState.cmpB = todas[1]?.airtable_id || null;
+  const A = todas.find(p => p.airtable_id === rdState.cmpA);
+  const B = todas.find(p => p.airtable_id === rdState.cmpB);
+  const cfg = rdGetFinCfg();
+
+  const opts = todas.map(p => `<option value="${p.airtable_id}">${(p.address||'—').replace(/</g,'&lt;')}</option>`).join('');
+
+  if (!A || !B) {
+    return '<div class="text-center text-slate-400 py-12">Necesitás al menos 2 obras cargadas para comparar.</div>';
+  }
+
+  const fA = rdFinanzas(A, cfg), fB = rdFinanzas(B, cfg);
+  const kA = rdAdvancedKPIs(A), kB = rdAdvancedKPIs(B);
+
+  const dollar = n => '$' + Math.round(n).toLocaleString();
+  const sqftA = +A.sqft || 0, sqftB = +B.sqft || 0;
+  const costPerSqftA = sqftA > 0 ? fA.costoDirecto/sqftA : null;
+  const costPerSqftB = sqftB > 0 ? fB.costoDirecto/sqftB : null;
+  const revPerSqftA = sqftA > 0 ? fA.revenue/sqftA : null;
+  const revPerSqftB = sqftB > 0 ? fB.revenue/sqftB : null;
+
+  // Helper: badge de "mejor"
+  const winner = (a, b, higherIsBetter) => {
+    if (a == null || b == null) return ['', ''];
+    if (Math.abs(a-b) < 0.001) return ['', ''];
+    const aWins = higherIsBetter ? a > b : a < b;
+    return aWins ? ['🏆','—'] : ['—','🏆'];
+  };
+  const row = (label, valA, valB, higherIsBetter, fmt) => {
+    fmt = fmt || (x => x);
+    const [bA, bB] = winner(valA, valB, higherIsBetter);
+    return `
+      <tr class="border-t border-slate-100">
+        <td class="p-2 font-semibold text-slate-700">${label}</td>
+        <td class="p-2 text-right ${bA==='🏆'?'bg-emerald-50 font-bold text-emerald-800':''}">${valA!=null?fmt(valA):'—'} ${bA==='🏆'?'🏆':''}</td>
+        <td class="p-2 text-right ${bB==='🏆'?'bg-emerald-50 font-bold text-emerald-800':''}">${valB!=null?fmt(valB):'—'} ${bB==='🏆'?'🏆':''}</td>
+      </tr>
+    `;
+  };
+
+  return `
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <label class="block text-[10px] uppercase font-bold text-blue-900 mb-1">Casa A</label>
+          <select onchange="rdState.cmpA=this.value; rdRender()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-semibold">${opts.replace(`value="${rdState.cmpA}"`, `value="${rdState.cmpA}" selected`)}</select>
+        </div>
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+          <label class="block text-[10px] uppercase font-bold text-violet-900 mb-1">Casa B</label>
+          <select onchange="rdState.cmpB=this.value; rdRender()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-semibold">${opts.replace(`value="${rdState.cmpB}"`, `value="${rdState.cmpB}" selected`)}</select>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="text-left p-2 w-1/3">Métrica</th>
+              <th class="text-right p-2 w-1/3">${(A.address||'A').replace(/</g,'&lt;')}</th>
+              <th class="text-right p-2 w-1/3">${(B.address||'B').replace(/</g,'&lt;')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="bg-slate-50"><td colspan="3" class="p-2 text-[10px] uppercase font-bold text-slate-600">🏠 Tamaño y plazo</td></tr>
+            ${row('SqFt', sqftA, sqftB, true, x => x.toLocaleString())}
+            ${row('Días totales obra', fA.dias, fB.dias, false)}
+            ${row('Líder', null, null, true)}
+            <tr class="border-t border-slate-100">
+              <td class="p-2 font-semibold text-slate-700">Líder</td>
+              <td class="p-2 text-right">${(A.lider||'—').replace(/</g,'&lt;')}</td>
+              <td class="p-2 text-right">${(B.lider||'—').replace(/</g,'&lt;')}</td>
+            </tr>
+            <tr class="bg-slate-50"><td colspan="3" class="p-2 text-[10px] uppercase font-bold text-slate-600">💵 Costo y revenue</td></tr>
+            ${row('Costo directo total', fA.costoDirecto, fB.costoDirecto, false, dollar)}
+            ${row('Revenue cliente', fA.revenue, fB.revenue, true, dollar)}
+            ${row('Costo / SqFt', costPerSqftA, costPerSqftB, false, x => '$'+x.toFixed(1))}
+            ${row('Revenue / SqFt', revPerSqftA, revPerSqftB, true, x => '$'+x.toFixed(1))}
+            ${row('Labor / costo (%)', kA.labor_ratio, kB.labor_ratio, false, x => x+'%')}
+            <tr class="bg-slate-50"><td colspan="3" class="p-2 text-[10px] uppercase font-bold text-slate-600">📊 Resultados</td></tr>
+            ${row('Margen Bruto %', fA.margenBrutoPct, fB.margenBrutoPct, true, x => x.toFixed(1)+'%')}
+            ${row('EBITDA', fA.ebitda, fB.ebitda, true, dollar)}
+            ${row('EBITDA %', fA.ebitdaPct, fB.ebitdaPct, true, x => x.toFixed(1)+'%')}
+            ${row('Neto post-impuestos', fA.utilidadNeta, fB.utilidadNeta, true, dollar)}
+            ${row('Margen neto %', fA.margenNetoDespuesImpPct, fB.margenNetoDespuesImpPct, true, x => x.toFixed(1)+'%')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+        <strong>💡 Cómo leer:</strong> 🏆 marca a la obra que ganó esa métrica. Comparando $/SqFt podés ver cuál fue
+        más eficiente; comparando Revenue/SqFt cuál se vendió mejor. Si la casa más chica tiene mejor margen %, hay
+        algo que está jugando — busca el delta en labor/costo o tiempos.
+      </div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════
+// 📋 INFORME POR HITO DE AVANCE — 10/25/50/75/90/100%
+// ════════════════════════════════════════════════════════════
+function rdOpenHitoReport(airtableId, hito) {
+  const p = rdState.properties.find(x => x.airtable_id === airtableId);
+  if (!p) return;
+  const k = rdAdvancedKPIs(p);
+  const f = rdFinanzas(p);
+  const dollar = n => '$' + Math.round(n).toLocaleString();
+  const avance = p.avance_pct || 0;
+  const llego = avance >= hito;
+  const proyMatLab = hito > 0 ? (((+p.gasto_materiales||0) + (+p.gasto_trabajadores||0)) / Math.max(1, avance)) * 100 : 0;
+  const proyTotalCost = (avance > 0 && hito > 0) ? proyMatLab : 0;
+  const proyDias = p.fecha_inicio && avance > 0
+    ? Math.round(((new Date() - new Date(p.fecha_inicio)) / 86400000) * (100 / avance))
+    : null;
+  const proyGanancia = (+p.valor_cliente||0) - proyTotalCost;
+  const proyMargenPct = (+p.valor_cliente||0) > 0 ? proyGanancia / (+p.valor_cliente) * 100 : 0;
+
+  openModal(`📋 Informe @ ${hito}% — ${p.address}`, `
+    <div class="space-y-3">
+      <div class="bg-gradient-to-br ${llego?'from-emerald-600 to-emerald-800':'from-slate-700 to-slate-900'} text-white rounded-xl p-4">
+        <div class="text-[10px] uppercase opacity-80 font-bold">Análisis del hito ${hito}%</div>
+        <div class="text-xl font-bold mt-1">${llego?'✅ HITO ALCANZADO':'⏳ Hito proyectado'}</div>
+        <div class="text-xs opacity-90">${p.address}</div>
+        <div class="text-sm mt-2 opacity-90">Avance real: <strong>${avance}%</strong> · Líder: <strong>${p.lider||'—'}</strong></div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">🎯 Proyección al cierre (extrapolando el ritmo actual)</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Costo final proy.</div><div class="text-base font-bold">${dollar(proyTotalCost)}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Ganancia proy.</div><div class="text-base font-bold ${proyGanancia>=0?'text-emerald-700':'text-red-700'}">${dollar(proyGanancia)}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Margen proy.</div><div class="text-base font-bold ${proyMargenPct>=20?'text-emerald-700':proyMargenPct>=10?'text-amber-700':'text-red-700'}">${proyMargenPct.toFixed(1)}%</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Duración proy.</div><div class="text-base font-bold">${proyDias||'—'} días</div></div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📊 Análisis para la gerencia</div>
+        <ul class="space-y-1.5 text-xs text-slate-700">
+          <li>• <strong>Eficiencia gasto:</strong> ${k.eficiencia_gasto!=null?k.eficiencia_gasto+'% del esperado':'—'} ${k.eficiencia_gasto != null && k.eficiencia_gasto <= 100 ? '✅' : k.eficiencia_gasto > 120 ? '🔴 sobre-gastando' : '⚠️'}</li>
+          <li>• <strong>Ratio labor:</strong> ${k.labor_ratio||'—'}% ${k.labor_ratio > 60 ? '🔴 sobre benchmark' : '✅'}</li>
+          <li>• <strong>Días de retraso:</strong> ${k.dias_retraso!=null?(k.dias_retraso>0?`🔴 ${k.dias_retraso}d retraso`:`✅ ${-k.dias_retraso}d restantes`):'—'}</li>
+          <li>• <strong>Margen actual:</strong> ${k.margen_venta!=null?k.margen_venta+'%':'—'} (objetivo ≥${BENCHMARKS_AUSTIN.margen_min}%)</li>
+          <li>• <strong>EBITDA actual:</strong> ${dollar(f.ebitda)} (${f.ebitdaPct.toFixed(1)}%)</li>
+          <li>• <strong>Neto post-impuestos:</strong> ${dollar(f.utilidadNeta)} (${f.margenNetoDespuesImpPct.toFixed(1)}%)</li>
+        </ul>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900">
+        <strong>🎯 Foco gerencial para cierre de semana:</strong>
+        ${k.dias_retraso > 5 ? `<div>• Recuperar plazo: la obra lleva ${k.dias_retraso}d de retraso, considerá refuerzo de crew o doble turno.</div>`:''}
+        ${k.eficiencia_gasto > 120 ? '<div>• Auditar gasto: estás 20%+ sobre lo esperado para tu avance. Revisar cotizaciones de materiales y horas de cuadrilla.</div>':''}
+        ${proyMargenPct < BENCHMARKS_AUSTIN.margen_min ? `<div>• Margen proyectado bajo (${proyMargenPct.toFixed(1)}%): renegociar materiales o ajustar scope con cliente.</div>`:''}
+        ${k.flags.length === 0 && proyMargenPct >= BENCHMARKS_AUSTIN.margen_min ? '<div>• Sin alertas — mantener ritmo. Documentar buenas prácticas para Estimador Pro.</div>':''}
+      </div>
+
+      <button onclick="window.print()" class="w-full bg-slate-900 text-white text-sm font-bold py-2 rounded">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+  `);
+}
+
+// ════════════════════════════════════════════════════════════
+// 📊 GENERAR PRESENTACIÓN PPTX — para reuniones de gerencia
+// Crea un deck con: cover, KPIs, ganancias/pérdidas, alertas críticas,
+// EBITDA, top obras, una slide de "noticias" (caso Garden).
+// ════════════════════════════════════════════════════════════
+async function rdGeneratePPTX() {
+  if (typeof PptxGenJS === 'undefined') {
+    alert('Librería PptxGenJS no disponible. Refrescá la página.');
+    return;
+  }
+  const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+  const finalizada = rdState.properties.filter(p => p.proceso === 'Finalizado');
+  const cfg = rdGetFinCfg();
+
+  // Cálculos agregados
+  const todas = [...active, ...finalizada];
+  let revenue=0, ebitda=0, utilidadNeta=0, gananciaActivas=0;
+  todas.forEach(p => {
+    const f = rdFinanzas(p, cfg);
+    revenue += f.revenue; ebitda += f.ebitda; utilidadNeta += f.utilidadNeta;
+  });
+  active.forEach(p => { gananciaActivas += (+p.valor_cliente||0) - ((+p.gasto_materiales||0)+(+p.gasto_trabajadores||0)); });
+  const gananciaHistorica = finalizada.reduce((s,p) => s + (+p.ganancia||0), 0);
+
+  const activeKpis = active.map(p => ({ p, k: rdAdvancedKPIs(p) }));
+  const criticas = activeKpis.filter(x => x.k.estado === 'critico');
+  const sanas = activeKpis.filter(x => x.k.estado === 'sano');
+  const fmt = n => '$' + Math.round(n).toLocaleString();
+
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE';
+  pptx.author = 'Empresa OS';
+  pptx.company = 'Rental Profitss';
+  pptx.title = 'Informe Ejecutivo Remodelación';
+
+  // ─── SLIDE 1: COVER ───
+  const s1 = pptx.addSlide();
+  s1.background = { color: '0F172A' };
+  s1.addText('Informe Ejecutivo', { x:0.5, y:1.2, w:12.3, h:0.8, fontSize:28, color:'94A3B8', bold:false });
+  s1.addText('Remodelación · Fix & Flip', { x:0.5, y:2.0, w:12.3, h:1.5, fontSize:54, color:'FFFFFF', bold:true });
+  s1.addText(`${active.length} obras activas · ${finalizada.length} finalizadas · ${new Date().toLocaleDateString('es')}`, { x:0.5, y:3.8, w:12.3, h:0.5, fontSize:18, color:'CBD5E1' });
+  s1.addText('Agua Construction Group · Structure One · Flipping Rentals', { x:0.5, y:6.5, w:12.3, h:0.4, fontSize:14, color:'64748B' });
+
+  // ─── SLIDE 2: KPIs HERO ───
+  const s2 = pptx.addSlide();
+  s2.addText('Resumen Financiero', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'0F172A' });
+  const kpis = [
+    { title:'Revenue total', value: fmt(revenue), sub:`${todas.length} obras` },
+    { title:'EBITDA empresa', value: fmt(ebitda), sub:`${revenue>0?(ebitda/revenue*100).toFixed(1):0}% sobre revenue` },
+    { title:'Neto post-impuestos', value: fmt(utilidadNeta), sub:`${revenue>0?(utilidadNeta/revenue*100).toFixed(1):0}% (obj 5-15%)` },
+    { title:'Ganancia histórica', value: fmt(gananciaHistorica), sub:`${finalizada.length} flips cerrados` }
+  ];
+  kpis.forEach((k, i) => {
+    const x = 0.5 + (i % 2) * 6.4;
+    const y = 1.2 + Math.floor(i/2) * 2.5;
+    s2.addShape(pptx.ShapeType.roundRect, { x, y, w:6.0, h:2.2, fill:{color:'F1F5F9'}, line:{color:'CBD5E1', width:1}, rectRadius:0.1 });
+    s2.addText(k.title.toUpperCase(), { x:x+0.3, y:y+0.2, w:5.4, h:0.4, fontSize:12, bold:true, color:'64748B' });
+    s2.addText(k.value, { x:x+0.3, y:y+0.6, w:5.4, h:1.0, fontSize:36, bold:true, color:'0F172A' });
+    s2.addText(k.sub, { x:x+0.3, y:y+1.6, w:5.4, h:0.4, fontSize:14, color:'64748B' });
+  });
+
+  // ─── SLIDE 3: GANANCIAS / PÉRDIDAS POR OBRA ───
+  const s3 = pptx.addSlide();
+  s3.addText('Ganancias y pérdidas por obra activa', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true });
+  const rowsPL = [['Obra','Líder','Revenue','Costo','Ganancia','Margen %']];
+  activeKpis.forEach(({p, k}) => {
+    rowsPL.push([
+      (p.address||'').slice(0,35),
+      p.lider||'—',
+      fmt(+p.valor_cliente||0),
+      fmt(k.totalCost),
+      fmt(k.ganancia||0),
+      (k.margen_venta!=null?k.margen_venta+'%':'—')
+    ]);
+  });
+  s3.addTable(rowsPL, { x:0.5, y:1.2, w:12.3, fontSize:11, border:{type:'solid', pt:0.5, color:'CBD5E1'},
+    colW:[3.5, 1.8, 1.8, 1.8, 1.8, 1.6],
+    fill:{color:'F8FAFC'} });
+
+  // ─── SLIDE 4: ALERTAS CRÍTICAS ───
+  if (criticas.length > 0) {
+    const s4 = pptx.addSlide();
+    s4.addText(`Alertas críticas (${criticas.length})`, { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'B91C1C' });
+    criticas.slice(0, 6).forEach((x, i) => {
+      const y = 1.2 + i * 0.85;
+      s4.addShape(pptx.ShapeType.roundRect, { x:0.5, y, w:12.3, h:0.75, fill:{color:'FEF2F2'}, line:{color:'FCA5A5', width:1}, rectRadius:0.05 });
+      s4.addText(`⚠ ${x.p.address}`, { x:0.7, y:y+0.05, w:11.9, h:0.35, fontSize:16, bold:true, color:'991B1B' });
+      s4.addText(x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · '), { x:0.7, y:y+0.4, w:11.9, h:0.3, fontSize:12, color:'7F1D1D' });
+    });
+  }
+
+  // ─── SLIDE 5: NOTICIAS IMPORTANTES ───
+  const s5 = pptx.addSlide();
+  s5.addText('Noticias y eventos importantes', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true });
+  s5.addText('(Caso Garden y otros eventos de la semana)', { x:0.5, y:0.95, w:12.3, h:0.4, fontSize:14, color:'64748B', italic:true });
+  // Slide editable manualmente después
+  s5.addText('• Caso Garden — describir incidente, impacto y plan de acción', { x:0.8, y:1.8, w:11.8, h:0.5, fontSize:16, color:'334155' });
+  s5.addText('• Material en escasez / cambio de precios', { x:0.8, y:2.5, w:11.8, h:0.5, fontSize:16, color:'334155' });
+  s5.addText('• Cambios en cuadrilla / nuevas contrataciones', { x:0.8, y:3.2, w:11.8, h:0.5, fontSize:16, color:'334155' });
+  s5.addText('• Decisiones tomadas esta semana', { x:0.8, y:3.9, w:11.8, h:0.5, fontSize:16, color:'334155' });
+  s5.addText('(Editar este slide directamente en PowerPoint con tu narrativa)', { x:0.5, y:6.5, w:12.3, h:0.4, fontSize:12, color:'94A3B8', italic:true });
+
+  // ─── SLIDE 6: CIERRE ───
+  const s6 = pptx.addSlide();
+  s6.background = { color: '0F172A' };
+  s6.addText('Gracias', { x:0.5, y:2.5, w:12.3, h:1.5, fontSize:64, bold:true, color:'FFFFFF', align:'center' });
+  s6.addText('Empresa OS · Rental Profitss', { x:0.5, y:4.3, w:12.3, h:0.5, fontSize:18, color:'94A3B8', align:'center' });
+
+  await pptx.writeFile({ fileName: `Informe_Ejecutivo_Remodelacion_${new Date().toISOString().slice(0,10)}.pptx` });
 }

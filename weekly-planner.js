@@ -2880,20 +2880,172 @@ function wpDoPrint() {
   const scope = document.querySelector('input[name="wp-print-scope"]:checked')?.value || 'day';
   const house = document.getElementById('wp-print-house').value;
   const format = document.querySelector('input[name="wp-print-format"]:checked')?.value || 'worker';
+  // En lugar de imprimir directo: abre editor pre-print para revisar herramientas + materiales
+  let from, to;
   if (scope === 'day') {
-    const d = document.getElementById('wp-print-date').value;
-    if (!d) return;
-    wpBackToPlanner();
-    if (format === 'worker') wpOpenPrintViewWorker(d, house);
-    else wpOpenPrintView(d, house);
+    from = to = document.getElementById('wp-print-date').value;
+    if (!from) return;
   } else {
-    const from = document.getElementById('wp-print-from').value;
-    const to = document.getElementById('wp-print-to').value;
+    from = document.getElementById('wp-print-from').value;
+    to = document.getElementById('wp-print-to').value;
     if (!from || !to) return;
-    wpBackToPlanner();
-    if (format === 'worker') wpOpenPrintRangeWorker(from, to, house);
-    else wpOpenPrintRange(from, to, house);
   }
+  wpOpenPrePrintEditor({ scope, from, to, house, format });
+}
+
+// ─── Editor pre-print: revisar/editar herramientas + materiales antes de imprimir ───
+const wpPrePrint = { ctx: null };
+
+function wpOpenPrePrintEditor(ctx) {
+  wpPrePrint.ctx = ctx;
+  let acts = (wpState.activities||[]).filter(a => a.date >= ctx.from && a.date <= ctx.to);
+  acts = wpFilterActsByHouse(acts, ctx.house || 'all');
+  if (!acts.length) { alert('Sin actividades en ese rango.'); return; }
+  // Agrupar por día
+  const byDay = {};
+  acts.forEach(a => {
+    if (!byDay[a.date]) byDay[a.date] = [];
+    byDay[a.date].push(a);
+  });
+  const days = Object.keys(byDay).sort();
+  wpPrePrint.acts = acts;
+  wpRenderPrePrintEditor(days, byDay);
+}
+
+function wpRenderPrePrintEditor(days, byDay) {
+  const ctx = wpPrePrint.ctx;
+  const html = `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
+        <strong>📝 Revisá y editá antes de imprimir.</strong> Agregá o quitá herramientas y materiales en cada tarea.
+        Los cambios se guardan automáticamente — cuando termines, clic en <strong>🖨️ Generar impresión</strong>.
+      </div>
+
+      <div class="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+        ${days.map(d => {
+          const dLbl = new Date(d+'T00:00:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+          return `
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-slate-900 text-white px-3 py-2 text-sm font-bold capitalize">📅 ${dLbl}</div>
+            <div class="divide-y divide-slate-100">
+              ${byDay[d].map(a => `
+                <div class="p-3" data-act-id="${a.id}">
+                  <div class="flex items-center justify-between gap-2 mb-2">
+                    <div>
+                      <div class="font-bold text-sm">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                      <div class="text-[10px] text-slate-500">${a.property_name||''} ${a.stage?'· '+a.stage:''}</div>
+                    </div>
+                    <button onclick="wpEditActivity('${a.id}')" class="text-[10px] text-slate-500 hover:text-slate-900">✏️ Editar tarea completa</button>
+                  </div>
+
+                  <!-- Materiales -->
+                  <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-1.5">
+                    <div class="flex items-center justify-between mb-1">
+                      <div class="text-[10px] font-bold uppercase text-amber-800">📦 Materiales (${(a.materials||[]).length})</div>
+                      <button onclick="wpPrePrintAddMaterial('${a.id}')" class="text-[10px] bg-white border border-amber-300 hover:bg-amber-100 px-1.5 py-0.5 rounded font-bold">+ Agregar</button>
+                    </div>
+                    ${(a.materials||[]).length === 0 ? '<div class="text-[10px] text-slate-400 italic">Sin materiales</div>' :
+                      (a.materials||[]).map((m, idx) => `
+                        <div class="flex items-center gap-1 mb-1">
+                          <input type="text" value="${(m.nombre||'').replace(/"/g,'&quot;')}" placeholder="Nombre" onchange="wpPrePrintEditMaterial('${a.id}', ${idx}, 'nombre', this.value)" class="flex-1 border border-amber-300 rounded px-1.5 py-0.5 text-xs"/>
+                          <input type="number" min="0" step="0.5" value="${m.cantidad||1}" onchange="wpPrePrintEditMaterial('${a.id}', ${idx}, 'cantidad', this.value)" class="w-16 border border-amber-300 rounded px-1.5 py-0.5 text-xs text-right"/>
+                          <input type="text" value="${(m.unidad||'ud').replace(/"/g,'&quot;')}" placeholder="ud" onchange="wpPrePrintEditMaterial('${a.id}', ${idx}, 'unidad', this.value)" class="w-14 border border-amber-300 rounded px-1.5 py-0.5 text-xs"/>
+                          <button onclick="wpPrePrintRemoveMaterial('${a.id}', ${idx})" class="text-red-600 hover:bg-red-100 px-1.5 rounded">✕</button>
+                        </div>
+                      `).join('')
+                    }
+                  </div>
+
+                  <!-- Herramientas (recursos tipo tool/vehicle/other) -->
+                  <div class="bg-blue-50 border border-blue-200 rounded p-2">
+                    <div class="flex items-center justify-between mb-1">
+                      <div class="text-[10px] font-bold uppercase text-blue-800">🔧 Herramientas / Equipos</div>
+                      <select onchange="if(this.value){wpPrePrintAddTool('${a.id}', this.value); this.value='';}" class="text-[10px] border border-blue-300 rounded px-1 py-0.5">
+                        <option value="">+ Agregar herramienta...</option>
+                        ${wpState.resources.filter(r => ['tool','vehicle','other'].includes(r.type) && !(a.resource_ids||[]).includes(r.id)).map(r => `<option value="${r.id}">${r.emoji} ${r.name}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div class="flex flex-wrap gap-1">
+                      ${((a.resource_ids||[]).map(rid => wpState.resources.find(r => r.id === rid)).filter(r => r && ['tool','vehicle','other'].includes(r.type)).map(r => `
+                        <span class="bg-white border border-blue-300 rounded px-1.5 py-0.5 text-xs flex items-center gap-1">${r.emoji} ${r.name}<button onclick="wpPrePrintRemoveTool('${a.id}', '${r.id}')" class="text-red-600 hover:bg-red-100 ml-0.5 px-1 rounded">✕</button></span>
+                      `).join('')) || '<span class="text-[10px] text-slate-400 italic">Sin herramientas</span>'}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="wpFinishPrePrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">🖨️ Generar impresión</button>
+      </div>
+    </div>
+  `;
+  openModal('📝 Revisar herramientas y materiales antes de imprimir', html);
+}
+
+function wpFinishPrePrint() {
+  const ctx = wpPrePrint.ctx;
+  if (!ctx) return;
+  wpBackToPlanner();
+  if (ctx.scope === 'day') {
+    if (ctx.format === 'worker') wpOpenPrintViewWorker(ctx.from, ctx.house);
+    else wpOpenPrintView(ctx.from, ctx.house);
+  } else {
+    if (ctx.format === 'worker') wpOpenPrintRangeWorker(ctx.from, ctx.to, ctx.house);
+    else wpOpenPrintRange(ctx.from, ctx.to, ctx.house);
+  }
+}
+
+async function wpPrePrintAddMaterial(actId) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const mats = [...(a.materials||[]), { nombre: 'Nuevo material', cantidad: 1, unidad: 'ud' }];
+  a.materials = mats;
+  const { error } = await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
+  if (error) return alert('Error: ' + error.message);
+  wpOpenPrePrintEditor(wpPrePrint.ctx);
+}
+
+async function wpPrePrintEditMaterial(actId, idx, field, value) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const mats = [...(a.materials||[])];
+  mats[idx] = { ...mats[idx], [field]: field === 'cantidad' ? +value : value };
+  a.materials = mats;
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
+}
+
+async function wpPrePrintRemoveMaterial(actId, idx) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const mats = [...(a.materials||[])];
+  mats.splice(idx, 1);
+  a.materials = mats;
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
+  wpOpenPrePrintEditor(wpPrePrint.ctx);
+}
+
+async function wpPrePrintAddTool(actId, resourceId) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const ids = [...(a.resource_ids||[]), resourceId];
+  a.resource_ids = ids;
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { resource_ids: ids, updated_at: new Date().toISOString() });
+  wpOpenPrePrintEditor(wpPrePrint.ctx);
+}
+
+async function wpPrePrintRemoveTool(actId, resourceId) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const ids = (a.resource_ids||[]).filter(x => x !== resourceId);
+  a.resource_ids = ids;
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { resource_ids: ids, updated_at: new Date().toISOString() });
+  wpOpenPrePrintEditor(wpPrePrint.ctx);
 }
 
 // ─── Print SUPER simple para obreros — día único ───
