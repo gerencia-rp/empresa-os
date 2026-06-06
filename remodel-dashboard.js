@@ -387,11 +387,13 @@ function rdRender() {
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           ${lastSync ? `<span class="text-[10px] text-slate-500 hidden md:inline">Última sync: ${lastSyncAgo < 1 ? 'ahora' : lastSyncAgo < 60 ? lastSyncAgo+'min' : Math.floor(lastSyncAgo/60)+'h'} · ${rdState.syncLog.records_synced || 0} obras</span>` : '<span class="text-[10px] text-amber-700 hidden md:inline">Sin sync todavía. Click 🔄</span>'}
-          <button onclick="openDailyDigest()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Genera digest del día con tareas, atrasos y alertas para enviar por WhatsApp">📤 Digest del día</button>
+          <button onclick="openDailyDigest()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Genera digest del día con tareas, atrasos y alertas para enviar por WhatsApp">📤 Digest</button>
+          <button onclick="openDigestScheduleConfig()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Programar digest diario automático">⏰</button>
           <button onclick="notifyRequestPermission()" class="text-xs bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 px-3 py-1.5 rounded font-bold" title="Activar notificaciones del navegador para alertas críticas">🔔 Alertas</button>
           <button onclick="rdOpenCeoMobile()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded font-bold" title="Vista CEO en formato celular — KPIs, alertas, decisiones">📱 Vista CEO</button>
+          <button onclick="rdPushAllToAirtable()" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-3 py-1.5 rounded font-bold" title="Empuja avance del planner, EBITDA y otros calculados a Airtable (push)">📤 Push calc</button>
           <button onclick="rdSync()" ${rdState.loading?'disabled':''} class="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded font-bold">
-            ${rdState.loading ? '⏳ Sync...' : '🔄 Sync Airtable'}
+            ${rdState.loading ? '⏳ Sync...' : '🔄 Pull Airtable'}
           </button>
         </div>
       </div>
@@ -1003,6 +1005,18 @@ async function rdRenderTendencias() {
         <div style="position:relative; height: 220px;">
           <canvas id="trend-ops"></canvas>
         </div>
+      </div>
+
+      <!-- Predictor IA -->
+      <div id="rd-trend-ai" class="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div class="text-xs font-bold uppercase text-violet-900">🤖 Predicción IA · próximos 3 meses</div>
+            <div class="text-[10px] text-violet-700 mt-0.5">Claude analiza tu histórico y proyecta los próximos meses con supuestos y alertas.</div>
+          </div>
+          <button onclick="rdRunTrendsPrediction()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded">🤖 Generar predicción</button>
+        </div>
+        <div id="rd-trend-ai-result"></div>
       </div>
 
       <!-- Tabla detalle por mes -->
@@ -3176,6 +3190,250 @@ function rdCeoMobileShare() {
       </div>
     </div>
   `);
+}
+
+// ════════════════════════════════════════════════════════════
+// 🤖 PREDICTOR IA del tab Tendencias
+// Pasa últimos 12m de revenue/neto/obras a Claude y pide proyección 3m.
+// ════════════════════════════════════════════════════════════
+async function rdRunTrendsPrediction() {
+  const finalizada = rdState.properties.filter(p => p.proceso === 'Finalizado');
+  const finCfg = rdGetFinCfg();
+  const btn = document.querySelector('[onclick="rdRunTrendsPrediction()"]');
+  const result = document.getElementById('rd-trend-ai-result');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analizando...'; }
+  if (result) result.innerHTML = '';
+
+  // Reconstruir histórico 12m
+  const byMonth = {};
+  finalizada.forEach(p => {
+    const fechaFin = p.fecha_real_fin || p.fecha_estimada_fin;
+    if (!fechaFin) return;
+    const monthKey = fechaFin.slice(0, 7);
+    if (!byMonth[monthKey]) byMonth[monthKey] = { count:0, revenue:0, ebitda:0, neto:0 };
+    const f = rdFinanzas(p, finCfg);
+    byMonth[monthKey].count++;
+    byMonth[monthKey].revenue += f.revenue;
+    byMonth[monthKey].ebitda += f.ebitda;
+    byMonth[monthKey].neto += f.utilidadNeta;
+  });
+  const last12 = (() => {
+    const arr = []; const t = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(t.getFullYear(), t.getMonth() - i, 1);
+      arr.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+    return arr;
+  })();
+  const series = last12.map(m => ({
+    mes: m,
+    obras: byMonth[m]?.count || 0,
+    revenue: Math.round(byMonth[m]?.revenue || 0),
+    ebitda: Math.round(byMonth[m]?.ebitda || 0),
+    neto: Math.round(byMonth[m]?.neto || 0)
+  }));
+
+  const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+  const pipeline = active.map(p => ({
+    address: p.address,
+    avance: p.avance_pct || 0,
+    valor_cliente: +p.valor_cliente || 0,
+    fecha_fin_estimada: p.fecha_estimada_fin || null
+  }));
+
+  const prompt = `Sos analista financiero de una empresa de fix & flip en Austin TX. Analizá el histórico de cierres y proyectá los próximos 3 meses considerando estacionalidad, pipeline activo y tendencia. Devolvé SOLO JSON sin markdown:
+{
+  "resumen": "1-2 frases sobre el momentum del negocio",
+  "tendencia": "creciendo|estable|cayendo",
+  "proyeccion": [
+    {"mes": "YYYY-MM", "obras": N, "revenue": $, "ebitda": $, "neto": $, "confianza": "alta|media|baja"},
+    {"mes": "YYYY-MM", "obras": N, "revenue": $, "ebitda": $, "neto": $, "confianza": "alta|media|baja"},
+    {"mes": "YYYY-MM", "obras": N, "revenue": $, "ebitda": $, "neto": $, "confianza": "alta|media|baja"}
+  ],
+  "supuestos": ["..."],
+  "alertas": ["..."],
+  "recomendaciones": [{"titulo": "...", "detalle": "...", "impacto": "alto|medio|bajo"}]
+}
+
+Datos:
+${JSON.stringify({serie_12m: series, pipeline_activo: pipeline, hoy: new Date().toISOString().slice(0,10)}, null, 2)}`;
+
+  try {
+    const token = await window.getAccessToken();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        project_context: { feature: 'rd-trends-prediction' }
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    let raw = '';
+    if (Array.isArray(json.content)) raw = json.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+    else raw = json.text || JSON.stringify(json);
+    const match = raw.match(/\{[\s\S]*\}/);
+    const pred = JSON.parse(match ? match[0] : raw);
+    rdRenderPrediction(pred);
+  } catch (e) {
+    if (result) result.innerHTML = `<div class="text-xs text-red-700 mt-2">❌ Error: ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Re-generar predicción'; }
+  }
+}
+
+function rdRenderPrediction(pred) {
+  const fmt = n => '$' + Math.round(n).toLocaleString();
+  const tendColor = pred.tendencia === 'creciendo' ? 'text-emerald-700' : pred.tendencia === 'cayendo' ? 'text-red-700' : 'text-amber-700';
+  const tendIcon = pred.tendencia === 'creciendo' ? '📈' : pred.tendencia === 'cayendo' ? '📉' : '➡️';
+  const confColor = c => c === 'alta' ? 'bg-emerald-100 text-emerald-800' : c === 'media' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
+  const impColor = i => i === 'alto' ? 'bg-red-100 text-red-800 border-red-300' : i === 'medio' ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-300';
+  const monthLabel = m => {
+    const [y, mm] = m.split('-');
+    return new Date(+y, +mm-1, 1).toLocaleDateString('es', { month:'short', year:'2-digit' });
+  };
+  const html = `
+    <div class="mt-3 bg-white border border-violet-300 rounded-xl p-3 space-y-3">
+      <div class="flex items-start gap-3 flex-wrap">
+        <div class="text-2xl">${tendIcon}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-bold uppercase ${tendColor}">${pred.tendencia || 'estable'}</div>
+          <div class="text-sm text-slate-800">${(pred.resumen||'').replace(/</g,'&lt;')}</div>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-3 gap-2">
+        ${(pred.proyeccion||[]).map(p => `
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div class="flex items-center justify-between">
+              <div class="text-xs font-bold capitalize">${monthLabel(p.mes)}</div>
+              <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${confColor(p.confianza)}">${p.confianza||'media'}</span>
+            </div>
+            <div class="mt-2 space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-slate-500">Obras</span><strong>${p.obras||0}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">Revenue</span><strong>${fmt(p.revenue||0)}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">EBITDA</span><strong>${fmt(p.ebitda||0)}</strong></div>
+              <div class="flex justify-between border-t pt-1 mt-1"><span class="text-slate-500">Neto</span><strong class="${p.neto>=0?'text-emerald-700':'text-red-700'}">${fmt(p.neto||0)}</strong></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      ${(pred.supuestos||[]).length > 0 ? `
+        <div class="bg-slate-50 border border-slate-200 rounded p-2">
+          <div class="text-[10px] uppercase font-bold text-slate-600 mb-1">📋 Supuestos</div>
+          <ul class="text-xs text-slate-700 space-y-0.5">${pred.supuestos.map(s => `<li>• ${s.replace(/</g,'&lt;')}</li>`).join('')}</ul>
+        </div>` : ''}
+      ${(pred.alertas||[]).length > 0 ? `
+        <div class="bg-red-50 border border-red-200 rounded p-2">
+          <div class="text-[10px] uppercase font-bold text-red-800 mb-1">🚨 Alertas</div>
+          <ul class="text-xs text-red-900 space-y-0.5">${pred.alertas.map(a => `<li>• ${a.replace(/</g,'&lt;')}</li>`).join('')}</ul>
+        </div>` : ''}
+      ${(pred.recomendaciones||[]).length > 0 ? `
+        <div>
+          <div class="text-[10px] uppercase font-bold text-slate-700 mb-1">🎯 Recomendaciones</div>
+          <div class="space-y-1.5">
+            ${pred.recomendaciones.map(r => `
+              <div class="border border-slate-200 rounded-lg p-2 flex items-start gap-2">
+                <div class="flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <div class="font-bold text-sm">${(r.titulo||'').replace(/</g,'&lt;')}</div>
+                    ${r.impacto ? `<span class="text-[10px] uppercase font-bold border px-1.5 py-0.5 rounded ${impColor(r.impacto)}">${r.impacto}</span>` : ''}
+                  </div>
+                  <div class="text-xs text-slate-600 mt-0.5">${(r.detalle||'').replace(/</g,'&lt;')}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>` : ''}
+    </div>
+  `;
+  const result = document.getElementById('rd-trend-ai-result');
+  if (result) result.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════
+// 📤 PUSH calculados → Airtable
+// Edge function update-airtable-record que ya existe en el proyecto.
+// Empuja avance_real_planner, criticas_pendientes, ebitda_proyectado,
+// neto_proyectado a campos custom del registro de Airtable.
+// ════════════════════════════════════════════════════════════
+async function rdPushObraToAirtable(airtableId) {
+  const p = rdState.properties.find(x => x.airtable_id === airtableId);
+  if (!p) return;
+
+  // Obtener métricas calculadas
+  const k = rdAdvancedKPIs(p);
+  const f = rdFinanzas(p);
+
+  // Métricas del planner (cruce por property_name)
+  const { data: wpActs } = await sb.from('weekly_activities')
+    .select('id, status, priority, date, notes')
+    .or(`property_name.ilike.%${(p.address||'').slice(0,30)}%,property_name.ilike.%${(p.name||p.address||'').slice(0,30)}%`);
+  const acts = wpActs || [];
+  const todayIso = new Date().toISOString().slice(0,10);
+  const planTotal = acts.length;
+  const planDone = acts.filter(a => a.status === 'done').length;
+  const planPct = planTotal ? Math.round(planDone/planTotal*100) : null;
+  const planCriticasPend = acts.filter(a => (a.priority==='critical'||a.priority==='urgent') && a.status !== 'done' && a.status !== 'cancelled').length;
+  const planCriticasAtras = acts.filter(a => (a.priority==='critical'||a.priority==='urgent') && a.status !== 'done' && a.status !== 'cancelled' && a.date < todayIso).length;
+  const planAtrasadas = acts.filter(a => a.status !== 'done' && a.status !== 'cancelled' && a.date && a.date < todayIso).length;
+
+  // Payload con campos custom (el usuario los crea en Airtable previamente con estos nombres exactos)
+  const fields = {
+    'avance_real_planner': planPct,
+    'plan_tareas_total': planTotal,
+    'plan_tareas_hechas': planDone,
+    'plan_atrasadas': planAtrasadas,
+    'criticas_pendientes': planCriticasPend,
+    'criticas_atrasadas': planCriticasAtras,
+    'ebitda_proyectado': Math.round(f.ebitda),
+    'neto_proyectado': Math.round(f.utilidadNeta),
+    'margen_neto_proyectado': +f.margenNetoDespuesImpPct.toFixed(2),
+    'eficiencia_gasto': k.eficiencia_gasto,
+    'labor_ratio_pct': k.labor_ratio,
+    'dias_retraso': k.dias_retraso,
+    'estado_kpi': k.estado,
+    'ultima_sync_calculados': new Date().toISOString()
+  };
+  // Limpiar nulls (Airtable no acepta null)
+  Object.keys(fields).forEach(k => { if (fields[k] === null || fields[k] === undefined) delete fields[k]; });
+
+  try {
+    const token = await window.getAccessToken();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/update-airtable-record`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        table: 'remodel_projects',
+        record_id: airtableId,
+        fields
+      })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('HTTP ' + res.status + ': ' + txt.slice(0, 300));
+    }
+    if (window.toast) toast('✅ Calculados sincronizados a Airtable', 'success');
+    else alert('✅ Sincronizado a Airtable');
+    return true;
+  } catch (e) {
+    const msg = `Error sync Airtable: ${e.message}\n\n⚠️ Es probable que los campos custom no existan en Airtable. Creálos primero con estos nombres exactos:\n\n${Object.keys(fields).join('\n')}`;
+    alert(msg);
+    return false;
+  }
+}
+
+async function rdPushAllToAirtable() {
+  const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+  if (!active.length) return alert('Sin obras activas para sincronizar.');
+  if (!confirm(`Sincronizar ${active.length} obras activas a Airtable?\n\nSe actualizarán los campos calculados (avance_real_planner, ebitda_proyectado, etc.) en cada registro. Asegurate que los campos existan en Airtable.`)) return;
+  let ok = 0, fail = 0;
+  for (const p of active) {
+    const r = await rdPushObraToAirtable(p.airtable_id);
+    if (r) ok++; else fail++;
+    await new Promise(r => setTimeout(r, 300)); // throttle
+  }
+  alert(`Sync completado: ${ok} OK / ${fail} fallaron`);
 }
 
 // Auto-abrir desde URL ?rd_mode=ceo

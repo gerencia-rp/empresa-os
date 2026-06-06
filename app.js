@@ -2760,6 +2760,134 @@ async function generateDailyDigest() {
   }
 }
 
+// ────────────────────────────────────────────────────────────
+// ⏰ Schedule del digest diario
+// Configurable por usuario en localStorage. Mientras la app esté
+// abierta o instalada como PWA, dispara notification a la hora
+// configurada y pre-genera el mensaje.
+// ────────────────────────────────────────────────────────────
+function getDigestSchedule() {
+  try {
+    const raw = localStorage.getItem('digest_schedule');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { enabled: false, hour: 19, minute: 0, days: [1,2,3,4,5], phone: '', lastFired: null };
+}
+function setDigestSchedule(patch) {
+  const cur = getDigestSchedule();
+  const next = { ...cur, ...patch };
+  try { localStorage.setItem('digest_schedule', JSON.stringify(next)); } catch {}
+  return next;
+}
+
+function openDigestScheduleConfig() {
+  const cfg = getDigestSchedule();
+  const dayLabels = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  openModal('⏰ Programar digest diario', `
+    <div class="space-y-3">
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+        El digest se prepara automáticamente a la hora elegida. Mientras la app esté abierta o instalada como PWA,
+        recibís una notificación con botón para enviar por WhatsApp.
+      </div>
+      <div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input id="ds-enabled" type="checkbox" ${cfg.enabled?'checked':''} class="w-4 h-4"/>
+          <span class="text-sm font-semibold">Activar digest programado</span>
+        </label>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Hora</label>
+          <input id="ds-hour" type="number" min="0" max="23" value="${cfg.hour}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Minutos</label>
+          <input id="ds-minute" type="number" min="0" max="59" value="${cfg.minute}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Días de la semana</label>
+        <div class="grid grid-cols-7 gap-1">
+          ${dayLabels.map((d, i) => `
+            <label class="flex flex-col items-center gap-1 cursor-pointer">
+              <input type="checkbox" data-day="${i}" ${cfg.days.includes(i)?'checked':''} class="w-4 h-4"/>
+              <span class="text-[10px] font-bold">${d}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número WhatsApp (con código país, sin +)</label>
+        <input id="ds-phone" type="text" value="${cfg.phone||''}" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="saveDigestSchedule()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+      </div>
+    </div>
+  `);
+}
+
+function saveDigestSchedule() {
+  const days = Array.from(document.querySelectorAll('[data-day]:checked')).map(el => +el.getAttribute('data-day'));
+  setDigestSchedule({
+    enabled: document.getElementById('ds-enabled').checked,
+    hour: Math.min(23, Math.max(0, +document.getElementById('ds-hour').value || 19)),
+    minute: Math.min(59, Math.max(0, +document.getElementById('ds-minute').value || 0)),
+    days,
+    phone: document.getElementById('ds-phone').value.replace(/[^0-9]/g, '')
+  });
+  closeModal();
+  if (window.toast) toast('✓ Schedule guardado', 'success');
+  else alert('✓ Schedule guardado');
+}
+
+// Chequeo recurrente cada minuto
+async function digestScheduleTick() {
+  const cfg = getDigestSchedule();
+  if (!cfg.enabled) return;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (cfg.lastFired === today) return; // ya disparó hoy
+  if (!cfg.days.includes(now.getDay())) return;
+  if (now.getHours() !== cfg.hour || now.getMinutes() !== cfg.minute) return;
+
+  // Marcar como fired ANTES de procesar (evitar re-fire en mismo minuto)
+  setDigestSchedule({ lastFired: today });
+
+  // Pre-generar y notificar
+  try {
+    const msg = await generateDailyDigest();
+    if (window.notifyState?.enabled) {
+      notifySend('📤 Digest diario listo', {
+        body: 'Tu resumen del día está preparado. Tap para revisar y enviar por WhatsApp.',
+        tag: 'digest-' + today,
+        persistent: true,
+        data: { url: '/?open_digest=1' }
+      });
+    }
+    // Si hay número configurado, ofrecer link directo
+    window._pendingDigest = { msg, phone: cfg.phone, date: today };
+  } catch (e) {
+    console.warn('digestScheduleTick failed:', e);
+  }
+}
+
+// Iniciar el tick cada minuto cuando la app cargue
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    digestScheduleTick();
+    setInterval(digestScheduleTick, 60000);
+  });
+  // Si la URL trae ?open_digest=1 → auto-abrir
+  window.addEventListener('DOMContentLoaded', () => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('open_digest') === '1') {
+      setTimeout(() => openDailyDigest(), 1500);
+    }
+  });
+}
+
 async function openDailyDigest() {
   const btn = document.querySelector('[onclick="openDailyDigest()"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
