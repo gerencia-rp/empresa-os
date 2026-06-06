@@ -316,7 +316,12 @@ function eduRenderStudents() {
                   <td class="p-2 text-slate-700">${fmtDate(s.enrolled_at)}</td>
                   <td class="p-2 text-center">${activo ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>' : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"></span>'}</td>
                   <td class="p-2"><span class="text-[10px] ${pagoCls} px-1.5 py-0.5 rounded font-bold">${pagoLbl}</span></td>
-                  <td class="p-2"><span class="text-blue-600 text-[10px] hover:underline">ver →</span></td>
+                  <td class="p-2">
+                    <div class="flex gap-1 justify-end" onclick="event.stopPropagation()">
+                      ${s.phone ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded" title="WhatsApp rápido">💬</button>` : ''}
+                      <span onclick="eduShowStudentDetail('${s.id}')" class="text-blue-600 text-[10px] hover:underline cursor-pointer">ver →</span>
+                    </div>
+                  </td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -2552,6 +2557,7 @@ function eduRenderStudentDetail(studentId) {
           <div class="flex gap-2 pt-2">
             <button onclick="eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
             <button onclick="eduState.tab='student_plan'; eduState.selectedStudentId='${s.id}'; eduCloseStudentDetail(); eduLoadStudentPlan('${s.id}').then(eduRender);" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700">🎯 Ir al plan</button>
+            ${s.phone || '' ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">💬 WhatsApp rápido</button>` : `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">📞 WhatsApp</button>`}
             <button onclick="eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
             ${s.airtable_record_id ? `<a href="https://airtable.com/${m?.airtable_base_id||''}/${m?.airtable_students_table||''}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
           </div>

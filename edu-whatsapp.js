@@ -330,6 +330,16 @@ function wpsRenderDetail() {
       ${msgs.length === 0 && (c.status === 'ready' || c.status === 'completed') ? `<div class="p-6 text-center text-slate-500 bg-white border border-slate-200 rounded">Sin mensajes generados.</div>` : ''}
 
       ${msgs.length > 0 ? `
+        <!-- Toolbar de acciones masivas -->
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex flex-wrap items-center gap-2">
+          <div class="text-xs font-bold text-emerald-900">⚡ Acciones rápidas:</div>
+          <button onclick="wpsCheckAll(true)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☑ Marcar todos pendientes</button>
+          <button onclick="wpsCheckAll(false)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☐ Desmarcar</button>
+          <button onclick="wpsOpenSelected()" class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Abre 1 wa.me por cada seleccionado (con pausa de 1s entre cada uno para evitar bloqueo)">📤 Abrir WhatsApp de los seleccionados</button>
+          <button onclick="wpsMarkAllSent()" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold" title="Marca como enviados los seleccionados (asume que ya los enviaste)">✓ Marcar enviados</button>
+          <div class="ml-auto text-[10px] text-slate-500">💡 Tip: si el navegador bloquea los popups, autorizalos en la barra de URL.</div>
+        </div>
+
         <div class="space-y-2 max-h-[60vh] overflow-y-auto">
           ${msgs.map(m => wpsRenderMessage(m)).join('')}
         </div>
@@ -337,6 +347,78 @@ function wpsRenderDetail() {
     </div>
   `;
 }
+
+// ─── Helpers de selección masiva ───
+function wpsCheckAll(checked) {
+  document.querySelectorAll('[data-wps-msg-id]').forEach(cb => {
+    if (!cb.disabled) cb.checked = checked;
+  });
+}
+
+function wpsGetSelectedIds() {
+  return Array.from(document.querySelectorAll('[data-wps-msg-id]:checked'))
+    .map(cb => cb.getAttribute('data-wps-msg-id'));
+}
+
+async function wpsOpenSelected() {
+  const ids = wpsGetSelectedIds();
+  if (!ids.length) return alert('Seleccioná al menos un mensaje (checkbox a la izquierda del nombre).');
+  if (!confirm(`Abrir ${ids.length} WhatsApp en pestañas separadas?\n\nEl navegador puede pedirte permitir popups. Si bloquea, autorizalos y reintentá.`)) return;
+
+  let opened = 0, failed = 0, noPhone = 0;
+  for (const id of ids) {
+    const m = wpsState.messages.find(x => x.id === id);
+    if (!m) continue;
+    const s = m.student || {};
+    const phoneClean = typeof eduCleanPhone === 'function' ? eduCleanPhone(s.phone || m.phone) : (s.phone||m.phone||'').replace(/\D/g,'');
+    if (!phoneClean || phoneClean.length < 10) { noPhone++; continue; }
+    const url = `https://wa.me/${phoneClean}?text=${encodeURIComponent(m.message_text)}`;
+    const win = window.open(url, '_blank');
+    if (win) {
+      opened++;
+      // marcar enviado en background
+      wpsMarkSent(id).catch(() => {});
+    } else {
+      failed++;
+    }
+    // Pausa de 800ms para no saturar y dar tiempo al browser
+    await new Promise(r => setTimeout(r, 800));
+  }
+  alert(`Resultado:\n✓ Abiertos: ${opened}\n⚠ Sin teléfono: ${noPhone}\n✗ Bloqueados (popup): ${failed}\n\n${failed > 0 ? 'Si hubo bloqueos: autorizá popups para este sitio y reintentá los faltantes.' : ''}`);
+}
+
+async function wpsMarkAllSent() {
+  const ids = wpsGetSelectedIds();
+  if (!ids.length) return alert('Seleccioná los que quieras marcar.');
+  if (!confirm(`Marcar ${ids.length} mensajes como enviados?`)) return;
+  for (const id of ids) {
+    try { await wpsMarkSent(id); } catch {}
+  }
+  alert(`✓ ${ids.length} mensajes marcados como enviados.`);
+}
+
+// Editar número y enviar (para los que no tienen phone en DB)
+function wpsEditPhoneAndSend(messageId, messageText) {
+  const m = wpsState.messages.find(x => x.id === messageId);
+  if (!m) return;
+  const s = m.student || {};
+  // Usar el flujo del WhatsApp rápido pero pre-cargado con el mensaje generado
+  if (typeof eduOpenWhatsappQuick === 'function') {
+    // Si el student existe en eduState, lo pasamos por ID. Sino, pasamos sólo el mensaje.
+    if (s.id) {
+      eduOpenWhatsappQuick(s.id, { message: messageText });
+    } else {
+      eduOpenWhatsappQuick(null, { message: messageText });
+    }
+  } else {
+    alert('No se pudo abrir el editor.');
+  }
+}
+
+window.wpsCheckAll = wpsCheckAll;
+window.wpsOpenSelected = wpsOpenSelected;
+window.wpsMarkAllSent = wpsMarkAllSent;
+window.wpsEditPhoneAndSend = wpsEditPhoneAndSend;
 
 function wpsRenderMessage(m) {
   const s = m.student || {};
@@ -350,23 +432,27 @@ function wpsRenderMessage(m) {
   }[stat] || stat;
 
   const phone = s.phone || m.phone || '';
-  // Validar phone: necesita country code + número (10-15 dígitos, default US/CA si vienen 10)
-  let phoneClean = (phone || '').replace(/\D/g,'');
-  if (phoneClean.length === 10) phoneClean = '1' + phoneClean; // US/CA default
-  const phoneValid = phoneClean.length >= 11 && phoneClean.length <= 15;
+  // Validar phone: usar eduCleanPhone que normaliza con CC default (configurable)
+  const phoneClean = typeof eduCleanPhone === 'function' ? eduCleanPhone(phone) : (phone||'').replace(/\D/g,'');
+  const phoneValid = phoneClean && phoneClean.length >= 10 && phoneClean.length <= 15;
   const waUrl = phoneValid ? `https://wa.me/${phoneClean}?text=${encodeURIComponent(m.message_text)}` : null;
 
   return `
     <div class="bg-white border border-slate-200 rounded-lg p-3">
       <div class="flex items-center justify-between gap-2 mb-2">
         <div class="flex items-center gap-2 min-w-0 flex-1">
+          <input type="checkbox" data-wps-msg-id="${m.id}" ${m.status==='pending'?'':'disabled'} class="mr-1 cursor-pointer"/>
           <div class="font-bold text-sm truncate">${(s.full_name||'?').replace(/</g,'&lt;')}</div>
           <div class="text-[10px] text-slate-500 truncate">${(s.current_stage||'').replace(/</g,'&lt;')}</div>
           ${statBadge}
         </div>
         <div class="flex gap-1">
-          ${waUrl ? `<a href="${waUrl}" target="_blank" onclick="wpsMarkSent('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2 py-1 rounded">📤 WhatsApp</a>` : `<span class="text-[10px] text-amber-700">sin teléfono</span>`}
-          <button onclick="wpsOpenResponseModal('${m.id}')" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-2 py-1 rounded" title="Pegar respuesta del estudiante y analizar con IA">📥 Capturar respuesta</button>
+          ${waUrl
+            ? `<a href="${waUrl}" target="_blank" onclick="wpsMarkSent('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2 py-1 rounded">📤 WhatsApp</a>`
+            : `<button onclick="wpsEditPhoneAndSend('${m.id}', \`${(m.message_text||'').replace(/`/g,'\\\`').replace(/\\/g,'\\\\')}\`)" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-2 py-1 rounded" title="Sin teléfono — editar y enviar">📞 Agregar nº</button>`
+          }
+          <button onclick="eduOpenWhatsappQuick('${s.id||''}', { message: \`${(m.message_text||'').replace(/`/g,'\\\`').replace(/\\/g,'\\\\')}\` })" class="bg-slate-500 hover:bg-slate-600 text-white text-xs font-bold px-2 py-1 rounded" title="Abrir editor de WhatsApp rápido">✏️</button>
+          <button onclick="wpsOpenResponseModal('${m.id}')" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-2 py-1 rounded" title="Pegar respuesta del estudiante y analizar con IA">📥 Resp</button>
         </div>
       </div>
       <div class="bg-emerald-50 border border-emerald-100 rounded p-2 text-xs whitespace-pre-wrap">${(m.message_text||'').replace(/</g,'&lt;')}</div>
@@ -453,6 +539,143 @@ function wpsOpenResponseModal(messageId) {
 window.closeModal2 = function() {
   document.getElementById('wps-resp-modal')?.remove();
 };
+
+// ════════════════════════════════════════════════════════════
+// 💬 WhatsApp RÁPIDO — abre modal con número editable + mensaje
+// Funciona desde cualquier parte (detalle estudiante, lista, etc.)
+// y NO requiere campaña previa. Lectura/envío de 1 paso.
+// ════════════════════════════════════════════════════════════
+function eduGetDefaultCountryCode() {
+  try { return localStorage.getItem('edu_wa_country_code') || '52'; } catch { return '52'; }
+}
+function eduSetDefaultCountryCode(cc) {
+  try { localStorage.setItem('edu_wa_country_code', String(cc||'52')); } catch {}
+}
+
+// Normaliza un teléfono a formato wa.me. Default country = 52 (MX) configurable.
+function eduCleanPhone(phone, defaultCC) {
+  if (!phone) return '';
+  let c = String(phone).replace(/\D/g, '');
+  const cc = String(defaultCC || eduGetDefaultCountryCode() || '52');
+  // Si empieza por 00, quitar
+  if (c.startsWith('00')) c = c.slice(2);
+  // Si tiene exactamente 10 dígitos (formato local), prefijar default country code
+  if (c.length === 10) c = cc + c;
+  // Si tiene 11 dígitos y empieza por "1" → ya tiene CC USA
+  // Si tiene 12-13 dígitos → asumir ya tiene CC
+  return c;
+}
+
+// Plantillas rápidas comunes
+const EDU_WA_TEMPLATES = [
+  { id: 'check', label: '👋 Check-in', text: 'Hola {nombre}, ¿cómo va todo? Hace tiempo no hablamos. ¿En qué puedo ayudarte esta semana?' },
+  { id: 'sesion', label: '📅 Recordatorio sesión', text: 'Hola {nombre}, te recuerdo que tenemos sesión mañana. ¿Confirmás? Cualquier cosa avisame.' },
+  { id: 'tarea', label: '✅ Pregunta por tarea', text: 'Hola {nombre}, ¿cómo vas con la tarea que quedó pendiente de la última sesión? Si tenés dudas, decime.' },
+  { id: 'pago', label: '💰 Recordatorio pago', text: 'Hola {nombre}, te paso recordatorio amable que el pago de la mentoría está pendiente. Si querés, mandame el comprobante por acá.' },
+  { id: 'agendar', label: '📆 Agendar sesión', text: 'Hola {nombre}, necesitamos agendar la próxima sesión. ¿Qué día te queda mejor esta semana? Tengo lunes y miércoles disponibles.' },
+  { id: 'felic', label: '🎉 Felicitación', text: 'Hola {nombre}, vi que avanzaste mucho. Felicitaciones por el esfuerzo. Seguí así.' }
+];
+
+function eduOpenWhatsappQuick(studentId, opts) {
+  opts = opts || {};
+  const s = studentId
+    ? (window.eduState?.students || []).find(x => x.id === studentId)
+    : null;
+  const initialPhone = (s?.phone || opts.phone || '');
+  const initialMsg = opts.message || '';
+  const cc = eduGetDefaultCountryCode();
+
+  openModal('💬 Enviar WhatsApp', `
+    <div class="space-y-3">
+      ${s ? `
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-2">
+          <div class="font-bold text-sm">${(s.full_name||'—').replace(/</g,'&lt;')}</div>
+          <div class="text-[10px] text-slate-600">${(s.grupo || s.current_stage || '').replace(/</g,'&lt;')}</div>
+        </div>
+      ` : ''}
+
+      <div class="grid grid-cols-3 gap-2">
+        <div class="col-span-1">
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Cód. país</label>
+          <input id="wa-cc" type="text" value="${cc}" maxlength="4" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/>
+        </div>
+        <div class="col-span-2">
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Número (sin código de país)</label>
+          <input id="wa-phone" type="text" value="${initialPhone.replace(/\D/g,'').slice(-10)}" placeholder="5512345678" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/>
+        </div>
+      </div>
+      <div class="text-[10px] text-slate-500">Si tu número ya incluye código país, igual funciona — lo limpio yo.</div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Plantillas rápidas</label>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-1">
+          ${EDU_WA_TEMPLATES.map(t => `<button type="button" onclick="eduApplyTemplate('${t.id}', ${s ? `'${(s.full_name||'').replace(/'/g,"\\'")}'` : 'null'})" class="text-[11px] bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-1 text-left">${t.label}</button>`).join('')}
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Mensaje</label>
+        <textarea id="wa-msg" rows="6" class="w-full border border-emerald-300 rounded p-2 text-sm" placeholder="Escribí tu mensaje o usá una plantilla...">${initialMsg.replace(/</g,'&lt;')}</textarea>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="eduCopyWaMessage()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Copia solo el mensaje al portapapeles">📋 Copiar</button>
+        <button onclick="eduSendWaQuick(${studentId ? `'${studentId}'` : 'null'})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Abrir WhatsApp</button>
+      </div>
+    </div>
+  `);
+}
+
+function eduApplyTemplate(templateId, studentName) {
+  const t = EDU_WA_TEMPLATES.find(x => x.id === templateId);
+  if (!t) return;
+  const ta = document.getElementById('wa-msg');
+  if (!ta) return;
+  const nombre = (studentName || 'tú').split(' ')[0]; // sólo primer nombre
+  ta.value = t.text.replace(/\{nombre\}/g, nombre);
+  ta.focus();
+}
+
+function eduCopyWaMessage() {
+  const ta = document.getElementById('wa-msg');
+  if (!ta || !ta.value.trim()) return alert('Escribí un mensaje primero.');
+  navigator.clipboard.writeText(ta.value).then(() => {
+    const btn = document.querySelector('[onclick="eduCopyWaMessage()"]');
+    if (btn) { const old = btn.innerHTML; btn.innerHTML = '✓ Copiado'; setTimeout(() => btn.innerHTML = old, 1500); }
+  });
+}
+
+function eduSendWaQuick(studentId) {
+  const cc = (document.getElementById('wa-cc').value || '52').replace(/\D/g,'');
+  const phoneInput = (document.getElementById('wa-phone').value || '').replace(/\D/g,'');
+  const msg = (document.getElementById('wa-msg').value || '').trim();
+  if (!phoneInput) return alert('Falta el número.');
+  if (!msg) return alert('Falta el mensaje.');
+
+  // Persistir el cc default
+  eduSetDefaultCountryCode(cc);
+
+  // Construir número final: si phoneInput ya tiene 11+ asume CC incluido
+  let finalPhone = phoneInput;
+  if (phoneInput.length === 10) finalPhone = cc + phoneInput;
+  if (phoneInput.length === 11 && phoneInput.startsWith('1')) finalPhone = phoneInput; // USA con 1
+  // Si tiene 12+ dígitos asume CC ya está
+
+  const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`;
+  const win = window.open(url, '_blank');
+  if (!win) {
+    // Pop-up bloqueado — copiar y mostrar
+    navigator.clipboard.writeText(url).then(() => alert('⚠️ El navegador bloqueó el popup. Copié el link al portapapeles — pegalo en una pestaña nueva.'));
+    return;
+  }
+  closeModal();
+}
+
+window.eduOpenWhatsappQuick = eduOpenWhatsappQuick;
+window.eduApplyTemplate = eduApplyTemplate;
+window.eduCopyWaMessage = eduCopyWaMessage;
+window.eduSendWaQuick = eduSendWaQuick;
 
 async function wpsSubmitResponse(messageId) {
   const text = document.getElementById('wps-resp-text').value.trim();
