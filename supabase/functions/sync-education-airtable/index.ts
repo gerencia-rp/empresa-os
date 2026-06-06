@@ -134,7 +134,13 @@ async function handleSync(req: Request): Promise<Response> {
     ])) || `Estudiante ${rec.id.slice(-6)}`;
 
     const email = normalize(findField(f, ['Email','Correo','Correo electrónico','e-mail','Mail','correo electronico']));
-    const phone = normalize(findField(f, ['Phone','Teléfono','Telefono','Celular','WhatsApp','Tel']));
+    const phone = normalize(findField(f, [
+      'Phone','Teléfono','Telefono','Celular','WhatsApp','Tel',
+      'Mobile','Móvil','Movil','Cell','Cellphone','Cell Phone','Phone Number',
+      'Número','Numero','Número de teléfono','Numero de telefono',
+      'WhatsApp Number','Número WhatsApp','Teléfono Móvil','Teléfono Celular',
+      'Contact','Contacto','Phone (From Ventas)','Teléfono (From Ventas)'
+    ]));
     const city = normalize(findField(f, ['City','Ciudad']));
     // Quitar 'Estado' del state — colisiona con "Estado del Estudiante" en Airtable
     const stateUS = normalize(findField(f, ['State','Provincia']));

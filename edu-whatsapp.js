@@ -575,23 +575,37 @@ window.closeModal2 = function() {
 // y NO requiere campaña previa. Lectura/envío de 1 paso.
 // ════════════════════════════════════════════════════════════
 function eduGetDefaultCountryCode() {
-  try { return localStorage.getItem('edu_wa_country_code') || '52'; } catch { return '52'; }
+  try {
+    // Migración: si el valor era el default antiguo (52) y el user no lo cambió manualmente,
+    // mover a USA (1) — Rental Profitss opera en USA
+    const saved = localStorage.getItem('edu_wa_country_code');
+    const manual = localStorage.getItem('edu_wa_country_code_manual') === '1';
+    if (saved === '52' && !manual) {
+      localStorage.setItem('edu_wa_country_code', '1');
+      return '1';
+    }
+    return saved || '1';
+  } catch { return '1'; }
 }
 function eduSetDefaultCountryCode(cc) {
-  try { localStorage.setItem('edu_wa_country_code', String(cc||'52')); } catch {}
+  try {
+    localStorage.setItem('edu_wa_country_code', String(cc||'1'));
+    // Marcar que el user lo seteó manualmente (no migrar más)
+    localStorage.setItem('edu_wa_country_code_manual', '1');
+  } catch {}
 }
 
 // Normaliza un teléfono a formato wa.me. Default country = 52 (MX) configurable.
 function eduCleanPhone(phone, defaultCC) {
   if (!phone) return '';
   let c = String(phone).replace(/\D/g, '');
-  const cc = String(defaultCC || eduGetDefaultCountryCode() || '52');
+  const cc = String(defaultCC || eduGetDefaultCountryCode() || '1');
   // Si empieza por 00, quitar
   if (c.startsWith('00')) c = c.slice(2);
   // Si tiene exactamente 10 dígitos (formato local), prefijar default country code
   if (c.length === 10) c = cc + c;
-  // Si tiene 11 dígitos y empieza por "1" → ya tiene CC USA
-  // Si tiene 12-13 dígitos → asumir ya tiene CC
+  // Si tiene 11 dígitos y empieza por "1" → USA con CC
+  // Si tiene 12-13 dígitos → asumir ya tiene CC (México con 521 prefix, etc.)
   return c;
 }
 
@@ -814,8 +828,13 @@ function wpsOpenQuickWeekly() {
               return !p || p.length < 10;
             }).length;
             if (sinTel === 0) return ' · <span class="text-emerald-700 font-bold">Todos con teléfono ✓</span>';
-            return ` · <span class="text-amber-700">⚠️ ${sinTel} sin teléfono (vas a poder agregarlos al enviar)</span>`;
+            if (sinTel === filteredAll.length) return ` · <span class="text-amber-700">⚠️ Todos sin teléfono — clic abajo "🔄 Traer desde Airtable"</span>`;
+            return ` · <span class="text-amber-700">⚠️ ${sinTel} sin teléfono</span>`;
           })()}
+        </div>
+        <div class="mt-2 flex items-center gap-2 flex-wrap">
+          <button onclick="wpsResyncFromAirtable()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded">🔄 Traer números desde Airtable</button>
+          <span class="text-[10px] text-slate-500">Si tus estudiantes salen "sin teléfono", esto trae los números desde Airtable. Asumiendo USA (+1) como código país.</span>
         </div>
       </div>
 
@@ -1005,6 +1024,112 @@ async function wpsActuallyCreate(students, template, campaignName, opts) {
 }
 
 window.wpsCreateQuickTest = wpsCreateQuickTest;
+
+// ────────────────────────────────────────────────────────────
+// 🔄 Re-sync de números desde Airtable
+// 1) Dispara sync-education-airtable (el sync ya intenta múltiples
+//    nombres de campos comunes: Phone, Teléfono, Mobile, Cell, etc.)
+// 2) Recarga estudiantes
+// 3) Muestra cuántos números nuevos llegaron
+// ────────────────────────────────────────────────────────────
+async function wpsResyncFromAirtable() {
+  const btn = document.querySelector('[onclick="wpsResyncFromAirtable()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando...'; }
+  try {
+    // Contar cuántos tenían teléfono antes
+    const before = (eduState.students || []).filter(s => {
+      const p = eduCleanPhone(s.phone);
+      return p && p.length >= 10;
+    }).length;
+
+    // Disparar sync (función global de education.js)
+    if (typeof eduTriggerSync === 'function') {
+      await eduTriggerSync({ silent: true });
+    } else {
+      // Fallback: llamar edge function directo
+      const token = await window.getAccessToken();
+      const res = await fetch(`${window.SUPABASE_URL}/functions/v1/sync-education-airtable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ mentorship_id: eduState.mentorshipId })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+    }
+
+    // Recargar estudiantes
+    if (typeof eduLoadAll === 'function') await eduLoadAll();
+
+    const after = (eduState.students || []).filter(s => {
+      const p = eduCleanPhone(s.phone);
+      return p && p.length >= 10;
+    }).length;
+    const total = (eduState.students || []).length;
+    const ganados = after - before;
+
+    if (after === 0) {
+      // Ninguno tiene teléfono → mostrar diagnóstico de campos disponibles
+      await wpsDiagnoseAirtablePhoneField();
+    } else {
+      alert(`✓ Sync completado\n\n${after}/${total} estudiantes ahora tienen teléfono.\n${ganados > 0 ? `+${ganados} números traídos en este sync.` : 'Los teléfonos ya estaban actualizados.'}`);
+    }
+
+    wpsOpenQuickWeekly();
+  } catch (e) {
+    alert('Error sync: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Traer números desde Airtable'; }
+  }
+}
+
+// Si nadie tiene teléfono después del sync, abre Airtable y muestra los campos disponibles
+async function wpsDiagnoseAirtablePhoneField() {
+  const m = (eduState.mentorships || []).find(x => x.id === eduState.mentorshipId);
+  const baseId = m?.airtable_base_id || '';
+  const tableName = m?.airtable_students_table || 'Estudiantes';
+  const url = baseId ? `https://airtable.com/${baseId}` : null;
+
+  openModal('🔍 Diagnóstico: campos de teléfono en Airtable', `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
+        El sync corrió pero <strong>0 estudiantes</strong> recibieron teléfono. Significa que el campo de teléfono en Airtable se llama distinto a lo esperado.
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">El sync busca estos nombres de campo:</div>
+        <div class="text-[11px] font-mono text-slate-600 bg-slate-50 p-2 rounded leading-relaxed">
+          Phone · Teléfono · Telefono · Celular · WhatsApp · Tel<br>
+          Mobile · Móvil · Movil · Cell · Cellphone · Cell Phone · Phone Number<br>
+          Número · Numero · Número de teléfono · WhatsApp Number<br>
+          Contact · Contacto · Phone (From Ventas)
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">Pasos para arreglarlo:</div>
+        <ol class="text-xs text-slate-700 space-y-1.5 list-decimal list-inside">
+          <li>${url ? `Abrí tu Airtable: <a href="${url}" target="_blank" class="text-blue-600 underline">↗ ${baseId}</a>` : 'Abrí tu Airtable'}</li>
+          <li>Andá a la tabla <strong>${tableName.replace(/</g,'&lt;')}</strong></li>
+          <li>Buscá la columna donde tenés los números de teléfono</li>
+          <li>Mirá el nombre exacto de esa columna</li>
+          <li>Renombrala a <strong>"Phone"</strong> (recomendado) o uno de los nombres de la lista de arriba</li>
+          <li>Volvé acá y dale otra vez a "🔄 Traer números desde Airtable"</li>
+        </ol>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
+        💡 <strong>Alternativa rápida:</strong> Si no querés renombrar el campo en Airtable, decime cómo se llama y agrego el nombre exacto al sync.
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Entendido</button>
+        ${url ? `<a href="${url}" target="_blank" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded text-center">↗ Abrir Airtable</a>` : ''}
+      </div>
+    </div>
+  `);
+}
+
+window.wpsResyncFromAirtable = wpsResyncFromAirtable;
+window.wpsDiagnoseAirtablePhoneField = wpsDiagnoseAirtablePhoneField;
 
 window.wpsOpenQuickWeekly = wpsOpenQuickWeekly;
 window.wpsCreateQuickWeekly = wpsCreateQuickWeekly;
