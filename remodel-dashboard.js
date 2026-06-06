@@ -2304,13 +2304,13 @@ async function rdGeneratePPTX() {
   }
   const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
   const finalizada = rdState.properties.filter(p => p.proceso === 'Finalizado');
-  const cfg = rdGetFinCfg();
+  const finCfg = rdGetFinCfg();
 
   // Cálculos agregados
   const todas = [...active, ...finalizada];
   let revenue=0, ebitda=0, utilidadNeta=0, gananciaActivas=0;
   todas.forEach(p => {
-    const f = rdFinanzas(p, cfg);
+    const f = rdFinanzas(p, finCfg);
     revenue += f.revenue; ebitda += f.ebitda; utilidadNeta += f.utilidadNeta;
   });
   active.forEach(p => { gananciaActivas += (+p.valor_cliente||0) - ((+p.gasto_materiales||0)+(+p.gasto_trabajadores||0)); });
