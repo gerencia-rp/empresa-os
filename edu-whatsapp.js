@@ -496,10 +496,10 @@ async function wpsSendCloudAPI() {
 
   try {
     const token = await window.getAccessToken();
-    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-send-cloud`, {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/whatsapp-send-cloud`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ message_ids: targetIds })
+      body: JSON.stringify({ source: 'edu', message_ids: targetIds })
     });
     if (!res.ok) {
       const txt = await res.text();

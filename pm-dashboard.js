@@ -346,6 +346,32 @@ function pmRenderWhatsApp() {
   const msgs = pmState.messages || [];
   return `
     <div class="space-y-3">
+      <!-- 🚀 Envío automático con Cloud API + compositor rápido -->
+      <div class="bg-gradient-to-br from-blue-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">⚡ Envío 100% automático</div>
+            <div class="text-base font-bold mt-0.5">Compositor rápido + Cloud API (Meta)</div>
+            <div class="text-xs opacity-90 mt-1">Mismas credenciales que Educación. Una sola app de Meta para los dos sistemas.</div>
+          </div>
+          <button onclick="pmOpenQuickComposer()" class="bg-white text-indigo-700 font-bold text-sm px-3 py-2 rounded shadow hover:bg-indigo-50 whitespace-nowrap">✍️ Componer mensaje →</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center bg-white/15 backdrop-blur rounded-lg p-2">
+          <div>
+            <div class="text-[9px] uppercase opacity-80 font-bold">Destinatarios</div>
+            <div class="text-base font-bold">${recipients.filter(r => r.active).length}</div>
+          </div>
+          <div>
+            <div class="text-[9px] uppercase opacity-80 font-bold">Mensajes hoy</div>
+            <div class="text-base font-bold">${msgs.filter(m => m.sent_at && m.sent_at.slice(0,10) === new Date().toISOString().slice(0,10)).length}</div>
+          </div>
+          <div>
+            <div class="text-[9px] uppercase opacity-80 font-bold">Cloud API</div>
+            <div class="text-base font-bold">${recipients.filter(r => r.active && (r.phone_number||'').replace(/\D/g,'').length >= 10).length} ok</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Config global -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
         <div class="text-xs font-bold uppercase text-slate-700 mb-2">⚙️ Config del bot</div>
@@ -2392,3 +2418,196 @@ async function pmAdoptDetectedRisk(idx) {
   pmRender();
   alert('✅ Riesgo agregado a tu register.');
 }
+
+// ════════════════════════════════════════════════════════════
+// 📱 PM · Compositor rápido + envío Cloud API
+// Misma infra que Educación. La edge function whatsapp-send-cloud
+// es compartida — un solo set de credenciales de Meta para ambos.
+// ════════════════════════════════════════════════════════════
+const pmComposerState = { selectedIds: new Set(), tono: 'amigable', context: '' };
+
+function pmOpenQuickComposer() {
+  const recipients = (pmState.recipients || []).filter(r => r.active);
+  if (!recipients.length) return alert('Sin destinatarios activos. Agregá uno desde la sección "👥 Destinatarios".');
+
+  pmComposerState.selectedIds = new Set(recipients.map(r => r.id));
+
+  openModal('✍️ Componer mensaje · WhatsApp Cloud API', `
+    <div class="space-y-3 max-h-[80vh] overflow-y-auto pr-1">
+      <div class="bg-blue-50 border border-blue-200 rounded p-2 text-xs text-blue-900">
+        Mensaje único enviado automáticamente vía Cloud API. Sin abrir pestañas. Si el setup todavía no está hecho, te muestro la guía.
+      </div>
+
+      <!-- Destinatarios -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">👥 Destinatarios (${recipients.length})</div>
+        <div class="flex gap-1.5 mb-2">
+          <button onclick="pmComposerCheckAll(true)" class="text-[11px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-bold">✓ Todos</button>
+          <button onclick="pmComposerCheckAll(false)" class="text-[11px] bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">✕ Ninguno</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-32 overflow-y-auto">
+          ${recipients.map(r => `
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded">
+              <input type="checkbox" ${pmComposerState.selectedIds.has(r.id)?'checked':''} onchange="pmComposerToggle('${r.id}')"/>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-semibold truncate">${(r.full_name||'').replace(/</g,'&lt;')}</div>
+                <div class="text-[10px] text-slate-500 font-mono">${(r.phone_number||'—').replace(/</g,'&lt;')}</div>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Mensaje -->
+      <div>
+        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">📝 Mensaje (puede usar {nombre} para personalizar)</label>
+        <textarea id="pm-composer-msg" rows="6" placeholder="Ej: Hola {nombre}, recordatorio que mañana 9am tenemos sync semanal. Llegá con avance de tus 3 OKRs principales." class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${(pmComposerState.context || '').replace(/</g,'&lt;')}</textarea>
+        <div class="text-[10px] text-slate-500 mt-1">💡 {nombre} se reemplaza con el primer nombre de cada destinatario.</div>
+      </div>
+
+      <!-- Botones -->
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="pmComposerSendManual()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Abre wa.me por cada destinatario (manual)">📲 Manual</button>
+        <button onclick="pmComposerSendCloud()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 rounded" title="Envía vía Cloud API sin abrir pestañas">🚀 Enviar automático</button>
+      </div>
+    </div>
+  `);
+}
+
+function pmComposerToggle(id) {
+  if (pmComposerState.selectedIds.has(id)) pmComposerState.selectedIds.delete(id);
+  else pmComposerState.selectedIds.add(id);
+}
+
+function pmComposerCheckAll(checked) {
+  const recipients = (pmState.recipients || []).filter(r => r.active);
+  pmComposerState.selectedIds = checked ? new Set(recipients.map(r => r.id)) : new Set();
+  pmOpenQuickComposer();
+}
+
+function pmFillTemplate(template, recipient) {
+  const nombre = (recipient.full_name || 'estudiante').split(' ')[0];
+  return template.replace(/\{nombre\}/g, nombre);
+}
+
+// Envío manual (wa.me, abre pestañas)
+async function pmComposerSendManual() {
+  const msg = document.getElementById('pm-composer-msg').value.trim();
+  if (!msg) return alert('Falta el mensaje');
+  if (pmComposerState.selectedIds.size === 0) return alert('Seleccioná al menos un destinatario');
+
+  const recipients = (pmState.recipients || []).filter(r => pmComposerState.selectedIds.has(r.id));
+  if (!confirm(`Abrir ${recipients.length} pestañas wa.me?`)) return;
+
+  let opened = 0, failed = 0;
+  for (const r of recipients) {
+    const phone = (r.phone_number||'').replace(/\D/g,'');
+    if (!phone || phone.length < 10) { failed++; continue; }
+    const personalMsg = pmFillTemplate(msg, r);
+    const url = `https://wa.me/${phone.length===10?'1'+phone:phone}?text=${encodeURIComponent(personalMsg)}`;
+    if (window.open(url, '_blank')) opened++;
+    else failed++;
+    await new Promise(res => setTimeout(res, 300));
+  }
+  alert(`✓ Abiertos: ${opened}\n✗ Fallaron: ${failed}`);
+  closeModal();
+}
+
+// Envío automático vía Cloud API
+async function pmComposerSendCloud() {
+  const msg = document.getElementById('pm-composer-msg').value.trim();
+  if (!msg) return alert('Falta el mensaje');
+  if (pmComposerState.selectedIds.size === 0) return alert('Seleccioná al menos un destinatario');
+
+  const recipients = (pmState.recipients || []).filter(r => pmComposerState.selectedIds.has(r.id));
+  if (!confirm(`🚀 Enviar ${recipients.length} mensajes vía Cloud API (sin abrir pestañas)?`)) return;
+
+  // 1) Insertar mensajes en pm_whatsapp_messages
+  const rows = recipients.map(r => ({
+    recipient_id: r.id,
+    phone: r.phone_number,
+    message_text: pmFillTemplate(msg, r),
+    status: 'pending',
+    sent_at: null
+  }));
+
+  let inserted;
+  if (typeof window.safeInsert === 'function') {
+    const { data, error } = await window.safeInsert(() => sb.from('pm_whatsapp_messages'), rows, { select: '*' });
+    if (error) return alert('Error guardando mensajes: ' + (error.message || error));
+    inserted = data || [];
+  } else {
+    const { data, error } = await sb.from('pm_whatsapp_messages').insert(rows).select();
+    if (error) return alert('Error: ' + error.message);
+    inserted = data || [];
+  }
+
+  const messageIds = inserted.map(m => m.id);
+
+  // 2) Llamar a la edge function genérica con source=pm
+  const overlay = document.createElement('div');
+  overlay.className = 'fixed inset-0 z-[200] bg-slate-900/80 flex items-center justify-center p-4';
+  overlay.innerHTML = '<div class="bg-white rounded-2xl p-6 text-center"><div class="text-4xl animate-pulse">🚀</div><div class="font-bold mt-2">Enviando vía Cloud API...</div></div>';
+  document.body.appendChild(overlay);
+
+  try {
+    const token = await window.getAccessToken();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/whatsapp-send-cloud`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ source: 'pm', message_ids: messageIds })
+    });
+    overlay.remove();
+
+    if (!res.ok) {
+      const txt = await res.text();
+      if (res.status === 404 || /not.found/i.test(txt)) {
+        return pmShowCloudSetup();
+      }
+      throw new Error('HTTP ' + res.status + ': ' + txt.slice(0, 200));
+    }
+    const r = await res.json();
+    if (r.needs_setup) return pmShowCloudSetup();
+
+    await pmLoadAll();
+    pmRender();
+    closeModal();
+    alert(`✅ Envío completado:\n\n✓ Enviados: ${r.sent || 0}\n✗ Fallaron: ${r.failed || 0}`);
+  } catch (e) {
+    overlay.remove();
+    alert('Error: ' + e.message);
+  }
+}
+
+function pmShowCloudSetup() {
+  openModal('⚙️ Setup Cloud API requerido', `
+    <div class="space-y-3">
+      <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
+        La edge function <code>whatsapp-send-cloud</code> o las credenciales Meta no están listas.
+      </div>
+      <div class="bg-white border border-slate-200 rounded p-3 text-xs">
+        <div class="font-bold mb-2">Setup compartido con Educación:</div>
+        <ol class="space-y-1 list-decimal list-inside text-slate-700">
+          <li>Andá a tu app Meta Developers → WhatsApp → API Setup</li>
+          <li>Copia el Phone Number ID y el Access Token</li>
+          <li>En terminal del proyecto:
+            <pre class="bg-slate-900 text-emerald-300 p-2 rounded text-[10px] mt-1 overflow-x-auto">supabase secrets set META_WHATSAPP_PHONE_ID="..."
+supabase secrets set META_WHATSAPP_TOKEN="..."
+supabase functions deploy whatsapp-send-cloud --no-verify-jwt</pre>
+          </li>
+          <li>Listo. Sirve para PM + Educación</li>
+        </ol>
+        <div class="mt-2 text-[10px] text-slate-500">📖 Guía completa en docs/whatsapp-cloud-api-setup.md</div>
+      </div>
+      <button onclick="closeModal()" class="w-full bg-slate-900 text-white text-sm font-bold py-2 rounded">Entendido</button>
+    </div>
+  `);
+}
+
+window.pmOpenQuickComposer = pmOpenQuickComposer;
+window.pmComposerToggle = pmComposerToggle;
+window.pmComposerCheckAll = pmComposerCheckAll;
+window.pmComposerSendManual = pmComposerSendManual;
+window.pmComposerSendCloud = pmComposerSendCloud;
+window.pmShowCloudSetup = pmShowCloudSetup;

@@ -1,17 +1,32 @@
 // ════════════════════════════════════════════════════════════
-// 🚀 WhatsApp Cloud API · Envío automático masivo
+// 🚀 WhatsApp Cloud API · Envío automático (genérico)
 //
-// Recibe message_ids[] y manda cada uno a través de la API oficial
-// de WhatsApp Business Cloud (Meta).
+// Sirve para múltiples sistemas dentro de Empresa OS:
+//   - Educación (edu_whatsapp_messages)
+//   - Project Manager (pm_whatsapp_messages)
+//   - Cualquier otro con la misma forma de tabla
+//
+// Una sola app de Meta + un solo set de credenciales para todos.
 //
 // Deploy:
-//   supabase functions deploy edu-whatsapp-send-cloud --no-verify-jwt
+//   supabase functions deploy whatsapp-send-cloud --no-verify-jwt
 //
-// Secrets requeridos:
+// Secrets requeridos (una sola vez para todo Empresa OS):
 //   supabase secrets set META_WHATSAPP_PHONE_ID="<phone_number_id>"
 //   supabase secrets set META_WHATSAPP_TOKEN="EAAxxxxx"
 //   supabase secrets set META_WHATSAPP_TEMPLATE_NAME="seguimiento_semanal"
-//     (opcional — solo si querés mandar templates aprobadas)
+//     (opcional — para envío fuera de ventana 24h)
+//
+// Request:
+//   POST /functions/v1/whatsapp-send-cloud
+//   {
+//     source: 'edu' | 'pm' | string,   // de qué sistema vienen los msgs
+//     message_ids: string[]
+//   }
+//
+// El parámetro `source` mapea a la tabla:
+//   edu → edu_whatsapp_messages, edu_students (student_id)
+//   pm  → pm_whatsapp_messages, pm_team_members (member_id)
 // ════════════════════════════════════════════════════════════
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -21,6 +36,19 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'content-type, authorization'
+};
+
+const SOURCE_CONFIG: Record<string, { table: string; fkColumn: string; fkTable: string }> = {
+  edu: {
+    table: 'edu_whatsapp_messages',
+    fkColumn: 'student_id',
+    fkTable: 'edu_students'
+  },
+  pm: {
+    table: 'pm_whatsapp_messages',
+    fkColumn: 'recipient_id',
+    fkTable: 'pm_whatsapp_recipients'
+  }
 };
 
 serve(async (req: Request) => {
@@ -34,12 +62,23 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({
       needs_setup: true,
       reason: 'missing_credentials',
-      message: 'Faltan META_WHATSAPP_PHONE_ID o META_WHATSAPP_TOKEN en Supabase secrets. Ver setup.'
+      message: 'Faltan META_WHATSAPP_PHONE_ID o META_WHATSAPP_TOKEN en Supabase secrets.'
     }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
   }
 
   try {
-    const { message_ids } = await req.json();
+    const body = await req.json();
+    const source = body.source || 'edu';
+    const message_ids = body.message_ids;
+    const phoneOverride = body.phone_override; // para envíos one-off sin tabla
+
+    const cfg = SOURCE_CONFIG[source];
+    if (!cfg) {
+      return new Response(JSON.stringify({ error: `source inválido: ${source}` }), {
+        status: 400, headers: { ...CORS, 'content-type': 'application/json' }
+      });
+    }
+
     if (!Array.isArray(message_ids) || !message_ids.length) {
       return new Response(JSON.stringify({ error: 'message_ids requerido' }), {
         status: 400, headers: { ...CORS, 'content-type': 'application/json' }
@@ -51,8 +90,8 @@ serve(async (req: Request) => {
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // Cargar los mensajes
-    const { data: messages, error } = await sb.from('edu_whatsapp_messages')
-      .select('id, message_text, phone, status, student_id')
+    const { data: messages, error } = await sb.from(cfg.table)
+      .select(`id, message_text, phone, status, ${cfg.fkColumn}`)
       .in('id', message_ids);
 
     if (error) {
@@ -61,29 +100,28 @@ serve(async (req: Request) => {
       });
     }
 
-    // Si no tienen phone, cargar el del estudiante
-    const studentIds = messages!.filter(m => !m.phone && m.student_id).map(m => m.student_id);
-    let studentPhones: Record<string, string> = {};
-    if (studentIds.length) {
-      const { data: students } = await sb.from('edu_students')
-        .select('id, phone')
-        .in('id', studentIds);
-      (students || []).forEach(s => { studentPhones[s.id] = s.phone || ''; });
+    // Resolver teléfonos faltantes desde la tabla del FK
+    const missingFkIds = messages!.filter((m: any) => !m.phone && m[cfg.fkColumn]).map((m: any) => m[cfg.fkColumn]);
+    const fkPhones: Record<string, string> = {};
+    if (missingFkIds.length) {
+      const { data: rows } = await sb.from(cfg.fkTable).select('id, phone').in('id', missingFkIds);
+      (rows || []).forEach((r: any) => { fkPhones[r.id] = r.phone || ''; });
     }
 
     const META_API = `https://graph.facebook.com/v18.0/${PHONE_ID}/messages`;
     let sent = 0, failed = 0;
     const errors: string[] = [];
 
-    for (const m of messages!) {
+    for (const m of messages! as any[]) {
       if (m.status === 'sent') continue;
-      let phone = m.phone || studentPhones[m.student_id] || '';
+
+      let phone = phoneOverride || m.phone || fkPhones[m[cfg.fkColumn]] || '';
       phone = phone.replace(/\D/g, '');
       if (phone.length === 10) phone = '1' + phone; // USA default
 
       if (!phone || phone.length < 10) {
         failed++;
-        errors.push(`Sin teléfono: msg ${m.id.slice(0,8)}`);
+        errors.push(`Sin teléfono: msg ${String(m.id).slice(0,8)}`);
         continue;
       }
 
@@ -95,21 +133,18 @@ serve(async (req: Request) => {
         text: { body: m.message_text }
       };
 
-      // Si hay template configurada, usarla en vez de texto libre
-      // (necesario para mensajes "fríos" sin conversación previa < 24h)
+      // Si hay template configurada, usarla (necesario fuera de ventana 24h)
       if (TEMPLATE_NAME) {
         payload.type = 'template';
         delete payload.text;
         payload.template = {
           name: TEMPLATE_NAME,
-          language: { code: 'es' }
+          language: { code: 'es' },
+          components: [{
+            type: 'body',
+            parameters: [{ type: 'text', text: m.message_text }]
+          }]
         };
-        // Si la template tiene placeholder {{1}} para body, mandar el mensaje completo
-        // Esto depende de cómo configures la template en Meta
-        payload.template.components = [{
-          type: 'body',
-          parameters: [{ type: 'text', text: m.message_text }]
-        }];
       }
 
       try {
@@ -124,7 +159,7 @@ serve(async (req: Request) => {
         const data = await r.json();
 
         if (r.ok && data.messages?.[0]?.id) {
-          await sb.from('edu_whatsapp_messages').update({
+          await sb.from(cfg.table).update({
             status: 'sent',
             sent_at: new Date().toISOString(),
             wa_message_id: data.messages[0].id
@@ -143,9 +178,10 @@ serve(async (req: Request) => {
       await new Promise(r => setTimeout(r, 120));
     }
 
-    return new Response(JSON.stringify({ ok: true, sent, failed, errors: errors.slice(0, 20) }), {
-      headers: { ...CORS, 'content-type': 'application/json' }
-    });
+    return new Response(JSON.stringify({
+      ok: true, source, sent, failed, errors: errors.slice(0, 20)
+    }), { headers: { ...CORS, 'content-type': 'application/json' } });
+
   } catch (e: any) {
     return new Response(JSON.stringify({ error: String(e.message || e) }), {
       status: 500, headers: { ...CORS, 'content-type': 'application/json' }
