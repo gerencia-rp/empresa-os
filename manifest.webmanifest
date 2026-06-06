@@ -37,6 +37,13 @@
       "description": "Dashboard de remodelación",
       "url": "/?open=remodel-dashboard",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Vista CEO",
+      "short_name": "CEO",
+      "description": "Resumen ejecutivo del portfolio",
+      "url": "/?rd_mode=ceo",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -385,10 +385,11 @@ function rdRender() {
             </button>
           `).join('')}
         </div>
-        <div class="flex items-center gap-2">
-          ${lastSync ? `<span class="text-[10px] text-slate-500">Última sync: ${lastSyncAgo < 1 ? 'ahora' : lastSyncAgo < 60 ? lastSyncAgo+'min' : Math.floor(lastSyncAgo/60)+'h'} · ${rdState.syncLog.records_synced || 0} obras</span>` : '<span class="text-[10px] text-amber-700">Sin sync todavía. Click 🔄</span>'}
+        <div class="flex items-center gap-2 flex-wrap">
+          ${lastSync ? `<span class="text-[10px] text-slate-500 hidden md:inline">Última sync: ${lastSyncAgo < 1 ? 'ahora' : lastSyncAgo < 60 ? lastSyncAgo+'min' : Math.floor(lastSyncAgo/60)+'h'} · ${rdState.syncLog.records_synced || 0} obras</span>` : '<span class="text-[10px] text-amber-700 hidden md:inline">Sin sync todavía. Click 🔄</span>'}
+          <button onclick="rdOpenCeoMobile()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded font-bold" title="Vista CEO en formato celular — KPIs, alertas, decisiones">📱 Vista CEO</button>
           <button onclick="rdSync()" ${rdState.loading?'disabled':''} class="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded font-bold">
-            ${rdState.loading ? '⏳ Sincronizando...' : '🔄 Sync Airtable'}
+            ${rdState.loading ? '⏳ Sync...' : '🔄 Sync Airtable'}
           </button>
         </div>
       </div>
@@ -2705,4 +2706,260 @@ async function rdGeneratePPTX() {
 
   const safeTitle = cfg.titulo.replace(/[^a-z0-9]/gi, '_').slice(0, 40);
   await pptx.writeFile({ fileName: `${safeTitle}_${new Date().toISOString().slice(0,10)}.pptx` });
+}
+
+// ════════════════════════════════════════════════════════════
+// 📱 VISTA CEO MOBILE — pantalla full screen
+// El dueño abre desde su celular y ve estado portfolio, KPIs hero,
+// alertas críticas, top 3 decisiones, lista de obras. Acciones táctiles.
+// ════════════════════════════════════════════════════════════
+function rdOpenCeoMobile() {
+  rdRenderCeoMobile();
+}
+
+function rdRenderCeoMobile() {
+  const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+  const finalizada = rdState.properties.filter(p => p.proceso === 'Finalizado');
+  const finCfg = rdGetFinCfg();
+  const fmt = n => '$' + Math.round(n).toLocaleString();
+  const fmtK = n => '$' + Math.round(n/1000) + 'k';
+
+  // Empresa-wide finanzas
+  const todas = [...active, ...finalizada];
+  let revenue=0, ebitda=0, utilidadNeta=0;
+  todas.forEach(p => { const f = rdFinanzas(p, finCfg); revenue+=f.revenue; ebitda+=f.ebitda; utilidadNeta+=f.utilidadNeta; });
+  const gananciaPipeline = active.reduce((s,p) => s + ((+p.valor_cliente||0) - ((+p.gasto_materiales||0)+(+p.gasto_trabajadores||0))), 0);
+  const gananciaHistorica = finalizada.reduce((s,p) => s + (+p.ganancia||0), 0);
+  const ebitdaPct = revenue > 0 ? (ebitda/revenue*100).toFixed(1) : '0';
+  const netoPct = revenue > 0 ? (utilidadNeta/revenue*100).toFixed(1) : '0';
+
+  // Status portfolio
+  const activeKpis = active.map(p => ({ p, k: rdAdvancedKPIs(p), acciones: rdAccionesRequeridas(p, rdAdvancedKPIs(p)) }));
+  const criticas = activeKpis.filter(x => x.k.estado === 'critico');
+  const advertencias = activeKpis.filter(x => x.k.estado === 'advertencia');
+  const sanas = activeKpis.filter(x => x.k.estado === 'sano');
+
+  let estado, color, icon, msg;
+  if (criticas.length > 0) {
+    estado = 'ALERTAS CRÍTICAS'; color = 'from-red-600 to-red-800'; icon = '🔴';
+    msg = `${criticas.length} proyecto${criticas.length>1?'s':''} requiere${criticas.length>1?'n':''} tu atención hoy.`;
+  } else if (advertencias.length > 0) {
+    estado = 'OPERACIÓN ESTABLE'; color = 'from-amber-500 to-amber-700'; icon = '🟡';
+    msg = `${advertencias.length} señal${advertencias.length>1?'es':''} de advertencia.`;
+  } else {
+    estado = 'PORTAFOLIO SANO'; color = 'from-emerald-600 to-emerald-800'; icon = '✅';
+    msg = 'Todos los proyectos dentro de parámetros.';
+  }
+
+  // Top 3 decisiones
+  const decisiones = [];
+  criticas.slice(0, 2).forEach(x => decisiones.push({
+    tipo: 'CRÍTICO', titulo: x.p.address, detalle: x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · '),
+    color: 'red', airtable_id: x.p.airtable_id
+  }));
+  advertencias.slice(0, 3 - decisiones.length).forEach(x => decisiones.push({
+    tipo: 'ADVERTENCIA', titulo: x.p.address, detalle: x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · ') || 'Revisar variables',
+    color: 'amber', airtable_id: x.p.airtable_id
+  }));
+  if (decisiones.length === 0) decisiones.push({ tipo: 'TODO OK', titulo: 'Sin acciones urgentes', detalle: 'Mantener disciplina de registro semanal.', color: 'emerald' });
+
+  // Overlay full screen
+  let overlay = document.getElementById('rd-ceo-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'rd-ceo-overlay';
+    overlay.className = 'fixed inset-0 bg-slate-100 z-[60] overflow-y-auto';
+    document.body.appendChild(overlay);
+  }
+
+  overlay.innerHTML = `
+    <div class="min-h-full flex flex-col">
+      <!-- Hero sticky -->
+      <div class="bg-gradient-to-br ${color} text-white p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <button onclick="rdCloseCeoMobile()" class="bg-white/15 hover:bg-white/25 rounded-lg px-3 py-2 text-sm font-bold">✕ Salir</button>
+          <div class="text-center flex-1">
+            <div class="text-[10px] uppercase opacity-75 font-bold tracking-wider">Vista CEO</div>
+            <div class="text-sm opacity-90">${new Date().toLocaleDateString('es', { day:'numeric', month:'long' })}</div>
+          </div>
+          <button onclick="rdCeoMobileShare()" class="bg-emerald-500 hover:bg-emerald-600 rounded-lg px-3 py-2 text-sm font-bold">📤</button>
+        </div>
+        <div class="text-center">
+          <div class="text-4xl">${icon}</div>
+          <div class="text-xl font-bold mt-1">${estado}</div>
+          <div class="text-sm opacity-90 mt-1">${msg}</div>
+        </div>
+        <!-- Distribución -->
+        <div class="grid grid-cols-3 gap-2 mt-4">
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Críticas</div>
+            <div class="text-2xl font-bold">${criticas.length}</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Advertencias</div>
+            <div class="text-2xl font-bold">${advertencias.length}</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur rounded-xl p-2 text-center">
+            <div class="text-[10px] uppercase opacity-80 font-bold">Sanas</div>
+            <div class="text-2xl font-bold">${sanas.length}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs Financieros -->
+      <div class="p-3 grid grid-cols-2 gap-2 max-w-2xl mx-auto w-full">
+        <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">💰 Pipeline ganancia</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">${fmtK(gananciaPipeline)}</div>
+          <div class="text-[10px] text-slate-500">${active.length} obras activas</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">📊 EBITDA</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">${fmtK(ebitda)}</div>
+          <div class="text-[10px] text-slate-500">${ebitdaPct}% sobre revenue</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">⭐ Neto post-imp</div>
+          <div class="text-xl font-bold ${utilidadNeta>=0?'text-emerald-700':'text-red-700'} mt-0.5">${fmtK(utilidadNeta)}</div>
+          <div class="text-[10px] text-slate-500">${netoPct}% (obj 5-15%)</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">🏁 Histórico</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">${fmtK(gananciaHistorica)}</div>
+          <div class="text-[10px] text-slate-500">${finalizada.length} flips cerrados</div>
+        </div>
+      </div>
+
+      <!-- Top 3 decisiones -->
+      <div class="px-3 pb-3 max-w-2xl mx-auto w-full">
+        <div class="text-xs uppercase tracking-wider font-bold text-slate-500 px-1 mb-2">🎯 Hoy decidís</div>
+        <div class="space-y-2">
+          ${decisiones.map((d, i) => `
+            <button onclick="${d.airtable_id?`rdCloseCeoMobile(); setTimeout(()=>rdOpenObra('${d.airtable_id}'), 200)`:''}" class="w-full text-left bg-white border-l-4 ${d.color==='red'?'border-red-500':d.color==='amber'?'border-amber-500':'border-emerald-500'} border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition">
+              <div class="flex items-center gap-3">
+                <div class="text-3xl font-black ${d.color==='red'?'text-red-700':d.color==='amber'?'text-amber-700':'text-emerald-700'}">${i+1}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[10px] uppercase tracking-wider font-bold ${d.color==='red'?'text-red-700':d.color==='amber'?'text-amber-700':'text-emerald-700'}">${d.tipo}</div>
+                  <div class="font-bold text-sm text-slate-900 truncate">${d.titulo}</div>
+                  <div class="text-xs text-slate-600 line-clamp-2">${d.detalle}</div>
+                </div>
+                ${d.airtable_id?'<span class="text-slate-400 text-lg">›</span>':''}
+              </div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Lista de obras compacta -->
+      <div class="px-3 pb-3 max-w-2xl mx-auto w-full">
+        <div class="text-xs uppercase tracking-wider font-bold text-slate-500 px-1 mb-2">🏠 Todas las obras (${active.length})</div>
+        <div class="space-y-1.5">
+          ${activeKpis.sort((a,b) => ({critico:0,advertencia:1,sano:2}[a.k.estado] - ({critico:0,advertencia:1,sano:2}[b.k.estado]))).map(({p, k}) => {
+            const avance = p.avance_pct || 0;
+            const avanceColor = avance >= 75 ? 'bg-emerald-500' : avance >= 40 ? 'bg-blue-500' : avance > 0 ? 'bg-amber-500' : 'bg-slate-300';
+            const dot = k.estado === 'critico' ? '🔴' : k.estado === 'advertencia' ? '🟡' : '🟢';
+            return `
+              <button onclick="rdCloseCeoMobile(); setTimeout(()=>rdOpenObra('${p.airtable_id}'), 200)" class="w-full text-left bg-white border border-slate-200 rounded-xl p-2.5 active:bg-slate-50">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-base">${dot}</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-bold text-sm text-slate-900 truncate">${(p.address||'—').replace(/</g,'&lt;')}</div>
+                    <div class="text-[10px] text-slate-500 truncate">${p.lider||'Sin líder'}${k.dias_retraso!=null?(k.dias_retraso>0?` · ⏰ ${k.dias_retraso}d`:` · ${-k.dias_retraso}d restantes`):''}</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-bold ${k.ganancia>=0?'text-emerald-700':'text-red-700'}">${fmtK(k.ganancia)}</div>
+                    <div class="text-[10px] text-slate-500">${k.margen_venta!=null?(k.margen_venta>0?'+':'')+k.margen_venta+'%':'—'}</div>
+                  </div>
+                </div>
+                <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="${avanceColor} h-full" style="width:${avance}%"></div>
+                </div>
+              </button>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="sticky bottom-0 bg-white border-t-2 border-slate-200 p-3 grid grid-cols-2 gap-2 shadow-lg">
+        <button onclick="rdCeoMobileShare()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">📤 Compartir</button>
+        <button onclick="rdCloseCeoMobile()" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-3 rounded-xl">✕ Cerrar</button>
+      </div>
+    </div>
+  `;
+}
+
+function rdCloseCeoMobile() {
+  const o = document.getElementById('rd-ceo-overlay');
+  if (o) o.remove();
+}
+
+function rdCeoMobileShare() {
+  const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+  const finalizada = rdState.properties.filter(p => p.proceso === 'Finalizado');
+  const finCfg = rdGetFinCfg();
+  const fmtK = n => '$' + Math.round(n/1000) + 'k';
+  let revenue=0, ebitda=0, utilidadNeta=0;
+  [...active, ...finalizada].forEach(p => { const f = rdFinanzas(p, finCfg); revenue+=f.revenue; ebitda+=f.ebitda; utilidadNeta+=f.utilidadNeta; });
+  const gananciaPipeline = active.reduce((s,p) => s + ((+p.valor_cliente||0) - ((+p.gasto_materiales||0)+(+p.gasto_trabajadores||0))), 0);
+
+  const activeKpis = active.map(p => ({ p, k: rdAdvancedKPIs(p) }));
+  const criticas = activeKpis.filter(x => x.k.estado === 'critico');
+  const advertencias = activeKpis.filter(x => x.k.estado === 'advertencia');
+
+  const base = window.location.origin + window.location.pathname;
+  const url = `${base}?rd_mode=ceo`;
+
+  let msg = `📊 *RESUMEN PORTFOLIO · ${new Date().toLocaleDateString('es',{day:'numeric',month:'long'}).toUpperCase()}*\n\n`;
+  msg += `🏗️ Activas: ${active.length} · Finalizadas: ${finalizada.length}\n`;
+  msg += `💰 Pipeline: ${fmtK(gananciaPipeline)}\n`;
+  msg += `📊 EBITDA: ${fmtK(ebitda)}\n`;
+  msg += `⭐ Neto post-imp: ${fmtK(utilidadNeta)}\n\n`;
+  if (criticas.length > 0) {
+    msg += `🔴 *CRÍTICAS (${criticas.length})*\n`;
+    criticas.slice(0,5).forEach(x => msg += `• ${x.p.address}\n`);
+    msg += '\n';
+  }
+  if (advertencias.length > 0) {
+    msg += `🟡 *ADVERTENCIAS (${advertencias.length})*\n`;
+    advertencias.slice(0,3).forEach(x => msg += `• ${x.p.address}\n`);
+    msg += '\n';
+  }
+  msg += `📱 Ver dashboard completo:\n${url}`;
+
+  openModal('📤 Compartir resumen CEO', `
+    <div class="space-y-3">
+      <div class="bg-violet-50 border border-violet-200 rounded p-2 text-xs">
+        Link al dashboard CEO: <code class="text-[10px]">${url}</code>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Mensaje (editable)</label>
+        <textarea id="rd-ceo-share-msg" rows="14" class="w-full border border-violet-300 rounded p-2 text-xs font-mono">${msg.replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional)</label>
+        <input id="rd-ceo-share-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="(()=>{const m=document.getElementById('rd-ceo-share-msg').value;const p=(document.getElementById('rd-ceo-share-phone').value||'').replace(/[^0-9]/g,'');const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`;window.open(u,'_blank');closeModal();})()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 WhatsApp</button>
+      </div>
+    </div>
+  `);
+}
+
+// Auto-abrir desde URL ?rd_mode=ceo
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('rd_mode') === 'ceo') {
+      const tryOpen = () => {
+        if (typeof rdState !== 'undefined' && rdState.properties && rdState.properties.length > 0) {
+          rdOpenCeoMobile();
+        } else {
+          setTimeout(tryOpen, 800);
+        }
+      };
+      setTimeout(tryOpen, 1500);
+    }
+  });
 }
