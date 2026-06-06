@@ -261,8 +261,8 @@ async function wpsGenerateCampaign() {
   if (targets.length === 0) return alert('Sin destinatarios con esos filtros.');
   if (!confirm(`Generar mensajes personalizados para ${targets.length} estudiante(s)?\n\nEsto puede tardar 1-3 minutos.`)) return;
 
-  // Crear campaña
-  const { data: campaign, error } = await sb.from('edu_whatsapp_campaigns').insert({
+  // Crear campaña con safeInsert (descarta columnas inexistentes)
+  const campaignPayload = {
     mentorship_id: eduState.mentorshipId,
     name,
     prompt_template: promptTpl,
@@ -270,8 +270,17 @@ async function wpsGenerateCampaign() {
     status: 'draft',
     total_recipients: targets.length,
     created_by: state.user.id
-  }).select().single();
-  if (error) return alert('Error: ' + error.message);
+  };
+  let campaign;
+  if (typeof window.safeInsert === 'function') {
+    const r = await window.safeInsert(() => sb.from('edu_whatsapp_campaigns'), campaignPayload, { single: true });
+    if (r.error) return alert('Error: ' + (r.error.message || r.error));
+    campaign = r.data;
+  } else {
+    const r = await sb.from('edu_whatsapp_campaigns').insert(campaignPayload).select().single();
+    if (r.error) return alert('Error: ' + r.error.message);
+    campaign = r.data;
+  }
 
   // Llamar edge function
   const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-generate`, {
@@ -818,7 +827,29 @@ function wpsOpenQuickWeekly() {
         <div class="text-[10px] text-slate-500 mt-1">Cada estudiante recibe su versión personalizada con sus datos.</div>
       </div>
 
-      <!-- Botón generar -->
+      <!-- 🧪 Modo prueba (probar antes de mandar a todos) -->
+      <details class="bg-amber-50 border border-amber-300 rounded-xl p-3">
+        <summary class="cursor-pointer text-xs font-bold uppercase text-amber-900 flex items-center gap-2">
+          🧪 Probar primero con un número (recomendado)
+          <span class="text-[10px] font-normal text-amber-700">click para abrir ▾</span>
+        </summary>
+        <div class="mt-3 space-y-2">
+          <div class="text-xs text-amber-900">Manda 1 mensaje de prueba al número que quieras (el tuyo, tu teléfono personal, etc.) para validar el mensaje y el formato antes de ir a todos los estudiantes.</div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="col-span-1">
+              <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tu número (con código país)</label>
+              <div class="text-[10px] text-slate-500 mb-1">Ej. 521555... (México) o 1555... (USA)</div>
+            </div>
+            <div class="col-span-2">
+              <input id="wps-test-phone" type="text" placeholder="521234567890" value="${(localStorage.getItem('wps_test_phone')||'').replace(/\D/g,'')}" oninput="try{localStorage.setItem('wps_test_phone', this.value.replace(/\\D/g,''))}catch(e){}" class="w-full border border-amber-400 rounded px-2 py-1.5 text-sm font-mono"/>
+            </div>
+          </div>
+          <button onclick="wpsCreateQuickTest()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2.5 rounded">🧪 Crear 1 mensaje de prueba</button>
+          <div class="text-[10px] text-slate-500">Se crea una campaña con prefijo "🧪 PRUEBA" y un solo mensaje hacia tu número. Lo abrís, lo enviás a vos mismo y validás cómo queda.</div>
+        </div>
+      </details>
+
+      <!-- Botón generar (real, a todos) -->
       <button onclick="wpsCreateQuickWeekly()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base py-3 rounded-lg" ${filteredAll.length === 0 ? 'disabled' : ''}>
         🚀 Crear ${filteredAll.length} mensaje${filteredAll.length===1?'':'s'} y ver para enviar
       </button>
@@ -889,8 +920,38 @@ async function wpsCreateQuickWeekly() {
     try { await eduLoadAllTasks(); } catch {}
   }
 
-  // Crear campaña
-  const { data: campaign, error: cErr } = await sb.from('edu_whatsapp_campaigns').insert({
+  await wpsActuallyCreate(filtered, template, campaignName);
+}
+
+// Modo prueba: crea una campaña con UN solo destinatario hacia un teléfono de prueba
+async function wpsCreateQuickTest() {
+  const phone = (document.getElementById('wps-test-phone')?.value || '').replace(/\D/g, '');
+  if (!phone || phone.length < 10) return alert('Pon un número válido de prueba (con código país, ej. 521555... o 1555...)');
+
+  const allStudents = (eduState.students || []).filter(s => !eduState.mentorshipId || s.mentorship_id === eduState.mentorshipId);
+  const filtered = wpsFilterQuickStudents(allStudents);
+  const previewStudent = filtered[0] || allStudents[0] || {
+    id: null, full_name: 'Estudiante Prueba', current_stage: 'Crédito', mentorship_id: eduState.mentorshipId
+  };
+
+  // Forzar phone en el preview student
+  const testStudent = { ...previewStudent, phone };
+
+  const template = WPS_WEEKLY_TEMPLATES.find(t => t.id === wpsQuickState.templateId) || WPS_WEEKLY_TEMPLATES[0];
+  const fecha = new Date().toLocaleDateString('es', { day: '2-digit', month: 'short' });
+  const campaignName = `🧪 PRUEBA · ${template.label} · ${fecha}`;
+
+  if (typeof eduLoadAllTasks === 'function' && !window.eduTasksState?.loaded) {
+    try { await eduLoadAllTasks(); } catch {}
+  }
+
+  await wpsActuallyCreate([testStudent], template, campaignName, { phoneOverride: phone });
+}
+
+// Insert real con safeInsert (descarta columnas que el schema no tenga)
+async function wpsActuallyCreate(students, template, campaignName, opts) {
+  opts = opts || {};
+  const campaignPayload = {
     name: campaignName,
     mentorship_id: eduState.mentorshipId || null,
     prompt_template: template.text,
@@ -900,40 +961,50 @@ async function wpsCreateQuickWeekly() {
       inactivos_dias: wpsQuickState.filterInactivos,
       template_id: template.id
     },
-    total_recipients: filtered.length,
+    total_recipients: students.length,
     sent_count: 0,
     responded_count: 0,
     status: 'ready',
     created_by: state.user?.id || null
-  }).select().single();
+  };
 
-  if (cErr) return alert('Error creando campaña: ' + cErr.message);
+  let campaign;
+  if (typeof window.safeInsert === 'function') {
+    const r = await window.safeInsert(() => sb.from('edu_whatsapp_campaigns'), campaignPayload, { single: true });
+    if (r.error) return alert('Error creando campaña: ' + (r.error.message || r.error));
+    campaign = r.data;
+  } else {
+    const r = await sb.from('edu_whatsapp_campaigns').insert(campaignPayload).select().single();
+    if (r.error) return alert('Error creando campaña: ' + r.error.message);
+    campaign = r.data;
+  }
 
-  // Generar mensajes (sin IA, llenando template)
-  const messages = filtered.map(s => ({
+  const messages = students.map(s => ({
     campaign_id: campaign.id,
-    student_id: s.id,
-    phone: s.phone || null,
+    student_id: s.id || null,
+    phone: opts.phoneOverride || s.phone || null,
     message_text: wpsFillTemplate(template.text, s),
     status: 'pending'
   }));
 
-  // Insertar en chunks de 100
   for (let i = 0; i < messages.length; i += 100) {
     const chunk = messages.slice(i, i + 100);
-    const { error: mErr } = await sb.from('edu_whatsapp_messages').insert(chunk);
-    if (mErr) {
-      alert('Error insertando mensajes: ' + mErr.message);
-      return;
+    if (typeof window.safeInsert === 'function') {
+      const r = await window.safeInsert(() => sb.from('edu_whatsapp_messages'), chunk, { select: false });
+      if (r.error) { alert('Error insertando mensajes: ' + (r.error.message || r.error)); return; }
+    } else {
+      const r = await sb.from('edu_whatsapp_messages').insert(chunk);
+      if (r.error) { alert('Error insertando mensajes: ' + r.error.message); return; }
     }
   }
 
-  // Recargar y abrir detalle
   await wpsLoad();
   wpsState.activeCampaignId = campaign.id;
   wpsState.activeView = 'detail';
   wpsRender();
 }
+
+window.wpsCreateQuickTest = wpsCreateQuickTest;
 
 window.wpsOpenQuickWeekly = wpsOpenQuickWeekly;
 window.wpsCreateQuickWeekly = wpsCreateQuickWeekly;
