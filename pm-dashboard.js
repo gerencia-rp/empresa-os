@@ -270,7 +270,7 @@ async function pmTriggerSync() {
     const url = `${window.SUPABASE_URL}/functions/v1/sync-clickup`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ user_id: state.user.id })
     });
     const r = await res.json();
@@ -483,7 +483,7 @@ async function pmRunDailyPushNow() {
   try {
     const res = await fetch(PM_PUSH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ trigger: 'manual' })
     });
     const r = await res.json();
@@ -609,7 +609,7 @@ async function pmRunWeeklyReviewNow() {
   try {
     const res = await fetch(PM_REVIEW_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({})
     });
     const r = await res.json();
@@ -1108,7 +1108,7 @@ async function pmRunComputePerformance() {
   try {
     const res = await fetch(PM_PERF_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({})
     });
     const r = await res.json();
@@ -1402,7 +1402,7 @@ async function pmPrepareOneOnOne(id) {
   try {
     const res = await fetch(PM_1ON1_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ one_on_one_id: id })
     });
     const r = await res.json();
@@ -1460,7 +1460,7 @@ async function pmRunCoaching() {
   try {
     const res = await fetch(PM_COACH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({})
     });
     const r = await res.json();

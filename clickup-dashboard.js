@@ -51,7 +51,7 @@ async function cuSync() {
   try {
     const res = await fetch(CU_FN_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ user_id: state.user.id })
     });
     const r = await res.json();
@@ -790,7 +790,7 @@ async function cuRunAgentNow() {
   try {
     const res = await fetch(CU_AGENT_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ max_proposals: 5 })
     });
     const r = await res.json();
@@ -871,7 +871,7 @@ async function cuExecuteProposal(id) {
   try {
     const res = await fetch(CU_EXEC_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({
         action_type,
         target_task_id: p.action_payload?.target_task_id,

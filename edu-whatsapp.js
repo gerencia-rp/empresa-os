@@ -294,7 +294,7 @@ async function wpsGenerateCampaign() {
   // Llamar edge function
   const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
     body: JSON.stringify({
       campaign_id: campaign.id,
       mentorship_id: eduState.mentorshipId,
@@ -941,9 +941,17 @@ window.eduSendWaQuick = eduSendWaQuick;
 // ════════════════════════════════════════════════════════════
 const WPS_WEEKLY_TEMPLATES = [
   {
+    id: 'ai_plan_semanal',
+    label: '📋 Plan semanal con IA',
+    desc: 'IA arma plan completo personalizado: qué tareas, en qué orden, con tiempos',
+    text: '__AI_PLAN_SEMANAL__',
+    isAI: true,
+    isPlanSemanal: true
+  },
+  {
     id: 'ai_custom',
-    label: '✍️ Personalizado con IA',
-    desc: 'IA escribe cada mensaje basado en perfil + contexto que vos das',
+    label: '✍️ Personalizado con IA (libre)',
+    desc: 'IA escribe cada mensaje basado en el contexto que vos das',
     text: '__AI_CUSTOM__',
     isAI: true
   },
@@ -1362,6 +1370,113 @@ async function wpsCreateAICampaign(students, template, campaignName) {
 
 // Genera 1 mensaje con Claude para 1 estudiante
 async function wpsAIGenerateOne(student) {
+  const currentTpl = WPS_WEEKLY_TEMPLATES.find(t => t.id === wpsQuickState.templateId);
+  if (currentTpl?.isPlanSemanal) {
+    return wpsAIGeneratePlanSemanal(student);
+  }
+  return wpsAIGenerateMessage(student);
+}
+
+// ════════════════════════════════════════════════════════════
+// 📋 Plan semanal con IA — mensaje profundo con plan completo
+// ════════════════════════════════════════════════════════════
+async function wpsAIGeneratePlanSemanal(student) {
+  const m = (eduState.mentorships || []).find(x => x.id === student.mentorship_id);
+  const stageObj = (m?.stages || []).find(st => st.key === student.current_stage);
+  const allTasks = window.eduTasksState?.all || [];
+  const pendingTasks = allTasks.filter(t => t.student_id === student.id && !t.completed).slice(0, 10);
+  const completedTasks = allTasks.filter(t => t.student_id === student.id && t.completed).slice(-3);
+  const lastCall = (eduState.calls || []).filter(c => c.student_id === student.id)
+    .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0];
+
+  const diasSinContacto = student.ultima_fecha_seguimiento
+    ? Math.floor((Date.now() - new Date(student.ultima_fecha_seguimiento).getTime()) / 86400000)
+    : null;
+
+  const studentData = {
+    nombre: (student.full_name || 'estudiante').split(' ')[0],
+    etapa_actual: stageObj?.name || student.current_stage || 'sin etapa',
+    grupo: student.grupo || '',
+    capital_actual: student.capital_actual || null,
+    estado_pago: student.payment_status || 'desconocido',
+    dias_sin_contacto: diasSinContacto,
+    tareas_pendientes: pendingTasks.map(t => ({
+      etapa: t.bloque_etapa,
+      tarea: t.paso_text
+    })),
+    tareas_completadas_recientes: completedTasks.map(t => t.paso_text),
+    ultima_sesion: lastCall ? {
+      fecha: lastCall.scheduled_at?.slice(0, 10),
+      asistio: lastCall.status_attendance === 'asistio',
+      resumen: lastCall.summary || lastCall.notes_md || ''
+    } : null,
+    observaciones: student.observaciones_seguimiento || ''
+  };
+
+  const tonoMap = {
+    amigable: 'amigable y cercano',
+    formal: 'formal y respetuoso',
+    motivacional: 'motivacional y empujándolo',
+    urgente: 'directo y enérgico, urgencia clara',
+    casual: 'casual y relajado'
+  };
+  const largoMap = {
+    corto: '5-8 líneas máximo',
+    medio: '10-15 líneas',
+    largo: '15-25 líneas'
+  };
+
+  const prompt = `Sos mentor de Real Estate / Fix & Flip en USA (Rental Profitss). Vas a armar el PLAN SEMANAL de tu estudiante: qué tareas tiene que hacer esta semana, en qué orden, y con tiempos sugeridos.
+
+CONTEXTO ADICIONAL del director (lo que querés comunicar esta semana):
+"""
+${wpsQuickState.aiContext || '(sin contexto extra — guíate sólo por los datos del estudiante)'}
+"""
+
+DATOS DEL ESTUDIANTE:
+${JSON.stringify(studentData, null, 2)}
+
+INSTRUCCIONES:
+- Tono: ${tonoMap[wpsQuickState.aiTono] || tonoMap.amigable}
+- Largo: ${largoMap[wpsQuickState.aiLargo] || largoMap.medio}
+- Formato: mensaje WhatsApp con saltos de línea (\\n) — sin markdown
+- Estructura recomendada:
+  1. Saludo personalizado con primer nombre
+  2. Una línea reconociendo dónde está en su proceso
+  3. PLAN DE LA SEMANA con 2-4 acciones concretas numeradas (1. 2. 3.) priorizadas
+  4. Para cada acción: qué hacer + tiempo estimado (ej. "30 minutos")
+  5. Una pregunta concreta o llamado a la acción al final
+- Usar SOLO sus tareas pendientes reales (de la lista que pasé). Si no tiene, sugerí 2-3 cosas típicas para su etapa.
+- Si tiene tareas completadas recientes, mencionalo en 1 línea para reconocer el avance
+- Si lleva muchos días sin contacto, abordá con empatía sin culpar
+- NO incluyas markdown (* _ ~), corchetes ni placeholders sin reemplazar
+- Devolvé SOLO el mensaje listo para mandar por WhatsApp`;
+
+  const token = await window.getAccessToken();
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-ai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: prompt }],
+      project_context: { feature: 'edu-wa-plan-semanal' }
+    })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  let raw = '';
+  if (Array.isArray(json.content)) {
+    raw = json.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+  } else {
+    raw = json.text || json.response || '';
+  }
+  raw = raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  return raw || `Hola ${studentData.nombre}, paso a saludarte. ¿Cómo va todo?`;
+}
+
+// ════════════════════════════════════════════════════════════
+// ✍️ Mensaje personalizado con IA (más libre, menos estructurado)
+// ════════════════════════════════════════════════════════════
+async function wpsAIGenerateMessage(student) {
   const m = (eduState.mentorships || []).find(x => x.id === student.mentorship_id);
   const stageObj = (m?.stages || []).find(st => st.key === student.current_stage);
   const allTasks = window.eduTasksState?.all || [];
@@ -1892,7 +2007,7 @@ async function wpsSubmitResponse(messageId) {
   try {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-whatsapp-analyze-response`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ message_id: messageId, response_text: text })
     });
     const r = await res.json();

@@ -1011,7 +1011,7 @@ async function eduTriggerSync() {
   try {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/sync-education-airtable`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ mentorship_id: m.id })
     });
     const r = await res.json();
@@ -2456,7 +2456,7 @@ async function fmSearchSend(forcedQuery = null) {
   try {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/fm-ai-coach`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
       body: JSON.stringify({ mode: 'search', messages: fmState.searchChat.map(m => ({ role: m.role, content: m.content })) })
     });
     const r = await res.json();
@@ -2625,7 +2625,7 @@ async function eduGuardarEstudiante(studentId) {
     try {
       const res = await fetch(`${window.SUPABASE_URL}/functions/v1/update-airtable-record`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getAccessToken()}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
         body: JSON.stringify({
           mentorship_id: s.mentorship_id,
           airtable_record_id: s.airtable_record_id,
