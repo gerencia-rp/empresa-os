@@ -246,6 +246,12 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW register failed:', err));
   });
+  // Cuando el SW emite navigate (desde notification click) → cambiar de URL
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    if (ev.data?.type === 'navigate' && ev.data.url) {
+      window.location.href = ev.data.url;
+    }
+  });
 }
 
 // Captura el evento beforeinstallprompt para ofrecer instalación on-demand
@@ -2587,3 +2593,193 @@ document.getElementById('add-system-btn').addEventListener('click', openAddSyste
 // INIT
 // ============================================================
 initAuth();
+
+// ============================================================
+// 🔔 Sistema de alertas nativas del browser
+// Notification API + chequeo periódico. Sin VAPID, sin push server.
+// Cuando hay críticas atrasadas o cambios importantes, dispara una
+// notification del SO. Funciona instalado como PWA o en pestaña abierta.
+// ============================================================
+window.notifyState = {
+  enabled: false,
+  lastDigestDate: null,
+  lastChecks: { critical_count: 0 }
+};
+
+async function notifyRequestPermission() {
+  if (!('Notification' in window)) {
+    alert('Tu navegador no soporta notificaciones.');
+    return false;
+  }
+  if (Notification.permission === 'granted') {
+    window.notifyState.enabled = true;
+    return true;
+  }
+  if (Notification.permission === 'denied') {
+    alert('Las notificaciones están bloqueadas. Activalas desde la configuración del navegador.');
+    return false;
+  }
+  const perm = await Notification.requestPermission();
+  window.notifyState.enabled = perm === 'granted';
+  if (perm === 'granted') {
+    notifySend('🔔 Notificaciones activadas', { body: 'Te avisaré cuando haya críticas atrasadas o cosas importantes.', tag: 'enabled' });
+  }
+  return perm === 'granted';
+}
+
+function notifySend(title, opts) {
+  if (!window.notifyState.enabled || Notification.permission !== 'granted') return;
+  const o = opts || {};
+  try {
+    // Preferir el SW para que las notifs persistan
+    if (navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, {
+          body: o.body || '',
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: o.tag || 'eos-' + Date.now(),
+          data: o.data || {},
+          requireInteraction: !!o.persistent
+        });
+      });
+    } else {
+      new Notification(title, { body: o.body || '', icon: '/icon-192.png', tag: o.tag });
+    }
+  } catch (e) {
+    console.warn('notifySend failed:', e);
+  }
+}
+
+// Chequea cosas importantes y dispara notifications si corresponde.
+// Se ejecuta al cargar y cada 15 minutos si la app sigue abierta.
+async function notifyCheckCriticals() {
+  if (!window.notifyState.enabled) return;
+  try {
+    // Buscar weekly_activities críticas atrasadas
+    const todayIso = new Date().toISOString().slice(0,10);
+    const { data } = await sb.from('weekly_activities')
+      .select('id, activity_name, property_name, date, status, priority, notes')
+      .or('priority.eq.critical,priority.eq.urgent')
+      .neq('status', 'done')
+      .neq('status', 'cancelled')
+      .lt('date', todayIso);
+    const overdueCritical = (data || []).filter(a => a.date < todayIso);
+    const prev = window.notifyState.lastChecks.critical_count || 0;
+    if (overdueCritical.length > prev) {
+      const newOnes = overdueCritical.length - prev;
+      notifySend(`⚠️ ${newOnes} nueva${newOnes>1?'s':''} crítica${newOnes>1?'s':''} atrasada${newOnes>1?'s':''}`, {
+        body: overdueCritical.slice(0,3).map(a => `• ${a.activity_name} (${a.property_name||'—'})`).join('\n'),
+        tag: 'critical-overdue',
+        persistent: true,
+        data: { url: '/?wp_mode=worker&wp_day=' + todayIso }
+      });
+    }
+    window.notifyState.lastChecks.critical_count = overdueCritical.length;
+  } catch (e) {
+    console.warn('notifyCheckCriticals failed:', e);
+  }
+}
+
+// Auto-iniciar check cada 15 min y al cargar
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    // Auto-activar si ya está concedido (no preguntar)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      window.notifyState.enabled = true;
+      // Primer check 30s después de cargar (dar tiempo a auth)
+      setTimeout(() => notifyCheckCriticals(), 30000);
+      // Recurrente cada 15 min
+      setInterval(() => notifyCheckCriticals(), 15 * 60 * 1000);
+    }
+  });
+}
+
+// ────────────────────────────────────────────────────────────
+// 📤 Digest diario — genera mensaje con las cosas del día y abre WhatsApp
+// ────────────────────────────────────────────────────────────
+async function generateDailyDigest() {
+  try {
+    const todayIso = new Date().toISOString().slice(0,10);
+    const tomorrowIso = new Date(Date.now() + 86400000).toISOString().slice(0,10);
+
+    // Cargar lo necesario
+    const [actsRes, projsRes] = await Promise.all([
+      sb.from('weekly_activities').select('*').gte('date', todayIso).lte('date', tomorrowIso),
+      sb.from('remodel_projects').select('id,name,address,status').neq('status', 'completed').neq('status', 'cancelled')
+    ]);
+    const acts = actsRes.data || [];
+    const projs = projsRes.data || [];
+
+    // Atrasadas críticas
+    const { data: overdueData } = await sb.from('weekly_activities')
+      .select('*')
+      .or('priority.eq.critical,priority.eq.urgent')
+      .neq('status', 'done').neq('status', 'cancelled')
+      .lt('date', todayIso);
+    const overdueCritical = overdueData || [];
+
+    // Tareas de hoy
+    const hoyActs = acts.filter(a => a.date === todayIso);
+    const hoyDone = hoyActs.filter(a => a.status === 'done').length;
+    const manana = acts.filter(a => a.date === tomorrowIso);
+
+    const fecha = new Date().toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
+
+    let msg = `📊 *DIGEST DIARIO · ${fecha.toUpperCase()}*\n\n`;
+
+    if (overdueCritical.length > 0) {
+      msg += `🔴 *${overdueCritical.length} CRÍTICA${overdueCritical.length>1?'S':''} ATRASADA${overdueCritical.length>1?'S':''}*\n`;
+      overdueCritical.slice(0,5).forEach(a => {
+        const daysLate = Math.round((new Date(todayIso+'T00:00:00') - new Date(a.date+'T00:00:00'))/86400000);
+        msg += `• ${a.activity_name} (${a.property_name||'—'}) — ${daysLate}d\n`;
+      });
+      msg += '\n';
+    }
+
+    msg += `📅 *HOY · ${hoyActs.length} tareas* (${hoyDone} hechas)\n`;
+    if (hoyActs.length > 0) {
+      const byHome = {};
+      hoyActs.forEach(a => { (byHome[a.property_name||'—'] = byHome[a.property_name||'—'] || []).push(a); });
+      Object.entries(byHome).slice(0,4).forEach(([home, list]) => {
+        msg += `🏠 ${home}: ${list.filter(a=>a.status==='done').length}/${list.length}\n`;
+      });
+      msg += '\n';
+    }
+
+    if (manana.length > 0) {
+      msg += `🔜 *MAÑANA · ${manana.length} tareas planeadas*\n\n`;
+    }
+
+    msg += `🏗️ ${projs.length} obras activas\n`;
+    msg += `\n📱 Ver dashboard: ${window.location.origin}/?rd_mode=ceo`;
+
+    return msg;
+  } catch (e) {
+    return '❌ Error generando digest: ' + e.message;
+  }
+}
+
+async function openDailyDigest() {
+  const btn = document.querySelector('[onclick="openDailyDigest()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+  const msg = await generateDailyDigest();
+  if (btn) { btn.disabled = false; btn.textContent = '📤 Digest del día'; }
+
+  openModal('📤 Digest diario', `
+    <div class="space-y-3">
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+        Resumen automático de lo que pasó hoy y lo que viene. Editalo y mandalo por WhatsApp a quien necesite el update.
+      </div>
+      <textarea id="digest-msg" rows="14" class="w-full border border-violet-300 rounded p-3 text-sm font-mono">${msg.replace(/</g,'&lt;')}</textarea>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional)</label>
+        <input id="digest-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="(()=>{const m=document.getElementById('digest-msg').value;const p=(document.getElementById('digest-phone').value||'').replace(/[^0-9]/g,'');const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`;window.open(u,'_blank');closeModal();})()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Enviar WhatsApp</button>
+      </div>
+    </div>
+  `);
+}

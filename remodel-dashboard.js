@@ -387,6 +387,8 @@ function rdRender() {
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           ${lastSync ? `<span class="text-[10px] text-slate-500 hidden md:inline">Última sync: ${lastSyncAgo < 1 ? 'ahora' : lastSyncAgo < 60 ? lastSyncAgo+'min' : Math.floor(lastSyncAgo/60)+'h'} · ${rdState.syncLog.records_synced || 0} obras</span>` : '<span class="text-[10px] text-amber-700 hidden md:inline">Sin sync todavía. Click 🔄</span>'}
+          <button onclick="openDailyDigest()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Genera digest del día con tareas, atrasos y alertas para enviar por WhatsApp">📤 Digest del día</button>
+          <button onclick="notifyRequestPermission()" class="text-xs bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 px-3 py-1.5 rounded font-bold" title="Activar notificaciones del navegador para alertas críticas">🔔 Alertas</button>
           <button onclick="rdOpenCeoMobile()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded font-bold" title="Vista CEO en formato celular — KPIs, alertas, decisiones">📱 Vista CEO</button>
           <button onclick="rdSync()" ${rdState.loading?'disabled':''} class="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded font-bold">
             ${rdState.loading ? '⏳ Sync...' : '🔄 Sync Airtable'}

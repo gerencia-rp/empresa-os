@@ -4,7 +4,7 @@
 // seguro cachearlo de forma indefinida; si cambia el hash, el index.html nuevo
 // referencia un filename distinto y la versión vieja se va por ttl natural.
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `empresa-os-${CACHE_VERSION}`;
 const SHELL = [
   '/',
@@ -25,6 +25,24 @@ self.addEventListener('activate', (ev) => {
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
+  );
+});
+
+// Notification click: enfoca la app o abre la URL adjunta en data.url
+self.addEventListener('notificationclick', (ev) => {
+  ev.notification.close();
+  const target = ev.notification.data?.url || '/';
+  ev.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      for (const c of clients) {
+        if (c.url.includes(self.location.origin)) {
+          c.focus();
+          if (target && target !== '/') c.postMessage({ type: 'navigate', url: target });
+          return;
+        }
+      }
+      return self.clients.openWindow(target);
+    })
   );
 });
 
