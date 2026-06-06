@@ -48,11 +48,20 @@ async function wpsLoad() {
   wpsState.campaigns = campaigns || [];
 
   if (wpsState.activeCampaignId) {
-    const { data: msgs } = await sb.from('edu_whatsapp_messages')
-      .select('*, student:edu_students(id,full_name,phone,email,current_stage)')
+    // Cargar mensajes sin JOIN (left join puede no estar configurado en RLS)
+    const { data: msgs, error: msgErr } = await sb.from('edu_whatsapp_messages')
+      .select('*')
       .eq('campaign_id', wpsState.activeCampaignId)
       .order('created_at');
-    wpsState.messages = msgs || [];
+    if (msgErr) console.warn('[wpsLoad] error cargando mensajes:', msgErr);
+
+    // Adjuntar el student manualmente desde el cache de eduState.students
+    const studentMap = {};
+    (eduState.students || []).forEach(s => { studentMap[s.id] = s; });
+    wpsState.messages = (msgs || []).map(m => ({
+      ...m,
+      student: m.student_id ? (studentMap[m.student_id] || { id: m.student_id, full_name: 'Estudiante', phone: m.phone, current_stage: '' }) : { full_name: 'Prueba', phone: m.phone, current_stage: '' }
+    }));
   }
   wpsState.loading = false;
 }
@@ -1476,17 +1485,17 @@ window.wpsAIPreviewMessage = wpsAIPreviewMessage;
 
 // Modo prueba: crea una campaña con UN solo destinatario hacia un teléfono de prueba
 async function wpsCreateQuickTest() {
-  const phone = (document.getElementById('wps-test-phone')?.value || '').replace(/\D/g, '');
-  if (!phone || phone.length < 10) return alert('Pon un número válido de prueba (con código país, ej. 521555... o 1555...)');
+  const phoneRaw = (document.getElementById('wps-test-phone')?.value || '').replace(/\D/g, '');
+  if (!phoneRaw || phoneRaw.length < 10) return alert('Pon un número válido de prueba (con código país, ej. 521555... o 1555...)');
 
   const allStudents = (eduState.students || []).filter(s => !eduState.mentorshipId || s.mentorship_id === eduState.mentorshipId);
   const filtered = wpsFilterQuickStudents(allStudents);
-  const previewStudent = filtered[0] || allStudents[0] || {
-    id: null, full_name: 'Estudiante Prueba', current_stage: 'Crédito', mentorship_id: eduState.mentorshipId
-  };
+  const previewStudent = filtered[0] || allStudents[0];
 
-  // Forzar phone en el preview student
-  const testStudent = { ...previewStudent, phone };
+  // Si NO hay estudiantes reales, usar null student_id (la tabla acepta null en student_id)
+  const testStudent = previewStudent
+    ? { ...previewStudent, phone: phoneRaw }
+    : { id: null, full_name: 'Estudiante Prueba', current_stage: '', mentorship_id: eduState.mentorshipId, phone: phoneRaw };
 
   const template = WPS_WEEKLY_TEMPLATES.find(t => t.id === wpsQuickState.templateId) || WPS_WEEKLY_TEMPLATES[0];
   const fecha = new Date().toLocaleDateString('es', { day: '2-digit', month: 'short' });
@@ -1496,7 +1505,21 @@ async function wpsCreateQuickTest() {
     try { await eduLoadAllTasks(); } catch {}
   }
 
-  await wpsActuallyCreate([testStudent], template, campaignName, { phoneOverride: phone });
+  // Para modo IA: generar mensaje con Claude
+  if (template.isAI) {
+    if (!wpsQuickState.aiContext || wpsQuickState.aiContext.trim().length < 20) {
+      return alert('Para usar el modo IA necesitás escribir contexto (mín 20 caracteres).');
+    }
+    try {
+      const msgText = await wpsAIGenerateOne(testStudent);
+      await wpsActuallyCreate([{ ...testStudent, _aiText: msgText }], template, campaignName, { phoneOverride: phoneRaw, useAIText: true });
+    } catch (e) {
+      alert('Error generando con IA: ' + e.message);
+    }
+    return;
+  }
+
+  await wpsActuallyCreate([testStudent], template, campaignName, { phoneOverride: phoneRaw });
 }
 
 // Insert real con safeInsert (descarta columnas que el schema no tenga)
@@ -1530,23 +1553,50 @@ async function wpsActuallyCreate(students, template, campaignName, opts) {
     campaign = r.data;
   }
 
-  const messages = students.map(s => ({
-    campaign_id: campaign.id,
-    student_id: s.id || null,
-    phone: opts.phoneOverride || s.phone || null,
-    message_text: wpsFillTemplate(template.text, s),
-    status: 'pending'
-  }));
+  // Construir filas de mensajes
+  const messages = students.map(s => {
+    const finalPhone = opts.phoneOverride || s.phone || null;
+    const finalText = opts.useAIText && s._aiText ? s._aiText : wpsFillTemplate(template.text, s);
+    const row = {
+      campaign_id: campaign.id,
+      phone: finalPhone,
+      message_text: finalText,
+      status: 'pending'
+    };
+    // Solo agregar student_id si es un UUID válido (sino dejar que safeInsert lo elimine)
+    if (s.id && typeof s.id === 'string' && s.id.length >= 30) {
+      row.student_id = s.id;
+    }
+    return row;
+  });
 
+  // DEBUG: log lo que vamos a insertar
+  console.log('[wpsActuallyCreate] insertando', messages.length, 'mensajes:', messages);
+
+  let totalInserted = 0;
   for (let i = 0; i < messages.length; i += 100) {
     const chunk = messages.slice(i, i + 100);
+    // Forzar select para confirmar inserts
+    let res;
     if (typeof window.safeInsert === 'function') {
-      const r = await window.safeInsert(() => sb.from('edu_whatsapp_messages'), chunk, { select: false });
-      if (r.error) { alert('Error insertando mensajes: ' + (r.error.message || r.error)); return; }
+      res = await window.safeInsert(() => sb.from('edu_whatsapp_messages'), chunk, { select: '*' });
     } else {
-      const r = await sb.from('edu_whatsapp_messages').insert(chunk);
-      if (r.error) { alert('Error insertando mensajes: ' + r.error.message); return; }
+      res = await sb.from('edu_whatsapp_messages').insert(chunk).select();
     }
+    if (res.error) {
+      const errMsg = res.error.message || String(res.error);
+      console.error('[wpsActuallyCreate] insert error:', res.error);
+      alert(`❌ Error insertando mensajes:\n\n${errMsg}\n\nDetalle: revisá la consola del browser (F12 → Console).`);
+      return;
+    }
+    totalInserted += (res.data || []).length;
+  }
+
+  console.log('[wpsActuallyCreate] total insertados:', totalInserted);
+
+  if (totalInserted === 0) {
+    alert(`⚠️ La campaña se creó pero 0 mensajes fueron insertados.\n\nEsto puede ser:\n• Un constraint en la tabla edu_whatsapp_messages\n• Restricción de RLS\n\nRevisá la consola del browser (F12 → Console) para ver el detalle del payload.`);
+    return;
   }
 
   await wpsLoad();
