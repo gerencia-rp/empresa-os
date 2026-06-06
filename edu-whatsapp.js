@@ -916,6 +916,13 @@ window.eduSendWaQuick = eduSendWaQuick;
 // ════════════════════════════════════════════════════════════
 const WPS_WEEKLY_TEMPLATES = [
   {
+    id: 'ai_custom',
+    label: '✍️ Personalizado con IA',
+    desc: 'IA escribe cada mensaje basado en perfil + contexto que vos das',
+    text: '__AI_CUSTOM__',
+    isAI: true
+  },
+  {
     id: 'general',
     label: '👋 Check-in semanal',
     desc: 'Para todos: cómo va la semana',
@@ -947,7 +954,16 @@ const WPS_WEEKLY_TEMPLATES = [
   }
 ];
 
-const wpsQuickState = { templateId: 'general', filterStage: 'all', filterStatus: 'active', filterInactivos: 0, prefillName: '' };
+const wpsQuickState = {
+  templateId: 'general', filterStage: 'all', filterStatus: 'active', filterInactivos: 0,
+  prefillName: '',
+  // Para modo "✍️ Personalizado con IA":
+  aiContext: '',          // contexto adicional que el usuario escribe sobre los clientes
+  aiTono: 'amigable',     // amigable | formal | motivacional | urgente | casual
+  aiFoco: 'general',      // general | tareas | sesion | pago | motivacion
+  aiLargo: 'corto',       // corto (2-3 lineas) | medio (4-6 lineas) | largo (7+ lineas)
+  aiSaludo: 'auto'        // auto | sin_saludo | hola | buenos_dias | qubo
+};
 
 function wpsOpenQuickWeekly() {
   const root = document.getElementById('wps-root');
@@ -958,10 +974,13 @@ function wpsOpenQuickWeekly() {
 
   const filteredAll = wpsFilterQuickStudents(allStudents);
   const template = WPS_WEEKLY_TEMPLATES.find(t => t.id === wpsQuickState.templateId) || WPS_WEEKLY_TEMPLATES[0];
+  const isAITemplate = template.isAI === true;
 
   // Preview de mensaje con el primer estudiante (si hay)
   const previewStudent = filteredAll[0] || { full_name: 'Juan Pérez', current_stage: 'Crédito', _daysWithoutContact: 7 };
-  const previewMsg = wpsFillTemplate(template.text, previewStudent);
+  const previewMsg = isAITemplate
+    ? '✨ Los mensajes se generan al momento de crear la campaña — cada estudiante recibe una versión única según su perfil + el contexto que indiques abajo.'
+    : wpsFillTemplate(template.text, previewStudent);
 
   root.innerHTML = `
     <div class="space-y-3">
@@ -975,13 +994,85 @@ function wpsOpenQuickWeekly() {
         <div class="text-xs font-bold uppercase text-slate-700 mb-2">1️⃣ Elegí la plantilla</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           ${WPS_WEEKLY_TEMPLATES.map(t => `
-            <button onclick="wpsQuickState.templateId='${t.id}'; wpsOpenQuickWeekly()" class="text-left border-2 ${wpsQuickState.templateId===t.id?'border-emerald-500 bg-emerald-50':'border-slate-200 hover:border-slate-300'} rounded-lg p-2.5">
-              <div class="font-bold text-sm">${t.label}</div>
+            <button onclick="wpsQuickState.templateId='${t.id}'; wpsOpenQuickWeekly()" class="text-left border-2 ${wpsQuickState.templateId===t.id?(t.isAI?'border-violet-500 bg-violet-50':'border-emerald-500 bg-emerald-50'):'border-slate-200 hover:border-slate-300'} ${t.isAI?'ring-1 ring-violet-300':''} rounded-lg p-2.5">
+              <div class="font-bold text-sm ${t.isAI?'text-violet-900':''}">${t.label}</div>
               <div class="text-[10px] text-slate-500">${t.desc}</div>
             </button>
           `).join('')}
         </div>
       </div>
+
+      ${isAITemplate ? `
+      <!-- Panel de configuración IA -->
+      <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4 space-y-3">
+        <div class="flex items-center gap-2">
+          <div class="text-2xl">🤖</div>
+          <div>
+            <div class="text-xs font-bold uppercase text-violet-900">Generador de mensajes con IA</div>
+            <div class="text-[10px] text-violet-700">Claude escribe un mensaje único para cada estudiante usando su perfil + el contexto que indiques</div>
+          </div>
+        </div>
+
+        <!-- Contexto adicional (el más importante) -->
+        <div>
+          <label class="block text-xs font-bold uppercase text-violet-900 mb-1">📝 Contexto / qué querés comunicar esta semana</label>
+          <textarea id="wps-ai-context" rows="4" oninput="wpsQuickState.aiContext=this.value" placeholder="Ej: 'Estamos cerrando trimestre y necesito que entreguen análisis de propiedades. Quien tenga deudas pendientes que avise. Recordales que el viernes hay webinar de financiamiento Hard Money con José.'" class="w-full border border-violet-300 rounded px-3 py-2 text-sm">${(wpsQuickState.aiContext||'').replace(/</g,'&lt;')}</textarea>
+          <div class="text-[10px] text-slate-600 mt-1">💡 Cuanto más específico, mejor. La IA va a tomar esto + datos de cada estudiante (etapa, tareas, días sin contacto) y armar un mensaje único.</div>
+        </div>
+
+        <!-- Configuración del tono y formato -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tono</label>
+            <select id="wps-ai-tono" onchange="wpsQuickState.aiTono=this.value" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs">
+              <option value="amigable" ${wpsQuickState.aiTono==='amigable'?'selected':''}>😊 Amigable</option>
+              <option value="formal" ${wpsQuickState.aiTono==='formal'?'selected':''}>🎩 Formal</option>
+              <option value="motivacional" ${wpsQuickState.aiTono==='motivacional'?'selected':''}>💪 Motivacional</option>
+              <option value="urgente" ${wpsQuickState.aiTono==='urgente'?'selected':''}>⚡ Urgente</option>
+              <option value="casual" ${wpsQuickState.aiTono==='casual'?'selected':''}>🙌 Casual</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Foco principal</label>
+            <select id="wps-ai-foco" onchange="wpsQuickState.aiFoco=this.value" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs">
+              <option value="general" ${wpsQuickState.aiFoco==='general'?'selected':''}>General · check-in</option>
+              <option value="tareas" ${wpsQuickState.aiFoco==='tareas'?'selected':''}>Tareas pendientes</option>
+              <option value="sesion" ${wpsQuickState.aiFoco==='sesion'?'selected':''}>Agendar sesión</option>
+              <option value="pago" ${wpsQuickState.aiFoco==='pago'?'selected':''}>Pago / cobranza</option>
+              <option value="motivacion" ${wpsQuickState.aiFoco==='motivacion'?'selected':''}>Motivar / activar</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Largo</label>
+            <select id="wps-ai-largo" onchange="wpsQuickState.aiLargo=this.value" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs">
+              <option value="corto" ${wpsQuickState.aiLargo==='corto'?'selected':''}>Corto (2-3 líneas)</option>
+              <option value="medio" ${wpsQuickState.aiLargo==='medio'?'selected':''}>Medio (4-6 líneas)</option>
+              <option value="largo" ${wpsQuickState.aiLargo==='largo'?'selected':''}>Largo (7+ líneas)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Saludo</label>
+            <select id="wps-ai-saludo" onchange="wpsQuickState.aiSaludo=this.value" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs">
+              <option value="auto" ${wpsQuickState.aiSaludo==='auto'?'selected':''}>Automático</option>
+              <option value="hola" ${wpsQuickState.aiSaludo==='hola'?'selected':''}>Hola</option>
+              <option value="buenos_dias" ${wpsQuickState.aiSaludo==='buenos_dias'?'selected':''}>Buenos días</option>
+              <option value="qubo" ${wpsQuickState.aiSaludo==='qubo'?'selected':''}>¿Qué tal?</option>
+              <option value="sin_saludo" ${wpsQuickState.aiSaludo==='sin_saludo'?'selected':''}>Sin saludo</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Botón Preview -->
+        <div class="bg-white border border-violet-200 rounded-lg p-2">
+          <button onclick="wpsAIPreviewMessage()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold py-2 rounded">✨ Ver muestra de 3 mensajes antes de crear todos</button>
+          <div id="wps-ai-preview-result" class="mt-2"></div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
+          ⚠️ Generar ${filteredAll.length} mensajes con IA toma ${Math.max(15, Math.round(filteredAll.length * 1.2))}-${Math.round(filteredAll.length * 2.5)} segundos. Cada mensaje es único.
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Filtros simples -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
@@ -1057,8 +1148,8 @@ function wpsOpenQuickWeekly() {
       </details>
 
       <!-- Botón generar (real, a todos) -->
-      <button onclick="wpsCreateQuickWeekly()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base py-3 rounded-lg" ${filteredAll.length === 0 ? 'disabled' : ''}>
-        🚀 Crear ${filteredAll.length} mensaje${filteredAll.length===1?'':'s'} y ver para enviar
+      <button onclick="wpsCreateQuickWeekly()" class="w-full ${isAITemplate?'bg-violet-600 hover:bg-violet-700':'bg-emerald-600 hover:bg-emerald-700'} text-white font-bold text-base py-3 rounded-lg" ${filteredAll.length === 0 ? 'disabled' : ''}>
+        ${isAITemplate ? `🤖 Generar ${filteredAll.length} mensaje${filteredAll.length===1?'':'s'} con IA y ver para enviar` : `🚀 Crear ${filteredAll.length} mensaje${filteredAll.length===1?'':'s'} y ver para enviar`}
       </button>
     </div>
   `;
@@ -1127,8 +1218,261 @@ async function wpsCreateQuickWeekly() {
     try { await eduLoadAllTasks(); } catch {}
   }
 
+  if (template.isAI) {
+    // Validar que escribió contexto
+    if (!wpsQuickState.aiContext || wpsQuickState.aiContext.trim().length < 20) {
+      return alert('Para usar el modo IA necesitás escribir algo en el campo de contexto (mínimo 20 caracteres). Decile a la IA qué querés comunicar esta semana.');
+    }
+    if (!confirm(`Generar ${filtered.length} mensajes únicos con IA?\n\nTiempo estimado: ${Math.max(15, Math.round(filtered.length * 1.2))}-${Math.round(filtered.length * 2.5)} segundos.\nCada estudiante recibe una versión personalizada.`)) return;
+    return wpsCreateAICampaign(filtered, template, campaignName);
+  }
+
   await wpsActuallyCreate(filtered, template, campaignName);
 }
+
+// ════════════════════════════════════════════════════════════
+// 🤖 Generar mensajes personalizados con IA (1 call por estudiante)
+// Usa la edge function remodel-ai (Claude) ya disponible.
+// ════════════════════════════════════════════════════════════
+async function wpsCreateAICampaign(students, template, campaignName) {
+  // Mostrar progreso
+  const overlay = document.createElement('div');
+  overlay.id = 'wps-ai-progress';
+  overlay.className = 'fixed inset-0 z-[200] bg-slate-900/80 flex items-center justify-center p-4';
+  overlay.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+      <div class="text-4xl mb-3 animate-pulse">🤖</div>
+      <div class="font-bold text-lg text-slate-900">Generando mensajes con IA</div>
+      <div class="text-sm text-slate-600 mt-1">Claude está escribiendo un mensaje único para cada estudiante</div>
+      <div class="mt-4 bg-slate-100 rounded-full h-3 overflow-hidden">
+        <div id="wps-ai-bar" class="bg-violet-600 h-full transition-all" style="width: 0%"></div>
+      </div>
+      <div id="wps-ai-progress-text" class="text-xs text-slate-500 mt-2">0 / ${students.length}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const messages = [];
+  let done = 0;
+
+  for (const s of students) {
+    try {
+      const msgText = await wpsAIGenerateOne(s);
+      messages.push({
+        student_id: s.id,
+        phone: s.phone || null,
+        message_text: msgText,
+        status: 'pending'
+      });
+    } catch (e) {
+      console.warn('IA failed for student', s.id, e);
+      // Fallback: usar template general como respaldo
+      const fallbackTemplate = WPS_WEEKLY_TEMPLATES.find(t => t.id === 'general');
+      messages.push({
+        student_id: s.id,
+        phone: s.phone || null,
+        message_text: wpsFillTemplate(fallbackTemplate.text, s),
+        status: 'pending'
+      });
+    }
+    done++;
+    const bar = document.getElementById('wps-ai-bar');
+    const txt = document.getElementById('wps-ai-progress-text');
+    if (bar) bar.style.width = (done / students.length * 100) + '%';
+    if (txt) txt.textContent = `${done} / ${students.length} (${(s.full_name||'').split(' ')[0]})`;
+  }
+
+  // Crear campaña + insertar mensajes
+  const campaignPayload = {
+    name: campaignName,
+    mentorship_id: eduState.mentorshipId || null,
+    prompt_template: 'AI_CUSTOM: ' + (wpsQuickState.aiContext || '').slice(0, 500),
+    target_filters: {
+      stage: wpsQuickState.filterStage,
+      status: wpsQuickState.filterStatus,
+      inactivos_dias: wpsQuickState.filterInactivos,
+      template_id: 'ai_custom',
+      ai_tono: wpsQuickState.aiTono,
+      ai_foco: wpsQuickState.aiFoco,
+      ai_largo: wpsQuickState.aiLargo
+    },
+    total_recipients: students.length,
+    sent_count: 0,
+    responded_count: 0,
+    status: 'ready',
+    created_by: state.user?.id || null
+  };
+
+  let campaign;
+  if (typeof window.safeInsert === 'function') {
+    const r = await window.safeInsert(() => sb.from('edu_whatsapp_campaigns'), campaignPayload, { single: true });
+    if (r.error) { overlay.remove(); return alert('Error creando campaña: ' + (r.error.message || r.error)); }
+    campaign = r.data;
+  } else {
+    const r = await sb.from('edu_whatsapp_campaigns').insert(campaignPayload).select().single();
+    if (r.error) { overlay.remove(); return alert('Error: ' + r.error.message); }
+    campaign = r.data;
+  }
+
+  // Asociar campaign_id a cada mensaje
+  const finalMessages = messages.map(m => ({ ...m, campaign_id: campaign.id }));
+
+  for (let i = 0; i < finalMessages.length; i += 100) {
+    const chunk = finalMessages.slice(i, i + 100);
+    if (typeof window.safeInsert === 'function') {
+      const r = await window.safeInsert(() => sb.from('edu_whatsapp_messages'), chunk, { select: false });
+      if (r.error) { overlay.remove(); alert('Error insertando: ' + (r.error.message || r.error)); return; }
+    } else {
+      const r = await sb.from('edu_whatsapp_messages').insert(chunk);
+      if (r.error) { overlay.remove(); alert('Error: ' + r.error.message); return; }
+    }
+  }
+
+  overlay.remove();
+  await wpsLoad();
+  wpsState.activeCampaignId = campaign.id;
+  wpsState.activeView = 'detail';
+  wpsRender();
+}
+
+// Genera 1 mensaje con Claude para 1 estudiante
+async function wpsAIGenerateOne(student) {
+  const m = (eduState.mentorships || []).find(x => x.id === student.mentorship_id);
+  const stageObj = (m?.stages || []).find(st => st.key === student.current_stage);
+  const allTasks = window.eduTasksState?.all || [];
+  const pendingTasks = allTasks.filter(t => t.student_id === student.id && !t.completed).slice(0, 5);
+  const lastCall = (eduState.calls || []).filter(c => c.student_id === student.id)
+    .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0];
+
+  const diasSinContacto = student.ultima_fecha_seguimiento
+    ? Math.floor((Date.now() - new Date(student.ultima_fecha_seguimiento).getTime()) / 86400000)
+    : null;
+
+  const studentData = {
+    nombre: (student.full_name || 'estudiante').split(' ')[0],
+    nombre_completo: student.full_name,
+    etapa_actual: stageObj?.name || student.current_stage || 'sin etapa',
+    grupo: student.grupo || '',
+    estado_pago: student.payment_status || 'desconocido',
+    dias_sin_contacto: diasSinContacto,
+    tareas_pendientes_top: pendingTasks.map(t => t.paso_text),
+    ultima_sesion: lastCall ? {
+      fecha: lastCall.scheduled_at?.slice(0, 10),
+      asistio: lastCall.status_attendance === 'asistio',
+      resumen: lastCall.summary || lastCall.status_reason || ''
+    } : null,
+    observaciones: student.observaciones_seguimiento || ''
+  };
+
+  const tonoMap = {
+    amigable: 'amigable y cercano, como un mentor que se preocupa',
+    formal: 'formal y respetuoso, lenguaje profesional',
+    motivacional: 'motivacional y energético, empujándolo a la acción',
+    urgente: 'directo y enérgico, urgencia clara',
+    casual: 'casual y relajado, como hablando entre amigos'
+  };
+  const focoMap = {
+    general: 'check-in general sobre cómo va su semana',
+    tareas: 'foco en sus tareas pendientes específicas',
+    sesion: 'foco en agendar la próxima sesión',
+    pago: 'recordatorio amable de pago pendiente',
+    motivacion: 'motivar al estudiante que está estancado'
+  };
+  const largoMap = {
+    corto: '2-3 líneas máximo, muy breve',
+    medio: '4-6 líneas, balanceado',
+    largo: '7-10 líneas, más extenso pero sin redundar'
+  };
+  const saludoMap = {
+    auto: '',
+    hola: 'Empezar con "Hola {nombre}, ".',
+    buenos_dias: 'Empezar con "Buenos días {nombre}, ".',
+    qubo: 'Empezar con "¿Qué tal {nombre}? ".',
+    sin_saludo: 'NO incluir saludo, ir directo al punto.'
+  };
+
+  const prompt = `Sos mentor de Real Estate / Fix & Flip en USA (Rental Profitss). Escribí un mensaje de WhatsApp para un estudiante específico.
+
+CONTEXTO DE LA SEMANA (lo que el director quiere comunicar):
+"""
+${wpsQuickState.aiContext}
+"""
+
+DATOS DEL ESTUDIANTE:
+${JSON.stringify(studentData, null, 2)}
+
+REGLAS:
+- Tono: ${tonoMap[wpsQuickState.aiTono] || tonoMap.amigable}
+- Foco principal: ${focoMap[wpsQuickState.aiFoco] || focoMap.general}
+- Largo: ${largoMap[wpsQuickState.aiLargo] || largoMap.corto}
+- ${saludoMap[wpsQuickState.aiSaludo] || ''}
+- Usar el primer nombre (no apellido)
+- Si tiene tareas pendientes, mencioná 1 o 2 específicas (no todas)
+- Si lleva mucho sin contacto, abordarlo con empatía
+- NO uses tags markdown (* _ ~). En WhatsApp esos caracteres están bien pero acá NO los uses.
+- NO escribas "Hola [nombre]" con corchetes — usá el nombre real
+- NO firmes ni cierres con "Saludos, [tu nombre]"
+- Devolvé SOLO el mensaje listo para enviar (sin comillas, sin meta-comentarios)`;
+
+  const token = await window.getAccessToken();
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-ai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: prompt }],
+      project_context: { feature: 'edu-wa-personalized' }
+    })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  let raw = '';
+  if (Array.isArray(json.content)) {
+    raw = json.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+  } else {
+    raw = json.text || json.response || '';
+  }
+  // Cleanup: quitar comillas externas si las puso
+  raw = raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  return raw || `Hola ${studentData.nombre}, paso a saludarte. ¿Cómo va todo?`;
+}
+
+// Preview de 3 mensajes para que el user valide antes de generar todos
+async function wpsAIPreviewMessage() {
+  const allStudents = (eduState.students || []).filter(s => !eduState.mentorshipId || s.mentorship_id === eduState.mentorshipId);
+  const filtered = wpsFilterQuickStudents(allStudents);
+  if (!filtered.length) return alert('Sin destinatarios con esos filtros.');
+  if (!wpsQuickState.aiContext || wpsQuickState.aiContext.trim().length < 20) {
+    return alert('Escribí algo en "Contexto" (mín 20 caracteres) para que la IA tenga material.');
+  }
+
+  if (typeof eduLoadAllTasks === 'function' && !window.eduTasksState?.loaded) {
+    try { await eduLoadAllTasks(); } catch {}
+  }
+
+  const container = document.getElementById('wps-ai-preview-result');
+  if (!container) return;
+  container.innerHTML = '<div class="text-center py-3 text-xs text-slate-500">⏳ Generando 3 muestras...</div>';
+
+  const samples = filtered.slice(0, 3);
+  const results = [];
+  for (const s of samples) {
+    try {
+      const msg = await wpsAIGenerateOne(s);
+      results.push({ student: s, msg, ok: true });
+    } catch (e) {
+      results.push({ student: s, msg: 'Error: ' + e.message, ok: false });
+    }
+  }
+
+  container.innerHTML = results.map(r => `
+    <div class="bg-white border border-violet-200 rounded p-2 mb-2">
+      <div class="text-[10px] font-bold uppercase text-violet-700">${(r.student.full_name||'').replace(/</g,'&lt;')} · ${(r.student.current_stage||'').replace(/</g,'&lt;')}</div>
+      <div class="text-xs mt-1 whitespace-pre-wrap ${r.ok?'text-slate-800':'text-red-700'}">${r.msg.replace(/</g,'&lt;')}</div>
+    </div>
+  `).join('') + '<div class="text-[10px] text-slate-500 italic text-center mt-1">💡 Si te gustan, dale a "🚀 Crear todos" abajo.</div>';
+}
+
+window.wpsAIPreviewMessage = wpsAIPreviewMessage;
 
 // Modo prueba: crea una campaña con UN solo destinatario hacia un teléfono de prueba
 async function wpsCreateQuickTest() {
