@@ -972,7 +972,7 @@ function rdRenderInforme(active, finalizada) {
       <div class="flex justify-between items-center print:hidden">
         <div class="text-xs text-slate-500 capitalize">${fechaStr} · Agua Construction Group · Structure One · Flipping Rentals</div>
         <div class="flex gap-2">
-          <button onclick="rdGeneratePPTX()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">📊 Generar presentación</button>
+          <button onclick="rdOpenPPTXEditor()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">📊 Generar presentación</button>
           <button onclick="rdPrintInforme()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">🖨️ Imprimir / PDF</button>
         </div>
       </div>
@@ -2011,6 +2011,21 @@ function rdRenderComparar(active, finalizada) {
             ${row('Costo / SqFt', costPerSqftA, costPerSqftB, false, x => '$'+x.toFixed(1))}
             ${row('Revenue / SqFt', revPerSqftA, revPerSqftB, true, x => '$'+x.toFixed(1))}
             ${row('Labor / costo (%)', kA.labor_ratio, kB.labor_ratio, false, x => x+'%')}
+            <tr class="bg-slate-50"><td colspan="3" class="p-2 text-[10px] uppercase font-bold text-slate-600">⚙️ Operación</td></tr>
+            ${row('Eficiencia gasto (% esperado)', kA.eficiencia_gasto, kB.eficiencia_gasto, false, x => x+'%')}
+            ${row('Ejecución presupuesto (%)', kA.ejecucion_pct, kB.ejecucion_pct, false, x => x+'%')}
+            ${(() => {
+              const velA = sqftA > 0 && fA.dias > 0 ? sqftA / fA.dias : null;
+              const velB = sqftB > 0 && fB.dias > 0 ? sqftB / fB.dias : null;
+              return row('Velocity SqFt/día', velA, velB, true, x => x.toFixed(1));
+            })()}
+            ${(() => {
+              const costPerDayA = fA.dias > 0 ? fA.costoDirecto / fA.dias : null;
+              const costPerDayB = fB.dias > 0 ? fB.costoDirecto / fB.dias : null;
+              return row('Burn rate ($/día)', costPerDayA, costPerDayB, false, dollar);
+            })()}
+            ${row('Días de retraso', kA.dias_retraso, kB.dias_retraso, false)}
+            ${row('Sobre presupuesto (%)', kA.sobre_presupuesto_pct, kB.sobre_presupuesto_pct, false, x => (x>0?'+':'')+x+'%')}
             <tr class="bg-slate-50"><td colspan="3" class="p-2 text-[10px] uppercase font-bold text-slate-600">📊 Resultados</td></tr>
             ${row('Margen Bruto %', fA.margenBrutoPct, fB.margenBrutoPct, true, x => x.toFixed(1)+'%')}
             ${row('EBITDA', fA.ebitda, fB.ebitda, true, dollar)}
@@ -2020,6 +2035,40 @@ function rdRenderComparar(active, finalizada) {
           </tbody>
         </table>
       </div>
+
+      <!-- Resumen comparativo en lenguaje natural -->
+      ${(() => {
+        const ganA = fA.margenNetoDespuesImpPct >= fB.margenNetoDespuesImpPct;
+        const wins = ganA ? A : B;
+        const loses = ganA ? B : A;
+        const winF = ganA ? fA : fB;
+        const loseF = ganA ? fB : fA;
+        const deltaPct = Math.abs(winF.margenNetoDespuesImpPct - loseF.margenNetoDespuesImpPct);
+        const deltaUSD = Math.abs(winF.utilidadNeta - loseF.utilidadNeta);
+        const insights = [];
+        if (deltaPct > 0.5) insights.push(`<strong>${wins.address}</strong> dejó <strong>${dollar(deltaUSD)}</strong> más de utilidad neta (${deltaPct.toFixed(1)}pp más de margen).`);
+        if (sqftA && sqftB && Math.abs(sqftA-sqftB) > 200) {
+          const chica = sqftA < sqftB ? A : B;
+          const grande = sqftA < sqftB ? B : A;
+          insights.push(`${chica.address} es ${Math.abs(sqftA-sqftB)} SqFt más chica que ${grande.address} — comparar márgenes a igual escala revela ineficiencias.`);
+        }
+        if (kA.labor_ratio != null && kB.labor_ratio != null && Math.abs(kA.labor_ratio - kB.labor_ratio) > 5) {
+          const altoLab = kA.labor_ratio > kB.labor_ratio ? A : B;
+          insights.push(`${altoLab.address} gastó más en mano de obra proporcionalmente (${Math.max(kA.labor_ratio, kB.labor_ratio)}%). Revisar productividad del crew.`);
+        }
+        if (fA.dias && fB.dias && Math.abs(fA.dias - fB.dias) > 14) {
+          const lenta = fA.dias > fB.dias ? A : B;
+          insights.push(`${lenta.address} tardó ${Math.abs(fA.dias - fB.dias)} días más. Diferencia de ${dollar(Math.abs(fA.dias - fB.dias) * (winF.costoDirecto/Math.max(1,winF.dias)))} en burn rate equivalente.`);
+        }
+        if (insights.length === 0) return '';
+        return `
+        <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-violet-900 mb-2">💡 Análisis comparativo</div>
+          <ul class="space-y-1 text-xs text-violet-900">
+            ${insights.map(i => `<li>• ${i}</li>`).join('')}
+          </ul>
+        </div>`;
+      })()}
 
       <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
         <strong>💡 Cómo leer:</strong> 🏆 marca a la obra que ganó esa métrica. Comparando $/SqFt podés ver cuál fue
@@ -2094,9 +2143,159 @@ function rdOpenHitoReport(airtableId, hito) {
 }
 
 // ════════════════════════════════════════════════════════════
+// 📊 EDITOR DE PRESENTACIÓN — configurar antes de generar PPTX
+// Permite elegir slides, escribir noticias, seleccionar obras destacadas
+// y agregar narrativa antes de exportar el .pptx
+// ════════════════════════════════════════════════════════════
+const rdPPTXConfig = {
+  titulo: 'Informe Ejecutivo Remodelación',
+  subtitulo: 'Reunión semanal de gerencia',
+  autor: 'Rental Profitss',
+  slides: {
+    cover: true,
+    kpis: true,
+    pl: true,
+    alertas: true,
+    noticias: true,
+    decisiones: true,
+    cierre: true
+  },
+  noticiasMd: '',
+  decisionesMd: '',
+  obrasDestacadas: [] // airtable_ids
+};
+
+function rdOpenPPTXEditor() {
+  // Cargar config persistida
+  try {
+    const saved = localStorage.getItem('rd_pptx_cfg');
+    if (saved) Object.assign(rdPPTXConfig, JSON.parse(saved));
+  } catch {}
+
+  const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+  const fecha = new Date().toLocaleDateString('es', { day:'numeric', month:'long', year:'numeric' });
+  const defaultNoticias = rdPPTXConfig.noticiasMd || `• Caso Garden — describir incidente, impacto y plan de acción
+• Material en escasez / cambios de precios
+• Cambios en cuadrilla / nuevas contrataciones
+• Eventos del mercado Austin TX`;
+
+  const defaultDecisiones = rdPPTXConfig.decisionesMd || `• Aprobar refuerzo de crew en obras críticas
+• Renegociar materiales con proveedor X
+• Revisar pricing para próximas obras
+• Próximos pasos para la semana entrante`;
+
+  openModal('📊 Configurar presentación ejecutiva', `
+    <div class="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+        Configurá la presentación antes de generarla. Todo lo que escribas acá queda guardado para la próxima vez.
+        El .pptx se puede seguir editando en PowerPoint o Keynote después.
+      </div>
+
+      <!-- Metadatos -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📋 Datos generales</div>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Título</label>
+            <input id="pptx-titulo" type="text" value="${rdPPTXConfig.titulo.replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Subtítulo</label>
+            <input id="pptx-subtitulo" type="text" value="${rdPPTXConfig.subtitulo.replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          </div>
+        </div>
+        <div class="text-[10px] text-slate-500 mt-1">Fecha automática: ${fecha}</div>
+      </div>
+
+      <!-- Selector de slides -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📑 Slides a incluir</div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-1.5 text-xs">
+          ${[
+            ['cover','🎨 Portada'],
+            ['kpis','💰 KPIs financieros'],
+            ['pl','📊 P&L por obra'],
+            ['alertas','🚨 Alertas críticas'],
+            ['noticias','📰 Noticias y eventos'],
+            ['decisiones','✅ Decisiones tomadas'],
+            ['cierre','🙏 Cierre']
+          ].map(([key, label]) => `
+            <label class="flex items-center gap-1.5 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-50">
+              <input type="checkbox" id="pptx-slide-${key}" ${rdPPTXConfig.slides[key]?'checked':''}/>
+              <span>${label}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Obras destacadas -->
+      ${active.length > 0 ? `
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs font-bold uppercase text-slate-600">⭐ Destacar obras (opcional)</div>
+          <div class="text-[10px] text-slate-500">Si marcás 1+, aparecen en slide propio</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs max-h-32 overflow-y-auto">
+          ${active.map(p => `
+            <label class="flex items-center gap-1.5 border border-slate-200 rounded px-2 py-1 cursor-pointer hover:bg-slate-50">
+              <input type="checkbox" data-pptx-obra="${p.airtable_id}" ${rdPPTXConfig.obrasDestacadas.includes(p.airtable_id)?'checked':''}/>
+              <span class="truncate">${(p.address||'—').replace(/</g,'&lt;')}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- Noticias / Eventos -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-xs font-bold uppercase text-amber-900">📰 Noticias y eventos importantes</div>
+          <div class="text-[10px] text-amber-700">Un punto por línea</div>
+        </div>
+        <textarea id="pptx-noticias" rows="6" class="w-full border border-amber-300 rounded px-2 py-1.5 text-sm font-mono">${defaultNoticias.replace(/</g,'&lt;')}</textarea>
+      </div>
+
+      <!-- Decisiones tomadas -->
+      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-xs font-bold uppercase text-emerald-900">✅ Decisiones tomadas / Próximos pasos</div>
+          <div class="text-[10px] text-emerald-700">Un punto por línea</div>
+        </div>
+        <textarea id="pptx-decisiones" rows="5" class="w-full border border-emerald-300 rounded px-2 py-1.5 text-sm font-mono">${defaultDecisiones.replace(/</g,'&lt;')}</textarea>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200 sticky bottom-0 bg-white">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="rdGeneratePPTXFromEditor()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">📊 Generar .pptx</button>
+      </div>
+    </div>
+  `);
+  // Ensanchar modal
+  const inner = document.querySelector('#modal > div');
+  if (inner) {
+    ['max-w-sm','max-w-md','max-w-lg','max-w-xl','max-w-2xl','max-w-3xl','max-w-5xl','max-w-7xl'].forEach(c => inner.classList.remove(c));
+    inner.classList.add('max-w-3xl');
+  }
+}
+
+function rdGeneratePPTXFromEditor() {
+  // Recoger config
+  rdPPTXConfig.titulo = document.getElementById('pptx-titulo').value || 'Informe Ejecutivo';
+  rdPPTXConfig.subtitulo = document.getElementById('pptx-subtitulo').value || '';
+  ['cover','kpis','pl','alertas','noticias','decisiones','cierre'].forEach(k => {
+    rdPPTXConfig.slides[k] = document.getElementById('pptx-slide-'+k).checked;
+  });
+  rdPPTXConfig.noticiasMd = document.getElementById('pptx-noticias').value || '';
+  rdPPTXConfig.decisionesMd = document.getElementById('pptx-decisiones').value || '';
+  rdPPTXConfig.obrasDestacadas = Array.from(document.querySelectorAll('[data-pptx-obra]:checked')).map(el => el.getAttribute('data-pptx-obra'));
+
+  try { localStorage.setItem('rd_pptx_cfg', JSON.stringify(rdPPTXConfig)); } catch {}
+  closeModal();
+  setTimeout(() => rdGeneratePPTX(), 100);
+}
+
+// ════════════════════════════════════════════════════════════
 // 📊 GENERAR PRESENTACIÓN PPTX — para reuniones de gerencia
-// Crea un deck con: cover, KPIs, ganancias/pérdidas, alertas críticas,
-// EBITDA, top obras, una slide de "noticias" (caso Garden).
+// Usa la config de rdPPTXConfig (editada por rdOpenPPTXEditor)
 // ════════════════════════════════════════════════════════════
 async function rdGeneratePPTX() {
   if (typeof PptxGenJS === 'undefined') {
@@ -2122,84 +2321,136 @@ async function rdGeneratePPTX() {
   const sanas = activeKpis.filter(x => x.k.estado === 'sano');
   const fmt = n => '$' + Math.round(n).toLocaleString();
 
+  const cfg = rdPPTXConfig;
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
-  pptx.author = 'Empresa OS';
+  pptx.author = cfg.autor;
   pptx.company = 'Rental Profitss';
-  pptx.title = 'Informe Ejecutivo Remodelación';
+  pptx.title = cfg.titulo;
 
-  // ─── SLIDE 1: COVER ───
-  const s1 = pptx.addSlide();
-  s1.background = { color: '0F172A' };
-  s1.addText('Informe Ejecutivo', { x:0.5, y:1.2, w:12.3, h:0.8, fontSize:28, color:'94A3B8', bold:false });
-  s1.addText('Remodelación · Fix & Flip', { x:0.5, y:2.0, w:12.3, h:1.5, fontSize:54, color:'FFFFFF', bold:true });
-  s1.addText(`${active.length} obras activas · ${finalizada.length} finalizadas · ${new Date().toLocaleDateString('es')}`, { x:0.5, y:3.8, w:12.3, h:0.5, fontSize:18, color:'CBD5E1' });
-  s1.addText('Agua Construction Group · Structure One · Flipping Rentals', { x:0.5, y:6.5, w:12.3, h:0.4, fontSize:14, color:'64748B' });
+  // ─── COVER ───
+  if (cfg.slides.cover) {
+    const s = pptx.addSlide();
+    s.background = { color: '0F172A' };
+    s.addText(cfg.subtitulo || 'Reunión semanal de gerencia', { x:0.5, y:1.2, w:12.3, h:0.8, fontSize:28, color:'94A3B8' });
+    s.addText(cfg.titulo, { x:0.5, y:2.0, w:12.3, h:1.5, fontSize:54, color:'FFFFFF', bold:true });
+    s.addText(`${active.length} obras activas · ${finalizada.length} finalizadas · ${new Date().toLocaleDateString('es')}`, { x:0.5, y:3.8, w:12.3, h:0.5, fontSize:18, color:'CBD5E1' });
+    s.addText('Agua Construction Group · Structure One · Flipping Rentals', { x:0.5, y:6.5, w:12.3, h:0.4, fontSize:14, color:'64748B' });
+  }
 
-  // ─── SLIDE 2: KPIs HERO ───
-  const s2 = pptx.addSlide();
-  s2.addText('Resumen Financiero', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'0F172A' });
-  const kpis = [
-    { title:'Revenue total', value: fmt(revenue), sub:`${todas.length} obras` },
-    { title:'EBITDA empresa', value: fmt(ebitda), sub:`${revenue>0?(ebitda/revenue*100).toFixed(1):0}% sobre revenue` },
-    { title:'Neto post-impuestos', value: fmt(utilidadNeta), sub:`${revenue>0?(utilidadNeta/revenue*100).toFixed(1):0}% (obj 5-15%)` },
-    { title:'Ganancia histórica', value: fmt(gananciaHistorica), sub:`${finalizada.length} flips cerrados` }
-  ];
-  kpis.forEach((k, i) => {
-    const x = 0.5 + (i % 2) * 6.4;
-    const y = 1.2 + Math.floor(i/2) * 2.5;
-    s2.addShape(pptx.ShapeType.roundRect, { x, y, w:6.0, h:2.2, fill:{color:'F1F5F9'}, line:{color:'CBD5E1', width:1}, rectRadius:0.1 });
-    s2.addText(k.title.toUpperCase(), { x:x+0.3, y:y+0.2, w:5.4, h:0.4, fontSize:12, bold:true, color:'64748B' });
-    s2.addText(k.value, { x:x+0.3, y:y+0.6, w:5.4, h:1.0, fontSize:36, bold:true, color:'0F172A' });
-    s2.addText(k.sub, { x:x+0.3, y:y+1.6, w:5.4, h:0.4, fontSize:14, color:'64748B' });
-  });
-
-  // ─── SLIDE 3: GANANCIAS / PÉRDIDAS POR OBRA ───
-  const s3 = pptx.addSlide();
-  s3.addText('Ganancias y pérdidas por obra activa', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true });
-  const rowsPL = [['Obra','Líder','Revenue','Costo','Ganancia','Margen %']];
-  activeKpis.forEach(({p, k}) => {
-    rowsPL.push([
-      (p.address||'').slice(0,35),
-      p.lider||'—',
-      fmt(+p.valor_cliente||0),
-      fmt(k.totalCost),
-      fmt(k.ganancia||0),
-      (k.margen_venta!=null?k.margen_venta+'%':'—')
-    ]);
-  });
-  s3.addTable(rowsPL, { x:0.5, y:1.2, w:12.3, fontSize:11, border:{type:'solid', pt:0.5, color:'CBD5E1'},
-    colW:[3.5, 1.8, 1.8, 1.8, 1.8, 1.6],
-    fill:{color:'F8FAFC'} });
-
-  // ─── SLIDE 4: ALERTAS CRÍTICAS ───
-  if (criticas.length > 0) {
-    const s4 = pptx.addSlide();
-    s4.addText(`Alertas críticas (${criticas.length})`, { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'B91C1C' });
-    criticas.slice(0, 6).forEach((x, i) => {
-      const y = 1.2 + i * 0.85;
-      s4.addShape(pptx.ShapeType.roundRect, { x:0.5, y, w:12.3, h:0.75, fill:{color:'FEF2F2'}, line:{color:'FCA5A5', width:1}, rectRadius:0.05 });
-      s4.addText(`⚠ ${x.p.address}`, { x:0.7, y:y+0.05, w:11.9, h:0.35, fontSize:16, bold:true, color:'991B1B' });
-      s4.addText(x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · '), { x:0.7, y:y+0.4, w:11.9, h:0.3, fontSize:12, color:'7F1D1D' });
+  // ─── KPIs HERO ───
+  if (cfg.slides.kpis) {
+    const s = pptx.addSlide();
+    s.addText('Resumen Financiero', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'0F172A' });
+    const kpis = [
+      { title:'Revenue total', value: fmt(revenue), sub:`${todas.length} obras` },
+      { title:'EBITDA empresa', value: fmt(ebitda), sub:`${revenue>0?(ebitda/revenue*100).toFixed(1):0}% sobre revenue` },
+      { title:'Neto post-impuestos', value: fmt(utilidadNeta), sub:`${revenue>0?(utilidadNeta/revenue*100).toFixed(1):0}% (obj 5-15%)` },
+      { title:'Ganancia histórica', value: fmt(gananciaHistorica), sub:`${finalizada.length} flips cerrados` }
+    ];
+    kpis.forEach((k, i) => {
+      const x = 0.5 + (i % 2) * 6.4;
+      const y = 1.2 + Math.floor(i/2) * 2.5;
+      s.addShape(pptx.ShapeType.roundRect, { x, y, w:6.0, h:2.2, fill:{color:'F1F5F9'}, line:{color:'CBD5E1', width:1}, rectRadius:0.1 });
+      s.addText(k.title.toUpperCase(), { x:x+0.3, y:y+0.2, w:5.4, h:0.4, fontSize:12, bold:true, color:'64748B' });
+      s.addText(k.value, { x:x+0.3, y:y+0.6, w:5.4, h:1.0, fontSize:36, bold:true, color:'0F172A' });
+      s.addText(k.sub, { x:x+0.3, y:y+1.6, w:5.4, h:0.4, fontSize:14, color:'64748B' });
     });
   }
 
-  // ─── SLIDE 5: NOTICIAS IMPORTANTES ───
-  const s5 = pptx.addSlide();
-  s5.addText('Noticias y eventos importantes', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true });
-  s5.addText('(Caso Garden y otros eventos de la semana)', { x:0.5, y:0.95, w:12.3, h:0.4, fontSize:14, color:'64748B', italic:true });
-  // Slide editable manualmente después
-  s5.addText('• Caso Garden — describir incidente, impacto y plan de acción', { x:0.8, y:1.8, w:11.8, h:0.5, fontSize:16, color:'334155' });
-  s5.addText('• Material en escasez / cambio de precios', { x:0.8, y:2.5, w:11.8, h:0.5, fontSize:16, color:'334155' });
-  s5.addText('• Cambios en cuadrilla / nuevas contrataciones', { x:0.8, y:3.2, w:11.8, h:0.5, fontSize:16, color:'334155' });
-  s5.addText('• Decisiones tomadas esta semana', { x:0.8, y:3.9, w:11.8, h:0.5, fontSize:16, color:'334155' });
-  s5.addText('(Editar este slide directamente en PowerPoint con tu narrativa)', { x:0.5, y:6.5, w:12.3, h:0.4, fontSize:12, color:'94A3B8', italic:true });
+  // ─── P&L POR OBRA ───
+  if (cfg.slides.pl && activeKpis.length > 0) {
+    const s = pptx.addSlide();
+    s.addText('Ganancias y pérdidas por obra activa', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true });
+    const rowsPL = [['Obra','Líder','Revenue','Costo','Ganancia','Margen %']];
+    activeKpis.forEach(({p, k}) => {
+      rowsPL.push([
+        (p.address||'').slice(0,35),
+        p.lider||'—',
+        fmt(+p.valor_cliente||0),
+        fmt(k.totalCost),
+        fmt(k.ganancia||0),
+        (k.margen_venta!=null?k.margen_venta+'%':'—')
+      ]);
+    });
+    s.addTable(rowsPL, { x:0.5, y:1.2, w:12.3, fontSize:11, border:{type:'solid', pt:0.5, color:'CBD5E1'},
+      colW:[3.5, 1.8, 1.8, 1.8, 1.8, 1.6], fill:{color:'F8FAFC'} });
+  }
 
-  // ─── SLIDE 6: CIERRE ───
-  const s6 = pptx.addSlide();
-  s6.background = { color: '0F172A' };
-  s6.addText('Gracias', { x:0.5, y:2.5, w:12.3, h:1.5, fontSize:64, bold:true, color:'FFFFFF', align:'center' });
-  s6.addText('Empresa OS · Rental Profitss', { x:0.5, y:4.3, w:12.3, h:0.5, fontSize:18, color:'94A3B8', align:'center' });
+  // ─── ALERTAS CRÍTICAS ───
+  if (cfg.slides.alertas && criticas.length > 0) {
+    const s = pptx.addSlide();
+    s.addText(`Alertas críticas (${criticas.length})`, { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'B91C1C' });
+    criticas.slice(0, 6).forEach((x, i) => {
+      const y = 1.2 + i * 0.85;
+      s.addShape(pptx.ShapeType.roundRect, { x:0.5, y, w:12.3, h:0.75, fill:{color:'FEF2F2'}, line:{color:'FCA5A5', width:1}, rectRadius:0.05 });
+      s.addText(`⚠ ${x.p.address}`, { x:0.7, y:y+0.05, w:11.9, h:0.35, fontSize:16, bold:true, color:'991B1B' });
+      s.addText(x.k.flags.map(f => rdFlagLabel(f, x.k)).join(' · '), { x:0.7, y:y+0.4, w:11.9, h:0.3, fontSize:12, color:'7F1D1D' });
+    });
+  }
 
-  await pptx.writeFile({ fileName: `Informe_Ejecutivo_Remodelacion_${new Date().toISOString().slice(0,10)}.pptx` });
+  // ─── OBRAS DESTACADAS ───
+  if (cfg.obrasDestacadas && cfg.obrasDestacadas.length > 0) {
+    cfg.obrasDestacadas.forEach(airtableId => {
+      const p = rdState.properties.find(x => x.airtable_id === airtableId);
+      if (!p) return;
+      const k = rdAdvancedKPIs(p);
+      const f = rdFinanzas(p);
+      const s = pptx.addSlide();
+      s.addText('🏠 Obra destacada', { x:0.5, y:0.3, w:12.3, h:0.4, fontSize:14, color:'64748B', bold:true });
+      s.addText(p.address || '—', { x:0.5, y:0.7, w:12.3, h:0.8, fontSize:30, bold:true, color:'0F172A' });
+      s.addText(`Líder: ${p.lider||'—'} · ${p.avance_pct||0}% avance · ${k.dias_retraso!=null?(k.dias_retraso>0?k.dias_retraso+'d retraso':-k.dias_retraso+'d restantes'):'—'}`, { x:0.5, y:1.5, w:12.3, h:0.4, fontSize:14, color:'475569' });
+      const rows = [
+        ['Revenue', fmt(+p.valor_cliente||0)],
+        ['Costo directo', fmt(k.totalCost)],
+        ['Margen Bruto', fmt(f.margenBruto)+' ('+f.margenBrutoPct.toFixed(1)+'%)'],
+        ['EBITDA', fmt(f.ebitda)+' ('+f.ebitdaPct.toFixed(1)+'%)'],
+        ['Neto post-impuestos', fmt(f.utilidadNeta)+' ('+f.margenNetoDespuesImpPct.toFixed(1)+'%)'],
+        ['Eficiencia gasto', k.eficiencia_gasto!=null?k.eficiencia_gasto+'%':'—'],
+        ['Labor / costo', (k.labor_ratio||0)+'%']
+      ];
+      s.addTable(rows.map(r => [{text:r[0], options:{bold:true, fill:'F1F5F9'}}, r[1]]), { x:0.5, y:2.1, w:12.3, fontSize:14, border:{type:'solid', pt:0.5, color:'CBD5E1'}, colW:[4, 8.3] });
+    });
+  }
+
+  // ─── NOTICIAS / EVENTOS ───
+  if (cfg.slides.noticias) {
+    const s = pptx.addSlide();
+    s.addText('Noticias y eventos importantes', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true });
+    const items = (cfg.noticiasMd||'').split('\n').filter(l => l.trim()).map(l => l.replace(/^[-•*]\s*/, ''));
+    if (items.length === 0) {
+      s.addText('(Sin noticias registradas)', { x:0.5, y:1.5, w:12.3, h:0.5, fontSize:16, italic:true, color:'94A3B8' });
+    } else {
+      items.slice(0, 10).forEach((txt, i) => {
+        const y = 1.5 + i * 0.55;
+        s.addText('• ' + txt, { x:0.7, y, w:11.8, h:0.5, fontSize:16, color:'1E293B', valign:'middle' });
+      });
+    }
+  }
+
+  // ─── DECISIONES TOMADAS ───
+  if (cfg.slides.decisiones) {
+    const s = pptx.addSlide();
+    s.addText('Decisiones tomadas / Próximos pasos', { x:0.5, y:0.3, w:12.3, h:0.6, fontSize:28, bold:true, color:'047857' });
+    const items = (cfg.decisionesMd||'').split('\n').filter(l => l.trim()).map(l => l.replace(/^[-•*]\s*/, ''));
+    if (items.length === 0) {
+      s.addText('(Sin decisiones registradas)', { x:0.5, y:1.5, w:12.3, h:0.5, fontSize:16, italic:true, color:'94A3B8' });
+    } else {
+      items.slice(0, 10).forEach((txt, i) => {
+        const y = 1.5 + i * 0.55;
+        s.addText('✓ ' + txt, { x:0.7, y, w:11.8, h:0.5, fontSize:16, color:'064E3B', valign:'middle' });
+      });
+    }
+  }
+
+  // ─── CIERRE ───
+  if (cfg.slides.cierre) {
+    const s = pptx.addSlide();
+    s.background = { color: '0F172A' };
+    s.addText('Gracias', { x:0.5, y:2.5, w:12.3, h:1.5, fontSize:64, bold:true, color:'FFFFFF', align:'center' });
+    s.addText(cfg.autor + ' · Empresa OS', { x:0.5, y:4.3, w:12.3, h:0.5, fontSize:18, color:'94A3B8', align:'center' });
+  }
+
+  const safeTitle = cfg.titulo.replace(/[^a-z0-9]/gi, '_').slice(0, 40);
+  await pptx.writeFile({ fileName: `${safeTitle}_${new Date().toISOString().slice(0,10)}.pptx` });
 }
