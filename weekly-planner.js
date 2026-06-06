@@ -229,7 +229,37 @@ function wpRender() {
     a.status !== 'done' && a.status !== 'cancelled' && a.date && a.date < todayIso
   );
   const overdueCount = overdueAll.length;
+  // ⚠️ Críticas atrasadas (subset de overdue)
+  const criticasAtrasadas = overdueAll.filter(a => a.priority === 'critical' || a.priority === 'urgent');
   const tomorrowIso = wpDateOnly(wpAddDays(new Date(), 1));
+  const criticasBanner = criticasAtrasadas.length ? `
+    <div class="bg-gradient-to-r from-rose-600 to-rose-800 text-white border border-rose-700 rounded-lg px-3 py-2 mb-2 shadow-md">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <div class="text-2xl">⚠️</div>
+          <div>
+            <div class="text-sm font-bold uppercase tracking-wide">${criticasAtrasadas.length} actividad${criticasAtrasadas.length>1?'es':''} de ruta crítica atrasada${criticasAtrasadas.length>1?'s':''}</div>
+            <div class="text-[11px] opacity-90">Cada día perdido empuja la fecha de entrega final · ${[...new Set(criticasAtrasadas.map(a => a.property_name||a.project_id))].length} casa(s) afectada(s)</div>
+          </div>
+        </div>
+        <button onclick="wpToggleCriticasDetails()" class="text-[11px] bg-white text-rose-700 hover:bg-rose-50 font-bold px-3 py-1 rounded">${wpState.showCriticasDetails?'▴ Ocultar':'▾ Ver cuáles'}</button>
+      </div>
+      ${wpState.showCriticasDetails ? `
+        <div class="mt-2 space-y-1 max-h-40 overflow-y-auto bg-rose-900/30 rounded p-2">
+          ${criticasAtrasadas.map(t => {
+            const daysLate = Math.round((new Date(todayIso+'T00:00:00') - new Date(t.date+'T00:00:00'))/86400000);
+            return `<div class="flex items-center justify-between bg-white/95 border border-rose-300 rounded px-2 py-1 text-[11px] text-slate-900 cursor-pointer hover:bg-white" onclick="wpEditActivity('${t.id}')">
+              <div class="flex-1 min-w-0">
+                <div class="font-bold truncate text-rose-900">⚠️ ${(t.activity_name||'').replace(/</g,'&lt;')}</div>
+                <div class="text-[10px] text-slate-600">🏠 ${(t.property_name||'').replace(/</g,'&lt;')}${t.stage?` · ${t.stage}`:''}</div>
+              </div>
+              <span class="bg-rose-700 text-white text-[10px] font-bold px-2 py-0.5 rounded ml-2">⏰ ${daysLate}d</span>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+    </div>
+  ` : '';
   const overdueBanner = overdueCount ? `
     <div class="bg-red-50 border border-red-300 rounded-lg px-3 py-2 mb-2 flex items-start gap-2">
       <div class="text-xl">⚠️</div>
@@ -264,6 +294,7 @@ function wpRender() {
 
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[80vh]">
+      ${criticasBanner}
       ${overdueBanner}
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
@@ -977,6 +1008,10 @@ async function wpReprogramAllOverdue(newDate) {
   wpRender();
 }
 
+function wpToggleCriticasDetails() {
+  wpState.showCriticasDetails = !wpState.showCriticasDetails;
+  wpRender();
+}
 function wpToggleOverdueDetails() {
   wpState.showOverdueDetails = !wpState.showOverdueDetails;
   wpRender();
@@ -3001,13 +3036,73 @@ function wpFinishPrePrint() {
   }
 }
 
+// Construye el catálogo de materiales más usados a partir de todas las tareas
+function wpGetMaterialCatalog() {
+  const counts = {};
+  (wpState.activities||[]).forEach(a => {
+    (a.materials||[]).forEach(m => {
+      if (!m.nombre) return;
+      const key = m.nombre.trim().toLowerCase();
+      if (!counts[key]) counts[key] = { nombre: m.nombre.trim(), unidad: m.unidad || 'ud', count: 0, sumCantidad: 0 };
+      counts[key].count++;
+      counts[key].sumCantidad += (+m.cantidad || 0);
+    });
+  });
+  return Object.values(counts)
+    .sort((a,b) => b.count - a.count)
+    .slice(0, 30)
+    .map(c => ({ ...c, cantidadProm: Math.round(c.sumCantidad / c.count * 10) / 10 || 1 }));
+}
+
 async function wpPrePrintAddMaterial(actId) {
   const a = (wpState.activities||[]).find(x => x.id === actId);
   if (!a) return;
-  const mats = [...(a.materials||[]), { nombre: 'Nuevo material', cantidad: 1, unidad: 'ud' }];
+  // Si hay catálogo, mostrar selector. Sino, agregar vacío.
+  const catalog = wpGetMaterialCatalog();
+  if (catalog.length === 0) {
+    const mats = [...(a.materials||[]), { nombre: '', cantidad: 1, unidad: 'ud' }];
+    a.materials = mats;
+    const { error } = await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
+    if (error) return alert('Error: ' + error.message);
+    wpOpenPrePrintEditor(wpPrePrint.ctx);
+    return;
+  }
+  openModal('📦 Agregar material', `
+    <div class="space-y-3 max-h-[60vh] overflow-y-auto">
+      <div class="text-xs text-slate-600">Elegí del catálogo (materiales más usados) o creá uno nuevo.</div>
+      <div class="grid grid-cols-2 gap-1.5">
+        ${catalog.map(c => `
+          <button onclick="wpPrePrintConfirmMaterial('${actId}', ${JSON.stringify({nombre:c.nombre,cantidad:c.cantidadProm,unidad:c.unidad}).replace(/"/g,'&quot;')})" class="text-left border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded p-2">
+            <div class="text-sm font-semibold">${c.nombre.replace(/</g,'&lt;')}</div>
+            <div class="text-[10px] text-slate-500">≈${c.cantidadProm} ${c.unidad} · usado ${c.count}×</div>
+          </button>
+        `).join('')}
+      </div>
+      <div class="pt-2 border-t border-slate-200">
+        <button onclick="wpPrePrintAddMaterialBlank('${actId}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Crear material nuevo</button>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="wpOpenPrePrintEditor(wpPrePrint.ctx)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+      </div>
+    </div>
+  `);
+}
+
+async function wpPrePrintConfirmMaterial(actId, m) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const mats = [...(a.materials||[]), m];
   a.materials = mats;
-  const { error } = await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
-  if (error) return alert('Error: ' + error.message);
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
+  wpOpenPrePrintEditor(wpPrePrint.ctx);
+}
+
+async function wpPrePrintAddMaterialBlank(actId) {
+  const a = (wpState.activities||[]).find(x => x.id === actId);
+  if (!a) return;
+  const mats = [...(a.materials||[]), { nombre: '', cantidad: 1, unidad: 'ud' }];
+  a.materials = mats;
+  await window.safeUpdate(p => sb.from('weekly_activities').update(p).eq('id', actId), { materials: mats, updated_at: new Date().toISOString() });
   wpOpenPrePrintEditor(wpPrePrint.ctx);
 }
 
@@ -3634,13 +3729,45 @@ function wpCalcAnalytics(fromIso, toIso, houseFilter) {
     houseName: (wpState.projects.find(p => p.id === a.project_id)?.name) || a.property_name || '?'
   })).sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 10);
 
+  // ─── CRÍTICAS y APLAZADAS ───
+  const criticas = inRange.filter(a => a.priority === 'critical' || a.priority === 'urgent');
+  const criticasDone = criticas.filter(a => a.status === 'done').length;
+  const criticasAtrasadas = criticas.filter(a => a.status !== 'done' && a.status !== 'cancelled' && a.date < todayIso);
+  const aplazadas = inRange.filter(a => (a.notes||'').includes('[APLAZADA'));
+  // Extraer motivos de aplazamiento más frecuentes
+  const motivosMap = {};
+  aplazadas.forEach(a => {
+    const matches = (a.notes||'').match(/\[APLAZADA[^\]]*:\s*([^\]]+)\]/g) || [];
+    matches.forEach(m => {
+      const motivo = (m.match(/:\s*([^\]]+)\]/) || [])[1] || '';
+      const key = motivo.trim().slice(0, 60).toLowerCase();
+      if (!key) return;
+      // Categorizar por palabras clave
+      let cat = motivo.trim().slice(0, 50);
+      const lc = key.toLowerCase();
+      if (/material|cemento|drywall|pintura|insumo/.test(lc)) cat = '📦 Falta de material';
+      else if (/lluvia|clima|tiempo/.test(lc)) cat = '🌧️ Clima';
+      else if (/mano|obrero|equipo|crew|cuadrill|personal/.test(lc)) cat = '👷 Falta de personal';
+      else if (/prioridad|cambio|orden/.test(lc)) cat = '🔄 Cambio de prioridad';
+      else if (/dinero|pago|presup/.test(lc)) cat = '💰 Falta de presupuesto';
+      else if (/permiso|inspecci|aprob/.test(lc)) cat = '📋 Permisos / aprobación';
+      else if (/cliente|propietari/.test(lc)) cat = '🤝 Espera del cliente';
+      motivosMap[cat] = (motivosMap[cat] || 0) + 1;
+    });
+  });
+  const motivosTop = Object.entries(motivosMap).sort((a,b) => b[1]-a[1]).slice(0, 6);
+
   return {
     total, done, inProgress, planned, cancelled,
     overdueCount: overdue.length, overdueTop,
     movidasCount: movidas.length, movidasTop,
     pctCumplimiento: total ? Math.round((done/total)*100) : 0,
     daysSpan, velocityDay, avgCompletionDays,
-    houseList, stageList, dowSorted
+    houseList, stageList, dowSorted,
+    criticasCount: criticas.length, criticasDone,
+    criticasAtrasadasCount: criticasAtrasadas.length,
+    criticasAtrasadasTop: criticasAtrasadas.map(a => ({...a, houseName: (wpState.projects.find(p => p.id === a.project_id)?.name) || a.property_name || '?', daysLate: Math.round((new Date(todayIso+'T00:00:00') - new Date(a.date+'T00:00:00'))/86400000)})).sort((a,b) => b.daysLate - a.daysLate).slice(0,10),
+    aplazadasCount: aplazadas.length, motivosTop
   };
 }
 
@@ -3860,6 +3987,60 @@ function wpRenderAnalytics() {
           </tbody>
         </table>
       </div>` : ''}
+
+      <!-- ⚠️ RUTA CRÍTICA + 🟡 APLAZADAS -->
+      ${m.criticasCount > 0 || m.aplazadasCount > 0 ? `
+      <div class="grid md:grid-cols-2 gap-3">
+        <!-- Ruta crítica -->
+        <div class="bg-white border-2 ${m.criticasAtrasadasCount > 0 ? 'border-rose-400' : 'border-rose-200'} rounded-xl overflow-hidden">
+          <div class="${m.criticasAtrasadasCount > 0 ? 'bg-rose-100' : 'bg-rose-50'} px-3 py-2 text-xs font-bold uppercase text-rose-800 flex justify-between items-center">
+            <span>⚠️ Ruta crítica (${m.criticasCount})</span>
+            <span class="text-[10px] font-normal">${m.criticasDone}/${m.criticasCount} hechas · ${m.criticasAtrasadasCount} atrasadas</span>
+          </div>
+          ${m.criticasAtrasadasCount === 0 && m.criticasCount > 0 ? `<div class="p-3 text-xs text-emerald-700 bg-emerald-50 border-b border-emerald-100"><strong>✅ Sin atrasos críticos.</strong> La ruta crítica está bajo control.</div>` : ''}
+          ${m.criticasAtrasadasCount > 0 ? `
+            <div class="p-3 text-xs bg-rose-50 border-b border-rose-100">
+              <strong class="text-rose-900">🚨 ${m.criticasAtrasadasCount} crítica${m.criticasAtrasadasCount>1?'s':''} atrasada${m.criticasAtrasadasCount>1?'s':''}</strong> — Cada día perdido en ruta crítica empuja la fecha de entrega final.
+            </div>
+            <div class="divide-y divide-slate-100 max-h-48 overflow-y-auto">
+              ${m.criticasAtrasadasTop.map(a => `
+                <div class="px-3 py-2 hover:bg-slate-50 cursor-pointer" onclick="wpEditActivity('${a.id}')">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="text-xs font-semibold truncate text-rose-900">⚠️ ${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                      <div class="text-[10px] text-slate-500 truncate">🏠 ${(a.houseName||'').replace(/</g,'&lt;')}${a.stage?` · ${a.stage}`:''}</div>
+                    </div>
+                    <div class="text-[11px] bg-rose-700 text-white font-bold px-2 py-0.5 rounded whitespace-nowrap">⏰ ${a.daysLate}d</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : m.criticasCount === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin actividades marcadas como ruta crítica en este rango</div>' : ''}
+        </div>
+
+        <!-- Aplazadas — motivos más frecuentes -->
+        <div class="bg-white border-2 border-amber-200 rounded-xl overflow-hidden">
+          <div class="bg-amber-50 px-3 py-2 text-xs font-bold uppercase text-amber-800 flex justify-between items-center">
+            <span>🟡 Aplazadas en período (${m.aplazadasCount})</span>
+            <span class="text-[10px] font-normal">motivos analizados</span>
+          </div>
+          ${m.aplazadasCount === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin aplazamientos registrados 🎉</div>' : `
+            <div class="p-3 space-y-2">
+              ${m.motivosTop.length > 0 ? `
+                <div class="text-[11px] font-bold text-slate-700 mb-1">Motivos más frecuentes:</div>
+                ${m.motivosTop.map(([cat, count]) => `
+                  <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+                    <span class="text-xs font-medium text-slate-800">${cat}</span>
+                    <span class="text-xs font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">${count}×</span>
+                  </div>
+                `).join('')}
+              ` : '<div class="text-xs text-slate-500 italic">Aplazadas sin motivo categorizable. Revisar formato de notas.</div>'}
+              ${m.motivosTop[0] && m.motivosTop[0][1] >= 3 ? `<div class="text-[11px] text-amber-900 bg-amber-100 border-l-4 border-amber-500 p-2 mt-2 rounded-r"><strong>💡 Acción:</strong> "${m.motivosTop[0][0]}" se repite ${m.motivosTop[0][1]} veces — atacarlo de raíz reduce aplazamientos futuros.</div>` : ''}
+            </div>
+          `}
+        </div>
+      </div>
+      ` : ''}
 
       <div class="grid md:grid-cols-2 gap-3">
         <!-- Top atrasadas críticas -->
