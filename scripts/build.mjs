@@ -56,7 +56,11 @@ const STATIC_COPY = [
   "config.public.js",
   "viral.html",
   "viral.js",
-  "favicon.ico"
+  "favicon.ico",
+  "manifest.webmanifest",
+  "sw.js",
+  "icon-192.png",
+  "icon-512.png"
 ];
 
 async function fileExists(p) {

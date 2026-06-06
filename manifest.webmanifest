@@ -1,0 +1,42 @@
+{
+  "name": "Empresa OS · Rental Profitss",
+  "short_name": "Empresa OS",
+  "description": "Sistema operativo para Fix & Flip, Remodelación, Rentas, Educación y Project Management.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "es",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Planner del día",
+      "short_name": "Planner",
+      "description": "Tareas de hoy en vista obrero",
+      "url": "/?wp_mode=worker&wp_day=today",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard Obras",
+      "short_name": "Obras",
+      "description": "Dashboard de remodelación",
+      "url": "/?open=remodel-dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

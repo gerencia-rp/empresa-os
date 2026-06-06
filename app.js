@@ -240,6 +240,87 @@ async function saveSystemData(system) {
 }
 
 // ============================================================
+// PWA · Service worker + Install banner
+// ============================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW register failed:', err));
+  });
+}
+
+// Captura el evento beforeinstallprompt para ofrecer instalación on-demand
+window._deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (ev) => {
+  ev.preventDefault();
+  window._deferredInstallPrompt = ev;
+  // Mostrar mini-banner si no está instalada y no se mostró aún
+  const dismissed = localStorage.getItem('pwa_install_dismissed') === '1';
+  const installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (!dismissed && !installed) showInstallBanner();
+});
+window.addEventListener('appinstalled', () => {
+  localStorage.setItem('pwa_install_dismissed', '1');
+  const b = document.getElementById('pwa-install-banner');
+  if (b) b.remove();
+});
+
+function showInstallBanner() {
+  if (document.getElementById('pwa-install-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'pwa-install-banner';
+  banner.className = 'fixed bottom-4 left-4 right-4 lg:left-auto lg:right-4 lg:max-w-sm z-[70] bg-gradient-to-br from-emerald-600 to-emerald-800 text-white rounded-2xl p-4 shadow-2xl';
+  banner.innerHTML = `
+    <div class="flex items-start gap-3">
+      <div class="text-3xl">📱</div>
+      <div class="flex-1">
+        <div class="font-bold text-sm">Instalá Empresa OS</div>
+        <div class="text-xs opacity-90 mt-0.5">Acceso rápido desde tu pantalla de inicio. Funciona sin conexión.</div>
+        <div class="flex gap-2 mt-2">
+          <button onclick="pwaInstall()" class="bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded">Instalar</button>
+          <button onclick="pwaDismissInstall()" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-3 py-1.5 rounded">No, gracias</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(banner);
+}
+
+async function pwaInstall() {
+  const ev = window._deferredInstallPrompt;
+  if (!ev) {
+    // iOS Safari no soporta beforeinstallprompt — mostrar instrucciones
+    alert('Para instalar en iPhone:\n\n1. Tap el botón Compartir (cuadradito con flecha hacia arriba)\n2. Tap "Añadir a pantalla de inicio"\n3. Confirmá.');
+    return;
+  }
+  ev.prompt();
+  const { outcome } = await ev.userChoice;
+  if (outcome === 'accepted') {
+    localStorage.setItem('pwa_install_dismissed', '1');
+  }
+  window._deferredInstallPrompt = null;
+  const b = document.getElementById('pwa-install-banner');
+  if (b) b.remove();
+}
+
+function pwaDismissInstall() {
+  localStorage.setItem('pwa_install_dismissed', '1');
+  const b = document.getElementById('pwa-install-banner');
+  if (b) b.remove();
+}
+
+// En iOS Safari (sin beforeinstallprompt), mostrar banner manualmente si es mobile
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    const dismissed = localStorage.getItem('pwa_install_dismissed') === '1';
+    if (isIOS && !isStandalone && !dismissed) {
+      setTimeout(() => showInstallBanner(), 8000);
+    }
+  });
+}
+
+// ============================================================
 // PROPIEDADES — helpers compartidos entre sistemas
 // ============================================================
 window.propertiesCache = [];
