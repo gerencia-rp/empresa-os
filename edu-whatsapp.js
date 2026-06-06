@@ -72,13 +72,25 @@ function wpsRenderList() {
   const cs = wpsState.campaigns;
   root.innerHTML = `
     <div class="space-y-3">
-      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
-        <div>
-          <div class="text-xs font-bold uppercase text-emerald-800">💬 Campañas WhatsApp</div>
-          <div class="text-2xl font-bold text-slate-900">${cs.length} campañas</div>
-          <div class="text-[11px] text-slate-600">Mensajes personalizados con IA → wa.me → tracking respuestas → IA actualiza plan</div>
+      <!-- 🚀 Botón gigante de seguimiento semanal -->
+      <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-xl p-4 text-white shadow-lg">
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">⚡ Modo rápido</div>
+            <div class="text-xl font-bold mt-0.5">Seguimiento semanal en 1 click</div>
+            <div class="text-xs opacity-90 mt-1">Plantilla pre-armada con nombre + etapa + tareas pendientes. Sin IA, sin esperas.</div>
+          </div>
+          <button onclick="wpsOpenQuickWeekly()" class="bg-white text-emerald-700 font-bold text-sm px-4 py-3 rounded-lg shadow hover:bg-emerald-50 whitespace-nowrap">📤 Empezar →</button>
         </div>
-        <button onclick="wpsState.activeView='new'; wpsRender()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2.5 rounded-lg">+ Nueva campaña</button>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700">💬 Campañas con IA (modo avanzado)</div>
+          <div class="text-lg font-bold text-slate-900">${cs.length} campañas</div>
+          <div class="text-[11px] text-slate-600">IA personaliza cada mensaje · tarda 1-3 min · ideal para mensajes complejos</div>
+        </div>
+        <button onclick="wpsState.activeView='new'; wpsRender()" class="bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm px-4 py-2.5 rounded-lg">+ Nueva campaña IA</button>
       </div>
 
       ${cs.length === 0 ? `<div class="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-xl">Sin campañas todavía. Click "+ Nueva campaña" para empezar.</div>` : `
@@ -187,7 +199,15 @@ function wpsRenderNew() {
         </div>
         <div class="bg-white border border-blue-300 rounded p-2 text-xs">
           <strong>${filtered.length}</strong> estudiante(s) van a recibir el mensaje
-          ${filtered.filter(s => !s.phone).length > 0 ? `<span class="text-amber-700 ml-2">⚠️ ${filtered.filter(s => !s.phone).length} sin teléfono</span>` : ''}
+          ${(() => {
+            const sinTel = filtered.filter(s => {
+              const p = typeof eduCleanPhone === 'function' ? eduCleanPhone(s.phone) : (s.phone||'').replace(/\D/g,'');
+              return !p || p.length < 10;
+            }).length;
+            if (sinTel === 0) return '<span class="text-emerald-700 ml-2 font-bold">✓ Todos con teléfono válido</span>';
+            if (sinTel === filtered.length) return `<span class="text-amber-700 ml-2">⚠️ ${sinTel} sin teléfono (podés agregarlos al enviar)</span>`;
+            return `<span class="text-amber-700 ml-2">⚠️ ${sinTel} sin teléfono</span>`;
+          })()}
         </div>
       </div>
 
@@ -676,6 +696,247 @@ window.eduOpenWhatsappQuick = eduOpenWhatsappQuick;
 window.eduApplyTemplate = eduApplyTemplate;
 window.eduCopyWaMessage = eduCopyWaMessage;
 window.eduSendWaQuick = eduSendWaQuick;
+
+// ════════════════════════════════════════════════════════════
+// 🚀 SEGUIMIENTO SEMANAL en 1 click — sin IA, sin esperas
+// Plantillas pre-armadas que sustituyen {nombre}, {etapa},
+// {tareas_pendientes}, {dias_sin_contacto}. Crea campaña + mensajes
+// directamente (no llama a Claude). Mucho más rápido y predecible.
+// ════════════════════════════════════════════════════════════
+const WPS_WEEKLY_TEMPLATES = [
+  {
+    id: 'general',
+    label: '👋 Check-in semanal',
+    desc: 'Para todos: cómo va la semana',
+    text: '¡Hola {nombre}! 👋\n\n¿Cómo vas con tu plan esta semana? Veo que estás en la etapa de *{etapa}*.\n\n{tareas_pendientes_block}\n\nCualquier duda o si querés que agendemos sesión, decime.\n\nSeguimos. 💪'
+  },
+  {
+    id: 'inactivos',
+    label: '🔔 Activación inactivos',
+    desc: 'Para los que llevan días sin contacto',
+    text: 'Hola {nombre}, ¿cómo estás?\n\nHace {dias_sin_contacto} días que no hablamos y quería ver cómo vas con tu proceso. Estás en *{etapa}* y sé que puede ser desafiante.\n\n¿Hay algo en lo que pueda ayudarte? ¿Querés que agendemos una sesión esta semana?\n\nMe encantaría saber de vos. 🙌'
+  },
+  {
+    id: 'tareas',
+    label: '✅ Recordatorio de tareas',
+    desc: 'Foco en tareas pendientes',
+    text: 'Hola {nombre} 👋\n\nTe escribo para recordarte las tareas que tenés pendientes en tu plan:\n\n{tareas_pendientes_list}\n\n¿Cómo vas con eso? Si necesitás ayuda con alguna, avisame.'
+  },
+  {
+    id: 'motivacion',
+    label: '💪 Motivación + plan',
+    desc: 'Mensaje motivacional con foco en próximo paso',
+    text: '¡Buen día {nombre}! ☀️\n\nSé que el camino en la etapa *{etapa}* puede sentirse pesado a veces, pero cada paso cuenta.\n\n{tareas_pendientes_block}\n\nTu próximo objetivo está más cerca de lo que pensás. Si en algo te puedo ayudar esta semana, acá estoy. 🚀'
+  },
+  {
+    id: 'sesion',
+    label: '📅 Agendar sesión',
+    desc: 'Pedir disponibilidad para próxima sesión',
+    text: 'Hola {nombre} 👋\n\nQuiero agendar contigo la próxima sesión de mentoría. Estás avanzando en *{etapa}* y tengo cosas concretas que repasar contigo.\n\n¿Qué día te queda mejor esta semana? Mandame 2-3 opciones de horario y la confirmamos.\n\nSaludos!'
+  }
+];
+
+const wpsQuickState = { templateId: 'general', filterStage: 'all', filterStatus: 'active', filterInactivos: 0, prefillName: '' };
+
+function wpsOpenQuickWeekly() {
+  const root = document.getElementById('wps-root');
+  if (!root) return;
+
+  const allStudents = (eduState.students || []).filter(s => !eduState.mentorshipId || s.mentorship_id === eduState.mentorshipId);
+  const etapas = [...new Set(allStudents.map(s => s.current_stage).filter(Boolean))].sort();
+
+  const filteredAll = wpsFilterQuickStudents(allStudents);
+  const template = WPS_WEEKLY_TEMPLATES.find(t => t.id === wpsQuickState.templateId) || WPS_WEEKLY_TEMPLATES[0];
+
+  // Preview de mensaje con el primer estudiante (si hay)
+  const previewStudent = filteredAll[0] || { full_name: 'Juan Pérez', current_stage: 'Crédito', _daysWithoutContact: 7 };
+  const previewMsg = wpsFillTemplate(template.text, previewStudent);
+
+  root.innerHTML = `
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <button onclick="wpsState.activeView='list'; wpsRender()" class="text-xs text-slate-600 hover:text-slate-900">← Volver a campañas</button>
+        <div class="text-sm font-bold">⚡ Seguimiento semanal rápido</div>
+      </div>
+
+      <!-- Elegir plantilla -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">1️⃣ Elegí la plantilla</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          ${WPS_WEEKLY_TEMPLATES.map(t => `
+            <button onclick="wpsQuickState.templateId='${t.id}'; wpsOpenQuickWeekly()" class="text-left border-2 ${wpsQuickState.templateId===t.id?'border-emerald-500 bg-emerald-50':'border-slate-200 hover:border-slate-300'} rounded-lg p-2.5">
+              <div class="font-bold text-sm">${t.label}</div>
+              <div class="text-[10px] text-slate-500">${t.desc}</div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Filtros simples -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">2️⃣ ¿A quiénes?</div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Etapa</label>
+            <select onchange="wpsQuickState.filterStage=this.value; wpsOpenQuickWeekly()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs">
+              <option value="all" ${wpsQuickState.filterStage==='all'?'selected':''}>Todas</option>
+              ${etapas.map(e => `<option value="${e}" ${wpsQuickState.filterStage===e?'selected':''}>${e.replace(/</g,'&lt;')}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Status</label>
+            <select onchange="wpsQuickState.filterStatus=this.value; wpsOpenQuickWeekly()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs">
+              <option value="all" ${wpsQuickState.filterStatus==='all'?'selected':''}>Todos los activos</option>
+              <option value="active" ${wpsQuickState.filterStatus==='active'?'selected':''}>Solo activos</option>
+              <option value="at_risk" ${wpsQuickState.filterStatus==='at_risk'?'selected':''}>Solo at_risk</option>
+              <option value="paused" ${wpsQuickState.filterStatus==='paused'?'selected':''}>Solo pausados</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Solo inactivos &gt; X días</label>
+            <input type="number" min="0" max="365" value="${wpsQuickState.filterInactivos}" oninput="wpsQuickState.filterInactivos=+this.value; wpsOpenQuickWeekly()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs"/>
+          </div>
+        </div>
+        <div class="mt-2 bg-emerald-50 border border-emerald-300 rounded p-2 text-xs">
+          ✓ <strong>${filteredAll.length}</strong> estudiante(s) van a recibir el mensaje
+          ${(() => {
+            const sinTel = filteredAll.filter(s => {
+              const p = eduCleanPhone(s.phone);
+              return !p || p.length < 10;
+            }).length;
+            if (sinTel === 0) return ' · <span class="text-emerald-700 font-bold">Todos con teléfono ✓</span>';
+            return ` · <span class="text-amber-700">⚠️ ${sinTel} sin teléfono (vas a poder agregarlos al enviar)</span>`;
+          })()}
+        </div>
+      </div>
+
+      <!-- Preview del mensaje -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3">
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">3️⃣ Vista previa</div>
+        <div class="text-[10px] text-slate-500 mb-1">Ejemplo para <strong>${(previewStudent.full_name||'').replace(/</g,'&lt;')}</strong>:</div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-sm whitespace-pre-wrap">${previewMsg.replace(/</g,'&lt;')}</div>
+        <div class="text-[10px] text-slate-500 mt-1">Cada estudiante recibe su versión personalizada con sus datos.</div>
+      </div>
+
+      <!-- Botón generar -->
+      <button onclick="wpsCreateQuickWeekly()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base py-3 rounded-lg" ${filteredAll.length === 0 ? 'disabled' : ''}>
+        🚀 Crear ${filteredAll.length} mensaje${filteredAll.length===1?'':'s'} y ver para enviar
+      </button>
+    </div>
+  `;
+}
+
+function wpsFilterQuickStudents(students) {
+  const now = Date.now();
+  const dayMs = 86400000;
+  return students.filter(s => {
+    if (wpsQuickState.filterStage !== 'all' && s.current_stage !== wpsQuickState.filterStage) return false;
+    if (wpsQuickState.filterStatus !== 'all' && s.status !== wpsQuickState.filterStatus) return false;
+    // Si filter status es 'all', no incluir graduados/dropped
+    if (wpsQuickState.filterStatus === 'all' && (s.status === 'graduated' || s.status === 'dropped')) return false;
+    if (wpsQuickState.filterInactivos > 0) {
+      const last = s.ultima_fecha_seguimiento || s.enrolled_at;
+      if (!last) return true;
+      const dias = Math.floor((now - new Date(last).getTime()) / dayMs);
+      if (dias < wpsQuickState.filterInactivos) return false;
+    }
+    return true;
+  });
+}
+
+function wpsFillTemplate(template, student) {
+  const m = window.eduState?.mentorships?.find(x => x.id === student.mentorship_id);
+  const stageObj = (m?.stages || []).find(st => st.key === student.current_stage);
+  const nombre = (student.full_name || 'estudiante').split(' ')[0]; // sólo primer nombre
+  const etapa = stageObj?.name || student.current_stage || 'tu etapa actual';
+
+  // Tareas pendientes desde eduTasksState
+  const allTasks = window.eduTasksState?.all || [];
+  const studentTasks = allTasks.filter(t => t.student_id === student.id && !t.completed).slice(0, 3);
+  const tareasList = studentTasks.length > 0
+    ? studentTasks.map((t, i) => `${i+1}. ${t.paso_text}`).join('\n')
+    : 'No tenés tareas pendientes registradas en el sistema.';
+  const tareasBlock = studentTasks.length > 0
+    ? `Tus tareas pendientes son:\n${tareasList}`
+    : '';
+
+  // Días sin contacto
+  let diasSinContacto = student._daysWithoutContact;
+  if (diasSinContacto == null && student.ultima_fecha_seguimiento) {
+    diasSinContacto = Math.floor((Date.now() - new Date(student.ultima_fecha_seguimiento).getTime()) / 86400000);
+  }
+  if (diasSinContacto == null) diasSinContacto = 'varios';
+
+  return template
+    .replace(/\{nombre\}/g, nombre)
+    .replace(/\{etapa\}/g, etapa)
+    .replace(/\{tareas_pendientes_list\}/g, tareasList)
+    .replace(/\{tareas_pendientes_block\}/g, tareasBlock)
+    .replace(/\{dias_sin_contacto\}/g, String(diasSinContacto));
+}
+
+async function wpsCreateQuickWeekly() {
+  const allStudents = (eduState.students || []).filter(s => !eduState.mentorshipId || s.mentorship_id === eduState.mentorshipId);
+  const filtered = wpsFilterQuickStudents(allStudents);
+  if (!filtered.length) return alert('Sin destinatarios con esos filtros.');
+
+  const template = WPS_WEEKLY_TEMPLATES.find(t => t.id === wpsQuickState.templateId) || WPS_WEEKLY_TEMPLATES[0];
+  const fecha = new Date().toLocaleDateString('es', { day: '2-digit', month: 'short' });
+  const campaignName = `${template.label} · ${fecha}`;
+
+  // Cargar tareas si no están cargadas
+  if (typeof eduLoadAllTasks === 'function' && !window.eduTasksState?.loaded) {
+    try { await eduLoadAllTasks(); } catch {}
+  }
+
+  // Crear campaña
+  const { data: campaign, error: cErr } = await sb.from('edu_whatsapp_campaigns').insert({
+    name: campaignName,
+    mentorship_id: eduState.mentorshipId || null,
+    prompt_template: template.text,
+    target_filters: {
+      stage: wpsQuickState.filterStage,
+      status: wpsQuickState.filterStatus,
+      inactivos_dias: wpsQuickState.filterInactivos,
+      template_id: template.id
+    },
+    total_recipients: filtered.length,
+    sent_count: 0,
+    responded_count: 0,
+    status: 'ready',
+    created_by: state.user?.id || null
+  }).select().single();
+
+  if (cErr) return alert('Error creando campaña: ' + cErr.message);
+
+  // Generar mensajes (sin IA, llenando template)
+  const messages = filtered.map(s => ({
+    campaign_id: campaign.id,
+    student_id: s.id,
+    phone: s.phone || null,
+    message_text: wpsFillTemplate(template.text, s),
+    status: 'pending'
+  }));
+
+  // Insertar en chunks de 100
+  for (let i = 0; i < messages.length; i += 100) {
+    const chunk = messages.slice(i, i + 100);
+    const { error: mErr } = await sb.from('edu_whatsapp_messages').insert(chunk);
+    if (mErr) {
+      alert('Error insertando mensajes: ' + mErr.message);
+      return;
+    }
+  }
+
+  // Recargar y abrir detalle
+  await wpsLoad();
+  wpsState.activeCampaignId = campaign.id;
+  wpsState.activeView = 'detail';
+  wpsRender();
+}
+
+window.wpsOpenQuickWeekly = wpsOpenQuickWeekly;
+window.wpsCreateQuickWeekly = wpsCreateQuickWeekly;
 
 async function wpsSubmitResponse(messageId) {
   const text = document.getElementById('wps-resp-text').value.trim();
