@@ -852,57 +852,286 @@ async function rdResolveAlert(id) {
 
 // ─── TENDENCIAS TAB ───
 async function rdRenderTendencias() {
-  // Pull snapshots de últimas 8 semanas (resumido por semana)
-  // Por ahora simple: muestra últimos 14 días agregados
+  // Cargar todo lo necesario en paralelo
   setTimeout(async () => {
-    const cutoff = new Date(Date.now() - 30*86400000).toISOString().split('T')[0];
-    const { data } = await sb.from('remodel_snapshots')
-      .select('snapshot_date,gasto_total,avance_pct')
-      .gte('snapshot_date', cutoff)
-      .order('snapshot_date');
-    const byDate = {};
-    (data || []).forEach(s => {
-      if (!byDate[s.snapshot_date]) byDate[s.snapshot_date] = { gasto: 0, avgAvance: 0, count: 0 };
-      byDate[s.snapshot_date].gasto += s.gasto_total || 0;
-      byDate[s.snapshot_date].avgAvance += s.avance_pct || 0;
-      byDate[s.snapshot_date].count++;
-    });
-    const dates = Object.keys(byDate).sort();
     const container = document.getElementById('rd-trend-data');
     if (!container) return;
-    container.innerHTML = dates.length === 0
-      ? '<div class="text-center py-8 text-slate-400">Sin snapshots históricos todavía. Hacé sync cada día para acumular tendencias.</div>'
-      : `
-        <div class="overflow-x-auto">
+
+    const finalizada = rdState.properties.filter(p => p.proceso === 'Finalizado');
+    const active = rdState.properties.filter(p => p.proceso === 'En obra' || p.proceso === 'En venta');
+    const finCfg = rdGetFinCfg();
+
+    // 1) Obras finalizadas por mes (últimos 12 meses)
+    const byMonth = {};
+    finalizada.forEach(p => {
+      const fechaFin = p.fecha_real_fin || p.fecha_estimada_fin;
+      if (!fechaFin) return;
+      const monthKey = fechaFin.slice(0, 7); // YYYY-MM
+      if (!byMonth[monthKey]) byMonth[monthKey] = { count: 0, revenue: 0, costo: 0, ebitda: 0, neto: 0 };
+      const f = rdFinanzas(p, finCfg);
+      byMonth[monthKey].count++;
+      byMonth[monthKey].revenue += f.revenue;
+      byMonth[monthKey].costo += f.costoDirecto;
+      byMonth[monthKey].ebitda += f.ebitda;
+      byMonth[monthKey].neto += f.utilidadNeta;
+    });
+
+    // 2) Cumplimiento weekly_activities por mes (últimos 6 meses)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const cutoffIso = sixMonthsAgo.toISOString().slice(0,10);
+    const { data: wpData } = await sb.from('weekly_activities')
+      .select('date,status,priority,notes')
+      .gte('date', cutoffIso);
+    const wpByMonth = {};
+    (wpData || []).forEach(a => {
+      const key = a.date.slice(0, 7);
+      if (!wpByMonth[key]) wpByMonth[key] = { total: 0, done: 0, criticas: 0, criticasDone: 0, aplazadas: 0 };
+      wpByMonth[key].total++;
+      if (a.status === 'done') wpByMonth[key].done++;
+      if (a.priority === 'critical' || a.priority === 'urgent') {
+        wpByMonth[key].criticas++;
+        if (a.status === 'done') wpByMonth[key].criticasDone++;
+      }
+      if ((a.notes||'').includes('[APLAZADA')) wpByMonth[key].aplazadas++;
+    });
+
+    // 3) Snapshots de portfolio histórico (gasto + avance)
+    const cutoffSnap = new Date(Date.now() - 90*86400000).toISOString().split('T')[0];
+    const { data: snapData } = await sb.from('remodel_snapshots')
+      .select('snapshot_date,gasto_total,avance_pct')
+      .gte('snapshot_date', cutoffSnap)
+      .order('snapshot_date');
+    const snapByDate = {};
+    (snapData || []).forEach(s => {
+      if (!snapByDate[s.snapshot_date]) snapByDate[s.snapshot_date] = { gasto: 0, avgAvance: 0, count: 0 };
+      snapByDate[s.snapshot_date].gasto += s.gasto_total || 0;
+      snapByDate[s.snapshot_date].avgAvance += s.avance_pct || 0;
+      snapByDate[s.snapshot_date].count++;
+    });
+
+    // Construir series ordenadas
+    const sortedMonths = Object.keys(byMonth).sort();
+    const last12Months = (() => {
+      const arr = [];
+      const t = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(t.getFullYear(), t.getMonth() - i, 1);
+        arr.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+      }
+      return arr;
+    })();
+    const last6Months = last12Months.slice(-6);
+
+    // KPIs de evolución
+    const totalRevenue12m = last12Months.reduce((s,m) => s + (byMonth[m]?.revenue || 0), 0);
+    const totalNeto12m = last12Months.reduce((s,m) => s + (byMonth[m]?.neto || 0), 0);
+    const totalObras12m = last12Months.reduce((s,m) => s + (byMonth[m]?.count || 0), 0);
+    const promedioObrasMes = totalObras12m / 12;
+
+    // Comparar 6m vs 6m (período actual vs anterior)
+    const prev6 = last12Months.slice(0,6);
+    const recent6 = last12Months.slice(6);
+    const prev6Revenue = prev6.reduce((s,m) => s + (byMonth[m]?.revenue || 0), 0);
+    const recent6Revenue = recent6.reduce((s,m) => s + (byMonth[m]?.revenue || 0), 0);
+    const revenueGrowth = prev6Revenue > 0 ? Math.round((recent6Revenue - prev6Revenue) / prev6Revenue * 100) : null;
+    const prev6Neto = prev6.reduce((s,m) => s + (byMonth[m]?.neto || 0), 0);
+    const recent6Neto = recent6.reduce((s,m) => s + (byMonth[m]?.neto || 0), 0);
+    const netoGrowth = prev6Neto > 0 ? Math.round((recent6Neto - prev6Neto) / prev6Neto * 100) : null;
+
+    const fmt = n => '$' + Math.round(n).toLocaleString();
+    const fmtK = n => '$' + Math.round(n/1000) + 'k';
+    const monthLabel = m => {
+      const [y, mm] = m.split('-');
+      const d = new Date(+y, +mm-1, 1);
+      return d.toLocaleDateString('es', { month:'short', year:'2-digit' });
+    };
+
+    // Render
+    container.innerHTML = `
+      <!-- KPIs de evolución -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">Revenue 12m</div>
+          <div class="text-lg font-bold">${fmtK(totalRevenue12m)}</div>
+          ${revenueGrowth !== null ? `<div class="text-[10px] ${revenueGrowth>=0?'text-emerald-700':'text-red-700'} font-bold">${revenueGrowth>=0?'↗':'↘'} ${Math.abs(revenueGrowth)}% vs 6m anteriores</div>` : '<div class="text-[10px] text-slate-400">Sin comparativa</div>'}
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">Neto 12m</div>
+          <div class="text-lg font-bold ${totalNeto12m>=0?'text-emerald-700':'text-red-700'}">${fmtK(totalNeto12m)}</div>
+          ${netoGrowth !== null ? `<div class="text-[10px] ${netoGrowth>=0?'text-emerald-700':'text-red-700'} font-bold">${netoGrowth>=0?'↗':'↘'} ${Math.abs(netoGrowth)}% vs 6m anteriores</div>` : '<div class="text-[10px] text-slate-400">Sin comparativa</div>'}
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">Obras 12m</div>
+          <div class="text-lg font-bold">${totalObras12m}</div>
+          <div class="text-[10px] text-slate-500">prom ${promedioObrasMes.toFixed(1)}/mes</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase text-slate-500 font-bold">Margen neto avg</div>
+          <div class="text-lg font-bold ${totalNeto12m/totalRevenue12m>=0.05?'text-emerald-700':'text-amber-700'}">${totalRevenue12m>0?(totalNeto12m/totalRevenue12m*100).toFixed(1):'0'}%</div>
+          <div class="text-[10px] text-slate-500">objetivo 5-15%</div>
+        </div>
+      </div>
+
+      <!-- Gráfico 1: Revenue y Neto mensual -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 mb-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📈 Revenue y Neto mensual (12m)</div>
+        <div style="position:relative; height: 240px;">
+          <canvas id="trend-revenue"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfico 2: Obras finalizadas + Cumplimiento planner -->
+      <div class="grid md:grid-cols-2 gap-3 mb-3">
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">🏁 Obras finalizadas por mes</div>
+          <div style="position:relative; height: 200px;">
+            <canvas id="trend-obras"></canvas>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">✅ % Cumplimiento planner (6m)</div>
+          <div style="position:relative; height: 200px;">
+            <canvas id="trend-cumplimiento"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico 3: Críticas vs Aplazadas (operación) -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 mb-3">
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">⚠️ Salud operativa mensual (6m)</div>
+        <div style="position:relative; height: 220px;">
+          <canvas id="trend-ops"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabla detalle por mes -->
+      <details class="bg-slate-50 border border-slate-200 rounded-xl">
+        <summary class="cursor-pointer px-3 py-2 text-xs font-bold uppercase text-slate-700 hover:bg-slate-100">📋 Detalle mensual (click para expandir)</summary>
+        <div class="p-3 overflow-x-auto">
           <table class="w-full text-xs">
-            <thead class="bg-slate-50">
-              <tr><th class="text-left p-2">Fecha</th><th class="text-right p-2">Gasto total</th><th class="text-right p-2">Avance avg</th><th class="text-right p-2">Obras</th></tr>
+            <thead class="bg-white">
+              <tr class="border-b border-slate-200">
+                <th class="text-left p-2">Mes</th>
+                <th class="text-right p-2">Obras cerradas</th>
+                <th class="text-right p-2">Revenue</th>
+                <th class="text-right p-2">EBITDA</th>
+                <th class="text-right p-2">Neto</th>
+                <th class="text-right p-2">Margen %</th>
+              </tr>
             </thead>
             <tbody>
-              ${dates.map(d => {
-                const x = byDate[d];
-                const avg = Math.round(x.avgAvance / x.count);
+              ${last12Months.map(m => {
+                const x = byMonth[m];
+                if (!x) return `<tr class="border-t border-slate-100 text-slate-400"><td class="p-2">${monthLabel(m)}</td><td class="p-2 text-right">—</td><td class="p-2 text-right">—</td><td class="p-2 text-right">—</td><td class="p-2 text-right">—</td><td class="p-2 text-right">—</td></tr>`;
+                const margen = x.revenue > 0 ? (x.neto/x.revenue*100).toFixed(1) : 0;
                 return `<tr class="border-t border-slate-100">
-                  <td class="p-2">${d}</td>
-                  <td class="p-2 text-right">$${Math.round(x.gasto).toLocaleString()}</td>
-                  <td class="p-2 text-right">${avg}%</td>
-                  <td class="p-2 text-right">${x.count}</td>
+                  <td class="p-2 font-medium">${monthLabel(m)}</td>
+                  <td class="p-2 text-right font-bold">${x.count}</td>
+                  <td class="p-2 text-right">${fmt(x.revenue)}</td>
+                  <td class="p-2 text-right">${fmt(x.ebitda)}</td>
+                  <td class="p-2 text-right ${x.neto>=0?'text-emerald-700':'text-red-700'} font-semibold">${fmt(x.neto)}</td>
+                  <td class="p-2 text-right ${+margen>=5?'text-emerald-700':+margen>=0?'text-amber-700':'text-red-700'} font-bold">${margen}%</td>
                 </tr>`;
               }).join('')}
             </tbody>
           </table>
         </div>
-      `;
+      </details>
+    `;
+
+    // Renderizar charts después de inyectar el HTML
+    if (typeof Chart === 'undefined') return;
+
+    // Chart 1: Revenue y Neto
+    const ctx1 = document.getElementById('trend-revenue');
+    if (ctx1) new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: last12Months.map(monthLabel),
+        datasets: [
+          { label: 'Revenue', data: last12Months.map(m => byMonth[m]?.revenue || 0), backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 6 },
+          { label: 'Neto post-imp', data: last12Months.map(m => byMonth[m]?.neto || 0), backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 6, type:'line', tension: 0.3, borderColor:'rgb(16,185,129)', backgroundColor:'rgba(16,185,129,0.15)', fill: true }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+        scales: {
+          y: { ticks: { callback: v => '$' + (v/1000) + 'k', font: { size: 10 } } },
+          x: { ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+
+    // Chart 2: Obras finalizadas
+    const ctx2 = document.getElementById('trend-obras');
+    if (ctx2) new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: last12Months.map(monthLabel),
+        datasets: [{ label: 'Obras', data: last12Months.map(m => byMonth[m]?.count || 0), backgroundColor: 'rgba(139,92,246,0.7)', borderRadius: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 } }, x: { ticks: { font: { size: 9 } } } }
+      }
+    });
+
+    // Chart 3: % Cumplimiento planner
+    const ctx3 = document.getElementById('trend-cumplimiento');
+    if (ctx3) new Chart(ctx3, {
+      type: 'line',
+      data: {
+        labels: last6Months.map(monthLabel),
+        datasets: [{
+          label: '% Cumplimiento',
+          data: last6Months.map(m => {
+            const x = wpByMonth[m];
+            return x && x.total > 0 ? Math.round(x.done/x.total*100) : null;
+          }),
+          borderColor: 'rgb(16,185,129)',
+          backgroundColor: 'rgba(16,185,129,0.15)',
+          tension: 0.3, fill: true,
+          pointRadius: 5, pointBackgroundColor: 'rgb(16,185,129)'
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: v => v+'%', font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
+      }
+    });
+
+    // Chart 4: Salud operativa (críticas done vs total, aplazadas)
+    const ctx4 = document.getElementById('trend-ops');
+    if (ctx4) new Chart(ctx4, {
+      type: 'bar',
+      data: {
+        labels: last6Months.map(monthLabel),
+        datasets: [
+          { label: 'Críticas totales', data: last6Months.map(m => wpByMonth[m]?.criticas || 0), backgroundColor: 'rgba(244,63,94,0.5)', borderRadius: 4 },
+          { label: 'Críticas hechas', data: last6Months.map(m => wpByMonth[m]?.criticasDone || 0), backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 4 },
+          { label: 'Aplazadas', data: last6Months.map(m => wpByMonth[m]?.aplazadas || 0), backgroundColor: 'rgba(245,158,11,0.7)', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 } }, x: { ticks: { font: { size: 10 } } } }
+      }
+    });
+
   }, 50);
 
   return `
     <div class="space-y-3">
-      <div class="text-xs text-slate-600">Series de los últimos 30 días. Hace falta sync diario para que acumule data.</div>
-      <div id="rd-trend-data" class="border border-slate-200 rounded-xl p-3">Cargando...</div>
-      <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
-        <div class="text-xs font-bold text-violet-900 uppercase mb-2">🧠 Análisis IA semanal (próximamente)</div>
-        <div class="text-xs text-violet-800">Cada lunes se generará un resumen narrativo del portfolio con recomendaciones. Falta la edge function de IA semanal — se activa con tus reportes históricos como contexto.</div>
+      <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
+        📈 <strong>Tendencias del portfolio</strong> — evolución financiera y operativa de los últimos 12 meses.
+        Cruza obras finalizadas (Airtable) con cumplimiento operativo (Weekly Planner). El % Cumplimiento y Salud operativa requieren tareas en el planner para mostrarse.
       </div>
+      <div id="rd-trend-data" class="text-center py-8 text-slate-400">⏳ Calculando tendencias…</div>
     </div>
   `;
 }
