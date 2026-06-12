@@ -244,13 +244,40 @@ async function init() {
   const token = sp.get('t');
   if (!token) return showInvalid('Falta el token en el link.');
 
-  const { data: invite, error } = await sb.from('edu_diagnostic_invites').select('*, edu_students(id, full_name, mentorship_id)').eq('token', token).maybeSingle();
-  if (error || !invite) return showInvalid('No encontré tu invitación. Pedile a tu mentor un link nuevo.');
+  // SELECT directo sin JOIN (el join puede fallar por RLS de edu_students)
+  const { data: invite, error } = await sb
+    .from('edu_diagnostic_invites')
+    .select('*')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[diag] select error:', error);
+    return showInvalid(`Error de DB: ${error.message}\n\nCódigo: ${error.code}`);
+  }
+  if (!invite) {
+    return showInvalid(`No encontré la invitación con este token.\n\nToken: ${token}\n\nPedile a tu mentor que genere un link nuevo.`);
+  }
   if (invite.expires_at && new Date(invite.expires_at) < new Date()) return showInvalid('Este link expiró. Pedile a tu mentor uno nuevo.');
   if (invite.completed_at) return showInvalid('Ya completaste este diagnóstico. Tu mentor ya recibió tu plan.');
 
   INVITE = invite;
-  document.getElementById('student-name').textContent = (invite.edu_students?.full_name || '').split(' ')[0] || 'amigo';
+
+  // Cargar nombre del estudiante por separado (puede fallar sin romper el flujo)
+  if (invite.student_id) {
+    try {
+      const { data: stu } = await sb
+        .from('edu_students')
+        .select('full_name')
+        .eq('id', invite.student_id)
+        .maybeSingle();
+      if (stu?.full_name) {
+        document.getElementById('student-name').textContent = stu.full_name.split(' ')[0];
+      }
+    } catch (e) {
+      console.warn('[diag] no pude cargar nombre:', e);
+    }
+  }
 
   QUESTIONS = await loadQuestionsFromMainApp();
   document.getElementById('q-total').textContent = QUESTIONS.length;

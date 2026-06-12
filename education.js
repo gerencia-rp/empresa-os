@@ -3605,7 +3605,20 @@ async function eduShareDiagnosticForm(studentId) {
     if (/relation .* does not exist|Could not find the table/i.test(error.message)) {
       return alert('❌ Falta correr el SQL para crear la tabla edu_diagnostic_invites.\n\nAndá a Supabase → SQL Editor → pegá supabase/edu-diagnostic-invites-schema.sql y corré.');
     }
-    return alert('Error creando invitación: ' + error.message);
+    if (/row.level security/i.test(error.message) || error.code === '42501') {
+      return alert('❌ RLS bloqueó el insert.\n\nAsegurate de haber corrido el SQL completo (incluye las policies). Si lo corriste, andá a Supabase → Database → edu_diagnostic_invites → Authentication → verificá que existe la policy "edu_diag_inv_insert_authed".');
+    }
+    return alert('Error creando invitación: ' + error.message + '\n\nCódigo: ' + (error.code || 'sin código'));
+  }
+  if (!invite) {
+    return alert('⚠️ El insert no retornó la invitación. Probablemente un RLS bloqueando.');
+  }
+
+  // VERIFICACIÓN: leer la invite que acabamos de crear (con el anon key, como hace el estudiante)
+  // Si esto falla, el link tampoco va a funcionar.
+  const { data: verify, error: vErr } = await sb.from('edu_diagnostic_invites').select('id, token').eq('token', token).maybeSingle();
+  if (vErr || !verify) {
+    return alert(`⚠️ La invitación se creó pero no la puedo leer con el token.\n\nEl link va a fallar para el estudiante.\n\nDetalle: ${vErr?.message || 'no encontrada'}\n\nVerificá que en Supabase exista la policy "edu_diag_inv_select_all" sobre edu_diagnostic_invites con "using (true)".`);
   }
 
   const baseUrl = window.location.origin;
