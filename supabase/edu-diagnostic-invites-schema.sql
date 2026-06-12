@@ -5,16 +5,20 @@
 -- Idempotente.
 -- ════════════════════════════════════════════════════════════
 
+-- NOTA: edu_mentorships.id puede ser text o uuid según la versión del schema.
+-- Para máxima compatibilidad, mentorship_id es text (acepta cualquier formato).
+-- student_id es uuid (asumimos edu_students.id sí es uuid).
+-- Sin foreign keys explícitas para evitar mismatch de tipos.
 create table if not exists public.edu_diagnostic_invites (
   id uuid primary key default gen_random_uuid(),
   token text unique not null,                  -- aleatorio, va en el URL
-  student_id uuid references public.edu_students(id) on delete cascade,
-  mentorship_id uuid references public.edu_mentorships(id),
+  student_id uuid,                              -- ref informal a edu_students.id
+  mentorship_id text,                           -- ref informal a edu_mentorships.id (puede ser text o uuid)
   created_by uuid references auth.users(id),
   created_at timestamptz default now(),
   expires_at timestamptz default (now() + interval '30 days'),
   completed_at timestamptz,
-  result_plan_id uuid references public.edu_student_plans(id) on delete set null,
+  result_plan_id uuid,                          -- ref informal a edu_student_plans.id
   -- snapshot del diagnóstico que llenó el estudiante (jsonb)
   answers jsonb,
   -- snapshot del perfil resultante para reabrir resultados
