@@ -3590,7 +3590,7 @@ async function eduShareDiagnosticForm(studentId) {
   const s = (eduState.students || []).find(x => x.id === studentId);
   if (!s) return alert('Estudiante no encontrado');
 
-  // Si el estudiante ya tiene una invite reciente con plan generado, ofrecer reusarla
+  // Si el estudiante ya tiene una invite reciente con plan generado, reusarla
   const { data: existing } = await sb.from('edu_diagnostic_invites')
     .select('*')
     .eq('student_id', studentId)
@@ -3604,38 +3604,116 @@ async function eduShareDiagnosticForm(studentId) {
     return eduShowShareModal(s, existing, true);
   }
 
-  // Generar token único (UUID short)
-  const token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+  // ── Flujo NUEVO sin fricción para el estudiante ──
+  // Generamos plan acá mismo desde los datos del CRM y armamos la invite
+  // CON result_plan_id seteado. El estudiante abre el link y va directo
+  // al portal de tareas, sin pasar por las 21 preguntas.
 
-  const payload = {
+  if (typeof eduInferirDiagnostico !== 'function' ||
+      typeof fmCalcularPerfil !== 'function' ||
+      typeof fmGenerarBloques !== 'function') {
+    return alert('Sistema de Metodología no cargado. Recargá la página.');
+  }
+
+  // 1) Inferir respuestas desde el CRM
+  const answers = eduInferirDiagnostico(s);
+
+  // 2) Calcular perfil + bloques
+  const perfilResult = fmCalcularPerfil(answers);
+  const userProfile = {
+    mercado: answers.mercado_estado,
+    estrategiaLabel: answers.objetivo === 'flip' ? 'Fix & Flip' :
+                     answers.objetivo === 'hold' ? 'Fix & Hold' :
+                     answers.objetivo === 'wholesale' ? 'Wholesaling' :
+                     answers.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip'
+  };
+  const bloques = fmGenerarBloques(userProfile, answers);
+
+  // 3) Archivar plan anterior si existe
+  await sb.from('edu_student_plans')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('student_id', studentId)
+    .eq('status', 'active');
+
+  // 4) Crear plan
+  const planPayload = {
+    student_id: studentId,
+    mentorship_id: s.mentorship_id,
+    diagnostico: answers,
+    perfil: { ...perfilResult, userProfile, fromInvite: true },
+    bloques_ids: bloques.map(b => b.id),
+    modo: 'completo',
+    status: 'active'
+  };
+  let { data: plan, error: planErr } = await sb.from('edu_student_plans').insert(planPayload).select().single();
+
+  // Si choca duplicate, forzar
+  if (planErr && /duplicate key|unique constraint/i.test(planErr.message || '')) {
+    const { data: oldPlans } = await sb.from('edu_student_plans').select('id').eq('student_id', studentId).eq('status', 'active');
+    for (const op of (oldPlans || [])) {
+      await sb.from('edu_student_plan_tasks').delete().eq('plan_id', op.id);
+    }
+    await sb.from('edu_student_plans').delete().eq('student_id', studentId).eq('status', 'active');
+    const retry = await sb.from('edu_student_plans').insert(planPayload).select().single();
+    plan = retry.data; planErr = retry.error;
+  }
+
+  if (planErr || !plan) return alert('Error generando plan: ' + (planErr?.message || 'sin plan'));
+
+  // 5) Insertar tasks
+  const tasks = [];
+  bloques.forEach((b, bIdx) => {
+    const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
+    pasos.forEach((paso, pIdx) => {
+      tasks.push({
+        plan_id: plan.id,
+        student_id: studentId,
+        bloque_id: b.id,
+        bloque_etapa: b.etapa,
+        bloque_subetapa: b.subetapa,
+        bloque_orden: bIdx,
+        paso_index: pIdx,
+        paso_text: paso,
+        completed: false
+      });
+    });
+  });
+  if (tasks.length) {
+    const { error: tErr } = await sb.from('edu_student_plan_tasks').insert(tasks);
+    if (tErr) console.warn('[tasks insert]', tErr);
+  }
+
+  // 6) Crear invite YA con plan + completed_at (salta el wizard)
+  const token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+  const invitePayload = {
     token,
     student_id: studentId,
     mentorship_id: s.mentorship_id,
-    created_by: state.user?.id || null
+    created_by: state.user?.id || null,
+    answers,
+    perfil: perfilResult,
+    completed_at: new Date().toISOString(),
+    result_plan_id: plan.id
   };
 
-  const { data: invite, error } = await sb.from('edu_diagnostic_invites').insert(payload).select().single();
-  if (error) {
-    if (/relation .* does not exist|Could not find the table/i.test(error.message)) {
+  const { data: invite, error: invErr } = await sb.from('edu_diagnostic_invites').insert(invitePayload).select().single();
+  if (invErr) {
+    if (/relation .* does not exist|Could not find the table/i.test(invErr.message)) {
       return alert('❌ Falta correr el SQL para crear la tabla edu_diagnostic_invites.\n\nAndá a Supabase → SQL Editor → pegá supabase/edu-diagnostic-invites-schema.sql y corré.');
     }
-    if (/row.level security/i.test(error.message) || error.code === '42501') {
-      return alert('❌ RLS bloqueó el insert.\n\nAsegurate de haber corrido el SQL completo (incluye las policies). Si lo corriste, andá a Supabase → Database → edu_diagnostic_invites → Authentication → verificá que existe la policy "edu_diag_inv_insert_authed".');
-    }
-    return alert('Error creando invitación: ' + error.message + '\n\nCódigo: ' + (error.code || 'sin código'));
-  }
-  if (!invite) {
-    return alert('⚠️ El insert no retornó la invitación. Probablemente un RLS bloqueando.');
+    return alert('Error creando link: ' + invErr.message);
   }
 
-  // VERIFICACIÓN: leer la invite que acabamos de crear (con el anon key, como hace el estudiante)
-  // Si esto falla, el link tampoco va a funcionar.
-  const { data: verify, error: vErr } = await sb.from('edu_diagnostic_invites').select('id, token').eq('token', token).maybeSingle();
-  if (vErr || !verify) {
-    return alert(`⚠️ La invitación se creó pero no la puedo leer con el token.\n\nEl link va a fallar para el estudiante.\n\nDetalle: ${vErr?.message || 'no encontrada'}\n\nVerificá que en Supabase exista la policy "edu_diag_inv_select_all" sobre edu_diagnostic_invites con "using (true)".`);
+  // Verificación
+  const { data: verify } = await sb.from('edu_diagnostic_invites').select('id, token').eq('token', token).maybeSingle();
+  if (!verify) {
+    return alert('⚠️ La invitación se creó pero no la puedo leer con el token.\n\nVerificá la policy "edu_diag_inv_select_all" en edu_diagnostic_invites.');
   }
 
-  eduShowShareModal(s, invite, false);
+  // Recargar lista de tareas en el cache para que aparezca el plan en el tab
+  if (typeof eduLoadAllTasks === 'function') eduLoadAllTasks().catch(()=>{});
+
+  eduShowShareModal(s, invite, true);
 }
 
 // Modal compartido (usado tanto para invites nuevas como existentes con plan)

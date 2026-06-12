@@ -133,6 +133,14 @@ async function init() {
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('portal').classList.remove('hidden');
   renderTasks();
+
+  // 5) Restaurar scroll donde estaba la última vez
+  try {
+    const savedScroll = +(localStorage.getItem('mp_last_scroll_' + TOKEN) || 0);
+    if (savedScroll > 100) {
+      setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'smooth' }), 300);
+    }
+  } catch {}
 }
 
 async function loadTasks() {
@@ -233,10 +241,19 @@ async function toggleTask(taskId, btn) {
   if (!task) return;
   const newCompleted = !task.completed;
 
+  // Guardar última tarea tocada (para resaltar al volver) + scroll
+  try {
+    localStorage.setItem('mp_last_task_' + TOKEN, taskId);
+    localStorage.setItem('mp_last_scroll_' + TOKEN, String(window.scrollY));
+  } catch {}
+
   // Optimistic UI
   task.completed = newCompleted;
   task.completed_at = newCompleted ? new Date().toISOString() : null;
   renderTasks();
+
+  // Mini toast "Guardado ✓"
+  showSavedToast();
 
   try {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-student-task-toggle`, {
@@ -257,6 +274,21 @@ async function toggleTask(taskId, btn) {
   }
 }
 
+let _savedToastTimer = null;
+function showSavedToast() {
+  let t = document.getElementById('saved-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'saved-toast';
+    t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg z-50 transition-opacity';
+    document.body.appendChild(t);
+  }
+  t.textContent = '✓ Guardado';
+  t.style.opacity = '1';
+  clearTimeout(_savedToastTimer);
+  _savedToastTimer = setTimeout(() => { t.style.opacity = '0'; }, 1500);
+}
+
 function showInvalid(msg) {
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('invalid-screen').classList.remove('hidden');
@@ -264,6 +296,17 @@ function showInvalid(msg) {
 }
 
 init().catch(e => showInvalid('Error: ' + e.message));
+
+// Guardar scroll cada 1s mientras el estudiante navega
+let _scrollTimer = null;
+window.addEventListener('scroll', () => {
+  clearTimeout(_scrollTimer);
+  _scrollTimer = setTimeout(() => {
+    if (TOKEN) {
+      try { localStorage.setItem('mp_last_scroll_' + TOKEN, String(window.scrollY)); } catch {}
+    }
+  }, 1000);
+}, { passive: true });
 </script>
 
 </body>
