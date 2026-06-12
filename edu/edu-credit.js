@@ -343,253 +343,589 @@ function fmCalcularPerfilCredito(a) {
   };
 }
 
+// ════════════════════════════════════════════════════════════
+// HELPER · agrega una acción al plan con todos los campos
+// ════════════════════════════════════════════════════════════
+function _addAccion(acciones, opts) {
+  acciones.push({
+    fase: opts.fase,
+    nivel: opts.nivel || 'basico',         // basico | intermedio | avanzado | pro | elite
+    prioridad: opts.prioridad || 'media',  // alta | media | baja
+    area: opts.area,
+    accion: opts.accion,
+    meta: opts.meta,
+    plazo_dias: opts.plazo_dias,
+    leccion_ref: opts.leccion_ref || [],
+    por_que: opts.por_que,
+    puntos_estimados: opts.puntos_estimados || null,  // ej "+15-30 pts"
+    costo: opts.costo || 'gratis',          // gratis | bajo | medio | alto
+    pasos: opts.pasos || []                  // pasos concretos paso a paso
+  });
+}
+
 function fmGenerarPlanCredito(tier, a, gaps) {
-  // Plan estructurado en 4 FASES secuenciales (metodología real del programa):
-  // FASE 1 · DEFENSA & DIAGNÓSTICO (semana 1)
-  // FASE 2 · LIMPIEZA (semanas 2-4) — solo si hay derogatorios
-  // FASE 3 · OPTIMIZACIÓN (mes 2)
-  // FASE 4 · CONSTRUCCIÓN / ACELERACIÓN (mes 3+)
+  // ════════════════════════════════════════════════════════════
+  // PLAN PROFUNDO · 12 FASES · estrategias básica → pro
+  // Ataca los 5 factores FICO sistemáticamente + 7 vías de capital
+  // ════════════════════════════════════════════════════════════
   const acciones = [];
   const derog = Array.isArray(a.derogatorios) ? a.derogatorios : [];
   const tieneDeroga = derog.length > 0 && !derog.includes('ninguno');
+  const mix = Array.isArray(a.mix_credito) ? a.mix_credito : [];
+  const ficoEstimado = (() => {
+    const map = {'sin_historial':0,'menos_580':540,'580_619':600,'620_659':640,'660_699':680,'700_739':720,'740_779':760,'mas_780':790};
+    return map[a.fico_band] || 650;
+  })();
 
-  // ════════ FASE 1 · DEFENSA & DIAGNÓSTICO (semana 1) ════════
-  acciones.push({
-    fase:1, prioridad:'alta', area:'setup',
-    accion:'Bajar los 3 reportes oficiales en annualcreditreport.com (Equifax, Experian, TransUnion) — gratis 1×/semana cada uno',
-    meta:'3 reportes en PDF + revisar errores',
-    plazo_dias:3,
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 1 · DEFENSA & MONITOREO (Semana 1) — todos sí o sí
+  // ═══════════════════════════════════════════════════════════════════
+  _addAccion(acciones, {
+    fase:1, nivel:'basico', prioridad:'alta', area:'setup',
+    accion:'Bajar los 3 reportes oficiales en annualcreditreport.com (Equifax + Experian + TransUnion) — gratis 1×/semana cada uno',
+    meta:'3 reportes en PDF + leídos línea por línea',
+    plazo_dias:3, costo:'gratis',
     leccion_ref:['1.3','2.1'],
-    por_que:'Necesitás el reporte REAL antes de planear. Lo que ves en Credit Karma es VantageScore; los lenders usan FICO desde estos burós.'
+    por_que:'El reporte oficial es la única foto real. Credit Karma muestra VantageScore (no FICO); MyFICO es el FICO real que ven los lenders.',
+    pasos:[
+      'Entrar a annualcreditreport.com (NO confundir con sitios fake)',
+      'Bajar 1 reporte por semana de cada buró → en 3 semanas tenés los 3',
+      'Guardar los PDFs en carpeta "Crédito · Reportes" con fecha',
+      'Hacer una tabla: cuentas + montos + fechas + estado en cada buró'
+    ]
   });
-
-  if (a.monitoring === 'nada') {
-    acciones.push({
-      fase:1, prioridad:'alta', area:'setup',
-      accion:'Activar monitoreo: Credit Karma (gratis, VantageScore) + MyFICO (pago, FICO real). Anotar score base de HOY.',
-      meta:'Monitoreo activo + baseline registrado',
-      plazo_dias:3,
-      leccion_ref:['2.1','2.2','2.3'],
-      por_que:'Sin baseline no podés medir progreso. El programa enseña a interpretar la diferencia entre VantageScore y FICO real.'
-    });
-  }
-  acciones.push({
-    fase:1, prioridad:'media', area:'setup',
-    accion:'Congelar los 3 burós (Equifax, Experian, TransUnion) — bloquea fraude y aplicaciones no autorizadas',
-    meta:'3 burós congelados con PIN guardado',
-    plazo_dias:7,
+  _addAccion(acciones, {
+    fase:1, nivel:'basico', prioridad:'alta', area:'setup',
+    accion:'Activar 3 capas de monitoreo: Credit Karma (gratis · VantageScore) + Experian app (gratis · FICO 8) + MyFICO (~$20/mes · los 9 FICO scores que usan lenders)',
+    meta:'Score baseline anotado en 3 fuentes',
+    plazo_dias:3, costo:'bajo',
+    leccion_ref:['2.1','2.2','2.3'],
+    por_que:'Cada buró reporta distinto. Lender de auto usa FICO 8 Auto, mortgage usa FICO 2/4/5, tarjetas usa FICO 8 Bankcard. MyFICO te muestra los 9.',
+    puntos_estimados:'Diagnóstico (no sube puntos directamente)'
+  });
+  _addAccion(acciones, {
+    fase:1, nivel:'intermedio', prioridad:'alta', area:'setup',
+    accion:'Congelar (freeze) los 3 burós + ChexSystems + LexisNexis. PIN guardado en password manager.',
+    meta:'5 freezes activos con PINs guardados',
+    plazo_dias:7, costo:'gratis',
     leccion_ref:['2.4'],
-    por_que:'Defensa básica. Se descongela en 1 minuto cuando necesites aplicar a algo real.'
+    por_que:'Bloquea fraude Y bloquea aplicaciones automáticas. Se descongela en 1 minuto cuando vos quieras aplicar a algo. ChexSystems y LexisNexis los olvida el 99% de la gente y son los que usan los bancos para abrir cuentas.',
+    pasos:[
+      'Equifax: equifax.com/personal/credit-report-services/credit-freeze',
+      'Experian: experian.com/freeze',
+      'TransUnion: transunion.com/credit-freeze',
+      'ChexSystems: chexsystems.com → Security Freeze',
+      'LexisNexis: consumer.risk.lexisnexis.com → Security Freeze'
+    ]
   });
   if (['itin','sin_status'].includes(a.inmigracion)) {
-    acciones.push({
-      fase:1, prioridad:'alta', area:'setup',
-      accion:'Revisar tu reporte ITIN-specific: Experian y TransUnion son los que mejor reportan con ITIN. Usar los métodos específicos para tu caso.',
+    _addAccion(acciones, {
+      fase:1, nivel:'intermedio', prioridad:'alta', area:'setup',
+      accion:'Pull ITIN-specific: Experian y TransUnion son los que mejor reportan con ITIN. Equifax solo si tenés SSN.',
       meta:'Reporte ITIN confirmado y entendido',
-      plazo_dias:7,
+      plazo_dias:7, costo:'gratis',
       leccion_ref:['2.5'],
-      por_que:'Con ITIN la jugada es diferente — no todos los burós te reportan igual y muchos bancos sí aceptan tu perfil.'
+      por_que:'Con ITIN tu reporte vive principalmente en 2 burós. Saber esto te ahorra estrés cuando un buró diga "no record found".'
     });
   }
 
-  // ════════ FASE 2 · LIMPIEZA (semanas 2-4) — solo si hay derogatorios ════════
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 2 · DIAGNÓSTICO PROFUNDO DEL REPORTE (Semana 1-2)
+  // ═══════════════════════════════════════════════════════════════════
+  _addAccion(acciones, {
+    fase:2, nivel:'basico', prioridad:'alta', area:'diagnostico',
+    accion:'Auditoría del reporte línea por línea: info personal, cada tradeline (apertura, status, balance, límite, pagos), inquiries de 24m, public records',
+    meta:'Lista master con TODO lo que aparece + errores marcados',
+    plazo_dias:10, costo:'gratis',
+    leccion_ref:['3.0','3.1'],
+    por_que:'El 79% de los reportes tienen al menos 1 error. Errores = puntos perdidos. Encontrarlos = subir 10-30 puntos gratis.',
+    pasos:[
+      'Info personal: nombre exacto, direcciones (eliminar antiguas), empleadores, SSN parcial',
+      'Por cada cuenta: fecha apertura, fecha último pago, status (open/closed/charge-off)',
+      'Inquiries: anotar cuáles fueron autorizadas y cuáles no',
+      'Public records: judgments, liens, bankruptcies'
+    ]
+  });
+  _addAccion(acciones, {
+    fase:2, nivel:'intermedio', prioridad:'media', area:'diagnostico',
+    accion:'Calcular utilization REAL por tarjeta + global. Identificar la tarjeta con peor ratio para atacar primero.',
+    meta:'Tabla de utilization individual y global',
+    plazo_dias:10, costo:'gratis',
+    leccion_ref:['4.4'],
+    por_que:'El FICO mira utilization individual Y global. Una tarjeta a 90% baja tu score aunque las otras estén a 0%.',
+    puntos_estimados:'+20-50 pts al optimizar'
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 3 · PAYMENT HISTORY (35% del FICO) — el factor más grande
+  // ═══════════════════════════════════════════════════════════════════
+  _addAccion(acciones, {
+    fase:3, nivel:'basico', prioridad:'alta', area:'pagos',
+    accion:'Auto-pay del MÍNIMO en TODAS las tarjetas (defensa contra olvidos) + auto-pay del FULL BALANCE programado 3 días antes del statement date',
+    meta:'0% probabilidad de pago tarde + utilization reportada baja',
+    plazo_dias:7, costo:'gratis',
+    leccion_ref:['4.2','4.3'],
+    por_que:'Pagos tarde son el #1 destructor de FICO. Un solo pago de 30 días tarde te baja 60-110 puntos. Auto-pay del mínimo = seguro. Auto-pay del full antes del statement = utilization óptima.',
+    puntos_estimados:'Protege todo tu progreso futuro'
+  });
+  if (a.pagos_tarde !== 'cero') {
+    _addAccion(acciones, {
+      fase:3, nivel:'intermedio', prioridad:'alta', area:'pagos',
+      accion:'Goodwill letter a CADA acreedor que reporta pagos tarde recientes (<24m). Modelo: explicar circunstancia + historial reciente perfecto + pedir remoción.',
+      meta:'30-50% de las marcas de tarde removidas',
+      plazo_dias:60, costo:'gratis',
+      leccion_ref:['3.3','4.2'],
+      por_que:'Goodwill funciona ~30% de las veces con acreedores buenos (Discover, Cap One, Chase). Cada late removida = 30-60 puntos de regreso.',
+      puntos_estimados:'+30-90 pts si funciona',
+      pasos:[
+        'Buscar dirección de "executive customer relations" del banco (no la 800)',
+        'Carta de 1 página: contexto + apología + status actual + pedido específico',
+        'Adjuntar evidencia de pagos perfectos posteriores',
+        'Si rechazan: reintento cada 90 días con persona diferente'
+      ]
+    });
+  }
+  if (a.pagos_tarde === 'mas_3' || a.pagos_tarde === '2_3') {
+    _addAccion(acciones, {
+      fase:3, nivel:'avanzado', prioridad:'alta', area:'pagos',
+      accion:'Si las tardes son por un MISMO período (ej: hospital, desempleo) → estrategia "string of lates" + dispute por inaccuracy si las fechas no coinciden exactamente con el sistema del acreedor',
+      meta:'Lates removidas por inconsistencia',
+      plazo_dias:90, costo:'gratis',
+      leccion_ref:['3.2','3.3'],
+      por_que:'Los acreedores rara vez reportan las fechas EXACTAS al buró. Si vos demostrás que la fecha reportada no coincide con tu evidencia, el buró debe remover.'
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 4 · LIMPIEZA DE NEGATIVOS (Semanas 2-6) — solo si hay derogatorios
+  // ═══════════════════════════════════════════════════════════════════
   if (tieneDeroga) {
-    acciones.push({
-      fase:2, prioridad:'alta', area:'derogatorios',
-      accion:'Identificar TODAS las marcas negativas del reporte (collections, charge-offs, late payments, judgments) — listarlas con monto, acreedor y fecha',
-      meta:'Tabla con cada marca negativa documentada',
-      plazo_dias:14,
-      leccion_ref:['3.0','3.1'],
-      por_que:'No podés disputar lo que no tenés mapeado. El programa enseña qué errores tipo de información personal corregir primero porque son los más fáciles.'
+    _addAccion(acciones, {
+      fase:4, nivel:'basico', prioridad:'alta', area:'derogatorios',
+      accion:'Dispute carta certificada al buró por CADA marca negativa cuestionable. Bajo FCRA tienen 30 días para verificar o remover.',
+      meta:'Iniciar 1 dispute por marca cuestionable',
+      plazo_dias:14, costo:'bajo',
+      leccion_ref:['3.0','3.1','3.2'],
+      por_que:'El buró NO investiga — solo manda código al acreedor. Si el acreedor no responde en 30 días, la marca DEBE removerse por ley.',
+      pasos:[
+        'Carta certificada CON acuse de recibo a cada buró',
+        'Específica QUÉ marca + razón (ej: "no es mía", "monto incorrecto", "fecha mal")',
+        'Adjuntar copia de tu ID + utility bill (proof of address)',
+        'Marcar 30 días en calendario para seguimiento'
+      ]
     });
     if (derog.includes('collection')) {
-      acciones.push({
-        fase:2, prioridad:'alta', area:'derogatorios',
-        accion:'Pay-for-delete: negociar con la collection agency pago A CAMBIO de remover del reporte (carta por escrito ANTES de pagar — sin acuerdo escrito, NO pagar)',
-        meta:'Collection removida (no solo "paid")',
-        plazo_dias:60,
+      _addAccion(acciones, {
+        fase:4, nivel:'intermedio', prioridad:'alta', area:'derogatorios',
+        accion:'Pay-for-delete con la collection agency: carta ofreciendo pagar 30-50% del balance A CAMBIO de remover (no solo marcar paid). ACUERDO POR ESCRITO antes de transferir.',
+        meta:'Collection removida del reporte',
+        plazo_dias:60, costo:'medio',
         leccion_ref:['3.2'],
-        por_que:'Pagar sin pay-for-delete deja la marca en el reporte 7 años. Pagar CON pay-for-delete la borra. La carta escrita es no-negociable.'
+        por_que:'Pagar sin pay-for-delete deja la marca 7 años. Pagar CON acuerdo escrito la borra. Las agencias compran deuda al 5-10% del valor — aceptan 30-50%.',
+        puntos_estimados:'+30-100 pts por collection removida'
+      });
+      _addAccion(acciones, {
+        fase:4, nivel:'avanzado', prioridad:'media', area:'derogatorios',
+        accion:'Validation letter (FDCPA) ANTES de pagar: pedir prueba de que la deuda es tuya, contrato firmado, chain of custody. Muchas no pueden validar.',
+        meta:'Collection removida por inability to validate',
+        plazo_dias:45, costo:'gratis',
+        leccion_ref:['3.2','3.3'],
+        por_que:'Las agencias compraron papeles de 5-10 años atrás sin documentación. ~40% no puede validar legalmente. Si no validan en 30 días, deben remover.'
       });
     }
     if (derog.includes('charge_off')) {
-      acciones.push({
-        fase:2, prioridad:'alta', area:'derogatorios',
-        accion:'Goodwill letter al acreedor original pidiendo remover el charge-off (especialmente si ya está pagado o si tu historial general es bueno)',
-        meta:'Charge-off removido o actualizado a "paid as agreed"',
-        plazo_dias:90,
+      _addAccion(acciones, {
+        fase:4, nivel:'intermedio', prioridad:'alta', area:'derogatorios',
+        accion:'Si el charge-off es del acreedor original (no vendido): Goodwill letter pidiendo "soft delete" especialmente si lo pagaste o tenés relación activa',
+        meta:'Charge-off "Paid as agreed" o removido',
+        plazo_dias:90, costo:'gratis',
         leccion_ref:['3.2','3.3'],
-        por_que:'Charge-off es de los peores marks. Goodwill funciona ~30% de las veces con acreedores originales — vale el intento.'
+        por_que:'Charge-off del original es de los peores. Si pagás SIN acuerdo de remoción, sigue mostrando 7 años. Goodwill tiene ~30% éxito.',
+        puntos_estimados:'+50-100 pts si funciona'
       });
     }
     if (derog.includes('judgment')) {
-      acciones.push({
-        fase:2, prioridad:'alta', area:'derogatorios',
-        accion:'Validar el judgment: pedir validación de deuda al acreedor (FDCPA). Si no responde en 30 días, disputar como inexacto.',
-        meta:'Judgment validado o removido',
-        plazo_dias:60,
+      _addAccion(acciones, {
+        fase:4, nivel:'avanzado', prioridad:'alta', area:'derogatorios',
+        accion:'Judgment requiere validación legal: pedir certified copy del judgment + proof of service. Si fuiste no notificado correctamente, "Motion to Vacate".',
+        meta:'Judgment vacated o expirado',
+        plazo_dias:120, costo:'medio',
         leccion_ref:['3.3'],
-        por_que:'Bajo FDCPA tienen que probar la deuda. Muchas agencias compraron papeles viejos sin documentación y no pueden validar.'
+        por_que:'Si no te notificaron correctamente (sirvieron a dirección vieja), el judgment es vacatable. Eso lo borra como si nunca hubiera existido.'
       });
     }
-    if (derog.includes('bankruptcy') || derog.includes('foreclosure')) {
-      acciones.push({
-        fase:2, prioridad:'media', area:'derogatorios',
-        accion:'BK Cap 7 dura 10 años, Foreclosure 7 años — NO se pueden disputar (son legales). Estrategia: construir 3+ tradelines positivas EN PARALELO para diluir el peso del derog.',
-        meta:'3+ cuentas positivas activas mientras pasa el tiempo',
-        plazo_dias:180,
+    if (derog.includes('bankruptcy')) {
+      _addAccion(acciones, {
+        fase:4, nivel:'pro', prioridad:'alta', area:'derogatorios',
+        accion:'BK Cap 7 dura 10 años (Cap 13: 7). NO disputable. Estrategia paralela: construir 3+ tradelines positivas Y aplicar a tarjetas BK-friendly (Capital One, Petal, Mission Lane, OpenSky).',
+        meta:'4+ tradelines positivas durante el waiting period',
+        plazo_dias:180, costo:'medio',
         leccion_ref:['3.3','4.5'],
-        por_que:'No podés borrar lo que existió legalmente. Pero un reporte con 5 tradelines positivas + 1 BK vieja vale mucho más que solo la BK.'
+        por_que:'Las tarjetas BK-friendly te aprueban 12 meses post-discharge. Cada año post-BK pesa menos. Después de 4 años con buen historial, el FICO puede estar arriba de 700.'
       });
     }
   }
-  if (a.pagos_tarde !== 'cero') {
-    acciones.push({
-      fase:2, prioridad:'alta', area:'pagos',
-      accion:'AUTO-PAY del mínimo en TODAS las tarjetas + reminder 5 días antes del due date. Para los pagos tarde recientes (<24m), enviar goodwill letters.',
-      meta:'0 pagos tarde en próximos 6 meses + remover los recientes',
-      plazo_dias:7,
-      leccion_ref:['4.2','4.3'],
-      por_que:'Historial de pagos = 35% del FICO. Un solo pago tarde de 30 días te puede bajar 60-110 puntos.'
-    });
-  }
 
-  // ════════ FASE 3 · OPTIMIZACIÓN (mes 2) ════════
-  if (['30_49','50_74','mas_75','no_se'].includes(a.utilization)) {
-    acciones.push({
-      fase:3, prioridad:'alta', area:'utilization',
-      accion:'Bajar utilization a <10%: (1) Pagar antes del statement date (no del due date), (2) Pedir aumento de credit limit en TODAS las tarjetas (sin hard pull en issuers con 6+ meses), (3) Si tenés más cash, pagar la tarjeta con mayor % primero',
-      meta:'Suma de balances ÷ suma de límites < 10%',
-      plazo_dias:30,
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 5 · UTILIZATION (30% del FICO) — el factor más rápido de mover
+  // ═══════════════════════════════════════════════════════════════════
+  if (a.utilization !== 'menos_10') {
+    _addAccion(acciones, {
+      fase:5, nivel:'basico', prioridad:'alta', area:'utilization',
+      accion:'TRUCO #1 · Pagar antes del statement date (no del due date). El balance del statement es el que se reporta al buró.',
+      meta:'Statement balance reportado <10% del límite',
+      plazo_dias:30, costo:'gratis',
       leccion_ref:['4.4'],
-      por_que:'Utilization = 30% del FICO. Es el CAMBIO MÁS RÁPIDO de score: bajar de 50% a 10% puede subir 30-60 puntos en 1 ciclo. Truco: el saldo que reporta es el del cierre del statement, NO el del due date.'
+      por_que:'El due date es para evitar pago tarde. El statement date es para utilization. Pagar 2 días antes del statement = $0 reportado al buró = score máximo.',
+      puntos_estimados:'+20-50 pts en 1 ciclo'
+    });
+    _addAccion(acciones, {
+      fase:5, nivel:'intermedio', prioridad:'alta', area:'utilization',
+      accion:'TRUCO #2 · Pedir Credit Limit Increase (CLI) en TODAS las tarjetas con 6+ meses de antigüedad. La mayoría de issuers (Cap One, Discover, Chase via website) lo hacen con SOFT pull.',
+      meta:'+25-100% más límite total',
+      plazo_dias:14, costo:'gratis',
+      leccion_ref:['4.4','6.4'],
+      por_que:'Subir el denominador es más fácil que pagar deuda. $5K balance con $10K límite = 50%. Subís límite a $30K = 17% sin pagar nada.',
+      puntos_estimados:'+15-40 pts',
+      pasos:[
+        'Cap One: login → cuenta → Request Credit Line Increase (cada 6m, soft)',
+        'Discover: igual proceso, sin hard pull si tiene 6m+',
+        'Chase: llamar reconsideration line si la web no ofrece',
+        'Amex: cada 6m por web, NO genera hard pull',
+        'Bank of America: por web, OJO algunos generan hard pull'
+      ]
     });
   }
-  if (['mas_6','3_5'].includes(a.consultas)) {
-    acciones.push({
-      fase:3, prioridad:'alta', area:'consultas',
-      accion:'PAUSAR aplicaciones nuevas por 6 meses. Las inquiries pesan 12 meses y caen del scoring a los 24 meses.',
-      meta:'< 3 hard inquiries útiles 12m a futuro',
-      plazo_dias:180,
-      leccion_ref:['4.7','6.1'],
-      por_que:'Cada aplicación nueva = -3 a -10 puntos por 12 meses. Si vas a hacer ronda de tarjetas, hacerlas TODAS el mismo día (lección 6.3).'
+  if (['30_49','50_74','mas_75'].includes(a.utilization)) {
+    _addAccion(acciones, {
+      fase:5, nivel:'avanzado', prioridad:'alta', area:'utilization',
+      accion:'AZEO Method (All Zero Except One): pagar TODAS las tarjetas a $0 ANTES del statement. Dejar SOLO una con balance bajo (1-9%). Es la utilization óptima FICO 8.',
+      meta:'1 tarjeta reportando 1-9% · resto $0',
+      plazo_dias:45, costo:'gratis',
+      leccion_ref:['4.4','7.3'],
+      por_que:'FICO penaliza tener "muchas tarjetas con balance". AZEO te da el máximo posible. Subir de 30% a AZEO puede dar +60 puntos.',
+      puntos_estimados:'+30-60 pts vs. utilization regular'
+    });
+    _addAccion(acciones, {
+      fase:5, nivel:'pro', prioridad:'media', area:'utilization',
+      accion:'Balance transfer a tarjeta 0% APR (12-21 meses). Mueve la deuda de tarjetas a una sola → bajas múltiples ratios + ganás tiempo sin interés.',
+      meta:'Deuda consolidada a 0% APR',
+      plazo_dias:30, costo:'bajo',
+      leccion_ref:['7.1','6.5'],
+      por_que:'BT fee es 3-5% (mucho menor que 20-29% APR de tarjeta normal). 18 meses de 0% para pagar = $2-5K ahorrados en intereses según el balance.',
+      pasos:[
+        'Citi Diamond Preferred: 21m 0% BT (best 2026)',
+        'Wells Fargo Reflect: 21m 0% BT',
+        'Chase Slate Edge: 18m 0% (genera hard pull)',
+        'Hacer math: BT fee vs interés futuro = pagás si la diferencia es positiva'
+      ]
     });
   }
 
-  // ════════ FASE 4 · CONSTRUCCIÓN (mes 3+) ════════
-  if (a.antiguedad === 'cero') {
-    acciones.push({
-      fase:4, prioridad:'alta', area:'historial',
-      accion:'Abrir 2 secured credit cards: Discover Secured + Capital One Secured. Depósito $200-500 c/u. Usar 5-10% del límite. Auto-pay total.',
-      meta:'2 tradelines positivas activas en 21 días',
-      plazo_dias:21,
-      leccion_ref:['4.1','4.5','6.2'],
-      por_que:'Sin historial no hay score. 2 cuentas dan estabilidad estadística al algoritmo FICO y se gradúan a tarjetas normales en 12 meses.'
-    });
-  }
-  if (['1_nueva','1_vieja','2_3_nuevas'].includes(a.antiguedad)) {
-    acciones.push({
-      fase:4, prioridad:'media', area:'historial',
-      accion:'Aumentar mix: convertirte en Authorized User en cuenta VIEJA (5+ años) de familiar con buen historial. Suma su antigüedad y utilization a TU reporte.',
-      meta:'+5 años de historial promedio en 14 días',
-      plazo_dias:14,
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 6 · LENGTH OF HISTORY (15% del FICO)
+  // ═══════════════════════════════════════════════════════════════════
+  _addAccion(acciones, {
+    fase:6, nivel:'basico', prioridad:'media', area:'historial',
+    accion:'NUNCA cerrar tarjetas viejas. Si tienen annual fee → pedir "product change" a versión sin fee (mantiene la fecha de apertura).',
+    meta:'Cuenta más vieja sigue activa',
+    plazo_dias:7, costo:'gratis',
+    leccion_ref:['4.5'],
+    por_que:'Cerrar tu tarjeta más vieja te puede tirar el promedio de antigüedad de 8 años a 3 — eso son 50+ puntos perdidos. Product change mantiene la fecha.',
+    puntos_estimados:'Protege 30-80 pts'
+  });
+  if (['cero','1_nueva','1_vieja','2_3_nuevas'].includes(a.antiguedad)) {
+    _addAccion(acciones, {
+      fase:6, nivel:'intermedio', prioridad:'alta', area:'historial',
+      accion:'Authorized User en cuenta VIEJA (5+ años) de familiar con buen pago. Suma su antigüedad y utilization a tu reporte.',
+      meta:'+5 años de avg age en 14 días',
+      plazo_dias:14, costo:'gratis',
       leccion_ref:['4.5'],
-      por_que:'El familiar no asume riesgo (no necesitas la tarjeta física). Su historial pasa al tuyo. Es uno de los hacks más rápidos para subir antigüedad.'
+      por_que:'El familiar no pierde nada (vos no necesitás la tarjeta física). Su buen historial pasa a tu reporte. Hack de los más rápidos.',
+      puntos_estimados:'+30-80 pts en 30 días',
+      pasos:[
+        'Pedir a padre/tío/amigo con tarjeta de 10+ años',
+        'Que te agregue como Authorized User',
+        'Verificar que el banco reporte AUs al buró (Amex/Chase/Cap One sí; Discover varía)',
+        'Tu reporte muestra esa cuenta como propia para scoring'
+      ]
+    });
+    _addAccion(acciones, {
+      fase:6, nivel:'avanzado', prioridad:'media', area:'historial',
+      accion:'Tradeline rental: pagar $200-500 por aparecer como AU en una tarjeta de 10-20 años con buen pago. Útil cuando no tenés familia con buen crédito.',
+      meta:'1-2 tradelines vieja agregada',
+      plazo_dias:30, costo:'medio',
+      leccion_ref:['4.5'],
+      por_que:'Servicios como Tradeline Supply alquilan tradelines de 10-20 años. Reportan 2 ciclos. Sube avg age + utilization en un mes.',
+      puntos_estimados:'+40-100 pts temporal (2 meses)'
     });
   }
-  const mix = Array.isArray(a.mix_credito) ? a.mix_credito : [];
-  if (mix.includes('ninguno') || mix.length === 0) {
-    acciones.push({
-      fase:4, prioridad:'media', area:'mix',
-      accion:'Agregar credit-builder loan ($500-1000 en Self o Credit Strong). Pagás $50/mes 18-24m. Suma installment al reporte sin gastar dinero real (te lo devuelven al final).',
-      meta:'1 installment loan reportando',
-      plazo_dias:30,
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 7 · CREDIT MIX (10% del FICO)
+  // ═══════════════════════════════════════════════════════════════════
+  if (mix.includes('ninguno') || mix.length === 0 || (mix.length === 1 && mix[0] !== 'ninguno')) {
+    _addAccion(acciones, {
+      fase:7, nivel:'basico', prioridad:'media', area:'mix',
+      accion:'Credit Builder Loan: $500-1000 en Self, Credit Strong o local credit union. Pagás $50/mes por 12-24m. Te devuelven el dinero al final.',
+      meta:'1 installment loan activo reportando',
+      plazo_dias:30, costo:'bajo',
       leccion_ref:['4.6'],
-      por_que:'Credit Mix = 10% del FICO. Tener solo tarjetas limita tu score techo. Un installment activo abre el siguiente nivel.'
+      por_que:'Sin installment tu Credit Mix está limitado. CBL no requiere score (es secured) y aporta tipo nuevo al reporte sin riesgo.',
+      puntos_estimados:'+10-25 pts'
+    });
+    _addAccion(acciones, {
+      fase:7, nivel:'intermedio', prioridad:'baja', area:'mix',
+      accion:'Personal loan pequeño ($1-5K) en credit union local + pagarlo en 6-12 meses. Añade installment y se cierra positivo.',
+      meta:'1 personal loan cerrado positivo',
+      plazo_dias:180, costo:'bajo',
+      leccion_ref:['4.6','5.3'],
+      por_que:'Personal loan cerrado positivo = tradeline buena por 10 años después de cerrar. Sube mix + length con 1 sola acción.'
+    });
+  }
+  if (mix.length >= 1 && !mix.includes('auto') && tier !== 'reconstruir' && tier !== 'sin_historial') {
+    _addAccion(acciones, {
+      fase:7, nivel:'avanzado', prioridad:'baja', area:'mix',
+      accion:'Auto loan secured: si necesitás auto, financialo aunque puedas pagarlo cash. Aporta installment grande al reporte.',
+      meta:'Auto loan activo reportando',
+      plazo_dias:60, costo:'gratis',
+      leccion_ref:['4.6'],
+      por_que:'Auto loan = installment grande con pago mensual fijo. Sube mix significativamente.'
     });
   }
 
-  // ════════ ESTRATEGIA BANCARIA & APLICACIONES (mes 3-4) ════════
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 8 · NEW CREDIT & INQUIRIES (10% del FICO)
+  // ═══════════════════════════════════════════════════════════════════
+  if (a.consultas === 'mas_6') {
+    _addAccion(acciones, {
+      fase:8, nivel:'basico', prioridad:'alta', area:'consultas',
+      accion:'PAUSA TOTAL de aplicaciones por 6 meses. Las inquiries dejan de afectar score a los 12m (pero quedan visibles 24m).',
+      meta:'<3 hard inquiries a futuro 12m',
+      plazo_dias:180, costo:'gratis',
+      leccion_ref:['4.7','6.1'],
+      por_que:'Cada hard inquiry baja 3-10 pts por 12 meses. 6+ inquiries indica desesperación financiera al algoritmo.',
+      puntos_estimados:'+10-30 pts cuando caigan'
+    });
+  }
+  _addAccion(acciones, {
+    fase:8, nivel:'intermedio', prioridad:'media', area:'consultas',
+    accion:'Pre-qualification antes de aplicar: usar herramientas de soft-pull (CardMatch, Chase pre-qualified, Cap One pre-approval) para saber qué tarjetas te dan SI o SÍ antes del hard pull.',
+    meta:'0 rechazos por aplicar a ciegas',
+    plazo_dias:30, costo:'gratis',
+    leccion_ref:['6.1','6.2'],
+    por_que:'Aplicar y ser rechazado = hard pull SIN tarjeta. Pre-qual te muestra ofertas con 90%+ probabilidad de aprobación sin tocar tu score.'
+  });
   if (tier !== 'sin_historial' && tier !== 'reconstruir') {
-    acciones.push({
-      fase:4, prioridad:'media', area:'estrategia',
-      accion:'Centrífuga bancaria: abrir cuentas en 3-5 bancos diferentes para generar relaciones (lección 5.4). Algunos te pagan $200-500 por abrir cuenta nueva (lección 5.2).',
-      meta:'3-5 relaciones bancarias activas',
-      plazo_dias:60,
-      leccion_ref:['5.1','5.2','5.3','5.4'],
-      por_que:'Bancos donde tenés cuenta corriente son ~3× más probables de aprobarte tarjeta sin hard pull. La centrífuga construye esta red.'
+    _addAccion(acciones, {
+      fase:8, nivel:'avanzado', prioridad:'media', area:'consultas',
+      accion:'RONDA DE APLICACIÓN (lección 6.3): aplicar a 3-5 tarjetas el MISMO DÍA. El algoritmo cuenta múltiples inquiries en 14-45 días como 1 (rate shopping).',
+      meta:'3-5 tarjetas aprobadas con 1-2 inquiries efectivas',
+      plazo_dias:1, costo:'gratis',
+      leccion_ref:['6.3','6.4'],
+      por_que:'Si vas a abrir 5 tarjetas en 6 meses, mejor el mismo día → solo 1 hard pull cuenta para scoring. Las otras 4 son "shopping".',
+      puntos_estimados:'Aprobaciones múltiples = +límite + edad futura'
+    });
+  }
+  _addAccion(acciones, {
+    fase:8, nivel:'pro', prioridad:'baja', area:'consultas',
+    accion:'Reconsideration line: si te rechazan, llamar a la línea de reconsideration del banco (no la 800 normal) para revertir el rechazo en vivo.',
+    meta:'Revertir 30-50% de los rechazos',
+    plazo_dias:7, costo:'gratis',
+    leccion_ref:['6.4'],
+    por_que:'El sistema rechaza automático, pero un agente humano puede aprobar moviendo límite de otra tarjeta o pidiendo info extra. ~40% de éxito.',
+    pasos:[
+      'Chase recon: 1-888-270-2127',
+      'Amex recon: 1-800-567-1083',
+      'Cap One recon: 1-800-625-7866',
+      'Citi recon: 1-800-695-5171',
+      'Decir: "I want to reconsider my application denied on [fecha]"'
+    ]
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 9 · CONSTRUCCIÓN BANCARIA (Mes 2-3)
+  // ═══════════════════════════════════════════════════════════════════
+  _addAccion(acciones, {
+    fase:9, nivel:'basico', prioridad:'media', area:'bancos',
+    accion:'Sólida cuenta corriente primaria 3+ meses (Chase / BoA / Wells / local CU) con depósitos directos regulares.',
+    meta:'1 relación bancaria principal sólida',
+    plazo_dias:90, costo:'gratis',
+    leccion_ref:['5.1'],
+    por_que:'Tu banco principal te aprueba productos a tasa preferencial. Tener 3+ meses de actividad mejora aprobación de tarjetas Y préstamos.'
+  });
+  _addAccion(acciones, {
+    fase:9, nivel:'intermedio', prioridad:'media', area:'bancos',
+    accion:'Centrífuga bancaria · bonos de bienvenida: abrir cuentas en 3-5 bancos diferentes que pagan $200-500 por nueva cuenta con depósito directo.',
+    meta:'$1000-3000 en bonos + 3-5 relaciones',
+    plazo_dias:120, costo:'gratis',
+    leccion_ref:['5.2','5.4'],
+    por_que:'Chase ofrece $300, Cap One $250, BMO $400, etc. Mientras hacés el trabajo de mover el depósito directo, ganás $$ Y relaciones futuras para tarjetas.',
+    puntos_estimados:'Sin pts directo, pero acceso a +productos premium'
+  });
+  _addAccion(acciones, {
+    fase:9, nivel:'avanzado', prioridad:'baja', area:'bancos',
+    accion:'Credit Unions estratégicos: Penfed, Navy Federal (con vínculo militar), Alliant. Sus tarjetas son más fáciles de aprobar y tienen límites altos.',
+    meta:'1-2 cuentas en credit unions premium',
+    plazo_dias:60, costo:'gratis',
+    leccion_ref:['5.3'],
+    por_que:'CUs reportan a los 3 burós pero usan sus propios scoring. Penfed Power Cash Rewards y NFCU cashRewards Plus son de las mejores tarjetas accesibles.'
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 10 · APLICACIÓN ESTRATÉGICA DE TARJETAS (Mes 3+)
+  // ═══════════════════════════════════════════════════════════════════
+  if (a.antiguedad === 'cero') {
+    _addAccion(acciones, {
+      fase:10, nivel:'basico', prioridad:'alta', area:'tarjetas',
+      accion:'Abrir 2 secured cards: Discover Secured + Cap One Quicksilver Secured. Depósito $200-500 c/u. Auto-pay. Usar 5% del límite.',
+      meta:'2 tradelines activas en 21 días',
+      plazo_dias:21, costo:'medio',
+      leccion_ref:['4.1','4.5','6.2'],
+      por_que:'Sin historial necesitás iniciar. 2 secured cards dan base. Discover gradúa a unsecured en 12m + devuelve el depósito.'
+    });
+  }
+  if (tier === 'reconstruir' || tier === 'limitado') {
+    _addAccion(acciones, {
+      fase:10, nivel:'intermedio', prioridad:'alta', area:'tarjetas',
+      accion:'Tarjetas de transición (FICO 580-680): Capital One Platinum, Discover IT, Mission Lane Visa, Petal 2. Reportan a 3 burós sin fee.',
+      meta:'1-2 tarjetas no-secured aprobadas',
+      plazo_dias:30, costo:'gratis',
+      leccion_ref:['6.2','6.4'],
+      por_que:'Son las "starter cards" de 2026. Aceptan FICO 580+ con probabilidad ~70%. Sin annual fee. Reportan a los 3 burós.'
+    });
+  }
+  if (tier === 'bueno' || tier === 'excelente') {
+    _addAccion(acciones, {
+      fase:10, nivel:'avanzado', prioridad:'alta', area:'tarjetas',
+      accion:'Chase 5/24 strategy: si tenés <5 cuentas en últimos 24m, aplicar a TODAS las Chase quieras AHORA (Sapphire Preferred, Freedom Unlimited, Ink Business). Después de 5, Chase te rechaza por 24m.',
+      meta:'3-4 Chase cards con bonuses $1000+ c/u',
+      plazo_dias:14, costo:'gratis',
+      leccion_ref:['6.3','6.4'],
+      por_que:'Chase tiene los mejores sign-up bonuses ($1000+) pero rechaza si tenés 5+ cuentas nuevas. Si calificás, hacer la ronda completa ANTES de cualquier otra aplicación.',
+      puntos_estimados:'$3-5K en bonus stacking'
+    });
+    _addAccion(acciones, {
+      fase:10, nivel:'pro', prioridad:'media', area:'tarjetas',
+      accion:'Amex pop-up jail / Amex Platinum / Gold / Business stack: Amex tiene "lifetime bonus rule" (1 por tarjeta) pero las business cards no afectan personal 5/24.',
+      meta:'Amex personal + business stack',
+      plazo_dias:60, costo:'bajo',
+      leccion_ref:['6.3','8.4'],
+      por_que:'Amex business cards no reportan a personal credit (mejor para tu utilization) Y son la mejor manera de stack puntos para travel.'
     });
   }
 
-  // ════════ ACCIONES POR META (mes 3+) ════════
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 11 · BUSINESS CREDIT BUILD (Mes 4-12) — siempre, no solo si meta_uso=business
+  // ═══════════════════════════════════════════════════════════════════
+  _addAccion(acciones, {
+    fase:11, nivel:'basico', prioridad:'media', area:'business',
+    accion:'Setup foundational: LLC en TU estado + EIN gratuito en irs.gov + DBA si vendés con otro nombre. Sin esto NO hay business credit.',
+    meta:'LLC + EIN activos',
+    plazo_dias:30, costo:'medio',
+    leccion_ref:['8.1','8.2'],
+    por_que:'Business credit corre paralelo al personal pero NO se mezcla. Esto es lo primero. Sin EIN no podés abrir nada de empresa.'
+  });
+  _addAccion(acciones, {
+    fase:11, nivel:'intermedio', prioridad:'media', area:'business',
+    accion:'DUNS Number en Dun & Bradstreet (gratis · gov contracts; $189 si lo apurás) + Nav profile (gratis, monitorea business credit) + Experian Business (auto-genera al primer reporte)',
+    meta:'3 burós de business activos',
+    plazo_dias:30, costo:'bajo',
+    leccion_ref:['8.2','8.3'],
+    por_que:'Sin perfil en estos 3, las business cards no encuentran tu empresa. DUNS es la identidad legal de tu empresa para B2B.'
+  });
+  _addAccion(acciones, {
+    fase:11, nivel:'intermedio', prioridad:'alta', area:'business',
+    accion:'3 Net30 vendors reportando: Uline, Crown Office Supplies, Quill, Grainger. Pedís cualquier cosa pequeña ($50-100), pagás en 15 días, ellos reportan a D&B.',
+    meta:'3 tradelines de empresa reportando',
+    plazo_dias:90, costo:'bajo',
+    leccion_ref:['8.3'],
+    por_que:'Necesitás 3+ tradelines en D&B para tener un Paydex score (el FICO de empresa). Sin eso, ninguna business card seria te aprueba.'
+  });
+  _addAccion(acciones, {
+    fase:11, nivel:'avanzado', prioridad:'media', area:'business',
+    accion:'Primera business card que NO revisa personal credit (módulo 8.6/8.8): Brex (necesita $50K+ en banco empresa), Capital on Tap, Ramp (B2B), Divvy.',
+    meta:'Business card no-personal activa',
+    plazo_dias:60, costo:'gratis',
+    leccion_ref:['8.4','8.6','8.8'],
+    por_que:'Tu personal score deja de ser cuello de botella. Brex aprueba con $50K+ en cuenta empresa SIN mirar tu FICO. Capital on Tap acepta empresas con 3+ meses.'
+  });
+  _addAccion(acciones, {
+    fase:11, nivel:'pro', prioridad:'media', area:'business',
+    accion:'Después de 6m de business credit: aplicar a líneas $50K-100K (Bluevine, Fundbox, OnDeck). Estas se basan en revenue empresa, no en tu FICO.',
+    meta:'Línea de crédito empresarial $50K+',
+    plazo_dias:240, costo:'gratis',
+    leccion_ref:['7.2','8.5'],
+    por_que:'Estas líneas miran tu revenue mensual ($10K+/mes te abre puertas) y los 6m de paydex. Tu FICO personal puede ser 600 y aprobarte $100K si la empresa lo merece.'
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FASE 12 · ACCESO A CAPITAL — la meta final · 7 vías
+  // ═══════════════════════════════════════════════════════════════════
   if (a.meta_uso === 'hml') {
-    acciones.push({
-      fase:4, prioridad:'alta', area:'meta',
-      accion:'HMLs típicos (Kiavi, RCN, ROC360) piden FICO 660+. Flexibles 2026 aceptan 620+ con LTV reducido. Si tenés 700+, negociar puntos. Si <620, pausar HML y enfocar en subir score primero.',
-      meta:'Calificar HML con tasa <12% y puntos <3',
-      plazo_dias:90,
+    _addAccion(acciones, {
+      fase:12, nivel:'avanzado', prioridad:'alta', area:'capital_hml',
+      accion:'HML stack: Kiavi (660+, fastest), RCN (620+, flexible), ROC360 (640+), Easy Street Capital (no min · solo equity), Constructive Capital (creative).',
+      meta:'2 HMLs aprobados a tasa <12%',
+      plazo_dias:90, costo:'gratis',
       leccion_ref:['7.2'],
-      por_que:'HMLs miran principalmente equity y exit strategy, pero un FICO bajo te sube 2-3 puntos en costo del préstamo. Vale la pena llegar a 660+.'
+      por_que:'HMLs no son commodity — algunos miran solo equity (Easy Street), otros score Y experiencia (Kiavi). Tener 2-3 te da palanca de negociación.'
     });
   }
   if (a.meta_uso === 'mortgage') {
-    acciones.push({
-      fase:4, prioridad:'alta', area:'meta',
-      accion:'Mortgage convencional pide 620+ (FHA 580+). Empujar a 720+ para evitar PMI y obtener mejor APR. Diferencia 680 vs 760 = $50K+ en intereses totales en una casa de $400K.',
-      meta:'FICO 720+ antes de aplicar',
-      plazo_dias:120,
+    _addAccion(acciones, {
+      fase:12, nivel:'avanzado', prioridad:'alta', area:'capital_mortgage',
+      accion:'Mortgage stack: Conventional (Fannie/Freddie 620+), FHA (580+ 3.5% down), VA (vet, 0% down, no min), USDA (rural 640+), Non-QM (no min · DSCR · bank stmt loans · ITIN).',
+      meta:'Aprobación con APR < market+0.5%',
+      plazo_dias:120, costo:'gratis',
       leccion_ref:['4.1','4.4'],
-      por_que:'Para un mortgage tradicional el score IMPORTA tanto como el ingreso. Cada 20 puntos arriba de 700 te ahorra dinero real.'
+      por_que:'No todos los mortgages requieren score alto. Non-QM lenders (Angel Oak, Athas, Sprout) aceptan ITIN y bank statements. FHA es la entrada con score bajo.'
     });
   }
   if (a.meta_uso === 'dscr') {
-    acciones.push({
-      fase:4, prioridad:'alta', area:'meta',
-      accion:'DSCR loan ignora DTI personal pero pide FICO 660+ y reserves (6 meses de PITI). Subir score y juntar reserves en paralelo.',
-      meta:'FICO 680+ + 6m reserves líquidos',
-      plazo_dias:120,
+    _addAccion(acciones, {
+      fase:12, nivel:'avanzado', prioridad:'alta', area:'capital_dscr',
+      accion:'DSCR stack 2026: Visio Lending (660+), Velocity (640+), Lima One Capital (proven track), Civic Financial (LTC alto), Constructive Capital (creative for ITIN).',
+      meta:'DSCR loan aprobado · 1.25+ ratio',
+      plazo_dias:120, costo:'gratis',
       leccion_ref:['4.1'],
-      por_que:'DSCR mira la renta de la propiedad como ingreso, NO el tuyo. Pero el score y reserves son no-negociables.'
+      por_que:'DSCR vive del rent/PITI ratio (>1.0). Score importa pero no es el cuello principal. Para ITIN-friendly: Constructive y Athas.'
     });
   }
-  if (a.meta_uso === 'heloc') {
-    acciones.push({
-      fase:4, prioridad:'alta', area:'meta',
-      accion:'HELOC requiere equity 20%+, FICO 680+ y DTI <43%. Verificar valor actual de tu vivienda (Redfin/Zillow) y el equity disponible.',
-      meta:'Aprobación HELOC tasa <prime+1%',
-      plazo_dias:60,
+  if (a.meta_uso === 'heloc' || (a.meta_uso === 'mortgage' && tier === 'bueno')) {
+    _addAccion(acciones, {
+      fase:12, nivel:'avanzado', prioridad:'media', area:'capital_heloc',
+      accion:'HELOC stack: Figure (online · 5 días · 680+), Spring EQ, Discover Home Equity, BoA HELOC (existing customer rate). Equity 20%+ required.',
+      meta:'HELOC línea $50K+',
+      plazo_dias:60, costo:'bajo',
       leccion_ref:['4.1'],
-      por_que:'HELOC es el dinero más barato para invertir si ya tenés equity. La key es: NO usarlo para gastos personales, solo para deal.'
+      por_que:'Figure es el más rápido (5 días). BoA es el más barato si ya sos cliente. Spring EQ acepta investment properties (raro).'
     });
   }
-  if (a.meta_uso === 'business') {
-    acciones.push({
-      fase:4, prioridad:'alta', area:'meta',
-      accion:'Iniciar build de Business Credit: (1) LLC + EIN, (2) Net30 vendors para reportes a Dun & Bradstreet, (3) primera business credit card. Hay tarjetas que NO revisan tu crédito personal.',
-      meta:'Business credit perfil activo en Nav/D&B',
-      plazo_dias:90,
-      leccion_ref:['8.1','8.2','8.3','8.6','8.8'],
-      por_que:'Crédito de empresa = límites más altos sin afectar tu personal. Y los bancos del Módulo 8 que NO revisan tu personal son la llave si tu score personal está limitado.'
-    });
-  }
-  if (a.meta_uso === 'cash') {
-    acciones.push({
-      fase:4, prioridad:'media', area:'meta',
-      accion:'Convertir tarjetas en cash via balance transfer a 0% APR (12-18 meses) o cash-back optimization. Estrategias específicas en lección 6.5 y 7.1.',
-      meta:'Cash deployable de tu límite de crédito',
-      plazo_dias:30,
-      leccion_ref:['6.5','7.1'],
-      por_que:'Las tarjetas son tu banco más flexible si las usás bien. 0% APR durante 18 meses = dinero gratis para deal si lo pagás antes que termine.'
-    });
-  }
-  if (a.meta_uso === 'mejorar' && tier === 'bueno') {
-    acciones.push({
-      fase:4, prioridad:'media', area:'meta',
-      accion:'Empujar de 700+ a 760+: foco en (1) utilization <5%, (2) edad promedio de cuentas creciente, (3) NO abrir tarjetas innecesarias.',
-      meta:'FICO 760+ en 6 meses',
-      plazo_dias:180,
-      leccion_ref:['4.4','4.5','7.3'],
-      por_que:'De 720 a 760 hay diferencia mínima en aprobación pero significativa en tasa. Vale la pena cuando vas a comprar mortgage o auto.'
+  _addAccion(acciones, {
+    fase:12, nivel:'intermedio', prioridad:'media', area:'capital_personal',
+    accion:'Personal lines of credit: SoFi ($5K-100K · 680+), LightStream ($5K-100K · 660+), Discover Personal Loan, Marcus by Goldman. Para gap financing en deals.',
+    meta:'1-2 personal lines aprobadas',
+    plazo_dias:30, costo:'gratis',
+    leccion_ref:['7.2'],
+    por_que:'Personal loans son gap financing rápido. LightStream funda en 24h. SoFi tiene los mejores rates si tenés ingreso alto.'
+  });
+  _addAccion(acciones, {
+    fase:12, nivel:'pro', prioridad:'media', area:'capital_0apr',
+    accion:'0% APR stack: convertir tarjetas en CASH via balance transfer (Citi Diamond 21m), cash advance check, plastiq (paga cualquier factura con tarjeta · 2.5% fee), Curve / Wise Multi (workarounds).',
+    meta:'$10K-50K en cash a 0% por 18-21 meses',
+    plazo_dias:30, costo:'bajo',
+    leccion_ref:['6.5','7.1'],
+    por_que:'Si tenés tarjetas con $50K límite y 0% APR, eso ES capital. Plastiq permite pagar mortgage/rent con tarjeta (2.5% fee). Manejado bien = capital gratis 18m.'
+  });
+  if (a.meta_uso === 'cash' || tier === 'bueno' || tier === 'excelente') {
+    _addAccion(acciones, {
+      fase:12, nivel:'elite', prioridad:'baja', area:'capital_avanzado',
+      accion:'Estrategias avanzadas (lección 7.3): manufactured spending, gift card arbitrage, business loans via revenue (Clearco · Pipe · revenue-based), invoice factoring, equipment financing.',
+      meta:'Sistema de capital continuo $10K+/mes',
+      plazo_dias:180, costo:'bajo',
+      leccion_ref:['7.1','7.3','8.5'],
+      por_que:'Estas son las jugadas de los pros que combinan crédito personal + business + manejo de cashflow para tener liquidez constante.'
     });
   }
 
@@ -800,19 +1136,36 @@ function fmRenderCreditoPlan() {
           </div>
         </div>
 
-        <!-- Plan de acción ESTRUCTURADO en 4 FASES (metodología real) -->
+        <!-- Plan de acción PROFUNDO · 12 FASES · cubre los 5 factores FICO + 7 vías de capital -->
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
-          <div class="bg-slate-900 text-white px-5 py-3 flex items-center justify-between">
-            <h3 class="font-bold">📋 Plan de acción (${r.acciones.length} acciones · 4 fases)</h3>
-            <div class="text-[10px] opacity-80">Mapeado a lecciones del programa</div>
+          <div class="bg-slate-900 text-white px-5 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <h3 class="font-bold text-base">📋 Plan PROFUNDO · ${r.acciones.length} acciones · 12 fases</h3>
+              <div class="text-[10px] opacity-80">Ataca los 5 factores FICO + 7 vías de capital</div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px]">
+              <div class="bg-white/15 rounded px-2 py-1.5"><div class="font-bold">35%</div><div class="opacity-80">Payment History</div></div>
+              <div class="bg-white/15 rounded px-2 py-1.5"><div class="font-bold">30%</div><div class="opacity-80">Amounts Owed</div></div>
+              <div class="bg-white/15 rounded px-2 py-1.5"><div class="font-bold">15%</div><div class="opacity-80">Length History</div></div>
+              <div class="bg-white/15 rounded px-2 py-1.5"><div class="font-bold">10%</div><div class="opacity-80">New Credit</div></div>
+              <div class="bg-white/15 rounded px-2 py-1.5"><div class="font-bold">10%</div><div class="opacity-80">Credit Mix</div></div>
+            </div>
           </div>
-          ${fmRenderFaseCredito(r.acciones, 1, '🛡️ FASE 1 · Defensa & Diagnóstico', 'Semana 1', 'sky')}
-          ${fmRenderFaseCredito(r.acciones, 2, '🧹 FASE 2 · Limpieza de Marcas Negativas', 'Semanas 2-4', 'red')}
-          ${fmRenderFaseCredito(r.acciones, 3, '⚙️ FASE 3 · Optimización (utilization / inquiries)', 'Mes 2', 'amber')}
-          ${fmRenderFaseCredito(r.acciones, 4, '🚀 FASE 4 · Construcción & Aceleración', 'Mes 3+', 'emerald')}
+          ${fmRenderFaseCredito(r.acciones,  1, '🛡️ FASE 1 · Defensa & Monitoreo',           'Semana 1',  'sky')}
+          ${fmRenderFaseCredito(r.acciones,  2, '🔍 FASE 2 · Diagnóstico Profundo',          'Semana 1-2','indigo')}
+          ${fmRenderFaseCredito(r.acciones,  3, '💳 FASE 3 · Payment History (35% del FICO)', 'Mes 1',     'rose')}
+          ${fmRenderFaseCredito(r.acciones,  4, '🧹 FASE 4 · Limpieza de Negativos',          'Semana 2-6','red')}
+          ${fmRenderFaseCredito(r.acciones,  5, '⚡ FASE 5 · Utilization (30% del FICO)',     'Mes 1-2',   'amber')}
+          ${fmRenderFaseCredito(r.acciones,  6, '⏳ FASE 6 · Length of History (15%)',         'Mes 2',     'violet')}
+          ${fmRenderFaseCredito(r.acciones,  7, '🔗 FASE 7 · Credit Mix (10%)',                'Mes 2-3',   'fuchsia')}
+          ${fmRenderFaseCredito(r.acciones,  8, '🎯 FASE 8 · New Credit & Inquiries (10%)',   'Mes 2-3',   'orange')}
+          ${fmRenderFaseCredito(r.acciones,  9, '🏦 FASE 9 · Construcción Bancaria',          'Mes 2-3',   'cyan')}
+          ${fmRenderFaseCredito(r.acciones, 10, '💎 FASE 10 · Aplicación Estratégica Cards',  'Mes 3+',    'teal')}
+          ${fmRenderFaseCredito(r.acciones, 11, '🏢 FASE 11 · Business Credit Build',          'Mes 4-12',  'blue')}
+          ${fmRenderFaseCredito(r.acciones, 12, '💰 FASE 12 · Acceso a Capital (7 vías)',     'Mes 4+',    'emerald')}
         </div>
 
-        <div class="text-[10px] text-slate-500 italic">Plan mapeado al programa de 42 lecciones (Módulos 1-8). Cada acción cita las lecciones específicas a estudiar primero. Validá con broker/lender antes de aplicar a productos. FICO real solo via MyFICO.</div>
+        <div class="text-[10px] text-slate-500 italic">Plan PROFUNDO mapeado al programa de 42 lecciones · ataca cada factor FICO sistemáticamente · estrategias básica→pro→elite · 7 vías de capital. Validá con broker/lender antes de aplicar. FICO real solo via MyFICO.</div>
       </div>
     </div>
   `;
@@ -822,47 +1175,92 @@ function fmRenderFaseCredito(acciones, faseNum, titulo, plazo, color) {
   const xs = acciones.filter(a => a.fase === faseNum);
   if (!xs.length) return '';
   const colorMap = {
-    sky:      { bg:'bg-sky-50',     border:'border-sky-200',     text:'text-sky-800',     accent:'bg-sky-600' },
-    red:      { bg:'bg-red-50',     border:'border-red-200',     text:'text-red-800',     accent:'bg-red-600' },
-    amber:    { bg:'bg-amber-50',   border:'border-amber-200',   text:'text-amber-800',   accent:'bg-amber-500' },
-    emerald:  { bg:'bg-emerald-50', border:'border-emerald-200', text:'text-emerald-800', accent:'bg-emerald-600' }
+    sky:      { bg:'bg-sky-50',      text:'text-sky-800',      accent:'bg-sky-600' },
+    indigo:   { bg:'bg-indigo-50',   text:'text-indigo-800',   accent:'bg-indigo-600' },
+    rose:     { bg:'bg-rose-50',     text:'text-rose-800',     accent:'bg-rose-600' },
+    red:      { bg:'bg-red-50',      text:'text-red-800',      accent:'bg-red-600' },
+    amber:    { bg:'bg-amber-50',    text:'text-amber-800',    accent:'bg-amber-500' },
+    violet:   { bg:'bg-violet-50',   text:'text-violet-800',   accent:'bg-violet-600' },
+    fuchsia:  { bg:'bg-fuchsia-50',  text:'text-fuchsia-800',  accent:'bg-fuchsia-600' },
+    orange:   { bg:'bg-orange-50',   text:'text-orange-800',   accent:'bg-orange-500' },
+    cyan:     { bg:'bg-cyan-50',     text:'text-cyan-800',     accent:'bg-cyan-600' },
+    teal:     { bg:'bg-teal-50',     text:'text-teal-800',     accent:'bg-teal-600' },
+    blue:     { bg:'bg-blue-50',     text:'text-blue-800',     accent:'bg-blue-600' },
+    emerald:  { bg:'bg-emerald-50',  text:'text-emerald-800',  accent:'bg-emerald-600' }
   };
   const c = colorMap[color] || colorMap.sky;
+  // Conteo por nivel
+  const nivelCounts = { basico:0, intermedio:0, avanzado:0, pro:0, elite:0 };
+  xs.forEach(x => { nivelCounts[x.nivel || 'basico'] = (nivelCounts[x.nivel || 'basico']||0) + 1; });
+  const nivelChips = ['basico','intermedio','avanzado','pro','elite']
+    .filter(n => nivelCounts[n] > 0)
+    .map(n => `<span class="text-[9px] bg-white/80 ${c.text} px-1 rounded">${n} ${nivelCounts[n]}</span>`)
+    .join('');
+
   return `
-    <div class="border-b border-slate-100 last:border-0">
-      <div class="${c.bg} ${c.text} px-5 py-2 flex items-center justify-between">
+    <details class="border-b border-slate-100 last:border-0" open>
+      <summary class="${c.bg} ${c.text} px-5 py-3 cursor-pointer hover:opacity-90 flex items-center justify-between flex-wrap gap-2">
         <div class="font-bold text-sm">${titulo}</div>
-        <div class="text-[10px] uppercase tracking-wider font-bold opacity-75">${plazo} · ${xs.length} acción${xs.length===1?'':'es'}</div>
-      </div>
-      <div class="p-4 space-y-3">
+        <div class="flex items-center gap-2">
+          ${nivelChips}
+          <div class="text-[10px] uppercase tracking-wider font-bold opacity-75">${plazo} · ${xs.length} acc</div>
+        </div>
+      </summary>
+      <div class="p-4 space-y-3 bg-slate-50/30">
         ${xs.map(a => fmRenderAccionCredito(a, c)).join('')}
       </div>
-    </div>
+    </details>
   `;
 }
 
 function fmRenderAccionCredito(a, color) {
   const c = color || { accent:'bg-slate-600', text:'text-slate-700' };
   const lecciones = Array.isArray(a.leccion_ref) ? a.leccion_ref : [];
+  const pasos = Array.isArray(a.pasos) ? a.pasos : [];
+
+  // Badge de nivel (básico → elite)
+  const nivelMap = {
+    basico:     '<span class="text-[9px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase">🟢 Básico</span>',
+    intermedio: '<span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded uppercase">🔵 Intermedio</span>',
+    avanzado:   '<span class="text-[9px] font-bold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded uppercase">🟣 Avanzado</span>',
+    pro:        '<span class="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded uppercase">🟠 Pro</span>',
+    elite:      '<span class="text-[9px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded uppercase">🔴 Elite</span>'
+  };
+  const nivelBadge = nivelMap[a.nivel || 'basico'] || '';
+
   const prioBadge = {
     alta: '<span class="text-[9px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded uppercase">Alta</span>',
     media: '<span class="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded uppercase">Media</span>',
     baja: '<span class="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded uppercase">Baja</span>'
   }[a.prioridad] || '';
 
+  const costoBadge = a.costo ? {
+    gratis: '<span class="text-[9px] text-emerald-700 font-bold">💚 Gratis</span>',
+    bajo:   '<span class="text-[9px] text-slate-600 font-bold">💵 Bajo costo</span>',
+    medio:  '<span class="text-[9px] text-amber-700 font-bold">💰 Costo medio</span>',
+    alto:   '<span class="text-[9px] text-red-700 font-bold">💸 Costo alto</span>'
+  }[a.costo] || '' : '';
+
   return `
     <div class="bg-white border border-slate-200 rounded-lg p-3 hover:shadow-sm transition">
-      <div class="flex items-start justify-between gap-2 mb-2">
-        <div class="font-semibold text-sm text-slate-900 flex-1">${a.accion}</div>
-        ${prioBadge}
+      <div class="flex items-start justify-between gap-2 mb-2 flex-wrap">
+        <div class="font-semibold text-sm text-slate-900 flex-1 min-w-[60%]">${a.accion}</div>
+        <div class="flex items-center gap-1 flex-wrap">${nivelBadge}${prioBadge}</div>
       </div>
-      <div class="grid grid-cols-2 gap-2 text-[11px] mb-2">
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[11px] mb-2">
         <div class="text-emerald-700"><strong>🎯 Meta:</strong> ${a.meta}</div>
-        <div class="text-slate-600 text-right"><strong>⏱</strong> ${a.plazo_dias} días</div>
+        <div class="text-slate-600"><strong>⏱</strong> ${a.plazo_dias} días · ${costoBadge}</div>
+        ${a.puntos_estimados ? `<div class="text-blue-700"><strong>📈 Score:</strong> ${a.puntos_estimados}</div>` : ''}
       </div>
       ${a.por_que ? `<div class="bg-slate-50 border-l-2 ${c.accent.replace('bg-','border-')} rounded-r px-3 py-2 text-[11px] text-slate-700 italic mb-2">
         <strong class="not-italic ${c.text}">¿Por qué?</strong> ${a.por_que}
       </div>` : ''}
+      ${pasos.length ? `<details class="mb-2">
+        <summary class="text-[10px] text-slate-600 font-bold cursor-pointer hover:text-slate-900">📝 Ver pasos detallados (${pasos.length})</summary>
+        <ol class="mt-2 ml-4 space-y-1 list-decimal text-[11px] text-slate-700">
+          ${pasos.map(p => `<li>${p.replace(/</g,'&lt;')}</li>`).join('')}
+        </ol>
+      </details>` : ''}
       ${lecciones.length ? `<div class="flex items-center gap-1 flex-wrap mt-1.5">
         <span class="text-[10px] text-slate-500 font-bold mr-1">📚 Estudiar:</span>
         ${lecciones.map(L => {
