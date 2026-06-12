@@ -1,24 +1,264 @@
 // ════════════════════════════════════════════════════════════
 // 🎬 Generador de presentaciones IA + builder PPTX
 // (extraído de education.js)
-// Depende de: eduState, window.aiState, eduCurrentMentorship,
-// eduRenderReportsStandalone (de edu-reports.js), eduLoadAll,
-// sb, state, openModal, PptxGenJS
+// V2: wizard universal (informe/educativo/pitch/mkt/libre) + modo
+// experto. Genera slide-por-slide vía edge function generate-presentation-v2
+// (síncrona, sin timeout, funciona en plan free de Supabase).
 // ════════════════════════════════════════════════════════════
+
+// Estado del wizard V2 (vive en window para no perderse)
+window.eduPresWizard = window.eduPresWizard || {
+  step: 1,
+  preset_type: 'libre',
+  title: '',
+  topic: '',
+  audience: '',
+  slides_count: 12,
+  tone_extra: '',
+  language: 'es',
+  expertMode: false,
+  expertPrompt: '',
+  generating: false,
+  progress: { phase: 'idle', current: 0, total: 0, message: '' },
+  cancel: false
+};
+
+const EDU_PRES_PRESETS = [
+  { key: 'informe',   icon: '📊', label: 'Informe ejecutivo',  desc: 'KPIs, hallazgos, recomendaciones. Para junta directiva o socios.', defaultSlides: 10 },
+  { key: 'educativo', icon: '🎓', label: 'Educativo / clase',  desc: 'Objetivos de aprendizaje, casos, ejercicios. Para mentorías y workshops.', defaultSlides: 15 },
+  { key: 'pitch',     icon: '🎤', label: 'Pitch comercial',    desc: 'Problema, solución, prueba, CTA. Para vender a un cliente.', defaultSlides: 12 },
+  { key: 'marketing', icon: '📣', label: 'Marketing / redes',  desc: 'Hooks visuales, antes/después. Para carruseles o contenido.', defaultSlides: 8 },
+  { key: 'libre',     icon: '✨', label: 'Tema libre',         desc: 'Cualquier tema. La IA adapta estructura al input.', defaultSlides: 12 }
+];
+
+function eduPresSetField(field, value) {
+  window.eduPresWizard[field] = value;
+  // Re-render solo si cambió step o preset (para mostrar/ocultar campos)
+  if (field === 'step' || field === 'preset_type' || field === 'expertMode') eduRender();
+}
+
+function eduPresWizardNext() {
+  const w = window.eduPresWizard;
+  if (w.step === 1 && !w.preset_type) return alert('Elegí un tipo de presentación primero.');
+  if (w.step === 2) {
+    // Capturar valores actuales del form
+    w.title = (document.getElementById('wz-title')?.value || '').trim();
+    w.topic = (document.getElementById('wz-topic')?.value || '').trim();
+    w.audience = (document.getElementById('wz-audience')?.value || '').trim();
+    w.slides_count = +(document.getElementById('wz-slides')?.value) || 10;
+    w.tone_extra = (document.getElementById('wz-tone')?.value || '').trim();
+    w.language = document.getElementById('wz-language')?.value || 'es';
+    if (!w.title) return alert('El título es obligatorio.');
+    if (!w.topic) return alert('El tema es obligatorio — escribí qué cubrir en 1-3 oraciones.');
+    if (!w.audience) w.audience = 'profesionales del rubro';
+  }
+  w.step = Math.min(3, w.step + 1);
+  eduRender();
+}
+
+function eduPresWizardBack() {
+  window.eduPresWizard.step = Math.max(1, window.eduPresWizard.step - 1);
+  eduRender();
+}
+
+function eduPresWizardReset() {
+  window.eduPresWizard = {
+    step: 1,
+    preset_type: 'libre',
+    title: '', topic: '', audience: '',
+    slides_count: 12, tone_extra: '', language: 'es',
+    expertMode: false, expertPrompt: '',
+    generating: false,
+    progress: { phase: 'idle', current: 0, total: 0, message: '' },
+    cancel: false
+  };
+  // Limpiar el draft visible
+  const aiKey = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
+  if (window.aiState && window.aiState[aiKey]) delete window.aiState[aiKey].presentation;
+  eduRender();
+}
+
+function eduPresPickPreset(key) {
+  const p = EDU_PRES_PRESETS.find(x => x.key === key);
+  if (!p) return;
+  window.eduPresWizard.preset_type = key;
+  window.eduPresWizard.slides_count = p.defaultSlides;
+  window.eduPresWizard.step = 2;
+  eduRender();
+}
+
+function eduPresCancelGeneration() {
+  window.eduPresWizard.cancel = true;
+}
+
+window.eduPresSetField = eduPresSetField;
+window.eduPresWizardNext = eduPresWizardNext;
+window.eduPresWizardBack = eduPresWizardBack;
+window.eduPresWizardReset = eduPresWizardReset;
+window.eduPresPickPreset = eduPresPickPreset;
+window.eduPresCancelGeneration = eduPresCancelGeneration;
 
 // TAB: PRESENTACIONES IA — genera slides con web search live + descarga PPTX
 // ============================================================
 function eduRenderPresentations() {
   const m = eduCurrentMentorship();
   const presentations = (eduState.presentations || []).filter(p => p.mentorship_id === eduState.mentorshipId);
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
+  const aiKey = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
   const ai = (window.aiState && window.aiState[aiKey]) || {};
   const draft = ai.presentation;
+  const w = window.eduPresWizard;
+  const sel = EDU_PRES_PRESETS.find(p => p.key === w.preset_type);
 
   return `
     <div class="space-y-3">
-      <!-- Form de input -->
-      <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
+
+      <!-- 🆕 WIZARD UNIVERSAL V2 -->
+      <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl overflow-hidden">
+        <div class="bg-violet-700 text-white px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div class="text-[10px] uppercase font-bold text-violet-200 tracking-wider">🎬 Generador IA de presentaciones</div>
+            <div class="text-base font-bold mt-0.5">${w.expertMode ? 'Modo experto · prompt libre' : `Wizard · Paso ${w.step} de 3`}</div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="window.eduPresWizard.expertMode = !window.eduPresWizard.expertMode; eduRender();" class="text-[11px] bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded">${w.expertMode ? '🧙 Volver al wizard' : '⚡ Modo experto'}</button>
+            ${w.step > 1 && !w.expertMode ? `<button onclick="eduPresWizardReset()" class="text-[11px] bg-white/10 hover:bg-white/20 text-white font-bold px-3 py-1.5 rounded">↺ Reiniciar</button>` : ''}
+          </div>
+        </div>
+
+        ${w.generating ? `
+          <!-- VISTA DE PROGRESO -->
+          <div class="p-6 text-center bg-white">
+            <div class="text-3xl mb-2">🧠</div>
+            <div class="font-bold text-violet-900 text-base">${w.progress.message || 'Generando...'}</div>
+            ${w.progress.total > 0 ? `
+              <div class="mt-3 max-w-md mx-auto">
+                <div class="w-full bg-violet-100 rounded-full h-3">
+                  <div class="bg-violet-600 h-3 rounded-full transition-all" style="width:${Math.round(100*w.progress.current/w.progress.total)}%"></div>
+                </div>
+                <div class="text-[11px] text-violet-700 mt-1">${w.progress.current} de ${w.progress.total} slides</div>
+              </div>
+            ` : ''}
+            <div class="text-[11px] text-slate-500 mt-3">Cada slide tarda 10-25s. No cierres esta ventana.</div>
+            <button onclick="eduPresCancelGeneration()" class="mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-1.5 rounded">✕ Cancelar</button>
+          </div>
+        ` : w.expertMode ? `
+          <!-- MODO EXPERTO -->
+          <div class="p-4 space-y-3">
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tipo</label>
+              <select id="exp-preset" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                ${EDU_PRES_PRESETS.map(p => `<option value="${p.key}" ${w.preset_type===p.key?'selected':''}>${p.icon} ${p.label}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Título *</label>
+              <input id="exp-title" value="${(w.title||'').replace(/"/g,'&quot;')}" placeholder="Ej. Resultados Q2 2026 · Rental Profits" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold"/>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Prompt libre — describí qué querés *</label>
+              <textarea id="exp-prompt" rows="5" placeholder="Ej: presentación de 12 slides para junta directiva sobre los resultados del Q2 2026 de Rental Profits. Incluí: revenue $1.2M (+18% vs Q1), 47 propiedades activas, 92% occupancy, 3 nuevos mercados (Austin/Houston/San Antonio), 2 riesgos principales (tasas + competencia), 3 recomendaciones para Q3. Tono ejecutivo, KPIs claros." class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${(w.expertPrompt||'').replace(/</g,'&lt;')}</textarea>
+              <div class="text-[10px] text-slate-500 mt-0.5">Cuanto más específico, mejor sale. Mencioná: tema, audiencia, # slides, datos clave, tono.</div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1"># Slides</label>
+                <input id="exp-slides" type="number" min="5" max="40" value="${w.slides_count}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Idioma</label>
+                <select id="exp-language" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                  <option value="es" ${w.language==='es'?'selected':''}>Español</option>
+                  <option value="en" ${w.language==='en'?'selected':''}>English</option>
+                </select>
+              </div>
+            </div>
+            <button onclick="eduGeneratePresentationV2(true)" class="w-full bg-violet-700 hover:bg-violet-800 text-white font-bold py-2.5 rounded">🚀 Generar presentación</button>
+          </div>
+        ` : w.step === 1 ? `
+          <!-- PASO 1: ELEGIR TIPO -->
+          <div class="p-4">
+            <div class="text-sm font-bold text-slate-900 mb-3">1. ¿Qué tipo de presentación querés?</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              ${EDU_PRES_PRESETS.map(p => `
+                <button onclick="eduPresPickPreset('${p.key}')" class="text-left p-3 rounded-lg border-2 ${w.preset_type===p.key?'border-violet-600 bg-violet-50':'border-slate-200 bg-white hover:border-violet-400'} transition">
+                  <div class="text-lg">${p.icon} <span class="font-bold text-sm text-slate-900">${p.label}</span></div>
+                  <div class="text-[11px] text-slate-600 mt-1">${p.desc}</div>
+                  <div class="text-[9px] text-violet-600 mt-1">~${p.defaultSlides} slides recomendados</div>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        ` : w.step === 2 ? `
+          <!-- PASO 2: TEMA + DETALLES -->
+          <div class="p-4 space-y-3">
+            <div class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <span>2. Contame sobre ${sel?.icon || ''} ${sel?.label || 'la presentación'}</span>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Título de la presentación *</label>
+              <input id="wz-title" value="${(w.title||'').replace(/"/g,'&quot;')}" placeholder="Ej. Resultados Q2 2026 · Rental Profits" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-bold"/>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tema / qué cubrir en 1-3 oraciones *</label>
+              <textarea id="wz-topic" rows="3" placeholder="${w.preset_type==='informe' ? 'Ej: Revenue Q2: $1.2M (+18%). 47 propiedades activas, 92% occupancy. Hubo 3 hitos: nuevos mercados, mejora processes, app móvil. Riesgos: tasas y competencia. Recomendación: foco H2 en Texas.' : w.preset_type==='educativo' ? 'Ej: Cómo analizar un fix&flip. Cubrir: ARV, MAO, comps. Caso real Austin. Audiencia ya sabe lo básico de R/E.' : w.preset_type==='pitch' ? 'Ej: Vender servicio de property management. El cliente es dueño de 3 casas que no le rentan bien. Diferencial: tecnología + transparencia + cobramos % solo si superamos benchmark.' : 'Describí qué querés cubrir...'}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${(w.topic||'').replace(/</g,'&lt;')}</textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Audiencia</label>
+                <input id="wz-audience" value="${(w.audience||(w.preset_type==='informe'?'Junta directiva y socios':w.preset_type==='educativo'?'Estudiantes de mentoría':w.preset_type==='pitch'?'Cliente prospect':w.preset_type==='marketing'?'Audiencia general en redes':'Profesionales del rubro')).replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1"># Slides</label>
+                <input id="wz-slides" type="number" min="5" max="40" value="${w.slides_count}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tono extra (opcional)</label>
+                <input id="wz-tone" value="${(w.tone_extra||'').replace(/"/g,'&quot;')}" placeholder="Ej. Cercano, formal, técnico, divertido..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Idioma</label>
+                <select id="wz-language" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                  <option value="es" ${w.language==='es'?'selected':''}>Español</option>
+                  <option value="en" ${w.language==='en'?'selected':''}>English</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-violet-200">
+              <button onclick="eduPresWizardBack()" class="text-sm text-slate-600 hover:text-slate-900">← Atrás</button>
+              <button onclick="eduPresWizardNext()" class="bg-violet-700 hover:bg-violet-800 text-white font-bold text-sm px-5 py-2 rounded">Siguiente →</button>
+            </div>
+          </div>
+        ` : `
+          <!-- PASO 3: CONFIRMAR Y GENERAR -->
+          <div class="p-4 space-y-3">
+            <div class="text-sm font-bold text-slate-900">3. Confirmar y generar</div>
+            <div class="bg-white border border-violet-200 rounded-lg p-3 space-y-2">
+              <div class="flex justify-between text-sm"><span class="text-slate-600">Tipo:</span><strong>${sel?.icon} ${sel?.label}</strong></div>
+              <div class="flex justify-between text-sm"><span class="text-slate-600">Título:</span><strong class="text-right max-w-[60%] truncate">${(w.title||'—').replace(/</g,'&lt;')}</strong></div>
+              <div class="flex justify-between text-sm"><span class="text-slate-600">Audiencia:</span><strong>${(w.audience||'—').replace(/</g,'&lt;')}</strong></div>
+              <div class="flex justify-between text-sm"><span class="text-slate-600"># Slides:</span><strong>${w.slides_count}</strong></div>
+              <div class="flex justify-between text-sm"><span class="text-slate-600">Idioma:</span><strong>${w.language==='es'?'Español':'English'}</strong></div>
+              <div class="text-xs text-slate-700 pt-2 border-t border-violet-100"><span class="text-slate-500 font-bold">Tema:</span> ${(w.topic||'—').replace(/</g,'&lt;')}</div>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
+              ⏱ Tiempo estimado: <strong>~${15 + (w.slides_count * 15)} segundos</strong> (outline 15s + slide 15s c/u). Genera slide-por-slide en vivo, con barra de progreso.
+            </div>
+            <div class="flex justify-between items-center pt-2">
+              <button onclick="eduPresWizardBack()" class="text-sm text-slate-600 hover:text-slate-900">← Atrás</button>
+              <button onclick="eduGeneratePresentationV2(false)" class="bg-violet-700 hover:bg-violet-800 text-white font-bold text-sm px-6 py-2.5 rounded shadow">🚀 Generar presentación</button>
+            </div>
+          </div>
+        `}
+      </div>
+
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">⚠️ ${ai.error}</div>` : ''}
+
+      <!-- 📦 LEGACY: Form original abajo (oculto por default — solo dev) -->
+      <details class="bg-slate-50 border border-slate-200 rounded-xl">
+        <summary class="cursor-pointer text-[10px] font-bold uppercase text-slate-500 px-3 py-2">🔧 Modo legacy (V1 con web search live — sirve si tenés plan Pro de Supabase)</summary>
+        <div class="p-4">
         <div class="text-xs font-bold uppercase text-violet-900 mb-3">🎬 Generar presentación con IA + web search live</div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -115,7 +355,8 @@ function eduRenderPresentations() {
           <button onclick="withLoading(this, eduGeneratePresentation)" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2.5 rounded">🤖 Generar con IA</button>
         </div>
         <div class="text-[10px] text-violet-700 mt-2 italic" id="edu-pres-time-hint">⚡ Modo normal: ~30-90 seg, 8 web searches. Modo investigación: ~3-5 min, 25 searches + thinking. Activá investigación para casos donde necesitás profundidad real (clase nueva, tema técnico, lanzamiento).</div>
-      </div>
+        </div>
+      </details>
 
       ${ai.loading ? `
         <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
@@ -202,6 +443,177 @@ function eduRenderPresentations() {
     </div>
   `;
 }
+
+// ════════════════════════════════════════════════════════════════
+// 🆕 GENERATE V2 — slide-por-slide síncrono, sin timeout
+// Llama a /generate-presentation-v2 con mode='outline' y luego mode='slide'
+// una vez por cada slide. Actualiza la barra de progreso en vivo.
+// ════════════════════════════════════════════════════════════════
+async function eduGeneratePresentationV2(isExpertMode) {
+  const w = window.eduPresWizard;
+
+  // Si es modo experto, leer del form de expert
+  if (isExpertMode) {
+    w.preset_type = document.getElementById('exp-preset')?.value || 'libre';
+    w.title       = (document.getElementById('exp-title')?.value || '').trim();
+    w.topic       = (document.getElementById('exp-prompt')?.value || '').trim();
+    w.slides_count = +(document.getElementById('exp-slides')?.value) || 12;
+    w.language    = document.getElementById('exp-language')?.value || 'es';
+    w.audience    = w.audience || 'profesionales del rubro';
+    if (!w.title || !w.topic) return alert('Título y prompt son obligatorios en modo experto.');
+  }
+
+  // Validar auth
+  if (!state || !state.user || !state.user.id) return alert('No hay sesión activa. Refrescá y volvé a iniciar sesión.');
+
+  const aiKey = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
+  window.aiState = window.aiState || {};
+  delete window.aiState[aiKey]; // limpiar draft viejo
+
+  w.generating = true;
+  w.cancel = false;
+  w.progress = { phase: 'outline', current: 0, total: w.slides_count, message: '📋 Generando outline (estructura del deck)...' };
+  eduRender();
+
+  const baseUrl = `${window.SUPABASE_URL}/functions/v1/generate-presentation-v2`;
+  let token;
+  try { token = await getAccessToken(); }
+  catch (e) { return _eduPresFail('No pude leer el token de sesión: ' + e.message); }
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
+  // PASO 1: OUTLINE
+  let outline;
+  try {
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        mode: 'outline',
+        preset_type: w.preset_type,
+        title: w.title,
+        topic: w.topic,
+        audience: w.audience,
+        slides_count: w.slides_count,
+        language: w.language,
+        tone_extra: w.tone_extra
+      })
+    });
+    const txt = await res.text();
+    let r;
+    try { r = JSON.parse(txt); } catch { throw new Error(`HTTP ${res.status}: ${txt.slice(0,300)}`); }
+    if (!r.ok) throw new Error(r.error || 'Edge function falló');
+    outline = r.outline;
+    if (!outline || !Array.isArray(outline.slides_outline)) throw new Error('Outline inválido: faltan slides_outline');
+    w.progress = { phase: 'outline', current: 0, total: outline.slides_outline.length, message: `✓ Outline listo (${outline.slides_outline.length} slides). Generando slides...` };
+    eduRender();
+  } catch (e) {
+    return _eduPresFail('Outline falló: ' + e.message);
+  }
+
+  // PASO 2: SLIDES (uno por uno, con retry x1)
+  const slides = [];
+  for (let i = 0; i < outline.slides_outline.length; i++) {
+    if (w.cancel) return _eduPresFail('Generación cancelada por el usuario.');
+    const slideInfo = outline.slides_outline[i];
+    const prevSlide = i > 0 ? outline.slides_outline[i - 1] : null;
+    const nextOutline = i + 1 < outline.slides_outline.length ? outline.slides_outline[i + 1] : null;
+
+    w.progress = { phase: 'slide', current: i + 1, total: outline.slides_outline.length, message: `🎨 Slide ${i + 1}/${outline.slides_outline.length}: ${slideInfo.title}` };
+    eduRender();
+
+    let slide = null;
+    for (let attempt = 0; attempt < 2 && !slide; attempt++) {
+      try {
+        const res = await fetch(baseUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            mode: 'slide',
+            preset_type: w.preset_type,
+            audience: w.audience,
+            language: w.language,
+            slide_info: slideInfo,
+            outline,
+            prev_slide: prevSlide,
+            next_outline: nextOutline
+          })
+        });
+        const txt = await res.text();
+        let r;
+        try { r = JSON.parse(txt); } catch { throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`); }
+        if (!r.ok) throw new Error(r.error || 'edge function falló');
+        slide = r.slide;
+      } catch (e) {
+        if (attempt === 1) {
+          // Fallback: slide básico para no abortar todo el deck
+          slide = {
+            number: slideInfo.number,
+            title: slideInfo.title,
+            layout: slideInfo.layout || 'content',
+            block_label: slideInfo.block_label || '',
+            bullets: [slideInfo.purpose || 'Contenido del slide'],
+            speaker_notes: `Hubo un error generando este slide. Editalo manual. Error: ${e.message}`,
+            _generation_error: e.message
+          };
+        }
+      }
+    }
+    slides.push(slide);
+  }
+
+  // PASO 3: ENSAMBLAR EN EL FORMATO QUE ESPERA EL PREVIEW/DOWNLOAD
+  const presentation = {
+    title: outline.title || w.title,
+    subtitle: outline.subtitle || '',
+    brand: w.audience.toLowerCase().includes('rental profit') ? 'RENTAL PROFITS' : w.audience.toLowerCase().includes('flipping') ? 'FLIPPING RENTALS' : 'EMPRESA OS',
+    outline: (outline.blocks || []).map(b => b.name),
+    slides,
+    all_sources: [],
+    summary: outline.narrative_arc || ''
+  };
+
+  // Guardar en aiState para que el preview/download funcionen igual que antes
+  window.aiState[aiKey] = { loading: false, presentation };
+
+  // (Opcional) guardar en edu_presentations
+  try {
+    const m = eduCurrentMentorship();
+    if (m && typeof sb !== 'undefined') {
+      const { data: saved } = await sb.from('edu_presentations').insert({
+        mentorship_id: m.id,
+        title: presentation.title,
+        topic: w.topic,
+        audience: w.audience,
+        presentation_type: w.preset_type,
+        duration_min: w.slides_count * 4,
+        language: w.language,
+        outline: presentation.outline,
+        slides: presentation.slides,
+        sources: [],
+        status: 'generated',
+        generated_by: state.user.id
+      }).select().single();
+      if (saved) window.aiState[aiKey].saved_id = saved.id;
+    }
+  } catch (e) { console.warn('[edu-pres-v2] no se pudo guardar en DB:', e.message); }
+
+  w.generating = false;
+  w.progress = { phase: 'done', current: slides.length, total: slides.length, message: '✓ Listo. Descargá la PPTX abajo.' };
+  if (typeof eduLoadAll === 'function') await eduLoadAll();
+  eduRender();
+}
+
+function _eduPresFail(msg) {
+  const w = window.eduPresWizard;
+  w.generating = false;
+  w.progress = { phase: 'error', current: 0, total: 0, message: msg };
+  const aiKey = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
+  window.aiState = window.aiState || {};
+  window.aiState[aiKey] = { loading: false, error: msg };
+  eduRender();
+}
+
+window.eduGeneratePresentationV2 = eduGeneratePresentationV2;
 
 async function eduGeneratePresentation() {
   const title = (document.getElementById('edu-pres-title')?.value || '').trim();
