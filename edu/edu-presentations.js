@@ -255,9 +255,10 @@ function eduRenderPresentations() {
 
       ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">⚠️ ${ai.error}</div>` : ''}
 
-      <!-- 📦 LEGACY: Form original abajo (oculto por default — solo dev) -->
+      <!-- 📦 LEGACY: completamente oculto (solo accesible cambiando flag en consola) -->
+      ${window.__eduShowLegacy ? `
       <details class="bg-slate-50 border border-slate-200 rounded-xl">
-        <summary class="cursor-pointer text-[10px] font-bold uppercase text-slate-500 px-3 py-2">🔧 Modo legacy (V1 con web search live — sirve si tenés plan Pro de Supabase)</summary>
+        <summary class="cursor-pointer text-[10px] font-bold uppercase text-slate-500 px-3 py-2">🔧 Modo legacy V1 (dev only)</summary>
         <div class="p-4">
         <div class="text-xs font-bold uppercase text-violet-900 mb-3">🎬 Generar presentación con IA + web search live</div>
 
@@ -357,6 +358,7 @@ function eduRenderPresentations() {
         <div class="text-[10px] text-violet-700 mt-2 italic" id="edu-pres-time-hint">⚡ Modo normal: ~30-90 seg, 8 web searches. Modo investigación: ~3-5 min, 25 searches + thinking. Activá investigación para casos donde necesitás profundidad real (clase nueva, tema técnico, lanzamiento).</div>
         </div>
       </details>
+      ` : ''}
 
       ${ai.loading ? `
         <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
