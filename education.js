@@ -304,6 +304,20 @@ function eduRenderDashboard() {
         <button onclick="eduSetTab('students')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-4 py-2 rounded-lg whitespace-nowrap">👥 Ir a Estudiantes →</button>
       </div>
 
+      <!-- 🆕 Bridge a los otros 2 sistemas -->
+      <div class="grid md:grid-cols-2 gap-3">
+        <button onclick="eduOpenSystemFromManager('edu-reports')" class="bg-gradient-to-r from-indigo-900 to-slate-900 hover:from-indigo-800 hover:to-slate-800 text-white rounded-xl p-4 text-left">
+          <div class="text-[10px] uppercase font-bold text-indigo-200">📋 Informe ejecutivo</div>
+          <div class="text-base font-bold mt-1">Ver dashboard board-ready →</div>
+          <div class="text-[11px] text-indigo-100 mt-1">KPIs en vivo, salud del programa, insights para junta directiva</div>
+        </button>
+        <button onclick="eduOpenSystemFromManager('edu-methodology')" class="bg-gradient-to-r from-violet-700 to-fuchsia-700 hover:from-violet-600 hover:to-fuchsia-600 text-white rounded-xl p-4 text-left">
+          <div class="text-[10px] uppercase font-bold text-violet-100">📘 Metodología FlipMentoría</div>
+          <div class="text-base font-bold mt-1">Biblioteca + diagnóstico + crédito →</div>
+          <div class="text-[11px] text-violet-100 mt-1">Currículum, planes generados, módulo de crédito (12 fases · 49 acciones)</div>
+        </button>
+      </div>
+
       <!-- Embudo por etapa -->
       ${(m?.stages || []).length ? `
         <div class="bg-white border border-slate-200 rounded-xl p-4">
@@ -1264,6 +1278,398 @@ function eduRenderReportsStandalone() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// RESUMEN EJECUTIVO EN VIVO (no depende de vistas SQL precomputadas)
+// Calcula KPIs y distribuciones DIRECTO desde eduState y consultas livianas
+// Formato pensado para PRESENTAR A JUNTA DIRECTIVA
+// ════════════════════════════════════════════════════════════════════════
+let eduBoardCache = { key: null, data: null, loading: false };
+
+async function eduLoadBoardSummary(mentorshipId) {
+  if (!mentorshipId) return null;
+  const key = `${mentorshipId}|board|${new Date().toISOString().slice(0,10)}`;
+  if (eduBoardCache.key === key) return eduBoardCache.data;
+  if (eduBoardCache.loading) return null;
+  eduBoardCache.loading = true;
+  try {
+    // Queries livianas — solo COUNTs y agregados básicos. No depende de vistas SQL.
+    const [plansRes, creditDiagRes] = await Promise.all([
+      sb.from('edu_student_plans')
+        .select('id, status, created_at, perfil, student_id', { count: 'exact' })
+        .eq('mentorship_id', mentorshipId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(500)
+        .catch(() => ({ data: [], count: 0 })),
+      sb.from('edu_credit_diagnostics')
+        .select('id, student_id, created_at, perfil, status', { count: 'exact' })
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(200)
+        .catch(() => ({ data: [], count: 0 }))
+    ]);
+
+    eduBoardCache = {
+      key, loading: false,
+      data: {
+        plans: plansRes.data || [],
+        plansCount: plansRes.count || (plansRes.data || []).length,
+        creditDiagnostics: creditDiagRes.data || [],
+        creditCount: creditDiagRes.count || (creditDiagRes.data || []).length,
+        loadedAt: new Date()
+      }
+    };
+    return eduBoardCache.data;
+  } catch (e) {
+    console.warn('eduLoadBoardSummary:', e);
+    eduBoardCache = { key, loading: false, data: { plans: [], plansCount: 0, creditDiagnostics: [], creditCount: 0 } };
+    return eduBoardCache.data;
+  }
+}
+
+// Render del Resumen Ejecutivo (sección board-friendly al INICIO del informe)
+function eduRenderBoardSummary(board) {
+  const students = eduMyStudents();
+  const total = students.length;
+  const activos = students.filter(s => s.estado_pago === 'activo' || s.status === 'active' || !s.estado_pago).length;
+  const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []).length;
+  const alertasAbiertas = eduMyAlerts().length;
+  const sesionesProx = (eduState.calls || []).filter(c => {
+    const d = new Date(c.scheduled_at || c.starts_at);
+    return d >= new Date() && d <= new Date(Date.now() + 7*24*3600*1000);
+  }).length;
+  const plansCount = board?.plansCount || 0;
+  const creditCount = board?.creditCount || 0;
+  const conPlanPct = total ? Math.round(100 * plansCount / total) : 0;
+
+  // Distribución por etapa
+  const m = eduCurrentMentorship();
+  const byStage = {};
+  (m?.stages || []).forEach(st => { byStage[st.key] = { name: st.name, icon: st.icon, n: 0, students: [] }; });
+  students.forEach(s => {
+    if (s.current_stage && byStage[s.current_stage]) {
+      byStage[s.current_stage].n++;
+      byStage[s.current_stage].students.push(s);
+    }
+  });
+
+  // Salud del programa: % de estudiantes con GLScore ≥ 60
+  const withScore = students.filter(s => s.glscore != null && s.glscore > 0);
+  const saludablePct = withScore.length ? Math.round(100 * withScore.filter(s => s.glscore >= 60).length / withScore.length) : null;
+  const avgGL = withScore.length ? Math.round(withScore.reduce((sum, s) => sum + s.glscore, 0) / withScore.length) : null;
+
+  // Top 3 cohortes
+  const cohortes = {};
+  students.forEach(s => {
+    if (!s.grupo) return;
+    if (!cohortes[s.grupo]) cohortes[s.grupo] = 0;
+    cohortes[s.grupo]++;
+  });
+  const topCohortes = Object.entries(cohortes).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  // Distribución de perfiles (de los planes generados)
+  const perfilesDist = {};
+  (board?.plans || []).forEach(p => {
+    const perfilName = p.perfil?.perfil?.nombre || 'Sin clasificar';
+    perfilesDist[perfilName] = (perfilesDist[perfilName] || 0) + 1;
+  });
+
+  // Salud del programa — color por banda
+  const saludColor = saludablePct == null ? 'slate'
+    : saludablePct >= 70 ? 'emerald'
+    : saludablePct >= 50 ? 'amber' : 'red';
+
+  return `
+    <div class="bg-gradient-to-br from-slate-900 to-indigo-900 text-white rounded-xl overflow-hidden mb-4">
+      <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div class="text-[10px] font-bold uppercase text-indigo-200 tracking-wider">📋 RESUMEN EJECUTIVO · ${m?.name || ''}</div>
+          <div class="text-lg font-bold mt-1">Informe para Junta Directiva</div>
+          <div class="text-[11px] text-indigo-200">Datos en vivo · ${new Date().toLocaleDateString('es', { day:'numeric', month:'long', year:'numeric' })}</div>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="eduOpenSystemFromReports('edu-manager')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">🎓 Ver CRM →</button>
+          <button onclick="eduOpenSystemFromReports('edu-methodology')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">📘 Ver Metodología →</button>
+        </div>
+      </div>
+
+      <!-- Hero KPIs · 5 indicadores principales -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 p-5">
+        <div class="bg-white/10 rounded-lg p-3">
+          <div class="text-[10px] uppercase text-indigo-200 font-bold">Estudiantes</div>
+          <div class="text-3xl font-bold mt-1">${total}</div>
+          <div class="text-[10px] text-indigo-200">${activos} activos · ${enRiesgo} en riesgo</div>
+        </div>
+        <div class="bg-white/10 rounded-lg p-3">
+          <div class="text-[10px] uppercase text-indigo-200 font-bold">Salud Programa</div>
+          <div class="text-3xl font-bold mt-1">${saludablePct != null ? saludablePct + '%' : '—'}</div>
+          <div class="text-[10px] text-indigo-200">GLScore ≥ 60${avgGL ? ` · promedio ${avgGL}` : ''}</div>
+        </div>
+        <div class="bg-white/10 rounded-lg p-3">
+          <div class="text-[10px] uppercase text-indigo-200 font-bold">Con Plan</div>
+          <div class="text-3xl font-bold mt-1">${conPlanPct}%</div>
+          <div class="text-[10px] text-indigo-200">${plansCount} planes activos</div>
+        </div>
+        <div class="bg-white/10 rounded-lg p-3">
+          <div class="text-[10px] uppercase text-indigo-200 font-bold">Crédito</div>
+          <div class="text-3xl font-bold mt-1">${creditCount}</div>
+          <div class="text-[10px] text-indigo-200">Diagnósticos activos</div>
+        </div>
+        <div class="bg-white/10 rounded-lg p-3">
+          <div class="text-[10px] uppercase text-indigo-200 font-bold">Próx. 7 días</div>
+          <div class="text-3xl font-bold mt-1">${sesionesProx}</div>
+          <div class="text-[10px] text-indigo-200">Sesiones agendadas</div>
+        </div>
+      </div>
+
+      <!-- Salud + acción rápida -->
+      ${alertasAbiertas > 0 ? `
+        <div class="px-5 pb-4">
+          <div class="bg-amber-500/20 border border-amber-300/30 rounded-lg px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div class="text-xs text-amber-100">
+              <strong class="text-amber-50">⚠️ ${alertasAbiertas} alerta${alertasAbiertas===1?'':'s'} sin atender</strong> · estudiantes que requieren intervención inmediata
+            </div>
+            <button onclick="eduOpenSystemFromReports('edu-manager','alerts')" class="bg-amber-400 hover:bg-amber-300 text-amber-900 text-xs font-bold px-3 py-1 rounded">Ver alertas →</button>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- Distribución por etapa · embudo visual -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-bold text-slate-900">📈 Embudo por etapa</div>
+        <div class="text-[10px] text-slate-500">${m?.stages?.length || 0} etapas · ${total} estudiantes</div>
+      </div>
+      <div class="space-y-2">
+        ${(m?.stages || []).map(st => {
+          const data = byStage[st.key] || { n: 0 };
+          const pct = total ? Math.round(100 * data.n / total) : 0;
+          return `
+            <div>
+              <div class="flex items-center justify-between text-[11px] mb-1">
+                <span class="font-semibold text-slate-700">${st.icon || ''} ${st.name}</span>
+                <span class="text-slate-600"><strong>${data.n}</strong> · ${pct}%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-500 to-blue-500 h-2.5 rounded-full transition-all" style="width:${pct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- 2 columnas: Top cohortes + Distribución de perfiles -->
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <!-- Top cohortes -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-sm font-bold text-slate-900 mb-3">👨‍👩‍👧‍👦 Top cohortes</div>
+        ${topCohortes.length ? topCohortes.map(([nom, n]) => `
+          <div class="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
+            <div class="text-sm text-slate-700 truncate flex-1 mr-2">${(nom||'').replace(/</g,'&lt;')}</div>
+            <div class="text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">${n} est.</div>
+          </div>
+        `).join('') : '<div class="text-xs text-slate-400 italic">Sin cohortes definidas todavía.</div>'}
+      </div>
+      <!-- Distribución de perfiles -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-sm font-bold text-slate-900 mb-3">🎯 Distribución de perfiles (planes activos)</div>
+        ${Object.keys(perfilesDist).length ? Object.entries(perfilesDist).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([nom, n]) => {
+          const pct = plansCount ? Math.round(100 * n / plansCount) : 0;
+          return `
+            <div class="mb-1.5">
+              <div class="flex items-center justify-between text-[11px] mb-0.5">
+                <span class="font-semibold text-slate-700 truncate flex-1 mr-2">${nom.replace(/</g,'&lt;')}</span>
+                <span class="text-slate-600">${n} · ${pct}%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5">
+                <div class="bg-violet-500 h-1.5 rounded-full" style="width:${pct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('') : '<div class="text-xs text-slate-400 italic">Aún no se han generado planes. Generá uno desde Metodología FlipMentoría → Diagnóstico.</div>'}
+      </div>
+    </div>
+
+    <!-- Insights ejecutivos automáticos -->
+    ${eduRenderBoardInsights({ total, activos, enRiesgo, alertasAbiertas, plansCount, conPlanPct, creditCount, saludablePct, avgGL, perfilesDist, byStage })}
+  `;
+}
+
+// Genera 3-5 insights accionables para presentar a junta directiva
+function eduRenderBoardInsights(metrics) {
+  const insights = [];
+
+  if (metrics.enRiesgo > 0) {
+    const pct = metrics.total ? Math.round(100 * metrics.enRiesgo / metrics.total) : 0;
+    insights.push({
+      tipo: pct > 20 ? 'critica' : 'atencion',
+      titulo: `${metrics.enRiesgo} estudiante${metrics.enRiesgo===1?'':'s'} en riesgo (${pct}% de la cartera)`,
+      accion: 'Programar sesiones 1-a-1 esta semana. Si no respondés, considerar churn prevention call.'
+    });
+  }
+
+  if (metrics.conPlanPct < 50) {
+    insights.push({
+      tipo: 'atencion',
+      titulo: `Solo ${metrics.conPlanPct}% de los estudiantes tiene plan activo`,
+      accion: `Generar plan para los ${metrics.total - metrics.plansCount} restantes desde Metodología FlipMentoría → Diagnóstico.`
+    });
+  } else if (metrics.conPlanPct >= 80) {
+    insights.push({
+      tipo: 'win',
+      titulo: `${metrics.conPlanPct}% de los estudiantes con plan activo`,
+      accion: 'Excelente cobertura. Foco ahora en seguimiento de cumplimiento de tareas.'
+    });
+  }
+
+  if (metrics.saludablePct != null) {
+    if (metrics.saludablePct < 50) {
+      insights.push({
+        tipo: 'critica',
+        titulo: `Salud del programa baja: ${metrics.saludablePct}% con GLScore ≥ 60`,
+        accion: 'Revisar metodología pedagógica y mecanismos de seguimiento. Considerar cambio en formato de sesiones.'
+      });
+    } else if (metrics.saludablePct >= 70) {
+      insights.push({
+        tipo: 'win',
+        titulo: `Salud del programa sólida: ${metrics.saludablePct}% de estudiantes con GLScore saludable`,
+        accion: 'Mantener cadencia actual. Documentar mejores prácticas.'
+      });
+    }
+  }
+
+  if (metrics.alertasAbiertas > 5) {
+    insights.push({
+      tipo: 'atencion',
+      titulo: `${metrics.alertasAbiertas} alertas sin atender acumuladas`,
+      accion: 'Bloquear 60 min esta semana para revisar todas. Si hay patrón común, ajustar el proceso.'
+    });
+  }
+
+  if (metrics.plansCount > 0 && Object.keys(metrics.perfilesDist).length > 0) {
+    const top = Object.entries(metrics.perfilesDist).sort((a,b)=>b[1]-a[1])[0];
+    if (top && top[1] / metrics.plansCount > 0.4) {
+      insights.push({
+        tipo: 'oportunidad',
+        titulo: `Perfil dominante: "${top[0]}" (${Math.round(100*top[1]/metrics.plansCount)}% de los planes)`,
+        accion: `Crear contenido y sesiones grupales específicas para este perfil — alta palanca de impacto.`
+      });
+    }
+  }
+
+  // Identificar etapa con más cuello de botella
+  if (metrics.byStage) {
+    const etapasConDatos = Object.entries(metrics.byStage).filter(([k,v]) => v.n > 0);
+    if (etapasConDatos.length) {
+      const maxEtapa = etapasConDatos.sort((a,b) => b[1].n - a[1].n)[0];
+      const pct = metrics.total ? Math.round(100 * maxEtapa[1].n / metrics.total) : 0;
+      if (pct > 30) {
+        insights.push({
+          tipo: 'oportunidad',
+          titulo: `${pct}% de los estudiantes está en "${maxEtapa[1].name}"`,
+          accion: 'Es la etapa con mayor concentración. Diseñar contenido específico para acelerar avance + identificar bloqueos comunes.'
+        });
+      }
+    }
+  }
+
+  if (!insights.length) {
+    insights.push({
+      tipo: 'win',
+      titulo: 'Sin alertas críticas detectadas',
+      accion: 'Buen momento para enfocarse en crecimiento o nuevos formatos.'
+    });
+  }
+
+  const colorMap = {
+    critica: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-900', accent: 'bg-red-600', label: '🚨 CRÍTICO' },
+    atencion: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900', accent: 'bg-amber-500', label: '⚠️ ATENCIÓN' },
+    win: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-900', accent: 'bg-emerald-600', label: '✅ FORTALEZA' },
+    oportunidad: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', accent: 'bg-blue-600', label: '💡 OPORTUNIDAD' }
+  };
+
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
+      <div class="bg-slate-900 text-white px-5 py-3">
+        <div class="font-bold text-sm">💼 Insights ejecutivos · qué presentar a la junta</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Conclusiones accionables generadas automáticamente desde los datos</div>
+      </div>
+      <div class="p-4 space-y-3">
+        ${insights.map(i => {
+          const c = colorMap[i.tipo] || colorMap.atencion;
+          return `
+            <div class="${c.bg} ${c.border} border rounded-lg p-3">
+              <div class="flex items-start gap-3">
+                <div class="${c.accent} text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase whitespace-nowrap">${c.label}</div>
+                <div class="flex-1">
+                  <div class="font-bold text-sm ${c.text}">${i.titulo}</div>
+                  <div class="text-xs ${c.text} opacity-80 mt-1">${i.accion}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div class="bg-slate-50 border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">
+        💡 Estos insights se generan en vivo desde el CRM y Metodología. La narrativa IA completa se genera más abajo.
+      </div>
+    </div>
+  `;
+}
+
+// Helper: abre CRM Mentorías o Informes Ejecutivos desde Metodología FlipMentoría
+async function eduOpenSystemFromMethodology(systemType) {
+  let target = null;
+  if (state && state.systems) {
+    for (const arr of Object.values(state.systems || {})) {
+      const found = (arr || []).find(s => s.type === systemType);
+      if (found) { target = found; break; }
+    }
+  }
+  if (!target) return alert('No encontré el sistema. Verificá que esté creado en Educación.');
+  try { closeModal(); } catch (e) {}
+  if (systemType === 'edu-manager') return openEduManager(target);
+  if (systemType === 'edu-reports') return openEduReportsSystem(target);
+}
+
+// Helper: abre Informes Ejecutivos o Metodología desde Mentorías Manager
+async function eduOpenSystemFromManager(systemType) {
+  let target = null;
+  if (state && state.systems) {
+    for (const arr of Object.values(state.systems || {})) {
+      const found = (arr || []).find(s => s.type === systemType);
+      if (found) { target = found; break; }
+    }
+  }
+  if (!target) return alert('No encontré el sistema. Verificá que esté creado en Educación.');
+  try { closeModal(); } catch (e) {}
+  if (systemType === 'edu-reports') return openEduReportsSystem(target);
+  if (systemType === 'edu-methodology') return openEduMethodologySystem(target);
+}
+
+// Helper: abre otro sistema (Mentorías Manager o Metodología) desde Informes Ejecutivos
+async function eduOpenSystemFromReports(systemType, tabKey) {
+  let target = null;
+  if (state && state.systems) {
+    for (const arr of Object.values(state.systems || {})) {
+      const found = (arr || []).find(s => s.type === systemType);
+      if (found) { target = found; break; }
+    }
+  }
+  if (!target) return alert('No encontré el sistema. Verificá que esté creado en Educación.');
+  try { closeModal(); } catch (e) {}
+  if (systemType === 'edu-manager') {
+    if (tabKey && EDU_TABS.find(t => t.key === tabKey)) eduState.tab = tabKey;
+    return openEduManager(target);
+  }
+  if (systemType === 'edu-methodology') {
+    if (tabKey && typeof fmState !== 'undefined') fmState.activeTab = tabKey;
+    return openEduMethodologySystem(target);
+  }
+}
+
 function _eduRenderReportsStandaloneInner(root) {
   const cur = eduCurrentMentorship();
   const reports = (eduState.reports || []).filter(r => r.mentorship_id === eduState.mentorshipId);
@@ -1297,7 +1703,15 @@ function _eduRenderReportsStandaloneInner(root) {
     if (typeof eduRenderCeoSectionAsync === 'function') {
       setTimeout(() => eduRenderCeoSectionAsync(eduState.mentorshipId, 'edu-ceo-section'), 50);
     }
+    // 🆕 Cargar Resumen Ejecutivo en vivo (board-ready) — independiente de vistas SQL
+    const boardKey = `${eduState.mentorshipId}|board|${new Date().toISOString().slice(0,10)}`;
+    if (eduBoardCache.key !== boardKey && !eduBoardCache.loading) {
+      eduLoadBoardSummary(eduState.mentorshipId).then((res) => {
+        if (res != null && eduBoardCache.key === boardKey) eduRenderReportsStandalone();
+      });
+    }
   }
+  const boardSummary = (eduBoardCache.key === `${eduState.mentorshipId}|board|${new Date().toISOString().slice(0,10)}`) ? eduBoardCache.data : null;
 
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
@@ -1314,6 +1728,9 @@ function _eduRenderReportsStandaloneInner(root) {
       </div>
 
       <div class="flex-1 overflow-y-auto space-y-3">
+
+        <!-- 🆕 RESUMEN EJECUTIVO EN VIVO (board-friendly · no depende de vistas SQL) -->
+        ${cur ? eduRenderBoardSummary(boardSummary) : ''}
 
         <!-- KPIs dashboard (auto desde DB) -->
         <div class="bg-slate-900 text-white rounded-xl p-4">
@@ -1998,7 +2415,11 @@ function fmRenderInner() {
             <h2 class="font-bold text-slate-900 text-lg">📘 ${fmState.sys.name}</h2>
             <p class="text-xs text-slate-500">71 tareas · 400+ contactos · 3 anexos · IA Coach</p>
           </div>
-          <button onclick="window.history.back()" class="text-sm text-slate-500 hover:text-slate-700">← Volver</button>
+          <div class="flex items-center gap-2">
+            <button onclick="eduOpenSystemFromMethodology('edu-manager')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded">🎓 CRM Mentorías</button>
+            <button onclick="eduOpenSystemFromMethodology('edu-reports')" class="text-[11px] bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold px-3 py-1.5 rounded">📋 Informe ejecutivo</button>
+            <button onclick="window.history.back()" class="text-sm text-slate-500 hover:text-slate-700">← Volver</button>
+          </div>
         </div>
         <div class="flex gap-1 -mb-px">
           <button onclick="fmSetTab('biblioteca')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'biblioteca' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">📚 Biblioteca</button>
@@ -2606,13 +3027,457 @@ function eduCloseStudentDetail() {
 
 function eduShowStudentDetail(studentId) {
   eduCloseStudentDetail();
-  const html = eduRenderStudentDetail(studentId);
-  if (!html) return;
+  const s = eduState.students.find(x => x.id === studentId);
+  if (!s) return;
+  const escFn = window.esc || (str => String(str||''));
+
   const wrap = document.createElement('div');
   wrap.id = 'edu-student-detail-modal';
-  wrap.innerHTML = html;
+  wrap.innerHTML = `
+    <div class="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4" onclick="if(event.target===this) eduCloseStudentDetail()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white p-4 flex items-start justify-between gap-3 flex-shrink-0">
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] font-bold text-amber-300 tracking-wider mb-0.5">📊 CRM 360° · FICHA COMPLETA</div>
+            <h2 class="text-xl font-bold truncate">${escFn(s.full_name || '—')}</h2>
+            <div class="text-xs text-slate-300 mt-0.5">${escFn(s.grupo||'')}${s.email?' · '+escFn(s.email):''}${s.phone?' · '+escFn(s.phone):''}</div>
+          </div>
+          <button onclick="eduCloseStudentDetail()" class="text-white/70 hover:text-white text-2xl leading-none flex-shrink-0">×</button>
+        </div>
+        <div class="border-b border-slate-200 flex gap-1 px-3 pt-2 bg-slate-50 overflow-x-auto flex-shrink-0">
+          <button data-crm360-tab="resumen" onclick="eduCRM360ShowTab('${s.id}','resumen')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-900 text-white whitespace-nowrap">📊 Resumen</button>
+          <button data-crm360-tab="diagnostico" onclick="eduCRM360ShowTab('${s.id}','diagnostico')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">📝 Diagnóstico <span id="crm360-badge-diag" class="ml-1 text-[10px] opacity-70"></span></button>
+          <button data-crm360-tab="plan" onclick="eduCRM360ShowTab('${s.id}','plan')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">🎯 Plan & Progreso <span id="crm360-badge-plan" class="ml-1 text-[10px] opacity-70"></span></button>
+          <button data-crm360-tab="timeline" onclick="eduCRM360ShowTab('${s.id}','timeline')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">⏱ Timeline</button>
+          <button data-crm360-tab="notas" onclick="eduCRM360ShowTab('${s.id}','notas')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">✏️ Notas + Editar</button>
+        </div>
+        <div class="bg-slate-50 border-b border-slate-200 px-3 py-2 flex flex-wrap gap-1.5 flex-shrink-0">
+          <button onclick="eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}');" class="px-2.5 py-1 bg-amber-600 text-white text-[11px] font-bold rounded hover:bg-amber-700">🎯 Ver/Generar Plan</button>
+          <button onclick="try { eduShareDiagnosticForm('${s.id}'); } catch(e) { alert('Error: '+e.message); }" class="px-2.5 py-1 bg-blue-600 text-white text-[11px] font-bold rounded hover:bg-blue-700">📨 Enviar diagnóstico</button>
+          <button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-2.5 py-1 ${s.phone?'bg-emerald-500 hover:bg-emerald-600':'bg-amber-500 hover:bg-amber-600'} text-white text-[11px] font-bold rounded">💬 WhatsApp</button>
+          <button onclick="eduGenerateCertificate('${s.id}')" class="px-2.5 py-1 bg-violet-600 text-white text-[11px] font-bold rounded hover:bg-violet-700">🎓 Certificado</button>
+        </div>
+        <div id="crm360-content" class="p-4 overflow-y-auto flex-1">
+          <div class="text-center text-slate-500 py-8">
+            <div class="inline-block w-8 h-8 border-3 border-slate-300 border-t-slate-700 rounded-full animate-spin"></div>
+            <div class="text-xs mt-2">Cargando datos del estudiante...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
   document.body.appendChild(wrap);
+  setTimeout(() => { try { eduLoadCRM360(studentId); } catch (e) { console.warn('crm360', e); } }, 30);
 }
+
+// ════════════════════════════════════════════════════════════
+// 📊 CRM 360° — carga TODO en paralelo, mostra por tabs
+// ════════════════════════════════════════════════════════════
+window._crm360Cache = window._crm360Cache || {};
+
+async function eduLoadCRM360(studentId) {
+  const cont = document.getElementById('crm360-content');
+  if (!cont) return;
+  try {
+    const [invitesRes, planRes, tasksRes] = await Promise.all([
+      sb.from('edu_diagnostic_invites').select('*').eq('student_id', studentId).order('created_at', { ascending: false }),
+      sb.from('edu_student_plans').select('*').eq('student_id', studentId).order('created_at', { ascending: false }),
+      sb.from('edu_student_plan_tasks').select('*').eq('student_id', studentId).order('completed_at', { ascending: false, nullsFirst: false })
+    ]);
+    const invites = invitesRes.data || [];
+    const plans = planRes.data || [];
+    const tasks = tasksRes.data || [];
+    const activePlan = plans.find(p => p.status === 'active') || plans[0];
+    const activePlanTasks = activePlan ? tasks.filter(t => t.plan_id === activePlan.id) : [];
+    window._crm360Cache[studentId] = { invites, plans, tasks, activePlan, activePlanTasks };
+
+    const bD = document.getElementById('crm360-badge-diag');
+    const bP = document.getElementById('crm360-badge-plan');
+    if (bD) bD.textContent = invites.length ? `(${invites.length})` : '';
+    if (bP) bP.textContent = activePlan ? `(${activePlanTasks.filter(t=>t.completed).length}/${activePlanTasks.length})` : '';
+
+    eduCRM360ShowTab(studentId, 'resumen');
+  } catch (e) {
+    console.error('eduLoadCRM360', e);
+    cont.innerHTML = `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-800">Error cargando datos: ${e.message}</div>`;
+  }
+}
+
+function eduCRM360ShowTab(studentId, tab) {
+  const data = window._crm360Cache?.[studentId];
+  const s = eduState.students.find(x => x.id === studentId);
+  const cont = document.getElementById('crm360-content');
+  if (!cont || !s) return;
+  if (!data) { cont.innerHTML = '<div class="text-xs text-slate-500 p-4">Cargando…</div>'; return; }
+
+  document.querySelectorAll('[data-crm360-tab]').forEach(el => {
+    if (el.dataset.crm360Tab === tab) {
+      el.classList.add('bg-slate-900', 'text-white');
+      el.classList.remove('bg-slate-100', 'text-slate-700');
+    } else {
+      el.classList.remove('bg-slate-900', 'text-white');
+      el.classList.add('bg-slate-100', 'text-slate-700');
+    }
+  });
+
+  if (tab === 'resumen') cont.innerHTML = eduCRM360RenderResumen(s, data);
+  else if (tab === 'diagnostico') cont.innerHTML = eduCRM360RenderDiagnostico(s, data);
+  else if (tab === 'plan') cont.innerHTML = eduCRM360RenderPlan(s, data);
+  else if (tab === 'timeline') cont.innerHTML = eduCRM360RenderTimeline(s, data);
+  else if (tab === 'notas') cont.innerHTML = eduCRM360RenderNotas(s, data);
+}
+
+function eduCRM360RenderResumen(s, data) {
+  const escFn = window.esc || (str => String(str||''));
+  const { invites, plans, activePlan, activePlanTasks } = data;
+  const completas = invites.filter(i => i.completed_at).length;
+  const planTitle = activePlan?.perfil?.perfil?.nombre || activePlan?.perfil?.titulo || '—';
+  const totalTasks = activePlanTasks.length;
+  const doneTasks = activePlanTasks.filter(t => t.completed).length;
+  const pct = totalTasks ? Math.round(doneTasks/totalTasks*100) : 0;
+  const blocksMap = {};
+  activePlanTasks.forEach(t => {
+    const k = `${t.bloque_orden}__${t.bloque_id}`;
+    if (!blocksMap[k]) blocksMap[k] = { orden: t.bloque_orden, etapa: t.bloque_etapa, subetapa: t.bloque_subetapa, tasks: [] };
+    blocksMap[k].tasks.push(t);
+  });
+  const blocks = Object.values(blocksMap).sort((a,b)=>a.orden-b.orden);
+  const currentBlock = blocks.find(b => b.tasks.some(t => !t.completed));
+  const lastAct = activePlanTasks.filter(t => t.completed_at).sort((a,b)=>new Date(b.completed_at)-new Date(a.completed_at))[0];
+  const lastDate = lastAct?.completed_at ? new Date(lastAct.completed_at) : null;
+  const diasInactivo = lastDate ? Math.floor((Date.now()-lastDate.getTime())/(86400000)) : (s.enrolled_at ? Math.floor((Date.now()-new Date(s.enrolled_at).getTime())/(86400000)) : null);
+
+  return `
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div class="bg-slate-900 text-white rounded-lg p-3">
+          <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Etapa actual</div>
+          <div class="text-lg font-bold mt-0.5">${escFn(s.current_stage || '—')}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Progreso plan</div>
+          <div class="text-lg font-bold text-emerald-900">${pct}%</div>
+          <div class="text-[10px] text-emerald-700">${doneTasks}/${totalTasks} tareas</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Diagnósticos</div>
+          <div class="text-lg font-bold text-blue-900">${completas}/${invites.length}</div>
+          <div class="text-[10px] text-blue-700">completos / enviados</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Inactividad</div>
+          <div class="text-lg font-bold text-amber-900">${diasInactivo!=null?diasInactivo+'d':'—'}</div>
+          <div class="text-[10px] text-amber-700">desde última acción</div>
+        </div>
+      </div>
+
+      ${activePlan ? `
+        <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-lg p-3">
+          <div class="text-[10px] font-bold uppercase text-slate-600 mb-1">PLAN ACTIVO</div>
+          <div class="font-bold text-sm">${escFn(planTitle)}</div>
+          ${currentBlock ? `<div class="text-xs text-slate-700 mt-1">📍 Bloque actual: <strong>${escFn(currentBlock.subetapa)}</strong> (${escFn(currentBlock.etapa)})</div>` : '<div class="text-xs text-emerald-700 mt-1">🎉 Plan completado</div>'}
+          <div class="h-1.5 bg-white rounded-full mt-2 overflow-hidden"><div class="h-full bg-emerald-500" style="width:${pct}%"></div></div>
+        </div>` : `
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">⚠️ Sin plan asignado todavía.</div>`}
+
+      <div class="bg-white border border-slate-200 rounded-lg p-3">
+        <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">📞 DATOS CRM (contacto + comercial)</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div><span class="text-slate-500">Email:</span> <strong>${escFn(s.email||'—')}</strong></div>
+          <div><span class="text-slate-500">Phone:</span> <strong>${escFn(s.phone||'—')}</strong></div>
+          <div><span class="text-slate-500">Ciudad:</span> <strong>${escFn(s.city||'—')}</strong></div>
+          <div><span class="text-slate-500">Cohorte:</span> <strong>${escFn(s.grupo||'—')}</strong></div>
+          <div><span class="text-slate-500">Pago:</span> <strong class="${s.payment_status==='active'?'text-emerald-700':s.payment_status==='past_due'?'text-red-700':'text-slate-700'}">${escFn(s.payment_status||'—')}</strong></div>
+          <div><span class="text-slate-500">Status:</span> <strong>${escFn(s.status||'—')}</strong></div>
+          <div><span class="text-slate-500">Entrada:</span> <strong>${s.enrolled_at?new Date(s.enrolled_at).toLocaleDateString('es'):'—'}</strong></div>
+          <div><span class="text-slate-500">Vence:</span> <strong>${s.expires_at?new Date(s.expires_at).toLocaleDateString('es'):'—'}</strong></div>
+          <div><span class="text-slate-500">Capital:</span> <strong>${s.capital_actual?'$'+Number(s.capital_actual).toLocaleString():'—'}</strong></div>
+          <div><span class="text-slate-500">Días en etapa:</span> <strong>${eduDaysInStage(s)??'—'}d</strong></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+const DIAG_Q_LABELS = {
+  objetivo: '¿Cuál es tu objetivo principal en real estate?',
+  mercado: '¿En qué mercado o estado vas a operar?',
+  capital: '¿Cuánto capital tenés disponible?',
+  capital_real: '¿Qué tan líquido es ese capital?',
+  fuentes_capital: '¿Cómo conseguís capital adicional?',
+  credit: '¿Cuál es tu credit score actual?',
+  llc: '¿Tenés LLC formada?',
+  setup_legal: '¿Qué elementos del setup legal ya tenés?',
+  tiempo: '¿Cuántas horas por semana podés dedicar?',
+  deals_cerrados: '¿Cuántos deals cerraste hasta ahora?',
+  buybox: '¿Tenés Buy Box definido?',
+  arv_skill: '¿Qué tan bien calculás ARV?',
+  hml_status: '¿Tenés HML pre-aprobado?',
+  wholesalers: '¿Cuántos wholesalers activos te mandan deals?',
+  ofertas_mes: '¿Cuántas ofertas formales hacés por mes?',
+  gc_status: '¿Tenés GC primario y backup?',
+  mayor_obstaculo: '¿Cuál es tu mayor obstáculo hoy?',
+  meta_deals: '¿Cuál es tu meta de deals para los próximos 12 meses?',
+  etapa_actual: '¿En qué etapa de la metodología creés que estás?',
+  inmigracion: '¿Cuál es tu situación migratoria/legal?',
+  experiencia_renta: '¿Experiencia previa con rentas?'
+};
+const DIAG_A_LABELS = {
+  'menos_20k':'menos de $20K','20_50k':'$20K-$50K','50_100k':'$50K-$100K','100_250k':'$100K-$250K','mas_250k':'más de $250K',
+  'todo':'100% líquido','mitad':'~50% líquido','minimo':'mínimo líquido','teorico':'mayoritariamente teórico',
+  'mas_780':'> 780','720_780':'720-780','660_720':'660-720','600_660':'600-660','menos_600':'< 600','sin_historial':'sin historial USA',
+  'si_mismo':'Sí, en el estado de inversión','si_otro':'Sí, pero en otro estado','no':'No, todavía no',
+  'mas_30':'30+ h/sem (full-time)','15_30':'15-30 h/sem','menos_15':'menos de 15 h/sem',
+  '0':'Ninguno','3_5':'3 a 5','5_mas':'5 o más',
+  '10_mas':'10+','3_9':'3 a 9','1_2':'1 o 2','cero':'Ninguno','analisis_no_oferta':'Analizo pero no oferto',
+  'capital':'Capital insuficiente','conocimiento':'Falta de conocimiento técnico','red':'Red de contactos débil','tiempo':'Tiempo limitado','miedo':'Parálisis / miedo','mercado':'Encontrar deals','equipo':'Equipo para escalar',
+  'fix_flip':'Fix & Flip','fix_hold':'Fix & Hold','hibrido':'Híbrido','wholesale':'Wholesaling','lender':'Private/Hard Money Lender',
+  'principiante':'Principiante','algo':'Algo de noción','solido':'Sólido','experto':'Experto',
+  'a_construir':'Construir las fuentes','familia':'Familia / amigos','partnership':'Partnership','private_money':'Private money','heloc':'HELOC','propio_100':'100% propio'
+};
+function diagAnswerLabel(value) {
+  if (value == null || value === '') return '—';
+  if (Array.isArray(value)) return value.map(v => DIAG_A_LABELS[v] || v).join(', ');
+  return DIAG_A_LABELS[value] || String(value);
+}
+
+function eduCRM360RenderDiagnostico(s, data) {
+  const escFn = window.esc || (str => String(str||''));
+  const { invites } = data;
+  if (!invites.length) {
+    return `<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+      Sin diagnóstico todavía.
+      <button onclick="eduShareDiagnosticForm('${s.id}')" class="ml-2 font-bold underline">Enviar formulario →</button>
+    </div>`;
+  }
+  return `
+    <div class="space-y-3">
+      ${invites.map((inv, idx) => {
+        const ans = inv.answers || {};
+        const isLast = idx === 0;
+        const completado = !!inv.completed_at;
+        const respondidas = Object.keys(ans).filter(k => ans[k] != null && ans[k] !== '').length;
+        return `
+          <div class="bg-white border ${isLast ? 'border-blue-300 ring-1 ring-blue-200' : 'border-slate-200'} rounded-lg overflow-hidden">
+            <details ${isLast ? 'open' : ''}>
+              <summary class="cursor-pointer p-3 bg-slate-50 flex items-center justify-between list-none">
+                <div>
+                  <div class="text-[10px] font-bold uppercase text-slate-600">${isLast ? '🆕 ÚLTIMO' : 'Diagnóstico'} · ${new Date(inv.created_at).toLocaleDateString('es')}</div>
+                  <div class="text-sm font-bold mt-0.5">${completado ? '✅ Completado ' + new Date(inv.completed_at).toLocaleDateString('es') : '⏳ Enviado, sin completar'}</div>
+                </div>
+                <div class="text-xs text-slate-500">${respondidas} respuestas</div>
+              </summary>
+              <div class="divide-y divide-slate-100">
+                ${Object.keys(DIAG_Q_LABELS).map(key => {
+                  const v = ans[key];
+                  if (v == null || v === '' || (Array.isArray(v) && !v.length)) return '';
+                  return `
+                    <div class="p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <div class="text-xs text-slate-600 md:col-span-2">${escFn(DIAG_Q_LABELS[key])}</div>
+                      <div class="text-sm font-bold text-slate-900">${escFn(diagAnswerLabel(v))}</div>
+                    </div>
+                  `;
+                }).join('')}
+                ${Object.keys(ans).filter(k => !DIAG_Q_LABELS[k] && ans[k] != null && ans[k] !== '').length ? `
+                  <details class="p-3 bg-slate-50">
+                    <summary class="text-xs font-bold text-slate-600 cursor-pointer">📦 Otros campos (raw)</summary>
+                    <pre class="text-[10px] text-slate-700 mt-2 whitespace-pre-wrap">${escFn(JSON.stringify(Object.fromEntries(Object.entries(ans).filter(([k,val])=>!DIAG_Q_LABELS[k] && val != null && val !== '')), null, 2))}</pre>
+                  </details>` : ''}
+              </div>
+            </details>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function eduCRM360RenderPlan(s, data) {
+  const escFn = window.esc || (str => String(str||''));
+  const { activePlan, activePlanTasks, plans } = data;
+  if (!activePlan) {
+    return `<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+      Sin plan asignado todavía.
+      <button onclick="eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}')" class="ml-2 font-bold underline">Generar plan →</button>
+    </div>`;
+  }
+  const pdata = activePlan.perfil || {};
+  const perfil = pdata.perfil || {};
+  const map = {};
+  activePlanTasks.forEach(t => {
+    const k = `${t.bloque_orden}__${t.bloque_id}`;
+    if (!map[k]) map[k] = { orden: t.bloque_orden, etapa: t.bloque_etapa, subetapa: t.bloque_subetapa, tasks: [] };
+    map[k].tasks.push(t);
+  });
+  const blocks = Object.values(map).sort((a,b)=>a.orden-b.orden);
+  const currentBlockIdx = blocks.findIndex(b => b.tasks.some(t => !t.completed));
+
+  return `
+    <div class="space-y-3">
+      <div class="bg-slate-900 text-white rounded-lg p-3">
+        <div class="text-[10px] font-bold text-amber-300 uppercase">${escFn(perfil.nombre || pdata.titulo || 'Plan personalizado')}</div>
+        <div class="text-xs mt-1">Creado: ${new Date(activePlan.created_at).toLocaleDateString('es')}</div>
+        ${pdata.objetivo_operativo ? `<div class="mt-2 text-xs bg-white/10 rounded p-2"><strong>Objetivo:</strong> ${escFn(pdata.objetivo_operativo)}</div>` : ''}
+        ${pdata.regla_plan ? `<div class="mt-1 text-xs bg-white/10 rounded p-2"><strong>Regla:</strong> ${escFn(pdata.regla_plan)}</div>` : ''}
+      </div>
+
+      ${blocks.map((b, idx) => {
+        const bDone = b.tasks.filter(t=>t.completed).length;
+        const bTotal = b.tasks.length;
+        const bPct = bTotal ? Math.round(bDone/bTotal*100) : 0;
+        const isCurrent = idx === currentBlockIdx;
+        const isDone = bDone === bTotal && bTotal > 0;
+        return `
+          <div class="bg-white border ${isCurrent?'border-amber-400 ring-1 ring-amber-200':isDone?'border-emerald-300':'border-slate-200'} rounded-lg overflow-hidden">
+            <details ${isCurrent ? 'open' : ''}>
+              <summary class="cursor-pointer p-2.5 ${isCurrent?'bg-amber-50':isDone?'bg-emerald-50':'bg-slate-50'} flex items-center justify-between list-none">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                  <div class="w-6 h-6 rounded-full ${isCurrent?'bg-amber-600':isDone?'bg-emerald-600':'bg-slate-400'} text-white text-xs font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-[10px] font-bold uppercase ${isCurrent?'text-amber-700':isDone?'text-emerald-700':'text-slate-500'} truncate">${escFn(b.etapa)}${isCurrent?' · ACTUAL':''}</div>
+                    <div class="text-sm font-bold truncate">${escFn(b.subetapa)}</div>
+                  </div>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  <div class="text-sm font-bold">${bDone}/${bTotal}</div>
+                  <div class="text-[10px] text-slate-500">${bPct}%</div>
+                </div>
+              </summary>
+              <ul class="divide-y divide-slate-100">
+                ${b.tasks.map(t => `
+                  <li class="p-2 flex items-start gap-2 text-xs">
+                    <span class="${t.completed?'text-emerald-600':'text-slate-300'} font-bold flex-shrink-0">${t.completed?'✓':'○'}</span>
+                    <span class="flex-1 ${t.completed?'line-through text-slate-400':'text-slate-800'}">${escFn(t.paso_text||'')}</span>
+                    ${t.completed_at ? `<span class="text-[10px] text-slate-400 flex-shrink-0">${new Date(t.completed_at).toLocaleDateString('es')}</span>` : ''}
+                  </li>
+                `).join('')}
+              </ul>
+            </details>
+          </div>
+        `;
+      }).join('')}
+
+      ${plans.length > 1 ? `
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700">
+          📚 Historial: ${plans.length} planes totales (${plans.filter(p=>p.status==='archived').length} archivados)
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function eduCRM360RenderTimeline(s, data) {
+  const escFn = window.esc || (str => String(str||''));
+  const { invites, plans, activePlanTasks } = data;
+  const events = [];
+
+  if (s.enrolled_at) events.push({ date: s.enrolled_at, icon: '🎓', text: 'Inscripción al programa', type: 'milestone' });
+
+  invites.forEach(i => {
+    events.push({ date: i.created_at, icon: '📨', text: 'Diagnóstico enviado al estudiante', type: 'action' });
+    if (i.completed_at) events.push({ date: i.completed_at, icon: '✅', text: 'Estudiante completó el diagnóstico', type: 'milestone' });
+    if (i.result_plan_id && i.completed_at) events.push({ date: i.completed_at, icon: '🎯', text: 'Plan generado automáticamente desde el diagnóstico', type: 'milestone' });
+  });
+
+  plans.forEach(p => {
+    const title = p.perfil?.perfil?.nombre || p.perfil?.titulo || 'Plan personalizado';
+    events.push({ date: p.created_at, icon: '📋', text: `Plan "${title}" ${p.status==='active'?'asignado y activo':'creado (archivado)'}`, type: 'milestone' });
+  });
+
+  activePlanTasks.filter(t => t.completed_at).forEach(t => {
+    const txt = (t.paso_text||'').slice(0,90) + ((t.paso_text||'').length>90?'…':'');
+    events.push({ date: t.completed_at, icon: '✓', text: `Tarea completada: ${txt}`, type: 'progress' });
+  });
+
+  events.sort((a,b)=> new Date(b.date)-new Date(a.date));
+
+  if (!events.length) return `<div class="text-center text-slate-500 text-sm p-8">Sin eventos registrados todavía.</div>`;
+
+  return `
+    <div class="space-y-2">
+      <div class="text-xs text-slate-600 mb-2">📊 ${events.length} eventos en orden cronológico (más reciente primero)</div>
+      ${events.map(e => {
+        const cls = e.type==='milestone'?'border-emerald-300 bg-emerald-50':e.type==='action'?'border-blue-300 bg-blue-50':'border-slate-200 bg-white';
+        return `
+          <div class="border ${cls} rounded-lg p-2.5 flex items-start gap-2">
+            <div class="text-base flex-shrink-0">${e.icon}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs text-slate-900">${escFn(e.text)}</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">${new Date(e.date).toLocaleString('es')}</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function eduCRM360RenderNotas(s) {
+  const m = typeof eduCurrentMentorship === 'function' ? eduCurrentMentorship() : null;
+  const stages = (m?.stages || []).map(x => x.name);
+  return `
+    <div class="space-y-3">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Etapa actual</label>
+          <input id="crm360-stage" type="text" value="${(s.current_stage||'').replace(/"/g,'&quot;')}" list="crm360-stages-${s.id}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+          <datalist id="crm360-stages-${s.id}">${stages.map(st => `<option value="${st}">`).join('')}</datalist>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Status</label>
+          <select id="crm360-status" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${['active','at_risk','paused','graduated','dropped'].map(st => `<option value="${st}" ${s.status===st?'selected':''}>${st}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Pago</label>
+          <select id="crm360-payment" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${['active','past_due','expired','paused','cancelled'].map(pp => `<option value="${pp}" ${s.payment_status===pp?'selected':''}>${pp}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Capital ($)</label>
+          <input id="crm360-capital" type="number" value="${s.capital_actual||''}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold uppercase text-slate-600">Observaciones de seguimiento (último call, situación actual)</label>
+        <textarea id="crm360-obs" rows="3" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(s.observaciones_seguimiento||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold uppercase text-slate-600">Notas generales (contexto comercial, marketing, ventas)</label>
+        <textarea id="crm360-notes" rows="5" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" placeholder="Ej: prospect referido por X, interés en Fix&Hold, capital $80K líquido...">${(s.notes||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <button onclick="eduCRM360SaveAll('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar todo</button>
+    </div>
+  `;
+}
+
+async function eduCRM360SaveAll(studentId) {
+  const stage = document.getElementById('crm360-stage')?.value?.trim() || null;
+  const status = document.getElementById('crm360-status')?.value;
+  const payment = document.getElementById('crm360-payment')?.value;
+  const capital = document.getElementById('crm360-capital')?.value;
+  const obs = document.getElementById('crm360-obs')?.value || null;
+  const notes = document.getElementById('crm360-notes')?.value || null;
+  const patch = {
+    current_stage: stage,
+    status,
+    payment_status: payment,
+    capital_actual: capital ? Number(capital) : null,
+    observaciones_seguimiento: obs,
+    notes,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('edu_students').update(patch).eq('id', studentId);
+  if (error) return alert('Error guardando: ' + error.message);
+  const s = eduState.students.find(x => x.id === studentId);
+  if (s) Object.assign(s, patch);
+  if (typeof toast === 'function') toast('✓ Guardado'); else alert('✓ Guardado');
+}
+
+window.eduLoadCRM360 = eduLoadCRM360;
+window.eduCRM360ShowTab = eduCRM360ShowTab;
+window.eduCRM360SaveAll = eduCRM360SaveAll;
 
 async function eduGuardarEstudiante(studentId) {
   const s = eduState.students.find(x => x.id === studentId);
