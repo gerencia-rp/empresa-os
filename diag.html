@@ -259,7 +259,11 @@ async function init() {
     return showInvalid(`No encontré la invitación con este token.\n\nToken: ${token}\n\nPedile a tu mentor que genere un link nuevo.`);
   }
   if (invite.expires_at && new Date(invite.expires_at) < new Date()) return showInvalid('Este link expiró. Pedile a tu mentor uno nuevo.');
-  if (invite.completed_at) return showInvalid('Ya completaste este diagnóstico. Tu mentor ya recibió tu plan.');
+  // Si ya completó → redirigir al portal de tareas
+  if (invite.completed_at) {
+    window.location.href = '/mi-plan?t=' + token;
+    return;
+  }
 
   INVITE = invite;
 
@@ -353,11 +357,11 @@ async function finish() {
     return;
   }
 
-  // Mostrar pantalla done con resumen
+  // Mostrar pantalla done con resumen + auto-redirect al portal en ~5s
   document.getElementById('wizard').classList.add('hidden');
   document.getElementById('done-screen').classList.remove('hidden');
 
-  // Resumen
+  // Resumen + countdown para redirect
   const summary = `
     <div class="space-y-1.5">
       <div><strong>Objetivo:</strong> ${ANSWERS.objetivo || '—'}</div>
@@ -368,9 +372,20 @@ async function finish() {
     <div class="text-[10px] text-slate-500 mt-3 pt-3 border-t border-amber-200">
       ID: ${INVITE.id.slice(0,8).toUpperCase()}
     </div>
+    <div class="mt-4 pt-3 border-t border-amber-200">
+      <a href="/mi-plan?t=${INVITE.token}" class="block w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-center font-bold py-3 rounded-xl hover:opacity-90">
+        🎯 Ver mi plan de acción →
+      </a>
+      <p class="text-xs text-slate-500 mt-2 text-center">En unos segundos te llevo automáticamente.</p>
+    </div>
   `;
   document.getElementById('done-summary').innerHTML = summary;
   window.scrollTo({top:0,behavior:'smooth'});
+
+  // Esperar 8s para que el auto-procesamiento del mentor genere el plan, después redirigir
+  setTimeout(() => {
+    window.location.href = '/mi-plan?t=' + INVITE.token;
+  }, 8000);
 }
 
 function showInvalid(msg) {

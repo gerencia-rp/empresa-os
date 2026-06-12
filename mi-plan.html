@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Plan de Acción · FlipMentoría</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.public.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .check-anim { transition: all 0.2s ease; }
+  .check-anim:active { transform: scale(0.95); }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20">
+
+<!-- LOADING -->
+<div id="loading-screen" class="fixed inset-0 flex items-center justify-center bg-white/80 backdrop-blur z-50">
+  <div class="text-center">
+    <div class="text-4xl mb-2 animate-pulse">📋</div>
+    <div class="text-sm text-slate-600">Cargando tu plan...</div>
+  </div>
+</div>
+
+<!-- INVALID -->
+<div id="invalid-screen" class="hidden fixed inset-0 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl max-w-md p-6 text-center">
+    <div class="text-5xl mb-3">⚠️</div>
+    <h1 class="text-xl font-bold text-slate-900">No pude cargar tu plan</h1>
+    <p id="invalid-msg" class="text-sm text-slate-600 mt-2">Pedile a tu mentor un link nuevo.</p>
+  </div>
+</div>
+
+<!-- PORTAL -->
+<div id="portal" class="hidden max-w-3xl mx-auto p-4 md:p-6">
+  <!-- Hero -->
+  <div class="bg-gradient-to-br from-amber-500 to-orange-700 text-white rounded-2xl p-5 md:p-6 shadow-lg mb-4">
+    <div class="text-xs uppercase opacity-90 font-bold tracking-wider">Tu plan de acción · FlipMentoría</div>
+    <h1 class="text-xl md:text-2xl font-bold mt-1">Hola <span id="student-name">amigo</span> 👋</h1>
+    <div id="perfil-info" class="text-sm opacity-95 mt-1">Cargando perfil...</div>
+
+    <!-- Progress -->
+    <div class="mt-4 bg-white/20 backdrop-blur rounded-xl p-3">
+      <div class="flex items-center justify-between text-xs mb-1">
+        <span class="font-bold">PROGRESO</span>
+        <span><span id="done-count">0</span> / <span id="total-count">0</span> tareas</span>
+      </div>
+      <div class="h-3 bg-white/20 rounded-full overflow-hidden">
+        <div id="prog-bar" class="h-full bg-emerald-400 transition-all" style="width: 0%"></div>
+      </div>
+      <div class="text-2xl font-black text-center mt-2"><span id="pct">0</span>%</div>
+    </div>
+  </div>
+
+  <!-- Info -->
+  <div class="bg-white border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
+    💡 <strong>Marcá las tareas a medida que las terminás.</strong> Tu mentor las ve actualizadas en tiempo real. Podés volver a este link cuando quieras.
+  </div>
+
+  <!-- Bloques -->
+  <div id="bloques-container" class="space-y-4"></div>
+
+  <!-- Done message si todo está completo -->
+  <div id="all-done" class="hidden bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-6 text-center mt-6">
+    <div class="text-5xl mb-2">🎉</div>
+    <h2 class="text-xl font-bold text-emerald-900">¡Completaste tu plan!</h2>
+    <p class="text-sm text-emerald-700 mt-2">Tu mentor ya recibió el aviso. Te van a contactar para revisar lo que hiciste y armar la siguiente etapa.</p>
+  </div>
+</div>
+
+<script>
+const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+let TOKEN = null;
+let INVITE = null;
+let TASKS = [];
+
+async function init() {
+  const sp = new URLSearchParams(window.location.search);
+  TOKEN = sp.get('t');
+  if (!TOKEN) return showInvalid('Falta el token en el link.');
+
+  // 1) Cargar invite
+  const { data: invite, error: invErr } = await sb
+    .from('edu_diagnostic_invites')
+    .select('*')
+    .eq('token', TOKEN)
+    .maybeSingle();
+
+  if (invErr || !invite) {
+    return showInvalid(`No encontré tu invitación.\n\nToken: ${TOKEN}\n\nPedile a tu mentor un link nuevo.`);
+  }
+
+  if (!invite.result_plan_id) {
+    // Todavía no se generó el plan — redirigir al diagnóstico
+    if (!invite.completed_at) {
+      window.location.href = '/diag?t=' + TOKEN;
+      return;
+    }
+    return showInvalid('Tu plan todavía no fue generado. Volvé en unos minutos.');
+  }
+
+  INVITE = invite;
+
+  // 2) Cargar nombre del estudiante
+  if (invite.student_id) {
+    try {
+      const { data: stu } = await sb
+        .from('edu_students')
+        .select('full_name, current_stage')
+        .eq('id', invite.student_id)
+        .maybeSingle();
+      if (stu?.full_name) {
+        document.getElementById('student-name').textContent = stu.full_name.split(' ')[0];
+      }
+      if (stu?.current_stage) {
+        document.getElementById('perfil-info').textContent = 'Etapa actual: ' + stu.current_stage;
+      }
+    } catch (e) { console.warn('no student name', e); }
+  }
+
+  // 3) Cargar perfil del plan para hero
+  if (invite.perfil?.perfil) {
+    const p = invite.perfil.perfil;
+    const txt = `${p.nombre || ''} ${p.num ? '· #'+p.num : ''}`.trim();
+    if (txt) document.getElementById('perfil-info').textContent = txt;
+  }
+
+  // 4) Cargar tasks
+  await loadTasks();
+  document.getElementById('loading-screen').classList.add('hidden');
+  document.getElementById('portal').classList.remove('hidden');
+  renderTasks();
+}
+
+async function loadTasks() {
+  const { data, error } = await sb
+    .from('edu_student_plan_tasks')
+    .select('*')
+    .eq('plan_id', INVITE.result_plan_id)
+    .order('bloque_orden')
+    .order('paso_index');
+
+  if (error) {
+    console.error('[loadTasks]', error);
+    return showInvalid('No pude cargar tus tareas: ' + error.message);
+  }
+
+  TASKS = data || [];
+}
+
+function renderTasks() {
+  const total = TASKS.length;
+  const done = TASKS.filter(t => t.completed).length;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+  document.getElementById('total-count').textContent = total;
+  document.getElementById('done-count').textContent = done;
+  document.getElementById('pct').textContent = pct;
+  document.getElementById('prog-bar').style.width = pct + '%';
+
+  // Agrupar por bloque
+  const byBloque = {};
+  TASKS.forEach(t => {
+    const key = `${t.bloque_orden}__${t.bloque_id}`;
+    if (!byBloque[key]) {
+      byBloque[key] = {
+        orden: t.bloque_orden,
+        etapa: t.bloque_etapa || '',
+        subetapa: t.bloque_subetapa || '',
+        bloque_id: t.bloque_id,
+        tasks: []
+      };
+    }
+    byBloque[key].tasks.push(t);
+  });
+
+  const bloques = Object.values(byBloque).sort((a, b) => a.orden - b.orden);
+  const cont = document.getElementById('bloques-container');
+
+  cont.innerHTML = bloques.map(b => {
+    const bDone = b.tasks.filter(t => t.completed).length;
+    const bTotal = b.tasks.length;
+    const bPct = bTotal > 0 ? Math.round(bDone / bTotal * 100) : 0;
+    const isAllDone = bDone === bTotal;
+
+    return `
+      <div class="bg-white rounded-2xl shadow-sm border ${isAllDone ? 'border-emerald-300' : 'border-slate-200'} overflow-hidden">
+        <!-- Header del bloque -->
+        <div class="p-4 ${isAllDone ? 'bg-emerald-50' : 'bg-amber-50'}">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] uppercase font-bold tracking-wider ${isAllDone ? 'text-emerald-700' : 'text-amber-700'}">${(b.etapa || '').replace(/</g,'&lt;')}</div>
+              <div class="text-sm md:text-base font-bold text-slate-900 mt-0.5">${(b.subetapa || 'Bloque').replace(/</g,'&lt;')}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-base font-bold ${isAllDone ? 'text-emerald-700' : 'text-slate-900'}">${bDone}/${bTotal}</div>
+              <div class="text-[10px] text-slate-500">${bPct}%</div>
+            </div>
+          </div>
+          <div class="h-1.5 bg-white/60 rounded-full mt-3 overflow-hidden">
+            <div class="h-full ${isAllDone ? 'bg-emerald-500' : 'bg-amber-500'}" style="width: ${bPct}%"></div>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        <div class="divide-y divide-slate-100">
+          ${b.tasks.map(t => `
+            <button onclick="toggleTask('${t.id}', this)" class="check-anim w-full text-left p-4 flex items-start gap-3 hover:bg-slate-50">
+              <div class="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full border-2 ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'} flex items-center justify-center transition">
+                ${t.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+              </div>
+              <div class="flex-1 ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'} text-sm md:text-base">${(t.paso_text || '').replace(/</g,'&lt;')}</div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Mostrar mensaje si todo completo
+  if (total > 0 && done === total) {
+    document.getElementById('all-done').classList.remove('hidden');
+  } else {
+    document.getElementById('all-done').classList.add('hidden');
+  }
+}
+
+async function toggleTask(taskId, btn) {
+  const task = TASKS.find(t => t.id === taskId);
+  if (!task) return;
+  const newCompleted = !task.completed;
+
+  // Optimistic UI
+  task.completed = newCompleted;
+  task.completed_at = newCompleted ? new Date().toISOString() : null;
+  renderTasks();
+
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-student-task-toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ token: TOKEN, task_id: taskId, completed: newCompleted })
+    });
+    if (!res.ok) {
+      const r = await res.json();
+      throw new Error(r.error || 'HTTP ' + res.status);
+    }
+  } catch (e) {
+    // Rollback
+    task.completed = !newCompleted;
+    task.completed_at = !newCompleted ? new Date().toISOString() : null;
+    renderTasks();
+    alert('No pude guardar: ' + e.message + '\n\n(Si el problema sigue, decile a tu mentor.)');
+  }
+}
+
+function showInvalid(msg) {
+  document.getElementById('loading-screen').classList.add('hidden');
+  document.getElementById('invalid-screen').classList.remove('hidden');
+  if (msg) document.getElementById('invalid-msg').textContent = msg;
+}
+
+init().catch(e => showInvalid('Error: ' + e.message));
+</script>
+
+</body>
+</html>

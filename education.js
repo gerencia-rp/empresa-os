@@ -3590,6 +3590,20 @@ async function eduShareDiagnosticForm(studentId) {
   const s = (eduState.students || []).find(x => x.id === studentId);
   if (!s) return alert('Estudiante no encontrado');
 
+  // Si el estudiante ya tiene una invite reciente con plan generado, ofrecer reusarla
+  const { data: existing } = await sb.from('edu_diagnostic_invites')
+    .select('*')
+    .eq('student_id', studentId)
+    .not('result_plan_id', 'is', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return eduShowShareModal(s, existing, true);
+  }
+
   // Generar token único (UUID short)
   const token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
 
@@ -3621,28 +3635,40 @@ async function eduShareDiagnosticForm(studentId) {
     return alert(`⚠️ La invitación se creó pero no la puedo leer con el token.\n\nEl link va a fallar para el estudiante.\n\nDetalle: ${vErr?.message || 'no encontrada'}\n\nVerificá que en Supabase exista la policy "edu_diag_inv_select_all" sobre edu_diagnostic_invites con "using (true)".`);
   }
 
+  eduShowShareModal(s, invite, false);
+}
+
+// Modal compartido (usado tanto para invites nuevas como existentes con plan)
+function eduShowShareModal(s, invite, hasPlan) {
   const baseUrl = window.location.origin;
-  const link = `${baseUrl}/diag.html?t=${token}`;
+  // Si ya tiene plan, link al portal; si no, al diagnóstico
+  const link = hasPlan
+    ? `${baseUrl}/mi-plan?t=${invite.token}`
+    : `${baseUrl}/diag?t=${invite.token}`;
+
   const nombre = (s.full_name || '').split(' ')[0];
 
-  // Mensaje WhatsApp pre-armado
-  const waMsg = `¡Hola ${nombre}! 👋\n\nSoy tu mentor de FlipMentoría. Antes de nuestra próxima sesión, completá este diagnóstico de 21 preguntas (5-7 minutos):\n\n${link}\n\nCon tus respuestas voy a armar tu plan de acción personalizado para los próximos 90 días.\n\nCualquier duda, decime. 💪`;
+  const waMsg = hasPlan
+    ? `¡Hola ${nombre}! 👋\n\nAcá tenés tu plan de acción personalizado de FlipMentoría:\n\n${link}\n\nEn el portal podés marcar cada tarea a medida que la completás. Yo voy a ir viendo tu progreso en tiempo real.\n\nVamos. 💪`
+    : `¡Hola ${nombre}! 👋\n\nSoy tu mentor de FlipMentoría. Antes de nuestra próxima sesión, completá este diagnóstico de 21 preguntas (5-7 minutos):\n\n${link}\n\nApenas termines, te llevo automático a tu portal personalizado con todas las tareas que tenés que hacer.\n\nCualquier duda, decime. 💪`;
 
   const phoneClean = typeof eduCleanPhone === 'function' ? eduCleanPhone(s.phone) : (s.phone||'').replace(/\D/g,'');
   const waUrl = phoneClean && phoneClean.length >= 10
     ? `https://wa.me/${phoneClean}?text=${encodeURIComponent(waMsg)}`
     : null;
 
-  openModal('📨 Formulario compartible · ' + (s.full_name||''), `
+  openModal((hasPlan ? '🎯 Portal del estudiante · ' : '📨 Formulario compartible · ') + (s.full_name||''), `
     <div class="space-y-3">
-      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        Generé un link único para que <strong>${(s.full_name||'').replace(/</g,'&lt;')}</strong> complete el diagnóstico por su cuenta. Tiene 30 días de vigencia.
+      <div class="${hasPlan ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-blue-50 border-blue-200 text-blue-900'} border rounded p-3 text-xs">
+        ${hasPlan
+          ? `<strong>Este estudiante ya completó el diagnóstico</strong> y tiene su plan generado. Este es el link al portal donde marca sus tareas. Lo podés compartir las veces que quieras — es el mismo link siempre.`
+          : `Generé un link único para que <strong>${(s.full_name||'').replace(/</g,'&lt;')}</strong> complete el diagnóstico por su cuenta. Cuando termine, queda redirigido a su portal de tareas. Tiene 30 días de vigencia.`}
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">🔗 Link único</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">🔗 ${hasPlan ? 'Link al portal de tareas' : 'Link del diagnóstico'}</label>
         <div class="flex gap-2">
-          <input id="diag-link" type="text" readonly value="${link}" class="flex-1 border border-slate-300 rounded px-2 py-2 text-xs font-mono bg-slate-50" onclick="this.select()"/>
+          <input type="text" readonly value="${link}" class="flex-1 border border-slate-300 rounded px-2 py-2 text-xs font-mono bg-slate-50" onclick="this.select()"/>
           <button onclick="navigator.clipboard.writeText('${link}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='📋 Copiar', 1500)" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">📋 Copiar</button>
         </div>
         <div class="text-[10px] text-slate-500 mt-1">⚠️ No compartas este link con otra persona — está asociado al estudiante.</div>
@@ -3650,12 +3676,17 @@ async function eduShareDiagnosticForm(studentId) {
 
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📱 Mensaje WhatsApp pre-armado</label>
-        <textarea id="diag-msg" rows="8" class="w-full border border-emerald-300 rounded p-2 text-xs font-mono">${waMsg.replace(/</g,'&lt;')}</textarea>
+        <textarea rows="8" class="w-full border border-emerald-300 rounded p-2 text-xs font-mono">${waMsg.replace(/</g,'&lt;')}</textarea>
       </div>
+
+      ${hasPlan ? `<div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
+        💡 Si querés <strong>regenerar el plan desde cero</strong> (nuevo diagnóstico), borrá la invite vieja desde Supabase o pedile al estudiante que vaya al diagnóstico de nuevo.
+      </div>` : ''}
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
-        ${waUrl ? `<a href="${waUrl}" target="_blank" onclick="closeModal()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded text-center">💬 Enviar por WhatsApp</a>` : `<button disabled class="flex-1 bg-slate-300 text-white text-sm font-bold py-2 rounded" title="Falta teléfono">📞 Sin teléfono</button>`}
+        <a href="${link}" target="_blank" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded text-center">👁️ Ver portal</a>
+        ${waUrl ? `<a href="${waUrl}" target="_blank" onclick="closeModal()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded text-center">💬 WhatsApp</a>` : `<button disabled class="flex-1 bg-slate-300 text-white text-sm font-bold py-2 rounded">📞 Sin tel</button>`}
       </div>
     </div>
   `);

@@ -57,6 +57,7 @@ const STATIC_COPY = [
   "viral.html",
   "viral.js",
   "diag.html",
+  "mi-plan.html",
   "favicon.ico",
   "manifest.webmanifest",
   "sw.js",
