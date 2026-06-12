@@ -5,7 +5,7 @@
 const eduState = {
   sys: null,
   mentorshipId: 'flipping-rentals',  // mentoría activa
-  tab: 'students',                    // students | plan | progress | resources | calls | config
+  tab: 'students',                    // dashboard | students | cohorts | alerts | progress | resources | calls | config
   mentorships: [],
   students: [],
   resources: [],
@@ -16,15 +16,57 @@ const eduState = {
   stageFilter: 'all',
   statusFilter: 'all',
   loading: false,
-  studentPlan: null,        // plan activo del estudiante seleccionado
-  studentPlanTasks: []      // tareas marcables del plan
+  // Snapshot lectura del plan más reciente del estudiante seleccionado
+  // (el plan se EDITA solo desde Metodología FlipMentoría · esto es read-only)
+  studentPlanSnapshot: null
 };
 
+// ════════════════════════════════════════════════════════════════════════
+// HELPER · sincroniza estudiante seleccionado entre eduState y fmState
+// Usar SIEMPRE este helper en lugar de setear eduState.selectedStudentId directo
+// ════════════════════════════════════════════════════════════════════════
+function eduSetSelectedStudent(studentId, opts = {}) {
+  eduState.selectedStudentId = studentId || null;
+  // Sincronizar con FM state si está disponible (no pisa el wizard en curso)
+  if (typeof fmState !== 'undefined' && fmState) {
+    fmState.diagStudentId = studentId || null;
+    // Si hay wizard en curso pero el estudiante cambió, lo reseteamos
+    if (studentId && fmState.diagResult && fmState.diagStudentId !== studentId) {
+      fmState.diagResult = null;
+      fmState.diagStep = 0;
+      fmState.diagAnswers = {};
+    }
+  }
+  // Cargar el último plan del estudiante (snapshot read-only para mostrar en la ficha)
+  eduState.studentPlanSnapshot = null;
+  if (studentId) eduLoadStudentPlanSnapshot(studentId);
+  if (!opts.silent) eduRender();
+}
+
+// Carga el plan más reciente del estudiante como snapshot lectura
+async function eduLoadStudentPlanSnapshot(studentId) {
+  try {
+    const { data } = await sb.from('edu_student_plans')
+      .select('id, perfil, status, created_at, bloques_ids')
+      .eq('student_id', studentId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data && eduState.selectedStudentId === studentId) {
+      eduState.studentPlanSnapshot = data;
+      eduRender();
+    }
+  } catch (e) { console.warn('eduLoadStudentPlanSnapshot:', e); }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MENTORÍAS MANAGER = CRM PURO
+// (Plan + Tareas + Diagnóstico viven SOLO en Metodología FlipMentoría)
+// ════════════════════════════════════════════════════════════════════════
 const EDU_TABS = [
   { key: 'dashboard',    label: '📊 Dashboard' },
   { key: 'students',     label: '👥 Estudiantes' },
-  { key: 'student_plan', label: '🎯 Plan Acción' },
-  { key: 'tasks',        label: '✅ Tareas' },
   { key: 'cohorts',      label: '👨‍👩‍👧‍👦 Cohortes' },
   { key: 'alerts',       label: '🚨 Alertas' },
   { key: 'progress',     label: '📈 Progreso' },
@@ -37,14 +79,19 @@ const EDU_TABS = [
 
 async function openEduManager(sys) {
   eduState.sys = sys;
-  // CRÍTICO: reset del tab a uno válido del Manager (no quedar en marker de otro sistema)
+  // CRÍTICO: reset del tab a uno válido del Manager.
+  // Si venía de tabs eliminados (student_plan, tasks) o de otro sistema, default a 'students'.
   if (!EDU_TABS.find(t => t.key === eduState.tab)) {
-    eduState.tab = 'dashboard';
+    eduState.tab = 'students';
   }
   openModal(`🎓 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await eduLoadAll();
+  // Sincronizar: si veníamos de Metodología con un estudiante en fmState, traerlo acá
+  if (typeof fmState !== 'undefined' && fmState && fmState.diagStudentId && !eduState.selectedStudentId) {
+    eduSetSelectedStudent(fmState.diagStudentId, { silent: true });
+  }
   eduRender();
 }
 
@@ -106,7 +153,7 @@ function eduSetMentorship(id) {
   // Preservar selectedStudentId SI el estudiante existe en la nueva mentoría
   if (eduState.selectedStudentId) {
     const s = eduState.students.find(x => x.id === eduState.selectedStudentId);
-    if (!s || s.mentorship_id !== id) eduState.selectedStudentId = null;
+    if (!s || s.mentorship_id !== id) eduSetSelectedStudent(null, { silent: true });
   }
   eduRender();
 }
@@ -191,14 +238,103 @@ function eduRender() {
       <div class="flex-1 overflow-y-auto">
         ${eduState.tab === 'dashboard' ? eduRenderDashboard() :
           eduState.tab === 'students' ? eduRenderStudents() :
-          eduState.tab === 'student_plan' ? eduRenderStudentPlan() :
-          eduState.tab === 'tasks' ? eduRenderTasksOverview() :
           eduState.tab === 'cohorts' ? eduRenderCohorts() :
           eduState.tab === 'progress' ? eduRenderProgressFunnel() :
           eduState.tab === 'resources' ? eduRenderResourcesIntegrated() :
           eduState.tab === 'calls' ? eduRenderCallsEnhanced() :
           eduState.tab === 'alerts' ? eduRenderAlerts() :
           eduRenderConfig()}
+      </div>
+    </div>
+  `;
+}
+
+// ─── TAB: DASHBOARD (overview del CRM · KPIs + accesos rápidos) ───
+function eduRenderDashboard() {
+  const students = eduMyStudents();
+  const total = students.length;
+  const activos = students.filter(s => s.estado_pago === 'activo' || s.status === 'active' || !s.estado_pago).length;
+  const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []).length;
+  const myAlerts = eduMyAlerts();
+  const recursos = eduMyResources().length;
+  const sesionesProx = (eduState.calls || []).filter(c => new Date(c.scheduled_at || c.starts_at) >= new Date()).length;
+
+  // Embudo por etapa
+  const m = eduCurrentMentorship();
+  const byStage = {};
+  (m?.stages || []).forEach(st => { byStage[st.key] = 0; });
+  students.forEach(s => { if (s.current_stage) byStage[s.current_stage] = (byStage[s.current_stage] || 0) + 1; });
+
+  return `
+    <div class="p-4 space-y-4">
+      <!-- Hero KPIs -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase font-bold text-slate-500">Estudiantes</div>
+          <div class="text-2xl font-bold text-slate-900 mt-1">${total}</div>
+          <div class="text-[10px] text-slate-500">${activos} activos</div>
+        </div>
+        <div class="bg-white border border-red-200 rounded-xl p-3 ${enRiesgo ? 'ring-1 ring-red-200' : ''}">
+          <div class="text-[10px] uppercase font-bold text-red-700">En riesgo</div>
+          <div class="text-2xl font-bold text-red-700 mt-1">${enRiesgo}</div>
+          <div class="text-[10px] text-slate-500">Sin progreso reciente</div>
+        </div>
+        <div class="bg-white border border-amber-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase font-bold text-amber-700">Alertas</div>
+          <div class="text-2xl font-bold text-amber-700 mt-1">${myAlerts.length}</div>
+          <div class="text-[10px] text-slate-500">Sin atender</div>
+        </div>
+        <div class="bg-white border border-blue-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase font-bold text-blue-700">Sesiones próx.</div>
+          <div class="text-2xl font-bold text-blue-700 mt-1">${sesionesProx}</div>
+          <div class="text-[10px] text-slate-500">Calendario</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="text-[10px] uppercase font-bold text-slate-500">Recursos</div>
+          <div class="text-2xl font-bold text-slate-900 mt-1">${recursos}</div>
+          <div class="text-[10px] text-slate-500">Materiales</div>
+        </div>
+      </div>
+
+      <!-- CTA: Diagnóstico vive en Metodología -->
+      <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-xs font-bold uppercase text-amber-800 mb-1">📘 Plan de acción del estudiante</div>
+          <div class="text-sm text-slate-700">El diagnóstico + plan vive en <strong>Metodología FlipMentoría</strong>. Andá al tab <strong>Estudiantes</strong>, abrí la ficha y hacé click en "Ver / generar Plan".</div>
+        </div>
+        <button onclick="eduSetTab('students')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-4 py-2 rounded-lg whitespace-nowrap">👥 Ir a Estudiantes →</button>
+      </div>
+
+      <!-- Embudo por etapa -->
+      ${(m?.stages || []).length ? `
+        <div class="bg-white border border-slate-200 rounded-xl p-4">
+          <div class="text-xs font-bold uppercase text-slate-700 mb-3">📈 Distribución por etapa · ${m.name}</div>
+          <div class="space-y-1.5">
+            ${m.stages.map(st => {
+              const n = byStage[st.key] || 0;
+              const pct = total ? Math.round(100 * n / total) : 0;
+              return `
+                <div>
+                  <div class="flex items-center justify-between text-[11px] mb-0.5">
+                    <span class="font-semibold text-slate-700">${st.icon || ''} ${st.name}</span>
+                    <span class="text-slate-500">${n} · ${pct}%</span>
+                  </div>
+                  <div class="w-full bg-slate-100 rounded-full h-2">
+                    <div class="bg-slate-900 h-2 rounded-full" style="width:${pct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Atajos -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <button onclick="eduSetTab('students')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">👥 Estudiantes</button>
+        <button onclick="eduSetTab('alerts')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">🚨 Alertas (${myAlerts.length})</button>
+        <button onclick="eduSetTab('progress')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">📈 Progreso</button>
+        <button onclick="eduSetTab('calls')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">📅 Calendario</button>
       </div>
     </div>
   `;
@@ -332,75 +468,12 @@ function eduRenderStudents() {
   `;
 }
 
-// ─── TAB: PLAN IA ───
-function eduRenderPlan() {
-  // ════════════════════════════════════════════════════════════
-  // Plan Acción ahora es solo un LINK al diagnóstico en Metodología FlipMentoría
-  // (la generación del plan vive sólo allí, evita duplicación)
-  // ════════════════════════════════════════════════════════════
-  const student = eduState.students.find(s => s.id === eduState.selectedStudentId);
-
-  if (!student) {
-    return `<div class="text-center py-12 text-slate-500">
-      <div class="text-5xl mb-3">🎯</div>
-      <div class="font-bold">Plan de Acción del Estudiante</div>
-      <div class="text-xs mt-2 max-w-md mx-auto">
-        El plan de acción se genera desde el <strong>Diagnóstico</strong> en Metodología FlipMentoría.
-        Seleccioná primero un estudiante:
-      </div>
-      <select onchange="eduState.selectedStudentId=this.value; eduRender()" class="mt-4 border border-slate-300 rounded px-3 py-2 text-sm">
-        <option value="">— Seleccionar estudiante —</option>
-        ${eduMyStudents().map(s => `<option value="${s.id}">${s.full_name} · ${eduStageObj(s.current_stage)?.name || s.current_stage || 'sin etapa'}</option>`).join('')}
-      </select>
-    </div>`;
-  }
-
-  const stage = eduStageObj(student.current_stage);
-  return `
-    <div class="space-y-4 max-w-2xl mx-auto py-4">
-      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-        <div class="flex justify-between items-start gap-2 flex-wrap">
-          <div>
-            <div class="text-xs font-bold text-blue-900 uppercase">🎓 Estudiante seleccionado</div>
-            <div class="text-xl font-bold mt-1">${student.full_name}</div>
-            <div class="text-[12px] text-slate-600 mt-1">
-              Etapa: <strong>${stage?.name || student.current_stage || 'sin etapa'}</strong>
-              · ${eduDaysInStage(student) || 0}d en etapa
-              · GLScore <strong>${student.glscore||50}</strong>
-            </div>
-          </div>
-          <button onclick="eduState.selectedStudentId=null; eduRender()" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded">Cambiar</button>
-        </div>
-      </div>
-
-      <!-- BIG CTA: redirige al sistema Metodología → tab Diagnóstico con estudiante pre-cargado -->
-      <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-6 text-center">
-        <div class="text-4xl mb-2">🎯</div>
-        <div class="text-lg font-bold text-slate-900 mb-1">Generar / ver Plan de Acción</div>
-        <div class="text-sm text-slate-600 mb-4 max-w-md mx-auto">
-          El plan vive en <strong>Metodología FlipMentoría → Diagnóstico</strong>.
-          Hacé click acá y vas directo al cuestionario con <strong>${student.full_name}</strong> pre-seleccionado.
-        </div>
-        <button onclick="eduOpenStudentInDiagnostico('${student.id}')"
-                class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-6 py-3 rounded-lg shadow inline-flex items-center gap-2">
-          📘 Abrir en Metodología FlipMentoría
-          <span class="text-base">→</span>
-        </button>
-        <div class="text-[11px] text-slate-500 mt-3">
-          Diagnóstico (18 preguntas) genera el plan completo de la mentoría · Crédito tiene su propio tab dentro
-        </div>
-      </div>
-
-      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-600">
-        <strong class="text-slate-800">Nota:</strong> antes había un generador IA acá adentro, pero lo movimos a Metodología FlipMentoría para tener una sola fuente de verdad. El plan que se genere ahí queda vinculado al estudiante y aparece en "Planes ya guardados".
-      </div>
-    </div>
-  `;
-}
-
 // ════════════════════════════════════════════════════════════
 // Abre el sistema "Metodología FlipMentoría" desde Mentorías Manager
-// con el estudiante pre-seleccionado en el tab Diagnóstico
+// con el estudiante pre-seleccionado en el tab Diagnóstico.
+//
+// Único punto de entrada al wizard de Plan de Acción.
+// Llamado desde: ficha del estudiante, dashboard, tab Alertas (estudiantes en riesgo)
 // ════════════════════════════════════════════════════════════
 async function eduOpenStudentInDiagnostico(studentId) {
   if (!studentId) return alert('Falta el ID del estudiante.');
@@ -432,79 +505,6 @@ async function eduOpenStudentInDiagnostico(studentId) {
       fmSelectStudentForDiag(studentId);
     }
   } catch (e) { console.warn('fmSelectStudentForDiag no disponible:', e); }
-}
-
-async function eduGeneratePlan() {
-  const student = eduState.students.find(s => s.id === eduState.selectedStudentId);
-  if (!student) return alert('Seleccioná un estudiante primero');
-  const diagnostic = document.getElementById('edu-plan-diagnostic').value.trim();
-  const horizon = +document.getElementById('edu-plan-horizon').value || 2;
-  const m = eduCurrentMentorship();
-  const stage = eduStageObj(student.current_stage);
-  const aiKey = `edu-plan-${eduState.mentorshipId}-${student.id}`;
-  window.aiState = window.aiState || {};
-  window.aiState[aiKey] = { loading: true, horizon };
-  eduRender();
-  try {
-    const { data, error } = await sb.functions.invoke('ai-deep-analyze', {
-      body: {
-        system: 'edu-plan',
-        context: {
-          mentorship: m.name,
-          mentorship_slug: m.id,
-          stages: m.stages,
-          current_stage: stage?.name || student.current_stage,
-          stage_target_weeks: stage?.target_weeks,
-          days_in_stage: eduDaysInStage(student),
-          student: {
-            name: student.full_name,
-            enrolled_at: student.enrolled_at,
-            expires_at: student.expires_at,
-            glscore: student.glscore,
-            goals: student.goals,
-            notes: student.notes
-          },
-          coach_diagnostic: diagnostic,
-          horizon_weeks: horizon
-        },
-        force: true
-      }
-    });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    window.aiState[aiKey] = { loading: false, plan: data, horizon };
-  } catch (e) {
-    window.aiState[aiKey] = { loading: false, error: e.message || String(e) };
-  }
-  eduRender();
-}
-
-function eduCopyPlan() {
-  const el = document.getElementById('edu-plan-preview');
-  if (!el) return;
-  const text = el.innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    toast ? toast('Plan copiado al portapapeles', 'success') : alert('✓ Copiado');
-  });
-}
-
-async function eduSavePlan() {
-  const aiKey = `edu-plan-${eduState.mentorshipId}-${eduState.selectedStudentId}`;
-  const plan = window.aiState[aiKey]?.plan;
-  if (!plan?.tasks?.length) return alert('Sin tareas para guardar');
-  const rows = plan.tasks.map(t => ({
-    student_id: eduState.selectedStudentId,
-    stage_key: eduState.students.find(s => s.id === eduState.selectedStudentId)?.current_stage,
-    title: t.title,
-    description: t.description || null,
-    resources: plan.resources || [],
-    generated_by: 'ai',
-    due_date: t.due_date || null,
-    status: 'pending'
-  }));
-  const { error } = await sb.from('edu_student_tasks').insert(rows);
-  if (error) return alert('Error: ' + error.message);
-  alert(`✓ ${rows.length} tareas guardadas en el plan del estudiante.`);
 }
 
 // ─── TAB: PROGRESO ───
@@ -948,11 +948,15 @@ async function eduSaveConfig() {
 }
 
 // ─── ACCIONES ───
+// "Ver plan del estudiante" ahora redirige a Metodología FlipMentoría → Diagnóstico
+// (tab 'student_plan' fue eliminado de Mentorías Manager)
 async function eduOpenStudent(id) {
-  eduState.selectedStudentId = id;
-  eduState.tab = 'student_plan';
-  eduRender();  // pinta loading
-  await eduLoadStudentPlan(id);
+  if (typeof eduOpenStudentInDiagnostico === 'function') {
+    return eduOpenStudentInDiagnostico(id);
+  }
+  // Fallback si no está cargada la función (no debería pasar)
+  eduSetSelectedStudent(id);
+  eduState.tab = 'students';
   eduRender();
 }
 
@@ -2571,7 +2575,7 @@ function eduRenderStudentDetail(studentId) {
 
           <div class="flex gap-2 pt-2">
             <button onclick="event.stopPropagation(); eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
-            <button onclick="event.stopPropagation(); eduState.tab='student_plan'; eduState.selectedStudentId='${s.id}'; eduCloseStudentDetail(); eduLoadStudentPlan('${s.id}').then(eduRender);" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700">🎯 Ir al plan</button>
+            <button onclick="event.stopPropagation(); eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}');" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700" title="Abre Metodología FlipMentoría → Diagnóstico con este estudiante pre-cargado">🎯 Ver / generar Plan →</button>
             <button onclick="event.stopPropagation(); try { eduShareDiagnosticForm('${s.id}'); } catch(e) { console.error('share err', e); alert('Error: ' + e.message); }" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Compartir formulario</button>
             ${s.phone ? `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">💬 WhatsApp rápido</button>` : `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">📞 WhatsApp</button>`}
             <button onclick="event.stopPropagation(); eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
@@ -3118,16 +3122,12 @@ const eduWiz = {
   step: 0
 };
 
-// Override de eduCrearPlanEstudiante — ahora abre wizard
+// Plan del estudiante: única vía oficial = Metodología FlipMentoría → Diagnóstico
+// (el wizard interno de Mentorías Manager fue jubilado · esta función redirige)
 async function eduCrearPlanEstudiante(studentId) {
   const s = eduState.students.find(x => x.id === studentId);
   if (!s) return alert('Estudiante no encontrado');
-  // Pre-llenar respuestas inferibles
-  eduWiz.answers = eduInferirDiagnostico(s);
-  eduWiz.studentId = studentId;
-  eduWiz.step = 0;
-  eduWiz.active = true;
-  eduMostrarWizard();
+  return eduOpenStudentInDiagnostico(studentId);
 }
 
 function eduMostrarWizard() {
@@ -3503,11 +3503,14 @@ async function fmLinkPlanAStudiante(studentId, mentorshipId) {
     titulo: b.titulo || '',
     actividad: typeof b.actividad === 'function' ? b.actividad(userProfile, answers) : (b.actividad || ''),
     descripcion: b.descripcion || '',
+    observacion: b.observacion || '',
+    entregable: b.entregable || '',
     tiempo: b.tiempo || '',
     pasos: typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []),
     criterios_exito: b.criterios_exito || [],
     herramientas: b.herramientas || [],
-    errores_comunes: b.errores_comunes || []
+    errores_comunes: b.errores_comunes || b.errores || [],
+    recursos: b.recursos || []
   }));
 
   const fullPlanData = {
@@ -3999,7 +4002,7 @@ async function eduProcessPendingInvites() {
         try { if (typeof fmGenerarFraseFinal === 'function') fraseFinal = fmGenerarFraseFinal(userProfile, answers); } catch {}
         try { if (typeof fmGenerarRiesgos === 'function') riesgos = fmGenerarRiesgos(answers, perfilResult); } catch {}
 
-        // Serializar bloques con TODA la metadata
+        // Serializar bloques con TODA la metadata (incluido contenido educativo)
         const bloquesData = bloques.map(b => {
           const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
           return {
@@ -4009,11 +4012,14 @@ async function eduProcessPendingInvites() {
             titulo: b.titulo || '',
             actividad: typeof b.actividad === 'function' ? b.actividad(userProfile, answers) : (b.actividad || ''),
             descripcion: b.descripcion || '',
+            observacion: b.observacion || '',          // ← por qué este bloque importa
+            entregable: b.entregable || '',            // ← qué se entrega al final
             tiempo: b.tiempo || '',
             pasos,
             criterios_exito: b.criterios_exito || [],
             herramientas: b.herramientas || [],
-            errores_comunes: b.errores_comunes || []
+            errores_comunes: b.errores_comunes || b.errores || [],
+            recursos: b.recursos || []                 // ← links/herramientas con desc
           };
         });
 
@@ -4339,10 +4345,10 @@ function eduOpenCeoMobile() {
             <div class="text-sm font-bold mt-1">Estudiantes</div>
             <div class="text-[10px] text-slate-500">${total} total</div>
           </button>
-          <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='tasks'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
-            <div class="text-2xl">✅</div>
-            <div class="text-sm font-bold mt-1">Tareas</div>
-            <div class="text-[10px] text-slate-500">Plan global</div>
+          <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='alerts'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
+            <div class="text-2xl">🚨</div>
+            <div class="text-sm font-bold mt-1">Alertas</div>
+            <div class="text-[10px] text-slate-500">Riesgo / atrasos</div>
           </button>
           <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='calls'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
             <div class="text-2xl">📅</div>
