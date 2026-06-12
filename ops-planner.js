@@ -120,7 +120,7 @@ async function opLoadAll() {
   const weekStart = opDateOnly(opMondayOf(opState.date));
   const weekEnd = opAddDays(weekStart, 6);
 
-  const [tRes, dRes, wRes, bRes, rRes, pRes, projRes, dtRes] = await Promise.all([
+  const [tRes, dRes, wRes, bRes, rRes, pRes, projRes, dtRes, durRes, rtRes] = await Promise.all([
     sb.from('ops_tasks').select('*').eq('active', true).order('category').order('name'),
     sb.from('ops_day_tasks').select('*').eq('date', opState.date).order('start_time'),
     sb.from('ops_day_tasks').select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time'),
@@ -128,7 +128,10 @@ async function opLoadAll() {
     sb.from('ops_recurring').select('*').eq('active', true),
     sb.from('properties').select('id,address,nickname,property_type').order('address'),
     sb.from('remodel_projects').select('id,name,address,status').in('status', ['planning','active']),
-    sb.from('ops_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] }))
+    sb.from('ops_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
+    // NUEVO (feedback PDF Juan): catálogo de duraciones reales + rutas sugeridas
+    sb.from('ops_property_durations').select('*').then(r => r).catch(() => ({ data: [] })),
+    sb.from('ops_day_routes').select('*').eq('is_recommended', true).order('code').then(r => r).catch(() => ({ data: [] }))
   ]);
   opState.tasks = tRes.data || [];
   opState.dayTasks = dRes.data || [];
@@ -138,6 +141,8 @@ async function opLoadAll() {
   opState.properties = pRes.data || [];
   opState.projects = projRes.data || [];
   opState.dayTemplates = dtRes.data || [];
+  opState.propertyDurations = durRes.data || [];
+  opState.dayRoutes = rtRes.data || [];
 
   // Si estamos en vista 'casas', cargar TODO lo upcoming (hoy + futuro)
   if (opState.view === 'casas') {
@@ -752,14 +757,47 @@ function opRenderTimeline(filteredDay) {
 }
 
 // ─── Vista Semana ───
+// ──────────────────────────────────────────────────────────────
+// JORNADA OBJETIVO 8h · badge verde/amarillo/rojo (feedback PDF Juan)
+// ──────────────────────────────────────────────────────────────
+function opDayHealthBadge(totalMin) {
+  if (totalMin === 0) return '';
+  const h = totalMin / 60;
+  if (h > 8.5)   return '<span class="bg-red-600 text-white text-[8px] font-bold px-1 rounded" title="Sobrecarga · >8.5h">⚠️ OVER</span>';
+  if (h >= 7)    return '<span class="bg-emerald-600 text-white text-[8px] font-bold px-1 rounded" title="Jornada óptima 7-8.5h">✓ ÓPTIMO</span>';
+  if (h >= 4)    return '<span class="bg-amber-500 text-white text-[8px] font-bold px-1 rounded" title="Tiene margen · 4-7h">~ MARGEN</span>';
+  return '<span class="bg-slate-400 text-white text-[8px] font-bold px-1 rounded" title="Día corto · <4h">· CORTO</span>';
+}
+
+// Detecta si un día tiene propiedad pesada (Cervin) mezclada con otra → warning
+function opDayHasHeavyConflict(acts) {
+  const heavies = (opState.propertyDurations || []).filter(d => d.is_heavy).map(d => d.property_short);
+  if (!heavies.length) return false;
+  const hasHeavy = acts.some(t => heavies.some(h => (t.title||'').includes(h) || (t.property_name||'').includes(h)));
+  if (!hasHeavy) return false;
+  // Si hay pesada Y MÁS DE 1 tarea de podada → conflicto
+  const podadas = acts.filter(t => /podar|podada/i.test(t.title||'') || /podar|podada/i.test(t.category||''));
+  return hasHeavy && podadas.length > 1;
+}
+
 function opRenderWeek() {
   const weekStart = opDateOnly(opMondayOf(opState.date));
   const days = Array.from({length:7}, (_, i) => opAddDays(weekStart, i));
   const today = opDateOnly(new Date());
+  const routes = opState.dayRoutes || [];
 
   return `
-    <div class="sticky top-0 bg-slate-50 border-b border-slate-200 px-3 py-2 z-10">
+    <div class="sticky top-0 bg-slate-50 border-b border-slate-200 px-3 py-2 z-10 flex items-center justify-between flex-wrap gap-2">
       <div class="text-xs font-bold uppercase text-slate-700">📊 Vista semanal · arrastrá del backlog a un día</div>
+      ${routes.length ? `
+        <div class="flex items-center gap-1">
+          <span class="text-[10px] text-slate-500 font-bold">📍 Rutas sugeridas (PDF Juan):</span>
+          <select onchange="if(this.value) opInsertRouteToDay(this.value); this.value=''" class="text-[10px] border border-slate-300 rounded px-1 py-0.5 bg-white">
+            <option value="">— elegir ruta + día —</option>
+            ${routes.map(r => `<option value="${r.code}">${r.name} (${Math.floor(r.total_work_min/60)}h${r.total_work_min%60?r.total_work_min%60+'m':''})</option>`).join('')}
+          </select>
+        </div>
+      ` : ''}
     </div>
     <div class="grid grid-cols-7 flex-1 overflow-auto divide-x divide-slate-200">
       ${days.map(dStr => {
@@ -793,7 +831,11 @@ function opRenderWeek() {
                   ${acts.length ? `<div class="text-[9px] text-slate-500 mt-0.5">${done}/${acts.length} · ${Math.floor(totalMin/60)}h${totalMin%60?totalMin%60+'m':''}</div>` : ''}
                 </div>
               </div>
-              ${zonaCount.Norte && zonaCount.Sur ? `<div class="text-[9px] text-amber-700 mt-0.5">⚠️ mezcla zonas</div>` : ''}
+              <div class="flex items-center gap-1 mt-0.5 flex-wrap">
+                ${acts.length ? opDayHealthBadge(totalMin) : ''}
+                ${zonaCount.Norte && zonaCount.Sur ? `<span class="text-[8px] bg-amber-100 text-amber-800 px-1 rounded font-bold">⚠️ mezcla zonas</span>` : ''}
+                ${opDayHasHeavyConflict(acts) ? `<span class="text-[8px] bg-red-100 text-red-800 px-1 rounded font-bold" title="Hay una propiedad PESADA (ej. Cervin) con otras tareas. PDF recomienda aislarla.">⚠️ pesada mezclada</span>` : ''}
+              </div>
             </button>
             <div class="flex-1 overflow-y-auto p-1 space-y-1 min-h-[200px]">
               ${acts.length === 0 ? `<div class="text-[10px] text-slate-300 text-center py-4 italic">vacío</div>` : acts.map(t => opRenderWeekTaskCard(t)).join('')}
@@ -855,13 +897,56 @@ function opRenderWeekTaskCard(t) {
 // Acciones rápidas in-card (1 click, sin modal)
 // ──────────────────────────────────────────────────────────────
 async function opQuickComplete(id) {
-  await sb.from('ops_day_tasks').update({
+  // Buscar la tarea para conocer la estimación
+  const t = (opState.weekTasks || []).find(x => x.id === id) || (opState.dayTasks || []).find(x => x.id === id);
+  const estim = t?.duration_min || 0;
+  // Preguntar tiempo REAL (feedback PDF Juan: "Registrar tiempos reales para mejorar proyecciones futuras")
+  let actualMin = null;
+  if (estim > 0) {
+    const ans = prompt(`✓ Marcar "${t.title}" como completada.\n\n¿Cuántos minutos REALES tomó? (estimado: ${estim} min)\n\nDejá vacío si no querés registrar.`, String(estim));
+    if (ans !== null && ans.trim() !== '' && !isNaN(parseInt(ans))) {
+      actualMin = parseInt(ans);
+    }
+  }
+  const update = {
     status: 'done',
     completed_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
-  }).eq('id', id);
+  };
+  if (actualMin !== null) {
+    update.actual_duration_min = actualMin;
+    update.estimated_duration_min = estim;
+  }
+  await sb.from('ops_day_tasks').update(update).eq('id', id);
   await opLoadAll();
   opRender();
+}
+
+// Inserta una ruta sugerida (PDF Juan) en el día que elijas
+async function opInsertRouteToDay(routeCode) {
+  const route = (opState.dayRoutes || []).find(r => r.code === routeCode);
+  if (!route) return alert('Ruta no encontrada');
+  const dateStr = prompt(`📍 Insertar "${route.name}"\nTotal: ${Math.floor(route.total_work_min/60)}h${route.total_work_min%60?route.total_work_min%60+'m':''}\n\n¿Qué día? (YYYY-MM-DD)`, opState.date);
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+  const stops = route.stops || [];
+  if (!confirm(`Vas a insertar ${stops.length} tarea(s) el ${dateStr}.\n\n${stops.map((s,i) => `${i+1}. ${s.start_time} · ${s.property_short} (${s.duration_min}m)`).join('\n')}\n\n¿Confirmás?`)) return;
+  const inserts = stops.map(s => ({
+    date: dateStr,
+    start_time: s.start_time,
+    duration_min: s.duration_min,
+    title: `Podar · ${s.property_short}`,
+    property_name: s.property_short,
+    zona: route.zona,
+    category: 'podada',
+    status: 'planned',
+    estimated_duration_min: s.duration_min,
+    created_by: state.user.id
+  }));
+  const { error } = await sb.from('ops_day_tasks').insert(inserts);
+  if (error) return alert('Error: ' + error.message);
+  await opLoadAll();
+  opRender();
+  alert(`✓ Ruta "${route.name}" insertada en ${dateStr}`);
 }
 
 async function opQuickUndo(id) {

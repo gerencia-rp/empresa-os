@@ -2494,7 +2494,7 @@ function eduRenderStudentDetail(studentId) {
   const stages = (m?.stages || []).map(x => x.name);
   return `
     <div class="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4" onclick="if(event.target===this) eduCloseStudentDetail()">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
         <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white p-5 sticky top-0">
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -2558,11 +2558,11 @@ function eduRenderStudentDetail(studentId) {
           </div>
 
           <div class="flex gap-2 pt-2">
-            <button onclick="eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
-            <button onclick="eduState.tab='student_plan'; eduState.selectedStudentId='${s.id}'; eduCloseStudentDetail(); eduLoadStudentPlan('${s.id}').then(eduRender);" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700">🎯 Ir al plan</button>
-            <button onclick="eduShareDiagnosticForm('${s.id}')" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Compartir formulario</button>
-            ${s.phone || '' ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">💬 WhatsApp rápido</button>` : `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">📞 WhatsApp</button>`}
-            <button onclick="eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
+            <button onclick="event.stopPropagation(); eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
+            <button onclick="event.stopPropagation(); eduState.tab='student_plan'; eduState.selectedStudentId='${s.id}'; eduCloseStudentDetail(); eduLoadStudentPlan('${s.id}').then(eduRender);" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700">🎯 Ir al plan</button>
+            <button onclick="event.stopPropagation(); try { eduShareDiagnosticForm('${s.id}'); } catch(e) { console.error('share err', e); alert('Error: ' + e.message); }" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Compartir formulario</button>
+            ${s.phone ? `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">💬 WhatsApp rápido</button>` : `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">📞 WhatsApp</button>`}
+            <button onclick="event.stopPropagation(); eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
             ${s.airtable_record_id ? `<a href="https://airtable.com/${m?.airtable_base_id||''}/${m?.airtable_students_table||''}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
           </div>
 
@@ -3587,12 +3587,18 @@ async function eduToggleTaskCompletedOverview(taskId) {
 // terminar el mentor recibe el diagnóstico listo para generar plan.
 // ════════════════════════════════════════════════════════════
 async function eduShareDiagnosticForm(studentId) {
+  console.log('[eduShareDiagnosticForm] studentId:', studentId);
+  try {
+
   const s = (eduState.students || []).find(x => x.id === studentId);
-  if (!s) return alert('Estudiante no encontrado');
+  if (!s) {
+    console.error('[eduShareDiagnosticForm] estudiante no encontrado:', studentId);
+    return alert('Estudiante no encontrado');
+  }
 
   // Si ya tiene una invite reciente (con o sin plan), reusarla:
   // si tiene plan → link al portal; si no → link al diagnóstico
-  const { data: existing } = await sb.from('edu_diagnostic_invites')
+  const { data: existing, error: exErr } = await sb.from('edu_diagnostic_invites')
     .select('*')
     .eq('student_id', studentId)
     .gt('expires_at', new Date().toISOString())
@@ -3600,7 +3606,13 @@ async function eduShareDiagnosticForm(studentId) {
     .limit(1)
     .maybeSingle();
 
+  if (exErr) {
+    console.warn('[eduShareDiagnosticForm] error buscando invite existente:', exErr);
+    // Sigue al flujo de crear nueva — si la tabla falta acá igual lo dice
+  }
+
   if (existing) {
+    console.log('[eduShareDiagnosticForm] reusando invite existente', existing.token);
     return eduShowShareModal(s, existing, !!existing.result_plan_id);
   }
 
@@ -3632,7 +3644,13 @@ async function eduShareDiagnosticForm(studentId) {
     return alert('⚠️ La invitación se creó pero no la puedo leer con el token.\n\nVerificá la policy "edu_diag_inv_select_all" en edu_diagnostic_invites.');
   }
 
+  console.log('[eduShareDiagnosticForm] invite OK:', invite.token);
   eduShowShareModal(s, invite, false);
+
+  } catch (e) {
+    console.error('[eduShareDiagnosticForm] error inesperado:', e);
+    alert('Error inesperado: ' + (e.message || String(e)) + '\n\nAbrí la consola (F12 → Console) y mandame el error completo.');
+  }
 }
 
 // Modal compartido (usado tanto para invites nuevas como existentes con plan)
