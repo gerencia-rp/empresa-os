@@ -1,7 +1,10 @@
 // ============================================================
-// OPS PLANNER v2 — Backlog + Planificación por zona
-// Equipo Limpieza: tareas se acumulan sin fecha; un día se "arma" por zona
-// (lunes Sur, martes Norte). Agrupado por casa para minimizar viajes.
+// CLEANING PLANNER — Copia funcional del Ops Planner (Juan Austin)
+// adaptada para el Equipo de Limpieza.
+// Maneja: turnovers Airbnb, limpieza por habitación (coliving/PadSplit),
+//         limpieza mensual long-term, limpieza post-remodelación.
+// Mismo modelo: backlog (date=null), "armar día" agrupando por zona y casa.
+// Tablas: clean_tasks, clean_day_tasks, clean_recurring, clean_day_templates
 // ============================================================
 
 const clState = {
@@ -649,8 +652,8 @@ function clRenderTemplatesPanel() {
 }
 
 // ─── Timeline ───
-// Altura visual: 1 minuto = OP_PX_PER_MIN px → 30min slot = 36px, 1h = 72px, 2h = 144px
-const OP_PX_PER_MIN = 1.2;
+// Altura visual: 1 minuto = CL_PX_PER_MIN px → 30min slot = 36px, 1h = 72px, 2h = 144px
+const CL_PX_PER_MIN = 1.2;
 
 function clRenderTimeline(filteredDay) {
   // Slots de 30 min para drop targets + labels
@@ -661,8 +664,8 @@ function clRenderTimeline(filteredDay) {
   }
   const dayStartMin = CL_START_HOUR * 60;
   const totalMin = (CL_END_HOUR - CL_START_HOUR) * 60;
-  const totalPx = totalMin * OP_PX_PER_MIN;
-  const SLOT_PX = 30 * OP_PX_PER_MIN; // 36px
+  const totalPx = totalMin * CL_PX_PER_MIN;
+  const SLOT_PX = 30 * CL_PX_PER_MIN; // 36px
 
   // Sorted para detectar cambios de casa + gaps + travel
   const sorted = [...filteredDay].sort((a,b) => clTimeToMin(a.start_time) - clTimeToMin(b.start_time));
@@ -704,7 +707,7 @@ function clRenderTimeline(filteredDay) {
     <div class="relative" style="height: ${totalPx}px;">
       <!-- Grid de slots (background + drop targets) -->
       ${slots.map((slot) => {
-        const top = (clTimeToMin(slot.time) - dayStartMin) * OP_PX_PER_MIN;
+        const top = (clTimeToMin(slot.time) - dayStartMin) * CL_PX_PER_MIN;
         return `
           <div class="absolute left-0 right-0 flex ${slot.isHour?'border-t border-slate-300':'border-t border-slate-100 border-dashed'} hover:bg-blue-50/40"
                style="top: ${top}px; height: ${SLOT_PX}px;"
@@ -721,8 +724,8 @@ function clRenderTimeline(filteredDay) {
 
       <!-- Indicadores de gaps -->
       ${gaps.filter(g => g.durMin >= 15).map(g => {
-        const top = (g.startMin - dayStartMin) * OP_PX_PER_MIN;
-        const height = g.durMin * OP_PX_PER_MIN;
+        const top = (g.startMin - dayStartMin) * CL_PX_PER_MIN;
+        const height = g.durMin * CL_PX_PER_MIN;
         return `
           <div class="absolute pointer-events-none flex items-center justify-center bg-red-50/60 border-l-4 border-red-300"
                style="top: ${top}px; height: ${height}px; left: 64px; right: 8px;">
@@ -734,9 +737,9 @@ function clRenderTimeline(filteredDay) {
       <!-- Tasks (absolutely positioned con altura proporcional) -->
       ${placed.map(p => {
         const t = p.task;
-        const top = (p.startMin - dayStartMin) * OP_PX_PER_MIN;
-        const height = Math.max(24, (t.duration_min || 30) * OP_PX_PER_MIN);
-        const travelHeight = (t.travel_min || 0) * OP_PX_PER_MIN;
+        const top = (p.startMin - dayStartMin) * CL_PX_PER_MIN;
+        const height = Math.max(24, (t.duration_min || 30) * CL_PX_PER_MIN);
+        const travelHeight = (t.travel_min || 0) * CL_PX_PER_MIN;
         const laneWidth = 100 / (maxLane + 1);
         const laneLeft = p.lane * laneWidth;
         return `

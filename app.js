@@ -1216,6 +1216,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'remodel-pro') return openRemodelPro(sys);
   if (sys.type === 'weekly-planner') return openWeeklyPlanner(sys);
   if (sys.type === 'ops-planner') return openOpsPlanner(sys);
+  if (sys.type === 'cleaning-planner') return openCleaningPlanner(sys);
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
