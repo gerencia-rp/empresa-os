@@ -194,6 +194,15 @@ async function init() {
   if (pErr || !plan) return showInvalid('No pude cargar tu plan: ' + (pErr?.message || 'no encontrado'));
 
   PLAN_DATA = plan.perfil || {};
+  // Fallback: si el plan es viejo y no tiene la data enriquecida, construir un mínimo viable
+  if (!PLAN_DATA.bloques && !PLAN_DATA.objetivo_operativo && !PLAN_DATA.perfil) {
+    console.log('[mi-plan] plan viejo sin data enriquecida, usando fallback');
+    PLAN_DATA = {
+      perfil: { nombre: 'Tu plan personalizado', num: '', emoji: '🚀' },
+      userProfile: { estrategiaLabel: '' },
+      ...PLAN_DATA
+    };
+  }
   await loadTasks(plan.id);
 
   document.getElementById('loading-screen').classList.add('hidden');
@@ -401,9 +410,15 @@ function updateProgress() {
   }
 }
 
+// Lock para evitar race condition cuando user clickea 2x rápido
+const _toggleLocks = new Set();
+
 async function toggleTask(taskId) {
+  if (_toggleLocks.has(taskId)) return; // ignora doble click
+  _toggleLocks.add(taskId);
+
   const task = TASKS.find(t => t.id === taskId);
-  if (!task) return;
+  if (!task) { _toggleLocks.delete(taskId); return; }
   const newCompleted = !task.completed;
 
   try {
@@ -423,13 +438,17 @@ async function toggleTask(taskId) {
       body: JSON.stringify({ token: TOKEN, task_id: taskId, completed: newCompleted })
     });
     if (!res.ok) {
-      const r = await res.json();
+      const r = await res.json().catch(() => ({}));
       throw new Error(r.error || 'HTTP ' + res.status);
     }
   } catch (e) {
+    // Rollback solo si falló persistencia
     task.completed = !newCompleted;
+    task.completed_at = !newCompleted ? new Date().toISOString() : null;
     renderBloques();
-    alert('No pude guardar: ' + e.message);
+    alert('No pude guardar: ' + e.message + '\n\nReintentá tap en la tarea.');
+  } finally {
+    _toggleLocks.delete(taskId);
   }
 }
 
@@ -453,11 +472,12 @@ function waitForPlan() {
     <div class="text-center max-w-md p-6">
       <div class="text-6xl mb-3 animate-pulse">🤖</div>
       <h2 class="text-xl font-bold text-slate-900">Armando tu plan...</h2>
-      <p class="text-sm text-slate-600 mt-2">Estamos preparando tu plan personalizado. Esto puede tardar 1-2 minutos.</p>
+      <p class="text-sm text-slate-600 mt-2">Tu mentor está procesando tus respuestas. Esto suele tardar menos de 1 minuto.</p>
       <div class="h-2 bg-slate-200 rounded-full overflow-hidden mt-4">
         <div class="h-full bg-amber-500 animate-pulse" style="width: 60%"></div>
       </div>
       <div id="wait-elapsed" class="text-[10px] text-slate-400 mt-2"></div>
+      <button id="wait-retry" class="hidden mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg" onclick="window.location.reload()">🔄 Recargar</button>
     </div>
   `;
   let elapsed = 0;
@@ -466,14 +486,30 @@ function waitForPlan() {
     elapsed = Math.round((Date.now() - startTime) / 1000);
     const el = document.getElementById('wait-elapsed');
     if (el) el.textContent = `Esperando ${elapsed}s...`;
-    const { data: inv } = await sb.from('edu_diagnostic_invites').select('result_plan_id').eq('token', TOKEN).maybeSingle();
-    if (inv?.result_plan_id) {
-      clearInterval(interval);
-      window.location.reload();
+
+    try {
+      const { data: inv } = await sb.from('edu_diagnostic_invites').select('result_plan_id').eq('token', TOKEN).maybeSingle();
+      if (inv?.result_plan_id) {
+        clearInterval(interval);
+        window.location.reload();
+        return;
+      }
+    } catch (e) { console.warn('poll error', e); }
+
+    // Mostrar retry después de 60s en vez de 180s
+    if (elapsed > 60) {
+      const retryBtn = document.getElementById('wait-retry');
+      if (retryBtn) retryBtn.classList.remove('hidden');
     }
-    if (elapsed > 180) {
+    if (elapsed > 120) {
       clearInterval(interval);
-      document.getElementById('loading-screen').innerHTML = `<div class="text-center max-w-md p-6"><div class="text-5xl mb-3">⏳</div><h2 class="text-xl font-bold">Tu plan se está demorando</h2><p class="text-sm text-slate-600 mt-2">Volvé en un par de minutos.</p></div>`;
+      document.getElementById('loading-screen').innerHTML = `
+        <div class="text-center max-w-md p-6">
+          <div class="text-5xl mb-3">⏳</div>
+          <h2 class="text-xl font-bold">Tu plan se está demorando</h2>
+          <p class="text-sm text-slate-600 mt-2">Tu mentor lo va a generar manualmente. Te avisará cuando esté listo.</p>
+          <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg">🔄 Reintentar</button>
+        </div>`;
     }
   }, 5000);
 }

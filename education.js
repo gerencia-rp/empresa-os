@@ -3305,7 +3305,18 @@ function fmLinkSearchFilter() {
 
 async function fmLinkPlanAStudiante(studentId, mentorshipId) {
   if (!fmState.diagResult) return alert('Sin resultado del diagnóstico');
+  if (!studentId) return alert('Falta el ID del estudiante');
   if (!confirm('¿Vincular este plan al estudiante seleccionado? Si ya tenía plan activo, se archivará.')) return;
+
+  // VALIDACIÓN FK: verificar que el estudiante exista en la DB
+  const { data: existsStudent, error: chkErr } = await sb.from('edu_students')
+    .select('id, full_name, mentorship_id')
+    .eq('id', studentId)
+    .maybeSingle();
+  if (chkErr) return alert('Error validando estudiante: ' + chkErr.message);
+  if (!existsStudent) return alert('El estudiante no existe en la DB. Sincronizá Mentorías Manager y reintentá.');
+
+  const finalMentorshipId = mentorshipId || existsStudent.mentorship_id;
 
   const r = fmState.diagResult;
   const answers = r.answers || {};
@@ -3320,21 +3331,69 @@ async function fmLinkPlanAStudiante(studentId, mentorshipId) {
   };
   const bloques = fmGenerarBloques(userProfile, answers);
 
+  // Capturar TODA la data enriquecida (igual que eduProcessPendingInvites)
+  let objetivoOperativo = '', reglaPlan = '', analisisProfundo = [], checklistFinal = [], fraseFinal = '', riesgos = [];
+  try { if (typeof fmGenerarObjetivoOperativo === 'function') objetivoOperativo = fmGenerarObjetivoOperativo(userProfile, answers); } catch {}
+  try { if (typeof fmGenerarReglaPlan === 'function') reglaPlan = fmGenerarReglaPlan(r.perfil, answers); } catch {}
+  try { if (typeof fmGenerarAnalisisProfundo === 'function') analisisProfundo = fmGenerarAnalisisProfundo(r.perfil, r, answers, userProfile); } catch {}
+  try { if (typeof fmGenerarChecklistFinal === 'function') checklistFinal = fmGenerarChecklistFinal(bloques, answers); } catch {}
+  try { if (typeof fmGenerarFraseFinal === 'function') fraseFinal = fmGenerarFraseFinal(userProfile, answers); } catch {}
+  try { if (typeof fmGenerarRiesgos === 'function') riesgos = fmGenerarRiesgos(answers, r.perfil); } catch {}
+
+  const bloquesData = bloques.map(b => ({
+    id: b.id,
+    etapa: b.etapa || '',
+    subetapa: b.subetapa || '',
+    titulo: b.titulo || '',
+    actividad: typeof b.actividad === 'function' ? b.actividad(userProfile, answers) : (b.actividad || ''),
+    descripcion: b.descripcion || '',
+    tiempo: b.tiempo || '',
+    pasos: typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []),
+    criterios_exito: b.criterios_exito || [],
+    herramientas: b.herramientas || [],
+    errores_comunes: b.errores_comunes || []
+  }));
+
+  const fullPlanData = {
+    ...r,
+    perfil: r.perfil || {},
+    userProfile,
+    objetivo_operativo: objetivoOperativo,
+    regla_plan: reglaPlan,
+    analisis_profundo: analisisProfundo,
+    fortalezas: r.fortalezas || [],
+    riesgos,
+    bloques: bloquesData,
+    checklist_final: checklistFinal,
+    frase_final: fraseFinal,
+    fromMentor: true,
+    generated_at: new Date().toISOString()
+  };
+
   // Archivar plan previo activo
-  await sb.from('edu_student_plans').update({ status: 'archived' })
+  await sb.from('edu_student_plans').update({ status: 'archived', updated_at: new Date().toISOString() })
     .eq('student_id', studentId).eq('status', 'active');
 
-  // Crear plan
-  const { data: plan, error } = await sb.from('edu_student_plans').insert({
+  // Crear plan con retry si duplicate key
+  const planPayload = {
     student_id: studentId,
-    mentorship_id: mentorshipId,
+    mentorship_id: finalMentorshipId,
     diagnostico: answers,
-    perfil: { ...r, userProfile },
+    perfil: fullPlanData,
     bloques_ids: bloques.map(b => b.id),
     modo: 'completo',
     status: 'active'
-  }).select().single();
-  if (error) return alert('Error: '+error.message);
+  };
+  let { data: plan, error } = await sb.from('edu_student_plans').insert(planPayload).select().single();
+
+  if (error && /duplicate key|unique constraint/i.test(error.message || '')) {
+    const { data: oldPlans } = await sb.from('edu_student_plans').select('id').eq('student_id', studentId).eq('status', 'active');
+    for (const op of (oldPlans || [])) await sb.from('edu_student_plan_tasks').delete().eq('plan_id', op.id);
+    await sb.from('edu_student_plans').delete().eq('student_id', studentId).eq('status', 'active');
+    const retry = await sb.from('edu_student_plans').insert(planPayload).select().single();
+    plan = retry.data; error = retry.error;
+  }
+  if (error) return alert('Error creando plan: ' + error.message);
 
   // Insertar tasks
   const tasks = [];
@@ -3348,7 +3407,10 @@ async function fmLinkPlanAStudiante(studentId, mentorshipId) {
       });
     });
   });
-  if (tasks.length) await sb.from('edu_student_plan_tasks').insert(tasks);
+  if (tasks.length) {
+    const { error: tErr } = await sb.from('edu_student_plan_tasks').insert(tasks);
+    if (tErr) console.warn('[fmLinkPlan tasks]', tErr);
+  }
 
   // Cerrar modal y notificar
   document.getElementById('fm-link-student-modal')?.remove();
