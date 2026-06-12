@@ -342,13 +342,13 @@ async function nextQuestion() {
 
 async function finish() {
   document.getElementById('btn-next').disabled = true;
-  document.getElementById('btn-next').textContent = '⏳ Guardando...';
+  document.getElementById('btn-next').textContent = '🤖 Armando tu plan...';
 
+  // 1) Guardar respuestas en la invitación
   const payload = {
     answers: ANSWERS,
     completed_at: new Date().toISOString()
   };
-
   const { error } = await sb.from('edu_diagnostic_invites').update(payload).eq('id', INVITE.id);
   if (error) {
     alert('Error guardando: ' + error.message);
@@ -357,35 +357,22 @@ async function finish() {
     return;
   }
 
-  // Mostrar pantalla done con resumen + auto-redirect al portal en ~5s
-  document.getElementById('wizard').classList.add('hidden');
-  document.getElementById('done-screen').classList.remove('hidden');
+  // 2) Llamar edge function que genera el plan AHORA (sincrónico)
+  // — sin esperar el auto-procesamiento de cada 2 min del mentor.
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-generate-plan-from-invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ token: new URLSearchParams(window.location.search).get('t') })
+    });
+    // Si falla la edge function igual continuamos — el auto-procesamiento lo levanta después
+    if (!res.ok) console.warn('[gen-plan] no ok, fallback al auto-process');
+  } catch (e) {
+    console.warn('[gen-plan]', e);
+  }
 
-  // Resumen + countdown para redirect
-  const summary = `
-    <div class="space-y-1.5">
-      <div><strong>Objetivo:</strong> ${ANSWERS.objetivo || '—'}</div>
-      <div><strong>Mercado:</strong> ${ANSWERS.mercado_estado || '—'}</div>
-      <div><strong>Capital:</strong> ${ANSWERS.capital_disponible || '—'}</div>
-      <div><strong>Tipo:</strong> ${ANSWERS.disp_tipo || '—'}</div>
-    </div>
-    <div class="text-[10px] text-slate-500 mt-3 pt-3 border-t border-amber-200">
-      ID: ${INVITE.id.slice(0,8).toUpperCase()}
-    </div>
-    <div class="mt-4 pt-3 border-t border-amber-200">
-      <a href="/mi-plan?t=${INVITE.token}" class="block w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-center font-bold py-3 rounded-xl hover:opacity-90">
-        🎯 Ver mi plan de acción →
-      </a>
-      <p class="text-xs text-slate-500 mt-2 text-center">En unos segundos te llevo automáticamente.</p>
-    </div>
-  `;
-  document.getElementById('done-summary').innerHTML = summary;
-  window.scrollTo({top:0,behavior:'smooth'});
-
-  // Esperar 8s para que el auto-procesamiento del mentor genere el plan, después redirigir
-  setTimeout(() => {
-    window.location.href = '/mi-plan?t=' + INVITE.token;
-  }, 8000);
+  // 3) Redirigir al portal — si el plan no está listo, mi-plan.html muestra "esperando..."
+  window.location.href = '/mi-plan?t=' + new URLSearchParams(window.location.search).get('t');
 }
 
 function showInvalid(msg) {

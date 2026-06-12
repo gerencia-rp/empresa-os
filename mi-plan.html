@@ -99,7 +99,9 @@ async function init() {
       window.location.href = '/diag?t=' + TOKEN;
       return;
     }
-    return showInvalid('Tu plan todavía no fue generado. Volvé en unos minutos.');
+    // Completó el diagnóstico pero el plan está siendo generado por el mentor.
+    // Mostrar pantalla "armando tu plan" y poll cada 5s
+    return waitForPlan();
   }
 
   INVITE = invite;
@@ -287,6 +289,48 @@ function showSavedToast() {
   t.style.opacity = '1';
   clearTimeout(_savedToastTimer);
   _savedToastTimer = setTimeout(() => { t.style.opacity = '0'; }, 1500);
+}
+
+function waitForPlan() {
+  document.getElementById('loading-screen').innerHTML = `
+    <div class="text-center max-w-md p-6">
+      <div class="text-6xl mb-3 animate-pulse">🤖</div>
+      <h2 class="text-xl font-bold text-slate-900">Armando tu plan...</h2>
+      <p class="text-sm text-slate-600 mt-2">Estamos preparando tu plan de acción personalizado basado en tus respuestas. Esto puede tardar 1-2 minutos.</p>
+      <div class="h-2 bg-slate-200 rounded-full overflow-hidden mt-4">
+        <div class="h-full bg-amber-500 animate-pulse" style="width: 60%"></div>
+      </div>
+      <div id="wait-elapsed" class="text-[10px] text-slate-400 mt-2"></div>
+    </div>
+  `;
+  let elapsed = 0;
+  const startTime = Date.now();
+  const interval = setInterval(async () => {
+    elapsed = Math.round((Date.now() - startTime) / 1000);
+    const el = document.getElementById('wait-elapsed');
+    if (el) el.textContent = `Esperando ${elapsed}s...`;
+    // Poll para ver si el plan ya está
+    const { data: inv } = await sb
+      .from('edu_diagnostic_invites')
+      .select('result_plan_id')
+      .eq('token', TOKEN)
+      .maybeSingle();
+    if (inv?.result_plan_id) {
+      clearInterval(interval);
+      // Reload para reactivar init() con el plan ya listo
+      window.location.reload();
+    }
+    if (elapsed > 180) {
+      clearInterval(interval);
+      document.getElementById('loading-screen').innerHTML = `
+        <div class="text-center max-w-md p-6">
+          <div class="text-5xl mb-3">⏳</div>
+          <h2 class="text-xl font-bold text-slate-900">Tu plan se está demorando</h2>
+          <p class="text-sm text-slate-600 mt-2">Volvé a abrir el link en un par de minutos. Si sigue así, contactá a tu mentor.</p>
+        </div>
+      `;
+    }
+  }, 5000);
 }
 
 function showInvalid(msg) {
