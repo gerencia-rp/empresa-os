@@ -2115,13 +2115,16 @@ function fmRenderDiagnostico() {
         ${selStudent ? `<button onclick="fmSelectStudentForDiag(null)" class="text-[10px] text-slate-500 hover:text-red-700">✕ Limpiar selección</button>` : ''}
       </div>
       ${selStudent ? `
-        <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-3 py-2">
-          <div class="min-w-0">
-            <div class="font-bold text-sm text-slate-900 truncate">${(selStudent.full_name||'').replace(/</g,'&lt;')}</div>
-            <div class="text-[11px] text-slate-600">
-              ${selStudent.current_stage || 'Sin etapa'} ${selStudent.grupo ? '· '+selStudent.grupo : ''} ${selStudent.email ? '· '+selStudent.email : ''}
+        <div class="bg-amber-50 border border-amber-200 rounded px-3 py-2 space-y-2">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-sm text-slate-900 truncate">${(selStudent.full_name||'').replace(/</g,'&lt;')}</div>
+              <div class="text-[11px] text-slate-600">
+                ${selStudent.current_stage || 'Sin etapa'} ${selStudent.grupo ? '· '+selStudent.grupo : ''} ${selStudent.email ? '· '+selStudent.email : ''}
+              </div>
+              <div class="text-[10px] text-emerald-700 mt-1">✓ Respuestas pre-llenadas desde el CRM. Revisá y ajustá lo que necesites.</div>
             </div>
-            <div class="text-[10px] text-emerald-700 mt-1">✓ Respuestas pre-llenadas desde el CRM. Revisá y ajustá lo que necesites.</div>
+            <button onclick="eduShareDiagnosticForm('${selStudent.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded shadow whitespace-nowrap" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Enviarle a ${(selStudent.full_name||'').split(' ')[0].replace(/</g,'&lt;')}</button>
           </div>
         </div>
       ` : `
