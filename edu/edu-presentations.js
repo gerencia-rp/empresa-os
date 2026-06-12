@@ -383,6 +383,7 @@ function eduRenderPresentations() {
             <div class="flex gap-1">
               <button onclick="eduDownloadPPTX()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Descargar PPTX</button>
               <button onclick="eduDownloadSpeakerNotes()" class="bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold px-3 py-1.5 rounded">📋 Speaker notes</button>
+              <button onclick="eduDownloadPresJSON()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded" title="Backup en JSON por si el PPTX no funciona">📄 JSON</button>
             </div>
           </div>
           <div class="p-4 max-h-[60vh] overflow-y-auto">
@@ -760,23 +761,82 @@ async function eduGeneratePresentation() {
   eduRender();
 }
 
-// ─── DOWNLOAD PPTX usando PptxGenJS ───
-function eduDownloadPPTX() {
-  if (typeof PptxGenJS === 'undefined') return alert('⚠️ Librería PptxGenJS no cargada. Hacé hard refresh (Cmd+Shift+R) y probá de nuevo.');
-  // Buscar con ambos formatos de aiKey (V1 + V2)
+// Carga PptxGenJS dinámicamente si no está disponible (fallback robusto)
+async function _eduEnsurePptxGen() {
+  if (typeof PptxGenJS !== 'undefined') return true;
+  console.warn('[edu-pres] PptxGenJS no está en window. Intentando cargarla dinámicamente...');
+  return new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@v3.12.0/dist/pptxgen.bundle.js';
+    s.onload = () => { console.log('[edu-pres] PptxGenJS cargada dinámicamente OK'); resolve(true); };
+    s.onerror = () => { console.error('[edu-pres] No pude cargar PptxGenJS del CDN'); resolve(false); };
+    document.head.appendChild(s);
+  });
+}
+
+// ─── DOWNLOAD PPTX usando PptxGenJS — robusto a 3 niveles ───
+async function eduDownloadPPTX() {
+  // Buscar la presentación
   const k1 = `edu-pres-${eduState.mentorshipId}`;
   const k2 = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
   const p = (window.aiState?.[k1] || window.aiState?.[k2] || {}).presentation;
   if (!p) return alert('Sin presentación cargada. Generá una primero.');
   if (!Array.isArray(p.slides) || !p.slides.length) return alert('La presentación no tiene slides válidos.');
-  console.log('[edu-pres] Iniciando descarga PPTX con', p.slides.length, 'slides');
+  console.log('[edu-pres] Click Descargar PPTX. Slides:', p.slides.length, '· Título:', p.title);
+
+  // Asegurar que PptxGenJS esté disponible
+  const ok = await _eduEnsurePptxGen();
+  if (!ok || typeof PptxGenJS === 'undefined') {
+    return alert('⚠️ No pude cargar la librería PptxGenJS.\n\nProbá:\n1) Verificar que tengas internet\n2) Desactivar bloqueadores de ads/scripts\n3) Hard refresh (Cmd+Shift+R)\n\nMientras tanto, podés usar el botón "📋 Speaker notes" para descargar como markdown.');
+  }
+
+  // Construir + descargar con método robusto (blob + anchor)
   try {
-    eduBuildPPTX(p, { download: true });
+    const pres = eduBuildPPTX(p, { download: false }); // construir sin auto-download
+    const safeName = (p.title || 'presentacion').replace(/[^a-z0-9]/gi, '_').slice(0, 60);
+    const fileName = `${new Date().toISOString().split('T')[0]}_${safeName}.pptx`;
+
+    // writeFile es el método "fácil" pero falla en algunos contextos
+    // Usar write() → blob → anchor click es más confiable
+    console.log('[edu-pres] PPT construido OK. Generando blob...');
+    const blob = await pres.write({ outputType: 'blob' });
+    console.log('[edu-pres] Blob listo, tamaño:', blob.size, 'bytes. Descargando como', fileName);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    console.log('[edu-pres] ✅ Descarga disparada');
   } catch (e) {
-    console.error('[edu-pres] Error construyendo PPTX:', e);
-    alert('⚠️ Error generando el .pptx:\n\n' + (e?.message || String(e)) + '\n\nAbrí la consola (F12 → Console) y pasame el error completo para que lo arregle.');
+    console.error('[edu-pres] Error generando PPTX:', e);
+    // Fallback: probar writeFile() directo (método viejo)
+    try {
+      console.log('[edu-pres] Intentando fallback writeFile()...');
+      eduBuildPPTX(p, { download: true });
+    } catch (e2) {
+      console.error('[edu-pres] Fallback writeFile() también falló:', e2);
+      alert('⚠️ Error generando el .pptx:\n\n' + (e?.message || String(e)) + '\n\nMientras tanto:\n• Click "📋 Speaker notes" para markdown\n• O click "📄 JSON" para descargar el contenido raw\n\nPasame screenshot de la consola (F12) para que lo arregle.');
+    }
   }
 }
+
+// Descarga la presentación como JSON (plan C — útil si el .pptx no funciona)
+function eduDownloadPresJSON() {
+  const k1 = `edu-pres-${eduState.mentorshipId}`;
+  const k2 = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
+  const p = (window.aiState?.[k1] || window.aiState?.[k2] || {}).presentation;
+  if (!p) return alert('Sin presentación.');
+  const blob = new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeName = (p.title || 'presentacion').replace(/[^a-z0-9]/gi, '_').slice(0, 60);
+  a.href = url; a.download = `${safeName}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+window.eduDownloadPresJSON = eduDownloadPresJSON;
 
 // ──────────────────────────────────────────────────────────────────
 // HELPERS DE ENRIQUECIMIENTO VISUAL (Unsplash + QuickChart auto)
