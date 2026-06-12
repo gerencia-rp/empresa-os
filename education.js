@@ -356,6 +356,179 @@ function eduRenderDashboard() {
   `;
 }
 
+// ════════════════════════════════════════════════════════════════
+// 🆕 SEGUIMIENTOS DEL DÍA — vista operativa #1 del coach
+// Score 0-100 por estudiante combinando: días sin contacto, días sin
+// actividad en portal, estado de riesgo, alertas pendientes, etapa.
+// Muestra TOP 5 con acciones rápidas: WhatsApp, registrar, marcar tarea.
+// ════════════════════════════════════════════════════════════════
+function eduCalcFollowupScore(s) {
+  const now = Date.now();
+  const lastContact = s.last_contact_at ? new Date(s.last_contact_at).getTime() : null;
+  const lastActivity = s.last_activity_at ? new Date(s.last_activity_at).getTime() : null;
+  const created = s.created_at ? new Date(s.created_at).getTime() : now;
+
+  // Días sin cada cosa
+  const dSinContact = lastContact ? Math.floor((now - lastContact) / 86400000) : Math.floor((now - created) / 86400000);
+  const dSinActivity = lastActivity ? Math.floor((now - lastActivity) / 86400000) : Math.floor((now - created) / 86400000);
+
+  // Score base
+  let score = 0;
+  score += Math.min(40, dSinContact * 3);    // máx +40 por sin contacto
+  score += Math.min(30, dSinActivity * 2);   // máx +30 por sin activity
+  if (s.estado_pago && s.estado_pago !== 'activo') score += 25;
+  if (s.glscore != null && s.glscore < 40) score += 15;
+
+  // Motivos legibles
+  const reasons = [];
+  if (dSinContact >= 7) reasons.push(`${dSinContact}d sin contactarlo`);
+  if (dSinActivity >= 7) reasons.push(`${dSinActivity}d sin abrir portal`);
+  if (s.estado_pago && s.estado_pago !== 'activo') reasons.push('pago pendiente');
+  if (s.glscore != null && s.glscore < 40) reasons.push(`GLScore bajo (${s.glscore})`);
+  if (!reasons.length) reasons.push('check-in semanal');
+
+  return { score: Math.min(100, score), reasons, dSinContact, dSinActivity };
+}
+
+function eduRenderFollowupsToday(students) {
+  if (!students.length) return '';
+  // Calcular y rankear
+  const ranked = students.map(s => ({ s, ...eduCalcFollowupScore(s) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  const promedio = Math.round(ranked.reduce((sum, r) => sum + r.score, 0) / ranked.length);
+  const cardColor = (sc) => sc >= 70 ? 'bg-red-50 border-red-300' : sc >= 40 ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300';
+  const badgeColor = (sc) => sc >= 70 ? 'bg-red-600' : sc >= 40 ? 'bg-amber-500' : 'bg-emerald-600';
+
+  return `
+    <div class="bg-gradient-to-br from-slate-900 to-blue-900 text-white rounded-xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div class="text-[10px] uppercase font-bold text-blue-200 tracking-wider">🔥 Seguimientos del día</div>
+          <div class="text-base font-bold mt-0.5">Top 5 estudiantes a contactar ahora</div>
+          <div class="text-[11px] text-blue-200">Score promedio: <strong>${promedio}/100</strong> · ranking automático por urgencia</div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="eduStartFollowupSession()" class="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs px-3 py-2 rounded">▶️ Empezar sesión seguimiento</button>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-5 gap-2 p-3 bg-white">
+        ${ranked.map(({ s, score, reasons, dSinContact }) => `
+          <div class="${cardColor(score)} border-2 rounded-lg p-2.5 relative">
+            <div class="absolute top-1.5 right-1.5 ${badgeColor(score)} text-white text-[9px] font-bold px-1.5 py-0.5 rounded">${score}</div>
+            <div class="text-xs font-bold text-slate-900 truncate pr-8">${(s.full_name||'—').replace(/</g,'&lt;')}</div>
+            <div class="text-[10px] text-slate-600 mb-2 truncate">${(s.grupo || s.current_stage || '').replace(/</g,'&lt;')}</div>
+            <ul class="text-[10px] text-slate-700 mb-2 space-y-0.5">
+              ${reasons.slice(0,2).map(r => `<li>• ${r}</li>`).join('')}
+            </ul>
+            <div class="flex gap-1">
+              ${s.phone ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1 rounded" title="WhatsApp">💬</button>` : `<button disabled class="flex-1 bg-slate-300 text-white text-[10px] py-1 rounded" title="Sin teléfono">📞</button>`}
+              <button onclick="eduOpenStudent('${s.id}')" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded" title="Ver ficha">👁</button>
+              <button onclick="eduQuickLogInteraction('${s.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1 rounded" title="Registrar contacto manual">📝</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Modo "sesión de seguimiento": abre el WA del primero, después siguiente, etc.
+function eduStartFollowupSession() {
+  const students = eduMyStudents();
+  const ranked = students.map(s => ({ s, ...eduCalcFollowupScore(s) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+  if (!ranked.length) return;
+  eduState._followupQueue = ranked.map(r => r.s.id);
+  eduState._followupIdx = 0;
+  eduFollowupNext();
+}
+
+function eduFollowupNext() {
+  const q = eduState._followupQueue || [];
+  const i = eduState._followupIdx || 0;
+  if (i >= q.length) {
+    return alert('✅ Terminaste tu sesión de seguimiento. ' + q.length + ' estudiantes contactados.');
+  }
+  const s = eduMyStudents().find(x => x.id === q[i]);
+  if (!s) {
+    eduState._followupIdx++;
+    return eduFollowupNext();
+  }
+  // Abre el WA modal del estudiante con un callback al cerrar
+  eduOpenWhatsappQuick(s.id);
+  eduState._followupIdx++;
+  // Muestra contador
+  setTimeout(() => {
+    const modal = document.querySelector('#modal h2, #modal h3');
+    if (modal) modal.innerHTML += ` <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">${i+1}/${q.length}</span>`;
+  }, 200);
+}
+
+// Registrar interacción manual rápida (llamada, reunión presencial, mensaje de Discord, etc.)
+function eduQuickLogInteraction(studentId) {
+  const s = eduMyStudents().find(x => x.id === studentId);
+  if (!s) return;
+  openModal('📝 Registrar contacto · ' + (s.full_name||''), `
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Canal</label>
+          <select id="qli-channel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            <option value="call">📞 Llamada</option>
+            <option value="meet">🎥 Videollamada</option>
+            <option value="session">🪑 Sesión presencial</option>
+            <option value="email">📧 Email</option>
+            <option value="manual">✍️ Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Resultado</label>
+          <select id="qli-outcome" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            <option value="answered">✅ Respondió / asistió</option>
+            <option value="scheduled">📅 Agendamos siguiente paso</option>
+            <option value="no_response">❌ No respondió</option>
+            <option value="sent">📨 Solo enviado</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Resumen rápido</label>
+        <textarea id="qli-notes" rows="4" class="w-full border border-slate-300 rounded p-2 text-sm" placeholder="Ej: hablamos 10 min, está trabado con el análisis de la propiedad de Killeen. Mandé ejemplo. Próxima sesión miércoles."></textarea>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="eduSaveQuickLog('${studentId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+      </div>
+    </div>
+  `);
+}
+
+async function eduSaveQuickLog(studentId) {
+  const channel = document.getElementById('qli-channel')?.value;
+  const outcome = document.getElementById('qli-outcome')?.value;
+  const notes = document.getElementById('qli-notes')?.value || '';
+  if (typeof eduLogInteraction === 'function') {
+    await eduLogInteraction(studentId, {
+      channel, outcome,
+      direction: 'outbound',
+      template_id: 'manual',
+      template_label: 'Contacto manual',
+      subject: (notes.split('\n')[0] || channel).slice(0, 80),
+      body: notes
+    });
+  }
+  closeModal();
+  if (typeof eduRender === 'function') eduRender();
+}
+
+window.eduStartFollowupSession = eduStartFollowupSession;
+window.eduFollowupNext = eduFollowupNext;
+window.eduQuickLogInteraction = eduQuickLogInteraction;
+window.eduSaveQuickLog = eduSaveQuickLog;
+
 // ─── TAB: ESTUDIANTES (con buscador inteligente lenguaje natural) ───
 function eduRenderStudents() {
   const students = eduMyStudents();
@@ -1622,6 +1795,248 @@ function eduRenderBoardInsights(metrics) {
   `;
 }
 
+// ════════════════════════════════════════════════════════════════
+// 📣 DASHBOARD MARKETING — sección dedicada en Informes Ejecutivos
+// Carga: origen leads + conversión, análisis diagnóstico, engagement,
+// puntos de atasco, recomendaciones campañas autogeneradas.
+// ════════════════════════════════════════════════════════════════
+let eduMktCache = { key: null, data: null, loading: false };
+
+async function eduLoadMarketingData(mentorshipId) {
+  if (!mentorshipId) return null;
+  const key = `${mentorshipId}|mkt|${new Date().toISOString().slice(0,10)}`;
+  if (eduMktCache.key === key) return eduMktCache.data;
+  if (eduMktCache.loading) return null;
+  eduMktCache.loading = true;
+  try {
+    const [acquisition, engagement, interactions, diagnostics, activity] = await Promise.all([
+      sb.from('edu_mkt_acquisition').select('*').eq('mentorship_id', mentorshipId).catch(() => ({ data: [] })),
+      sb.from('edu_mkt_engagement').select('*').eq('mentorship_id', mentorshipId).limit(500).catch(() => ({ data: [] })),
+      sb.from('edu_student_interactions').select('channel, template_id, template_label, outcome, occurred_at')
+        .eq('mentorship_id', mentorshipId)
+        .gte('occurred_at', new Date(Date.now() - 30*86400000).toISOString())
+        .limit(2000).catch(() => ({ data: [] })),
+      sb.from('edu_credit_diagnostics').select('id, perfil, created_at, status')
+        .eq('status', 'active').limit(500).catch(() => ({ data: [] })),
+      sb.from('edu_student_activity').select('event_type, duration_seconds, occurred_at, ref_label')
+        .eq('mentorship_id', mentorshipId)
+        .gte('occurred_at', new Date(Date.now() - 30*86400000).toISOString())
+        .limit(2000).catch(() => ({ data: [] }))
+    ]);
+    eduMktCache = { key, loading: false, data: {
+      acquisition: acquisition.data || [],
+      engagement: engagement.data || [],
+      interactions: interactions.data || [],
+      diagnostics: diagnostics.data || [],
+      activity: activity.data || []
+    }};
+    return eduMktCache.data;
+  } catch (e) {
+    console.warn('eduLoadMarketingData:', e);
+    eduMktCache = { key, loading: false, data: { acquisition: [], engagement: [], interactions: [], diagnostics: [], activity: [] }};
+    return eduMktCache.data;
+  }
+}
+
+function eduRenderMarketingDashboard(mkt) {
+  const students = eduMyStudents();
+  const total = students.length;
+  const acq = mkt?.acquisition || [];
+  const totalLeads = acq.reduce((s, a) => s + (a.leads||0), 0);
+  const totalClientes = acq.reduce((s, a) => s + (a.clientes||0), 0);
+  const totalRevenue = acq.reduce((s, a) => s + Number(a.revenue||0), 0);
+  const convGlobal = totalLeads ? Math.round(100 * totalClientes / totalLeads) : 0;
+  const eng = mkt?.engagement || [];
+  const engCount = { activo: 0, tibio: 0, frio: 0, nunca: 0 };
+  eng.forEach(e => { engCount[e.estado_engagement] = (engCount[e.estado_engagement]||0) + 1; });
+  const diag = mkt?.diagnostics || [];
+  const perfiles = {};
+  diag.forEach(d => {
+    const name = d.perfil?.perfil?.nombre || 'Sin clasificar';
+    perfiles[name] = (perfiles[name]||0) + 1;
+  });
+  const metas = {}, objeciones = {}, niveles = {};
+  diag.forEach(d => {
+    const meta = d.perfil?.meta || d.perfil?.objetivo;
+    if (meta) metas[meta] = (metas[meta]||0) + 1;
+    const obj = d.perfil?.obstaculo_principal || d.perfil?.problema_principal;
+    if (obj) objeciones[obj] = (objeciones[obj]||0) + 1;
+    const niv = d.perfil?.nivel_experiencia || d.perfil?.nivel;
+    if (niv) niveles[niv] = (niveles[niv]||0) + 1;
+  });
+  const act = mkt?.activity || [];
+  const lessonViews = {};
+  const taskComplete = {};
+  let totalLogins = 0;
+  let totalTaskTime = 0, taskTimeCount = 0;
+  act.forEach(a => {
+    if (a.event_type === 'portal_login') totalLogins++;
+    if (a.event_type === 'lesson_view' && a.ref_label) lessonViews[a.ref_label] = (lessonViews[a.ref_label]||0) + 1;
+    if (a.event_type === 'task_complete' && a.ref_label) taskComplete[a.ref_label] = (taskComplete[a.ref_label]||0) + 1;
+    if (a.event_type === 'task_complete' && a.duration_seconds) {
+      totalTaskTime += a.duration_seconds;
+      taskTimeCount++;
+    }
+  });
+  const avgTaskMin = taskTimeCount ? Math.round(totalTaskTime / taskTimeCount / 60) : null;
+  const loginsPerStudent = total ? (totalLogins / total).toFixed(1) : '0';
+  const inter = mkt?.interactions || [];
+  const templateStats = {};
+  inter.forEach(i => {
+    const tid = i.template_id || 'manual';
+    if (!templateStats[tid]) templateStats[tid] = { label: i.template_label || tid, total: 0, replied: 0 };
+    templateStats[tid].total++;
+    if (i.outcome === 'replied' || i.outcome === 'answered' || i.outcome === 'scheduled') templateStats[tid].replied++;
+  });
+  const topTemplates = Object.entries(templateStats)
+    .map(([id, s]) => ({ id, ...s, reply_pct: s.total ? Math.round(100*s.replied/s.total) : 0 }))
+    .sort((a,b) => b.reply_pct - a.reply_pct).slice(0, 5);
+  const m = eduCurrentMentorship();
+  const stageBlock = {};
+  (m?.stages || []).forEach(st => { stageBlock[st.key] = { name: st.name, icon: st.icon, n: 0 }; });
+  students.forEach(s => {
+    if (s.current_stage && stageBlock[s.current_stage]) stageBlock[s.current_stage].n++;
+  });
+  const stageList = Object.values(stageBlock).sort((a,b) => b.n - a.n);
+  const stageMax = stageList[0];
+
+  // Recomendaciones autogeneradas
+  const recs = [];
+  if (Object.keys(perfiles).length) {
+    const topPerfil = Object.entries(perfiles).sort((a,b)=>b[1]-a[1])[0];
+    if (topPerfil[1] / Math.max(1, diag.length) > 0.3) {
+      recs.push({ tipo: 'campania', titulo: `Hacer ads dirigidos al perfil "${topPerfil[0]}" (${Math.round(100*topPerfil[1]/diag.length)}% de los diagnósticos)`, accion: `Crear creativos con copy + casos de éxito de este perfil. Probable highest-converting audience.` });
+    }
+  }
+  if (Object.keys(objeciones).length) {
+    const topObj = Object.entries(objeciones).sort((a,b)=>b[1]-a[1])[0];
+    recs.push({ tipo: 'mensaje', titulo: `Objeción más común: "${topObj[0]}" (${topObj[1]} estudiantes)`, accion: `Anticiparla en los anuncios y en la primera llamada. Crear contenido educativo que la desactive antes del call.` });
+  }
+  if (engCount.frio + engCount.nunca > engCount.activo) {
+    recs.push({ tipo: 'retencion', titulo: `${engCount.frio + engCount.nunca} estudiantes en estado frío/nunca abrió portal`, accion: `Activar campaña de re-engagement con casos de éxito recientes + 1 sesión grupal "abierta" para reactivar.` });
+  }
+  if (stageMax && total > 0 && stageMax.n / total > 0.4) {
+    recs.push({ tipo: 'producto', titulo: `${Math.round(100*stageMax.n/total)}% atascado en "${stageMax.name}"`, accion: `Crear masterclass específica de esta etapa + usar como hook de marketing ("dejá de estancarte en X").` });
+  }
+  if (topTemplates.length) {
+    const best = topTemplates[0];
+    if (best.reply_pct > 50 && best.total >= 3) recs.push({ tipo: 'comunicacion', titulo: `Template ganador: "${best.label}" (${best.reply_pct}% respuesta)`, accion: `Replicar tono y estructura en campañas email/SMS automáticas. Es el que más conecta.` });
+  }
+  if (acq.length) {
+    const bestCanal = acq.sort((a,b) => (b.conv_pct||0) - (a.conv_pct||0))[0];
+    if (bestCanal && bestCanal.conv_pct > 10) recs.push({ tipo: 'canal', titulo: `Canal con mejor conversión: ${bestCanal.canal} (${bestCanal.conv_pct}%)`, accion: `Duplicar inversión acá. Auditar qué hace diferente y replicarlo en otros canales.` });
+  }
+  if (!recs.length) recs.push({ tipo: 'data', titulo: 'Faltan datos para recomendaciones', accion: 'Asegurate de capturar lead_source en cada estudiante (Tab Estudiantes → Editar → Origen).' });
+
+  return `
+    <div class="bg-white border-2 border-pink-300 rounded-xl overflow-hidden">
+      <div class="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-4 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div class="text-[10px] font-bold uppercase text-pink-100 tracking-wider">📣 INFORME MARKETING & VENTAS</div>
+          <div class="text-lg font-bold mt-0.5">Datos para decisiones de campaña y producto</div>
+          <div class="text-[11px] text-pink-100">Últimos 30 días · ${total} estudiantes · ${totalLeads} leads · ${totalClientes} clientes</div>
+        </div>
+        <button onclick="eduExportMarketingCsv()" class="bg-white text-pink-700 text-xs font-bold px-3 py-1.5 rounded">📥 Export CSV</button>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-pink-50">
+        <div class="bg-white rounded-lg p-3 border border-pink-100"><div class="text-[10px] uppercase text-slate-500 font-bold">Leads totales</div><div class="text-2xl font-bold text-slate-900 mt-1">${totalLeads}</div><div class="text-[10px] text-slate-500">${acq.length} canales activos</div></div>
+        <div class="bg-white rounded-lg p-3 border border-pink-100"><div class="text-[10px] uppercase text-slate-500 font-bold">Conv. global</div><div class="text-2xl font-bold text-emerald-700 mt-1">${convGlobal}%</div><div class="text-[10px] text-slate-500">${totalClientes} clientes</div></div>
+        <div class="bg-white rounded-lg p-3 border border-pink-100"><div class="text-[10px] uppercase text-slate-500 font-bold">Revenue 30d</div><div class="text-2xl font-bold text-slate-900 mt-1">$${(totalRevenue/1000).toFixed(1)}k</div><div class="text-[10px] text-slate-500">Clientes nuevos</div></div>
+        <div class="bg-white rounded-lg p-3 border border-pink-100"><div class="text-[10px] uppercase text-slate-500 font-bold">Logins / estudiante</div><div class="text-2xl font-bold text-slate-900 mt-1">${loginsPerStudent}</div><div class="text-[10px] text-slate-500">30d${avgTaskMin?` · ${avgTaskMin}min/tarea`:''}</div></div>
+      </div>
+      <div class="p-4 border-t border-pink-100">
+        <div class="text-xs font-bold text-slate-900 mb-2">🎯 Origen + conversión por canal</div>
+        ${acq.length ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-100 text-slate-700"><tr><th class="px-2 py-1 text-left">Canal</th><th class="px-2 py-1 text-left">Campaña</th><th class="px-2 py-1 text-right">Leads</th><th class="px-2 py-1 text-right">Clientes</th><th class="px-2 py-1 text-right">Conv.</th><th class="px-2 py-1 text-right">Revenue</th></tr></thead><tbody>${acq.sort((a,b)=>(b.revenue||0)-(a.revenue||0)).map(a => `<tr class="border-b border-slate-100"><td class="px-2 py-1 font-semibold">${(a.canal||'').replace(/</g,'&lt;')}</td><td class="px-2 py-1 text-slate-600 text-[10px]">${(a.campania||'—').replace(/</g,'&lt;')}</td><td class="px-2 py-1 text-right">${a.leads||0}</td><td class="px-2 py-1 text-right">${a.clientes||0}</td><td class="px-2 py-1 text-right font-bold ${(a.conv_pct||0)>=15?'text-emerald-700':(a.conv_pct||0)>=5?'text-amber-700':'text-slate-600'}">${a.conv_pct||0}%</td><td class="px-2 py-1 text-right">$${Number(a.revenue||0).toLocaleString('en-US')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="text-xs text-slate-400 italic">No hay datos de origen. Capturá <code>lead_source</code> al crear estudiantes para analizar canales.</div>`}
+      </div>
+      <div class="grid md:grid-cols-2 gap-4 p-4 border-t border-pink-100">
+        <div>
+          <div class="text-xs font-bold text-slate-900 mb-2">👥 Engagement actual</div>
+          <div class="space-y-1.5 text-xs">
+            <div class="flex items-center justify-between"><span class="text-emerald-700">🟢 Activos (últimos 3d)</span><strong>${engCount.activo||0}</strong></div>
+            <div class="flex items-center justify-between"><span class="text-amber-700">🟡 Tibios (3-14d)</span><strong>${engCount.tibio||0}</strong></div>
+            <div class="flex items-center justify-between"><span class="text-red-700">🔴 Fríos (+14d)</span><strong>${engCount.frio||0}</strong></div>
+            <div class="flex items-center justify-between"><span class="text-slate-500">⚪ Nunca abrió portal</span><strong>${engCount.nunca||0}</strong></div>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-900 mb-2">🎯 Perfiles del cliente (diagnóstico)</div>
+          ${Object.keys(perfiles).length ? Object.entries(perfiles).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n, c]) => { const pct = diag.length ? Math.round(100*c/diag.length) : 0; return `<div class="mb-1"><div class="flex justify-between text-[11px]"><span class="truncate">${n.replace(/</g,'&lt;')}</span><span><strong>${c}</strong> · ${pct}%</span></div><div class="w-full bg-slate-100 rounded-full h-1.5"><div class="bg-pink-500 h-1.5 rounded-full" style="width:${pct}%"></div></div></div>`; }).join('') : '<div class="text-xs text-slate-400 italic">Aún no hay diagnósticos.</div>'}
+        </div>
+      </div>
+      <div class="p-4 border-t border-pink-100 bg-amber-50">
+        <div class="text-xs font-bold text-slate-900 mb-3">💡 Análisis del diagnóstico — qué te dice el cliente</div>
+        <div class="grid md:grid-cols-3 gap-3 text-xs">
+          <div>
+            <div class="text-[10px] font-bold uppercase text-amber-700 mb-1">Top metas declaradas</div>
+            ${Object.keys(metas).length ? Object.entries(metas).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([n,c]) => `<div class="bg-white rounded p-1.5 mb-1 border border-amber-200"><span class="font-semibold">${(n||'').replace(/</g,'&lt;').slice(0,60)}</span> <span class="text-amber-700">(${c})</span></div>`).join('') : '<div class="text-slate-400 italic">Sin datos</div>'}
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-amber-700 mb-1">Top obstáculos / objeciones</div>
+            ${Object.keys(objeciones).length ? Object.entries(objeciones).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([n,c]) => `<div class="bg-white rounded p-1.5 mb-1 border border-amber-200"><span class="font-semibold">${(n||'').replace(/</g,'&lt;').slice(0,60)}</span> <span class="text-amber-700">(${c})</span></div>`).join('') : '<div class="text-slate-400 italic">Sin datos</div>'}
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-amber-700 mb-1">Nivel de experiencia</div>
+            ${Object.keys(niveles).length ? Object.entries(niveles).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([n,c]) => `<div class="bg-white rounded p-1.5 mb-1 border border-amber-200"><span class="font-semibold">${(n||'').replace(/</g,'&lt;').slice(0,60)}</span> <span class="text-amber-700">(${c})</span></div>`).join('') : '<div class="text-slate-400 italic">Sin datos</div>'}
+          </div>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4 p-4 border-t border-pink-100">
+        <div>
+          <div class="text-xs font-bold text-slate-900 mb-2">📚 Top 5 lecciones más vistas</div>
+          ${Object.keys(lessonViews).length ? Object.entries(lessonViews).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,c]) => `<div class="flex justify-between text-[11px] py-1 border-b border-slate-100"><span class="truncate">${n.replace(/</g,'&lt;')}</span><strong>${c} vistas</strong></div>`).join('') : '<div class="text-xs text-slate-400 italic">Sin tracking aún. Loguear lesson_view al abrir lecciones para activar.</div>'}
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-900 mb-2">⏱ Top 5 tareas más completadas</div>
+          ${Object.keys(taskComplete).length ? Object.entries(taskComplete).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,c]) => `<div class="flex justify-between text-[11px] py-1 border-b border-slate-100"><span class="truncate">${n.replace(/</g,'&lt;')}</span><strong>${c}×</strong></div>`).join('') : '<div class="text-xs text-slate-400 italic">Sin tracking aún. Loguear task_complete con duration_seconds.</div>'}
+        </div>
+      </div>
+      <div class="p-4 border-t border-pink-100 bg-blue-50">
+        <div class="text-xs font-bold text-slate-900 mb-2">💬 Templates WhatsApp — ranking por respuesta</div>
+        ${topTemplates.length ? `<table class="w-full text-xs"><thead><tr class="text-slate-700"><th class="text-left">Template</th><th class="text-right">Enviados</th><th class="text-right">Respondieron</th><th class="text-right">% respuesta</th></tr></thead><tbody>${topTemplates.map(t => `<tr class="border-t border-blue-200"><td class="py-1">${t.label.replace(/</g,'&lt;')}</td><td class="py-1 text-right">${t.total}</td><td class="py-1 text-right">${t.replied}</td><td class="py-1 text-right font-bold ${t.reply_pct>=50?'text-emerald-700':t.reply_pct>=25?'text-amber-700':'text-slate-600'}">${t.reply_pct}%</td></tr>`).join('')}</tbody></table>` : `<div class="text-xs text-slate-400 italic">Aún no hay datos. Empezá a usar los templates de WhatsApp y los datos se llenan solos.</div>`}
+      </div>
+      <div class="p-4 border-t border-pink-100">
+        <div class="text-xs font-bold text-slate-900 mb-3">🚀 Recomendaciones accionables para próximas campañas</div>
+        <div class="space-y-2">
+          ${recs.map(r => {
+            const cmap = {
+              campania:    { bg:'bg-pink-50',    border:'border-pink-300',    label:'CAMPAÑA',      text:'text-pink-900' },
+              mensaje:     { bg:'bg-amber-50',   border:'border-amber-300',   label:'MENSAJE',      text:'text-amber-900' },
+              retencion:   { bg:'bg-red-50',     border:'border-red-300',     label:'RETENCIÓN',    text:'text-red-900' },
+              producto:    { bg:'bg-blue-50',    border:'border-blue-300',    label:'PRODUCTO',     text:'text-blue-900' },
+              comunicacion:{ bg:'bg-emerald-50', border:'border-emerald-300', label:'COMUNICACIÓN', text:'text-emerald-900' },
+              canal:       { bg:'bg-violet-50',  border:'border-violet-300',  label:'CANAL',        text:'text-violet-900' },
+              data:        { bg:'bg-slate-50',   border:'border-slate-300',   label:'DATA',         text:'text-slate-900' }
+            };
+            const c = cmap[r.tipo] || cmap.data;
+            return `<div class="${c.bg} ${c.border} border rounded p-3"><div class="flex items-start gap-2"><span class="text-[9px] font-bold bg-white border border-current px-1.5 py-0.5 rounded ${c.text}">${c.label}</span><div class="flex-1"><div class="font-bold text-sm ${c.text}">${r.titulo}</div><div class="text-xs ${c.text} opacity-80 mt-1">${r.accion}</div></div></div></div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function eduExportMarketingCsv() {
+  const mkt = eduMktCache.data;
+  if (!mkt) return alert('Cargando datos. Probá de nuevo en 1 segundo.');
+  const lines = ['Sección,Métrica,Valor'];
+  (mkt.acquisition || []).forEach(a => {
+    lines.push(`Adquisición,${a.canal||''} / ${a.campania||''},Leads ${a.leads||0} · Clientes ${a.clientes||0} · Conv ${a.conv_pct||0}% · Revenue $${a.revenue||0}`);
+  });
+  const eng = mkt.engagement || [];
+  const engCount = { activo:0, tibio:0, frio:0, nunca:0 };
+  eng.forEach(e => { engCount[e.estado_engagement] = (engCount[e.estado_engagement]||0) + 1; });
+  Object.entries(engCount).forEach(([k,v]) => lines.push(`Engagement,${k},${v}`));
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `marketing-informe-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+window.eduExportMarketingCsv = eduExportMarketingCsv;
+
 // Helper: abre CRM Mentorías o Informes Ejecutivos desde Metodología FlipMentoría
 async function eduOpenSystemFromMethodology(systemType) {
   let target = null;
@@ -1713,8 +2128,16 @@ function _eduRenderReportsStandaloneInner(root) {
         if (res != null && eduBoardCache.key === boardKey) eduRenderReportsStandalone();
       });
     }
+    // 🆕 Cargar Marketing Dashboard
+    const mktKey = `${eduState.mentorshipId}|mkt|${new Date().toISOString().slice(0,10)}`;
+    if (eduMktCache.key !== mktKey && !eduMktCache.loading) {
+      eduLoadMarketingData(eduState.mentorshipId).then((res) => {
+        if (res != null && eduMktCache.key === mktKey) eduRenderReportsStandalone();
+      });
+    }
   }
   const boardSummary = (eduBoardCache.key === `${eduState.mentorshipId}|board|${new Date().toISOString().slice(0,10)}`) ? eduBoardCache.data : null;
+  const mktData = (eduMktCache.key === `${eduState.mentorshipId}|mkt|${new Date().toISOString().slice(0,10)}`) ? eduMktCache.data : null;
 
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
@@ -1734,6 +2157,9 @@ function _eduRenderReportsStandaloneInner(root) {
 
         <!-- 🆕 RESUMEN EJECUTIVO EN VIVO (board-friendly · no depende de vistas SQL) -->
         ${cur ? eduRenderBoardSummary(boardSummary) : ''}
+
+        <!-- 🆕 DASHBOARD MARKETING & VENTAS -->
+        ${cur ? eduRenderMarketingDashboard(mktData) : ''}
 
         <!-- KPIs dashboard (auto desde DB) -->
         <div class="bg-slate-900 text-white rounded-xl p-4">
@@ -3151,8 +3577,37 @@ function eduCRM360RenderResumen(s, data) {
   const lastDate = lastAct?.completed_at ? new Date(lastAct.completed_at) : null;
   const diasInactivo = lastDate ? Math.floor((Date.now()-lastDate.getTime())/(86400000)) : (s.enrolled_at ? Math.floor((Date.now()-new Date(s.enrolled_at).getTime())/(86400000)) : null);
 
+  // ── Alertas activas (como la ficha vieja) ──
+  let alertasHTML = '';
+  try {
+    const alertas = typeof eduCalcularAlertasEstudiante === 'function' ? eduCalcularAlertasEstudiante(s) : [];
+    alertasHTML = alertas.length
+      ? `<div class="space-y-1">${alertas.map(a => `
+          <div class="bg-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-50 border border-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-200 rounded-lg p-2.5 text-xs">
+            <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?'🚨':a.severity==='high'?'⚠️':'📌'} ${escFn(a.mensaje)}</div>
+            <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">💡 ${escFn(a.accion)}</div>
+          </div>`).join('')}</div>`
+      : `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-900">✅ Sin alertas activas</div>`;
+  } catch {}
+
+  // ── Mentorship para link Airtable ──
+  const m = typeof eduCurrentMentorship === 'function' ? eduCurrentMentorship() : null;
+  const airtableLink = (s.airtable_record_id && m?.airtable_base_id && m?.airtable_students_table)
+    ? `https://airtable.com/${m.airtable_base_id}/${m.airtable_students_table}/${s.airtable_record_id}`
+    : null;
+
+  // ── Última fecha de seguimiento (manual del mentor) ──
+  const ultimaFecha = s.ultima_fecha_seguimiento ? new Date(s.ultima_fecha_seguimiento) : null;
+  const diasUltimoContacto = ultimaFecha ? Math.floor((Date.now() - ultimaFecha.getTime())/86400000) : null;
+  const colorContacto = diasUltimoContacto == null ? 'slate' : diasUltimoContacto > 14 ? 'red' : diasUltimoContacto > 7 ? 'amber' : 'emerald';
+
   return `
     <div class="space-y-3">
+
+      <!-- 🚨 ALERTAS ACTIVAS (lo de la ficha vieja) -->
+      ${alertasHTML}
+
+      <!-- KPIs principales (4 cards) -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div class="bg-slate-900 text-white rounded-lg p-3">
           <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Etapa actual</div>
@@ -3169,12 +3624,25 @@ function eduCRM360RenderResumen(s, data) {
           <div class="text-[10px] text-blue-700">completos / enviados</div>
         </div>
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <div class="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Inactividad</div>
+          <div class="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Inactividad app</div>
           <div class="text-lg font-bold text-amber-900">${diasInactivo!=null?diasInactivo+'d':'—'}</div>
           <div class="text-[10px] text-amber-700">desde última acción</div>
         </div>
       </div>
 
+      <!-- 📞 ÚLTIMO CONTACTO (manual del mentor) — banner destacado -->
+      <div class="bg-${colorContacto}-50 border border-${colorContacto}-200 rounded-lg p-3 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <div class="text-xl">📞</div>
+          <div>
+            <div class="text-[10px] font-bold uppercase text-${colorContacto}-800">ÚLTIMO CONTACTO DEL MENTOR</div>
+            <div class="text-sm font-bold text-${colorContacto}-900">${ultimaFecha ? ultimaFecha.toLocaleDateString('es') : 'Sin registrar'}${diasUltimoContacto!=null?` · hace ${diasUltimoContacto}d`:''}</div>
+          </div>
+        </div>
+        <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-xs bg-white border border-${colorContacto}-300 text-${colorContacto}-700 font-bold px-2.5 py-1 rounded hover:bg-${colorContacto}-100">✏️ Actualizar</button>
+      </div>
+
+      <!-- Plan activo -->
       ${activePlan ? `
         <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-lg p-3">
           <div class="text-[10px] font-bold uppercase text-slate-600 mb-1">PLAN ACTIVO</div>
@@ -3184,21 +3652,66 @@ function eduCRM360RenderResumen(s, data) {
         </div>` : `
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">⚠️ Sin plan asignado todavía.</div>`}
 
+      <!-- 📞 DATOS CRM con etiquetas más claras y links -->
       <div class="bg-white border border-slate-200 rounded-lg p-3">
-        <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">📞 DATOS CRM (contacto + comercial)</div>
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <div><span class="text-slate-500">Email:</span> <strong>${escFn(s.email||'—')}</strong></div>
-          <div><span class="text-slate-500">Phone:</span> <strong>${escFn(s.phone||'—')}</strong></div>
-          <div><span class="text-slate-500">Ciudad:</span> <strong>${escFn(s.city||'—')}</strong></div>
-          <div><span class="text-slate-500">Cohorte:</span> <strong>${escFn(s.grupo||'—')}</strong></div>
-          <div><span class="text-slate-500">Pago:</span> <strong class="${s.payment_status==='active'?'text-emerald-700':s.payment_status==='past_due'?'text-red-700':'text-slate-700'}">${escFn(s.payment_status||'—')}</strong></div>
-          <div><span class="text-slate-500">Status:</span> <strong>${escFn(s.status||'—')}</strong></div>
-          <div><span class="text-slate-500">Entrada:</span> <strong>${s.enrolled_at?new Date(s.enrolled_at).toLocaleDateString('es'):'—'}</strong></div>
-          <div><span class="text-slate-500">Vence:</span> <strong>${s.expires_at?new Date(s.expires_at).toLocaleDateString('es'):'—'}</strong></div>
-          <div><span class="text-slate-500">Capital:</span> <strong>${s.capital_actual?'$'+Number(s.capital_actual).toLocaleString():'—'}</strong></div>
-          <div><span class="text-slate-500">Días en etapa:</span> <strong>${eduDaysInStage(s)??'—'}d</strong></div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[10px] font-bold uppercase text-slate-600">📞 DATOS CRM (contacto + comercial)</div>
+          ${airtableLink ? `<a href="${airtableLink}" target="_blank" class="text-[10px] bg-blue-50 border border-blue-200 text-blue-700 font-bold px-2 py-0.5 rounded hover:bg-blue-100">↗ Ver en Airtable</a>` : `<span class="text-[10px] text-slate-400">Sin link Airtable</span>`}
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">📧 Email</span> <strong class="truncate ml-2">${escFn(s.email||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+            <span class="text-slate-500">📱 Phone</span>
+            ${s.phone ? `<a href="https://wa.me/${escFn(String(s.phone).replace(/\\D/g,''))}" target="_blank" class="font-bold text-emerald-700 hover:underline">${escFn(s.phone)}</a>` : '<strong>—</strong>'}
+          </div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">📍 Ciudad</span> <strong>${escFn(s.city||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">👥 Cohorte</span> <strong>${escFn(s.grupo||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">💳 Pago</span> <strong class="${s.payment_status==='active'?'text-emerald-700':s.payment_status==='past_due'?'text-red-700':'text-slate-700'}">${escFn(s.payment_status||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">⚡ Status</span> <strong class="${s.status==='active'?'text-emerald-700':s.status==='at_risk'?'text-amber-700':s.status==='dropped'?'text-red-700':'text-slate-700'}">${escFn(s.status||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">📅 Entrada</span> <strong>${s.enrolled_at?new Date(s.enrolled_at).toLocaleDateString('es'):'—'}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">⏳ Vence</span> <strong>${s.expires_at?new Date(s.expires_at).toLocaleDateString('es'):'—'}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">💰 Capital</span> <strong>${s.capital_actual?'$'+Number(s.capital_actual).toLocaleString():'—'}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">⌛ Días en etapa</span> <strong>${eduDaysInStage(s)??'—'}d</strong></div>
         </div>
       </div>
+
+      <!-- 📝 OBSERVACIONES DE SEGUIMIENTO (preview con link a editar) -->
+      ${s.observaciones_seguimiento || s.notes ? `
+        <div class="grid grid-cols-1 ${s.observaciones_seguimiento && s.notes ? 'md:grid-cols-2' : ''} gap-2">
+          ${s.observaciones_seguimiento ? `
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div class="flex items-center justify-between mb-1">
+                <div class="text-[10px] font-bold uppercase text-amber-800">📋 OBSERVACIONES DE SEGUIMIENTO</div>
+                <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[10px] text-amber-700 hover:underline">✏️ editar</button>
+              </div>
+              <div class="text-xs text-slate-800 whitespace-pre-wrap line-clamp-6">${escFn(s.observaciones_seguimiento)}</div>
+            </div>` : ''}
+          ${s.notes ? `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div class="flex items-center justify-between mb-1">
+                <div class="text-[10px] font-bold uppercase text-blue-800">💼 NOTAS COMERCIALES / MARKETING</div>
+                <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[10px] text-blue-700 hover:underline">✏️ editar</button>
+              </div>
+              <div class="text-xs text-slate-800 whitespace-pre-wrap line-clamp-6">${escFn(s.notes)}</div>
+            </div>` : ''}
+        </div>` : `
+        <div class="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-3 text-xs text-slate-600 flex items-center justify-between">
+          <span>Sin observaciones ni notas comerciales registradas.</span>
+          <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[11px] bg-slate-900 text-white font-bold px-2 py-1 rounded hover:bg-slate-700">➕ Agregar</button>
+        </div>`}
+
+      <!-- 📎 EVIDENCIA (si tiene URL) -->
+      ${s.evidencia_url ? `
+        <a href="${escFn(s.evidencia_url)}" target="_blank" class="block bg-violet-50 border border-violet-200 rounded-lg p-3 hover:bg-violet-100 transition">
+          <div class="flex items-center gap-2">
+            <div class="text-xl">📎</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold uppercase text-violet-800">EVIDENCIA</div>
+              <div class="text-xs text-violet-900 truncate">${escFn(s.evidencia_url)}</div>
+            </div>
+            <div class="text-violet-500 text-xs">↗</div>
+          </div>
+        </a>` : ''}
     </div>
   `;
 }
