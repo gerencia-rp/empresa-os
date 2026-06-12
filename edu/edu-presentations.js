@@ -476,9 +476,33 @@ async function eduGeneratePresentationV2(isExpertMode) {
   eduRender();
 
   const baseUrl = `${window.SUPABASE_URL}/functions/v1/generate-presentation-v2`;
+
+  // 🔐 AUTH STRICT: el token debe ser el access_token del user (con `sub` claim),
+  // NO la anon key. Si la sesión está vacía/expirada, intentamos refresh y si falla
+  // pedimos relogin con mensaje claro.
   let token;
-  try { token = await getAccessToken(); }
-  catch (e) { return _eduPresFail('No pude leer el token de sesión: ' + e.message); }
+  try {
+    const sbAuth = (typeof sb !== 'undefined' && sb) ? sb : (window.sb || null);
+    if (!sbAuth) throw new Error('Cliente Supabase no disponible');
+    let sess = await sbAuth.auth.getSession();
+    if (!sess?.data?.session?.access_token) {
+      // Intentar refresh por si el token está vencido pero hay refresh_token
+      try { await sbAuth.auth.refreshSession(); sess = await sbAuth.auth.getSession(); } catch (e) {}
+    }
+    token = sess?.data?.session?.access_token;
+    if (!token) throw new Error('No hay sesión activa');
+    // Sanity: la anon key empieza con eyJ y es muy larga pero NO debería usarse
+    if (token === window.SUPABASE_ANON_KEY) throw new Error('Caché devolvió anon key en vez de session token');
+  } catch (e) {
+    return _eduPresFail(
+      '⚠️ Tu sesión expiró o no se pudo leer.\n\n' +
+      'Hacé esto:\n' +
+      '1) Cerrá sesión (botón Salir abajo a la izquierda)\n' +
+      '2) Volvé a entrar con tu email\n' +
+      '3) Retomá el wizard\n\n' +
+      'Detalle técnico: ' + (e.message || String(e))
+    );
+  }
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
   // PASO 1: OUTLINE
