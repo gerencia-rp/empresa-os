@@ -70,9 +70,9 @@ const EDU_TABS = [
   { key: 'cohorts',      label: '👨‍👩‍👧‍👦 Cohortes' },
   { key: 'alerts',       label: '🚨 Alertas' },
   { key: 'progress',     label: '📈 Progreso' },
-  { key: 'resources',    label: '📑 Recursos' },
   { key: 'calls',        label: '📅 Calendario' },
   { key: 'config',       label: '⚙️ Config' }
+  // 'resources' eliminada — los recursos viven dentro de Metodología FlipMentoría (cada bloque trae sus herramientas y links)
 ];
 // NOTA: Presentaciones e Informes son sistemas INDEPENDIENTES ahora
 // (openEduPresentationsSystem y openEduReportsSystem abren modales propios)
