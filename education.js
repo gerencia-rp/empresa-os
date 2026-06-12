@@ -334,16 +334,20 @@ function eduRenderStudents() {
 
 // ─── TAB: PLAN IA ───
 function eduRenderPlan() {
-  const m = eduCurrentMentorship();
-  const aiKey = `edu-plan-${eduState.mentorshipId}-${eduState.selectedStudentId || 'none'}`;
-  const ai = (window.aiState && window.aiState[aiKey]) || {};
+  // ════════════════════════════════════════════════════════════
+  // Plan Acción ahora es solo un LINK al diagnóstico en Metodología FlipMentoría
+  // (la generación del plan vive sólo allí, evita duplicación)
+  // ════════════════════════════════════════════════════════════
   const student = eduState.students.find(s => s.id === eduState.selectedStudentId);
 
   if (!student) {
     return `<div class="text-center py-12 text-slate-500">
       <div class="text-5xl mb-3">🎯</div>
-      <div class="font-bold">Generador de Plan IA</div>
-      <div class="text-xs mt-2 max-w-md mx-auto">Seleccioná un estudiante en el tab Estudiantes (botón "ver detalle"), o eligí uno acá abajo:</div>
+      <div class="font-bold">Plan de Acción del Estudiante</div>
+      <div class="text-xs mt-2 max-w-md mx-auto">
+        El plan de acción se genera desde el <strong>Diagnóstico</strong> en Metodología FlipMentoría.
+        Seleccioná primero un estudiante:
+      </div>
       <select onchange="eduState.selectedStudentId=this.value; eduRender()" class="mt-4 border border-slate-300 rounded px-3 py-2 text-sm">
         <option value="">— Seleccionar estudiante —</option>
         ${eduMyStudents().map(s => `<option value="${s.id}">${s.full_name} · ${eduStageObj(s.current_stage)?.name || s.current_stage || 'sin etapa'}</option>`).join('')}
@@ -352,74 +356,82 @@ function eduRenderPlan() {
   }
 
   const stage = eduStageObj(student.current_stage);
-  const generatedPlan = ai.plan || null;
-
   return `
-    <div class="space-y-3">
-      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3">
+    <div class="space-y-4 max-w-2xl mx-auto py-4">
+      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
         <div class="flex justify-between items-start gap-2 flex-wrap">
           <div>
             <div class="text-xs font-bold text-blue-900 uppercase">🎓 Estudiante seleccionado</div>
-            <div class="text-lg font-bold mt-1">${student.full_name}</div>
-            <div class="text-[11px] text-slate-600">
-              Etapa: <strong>${stage?.name || student.current_stage || 'sin etapa'}</strong> · ${eduDaysInStage(student) || 0}d en etapa · GLScore <strong>${student.glscore||50}</strong>
+            <div class="text-xl font-bold mt-1">${student.full_name}</div>
+            <div class="text-[12px] text-slate-600 mt-1">
+              Etapa: <strong>${stage?.name || student.current_stage || 'sin etapa'}</strong>
+              · ${eduDaysInStage(student) || 0}d en etapa
+              · GLScore <strong>${student.glscore||50}</strong>
             </div>
           </div>
-          <button onclick="eduState.selectedStudentId=null; eduRender()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Cambiar</button>
+          <button onclick="eduState.selectedStudentId=null; eduRender()" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded">Cambiar</button>
         </div>
       </div>
 
-      <!-- Diagnóstico que el coach pasa para que IA genere el plan -->
-      <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📝 Diagnóstico de la sesión (input para IA)</div>
-        <textarea id="edu-plan-diagnostic" rows="4" placeholder="Describe rápidamente qué hicieron en la última sesión, qué objetivos tiene el estudiante para las próximas 2 semanas, y dónde está atascado. Ej: 'Ya tiene buybox definido en Austin SE. Le falta análisis de 5 comps. Quiere cerrar primera oferta en 30d.'" class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${student._lastDiagnostic||''}</textarea>
-        <div class="flex justify-between items-center mt-2">
-          <select id="edu-plan-horizon" class="border border-slate-300 rounded px-2 py-1 text-xs">
-            <option value="1">Plan para 1 semana</option>
-            <option value="2" selected>Plan para 2 semanas</option>
-            <option value="4">Plan para 1 mes</option>
-          </select>
-          <button onclick="eduGeneratePlan()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-4 py-2 rounded">🤖 Generar plan con IA</button>
+      <!-- BIG CTA: redirige al sistema Metodología → tab Diagnóstico con estudiante pre-cargado -->
+      <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-6 text-center">
+        <div class="text-4xl mb-2">🎯</div>
+        <div class="text-lg font-bold text-slate-900 mb-1">Generar / ver Plan de Acción</div>
+        <div class="text-sm text-slate-600 mb-4 max-w-md mx-auto">
+          El plan vive en <strong>Metodología FlipMentoría → Diagnóstico</strong>.
+          Hacé click acá y vas directo al cuestionario con <strong>${student.full_name}</strong> pre-seleccionado.
+        </div>
+        <button onclick="eduOpenStudentInDiagnostico('${student.id}')"
+                class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-6 py-3 rounded-lg shadow inline-flex items-center gap-2">
+          📘 Abrir en Metodología FlipMentoría
+          <span class="text-base">→</span>
+        </button>
+        <div class="text-[11px] text-slate-500 mt-3">
+          Diagnóstico (18 preguntas) genera el plan completo de la mentoría · Crédito tiene su propio tab dentro
         </div>
       </div>
 
-      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900 text-center"><span class="animate-pulse">🧠 Claude analizando el contexto y armando el plan...</span></div>` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
-
-      ${generatedPlan ? `
-        <div class="bg-white border-2 border-violet-300 rounded-xl overflow-hidden">
-          <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 flex justify-between items-center">
-            <div class="text-xs font-bold uppercase text-violet-900">🎯 Plan generado · listo para copiar y pegar al estudiante</div>
-            <div class="flex gap-1">
-              <button onclick="eduCopyPlan()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">📋 Copiar</button>
-              <button onclick="eduSavePlan()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2 py-1 rounded">💾 Guardar como tareas</button>
-            </div>
-          </div>
-          <div class="p-4" id="edu-plan-preview">
-            <div class="prose prose-sm max-w-none">
-              ${generatedPlan.message ? `<div class="bg-blue-50 border border-blue-200 rounded p-3 mb-3 text-xs whitespace-pre-wrap">${generatedPlan.message}</div>` : ''}
-              <h3 class="text-sm font-bold text-slate-900 mt-3">🎯 Objetivo de las próximas ${ai.horizon || 2} semanas</h3>
-              <p class="text-xs text-slate-700">${generatedPlan.objective || '—'}</p>
-              <h3 class="text-sm font-bold text-slate-900 mt-3">📋 Tareas concretas</h3>
-              <ol class="text-xs text-slate-700 space-y-1.5">
-                ${(generatedPlan.tasks || []).map(t => `<li><strong>${t.title}</strong>${t.description ? '<br><span class="text-slate-500">'+t.description+'</span>' : ''}${t.due_date ? '<br><em class="text-blue-700">Due: '+t.due_date+'</em>' : ''}</li>`).join('')}
-              </ol>
-              ${(generatedPlan.resources || []).length ? `
-                <h3 class="text-sm font-bold text-slate-900 mt-3">📚 Recursos recomendados</h3>
-                <ul class="text-xs text-slate-700 space-y-1">
-                  ${generatedPlan.resources.map(r => `<li>${r.title}${r.url ? ' · <a href="'+r.url+'" target="_blank" class="text-blue-600 underline">link</a>' : ''}</li>`).join('')}
-                </ul>
-              ` : ''}
-              ${(generatedPlan.success_criteria || []).length ? `
-                <h3 class="text-sm font-bold text-slate-900 mt-3">✅ Criterios de éxito</h3>
-                <ul class="text-xs text-slate-700 space-y-1">${generatedPlan.success_criteria.map(s => `<li>• ${s}</li>`).join('')}</ul>
-              ` : ''}
-            </div>
-          </div>
-        </div>
-      ` : ''}
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-600">
+        <strong class="text-slate-800">Nota:</strong> antes había un generador IA acá adentro, pero lo movimos a Metodología FlipMentoría para tener una sola fuente de verdad. El plan que se genere ahí queda vinculado al estudiante y aparece en "Planes ya guardados".
+      </div>
     </div>
   `;
+}
+
+// ════════════════════════════════════════════════════════════
+// Abre el sistema "Metodología FlipMentoría" desde Mentorías Manager
+// con el estudiante pre-seleccionado en el tab Diagnóstico
+// ════════════════════════════════════════════════════════════
+async function eduOpenStudentInDiagnostico(studentId) {
+  if (!studentId) return alert('Falta el ID del estudiante.');
+  // Buscar el sistema Metodología en el state cargado
+  let methodologySys = null;
+  if (state && state.systems) {
+    for (const arr of Object.values(state.systems || {})) {
+      const found = (arr || []).find(s => s.type === 'edu-methodology');
+      if (found) { methodologySys = found; break; }
+    }
+  }
+  if (!methodologySys) {
+    return alert('No encontré el sistema "Metodología FlipMentoría". Verificá que esté creado en el área Educación.');
+  }
+  // Cerrar el modal de Mentorías Manager para evitar conflictos
+  try { closeModal(); } catch(e) {}
+  // Setear el tab activo a "diagnostico" antes de abrir
+  if (typeof fmState !== 'undefined') {
+    fmState.activeTab = 'diagnostico';
+    fmState.diagStudentId = studentId;
+    fmState.diagResult = null;   // forzar wizard, no plan viejo
+    fmState.diagStep = 0;
+  }
+  // Abrir el sistema
+  await openEduMethodologySystem(methodologySys);
+  // Pre-cargar las respuestas inferidas del estudiante (mismo flow que fmSelectStudentForDiag)
+  try {
+    if (typeof fmSelectStudentForDiag === 'function') {
+      fmSelectStudentForDiag(studentId);
+    }
+  } catch (e) { console.warn('fmSelectStudentForDiag no disponible:', e); }
 }
 
 async function eduGeneratePlan() {
