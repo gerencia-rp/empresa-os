@@ -2904,62 +2904,187 @@ function fmRenderSavedPlansSection() {
 
 async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
   console.log('[fmAbrirPlanGuardado] plan:', planId, 'student:', studentId);
+  const escFn = (s) => (typeof window.esc === 'function')
+    ? window.esc(s)
+    : String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-  // Cerrar el modal actual de Metodología si está abierto
-  if (typeof closeModal === 'function') {
-    try { closeModal(); } catch {}
-  }
-
-  // Setear el state del manager
-  if (typeof eduState !== 'undefined') {
-    if (mentorshipId) eduState.mentorshipId = mentorshipId;
-    eduState.selectedStudentId = studentId;
-    eduState.tab = 'student_plan';
-  }
-
-  // Buscar el sistema edu-manager en TODAS las áreas (no solo current)
-  let eduSys = null;
   try {
-    const areas = state?.areas || [];
-    for (const area of areas) {
-      const sys = (area.systems || []).find(s => s.type === 'edu-manager');
-      if (sys) { eduSys = sys; break; }
-    }
-  } catch (e) { console.warn('search sys', e); }
+    // 1) Cargar plan + tareas + estudiante + invite (para link al portal) en paralelo
+    const [planRes, tasksRes, studentRes, inviteRes] = await Promise.all([
+      sb.from('edu_student_plans').select('*').eq('id', planId).maybeSingle(),
+      sb.from('edu_student_plan_tasks').select('*').eq('plan_id', planId).order('bloque_orden').order('paso_index'),
+      studentId ? sb.from('edu_students').select('*').eq('id', studentId).maybeSingle() : Promise.resolve({ data: null }),
+      sb.from('edu_diagnostic_invites').select('token').eq('result_plan_id', planId).maybeSingle()
+    ]);
 
-  // Si encontramos el sistema, abrirlo
-  if (eduSys && typeof openEduManager === 'function') {
-    await openEduManager(eduSys);
-    // Cargar el plan específico
-    if (typeof eduLoadStudentPlan === 'function') {
-      try {
-        await eduLoadStudentPlan(studentId);
-        if (typeof eduRender === 'function') eduRender();
-      } catch (e) { console.warn('loadStudentPlan', e); }
+    if (planRes.error || !planRes.data) {
+      return alert('No pude cargar el plan: ' + (planRes.error?.message || 'no encontrado'));
     }
-    return;
-  }
 
-  // Fallback: si no encuentra el sistema, buscar por nombre / área Educación
-  try {
-    const areas = state?.areas || [];
-    const eduArea = areas.find(a => /educac/i.test(a.name || ''));
-    if (eduArea) {
-      const sys = (eduArea.systems || []).find(s => s.type === 'edu-manager') || eduArea.systems?.[0];
-      if (sys && typeof openEduManager === 'function') {
-        await openEduManager(sys);
-        if (typeof eduLoadStudentPlan === 'function') {
-          await eduLoadStudentPlan(studentId);
-          if (typeof eduRender === 'function') eduRender();
-        }
-        return;
+    const plan = planRes.data;
+    const tasks = tasksRes.data || [];
+    const student = studentRes.data;
+    const planData = plan.perfil || {};
+    const perfil = planData.perfil || {};
+    const studentName = student?.full_name || planData?.userProfile?.name || 'Estudiante';
+    const studentLink = inviteRes?.data?.token
+      ? `${window.location.origin}/mi-plan?t=${inviteRes.data.token}`
+      : null;
+
+    // 2) Agrupar tasks por bloque
+    const byBloque = {};
+    tasks.forEach(t => {
+      const key = `${t.bloque_orden}__${t.bloque_id}`;
+      if (!byBloque[key]) {
+        byBloque[key] = {
+          orden: t.bloque_orden,
+          bloque_id: t.bloque_id,
+          etapa: t.bloque_etapa || '',
+          subetapa: t.bloque_subetapa || '',
+          tasks: []
+        };
       }
-    }
-  } catch (e) { console.warn('fallback', e); }
+      byBloque[key].tasks.push(t);
+    });
+    const blocks = Object.values(byBloque).sort((a, b) => a.orden - b.orden);
 
-  // Último recurso: alert con instrucciones (sin reload)
-  alert('No encontré el sistema "Mentorías Manager" para abrir el plan.\n\nAndá a Educación → Mentorías Manager → buscá el estudiante → Plan Acción.');
+    const done = tasks.filter(t => t.completed).length;
+    const total = tasks.length;
+    const pct = total ? Math.round(done / total * 100) : 0;
+    const planTitle = perfil.nombre || planData.titulo || 'Plan personalizado';
+    const planEmoji = perfil.emoji || '🚀';
+
+    // 3) Render HTML
+    const html = `
+      <div class="space-y-4">
+        <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white rounded-xl p-4">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold text-amber-300 tracking-wider mb-1">PLAN · ${escFn(studentName).toUpperCase()}</div>
+              <h2 class="text-xl font-bold leading-tight">${planEmoji} ${escFn(planTitle)}</h2>
+              <div class="text-xs text-slate-300 mt-1">${blocks.length} bloques · ${total} tareas${perfil.num ? ` · Perfil #${escFn(perfil.num)}` : ''}</div>
+            </div>
+            ${studentLink ? `<a href="${escFn(studentLink)}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap">👁️ Ver como estudiante</a>` : ''}
+          </div>
+          <div class="mt-4 bg-white/15 backdrop-blur rounded-lg p-3">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-bold opacity-90">PROGRESO</span>
+              <span class="font-bold">${done}/${total} · ${pct}%</span>
+            </div>
+            <div class="h-2 bg-white/20 rounded-full overflow-hidden">
+              <div class="h-full bg-emerald-400 transition-all" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        </div>
+
+        ${planData.objetivo_operativo ? `
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div class="text-[10px] font-bold text-blue-800 tracking-wider mb-1">🎯 OBJETIVO OPERATIVO</div>
+            <p class="text-xs text-slate-800">${escFn(planData.objetivo_operativo)}</p>
+          </div>` : ''}
+
+        ${planData.regla_plan ? `
+          <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <span class="text-[10px] font-bold text-amber-800 tracking-wider">📏 REGLA: </span>
+            <span class="text-xs text-slate-800">${escFn(planData.regla_plan)}</span>
+          </div>` : ''}
+
+        ${(planData.analisis_profundo || []).length ? `
+          <div class="bg-white border border-slate-200 rounded-lg p-3">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">🔬 Análisis profundo</div>
+            <div class="space-y-2 text-xs text-slate-700 leading-relaxed">
+              ${planData.analisis_profundo.map(p => `<p>${escFn(p)}</p>`).join('')}
+            </div>
+          </div>` : ''}
+
+        ${((planData.fortalezas||[]).length || (planData.riesgos||[]).length) ? `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            ${(planData.fortalezas||[]).length ? `
+              <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <div class="text-[10px] font-bold text-emerald-800 mb-1">✅ FORTALEZAS</div>
+                <ul class="text-xs text-emerald-900 space-y-0.5">${planData.fortalezas.map(f => `<li>• ${escFn(f)}</li>`).join('')}</ul>
+              </div>` : ''}
+            ${(planData.riesgos||[]).length ? `
+              <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div class="text-[10px] font-bold text-red-800 mb-1">⚠️ RIESGOS</div>
+                <ul class="text-xs text-red-900 space-y-0.5">${planData.riesgos.map(r => `<li>• ${escFn(r)}</li>`).join('')}</ul>
+              </div>` : ''}
+          </div>` : ''}
+
+        <div class="space-y-2">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-700">📋 Bloques (${blocks.length})</div>
+          ${blocks.length === 0 ? `<div class="bg-slate-50 border border-dashed border-slate-300 rounded p-4 text-center text-xs text-slate-500">Sin tareas guardadas para este plan.</div>` : blocks.map((b, idx) => {
+            const bDone = b.tasks.filter(t => t.completed).length;
+            const bTotal = b.tasks.length;
+            const bPct = bTotal ? Math.round(bDone/bTotal*100) : 0;
+            const isDone = bDone === bTotal && bTotal > 0;
+            return `
+              <div class="bg-white border ${isDone ? 'border-emerald-300' : 'border-slate-200'} rounded-lg overflow-hidden">
+                <details ${isDone ? '' : 'open'}>
+                  <summary class="cursor-pointer p-3 ${isDone ? 'bg-emerald-50' : 'bg-amber-50'} flex items-center justify-between gap-2 list-none">
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                      <div class="w-7 h-7 rounded-full ${isDone ? 'bg-emerald-600' : 'bg-amber-600'} text-white text-xs font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-[10px] uppercase font-bold ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${escFn(b.etapa)}</div>
+                        <div class="text-sm font-bold text-slate-900 truncate">${escFn(b.subetapa)}</div>
+                      </div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                      <div class="text-sm font-bold ${isDone ? 'text-emerald-700' : 'text-slate-900'}">${bDone}/${bTotal}</div>
+                      <div class="text-[10px] text-slate-500">${bPct}%</div>
+                    </div>
+                  </summary>
+                  <ul class="divide-y divide-slate-100">
+                    ${b.tasks.map(t => `
+                      <li class="px-3 py-2 flex items-start gap-2">
+                        <div class="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'} flex items-center justify-center">
+                          ${t.completed ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+                        </div>
+                        <span class="flex-1 text-xs ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${escFn(t.paso_text || '')}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </details>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        ${planData.frase_final ? `
+          <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-3">
+            <div class="text-[10px] font-bold text-amber-700 tracking-wider mb-1">💬 FRASE FINAL</div>
+            <p class="text-sm italic text-slate-800">${escFn(planData.frase_final)}</p>
+          </div>` : ''}
+      </div>
+    `;
+
+    // 4) Render modal independiente (no toca el modal global de Metodología)
+    document.getElementById('fm-plan-guardado-modal')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'fm-plan-guardado-modal';
+    overlay.className = 'fixed inset-0 z-[200] bg-slate-900/70 flex items-center justify-center p-4';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col" onclick="event.stopPropagation()">
+        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0">
+          <div class="font-bold text-sm">📋 Plan de ${escFn(studentName)}</div>
+          <div class="flex items-center gap-2">
+            ${studentLink ? `<button onclick="navigator.clipboard.writeText('${escFn(studentLink)}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='📋 Copiar link',1500)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded">📋 Copiar link</button>` : ''}
+            <button onclick="window.print()" class="text-xs bg-slate-700 hover:bg-slate-900 text-white font-bold px-3 py-1.5 rounded">🖨️ PDF</button>
+            <button onclick="document.getElementById('fm-plan-guardado-modal')?.remove()" class="text-2xl leading-none text-slate-500 hover:text-slate-900 ml-1">×</button>
+          </div>
+        </div>
+        <div class="p-4 overflow-y-auto">${html}</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  } catch (e) {
+    console.error('[fmAbrirPlanGuardado]', e);
+    alert('Error abriendo el plan: ' + (e?.message || e));
+  }
 }
+
+window.fmAbrirPlanGuardado = fmAbrirPlanGuardado;
 
 // ============================================================
 // 🎓 WIZARD DE CUALIFICACIÓN PARA PLAN DE ACCIÓN (embed en CRM)
