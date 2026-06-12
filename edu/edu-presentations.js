@@ -760,11 +760,20 @@ async function eduGeneratePresentation() {
 
 // ─── DOWNLOAD PPTX usando PptxGenJS ───
 function eduDownloadPPTX() {
-  if (typeof PptxGenJS === 'undefined') return alert('Librería PptxGenJS no cargada. Refresh la página.');
-  const aiKey = `edu-pres-${eduState.mentorshipId}`;
-  const p = (window.aiState[aiKey] || {}).presentation;
-  if (!p) return alert('Sin presentación cargada');
-  eduBuildPPTX(p, { download: true });
+  if (typeof PptxGenJS === 'undefined') return alert('⚠️ Librería PptxGenJS no cargada. Hacé hard refresh (Cmd+Shift+R) y probá de nuevo.');
+  // Buscar con ambos formatos de aiKey (V1 + V2)
+  const k1 = `edu-pres-${eduState.mentorshipId}`;
+  const k2 = `edu-pres-${eduState.mentorshipId || 'no-mentorship'}`;
+  const p = (window.aiState?.[k1] || window.aiState?.[k2] || {}).presentation;
+  if (!p) return alert('Sin presentación cargada. Generá una primero.');
+  if (!Array.isArray(p.slides) || !p.slides.length) return alert('La presentación no tiene slides válidos.');
+  console.log('[edu-pres] Iniciando descarga PPTX con', p.slides.length, 'slides');
+  try {
+    eduBuildPPTX(p, { download: true });
+  } catch (e) {
+    console.error('[edu-pres] Error construyendo PPTX:', e);
+    alert('⚠️ Error generando el .pptx:\n\n' + (e?.message || String(e)) + '\n\nAbrí la consola (F12 → Console) y pasame el error completo para que lo arregle.');
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -862,7 +871,9 @@ function eduBuildPPTX(p, opts = {}) {
   pres.defineSlideMaster({ title: 'BARE', background: { color: NAV } });
 
   const slides = p.slides || [];
+  let failedCount = 0;
   slides.forEach((s, idx) => {
+    try {
     const isCover = s.layout === 'cover' || (idx === 0 && !s.layout);
     const slide = pres.addSlide({ masterName: isCover ? 'BARE' : 'BRAND' });
 
@@ -931,7 +942,23 @@ function eduBuildPPTX(p, opts = {}) {
     if (s.transition_out) notesParts.push('\n➡️ PUENTE al siguiente slide:\n' + s.transition_out);
     if ((s.sources||[]).length) notesParts.push('\n📚 Fuentes:\n' + s.sources.map(src => '• ' + (src.title||'') + ' — ' + (src.url||'')).join('\n'));
     if (notesParts.length) slide.addNotes(notesParts.join('\n'));
+    } catch (slideErr) {
+      // Si una slide individual falla al renderearse, no abortamos todo el deck.
+      // Agregamos slide placeholder con el error visible.
+      console.warn(`[edu-pres] Slide ${idx+1} (${s?.layout||'?'}) falló: ${slideErr?.message}`);
+      failedCount++;
+      try {
+        const fb = pres.addSlide({ masterName: 'BRAND' });
+        fb.addText(s?.title || `Slide ${idx+1}`, { x: 0.4, y: 1, w: 12.5, h: 0.8, fontSize: 26, bold: true, color: NAV });
+        fb.addText('⚠️ Hubo un error renderizando este slide. Editalo manual.', { x: 0.4, y: 2.2, w: 12.5, h: 0.5, fontSize: 14, italic: true, color: GRAY_MED });
+        if (Array.isArray(s?.bullets) && s.bullets.length) {
+          fb.addText(s.bullets.map(b => '• ' + b).join('\n'), { x: 0.4, y: 3, w: 12.5, h: 3, fontSize: 14, color: NAV_LIGHT });
+        }
+        if (s?.speaker_notes) fb.addNotes(s.speaker_notes + '\n\n[Error técnico: ' + slideErr.message + ']');
+      } catch (_) {}
+    }
   });
+  if (failedCount > 0) console.warn(`[edu-pres] ${failedCount}/${slides.length} slides cayeron a placeholder.`);
 
   // Slide final con fuentes
   if ((p.all_sources || []).length) {

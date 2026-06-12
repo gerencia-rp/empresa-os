@@ -114,40 +114,145 @@ create policy cdtmpl_select on public.clean_day_templates for select using (auth
 drop policy if exists cdtmpl_write on public.clean_day_templates;
 create policy cdtmpl_write on public.clean_day_templates for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
--- Catálogo: tareas reales del equipo de limpieza
-insert into public.clean_tasks (name, category, business, default_duration_min, default_materials, emoji) values
-  -- Post-remodelación
-  ('Limpieza post-remodelación', 'post-obra', 'remodelacion', 240, '["aspiradora industrial","trapeador","baldes","escoba","productos limpieza","bolsas grandes","guantes","mascarillas","quitamanchas"]'::jsonb, '🏗️'),
-  ('Retirar polvo de construcción', 'post-obra', 'remodelacion', 120, '["aspiradora con filtro HEPA","plumeros","trapos microfibra","mascarillas"]'::jsonb, '💨'),
-  ('Limpieza de ventanas post-obra', 'post-obra', 'remodelacion', 90, '["limpiavidrios","escurridor","trapos","escalera","quitapintura"]'::jsonb, '🪟'),
-  ('Limpiar pisos pegados de pintura/yeso', 'post-obra', 'remodelacion', 60, '["espátula","quitapintura","mopa","productos especializados"]'::jsonb, '🧴'),
-  -- Turnover Airbnb (entre huéspedes)
-  ('Turnover completo Airbnb', 'airbnb', 'rentas', 150, '["sábanas limpias","toallas","amenities","productos limpieza","aspiradora","mopa","bolsas basura"]'::jsonb, '🏘️'),
-  ('Cambio de sábanas + lavado', 'airbnb', 'rentas', 60, '["sábanas","fundas","toallas","detergente"]'::jsonb, '🛏️'),
-  ('Reabastecer amenities (jabones, papel, café)', 'airbnb', 'rentas', 30, '["jabones","shampoo","papel higiénico","café","azúcar","té"]'::jsonb, '🧴'),
-  ('Inspección final pre-check-in', 'airbnb', 'rentas', 30, '["checklist","cámara"]'::jsonb, '✅'),
-  ('Limpieza profunda baño Airbnb', 'airbnb', 'rentas', 45, '["limpiador baño","desinfectante","cepillo wc","guantes","esponjas"]'::jsonb, '🚿'),
-  ('Limpieza profunda cocina Airbnb', 'airbnb', 'rentas', 60, '["desengrasante","esponjas","trapos","limpiavidrios","productos acero"]'::jsonb, '🍳'),
-  -- Limpieza por habitación (coliving / PadSplit)
-  ('Limpieza habitación individual', 'habitacion', 'rentas', 45, '["aspiradora","mopa","trapos","desinfectante","limpiavidrios"]'::jsonb, '🛌'),
-  ('Limpieza áreas comunes', 'habitacion', 'rentas', 90, '["aspiradora","mopa","desinfectante","bolsas basura","trapos"]'::jsonb, '🛋️'),
-  ('Limpieza baño compartido', 'habitacion', 'rentas', 30, '["desinfectante","limpiador baño","cepillo wc","trapos","guantes"]'::jsonb, '🚽'),
-  ('Cambio entre inquilinos (move-out clean)', 'habitacion', 'rentas', 180, '["productos limpieza profunda","aspiradora","trapeador","esponjas","desengrasante","quitamanchas"]'::jsonb, '🔁'),
-  -- Limpieza mensual long-term
-  ('Limpieza mensual general', 'mensual', 'rentas', 180, '["aspiradora","mopa","desinfectante","limpiavidrios","trapos","escobas"]'::jsonb, '📅'),
-  ('Limpieza profunda cocina mensual', 'mensual', 'rentas', 90, '["desengrasante","limpiador hornos","esponjas","trapos","productos acero"]'::jsonb, '🧑‍🍳'),
-  ('Limpieza profunda baños mensual', 'mensual', 'rentas', 90, '["limpiador baño","desincrustante","desinfectante","cepillos","trapos"]'::jsonb, '🛁'),
-  ('Limpieza patios y exteriores', 'mensual', 'rentas', 60, '["escoba","manguera","balde","productos exterior"]'::jsonb, '🌿'),
-  -- Tareas generales
-  ('Lavado de ropa de cama y toallas', 'lavanderia', 'rentas', 90, '["detergente","suavizante","máquina disponible"]'::jsonb, '🧺'),
-  ('Aspirado profundo de alfombras', 'limpieza', 'both', 60, '["aspiradora industrial","champu alfombras","cepillo"]'::jsonb, '🧹'),
-  ('Limpieza de electrodomésticos', 'limpieza', 'rentas', 60, '["desengrasante","productos acero","trapos microfibra"]'::jsonb, '🔌'),
-  ('Limpiar refrigerador a fondo', 'limpieza', 'rentas', 45, '["bicarbonato","trapos","limpiador food-safe","bolsas basura"]'::jsonb, '❄️'),
-  ('Limpiar horno y microondas', 'limpieza', 'rentas', 45, '["limpiador hornos","trapos","esponjas","guantes"]'::jsonb, '🔥'),
-  ('Sacar basura', 'logistica', 'both', 30, '["bolsas industriales","guantes","truck o carrito"]'::jsonb, '🗑️'),
-  ('Reposición de productos de limpieza', 'logistica', 'both', 30, '["lista compras","vehículo"]'::jsonb, '🛒'),
-  ('Tiempo Almuerzo', 'descanso', 'both', 60, '[]'::jsonb, '🍽️'),
-  ('Desplazamiento', 'logistica', 'both', 20, '[]'::jsonb, '🚗')
+-- ────────────────────────────────────────────────────────────
+-- CATÁLOGO MACRO — 4 servicios completos de limpieza
+-- Cada uno incluye TODO el checklist en `notes` para que el equipo
+-- sepa exactamente qué hacer sin tener que armar 10 tareas chicas.
+-- ────────────────────────────────────────────────────────────
+-- Si ya corriste la versión vieja del SQL con 27 tareas chicas, esto
+-- las inactiva (no las borra para no romper FKs en clean_day_tasks
+-- históricos). Las nuevas macro arrancan limpias.
+update public.clean_tasks set active = false
+  where name in (
+    'Limpieza post-remodelación','Retirar polvo de construcción','Limpieza de ventanas post-obra',
+    'Limpiar pisos pegados de pintura/yeso','Turnover completo Airbnb','Cambio de sábanas + lavado',
+    'Reabastecer amenities (jabones, papel, café)','Inspección final pre-check-in',
+    'Limpieza profunda baño Airbnb','Limpieza profunda cocina Airbnb','Limpieza habitación individual',
+    'Limpieza áreas comunes','Limpieza baño compartido','Cambio entre inquilinos (move-out clean)',
+    'Limpieza mensual general','Limpieza profunda cocina mensual','Limpieza profunda baños mensual',
+    'Limpieza patios y exteriores','Lavado de ropa de cama y toallas','Aspirado profundo de alfombras',
+    'Limpieza de electrodomésticos','Limpiar refrigerador a fondo','Limpiar horno y microondas'
+  );
+
+insert into public.clean_tasks (name, category, business, default_duration_min, default_materials, emoji, notes) values
+
+  -- 1) POST-REMODELACIÓN
+  ('🏗️ Limpieza Post-Remodelación (casa completa)',
+   'post-obra', 'remodelacion', 360,
+   '["aspiradora industrial con filtro HEPA","mopa industrial","baldes","escoba","escurridor","plumeros","trapos microfibra","limpiavidrios","desengrasante","quitapintura","espátula","productos especializados pisos","mascarillas","guantes","bolsas grandes industriales","escalera"]'::jsonb,
+   '🏗️',
+   'Entrega final post-obra. El objetivo es que la casa quede impecable para foto y entrega al cliente o inquilino.
+
+CHECKLIST COMPLETO (5-7 horas, 2 personas recomendado):
+1. Retirar TODO el polvo de construcción (techos → paredes → pisos). Aspiradora HEPA + plumeros.
+2. Limpiar ventanas por dentro y por fuera (rascar pintura/silicona con espátula).
+3. Limpiar marcos de puertas y ventanas.
+4. Sacar pintura/yeso pegado en pisos con espátula y productos especializados.
+5. Trapear profundo todos los pisos (puede requerir 2-3 pasadas).
+6. Limpieza profunda de TODOS los baños (lavamanos, WC, ducha, espejos, grifería).
+7. Limpieza profunda de cocina (gabinetes por dentro/fuera, electrodomésticos, encimeras).
+8. Limpiar puertas y manijas.
+9. Aspirar TODOS los rincones (cocheras, closets, debajo de muebles si hay).
+10. Detallado final: enchufes, interruptores, lámparas, ventiladores.
+11. Sacar TODA la basura y dejar la propiedad lista para entrega.
+
+ENTREGA: foto de cada cuarto al supervisor para validar antes de cerrar.'),
+
+  -- 2) LIMPIEZA PROFUNDA AIRBNB · CASA COMPLETA
+  ('🏘️ Limpieza Profunda Airbnb · Casa completa',
+   'airbnb', 'rentas', 210,
+   '["sábanas limpias (todas las camas)","toallas limpias","amenities (jabones, shampoo, papel higiénico, café, té)","productos limpieza baño","desengrasante cocina","limpiavidrios","aspiradora","mopa","trapos microfibra","bolsas basura","detergente lavandería","esponjas","cepillos wc","guantes"]'::jsonb,
+   '🏘️',
+   'Turnover entre huéspedes — casa Airbnb completa. La casa debe quedar como nueva en máximo 3.5 horas.
+
+CHECKLIST COMPLETO (~3-4 horas):
+1. Cambio TOTAL de sábanas, fundas y toallas (todas las camas y baños).
+2. Lavar ropa de cama y toallas usadas (dejar en marcha la lavadora).
+3. Limpieza profunda de TODOS los baños:
+   - WC, lavamanos, ducha/bañera, espejos, piso.
+   - Desinfectar grifería, manijas, interruptores.
+   - Reponer papel higiénico y amenities (shampoo, jabón).
+4. Limpieza profunda de cocina:
+   - Encimeras, lavaplatos, electrodomésticos (microondas, horno por fuera, refrigerador).
+   - Limpiar gabinetes por fuera.
+   - Sacar basura de cocina.
+5. Aspirar y trapear TODA la casa (cuartos, sala, comedor, pasillos).
+6. Quitar polvo de muebles, lámparas, ventiladores.
+7. Reponer amenities (café, té, azúcar, papel cocina).
+8. Sacar TODA la basura y poner bolsas nuevas.
+9. Inspección final pre-check-in:
+   - Foto de cada cuarto para evidencia.
+   - Verificar que TV, AC, luces funcionan.
+   - Dejar nota de bienvenida si aplica.
+
+ENTREGA: 5-10 fotos al supervisor antes de cerrar.'),
+
+  -- 3) LIMPIEZA PROFUNDA AIRBNB · HABITACIÓN
+  ('🛌 Limpieza Profunda Airbnb · Habitación',
+   'airbnb', 'rentas', 75,
+   '["sábanas limpias","toallas limpias","amenities habitación","productos limpieza baño","aspiradora","mopa","trapos microfibra","limpiavidrios","detergente","bolsas basura","desinfectante"]'::jsonb,
+   '🛌',
+   'Turnover de UNA habitación Airbnb (coliving / PadSplit / habitación independiente).
+
+CHECKLIST COMPLETO (~1-1.5 horas):
+1. Cambio de sábanas, fundas y toallas de la habitación.
+2. Lavar ropa de cama y toallas usadas.
+3. Aspirar y trapear el piso de la habitación.
+4. Quitar polvo de muebles, mesita de noche, escritorio.
+5. Limpiar espejo y ventanas de la habitación.
+6. Vaciar y limpiar caneca de basura.
+7. Limpiar baño asignado (si es privado) o aportar a limpieza de baño compartido:
+   - WC, lavamanos, ducha, espejo, piso.
+   - Reponer papel higiénico y amenities.
+8. Reposición de amenities en la habitación (agua, shampoo si aplica).
+9. Inspección final:
+   - Foto de la habitación y baño.
+   - Verificar AC, luces, enchufes funcionan.
+   - Cerrar puerta con código nuevo si aplica.
+
+ENTREGA: 3-5 fotos al supervisor antes de cerrar.'),
+
+  -- 4) LIMPIEZA MENSUAL MANTENIMIENTO (long-term rental)
+  ('📅 Limpieza Mensual Mantenimiento (long-term)',
+   'mensual', 'rentas', 180,
+   '["aspiradora","mopa","trapos microfibra","desinfectante","limpiavidrios","desengrasante","limpiador baño","cepillos wc","escoba exterior","manguera","bolsas basura","guantes"]'::jsonb,
+   '📅',
+   'Mantenimiento mensual de casa rentada a inquilino long-term. Va con cita previa.
+El objetivo es que la casa se mantenga en buen estado y detectar problemas temprano.
+
+CHECKLIST COMPLETO (~3 horas):
+1. Aspirar y trapear TODA la casa (cuartos, áreas comunes, pasillos).
+2. Quitar polvo de muebles, repisas, lámparas, ventiladores de techo.
+3. Limpiar ventanas (interior — exterior solo si el inquilino lo pide).
+4. Limpieza de baños (todos):
+   - WC, lavamanos, ducha, espejos, piso.
+   - Desinfectar grifería y manijas.
+5. Limpieza de cocina:
+   - Encimeras y lavaplatos.
+   - Limpiar por fuera electrodomésticos (microondas, horno, refri).
+   - Limpiar gabinetes por fuera.
+6. Limpiar puertas, manijas e interruptores.
+7. Sacar basura general (todas las canecas).
+8. Patio y exteriores (si aplica):
+   - Barrer, regar plantas, recoger hojas.
+9. INSPECCIÓN DE MANTENIMIENTO (reportar al supervisor):
+   - Leaks de plomería, manchas en techos.
+   - Filtros AC sucios, focos quemados.
+   - Daños en pisos, paredes, puertas.
+   - Cualquier deterioro que requiera repair.
+
+ENTREGA: foto del estado general + reporte escrito de cualquier hallazgo
+al supervisor el mismo día.'),
+
+  -- Generales (siguen disponibles para casos sueltos)
+  ('🗑️ Sacar basura', 'logistica', 'both', 30, '["bolsas industriales","guantes","truck o carrito"]'::jsonb, '🗑️',
+   'Sacar basura de la casa al contenedor municipal o a la calle según día de recolección.'),
+  ('🛒 Reposición de productos de limpieza', 'logistica', 'both', 30, '["lista compras","vehículo"]'::jsonb, '🛒',
+   'Comprar/recoger productos faltantes para el stock del equipo.'),
+  ('🍽️ Tiempo Almuerzo', 'descanso', 'both', 60, '[]'::jsonb, '🍽️',
+   'Almuerzo del equipo durante jornada.'),
+  ('🚗 Desplazamiento', 'logistica', 'both', 20, '[]'::jsonb, '🚗',
+   'Traslado entre casas dentro de la zona.')
 on conflict do nothing;
 
 -- Sistemas visibles
