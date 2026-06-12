@@ -844,8 +844,13 @@ window.eduDownloadPresJSON = eduDownloadPresJSON;
 // NEGOCIO FIX: Unsplash Source API descontinuada en junio 2024 → 404/redirect.
 // Migrado a Picsum (gratis, sin auth, estable). Seed determinístico por query
 // para que el mismo slide siempre tenga la misma imagen.
+// FLAG: bloquear imágenes externas porque la CSP de Vercel no permite
+// connect-src a picsum.photos / quickchart.io. Cuando se arregle el CSP
+// (vercel.json), poner en false para reactivar imágenes auto.
+const _EDU_BLOCK_EXTERNAL_IMG = true;
+
 function eduPicsumUrl(query, w = 1600, h = 900) {
-  // Hash simple del query para seed estable
+  if (_EDU_BLOCK_EXTERNAL_IMG) return null;
   let h2 = 0;
   for (let i = 0; i < String(query||'').length; i++) {
     h2 = ((h2 << 5) - h2 + String(query).charCodeAt(i)) | 0;
@@ -854,11 +859,10 @@ function eduPicsumUrl(query, w = 1600, h = 900) {
   return `https://picsum.photos/seed/${seed}/${w}/${h}`;
 }
 function eduUnsplashUrl(query, w = 1600, h = 900) {
-  // Wrapper que delega a Picsum (Unsplash Source ya no existe).
   return eduPicsumUrl(query, w, h);
 }
 function eduQuickChartUrl(config, w = 900, h = 500) {
-  // QuickChart.io: gráficos Chart.js renderizados server-side, sin auth
+  if (_EDU_BLOCK_EXTERNAL_IMG) return null;
   const c = encodeURIComponent(JSON.stringify(config));
   return `https://quickchart.io/chart?bkg=white&w=${w}&h=${h}&c=${c}`;
 }
@@ -957,12 +961,25 @@ function eduBuildPPTX(p, opts = {}) {
 
     const C = { NAV, NAV_LIGHT, ACCENT, GOLD, GRAY_LIGHT, GRAY_MED, WHITE, BRAND };
 
-    // ─── ENRIQUECIMIENTO AUTO: si no hay image_url ni chart_url, genera ───
-    if (!s.image_url && !s.chart_url && ['hero-image','split-image','chart-spotlight','image-grid'].includes(s.layout)) {
-      s.image_url = eduUnsplashUrl(eduSlideToImageQuery(s, p.title));
-    }
-    if (s.layout === 'chart-spotlight' && !s.chart_url && (s.stats || s.metric_cards)?.length) {
-      s.chart_url = eduStatsToChartUrl(s.stats || s.metric_cards, ACCENT);
+    // ─── ENRIQUECIMIENTO AUTO (DESACTIVADO) ─────────────────────────
+    // BUG: Picsum + QuickChart están bloqueados por CSP `connect-src` de Vercel.
+    // PptxGenJS intenta fetch xhr y falla → el deck entero no descarga.
+    // Hasta agregar esos dominios al CSP (o usar base64 inline), no auto-asignamos.
+    // Si V2 devuelve image_url/chart_url explícita, igual lo intentamos pero con
+    // safety: si la URL no carga, el render fallback a versión sin imagen.
+    // ── ANTES (rompía):
+    //   if (!s.image_url ... ) s.image_url = eduUnsplashUrl(...);
+    //   if (s.layout === 'chart-spotlight' && ...) s.chart_url = eduStatsToChartUrl(...);
+    // ── AHORA: dejamos las flags pero NO inventamos URLs externas.
+    const _BLOCK_EXTERNAL_IMAGES = true;
+    if (_BLOCK_EXTERNAL_IMAGES) {
+      // Limpiar image_url externas que vinieron del LLM por las dudas
+      if (s.image_url && /^https?:\/\/(picsum|images\.unsplash|quickchart)/i.test(s.image_url)) {
+        delete s.image_url;
+      }
+      if (s.chart_url && /^https?:\/\/(picsum|images\.unsplash|quickchart)/i.test(s.chart_url)) {
+        delete s.chart_url;
+      }
     }
 
     switch (s.layout) {
@@ -1413,12 +1430,18 @@ function renderHighlight(slide, s, c) {
 function renderHeroImage(slide, s, c) {
   // Full-bleed hero image + título overlay grande (magazine cover style)
   const url = s.image_url || eduUnsplashUrl(eduSlideToImageQuery(s));
-  try {
-    slide.addImage({ path: url, x: 0, y: 0, w: 13.333, h: 7.5, sizing: { type: 'cover', w: 13.333, h: 7.5 } });
-    // Gradient overlay desde abajo (gradient se simula con 2 rects)
-    slide.addShape('rect', { x: 0, y: 4.5, w: 13.333, h: 3.0, fill: { color: '0F172A', transparency: 25 }, line: { type: 'none' } });
-    slide.addShape('rect', { x: 0, y: 5.5, w: 13.333, h: 2.0, fill: { color: '0F172A', transparency: 10 }, line: { type: 'none' } });
-  } catch(e) {}
+  if (url) {
+    try {
+      slide.addImage({ path: url, x: 0, y: 0, w: 13.333, h: 7.5, sizing: { type: 'cover', w: 13.333, h: 7.5 } });
+      slide.addShape('rect', { x: 0, y: 4.5, w: 13.333, h: 3.0, fill: { color: '0F172A', transparency: 25 }, line: { type: 'none' } });
+      slide.addShape('rect', { x: 0, y: 5.5, w: 13.333, h: 2.0, fill: { color: '0F172A', transparency: 10 }, line: { type: 'none' } });
+    } catch(e) {}
+  } else {
+    // Sin imagen → fondo gradient simulado con shapes (navy + accent)
+    slide.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: c.NAV }, line: { type: 'none' } });
+    slide.addShape('rect', { x: 0, y: 4.0, w: 13.333, h: 3.5, fill: { color: c.NAV_LIGHT, transparency: 20 }, line: { type: 'none' } });
+    slide.addShape('rect', { x: 0, y: 0, w: 0.15, h: 7.5, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+  }
 
   // Block label arriba a la izquierda
   if (s.block_label) {
@@ -1436,10 +1459,20 @@ function renderHeroImage(slide, s, c) {
 function renderSplitImage(slide, s, c) {
   // 50/50: imagen izquierda + contenido derecha
   const url = s.image_url || eduUnsplashUrl(eduSlideToImageQuery(s));
-  try {
-    slide.addImage({ path: url, x: 0, y: 0.55, w: 6.5, h: 6.55, sizing: { type: 'cover', w: 6.5, h: 6.55 } });
-  } catch(e) {
+  if (url) {
+    try {
+      slide.addImage({ path: url, x: 0, y: 0.55, w: 6.5, h: 6.55, sizing: { type: 'cover', w: 6.5, h: 6.55 } });
+    } catch(e) {
+      slide.addShape('rect', { x: 0, y: 0.55, w: 6.5, h: 6.55, fill: { color: c.NAV }, line: { type: 'none' } });
+    }
+  } else {
+    // Sin imagen → panel decorativo izquierdo
     slide.addShape('rect', { x: 0, y: 0.55, w: 6.5, h: 6.55, fill: { color: c.NAV }, line: { type: 'none' } });
+    slide.addShape('rect', { x: 0.4, y: 1.2, w: 5.7, h: 0.08, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+    if (s.image_query) {
+      slide.addText('🎨', { x: 0, y: 3, w: 6.5, h: 1.5, fontSize: 60, color: c.GOLD, align: 'center' });
+    }
+    slide.addText((s.block_label || s.title || '').toUpperCase(), { x: 0.4, y: 1.5, w: 5.7, h: 0.4, fontSize: 12, bold: true, color: c.GOLD, charSpacing: 3 });
   }
   // Banda dorada vertical entre imagen y texto
   slide.addShape('rect', { x: 6.5, y: 0.55, w: 0.08, h: 6.55, fill: { color: c.GOLD }, line: { color: c.GOLD } });
@@ -1472,9 +1505,22 @@ function renderChartSpotlight(slide, s, c) {
       slide.addImage({ path: chartUrl, x: 0.4, y: 1.4, w: 8.2, h: 5.3 });
     } catch(e) {}
   } else {
-    // Fallback: bullets en card grande
+    // Fallback: stats como bigcards visuales (sin necesidad de chart externo)
     slide.addShape('roundRect', { x: 0.4, y: 1.4, w: 8.2, h: 5.3, fill: { color: c.GRAY_LIGHT }, line: { color: 'CBD5E1' }, rectRadius: 0.1 });
-    slide.addText('Sin chart_url ni stats numéricos para graficar', { x: 0.6, y: 4.0, w: 7.8, h: 0.5, fontSize: 14, color: c.GRAY_MED, italic: true, align: 'center' });
+    const stats = s.stats || s.metric_cards || [];
+    if (stats.length) {
+      const cols = Math.min(stats.length, 3);
+      const cardW = (8.0 - 0.4 * (cols - 1)) / cols;
+      stats.slice(0, 3).forEach((st, i) => {
+        const x = 0.5 + i * (cardW + 0.4);
+        slide.addShape('roundRect', { x, y: 1.7, w: cardW, h: 4.7, fill: { color: c.WHITE }, line: { color: c.ACCENT, width: 2 }, rectRadius: 0.08 });
+        slide.addText(String(st.value || st.trend || ''), { x: x + 0.2, y: 2.2, w: cardW - 0.4, h: 1.5, fontSize: 36, bold: true, color: c.ACCENT, align: 'center', valign: 'middle' });
+        slide.addText(String(st.label || ''), { x: x + 0.2, y: 4.0, w: cardW - 0.4, h: 1.0, fontSize: 14, color: c.NAV, align: 'center', valign: 'top' });
+        if (st.source_name) slide.addText('📍 ' + st.source_name, { x: x + 0.2, y: 5.5, w: cardW - 0.4, h: 0.5, fontSize: 9, italic: true, color: c.GRAY_MED, align: 'center' });
+      });
+    } else {
+      slide.addText('Datos clave', { x: 0.6, y: 3.8, w: 7.8, h: 0.6, fontSize: 18, bold: true, color: c.GRAY_MED, italic: true, align: 'center' });
+    }
   }
 
   // Panel derecho con 3 insights
@@ -1505,10 +1551,16 @@ function renderImageGrid(slide, s, c) {
     const x = 0.4 + col * (cardW + 0.15);
     const y = baseY + row * (cardH + 0.15);
     const url = item.image_url || eduUnsplashUrl(item.image_query || item.caption || 'business');
-    try {
-      slide.addImage({ path: url, x, y, w: cardW, h: cardH * 0.72, sizing: { type: 'cover', w: cardW, h: cardH * 0.72 } });
-    } catch(e) {
+    if (url) {
+      try {
+        slide.addImage({ path: url, x, y, w: cardW, h: cardH * 0.72, sizing: { type: 'cover', w: cardW, h: cardH * 0.72 } });
+      } catch(e) {
+        slide.addShape('rect', { x, y, w: cardW, h: cardH * 0.72, fill: { color: c.NAV_LIGHT }, line: { type: 'none' } });
+      }
+    } else {
+      // Placeholder visual sin imagen
       slide.addShape('rect', { x, y, w: cardW, h: cardH * 0.72, fill: { color: c.NAV_LIGHT }, line: { type: 'none' } });
+      slide.addShape('rect', { x: x + cardW/2 - 0.05, y: y + cardH * 0.32, w: 0.1, h: 0.1, fill: { color: c.GOLD }, line: { color: c.GOLD } });
     }
     // Caption card abajo
     slide.addShape('rect', { x, y: y + cardH * 0.72, w: cardW, h: cardH * 0.28, fill: { color: c.NAV }, line: { color: c.NAV } });

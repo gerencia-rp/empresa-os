@@ -116,49 +116,67 @@ function clPropName(t) {
 }
 
 // ─── Data loading ───
+// Helper: query tolerante a errores (devuelve {data:[], error}) — evita que
+// una tabla faltante haga explotar todo el load.
+async function _clSafeQuery(promise) {
+  try {
+    const r = await promise;
+    return { data: r.data || [], error: r.error || null };
+  } catch (e) {
+    return { data: [], error: e };
+  }
+}
+
 async function clLoadAll() {
   if (!clState.date) clState.date = clDateOnly(new Date());
 
-  // Si estamos en vista semana, cargar las 7 fechas; si día, solo clState.date
   const weekStart = clDateOnly(clMondayOf(clState.date));
   const weekEnd = clAddDays(weekStart, 6);
 
+  // TODAS las queries son tolerantes a errores ahora — si una falla,
+  // devuelve array vacío y guardamos el error para mostrarlo.
   const [tRes, dRes, wRes, bRes, rRes, pRes, projRes, dtRes, durRes, rtRes] = await Promise.all([
-    sb.from('clean_tasks').select('*').eq('active', true).order('category').order('name'),
-    sb.from('clean_day_tasks').select('*').eq('date', clState.date).order('start_time'),
-    sb.from('clean_day_tasks').select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time'),
-    sb.from('clean_day_tasks').select('*').is('date', null).order('priority', { ascending: false }).order('created_at'),
-    sb.from('clean_recurring').select('*').eq('active', true),
-    sb.from('properties').select('id,address,nickname,property_type').order('address'),
-    sb.from('remodel_projects').select('id,name,address,status').in('status', ['planning','active']),
-    sb.from('clean_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
-    // NUEVO (feedback PDF Juan): catálogo de duraciones reales + rutas sugeridas
-    sb.from('ops_property_durations').select('*').then(r => r).catch(() => ({ data: [] })),
-    sb.from('ops_day_routes').select('*').eq('is_recommended', true).order('code').then(r => r).catch(() => ({ data: [] }))
+    _clSafeQuery(sb.from('clean_tasks').select('*').eq('active', true).order('category').order('name')),
+    _clSafeQuery(sb.from('clean_day_tasks').select('*').eq('date', clState.date).order('start_time')),
+    _clSafeQuery(sb.from('clean_day_tasks').select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time')),
+    _clSafeQuery(sb.from('clean_day_tasks').select('*').is('date', null).order('priority', { ascending: false }).order('created_at')),
+    _clSafeQuery(sb.from('clean_recurring').select('*').eq('active', true)),
+    _clSafeQuery(sb.from('properties').select('id,address,nickname,property_type').order('address')),
+    _clSafeQuery(sb.from('remodel_projects').select('id,name,address,status').in('status', ['planning','active'])),
+    _clSafeQuery(sb.from('clean_day_templates').select('*').order('created_at', { ascending: false })),
+    _clSafeQuery(sb.from('ops_property_durations').select('*')),
+    _clSafeQuery(sb.from('ops_day_routes').select('*').eq('is_recommended', true).order('code'))
   ]);
-  clState.tasks = tRes.data || [];
-  clState.dayTasks = dRes.data || [];
-  clState.weekTasks = wRes.data || [];
-  clState.backlog = bRes.data || [];
-  clState.recurring = rRes.data || [];
-  clState.properties = pRes.data || [];
-  clState.projects = projRes.data || [];
-  clState.dayTemplates = dtRes.data || [];
-  clState.propertyDurations = durRes.data || [];
-  clState.dayRoutes = rtRes.data || [];
+  clState.tasks = tRes.data;
+  clState.dayTasks = dRes.data;
+  clState.weekTasks = wRes.data;
+  clState.backlog = bRes.data;
+  clState.recurring = rRes.data;
+  clState.properties = pRes.data;
+  clState.projects = projRes.data;
+  clState.dayTemplates = dtRes.data;
+  clState.propertyDurations = durRes.data;
+  clState.dayRoutes = rtRes.data;
 
-  // Si estamos en vista 'casas', cargar TODO lo upcoming (hoy + futuro)
+  // CRÍTICO: si las tablas clean_* fallan con "does not exist", mostrar
+  // banner persistente con el SQL a correr — no silenciar el error.
+  const criticalErrors = [tRes, dRes, wRes, bRes, rRes].map(r => r.error).filter(Boolean);
+  const missingTables = criticalErrors.find(e => /does not exist|relation .* does not exist/i.test(e?.message || ''));
+  clState.tablesError = missingTables ? missingTables.message : null;
+  if (missingTables) {
+    console.error('[cleaning-planner] Tablas clean_* faltantes:', missingTables.message);
+  }
+
   if (clState.view === 'casas') {
-    const { data: up } = await sb.from('clean_day_tasks')
-      .select('*')
-      .gte('date', clDateOnly(new Date()))
-      .order('date').order('start_time');
-    clState.allUpcoming = up || [];
+    const upRes = await _clSafeQuery(
+      sb.from('clean_day_tasks').select('*').gte('date', clDateOnly(new Date())).order('date').order('start_time')
+    );
+    clState.allUpcoming = upRes.data;
   }
 
   // Auto-rollback + generación recurrentes (silenciosas, no bloquean)
-  await clAutoRollback();
-  await clGenerateRecurring();
+  try { await clAutoRollback(); } catch (e) { console.warn('clAutoRollback', e); }
+  try { await clGenerateRecurring(); } catch (e) { console.warn('clGenerateRecurring', e); }
 }
 
 // Carga las tareas vencidas (pasadas no hechas). NO las devuelve al backlog —
@@ -218,7 +236,7 @@ async function clGenerateRecurring() {
       business: r.business,
       priority: r.priority,
       recurring_id: r.id,
-      created_by: state.user.id
+      created_by: state.user?.id || null
     });
   }
   if (rows.length) {
@@ -313,9 +331,25 @@ function clRender() {
     </div>
   ` : '';
 
+  // BANNER CRÍTICO: si las tablas clean_* no existen, mostrar SQL a correr
+  const tablesErrorBanner = clState.tablesError ? `
+    <div class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
+      <div class="flex items-start gap-2">
+        <div class="text-2xl">⚠️</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-red-900 text-sm">Las tablas del Cronograma Limpieza NO existen todavía</div>
+          <div class="text-xs text-red-800 mt-1">Por eso no podés agregar tareas. Pegá este SQL en el SQL Editor de Supabase y correlo una vez:</div>
+          <code class="block mt-2 bg-slate-900 text-emerald-300 text-[11px] px-2 py-1 rounded">supabase/cleaning-planner-schema.sql</code>
+          <div class="text-[10px] text-red-700 mt-1">Error técnico: ${(clState.tablesError||'').replace(/[<>]/g,'')}</div>
+          <button onclick="clLoadAll().then(clRender)" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded">🔄 Reintentar</button>
+        </div>
+      </div>
+    </div>` : '';
+
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
 
+      ${tablesErrorBanner}
       ${overdueBanner}
 
       <!-- HEADER -->
@@ -943,7 +977,7 @@ async function clInsertRouteToDay(routeCode) {
     category: 'podada',
     status: 'planned',
     estimated_duration_min: s.duration_min,
-    created_by: state.user.id
+    created_by: state.user?.id || null
   }));
   const { error } = await sb.from('clean_day_tasks').insert(inserts);
   if (error) return alert('Error: ' + error.message);
@@ -1014,7 +1048,7 @@ async function clDropOnWeekDay(dateStr, ev) {
       title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
       materials: tmpl.default_materials || [],
       checklist: (tmpl.default_checklist || []).map(item => ({ item, done: false })),
-      created_by: state.user.id
+      created_by: state.user?.id || null
     });
   } else return;
   await clLoadAll();
@@ -1514,7 +1548,7 @@ async function clDropOnSlot(slotTime, ev) {
         title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
         materials: tmpl.default_materials || [],
         checklist: (tmpl.default_checklist || []).map(item => ({ item, done: false })),
-        created_by: state.user.id
+        created_by: state.user?.id || null
       });
     }
   }
@@ -1621,7 +1655,7 @@ async function clCreatePendiente() {
     materials: (document.getElementById('op-p-materials').value || '').split(',').map(s => s.trim()).filter(Boolean),
     checklist: (tmpl?.default_checklist || []).map(item => ({ item, done: false })),
     notes: document.getElementById('op-p-notes').value || null,
-    created_by: state.user.id
+    created_by: state.user?.id || null
   };
   const { error } = await sb.from('clean_day_tasks').insert(payload);
   if (error) return alert(error.message);
@@ -1776,7 +1810,7 @@ async function clEjecutarArmarDia() {
     await sb.from('clean_day_tasks').insert({
       date: clState.date, start_time: lunchTime, duration_min: lunchDur,
       title: 'Tiempo Almuerzo', business: 'both', zona: null,
-      created_by: state.user.id
+      created_by: state.user?.id || null
     });
   }
 
@@ -2000,7 +2034,7 @@ async function clSaveEdit(id, isBacklog) {
       interval_days: interval,
       next_due: nextDue,
       active: true,
-      created_by: state.user.id
+      created_by: state.user?.id || null
     }).select().single();
     if (!rErr && rec) {
       await sb.from('clean_day_tasks').update({ recurring_id: rec.id }).eq('id', id);
@@ -2267,7 +2301,7 @@ async function clCreateLoose() {
       travel_min: +document.getElementById('op-l-travel').value || 0,
       title, task_id: tmplId, zona, property_id, project_id, materials, checklist, notes,
       business: project_id ? 'remodelacion' : 'rentas',
-      created_by: state.user.id
+      created_by: state.user?.id || null
     };
     const { error } = await sb.from('clean_day_tasks').insert(payload);
     if (error) return alert('Error: ' + error.message);
@@ -2493,7 +2527,7 @@ async function clSaveDayAsTemplate() {
   const { error } = await sb.from('clean_day_templates').insert({
     name, description, tasks: snapshot, zona: zonaDom,
     task_count: snapshot.length, total_min: totalMin,
-    created_by: state.user.id
+    created_by: state.user?.id || null
   });
   if (error) return alert('Error: ' + error.message + '\n\nSi la tabla no existe, corré el SQL: supabase/ops-day-templates.sql');
   await clLoadAll();
@@ -2558,7 +2592,7 @@ async function clApplyTemplate(templateId) {
     project_id: t.project_id || null,
     task_id: t.task_id || null,
     status: 'planned',
-    created_by: state.user.id
+    created_by: state.user?.id || null
   }));
   if (!rows.length) return alert('La plantilla no tiene tareas.');
   const { error } = await sb.from('clean_day_tasks').insert(rows);
@@ -2787,7 +2821,7 @@ async function clConvertToRecurring(taskId) {
     interval_days: interval,
     next_due: nextDue,
     active: true,
-    created_by: state.user.id
+    created_by: state.user?.id || null
   };
   const { data: recurring, error } = await sb.from('clean_recurring').insert(payload).select().single();
   if (error) return alert('Error: ' + error.message);
