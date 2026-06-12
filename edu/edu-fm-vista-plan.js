@@ -504,7 +504,60 @@ function fmTotalHoras(bloques) {
 }
 
 function fmDiagPrintPlan() {
-  window.print();
+  // Bug: window.print() solo imprime la pantalla visible (el modal tiene
+  // overflow-y:auto y max-h, así que sale 1 sola página).
+  // Fix: copiar el HTML del plan a una ventana nueva sin restricciones
+  // de altura y disparar print desde ahí.
+  const planEl = document.querySelector('#fm-plan-print');
+  if (!planEl) {
+    alert('No encuentro el plan en pantalla. Reabrí el plan e intentá de nuevo.');
+    return;
+  }
+
+  const planHTML = planEl.innerHTML;
+  const win = window.open('', '_blank', 'width=1000,height=1200');
+  if (!win) {
+    alert('El navegador bloqueó la ventana. Autorizá popups para este sitio y reintentá.');
+    return;
+  }
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Plan de Acción · FlipMentoría</title>
+<script src="https://cdn.tailwindcss.com"><\/script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: white; }
+  @page { margin: 1.2cm; }
+  @media print {
+    .no-print { display: none !important; }
+    .bg-slate-900, .bg-slate-800, .bg-slate-700 { background: #fff !important; color: #0F172A !important; }
+    .text-white { color: #0F172A !important; }
+    .text-slate-300, .text-slate-400 { color: #475569 !important; }
+    /* Forzar que cada bloque grande no se corte feo */
+    [id^="bloque-"] { page-break-inside: avoid; break-inside: avoid; }
+    /* Evitar fondos oscuros que gasten tinta */
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="no-print sticky top-0 z-50 bg-emerald-600 text-white p-3 flex justify-between items-center shadow-md">
+    <div class="text-sm font-bold">📋 Plan de Acción listo para imprimir</div>
+    <div class="flex gap-2">
+      <button onclick="window.print()" class="bg-white text-emerald-700 font-bold px-4 py-2 rounded-lg text-sm">🖨️ Imprimir / Guardar PDF</button>
+      <button onclick="window.close()" class="bg-emerald-700 hover:bg-emerald-800 font-bold px-4 py-2 rounded-lg text-sm">✕ Cerrar</button>
+    </div>
+  </div>
+  <div class="p-6 max-w-5xl mx-auto">${planHTML}</div>
+  <script>
+    // Esperar a que Tailwind cargue antes de imprimir
+    window.addEventListener('load', () => { setTimeout(() => window.print(), 800); });
+  <\/script>
+</body>
+</html>`);
+  win.document.close();
 }
 
 function fmDiagCopyPlan() {
