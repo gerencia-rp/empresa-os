@@ -158,10 +158,16 @@ function fmRenderDiagPlan() {
         </div>
 
         <!-- Bloques visibles según modo -->
-        ${bloques.filter(b => bloquesVisibles.includes(b) || fmState.diagExpandidos[b.id]).map((b, i) => {
-          const realIdx = bloques.indexOf(b);
-          return fmRenderBloque(b, realIdx, userProfile, a);
-        }).join('')}
+        ${(() => {
+          const visibles = bloques.filter(b => bloquesVisibles.includes(b) || fmState.diagExpandidos[b.id]);
+          return visibles.map((b, i) => {
+            const realIdx = bloques.indexOf(b);
+            const prevEtapa = i > 0 ? visibles[i-1].etapa : null;
+            // Si cambia la etapa (o es el primer bloque visible), insertar header de etapa
+            const showEtapaHeader = b.etapa !== prevEtapa;
+            return (showEtapaHeader ? fmRenderEtapaHeader(b.etapa) : '') + fmRenderBloque(b, realIdx, userProfile, a);
+          }).join('');
+        })()}
 
         ${fmState.diagModo !== 'completo' && bloques.length > bloquesVisibles.length ? `
           <div class="bg-amber-50 border-2 border-dashed border-amber-300 rounded-2xl p-6 text-center mb-6 print:hidden">
@@ -216,9 +222,156 @@ function fmRenderDiagPlan() {
   `;
 }
 
+// Mapa educativo de las 6 etapas — se muestra cuando un bloque arranca una etapa nueva
+const FM_ETAPA_MAP = {
+  'PRE-E0': {
+    nombre: 'Pre-Fundación · Reconstrucción de Crédito',
+    icono: '🪜',
+    proposito: 'Antes de poder formar LLC y pedir HML, necesitás el crédito en orden. Esto es un track paralelo que no bloquea avanzar con el resto.',
+    aprenderas: 'Cómo leer un reporte de crédito, identificar qué baja el score, reconstruirlo con secured cards + utilización < 30% + on-time pagos, y monitorear progreso mensual.',
+    despues: 'E0 — Fundación legal y mental'
+  },
+  'E0': {
+    nombre: 'Fundación · Bases legales, mentales y financieras',
+    icono: '🏛️',
+    proposito: 'Construir las bases legales (LLC, EIN, banco), mentales (Big Why, disciplina) y de equipo (CPA, abogado) ANTES de buscar deals. Sin estas bases, todo lo demás se cae.',
+    aprenderas: 'Cómo proteger tu patrimonio con LLC en el estado correcto, formar Operating Agreement, obtener EIN, abrir cuenta bancaria de negocio, definir tu Big Why, instalar bloque diario no negociable, y armar tu equipo mínimo.',
+    despues: 'E1 — Evaluar mercado y deals con criterio'
+  },
+  'E1': {
+    nombre: 'Evaluar · Criterio de mercado y análisis de deals',
+    icono: '🔍',
+    proposito: 'Aprender a leer el mercado y filtrar deals con números reales — no con intuición ni con lo que dice el wholesaler.',
+    aprenderas: 'Cómo definir Buy Box operativo en 5 ZIPs, validar ARV con comparables vendidos, aplicar MAO (Máxima Oferta Aceptable) a 10+ propiedades, y descartar rápido lo que no funciona.',
+    despues: 'E2 — Estructurar capital y financiamiento'
+  },
+  'E1/E2': {
+    nombre: 'Evaluar + Estructurar (paralelo)',
+    icono: '🔁',
+    proposito: 'Estos bloques mezclan análisis de deals + setup financiero. Avanzás los dos frentes en paralelo.',
+    aprenderas: 'Cómo justificar ofertas por MAO con números reales y al mismo tiempo cerrar tu HML.',
+    despues: 'E3 — Ofertar con autoridad'
+  },
+  'E2/E1': {
+    nombre: 'Estructurar + Evaluar (paralelo)',
+    icono: '🔁',
+    proposito: 'Estos bloques mezclan setup financiero + análisis de deals. Avanzás los dos frentes en paralelo.',
+    aprenderas: 'Cómo cerrar HML y al mismo tiempo seguir analizando deals con MAO.',
+    despues: 'E3 — Ofertar con autoridad'
+  },
+  'E2': {
+    nombre: 'Estructurar · Capital y financiamiento listos',
+    icono: '💵',
+    proposito: 'Separar capital líquido del teórico y dejar el financiamiento pre-aprobado ANTES de ofertar. Los wholesalers no te toman en serio sin esto.',
+    aprenderas: 'Cuánto earnest money podés poner, cuánto gap cubrir, cuántos meses de reservas necesitás, qué HMLs comparar y cómo conseguir 5 term sheets reales.',
+    despues: 'E3 — Generar deal flow y ofertar'
+  },
+  'E3': {
+    nombre: 'Ofertar · Red operativa y ofertas con autoridad',
+    icono: '📨',
+    proposito: 'Construir red de wholesalers + realtors para que entren deals constantes y empezar a ofertar como buyer serio.',
+    aprenderas: 'Cómo posicionarte ante wholesalers, armar tu pitch de buyer, ofertar con LOI + Proof of Funds, y hacer follow-up disciplinado para subir tasa de aceptación.',
+    despues: 'E4 — Ejecutar tu primer deal'
+  },
+  'E4': {
+    nombre: 'Ejecutar · Cerrar y operar tu primer deal',
+    icono: '🔨',
+    proposito: 'Cerrar tu primer deal de forma controlada: due diligence completa, scope of work claro, GCs gestionados con disciplina.',
+    aprenderas: 'Cómo correr inspecciones, armar SOW realista, manejar GC y subcontratistas con draw schedule, controlar presupuesto y cronograma sin sorpresas.',
+    despues: 'E5 — Salir del deal con margen'
+  },
+  'E5': {
+    nombre: 'Salir · Venta o renta con margen + sistema',
+    icono: '🏁',
+    proposito: 'Vender o rentar con la mejor estrategia para maximizar margen, documentar SOPs y construir el próximo deal con sistema.',
+    aprenderas: 'Pricing real de salida, staging, elegir broker correcto, cuándo bajar precio, cuándo rentar vs vender, refinanciar con DSCR loan, y armar SOPs reproducibles.',
+    despues: 'Escalar a 2+ deals/año con equipo'
+  },
+  'REVISIÓN': {
+    nombre: 'Revisión · Preparación para sesión con mentor',
+    icono: '📊',
+    proposito: 'Preparar todo el contexto para sacar el máximo provecho de tu próxima sesión con el coach.',
+    aprenderas: 'Cómo armar un caso completo para revisión: números, decisiones, dudas concretas, screenshots de evidencia.',
+    despues: 'Próxima sesión y siguiente ciclo'
+  }
+};
+
+function fmRenderEtapaHeader(etapa) {
+  const info = FM_ETAPA_MAP[etapa];
+  if (!info) return '';
+  return `
+    <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-5 mb-4 mt-6 first:mt-0 shadow-md print:bg-white print:text-slate-900 print:border print:border-slate-300">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="text-3xl">${info.icono}</div>
+        <div>
+          <div class="text-[10px] font-bold tracking-widest text-amber-400 print:text-amber-700">ETAPA ${etapa} · MAPA EDUCATIVO</div>
+          <div class="text-xl font-bold">${info.nombre}</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+        <div class="bg-white/10 print:bg-blue-50 print:border print:border-blue-200 rounded p-2.5">
+          <div class="text-[10px] font-bold text-amber-300 print:text-amber-800 mb-1">🎯 PROPÓSITO DE ESTA ETAPA</div>
+          <div class="text-slate-100 print:text-slate-800 leading-relaxed">${info.proposito}</div>
+        </div>
+        <div class="bg-white/10 print:bg-emerald-50 print:border print:border-emerald-200 rounded p-2.5">
+          <div class="text-[10px] font-bold text-emerald-300 print:text-emerald-800 mb-1">🧠 QUÉ VAS A APRENDER</div>
+          <div class="text-slate-100 print:text-slate-800 leading-relaxed">${info.aprenderas}</div>
+        </div>
+        <div class="bg-white/10 print:bg-blue-50 print:border print:border-blue-200 rounded p-2.5">
+          <div class="text-[10px] font-bold text-blue-300 print:text-blue-800 mb-1">➡️ DESPUÉS DE ESTA ETAPA</div>
+          <div class="text-slate-100 print:text-slate-800 leading-relaxed">${info.despues}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Genera criterios de éxito a partir del entregable + reglas heurísticas
+function fmGenerarCriteriosBloque(b) {
+  const criterios = [];
+  // Si el entregable existe, descomponerlo
+  if (b.entregable) {
+    const parts = b.entregable.split(/[.+]/).map(s => s.trim()).filter(s => s.length > 8);
+    parts.forEach(p => criterios.push(p));
+  }
+  // Reglas por tipo de bloque
+  const obs = (b.observacion || '').toLowerCase();
+  const sub = (b.subetapa || '').toLowerCase();
+  if (sub.includes('llc') && b.etapa === 'E0') {
+    criterios.push('Tenés Certificate of Formation aprobado en mano (no pendiente del estado)');
+    criterios.push('La cuenta bancaria de negocio acepta depósitos y tiene tarjeta crédito activa');
+  }
+  if (sub.includes('big why')) {
+    criterios.push('El Big Why está escrito (no solo en tu cabeza) y compartido con al menos 2 personas');
+    criterios.push('El bloque diario aparece recurrente en tu calendario los próximos 90 días');
+  }
+  if (sub.includes('buy box')) {
+    criterios.push('Podés enviarle el Buy Box de 1 página a un wholesaler hoy mismo');
+    criterios.push('Podés explicar tu pitch en menos de 60 segundos sin leer');
+  }
+  if (sub.includes('comparables') || sub.includes('arv')) {
+    criterios.push('Tenés screenshots de 3+ comps vendidos por cada ZIP del Buy Box');
+    criterios.push('Tu ARV conservador es más bajo que el ARV "optimista" del wholesaler');
+  }
+  if (sub.includes('mao') || sub.includes('análisis')) {
+    criterios.push('Tu plantilla incluye holding costs, closing costs y contingencia');
+    criterios.push('Descartaste el 70%+ de las propiedades que analizaste — esa es buena señal');
+  }
+  if (sub.includes('hml')) {
+    criterios.push('Tenés 5 term sheets en PDF de HMLs distintos (no solo conversaciones)');
+    criterios.push('Sabés exactamente cuánto interés, points y LTV te ofrece tu HML primario');
+  }
+  if (sub.includes('wholesaler')) {
+    criterios.push('Te están enviando deals SIN que pidas — eso es la prueba real');
+    criterios.push('Respondés cada deal en < 24h con análisis (aunque sea para descartar)');
+  }
+  return [...new Set(criterios)].slice(0, 5);
+}
+
 function fmRenderBloque(b, idx, p, a) {
   const actividadStr = typeof b.actividad === 'function' ? b.actividad(p, a) : b.actividad;
   const pasos = typeof b.pasos === 'function' ? b.pasos(p, a) : (b.pasos || []);
+  const criterios = fmGenerarCriteriosBloque(b);
   return `
     <div id="bloque-${b.id}" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
       <!-- Header del bloque -->
@@ -262,6 +415,15 @@ function fmRenderBloque(b, idx, p, a) {
                 </ol>
               </td>
             </tr>
+            ${criterios.length ? `
+              <tr class="border-b border-slate-300">
+                <th class="bg-emerald-800 text-white text-left p-3 align-top font-bold text-sm">✅ Cómo sabés que el bloque está LISTO</th>
+                <td class="p-3 align-top bg-emerald-50/40">
+                  <ul class="space-y-1.5 text-slate-800">
+                    ${criterios.map(c => `<li class="flex gap-2"><span class="text-emerald-600 font-bold">✓</span><span>${c}</span></li>`).join('')}
+                  </ul>
+                </td>
+              </tr>` : ''}
             <tr class="border-b border-slate-300">
               <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🧰 Recursos y herramientas</th>
               <td class="p-3 align-top">
@@ -285,6 +447,13 @@ function fmRenderBloque(b, idx, p, a) {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Nota educativa de cierre del bloque -->
+      <div class="px-6 pb-5">
+        <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r p-3 text-xs text-amber-900 print:bg-amber-50 print:border-amber-500">
+          <strong>📌 Antes de pasar al siguiente bloque:</strong> revisá los criterios de éxito arriba. Si alguno queda flojo, no avances — el siguiente bloque va a chocar con esa debilidad. La metodología funciona en secuencia.
+        </div>
       </div>
     </div>
   `;
