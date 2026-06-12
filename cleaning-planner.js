@@ -127,6 +127,23 @@ async function _clSafeQuery(promise) {
   }
 }
 
+// Copia el SQL al portapapeles para que el usuario lo pegue en Supabase
+async function clCopySchemaSQL() {
+  // Fetch del archivo SQL desde el servidor (Vercel sirve los archivos estáticos)
+  try {
+    const res = await fetch('/supabase/cleaning-planner-schema.sql');
+    if (!res.ok) throw new Error('No pude cargar el SQL (HTTP ' + res.status + ')');
+    const sql = await res.text();
+    await navigator.clipboard.writeText(sql);
+    alert('✅ SQL copiado al portapapeles (' + sql.length + ' caracteres).\n\nAhora andá a Supabase → SQL Editor, pegá (Cmd/Ctrl+V) y dale Run.\n\nDespués volvé y tap "🔄 Reintentar".');
+  } catch (e) {
+    // Fallback: abrir el SQL en una nueva ventana
+    alert('No pude copiar automáticamente: ' + e.message + '\n\nVoy a abrir el SQL en otra ventana — copialo desde ahí.');
+    window.open('/supabase/cleaning-planner-schema.sql', '_blank');
+  }
+}
+window.clCopySchemaSQL = clCopySchemaSQL;
+
 async function clLoadAll() {
   if (!clState.date) clState.date = clDateOnly(new Date());
 
@@ -333,15 +350,26 @@ function clRender() {
 
   // BANNER CRÍTICO: si las tablas clean_* no existen, mostrar SQL a correr
   const tablesErrorBanner = clState.tablesError ? `
-    <div class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
-      <div class="flex items-start gap-2">
-        <div class="text-2xl">⚠️</div>
+    <div class="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-3 shadow-md">
+      <div class="flex items-start gap-3">
+        <div class="text-3xl">⚠️</div>
         <div class="flex-1 min-w-0">
-          <div class="font-bold text-red-900 text-sm">Las tablas del Cronograma Limpieza NO existen todavía</div>
-          <div class="text-xs text-red-800 mt-1">Por eso no podés agregar tareas. Pegá este SQL en el SQL Editor de Supabase y correlo una vez:</div>
-          <code class="block mt-2 bg-slate-900 text-emerald-300 text-[11px] px-2 py-1 rounded">supabase/cleaning-planner-schema.sql</code>
-          <div class="text-[10px] text-red-700 mt-1">Error técnico: ${(clState.tablesError||'').replace(/[<>]/g,'')}</div>
-          <button onclick="clLoadAll().then(clRender)" class="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded">🔄 Reintentar</button>
+          <div class="font-bold text-red-900 text-base">El Cronograma Limpieza NO está activado</div>
+          <div class="text-sm text-red-800 mt-1">El SQL de las tablas falta en Supabase. Por eso no se guardan las tareas que arrastrás. Te lo arreglo en 30 segundos:</div>
+          <ol class="text-sm text-red-900 mt-2 space-y-1 list-decimal list-inside">
+            <li>Hacé tap en <strong>"📋 Copiar SQL"</strong> abajo</li>
+            <li>Abrí <a href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" class="text-blue-700 underline font-bold">Supabase SQL Editor</a></li>
+            <li>Pegá (Cmd/Ctrl+V) y dale <strong>Run</strong></li>
+            <li>Volvé acá y tap en <strong>"🔄 Reintentar"</strong></li>
+          </ol>
+          <div class="flex gap-2 mt-3">
+            <button onclick="clCopySchemaSQL()" class="text-sm bg-slate-900 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded">📋 Copiar SQL al portapapeles</button>
+            <button onclick="clLoadAll().then(clRender)" class="text-sm bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded">🔄 Reintentar</button>
+          </div>
+          <details class="mt-2">
+            <summary class="text-[10px] text-red-700 cursor-pointer">Error técnico</summary>
+            <code class="block mt-1 bg-slate-900 text-emerald-300 text-[10px] px-2 py-1 rounded">${(clState.tablesError||'').replace(/[<>]/g,'')}</code>
+          </details>
         </div>
       </div>
     </div>` : '';
@@ -1019,19 +1047,21 @@ async function clQuickReprogramToday(id) {
 
 async function clDropOnWeekDay(dateStr, ev) {
   ev.preventDefault();
+  let opError = null;
   if (clState.draggedScheduledId) {
     const id = clState.draggedScheduledId; clState.draggedScheduledId = null;
-    await sb.from('clean_day_tasks').update({ date: dateStr, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from('clean_day_tasks').update({ date: dateStr, updated_at: new Date().toISOString() }).eq('id', id);
+    opError = error;
   } else if (clState.draggedBacklogId) {
     const id = clState.draggedBacklogId; clState.draggedBacklogId = null;
-    // Buscar hora libre: 8am si día vacío, sino end del último + 0
     const existing = clState.weekTasks.filter(x => x.date === dateStr).sort((a,b) => clTimeToMin(a.start_time) - clTimeToMin(b.start_time));
     let startTime = '08:00';
     if (existing.length) {
       const last = existing[existing.length-1];
       startTime = clAddMin(last.start_time, last.duration_min);
     }
-    await sb.from('clean_day_tasks').update({ date: dateStr, start_time: startTime, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from('clean_day_tasks').update({ date: dateStr, start_time: startTime, updated_at: new Date().toISOString() }).eq('id', id);
+    opError = error;
   } else if (clState.draggedTemplateId) {
     const tmpl = clState.tasks.find(x => x.id === clState.draggedTemplateId);
     clState.draggedTemplateId = null;
@@ -1042,7 +1072,7 @@ async function clDropOnWeekDay(dateStr, ev) {
       const last = existing[existing.length-1];
       startTime = clAddMin(last.start_time, last.duration_min);
     }
-    await sb.from('clean_day_tasks').insert({
+    const { error } = await sb.from('clean_day_tasks').insert({
       date: dateStr, start_time: startTime,
       duration_min: tmpl.default_duration_min || 30,
       title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
@@ -1050,7 +1080,19 @@ async function clDropOnWeekDay(dateStr, ev) {
       checklist: (tmpl.default_checklist || []).map(item => ({ item, done: false })),
       created_by: state.user?.id || null
     });
+    opError = error;
   } else return;
+  if (opError) {
+    const msg = opError.message || String(opError);
+    if (/does not exist|relation/i.test(msg)) {
+      clState.tablesError = msg;
+      clRender();
+      alert('❌ No se guardó la tarea\n\nLas tablas del Cronograma Limpieza NO existen en Supabase todavía.\n\nAndá a Supabase → SQL Editor y pegá el contenido de:\nsupabase/cleaning-planner-schema.sql\n\nDespués recargá la página.');
+    } else {
+      alert('❌ Error al guardar la tarea:\n\n' + msg);
+    }
+    return;
+  }
   await clLoadAll();
   clRender();
 }
@@ -1531,18 +1573,20 @@ async function clDropOnSlot(slotTime, ev) {
   }
 
   // Aplicar el drop ahora que el conflicto está resuelto
+  let opError = null;
   if (droppedId) {
     // Reschedule existing task (scheduled or backlog)
-    await sb.from('clean_day_tasks').update({
+    const { error } = await sb.from('clean_day_tasks').update({
       date: clState.date,
       start_time: slotTime,
       updated_at: new Date().toISOString()
     }).eq('id', droppedId);
+    opError = error;
   } else {
     // Nueva tarea desde plantilla
     const tmpl = clState.tasks.find(x => x.name === droppedTask.title);
     if (tmpl) {
-      await sb.from('clean_day_tasks').insert({
+      const { error } = await sb.from('clean_day_tasks').insert({
         date: clState.date, start_time: slotTime,
         duration_min: tmpl.default_duration_min || 30,
         title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
@@ -1550,7 +1594,21 @@ async function clDropOnSlot(slotTime, ev) {
         checklist: (tmpl.default_checklist || []).map(item => ({ item, done: false })),
         created_by: state.user?.id || null
       });
+      opError = error;
     }
+  }
+  // FIX CRÍTICO: si falla la persistencia, avisar al usuario en lugar de
+  // re-render silencioso que da falsa sensación de éxito.
+  if (opError) {
+    const msg = opError.message || String(opError);
+    if (/does not exist|relation/i.test(msg)) {
+      clState.tablesError = msg;
+      clRender();
+      alert('❌ No se guardó la tarea\n\nLas tablas del Cronograma Limpieza NO existen en Supabase todavía.\n\nAndá a Supabase → SQL Editor y pegá el contenido de:\nsupabase/cleaning-planner-schema.sql\n\nDespués recargá la página.');
+    } else {
+      alert('❌ Error al guardar la tarea:\n\n' + msg);
+    }
+    return;
   }
   await clLoadAll();
   clRender();

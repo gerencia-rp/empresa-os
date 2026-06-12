@@ -63,7 +63,8 @@ const STATIC_COPY = [
   "manifest.webmanifest",
   "sw.js",
   "icon-192.png",
-  "icon-512.png"
+  "icon-512.png",
+  "supabase/cleaning-planner-schema.sql"  // copia para que el banner de error pueda servirlo al copy-to-clipboard
 ];
 
 async function fileExists(p) {
