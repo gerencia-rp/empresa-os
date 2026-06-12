@@ -3,16 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mi Plan de Acción · FlipMentoría</title>
+<title>Mi Plan de Trabajo · FlipMentoría</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/config.public.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Inter', system-ui, sans-serif; }
-  .check-anim { transition: all 0.2s ease; }
-  .check-anim:active { transform: scale(0.95); }
+  .check-anim { transition: all 0.15s ease; }
+  .check-anim:active { transform: scale(0.96); }
+  @media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+    .page-break { page-break-before: always; }
+  }
 </style>
 </head>
 <body class="bg-slate-50 min-h-screen pb-20">
@@ -35,39 +40,115 @@
 </div>
 
 <!-- PORTAL -->
-<div id="portal" class="hidden max-w-3xl mx-auto p-4 md:p-6">
-  <!-- Hero -->
-  <div class="bg-gradient-to-br from-amber-500 to-orange-700 text-white rounded-2xl p-5 md:p-6 shadow-lg mb-4">
-    <div class="text-xs uppercase opacity-90 font-bold tracking-wider">Tu plan de acción · FlipMentoría</div>
-    <h1 class="text-xl md:text-2xl font-bold mt-1">Hola <span id="student-name">amigo</span> 👋</h1>
-    <div id="perfil-info" class="text-sm opacity-95 mt-1">Cargando perfil...</div>
+<div id="portal" class="hidden">
 
-    <!-- Progress -->
-    <div class="mt-4 bg-white/20 backdrop-blur rounded-xl p-3">
-      <div class="flex items-center justify-between text-xs mb-1">
-        <span class="font-bold">PROGRESO</span>
-        <span><span id="done-count">0</span> / <span id="total-count">0</span> tareas</span>
+  <!-- Header / Hero del plan -->
+  <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+    <div class="max-w-5xl mx-auto px-4 md:px-8 py-6 md:py-8">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-bold text-amber-400 tracking-wider mb-2">FLIPMENTORÍA · PLAN DE TRABAJO PERSONALIZADO</div>
+          <h1 id="plan-title" class="text-2xl md:text-3xl font-bold mb-2 leading-tight">Cargando...</h1>
+          <p id="plan-subtitle" class="text-sm text-slate-300"></p>
+        </div>
+        <div class="flex gap-2 no-print">
+          <button onclick="window.print()" class="px-3 md:px-4 py-2 bg-white text-slate-900 rounded-lg text-xs md:text-sm font-medium hover:bg-slate-100">🖨️ Imprimir / PDF</button>
+        </div>
       </div>
-      <div class="h-3 bg-white/20 rounded-full overflow-hidden">
-        <div id="prog-bar" class="h-full bg-emerald-400 transition-all" style="width: 0%"></div>
+
+      <!-- Objetivo operativo -->
+      <div id="objetivo-card" class="mt-6 bg-blue-900/50 rounded-lg p-4 border border-blue-700 hidden">
+        <div class="text-xs font-bold text-blue-300 tracking-wider mb-1">OBJETIVO OPERATIVO</div>
+        <p id="objetivo-text" class="text-sm font-medium"></p>
       </div>
-      <div class="text-2xl font-black text-center mt-2"><span id="pct">0</span>%</div>
+
+      <!-- Regla del plan -->
+      <div id="regla-card" class="mt-3 bg-amber-900/50 rounded-lg p-3 border border-amber-700 hidden">
+        <span class="text-xs font-bold text-amber-300 tracking-wider">REGLA DEL PLAN: </span>
+        <span id="regla-text" class="text-sm"></span>
+      </div>
     </div>
   </div>
 
-  <!-- Info -->
-  <div class="bg-white border border-slate-200 rounded-xl p-3 mb-4 text-xs text-slate-600">
-    💡 <strong>Marcá las tareas a medida que las terminás.</strong> Tu mentor las ve actualizadas en tiempo real. Podés volver a este link cuando quieras.
-  </div>
+  <!-- Body -->
+  <div class="max-w-5xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
 
-  <!-- Bloques -->
-  <div id="bloques-container" class="space-y-4"></div>
+    <!-- Progreso global -->
+    <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl p-4 md:p-5 shadow-lg">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-xs uppercase font-bold tracking-wider opacity-90">Tu progreso</div>
+        <div class="text-sm font-bold"><span id="done-count">0</span> / <span id="total-count">0</span> tareas</div>
+      </div>
+      <div class="h-3 bg-white/25 rounded-full overflow-hidden">
+        <div id="prog-bar" class="h-full bg-white transition-all" style="width: 0%"></div>
+      </div>
+      <div class="text-3xl md:text-4xl font-black text-center mt-2"><span id="pct">0</span>%</div>
+      <div class="text-center text-xs opacity-90 mt-1">💡 Marcá cada tarea al terminarla. Tu mentor lo ve en tiempo real.</div>
+    </div>
 
-  <!-- Done message si todo está completo -->
-  <div id="all-done" class="hidden bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-6 text-center mt-6">
-    <div class="text-5xl mb-2">🎉</div>
-    <h2 class="text-xl font-bold text-emerald-900">¡Completaste tu plan!</h2>
-    <p class="text-sm text-emerald-700 mt-2">Tu mentor ya recibió el aviso. Te van a contactar para revisar lo que hiciste y armar la siguiente etapa.</p>
+    <!-- Análisis profundo -->
+    <div id="analisis-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 hidden">
+      <h2 class="text-lg md:text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <span>🔬</span> Análisis Profundo del Cliente
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        <div class="bg-slate-50 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-slate-500 tracking-wider mb-1">PERFIL</div>
+          <div id="perfil-text" class="font-bold text-slate-900"></div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-slate-500 tracking-wider mb-1">ETAPA ACTUAL</div>
+          <div id="etapa-text" class="font-bold text-slate-900"></div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-slate-500 tracking-wider mb-1">CRONOGRAMA</div>
+          <div id="cronograma-text" class="font-bold text-slate-900 text-sm"></div>
+        </div>
+      </div>
+      <div id="analisis-parrafos" class="space-y-3 text-sm text-slate-700 leading-relaxed"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+          <h4 class="text-sm font-bold text-emerald-900 mb-2">✅ Fortalezas identificadas</h4>
+          <ul id="fortalezas-list" class="space-y-1 text-xs text-emerald-900"></ul>
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h4 class="text-sm font-bold text-red-900 mb-2">⚠️ Riesgos a mitigar</h4>
+          <ul id="riesgos-list" class="space-y-1 text-xs text-red-900"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header bloques -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6">
+      <h2 class="text-lg md:text-xl font-bold text-slate-900 mb-1 flex items-center gap-2">
+        <span>📋</span> Tu Plan de Acción
+      </h2>
+      <p class="text-sm text-slate-600">Cada bloque es una etapa de tu metodología. Marcá cada paso a medida que lo completás.</p>
+    </div>
+
+    <!-- Bloques -->
+    <div id="bloques-container" class="space-y-4"></div>
+
+    <!-- Checklist final -->
+    <div id="checklist-section" class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 md:p-6 hidden">
+      <h2 class="text-lg md:text-xl font-bold mb-2 flex items-center gap-2"><span>✅</span> Checklist Final</h2>
+      <p class="text-sm text-slate-300 mb-4">Estarás listo para tu primer (o próximo) deal cuando todos estos ítems estén ✓:</p>
+      <ul id="checklist-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm"></ul>
+    </div>
+
+    <!-- Frase final -->
+    <div id="frase-section" class="bg-amber-50 border-l-4 border-amber-500 rounded-r-2xl p-5 md:p-6 hidden">
+      <div class="text-xs font-bold text-amber-700 tracking-wider mb-2">FRASE FINAL QUE DEBÉS PODER SOSTENER</div>
+      <p id="frase-text" class="text-base md:text-lg italic text-slate-900 font-medium leading-relaxed"></p>
+    </div>
+
+    <!-- All done -->
+    <div id="all-done" class="hidden bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-6 text-center">
+      <div class="text-5xl mb-2">🎉</div>
+      <h2 class="text-xl font-bold text-emerald-900">¡Completaste tu plan!</h2>
+      <p class="text-sm text-emerald-700 mt-2">Tu mentor ya recibió el aviso. Te van a contactar para revisar lo que hiciste.</p>
+    </div>
   </div>
 </div>
 
@@ -75,14 +156,15 @@
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 let TOKEN = null;
 let INVITE = null;
-let TASKS = [];
+let PLAN_DATA = null;   // edu_student_plans.perfil — jsonb enriquecido
+let TASKS = [];          // edu_student_plan_tasks
+// Mapa task_id → contiene plan_id, etc.
 
 async function init() {
   const sp = new URLSearchParams(window.location.search);
   TOKEN = sp.get('t');
   if (!TOKEN) return showInvalid('Falta el token en el link.');
 
-  // 1) Cargar invite
   const { data: invite, error: invErr } = await sb
     .from('edu_diagnostic_invites')
     .select('*')
@@ -90,147 +172,228 @@ async function init() {
     .maybeSingle();
 
   if (invErr || !invite) {
-    return showInvalid(`No encontré tu invitación.\n\nToken: ${TOKEN}\n\nPedile a tu mentor un link nuevo.`);
+    return showInvalid(`No encontré tu invitación.\n\nToken: ${TOKEN}`);
   }
 
   if (!invite.result_plan_id) {
-    // Todavía no se generó el plan — redirigir al diagnóstico
     if (!invite.completed_at) {
       window.location.href = '/diag?t=' + TOKEN;
       return;
     }
-    // Completó el diagnóstico pero el plan está siendo generado por el mentor.
-    // Mostrar pantalla "armando tu plan" y poll cada 5s
     return waitForPlan();
   }
 
   INVITE = invite;
 
-  // 2) Cargar nombre del estudiante
-  if (invite.student_id) {
-    try {
-      const { data: stu } = await sb
-        .from('edu_students')
-        .select('full_name, current_stage')
-        .eq('id', invite.student_id)
-        .maybeSingle();
-      if (stu?.full_name) {
-        document.getElementById('student-name').textContent = stu.full_name.split(' ')[0];
-      }
-      if (stu?.current_stage) {
-        document.getElementById('perfil-info').textContent = 'Etapa actual: ' + stu.current_stage;
-      }
-    } catch (e) { console.warn('no student name', e); }
-  }
+  // Cargar plan (con TODA la data enriquecida en .perfil)
+  const { data: plan, error: pErr } = await sb
+    .from('edu_student_plans')
+    .select('*')
+    .eq('id', invite.result_plan_id)
+    .maybeSingle();
+  if (pErr || !plan) return showInvalid('No pude cargar tu plan: ' + (pErr?.message || 'no encontrado'));
 
-  // 3) Cargar perfil del plan para hero
-  if (invite.perfil?.perfil) {
-    const p = invite.perfil.perfil;
-    const txt = `${p.nombre || ''} ${p.num ? '· #'+p.num : ''}`.trim();
-    if (txt) document.getElementById('perfil-info').textContent = txt;
-  }
+  PLAN_DATA = plan.perfil || {};
+  await loadTasks(plan.id);
 
-  // 4) Cargar tasks
-  await loadTasks();
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('portal').classList.remove('hidden');
-  renderTasks();
 
-  // 5) Restaurar scroll donde estaba la última vez
-  try {
-    const savedScroll = +(localStorage.getItem('mp_last_scroll_' + TOKEN) || 0);
-    if (savedScroll > 100) {
-      setTimeout(() => window.scrollTo({ top: savedScroll, behavior: 'smooth' }), 300);
-    }
-  } catch {}
+  await renderPlan();
+  restoreScroll();
 }
 
-async function loadTasks() {
+async function loadTasks(planId) {
   const { data, error } = await sb
     .from('edu_student_plan_tasks')
     .select('*')
-    .eq('plan_id', INVITE.result_plan_id)
+    .eq('plan_id', planId)
     .order('bloque_orden')
     .order('paso_index');
-
   if (error) {
     console.error('[loadTasks]', error);
-    return showInvalid('No pude cargar tus tareas: ' + error.message);
+    return;
   }
-
   TASKS = data || [];
 }
 
-function renderTasks() {
-  const total = TASKS.length;
-  const done = TASKS.filter(t => t.completed).length;
-  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+async function renderPlan() {
+  // Hero
+  const p = PLAN_DATA.perfil || {};
+  const nombre = p.nombre || 'Tu Plan';
+  const emoji = p.emoji || '🚀';
+  document.getElementById('plan-title').textContent = `${emoji} Plan de Trabajo · ${nombre}`;
 
-  document.getElementById('total-count').textContent = total;
-  document.getElementById('done-count').textContent = done;
-  document.getElementById('pct').textContent = pct;
-  document.getElementById('prog-bar').style.width = pct + '%';
+  // Cargar info del estudiante
+  let studentFullName = '';
+  if (INVITE.student_id) {
+    try {
+      const { data: stu } = await sb.from('edu_students').select('full_name').eq('id', INVITE.student_id).maybeSingle();
+      if (stu?.full_name) studentFullName = stu.full_name;
+    } catch {}
+  }
 
-  // Agrupar por bloque
+  const etapa = PLAN_DATA.etapa || p.etapa || (INVITE.answers?.etapa_actual) || '';
+  const cronograma = PLAN_DATA.cronograma || p.cronograma || '';
+  const subtitle = [
+    studentFullName ? `Para ${studentFullName}` : '',
+    p.num ? `Perfil #${p.num}` : '',
+    etapa,
+    cronograma
+  ].filter(Boolean).join(' · ');
+  document.getElementById('plan-subtitle').textContent = subtitle;
+
+  // Objetivo y regla
+  if (PLAN_DATA.objetivo_operativo) {
+    document.getElementById('objetivo-text').textContent = PLAN_DATA.objetivo_operativo;
+    document.getElementById('objetivo-card').classList.remove('hidden');
+  }
+  if (PLAN_DATA.regla_plan) {
+    document.getElementById('regla-text').textContent = PLAN_DATA.regla_plan;
+    document.getElementById('regla-card').classList.remove('hidden');
+  }
+
+  // Análisis profundo
+  if (PLAN_DATA.analisis_profundo?.length || PLAN_DATA.fortalezas?.length || PLAN_DATA.riesgos?.length) {
+    document.getElementById('analisis-section').classList.remove('hidden');
+    document.getElementById('perfil-text').textContent = p.num ? `#${p.num} ${p.nombre || ''}` : (p.nombre || '—');
+    document.getElementById('etapa-text').textContent = etapa || '—';
+    document.getElementById('cronograma-text').textContent = cronograma || '—';
+
+    const parrafosCont = document.getElementById('analisis-parrafos');
+    parrafosCont.innerHTML = (PLAN_DATA.analisis_profundo || []).map(par => `<p>${esc(par)}</p>`).join('');
+
+    const fortList = document.getElementById('fortalezas-list');
+    const forts = PLAN_DATA.fortalezas || [];
+    fortList.innerHTML = forts.length
+      ? forts.map(f => `<li class="flex gap-1.5"><span>•</span><span>${esc(f)}</span></li>`).join('')
+      : '<li class="italic text-emerald-700">Estás empezando — esa es tu primera fortaleza.</li>';
+
+    const riesList = document.getElementById('riesgos-list');
+    const riesgos = PLAN_DATA.riesgos || [];
+    riesList.innerHTML = riesgos.length
+      ? riesgos.map(r => `<li class="flex gap-1.5"><span>•</span><span>${esc(r)}</span></li>`).join('')
+      : '<li class="italic text-red-700">Sin riesgos críticos detectados.</li>';
+  }
+
+  // Checklist final
+  if (PLAN_DATA.checklist_final?.length) {
+    document.getElementById('checklist-section').classList.remove('hidden');
+    document.getElementById('checklist-list').innerHTML = PLAN_DATA.checklist_final.map(item => `
+      <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">☐</span><span>${esc(item)}</span></li>
+    `).join('');
+  }
+
+  // Frase final
+  if (PLAN_DATA.frase_final) {
+    document.getElementById('frase-section').classList.remove('hidden');
+    document.getElementById('frase-text').textContent = PLAN_DATA.frase_final;
+  }
+
+  renderBloques();
+}
+
+function renderBloques() {
+  // Agrupar tasks por bloque
   const byBloque = {};
   TASKS.forEach(t => {
     const key = `${t.bloque_orden}__${t.bloque_id}`;
     if (!byBloque[key]) {
       byBloque[key] = {
         orden: t.bloque_orden,
+        bloque_id: t.bloque_id,
         etapa: t.bloque_etapa || '',
         subetapa: t.bloque_subetapa || '',
-        bloque_id: t.bloque_id,
         tasks: []
       };
     }
     byBloque[key].tasks.push(t);
   });
+  const blocks = Object.values(byBloque).sort((a, b) => a.orden - b.orden);
 
-  const bloques = Object.values(byBloque).sort((a, b) => a.orden - b.orden);
+  // Buscar metadata del bloque en PLAN_DATA.bloques
+  const planBloques = PLAN_DATA.bloques || [];
+  const bloqueMetaById = {};
+  planBloques.forEach(b => { bloqueMetaById[b.id] = b; });
+
   const cont = document.getElementById('bloques-container');
-
-  cont.innerHTML = bloques.map(b => {
+  cont.innerHTML = blocks.map((b, idx) => {
+    const meta = bloqueMetaById[b.bloque_id] || {};
     const bDone = b.tasks.filter(t => t.completed).length;
     const bTotal = b.tasks.length;
-    const bPct = bTotal > 0 ? Math.round(bDone / bTotal * 100) : 0;
-    const isAllDone = bDone === bTotal;
+    const bPct = bTotal ? Math.round(bDone/bTotal*100) : 0;
+    const isDone = bDone === bTotal && bTotal > 0;
 
     return `
-      <div class="bg-white rounded-2xl shadow-sm border ${isAllDone ? 'border-emerald-300' : 'border-slate-200'} overflow-hidden">
+      <div class="bg-white rounded-2xl shadow-sm border ${isDone ? 'border-emerald-300' : 'border-slate-200'} overflow-hidden">
         <!-- Header del bloque -->
-        <div class="p-4 ${isAllDone ? 'bg-emerald-50' : 'bg-amber-50'}">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex-1 min-w-0">
-              <div class="text-[10px] uppercase font-bold tracking-wider ${isAllDone ? 'text-emerald-700' : 'text-amber-700'}">${(b.etapa || '').replace(/</g,'&lt;')}</div>
-              <div class="text-sm md:text-base font-bold text-slate-900 mt-0.5">${(b.subetapa || 'Bloque').replace(/</g,'&lt;')}</div>
+        <div class="p-4 md:p-5 ${isDone ? 'bg-emerald-50' : 'bg-amber-50'}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3 flex-1 min-w-0">
+              <div class="w-9 h-9 rounded-full ${isDone ? 'bg-emerald-600' : 'bg-amber-600'} text-white font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] uppercase font-bold tracking-wider ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${esc(b.etapa)}</div>
+                <div class="text-base md:text-lg font-bold text-slate-900 mt-0.5">${esc(b.subetapa || 'Bloque')}</div>
+                ${meta.actividad ? `<div class="text-xs md:text-sm text-slate-600 mt-1">${esc(meta.actividad)}</div>` : ''}
+                ${meta.tiempo ? `<div class="text-[10px] text-slate-500 mt-1">⏱ ${esc(meta.tiempo)}</div>` : ''}
+              </div>
             </div>
-            <div class="text-right">
-              <div class="text-base font-bold ${isAllDone ? 'text-emerald-700' : 'text-slate-900'}">${bDone}/${bTotal}</div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-base font-bold ${isDone ? 'text-emerald-700' : 'text-slate-900'}">${bDone}/${bTotal}</div>
               <div class="text-[10px] text-slate-500">${bPct}%</div>
             </div>
           </div>
           <div class="h-1.5 bg-white/60 rounded-full mt-3 overflow-hidden">
-            <div class="h-full ${isAllDone ? 'bg-emerald-500' : 'bg-amber-500'}" style="width: ${bPct}%"></div>
+            <div class="h-full ${isDone ? 'bg-emerald-500' : 'bg-amber-500'}" style="width: ${bPct}%"></div>
           </div>
         </div>
 
-        <!-- Tasks -->
+        <!-- Tasks (pasos del bloque) -->
         <div class="divide-y divide-slate-100">
           ${b.tasks.map(t => `
-            <button onclick="toggleTask('${t.id}', this)" class="check-anim w-full text-left p-4 flex items-start gap-3 hover:bg-slate-50">
+            <button onclick="toggleTask('${t.id}')" class="check-anim w-full text-left p-3 md:p-4 flex items-start gap-3 hover:bg-slate-50">
               <div class="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full border-2 ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'} flex items-center justify-center transition">
                 ${t.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
               </div>
-              <div class="flex-1 ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'} text-sm md:text-base">${(t.paso_text || '').replace(/</g,'&lt;')}</div>
+              <div class="flex-1 text-sm md:text-base ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${esc(t.paso_text || '')}</div>
             </button>
           `).join('')}
         </div>
+
+        <!-- Metadata extra del bloque -->
+        ${(meta.criterios_exito?.length || meta.herramientas?.length || meta.errores_comunes?.length) ? `
+          <div class="p-4 md:p-5 bg-slate-50 border-t border-slate-100 space-y-3">
+            ${meta.criterios_exito?.length ? `
+              <div>
+                <div class="text-[10px] uppercase font-bold text-emerald-700 mb-1">✅ Criterios de éxito</div>
+                <ul class="text-xs text-slate-700 space-y-0.5">${meta.criterios_exito.map(c => `<li>• ${esc(c)}</li>`).join('')}</ul>
+              </div>` : ''}
+            ${meta.herramientas?.length ? `
+              <div>
+                <div class="text-[10px] uppercase font-bold text-blue-700 mb-1">🛠 Herramientas</div>
+                <ul class="text-xs text-slate-700 space-y-0.5">${meta.herramientas.map(h => `<li>• ${esc(h)}</li>`).join('')}</ul>
+              </div>` : ''}
+            ${meta.errores_comunes?.length ? `
+              <div>
+                <div class="text-[10px] uppercase font-bold text-red-700 mb-1">⚠️ Errores comunes a evitar</div>
+                <ul class="text-xs text-slate-700 space-y-0.5">${meta.errores_comunes.map(e => `<li>• ${esc(e)}</li>`).join('')}</ul>
+              </div>` : ''}
+          </div>` : ''}
       </div>
     `;
   }).join('');
 
-  // Mostrar mensaje si todo completo
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = TASKS.length;
+  const done = TASKS.filter(t => t.completed).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('total-count').textContent = total;
+  document.getElementById('done-count').textContent = done;
+  document.getElementById('pct').textContent = pct;
+  document.getElementById('prog-bar').style.width = pct + '%';
   if (total > 0 && done === total) {
     document.getElementById('all-done').classList.remove('hidden');
   } else {
@@ -238,23 +401,19 @@ function renderTasks() {
   }
 }
 
-async function toggleTask(taskId, btn) {
+async function toggleTask(taskId) {
   const task = TASKS.find(t => t.id === taskId);
   if (!task) return;
   const newCompleted = !task.completed;
 
-  // Guardar última tarea tocada (para resaltar al volver) + scroll
   try {
     localStorage.setItem('mp_last_task_' + TOKEN, taskId);
     localStorage.setItem('mp_last_scroll_' + TOKEN, String(window.scrollY));
   } catch {}
 
-  // Optimistic UI
   task.completed = newCompleted;
   task.completed_at = newCompleted ? new Date().toISOString() : null;
-  renderTasks();
-
-  // Mini toast "Guardado ✓"
+  renderBloques();
   showSavedToast();
 
   try {
@@ -268,11 +427,9 @@ async function toggleTask(taskId, btn) {
       throw new Error(r.error || 'HTTP ' + res.status);
     }
   } catch (e) {
-    // Rollback
     task.completed = !newCompleted;
-    task.completed_at = !newCompleted ? new Date().toISOString() : null;
-    renderTasks();
-    alert('No pude guardar: ' + e.message + '\n\n(Si el problema sigue, decile a tu mentor.)');
+    renderBloques();
+    alert('No pude guardar: ' + e.message);
   }
 }
 
@@ -282,7 +439,7 @@ function showSavedToast() {
   if (!t) {
     t = document.createElement('div');
     t.id = 'saved-toast';
-    t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg z-50 transition-opacity';
+    t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg z-50 transition-opacity no-print';
     document.body.appendChild(t);
   }
   t.textContent = '✓ Guardado';
@@ -296,7 +453,7 @@ function waitForPlan() {
     <div class="text-center max-w-md p-6">
       <div class="text-6xl mb-3 animate-pulse">🤖</div>
       <h2 class="text-xl font-bold text-slate-900">Armando tu plan...</h2>
-      <p class="text-sm text-slate-600 mt-2">Estamos preparando tu plan de acción personalizado basado en tus respuestas. Esto puede tardar 1-2 minutos.</p>
+      <p class="text-sm text-slate-600 mt-2">Estamos preparando tu plan personalizado. Esto puede tardar 1-2 minutos.</p>
       <div class="h-2 bg-slate-200 rounded-full overflow-hidden mt-4">
         <div class="h-full bg-amber-500 animate-pulse" style="width: 60%"></div>
       </div>
@@ -309,28 +466,23 @@ function waitForPlan() {
     elapsed = Math.round((Date.now() - startTime) / 1000);
     const el = document.getElementById('wait-elapsed');
     if (el) el.textContent = `Esperando ${elapsed}s...`;
-    // Poll para ver si el plan ya está
-    const { data: inv } = await sb
-      .from('edu_diagnostic_invites')
-      .select('result_plan_id')
-      .eq('token', TOKEN)
-      .maybeSingle();
+    const { data: inv } = await sb.from('edu_diagnostic_invites').select('result_plan_id').eq('token', TOKEN).maybeSingle();
     if (inv?.result_plan_id) {
       clearInterval(interval);
-      // Reload para reactivar init() con el plan ya listo
       window.location.reload();
     }
     if (elapsed > 180) {
       clearInterval(interval);
-      document.getElementById('loading-screen').innerHTML = `
-        <div class="text-center max-w-md p-6">
-          <div class="text-5xl mb-3">⏳</div>
-          <h2 class="text-xl font-bold text-slate-900">Tu plan se está demorando</h2>
-          <p class="text-sm text-slate-600 mt-2">Volvé a abrir el link en un par de minutos. Si sigue así, contactá a tu mentor.</p>
-        </div>
-      `;
+      document.getElementById('loading-screen').innerHTML = `<div class="text-center max-w-md p-6"><div class="text-5xl mb-3">⏳</div><h2 class="text-xl font-bold">Tu plan se está demorando</h2><p class="text-sm text-slate-600 mt-2">Volvé en un par de minutos.</p></div>`;
     }
   }, 5000);
+}
+
+function restoreScroll() {
+  try {
+    const saved = +(localStorage.getItem('mp_last_scroll_' + TOKEN) || 0);
+    if (saved > 100) setTimeout(() => window.scrollTo({ top: saved, behavior: 'smooth' }), 300);
+  } catch {}
 }
 
 function showInvalid(msg) {
@@ -339,16 +491,17 @@ function showInvalid(msg) {
   if (msg) document.getElementById('invalid-msg').textContent = msg;
 }
 
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 init().catch(e => showInvalid('Error: ' + e.message));
 
-// Guardar scroll cada 1s mientras el estudiante navega
 let _scrollTimer = null;
 window.addEventListener('scroll', () => {
   clearTimeout(_scrollTimer);
   _scrollTimer = setTimeout(() => {
-    if (TOKEN) {
-      try { localStorage.setItem('mp_last_scroll_' + TOKEN, String(window.scrollY)); } catch {}
-    }
+    if (TOKEN) try { localStorage.setItem('mp_last_scroll_' + TOKEN, String(window.scrollY)); } catch {}
   }, 1000);
 }, { passive: true });
 </script>

@@ -132,6 +132,7 @@ ON CONFLICT (code) DO UPDATE SET stops = EXCLUDED.stops, total_work_min = EXCLUD
 -- 3) AÑADIR campos faltantes a ops_day_tasks para tracking de tiempo REAL
 -- ────────────────────────────────────────────────────────────────────────────
 ALTER TABLE ops_day_tasks
+  ADD COLUMN IF NOT EXISTS property_name           TEXT,
   ADD COLUMN IF NOT EXISTS estimated_duration_min  INTEGER,
   ADD COLUMN IF NOT EXISTS actual_duration_min     INTEGER,
   ADD COLUMN IF NOT EXISTS materials_status        TEXT CHECK (materials_status IN ('pending','ready','missing','na')),

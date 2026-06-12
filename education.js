@@ -3736,6 +3736,48 @@ async function eduProcessPendingInvites() {
         };
         const bloques = fmGenerarBloques(userProfile, answers);
 
+        // ── Capturar TODA la data enriquecida para el portal del estudiante ──
+        let objetivoOperativo = '', reglaPlan = '', analisisProfundo = [], checklistFinal = [], fraseFinal = '', riesgos = [];
+        try { if (typeof fmGenerarObjetivoOperativo === 'function') objetivoOperativo = fmGenerarObjetivoOperativo(userProfile, answers); } catch {}
+        try { if (typeof fmGenerarReglaPlan === 'function') reglaPlan = fmGenerarReglaPlan(perfilResult, answers); } catch {}
+        try { if (typeof fmGenerarAnalisisProfundo === 'function') analisisProfundo = fmGenerarAnalisisProfundo(perfilResult, perfilResult, answers, userProfile); } catch {}
+        try { if (typeof fmGenerarChecklistFinal === 'function') checklistFinal = fmGenerarChecklistFinal(bloques, answers); } catch {}
+        try { if (typeof fmGenerarFraseFinal === 'function') fraseFinal = fmGenerarFraseFinal(userProfile, answers); } catch {}
+        try { if (typeof fmGenerarRiesgos === 'function') riesgos = fmGenerarRiesgos(answers, perfilResult); } catch {}
+
+        // Serializar bloques con TODA la metadata
+        const bloquesData = bloques.map(b => {
+          const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
+          return {
+            id: b.id,
+            etapa: b.etapa || '',
+            subetapa: b.subetapa || '',
+            titulo: b.titulo || '',
+            actividad: typeof b.actividad === 'function' ? b.actividad(userProfile, answers) : (b.actividad || ''),
+            descripcion: b.descripcion || '',
+            tiempo: b.tiempo || '',
+            pasos,
+            criterios_exito: b.criterios_exito || [],
+            herramientas: b.herramientas || [],
+            errores_comunes: b.errores_comunes || []
+          };
+        });
+
+        const fullPlanData = {
+          perfil: perfilResult,
+          userProfile,
+          objetivo_operativo: objetivoOperativo,
+          regla_plan: reglaPlan,
+          analisis_profundo: analisisProfundo,
+          fortalezas: perfilResult.fortalezas || [],
+          riesgos,
+          bloques: bloquesData,
+          checklist_final: checklistFinal,
+          frase_final: fraseFinal,
+          fromInvite: true,
+          generated_at: new Date().toISOString()
+        };
+
         // Archivar plan anterior
         await sb.from('edu_student_plans')
           .update({ status: 'archived', updated_at: new Date().toISOString() })
@@ -3747,7 +3789,7 @@ async function eduProcessPendingInvites() {
           student_id: inv.student_id,
           mentorship_id: inv.mentorship_id,
           diagnostico: answers,
-          perfil: { ...perfilResult, userProfile, fromInvite: true },
+          perfil: fullPlanData,  // ← jsonb con TODO el plan enriquecido
           bloques_ids: bloques.map(b => b.id),
           modo: 'completo',
           status: 'active'
@@ -3800,11 +3842,50 @@ if (typeof window !== 'undefined') {
     setTimeout(() => eduProcessPendingInvites().then(n => {
       if (n > 0 && typeof eduLoadAll === 'function') {
         console.log('[invites] procesados:', n);
+        // Notificación al mentor
+        eduNotifyMentorNewPlans(n);
         eduLoadAll().then(() => typeof eduRender === 'function' && eduRender());
       }
     }), 5000);
-    setInterval(() => eduProcessPendingInvites(), 120000);
+    setInterval(() => eduProcessPendingInvites().then(n => {
+      if (n > 0) {
+        eduNotifyMentorNewPlans(n);
+        if (typeof eduLoadAll === 'function') eduLoadAll().then(() => typeof eduRender === 'function' && eduRender());
+      }
+    }), 120000);
   });
+}
+
+// Notificar al mentor — banner + browser notification si está activado
+function eduNotifyMentorNewPlans(n) {
+  // Browser native notification
+  if (typeof notifySend === 'function' && window.notifyState?.enabled) {
+    notifySend(`🎓 ${n} estudiante${n>1?'s completaron':' completó'} su diagnóstico`, {
+      body: `Plan${n>1?'es':''} generado${n>1?'s':''} y listo${n>1?'s':''} para revisar.`,
+      tag: 'edu-new-plans',
+      data: { url: '/?focus=edu_alerts' }
+    });
+  }
+  // Banner in-app
+  let banner = document.getElementById('edu-new-plans-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'edu-new-plans-banner';
+    banner.className = 'fixed top-4 right-4 z-[300] bg-gradient-to-br from-emerald-500 to-emerald-700 text-white p-4 rounded-2xl shadow-2xl max-w-sm';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `
+    <div class="flex items-start gap-3">
+      <div class="text-2xl">🎓</div>
+      <div class="flex-1">
+        <div class="font-bold text-sm">${n} estudiante${n>1?'s':''} completaron su diagnóstico</div>
+        <div class="text-xs opacity-90 mt-0.5">Plan${n>1?'es':''} listo${n>1?'s':''} para que veas el progreso</div>
+      </div>
+      <button onclick="document.getElementById('edu-new-plans-banner').remove()" class="text-white/80 hover:text-white text-xl leading-none">×</button>
+    </div>
+  `;
+  // Auto-hide después de 30s
+  setTimeout(() => banner?.remove(), 30000);
 }
 
 window.eduShareDiagnosticForm = eduShareDiagnosticForm;
