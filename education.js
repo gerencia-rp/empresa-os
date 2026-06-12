@@ -304,6 +304,9 @@ function eduRenderDashboard() {
         <button onclick="eduSetTab('students')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-4 py-2 rounded-lg whitespace-nowrap">👥 Ir a Estudiantes →</button>
       </div>
 
+      <!-- 🆕 SEGUIMIENTOS DEL DÍA · vista operativa #1 del coach -->
+      ${eduRenderFollowupsToday(students)}
+
       <!-- 🆕 Bridge a los otros 2 sistemas -->
       <div class="grid md:grid-cols-2 gap-3">
         <button onclick="eduOpenSystemFromManager('edu-reports')" class="bg-gradient-to-r from-indigo-900 to-slate-900 hover:from-indigo-800 hover:to-slate-800 text-white rounded-xl p-4 text-left">

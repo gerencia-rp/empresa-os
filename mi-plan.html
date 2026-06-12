@@ -450,16 +450,16 @@ function renderBloques() {
       `;
     }
 
-    // BLOQUE ACTUAL (current) — expandido con TODO el detalle EDUCATIVO
+    // BLOQUE ACTUAL (current) — diseño tipo "ficha del mentor" (PDF) con tareas marcables
     const etapaInfo = getEtapaInfo(b.etapa);
     return `
-      <div class="bg-white rounded-2xl shadow-lg border-2 border-amber-400 overflow-hidden ring-2 ring-amber-200">
+      <div class="bg-white rounded-2xl shadow-xl border-2 border-amber-400 overflow-hidden ring-2 ring-amber-200">
         <!-- Banner FOCO AHORA -->
         <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 text-center">
           <div class="text-[10px] font-bold uppercase tracking-wider">📍 ENFOCATE ACÁ AHORA · BLOQUE ${idx+1} DE ${blocks.length}</div>
         </div>
 
-        <!-- 🧭 MAPA DE ETAPA: dónde estás en el camino global -->
+        <!-- 🧭 MAPA DE ETAPA -->
         ${etapaInfo ? `
           <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white p-4 md:p-5">
             <div class="flex items-center gap-3 mb-2">
@@ -485,57 +485,54 @@ function renderBloques() {
             </div>
           </div>` : ''}
 
-        <!-- Header del bloque -->
-        <div class="p-4 md:p-5 bg-amber-50">
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-start gap-3 flex-1 min-w-0">
-              <div class="w-10 h-10 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
-              <div class="flex-1 min-w-0">
-                <div class="text-[10px] uppercase font-bold tracking-wider text-amber-700">BLOQUE ${idx+1}</div>
-                <div class="text-lg md:text-xl font-bold text-slate-900 mt-0.5">${esc(b.subetapa || 'Bloque')}</div>
-                ${meta.actividad ? `<div class="text-sm text-slate-700 mt-2 leading-relaxed">${esc(meta.actividad)}</div>` : ''}
-                ${meta.tiempo ? `<div class="text-[11px] text-amber-700 font-semibold mt-2">⏱ ${esc(meta.tiempo)}</div>` : ''}
-              </div>
-            </div>
-            <div class="text-right flex-shrink-0">
-              <div class="text-lg font-bold text-slate-900">${bDone}/${bTotal}</div>
-              <div class="text-[10px] text-slate-500">${bPct}%</div>
-            </div>
+        <!-- Header negro tipo PDF: BLOQUE N · ETAPA + título grande -->
+        <div class="bg-slate-900 text-white px-5 py-4 flex items-start gap-3">
+          <div class="w-12 h-12 rounded-full bg-amber-500 text-slate-900 font-bold text-xl flex items-center justify-center flex-shrink-0">${idx+1}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[10px] uppercase font-bold tracking-widest text-amber-400">BLOQUE ${idx+1} · ${esc(b.etapa)}</div>
+            <h3 class="text-xl md:text-2xl font-bold leading-tight mt-1">${esc(b.subetapa || 'Bloque')}</h3>
           </div>
-          <div class="h-2 bg-white/60 rounded-full mt-3 overflow-hidden">
-            <div class="h-full bg-amber-500 transition-all duration-500" style="width: ${bPct}%"></div>
+          <div class="text-right flex-shrink-0">
+            <div class="text-lg font-bold">${bDone}/${bTotal}</div>
+            <div class="text-[10px] text-slate-400">${bPct}%</div>
           </div>
         </div>
+        <!-- Barra progreso del bloque -->
+        <div class="h-1.5 bg-slate-200 overflow-hidden">
+          <div class="h-full bg-amber-500 transition-all duration-500" style="width: ${bPct}%"></div>
+        </div>
 
-        <!-- 📖 POR QUÉ ESTE BLOQUE IMPORTA (observación de la metodología) -->
+        <!-- 📖 OBSERVACIÓN DEL MENTOR (estilo PDF — card azul) -->
         ${meta.observacion || meta.contexto || meta.descripcion ? `
-          <div class="px-4 md:px-5 py-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-t border-blue-100">
-            <div class="flex items-start gap-2">
-              <div class="text-xl">📖</div>
-              <div class="flex-1">
-                <div class="text-[10px] font-bold uppercase tracking-wider text-blue-800 mb-1">POR QUÉ ESTE BLOQUE ES CRÍTICO</div>
-                <div class="text-sm text-slate-800 leading-relaxed">${safeHtml(meta.observacion || meta.contexto || meta.descripcion)}</div>
-              </div>
-            </div>
+          <div class="px-5 py-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-t border-blue-100">
+            <div class="text-[10px] font-bold uppercase tracking-widest text-blue-800 mb-1.5">📖 OBSERVACIÓN DEL MENTOR</div>
+            <div class="text-sm text-slate-800 leading-relaxed">${safeHtml(meta.observacion || meta.contexto || meta.descripcion)}</div>
           </div>` : ''}
 
-        <!-- 🎯 ENTREGABLE (qué tenés que producir) -->
-        ${meta.entregable ? `
-          <div class="px-4 md:px-5 py-3 bg-emerald-50 border-t border-emerald-100">
-            <div class="flex items-start gap-2">
-              <div class="text-xl">🎯</div>
-              <div class="flex-1">
-                <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-1">QUÉ VAS A LOGRAR (entregable concreto)</div>
-                <div class="text-sm text-slate-800 leading-relaxed">${safeHtml(meta.entregable)}</div>
-              </div>
-            </div>
-          </div>` : ''}
+        <!-- Tabla formal estilo PDF: Tiempo / Actividad / Entregable -->
+        <div class="divide-y divide-slate-200 border-t border-slate-200">
+          ${meta.tiempo ? `
+            <div class="grid grid-cols-12 gap-3 px-5 py-3">
+              <div class="col-span-12 md:col-span-3 text-[11px] font-bold text-slate-600 flex items-center gap-1">⏱ TIEMPO ESTIMADO</div>
+              <div class="col-span-12 md:col-span-9 text-sm text-slate-800">${esc(meta.tiempo)}</div>
+            </div>` : ''}
+          ${meta.actividad ? `
+            <div class="grid grid-cols-12 gap-3 px-5 py-3 bg-slate-50/50">
+              <div class="col-span-12 md:col-span-3 text-[11px] font-bold text-slate-600 flex items-center gap-1">🎯 ACTIVIDAD</div>
+              <div class="col-span-12 md:col-span-9 text-sm text-slate-800 leading-relaxed">${esc(meta.actividad)}</div>
+            </div>` : ''}
+          ${meta.entregable ? `
+            <div class="grid grid-cols-12 gap-3 px-5 py-3 bg-emerald-50/40">
+              <div class="col-span-12 md:col-span-3 text-[11px] font-bold text-emerald-700 flex items-center gap-1">📦 ENTREGABLE</div>
+              <div class="col-span-12 md:col-span-9 text-sm font-bold text-slate-900 leading-relaxed">${safeHtml(meta.entregable)}</div>
+            </div>` : ''}
+        </div>
 
-        <!-- 📋 TAREAS PASO A PASO -->
-        <div class="p-3 md:p-4 border-t border-slate-100">
-          <div class="flex items-center justify-between mb-2 px-1">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-600">📋 Pasos a ejecutar (marcalos al terminarlos)</div>
-            <div class="text-[10px] text-slate-500">${bDone}/${bTotal} hechos</div>
+        <!-- 📝 PASO A PASO (tareas interactivas, equivalentes a "Paso a paso" del PDF) -->
+        <div class="px-5 py-4 border-t border-slate-200 bg-white">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-[11px] font-bold uppercase tracking-widest text-slate-700">📝 PASO A PASO</div>
+            <div class="text-[10px] text-slate-500">${bDone}/${bTotal} hechos · marcalos al completar</div>
           </div>
           <div class="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
             ${b.tasks.map((t, ti) => `
@@ -551,42 +548,37 @@ function renderBloques() {
 
         <!-- ✅ CRITERIOS DE ÉXITO -->
         ${meta.criterios_exito?.length ? `
-          <div class="px-4 md:px-5 py-3 bg-emerald-50/50 border-t border-emerald-100">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-2">✅ CÓMO SABÉS QUE EL BLOQUE ESTÁ LISTO</div>
+          <div class="px-5 py-3 bg-emerald-50/60 border-t border-emerald-100">
+            <div class="text-[11px] font-bold uppercase tracking-widest text-emerald-800 mb-2">✅ CÓMO SABÉS QUE EL BLOQUE ESTÁ LISTO</div>
             <ul class="text-sm text-slate-700 space-y-1.5">
               ${meta.criterios_exito.map(c => `<li class="flex gap-2"><span class="text-emerald-600 font-bold">✓</span><span class="flex-1">${safeHtml(c)}</span></li>`).join('')}
             </ul>
           </div>` : ''}
 
-        <!-- 🛠 HERRAMIENTAS + RECURSOS CON LINKS -->
-        ${(meta.herramientas?.length || meta.recursos?.length) ? `
-          <div class="px-4 md:px-5 py-3 bg-blue-50/60 border-t border-blue-100">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-blue-800 mb-2">🛠 HERRAMIENTAS Y RECURSOS PARA EJECUTAR</div>
-            ${meta.herramientas?.length ? `
-              <ul class="text-sm text-slate-700 space-y-1 mb-2">
-                ${meta.herramientas.map(h => `<li class="flex gap-2"><span class="text-blue-600">•</span><span class="flex-1">${safeHtml(h)}</span></li>`).join('')}
-              </ul>` : ''}
+        <!-- 🔗 RECURSOS Y HERRAMIENTAS (estilo PDF: links visibles con descripción) -->
+        ${(meta.recursos?.length || meta.herramientas?.length) ? `
+          <div class="px-5 py-3 bg-blue-50/50 border-t border-blue-100">
+            <div class="text-[11px] font-bold uppercase tracking-widest text-blue-800 mb-2">🔗 RECURSOS Y HERRAMIENTAS</div>
             ${meta.recursos?.length ? `
-              <div class="space-y-1.5 mt-2">
+              <div class="space-y-1.5">
                 ${meta.recursos.map(r => `
-                  <a href="${esc(r.url || '#')}" target="_blank" rel="noopener" class="block bg-white rounded border border-blue-200 p-2 hover:border-blue-400 hover:shadow-sm transition">
-                    <div class="flex items-center gap-2">
-                      <div class="text-blue-600 text-sm">🔗</div>
-                      <div class="flex-1 min-w-0">
-                        <div class="text-sm font-bold text-blue-900 truncate">${esc(r.nombre || 'Recurso')}</div>
-                        ${r.desc ? `<div class="text-xs text-slate-600 truncate">${esc(r.desc)}</div>` : ''}
-                      </div>
-                      <div class="text-blue-400 text-xs">↗</div>
-                    </div>
+                  <a href="${esc(r.url || '#')}" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm hover:bg-blue-100/60 rounded px-2 py-1 transition">
+                    <span class="text-blue-700 font-semibold hover:underline">${esc(r.nombre || 'Recurso')}</span>
+                    ${r.desc ? `<span class="text-slate-600 text-xs">— ${esc(r.desc)}</span>` : ''}
+                    <span class="text-blue-400 text-[10px] ml-auto">↗</span>
                   </a>
                 `).join('')}
               </div>` : ''}
+            ${meta.herramientas?.length ? `
+              <ul class="text-sm text-slate-700 space-y-1 ${meta.recursos?.length?'mt-2 pt-2 border-t border-blue-100':''}">
+                ${meta.herramientas.map(h => `<li class="flex gap-2"><span class="text-blue-600">•</span><span class="flex-1">${safeHtml(h)}</span></li>`).join('')}
+              </ul>` : ''}
           </div>` : ''}
 
-        <!-- ⚠️ ERRORES COMUNES -->
+        <!-- ⚠️ ERRORES REALES QUE VEO TODO EL TIEMPO (estilo PDF) -->
         ${meta.errores_comunes?.length ? `
-          <div class="px-4 md:px-5 py-3 bg-red-50/60 border-t border-red-100">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-red-800 mb-2">⚠️ NO COMETAS ESTOS ERRORES (los más comunes)</div>
+          <div class="px-5 py-3 bg-red-50/60 border-t border-red-100">
+            <div class="text-[11px] font-bold uppercase tracking-widest text-red-800 mb-2">⚠️ ERRORES REALES QUE VEO TODO EL TIEMPO</div>
             <ul class="text-sm text-slate-700 space-y-1.5">
               ${meta.errores_comunes.map(e => `<li class="flex gap-2"><span class="text-red-600 font-bold">✗</span><span class="flex-1">${safeHtml(e)}</span></li>`).join('')}
             </ul>

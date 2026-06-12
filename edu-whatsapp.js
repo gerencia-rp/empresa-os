@@ -822,15 +822,112 @@ function eduCleanPhone(phone, defaultCC) {
   return c;
 }
 
-// Plantillas rápidas comunes
+// ════════════════════════════════════════════════════════════════
+// Plantillas WA — categorizadas por SITUACIÓN del coach
+// Soportan placeholders: {nombre}, {etapa}, {tarea}, {dias_sin_contacto}, {progreso}
+// ════════════════════════════════════════════════════════════════
 const EDU_WA_TEMPLATES = [
-  { id: 'check', label: '👋 Check-in', text: 'Hola {nombre}, ¿cómo va todo? Hace tiempo no hablamos. ¿En qué puedo ayudarte esta semana?' },
-  { id: 'sesion', label: '📅 Recordatorio sesión', text: 'Hola {nombre}, te recuerdo que tenemos sesión mañana. ¿Confirmás? Cualquier cosa avisame.' },
-  { id: 'tarea', label: '✅ Pregunta por tarea', text: 'Hola {nombre}, ¿cómo vas con la tarea que quedó pendiente de la última sesión? Si tenés dudas, decime.' },
-  { id: 'pago', label: '💰 Recordatorio pago', text: 'Hola {nombre}, te paso recordatorio amable que el pago de la mentoría está pendiente. Si querés, mandame el comprobante por acá.' },
-  { id: 'agendar', label: '📆 Agendar sesión', text: 'Hola {nombre}, necesitamos agendar la próxima sesión. ¿Qué día te queda mejor esta semana? Tengo lunes y miércoles disponibles.' },
-  { id: 'felic', label: '🎉 Felicitación', text: 'Hola {nombre}, vi que avanzaste mucho. Felicitaciones por el esfuerzo. Seguí así.' }
+  // 🔥 Seguimiento operativo
+  { id: 'tarea',    cat: 'seguimiento', label: '✅ Pregunta por tarea', text: 'Hola {nombre}, ¿cómo vas con: "{tarea}"? Es la tarea que tenés priorizada esta semana. Si tenés dudas o trabaste, decime y la revisamos.' },
+  { id: 'check',    cat: 'seguimiento', label: '👋 Check-in', text: 'Hola {nombre}, ¿cómo va todo en {etapa}? Hace {dias_sin_contacto} días no hablamos. ¿Algo en lo que te pueda ayudar?' },
+  { id: 'recordatorio_plan', cat: 'seguimiento', label: '📋 Recordá tu plan', text: 'Hola {nombre}, te recuerdo que tu plan de acción está en el portal. Esta semana toca enfocarte en: "{tarea}". Te dejo el link en el siguiente mensaje.' },
+  { id: 'cerrar_semana', cat: 'seguimiento', label: '🗓 Cierre semana', text: 'Hola {nombre}, cerrando la semana — ¿qué pudiste avanzar de tu plan? Mandame 2-3 líneas y te paso feedback puntual.' },
+
+  // 📅 Sesiones
+  { id: 'agendar',  cat: 'sesion', label: '📆 Agendar sesión', text: 'Hola {nombre}, ya nos toca agendar la próxima sesión. ¿Qué día te queda mejor esta semana? Tengo martes y jueves.' },
+  { id: 'sesion',   cat: 'sesion', label: '⏰ Recordatorio sesión', text: 'Hola {nombre}, te recuerdo nuestra sesión mañana. Si podés, llegá con: dudas concretas, lo que ya hiciste, y bloqueos. Así avanzamos en serio.' },
+  { id: 'post_sesion', cat: 'sesion', label: '📝 Post-sesión', text: 'Hola {nombre}, gracias por la sesión. Te dejo los 3 commitments que cerramos:\n\n1.\n2.\n3.\n\nNos hablamos el viernes para revisar avance.' },
+
+  // 🎉 Motivación / refuerzo
+  { id: 'felic',    cat: 'refuerzo', label: '🎉 Felicitación logro', text: 'Hola {nombre}, vi que completaste {progreso} de tu plan. Buen ritmo. Seguí así — los resultados llegan con consistencia.' },
+  { id: 'animar',   cat: 'refuerzo', label: '💪 Animar (semana floja)', text: 'Hola {nombre}, hace {dias_sin_contacto} días no te veo activo en el portal. Sé que tener un negocio es complicado — ¿qué te está frenando? Hablemos.' },
+
+  // 🚨 Riesgo / alerta
+  { id: 'riesgo',   cat: 'alerta', label: '🚨 Reactivación riesgo', text: 'Hola {nombre}, te escribo porque te veo bajado de ritmo. Mi compromiso es que TE FUNCIONE la mentoría. Decime cuándo podemos hablar 15 minutos esta semana y vemos cómo desbloquearte.' },
+  { id: 'pago',     cat: 'alerta', label: '💰 Recordatorio pago', text: 'Hola {nombre}, te paso recordatorio amable que el pago está pendiente. Si necesitás coordinar fecha o forma, decime por acá.' },
+
+  // 🎯 Diagnóstico / onboarding
+  { id: 'diag_invite', cat: 'onboarding', label: '📨 Invitación diagnóstico', text: 'Hola {nombre}, antes de nuestra primera sesión completá este diagnóstico (5-7 min). Es la base de tu plan personalizado. Te paso el link en el siguiente mensaje.' },
+  { id: 'portal_recordar', cat: 'onboarding', label: '🔗 Mandá portal', text: 'Hola {nombre}, te paso de nuevo el link a tu portal donde está tu plan completo y podés marcar tareas a medida que las completás:' }
 ];
+
+// Plantillas legacy (mantener IDs para no romper integraciones)
+const EDU_WA_TEMPLATE_CATS = [
+  { key: 'seguimiento', label: '🔥 Seguimiento operativo', color: 'bg-blue-100 text-blue-800' },
+  { key: 'sesion',      label: '📅 Sesiones',              color: 'bg-purple-100 text-purple-800' },
+  { key: 'refuerzo',    label: '🎉 Refuerzo',              color: 'bg-emerald-100 text-emerald-800' },
+  { key: 'alerta',      label: '🚨 Riesgo / alerta',       color: 'bg-red-100 text-red-800' },
+  { key: 'onboarding',  label: '🎯 Onboarding',            color: 'bg-amber-100 text-amber-800' }
+];
+
+// ════════════════════════════════════════════════════════════════
+// Helpers de contexto para sustituir placeholders {tarea}, {etapa}, {progreso}, {dias_sin_contacto}
+// ════════════════════════════════════════════════════════════════
+function eduGetStudentContext(studentId) {
+  const s = (window.eduState?.students || []).find(x => x.id === studentId);
+  if (!s) return {};
+  const m = (window.eduState?.mentorships || []).find(x => x.id === s.mentorship_id);
+  const stage = m?.stages?.find(st => st.key === s.current_stage);
+  // última tarea pendiente (mejor estimate)
+  let tareaPendiente = '';
+  try {
+    const tasks = (window.eduState?.studentTasks || []).filter(t => t.student_id === studentId && !t.completed_at);
+    tareaPendiente = (tasks[0]?.title || tasks[0]?.task_name || '').slice(0, 80);
+  } catch (e) {}
+  // días sin contacto
+  let dias = '';
+  if (s.last_contact_at) {
+    dias = String(Math.floor((Date.now() - new Date(s.last_contact_at).getTime()) / 86400000));
+  } else {
+    dias = '?';
+  }
+  // % progreso (best-effort)
+  let progreso = '';
+  if (s.completion_pct != null) progreso = s.completion_pct + '%';
+  else if (s.glscore != null) progreso = 'GLScore ' + s.glscore;
+  return {
+    nombre: (s.full_name || '').split(' ')[0] || 'amigo',
+    etapa: stage?.name || s.current_stage || 'tu etapa actual',
+    tarea: tareaPendiente || 'tu próxima tarea del plan',
+    dias_sin_contacto: dias,
+    progreso: progreso || 'tu avance'
+  };
+}
+
+function eduFillTemplate(text, ctx) {
+  return (text || '').replace(/\{(\w+)\}/g, (m, k) => ctx[k] != null ? ctx[k] : m);
+}
+
+// ════════════════════════════════════════════════════════════════
+// Log de interacción — graba en edu_student_interactions
+// (silencioso si la tabla no existe — primera vez que corren el schema)
+// ════════════════════════════════════════════════════════════════
+async function eduLogInteraction(studentId, payload) {
+  try {
+    if (typeof sb === 'undefined' || !studentId) return;
+    const s = (window.eduState?.students || []).find(x => x.id === studentId);
+    await sb.from('edu_student_interactions').insert({
+      student_id: studentId,
+      mentorship_id: s?.mentorship_id || null,
+      coach_id: (window.state?.user?.id) || null,
+      channel: payload.channel || 'whatsapp',
+      direction: payload.direction || 'outbound',
+      template_id: payload.template_id || null,
+      template_label: payload.template_label || null,
+      subject: payload.subject || null,
+      body: payload.body || null,
+      outcome: payload.outcome || 'sent',
+      occurred_at: new Date().toISOString()
+    });
+  } catch (e) {
+    // No bloqueo el flujo si falla — solo log
+    console.warn('[eduLogInteraction] no se pudo loguear:', e?.message || e);
+  }
+}
+window.eduLogInteraction = eduLogInteraction;
+window.eduGetStudentContext = eduGetStudentContext;
+window.eduFillTemplate = eduFillTemplate;
+window.EDU_WA_TEMPLATE_CATS = EDU_WA_TEMPLATE_CATS;
 
 function eduOpenWhatsappQuick(studentId, opts) {
   opts = opts || {};
@@ -841,12 +938,38 @@ function eduOpenWhatsappQuick(studentId, opts) {
   const initialMsg = opts.message || '';
   const cc = eduGetDefaultCountryCode();
 
+  // Contexto del estudiante para mostrar info útil
+  const ctx = s ? eduGetStudentContext(s.id) : null;
+  const days = ctx?.dias_sin_contacto;
+  const ctxBadge = ctx ? `
+    <div class="grid grid-cols-3 gap-1 mt-2">
+      <div class="bg-white border border-emerald-200 rounded p-1 text-center">
+        <div class="text-[9px] uppercase text-emerald-700 font-bold">Etapa</div>
+        <div class="text-[11px] font-semibold text-slate-900 truncate">${(ctx.etapa||'—').replace(/</g,'&lt;')}</div>
+      </div>
+      <div class="bg-white border border-emerald-200 rounded p-1 text-center">
+        <div class="text-[9px] uppercase text-emerald-700 font-bold">Sin contacto</div>
+        <div class="text-[11px] font-semibold ${parseInt(days)>14?'text-red-600':parseInt(days)>7?'text-amber-600':'text-emerald-700'}">${days||'?'} días</div>
+      </div>
+      <div class="bg-white border border-emerald-200 rounded p-1 text-center">
+        <div class="text-[9px] uppercase text-emerald-700 font-bold">Tarea</div>
+        <div class="text-[11px] font-semibold text-slate-900 truncate" title="${(ctx.tarea||'').replace(/"/g,'&quot;')}">${(ctx.tarea||'—').slice(0,20).replace(/</g,'&lt;')}</div>
+      </div>
+    </div>` : '';
+
+  // Agrupar templates por categoría
+  const byCategory = EDU_WA_TEMPLATE_CATS.map(c => ({
+    ...c,
+    templates: EDU_WA_TEMPLATES.filter(t => t.cat === c.key)
+  })).filter(c => c.templates.length);
+
   openModal('💬 Enviar WhatsApp', `
-    <div class="space-y-3">
+    <div class="space-y-3" ${s ? `data-student-id="${s.id}"` : ''}>
       ${s ? `
         <div class="bg-emerald-50 border border-emerald-200 rounded p-2">
           <div class="font-bold text-sm">${(s.full_name||'—').replace(/</g,'&lt;')}</div>
-          <div class="text-[10px] text-slate-600">${(s.grupo || s.current_stage || '').replace(/</g,'&lt;')}</div>
+          <div class="text-[10px] text-slate-600">${(s.grupo || '').replace(/</g,'&lt;')}</div>
+          ${ctxBadge}
         </div>
       ` : ''}
 
@@ -863,15 +986,23 @@ function eduOpenWhatsappQuick(studentId, opts) {
       <div class="text-[10px] text-slate-500">Si tu número ya incluye código país, igual funciona — lo limpio yo.</div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Plantillas rápidas</label>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-1">
-          ${EDU_WA_TEMPLATES.map(t => `<button type="button" onclick="eduApplyTemplate('${t.id}', ${s ? `'${(s.full_name||'').replace(/'/g,"\\'")}'` : 'null'})" class="text-[11px] bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-1 text-left">${t.label}</button>`).join('')}
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Plantillas inteligentes (con contexto del estudiante)</label>
+        <div class="space-y-2">
+          ${byCategory.map(c => `
+            <div>
+              <div class="text-[9px] font-bold uppercase ${c.color} inline-block px-1.5 py-0.5 rounded mb-1">${c.label}</div>
+              <div class="flex flex-wrap gap-1">
+                ${c.templates.map(t => `<button type="button" onclick="eduApplyTemplate('${t.id}', ${s ? `'${(s.full_name||'').replace(/'/g,"\\'")}'` : 'null'})" class="text-[11px] bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-1 text-left">${t.label}</button>`).join('')}
+              </div>
+            </div>
+          `).join('')}
         </div>
       </div>
 
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Mensaje</label>
         <textarea id="wa-msg" rows="6" class="w-full border border-emerald-300 rounded p-2 text-sm" placeholder="Escribí tu mensaje o usá una plantilla...">${initialMsg.replace(/</g,'&lt;')}</textarea>
+        ${s ? `<div class="text-[9px] text-slate-500 mt-0.5">💡 Las plantillas reemplazan automáticamente {nombre}, {etapa}, {tarea}, {dias_sin_contacto} y {progreso} con datos reales del estudiante.</div>` : ''}
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
@@ -888,8 +1019,22 @@ function eduApplyTemplate(templateId, studentName) {
   if (!t) return;
   const ta = document.getElementById('wa-msg');
   if (!ta) return;
-  const nombre = (studentName || 'tú').split(' ')[0]; // sólo primer nombre
-  ta.value = t.text.replace(/\{nombre\}/g, nombre);
+  // Si tenemos studentId en el modal (data attr), usamos el contexto completo
+  const modal = document.getElementById('modal');
+  const studentId = modal?.querySelector('[data-student-id]')?.dataset?.studentId
+    || modal?.dataset?.studentId
+    || null;
+  let ctx;
+  if (studentId && typeof eduGetStudentContext === 'function') {
+    ctx = eduGetStudentContext(studentId);
+  } else {
+    const nombre = (studentName || 'tú').split(' ')[0];
+    ctx = { nombre, etapa: 'tu etapa', tarea: 'tu próxima tarea', dias_sin_contacto: '?', progreso: 'tu avance' };
+  }
+  ta.value = eduFillTemplate(t.text, ctx);
+  // Guardar template_id en data attr del textarea para loguear después
+  ta.dataset.templateId = t.id;
+  ta.dataset.templateLabel = t.label;
   ta.focus();
 }
 
@@ -905,7 +1050,8 @@ function eduCopyWaMessage() {
 function eduSendWaQuick(studentId) {
   const cc = (document.getElementById('wa-cc').value || '52').replace(/\D/g,'');
   const phoneInput = (document.getElementById('wa-phone').value || '').replace(/\D/g,'');
-  const msg = (document.getElementById('wa-msg').value || '').trim();
+  const ta = document.getElementById('wa-msg');
+  const msg = (ta?.value || '').trim();
   if (!phoneInput) return alert('Falta el número.');
   if (!msg) return alert('Falta el mensaje.');
 
@@ -924,6 +1070,20 @@ function eduSendWaQuick(studentId) {
     // Pop-up bloqueado — copiar y mostrar
     navigator.clipboard.writeText(url).then(() => alert('⚠️ El navegador bloqueó el popup. Copié el link al portapapeles — pegalo en una pestaña nueva.'));
     return;
+  }
+  // 🆕 Loguear interacción si tenemos studentId (no bloqueante)
+  if (studentId && typeof eduLogInteraction === 'function') {
+    eduLogInteraction(studentId, {
+      channel: 'whatsapp',
+      direction: 'outbound',
+      template_id: ta?.dataset?.templateId || 'manual',
+      template_label: ta?.dataset?.templateLabel || 'Manual',
+      subject: (msg.split('\n')[0] || '').slice(0, 80),
+      body: msg,
+      outcome: 'sent'
+    });
+    // Refrescar UI suavemente para que se vea last_contact_at actualizado
+    setTimeout(() => { if (typeof eduRender === 'function') eduRender(); }, 600);
   }
   closeModal();
 }
