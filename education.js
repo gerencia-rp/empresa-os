@@ -2890,27 +2890,63 @@ function fmRenderSavedPlansSection() {
   `;
 }
 
-function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
-  // Cerrar Metodología (si está en modal) y abrir Mentorías Manager con ese estudiante
-  // Como las funciones de eduState pueden no estar inicializadas, hacemos guardar en localStorage hint y recargamos
-  localStorage.setItem('edu_open_plan', JSON.stringify({ studentId, mentorshipId, ts: Date.now() }));
-  // Si fmState.sys está disponible, cerrar modal
-  alert(`Abriendo plan en Mentorías Manager...\n\nEstudiante ID: ${studentId.slice(0,8)}...`);
-  // Cierre y abre el manager
-  if (typeof closeModal === 'function') closeModal();
-  // Buscar sistema edu-manager y abrirlo
-  if (typeof state !== 'undefined' && state?.areas) {
-    const sys = (window._allSystems || []).find(s => s.type === 'edu-manager');
-    if (sys && typeof openEduManager === 'function') {
-      eduState.mentorshipId = mentorshipId;
-      eduState.selectedStudentId = studentId;
-      eduState.tab = 'student_plan';
-      openEduManager(sys);
-      setTimeout(() => eduLoadStudentPlan(studentId).then(eduRender), 500);
-      return;
-    }
+async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
+  console.log('[fmAbrirPlanGuardado] plan:', planId, 'student:', studentId);
+
+  // Cerrar el modal actual de Metodología si está abierto
+  if (typeof closeModal === 'function') {
+    try { closeModal(); } catch {}
   }
-  window.location.reload();
+
+  // Setear el state del manager
+  if (typeof eduState !== 'undefined') {
+    if (mentorshipId) eduState.mentorshipId = mentorshipId;
+    eduState.selectedStudentId = studentId;
+    eduState.tab = 'student_plan';
+  }
+
+  // Buscar el sistema edu-manager en TODAS las áreas (no solo current)
+  let eduSys = null;
+  try {
+    const areas = state?.areas || [];
+    for (const area of areas) {
+      const sys = (area.systems || []).find(s => s.type === 'edu-manager');
+      if (sys) { eduSys = sys; break; }
+    }
+  } catch (e) { console.warn('search sys', e); }
+
+  // Si encontramos el sistema, abrirlo
+  if (eduSys && typeof openEduManager === 'function') {
+    await openEduManager(eduSys);
+    // Cargar el plan específico
+    if (typeof eduLoadStudentPlan === 'function') {
+      try {
+        await eduLoadStudentPlan(studentId);
+        if (typeof eduRender === 'function') eduRender();
+      } catch (e) { console.warn('loadStudentPlan', e); }
+    }
+    return;
+  }
+
+  // Fallback: si no encuentra el sistema, buscar por nombre / área Educación
+  try {
+    const areas = state?.areas || [];
+    const eduArea = areas.find(a => /educac/i.test(a.name || ''));
+    if (eduArea) {
+      const sys = (eduArea.systems || []).find(s => s.type === 'edu-manager') || eduArea.systems?.[0];
+      if (sys && typeof openEduManager === 'function') {
+        await openEduManager(sys);
+        if (typeof eduLoadStudentPlan === 'function') {
+          await eduLoadStudentPlan(studentId);
+          if (typeof eduRender === 'function') eduRender();
+        }
+        return;
+      }
+    }
+  } catch (e) { console.warn('fallback', e); }
+
+  // Último recurso: alert con instrucciones (sin reload)
+  alert('No encontré el sistema "Mentorías Manager" para abrir el plan.\n\nAndá a Educación → Mentorías Manager → buscá el estudiante → Plan Acción.');
 }
 
 // ============================================================
