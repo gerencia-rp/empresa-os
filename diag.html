@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico FlipMentoría · Rental Profitss</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/config.public.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style> body { font-family: 'Inter', system-ui, sans-serif; } </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 min-h-screen">
+
+<!-- LOADING -->
+<div id="loading-screen" class="fixed inset-0 flex items-center justify-center bg-white/80 backdrop-blur z-50">
+  <div class="text-center">
+    <div class="text-4xl mb-2 animate-pulse">📋</div>
+    <div class="text-sm text-slate-600">Cargando tu diagnóstico...</div>
+  </div>
+</div>
+
+<!-- INVALID -->
+<div id="invalid-screen" class="hidden fixed inset-0 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl max-w-md p-6 text-center">
+    <div class="text-5xl mb-3">⚠️</div>
+    <h1 class="text-xl font-bold text-slate-900">Link inválido o expirado</h1>
+    <p id="invalid-msg" class="text-sm text-slate-600 mt-2">Pedile a tu mentor un link nuevo.</p>
+  </div>
+</div>
+
+<!-- WIZARD -->
+<div id="wizard" class="hidden max-w-4xl mx-auto p-4 md:p-6">
+  <!-- Header -->
+  <div class="bg-white rounded-2xl shadow-sm p-4 md:p-6 mb-4">
+    <div class="flex items-center gap-3">
+      <div class="text-3xl">🚀</div>
+      <div>
+        <h1 class="text-lg md:text-xl font-bold text-slate-900">Diagnóstico FlipMentoría</h1>
+        <p class="text-xs md:text-sm text-slate-600">Hola <span id="student-name" class="font-bold">amigo</span>, contestá estas 21 preguntas y armo tu plan de acción personalizado.</p>
+      </div>
+    </div>
+    <!-- Progreso -->
+    <div class="mt-4">
+      <div class="flex items-center justify-between text-xs text-slate-600 mb-1">
+        <span>Pregunta <span id="q-current">1</span> de <span id="q-total">21</span></span>
+        <span id="q-pct">5%</span>
+      </div>
+      <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div id="q-bar" class="h-full bg-gradient-to-r from-amber-500 to-orange-600 transition-all" style="width: 5%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pregunta -->
+  <div id="question-card" class="bg-white rounded-2xl shadow-sm p-5 md:p-6 mb-4">
+    <div id="q-section" class="text-xs font-bold uppercase text-amber-700 tracking-wider">A · OBJETIVO</div>
+    <h2 id="q-text" class="text-xl md:text-2xl font-bold text-slate-900 mt-2 leading-tight">Pregunta cargando...</h2>
+
+    <div id="q-options" class="mt-5 space-y-2"></div>
+  </div>
+
+  <!-- Nav -->
+  <div class="flex gap-3 justify-between">
+    <button id="btn-prev" onclick="prevQuestion()" class="px-5 py-3 text-sm font-bold text-slate-600 hover:text-slate-900">← Atrás</button>
+    <button id="btn-next" onclick="nextQuestion()" disabled class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl shadow disabled:opacity-40 disabled:cursor-not-allowed">Siguiente →</button>
+  </div>
+</div>
+
+<!-- DONE -->
+<div id="done-screen" class="hidden max-w-2xl mx-auto p-6">
+  <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
+    <div class="text-6xl mb-3">🎉</div>
+    <h1 class="text-2xl font-bold text-slate-900">¡Listo!</h1>
+    <p class="text-slate-700 mt-2">Recibí tu diagnóstico. Tu mentor ya tiene tu plan de acción personalizado.</p>
+    <div id="done-summary" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4 text-left text-sm"></div>
+    <p class="text-xs text-slate-500 mt-4">Ya podés cerrar esta pestaña. Tu mentor te va a contactar para revisar el plan juntos.</p>
+  </div>
+</div>
+
+<script>
+const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+// Preguntas del diagnóstico (deben coincidir con fmDiagPreguntas del sistema principal)
+// Las cargo dinámicamente desde la app real para mantenerlas sincronizadas.
+let QUESTIONS = [];
+let CURRENT_INDEX = 0;
+let ANSWERS = {};
+let INVITE = null;
+
+// Wrapper para cargar el script principal y conseguir las preguntas
+async function loadQuestionsFromMainApp() {
+  // Embedded: definimos las preguntas acá para no tener dependencia.
+  // Si cambia el master en el app, hay que actualizar acá también.
+  // Es la misma lista que está en edu/edu-fm-diagnostico.js
+  return [
+    { id: 'objetivo', section: 'A · OBJETIVO', text: '¿Cuál es tu resultado objetivo en los próximos 12 meses?',
+      options: [
+        { val: 'flip', label: '🏠 Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
+        { val: 'hold', label: '🏘️ Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
+        { val: 'hibrido', label: '🔀 Mix flips + holds' },
+        { val: 'escalar', label: '🚀 Escalar negocio existente (sistemas, equipo, múltiples deals)' },
+        { val: 'lender', label: '💰 Ser private money lender (prestar capital, no operar)' }
+      ]},
+    { id: 'flips_cerrados', section: 'A · OBJETIVO', text: '¿Cuántos flips cerraste en los últimos 12 meses?',
+      options: [
+        { val: '0', label: '0 flips (nuevo o aprendiendo)' },
+        { val: '1-3', label: '1-3 flips' },
+        { val: '4-10', label: '4-10 flips' },
+        { val: '10+', label: '10+ flips' }
+      ]},
+    { id: 'holds', section: 'A · OBJETIVO', text: '¿Cuántas propiedades tenés en hold (renta)?',
+      options: [
+        { val: '0', label: '0 holds' },
+        { val: '1-2', label: '1-2 holds' },
+        { val: '3-5', label: '3-5 holds' },
+        { val: '6+', label: '6+ holds' }
+      ]},
+    { id: 'capital_disponible', section: 'B · CAPITAL', text: '¿Cuánto capital líquido (cash) tenés disponible HOY para invertir?',
+      options: [
+        { val: '0-25k', label: '$0 - $25k' },
+        { val: '25-75k', label: '$25k - $75k' },
+        { val: '75-150k', label: '$75k - $150k' },
+        { val: '150-300k', label: '$150k - $300k' },
+        { val: '300k+', label: '$300k+' }
+      ]},
+    { id: 'fico', section: 'B · CAPITAL', text: '¿Cuál es tu score FICO actual? (si no estás seguro, da un estimado)',
+      options: [
+        { val: '<620', label: 'Menos de 620 (necesito trabajar el crédito)' },
+        { val: '620-680', label: '620-680 (regular)' },
+        { val: '680-740', label: '680-740 (bueno)' },
+        { val: '740+', label: '740+ (excelente)' },
+        { val: 'no_se', label: 'No sé / no tengo' }
+      ]},
+    { id: 'dti', section: 'B · CAPITAL', text: '¿Conocés tu Debt-to-Income Ratio (DTI)?',
+      options: [
+        { val: '<35', label: 'Menos de 35% (muy bueno)' },
+        { val: '35-45', label: '35-45% (aceptable)' },
+        { val: '45+', label: '45%+ (alto)' },
+        { val: 'no_se', label: 'No sé' }
+      ]},
+    { id: 'ingresos_w2', section: 'B · CAPITAL', text: '¿Tenés ingresos W2 (empleo formal con paystubs)?',
+      options: [
+        { val: 'si_alto', label: 'Sí, ingresos altos estables (75k+)' },
+        { val: 'si_medio', label: 'Sí, ingresos medios (40-75k)' },
+        { val: 'si_bajo', label: 'Sí, ingresos bajos (<40k)' },
+        { val: 'no_self', label: 'No, soy self-employed / 1099' },
+        { val: 'no', label: 'No tengo ingresos formales' }
+      ]},
+    { id: 'reservas', section: 'B · CAPITAL', text: '¿Cuántos meses de gastos personales tenés guardados como reserva?',
+      options: [
+        { val: '0', label: 'Sin reservas' },
+        { val: '1-2', label: '1-2 meses' },
+        { val: '3-6', label: '3-6 meses' },
+        { val: '6+', label: '6+ meses' }
+      ]},
+    { id: 'tiene_llc', section: 'C · FUNDACION', text: '¿Tenés LLC armada para hacer real estate?',
+      options: [
+        { val: 'si', label: 'Sí, LLC activa' },
+        { val: 'en_proceso', label: 'En proceso de armarla' },
+        { val: 'no', label: 'No tengo todavía' }
+      ]},
+    { id: 'tiene_banco_negocio', section: 'C · FUNDACION', text: '¿Tenés cuenta de banco de negocio separada (no personal)?',
+      options: [
+        { val: 'si', label: 'Sí' },
+        { val: 'no', label: 'No, todo va por personal' }
+      ]},
+    { id: 'tiene_cpa', section: 'C · FUNDACION', text: '¿Trabajás con un CPA (contador) que entienda real estate?',
+      options: [
+        { val: 'si', label: 'Sí, CPA con expertise RE' },
+        { val: 'si_generico', label: 'CPA pero genérico (no RE)' },
+        { val: 'no', label: 'No tengo CPA' }
+      ]},
+    { id: 'tiene_atorney', section: 'C · FUNDACION', text: '¿Tenés Real Estate Attorney para revisar contratos / cerrar deals?',
+      options: [
+        { val: 'si', label: 'Sí' },
+        { val: 'no', label: 'No' }
+      ]},
+    { id: 'tiene_business_credit', section: 'C · FUNDACION', text: '¿Empezaste a construir crédito de negocio (D&B, business cards)?',
+      options: [
+        { val: 'avanzado', label: 'Sí, varios trade lines + business cards' },
+        { val: 'empezando', label: 'Sí, recién empezando' },
+        { val: 'no', label: 'No, solo personal' }
+      ]},
+    { id: 'mercado_estado', section: 'D · MERCADO', text: '¿En qué estado vas a operar principalmente?',
+      options: [
+        { val: 'TX', label: 'Texas' },
+        { val: 'FL', label: 'Florida' },
+        { val: 'GA', label: 'Georgia' },
+        { val: 'TN', label: 'Tennessee' },
+        { val: 'NC', label: 'North Carolina' },
+        { val: 'OH', label: 'Ohio' },
+        { val: 'OTRO', label: 'Otro estado USA' }
+      ]},
+    { id: 'mercado_subarea', section: 'D · MERCADO', text: '¿Ya tenés un sub-mercado específico (ciudad / zip codes) elegido?',
+      options: [
+        { val: 'si_validado', label: 'Sí, con comps y rentas validados' },
+        { val: 'si_inicial', label: 'Sí, pero sin validar a fondo' },
+        { val: 'no', label: 'No, sigo buscando' }
+      ]},
+    { id: 'mercado_buybox', section: 'D · MERCADO', text: '¿Tenés un Buy Box definido (ARV, rehab budget, scope)?',
+      options: [
+        { val: 'si_detallado', label: 'Sí, detallado con números' },
+        { val: 'parcial', label: 'Idea general, sin tanto detalle' },
+        { val: 'no', label: 'No tengo Buy Box todavía' }
+      ]},
+    { id: 'red_agente', section: 'E · RED OPERATIVA', text: '¿Tenés Real Estate Agent que entienda investor deals?',
+      options: [
+        { val: 'si_investor', label: 'Sí, agente investor-friendly' },
+        { val: 'si_generico', label: 'Agente regular (no investor)' },
+        { val: 'no', label: 'No tengo' }
+      ]},
+    { id: 'red_contractor', section: 'E · RED OPERATIVA', text: '¿Tenés General Contractor o crew confiable para rehab?',
+      options: [
+        { val: 'si_probado', label: 'Sí, ya hicimos deals juntos' },
+        { val: 'si_referido', label: 'Tengo referencias pero sin probar' },
+        { val: 'no', label: 'No tengo' }
+      ]},
+    { id: 'red_lender', section: 'E · RED OPERATIVA', text: '¿Tenés relación con Hard Money / Private Money Lender?',
+      options: [
+        { val: 'si_aprobado', label: 'Sí, ya estoy pre-aprobado' },
+        { val: 'si_contacto', label: 'Tengo contactos sin pre-aprobación' },
+        { val: 'no', label: 'No' }
+      ]},
+    { id: 'disp_tiempo', section: 'F · DISPONIBILIDAD', text: '¿Cuántas horas/semana podés dedicar a real estate?',
+      options: [
+        { val: '<10', label: 'Menos de 10 horas (full-time job)' },
+        { val: '10-20', label: '10-20 horas' },
+        { val: '20-40', label: '20-40 horas' },
+        { val: '40+', label: 'Full-time (40+ horas)' }
+      ]},
+    { id: 'disp_tipo', section: 'F · DISPONIBILIDAD', text: '¿Querés ser hands-on operativo o más passive / lender?',
+      options: [
+        { val: 'operativo', label: '🛠️ Hands-on operativo (busco, negocio, gestiono crew)' },
+        { val: 'estratega', label: '🎯 Estratega (decisiones, pero delego operación)' },
+        { val: 'passive', label: '💼 Passive (capital, no operación)' }
+      ]}
+  ];
+}
+
+async function init() {
+  const sp = new URLSearchParams(window.location.search);
+  const token = sp.get('t');
+  if (!token) return showInvalid('Falta el token en el link.');
+
+  const { data: invite, error } = await sb.from('edu_diagnostic_invites').select('*, edu_students(id, full_name, mentorship_id)').eq('token', token).maybeSingle();
+  if (error || !invite) return showInvalid('No encontré tu invitación. Pedile a tu mentor un link nuevo.');
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) return showInvalid('Este link expiró. Pedile a tu mentor uno nuevo.');
+  if (invite.completed_at) return showInvalid('Ya completaste este diagnóstico. Tu mentor ya recibió tu plan.');
+
+  INVITE = invite;
+  document.getElementById('student-name').textContent = (invite.edu_students?.full_name || '').split(' ')[0] || 'amigo';
+
+  QUESTIONS = await loadQuestionsFromMainApp();
+  document.getElementById('q-total').textContent = QUESTIONS.length;
+
+  document.getElementById('loading-screen').classList.add('hidden');
+  document.getElementById('wizard').classList.remove('hidden');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[CURRENT_INDEX];
+  document.getElementById('q-section').textContent = q.section;
+  document.getElementById('q-text').textContent = q.text;
+  document.getElementById('q-current').textContent = CURRENT_INDEX + 1;
+  const pct = Math.round(((CURRENT_INDEX + 1) / QUESTIONS.length) * 100);
+  document.getElementById('q-pct').textContent = pct + '%';
+  document.getElementById('q-bar').style.width = pct + '%';
+
+  const cont = document.getElementById('q-options');
+  cont.innerHTML = q.options.map(o => {
+    const sel = ANSWERS[q.id] === o.val;
+    return `
+      <button onclick="selectAnswer('${q.id}','${o.val}')" class="w-full text-left p-4 rounded-xl border-2 ${sel?'border-amber-500 bg-amber-50':'border-slate-200 hover:border-amber-300 bg-white'} transition">
+        <div class="flex items-center gap-3">
+          <div class="w-5 h-5 rounded-full border-2 ${sel?'border-amber-500 bg-amber-500':'border-slate-300'} flex items-center justify-center flex-shrink-0">
+            ${sel ? '<div class="w-2 h-2 bg-white rounded-full"></div>' : ''}
+          </div>
+          <div class="text-sm md:text-base ${sel?'font-semibold text-slate-900':'text-slate-700'}">${o.label}</div>
+        </div>
+      </button>
+    `;
+  }).join('');
+
+  document.getElementById('btn-next').disabled = !ANSWERS[q.id];
+  document.getElementById('btn-next').textContent = CURRENT_INDEX === QUESTIONS.length - 1 ? '✓ Terminar' : 'Siguiente →';
+  document.getElementById('btn-prev').style.visibility = CURRENT_INDEX === 0 ? 'hidden' : 'visible';
+}
+
+function selectAnswer(qid, val) {
+  ANSWERS[qid] = val;
+  renderQuestion();
+}
+
+function prevQuestion() {
+  if (CURRENT_INDEX > 0) { CURRENT_INDEX--; renderQuestion(); window.scrollTo({top:0,behavior:'smooth'}); }
+}
+
+async function nextQuestion() {
+  if (CURRENT_INDEX < QUESTIONS.length - 1) {
+    CURRENT_INDEX++;
+    renderQuestion();
+    window.scrollTo({top:0,behavior:'smooth'});
+    return;
+  }
+  // Terminar — guardar
+  await finish();
+}
+
+async function finish() {
+  document.getElementById('btn-next').disabled = true;
+  document.getElementById('btn-next').textContent = '⏳ Guardando...';
+
+  const payload = {
+    answers: ANSWERS,
+    completed_at: new Date().toISOString()
+  };
+
+  const { error } = await sb.from('edu_diagnostic_invites').update(payload).eq('id', INVITE.id);
+  if (error) {
+    alert('Error guardando: ' + error.message);
+    document.getElementById('btn-next').disabled = false;
+    document.getElementById('btn-next').textContent = '✓ Terminar';
+    return;
+  }
+
+  // Mostrar pantalla done con resumen
+  document.getElementById('wizard').classList.add('hidden');
+  document.getElementById('done-screen').classList.remove('hidden');
+
+  // Resumen
+  const summary = `
+    <div class="space-y-1.5">
+      <div><strong>Objetivo:</strong> ${ANSWERS.objetivo || '—'}</div>
+      <div><strong>Mercado:</strong> ${ANSWERS.mercado_estado || '—'}</div>
+      <div><strong>Capital:</strong> ${ANSWERS.capital_disponible || '—'}</div>
+      <div><strong>Tipo:</strong> ${ANSWERS.disp_tipo || '—'}</div>
+    </div>
+    <div class="text-[10px] text-slate-500 mt-3 pt-3 border-t border-amber-200">
+      ID: ${INVITE.id.slice(0,8).toUpperCase()}
+    </div>
+  `;
+  document.getElementById('done-summary').innerHTML = summary;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showInvalid(msg) {
+  document.getElementById('loading-screen').classList.add('hidden');
+  document.getElementById('invalid-screen').classList.remove('hidden');
+  if (msg) document.getElementById('invalid-msg').textContent = msg;
+}
+
+init().catch(e => showInvalid('Error: ' + e.message));
+</script>
+
+</body>
+</html>

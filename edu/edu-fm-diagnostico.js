@@ -276,14 +276,15 @@ async function eduCrearPlanEstudianteAuto(studentId) {
   };
   const bloques = fmGenerarBloques(userProfile, answers);
 
-  // 3) Archivar plan anterior si existe
-  await sb.from('edu_student_plans')
+  // 3) Archivar plan anterior si existe + verificar
+  const archRes = await sb.from('edu_student_plans')
     .update({ status: 'archived', updated_at: new Date().toISOString() })
     .eq('student_id', studentId)
     .eq('status', 'active');
+  if (archRes.error) console.warn('[archive prev plan]', archRes.error);
 
   // 4) Crear nuevo plan
-  const { data: plan, error: planErr } = await sb.from('edu_student_plans').insert({
+  const planPayload = {
     student_id: studentId,
     mentorship_id: student.mentorship_id,
     diagnostico: answers,
@@ -291,9 +292,27 @@ async function eduCrearPlanEstudianteAuto(studentId) {
     bloques_ids: bloques.map(b => b.id),
     modo: 'completo',
     status: 'active'
-  }).select().single();
+  };
+  let { data: plan, error: planErr } = await sb.from('edu_student_plans').insert(planPayload).select().single();
+
+  // Si choca por duplicate key (plan anterior no se archivó), borrar el activo viejo y reintentar
+  if (planErr && /duplicate key|unique constraint/i.test(planErr.message || '')) {
+    console.warn('[plan duplicate, forcing delete of old active]');
+    // Borrar tasks del plan viejo primero (FK)
+    const { data: oldPlans } = await sb.from('edu_student_plans').select('id').eq('student_id', studentId).eq('status', 'active');
+    if (oldPlans?.length) {
+      for (const op of oldPlans) {
+        await sb.from('edu_student_plan_tasks').delete().eq('plan_id', op.id);
+      }
+      await sb.from('edu_student_plans').delete().eq('student_id', studentId).eq('status', 'active');
+    }
+    // Reintentar insert
+    const retry = await sb.from('edu_student_plans').insert(planPayload).select().single();
+    plan = retry.data; planErr = retry.error;
+  }
 
   if (planErr) return alert('Error creando plan: ' + planErr.message);
+  if (!plan) return alert('No se pudo crear el plan (sin error pero sin row)');
 
   // 5) Insertar tasks (un row por paso de cada bloque)
   const tasks = [];

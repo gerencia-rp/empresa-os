@@ -2557,6 +2557,7 @@ function eduRenderStudentDetail(studentId) {
           <div class="flex gap-2 pt-2">
             <button onclick="eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
             <button onclick="eduState.tab='student_plan'; eduState.selectedStudentId='${s.id}'; eduCloseStudentDetail(); eduLoadStudentPlan('${s.id}').then(eduRender);" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700">🎯 Ir al plan</button>
+            <button onclick="eduShareDiagnosticForm('${s.id}')" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Compartir formulario</button>
             ${s.phone || '' ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">💬 WhatsApp rápido</button>` : `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">📞 WhatsApp</button>`}
             <button onclick="eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
             ${s.airtable_record_id ? `<a href="https://airtable.com/${m?.airtable_base_id||''}/${m?.airtable_students_table||''}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
@@ -3577,6 +3578,176 @@ async function eduToggleTaskCompletedOverview(taskId) {
 // ════════════════════════════════════════════════════════════
 // 🎓 CERTIFICADO de finalización — HTML imprimible (PDF via window.print)
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 📨 Compartir formulario de diagnóstico con el estudiante
+// Genera link único token-based. El estudiante completa solo y al
+// terminar el mentor recibe el diagnóstico listo para generar plan.
+// ════════════════════════════════════════════════════════════
+async function eduShareDiagnosticForm(studentId) {
+  const s = (eduState.students || []).find(x => x.id === studentId);
+  if (!s) return alert('Estudiante no encontrado');
+
+  // Generar token único (UUID short)
+  const token = crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+
+  const payload = {
+    token,
+    student_id: studentId,
+    mentorship_id: s.mentorship_id,
+    created_by: state.user?.id || null
+  };
+
+  const { data: invite, error } = await sb.from('edu_diagnostic_invites').insert(payload).select().single();
+  if (error) {
+    if (/relation .* does not exist|Could not find the table/i.test(error.message)) {
+      return alert('❌ Falta correr el SQL para crear la tabla edu_diagnostic_invites.\n\nAndá a Supabase → SQL Editor → pegá supabase/edu-diagnostic-invites-schema.sql y corré.');
+    }
+    return alert('Error creando invitación: ' + error.message);
+  }
+
+  const baseUrl = window.location.origin;
+  const link = `${baseUrl}/diag.html?t=${token}`;
+  const nombre = (s.full_name || '').split(' ')[0];
+
+  // Mensaje WhatsApp pre-armado
+  const waMsg = `¡Hola ${nombre}! 👋\n\nSoy tu mentor de FlipMentoría. Antes de nuestra próxima sesión, completá este diagnóstico de 21 preguntas (5-7 minutos):\n\n${link}\n\nCon tus respuestas voy a armar tu plan de acción personalizado para los próximos 90 días.\n\nCualquier duda, decime. 💪`;
+
+  const phoneClean = typeof eduCleanPhone === 'function' ? eduCleanPhone(s.phone) : (s.phone||'').replace(/\D/g,'');
+  const waUrl = phoneClean && phoneClean.length >= 10
+    ? `https://wa.me/${phoneClean}?text=${encodeURIComponent(waMsg)}`
+    : null;
+
+  openModal('📨 Formulario compartible · ' + (s.full_name||''), `
+    <div class="space-y-3">
+      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
+        Generé un link único para que <strong>${(s.full_name||'').replace(/</g,'&lt;')}</strong> complete el diagnóstico por su cuenta. Tiene 30 días de vigencia.
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">🔗 Link único</label>
+        <div class="flex gap-2">
+          <input id="diag-link" type="text" readonly value="${link}" class="flex-1 border border-slate-300 rounded px-2 py-2 text-xs font-mono bg-slate-50" onclick="this.select()"/>
+          <button onclick="navigator.clipboard.writeText('${link}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='📋 Copiar', 1500)" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">📋 Copiar</button>
+        </div>
+        <div class="text-[10px] text-slate-500 mt-1">⚠️ No compartas este link con otra persona — está asociado al estudiante.</div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📱 Mensaje WhatsApp pre-armado</label>
+        <textarea id="diag-msg" rows="8" class="w-full border border-emerald-300 rounded p-2 text-xs font-mono">${waMsg.replace(/</g,'&lt;')}</textarea>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+        ${waUrl ? `<a href="${waUrl}" target="_blank" onclick="closeModal()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded text-center">💬 Enviar por WhatsApp</a>` : `<button disabled class="flex-1 bg-slate-300 text-white text-sm font-bold py-2 rounded" title="Falta teléfono">📞 Sin teléfono</button>`}
+      </div>
+    </div>
+  `);
+}
+
+// Procesar invitaciones completadas — generar plan automático
+async function eduProcessPendingInvites() {
+  try {
+    const { data: pending } = await sb.from('edu_diagnostic_invites')
+      .select('*')
+      .not('completed_at', 'is', null)
+      .is('result_plan_id', null)
+      .limit(20);
+
+    if (!pending || pending.length === 0) return 0;
+
+    let processed = 0;
+    for (const inv of pending) {
+      if (!inv.student_id || !inv.answers) continue;
+      try {
+        // Generar plan con las respuestas del estudiante
+        if (typeof fmCalcularPerfil !== 'function' || typeof fmGenerarBloques !== 'function') continue;
+
+        const answers = inv.answers;
+        const perfilResult = fmCalcularPerfil(answers);
+        const userProfile = {
+          mercado: answers.mercado_estado,
+          estrategiaLabel: answers.objetivo === 'flip' ? 'Fix & Flip' :
+                           answers.objetivo === 'hold' ? 'Fix & Hold' :
+                           answers.objetivo === 'wholesale' ? 'Wholesaling' :
+                           answers.objetivo === 'hibrido' ? 'Mix Flip + Hold' : 'Fix & Flip'
+        };
+        const bloques = fmGenerarBloques(userProfile, answers);
+
+        // Archivar plan anterior
+        await sb.from('edu_student_plans')
+          .update({ status: 'archived', updated_at: new Date().toISOString() })
+          .eq('student_id', inv.student_id)
+          .eq('status', 'active');
+
+        // Crear nuevo plan
+        const { data: plan, error: pErr } = await sb.from('edu_student_plans').insert({
+          student_id: inv.student_id,
+          mentorship_id: inv.mentorship_id,
+          diagnostico: answers,
+          perfil: { ...perfilResult, userProfile, fromInvite: true },
+          bloques_ids: bloques.map(b => b.id),
+          modo: 'completo',
+          status: 'active'
+        }).select().single();
+
+        if (pErr || !plan) { console.warn('[invite plan failed]', inv.id, pErr); continue; }
+
+        // Tasks
+        const tasks = [];
+        bloques.forEach((b, bIdx) => {
+          const pasos = typeof b.pasos === 'function' ? b.pasos(userProfile, answers) : (b.pasos || []);
+          pasos.forEach((paso, pIdx) => {
+            tasks.push({
+              plan_id: plan.id,
+              student_id: inv.student_id,
+              bloque_id: b.id,
+              bloque_etapa: b.etapa,
+              bloque_subetapa: b.subetapa,
+              bloque_orden: bIdx,
+              paso_index: pIdx,
+              paso_text: paso,
+              completed: false
+            });
+          });
+        });
+
+        if (tasks.length) await sb.from('edu_student_plan_tasks').insert(tasks);
+
+        // Marcar invite como procesado
+        await sb.from('edu_diagnostic_invites').update({
+          perfil: perfilResult,
+          result_plan_id: plan.id
+        }).eq('id', inv.id);
+
+        processed++;
+      } catch (e) {
+        console.warn('[process invite error]', e);
+      }
+    }
+    return processed;
+  } catch (e) {
+    console.warn('[eduProcessPendingInvites]', e);
+    return 0;
+  }
+}
+
+// Auto-procesar invites al cargar la app + cada 2 min
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    setTimeout(() => eduProcessPendingInvites().then(n => {
+      if (n > 0 && typeof eduLoadAll === 'function') {
+        console.log('[invites] procesados:', n);
+        eduLoadAll().then(() => typeof eduRender === 'function' && eduRender());
+      }
+    }), 5000);
+    setInterval(() => eduProcessPendingInvites(), 120000);
+  });
+}
+
+window.eduShareDiagnosticForm = eduShareDiagnosticForm;
+window.eduProcessPendingInvites = eduProcessPendingInvites;
+
 function eduGenerateCertificate(studentId) {
   const s = eduState.students.find(x => x.id === studentId);
   if (!s) return alert('Estudiante no encontrado');
