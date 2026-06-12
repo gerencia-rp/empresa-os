@@ -244,9 +244,11 @@ async function renderPlan() {
 
   const etapa = PLAN_DATA.etapa || p.etapa || (INVITE.answers?.etapa_actual) || '';
   const cronograma = PLAN_DATA.cronograma || p.cronograma || '';
+  // Solo agregamos perfil si tiene num Y nombre (evita "#undefined undefined")
+  const perfilLabel = (p.num && p.nombre) ? `Perfil #${p.num} ${p.nombre}` : (p.nombre ? `Perfil ${p.nombre}` : '');
   const subtitle = [
     studentFullName ? `Para ${studentFullName}` : '',
-    p.num ? `Perfil #${p.num}` : '',
+    perfilLabel,
     etapa,
     cronograma
   ].filter(Boolean).join(' · ');
@@ -270,7 +272,7 @@ async function renderPlan() {
     document.getElementById('cronograma-text').textContent = cronograma || '—';
 
     const parrafosCont = document.getElementById('analisis-parrafos');
-    parrafosCont.innerHTML = (PLAN_DATA.analisis_profundo || []).map(par => `<p>${esc(par)}</p>`).join('');
+    parrafosCont.innerHTML = (PLAN_DATA.analisis_profundo || []).map(par => `<p>${safeHtml(par)}</p>`).join('');
 
     const fortList = document.getElementById('fortalezas-list');
     const forts = PLAN_DATA.fortalezas || [];
@@ -325,6 +327,15 @@ function renderBloques() {
   const bloqueMetaById = {};
   planBloques.forEach(b => { bloqueMetaById[b.id] = b; });
 
+  // Encontrar el índice del bloque "actual" = primer bloque no completado al 100%
+  const currentIdx = blocks.findIndex(b => {
+    const total = b.tasks.length;
+    const done = b.tasks.filter(t => t.completed).length;
+    return total === 0 || done < total;
+  });
+  // Si todos están completos, currentIdx = -1 y nada queda desbloqueado pendiente
+  const activeIdx = currentIdx === -1 ? blocks.length : currentIdx;
+
   const cont = document.getElementById('bloques-container');
   cont.innerHTML = blocks.map((b, idx) => {
     const meta = bloqueMetaById[b.bloque_id] || {};
@@ -332,67 +343,157 @@ function renderBloques() {
     const bTotal = b.tasks.length;
     const bPct = bTotal ? Math.round(bDone/bTotal*100) : 0;
     const isDone = bDone === bTotal && bTotal > 0;
+    const isCurrent = idx === activeIdx;
+    const isLocked = idx > activeIdx;
+    const isPast = idx < activeIdx;
 
+    // BLOQUES ANTERIORES (completos): collapsed con check verde grande
+    if (isPast) {
+      return `
+        <div class="bg-emerald-50 rounded-2xl border border-emerald-200 overflow-hidden">
+          <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.expand-ico').textContent = this.nextElementSibling.classList.contains('hidden') ? '▼' : '▲';" class="w-full p-4 md:p-5 flex items-center justify-between gap-3 text-left hover:bg-emerald-100/50">
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+              <div class="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] uppercase font-bold tracking-wider text-emerald-700">${esc(b.etapa)} · COMPLETADO</div>
+                <div class="text-sm md:text-base font-bold text-slate-700 line-through">${esc(b.subetapa || 'Bloque')}</div>
+              </div>
+            </div>
+            <div class="text-emerald-700 text-xs font-bold expand-ico">▼</div>
+          </button>
+          <div class="hidden divide-y divide-emerald-100 border-t border-emerald-200">
+            ${b.tasks.map(t => `
+              <button onclick="toggleTask('${t.id}')" class="check-anim w-full text-left p-3 flex items-start gap-3 hover:bg-emerald-100/50">
+                <div class="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'} flex items-center justify-center">
+                  ${t.completed ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+                </div>
+                <div class="flex-1 text-xs md:text-sm ${t.completed ? 'line-through text-slate-400' : 'text-slate-700'}">${esc(t.paso_text || '')}</div>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // BLOQUES FUTUROS: lockeados
+    if (isLocked) {
+      return `
+        <div class="bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 p-5 opacity-70">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-slate-400 text-white text-lg flex items-center justify-center flex-shrink-0">🔒</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] uppercase font-bold tracking-wider text-slate-500">${esc(b.etapa)} · BLOQUEADO</div>
+              <div class="text-sm md:text-base font-bold text-slate-600">${esc(b.subetapa || 'Bloque')}</div>
+              <div class="text-xs text-slate-500 mt-1">Completá el bloque actual para desbloquear este.</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // BLOQUE ACTUAL (current) — expandido con TODO el detalle
     return `
-      <div class="bg-white rounded-2xl shadow-sm border ${isDone ? 'border-emerald-300' : 'border-slate-200'} overflow-hidden">
+      <div class="bg-white rounded-2xl shadow-lg border-2 border-amber-400 overflow-hidden ring-2 ring-amber-200">
+        <!-- Banner FOCO AHORA -->
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 text-center">
+          <div class="text-[10px] font-bold uppercase tracking-wider">📍 ENFOCATE ACÁ AHORA · BLOQUE ${idx+1} DE ${blocks.length}</div>
+        </div>
         <!-- Header del bloque -->
-        <div class="p-4 md:p-5 ${isDone ? 'bg-emerald-50' : 'bg-amber-50'}">
+        <div class="p-4 md:p-5 bg-amber-50">
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-start gap-3 flex-1 min-w-0">
-              <div class="w-9 h-9 rounded-full ${isDone ? 'bg-emerald-600' : 'bg-amber-600'} text-white font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
+              <div class="w-10 h-10 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
               <div class="flex-1 min-w-0">
-                <div class="text-[10px] uppercase font-bold tracking-wider ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${esc(b.etapa)}</div>
-                <div class="text-base md:text-lg font-bold text-slate-900 mt-0.5">${esc(b.subetapa || 'Bloque')}</div>
-                ${meta.actividad ? `<div class="text-xs md:text-sm text-slate-600 mt-1">${esc(meta.actividad)}</div>` : ''}
-                ${meta.tiempo ? `<div class="text-[10px] text-slate-500 mt-1">⏱ ${esc(meta.tiempo)}</div>` : ''}
+                <div class="text-[10px] uppercase font-bold tracking-wider text-amber-700">${esc(b.etapa)}</div>
+                <div class="text-lg md:text-xl font-bold text-slate-900 mt-0.5">${esc(b.subetapa || 'Bloque')}</div>
+                ${meta.actividad ? `<div class="text-sm text-slate-700 mt-2">${esc(meta.actividad)}</div>` : ''}
+                ${meta.tiempo ? `<div class="text-[11px] text-amber-700 font-semibold mt-2">⏱ ${esc(meta.tiempo)}</div>` : ''}
               </div>
             </div>
             <div class="text-right flex-shrink-0">
-              <div class="text-base font-bold ${isDone ? 'text-emerald-700' : 'text-slate-900'}">${bDone}/${bTotal}</div>
+              <div class="text-lg font-bold text-slate-900">${bDone}/${bTotal}</div>
               <div class="text-[10px] text-slate-500">${bPct}%</div>
             </div>
           </div>
-          <div class="h-1.5 bg-white/60 rounded-full mt-3 overflow-hidden">
-            <div class="h-full ${isDone ? 'bg-emerald-500' : 'bg-amber-500'}" style="width: ${bPct}%"></div>
+          <div class="h-2 bg-white/60 rounded-full mt-3 overflow-hidden">
+            <div class="h-full bg-amber-500 transition-all duration-500" style="width: ${bPct}%"></div>
           </div>
         </div>
 
-        <!-- Tasks (pasos del bloque) -->
-        <div class="divide-y divide-slate-100">
-          ${b.tasks.map(t => `
-            <button onclick="toggleTask('${t.id}')" class="check-anim w-full text-left p-3 md:p-4 flex items-start gap-3 hover:bg-slate-50">
-              <div class="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full border-2 ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'} flex items-center justify-center transition">
-                ${t.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
-              </div>
-              <div class="flex-1 text-sm md:text-base ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${esc(t.paso_text || '')}</div>
-            </button>
-          `).join('')}
+        <!-- Contexto / explicación detallada -->
+        ${meta.contexto || meta.descripcion ? `
+          <div class="px-4 md:px-5 py-3 bg-blue-50 border-t border-blue-100">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-blue-800 mb-1">📖 Por qué este bloque</div>
+            <div class="text-sm text-slate-700 leading-relaxed">${safeHtml(meta.contexto || meta.descripcion)}</div>
+          </div>` : ''}
+
+        <!-- Tasks paso a paso -->
+        <div class="p-3 md:p-4 border-t border-slate-100">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2 px-1">📋 Tareas (marcalas a medida que las hacés)</div>
+          <div class="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+            ${b.tasks.map((t, ti) => `
+              <button onclick="toggleTask('${t.id}')" class="check-anim w-full text-left p-3 md:p-4 flex items-start gap-3 hover:bg-amber-50 transition">
+                <div class="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full border-2 ${t.completed ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-amber-400'} flex items-center justify-center transition">
+                  ${t.completed ? '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : `<span class="text-[10px] font-bold text-amber-600">${ti+1}</span>`}
+                </div>
+                <div class="flex-1 text-sm md:text-base ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${esc(t.paso_text || '')}</div>
+              </button>
+            `).join('')}
+          </div>
         </div>
 
-        <!-- Metadata extra del bloque -->
-        ${(meta.criterios_exito?.length || meta.herramientas?.length || meta.errores_comunes?.length) ? `
+        <!-- Metadata extra del bloque: criterios, herramientas, errores -->
+        ${(meta.criterios_exito?.length || meta.herramientas?.length || meta.errores_comunes?.length || meta.entregable) ? `
           <div class="p-4 md:p-5 bg-slate-50 border-t border-slate-100 space-y-3">
+            ${meta.entregable ? `
+              <div class="bg-white border border-emerald-200 rounded-lg p-3">
+                <div class="text-[10px] uppercase font-bold text-emerald-700 mb-1">🎯 ENTREGABLE FINAL DE ESTE BLOQUE</div>
+                <div class="text-sm text-slate-800">${safeHtml(meta.entregable)}</div>
+              </div>` : ''}
             ${meta.criterios_exito?.length ? `
               <div>
-                <div class="text-[10px] uppercase font-bold text-emerald-700 mb-1">✅ Criterios de éxito</div>
-                <ul class="text-xs text-slate-700 space-y-0.5">${meta.criterios_exito.map(c => `<li>• ${esc(c)}</li>`).join('')}</ul>
+                <div class="text-[10px] uppercase font-bold text-emerald-700 mb-1">✅ Criterios de éxito (cuándo está listo)</div>
+                <ul class="text-xs text-slate-700 space-y-1 pl-1">${meta.criterios_exito.map(c => `<li class="flex gap-1.5"><span>•</span><span>${safeHtml(c)}</span></li>`).join('')}</ul>
               </div>` : ''}
             ${meta.herramientas?.length ? `
               <div>
-                <div class="text-[10px] uppercase font-bold text-blue-700 mb-1">🛠 Herramientas</div>
-                <ul class="text-xs text-slate-700 space-y-0.5">${meta.herramientas.map(h => `<li>• ${esc(h)}</li>`).join('')}</ul>
+                <div class="text-[10px] uppercase font-bold text-blue-700 mb-1">🛠 Herramientas que vas a usar</div>
+                <ul class="text-xs text-slate-700 space-y-1 pl-1">${meta.herramientas.map(h => `<li class="flex gap-1.5"><span>•</span><span>${safeHtml(h)}</span></li>`).join('')}</ul>
               </div>` : ''}
             ${meta.errores_comunes?.length ? `
               <div>
                 <div class="text-[10px] uppercase font-bold text-red-700 mb-1">⚠️ Errores comunes a evitar</div>
-                <ul class="text-xs text-slate-700 space-y-0.5">${meta.errores_comunes.map(e => `<li>• ${esc(e)}</li>`).join('')}</ul>
+                <ul class="text-xs text-slate-700 space-y-1 pl-1">${meta.errores_comunes.map(e => `<li class="flex gap-1.5"><span>•</span><span>${safeHtml(e)}</span></li>`).join('')}</ul>
               </div>` : ''}
           </div>` : ''}
+
+        <!-- CTA cierre del bloque -->
+        ${isDone ? `
+          <div class="p-4 bg-emerald-50 border-t-2 border-emerald-300 text-center">
+            <div class="text-sm font-bold text-emerald-800">🎉 ¡Bloque completado! Pasá al siguiente.</div>
+            <button onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})" class="mt-2 text-xs font-bold text-emerald-700 underline">Ver siguiente bloque ↓</button>
+          </div>` : `
+          <div class="p-3 bg-amber-50 border-t border-amber-200 text-center text-xs text-amber-800">
+            Te faltan <strong>${bTotal - bDone} tareas</strong> para desbloquear el siguiente bloque
+          </div>`}
       </div>
     `;
   }).join('');
 
   updateProgress();
+
+  // Si el estudiante acaba de completar un bloque, scrollea suave al siguiente
+  if (currentIdx !== -1 && currentIdx > 0) {
+    setTimeout(() => {
+      const currentEl = cont.children[currentIdx];
+      if (currentEl && !window._mp_initial_scroll_done) {
+        currentEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window._mp_initial_scroll_done = true;
+      }
+    }, 400);
+  }
 }
 
 function updateProgress() {
@@ -529,6 +630,16 @@ function showInvalid(msg) {
 
 function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Permite <strong> <em> <b> <i> <br> y nada más — limpia el resto
+function safeHtml(s) {
+  if (!s) return '';
+  // Primero escapamos todo
+  let out = esc(s);
+  // Después re-permitimos tags safe específicos
+  out = out.replace(/&lt;(\/?(strong|em|b|i|br)\s*\/?)&gt;/gi, '<$1>');
+  return out;
 }
 
 init().catch(e => showInvalid('Error: ' + e.message));

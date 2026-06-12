@@ -2954,6 +2954,15 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
     const planTitle = perfil.nombre || planData.titulo || 'Plan personalizado';
     const planEmoji = perfil.emoji || '🚀';
 
+    // Bloque actual (donde el estudiante está parado)
+    const currentBlockIdx = blocks.findIndex(b => {
+      const bt = b.tasks.length;
+      const bd = b.tasks.filter(t => t.completed).length;
+      return bt === 0 || bd < bt;
+    });
+    const currentBlock = currentBlockIdx >= 0 ? blocks[currentBlockIdx] : null;
+    const isAllDone = currentBlockIdx === -1 && total > 0;
+
     // 3) Render HTML
     const html = `
       <div class="space-y-4">
@@ -2975,6 +2984,14 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
               <div class="h-full bg-emerald-400 transition-all" style="width: ${pct}%"></div>
             </div>
           </div>
+          ${isAllDone ? `
+            <div class="mt-3 bg-emerald-500/30 border border-emerald-300/50 rounded-lg p-2 text-center text-xs font-bold">
+              🎉 PLAN COMPLETADO — el estudiante terminó todos los bloques
+            </div>` : currentBlock ? `
+            <div class="mt-3 bg-amber-500/30 border border-amber-300/50 rounded-lg p-2 text-xs">
+              <div class="font-bold text-amber-100">📍 ETAPA ACTUAL DEL ESTUDIANTE</div>
+              <div class="text-white mt-0.5">Bloque ${currentBlockIdx+1} de ${blocks.length}: ${escFn(currentBlock.subetapa || currentBlock.etapa)}</div>
+            </div>` : ''}
         </div>
 
         ${planData.objetivo_operativo ? `
@@ -3018,14 +3035,16 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
             const bTotal = b.tasks.length;
             const bPct = bTotal ? Math.round(bDone/bTotal*100) : 0;
             const isDone = bDone === bTotal && bTotal > 0;
+            const isCurrent = idx === currentBlockIdx;
+            const borderCls = isCurrent ? 'border-amber-400 ring-2 ring-amber-200' : (isDone ? 'border-emerald-300' : 'border-slate-200');
             return `
-              <div class="bg-white border ${isDone ? 'border-emerald-300' : 'border-slate-200'} rounded-lg overflow-hidden">
-                <details ${isDone ? '' : 'open'}>
+              <div class="bg-white border-2 ${borderCls} rounded-lg overflow-hidden">
+                <details ${isCurrent || !isDone ? 'open' : ''}>
                   <summary class="cursor-pointer p-3 ${isDone ? 'bg-emerald-50' : 'bg-amber-50'} flex items-center justify-between gap-2 list-none">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                       <div class="w-7 h-7 rounded-full ${isDone ? 'bg-emerald-600' : 'bg-amber-600'} text-white text-xs font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
                       <div class="flex-1 min-w-0">
-                        <div class="text-[10px] uppercase font-bold ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${escFn(b.etapa)}</div>
+                        <div class="text-[10px] uppercase font-bold ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${escFn(b.etapa)}${isCurrent ? ' · 📍 ACTUAL' : ''}</div>
                         <div class="text-sm font-bold text-slate-900 truncate">${escFn(b.subetapa)}</div>
                       </div>
                     </div>
