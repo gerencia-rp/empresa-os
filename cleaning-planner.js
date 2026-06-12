@@ -284,6 +284,21 @@ async function openCleaningPlanner(sys) {
   clRender();
 }
 
+// REFOCUS — vuelve al planner SIN cerrar el modal (ver opRefocusPlanner).
+async function clRefocusPlanner() {
+  const titleEl = document.getElementById('modal-title');
+  const bodyEl = document.getElementById('modal-body');
+  const modal = document.getElementById('modal');
+  if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
+    return openCleaningPlanner(clState.sys);
+  }
+  titleEl.textContent = `🧰 ${clState.sys.name}`;
+  bodyEl.innerHTML = '<div id="op-root"></div>';
+  try { await clLoadAll(); } catch (e) { console.warn('clLoadAll on refocus', e); }
+  clRender();
+}
+window.clRefocusPlanner = clRefocusPlanner;
+
 // ─── Render principal ───
 function clRender() {
   const root = document.getElementById('op-root');
@@ -937,7 +952,7 @@ function clRenderWeekTaskCard(t) {
          ondragend="clState.draggedScheduledId=null"
          class="${cardCls} border rounded p-1 cursor-grab text-[10px] hover:shadow-sm relative">
       ${isOverdue ? `<div class="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold px-1 rounded-sm shadow z-10">⚠️ ATRASADA</div>` : ''}
-      <div onclick="clEditScheduled('${t.id}')" class="cursor-pointer">
+      <div onclick="event.stopPropagation(); clEditScheduled('${t.id}')" class="cursor-pointer">
         <div class="flex items-center gap-1">
           <span class="font-bold text-slate-900">${clFmt12(t.start_time).replace(' ','')}</span>
           ${t.zona ? `<span class="${clZonaColor(t.zona)} px-1 rounded text-[8px] font-bold">${t.zona[0]}</span>` : ''}
@@ -1434,7 +1449,7 @@ function clOpenAddCasa(propId) {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         ${isEdit ? `<button onclick="clDeleteCasa('${propId}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 px-4 rounded" title="Eliminar casa (no se eliminan tareas)">🗑️</button>` : ''}
         <button onclick="clSaveCasa('${propId || ''}')" class="flex-1 ${isEdit?'bg-blue-600 hover:bg-blue-700':'bg-emerald-600 hover:bg-emerald-700'} text-white text-sm font-bold py-2 rounded">${isEdit ? '💾 Guardar cambios' : '+ Crear casa'}</button>
       </div>
@@ -1471,24 +1486,16 @@ async function clSaveCasa(propId) {
     }
     return alert('Error al guardar: ' + error.message);
   }
-  closeModal();
-  setTimeout(async () => {
-    await openCleaningPlanner(clState.sys);
-    clState.view = 'casas';
-    clRender();
-  }, 100);
+  clState.view = 'casas';
+  await clRefocusPlanner();
 }
 
 async function clDeleteCasa(propId) {
   if (!confirm('¿Eliminar esta casa?\n\nLas tareas asignadas a ella NO se eliminan — quedan como "Sin casa".')) return;
   const { error } = await sb.from('properties').delete().eq('id', propId);
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openCleaningPlanner(clState.sys);
-    clState.view = 'casas';
-    clRender();
-  }, 100);
+  clState.view = 'casas';
+  await clRefocusPlanner();
 }
 
 function clEditFromCasas(id, bucket) {
@@ -1672,7 +1679,7 @@ function clOpenAddPendiente() {
         <textarea id="op-p-notes" rows="2" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="clCreatePendiente()" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">+ Al backlog</button>
       </div>
     </div>
@@ -1718,7 +1725,7 @@ async function clCreatePendiente() {
   const { error } = await sb.from('clean_day_tasks').insert(payload);
   if (error) return alert(error.message);
   closeModal();
-  setTimeout(() => openCleaningPlanner(clState.sys), 100);
+  await clRefocusPlanner();
 }
 
 // ─── 🎯 Armar día por zona ───
@@ -1770,7 +1777,7 @@ function clOpenArmarDia() {
         </div>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="clEjecutarArmarDia()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🎯 Armar</button>
       </div>
     </div>
@@ -2006,7 +2013,7 @@ function _opOpenEditModal(t, isBacklog) {
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         ${!isBacklog ? `<button onclick="clSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-2 rounded" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
         <button onclick="clDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 rounded">🗑️</button>
-        <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="clSaveEdit('${t.id}', ${isBacklog})" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
       </div>
     </div>
@@ -2123,7 +2130,7 @@ async function clSaveEdit(id, isBacklog) {
   }
 
   closeModal();
-  setTimeout(() => openCleaningPlanner(clState.sys), 100);
+  await clRefocusPlanner();
 }
 
 function clToggleRecurringFields(checked) {
@@ -2133,7 +2140,7 @@ function clToggleRecurringFields(checked) {
 
 async function clSendToBacklog(id, fromModal) {
   await sb.from('clean_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).eq('id', id);
-  if (fromModal) { closeModal(); setTimeout(() => openCleaningPlanner(clState.sys), 100); }
+  if (fromModal) { clRefocusPlanner(); }
   else { await clLoadAll(); clRender(); }
 }
 
@@ -2147,7 +2154,7 @@ async function clDeleteBacklog(id) {
 async function clDeleteScheduled(id, fromModal) {
   if (!confirm('¿Eliminar esta tarea?')) return;
   await sb.from('clean_day_tasks').delete().eq('id', id);
-  if (fromModal) { closeModal(); setTimeout(() => openCleaningPlanner(clState.sys), 100); }
+  if (fromModal) { clRefocusPlanner(); }
   else { await clLoadAll(); clRender(); }
 }
 
@@ -2250,7 +2257,7 @@ function clOpenAddLoose(presetTarget) {
       <textarea id="op-l-notes" rows="2" placeholder="Notas adicionales" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
 
       <div class="flex gap-2">
-        <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="clCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Agendar</button>
       </div>
     </div>
@@ -2365,7 +2372,7 @@ async function clCreateLoose() {
     if (error) return alert('Error: ' + error.message);
   }
   closeModal();
-  setTimeout(() => openCleaningPlanner(clState.sys), 100);
+  await clRefocusPlanner();
 }
 
 // ─── CHECKLIST DE ENTREGABLES ───
@@ -2407,7 +2414,7 @@ function clOpenChecklist(taskId) {
 
       ${pct === 100 && t.status !== 'done' ? `<button onclick="clMarkDoneFromChecklist('${taskId}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✅ Marcar tarea como TERMINADA</button>` : ''}
 
-      <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
+      <button onclick="clRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
   openModal(`📋 Entregables`, html);
@@ -2516,7 +2523,7 @@ function clOpenManageRecurring() {
         ${list || '<div class="text-xs text-slate-400 text-center py-4">Sin recurrentes configuradas.</div>'}
       </div>
 
-      <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
+      <button onclick="clRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
   openModal('⚙️ Tareas recurrentes', html);
@@ -2537,14 +2544,14 @@ async function clCreateRecurring() {
   const { error } = await sb.from('clean_recurring').insert(payload);
   if (error) return alert(error.message);
   closeModal();
-  setTimeout(() => { openCleaningPlanner(clState.sys).then(() => clOpenManageRecurring()); }, 100);
+  await clRefocusPlanner(); clOpenManageRecurring();
 }
 
 async function clDeleteRecurring(id) {
   if (!confirm('¿Eliminar esta recurrente?')) return;
   await sb.from('clean_recurring').update({ active: false }).eq('id', id);
   closeModal();
-  setTimeout(() => { openCleaningPlanner(clState.sys).then(() => clOpenManageRecurring()); }, 100);
+  await clRefocusPlanner(); clOpenManageRecurring();
 }
 
 // ============================================================
@@ -2622,7 +2629,7 @@ function clOpenApplyTemplate() {
       <div class="space-y-2 max-h-[60vh] overflow-y-auto">
         ${tplOpts}
       </div>
-      <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys),100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+      <button onclick="clRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
     </div>
   `;
   openModal('📋 Aplicar plantilla de día', html);
@@ -2655,12 +2662,8 @@ async function clApplyTemplate(templateId) {
   if (!rows.length) return alert('La plantilla no tiene tareas.');
   const { error } = await sb.from('clean_day_tasks').insert(rows);
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openCleaningPlanner(clState.sys);
-    clRender();
-    alert(`✅ ${rows.length} tareas agregadas al ${clState.date}.`);
-  }, 100);
+  await clRefocusPlanner();
+  alert(`✅ ${rows.length} tareas agregadas al ${clState.date}.`);
 }
 
 // Editar plantilla (nombre, descripción)
@@ -3056,7 +3059,7 @@ function clRenderEditDayTemplate() {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); window._opEditingTpl=null; setTimeout(()=>openCleaningPlanner(clState.sys),100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="window._opEditingTpl=null; clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="clSaveDayTemplateEdits()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">💾 Guardar cambios</button>
       </div>
     </div>
@@ -3130,11 +3133,8 @@ async function clSaveDayTemplateEdits() {
   }).eq('id', tpl.id);
   if (error) return alert('Error: ' + error.message);
   window._opEditingTpl = null;
-  closeModal();
-  setTimeout(async () => {
-    await openCleaningPlanner(clState.sys);
-    clSetLeftTab('daytemplates');
-  }, 100);
+  await clRefocusPlanner();
+  clSetLeftTab('daytemplates');
 }
 
 // ============================================================
@@ -3309,7 +3309,7 @@ function clOpenTemplateModal(tmpl, prefilledCategory) {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openCleaningPlanner(clState.sys),100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         ${isEdit ? `<button onclick="clDeleteTemplateConfirm('${t.id}','${(t.name||'').replace(/'/g,"\\'")}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 px-4 rounded">🗑️</button>` : ''}
         <button onclick="clSaveTemplate('${t.id||''}')" class="flex-1 ${isEdit?'bg-blue-600 hover:bg-blue-700':'bg-emerald-600 hover:bg-emerald-700'} text-white text-sm font-bold py-2 rounded">${isEdit?'💾 Guardar cambios':'+ Crear plantilla'}</button>
       </div>
@@ -3353,11 +3353,8 @@ async function clSaveTemplate(id) {
     }
   }
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openCleaningPlanner(clState.sys);
-    clSetLeftTab('templates');
-  }, 100);
+  await clRefocusPlanner();
+  clSetLeftTab('templates');
 }
 
 async function clDeleteTemplateConfirm(id, name) {
@@ -3365,9 +3362,6 @@ async function clDeleteTemplateConfirm(id, name) {
   // Soft delete: marcar active=false
   const { error } = await sb.from('clean_tasks').update({ active: false }).eq('id', id);
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openCleaningPlanner(clState.sys);
-    clSetLeftTab('templates');
-  }, 100);
+  await clRefocusPlanner();
+  clSetLeftTab('templates');
 }

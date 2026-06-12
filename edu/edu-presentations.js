@@ -1003,6 +1003,9 @@ function eduBuildPPTX(p, opts = {}) {
       case 'split-image':         renderSplitImage(slide, s, C); break;
       case 'chart-spotlight':     renderChartSpotlight(slide, s, C); break;
       case 'image-grid':          renderImageGrid(slide, s, C); break;
+      // 🆕 NUEVOS LAYOUTS NATIVOS (sin imagen externa, sin CSP issues)
+      case 'bar-chart':           renderBarChartNative(slide, s, C); break;
+      case 'data-table':          renderDataTable(slide, s, C); break;
       default:                    renderDefault(slide, s, C);
     }
 
@@ -1193,16 +1196,26 @@ function renderCaseStudy(slide, s, c) {
 function renderFramework(slide, s, c) {
   const items = s.framework_items || (s.bullets || []).map(b => ({ label: b, value: '' }));
   if (!items.length) return;
-  const cols = 2, rows = Math.ceil(items.length / cols);
-  const cardW = 5.9, cardH = 0.7;
-  items.forEach((it, i) => {
+  // Detectar si los values son cortos (números/%/sigla) o largos (descripción)
+  const allShort = items.every(it => !it.value || String(it.value).length <= 20);
+  const cols = items.length <= 4 ? 2 : 2;
+  const cardH = allShort ? 0.7 : 1.0;  // más alto si tiene descripción
+  const cardW = 5.9;
+  items.slice(0, 8).forEach((it, i) => {
     const col = i % cols, row = Math.floor(i / cols);
     const x = 0.5 + col * 6.3;
     const y = 2.0 + row * (cardH + 0.15);
     slide.addShape('rect', { x, y, w: 0.08, h: cardH, fill: { color: c.ACCENT } });
     slide.addShape('rect', { x: x + 0.08, y, w: cardW - 0.08, h: cardH, fill: { color: c.GRAY_LIGHT }, line: { color: 'E2E8F0' } });
-    slide.addText(it.label || '', { x: x + 0.3, y, w: cardW - 2.0, h: cardH, fontSize: 13, color: c.NAV, valign: 'middle', bold: true });
-    if (it.value) slide.addText(String(it.value), { x: x + cardW - 1.8, y, w: 1.6, h: cardH, fontSize: 14, bold: true, color: c.ACCENT, align: 'right', valign: 'middle' });
+    if (allShort) {
+      // Layout horizontal: label izquierda + value (corto) derecha
+      slide.addText(String(it.label || ''), { x: x + 0.3, y, w: cardW - 2.0, h: cardH, fontSize: 13, color: c.NAV, valign: 'middle', bold: true });
+      if (it.value) slide.addText(String(it.value), { x: x + cardW - 1.8, y, w: 1.6, h: cardH, fontSize: 14, bold: true, color: c.ACCENT, align: 'right', valign: 'middle' });
+    } else {
+      // Layout vertical: label arriba + descripción abajo (texto largo)
+      slide.addText(String(it.label || ''), { x: x + 0.3, y: y + 0.08, w: cardW - 0.5, h: 0.35, fontSize: 12, color: c.NAV, bold: true });
+      if (it.value) slide.addText(String(it.value), { x: x + 0.3, y: y + 0.4, w: cardW - 0.5, h: cardH - 0.45, fontSize: 9, color: c.NAV_LIGHT, valign: 'top' });
+    }
   });
 }
 
@@ -1265,6 +1278,99 @@ function renderMetricsDashboard(slide, s, c) {
     slide.addText(String(m.value || ''), { x: x + 0.15, y: y + 0.5, w: cardW - 0.3, h: 1.0, fontSize: 36, bold: true, color: c.ACCENT, valign: 'middle' });
     if (m.trend) slide.addText(m.trend, { x: x + 0.15, y: y + 1.55, w: cardW - 0.3, h: 0.35, fontSize: 11, color: '10B981', bold: true });
     if (m.source_name) slide.addText(`📍 ${m.source_name}`, { x: x + 0.15, y: y + 1.7, w: cardW - 0.3, h: 0.25, fontSize: 8, color: c.GRAY_MED, italic: true });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🆕 BAR CHART NATIVO — usa shapes para barras (sin imagen externa)
+// Acepta stats o metric_cards con campos {label, value}
+// ════════════════════════════════════════════════════════════════
+function renderBarChartNative(slide, s, c) {
+  // Extraer valores numéricos
+  const raw = s.bar_chart_data || s.stats || s.metric_cards || [];
+  const items = raw.map(it => {
+    const v = String(it.value || '').replace(/[$,%kKmMxX\s]/gi, '');
+    return { label: it.label || '', value: parseFloat(v) || 0, displayValue: it.value || '0' };
+  }).filter(it => !isNaN(it.value)).slice(0, 6);
+  if (!items.length) return renderDefault(slide, s, c);
+
+  const maxV = Math.max(...items.map(it => it.value), 1);
+  // Área del chart
+  const chartX = 0.8, chartY = 2.2, chartW = 11.5, chartH = 4.5;
+  const barH = Math.min(0.55, (chartH - 0.4) / items.length - 0.2);
+  const labelW = 3.0;
+  const barAreaW = chartW - labelW - 1.5;
+
+  // Línea base izquierda
+  slide.addShape('rect', { x: chartX + labelW, y: chartY, w: 0.02, h: chartH - 0.3, fill: { color: c.GRAY_MED } });
+  // Barras horizontales
+  items.forEach((it, i) => {
+    const y = chartY + 0.1 + i * (barH + 0.2);
+    const w = (it.value / maxV) * barAreaW;
+    // Label de categoría a la izquierda
+    slide.addText(it.label, { x: chartX, y, w: labelW - 0.1, h: barH, fontSize: 11, color: c.NAV, valign: 'middle', align: 'right', bold: true });
+    // Barra
+    slide.addShape('rect', { x: chartX + labelW + 0.05, y, w, h: barH, fill: { color: c.ACCENT }, line: { color: c.ACCENT } });
+    // Acento dorado al inicio
+    slide.addShape('rect', { x: chartX + labelW + 0.05, y, w: 0.08, h: barH, fill: { color: c.GOLD }, line: { color: c.GOLD } });
+    // Valor al final de la barra
+    slide.addText(String(it.displayValue), { x: chartX + labelW + w + 0.15, y, w: 2.0, h: barH, fontSize: 13, color: c.NAV, bold: true, valign: 'middle' });
+  });
+  // Caption opcional
+  if (s.subtitle) {
+    slide.addText(s.subtitle, { x: chartX, y: chartY + chartH, w: chartW, h: 0.3, fontSize: 10, color: c.GRAY_MED, italic: true, align: 'center' });
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🆕 DATA TABLE NATIVO — usa slide.addTable()
+// Acepta table_headers [string,...] y table_rows [[cell,...],...]
+// O fallback: framework_items → tabla de 2 columnas (label, value)
+// ════════════════════════════════════════════════════════════════
+function renderDataTable(slide, s, c) {
+  let headers = s.table_headers;
+  let rows = s.table_rows;
+
+  // Fallback desde framework_items si no hay table data
+  if ((!headers || !rows) && s.framework_items?.length) {
+    headers = ['Concepto', 'Valor'];
+    rows = s.framework_items.slice(0, 8).map(it => [it.label || '', String(it.value || '')]);
+  }
+  // Fallback desde stats
+  if ((!headers || !rows) && s.stats?.length) {
+    headers = ['Métrica', 'Valor', 'Fuente'];
+    rows = s.stats.slice(0, 8).map(it => [it.label || '', String(it.value || ''), it.source_name || '']);
+  }
+
+  if (!rows || !rows.length) return renderDefault(slide, s, c);
+
+  // Construir tableData para PptxGenJS
+  const tableData = [];
+  // Header
+  tableData.push(headers.map(h => ({
+    text: String(h),
+    options: { bold: true, color: 'FFFFFF', fill: { color: c.NAV }, valign: 'middle', align: 'left', fontSize: 12 }
+  })));
+  // Rows
+  rows.forEach((r, ri) => {
+    const isAlt = ri % 2 === 1;
+    tableData.push(r.map((cell, ci) => ({
+      text: String(cell || ''),
+      options: {
+        fill: { color: isAlt ? c.GRAY_LIGHT : 'FFFFFF' },
+        color: ci === 0 ? c.NAV : c.NAV_LIGHT,
+        bold: ci === 0,
+        fontSize: 11,
+        valign: 'middle'
+      }
+    })));
+  });
+
+  slide.addTable(tableData, {
+    x: 0.5, y: 2.0, w: 12.3,
+    border: { type: 'solid', color: 'E2E8F0', pt: 1 },
+    rowH: 0.4,
+    fontFace: 'Inter'
   });
 }
 

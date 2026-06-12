@@ -27,29 +27,29 @@ const json = (b: any, s = 200) => new Response(JSON.stringify(b), { status: s, h
 // ──────────────────────────────────────────────────────────
 const PRESETS: Record<string, { tone: string; structure: string; layouts: string[] }> = {
   informe: {
-    tone: "Ejecutivo, claro, basado en datos. Sin adornos. Cada slide va al grano.",
-    structure: "Portada → Resumen ejecutivo (3-5 KPIs) → Contexto del período → Análisis por área → Hallazgos clave → Riesgos → Recomendaciones priorizadas → Próximos pasos.",
-    layouts: ["cover", "metrics-dashboard", "chart-spotlight", "framework", "checklist", "comparison", "closing"]
+    tone: "Ejecutivo, claro, basado en datos. Cada slide debe tener cifras concretas (KPIs, %, $, plazos, deltas vs período anterior).",
+    structure: "Portada → Resumen ejecutivo (3-5 KPIs grandes) → Hallazgos con datos → Análisis por área (con gráficos) → Comparación período actual vs anterior → Riesgos cuantificados → Recomendaciones con impacto $ esperado → Próximos pasos.",
+    layouts: ["cover", "metrics-dashboard", "bar-chart", "data-table", "framework", "comparison", "checklist", "case-study", "closing"]
   },
   educativo: {
-    tone: "Claro, pedagógico, accesible. Como un buen profesor: define, ejemplifica, ejercita.",
-    structure: "Portada → Qué vas a aprender (4 objetivos numerados) → Por qué importa → Concepto base → Casos/ejemplos → Aplicación práctica → Errores comunes → Aprendiste a... → Actividad para reforzar.",
-    layouts: ["cover", "learning-objectives", "highlight", "goldbox", "comparison", "case-study", "checklist", "reflection-recap", "transfer-activity"]
+    tone: "Claro, pedagógico, accesible. Define con ejemplos numéricos. Casos reales con $$$.",
+    structure: "Portada → Qué vas a aprender → Por qué importa (con estadísticas) → Concepto base (definición + ejemplo numérico) → Caso real con números → Aplicación práctica (paso a paso) → Errores comunes (cuantificados) → Aprendiste a... → Actividad para reforzar.",
+    layouts: ["cover", "learning-objectives", "highlight", "goldbox", "comparison", "case-study", "framework", "metrics-dashboard", "bar-chart", "data-table", "checklist", "reflection-recap", "transfer-activity"]
   },
   pitch: {
-    tone: "Persuasivo, narrativo, foco en el cliente. Storytelling → datos → CTA claro.",
-    structure: "Portada → Problema del cliente → Costo de no resolverlo → Tu solución → Cómo funciona (3 pasos) → Pruebas/casos de éxito → Diferencial vs competencia → Inversión → Próximo paso (CTA).",
-    layouts: ["cover", "hero-image", "highlight", "split-image", "framework", "case-study", "comparison", "metrics-dashboard", "closing"]
+    tone: "Persuasivo, narrativo, foco en el cliente. Storytelling → datos duros → CTA claro.",
+    structure: "Portada → Problema cuantificado del cliente → Costo de no resolverlo ($) → Tu solución → Cómo funciona en 3-4 pasos numerados → Pruebas (casos con $$ y %) → Diferencial vs competencia (tabla comparativa) → Inversión con ROI esperado → Próximo paso (CTA).",
+    layouts: ["cover", "highlight", "framework", "case-study", "comparison", "metrics-dashboard", "bar-chart", "data-table", "closing"]
   },
   marketing: {
-    tone: "Punchy, emocional, visual. Hooks fuertes. Cada slide vendible por sí solo.",
-    structure: "Portada con hook → Antes/después → Problema → Solución → 3 beneficios visuales → Testimonios → Oferta → CTA.",
-    layouts: ["cover", "hero-image", "image-grid", "split-image", "quote", "comparison", "highlight", "closing"]
+    tone: "Punchy, visual, hooks fuertes. Datos cuantificados de impacto.",
+    structure: "Hook con dato impactante → Problema con cifras → Antes vs Después (con métricas) → 3 beneficios cuantificados → Testimonios con resultados $ → Oferta clara → CTA.",
+    layouts: ["cover", "highlight", "comparison", "framework", "metrics-dashboard", "quote", "closing"]
   },
   libre: {
-    tone: "Adaptar al tema según el usuario lo describa. Profesional y limpio.",
-    structure: "Portada → Agenda → Desarrollo en bloques numerados → Cierre con conclusión accionable.",
-    layouts: ["cover", "agenda", "content", "framework", "comparison", "case-study", "highlight", "checklist", "quote", "closing"]
+    tone: "Adaptar al tema. Profesional, limpio, SIEMPRE con cifras concretas en cada slide.",
+    structure: "Portada → Agenda → Desarrollo en bloques numerados (cada uno con stats) → Cierre con conclusión accionable.",
+    layouts: ["cover", "agenda", "content", "framework", "comparison", "case-study", "highlight", "checklist", "metrics-dashboard", "bar-chart", "data-table", "closing"]
   }
 };
 
@@ -81,6 +81,14 @@ Campos disponibles según layout (solo incluí los que correspondan):
 - transfer_activity ({challenge, deliverable, deliverable_items, rule}) — slide de actividad
 - image_grid (array de {image_query, caption}) para layout image-grid
 - insights (array de {title, body}) para chart-spotlight
+- bar_chart_data (array de {label, value}) — para layout "bar-chart" — value DEBE ser numérico (sin $ ni %)
+- table_headers (array de strings) + table_rows (array de arrays de strings) — para layout "data-table"
+
+🆕 NUEVOS LAYOUTS DISPONIBLES (preferirlos para máximo impacto visual):
+- "bar-chart": gráfico de barras horizontales NATIVO — usar para comparar 3-6 cifras (ej: ROI por estrategia, precio por mercado, conversión por canal). Requiere bar_chart_data array.
+- "data-table": tabla profesional NATIVA — usar para datos estructurados con varias columnas (ej: comparativa de productos, KPIs por trimestre). Requiere table_headers + table_rows.
+- "metrics-dashboard": 4-8 big-number cards — usar para "los números clave del mes/proyecto". Requiere metric_cards.
+- "framework": 4-8 mini-cards con label + value corto — usar para fases, etapas, componentes. Value DEBE ser ≤15 chars.
 `;
 
 // ──────────────────────────────────────────────────────────
@@ -154,31 +162,80 @@ SLIDE QUE TENÉS QUE GENERAR AHORA:
 ${prevSlide ? `\nSLIDE ANTERIOR (úsalo para hacer transition_in):\n- Número ${prevSlide.number}: ${prevSlide.title}\n- Propósito: ${prevSlide.purpose}` : ""}
 ${nextOutline ? `\nSLIDE SIGUIENTE (úsalo para hacer transition_out):\n- Número ${nextOutline.number}: ${nextOutline.title}\n- Propósito: ${nextOutline.purpose}` : ""}
 
-REGLAS:
+REGLAS GENERALES:
 1. Title corto (max 8 palabras).
 2. transition_in: si no es slide 1, OBLIGATORIO — 1 oración que conecte EXPLÍCITAMENTE con el slide anterior.
 3. transition_out: si no es el último, OBLIGATORIO — 1 oración que abra el siguiente.
-4. speaker_notes: 2-4 oraciones, guion natural para presentar — incluí 1 ejemplo concreto.
+4. speaker_notes: 2-4 oraciones, guion natural para presentar — incluí 1 ejemplo concreto Y 1 cifra/dato.
 5. Bullets max 12 palabras, max 5 por slide.
-6. Si layout permite image_query, incluila (en INGLÉS, 2-5 palabras).
-7. Para layouts especiales (case-study, comparison, framework, etc.), llená los campos del schema correspondiente.
+
+🎯 REGLA #1 ABSOLUTA (lo más importante):
+ESTE SLIDE DEBE TENER CIFRAS CONCRETAS, NÚMEROS, DATOS CUANTITATIVOS.
+Toda presentación profesional se gana con números. Cada slide DEBE incluir al menos 1-3 datos cuantitativos REALES (porcentajes, $, plazos, ratios, cantidades). Sin números, el slide no convence.
+
+Por ejemplo:
+✅ BIEN: "70% del ARV es el techo de compra" / "60-90 días de obra promedio" / "ROI mínimo 20%" / "$285K precio final venta"
+❌ MAL: "compras inteligentes" / "obra rápida" / "buen retorno" / "precio alto"
+
+INSTRUCCIONES POR CAMPO (CRÍTICO — leer con atención):
+
+• stats: SIEMPRE incluir un array de 2-4 objetos {label, value, source_name} con cifras del slide. Esto se renderea como big-number cards. Ej:
+  "stats": [
+    {"label": "Días en mercado", "value": "47", "source_name": "Redfin"},
+    {"label": "ROI promedio", "value": "22%", "source_name": "Caso interno"}
+  ]
+
+• framework_items: si usás framework, value DEBE ser corto (max 15 chars) — un número, %, sigla o palabra clave. NO descripciones largas. La descripción va en speaker_notes.
+  ✅ BIEN: {"label": "Fase 1: Análisis", "value": "30 días"}
+  ❌ MAL: {"label": "Fase 1: Análisis", "value": "Identificar propiedades infravaloradas usando criterios financieros claros: precio 70% del ARV..."}
+
+• metric_cards: si layout es metrics-dashboard, llenar con {label, value, trend} donde value es la cifra grande y trend opcional como "+12%" o "vs Q1".
+
+• comparison: para layout comparison, items DEBEN tener números si aplica (ej: "$185K compra" vs "$285K venta").
+
+• case_study: SIEMPRE incluir números reales — compra, remodelación, arv, cash_flow_monthly, roi_anual, duracion_meses.
+
+• checklist_items: title corto, detail puede explicar pero idealmente con un número o métrica.
+
+• goldbox_runs: definición concisa (max 25 palabras totales) — NO un párrafo. Si el concepto es complejo, ponelo en goldbox_runs corto + complementá en speaker_notes.
+
+• image_query: NO incluir (CSP de la app bloquea imágenes externas por ahora). Dejá ese campo en blanco.
+
+📐 LÍMITES DE LARGO (para evitar overflow visual):
+- title: max 8 palabras
+- subtitle: max 12 palabras
+- bullets: max 12 palabras c/u, max 5 bullets
+- framework_items.label: max 30 chars
+- framework_items.value: max 15 chars (¡CRÍTICO! — si es texto largo va a desbordar el card)
+- goldbox_runs: max 25 palabras totales sumando todos los runs
+- highlight_text: max 20 palabras
+- comparison.items: max 8 palabras c/u, max 4 items por lado
+- checklist_items: title max 8 palabras, detail max 12 palabras
 
 ${SLIDE_FIELDS_DOC}
 
 DEVOLVÉ SOLO JSON VÁLIDO (sin markdown, sin comentarios). El JSON debe ser el OBJETO del slide directamente, NO un array, NO un wrapper.
 
-Ejemplo de formato esperado:
+Ejemplo PERFECTO para layout "framework" con números:
 {
   "number": ${slideInfo.number},
-  "title": "...",
+  "title": "Las 5 fases del fix & flip",
   "block_label": "${slideInfo.block_label}",
   "layout": "${slideInfo.layout}",
-  "bullets": ["..."],
+  "framework_items": [
+    {"label": "1. Análisis", "value": "30 días"},
+    {"label": "2. Compra", "value": "≤70% ARV"},
+    {"label": "3. Renovación", "value": "60-90 días"},
+    {"label": "4. Listing", "value": "5-10 días"},
+    {"label": "5. Venta", "value": "20%+ ROI"}
+  ],
+  "stats": [
+    {"label": "Ciclo total promedio", "value": "5 meses"},
+    {"label": "ROI objetivo", "value": "20-30%"}
+  ],
   "transition_in": "...",
   "transition_out": "...",
-  "speaker_notes": "...",
-  "image_query": "..."
-  // ... otros campos según layout
+  "speaker_notes": "..."
 }`;
 }
 

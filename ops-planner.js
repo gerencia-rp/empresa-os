@@ -246,6 +246,30 @@ async function openOpsPlanner(sys) {
   opRender();
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// REFOCUS — vuelve al planner principal SIN cerrar el modal.
+// Resuelve el bug "edito una tarea y me saca al área principal".
+// Antes: closeModal() + setTimeout(()=>openOpsPlanner(opState.sys),100)
+//   → si openOpsPlanner fallaba, el usuario quedaba afuera.
+//   → setTimeout era race-condition con cierres rápidos del backdrop.
+// Ahora: solo reescribe el contenido del modal y recarga data fresca.
+//   → modal NUNCA se cierra durante el flujo de edit/guardar/cancelar.
+// ═══════════════════════════════════════════════════════════════════
+async function opRefocusPlanner() {
+  const titleEl = document.getElementById('modal-title');
+  const bodyEl = document.getElementById('modal-body');
+  const modal = document.getElementById('modal');
+  // Si el modal por algún motivo se cerró (ej. usuario hizo ESC), re-abrir entero
+  if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
+    return openOpsPlanner(opState.sys);
+  }
+  titleEl.textContent = `🧰 ${opState.sys.name}`;
+  bodyEl.innerHTML = '<div id="op-root"></div>';
+  try { await opLoadAll(); } catch (e) { console.warn('opLoadAll on refocus', e); }
+  opRender();
+}
+window.opRefocusPlanner = opRefocusPlanner;
+
 // ─── Render principal ───
 function opRender() {
   const root = document.getElementById('op-root');
@@ -872,7 +896,7 @@ function opRenderWeekTaskCard(t) {
          ondragend="opState.draggedScheduledId=null"
          class="${cardCls} border rounded p-1 cursor-grab text-[10px] hover:shadow-sm relative">
       ${isOverdue ? `<div class="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold px-1 rounded-sm shadow z-10">⚠️ ATRASADA</div>` : ''}
-      <div onclick="opEditScheduled('${t.id}')" class="cursor-pointer">
+      <div onclick="event.stopPropagation(); opEditScheduled('${t.id}')" class="cursor-pointer">
         <div class="flex items-center gap-1">
           <span class="font-bold text-slate-900">${opFmt12(t.start_time).replace(' ','')}</span>
           ${t.zona ? `<span class="${opZonaColor(t.zona)} px-1 rounded text-[8px] font-bold">${t.zona[0]}</span>` : ''}
@@ -1355,7 +1379,7 @@ function opOpenAddCasa(propId) {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         ${isEdit ? `<button onclick="opDeleteCasa('${propId}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 px-4 rounded" title="Eliminar casa (no se eliminan tareas)">🗑️</button>` : ''}
         <button onclick="opSaveCasa('${propId || ''}')" class="flex-1 ${isEdit?'bg-blue-600 hover:bg-blue-700':'bg-emerald-600 hover:bg-emerald-700'} text-white text-sm font-bold py-2 rounded">${isEdit ? '💾 Guardar cambios' : '+ Crear casa'}</button>
       </div>
@@ -1392,24 +1416,16 @@ async function opSaveCasa(propId) {
     }
     return alert('Error al guardar: ' + error.message);
   }
-  closeModal();
-  setTimeout(async () => {
-    await openOpsPlanner(opState.sys);
-    opState.view = 'casas';
-    opRender();
-  }, 100);
+  opState.view = 'casas';
+  await opRefocusPlanner();
 }
 
 async function opDeleteCasa(propId) {
   if (!confirm('¿Eliminar esta casa?\n\nLas tareas asignadas a ella NO se eliminan — quedan como "Sin casa".')) return;
   const { error } = await sb.from('properties').delete().eq('id', propId);
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openOpsPlanner(opState.sys);
-    opState.view = 'casas';
-    opRender();
-  }, 100);
+  opState.view = 'casas';
+  await opRefocusPlanner();
 }
 
 function opEditFromCasas(id, bucket) {
@@ -1577,7 +1593,7 @@ function opOpenAddPendiente() {
         <textarea id="op-p-notes" rows="2" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="opCreatePendiente()" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">+ Al backlog</button>
       </div>
     </div>
@@ -1622,8 +1638,7 @@ async function opCreatePendiente() {
   };
   const { error } = await sb.from('ops_day_tasks').insert(payload);
   if (error) return alert(error.message);
-  closeModal();
-  setTimeout(() => openOpsPlanner(opState.sys), 100);
+  await opRefocusPlanner();
 }
 
 // ─── 🎯 Armar día por zona ───
@@ -1675,7 +1690,7 @@ function opOpenArmarDia() {
         </div>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="opEjecutarArmarDia()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🎯 Armar</button>
       </div>
     </div>
@@ -1911,7 +1926,7 @@ function _opOpenEditModal(t, isBacklog) {
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         ${!isBacklog ? `<button onclick="opSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-2 rounded" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
         <button onclick="opDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 rounded">🗑️</button>
-        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="opSaveEdit('${t.id}', ${isBacklog})" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
       </div>
     </div>
@@ -2027,8 +2042,7 @@ async function opSaveEdit(id, isBacklog) {
     await sb.from('ops_day_tasks').update({ recurring_id: null }).eq('id', id);
   }
 
-  closeModal();
-  setTimeout(() => openOpsPlanner(opState.sys), 100);
+  await opRefocusPlanner();
 }
 
 function opToggleRecurringFields(checked) {
@@ -2038,7 +2052,7 @@ function opToggleRecurringFields(checked) {
 
 async function opSendToBacklog(id, fromModal) {
   await sb.from('ops_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).eq('id', id);
-  if (fromModal) { closeModal(); setTimeout(() => openOpsPlanner(opState.sys), 100); }
+  if (fromModal) { opRefocusPlanner(); }
   else { await opLoadAll(); opRender(); }
 }
 
@@ -2052,7 +2066,7 @@ async function opDeleteBacklog(id) {
 async function opDeleteScheduled(id, fromModal) {
   if (!confirm('¿Eliminar esta tarea?')) return;
   await sb.from('ops_day_tasks').delete().eq('id', id);
-  if (fromModal) { closeModal(); setTimeout(() => openOpsPlanner(opState.sys), 100); }
+  if (fromModal) { opRefocusPlanner(); }
   else { await opLoadAll(); opRender(); }
 }
 
@@ -2155,7 +2169,7 @@ function opOpenAddLoose(presetTarget) {
       <textarea id="op-l-notes" rows="2" placeholder="Notas adicionales" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
 
       <div class="flex gap-2">
-        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="opCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Agendar</button>
       </div>
     </div>
@@ -2269,8 +2283,7 @@ async function opCreateLoose() {
     const { error } = await sb.from('ops_day_tasks').insert(payload);
     if (error) return alert('Error: ' + error.message);
   }
-  closeModal();
-  setTimeout(() => openOpsPlanner(opState.sys), 100);
+  await opRefocusPlanner();
 }
 
 // ─── CHECKLIST DE ENTREGABLES ───
@@ -2312,7 +2325,7 @@ function opOpenChecklist(taskId) {
 
       ${pct === 100 && t.status !== 'done' ? `<button onclick="opMarkDoneFromChecklist('${taskId}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✅ Marcar tarea como TERMINADA</button>` : ''}
 
-      <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
+      <button onclick="opRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
   openModal(`📋 Entregables`, html);
@@ -2421,7 +2434,7 @@ function opOpenManageRecurring() {
         ${list || '<div class="text-xs text-slate-400 text-center py-4">Sin recurrentes configuradas.</div>'}
       </div>
 
-      <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys), 100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
+      <button onclick="opRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
   openModal('⚙️ Tareas recurrentes', html);
@@ -2441,15 +2454,15 @@ async function opCreateRecurring() {
   };
   const { error } = await sb.from('ops_recurring').insert(payload);
   if (error) return alert(error.message);
-  closeModal();
-  setTimeout(() => { openOpsPlanner(opState.sys).then(() => opOpenManageRecurring()); }, 100);
+  await opRefocusPlanner();
+  opOpenManageRecurring();
 }
 
 async function opDeleteRecurring(id) {
   if (!confirm('¿Eliminar esta recurrente?')) return;
   await sb.from('ops_recurring').update({ active: false }).eq('id', id);
-  closeModal();
-  setTimeout(() => { openOpsPlanner(opState.sys).then(() => opOpenManageRecurring()); }, 100);
+  await opRefocusPlanner();
+  opOpenManageRecurring();
 }
 
 // ============================================================
@@ -2527,7 +2540,7 @@ function opOpenApplyTemplate() {
       <div class="space-y-2 max-h-[60vh] overflow-y-auto">
         ${tplOpts}
       </div>
-      <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys),100)" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+      <button onclick="opRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
     </div>
   `;
   openModal('📋 Aplicar plantilla de día', html);
@@ -2961,7 +2974,7 @@ function opRenderEditDayTemplate() {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); window._opEditingTpl=null; setTimeout(()=>openOpsPlanner(opState.sys),100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="window._opEditingTpl=null; opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         <button onclick="opSaveDayTemplateEdits()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">💾 Guardar cambios</button>
       </div>
     </div>
@@ -3214,7 +3227,7 @@ function opOpenTemplateModal(tmpl, prefilledCategory) {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal(); setTimeout(()=>openOpsPlanner(opState.sys),100)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
         ${isEdit ? `<button onclick="opDeleteTemplateConfirm('${t.id}','${(t.name||'').replace(/'/g,"\\'")}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold py-2 px-4 rounded">🗑️</button>` : ''}
         <button onclick="opSaveTemplate('${t.id||''}')" class="flex-1 ${isEdit?'bg-blue-600 hover:bg-blue-700':'bg-emerald-600 hover:bg-emerald-700'} text-white text-sm font-bold py-2 rounded">${isEdit?'💾 Guardar cambios':'+ Crear plantilla'}</button>
       </div>
