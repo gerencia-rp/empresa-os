@@ -1757,6 +1757,7 @@ function _eduRenderReportsStandaloneInner(root) {
         <div id="edu-ceo-section"></div>
 
         ${cur && kpis ? eduRenderInformeProfundo(kpis) : ''}
+        ${cur && kpis ? (setTimeout(() => { try { if (typeof eduCargarSeccion6Diagnosticos === 'function') eduCargarSeccion6Diagnosticos(eduState.mentorshipId); } catch(e){console.warn('s6',e);} }, 80), '') : ''}
         ${cur && kpis ? eduRenderKpiDetalles(kpis) : ''}
 
         ${(() => {
@@ -3412,11 +3413,28 @@ function eduCRM360RenderTimeline(s, data) {
 }
 
 function eduCRM360RenderNotas(s) {
+  const escFn = window.esc || (str => String(str||''));
   const m = typeof eduCurrentMentorship === 'function' ? eduCurrentMentorship() : null;
   const stages = (m?.stages || []).map(x => x.name);
+  // Alertas activas (igual que la ficha vieja)
+  let alertasHTML = '';
+  try {
+    const alertas = typeof eduCalcularAlertasEstudiante === 'function' ? eduCalcularAlertasEstudiante(s) : [];
+    alertasHTML = alertas.length
+      ? `<div class="space-y-1">${alertas.map(a => `
+          <div class="bg-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-50 border border-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-200 rounded p-2 text-xs">
+            <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?'🚨':a.severity==='high'?'⚠️':'📌'} ${escFn(a.mensaje)}</div>
+            <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">💡 ${escFn(a.accion)}</div>
+          </div>`).join('')}</div>`
+      : `<div class="bg-emerald-50 border border-emerald-200 rounded p-2 text-xs text-emerald-900">✅ Sin alertas activas</div>`;
+  } catch {}
+
   return `
     <div class="space-y-3">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      ${alertasHTML}
+
+      <!-- Edición compleja: TODOS los campos -->
+      <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-[10px] font-bold uppercase text-slate-600">Etapa actual</label>
           <input id="crm360-stage" type="text" value="${(s.current_stage||'').replace(/"/g,'&quot;')}" list="crm360-stages-${s.id}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
@@ -3435,44 +3453,86 @@ function eduCRM360RenderNotas(s) {
           </select>
         </div>
         <div>
-          <label class="text-[10px] font-bold uppercase text-slate-600">Capital ($)</label>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Grupo / Cohorte</label>
+          <input id="crm360-grupo" type="text" value="${(s.grupo||'').replace(/"/g,'&quot;')}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Última fecha de seguimiento</label>
+          <input id="crm360-ultima" type="date" value="${s.ultima_fecha_seguimiento||''}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Capital actual ($)</label>
           <input id="crm360-capital" type="number" value="${s.capital_actual||''}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
         </div>
       </div>
+
       <div>
-        <label class="text-[10px] font-bold uppercase text-slate-600">Observaciones de seguimiento (último call, situación actual)</label>
+        <label class="text-[10px] font-bold uppercase text-slate-600">Observaciones de seguimiento (lo del último call)</label>
         <textarea id="crm360-obs" rows="3" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(s.observaciones_seguimiento||'').replace(/</g,'&lt;')}</textarea>
       </div>
       <div>
         <label class="text-[10px] font-bold uppercase text-slate-600">Notas generales (contexto comercial, marketing, ventas)</label>
-        <textarea id="crm360-notes" rows="5" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" placeholder="Ej: prospect referido por X, interés en Fix&Hold, capital $80K líquido...">${(s.notes||'').replace(/</g,'&lt;')}</textarea>
+        <textarea id="crm360-notes" rows="5" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" placeholder="Ej: prospect referido por X, interés en Fix&Hold, capital $80K líquido, expectativa $5K cashflow...">${(s.notes||'').replace(/</g,'&lt;')}</textarea>
       </div>
-      <button onclick="eduCRM360SaveAll('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar todo</button>
+      <div>
+        <label class="text-[10px] font-bold uppercase text-slate-600">URL de evidencia (PDF, foto, link Drive…)</label>
+        <input id="crm360-evidencia" type="url" value="${(s.evidencia_url||'').replace(/"/g,'&quot;')}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" placeholder="https://…" />
+        ${s.evidencia_url ? `<a href="${escFn(s.evidencia_url)}" target="_blank" class="text-xs text-blue-600 hover:underline mt-1 inline-block">📎 Abrir evidencia actual</a>` : ''}
+      </div>
+
+      <!-- Stats info read-only -->
+      <div class="border-t border-slate-200 pt-3 grid grid-cols-3 gap-2 text-xs">
+        <div><div class="font-bold text-slate-500 uppercase text-[10px]">Entrada</div><div class="text-slate-900">${s.enrolled_at?new Date(s.enrolled_at).toLocaleDateString('es'):'—'}</div></div>
+        <div><div class="font-bold text-slate-500 uppercase text-[10px]">Vence</div><div class="text-slate-900">${s.expires_at?new Date(s.expires_at).toLocaleDateString('es'):'—'}</div></div>
+        <div><div class="font-bold text-slate-500 uppercase text-[10px]">Días en etapa</div><div class="text-slate-900">${(typeof eduDaysInStage==='function'?eduDaysInStage(s):null)??'—'}d</div></div>
+        <div><div class="font-bold text-slate-500 uppercase text-[10px]">Email</div><div class="text-slate-900 truncate">${escFn(s.email||'—')}</div></div>
+        <div><div class="font-bold text-slate-500 uppercase text-[10px]">WhatsApp</div><div class="text-slate-900">${escFn(s.phone||'—')}</div></div>
+        <div><div class="font-bold text-slate-500 uppercase text-[10px]">Ciudad</div><div class="text-slate-900">${escFn(s.city||'—')}</div></div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+        <button onclick="eduCRM360SaveAll('${s.id}', true)" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
+        <button onclick="eduCRM360SaveAll('${s.id}', false)" class="px-4 py-2 bg-slate-200 text-slate-900 text-sm font-bold rounded hover:bg-slate-300" title="Solo guarda en Supabase, sin tocar Airtable">💾 Guardar (sin sync)</button>
+        ${s.airtable_record_id && m?.airtable_base_id && m?.airtable_students_table ? `<a href="https://airtable.com/${m.airtable_base_id}/${m.airtable_students_table}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
+      </div>
     </div>
   `;
 }
 
-async function eduCRM360SaveAll(studentId) {
+async function eduCRM360SaveAll(studentId, syncAirtable = true) {
   const stage = document.getElementById('crm360-stage')?.value?.trim() || null;
   const status = document.getElementById('crm360-status')?.value;
   const payment = document.getElementById('crm360-payment')?.value;
+  const grupo = document.getElementById('crm360-grupo')?.value?.trim() || null;
+  const ultima = document.getElementById('crm360-ultima')?.value || null;
   const capital = document.getElementById('crm360-capital')?.value;
   const obs = document.getElementById('crm360-obs')?.value || null;
   const notes = document.getElementById('crm360-notes')?.value || null;
+  const evidencia = document.getElementById('crm360-evidencia')?.value?.trim() || null;
   const patch = {
     current_stage: stage,
     status,
     payment_status: payment,
+    grupo,
+    ultima_fecha_seguimiento: ultima,
     capital_actual: capital ? Number(capital) : null,
     observaciones_seguimiento: obs,
     notes,
+    evidencia_url: evidencia,
     updated_at: new Date().toISOString()
   };
   const { error } = await sb.from('edu_students').update(patch).eq('id', studentId);
   if (error) return alert('Error guardando: ' + error.message);
   const s = eduState.students.find(x => x.id === studentId);
   if (s) Object.assign(s, patch);
-  if (typeof toast === 'function') toast('✓ Guardado'); else alert('✓ Guardado');
+  // Sync Airtable si tiene record_id (reusa lógica existente si está)
+  if (syncAirtable && s?.airtable_record_id && typeof eduGuardarEstudiante === 'function') {
+    try {
+      // Llamada silenciosa al sync de Airtable — reusa la función vieja
+      if (typeof window.eduSyncStudentToAirtable === 'function') await window.eduSyncStudentToAirtable(studentId);
+    } catch (e) { console.warn('airtable sync', e); }
+  }
+  if (typeof toast === 'function') toast('✓ Guardado' + (syncAirtable && s?.airtable_record_id ? ' + Airtable' : '')); else alert('✓ Guardado');
 }
 
 window.eduLoadCRM360 = eduLoadCRM360;

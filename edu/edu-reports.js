@@ -278,10 +278,297 @@ function eduRenderInformeProfundo(k) {
         ${eduRenderSeccion3Desercion(k)}
         ${eduRenderSeccion4Resultados(k)}
         ${eduRenderSeccion5Calidad(k)}
+        <div id="edu-informe-seccion6">
+          <div class="bg-white border border-slate-200 rounded-lg p-4 mt-3">
+            <div class="font-bold text-sm mb-1">📋 6. Diagnósticos & Planes (análisis profundo)</div>
+            <div class="text-xs text-slate-500">Cargando agregaciones de diagnósticos y planes…</div>
+          </div>
+        </div>
       </div>
     </div>
   `;
 }
+
+// ════════════════════════════════════════════════════════════
+// 📋 SECCIÓN 6: DIAGNÓSTICOS & PLANES — análisis agregado
+// Se renderiza async después de que el informe se monta (no bloquea)
+// ════════════════════════════════════════════════════════════
+async function eduCargarSeccion6Diagnosticos(mentorshipId) {
+  const cont = document.getElementById('edu-informe-seccion6');
+  if (!cont || !mentorshipId) return;
+  try {
+    const [invitesRes, plansRes, tasksRes] = await Promise.all([
+      sb.from('edu_diagnostic_invites').select('id,student_id,answers,created_at,completed_at,result_plan_id').eq('mentorship_id', mentorshipId),
+      sb.from('edu_student_plans').select('id,student_id,perfil,status,created_at').eq('mentorship_id', mentorshipId),
+      sb.from('edu_student_plan_tasks').select('id,student_id,plan_id,bloque_id,bloque_etapa,bloque_subetapa,bloque_orden,completed,completed_at').eq('mentorship_id', mentorshipId)
+    ]);
+    const invites = invitesRes.data || [];
+    const plans = plansRes.data || [];
+    const tasks = tasksRes.data || [];
+    cont.innerHTML = eduRenderSeccion6(invites, plans, tasks);
+  } catch (e) {
+    console.warn('seccion6', e);
+    cont.innerHTML = `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-800">Error cargando sección 6: ${e.message}</div>`;
+  }
+}
+
+function eduRenderSeccion6(invites, plans, tasks) {
+  const escFn = window.esc || (s => String(s||''));
+  // ── Agregaciones de diagnósticos ──
+  const totalInv = invites.length;
+  const completados = invites.filter(i => i.completed_at).length;
+  const pctCompl = totalInv ? Math.round(completados/totalInv*100) : 0;
+  // Tiempo promedio para completar
+  const tiempos = invites.filter(i => i.completed_at).map(i => (new Date(i.completed_at) - new Date(i.created_at))/(86400000));
+  const avgDias = tiempos.length ? (tiempos.reduce((a,b)=>a+b,0)/tiempos.length).toFixed(1) : null;
+
+  // Distribución por respuesta clave (las más estratégicas para marketing/ventas)
+  const claves = ['objetivo','capital','capital_real','credit','llc','tiempo','deals_cerrados','mayor_obstaculo','mercado'];
+  const distribuciones = {};
+  claves.forEach(k => {
+    const counts = {};
+    invites.forEach(i => {
+      const v = i.answers?.[k];
+      if (v == null || v === '') return;
+      const arr = Array.isArray(v) ? v : [v];
+      arr.forEach(val => { counts[val] = (counts[val] || 0) + 1; });
+    });
+    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    distribuciones[k] = sorted;
+  });
+
+  // ── Planes ──
+  const activos = plans.filter(p => p.status === 'active');
+  const perfilesDist = {};
+  activos.forEach(p => {
+    const n = p.perfil?.perfil?.nombre || p.perfil?.titulo || '—';
+    perfilesDist[n] = (perfilesDist[n] || 0) + 1;
+  });
+
+  // ── Progreso de tareas ──
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter(t => t.completed).length;
+  const pctTasks = totalTasks ? Math.round(doneTasks/totalTasks*100) : 0;
+  // Por bloque (etapa): cuánto se está completando
+  const porBloque = {};
+  tasks.forEach(t => {
+    const k = `${t.bloque_etapa||'—'} · ${t.bloque_subetapa||'—'}`;
+    if (!porBloque[k]) porBloque[k] = { total: 0, done: 0, etapa: t.bloque_etapa||'—' };
+    porBloque[k].total++;
+    if (t.completed) porBloque[k].done++;
+  });
+  const bloquesArr = Object.entries(porBloque).map(([k,v]) => ({ nombre: k, etapa: v.etapa, total: v.total, done: v.done, pct: v.total ? Math.round(v.done/v.total*100) : 0 })).sort((a,b)=>b.pct-a.pct);
+  const top5Avance = bloquesArr.slice(0,5);
+  const bottom5Avance = [...bloquesArr].sort((a,b)=>a.pct-b.pct).slice(0,5);
+
+  // Top estudiantes por progreso (necesita group by student_id)
+  const studentProgress = {};
+  tasks.forEach(t => {
+    if (!t.student_id) return;
+    if (!studentProgress[t.student_id]) studentProgress[t.student_id] = { total: 0, done: 0, last: null };
+    studentProgress[t.student_id].total++;
+    if (t.completed) {
+      studentProgress[t.student_id].done++;
+      const ts = t.completed_at ? new Date(t.completed_at) : null;
+      if (ts && (!studentProgress[t.student_id].last || ts > studentProgress[t.student_id].last)) {
+        studentProgress[t.student_id].last = ts;
+      }
+    }
+  });
+  const studs = Object.entries(studentProgress).map(([id,v]) => ({ id, total: v.total, done: v.done, pct: v.total?Math.round(v.done/v.total*100):0, last: v.last }));
+  const top5Estudiantes = [...studs].sort((a,b)=>b.pct-a.pct).slice(0,5);
+  const inactivos = [...studs].filter(s => s.last).sort((a,b)=>a.last - b.last).slice(0,5);
+
+  // Resolver nombres (usar eduState.students si está)
+  const getName = (id) => {
+    const s = (window.eduState?.students||[]).find(x => x.id === id);
+    return s?.full_name || id.slice(0,8);
+  };
+
+  // Helper para distribución bar
+  const distLabels = {
+    'menos_20k':'<$20K','20_50k':'$20-50K','50_100k':'$50-100K','100_250k':'$100-250K','mas_250k':'>$250K',
+    'todo':'100% líq','mitad':'~50% líq','minimo':'mínimo líq','teorico':'teórico',
+    'mas_780':'>780','720_780':'720-780','660_720':'660-720','600_660':'600-660','menos_600':'<600','sin_historial':'sin historial',
+    'si_mismo':'LLC mismo estado','si_otro':'LLC otro estado','no':'Sin LLC',
+    'mas_30':'30+h','15_30':'15-30h','menos_15':'<15h',
+    '0':'0','1_2':'1-2','3_5':'3-5','5_mas':'5+',
+    'capital':'Capital','conocimiento':'Conocimiento','red':'Red','tiempo':'Tiempo','miedo':'Miedo','mercado':'Mercado','equipo':'Equipo',
+    'fix_flip':'Fix & Flip','fix_hold':'Fix & Hold','hibrido':'Híbrido','wholesale':'Wholesale','lender':'Lender'
+  };
+  const lbl = v => distLabels[v] || v;
+
+  const renderDist = (key, title) => {
+    const data = distribuciones[key] || [];
+    if (!data.length) return '';
+    const total = data.reduce((a,b)=>a+b[1],0);
+    return `
+      <div class="bg-slate-50 rounded p-2.5">
+        <div class="text-[10px] font-bold uppercase text-slate-600 mb-1">${escFn(title)}</div>
+        <div class="space-y-0.5">
+          ${data.map(([v,c]) => {
+            const pct = Math.round(c/total*100);
+            return `<div class="flex items-center gap-2 text-[11px]">
+              <div class="w-24 truncate" title="${escFn(v)}">${escFn(lbl(v))}</div>
+              <div class="flex-1 h-3 bg-white rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500" style="width:${pct}%"></div>
+              </div>
+              <div class="w-12 text-right font-bold">${c} <span class="text-slate-400">(${pct}%)</span></div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  };
+
+  return `
+    <div class="bg-white border border-slate-200 rounded-lg p-4 mt-3 space-y-3">
+      <div>
+        <div class="font-bold text-sm">📋 6. Diagnósticos & Planes (análisis profundo)</div>
+        <div class="text-xs text-slate-500 mt-0.5">Data agregada de los formularios completados + planes asignados + progreso real de tareas.</div>
+      </div>
+
+      <!-- KPIs principales -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div class="bg-blue-50 border border-blue-200 rounded p-2">
+          <div class="text-[10px] font-bold uppercase text-blue-700">Diagnósticos enviados</div>
+          <div class="text-lg font-bold text-blue-900">${totalInv}</div>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-2">
+          <div class="text-[10px] font-bold uppercase text-emerald-700">Completados</div>
+          <div class="text-lg font-bold text-emerald-900">${completados} <span class="text-xs">(${pctCompl}%)</span></div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded p-2">
+          <div class="text-[10px] font-bold uppercase text-amber-700">Avg días para completar</div>
+          <div class="text-lg font-bold text-amber-900">${avgDias ?? '—'}${avgDias?'d':''}</div>
+        </div>
+        <div class="bg-violet-50 border border-violet-200 rounded p-2">
+          <div class="text-[10px] font-bold uppercase text-violet-700">Planes activos</div>
+          <div class="text-lg font-bold text-violet-900">${activos.length}</div>
+        </div>
+      </div>
+
+      <!-- Progreso global de tareas -->
+      <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded p-3">
+        <div class="flex items-center justify-between text-xs mb-1">
+          <span class="font-bold uppercase text-slate-600">Progreso global de tareas</span>
+          <span class="font-bold">${doneTasks}/${totalTasks} (${pctTasks}%)</span>
+        </div>
+        <div class="h-2 bg-white rounded-full overflow-hidden">
+          <div class="h-full bg-emerald-500" style="width:${pctTasks}%"></div>
+        </div>
+      </div>
+
+      <!-- Distribución de respuestas clave -->
+      <div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 Distribución de respuestas clave (para marketing/ventas)</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          ${renderDist('objetivo', 'Objetivo principal')}
+          ${renderDist('mayor_obstaculo', 'Mayor obstáculo')}
+          ${renderDist('capital', 'Capital declarado')}
+          ${renderDist('capital_real', 'Liquidez del capital')}
+          ${renderDist('credit', 'Credit score')}
+          ${renderDist('llc', 'Estado de LLC')}
+          ${renderDist('tiempo', 'Tiempo disponible')}
+          ${renderDist('deals_cerrados', 'Deals cerrados (experiencia)')}
+        </div>
+      </div>
+
+      <!-- Distribución de perfiles asignados -->
+      ${Object.keys(perfilesDist).length ? `
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🎯 Perfiles asignados (planes activos)</div>
+          <div class="bg-slate-50 rounded p-2.5 space-y-0.5">
+            ${Object.entries(perfilesDist).sort((a,b)=>b[1]-a[1]).map(([n,c]) => {
+              const totalActivos = activos.length;
+              const pct = totalActivos ? Math.round(c/totalActivos*100) : 0;
+              return `<div class="flex items-center gap-2 text-[11px]">
+                <div class="flex-1 truncate" title="${escFn(n)}">${escFn(n)}</div>
+                <div class="w-24 h-3 bg-white rounded-full overflow-hidden">
+                  <div class="h-full bg-violet-500" style="width:${pct}%"></div>
+                </div>
+                <div class="w-12 text-right font-bold">${c} <span class="text-slate-400">(${pct}%)</span></div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+
+      <!-- Top estudiantes por progreso -->
+      ${top5Estudiantes.length ? `
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🏆 Top 5 estudiantes con más avance</div>
+          <div class="bg-emerald-50 rounded p-2 space-y-0.5">
+            ${top5Estudiantes.map(s => `
+              <div class="flex items-center gap-2 text-[11px]">
+                <div class="flex-1 truncate font-bold">${escFn(getName(s.id))}</div>
+                <div class="w-24 h-3 bg-white rounded-full overflow-hidden"><div class="h-full bg-emerald-500" style="width:${s.pct}%"></div></div>
+                <div class="w-20 text-right">${s.done}/${s.total} (${s.pct}%)</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>` : ''}
+
+      <!-- Estudiantes más inactivos -->
+      ${inactivos.length ? `
+        <div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">⚠️ Estudiantes con actividad más antigua (riesgo)</div>
+          <div class="bg-red-50 rounded p-2 space-y-0.5">
+            ${inactivos.map(s => {
+              const dias = s.last ? Math.floor((Date.now() - s.last)/86400000) : null;
+              return `<div class="flex items-center gap-2 text-[11px]">
+                <div class="flex-1 truncate font-bold">${escFn(getName(s.id))}</div>
+                <div class="text-amber-700">${s.done}/${s.total} tareas</div>
+                <div class="w-24 text-right text-red-700 font-bold">${dias!=null?dias+'d sin acción':'—'}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+
+      <!-- Bloques: top + bottom avance -->
+      ${top5Avance.length ? `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">✅ Bloques más completados</div>
+            <div class="bg-emerald-50 rounded p-2 space-y-0.5">
+              ${top5Avance.map(b => `
+                <div class="flex items-center gap-2 text-[11px]">
+                  <div class="flex-1 truncate" title="${escFn(b.nombre)}">${escFn(b.nombre)}</div>
+                  <div class="font-bold text-emerald-700">${b.pct}%</div>
+                  <div class="w-16 text-right text-slate-500">${b.done}/${b.total}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">⏳ Bloques con menos progreso</div>
+            <div class="bg-amber-50 rounded p-2 space-y-0.5">
+              ${bottom5Avance.map(b => `
+                <div class="flex items-center gap-2 text-[11px]">
+                  <div class="flex-1 truncate" title="${escFn(b.nombre)}">${escFn(b.nombre)}</div>
+                  <div class="font-bold text-amber-700">${b.pct}%</div>
+                  <div class="w-16 text-right text-slate-500">${b.done}/${b.total}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>` : ''}
+
+      <!-- Insights resumen -->
+      <div class="bg-slate-900 text-white rounded p-3 text-xs">
+        <div class="font-bold text-amber-300 uppercase text-[10px] mb-1">💡 INSIGHTS PARA DECISIONES</div>
+        <ul class="space-y-1">
+          <li>• <strong>Tasa de completación de diagnóstico:</strong> ${pctCompl}%. ${pctCompl < 70 ? 'Hay que mejorar el follow-up de invites pendientes — quizás recordatorio automático a las 48h.' : 'Buen ratio. Mantener la cadencia de envío.'}</li>
+          ${avgDias ? `<li>• <strong>Tiempo promedio para completar:</strong> ${avgDias} días. ${avgDias > 3 ? 'Es alto — explorar enviar el link justo después del primer call.' : 'Rápido — los estudiantes responden con interés inicial.'}</li>` : ''}
+          ${pctTasks < 30 ? `<li>• <strong>Progreso global bajo (${pctTasks}%):</strong> revisar bloques con menos progreso — pueden ser muy largos o poco claros.</li>` : `<li>• <strong>Progreso global saludable (${pctTasks}%).</strong></li>`}
+          ${inactivos.length ? `<li>• <strong>${inactivos.length} estudiantes inactivos detectados:</strong> activar campaña de re-engagement (WhatsApp + call programado).</li>` : ''}
+          ${Object.keys(perfilesDist).length ? `<li>• <strong>Perfil más común:</strong> "${escFn(Object.entries(perfilesDist).sort((a,b)=>b[1]-a[1])[0][0])}". Diseñar material de marketing específico para este target.</li>` : ''}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+window.eduCargarSeccion6Diagnosticos = eduCargarSeccion6Diagnosticos;
 
 // ─── SECCIÓN 1: INVENTARIO DE CARTERA ───
 function eduRenderSeccion1Inventario(k) {
