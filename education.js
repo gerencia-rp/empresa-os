@@ -225,7 +225,6 @@ function eduRender() {
           let badge = '';
           if (t.key === 'students') badge = myStudents.length;
           if (t.key === 'alerts')   badge = myAlerts.length;
-          if (t.key === 'resources') badge = eduMyResources().length;
           return `
             <button onclick="eduSetTab('${t.key}')" class="px-2.5 py-1.5 rounded text-xs font-bold whitespace-nowrap flex-shrink-0 ${eduState.tab===t.key?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200'}">
               ${t.label}${badge?` <span class="bg-${eduState.tab===t.key?'white text-slate-900':'slate-900 text-white'} text-[9px] px-1 rounded ml-1">${badge}</span>`:''}
@@ -240,7 +239,6 @@ function eduRender() {
           eduState.tab === 'students' ? eduRenderStudents() :
           eduState.tab === 'cohorts' ? eduRenderCohorts() :
           eduState.tab === 'progress' ? eduRenderProgressFunnel() :
-          eduState.tab === 'resources' ? eduRenderResourcesIntegrated() :
           eduState.tab === 'calls' ? eduRenderCallsEnhanced() :
           eduState.tab === 'alerts' ? eduRenderAlerts() :
           eduRenderConfig()}
@@ -256,8 +254,9 @@ function eduRenderDashboard() {
   const activos = students.filter(s => s.estado_pago === 'activo' || s.status === 'active' || !s.estado_pago).length;
   const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []).length;
   const myAlerts = eduMyAlerts();
-  const recursos = eduMyResources().length;
   const sesionesProx = (eduState.calls || []).filter(c => new Date(c.scheduled_at || c.starts_at) >= new Date()).length;
+  // Cohortes únicas (campo 'grupo' del estudiante)
+  const cohortes = new Set(students.map(s => s.grupo).filter(Boolean)).size;
 
   // Embudo por etapa
   const m = eduCurrentMentorship();
@@ -290,9 +289,9 @@ function eduRenderDashboard() {
           <div class="text-[10px] text-slate-500">Calendario</div>
         </div>
         <div class="bg-white border border-slate-200 rounded-xl p-3">
-          <div class="text-[10px] uppercase font-bold text-slate-500">Recursos</div>
-          <div class="text-2xl font-bold text-slate-900 mt-1">${recursos}</div>
-          <div class="text-[10px] text-slate-500">Materiales</div>
+          <div class="text-[10px] uppercase font-bold text-slate-500">Cohortes</div>
+          <div class="text-2xl font-bold text-slate-900 mt-1">${cohortes}</div>
+          <div class="text-[10px] text-slate-500">Grupos activos</div>
         </div>
       </div>
 

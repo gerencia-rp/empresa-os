@@ -303,7 +303,9 @@ function fmGenerarObjetivoOperativo(p, a) {
 }
 
 function fmCapitalRange(c) {
-  return ({ 'menos_20k': '< $20K', '20_50k': '$20K-$50K', '50_100k': '$50K-$100K', '100_250k': '$100K-$250K', 'mas_250k': '> $250K' })[c] || 'definido';
+  // Cuando no hay rango específico devuelve un string fallback que SE DETECTA en fmGenerarAnalisisProfundo
+  // (busca === 'definido') — si cambiás el string, actualizá tieneRangoReal.
+  return ({ 'menos_20k': 'menos de $20K', '20_50k': 'entre $20K y $50K', '50_100k': 'entre $50K y $100K', '100_250k': 'entre $100K y $250K', 'mas_250k': 'más de $250K' })[c] || 'definido';
 }
 
 function fmGenerarReglaPlan(p, a) {
@@ -317,50 +319,125 @@ function fmGenerarReglaPlan(p, a) {
 function fmGenerarAnalisisProfundo(p, r, a, userProfile) {
   const parrafos = [];
 
-  // Párrafo 1: contexto general
-  parrafos.push(`Sos un perfil <strong>#${p.num} ${p.nombre}</strong>, ubicado en etapa <strong>${r.etapa}</strong> de la metodología FlipMentoría. Tu cronograma esperado para llegar al primer hito mayor es de <strong>${r.cronograma}</strong>. Trabajás con <strong>${a.tiempo === 'mas_30' ? 'tiempo full-time' : a.tiempo === '15_30' ? 'medio tiempo (15-30h/sem)' : 'tiempo limitado (<15h/sem)'}</strong>, lo cual ${a.tiempo === 'menos_15' ? 'extiende el cronograma — vas a tener que ser brutal con prioridades' : 'te permite avanzar a buen ritmo si la disciplina se sostiene'}.`);
+  // ── Helpers robustos: nunca devuelven undefined ──
+  const nombre = (userProfile && userProfile.name) ? String(userProfile.name).split(' ')[0] : '';
+  const saludo = nombre ? `${nombre}, ` : '';
 
-  // Párrafo 2: capital
-  const capitalTxt = fmCapitalRange(a.capital);
-  const liquidoTxt = a.capital_real === 'todo' ? '100% líquido' : a.capital_real === 'mitad' ? '~50% líquido' : a.capital_real === 'minimo' ? 'mínimo líquido' : 'mayoritariamente teórico';
-  parrafos.push(`Tu capital reportado es <strong>${capitalTxt}</strong> y está <strong>${liquidoTxt}</strong>. ${a.capital_real === 'teorico' || a.capital_real === 'minimo' ? 'Esto es un riesgo crítico — el capital teórico no se usa para ofertar. Antes de hacer cualquier oferta formal, tenés que convertir ese capital en líquido real (acceso 24-48h). Sin esto, los HMLs no te van a aprobar y los wholesalers no te van a tomar en serio.' : 'Esto te da capacidad real de cerrar deals con HML cuando aparezca la oportunidad correcta.'} ${a.fuentes_capital === 'a_construir' ? 'Además, mencionaste que tenés que CONSTRUIR fuentes de capital adicional — esto va en paralelo al estudio de mercado (Bloques de E2).' : ''}`);
+  // Nombre del perfil (humano, no "#undefined undefined")
+  const perfilNombre = p && p.nombre ? p.nombre :
+    (a.deals_cerrados === '0' ? 'Inversor en formación' :
+     a.deals_cerrados === '1_2' ? 'Inversor con experiencia inicial' :
+     a.deals_cerrados === '3_5' ? 'Operador en consolidación' :
+     a.deals_cerrados === '5_mas' ? 'Operador en escalamiento' : 'Inversor en desarrollo');
 
-  // Párrafo 3: crédito
-  if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
-    parrafos.push(`Tu credit score (<strong>${({ 'menos_600': '< 600', '600_660': '600-660', 'sin_historial': 'sin historial USA' })[a.credit]}</strong>) es el segundo riesgo crítico. Los HMLs nacionales 2026 (Kiavi, Lima One, RCN, Constructive Capital, Easy Street) aceptan 620+ con LTV reducido — el "660+ era duro" es la regla vieja. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'Aún así con < 600 necesitás reconstruir 6-12 meses ANTES de aplicar, o ir por: HMLs ITIN-friendly, partnership con socio con crédito, o empezar como buyer secundario.' : 'Tu score está en zona limítrofe — varios HMLs te aceptan pero con LTV 70-75% (vs 80% en 700+). Subir a 720+ destraba 5% más de LTV y baja tasa.'} Este es un track paralelo: no bloquea avanzar con E0 ni con análisis de mercado.`);
-  } else {
-    parrafos.push(`Tu credit score (<strong>${({ 'mas_780': '> 780', '720_780': '720-780', '660_720': '660-720' })[a.credit]}</strong>) te da acceso a los HMLs estándar nacionales (Kiavi, Lima One, RCN, Easy Street). Esto significa que el cuello de botella NO va a ser financiamiento — va a ser encontrar el deal correcto al precio correcto.`);
+  // Etapa con nombre humano (no solo "E0")
+  const etapaNombre = ({
+    'E0': 'Fundación — construir las bases legales, mentales y financieras',
+    'E1': 'Evaluar — desarrollar criterio de mercado y análisis de deals',
+    'E2': 'Estructurar — capital y financiamiento listos antes de ofertar',
+    'E3': 'Ofertar — generar deal flow y empezar a hacer ofertas reales',
+    'E4': 'Ejecutar — cerrar y operar tu primer deal',
+    'E5': 'Salir — vender o rentar con margen y construir el siguiente'
+  })[r.etapa] || (r.etapa || 'Inicial');
+
+  // Tiempo disponible
+  const tiempoTxt = a.tiempo === 'mas_30' ? 'tiempo full-time (30+ horas/semana)' :
+    a.tiempo === '15_30' ? 'medio tiempo (15-30 horas/semana)' :
+    a.tiempo === 'menos_15' ? 'tiempo limitado (menos de 15 horas/semana)' :
+    'el tiempo que tenés disponible para dedicar';
+
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 1 — Apertura humana: dónde estás y qué significa
+  // ──────────────────────────────────────────────────────────────
+  parrafos.push(`${saludo}después de leer tus respuestas, este es el diagnóstico que armamos. Estás ubicado en la <strong>etapa ${r.etapa}: ${etapaNombre}</strong>. Eso significa que tu foco ahora no es comprar tu primera propiedad — es preparar todo lo que va antes de poder hacerlo bien. La metodología FlipMentoría está pensada para que avances en orden: primero las bases, después el criterio de mercado, después el capital, después las ofertas, después la ejecución y por último la salida. Saltarte etapas es la causa #1 de pérdidas en este negocio.`);
+
+  parrafos.push(`Tu cronograma esperado para llegar al primer hito grande (tu primer deal cerrado y rentado) es de <strong>${r.cronograma || '9 a 15 meses'}</strong>. Eso no es lento — es realista. Las personas que prometen "primer deal en 60 días" generalmente terminan perdiendo dinero porque saltaron las bases. Vos vas a ir más lento al principio para ir mucho más rápido después. Trabajás con <strong>${tiempoTxt}</strong>, ${a.tiempo === 'menos_15' ? 'lo cual significa que tenés que ser quirúrgico con las prioridades — no podés perseguir 5 cosas a la vez, vas a enfocarte en lo que el bloque actual te pide.' : 'lo cual te permite avanzar a buen ritmo si la disciplina diaria se sostiene.'}`);
+
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 2 — Capital con explicación clara
+  // ──────────────────────────────────────────────────────────────
+  const capitalRango = fmCapitalRange(a.capital);
+  const tieneRangoReal = capitalRango !== 'definido';
+  const liquidoTxt = a.capital_real === 'todo' ? '100% líquido (lo tenés disponible en 24-48 horas)' :
+    a.capital_real === 'mitad' ? 'cerca de la mitad líquido y el resto entre cuentas o inversiones que tardan en moverse' :
+    a.capital_real === 'minimo' ? 'mínimamente líquido — la mayoría está atado en otras inversiones' :
+    a.capital_real === 'teorico' ? 'mayoritariamente teórico — está prometido o por construir, no disponible hoy' :
+    'parcialmente disponible';
+
+  parrafos.push(`<strong>Sobre tu capital:</strong> ${tieneRangoReal ? `reportaste un rango de <strong>${capitalRango}</strong>, y está <strong>${liquidoTxt}</strong>.` : `está <strong>${liquidoTxt}</strong>.`} En este negocio hay una regla que vas a leer muchas veces: <em>el capital teórico no compra propiedades</em>. ${a.capital_real === 'teorico' || a.capital_real === 'minimo' ? 'Antes de hacer cualquier oferta formal, vas a tener que convertir parte de ese capital en líquido real. Sin esto, los Hard Money Lenders no van a aprobarte y los wholesalers no van a mandarte deals porque saben que no podés cerrar. Esto NO bloquea avanzar — podés trabajar en las bases (E0) y en el criterio de mercado (E1) mientras resolvés el capital en paralelo.' : 'Esto te da capacidad real de cerrar deals con HML cuando aparezca la oportunidad. Tu trabajo ahora es asegurarte de no quemar ese capital en el primer deal — guardar reservas para imprevistos y mantener disciplina con el MAO (Máxima Oferta Aceptable).'} ${a.fuentes_capital === 'a_construir' ? 'Además, mencionaste que tenés que CONSTRUIR fuentes adicionales de capital. Esto se hace en paralelo: las primeras semanas vas a estar levantando private money, evaluando partnerships o ahorrando agresivamente, mientras el resto del plan avanza.' : ''}`);
+
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 3 — Crédito explicado
+  // ──────────────────────────────────────────────────────────────
+  const creditTxt = ({
+    'mas_780': 'arriba de 780',
+    '720_780': 'entre 720 y 780',
+    '660_720': 'entre 660 y 720',
+    '600_660': 'entre 600 y 660',
+    'menos_600': 'por debajo de 600',
+    'sin_historial': 'sin historial crediticio en USA todavía'
+  })[a.credit] || null;
+
+  if (creditTxt) {
+    if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
+      parrafos.push(`<strong>Sobre tu crédito:</strong> tu score está <strong>${creditTxt}</strong>. Esto es importante explicarte porque muchos creen que es un bloqueo y no lo es. Los Hard Money Lenders nacionales (Kiavi, Lima One, RCN, Easy Street, Constructive Capital) ya aceptan scores desde 620 — solo te bajan el LTV (Loan-to-Value, cuánto te prestan sobre el valor) del 80% al 70-75%. ${a.credit === 'menos_600' || a.credit === 'sin_historial' ? 'Con score abajo de 600 o sin historial, tenés 3 caminos: (1) reconstruir crédito 6-12 meses antes de aplicar, (2) buscar HMLs ITIN-friendly que aceptan sin SSN, (3) hacer partnership con un socio que ponga el crédito mientras vos ponés capital y operación. Mientras tanto NO te quedes parado — las E0 y E1 avanzan igual.' : 'Tu score está en zona limítrofe. Subirlo a 720+ destraba 5% más de LTV y 1-2% menos de tasa. Vamos a trabajar esto en paralelo: pagar revolving balances debajo del 30% de utilización, no abrir cuentas nuevas, mantener pagos perfectos.'} Recordá: <em>el crédito es un track paralelo</em>, no bloquea avanzar con lo demás.`);
+    } else {
+      parrafos.push(`<strong>Sobre tu crédito:</strong> tu score está <strong>${creditTxt}</strong>, lo cual te da acceso a los Hard Money Lenders estándar (Kiavi, Lima One, RCN, Easy Street) con condiciones razonables. Esto significa que el cuello de botella de tu negocio NO va a ser el financiamiento — va a ser encontrar el deal correcto al precio correcto. Tu trabajo ahora es mantener ese score: pagos siempre on-time, utilización debajo del 30%, no abrir cuentas nuevas en los próximos 6 meses si vas a aplicar a HML.`);
+    }
   }
 
-  // Párrafo 4: setup legal
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 4 — Setup legal explicado
+  // ──────────────────────────────────────────────────────────────
   if (a.llc === 'no') {
-    parrafos.push(`<strong>No tenés LLC formada</strong>. Esto es la tarea #1 del Bloque E0 — sin LLC no se ofertan propiedades porque arriesgás tu patrimonio personal completo (casa, ahorros, autos) en cada transacción. La LLC toma 1-4 semanas dependiendo del estado, así que se inicia hoy mismo en paralelo al estudio de mercado.`);
+    parrafos.push(`<strong>Sobre tu setup legal:</strong> todavía no tenés LLC formada. Esto es la tarea #1 del bloque E0 — <em>no se hacen ofertas de propiedades sin LLC</em>. ¿Por qué? Porque si firmás un contrato de compra como persona natural y algo sale mal (un demanda del comprador final, un accidente en la obra, un problema con un contratista), arriesgás tu patrimonio personal completo: tu casa, tus ahorros, tus autos, todo. La LLC es el escudo que separa tu vida personal de tu negocio. Formarla toma 1 a 4 semanas dependiendo del estado, así que se arranca HOY mismo en paralelo al estudio de mercado. No es un trámite — es protección legal real.`);
   } else if (a.llc === 'si_otro') {
-    parrafos.push(`Tenés LLC formada pero <strong>en otro estado al de inversión</strong>. Esto genera "foreign LLC registration" — costo doble (filing fee del estado original + del estado de inversión), compliance doble. La solución más limpia: formar segunda LLC en el estado donde vas a invertir, o consultar con abogado de real estate para foreign registration formal.`);
+    parrafos.push(`<strong>Sobre tu setup legal:</strong> tenés LLC formada pero en un estado distinto al de inversión. Esto genera lo que se llama "foreign LLC registration" — vas a pagar filing fees en los dos estados y vas a tener compliance doble (reportes anuales, registered agent, etc). La solución más limpia es formar una segunda LLC en el estado donde vas a invertir, o si querés mantener la única, hacer el foreign registration formal con un abogado de real estate. Esto se decide en el bloque E0 antes de cualquier oferta.`);
   } else if (a.llc === 'si_mismo') {
     const setupItems = Array.isArray(a.setup_legal) ? a.setup_legal : [];
     const completo = setupItems.includes('ein') && setupItems.includes('operating') && setupItems.includes('banco') && setupItems.includes('contabilidad') && setupItems.includes('cpa');
-    parrafos.push(`Tu setup legal está ${completo ? '<strong>completo</strong> (LLC + EIN + OA + banco + contabilidad + CPA). Esta es una fortaleza importante — la mayoría de los novatos se traban acá durante meses.' : `<strong>parcial</strong> — falta(n): ${['ein','operating','banco','contabilidad','cpa','abogado'].filter(x => !setupItems.includes(x)).map(x => ({ein:'EIN',operating:'Operating Agreement',banco:'Cuenta bancaria',contabilidad:'Contabilidad activa',cpa:'CPA',abogado:'Abogado'})[x]).join(', ')}. Completar lo que falta es prerequisito antes de cerrar deal.`}`);
+    const labels = { ein: 'EIN del IRS', operating: 'Operating Agreement', banco: 'Cuenta bancaria de negocio', contabilidad: 'Software contable conectado', cpa: 'CPA de real estate', abogado: 'Abogado de real estate' };
+    const faltan = ['ein','operating','banco','contabilidad','cpa','abogado'].filter(x => !setupItems.includes(x)).map(x => labels[x]);
+    parrafos.push(`<strong>Sobre tu setup legal:</strong> ${completo ? 'lo tenés <strong>completo</strong> — LLC en el estado correcto, EIN, Operating Agreement firmado, banco, contabilidad y CPA activos. Esto es una fortaleza grande, porque el 80% de los principiantes se traban acá durante meses. Vos ya superaste esa barrera, podés enfocarte en lo realmente productivo.' : `lo tenés <strong>parcial</strong>. Te falta(n): ${faltan.join(', ')}. Completar esto es prerequisito antes de la primera oferta — no es burocracia, es la infraestructura que te permite operar como negocio real.`}`);
   }
 
-  // Párrafo 5: red operativa y momentum
-  const ofertasTxt = a.ofertas_mes === '10_mas' ? '10+ ofertas/mes' : a.ofertas_mes === '1_9' ? '1-9 ofertas/mes' : a.ofertas_mes === 'analisis_no_oferta' ? 'analizando deals pero sin ofertar' : 'sin ofertar todavía';
-  const wsTxt = a.wholesalers === '10_mas' ? '10+ wholesalers activos' : a.wholesalers === '3_9' ? '3-9 wholesalers' : a.wholesalers === '1_2' ? '1-2 wholesalers ocasionales' : 'ningún wholesaler activo';
-  parrafos.push(`Sobre tu momentum actual: <strong>${ofertasTxt}</strong> y <strong>${wsTxt}</strong>. ${a.ofertas_mes === 'cero' || a.ofertas_mes === 'analisis_no_oferta' ? 'El cuello de botella crítico es pasar de análisis a oferta. Sin volumen de ofertas (target 10+/mes) no hay deals cerrados. Los Bloques E1 (Buy Box, ARV, MAO) y E2 (HML, wholesalers) están diseñados para resolver esto en paralelo.' : 'Estás generando volumen. Foco ahora: mejorar tasa de aceptación con mejor pain identification del vendedor y closing más rápido.'}`);
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 5 — Red operativa y momentum
+  // ──────────────────────────────────────────────────────────────
+  const ofertasTxt = a.ofertas_mes === '10_mas' ? 'haciendo 10 o más ofertas por mes' :
+    a.ofertas_mes === '1_9' ? 'haciendo entre 1 y 9 ofertas por mes' :
+    a.ofertas_mes === 'analisis_no_oferta' ? 'analizando deals pero sin ofertar todavía' :
+    a.ofertas_mes === 'cero' ? 'sin ofertas formales todavía' : null;
+  const wsTxt = a.wholesalers === '10_mas' ? 'con 10+ wholesalers activos' :
+    a.wholesalers === '3_9' ? 'con 3 a 9 wholesalers' :
+    a.wholesalers === '1_2' ? 'con 1 o 2 wholesalers ocasionales' :
+    a.wholesalers === 'cero' ? 'sin wholesalers activos todavía' : null;
 
-  // Párrafo 6: obstáculo principal
-  const obstaculoTxt = ({
-    'capital': 'capital insuficiente o no líquido',
-    'conocimiento': 'falta de conocimiento técnico (ARV, MAO, contratos)',
-    'red': 'red de contactos inexistente o débil',
-    'tiempo': 'tiempo limitado por otras responsabilidades',
-    'miedo': 'parálisis por análisis / miedo a ofertar',
-    'mercado': 'dificultad encontrando deals que pasen el filtro',
-    'equipo': 'necesidad de equipo para escalar'
-  })[a.mayor_obstaculo];
-  if (obstaculoTxt) {
-    parrafos.push(`Tu mayor obstáculo percibido es <strong>${obstaculoTxt}</strong>. El plan que sigue prioriza específicamente este obstáculo en los primeros bloques. ${a.mayor_obstaculo === 'miedo' ? 'Para parálisis, la solución NO es más información — es forzar volumen de ofertas. 10 ofertas/semana durante 30 días rompe el bloqueo.' : a.mayor_obstaculo === 'red' ? 'Para red débil, el Bloque "Base mínima de contactos" + "Wholesalers y pitch" te llevan de 0 a 25 contactos activos en 30-45 días.' : a.mayor_obstaculo === 'capital' ? 'Para capital, el Bloque "Capital Stack real" + opciones alternativas (private money, partnership, HELOC, wholesaling como bridge) está diseñado para resolver esto sin esperar años.' : 'El plan tiene bloques específicos para atacar este obstáculo directamente.'}`);
+  if (ofertasTxt && wsTxt) {
+    parrafos.push(`<strong>Sobre tu momentum actual:</strong> estás <strong>${ofertasTxt}</strong> y <strong>${wsTxt}</strong>. ${a.ofertas_mes === 'cero' || a.ofertas_mes === 'analisis_no_oferta' ? 'Acá hay un patrón clásico: la mayoría de los principiantes se traban entre "analizando deals" y "haciendo ofertas reales". Te leés 50 libros, mirás 100 propiedades en Zillow, y nunca enviás una LOI (Letter of Intent). El plan está diseñado específicamente para romper ese bloqueo: en E1 vas a definir tu Buy Box, en E2 vas a pre-aprobar HML, y en E3 vas a empezar a mandar ofertas con criterio. El target real es 10+ ofertas/mes — sin volumen no hay deals cerrados.' : 'Tenés momentum operativo. Tu foco ahora es subir la tasa de aceptación: identificar mejor el pain real del vendedor, escribir LOIs más limpias y cerrar más rápido cuando el vendedor dice sí.'}`);
   }
+
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 6 — Obstáculo principal y cómo el plan lo ataca
+  // ──────────────────────────────────────────────────────────────
+  const obstaculoMap = {
+    'capital': { txt: 'el capital insuficiente o no líquido', plan: 'En el bloque "Capital Stack real" vas a separar líquido, probable y teórico. Después vamos a explorar opciones: private money (gente que conozcas), partnerships, HELOC sobre propiedad propia, o usar wholesaling como puente para generar capital rápido sin riesgo. No hace falta esperar años para arrancar.' },
+    'conocimiento': { txt: 'la falta de conocimiento técnico (ARV, MAO, contratos)', plan: 'Los bloques de E1 están diseñados para esto exactamente. Vas a analizar 50 propiedades calculando ARV con comparables vendidos, vas a aplicar MAO a 10 de ellas, y vas a leer 3 contratos reales línea por línea con un abogado. Al final de E1 vas a poder analizar cualquier propiedad en 15 minutos.' },
+    'red': { txt: 'la red de contactos inexistente o débil', plan: 'Los bloques "Base mínima de contactos" + "Wholesalers y pitch" te llevan de 0 a 25 contactos activos en 30-45 días. Tenés un script para llamadas, plantillas de email, y un sistema para hacer follow-up. No es networking improvisado — es un proceso reproducible.' },
+    'tiempo': { txt: 'el tiempo limitado por otras responsabilidades', plan: 'Para esto la metodología tiene una respuesta clara: bloque diario de 90 minutos NO NEGOCIABLE. No 2 horas algunos días y 0 otros — 90 minutos todos los días a la misma hora. Eso son 10 horas/semana de trabajo enfocado, suficiente para avanzar.' },
+    'miedo': { txt: 'la parálisis por análisis o miedo a ofertar', plan: 'Para parálisis la solución NO es más información — es forzar volumen de ofertas. 10 ofertas/semana durante 30 días rompe el bloqueo mental. La mayoría de esas ofertas van a ser rechazadas, y eso es exactamente lo que necesitás: aprender que un rechazo no te mata.' },
+    'mercado': { txt: 'la dificultad encontrando deals que pasen el filtro', plan: 'Esto se ataca en dos frentes: (1) ampliar las fuentes de deals (wholesalers + realtors investor-friendly + direct mail + auctions) y (2) bajar el filtro a algo realista. Los deals "perfectos" no existen — buscamos deals que cumplan el 70% rule con margen para sorpresas.' },
+    'equipo': { txt: 'la necesidad de equipo para escalar', plan: 'Acá vamos a documentar tus SOPs (Standard Operating Procedures) primero, después contratar Project Manager, después delegar la primera obra. Sin SOPs no podés delegar — terminás reentrenando a cada persona desde cero.' }
+  };
+  const obs = obstaculoMap[a.mayor_obstaculo];
+  if (obs) {
+    parrafos.push(`<strong>Sobre tu mayor obstáculo:</strong> identificaste <strong>${obs.txt}</strong> como lo que más te frena. Es importante que el plan ataque eso directamente y no te dé generalidades. ${obs.plan}`);
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // PÁRRAFO 7 — Cierre + cómo usar este plan
+  // ──────────────────────────────────────────────────────────────
+  parrafos.push(`<strong>Cómo usar este plan:</strong> la metodología FlipMentoría funciona por bloques en secuencia. Cada bloque tiene un propósito educativo (qué vas a aprender), un entregable concreto (qué tenés que producir), tareas paso a paso, criterios de éxito (cómo sabés que está listo) y errores comunes a evitar. <em>No saltes bloques.</em> Si terminás antes de tiempo, repasá los criterios de éxito — probablemente algo quedó a medias. Si te atascás, llamá a tu mentor antes de improvisar. Este plan es tu hoja de ruta: si lo seguís en orden, vas a estar listo para tu primer deal en el cronograma que mencionamos arriba.`);
 
   return parrafos;
 }
