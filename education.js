@@ -3067,8 +3067,8 @@ function fmRenderDiagnostico() {
           </div>
         </div>
 
-        <!-- Pregunta -->
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <!-- Pregunta (id para scroll target — evita que el scroll salte arriba al cambiar respuesta) -->
+        <div id="fm-diag-wizard" data-fm-diag-question class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm scroll-mt-4">
           <div class="text-xs font-bold text-amber-600 tracking-wider mb-2">${q.bloque || ''} · PREGUNTA ${step + 1}</div>
           <h4 class="text-xl font-bold text-slate-900 mb-5">${q.pregunta}</h4>
           ${fmRenderQuestionInput(q)}
@@ -3153,6 +3153,17 @@ function fmDiagToggle(qid, val) {
   fmRender();
 }
 
+// Helper: después de fmRender(), scrollear al wizard para mantener la pregunta visible
+// (antes el scroll subía al top al re-renderizar y había que volver a bajar)
+function _fmScrollToDiagWizard() {
+  setTimeout(() => {
+    const el = document.getElementById('fm-diag-wizard') || document.querySelector('[data-fm-diag-question]');
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 50);
+}
+
 function fmDiagNext() {
   const activeQuestions = FM_DIAG_QUESTIONS.filter(q => !q.skipIf || !q.skipIf(fmState.diagAnswers));
   if (fmState.diagStep < activeQuestions.length - 1) {
@@ -3161,6 +3172,7 @@ function fmDiagNext() {
     fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
   }
   fmRender();
+  _fmScrollToDiagWizard();
 }
 
 function fmDiagAnswer(qid, val) {
@@ -3175,6 +3187,7 @@ function fmDiagAnswer(qid, val) {
       fmState.diagResult = fmCalcularPerfil(fmState.diagAnswers);
     }
     fmRender();
+    _fmScrollToDiagWizard();
   } catch (err) {
     console.error('[fmDiagAnswer]', err);
     alert('Error procesando la respuesta:\n\n' + (err?.message || err) + '\n\nMirá la consola del navegador (F12) para más detalles.');
@@ -3185,6 +3198,7 @@ function fmDiagBack() {
   if (fmState.diagStep > 0) {
     fmState.diagStep--;
     fmRender();
+    _fmScrollToDiagWizard();
   }
 }
 

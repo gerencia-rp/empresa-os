@@ -89,11 +89,255 @@ let CURRENT_INDEX = 0;
 let ANSWERS = {};
 let INVITE = null;
 
-// Wrapper para cargar el script principal y conseguir las preguntas
+// Preguntas IDÉNTICAS a las del mentor (FM_DIAG_QUESTIONS en education.js).
+// MANTENER SINCRONIZADO con education.js — si cambia una, cambian las dos.
+// Schema: { id, bloque, pregunta, opciones:[{val,label}], tipo?, placeholder?, multiSelect?, skipIf? }
+const FM_DIAG_QUESTIONS = [
+  // ━━━━━━━ A · OBJETIVO ━━━━━━━
+  {
+    id: 'objetivo', bloque: 'A · Objetivo',
+    pregunta: '¿Cuál es tu resultado objetivo en los próximos 12 meses?',
+    opciones: [
+      { val: 'flip',     label: '🏠 Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
+      { val: 'hold',     label: '🏘️ Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
+      { val: 'hibrido',  label: '🔀 Mix flips + holds' },
+      { val: 'escalar',  label: '🚀 Escalar negocio existente (sistemas, equipo, múltiples deals)' },
+      { val: 'lender',   label: '💰 Ser private money lender (prestar capital, no operar)' }
+    ]
+  },
+  {
+    id: 'mercado_estado', bloque: 'A · Objetivo',
+    pregunta: '¿En qué estado/región vas a invertir?',
+    tipo: 'text', placeholder: 'Ej: Texas (Austin/Houston), Florida (Miami), Georgia (Atlanta)...'
+  },
+  {
+    id: 'estrategia_renta', bloque: 'A · Objetivo',
+    pregunta: 'Si vas por Fix & Hold, ¿qué modelo de renta?',
+    opciones: [
+      { val: 'tradicional', label: '🏠 Renta tradicional (12 meses, familia)' },
+      { val: 'coliving',    label: '🛏️ Coliving / room-by-room (PadSplit, SpareRoom)' },
+      { val: 'airbnb',      label: '🌴 Short-Term Rental (Airbnb/VRBO)' },
+      { val: 'corporate',   label: '💼 Corporate housing / Furnished Finder' },
+      { val: 'na',          label: 'No aplica — voy por Flip' }
+    ],
+    skipIf: (a) => a.objetivo === 'flip' || a.objetivo === 'lender'
+  },
+  {
+    id: 'meta_deals', bloque: 'A · Objetivo',
+    pregunta: '¿Cuántos deals querés cerrar en los próximos 12 meses?',
+    opciones: [
+      { val: '1',     label: '1 deal — primero quiero validar' },
+      { val: '2_3',   label: '2-3 deals — empezar con cadencia' },
+      { val: '4_6',   label: '4-6 deals — escalar rápido' },
+      { val: '7_mas', label: '7+ deals — full operación con equipo' }
+    ]
+  },
+  // ━━━━━━━ B · CAPITAL ━━━━━━━
+  {
+    id: 'capital', bloque: 'B · Capital',
+    pregunta: '¿Cuánto capital propio disponible HOY (líquido, sin tocar reserva personal)?',
+    opciones: [
+      { val: 'menos_20k', label: '< $20K — limitado para flip directo' },
+      { val: '20_50k',    label: '$20K – $50K — apenas para 1 deal con HML' },
+      { val: '50_100k',   label: '$50K – $100K — cómodo con buffer' },
+      { val: '100_250k',  label: '$100K – $250K — multi-deal posible' },
+      { val: 'mas_250k',  label: '> $250K — capital robusto' }
+    ]
+  },
+  {
+    id: 'credit', bloque: 'B · Capital',
+    pregunta: '¿Tu credit score (FICO) actual?',
+    opciones: [
+      { val: 'mas_780',       label: '> 780 (top tier)' },
+      { val: '720_780',       label: '720 – 780 (excelente)' },
+      { val: '660_720',       label: '660 – 720 (bueno, califica HML estándar)' },
+      { val: '600_660',       label: '600 – 660 (limitado, HMLs flexibles)' },
+      { val: 'menos_600',     label: '< 600 (reconstruir antes)' },
+      { val: 'sin_historial', label: 'Sin historial crediticio en USA' }
+    ]
+  },
+  {
+    id: 'fuentes_capital', bloque: 'B · Capital',
+    pregunta: '¿Qué fuentes de capital adicional tenés? (elegí la principal)',
+    opciones: [
+      { val: 'solo_propio',     label: 'Solo capital propio' },
+      { val: 'heloc',           label: 'HELOC sobre vivienda principal disponible' },
+      { val: 'private_fam',     label: 'Private money familiar/cercano disponible' },
+      { val: 'socio_capital',   label: 'Tengo socio de capital identificado' },
+      { val: 'business_credit', label: 'Business credit / líneas de crédito activas' },
+      { val: 'a_construir',     label: 'Tengo que construirlo durante el proceso' }
+    ]
+  },
+  {
+    id: 'hml_status', bloque: 'B · Capital',
+    pregunta: '¿Tenés Hard Money Lender (HML) pre-aprobado?',
+    opciones: [
+      { val: 'primario_backup', label: '✅ Sí, primario + backup' },
+      { val: 'solo_primario',   label: '✅ Sí, solo primario' },
+      { val: 'hablado',         label: '🟡 He hablado con HMLs pero sin pre-aprobación' },
+      { val: 'investigando',    label: '🟠 Estoy investigando opciones' },
+      { val: 'ninguno',         label: '❌ Ningún contacto con HML todavía' }
+    ]
+  },
+  {
+    id: 'capital_real', bloque: 'B · Capital',
+    pregunta: 'Sobre el capital que dijiste tener: ¿cuánto está LÍQUIDO HOY (acceso 24-48h)?',
+    opciones: [
+      { val: 'todo',    label: '100% líquido — disponible inmediato' },
+      { val: 'mitad',   label: '~50% líquido, resto requiere 1-2 semanas' },
+      { val: 'minimo',  label: 'Mínimo líquido, mayoría requiere vender / HELOC' },
+      { val: 'teorico', label: 'Mayoritariamente teórico — todavía no lo tengo en mano' }
+    ]
+  },
+  // ━━━━━━━ C · FUNDACIÓN ━━━━━━━
+  {
+    id: 'llc', bloque: 'C · Fundación',
+    pregunta: '¿Tenés LLC formada?',
+    opciones: [
+      { val: 'si_mismo',     label: '✅ Sí, en el estado donde planeo invertir' },
+      { val: 'si_otro',      label: '⚠️ Sí, pero en otro estado distinto al de inversión' },
+      { val: 'no',           label: '❌ No, todavía no la formé' },
+      { val: 'otra_entidad', label: 'Tengo otra entidad (S-Corp, INC)' }
+    ]
+  },
+  {
+    id: 'setup_legal', bloque: 'C · Fundación',
+    pregunta: '¿Cuáles de estos tenés activos hoy?',
+    multiSelect: true,
+    opciones: [
+      { val: 'ein',          label: 'EIN del IRS' },
+      { val: 'operating',    label: 'Operating Agreement firmado' },
+      { val: 'banco',        label: 'Cuenta bancaria de negocio + tarjeta crédito' },
+      { val: 'contabilidad', label: 'Software contabilidad activo (QuickBooks/Stessa)' },
+      { val: 'cpa',          label: 'CPA de real estate identificado' },
+      { val: 'abogado',      label: 'Abogado de real estate identificado' },
+      { val: 'ninguno',      label: 'Ninguno todavía' }
+    ]
+  },
+  {
+    id: 'deals_cerrados', bloque: 'C · Fundación',
+    pregunta: '¿Cuántos deals exitosos has cerrado en real estate?',
+    opciones: [
+      { val: '0',     label: 'Ninguno todavía' },
+      { val: '1',     label: '1 deal' },
+      { val: '2_4',   label: '2 – 4 deals' },
+      { val: '5_mas', label: '5+ deals' }
+    ]
+  },
+  {
+    id: 'experiencia_previa', bloque: 'C · Fundación',
+    pregunta: '¿Tenés experiencia previa en algo relacionado?',
+    opciones: [
+      { val: 'cero',             label: 'Cero — completamente nuevo' },
+      { val: 'construccion',     label: 'Construcción / remodelación (contratista o similar)' },
+      { val: 'real_estate_otro', label: 'Real estate en otro país' },
+      { val: 'corporativo',      label: 'Background corporativo (finanzas, ventas, ops)' },
+      { val: 'mixto',            label: 'Mix de varios' }
+    ]
+  },
+  {
+    id: 'inmigracion', bloque: 'C · Fundación',
+    pregunta: 'Tu situación en USA:',
+    opciones: [
+      { val: 'residente',     label: '🇺🇸 Ciudadano o residente USA con SSN' },
+      { val: 'itin',          label: '📋 Tengo ITIN (sin SSN)' },
+      { val: 'internacional', label: '🌎 Internacional sin ITIN (visito USA)' }
+    ]
+  },
+  // ━━━━━━━ D · MERCADO ━━━━━━━
+  {
+    id: 'buybox', bloque: 'D · Mercado',
+    pregunta: '¿Tenés Buy Box (perfil de propiedad ideal) definido?',
+    opciones: [
+      { val: 'completo', label: '✅ 5+ Buy Box por estrategia con criterios numéricos documentados' },
+      { val: 'parcial',  label: '🟡 1-2 Buy Box parciales, faltan validar números' },
+      { val: 'mental',   label: '🟠 Sé qué quiero pero no está documentado' },
+      { val: 'cero',     label: '❌ No tengo Buy Box' }
+    ]
+  },
+  {
+    id: 'arv_skill', bloque: 'D · Mercado',
+    pregunta: '¿Sabés calcular ARV y MAO de una propiedad?',
+    opciones: [
+      { val: 'experto',  label: '✅ Sí, lo hago con 5+ comps y ajustes documentados' },
+      { val: 'basico',   label: '🟡 Conozco la fórmula básica (ARV × 75% - rehab)' },
+      { val: 'concepto', label: '🟠 Sé qué significan pero no lo he practicado' },
+      { val: 'no',       label: '❌ No estoy familiarizado con estos términos' }
+    ]
+  },
+  {
+    id: 'ofertas_mes', bloque: 'D · Mercado',
+    pregunta: '¿Cuántas ofertas formales has enviado en los últimos 30 días?',
+    opciones: [
+      { val: '10_mas',             label: '10+ ofertas' },
+      { val: '1_9',                label: '1-9 ofertas' },
+      { val: 'analisis_no_oferta', label: '0 ofertas pero analizo deals regularmente' },
+      { val: 'cero',               label: 'Ni siquiera analizo deals todavía' }
+    ]
+  },
+  // ━━━━━━━ E · RED OPERATIVA ━━━━━━━
+  {
+    id: 'wholesalers', bloque: 'E · Red operativa',
+    pregunta: '¿Cuántos wholesalers tenés en tu buyer list activa enviándote deals?',
+    opciones: [
+      { val: '10_mas', label: '10+ wholesalers activos' },
+      { val: '3_9',    label: '3-9 wholesalers' },
+      { val: '1_2',    label: '1-2 wholesalers ocasionales' },
+      { val: 'cero',   label: 'Ninguno' }
+    ]
+  },
+  {
+    id: 'gc_status', bloque: 'E · Red operativa',
+    pregunta: '¿Tenés General Contractor (GC) primario identificado y validado?',
+    opciones: [
+      { val: 'primario_backup', label: '✅ Sí, primario + backup con licencia/seguros verificados' },
+      { val: 'primario',        label: '✅ Sí, solo primario' },
+      { val: 'hablado',         label: '🟡 He hablado con varios pero sin elegir' },
+      { val: 'cero',            label: '❌ No tengo contactos de GC' }
+    ]
+  },
+  {
+    id: 'deal_activo', bloque: 'E · Red operativa',
+    pregunta: '¿Tenés deal activo ahora mismo?',
+    opciones: [
+      { val: 'no',       label: 'No, todavía no cierro mi primer deal' },
+      { val: 'busqueda', label: 'En búsqueda — analizando deals' },
+      { val: 'pre_obra', label: 'Sí, en preparación pre-obra (E2)' },
+      { val: 'obra',     label: 'Sí, en obra (E3)' },
+      { val: 'salida',   label: 'Sí, en salida / listing (E4)' }
+    ]
+  },
+  // ━━━━━━━ F · DISPONIBILIDAD ━━━━━━━
+  {
+    id: 'tiempo', bloque: 'F · Disponibilidad',
+    pregunta: '¿Cuántas horas/semana podés dedicarle al negocio?',
+    opciones: [
+      { val: 'mas_30',   label: '> 30 horas (full-time o casi)' },
+      { val: '15_30',    label: '15 – 30 horas (medio tiempo serio)' },
+      { val: 'menos_15', label: '< 15 horas (paralelo a trabajo)' }
+    ]
+  },
+  {
+    id: 'mayor_obstaculo', bloque: 'F · Disponibilidad',
+    pregunta: '¿Cuál es tu MAYOR obstáculo percibido hoy?',
+    opciones: [
+      { val: 'capital',      label: '💰 Capital — me siento sin recursos suficientes' },
+      { val: 'conocimiento', label: '📚 Conocimiento — no sé por dónde empezar' },
+      { val: 'red',          label: '🤝 Red — no tengo contactos' },
+      { val: 'tiempo',       label: '⏰ Tiempo — estoy ocupado con otras cosas' },
+      { val: 'miedo',        label: '😰 Miedo / parálisis — no me animo a ofertar' },
+      { val: 'mercado',      label: '🏘️ Mercado — no encuentro deals buenos' },
+      { val: 'equipo',       label: '👥 Equipo — necesito gente que ejecute conmigo' }
+    ]
+  }
+];
+
+// Wrapper legacy — ya no se usa pero queda para compatibilidad si algo lo llama
 async function loadQuestionsFromMainApp() {
-  // Embedded: definimos las preguntas acá para no tener dependencia.
-  // Si cambia el master en el app, hay que actualizar acá también.
-  // Es la misma lista que está en edu/edu-fm-diagnostico.js
+  return FM_DIAG_QUESTIONS;
+}
+// IGNORADO desde acá hacia abajo (legacy questions array — no se usa)
+async function _unusedLegacyQuestions() {
   return [
     { id: 'objetivo', section: 'A · OBJETIVO', text: '¿Cuál es tu resultado objetivo en los próximos 12 meses?',
       options: [
@@ -283,60 +527,133 @@ async function init() {
     }
   }
 
-  QUESTIONS = await loadQuestionsFromMainApp();
-  document.getElementById('q-total').textContent = QUESTIONS.length;
+  QUESTIONS = FM_DIAG_QUESTIONS; // mismo array que el mentor
+  document.getElementById('q-total').textContent = activeQuestions().length;
 
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('wizard').classList.remove('hidden');
   renderQuestion();
 }
 
+// Filtra preguntas según condición skipIf (reglas dinámicas)
+function activeQuestions() {
+  return QUESTIONS.filter(q => !q.skipIf || !q.skipIf(ANSWERS));
+}
+
 function renderQuestion() {
-  const q = QUESTIONS[CURRENT_INDEX];
-  document.getElementById('q-section').textContent = q.section;
-  document.getElementById('q-text').textContent = q.text;
+  const qs = activeQuestions();
+  if (CURRENT_INDEX >= qs.length) CURRENT_INDEX = qs.length - 1;
+  const q = qs[CURRENT_INDEX];
+  const total = qs.length;
+  document.getElementById('q-section').textContent = q.bloque || '';
+  document.getElementById('q-text').textContent = q.pregunta || '';
   document.getElementById('q-current').textContent = CURRENT_INDEX + 1;
-  const pct = Math.round(((CURRENT_INDEX + 1) / QUESTIONS.length) * 100);
+  document.getElementById('q-total').textContent = total;
+  const answered = Object.keys(ANSWERS).filter(k => ANSWERS[k] != null && ANSWERS[k] !== '').length;
+  const pct = Math.round(((CURRENT_INDEX + 1) / total) * 100);
   document.getElementById('q-pct').textContent = pct + '%';
   document.getElementById('q-bar').style.width = pct + '%';
 
   const cont = document.getElementById('q-options');
-  cont.innerHTML = q.options.map(o => {
-    const sel = ANSWERS[q.id] === o.val;
-    return `
-      <button onclick="selectAnswer('${q.id}','${o.val}')" class="w-full text-left p-4 rounded-xl border-2 ${sel?'border-amber-500 bg-amber-50':'border-slate-200 hover:border-amber-300 bg-white'} transition">
-        <div class="flex items-center gap-3">
-          <div class="w-5 h-5 rounded-full border-2 ${sel?'border-amber-500 bg-amber-500':'border-slate-300'} flex items-center justify-center flex-shrink-0">
-            ${sel ? '<div class="w-2 h-2 bg-white rounded-full"></div>' : ''}
-          </div>
-          <div class="text-sm md:text-base ${sel?'font-semibold text-slate-900':'text-slate-700'}">${o.label}</div>
-        </div>
-      </button>
-    `;
-  }).join('');
 
-  document.getElementById('btn-next').disabled = !ANSWERS[q.id];
-  document.getElementById('btn-next').textContent = CURRENT_INDEX === QUESTIONS.length - 1 ? '✓ Terminar' : 'Siguiente →';
+  // Tipo TEXT (campo de texto libre)
+  if (q.tipo === 'text') {
+    const val = ANSWERS[q.id] || '';
+    cont.innerHTML = `
+      <input id="q-text-input" type="text" value="${escapeAttr(val)}" placeholder="${escapeAttr(q.placeholder || '')}"
+        class="w-full text-base md:text-lg border-2 border-amber-300 rounded-xl px-4 py-3 focus:border-amber-500 focus:outline-none"
+        oninput="ANSWERS['${q.id}'] = this.value; document.getElementById('btn-next').disabled = !this.value.trim();"
+        onkeydown="if(event.key==='Enter'){event.preventDefault(); nextQuestion();}"
+      />
+      <div class="text-xs text-slate-500 mt-2">Escribí tu respuesta y presioná <strong>Enter</strong> o "Siguiente" →</div>
+    `;
+    setTimeout(() => document.getElementById('q-text-input')?.focus(), 50);
+    document.getElementById('btn-next').disabled = !val.trim();
+  }
+  // Tipo MULTISELECT (varias opciones)
+  else if (q.multiSelect) {
+    const selectedArr = Array.isArray(ANSWERS[q.id]) ? ANSWERS[q.id] : [];
+    cont.innerHTML = `
+      <div class="text-xs text-slate-500 mb-2">Podés elegir varias opciones · ${selectedArr.length} seleccionada(s)</div>
+      ${q.opciones.map(o => {
+        const sel = selectedArr.includes(o.val);
+        return `
+          <button onclick="toggleMultiAnswer('${q.id}','${o.val}')" class="w-full text-left p-4 rounded-xl border-2 ${sel?'border-amber-500 bg-amber-50':'border-slate-200 hover:border-amber-300 bg-white'} transition mb-2">
+            <div class="flex items-center gap-3">
+              <div class="w-5 h-5 rounded ${sel?'border-2 border-amber-500 bg-amber-500':'border-2 border-slate-300'} flex items-center justify-center flex-shrink-0">
+                ${sel ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+              </div>
+              <div class="text-sm md:text-base ${sel?'font-semibold text-slate-900':'text-slate-700'}">${o.label}</div>
+            </div>
+          </button>
+        `;
+      }).join('')}
+    `;
+    document.getElementById('btn-next').disabled = !selectedArr.length;
+  }
+  // Tipo radio (single choice) — el caso normal
+  else {
+    cont.innerHTML = q.opciones.map(o => {
+      const sel = ANSWERS[q.id] === o.val;
+      return `
+        <button onclick="selectAnswer('${q.id}','${o.val}')" class="w-full text-left p-4 rounded-xl border-2 ${sel?'border-amber-500 bg-amber-50':'border-slate-200 hover:border-amber-300 bg-white'} transition mb-2">
+          <div class="flex items-center gap-3">
+            <div class="w-5 h-5 rounded-full border-2 ${sel?'border-amber-500 bg-amber-500':'border-slate-300'} flex items-center justify-center flex-shrink-0">
+              ${sel ? '<div class="w-2 h-2 bg-white rounded-full"></div>' : ''}
+            </div>
+            <div class="text-sm md:text-base ${sel?'font-semibold text-slate-900':'text-slate-700'}">${o.label}</div>
+          </div>
+        </button>
+      `;
+    }).join('');
+    document.getElementById('btn-next').disabled = !ANSWERS[q.id];
+  }
+
+  document.getElementById('btn-next').textContent = CURRENT_INDEX === total - 1 ? '✓ Terminar' : 'Siguiente →';
   document.getElementById('btn-prev').style.visibility = CURRENT_INDEX === 0 ? 'hidden' : 'visible';
+}
+
+function escapeAttr(s) {
+  return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
 function selectAnswer(qid, val) {
   ANSWERS[qid] = val;
+  // Avanzar automáticamente como el wizard del mentor — más fluido
+  if (CURRENT_INDEX < activeQuestions().length - 1) {
+    CURRENT_INDEX++;
+    renderQuestion();
+    scrollToWizard();
+  } else {
+    renderQuestion();
+  }
+}
+
+function toggleMultiAnswer(qid, val) {
+  const current = Array.isArray(ANSWERS[qid]) ? [...ANSWERS[qid]] : [];
+  const idx = current.indexOf(val);
+  if (idx >= 0) current.splice(idx, 1); else current.push(val);
+  ANSWERS[qid] = current;
   renderQuestion();
 }
 
+function scrollToWizard() {
+  const el = document.getElementById('wizard') || document.getElementById('q-text');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function prevQuestion() {
-  if (CURRENT_INDEX > 0) { CURRENT_INDEX--; renderQuestion(); window.scrollTo({top:0,behavior:'smooth'}); }
+  if (CURRENT_INDEX > 0) { CURRENT_INDEX--; renderQuestion(); scrollToWizard(); }
 }
 
 async function nextQuestion() {
-  if (CURRENT_INDEX < QUESTIONS.length - 1) {
+  const qs = activeQuestions();
+  if (CURRENT_INDEX < qs.length - 1) {
     CURRENT_INDEX++;
     renderQuestion();
-    window.scrollTo({top:0,behavior:'smooth'});
+    scrollToWizard();
     return;
   }
-  // Terminar — guardar
   await finish();
 }
 

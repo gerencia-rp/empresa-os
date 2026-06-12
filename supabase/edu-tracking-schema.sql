@@ -93,6 +93,10 @@ FROM edu_students
 GROUP BY mentorship_id, lead_source, lead_campaign;
 
 -- 4.2) Engagement (días sin abrir portal)
+-- NOTA: la columna `estado_pago` puede no existir en tu schema actual de
+-- edu_students. Las vistas están diseñadas para NO depender de esa columna,
+-- así son universalmente compatibles. Si tenés `status` o `estado_pago`,
+-- podés agregarlo después como filtro adicional.
 CREATE OR REPLACE VIEW edu_mkt_engagement AS
 SELECT
   s.id AS student_id,
@@ -111,19 +115,21 @@ SELECT
   END AS estado_engagement
 FROM edu_students s;
 
--- 4.3) Puntos de atasco (etapa con más tiempo promedio + más estudiantes)
+-- 4.3) Puntos de atasco (etapa con más estudiantes)
+-- NOTA: usa created_at como fallback si no existe stage_started_at
 CREATE OR REPLACE VIEW edu_mkt_bottleneck AS
 SELECT
   mentorship_id,
   current_stage,
   COUNT(*) AS n_estudiantes,
-  AVG(EXTRACT(DAY FROM NOW() - COALESCE(stage_started_at, created_at))) AS dias_promedio_en_etapa,
-  COUNT(*) FILTER (WHERE EXTRACT(DAY FROM NOW() - COALESCE(stage_started_at, created_at)) > 30) AS atascados_30d
+  AVG(EXTRACT(DAY FROM NOW() - created_at)) AS dias_promedio_en_etapa,
+  COUNT(*) FILTER (WHERE EXTRACT(DAY FROM NOW() - created_at) > 30) AS atascados_30d
 FROM edu_students
 WHERE current_stage IS NOT NULL
 GROUP BY mentorship_id, current_stage;
 
 -- 4.4) Resumen de actividad por estudiante (para "Seguimientos del día")
+-- Sin dependencia de estado_pago — universalmente compatible
 CREATE OR REPLACE VIEW edu_student_followup_score AS
 SELECT
   s.id AS student_id,
@@ -133,19 +139,16 @@ SELECT
   s.phone,
   -- Score 0-100. Más alto = más urgente seguir
   GREATEST(0, LEAST(100,
-    -- Penaliza días sin actividad
+    -- Penaliza días sin actividad (peso 2×, máx 40)
     LEAST(40, EXTRACT(DAY FROM NOW() - COALESCE(s.last_activity_at, s.created_at)) * 2)::INT
-    -- Penaliza días sin contacto del coach
+    -- Penaliza días sin contacto del coach (peso 1.5×, máx 30)
     + LEAST(30, EXTRACT(DAY FROM NOW() - COALESCE(s.last_contact_at, s.created_at)) * 1.5)::INT
-    -- Estado de pago al día = bonus (menos urgente)
-    + CASE WHEN s.estado_pago = 'activo' THEN 0 ELSE 30 END
   ))::INT AS urgency_score,
   s.last_activity_at,
   s.last_contact_at,
   EXTRACT(DAY FROM NOW() - COALESCE(s.last_activity_at, s.created_at))::INT AS dias_sin_activity,
   EXTRACT(DAY FROM NOW() - COALESCE(s.last_contact_at, s.created_at))::INT AS dias_sin_contact
-FROM edu_students s
-WHERE COALESCE(s.estado_pago,'activo') = 'activo';
+FROM edu_students s;
 
 -- ───────────────────────────────────────────────────────────────
 -- 5) RLS Policies
