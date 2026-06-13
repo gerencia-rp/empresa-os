@@ -926,32 +926,134 @@ async function pmDeletePayment(id) {
 window.pmDeletePayment = pmDeletePayment;
 
 // ════════════════════════════════════════════════════════════════
-// IMPORTAR DE AIRTABLE — placeholder con instrucciones
-// (cuando estés listo, conectamos via API + Edge Function)
+// 🆕 SYNC AIRTABLE — Edge Function que jala las 10 tablas
+// Token + Base ID en localStorage del navegador. Idempotente.
 // ════════════════════════════════════════════════════════════════
 function pmOpenAirtableImport() {
-  openModal('📥 Importar de Airtable', `
+  const savedToken = localStorage.getItem('pm-airtable-token') || '';
+  const savedBaseId = localStorage.getItem('pm-airtable-base') || 'appzEnsuy4qPT6iHj';
+  openModal('🔄 Sync Airtable', `
     <div class="space-y-3 text-sm">
       <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        Para conectar Airtable necesitamos: <strong>(1)</strong> tu Airtable API key, <strong>(2)</strong> Base ID, <strong>(3)</strong> nombres de las tablas (propiedades, unidades, etc.). Por ahora podés:
+        Sincroniza tu base Airtable <code class="font-mono">${savedBaseId}</code> con el módulo PM.
+        Trae: propiedades, unidades, inquilinos, reservas, pagos, gastos, accesos y tareas.
+        <br><br>
+        🔐 <strong>Tu token NO se guarda en el servidor</strong> — solo en localStorage de este navegador.
+        Crealo en <a href="https://airtable.com/create/tokens" target="_blank" class="underline font-bold">airtable.com/create/tokens</a> con scopes:
+        <ul class="list-disc ml-5 mt-1">
+          <li><code>data.records:read</code></li>
+          <li><code>schema.bases:read</code></li>
+        </ul>
+        Y accesso a esta base específicamente.
       </div>
-      <div class="bg-slate-50 border border-slate-200 rounded p-3 text-xs">
-        <div class="font-bold mb-2">Opción A · Pegar JSON manualmente</div>
-        <div class="text-slate-600 mb-2">Exportá tus propiedades de Airtable como JSON o CSV y pegalo acá:</div>
-        <textarea id="pm-airtable-json" rows="8" placeholder='Pegá array JSON:\n[\n  {"name":"4916 Barkbridge","address":"...","rental_model":"por_habitaciones","total_rooms":5},\n  ...\n]' class="w-full border border-slate-300 rounded p-2 text-xs font-mono"></textarea>
-        <button onclick="pmImportFromJSON()" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Importar JSON</button>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Airtable Personal Access Token *</label>
+        <input id="pm-at-token" type="password" value="${savedToken.replace(/"/g,'&quot;')}" placeholder="patXXXX...." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/>
       </div>
-      <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs text-emerald-900">
-        <div class="font-bold mb-1">Opción B · Conectar Airtable directo (próximo)</div>
-        Cuando me pases tu API key y Base ID, hago una Edge Function que jala las propiedades automático cada X horas. Avísame cuando quieras.
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Base ID</label>
+        <input id="pm-at-base" value="${savedBaseId.replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/>
       </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
+        ⚠️ Primera sync: 30-90 segundos. <strong>No cierres la ventana.</strong> Hacé "Dry run" primero para ver qué se va a importar.
+      </div>
+
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="pmStartAirtableSync(true)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Prueba sin escribir a la DB">🧪 Dry run</button>
+        <button onclick="pmStartAirtableSync(false)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🔄 Sync ahora</button>
       </div>
+
+      <details class="text-[11px] text-slate-500">
+        <summary class="cursor-pointer">📋 Plan B · Importar JSON manualmente (legacy)</summary>
+        <div class="mt-2 bg-slate-50 border border-slate-200 rounded p-2">
+          <textarea id="pm-airtable-json" rows="4" placeholder='[{"name":"4916 Barkbridge",...}]' class="w-full border border-slate-300 rounded p-1 text-[10px] font-mono"></textarea>
+          <button onclick="pmImportFromJSON()" class="mt-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold px-2 py-1 rounded">Importar JSON</button>
+        </div>
+      </details>
     </div>
   `);
 }
 window.pmOpenAirtableImport = pmOpenAirtableImport;
+
+async function pmStartAirtableSync(dryRun) {
+  const token = (document.getElementById('pm-at-token')?.value || '').trim();
+  const baseId = (document.getElementById('pm-at-base')?.value || '').trim();
+  if (!token) return alert('Falta el token de Airtable.');
+  if (!baseId) return alert('Falta el Base ID.');
+  localStorage.setItem('pm-airtable-token', token);
+  localStorage.setItem('pm-airtable-base', baseId);
+
+  openModal('🔄 Sincronizando con Airtable...', `
+    <div class="text-center py-8">
+      <div class="text-5xl animate-pulse mb-3">🔄</div>
+      <div class="font-bold text-slate-900">${dryRun?'🧪 Dry run':'Sincronizando 10 tablas'}</div>
+      <div class="text-xs text-slate-500 mt-2">Hasta 90 segundos. No cierres la ventana.</div>
+    </div>
+  `);
+
+  // Auth strict
+  let accessToken;
+  try {
+    const sbAuth = (typeof sb !== 'undefined' && sb) ? sb : (window.sb || null);
+    let sess = await sbAuth.auth.getSession();
+    if (!sess?.data?.session?.access_token) {
+      try { await sbAuth.auth.refreshSession(); sess = await sbAuth.auth.getSession(); } catch (e) {}
+    }
+    accessToken = sess?.data?.session?.access_token;
+    if (!accessToken || accessToken === window.SUPABASE_ANON_KEY) throw new Error('Sin sesión activa');
+  } catch (e) {
+    closeModal();
+    return alert('⚠️ Sesión expirada. Cerrá sesión y volvé a entrar.');
+  }
+
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/pm-sync-airtable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ airtable_token: token, base_id: baseId, dry_run: !!dryRun })
+    });
+    const txt = await res.text();
+    let r;
+    try { r = JSON.parse(txt); } catch { throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`); }
+    if (!r.ok) throw new Error(r.error || 'Sync falló');
+
+    closeModal();
+    const stats = r.stats || {};
+    const errs = (r.errors||[]);
+    openModal(dryRun ? '🧪 Dry run completado' : '✅ Sync completado', `
+      <div class="space-y-3">
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-sm text-emerald-900">
+          ${dryRun ? 'Simulación OK. <strong>No se escribió nada a la DB.</strong>' : 'Datos sincronizados correctamente.'}
+          <br><span class="text-[10px]">⏱ ${Math.round((r.duration_ms||0)/1000)}s</span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Propiedades</div><div class="text-xl font-bold">${stats.properties||0}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Unidades</div><div class="text-xl font-bold">${stats.units||0}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Inquilinos</div><div class="text-xl font-bold">${stats.tenants||0}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Reservas</div><div class="text-xl font-bold">${stats.bookings||0}</div></div>
+          <div class="bg-emerald-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-emerald-700">Ingresos</div><div class="text-xl font-bold text-emerald-700">${stats.payments_in||0}</div></div>
+          <div class="bg-red-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-red-700">Gastos</div><div class="text-xl font-bold text-red-700">${stats.payments_out||0}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Accesos</div><div class="text-xl font-bold">${stats.credentials||0}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Tareas</div><div class="text-xl font-bold">${stats.tasks||0}</div></div>
+        </div>
+        ${errs.length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">⚠️ ${errs.length} warnings (sync continuó pese a estos errores)</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${errs.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
+        <div class="flex gap-2 pt-2 border-t border-slate-200">
+          <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+          ${!dryRun ? `<button onclick="closeModal();pmLoadAll();" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Ver datos</button>` : ''}
+        </div>
+      </div>
+    `);
+    if (!dryRun) await pmLoadAll();
+  } catch (e) {
+    closeModal();
+    alert('⚠️ Sync falló:\n\n' + (e?.message || String(e)) + '\n\nVerificá:\n• Token con scopes correctos\n• Base ID correcto\n• Token tiene acceso a esa base');
+  }
+}
+window.pmStartAirtableSync = pmStartAirtableSync;
 
 async function pmImportFromJSON() {
   const raw = document.getElementById('pm-airtable-json').value.trim();
