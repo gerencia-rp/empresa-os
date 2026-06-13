@@ -148,6 +148,12 @@ Reglas de la versión estratégica:
 - Es parte de una SECUENCIA con arco: hook → contexto → valor → CTA. 3-5 historias.
 - Tipos de secuencia: hand-raiser (lleva a un recurso gratis / comentar palabra), venta (agenda u oferta, solo en cosecha), autoridad/conexión (humaniza + demuestra autoridad).
 - Timing sugerido: hook ~14h, resto de la secuencia ~16h.
+PATRONES DE HISTORIAS QUE VENDEN (incorpóralos cuando encajen):
+- Hook de honestidad/vulnerabilidad: "Voy a ser muy honesta contigo…".
+- Lista de errores/creencias del avatar + sticker de TAP "toca si te sientes identificado".
+- Auto-diagnóstico que SEGMENTA leads: "¿Cómo ves tu situación hoy? [Necesito ayuda / Creo que estoy bien]"; el que admite que necesita ayuda es lead caliente.
+- Cada historia persigue 1 de 3 objetivos: RETENCIÓN, INTERACCIÓN o VENTA; equilíbralos en la secuencia.
+- En secuencias hand-raiser, pon la palabra clave DENTRO de la historia ("comenta CRITERIO y te la mando") y repítela en el cierre.
 Para bienes raíces usa momentos reales: ver una propiedad, estar en una obra, hacer los números, una llamada con un estudiante, firmar un cierre, etc.
 
 DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backticks) con esta forma:
@@ -163,7 +169,8 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
           "momento": "el momento cotidiano / b-roll que se graba",
           "debil": "lo que la mayoría pondría (genérico, sobre ti)",
           "estrategico": "la versión que conecta con la audiencia, lista para poner en pantalla",
-          "sticker": { "tipo": "encuesta|pregunta|quiz|cuestionario|emoji slider|ninguno", "texto": "texto del sticker", "opciones": ["opción A", "opción B"] },
+          "sticker": { "tipo": "encuesta|pregunta|quiz|cuestionario|emoji slider|auto-diagnóstico|tap (toca si te identificas)|ninguno", "texto": "texto del sticker", "opciones": ["opción A", "opción B"] },
+          "objetivo_historia": "retención|interacción|venta",
           "por_que": "1 frase: por qué la estratégica gana"
         }
       ],
@@ -684,7 +691,7 @@ function historiaCard(s, i) {
   const hist = Array.isArray(s.historias) ? s.historias : [];
   const rows = hist.map(h => `
     <div class="border-t border-zinc-800 pt-3 mt-3">
-      <div class="text-[11px] text-zinc-500 mb-1.5">📍 ${esc(h.momento)}</div>
+      <div class="text-[11px] text-zinc-500 mb-1.5 flex items-center gap-2">📍 ${esc(h.momento)}${h.objetivo_historia ? `<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">${esc(h.objetivo_historia)}</span>` : ''}</div>
       <div class="grid sm:grid-cols-2 gap-2">
         <div class="bg-red-950/20 border border-red-900/30 rounded-lg p-2.5">
           <div class="text-[10px] uppercase font-bold text-red-400 mb-1">Storie débil</div>
