@@ -139,8 +139,15 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
 const HISTORIA_SCHEMA = `=== MODO HISTORIAS ESTRATÉGICAS ===
 Las HISTORIAS venden (el reel solo atrae). El núcleo es convertir un momento cotidiano genérico en una historia estratégica.
 DIFERENCIA CLAVE que debes mostrar SIEMPRE en cada historia:
-- STORIE DÉBIL: sobre ti, genérica, sin objetivo ("Salí a cenar hoy", "Autocuidado ✅", "Hazme una pregunta").
-- STORIE ESTRATÉGICO: sobre la AUDIENCIA, conecta con su dolor/deseo, usa un sticker de engagement ESPECÍFICO y lleva a un objetivo ("Si llevas meses buscando tu primera inversión y no encuentras el deal, mira lo que reviso apenas entro a una casa 👇").
+- STORIE DÉBIL: sobre ti, genérica, sin objetivo ("Salí a cenar hoy", "Autocuidado ✅", "Hazme una pregunta", "Agotada, no dormí nada").
+- STORIE ESTRATÉGICO: sobre la AUDIENCIA, conecta con su dolor/deseo, usa un sticker de engagement ESPECÍFICO y lleva a un objetivo.
+
+EL PROBLEMA REAL no es subir historias, es subirlas SIN INTENCIÓN NI CONSTRUCCIÓN. Toda historia estratégica cumple estos 3 CRITERIOS (etiqueta cuáles cumple cada una):
+1. ENLAZA CON TU PRODUCTO/OFERTA: conecta el momento con lo que vendes (ej. "...no dormí nada porque me quedé diseñando el workbook que te enseña a empaquetar tu conocimiento y venderlo, aunque tengas 300 seguidores").
+2. INVOLUCRA AL CLIENTE: lo hace sobre la audiencia + sticker que invita a responder/tocar.
+3. CUENTA ALGO MÁS QUE EL MOMENTO: contextualiza, activa deseo y abre conversación; no solo "lo que hiciste".
+
+MOTOR DE TRANSFORMACIÓN (de momento crudo a historia que vende): momento real → puente al dolor/deseo del avatar → contextualiza/enlaza con tu producto u oferta → activa deseo → sticker específico → 1 objetivo (retención/interacción/venta). La versión estratégica de cada historia DEBE pasar por este motor.
 Reglas de la versión estratégica:
 - Hazla sobre la audiencia, no sobre ti (ej. "me cuido para poder cuidarte").
 - Conecta el momento cotidiano con un dolor/deseo del avatar.
@@ -171,6 +178,8 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
           "estrategico": "la versión que conecta con la audiencia, lista para poner en pantalla",
           "sticker": { "tipo": "encuesta|pregunta|quiz|cuestionario|emoji slider|auto-diagnóstico|tap (toca si te identificas)|ninguno", "texto": "texto del sticker", "opciones": ["opción A", "opción B"] },
           "objetivo_historia": "retención|interacción|venta",
+          "criterios": ["enlaza con producto", "involucra al cliente", "cuenta más que el momento"],
+          "enlace_oferta": "cómo esta historia conecta con tu producto/oferta (1 frase)",
           "por_que": "1 frase: por qué la estratégica gana"
         }
       ],
@@ -651,6 +660,7 @@ async function generarHistorias() {
   const tipo = document.getElementById('h-tipo').value;
   const variantes = document.getElementById('h-variantes').value;
   const cta = document.getElementById('h-cta').value.trim();
+  const oferta = document.getElementById('h-oferta').value.trim();
 
   const out = document.getElementById('h-output');
   out.innerHTML = loadingHTML(variantes).replace('reel(es)', 'secuencia(s) de historias');
@@ -659,9 +669,10 @@ async function generarHistorias() {
 
   const prompt = `Genera ${variantes} secuencia(s) de historias estratégicas.
 ${dolorPromptBlock(dolor)}${tema ? 'Momento/tema cotidiano a usar: ' + tema : 'Inventa momentos cotidianos creíbles del día a día en bienes raíces.'}
+Producto/oferta a enlazar: ${oferta || 'la mentoría de fix & flip / una clase gratis (enlaza los momentos a esto)'}
 Tipo de secuencia: ${tipo === 'auto' ? 'elige el mejor' : tipo}
 ${cta ? 'CTA / palabra clave a usar: ' + cta : ''}
-Cada secuencia debe tener 3-5 historias, y CADA historia debe mostrar la versión débil y la estratégica.`;
+Cada secuencia debe tener 3-5 historias. CADA historia debe mostrar la versión débil y la estratégica, pasar por el motor de transformación y etiquetar qué criterios cumple.`;
 
   try {
     const text = await callClaude(prompt, 1500 + Number(variantes) * 2000, HISTORIA_SCHEMA);
@@ -701,6 +712,8 @@ function historiaCard(s, i) {
           <div class="text-[10px] uppercase font-bold text-emerald-400 mb-1">Storie estratégico</div>
           <div class="text-sm">${esc(h.estrategico)}</div>
           ${stickerBadge(h.sticker)}
+          ${Array.isArray(h.criterios) && h.criterios.length ? `<div class="flex flex-wrap gap-1 mt-2">${h.criterios.map(c => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300">✓ ${esc(c)}</span>`).join('')}</div>` : ''}
+          ${h.enlace_oferta ? `<div class="text-[10px] text-amber-300/80 mt-1.5">🔗 ${esc(h.enlace_oferta)}</div>` : ''}
         </div>
       </div>
       ${h.por_que ? `<div class="text-[10px] text-zinc-600 mt-1">↳ ${esc(h.por_que)}</div>` : ''}
@@ -728,7 +741,8 @@ function copyHistoria(i, btn) {
   const txt = `${s.titulo} [${s.tipo}] — ${s.objetivo}\n${s.timing || ''}\n\n` +
     hist.map(h => {
       const st = h.sticker && h.sticker.tipo && h.sticker.tipo !== 'ninguno' ? `\n   STICKER (${h.sticker.tipo}): ${h.sticker.texto}${Array.isArray(h.sticker.opciones) && h.sticker.opciones.length ? ' [' + h.sticker.opciones.join(' / ') + ']' : ''}` : '';
-      return `${h.n}. ${h.momento}\n   DÉBIL: ${h.debil}\n   ESTRATÉGICO: ${h.estrategico}${st}`;
+      const en = h.enlace_oferta ? `\n   ENLACE OFERTA: ${h.enlace_oferta}` : '';
+      return `${h.n}. ${h.momento}\n   DÉBIL: ${h.debil}\n   ESTRATÉGICO: ${h.estrategico}${st}${en}`;
     }).join('\n\n') +
     `\n\nCTA FINAL: ${s.cta_final}`;
   navigator.clipboard.writeText(txt);
