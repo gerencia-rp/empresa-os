@@ -22,6 +22,12 @@ const pmaState = {
   calendarGroupByProperty: true,          // agrupar sidebar por propiedad (default ON)
   calendarCollapsedProps: {},             // { propertyId: true } — qué grupos están colapsados
   calendarGroupsInitialized: false,       // primera vez: colapsar todos
+  bookingsSearch: '',                     // buscador del tab Reservas
+  bookingsPlatformFilter: null,           // filtro de plataforma en tab Reservas
+  financePeriod: 'all',                   // 'all' | 'this_month' | 'this_year'
+  financeTypeFilter: 'all',               // 'all' | 'ingreso' | 'gasto'
+  financeSearch: '',                      // buscador de Finanzas
+  financeShowOrphansOnly: false,          // mostrar solo huérfanos
   // Data
   properties: [],
   units: [],
@@ -714,18 +720,42 @@ function pmRenderTimelineForUnits(units, year) {
 // ════════════════════════════════════════════════════════════════
 // TAB 2 · CALENDARIO GENERAL (todas las propiedades)
 // ════════════════════════════════════════════════════════════════
-// Dedupe units: si hay 2+ con mismo property_id+code, dejar la más reciente
+// Dedupe units: solo fusiona si TODOS los datos importantes son iguales
+// (mismo property_id, mismo code, mismo type, Y mismo target_rent o uno null).
+// Si dos unidades tienen el mismo code pero rentas diferentes, son UNIDADES REALES
+// distintas (error de import en Airtable) y deben mostrarse ambas.
 function pmDedupeUnits(units) {
   const map = new Map();
   units.forEach(u => {
-    const key = `${u.property_id}|${(u.code||'').toUpperCase()}|${u.unit_type||''}`;
+    const rent = u.target_rent ? Math.round(u.target_rent) : 'NULL';
+    const key = `${u.property_id}|${(u.code||'').toUpperCase()}|${u.unit_type||''}|${rent}`;
     const existing = map.get(key);
     if (!existing) { map.set(key, u); return; }
-    // Conservar la que tenga más datos (target_rent + created_at más reciente)
+    // Solo si TODO matchea, conservar la más completa
     const score = (x) => (x.target_rent?2:0) + (x.bath_type?1:0) + new Date(x.created_at||0).getTime()/1e15;
     if (score(u) > score(existing)) map.set(key, u);
   });
-  return Array.from(map.values());
+  // Si quedan unidades con mismo code pero distinto rent, des-ambiguar el code visual
+  // agregando un sufijo "(B)", "(C)", etc. para que el PM vea claro que son distintas
+  const units2 = Array.from(map.values());
+  const byCode = {};
+  units2.forEach(u => {
+    const k = `${u.property_id}|${(u.code||'').toUpperCase()}`;
+    if (!byCode[k]) byCode[k] = [];
+    byCode[k].push(u);
+  });
+  Object.values(byCode).forEach(arr => {
+    if (arr.length > 1) {
+      arr.sort((a,b) => (a.target_rent||0) - (b.target_rent||0));
+      arr.forEach((u, idx) => {
+        if (idx > 0) {
+          // Anotar variante en la copia local (sin tocar la DB)
+          u._displaySuffix = ` (${String.fromCharCode(65+idx)})`; // (B), (C)...
+        }
+      });
+    }
+  });
+  return units2;
 }
 
 function pmRenderCalendar() {
@@ -774,7 +804,7 @@ function pmRenderCalendar() {
       ${pmRenderListingsSidebar(filteredUnits, allUnits.length)}
       <div class="flex-1 flex flex-col overflow-hidden">
         ${pmRenderTimelineHeader()}
-        ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900">⚠️ ${dupesHidden} unidades duplicadas fusionadas</div>` : ''}
+        ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900 flex items-center justify-between"><span>⚠️ ${dupesHidden} ${dupesHidden===1?'registro duplicado':'registros duplicados'} fusionado${dupesHidden===1?'':'s'} (mismo código, tipo y renta)</span><span class="text-amber-700 italic">Si ves códigos como "ESTUDIO-1 (B)" son unidades distintas con mismo código en Airtable.</span></div>` : ''}
         <div class="flex-1 overflow-auto">${timelineUnits.length === 0 && pmaState.calendarGroupByProperty ? `
           <div class="p-12 text-center text-slate-400 text-sm">
             <div class="text-5xl mb-3">📂</div>
@@ -824,11 +854,12 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
     const dotColor = active ? (platformColors[active.booking_type] || '#10b981') : '#cbd5e1';
     const statusLabel = active ? (tenant.length > 18 ? tenant.slice(0,17)+'…' : tenant) : 'Libre';
     const statusClass = active ? 'text-emerald-700' : 'text-slate-400';
+    const displayName = (u.name||u.code||'') + (u._displaySuffix || '');
     return `<button onclick="pmaState.calendarSelectedUnitId='${u.id}';pmRender()" class="w-full px-3 py-2.5 hover:bg-white border-b border-slate-100 flex items-center gap-2.5 text-left transition group">
       <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-lg flex-shrink-0">${icon}</div>
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-bold text-slate-900 truncate">${(u.name||u.code||'').replace(/</g,'&lt;')}</div>
-        <div class="text-[10px] text-slate-500 truncate">${(p?.name||'—').replace(/</g,'&lt;').slice(0,30)}</div>
+        <div class="text-xs font-bold text-slate-900 truncate">${displayName.replace(/</g,'&lt;')}</div>
+        <div class="text-[10px] text-slate-500 truncate">${(p?.name||'—').replace(/</g,'&lt;').slice(0,30)}${u.target_rent ? ` · $${Number(u.target_rent).toLocaleString()}/mes` : ''}</div>
         <div class="text-[10px] ${statusClass} font-semibold truncate flex items-center gap-1 mt-0.5">
           <span style="background:${dotColor}" class="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"></span>
           ${statusLabel.replace(/</g,'&lt;')}
@@ -1068,8 +1099,8 @@ function pmRenderTimelineGrid(units) {
           <div onclick="pmaState.calendarSelectedUnitId='${unit.id}';pmRender()" style="width:${labelW}px;flex-shrink:0;padding:6px 10px;border-right:1px solid #e2e8f0;background:white;position:sticky;left:0;z-index:6;cursor:pointer;display:flex;align-items:center;gap:8px;" class="hover:bg-slate-50">
             <div style="font-size:18px;flex-shrink:0;">${icon}</div>
             <div style="min-width:0;flex:1;">
-              <div style="font-size:11px;font-weight:bold;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(unit.code||unit.name||'').replace(/</g,'&lt;')}</div>
-              <div style="font-size:9px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(p?.name||'—').replace(/</g,'&lt;')}</div>
+              <div style="font-size:11px;font-weight:bold;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${((unit.code||unit.name||'') + (unit._displaySuffix || '')).replace(/</g,'&lt;')}</div>
+              <div style="font-size:9px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(p?.name||'—').replace(/</g,'&lt;')}${unit.target_rent ? ` · $${Number(unit.target_rent).toLocaleString()}` : ''}</div>
             </div>
           </div>
           <!-- Celdas -->
@@ -1568,31 +1599,87 @@ window.pmCreateBookingFromDay = pmCreateBookingFromDay;
 // ════════════════════════════════════════════════════════════════
 function pmRenderBookings() {
   const today = new Date().toISOString().slice(0,10);
+  const todayDate = new Date(today);
   const all = pmaState.bookings;
-  const activeOrFuture = all.filter(b => (b.end_date || '9999') >= today && b.status !== 'cancelado');
-  const pastOrFinished = all.filter(b => (b.end_date || '') < today || b.status === 'finalizado' || b.status === 'cancelado');
+  const searchQ = (pmaState.bookingsSearch || '').toLowerCase().trim();
+  const platformFilter = pmaState.bookingsPlatformFilter || null;
+
+  // Filtros activos
+  let filtered = all;
+  if (searchQ) {
+    filtered = filtered.filter(b => {
+      const u = pmaState.units.find(x => x.id === b.unit_id);
+      const p = pmaState.properties.find(x => x.id === b.property_id);
+      const t = pmaState.tenants.find(t => t.id === b.tenant_id);
+      return ((t?.full_name||'').toLowerCase().includes(searchQ)
+           || (p?.name||'').toLowerCase().includes(searchQ)
+           || (u?.code||'').toLowerCase().includes(searchQ)
+           || (u?.name||'').toLowerCase().includes(searchQ));
+    });
+  }
+  if (platformFilter) filtered = filtered.filter(b => b.booking_type === platformFilter);
+
+  const activeOrFuture = filtered.filter(b => (b.end_date || '9999') >= today && b.status !== 'cancelado');
+  const pastOrFinished = filtered.filter(b => (b.end_date || '') < today || b.status === 'finalizado' || b.status === 'cancelado');
+
+  // Ordenar por fecha de inicio descendente (más reciente primero)
+  activeOrFuture.sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
+  pastOrFinished.sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
+
+  // Próximas a vencer (≤30 días)
+  const venceProximo = activeOrFuture.filter(b => {
+    if (!b.end_date) return false;
+    const days = Math.floor((new Date(b.end_date) - todayDate) / 86400000);
+    return days >= 0 && days <= 30;
+  });
+
+  // Conteos por plataforma para chips
+  const platformCounts = {};
+  all.forEach(b => { platformCounts[b.booking_type] = (platformCounts[b.booking_type] || 0) + 1; });
+  const platforms = Object.keys(platformCounts).sort((a,b) => platformCounts[b] - platformCounts[a]);
+  const platformLabel = { contrato_directo: 'Contrato', airbnb: 'Airbnb', booking: 'Booking', vrbo: 'VRBO', hospitable: 'Hospitable', padsplit: 'Padsplit', reserva_corta: 'Corta', otro: 'Otro' };
 
   const renderRow = (b) => {
     const u = pmaState.units.find(x => x.id === b.unit_id);
     const p = pmaState.properties.find(x => x.id === b.property_id);
-    const colorByType = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', otro: 'slate' };
+    const t = pmaState.tenants.find(t => t.id === b.tenant_id);
+    const colorByType = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', padsplit: 'violet', otro: 'slate' };
     const col = colorByType[b.booking_type] || 'slate';
+    // Días restantes
+    const daysLeft = b.end_date ? Math.floor((new Date(b.end_date) - todayDate) / 86400000) : null;
+    const venceBadge = (daysLeft != null && daysLeft >= 0 && daysLeft <= 30)
+      ? `<span class="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold animate-pulse">⏰ Vence en ${daysLeft}d</span>`
+      : (daysLeft != null && daysLeft < 0 && b.status !== 'finalizado')
+        ? `<span class="text-[10px] bg-red-100 text-red-900 px-1.5 py-0.5 rounded font-bold">⚠ Vencida hace ${-daysLeft}d</span>`
+        : '';
+    // Duración total
+    const durDays = (b.start_date && b.end_date) ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1 : null;
+    const durLabel = durDays ? (durDays >= 30 ? `${Math.round(durDays/30)} ${Math.round(durDays/30)===1?'mes':'meses'}` : `${durDays}d`) : '';
     return `
-      <div onclick="pmEditBooking('${b.id}')" class="border border-slate-200 rounded p-3 hover:border-emerald-400 cursor-pointer transition">
+      <div class="border border-slate-200 rounded-lg p-3 hover:border-emerald-400 hover:shadow-sm transition group bg-white">
         <div class="flex items-start justify-between gap-2 flex-wrap">
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 cursor-pointer" onclick="pmEditBooking('${b.id}')">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] uppercase bg-${col}-100 text-${col}-800 px-1.5 py-0.5 rounded font-bold">${b.booking_type}</span>
-              <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold">${b.status}</span>
+              <span class="text-[10px] uppercase bg-${col}-100 text-${col}-800 px-1.5 py-0.5 rounded font-bold">${platformLabel[b.booking_type] || b.booking_type}</span>
+              <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase">${b.status}</span>
+              ${venceBadge}
               <strong class="text-sm text-slate-900">${pmTenantName(b.tenant_id)}</strong>
             </div>
-            <div class="text-[11px] text-slate-600 mt-1">
-              📅 ${b.start_date} → ${b.end_date||'∞'} · 🏠 ${(p?.name||'').replace(/</g,'&lt;')} · 🛏 ${(u?.name||u?.code||'').replace(/</g,'&lt;')}
+            <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
+              <span>📅 ${b.start_date||'?'} → ${b.end_date||'∞'}${durLabel?` <span class="text-slate-400">(${durLabel})</span>`:''}</span>
+              <span>·</span>
+              <span>🏠 ${(p?.name||'').replace(/</g,'&lt;').slice(0,30)}</span>
+              <span>·</span>
+              <span>🛏 ${((u?.code||u?.name||'') + (u?._displaySuffix||'')).replace(/</g,'&lt;')}</span>
             </div>
           </div>
-          <div class="text-right">
-            <div class="text-sm font-bold text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</div>
-            <div class="text-[10px] text-slate-500">/${b.rent_period}</div>
+          <div class="text-right flex items-center gap-2">
+            ${t?.phone ? `<a href="https://wa.me/${t.phone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
+            ${t?.email ? `<a href="mailto:${t.email}" onclick="event.stopPropagation()" title="${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">📧</a>` : ''}
+            <div class="cursor-pointer" onclick="pmEditBooking('${b.id}')">
+              <div class="text-sm font-bold text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</div>
+              <div class="text-[10px] text-slate-500">/${b.rent_period||'mes'}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1601,19 +1688,45 @@ function pmRenderBookings() {
 
   return `
     <div class="space-y-3 p-1">
+      <!-- Header con stats + acción -->
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="text-xs uppercase font-bold text-slate-500">${all.length} reservas totales · ${activeOrFuture.length} actuales/futuras</div>
-        <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Reserva</button>
+        <div>
+          <div class="text-sm font-bold text-slate-900">${all.length} reservas <span class="text-slate-500 font-normal">· ${activeOrFuture.length} actuales/futuras</span></div>
+          ${venceProximo.length ? `<div class="text-[11px] text-amber-700 font-bold mt-0.5">⏰ ${venceProximo.length} ${venceProximo.length===1?'vence':'vencen'} en ≤30 días</div>` : ''}
+        </div>
+        <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">+ Nueva Reserva</button>
       </div>
 
+      <!-- Buscador + chips de plataforma -->
+      <div class="space-y-2">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input oninput="pmaState.bookingsSearch=this.value;pmRender()" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar por inquilino, propiedad o código de unidad…" class="w-full border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-full pl-9 pr-9 py-2 text-xs outline-none transition"/>
+          ${searchQ ? `<button onclick="pmaState.bookingsSearch='';pmRender()" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>` : ''}
+        </div>
+        <div class="flex gap-1.5 flex-wrap text-[10px] font-bold">
+          <button onclick="pmaState.bookingsPlatformFilter=null;pmRender()" class="px-2.5 py-1 rounded-full ${!platformFilter?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">Todas <span class="opacity-70">${all.length}</span></button>
+          ${platforms.map(plat => {
+            const c = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', padsplit: 'violet', otro: 'slate' }[plat] || 'slate';
+            const active = platformFilter === plat;
+            return `<button onclick="pmaState.bookingsPlatformFilter='${plat}';pmRender()" class="px-2.5 py-1 rounded-full ${active?`bg-${c}-600 text-white`:`bg-${c}-50 text-${c}-700 hover:bg-${c}-100`}">${platformLabel[plat]||plat} ${platformCounts[plat]}</button>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Lista de actuales/futuras -->
       <div>
-        <div class="text-[10px] font-bold uppercase text-slate-700 mb-2">🟢 Actuales y futuras (${activeOrFuture.length})</div>
-        ${activeOrFuture.length ? `<div class="space-y-2">${activeOrFuture.map(renderRow).join('')}</div>` : '<div class="text-xs text-slate-400 italic">Sin reservas actuales.</div>'}
+        <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Actuales y futuras (${activeOrFuture.length})
+        </div>
+        ${activeOrFuture.length ? `<div class="space-y-2">${activeOrFuture.map(renderRow).join('')}</div>` : '<div class="text-xs text-slate-400 italic px-3 py-6 text-center bg-slate-50 rounded-lg">Sin reservas que matcheen tu búsqueda/filtro.</div>'}
       </div>
 
       ${pastOrFinished.length ? `
         <div>
-          <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 mt-4">⚫ Pasadas / finalizadas (${pastOrFinished.length})</div>
+          <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 mt-4 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span> Pasadas / finalizadas (${pastOrFinished.length}) ${pastOrFinished.length > 20 ? '<span class="opacity-50">— mostrando 20</span>' : ''}
+          </div>
           <div class="space-y-2 opacity-60">${pastOrFinished.slice(0, 20).map(renderRow).join('')}</div>
         </div>
       ` : ''}
@@ -1625,72 +1738,153 @@ function pmRenderBookings() {
 // TAB 4 · FINANZAS
 // ════════════════════════════════════════════════════════════════
 function pmRenderFinance() {
-  const total = { ingresos: 0, gastos: 0, utilidad: 0 };
+  // Filtros del tab
+  const period = pmaState.financePeriod || 'all'; // 'all' | 'this_month' | 'this_year'
+  const typeFilter = pmaState.financeTypeFilter || 'all'; // 'all' | 'ingreso' | 'gasto'
+  const searchQ = (pmaState.financeSearch || '').toLowerCase().trim();
+  const now = new Date();
+  const thisMonth = now.toISOString().slice(0,7);
+  const thisYear = String(now.getFullYear());
+
+  // Filtrar payments según el período + tipo + búsqueda
+  let filteredPays = pmaState.payments.filter(p => p.status === 'pagado');
+  if (period === 'this_month') filteredPays = filteredPays.filter(p => (p.paid_at||'').startsWith(thisMonth));
+  else if (period === 'this_year') filteredPays = filteredPays.filter(p => (p.paid_at||'').startsWith(thisYear));
+  if (typeFilter !== 'all') filteredPays = filteredPays.filter(p => p.type === typeFilter);
+  if (searchQ) filteredPays = filteredPays.filter(p =>
+    (p.concept||'').toLowerCase().includes(searchQ) ||
+    (p.category||'').toLowerCase().includes(searchQ) ||
+    (p.notes||'').toLowerCase().includes(searchQ)
+  );
+
+  // Totales GLOBALES (de los filtrados, sin importar si tienen property o no)
+  const total = {
+    ingresos: filteredPays.filter(p => p.type === 'ingreso').reduce((s,p) => s + Number(p.amount||0), 0),
+    gastos: filteredPays.filter(p => p.type === 'gasto').reduce((s,p) => s + Number(p.amount||0), 0)
+  };
+  total.utilidad = total.ingresos - total.gastos;
+
+  // Pagos huérfanos (sin property_id)
+  const orphans = filteredPays.filter(p => !p.property_id);
+  const orphanIngresos = orphans.filter(p => p.type === 'ingreso').reduce((s,p) => s + Number(p.amount||0), 0);
+  const orphanGastos = orphans.filter(p => p.type === 'gasto').reduce((s,p) => s + Number(p.amount||0), 0);
+
+  // Por propiedad usando los pagos filtrados (no pmFinanceOf que ignora filtros)
   const byProperty = pmaState.properties.map(p => {
-    const f = pmFinanceOf(p.id);
-    total.ingresos += f.ingresos;
-    total.gastos += f.gastos;
-    total.utilidad += f.utilidad;
-    return { property: p, ...f };
-  }).sort((a, b) => b.utilidad - a.utilidad);
+    const pays = filteredPays.filter(x => x.property_id === p.id);
+    const ingresos = pays.filter(x => x.type === 'ingreso').reduce((s,x) => s + Number(x.amount||0), 0);
+    const gastos = pays.filter(x => x.type === 'gasto').reduce((s,x) => s + Number(x.amount||0), 0);
+    return { property: p, ingresos, gastos, utilidad: ingresos - gastos, count: pays.length };
+  }).filter(r => r.count > 0).sort((a, b) => b.utilidad - a.utilidad);
+
+  // Ordenar filtrados por fecha desc para "últimos movimientos"
+  const sortedPays = [...filteredPays].sort((a,b) => (b.paid_at||b.due_at||'').localeCompare(a.paid_at||a.due_at||''));
+
+  const periodLabel = { all: 'Todos los tiempos', this_month: 'Este mes', this_year: 'Este año' }[period];
 
   return `
     <div class="space-y-3 p-1">
+      <!-- Header -->
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="text-xs uppercase font-bold text-slate-500">Finanzas · ${pmaState.payments.length} movimientos cargados</div>
+        <div>
+          <div class="text-sm font-bold text-slate-900">Finanzas · <span class="text-slate-500 font-normal">${filteredPays.length} movimientos</span></div>
+          <div class="text-[11px] text-slate-500">${periodLabel}${typeFilter!=='all'?` · solo ${typeFilter}s`:''}${searchQ?` · busca "${searchQ}"`:''}</div>
+        </div>
         <div class="flex gap-2">
-          <button onclick="pmEditPayment(null,'ingreso')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Ingreso</button>
-          <button onclick="pmEditPayment(null,'gasto')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Gasto</button>
+          <button onclick="pmEditPayment(null,'ingreso')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">+ Ingreso</button>
+          <button onclick="pmEditPayment(null,'gasto')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">+ Gasto</button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
+        <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
+          <button onclick="pmaState.financePeriod='all';pmRender()" class="px-3 py-1 rounded-full ${period==='all'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Todo</button>
+          <button onclick="pmaState.financePeriod='this_year';pmRender()" class="px-3 py-1 rounded-full ${period==='this_year'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Este año</button>
+          <button onclick="pmaState.financePeriod='this_month';pmRender()" class="px-3 py-1 rounded-full ${period==='this_month'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Este mes</button>
+        </div>
+        <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
+          <button onclick="pmaState.financeTypeFilter='all';pmRender()" class="px-3 py-1 rounded-full ${typeFilter==='all'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Todos</button>
+          <button onclick="pmaState.financeTypeFilter='ingreso';pmRender()" class="px-3 py-1 rounded-full ${typeFilter==='ingreso'?'bg-emerald-600 text-white':'text-emerald-600 hover:bg-emerald-50'}">Ingresos</button>
+          <button onclick="pmaState.financeTypeFilter='gasto';pmRender()" class="px-3 py-1 rounded-full ${typeFilter==='gasto'?'bg-red-600 text-white':'text-red-600 hover:bg-red-50'}">Gastos</button>
+        </div>
+        <div class="relative flex-1 min-w-[200px]">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input oninput="pmaState.financeSearch=this.value;pmRender()" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar concepto, categoría, notas…" class="w-full border border-slate-300 focus:border-emerald-500 rounded-full pl-8 pr-3 py-1.5 text-[11px] outline-none"/>
         </div>
       </div>
 
       <!-- Totales -->
       <div class="grid grid-cols-3 gap-2">
-        <div class="bg-emerald-50 border border-emerald-200 rounded p-3"><div class="text-[10px] uppercase font-bold text-emerald-800">Ingresos</div><div class="text-2xl font-bold text-emerald-700 mt-1">$${Math.round(total.ingresos).toLocaleString()}</div></div>
-        <div class="bg-red-50 border border-red-200 rounded p-3"><div class="text-[10px] uppercase font-bold text-red-800">Gastos</div><div class="text-2xl font-bold text-red-700 mt-1">$${Math.round(total.gastos).toLocaleString()}</div></div>
-        <div class="bg-blue-50 border border-blue-200 rounded p-3"><div class="text-[10px] uppercase font-bold text-blue-800">Utilidad</div><div class="text-2xl font-bold ${total.utilidad>=0?'text-blue-700':'text-red-700'} mt-1">$${Math.round(total.utilidad).toLocaleString()}</div></div>
+        <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-lg p-3"><div class="text-[10px] uppercase font-bold text-emerald-800">Ingresos</div><div class="text-2xl font-bold text-emerald-700 mt-1">$${Math.round(total.ingresos).toLocaleString()}</div></div>
+        <div class="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-3"><div class="text-[10px] uppercase font-bold text-red-800">Gastos</div><div class="text-2xl font-bold text-red-700 mt-1">$${Math.round(total.gastos).toLocaleString()}</div></div>
+        <div class="bg-gradient-to-br ${total.utilidad>=0?'from-blue-50 to-blue-100 border-blue-200':'from-red-50 to-red-100 border-red-300'} border rounded-lg p-3"><div class="text-[10px] uppercase font-bold ${total.utilidad>=0?'text-blue-800':'text-red-800'}">Utilidad neta</div><div class="text-2xl font-bold ${total.utilidad>=0?'text-blue-700':'text-red-700'} mt-1">$${Math.round(total.utilidad).toLocaleString()}</div></div>
       </div>
+
+      ${orphans.length ? `
+        <!-- Alerta: pagos huérfanos -->
+        <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-start gap-3">
+          <div class="text-2xl">⚠️</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-sm text-amber-900">${orphans.length} ${orphans.length===1?'pago no está asignado':'pagos no están asignados'} a ninguna propiedad</div>
+            <div class="text-[11px] text-amber-800 mt-0.5">Estos movimientos ($${Math.round(orphanIngresos).toLocaleString()} ingresos, $${Math.round(orphanGastos).toLocaleString()} gastos) cuentan en el total global pero no en el rendimiento por propiedad. Para verlos discriminados, asigná la propiedad en cada uno.</div>
+            <button onclick="pmaState.financeShowOrphansOnly=!pmaState.financeShowOrphansOnly;pmRender()" class="mt-2 text-[10px] font-bold text-amber-900 underline hover:text-amber-700">${pmaState.financeShowOrphansOnly?'Ver todos':'Ver solo huérfanos'} →</button>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Por propiedad -->
-      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700">Rendimiento por propiedad</div>
-        <table class="w-full text-xs">
-          <thead class="bg-slate-50">
-            <tr><th class="text-left px-3 py-2">Propiedad</th><th class="text-right px-3 py-2">Ingresos</th><th class="text-right px-3 py-2">Gastos</th><th class="text-right px-3 py-2">Utilidad</th></tr>
-          </thead>
-          <tbody>
-            ${byProperty.map(r => `
-              <tr class="border-t border-slate-100">
-                <td class="px-3 py-2">${(r.property.name||'').replace(/</g,'&lt;')}</td>
-                <td class="text-right px-3 py-2 text-emerald-700 font-bold">$${Math.round(r.ingresos).toLocaleString()}</td>
-                <td class="text-right px-3 py-2 text-red-700">$${Math.round(r.gastos).toLocaleString()}</td>
-                <td class="text-right px-3 py-2 font-bold ${r.utilidad>=0?'text-emerald-700':'text-red-700'}">$${Math.round(r.utilidad).toLocaleString()}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Últimos movimientos -->
-      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700">Últimos movimientos · ${pmaState.payments.length}</div>
-        ${pmaState.payments.length ? `
+      ${byProperty.length ? `
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700 flex items-center justify-between">
+            <span>Rendimiento por propiedad</span>
+            <span class="text-[10px] text-slate-500 font-normal">${byProperty.length} ${byProperty.length===1?'propiedad':'propiedades'} con movimientos</span>
+          </div>
           <table class="w-full text-xs">
-            <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2">Fecha</th><th class="text-left px-3 py-2">Concepto</th><th class="text-left px-3 py-2">Propiedad</th><th class="text-left px-3 py-2">Cat</th><th class="text-right px-3 py-2">Monto</th><th class="text-center px-3 py-2">Estado</th></tr></thead>
+            <thead class="bg-slate-50">
+              <tr><th class="text-left px-3 py-2">Propiedad</th><th class="text-center px-3 py-2">Movs</th><th class="text-right px-3 py-2">Ingresos</th><th class="text-right px-3 py-2">Gastos</th><th class="text-right px-3 py-2">Utilidad</th></tr>
+            </thead>
             <tbody>
-              ${pmaState.payments.slice(0, 50).map(pay => `
-                <tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="pmEditPayment('${pay.id}')">
-                  <td class="px-3 py-2">${pay.paid_at||pay.due_at||'—'}</td>
-                  <td class="px-3 py-2 font-semibold">${(pay.concept||'').replace(/</g,'&lt;')}</td>
-                  <td class="px-3 py-2 text-slate-600">${pmPropertyName(pay.property_id).slice(0,28)}</td>
-                  <td class="px-3 py-2 text-slate-500 text-[10px]">${(pay.category||'').replace(/</g,'&lt;')}</td>
-                  <td class="text-right px-3 py-2 font-bold ${pay.type==='ingreso'?'text-emerald-700':'text-red-700'}">${pay.type==='ingreso'?'+':'-'}$${Number(pay.amount||0).toLocaleString()}</td>
-                  <td class="text-center px-3 py-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${pay.status}</span></td>
+              ${byProperty.map(r => `
+                <tr class="border-t border-slate-100 hover:bg-slate-50">
+                  <td class="px-3 py-2 font-semibold">${(r.property.name||'').replace(/</g,'&lt;')}</td>
+                  <td class="text-center px-3 py-2 text-slate-500">${r.count}</td>
+                  <td class="text-right px-3 py-2 text-emerald-700 font-bold">$${Math.round(r.ingresos).toLocaleString()}</td>
+                  <td class="text-right px-3 py-2 text-red-700">$${Math.round(r.gastos).toLocaleString()}</td>
+                  <td class="text-right px-3 py-2 font-bold ${r.utilidad>=0?'text-emerald-700':'text-red-700'}">$${Math.round(r.utilidad).toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
-        ` : '<div class="p-4 text-center text-slate-400 text-xs italic">Sin movimientos cargados. Empezá registrando un ingreso o gasto.</div>'}
+        </div>
+      ` : '<div class="text-xs text-slate-400 italic text-center py-4 bg-slate-50 rounded">Sin movimientos por propiedad en este período.</div>'}
+
+      <!-- Últimos movimientos -->
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700 flex items-center justify-between">
+          <span>Movimientos ${pmaState.financeShowOrphansOnly?'(solo huérfanos)':'recientes'}</span>
+          <span class="text-[10px] text-slate-500 font-normal">${sortedPays.length} en total · mostrando primeros 50</span>
+        </div>
+        ${sortedPays.length ? `
+          <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2">Fecha</th><th class="text-left px-3 py-2">Concepto</th><th class="text-left px-3 py-2">Propiedad</th><th class="text-left px-3 py-2">Cat</th><th class="text-right px-3 py-2">Monto</th></tr></thead>
+            <tbody>
+              ${(pmaState.financeShowOrphansOnly ? sortedPays.filter(p => !p.property_id) : sortedPays).slice(0, 50).map(pay => {
+                const propName = pay.property_id ? pmPropertyName(pay.property_id) : null;
+                return `
+                <tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="pmEditPayment('${pay.id}')">
+                  <td class="px-3 py-2 whitespace-nowrap">${pay.paid_at||pay.due_at||'—'}</td>
+                  <td class="px-3 py-2 font-semibold">${(pay.concept||'(sin concepto)').replace(/</g,'&lt;')}</td>
+                  <td class="px-3 py-2 ${propName?'text-slate-600':'text-amber-700 font-bold'}">${propName ? propName.slice(0,28) : '⚠ Sin asignar'}</td>
+                  <td class="px-3 py-2 text-slate-500 text-[10px]">${(pay.category||'').replace(/</g,'&lt;')}</td>
+                  <td class="text-right px-3 py-2 font-bold ${pay.type==='ingreso'?'text-emerald-700':'text-red-700'} whitespace-nowrap">${pay.type==='ingreso'?'+':'-'}$${Number(pay.amount||0).toLocaleString()}</td>
+                </tr>
+              `; }).join('')}
+            </tbody>
+          </table>
+          </div>
+        ` : '<div class="p-4 text-center text-slate-400 text-xs italic">Sin movimientos que matcheen los filtros.</div>'}
       </div>
     </div>
   `;
