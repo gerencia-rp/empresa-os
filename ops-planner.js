@@ -1935,9 +1935,7 @@ async function opEjecutarArmarDia() {
     });
   }
 
-  closeModal();
-  await opLoadAll();
-  opRender();
+  await opRefocusPlanner();
   const zonas = Array.from(new Set(propOrder.map(([_,info]) => info.zona).filter(Boolean)));
   alert(`✅ Día armado: ${updates.length} tareas, ${propOrder.length} casas across ${zonas.length} zona(s) (${zonas.join(', ') || 'sin zona'}), hasta ${opFmt12(opMinToTime(cursor))}.\n\n🚗 Viajes: ${sameZoneCount} intra-zona, ${crossZoneCount} inter-zona.\n\nPodés re-arrastrar lo que quieras manualmente.`);
 }
@@ -2515,9 +2513,7 @@ async function opRemoveChecklistItem(taskId, idx) {
 }
 async function opMarkDoneFromChecklist(taskId) {
   await sb.from('ops_day_tasks').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', taskId);
-  closeModal();
-  await opLoadAll();
-  opRender();
+  await opRefocusPlanner();
 }
 
 // ─── Recurrentes ───
@@ -2716,9 +2712,7 @@ async function opApplyTemplate(templateId) {
   if (!rows.length) return alert('La plantilla no tiene tareas.');
   const { error } = await sb.from('ops_day_tasks').insert(rows);
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openOpsPlanner(opState.sys);
+  await opRefocusPlanner();
     opRender();
     alert(`✅ ${rows.length} tareas agregadas al ${opState.date}.`);
   }, 100);
@@ -2951,9 +2945,7 @@ async function opConvertToRecurring(taskId) {
     // Marcar la instancia actual como vinculada al recurrente
     await sb.from('ops_day_tasks').update({ recurring_id: recurring.id }).eq('id', taskId);
   }
-  closeModal();
-  await opLoadAll();
-  opRender();
+  await opRefocusPlanner();
   alert(`✅ Convertida en recurrente.\nSe generará cada ${interval} día${interval>1?'s':''} a partir del ${nextDue}.`);
 }
 
@@ -3191,11 +3183,7 @@ async function opSaveDayTemplateEdits() {
   }).eq('id', tpl.id);
   if (error) return alert('Error: ' + error.message);
   window._opEditingTpl = null;
-  closeModal();
-  setTimeout(async () => {
-    await openOpsPlanner(opState.sys);
-    opSetLeftTab('daytemplates');
-  }, 100);
+  await opRefocusPlanner();
 }
 
 // ============================================================
@@ -3414,11 +3402,7 @@ async function opSaveTemplate(id) {
     }
   }
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openOpsPlanner(opState.sys);
-    opSetLeftTab('templates');
-  }, 100);
+  await opRefocusPlanner();
 }
 
 async function opDeleteTemplateConfirm(id, name) {
@@ -3426,9 +3410,5 @@ async function opDeleteTemplateConfirm(id, name) {
   // Soft delete: marcar active=false
   const { error } = await sb.from('ops_tasks').update({ active: false }).eq('id', id);
   if (error) return alert('Error: ' + error.message);
-  closeModal();
-  setTimeout(async () => {
-    await openOpsPlanner(opState.sys);
-    opSetLeftTab('templates');
-  }, 100);
+  await opRefocusPlanner();
 }

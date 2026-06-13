@@ -1918,8 +1918,7 @@ async function clCreatePendiente() {
   };
   const { error } = await sb.from('clean_day_tasks').insert(payload);
   if (error) return alert(error.message);
-  closeModal();
-  await clRefocusPlanner();
+    await clRefocusPlanner();
 }
 
 // ─── 🎯 Armar día por zona ───
@@ -2073,9 +2072,7 @@ async function clEjecutarArmarDia() {
     });
   }
 
-  closeModal();
-  await clLoadAll();
-  clRender();
+  await clRefocusPlanner();
   const zonas = Array.from(new Set(propOrder.map(([_,info]) => info.zona).filter(Boolean)));
   alert(`✅ Día armado: ${updates.length} tareas, ${propOrder.length} casas across ${zonas.length} zona(s) (${zonas.join(', ') || 'sin zona'}), hasta ${clFmt12(clMinToTime(cursor))}.\n\n🚗 Viajes: ${sameZoneCount} intra-zona, ${crossZoneCount} inter-zona.\n\nPodés re-arrastrar lo que quieras manualmente.`);
 }
@@ -2323,8 +2320,11 @@ async function clSaveEdit(id, isBacklog) {
     await sb.from('clean_day_tasks').update({ recurring_id: null }).eq('id', id);
   }
 
-  closeModal();
+  // BUG FIX: NO llamar closeModal() antes de refocus — el refocus reescribe
+  // el contenido del modal sin cerrarlo. Si cerramos, el flag _clInSubmodal
+  // queda activo y el modal global cierra causando "se sale del sistema".
   await clRefocusPlanner();
+  clToast('✓ Cambios guardados', 'success');
 }
 
 function clToggleRecurringFields(checked) {
@@ -2565,8 +2565,7 @@ async function clCreateLoose() {
     const { error } = await sb.from('clean_day_tasks').insert(payload);
     if (error) return alert('Error: ' + error.message);
   }
-  closeModal();
-  await clRefocusPlanner();
+    await clRefocusPlanner();
 }
 
 // ─── CHECKLIST DE ENTREGABLES ───
@@ -2655,9 +2654,7 @@ async function clRemoveChecklistItem(taskId, idx) {
 }
 async function clMarkDoneFromChecklist(taskId) {
   await sb.from('clean_day_tasks').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', taskId);
-  closeModal();
-  await clLoadAll();
-  clRender();
+  await clRefocusPlanner();
 }
 
 // ─── Recurrentes ───
@@ -2737,15 +2734,13 @@ async function clCreateRecurring() {
   };
   const { error } = await sb.from('clean_recurring').insert(payload);
   if (error) return alert(error.message);
-  closeModal();
-  await clRefocusPlanner(); clOpenManageRecurring();
+    await clRefocusPlanner(); clOpenManageRecurring();
 }
 
 async function clDeleteRecurring(id) {
   if (!confirm('¿Eliminar esta recurrente?')) return;
   await sb.from('clean_recurring').update({ active: false }).eq('id', id);
-  closeModal();
-  await clRefocusPlanner(); clOpenManageRecurring();
+    await clRefocusPlanner(); clOpenManageRecurring();
 }
 
 // ============================================================
@@ -3089,9 +3084,7 @@ async function clConvertToRecurring(taskId) {
     // Marcar la instancia actual como vinculada al recurrente
     await sb.from('clean_day_tasks').update({ recurring_id: recurring.id }).eq('id', taskId);
   }
-  closeModal();
-  await clLoadAll();
-  clRender();
+  await clRefocusPlanner();
   alert(`✅ Convertida en recurrente.\nSe generará cada ${interval} día${interval>1?'s':''} a partir del ${nextDue}.`);
 }
 
