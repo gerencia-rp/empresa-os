@@ -19,13 +19,16 @@ delete from public.properties where nickname like 'SEED:%';
 -- ────────────────────────────────────────────────────────────
 -- 1) PROPIEDADES de prueba (6 casas)
 -- ────────────────────────────────────────────────────────────
+-- NOTA: properties.status check constraint solo acepta:
+--   'evaluating' | 'purchased' | 'remodeling' | 'renting' | 'sold' | 'declined'
+-- Por eso Airbnbs/long-term usan 'renting' y el flip en obra usa 'remodeling'.
 insert into public.properties (id, nickname, address, city, state, zip, property_type, status, user_id) values
-  ('00000000-0000-0000-0000-c1ea0a000001', 'SEED: Casa Airbnb Norte 1', '1245 N Maple St', 'Austin', 'TX', '78701', 'single_family', 'active', auth.uid()),
-  ('00000000-0000-0000-0000-c1ea0a000002', 'SEED: Casa Airbnb Sur 1',   '8901 S Lakeview Dr', 'Austin', 'TX', '78745', 'single_family', 'active', auth.uid()),
-  ('00000000-0000-0000-0000-c1ea0a000003', 'SEED: Coliving Norte (4 rooms)', '3402 N Lamar Blvd', 'Austin', 'TX', '78705', 'townhouse', 'active', auth.uid()),
-  ('00000000-0000-0000-0000-c1ea0a000004', 'SEED: Renta LT Sur',        '5511 S Pleasant Valley Rd', 'Austin', 'TX', '78741', 'single_family', 'active', auth.uid()),
-  ('00000000-0000-0000-0000-c1ea0a000005', 'SEED: Flip Norte (en obra)', '2710 N Burnet Rd', 'Austin', 'TX', '78757', 'single_family', 'active', auth.uid()),
-  ('00000000-0000-0000-0000-c1ea0a000006', 'SEED: Casa Airbnb Norte 2', '4818 N Mopac Expy', 'Austin', 'TX', '78731', 'single_family', 'active', auth.uid())
+  ('00000000-0000-0000-0000-c1ea0a000001', 'SEED: Casa Airbnb Norte 1', '1245 N Maple St', 'Austin', 'TX', '78701', 'single_family', 'renting', auth.uid()),
+  ('00000000-0000-0000-0000-c1ea0a000002', 'SEED: Casa Airbnb Sur 1',   '8901 S Lakeview Dr', 'Austin', 'TX', '78745', 'single_family', 'renting', auth.uid()),
+  ('00000000-0000-0000-0000-c1ea0a000003', 'SEED: Coliving Norte (4 rooms)', '3402 N Lamar Blvd', 'Austin', 'TX', '78705', 'townhouse', 'renting', auth.uid()),
+  ('00000000-0000-0000-0000-c1ea0a000004', 'SEED: Renta LT Sur',        '5511 S Pleasant Valley Rd', 'Austin', 'TX', '78741', 'single_family', 'renting', auth.uid()),
+  ('00000000-0000-0000-0000-c1ea0a000005', 'SEED: Flip Norte (en obra)', '2710 N Burnet Rd', 'Austin', 'TX', '78757', 'single_family', 'remodeling', auth.uid()),
+  ('00000000-0000-0000-0000-c1ea0a000006', 'SEED: Casa Airbnb Norte 2', '4818 N Mopac Expy', 'Austin', 'TX', '78731', 'single_family', 'renting', auth.uid())
 on conflict (id) do nothing;
 
 -- ────────────────────────────────────────────────────────────
