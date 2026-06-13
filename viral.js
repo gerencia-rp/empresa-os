@@ -136,58 +136,73 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
   ]
 }`;
 
-const HISTORIA_SCHEMA = `=== MODO HISTORIAS ESTRATÉGICAS ===
-Las HISTORIAS venden (el reel solo atrae). El núcleo es convertir un momento cotidiano genérico en una historia estratégica.
-DIFERENCIA CLAVE que debes mostrar SIEMPRE en cada historia:
-- STORIE DÉBIL: sobre ti, genérica, sin objetivo ("Salí a cenar hoy", "Autocuidado ✅", "Hazme una pregunta", "Agotada, no dormí nada").
-- STORIE ESTRATÉGICO: sobre la AUDIENCIA, conecta con su dolor/deseo, usa un sticker de engagement ESPECÍFICO y lleva a un objetivo.
+const HISTORIA_SCHEMA = `=== SISTEMA STORY-SELLING · MÉTODO H.I.L.O.™ ===
+Generas SECUENCIAS de Instagram Stories listas para grabar. El usuario aporta el CONTENIDO; tú aportas la ESTRUCTURA. Nunca al revés.
 
-EL PROBLEMA REAL no es subir historias, es subirlas SIN INTENCIÓN NI CONSTRUCCIÓN. Toda historia estratégica cumple estos 3 CRITERIOS (etiqueta cuáles cumple cada una):
-1. ENLAZA CON TU PRODUCTO/OFERTA: conecta el momento con lo que vendes (ej. "...no dormí nada porque me quedé diseñando el workbook que te enseña a empaquetar tu conocimiento y venderlo, aunque tengas 300 seguidores").
-2. INVOLUCRA AL CLIENTE: lo hace sobre la audiencia + sticker que invita a responder/tocar.
-3. CUENTA ALGO MÁS QUE EL MOMENTO: contextualiza, activa deseo y abre conversación; no solo "lo que hiciste".
+MÉTODO H.I.L.O. (toda secuencia sigue estas 4 fases, una secuencia tiene de 3 a 10 frames):
+- H (Hook): frena el scroll en los primeros 2s. Pregunta / escasez / VS / contraste / curiosidad.
+- I (Identificación): espejo del problema/deseo ("esto te pasa", "esto aburre vs esto conecta").
+- L (Lleva, recorrido A→B): entrega el valor (paso a paso, comparación, demostración). DEBE incluir ≥1 frame de interacción (encuesta/pregunta/quiz).
+- O (Oferta + CTA de respuesta): promesa (Resultado+Tiempo+Alivio) + palabra clave para DM.
 
-MOTOR DE TRANSFORMACIÓN (de momento crudo a historia que vende): momento real → puente al dolor/deseo del avatar → contextualiza/enlaza con tu producto u oferta → activa deseo → sticker específico → 1 objetivo (retención/interacción/venta). La versión estratégica de cada historia DEBE pasar por este motor.
-Reglas de la versión estratégica:
-- Hazla sobre la audiencia, no sobre ti (ej. "me cuido para poder cuidarte").
-- Conecta el momento cotidiano con un dolor/deseo del avatar.
-- Sticker ESPECÍFICO, nunca genérico: "hazme una pregunta" → "cuéntame tu principal dificultad con X". Tipos: encuesta (2 opciones), pregunta abierta, quiz, cuestionario, emoji slider.
-- Es parte de una SECUENCIA con arco: hook → contexto → valor → CTA. 3-5 historias.
-- Tipos de secuencia: hand-raiser (lleva a un recurso gratis / comentar palabra), venta (agenda u oferta, solo en cosecha), autoridad/conexión (humaniza + demuestra autoridad).
-- Timing sugerido: hook ~14h, resto de la secuencia ~16h.
-PATRONES DE HISTORIAS QUE VENDEN (incorpóralos cuando encajen):
-- Hook de honestidad/vulnerabilidad: "Voy a ser muy honesta contigo…".
-- Lista de errores/creencias del avatar + sticker de TAP "toca si te sientes identificado".
-- Auto-diagnóstico que SEGMENTA leads: "¿Cómo ves tu situación hoy? [Necesito ayuda / Creo que estoy bien]"; el que admite que necesita ayuda es lead caliente.
-- Cada historia persigue 1 de 3 objetivos: RETENCIÓN, INTERACCIÓN o VENTA; equilíbralos en la secuencia.
-- En secuencias hand-raiser, pon la palabra clave DENTRO de la historia ("comenta CRITERIO y te la mando") y repítela en el cierre.
-Para bienes raíces usa momentos reales: ver una propiedad, estar en una obra, hacer los números, una llamada con un estudiante, firmar un cierre, etc.
+8 PRINCIPIOS (respétalos siempre):
+1. Estático aburre, dinámico conecta (datos sueltos → contexto + beneficio + escenario sensorial).
+2. Hook en los primeros 2s.
+3. CTA de respuesta (palabra clave a DM) > CTA directo (link).
+4. La interacción es contenido (encuestas/quiz/preguntas suben alcance y declaran intención).
+5. Promesa = Resultado + Tiempo + Alivio, y se siente POSIBLE, no mágica.
+6. Recorrido A→B (mueve de estado actual a deseado; los pasos intermedios son el valor).
+7. Validar antes de producir (si el objetivo es vender, sugiere un paso de validación).
+8. El lanzamiento vive en historias.
+
+BIBLIOTECA DE HOOKS (elige/combina):
+- HOOK_PREGUNTA: "¿Cómo {resultado} sin {dolor}?"
+- HOOK_ESCASEZ: "La ÚNICA {activo} disponible en {contexto}"
+- HOOK_VS: "{A} VS {B} · ¿cuál {criterio}?"
+- HOOK_CONTRASTE: "Esto {aburre} VS esto {conecta}"
+- HOOK_CURIOSIDAD: "Cómo {logré resultado} en {tiempo} (y {prueba})"
+- HOOK_ERROR: "Si {haces X}, estás perdiendo {recurso}. Hacé esto:"
+- HOOK_PROMESA: "{Resultado} + en {Tiempo} + sin {Fricción}"
+
+BIBLIOTECA DE CTAs: CTA_RESPUESTA ("Comenta '{PALABRA}' y te mando {recurso}", PREFERIDO) · CTA_ENCUESTA · CTA_PREGUNTA · CTA_QUIZ · CTA_LINK (último recurso).
+
+REGLA ABURRE→CONECTA (reescribe el tema plano): lista de specs → info dinámica (beneficio+escenario+sensorial) · "vendo/disponible/escríbeme" → escasez + CTA de respuesta · solo foto → foto + hook pregunta · lista de opciones → lista + encuesta/quiz · "cómpralo/link" → venta comparativa.
+
+VERTICALES (ajusta vocabulario):
+- flipmentoria (educación): A "quiero invertir pero no sé empezar" → B "cierro mi primer flip con sistema". Hooks fuertes: ERROR ("Si calculas el MAO a ojo, pierdes el deal"), CURIOSIDAD. CTA: "comenta FLIP y te mando la calculadora de MAO".
+- arbitraje (propiedades): A "propiedad vacía" → B "ocupada y rentando". Convierte specs en info dinámica. Hooks: ESCASEZ, VS ("renta tradicional VS arbitraje: el mismo cuarto, 3x el ingreso"). CTA: "responde CUARTO y te paso disponibilidad".
+- marca_personal: A "no sé si esto es real / si yo puedo" → B "confío en Nicolás y quiero su sistema". Hooks: CURIOSIDAD, CONTRASTE ("lo que muestran del real estate VS lo que pasa de verdad"). Tono bilingüe ES/EN, introspectivo.
+
+OBJETIVO: nutrir → H.I.L.O. con CTA_PREGUNTA (sin venta dura). validar → secuencia corta + CTA_ENCUESTA. vender → H.I.L.O. con CTA_RESPUESTA.
+
+REGLAS DURAS (NUNCA romper):
+- ≥1 frame de interacción por secuencia.
+- CTA por defecto = de respuesta/palabra clave, no link.
+- Toda promesa pasa el filtro Resultado+Tiempo+Alivio y se siente posible.
+- Texto en pantalla ≤ ~12 palabras por frame (legible en mobile).
+- No prometer rendimientos financieros garantizados ni cifras de inversión sin respaldo.
 
 DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backticks) con esta forma:
 {
-  "secuencias": [
+  "titulo_secuencia": "string",
+  "vertical": "flipmentoria|arbitraje|marca_personal",
+  "objetivo": "nutrir|validar|vender",
+  "frames": [
     {
-      "titulo": "nombre corto de la secuencia",
-      "tipo": "hand-raiser|venta|autoridad/conexión",
-      "objetivo": "a dónde lleva la secuencia",
-      "historias": [
-        {
-          "n": 1,
-          "momento": "el momento cotidiano / b-roll que se graba",
-          "debil": "lo que la mayoría pondría (genérico, sobre ti)",
-          "estrategico": "la versión que conecta con la audiencia, lista para poner en pantalla",
-          "sticker": { "tipo": "encuesta|pregunta|quiz|cuestionario|emoji slider|auto-diagnóstico|tap (toca si te identificas)|ninguno", "texto": "texto del sticker", "opciones": ["opción A", "opción B"] },
-          "objetivo_historia": "retención|interacción|venta",
-          "criterios": ["enlaza con producto", "involucra al cliente", "cuenta más que el momento"],
-          "enlace_oferta": "cómo esta historia conecta con tu producto/oferta (1 frase)",
-          "por_que": "1 frase: por qué la estratégica gana"
-        }
-      ],
-      "cta_final": "el cierre de la secuencia (comenta X / desliza / agenda)",
-      "timing": "sugerencia de horas"
+      "n": 1,
+      "fase": "H|I|L|L-interaccion|O",
+      "texto_en_pantalla": "≤12 palabras, lo que va escrito en el frame",
+      "voz_o_caption": "lo que se dice/escribe completo",
+      "elemento_visual": "qué grabar/mostrar",
+      "sticker": "ninguno | encuesta: A / B | pregunta: ¿...? | quiz: ... | countdown",
+      "nota_grabacion": "indicación práctica para Nicolás"
     }
-  ]
-}`;
+  ],
+  "cta_final": { "tipo": "respuesta|encuesta|pregunta|quiz", "palabra_clave": "string", "recurso": "qué se entrega" },
+  "variantes": ["1-2 hooks alternativos para A/B"],
+  "checklist_publicacion": ["validar idea antes", "≥1 interacción", "promesa posible no mágica", "CTA de respuesta > link"]
+}
+La secuencia debe tener exactamente la cantidad de frames pedida y SIEMPRE incluir un frame con fase "L-interaccion".`;
 
 // ---------- Banco de conocimiento (base_conocimiento.json) ----------
 let KB = null;
@@ -650,34 +665,39 @@ function copyCalendario(btn) {
   if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar todo'; }, 1500); }
 }
 
-// ---------- Generar historias ----------
+// ---------- Generar historias (Método H.I.L.O.) ----------
+const LONGITUD_FRAMES = { corta: 3, media: 5, larga: 8 };
 async function generarHistorias() {
   const tema = document.getElementById('h-tema').value.trim();
   const dolor = findPregunta(document.getElementById('h-dolor').value);
   if (!tema && !dolor) { document.getElementById('h-tema').focus(); return; }
   if (!LS.key) { openSettings(); return; }
 
-  const tipo = document.getElementById('h-tipo').value;
-  const variantes = document.getElementById('h-variantes').value;
-  const cta = document.getElementById('h-cta').value.trim();
-  const oferta = document.getElementById('h-oferta').value.trim();
+  const vertical = document.getElementById('h-vertical').value;
+  const objetivo = document.getElementById('h-objetivo').value;
+  const activo = document.getElementById('h-activo').value;
+  const longitud = document.getElementById('h-longitud').value;
+  const palabra = document.getElementById('h-palabra').value.trim();
+  const nFrames = LONGITUD_FRAMES[longitud] || 5;
 
   const out = document.getElementById('h-output');
-  out.innerHTML = loadingHTML(variantes).replace('reel(es)', 'secuencia(s) de historias');
+  out.innerHTML = loadingHTML('').replace('Generando  reel(es) con la fórmula viral…', 'Armando tu secuencia H.I.L.O.…');
   const genBtn = document.getElementById('h-generate');
   genBtn.disabled = true; genBtn.classList.add('opacity-50', 'pointer-events-none');
 
-  const prompt = `Genera ${variantes} secuencia(s) de historias estratégicas.
-${dolorPromptBlock(dolor)}${tema ? 'Momento/tema cotidiano a usar: ' + tema : 'Inventa momentos cotidianos creíbles del día a día en bienes raíces.'}
-Producto/oferta a enlazar: ${oferta || 'la mentoría de fix & flip / una clase gratis (enlaza los momentos a esto)'}
-Tipo de secuencia: ${tipo === 'auto' ? 'elige el mejor' : tipo}
-${cta ? 'CTA / palabra clave a usar: ' + cta : ''}
-Cada secuencia debe tener 3-5 historias. CADA historia debe mostrar la versión débil y la estratégica, pasar por el motor de transformación y etiquetar qué criterios cumple.`;
+  const prompt = `Genera 1 secuencia de Instagram Stories con el método H.I.L.O.
+Vertical: ${vertical}
+Objetivo: ${objetivo}
+Tema (contenido del usuario): ${tema || '(usa el dolor del avatar de abajo)'}
+${dolorPromptBlock(dolor)}Activo disponible: ${activo}
+Longitud: ${nFrames} frames exactos.
+Palabra clave para DM: ${palabra || 'invéntala según el tema (ej. FLIP, CUARTO, HISTORIAS)'}
+Aplica la regla aburre→conecta al tema, sigue las 4 fases H.I.L.O., incluye SIEMPRE un frame "L-interaccion" y cierra con CTA de respuesta.`;
 
   try {
-    const text = await callClaude(prompt, 1500 + Number(variantes) * 2000, HISTORIA_SCHEMA);
+    const text = await callClaude(prompt, 1200 + nFrames * 700, HISTORIA_SCHEMA);
     const data = parseJSON(text);
-    renderHistorias(data.secuencias || []);
+    renderHistorias(data);
   } catch (e) {
     out.innerHTML = errorHTML(e.message);
   } finally {
@@ -685,66 +705,71 @@ Cada secuencia debe tener 3-5 historias. CADA historia debe mostrar la versión 
   }
 }
 
-let LAST_HIST = [];
-const HTIPO_COLOR = { 'hand-raiser': 'bg-amber-900/40 text-amber-300', venta: 'bg-emerald-900/40 text-emerald-300', 'autoridad/conexión': 'bg-sky-900/40 text-sky-300' };
-function renderHistorias(secs) {
-  LAST_HIST = secs;
+let LAST_HIST = null;
+const FASE_INFO = {
+  'H': { label: 'HOOK', color: 'bg-fuchsia-900/40 text-fuchsia-300' },
+  'I': { label: 'IDENTIFICACIÓN', color: 'bg-sky-900/40 text-sky-300' },
+  'L': { label: 'LLEVA (A→B)', color: 'bg-amber-900/40 text-amber-300' },
+  'L-interaccion': { label: 'INTERACCIÓN', color: 'bg-purple-900/40 text-purple-300' },
+  'O': { label: 'OFERTA + CTA', color: 'bg-emerald-900/40 text-emerald-300' },
+};
+function renderHistorias(s) {
+  LAST_HIST = s;
   const out = document.getElementById('h-output');
-  if (!secs.length) { out.innerHTML = errorHTML('La IA no devolvió historias. Intenta de nuevo.'); return; }
-  out.innerHTML = secs.map((s, i) => historiaCard(s, i)).join('');
+  const frames = (s && Array.isArray(s.frames)) ? s.frames : [];
+  if (!frames.length) { out.innerHTML = errorHTML('La IA no devolvió la secuencia. Intenta de nuevo.'); return; }
+  out.innerHTML = historiaCard(s);
 }
-function stickerBadge(st) {
-  if (!st || !st.tipo || st.tipo === 'ninguno') return '';
-  const ops = Array.isArray(st.opciones) && st.opciones.length ? ' [' + st.opciones.map(esc).join(' / ') + ']' : '';
-  return `<div class="mt-2 text-[11px] bg-fuchsia-950/40 border border-fuchsia-900/40 rounded px-2 py-1 text-fuchsia-200">🎯 ${esc(st.tipo)}: ${esc(st.texto)}${ops}</div>`;
+function frameCard(f) {
+  const fi = FASE_INFO[f.fase] || { label: esc(f.fase || ''), color: 'bg-zinc-800 text-zinc-300' };
+  const stick = f.sticker && f.sticker !== 'ninguno' ? `<div class="mt-2 text-[11px] bg-purple-950/40 border border-purple-900/40 rounded px-2 py-1 text-purple-200">🎯 ${esc(f.sticker)}</div>` : '';
+  return `
+  <div class="border-t border-zinc-800 pt-3 mt-3">
+    <div class="flex items-center gap-2 mb-1.5">
+      <span class="text-zinc-600 text-xs">${esc(String(f.n ?? ''))}</span>
+      <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${fi.color}">${fi.label}</span>
+    </div>
+    <div class="bg-zinc-950 rounded-lg p-2 text-sm font-semibold mb-1">📱 ${esc(f.texto_en_pantalla)}</div>
+    ${f.voz_o_caption ? `<div class="text-sm text-zinc-300">${esc(f.voz_o_caption)}</div>` : ''}
+    ${f.elemento_visual ? `<div class="text-[11px] text-zinc-500 mt-1">🎬 ${esc(f.elemento_visual)}</div>` : ''}
+    ${stick}
+    ${f.nota_grabacion ? `<div class="text-[10px] text-zinc-600 mt-1">↳ ${esc(f.nota_grabacion)}</div>` : ''}
+  </div>`;
 }
-function historiaCard(s, i) {
-  const hist = Array.isArray(s.historias) ? s.historias : [];
-  const rows = hist.map(h => `
-    <div class="border-t border-zinc-800 pt-3 mt-3">
-      <div class="text-[11px] text-zinc-500 mb-1.5 flex items-center gap-2">📍 ${esc(h.momento)}${h.objetivo_historia ? `<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">${esc(h.objetivo_historia)}</span>` : ''}</div>
-      <div class="grid sm:grid-cols-2 gap-2">
-        <div class="bg-red-950/20 border border-red-900/30 rounded-lg p-2.5">
-          <div class="text-[10px] uppercase font-bold text-red-400 mb-1">Storie débil</div>
-          <div class="text-sm text-zinc-400">${esc(h.debil)}</div>
-        </div>
-        <div class="bg-emerald-950/20 border border-emerald-900/30 rounded-lg p-2.5">
-          <div class="text-[10px] uppercase font-bold text-emerald-400 mb-1">Storie estratégico</div>
-          <div class="text-sm">${esc(h.estrategico)}</div>
-          ${stickerBadge(h.sticker)}
-          ${Array.isArray(h.criterios) && h.criterios.length ? `<div class="flex flex-wrap gap-1 mt-2">${h.criterios.map(c => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300">✓ ${esc(c)}</span>`).join('')}</div>` : ''}
-          ${h.enlace_oferta ? `<div class="text-[10px] text-amber-300/80 mt-1.5">🔗 ${esc(h.enlace_oferta)}</div>` : ''}
-        </div>
-      </div>
-      ${h.por_que ? `<div class="text-[10px] text-zinc-600 mt-1">↳ ${esc(h.por_que)}</div>` : ''}
-    </div>`).join('');
+function historiaCard(s) {
+  const frames = Array.isArray(s.frames) ? s.frames : [];
+  const cta = s.cta_final || {};
+  const vars = Array.isArray(s.variantes) ? s.variantes : [];
+  const chk = Array.isArray(s.checklist_publicacion) ? s.checklist_publicacion : [];
   return `
   <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-5">
     <div class="flex items-start justify-between gap-3 mb-1">
       <div>
         <div class="flex items-center gap-2">
-          <span class="text-[10px] px-2 py-0.5 rounded-full ${HTIPO_COLOR[s.tipo] || 'bg-zinc-800 text-zinc-300'}">${esc(s.tipo)}</span>
-          <span class="text-[11px] text-zinc-500">${esc(s.timing || '')}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">${esc(s.vertical)}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300">${esc(s.objetivo)}</span>
+          <span class="text-[11px] text-zinc-500">${frames.length} frames</span>
         </div>
-        <h3 class="text-lg font-bold mt-1">${esc(s.titulo)}</h3>
-        <div class="text-xs text-zinc-500">🎯 ${esc(s.objetivo)}</div>
+        <h3 class="text-lg font-bold mt-1">${esc(s.titulo_secuencia)}</h3>
       </div>
-      <button onclick="copyHistoria(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
+      <button onclick="copyHistoria(this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
     </div>
-    ${rows}
-    <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 text-sm mt-3"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">📣 CTA FINAL</div>${esc(s.cta_final)}</div>
+    ${frames.map(frameCard).join('')}
+    <div class="bg-emerald-950/30 border border-emerald-900/40 rounded-lg p-3 text-sm mt-3">
+      <div class="text-[11px] text-emerald-400 font-semibold mb-0.5">📣 CTA FINAL (${esc(cta.tipo || '')})</div>
+      Comenta <b>${esc(cta.palabra_clave || '')}</b> y te mando ${esc(cta.recurso || '')}
+    </div>
+    ${vars.length ? `<div class="mt-3"><div class="text-[11px] text-zinc-500 font-semibold mb-1">🔀 Hooks alternativos (A/B)</div>${vars.map(v => `<div class="text-xs text-zinc-400">• ${esc(v)}</div>`).join('')}</div>` : ''}
+    ${chk.length ? `<div class="mt-3 flex flex-wrap gap-1">${chk.map(c => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">✓ ${esc(c)}</span>`).join('')}</div>` : ''}
   </div>`;
 }
-function copyHistoria(i, btn) {
-  const s = LAST_HIST[i]; if (!s) return;
-  const hist = Array.isArray(s.historias) ? s.historias : [];
-  const txt = `${s.titulo} [${s.tipo}] — ${s.objetivo}\n${s.timing || ''}\n\n` +
-    hist.map(h => {
-      const st = h.sticker && h.sticker.tipo && h.sticker.tipo !== 'ninguno' ? `\n   STICKER (${h.sticker.tipo}): ${h.sticker.texto}${Array.isArray(h.sticker.opciones) && h.sticker.opciones.length ? ' [' + h.sticker.opciones.join(' / ') + ']' : ''}` : '';
-      const en = h.enlace_oferta ? `\n   ENLACE OFERTA: ${h.enlace_oferta}` : '';
-      return `${h.n}. ${h.momento}\n   DÉBIL: ${h.debil}\n   ESTRATÉGICO: ${h.estrategico}${st}${en}`;
-    }).join('\n\n') +
-    `\n\nCTA FINAL: ${s.cta_final}`;
+function copyHistoria(btn) {
+  const s = LAST_HIST; if (!s) return;
+  const frames = Array.isArray(s.frames) ? s.frames : [];
+  const cta = s.cta_final || {};
+  const txt = `${s.titulo_secuencia} [${s.vertical} · ${s.objetivo}]\n\n` +
+    frames.map(f => `FRAME ${f.n} (${f.fase})\n  PANTALLA: ${f.texto_en_pantalla}\n  VOZ: ${f.voz_o_caption || ''}\n  VISUAL: ${f.elemento_visual || ''}${f.sticker && f.sticker !== 'ninguno' ? '\n  STICKER: ' + f.sticker : ''}${f.nota_grabacion ? '\n  NOTA: ' + f.nota_grabacion : ''}`).join('\n\n') +
+    `\n\nCTA FINAL (${cta.tipo || ''}): Comenta ${cta.palabra_clave || ''} y te mando ${cta.recurso || ''}`;
   navigator.clipboard.writeText(txt);
   if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
 }
