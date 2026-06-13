@@ -7,12 +7,14 @@ const LS = {
   set key(v)  { localStorage.setItem('viral_api_key', v); },
   get model() { return localStorage.getItem('viral_model') || 'claude-sonnet-4-5'; },
   set model(v){ localStorage.setItem('viral_model', v); },
+  get pass()  { return localStorage.getItem('viral_pass') || ''; },
+  set pass(v) { localStorage.setItem('viral_pass', v); },
 };
 
 function refreshKeyStatus() {
   const el = document.getElementById('key-status');
-  if (LS.key) { el.textContent = '● API conectada'; el.className = 'text-[11px] px-2 py-1 rounded-full bg-emerald-900/40 text-emerald-400'; }
-  else { el.textContent = 'Sin API key'; el.className = 'text-[11px] px-2 py-1 rounded-full bg-zinc-800 text-zinc-400'; }
+  if (LS.key) { el.textContent = '● API (tu key)'; el.className = 'text-[11px] px-2 py-1 rounded-full bg-emerald-900/40 text-emerald-400'; }
+  else { el.textContent = '● Modo servidor'; el.className = 'text-[11px] px-2 py-1 rounded-full bg-sky-900/40 text-sky-300'; }
 }
 
 // ---------- Estrategia embebida (system prompt) ----------
@@ -279,29 +281,41 @@ Nunca prometas riqueza fácil. Enfoca siempre criterio sobre capital.`;
 }
 
 // ---------- Llamada a la API ----------
+// Por defecto usa el proxy del servidor (/api/claude) con la key guardada como
+// variable de entorno en Vercel — no hay que meter nada en el navegador.
+// Si el usuario pone su propia key en Ajustes, la usa directamente (override).
 async function callClaude(userPrompt, maxTokens = 4000, schema = '') {
-  if (!LS.key) throw new Error('NO_KEY');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': LS.key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: LS.model,
-      max_tokens: maxTokens,
-      system: ESTRATEGIA + (schema ? '\n\n' + schema : '') + brandFacts(),
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
+  const body = JSON.stringify({
+    model: LS.model,
+    max_tokens: maxTokens,
+    system: ESTRATEGIA + (schema ? '\n\n' + schema : '') + brandFacts(),
+    messages: [{ role: 'user', content: userPrompt }],
   });
+  let res;
+  if (LS.key) {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': LS.key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body,
+    });
+  } else {
+    res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: Object.assign({ 'content-type': 'application/json' }, LS.pass ? { 'x-viral-pass': LS.pass } : {}),
+      body,
+    });
+  }
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`API ${res.status}: ${t.slice(0, 300)}`);
   }
   const data = await res.json();
-  return data.content.map(b => b.text || '').join('');
+  return (data.content || []).map(b => b.text || '').join('');
 }
 
 function parseJSON(text) {
@@ -319,7 +333,7 @@ async function generarReels() {
   const tema = document.getElementById('r-tema').value.trim();
   const dolor = findPregunta(document.getElementById('r-dolor').value);
   if (!tema && !dolor) { document.getElementById('r-tema').focus(); return; }
-  if (!LS.key) { openSettings(); return; }
+  // sin key local → usa el proxy del servidor (/api/claude)
 
   const formato = document.getElementById('r-formato').value;
   const variantes = document.getElementById('r-variantes').value;
@@ -428,7 +442,7 @@ async function generarCarruseles() {
   const tema = document.getElementById('c-tema').value.trim();
   const dolor = findPregunta(document.getElementById('c-dolor').value);
   if (!tema && !dolor) { document.getElementById('c-tema').focus(); return; }
-  if (!LS.key) { openSettings(); return; }
+  // sin key local → usa el proxy del servidor (/api/claude)
 
   const plantilla = document.getElementById('c-plantilla').value;
   const variantes = document.getElementById('c-variantes').value;
@@ -502,7 +516,7 @@ async function generarYoutube() {
   const tema = document.getElementById('y-tema').value.trim();
   const dolor = findPregunta(document.getElementById('y-dolor').value);
   if (!tema && !dolor) { document.getElementById('y-tema').focus(); return; }
-  if (!LS.key) { openSettings(); return; }
+  // sin key local → usa el proxy del servidor (/api/claude)
 
   const variantes = document.getElementById('y-variantes').value;
   const cta = document.getElementById('y-cta').value.trim();
@@ -600,7 +614,7 @@ CORTES A REELS: ${(v.cortes_reels || []).join(' / ')}`;
 
 // ---------- Generar calendario ----------
 async function generarCalendario() {
-  if (!LS.key) { openSettings(); return; }
+  // sin key local → usa el proxy del servidor (/api/claude)
   const dias = document.getElementById('cal-dias').value;
   const posts = document.getElementById('cal-posts').value;
   const fase = document.getElementById('cal-fase').value;
@@ -682,7 +696,7 @@ async function generarHistorias() {
   const tema = document.getElementById('h-tema').value.trim();
   const dolor = findPregunta(document.getElementById('h-dolor').value);
   if (!tema && !dolor) { document.getElementById('h-tema').focus(); return; }
-  if (!LS.key) { openSettings(); return; }
+  // sin key local → usa el proxy del servidor (/api/claude)
 
   const vertical = document.getElementById('h-vertical').value;
   const objetivo = document.getElementById('h-objetivo').value;
@@ -792,6 +806,7 @@ function copyHistoria(btn) {
 // ---------- Settings ----------
 function openSettings() {
   document.getElementById('s-key').value = LS.key;
+  const pf = document.getElementById('s-pass'); if (pf) pf.value = LS.pass;
   document.getElementById('s-model').value = ['claude-sonnet-4-5','claude-sonnet-4-6','claude-opus-4-1','claude-opus-4-8','claude-3-5-haiku-latest'].includes(LS.model) ? LS.model : 'claude-sonnet-4-5';
   if (!['claude-sonnet-4-5','claude-sonnet-4-6','claude-opus-4-1','claude-opus-4-8','claude-3-5-haiku-latest'].includes(LS.model)) document.getElementById('s-model-custom').value = LS.model;
   document.getElementById('settings-modal').classList.remove('hidden');
@@ -825,6 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('h-generate').addEventListener('click', generarHistorias);
   document.getElementById('s-save').addEventListener('click', () => {
     LS.key = document.getElementById('s-key').value.trim();
+    const pf = document.getElementById('s-pass'); if (pf) LS.pass = pf.value.trim();
     const custom = document.getElementById('s-model-custom').value.trim();
     LS.model = custom || document.getElementById('s-model').value;
     refreshKeyStatus();
