@@ -5,9 +5,11 @@
 // ════════════════════════════════════════════════════════════════
 
 const pmaState = {
-  tab: 'properties',                 // properties · calendar · bookings · finance
+  tab: 'properties',                 // properties · calendar · bookings · finance · feeds
   selectedPropertyId: null,           // para vista detalle
   calendarYear: new Date().getFullYear(),
+  calendarMonth: new Date().getMonth(),   // 0-11
+  calendarView: 'month',                  // 'year' | 'month'
   calendarFilterPropertyId: null,     // filtro de calendario (null = todas)
   // Data
   properties: [],
@@ -15,6 +17,7 @@ const pmaState = {
   bookings: [],
   tenants: [],
   payments: [],
+  feeds: [],                          // 🆕 calendarios externos
   loading: false,
   // Form state
   editingProperty: null,
@@ -63,7 +66,8 @@ async function pmLoadAll() {
     { name: 'units',      q: () => sb.from('pm_units').select('*').order('code') },
     { name: 'bookings',   q: () => sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).limit(2000) },
     { name: 'tenants',    q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
-    { name: 'payments',   q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) }
+    { name: 'payments',   q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
+    { name: 'feeds',      q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
   ];
 
   const results = {};
@@ -90,13 +94,15 @@ async function pmLoadAll() {
   pmaState.bookings = results.bookings || [];
   pmaState.tenants = results.tenants || [];
   pmaState.payments = results.payments || [];
+  pmaState.feeds = results.feeds || [];
 
   console.log('[pm] Carga completa:', {
     properties: pmaState.properties.length,
     units: pmaState.units.length,
     bookings: pmaState.bookings.length,
     tenants: pmaState.tenants.length,
-    payments: pmaState.payments.length
+    payments: pmaState.payments.length,
+    feeds: pmaState.feeds.length
   });
 
   pmaState.loading = false;
@@ -200,6 +206,7 @@ function pmRender() {
             ['properties','🏘️ Propiedades', pmaState.properties.length],
             ['calendar','📅 Calendario', ''],
             ['bookings','📋 Reservas', pmaState.bookings.length],
+            ['feeds','📡 Feeds', pmaState.feeds.length],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
             <button onclick="pmSetTab('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${pmaState.tab===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">
@@ -213,6 +220,7 @@ function pmRender() {
         ${pmaState.tab === 'properties' ? (pmaState.selectedPropertyId ? pmRenderPropertyDetail() : pmRenderPropertiesList()) : ''}
         ${pmaState.tab === 'calendar'   ? pmRenderCalendar() : ''}
         ${pmaState.tab === 'bookings'   ? pmRenderBookings() : ''}
+        ${pmaState.tab === 'feeds'      ? pmRenderFeeds() : ''}
         ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
       </div>
     </div>
@@ -655,7 +663,7 @@ function pmRenderTimelineForUnits(units, year) {
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
                   const tenant = pmTenantName(b.tenant_id);
                   const tooltip = `${tenant}\n${b.start_date} → ${b.end_date||'∞'}\n$${Number(b.rent_amount||0).toLocaleString()}/${b.rent_period}\n[${b.booking_type}]`;
-                  return `<div onclick="event.stopPropagation();pmEditBooking('${b.id}')" title="${tooltip.replace(/"/g,'&quot;')}" style="position:absolute;left:${left}%;width:${width}%;top:5px;bottom:5px;${bg};opacity:${opacity};border-radius:4px;padding:0 5px;display:flex;align-items:center;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.2);z-index:1;">
+                  return `<div onclick="event.stopPropagation();pmShowBookingDetail('${b.id}')" title="${tooltip.replace(/"/g,'&quot;')}" style="position:absolute;left:${left}%;width:${width}%;top:5px;bottom:5px;${bg};opacity:${opacity};border-radius:4px;padding:0 5px;display:flex;align-items:center;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.2);z-index:1;">
                     <span style="color:white;font-size:10px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${tenant.split(' ')[0]||'·'}</span>
                   </div>`;
                 }).join('')}
@@ -687,11 +695,27 @@ function pmRenderTimelineForUnits(units, year) {
 // ════════════════════════════════════════════════════════════════
 // TAB 2 · CALENDARIO GENERAL (todas las propiedades)
 // ════════════════════════════════════════════════════════════════
+// Dedupe units: si hay 2+ con mismo property_id+code, dejar la más reciente
+function pmDedupeUnits(units) {
+  const map = new Map();
+  units.forEach(u => {
+    const key = `${u.property_id}|${(u.code||'').toUpperCase()}|${u.unit_type||''}`;
+    const existing = map.get(key);
+    if (!existing) { map.set(key, u); return; }
+    // Conservar la que tenga más datos (target_rent + created_at más reciente)
+    const score = (x) => (x.target_rent?2:0) + (x.bath_type?1:0) + new Date(x.created_at||0).getTime()/1e15;
+    if (score(u) > score(existing)) map.set(key, u);
+  });
+  return Array.from(map.values());
+}
+
 function pmRenderCalendar() {
   const filter = pmaState.calendarFilterPropertyId;
-  const allUnits = filter
+  let rawUnits = filter
     ? pmUnitsOf(filter)
     : pmaState.units.filter(u => pmaState.properties.some(p => p.id === u.property_id));
+  const allUnits = pmDedupeUnits(rawUnits);
+  const dupesHidden = rawUnits.length - allUnits.length;
   const byProperty = {};
   allUnits.forEach(u => {
     if (!byProperty[u.property_id]) byProperty[u.property_id] = [];
@@ -711,29 +735,45 @@ function pmRenderCalendar() {
   });
   const coverage = totalDaysSum ? Math.round(100 * occupiedDaysSum / totalDaysSum) : 0;
 
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const view = pmaState.calendarView || 'month';
+  const periodLabel = view === 'month'
+    ? `${monthNames[pmaState.calendarMonth]} ${pmaState.calendarYear}`
+    : `${pmaState.calendarYear}`;
+
   return `
     <div class="space-y-3 p-1">
-      <!-- Header con título + filtros -->
+      <!-- Header con título + toggle vista + navegación -->
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
           <div class="flex items-center gap-2">
             <span class="text-xl">📅</span>
             <strong class="text-base text-slate-900">Calendario de Ocupación</strong>
-            <span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">${pmaState.calendarYear}</span>
+            <span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">${periodLabel}</span>
           </div>
-          <div class="text-[11px] text-slate-500 mt-0.5">Meta: 100% ocupación — Detecta huecos y planifica rotaciones</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">${view==='month'?'Vista mensual — Click reserva para ver detalles':'Vista anual — Detecta huecos y planifica rotaciones'}</div>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1">
+          <!-- Toggle vista -->
+          <div class="inline-flex bg-slate-100 rounded-lg p-0.5">
+            <button onclick="pmaState.calendarView='month';pmRender()" class="px-3 py-1 text-xs font-bold rounded ${view==='month'?'bg-white text-slate-900 shadow':'text-slate-500'}">📆 Mes</button>
+            <button onclick="pmaState.calendarView='year';pmRender()" class="px-3 py-1 text-xs font-bold rounded ${view==='year'?'bg-white text-slate-900 shadow':'text-slate-500'}">📊 Año</button>
+          </div>
+          <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1 max-w-[180px]">
             <option value="">Todas las propiedades</option>
             ${pmaState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
           </select>
-          <button onclick="pmaState.calendarYear--;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">←</button>
-          <button onclick="pmaState.calendarYear=new Date().getFullYear();pmRender()" class="bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded text-xs">Hoy</button>
-          <button onclick="pmaState.calendarYear++;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">→</button>
-          <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Reserva</button>
+          <!-- Navegación temporal -->
+          <div class="inline-flex bg-white border border-slate-300 rounded-lg overflow-hidden">
+            <button onclick="pmCalNavPrev()" class="px-2 py-1 hover:bg-slate-100 text-sm">←</button>
+            <button onclick="pmCalNavToday()" class="px-3 py-1 hover:bg-slate-100 text-xs font-bold border-l border-r border-slate-300">Hoy</button>
+            <button onclick="pmCalNavNext()" class="px-2 py-1 hover:bg-slate-100 text-sm">→</button>
+          </div>
+          <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Reserva</button>
         </div>
       </div>
+
+      ${dupesHidden ? `<div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">⚠️ Se detectaron <strong>${dupesHidden} unidades duplicadas</strong> con el mismo código en la misma propiedad. Se muestran fusionadas. Para limpiarlas definitivamente, andá al tab Propiedades → click en la propiedad → eliminá los duplicados.</div>` : ''}
 
       <!-- KPIs hero del año -->
       ${allUnits.length ? `
@@ -801,13 +841,282 @@ function pmRenderCalendar() {
               </div>
               <button onclick="pmaState.tab='properties';pmaState.expandedProperties=pmaState.expandedProperties||new Set();pmaState.expandedProperties.add('${p.id}');pmRender()" class="text-[11px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-3 py-1 rounded">Ver propiedad →</button>
             </div>
-            ${pmRenderTimelineForUnits(units, pmaState.calendarYear)}
+            ${view === 'month'
+              ? pmRenderMonthTimelineForUnits(units, pmaState.calendarYear, pmaState.calendarMonth)
+              : pmRenderTimelineForUnits(units, pmaState.calendarYear)
+            }
           </div>
         `;
       }).join('')}
     </div>
   `;
 }
+
+// ════════════════════════════════════════════════════════════════
+// 🆕 NAVEGACIÓN DE CALENDARIO (← → según vista)
+// ════════════════════════════════════════════════════════════════
+function pmCalNavPrev() {
+  if (pmaState.calendarView === 'month') {
+    pmaState.calendarMonth--;
+    if (pmaState.calendarMonth < 0) { pmaState.calendarMonth = 11; pmaState.calendarYear--; }
+  } else {
+    pmaState.calendarYear--;
+  }
+  pmRender();
+}
+function pmCalNavNext() {
+  if (pmaState.calendarView === 'month') {
+    pmaState.calendarMonth++;
+    if (pmaState.calendarMonth > 11) { pmaState.calendarMonth = 0; pmaState.calendarYear++; }
+  } else {
+    pmaState.calendarYear++;
+  }
+  pmRender();
+}
+function pmCalNavToday() {
+  pmaState.calendarYear = new Date().getFullYear();
+  pmaState.calendarMonth = new Date().getMonth();
+  pmRender();
+}
+window.pmCalNavPrev = pmCalNavPrev;
+window.pmCalNavNext = pmCalNavNext;
+window.pmCalNavToday = pmCalNavToday;
+
+// ════════════════════════════════════════════════════════════════
+// 🆕 VISTA MENSUAL ESTILO AIRBNB
+// Por cada unidad, un grid con días del mes y las reservas como barras.
+// ════════════════════════════════════════════════════════════════
+function pmRenderMonthTimelineForUnits(units, year, month) {
+  if (!units.length) return '<div class="p-4 text-center text-slate-400 text-xs italic">Sin unidades.</div>';
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0); // último día del mes
+  const totalDays = monthEnd.getDate();
+  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const today = new Date();
+  const todayDay = (today.getFullYear() === year && today.getMonth() === month) ? today.getDate() : null;
+  const colWidth = 32; // px por día — agradable para 28-31 días
+
+  return `
+    <div class="overflow-x-auto" style="background:white;">
+      <div style="min-width:${280 + totalDays * colWidth}px;">
+        <!-- Header con días -->
+        <div class="flex items-center border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style="font-size:10px;font-weight:bold;color:#475569;">
+          <div style="width:240px;padding:8px 10px;">Unidad</div>
+          <div style="width:40px;text-align:center;padding:8px 0;">%</div>
+          <div class="flex">
+            ${days.map(d => {
+              const dt = new Date(year, month, d);
+              const dow = ['D','L','M','M','J','V','S'][dt.getDay()];
+              const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+              const isToday = d === todayDay;
+              return `<div style="width:${colWidth}px;text-align:center;padding:6px 0;${isWeekend?'background:#f8fafc;':''}${isToday?'background:#fee2e2;color:#991b1b;font-weight:bold;':''};border-right:1px solid #f1f5f9;">
+                <div style="font-size:9px;color:#94a3b8;">${dow}</div>
+                <div style="font-size:11px;${isToday?'color:#991b1b;':'color:#334155;'}">${d}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        ${units.map(unit => {
+          const allBks = pmBookingsOf(unit.id).filter(b => {
+            if (!['activo','confirmado','finalizado','vencido'].includes(b.status)) return false;
+            if (!b.start_date) return false;
+            const s = new Date(b.start_date);
+            const e = b.end_date ? new Date(b.end_date) : monthEnd;
+            return s <= monthEnd && e >= monthStart;
+          });
+          // Calcular ocupación del mes
+          const occupiedDays = new Set();
+          allBks.forEach(b => {
+            const s = new Date(Math.max(monthStart, new Date(b.start_date)));
+            const e = new Date(Math.min(monthEnd, b.end_date ? new Date(b.end_date) : monthEnd));
+            for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+              if (d.getMonth() === month) occupiedDays.add(d.getDate());
+            }
+          });
+          const occPct = Math.round(100 * occupiedDays.size / totalDays);
+          const colorPct = occPct >= 80 ? 'text-emerald-600' : occPct >= 50 ? 'text-amber-600' : 'text-red-600';
+          return `
+            <div class="flex items-center border-b border-slate-100 hover:bg-slate-50" style="min-height:48px;">
+              <div class="flex items-center gap-2" style="width:240px;padding:6px 10px;">
+                <span class="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold font-mono">${(unit.code||'').replace(/</g,'&lt;')}</span>
+                <div class="min-w-0">
+                  <div class="text-xs font-semibold text-slate-700 truncate">${(unit.name||unit.code||'').replace(/</g,'&lt;')}</div>
+                  <div class="text-[9px] text-slate-500">${allBks.length} reserva${allBks.length===1?'':'s'} este mes${unit.target_rent?` · $${Number(unit.target_rent).toLocaleString()}/mes`:''}</div>
+                </div>
+              </div>
+              <div style="width:40px;text-align:center;" class="${colorPct} font-bold text-xs">${occPct}%</div>
+              <div class="relative flex" style="background:#fafafa;height:44px;">
+                ${days.map(d => {
+                  const dt = new Date(year, month, d);
+                  const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+                  const isToday = d === todayDay;
+                  return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" style="width:${colWidth}px;border-right:1px solid #f1f5f9;${isWeekend?'background:#f8fafc;':''}${isToday?'border-left:2px solid #ef4444;border-right:2px solid #ef4444;':''}cursor:pointer;" title="${dt.toLocaleDateString('es')} — click para nueva reserva"></div>`;
+                }).join('')}
+                <!-- Bookings encima -->
+                ${allBks.map(b => {
+                  const s = new Date(Math.max(monthStart, new Date(b.start_date)));
+                  const e = new Date(Math.min(monthEnd, b.end_date ? new Date(b.end_date) : monthEnd));
+                  const startCol = s.getDate() - 1;
+                  const endCol = e.getDate();
+                  const leftPx = startCol * colWidth + 2;
+                  const widthPx = (endCol - startCol) * colWidth - 4;
+                  const colorByType = {
+                    contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
+                    airbnb:            'background:linear-gradient(135deg,#f43f5e,#e11d48);',
+                    booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
+                    vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
+                    hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
+                    padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
+                    reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
+                    otro:              'background:linear-gradient(135deg,#64748b,#475569);'
+                  };
+                  const bg = colorByType[b.booking_type] || colorByType.otro;
+                  const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
+                  const tenant = pmTenantName(b.tenant_id);
+                  return `<div onclick="event.stopPropagation();pmShowBookingDetail('${b.id}')" title="Click para ver detalles · ${tenant} · ${b.start_date}→${b.end_date||'∞'}" style="position:absolute;left:${leftPx}px;width:${widthPx}px;top:6px;bottom:6px;${bg};opacity:${opacity};border-radius:6px;padding:0 8px;display:flex;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.25);z-index:1;overflow:hidden;">
+                    <span style="color:white;font-size:11px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${tenant} · $${Number(b.rent_amount||0).toLocaleString()}</span>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+        <!-- Leyenda -->
+        <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50 sticky bottom-0">
+          <span class="font-bold uppercase text-slate-500">Click reserva → detalles · Click día vacío → nueva reserva</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Directo</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#f43f5e,#e11d48);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Airbnb</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
+          <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🆕 MODAL DE DETALLES DE RESERVA (click sobre la barra)
+// ════════════════════════════════════════════════════════════════
+function pmShowBookingDetail(bookingId) {
+  const b = pmaState.bookings.find(x => x.id === bookingId);
+  if (!b) return alert('Reserva no encontrada.');
+  const tenant = pmaState.tenants.find(t => t.id === b.tenant_id);
+  const unit = pmaState.units.find(u => u.id === b.unit_id);
+  const property = pmaState.properties.find(p => p.id === b.property_id);
+  // Duración
+  const dur = (b.start_date && b.end_date)
+    ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1
+    : null;
+  const platformLabel = {
+    contrato_directo: '📄 Contrato directo',
+    airbnb: '🌐 Airbnb', vrbo: '🌐 VRBO', booking: '🌐 Booking',
+    hospitable: '🌐 Hospitable', padsplit: '🌐 Padsplit',
+    reserva_corta: '⏱ Reserva corta', otro: '• Otro'
+  }[b.booking_type] || b.booking_type;
+  const statusColor = {
+    activo: 'bg-emerald-100 text-emerald-800',
+    confirmado: 'bg-blue-100 text-blue-800',
+    borrador: 'bg-slate-100 text-slate-700',
+    vencido: 'bg-amber-100 text-amber-800',
+    cancelado: 'bg-red-100 text-red-800',
+    finalizado: 'bg-slate-200 text-slate-700'
+  }[b.status] || 'bg-slate-100 text-slate-700';
+
+  openModal('📋 Detalle de Reserva', `
+    <div class="space-y-3">
+      <!-- Header con plataforma y estado -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-lg p-4 -m-2 mb-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">${platformLabel}</div>
+            <div class="text-xl font-bold mt-1">${(tenant?.full_name || 'Sin inquilino asignado').replace(/</g,'&lt;')}</div>
+            ${tenant?.phone ? `<div class="text-xs text-slate-300 mt-1">📞 ${tenant.phone}</div>` : ''}
+            ${tenant?.email ? `<div class="text-xs text-slate-300">📧 ${tenant.email}</div>` : ''}
+          </div>
+          <span class="text-[10px] ${statusColor} px-2 py-1 rounded font-bold uppercase">${b.status||'—'}</span>
+        </div>
+      </div>
+
+      <!-- Propiedad y unidad -->
+      <div class="bg-slate-50 border border-slate-200 rounded p-3">
+        <div class="text-[10px] uppercase font-bold text-slate-500">📍 Propiedad / Unidad</div>
+        <div class="font-bold text-sm text-slate-900 mt-1">${(property?.name||'—').replace(/</g,'&lt;')}</div>
+        <div class="text-xs text-slate-600 mt-0.5">
+          <span class="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-mono font-bold">${(unit?.code||'').replace(/</g,'&lt;')}</span>
+          ${(unit?.name||'').replace(/</g,'&lt;')}
+          ${unit?.unit_type ? `<span class="text-slate-400">· ${unit.unit_type}</span>` : ''}
+        </div>
+      </div>
+
+      <!-- KPIs principales -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="bg-white border border-slate-200 rounded p-2 text-center">
+          <div class="text-[9px] uppercase font-bold text-slate-500">Inicio</div>
+          <div class="text-sm font-bold text-slate-900 mt-1">${b.start_date || '—'}</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded p-2 text-center">
+          <div class="text-[9px] uppercase font-bold text-slate-500">Fin</div>
+          <div class="text-sm font-bold text-slate-900 mt-1">${b.end_date || '∞'}</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded p-2 text-center">
+          <div class="text-[9px] uppercase font-bold text-slate-500">Duración</div>
+          <div class="text-sm font-bold text-slate-900 mt-1">${dur != null ? dur + ' días' : '—'}</div>
+        </div>
+      </div>
+
+      <!-- Económicas -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-2 text-center">
+          <div class="text-[9px] uppercase font-bold text-emerald-700">Renta</div>
+          <div class="text-lg font-bold text-emerald-700 mt-1">$${Number(b.rent_amount||0).toLocaleString()}</div>
+          <div class="text-[10px] text-emerald-600">/${b.rent_period||'mes'}</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded p-2 text-center">
+          <div class="text-[9px] uppercase font-bold text-blue-700">Depósito</div>
+          <div class="text-lg font-bold text-blue-700 mt-1">$${Number(b.deposit||0).toLocaleString()}</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded p-2 text-center">
+          <div class="text-[9px] uppercase font-bold text-amber-700">Día pago</div>
+          <div class="text-xs font-bold text-amber-700 mt-1.5">${b.payment_day || '—'}</div>
+        </div>
+      </div>
+
+      ${b.contract_status ? `
+        <div class="bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+          <span class="font-bold text-amber-800">Estado contrato:</span> ${b.contract_status.replace(/</g,'&lt;')}
+        </div>
+      ` : ''}
+      ${b.notes ? `
+        <div class="bg-slate-50 border border-slate-200 rounded p-2 text-xs">
+          <div class="font-bold text-slate-700 mb-1">📝 Notas</div>
+          <div class="text-slate-600 whitespace-pre-wrap">${(b.notes||'').replace(/</g,'&lt;')}</div>
+        </div>
+      ` : ''}
+
+      <!-- Acciones -->
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+        ${tenant?.phone ? `<a href="https://wa.me/${(tenant.phone||'').replace(/\\D/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 py-2 rounded text-center">💬 WhatsApp</a>` : ''}
+        ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded text-center">📄 Contrato</a>` : ''}
+        <button onclick="closeModal();pmEditBooking('${b.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✏️ Editar reserva</button>
+      </div>
+    </div>
+  `);
+}
+window.pmShowBookingDetail = pmShowBookingDetail;
+
+// Click sobre un día vacío del calendario → abrir form de nueva reserva pre-llenado
+function pmCreateBookingFromDay(unitId, year, month, day) {
+  const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  // Llamar a pmEditBooking(null, unitId) y luego prepopular start_date
+  pmEditBooking(null, unitId);
+  setTimeout(() => {
+    const startInput = document.getElementById('pm-bf-start');
+    if (startInput) startInput.value = dateStr;
+  }, 100);
+}
+window.pmCreateBookingFromDay = pmCreateBookingFromDay;
 
 // ════════════════════════════════════════════════════════════════
 // TAB 3 · RESERVAS (lista)
@@ -1281,6 +1590,302 @@ async function pmDeletePayment(id) {
   await pmAfterCrud();
 }
 window.pmDeletePayment = pmDeletePayment;
+
+// ════════════════════════════════════════════════════════════════
+// 📡 TAB 5 · FEEDS (calendarios iCal externos)
+// ════════════════════════════════════════════════════════════════
+function pmRenderFeeds() {
+  const feeds = pmaState.feeds || [];
+  const groupedByPlatform = {};
+  feeds.forEach(f => {
+    if (!groupedByPlatform[f.platform]) groupedByPlatform[f.platform] = [];
+    groupedByPlatform[f.platform].push(f);
+  });
+  return `
+    <div class="space-y-3 p-1">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div class="text-base font-bold text-slate-900">📡 Calendarios externos · ${feeds.length} feeds</div>
+          <div class="text-xs text-slate-500">Sincronización iCal con Airbnb, VRBO, Booking. Trae reservas automático.</div>
+        </div>
+        <div class="flex gap-2">
+          ${feeds.length ? `<button onclick="pmSyncAllFeeds()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🔄 Sync todos</button>` : ''}
+          <button onclick="pmEditFeed(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nuevo feed</button>
+        </div>
+      </div>
+
+      <!-- Guía rápida -->
+      <details class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
+        <summary class="cursor-pointer font-bold">📖 Cómo sacar el iCal de Airbnb (paso a paso)</summary>
+        <ol class="list-decimal ml-5 mt-2 space-y-1">
+          <li>Entrá a Airbnb (cuenta de host) → <strong>Today</strong> → <strong>Calendar</strong></li>
+          <li>Elegí el listing que querés sincronizar (de la lista de propiedades)</li>
+          <li>Arriba a la derecha: <strong>Availability</strong> → <strong>Connect another calendar</strong> (a veces "Sync calendars")</li>
+          <li>En la sección <strong>"Export your calendar"</strong>, copiá el link <code>.ics</code> (empieza con <code>https://www.airbnb.com/calendar/ical/...</code>)</li>
+          <li>Volvé acá → click <strong>+ Nuevo feed</strong> → elegí la unidad → pegá el link</li>
+          <li>Click <strong>🔄 Sync ahora</strong> → vas a ver las reservas en el calendario PM</li>
+        </ol>
+        <div class="mt-2 text-[11px] italic">⚠️ El iCal solo trae fechas+nombre del huésped (no monto). El monto $/noche lo configurás como "default" del feed.</div>
+      </details>
+
+      ${!feeds.length ? `
+        <div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-10 text-center">
+          <div class="text-5xl mb-2">📡</div>
+          <div class="font-bold text-slate-700">Sin feeds configurados</div>
+          <div class="text-xs text-slate-500 mt-1">Agregá tu primer iCal de Airbnb para empezar a sincronizar.</div>
+          <button onclick="pmEditFeed(null)" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded">+ Agregar primer feed</button>
+        </div>
+      ` : `
+        <div class="space-y-2">
+          ${Object.entries(groupedByPlatform).map(([platform, list]) => `
+            <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div class="bg-slate-100 px-4 py-2 flex items-center justify-between">
+                <div class="font-bold text-xs uppercase text-slate-700">${platform === 'airbnb' ? '🌐 Airbnb' : platform === 'vrbo' ? '🌐 VRBO' : platform === 'booking' ? '🌐 Booking' : platform === 'hospitable' ? '🌐 Hospitable' : '🔗 ' + platform} · ${list.length} feed${list.length===1?'':'s'}</div>
+              </div>
+              <div class="divide-y divide-slate-100">
+                ${list.map(f => pmRenderFeedRow(f)).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function pmRenderFeedRow(f) {
+  const unit = pmaState.units.find(u => u.id === f.unit_id);
+  const property = unit ? pmaState.properties.find(p => p.id === unit.property_id) : null;
+  const statusColor = f.last_status === 'success' ? 'text-emerald-700' : f.last_status === 'error' ? 'text-red-700' : 'text-slate-500';
+  const statusIcon = f.last_status === 'success' ? '✅' : f.last_status === 'error' ? '❌' : '⏳';
+  const lastSyncDate = f.last_synced_at ? new Date(f.last_synced_at).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'nunca';
+  return `
+    <div class="px-4 py-3 hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          ${f.active ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold uppercase">ACTIVO</span>' : '<span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase">PAUSADO</span>'}
+          <strong class="text-sm text-slate-900">${property ? property.name.replace(/</g,'&lt;') : '—'}</strong>
+          <span class="text-[10px] text-slate-500">·</span>
+          <span class="text-xs text-slate-700">${unit ? `${unit.code} ${unit.name||''}`.replace(/</g,'&lt;') : 'Sin unidad'}</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
+          <span class="${statusColor}">${statusIcon} ${f.last_status || 'pendiente'}</span>
+          <span>· última sync: ${lastSyncDate}</span>
+          ${f.last_total ? `<span>· ${f.last_total} eventos</span>` : ''}
+          ${f.default_rent ? `<span>· $${Number(f.default_rent).toLocaleString()}/${f.default_period||'noche'}</span>` : ''}
+        </div>
+        ${f.last_error ? `<div class="text-[10px] text-red-700 mt-0.5 truncate" title="${(f.last_error||'').replace(/"/g,'&quot;')}">⚠️ ${(f.last_error||'').slice(0,120)}</div>` : ''}
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button onclick="pmSyncFeed('${f.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-[11px] font-bold px-2 py-1 rounded" title="Sync ahora">🔄</button>
+        <button onclick="pmEditFeed('${f.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2 py-1 rounded">✏️</button>
+        <button onclick="pmDeleteFeed('${f.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold px-2 py-1 rounded">🗑</button>
+      </div>
+    </div>
+  `;
+}
+
+async function pmEditFeed(id) {
+  const f = id ? pmaState.feeds.find(x => x.id === id) : { platform: 'airbnb', feed_type: 'ical', active: true, auto_sync: true, default_period: 'noche' };
+  const isNew = !id;
+  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Feed (iCal externo)', `
+    <div class="space-y-3">
+      <div class="bg-blue-50 border border-blue-200 rounded p-2 text-[11px] text-blue-900">
+        💡 Para Airbnb: <strong>Calendar → Availability → Export calendar</strong>. Copiá la URL <code>.ics</code>.
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Plataforma *</label>
+          <select id="pm-ff-platform" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${[['airbnb','🌐 Airbnb'],['vrbo','🌐 VRBO'],['booking','🌐 Booking'],['hospitable','🌐 Hospitable'],['custom','🔗 Custom iCal'],['otro','• Otro']].map(([v,l])=>`<option value="${v}" ${(f.platform||'airbnb')===v?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Unidad *</label>
+          <select id="pm-ff-unit" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            <option value="">— Elegir —</option>
+            ${pmaState.units.map(u => { const p = pmaState.properties.find(x=>x.id===u.property_id); return `<option value="${u.id}" ${f.unit_id===u.id?'selected':''}>${(p?.name||'').slice(0,25)} · ${u.code}</option>`; }).join('')}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold uppercase text-slate-600">URL del iCal (.ics) *</label>
+        <textarea id="pm-ff-url" rows="2" placeholder="https://www.airbnb.com/calendar/ical/XXXXXX.ics?s=XXXXXX" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs font-mono">${(f.source_url||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">$/noche (default)</label>
+          <input id="pm-ff-rent" type="number" value="${f.default_rent||''}" placeholder="80" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          <div class="text-[9px] text-slate-500 mt-0.5">iCal no trae monto. Esto se usa para reservas nuevas.</div>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-600">Período</label>
+          <select id="pm-ff-period" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${[['noche','Noche'],['estadia','Estadía total'],['mensual','Mensual']].map(([v,l])=>`<option value="${v}" ${(f.default_period||'noche')===v?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="flex items-center gap-2 text-xs">
+          <input id="pm-ff-active" type="checkbox" ${f.active!==false?'checked':''}/>
+          <span>Feed activo</span>
+        </label>
+        <label class="flex items-center gap-2 text-xs">
+          <input id="pm-ff-auto" type="checkbox" ${f.auto_sync!==false?'checked':''}/>
+          <span>Sync automático</span>
+        </label>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold uppercase text-slate-600">Notas</label>
+        <textarea id="pm-ff-notes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(f.notes||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        ${!isNew ? `<button onclick="pmDeleteFeed('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        <button onclick="pmSaveFeed('${id||''}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${isNew?'Crear feed':'Guardar'}</button>
+      </div>
+    </div>
+  `);
+}
+window.pmEditFeed = pmEditFeed;
+
+async function pmSaveFeed(id) {
+  const unit_id = document.getElementById('pm-ff-unit').value;
+  if (!unit_id) return alert('Elegí una unidad.');
+  const unit = pmaState.units.find(u => u.id === unit_id);
+  const payload = {
+    unit_id,
+    property_id: unit?.property_id,
+    platform: document.getElementById('pm-ff-platform').value,
+    feed_type: 'ical',
+    source_url: document.getElementById('pm-ff-url').value.trim(),
+    default_rent: +document.getElementById('pm-ff-rent').value || null,
+    default_period: document.getElementById('pm-ff-period').value,
+    active: document.getElementById('pm-ff-active').checked,
+    auto_sync: document.getElementById('pm-ff-auto').checked,
+    notes: document.getElementById('pm-ff-notes').value.trim() || null
+  };
+  if (!payload.source_url) return alert('La URL del iCal es obligatoria.');
+  if (!/^https?:\/\//.test(payload.source_url)) return alert('La URL debe empezar con https://');
+  const r = id
+    ? await pmExecQuery(sb.from('pm_calendar_feeds').update(payload).eq('id', id).select(), 'Update feed')
+    : await pmExecQuery(sb.from('pm_calendar_feeds').insert(payload).select(), 'Crear feed');
+  if (!r) return;
+  // Si es nuevo, ofrecer sync inmediato
+  if (!id && r.data && r.data[0]) {
+    closeModal();
+    if (confirm('Feed creado. ¿Sincronizar ahora?')) {
+      await pmSyncFeed(r.data[0].id);
+    } else {
+      await pmAfterCrud();
+    }
+  } else {
+    await pmAfterCrud();
+  }
+}
+window.pmSaveFeed = pmSaveFeed;
+
+async function pmDeleteFeed(id) {
+  if (!confirm('¿Eliminar este feed? Las reservas ya sincronizadas se mantienen.')) return;
+  const r = await pmExecQuery(sb.from('pm_calendar_feeds').delete().eq('id', id), 'Eliminar feed');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmDeleteFeed = pmDeleteFeed;
+
+async function pmSyncFeed(feedId) {
+  openModal('🔄 Sincronizando feed...', `
+    <div class="text-center py-8">
+      <div class="text-5xl animate-pulse mb-3">📡</div>
+      <div class="font-bold text-slate-900">Descargando iCal y procesando reservas...</div>
+      <div class="text-xs text-slate-500 mt-2">Hasta 30 segundos.</div>
+    </div>
+  `);
+
+  let accessToken;
+  try {
+    const sess = await sb.auth.getSession();
+    accessToken = sess?.data?.session?.access_token;
+    if (!accessToken) throw new Error('Sin sesión');
+  } catch (e) {
+    closeModal();
+    return alert('⚠️ Sesión expirada.');
+  }
+
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/pm-sync-calendars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ feed_ids: [feedId] })
+    });
+    const txt = await res.text();
+    let r;
+    try { r = JSON.parse(txt); } catch { throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`); }
+    if (!r.ok) throw new Error(r.error || 'Sync falló');
+
+    closeModal();
+    const s = r.stats || {};
+    openModal('✅ Sync completado', `
+      <div class="space-y-3">
+        <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-sm text-emerald-900">
+          Feed sincronizado correctamente · ${Math.round((r.duration_ms||0)/1000)}s
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Procesados</div><div class="text-2xl font-bold">${s.feeds_processed||0}</div></div>
+          <div class="bg-emerald-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-emerald-700">Eventos iCal</div><div class="text-2xl font-bold text-emerald-700">${s.total_events||0}</div></div>
+          <div class="bg-blue-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-blue-700">Sincronizados</div><div class="text-2xl font-bold text-blue-700">${s.total_added||0}</div></div>
+        </div>
+        ${(s.errors||[]).length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">⚠️ ${s.errors.length} warnings</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${s.errors.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
+        <div class="flex gap-2 pt-2 border-t border-slate-200">
+          <button onclick="closeModal();openPmSystem();" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Ver reservas</button>
+        </div>
+      </div>
+    `);
+  } catch (e) {
+    closeModal();
+    alert('⚠️ Sync falló:\n\n' + (e?.message || String(e)) + '\n\nVerificá:\n• La URL es un .ics válido\n• El URL es accesible (probá pegarlo en otra pestaña)');
+  }
+}
+window.pmSyncFeed = pmSyncFeed;
+
+async function pmSyncAllFeeds() {
+  if (!confirm('¿Sincronizar TODOS los feeds activos? Puede tardar varios minutos.')) return;
+  openModal('🔄 Sincronizando todos los feeds...', `
+    <div class="text-center py-8">
+      <div class="text-5xl animate-pulse mb-3">📡</div>
+      <div class="font-bold text-slate-900">Procesando ${(pmaState.feeds||[]).filter(f=>f.active).length} feeds...</div>
+      <div class="text-xs text-slate-500 mt-2">No cierres la ventana.</div>
+    </div>
+  `);
+
+  let accessToken;
+  try {
+    const sess = await sb.auth.getSession();
+    accessToken = sess?.data?.session?.access_token;
+    if (!accessToken) throw new Error('Sin sesión');
+  } catch (e) {
+    closeModal();
+    return alert('⚠️ Sesión expirada.');
+  }
+
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/pm-sync-calendars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ all: true })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || 'Falló');
+    closeModal();
+    const s = r.stats || {};
+    alert(`✅ Sync completo\n\n${s.feeds_processed||0} feeds procesados\n${s.total_events||0} eventos\n${s.total_added||0} sincronizados\n\n${(s.errors||[]).length} warnings`);
+    await pmLoadAll();
+  } catch (e) {
+    closeModal();
+    alert('⚠️ Falló: ' + (e?.message||String(e)));
+  }
+}
+window.pmSyncAllFeeds = pmSyncAllFeeds;
 
 // ════════════════════════════════════════════════════════════════
 // 🆕 SYNC AIRTABLE — Edge Function que jala las 10 tablas
