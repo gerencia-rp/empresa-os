@@ -1666,11 +1666,17 @@ function opOpenAddPendiente() {
       </div>
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Casa (auto-llena zona si elegís una)</label>
-        <select id="op-p-target" onchange="opPendientePickTarget(this)" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-          <option value="">— ninguna —</option>
-          <optgroup label="🏠 Rentas">${propsOpts}</optgroup>
-          <optgroup label="🏗️ Obras">${projsOpts}</optgroup>
-        </select>
+        ${(!propsOpts && !projsOpts) ? `
+          <div class="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-900">
+            ⚠️ No hay casas cargadas. Verificá que tengas propiedades en el área Rentas o proyectos activos en Remodelación.
+            <button onclick="opLoadAll().then(opRefocusPlanner)" class="ml-2 text-amber-700 underline font-bold">🔄 Reintentar</button>
+          </div>` : `
+          <select id="op-p-target" onchange="opPendientePickTarget(this)" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+            <option value="">— ninguna —</option>
+            ${propsOpts ? `<optgroup label="🏠 Rentas (${opState.properties.length})">${propsOpts}</optgroup>` : ''}
+            ${projsOpts ? `<optgroup label="🏗️ Obras (${opState.projects.length})">${projsOpts}</optgroup>` : ''}
+          </select>
+          <div class="text-[10px] text-slate-500 mt-1">${opState.properties.length} rentas + ${opState.projects.length} obras disponibles</div>`}
       </div>
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Materiales (coma)</label>
@@ -1680,9 +1686,9 @@ function opOpenAddPendiente() {
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas</label>
         <textarea id="op-p-notes" rows="2" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
       </div>
-      <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="opCreatePendiente()" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">+ Al backlog</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2">
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver al calendario</button>
+        <button onclick="opCreatePendiente()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">💾 Guardar al backlog</button>
       </div>
     </div>
   `;
@@ -1777,9 +1783,9 @@ function opOpenArmarDia() {
           <input id="op-ar-lunch-dur" type="number" value="60" min="0" step="15" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
       </div>
-      <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="opEjecutarArmarDia()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🎯 Armar</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2">
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver al calendario</button>
+        <button onclick="opEjecutarArmarDia()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">🎯 Armar el día</button>
       </div>
     </div>
   `;
@@ -2011,11 +2017,11 @@ function _opOpenEditModal(t, isBacklog) {
         </div>
       </details>
 
-      <div class="flex gap-2 pt-2 border-t border-slate-200">
-        ${!isBacklog ? `<button onclick="opSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-2 rounded" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
-        <button onclick="opDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 rounded">🗑️</button>
-        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="opSaveEdit('${t.id}', ${isBacklog})" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2 flex-wrap">
+        ${!isBacklog ? `<button onclick="opSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-3 rounded font-bold" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
+        <button onclick="opDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-3 rounded font-bold" title="Eliminar la tarea">🗑️ Borrar</button>
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver</button>
+        <button onclick="opSaveEdit('${t.id}', ${isBacklog})" class="flex-[2_1_0] bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">💾 Guardar cambios</button>
       </div>
     </div>
   `;
@@ -2256,9 +2262,9 @@ function opOpenAddLoose(presetTarget) {
 
       <textarea id="op-l-notes" rows="2" placeholder="Notas adicionales" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
 
-      <div class="flex gap-2">
-        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="opCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Agendar</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2">
+        <button onclick="opRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver al calendario</button>
+        <button onclick="opCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">+ Agendar</button>
       </div>
     </div>
   `;

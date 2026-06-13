@@ -1735,7 +1735,7 @@ async function clDropOnSlot(slotTime, ev) {
       conflicts,
       overlapMin
     );
-    if (resolution === 'cancel') return;
+    if (resolution === 'cancel') { clState._dropping = false; return; }
     if (resolution === 'shift') {
       await clShiftTasksAfter(clState.date, newStartMin, overlapMin, droppedId ? [droppedId] : []);
     }
@@ -1788,6 +1788,7 @@ async function clDropOnSlot(slotTime, ev) {
 
 // ─── + Pendiente (al backlog) ───
 function clOpenAddPendiente() {
+  const noProps = clState.properties.length === 0 && clState.projects.length === 0;
   const propsOpts = clState.properties.map(p => `<option value="prop:${p.id}">🏠 ${p.nickname || p.address}</option>`).join('');
   const projsOpts = clState.projects.map(p => `<option value="proj:${p.id}">🏗️ ${p.name || p.address}</option>`).join('');
   const tmplOpts = clState.tasks.map(t => `<option value="${t.id}" data-dur="${t.default_duration_min}" data-mats='${JSON.stringify(t.default_materials||[])}' data-emoji="${t.emoji}">${t.emoji} ${t.name}</option>`).join('');
@@ -1829,11 +1830,17 @@ function clOpenAddPendiente() {
       </div>
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Casa (auto-llena zona si elegís una)</label>
-        <select id="op-p-target" onchange="clPendientePickTarget(this)" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-          <option value="">— ninguna —</option>
-          <optgroup label="🏠 Rentas">${propsOpts}</optgroup>
-          <optgroup label="🏗️ Obras">${projsOpts}</optgroup>
-        </select>
+        ${noProps ? `
+          <div class="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-900">
+            ⚠️ No hay casas cargadas. Andá al área Rentas → Propiedades para crear, o corré el seed SQL si todavía no lo hiciste.
+            <button onclick="clLoadAll().then(clRefocusPlanner)" class="ml-2 text-amber-700 underline font-bold">🔄 Reintentar carga</button>
+          </div>` : `
+          <select id="op-p-target" onchange="clPendientePickTarget(this)" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+            <option value="">— ninguna —</option>
+            ${propsOpts ? `<optgroup label="🏠 Rentas (${clState.properties.length})">${propsOpts}</optgroup>` : ''}
+            ${projsOpts ? `<optgroup label="🏗️ Obras (${clState.projects.length})">${projsOpts}</optgroup>` : ''}
+          </select>
+          <div class="text-[10px] text-slate-500 mt-1">${clState.properties.length} rentas + ${clState.projects.length} obras disponibles</div>`}
       </div>
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Materiales (coma)</label>
@@ -1843,9 +1850,9 @@ function clOpenAddPendiente() {
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Notas</label>
         <textarea id="op-p-notes" rows="2" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
       </div>
-      <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="clCreatePendiente()" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">+ Al backlog</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2">
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver al calendario</button>
+        <button onclick="clCreatePendiente()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">💾 Guardar al backlog</button>
       </div>
     </div>
   `;
@@ -1941,9 +1948,9 @@ function clOpenArmarDia() {
           <input id="op-ar-lunch-dur" type="number" value="60" min="0" step="15" class="w-full border border-slate-300 rounded px-2 py-2 text-sm" />
         </div>
       </div>
-      <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="clEjecutarArmarDia()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🎯 Armar</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2">
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver al calendario</button>
+        <button onclick="clEjecutarArmarDia()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">🎯 Armar el día</button>
       </div>
     </div>
   `;
@@ -2175,11 +2182,11 @@ function _opOpenEditModal(t, isBacklog) {
         </div>
       </details>
 
-      <div class="flex gap-2 pt-2 border-t border-slate-200">
-        ${!isBacklog ? `<button onclick="clSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-2 rounded" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
-        <button onclick="clDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 rounded">🗑️</button>
-        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="clSaveEdit('${t.id}', ${isBacklog})" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2 flex-wrap">
+        ${!isBacklog ? `<button onclick="clSendToBacklog('${t.id}', true)" class="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-sm py-3 rounded font-bold" title="Quitar fecha y mandar al backlog">↩ Backlog</button>` : ''}
+        <button onclick="clDeleteScheduled('${t.id}', true)" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-3 rounded font-bold" title="Eliminar la tarea">🗑️ Borrar</button>
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver</button>
+        <button onclick="clSaveEdit('${t.id}', ${isBacklog})" class="flex-[2_1_0] bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">💾 Guardar cambios</button>
       </div>
     </div>
   `;
@@ -2421,9 +2428,9 @@ function clOpenAddLoose(presetTarget) {
 
       <textarea id="op-l-notes" rows="2" placeholder="Notas adicionales" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
 
-      <div class="flex gap-2">
-        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="clCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">+ Agendar</button>
+      <div class="sticky bottom-0 -mx-6 px-6 -mb-6 pb-3 pt-3 bg-white border-t-2 border-slate-200 flex gap-2">
+        <button onclick="clRefocusPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-3 rounded font-bold">← Volver al calendario</button>
+        <button onclick="clCreateLoose()" id="op-l-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded">+ Agendar</button>
       </div>
     </div>
   `;
