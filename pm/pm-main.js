@@ -1290,29 +1290,69 @@ function pmRenderMonthAirbnbStyle(unit, year, month, monthNames) {
     const e = b.end_date ? new Date(b.end_date) : firstDay;
     return s <= lastDay && e >= firstDay;
   });
+
+  // Paleta con bg suave + texto color para no saturar visualmente
+  const colorByType = {
+    contrato_directo: { bg: 'bg-emerald-100', text: 'text-emerald-900', dot: 'bg-emerald-500', name: 'Contrato' },
+    airbnb:           { bg: 'bg-rose-100',    text: 'text-rose-900',    dot: 'bg-rose-500',    name: 'Airbnb' },
+    booking:          { bg: 'bg-blue-100',    text: 'text-blue-900',    dot: 'bg-blue-500',    name: 'Booking' },
+    vrbo:             { bg: 'bg-violet-100',  text: 'text-violet-900',  dot: 'bg-violet-500',  name: 'VRBO' },
+    hospitable:       { bg: 'bg-sky-100',     text: 'text-sky-900',     dot: 'bg-sky-500',     name: 'Hospitable' },
+    padsplit:         { bg: 'bg-fuchsia-100', text: 'text-fuchsia-900', dot: 'bg-fuchsia-500', name: 'Padsplit' },
+    reserva_corta:    { bg: 'bg-amber-100',   text: 'text-amber-900',   dot: 'bg-amber-500',   name: 'Corta' },
+    otro:             { bg: 'bg-slate-100',   text: 'text-slate-900',   dot: 'bg-slate-500',   name: 'Otro' }
+  };
+
   return `
-    <div>
-      <h2 class="text-3xl font-bold text-slate-900 mb-3 lowercase">${monthNames[month]}</h2>
-      <div class="grid grid-cols-7 gap-1 text-[11px] font-bold text-slate-500 mb-2">
-        <div class="text-center">lun.</div><div class="text-center">mar.</div><div class="text-center">mié.</div><div class="text-center">jue.</div><div class="text-center">vie.</div><div class="text-center">sáb.</div><div class="text-center">dom.</div>
+    <div class="mb-4">
+      <!-- Header del mes — pequeño y sutil -->
+      <div class="flex items-baseline justify-between border-b border-slate-200 pb-2 mb-2">
+        <h2 class="text-base font-bold text-slate-900 capitalize">${monthNames[month]} <span class="text-slate-400 font-normal text-xs">${year}</span></h2>
+        ${bks.length ? `<div class="text-[10px] text-slate-500">${bks.length} ${bks.length===1?'reserva':'reservas'} este mes</div>` : ''}
       </div>
+      <!-- Días de la semana -->
+      <div class="grid grid-cols-7 gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+        <div class="text-center">lun</div><div class="text-center">mar</div><div class="text-center">mié</div><div class="text-center">jue</div><div class="text-center">vie</div><div class="text-center">sáb</div><div class="text-center">dom</div>
+      </div>
+      <!-- Grid de cards compactas -->
       <div class="grid grid-cols-7 gap-1">
         ${cells.map(d => {
           if (!d) return '<div></div>';
           const dt = new Date(year, month, d);
           const isPast = dt < today;
           const isToday = dt.getTime() === today.getTime();
+          const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
           const bk = bks.find(b => {
             const s = new Date(b.start_date);
             const e = b.end_date ? new Date(b.end_date) : firstDay;
             return dt >= s && dt <= e;
           });
-          const colorByType = {contrato_directo:'bg-emerald-500 text-white',airbnb:'bg-rose-500 text-white',booking:'bg-blue-500 text-white',padsplit:'bg-violet-500 text-white',otro:'bg-slate-500 text-white'};
-          const bg = bk ? (colorByType[bk.booking_type] || colorByType.otro) : 'bg-white border-2 border-slate-100';
-          const textStyle = isPast && !bk ? 'text-slate-300 line-through' : 'text-slate-700';
-          return `<button onclick="${bk ? `pmaState.calendarSelectedBookingId='${bk.id}';pmRender()` : `pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})`}" class="aspect-square rounded-lg ${bg} ${isToday?'ring-2 ring-red-500 ring-offset-1':''} hover:shadow flex flex-col items-center justify-center transition cursor-pointer">
-            <div class="text-sm font-bold ${bk?'text-white':textStyle}">${d}</div>
-            ${unit.target_rent && !bk ? `<div class="text-[9px] ${isPast?'text-slate-300':'text-slate-500'}">\$${Math.round(unit.target_rent/30)}</div>` : ''}
+          // ¿Es el primer día de la reserva? → mostrar nombre del huésped
+          const isBkStart = bk && new Date(bk.start_date).toDateString() === dt.toDateString();
+          const isBkEnd = bk && bk.end_date && new Date(bk.end_date).toDateString() === dt.toDateString();
+          const c = bk ? (colorByType[bk.booking_type] || colorByType.otro) : null;
+          const tenant = bk ? pmTenantName(bk.tenant_id) : '';
+          // Bordes redondeados: izquierda si inicio, derecha si fin
+          const roundClass = bk
+            ? `${isBkStart?'rounded-l-md':''} ${isBkEnd?'rounded-r-md':''}`.trim() || 'rounded-none'
+            : 'rounded-md';
+
+          if (bk) {
+            return `<button onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${bk.id}';pmRender()" class="${c.bg} ${c.text} ${roundClass} ${isToday?'ring-2 ring-red-500':''} hover:brightness-95 transition cursor-pointer relative overflow-hidden text-left ${isPast?'opacity-60':''}" style="height:62px;padding:5px 6px;">
+              <div class="flex items-start justify-between">
+                <span class="text-[11px] font-bold">${d}</span>
+                ${isBkStart ? `<span class="${c.dot} w-1.5 h-1.5 rounded-full mt-1"></span>` : ''}
+              </div>
+              ${isBkStart ? `<div class="text-[9px] font-bold truncate mt-1">${tenant.replace(/</g,'&lt;')}</div>` : ''}
+              ${isBkStart && bk.rent_amount ? `<div class="text-[9px] opacity-80">$${Number(bk.rent_amount).toLocaleString()}</div>` : ''}
+            </button>`;
+          }
+          // Día libre: card blanca con número y precio sutil
+          const dayNumColor = isPast ? 'text-slate-300 line-through' : (isWeekend ? 'text-slate-600' : 'text-slate-800');
+          return `<button onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" class="bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 ${roundClass} ${isToday?'ring-2 ring-red-500 border-red-300':''} ${isWeekend?'bg-slate-50/60':''} transition cursor-pointer text-left" style="height:62px;padding:5px 6px;">
+            <div class="text-[11px] font-bold ${dayNumColor}">${d}</div>
+            ${unit.target_rent && !isPast ? `<div class="text-[9px] text-slate-400 mt-1">$${Math.round(unit.target_rent/30)}</div>` : ''}
+            ${isToday ? '<div class="text-[8px] text-red-600 font-bold mt-0.5 uppercase">Hoy</div>' : ''}
           </button>`;
         }).join('')}
       </div>
