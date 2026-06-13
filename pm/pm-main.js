@@ -59,33 +59,41 @@ async function pmLoadAll() {
     return pmRender();
   }
 
-  // Cargar cada tabla con error específico (NO usar .eq('is_active',true) — algunas units
-  // recién importadas pueden tener is_active null y se las saltearíamos)
+  // Cargar cada tabla. `optional: true` = si falla solo warning, NO bloquea todo el módulo.
   const queries = [
-    { name: 'properties', q: () => sb.from('pm_properties').select('*').order('name') },
-    { name: 'units',      q: () => sb.from('pm_units').select('*').order('code') },
-    { name: 'bookings',   q: () => sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).limit(2000) },
-    { name: 'tenants',    q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
-    { name: 'payments',   q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
-    { name: 'feeds',      q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
+    { name: 'properties', optional: false, q: () => sb.from('pm_properties').select('*').order('name') },
+    { name: 'units',      optional: false, q: () => sb.from('pm_units').select('*').order('code') },
+    { name: 'bookings',   optional: false, q: () => sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).limit(2000) },
+    { name: 'tenants',    optional: false, q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
+    { name: 'payments',   optional: false, q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
+    { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
   ];
 
   const results = {};
-  for (const { name, q } of queries) {
+  pmaState.loadWarnings = [];
+  for (const { name, optional, q } of queries) {
     try {
       const r = await q();
       if (r.error) {
-        console.error(`[pm] Error cargando ${name}:`, r.error);
+        console.warn(`[pm] ${optional?'(opcional)':''} Error cargando ${name}:`, r.error.message);
         results[name] = [];
-        pmaState.loadError = pmaState.loadError || `Error cargando ${name}: ${r.error.message}`;
+        if (optional) {
+          pmaState.loadWarnings.push(`${name}: ${r.error.message}`);
+        } else {
+          pmaState.loadError = pmaState.loadError || `Error cargando ${name}: ${r.error.message}`;
+        }
       } else {
         results[name] = r.data || [];
         console.log(`[pm] ${name}: ${results[name].length} registros`);
       }
     } catch (e) {
-      console.error(`[pm] Exception cargando ${name}:`, e);
+      console.warn(`[pm] ${optional?'(opcional)':''} Exception cargando ${name}:`, e);
       results[name] = [];
-      pmaState.loadError = pmaState.loadError || `Exception cargando ${name}: ${e.message}`;
+      if (optional) {
+        pmaState.loadWarnings.push(`${name}: ${e.message}`);
+      } else {
+        pmaState.loadError = pmaState.loadError || `Exception cargando ${name}: ${e.message}`;
+      }
     }
   }
 
@@ -1595,6 +1603,35 @@ window.pmDeletePayment = pmDeletePayment;
 // 📡 TAB 5 · FEEDS (calendarios iCal externos)
 // ════════════════════════════════════════════════════════════════
 function pmRenderFeeds() {
+  // Detectar si la tabla pm_calendar_feeds no existe todavía
+  const tableMissing = (pmaState.loadWarnings || []).some(w => /pm_calendar_feeds|feeds/.test(w));
+  if (tableMissing) {
+    return `
+      <div class="space-y-3 p-1">
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-6">
+          <div class="flex items-start gap-3">
+            <span class="text-3xl">⚠️</span>
+            <div class="flex-1">
+              <div class="font-bold text-amber-900 mb-1">Falta crear la tabla de feeds en Supabase</div>
+              <div class="text-sm text-amber-800 mb-3">Para usar la sincronización con calendarios externos (Airbnb, VRBO, Booking) tenés que correr el schema SQL primero.</div>
+              <div class="bg-white border border-amber-200 rounded p-3 text-xs font-mono text-slate-700 mb-3">
+                supabase/pm-calendar-feeds-schema.sql
+              </div>
+              <div class="text-xs text-amber-700 mb-2"><strong>Pasos:</strong></div>
+              <ol class="text-xs text-amber-800 list-decimal ml-5 space-y-1">
+                <li>Abrí Supabase Dashboard → SQL Editor</li>
+                <li>Copiá y pegá el contenido del archivo <code>pm-calendar-feeds-schema.sql</code></li>
+                <li>Click <strong>Run</strong></li>
+                <li>Volvé acá y refrescá el módulo</li>
+              </ol>
+              <button onclick="pmLoadAll()" class="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded">🔄 Reintentar (ya corrí el SQL)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   const feeds = pmaState.feeds || [];
   const groupedByPlatform = {};
   feeds.forEach(f => {
