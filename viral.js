@@ -136,6 +136,43 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
   ]
 }`;
 
+const HISTORIA_SCHEMA = `=== MODO HISTORIAS ESTRATÉGICAS ===
+Las HISTORIAS venden (el reel solo atrae). El núcleo es convertir un momento cotidiano genérico en una historia estratégica.
+DIFERENCIA CLAVE que debes mostrar SIEMPRE en cada historia:
+- STORIE DÉBIL: sobre ti, genérica, sin objetivo ("Salí a cenar hoy", "Autocuidado ✅", "Hazme una pregunta").
+- STORIE ESTRATÉGICO: sobre la AUDIENCIA, conecta con su dolor/deseo, usa un sticker de engagement ESPECÍFICO y lleva a un objetivo ("Si llevas meses buscando tu primera inversión y no encuentras el deal, mira lo que reviso apenas entro a una casa 👇").
+Reglas de la versión estratégica:
+- Hazla sobre la audiencia, no sobre ti (ej. "me cuido para poder cuidarte").
+- Conecta el momento cotidiano con un dolor/deseo del avatar.
+- Sticker ESPECÍFICO, nunca genérico: "hazme una pregunta" → "cuéntame tu principal dificultad con X". Tipos: encuesta (2 opciones), pregunta abierta, quiz, cuestionario, emoji slider.
+- Es parte de una SECUENCIA con arco: hook → contexto → valor → CTA. 3-5 historias.
+- Tipos de secuencia: hand-raiser (lleva a un recurso gratis / comentar palabra), venta (agenda u oferta, solo en cosecha), autoridad/conexión (humaniza + demuestra autoridad).
+- Timing sugerido: hook ~14h, resto de la secuencia ~16h.
+Para bienes raíces usa momentos reales: ver una propiedad, estar en una obra, hacer los números, una llamada con un estudiante, firmar un cierre, etc.
+
+DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backticks) con esta forma:
+{
+  "secuencias": [
+    {
+      "titulo": "nombre corto de la secuencia",
+      "tipo": "hand-raiser|venta|autoridad/conexión",
+      "objetivo": "a dónde lleva la secuencia",
+      "historias": [
+        {
+          "n": 1,
+          "momento": "el momento cotidiano / b-roll que se graba",
+          "debil": "lo que la mayoría pondría (genérico, sobre ti)",
+          "estrategico": "la versión que conecta con la audiencia, lista para poner en pantalla",
+          "sticker": { "tipo": "encuesta|pregunta|quiz|cuestionario|emoji slider|ninguno", "texto": "texto del sticker", "opciones": ["opción A", "opción B"] },
+          "por_que": "1 frase: por qué la estratégica gana"
+        }
+      ],
+      "cta_final": "el cierre de la secuencia (comenta X / desliza / agenda)",
+      "timing": "sugerencia de horas"
+    }
+  ]
+}`;
+
 // ---------- Banco de conocimiento (base_conocimiento.json) ----------
 let KB = null;
 async function loadKB() {
@@ -145,6 +182,7 @@ async function loadKB() {
     setupKBPicker('r');
     setupKBPicker('c');
     setupKBPicker('y');
+    setupKBPicker('h');
   } catch (e) { console.warn('No se pudo cargar el banco de conocimiento', e); }
 }
 function setupKBPicker(p) {
@@ -596,6 +634,100 @@ function copyCalendario(btn) {
   if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar todo'; }, 1500); }
 }
 
+// ---------- Generar historias ----------
+async function generarHistorias() {
+  const tema = document.getElementById('h-tema').value.trim();
+  const dolor = findPregunta(document.getElementById('h-dolor').value);
+  if (!tema && !dolor) { document.getElementById('h-tema').focus(); return; }
+  if (!LS.key) { openSettings(); return; }
+
+  const tipo = document.getElementById('h-tipo').value;
+  const variantes = document.getElementById('h-variantes').value;
+  const cta = document.getElementById('h-cta').value.trim();
+
+  const out = document.getElementById('h-output');
+  out.innerHTML = loadingHTML(variantes).replace('reel(es)', 'secuencia(s) de historias');
+  const genBtn = document.getElementById('h-generate');
+  genBtn.disabled = true; genBtn.classList.add('opacity-50', 'pointer-events-none');
+
+  const prompt = `Genera ${variantes} secuencia(s) de historias estratégicas.
+${dolorPromptBlock(dolor)}${tema ? 'Momento/tema cotidiano a usar: ' + tema : 'Inventa momentos cotidianos creíbles del día a día en bienes raíces.'}
+Tipo de secuencia: ${tipo === 'auto' ? 'elige el mejor' : tipo}
+${cta ? 'CTA / palabra clave a usar: ' + cta : ''}
+Cada secuencia debe tener 3-5 historias, y CADA historia debe mostrar la versión débil y la estratégica.`;
+
+  try {
+    const text = await callClaude(prompt, 1500 + Number(variantes) * 2000, HISTORIA_SCHEMA);
+    const data = parseJSON(text);
+    renderHistorias(data.secuencias || []);
+  } catch (e) {
+    out.innerHTML = errorHTML(e.message);
+  } finally {
+    genBtn.disabled = false; genBtn.classList.remove('opacity-50', 'pointer-events-none');
+  }
+}
+
+let LAST_HIST = [];
+const HTIPO_COLOR = { 'hand-raiser': 'bg-amber-900/40 text-amber-300', venta: 'bg-emerald-900/40 text-emerald-300', 'autoridad/conexión': 'bg-sky-900/40 text-sky-300' };
+function renderHistorias(secs) {
+  LAST_HIST = secs;
+  const out = document.getElementById('h-output');
+  if (!secs.length) { out.innerHTML = errorHTML('La IA no devolvió historias. Intenta de nuevo.'); return; }
+  out.innerHTML = secs.map((s, i) => historiaCard(s, i)).join('');
+}
+function stickerBadge(st) {
+  if (!st || !st.tipo || st.tipo === 'ninguno') return '';
+  const ops = Array.isArray(st.opciones) && st.opciones.length ? ' [' + st.opciones.map(esc).join(' / ') + ']' : '';
+  return `<div class="mt-2 text-[11px] bg-fuchsia-950/40 border border-fuchsia-900/40 rounded px-2 py-1 text-fuchsia-200">🎯 ${esc(st.tipo)}: ${esc(st.texto)}${ops}</div>`;
+}
+function historiaCard(s, i) {
+  const hist = Array.isArray(s.historias) ? s.historias : [];
+  const rows = hist.map(h => `
+    <div class="border-t border-zinc-800 pt-3 mt-3">
+      <div class="text-[11px] text-zinc-500 mb-1.5">📍 ${esc(h.momento)}</div>
+      <div class="grid sm:grid-cols-2 gap-2">
+        <div class="bg-red-950/20 border border-red-900/30 rounded-lg p-2.5">
+          <div class="text-[10px] uppercase font-bold text-red-400 mb-1">Storie débil</div>
+          <div class="text-sm text-zinc-400">${esc(h.debil)}</div>
+        </div>
+        <div class="bg-emerald-950/20 border border-emerald-900/30 rounded-lg p-2.5">
+          <div class="text-[10px] uppercase font-bold text-emerald-400 mb-1">Storie estratégico</div>
+          <div class="text-sm">${esc(h.estrategico)}</div>
+          ${stickerBadge(h.sticker)}
+        </div>
+      </div>
+      ${h.por_que ? `<div class="text-[10px] text-zinc-600 mt-1">↳ ${esc(h.por_que)}</div>` : ''}
+    </div>`).join('');
+  return `
+  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-5">
+    <div class="flex items-start justify-between gap-3 mb-1">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] px-2 py-0.5 rounded-full ${HTIPO_COLOR[s.tipo] || 'bg-zinc-800 text-zinc-300'}">${esc(s.tipo)}</span>
+          <span class="text-[11px] text-zinc-500">${esc(s.timing || '')}</span>
+        </div>
+        <h3 class="text-lg font-bold mt-1">${esc(s.titulo)}</h3>
+        <div class="text-xs text-zinc-500">🎯 ${esc(s.objetivo)}</div>
+      </div>
+      <button onclick="copyHistoria(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
+    </div>
+    ${rows}
+    <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 text-sm mt-3"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">📣 CTA FINAL</div>${esc(s.cta_final)}</div>
+  </div>`;
+}
+function copyHistoria(i, btn) {
+  const s = LAST_HIST[i]; if (!s) return;
+  const hist = Array.isArray(s.historias) ? s.historias : [];
+  const txt = `${s.titulo} [${s.tipo}] — ${s.objetivo}\n${s.timing || ''}\n\n` +
+    hist.map(h => {
+      const st = h.sticker && h.sticker.tipo && h.sticker.tipo !== 'ninguno' ? `\n   STICKER (${h.sticker.tipo}): ${h.sticker.texto}${Array.isArray(h.sticker.opciones) && h.sticker.opciones.length ? ' [' + h.sticker.opciones.join(' / ') + ']' : ''}` : '';
+      return `${h.n}. ${h.momento}\n   DÉBIL: ${h.debil}\n   ESTRATÉGICO: ${h.estrategico}${st}`;
+    }).join('\n\n') +
+    `\n\nCTA FINAL: ${s.cta_final}`;
+  navigator.clipboard.writeText(txt);
+  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
+}
+
 // ---------- Settings ----------
 function openSettings() {
   document.getElementById('s-key').value = LS.key;
@@ -629,6 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('c-generate').addEventListener('click', generarCarruseles);
   document.getElementById('y-generate').addEventListener('click', generarYoutube);
   document.getElementById('cal-generate').addEventListener('click', generarCalendario);
+  document.getElementById('h-generate').addEventListener('click', generarHistorias);
   document.getElementById('s-save').addEventListener('click', () => {
     LS.key = document.getElementById('s-key').value.trim();
     const custom = document.getElementById('s-model-custom').value.trim();
