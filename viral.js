@@ -803,6 +803,96 @@ function copyHistoria(btn) {
   if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
 }
 
+// ---------- Estrategia (guía operativa) ----------
+function renderEstrategia() {
+  const out = document.getElementById('tab-estrategia');
+  if (!out || out.dataset.rendered) return;
+  out.dataset.rendered = '1';
+  const card = (title, body) => `<div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5"><h3 class="font-bold text-base mb-3">${title}</h3>${body}</div>`;
+  const li = (arr) => `<ul class="space-y-1.5 text-sm text-zinc-300">${arr.map(x => `<li class="flex gap-2"><span class="text-fuchsia-400">▸</span><span>${x}</span></li>`).join('')}</ul>`;
+
+  const principios = card('🧭 Principios maestros (las reglas que nunca rompes)', li([
+    '<b>La marca NUNCA es el tema aparente.</b> El "chisme" (Messi, una camioneta, un drama) tapa el valor. Regala en público, vende en privado.',
+    '<b>Criterio &gt; Capital.</b> Tu avatar cree que el problema es la plata; el real es el criterio para encontrar el deal. Ataca lo que QUIERE (comprar/jubilarse) → hazlo consciente de lo que NECESITA (criterio + sistema + acompañamiento).',
+    '<b>Estático aburre, dinámico conecta.</b> Datos sueltos no mueven a nadie; contexto + beneficio + escenario sí.',
+    '<b>Promesa = Resultado + Tiempo + Alivio</b>, y que se sienta posible, no mágica.',
+    '<b>CTA de respuesta &gt; link.</b> Pide una palabra clave para DM (FLIP, CUARTO, CRITERIO), no "link en bio".',
+    '<b>La interacción es contenido.</b> Encuestas, quiz y preguntas suben alcance y declaran intención de compra.',
+  ]));
+
+  const rutina = card('☀️ Rutina diaria (mínimo 2-3 publicaciones)', `
+    <div class="overflow-x-auto"><table class="w-full text-sm">
+      <thead><tr class="text-[10px] uppercase text-zinc-600 text-left"><th class="pb-2 pr-3">Hora</th><th class="pb-2 pr-3">Qué subir</th><th class="pb-2">Para qué</th></tr></thead>
+      <tbody class="text-zinc-300">
+        ${[['09:00','Reel viral o <b>repost reciclado</b> (humor) — y oculto del perfil','<span class="text-fuchsia-300">Alcance</span>'],
+           ['14:00','<b>1ª historia del día</b> con un hook fuerte','<span class="text-sky-300">Enganche</span>'],
+           ['16:00','<b>Secuencia de historias H.I.L.O.</b> (3-5 frames)','<span class="text-emerald-300">Conversión</span>'],
+           ['18:00','Carrusel de autoridad o reel de valor','<span class="text-sky-300">Autoridad</span>'],
+           ['21:00','Reel motivacional o reciclado','<span class="text-fuchsia-300">Alcance</span>']].map(r=>`<tr class="border-t border-zinc-800"><td class="py-2 pr-3 whitespace-nowrap text-zinc-500">${r[0]}</td><td class="py-2 pr-3">${r[1]}</td><td class="py-2">${r[2]}</td></tr>`).join('')}
+      </tbody></table></div>
+    <div class="mt-3 text-xs text-zinc-500"><b class="text-zinc-400">Siempre:</b> responde TODOS los comentarios y DMs (ahí se vende), y mira TikTok 10 min para tomar formatos virales que ya funcionan.</div>`);
+
+  const mes = card('🌱 Ritmo del mes (siembra → cosecha)', li([
+    '<b>Días 1-20 — SIEMBRA:</b> valor + hand-raisers (recursos gratis), conversaciones sin presión. NO vendes de frente.',
+    '<b>Días 21-27 — COSECHA:</b> vendes sobre todo por <b>historias</b>, con urgencia/escasez real (Why Now). Máx 4-5 historias de venta en la semana.',
+    '<b>Día 28:</b> vuelves a siembra.',
+    '<b>YouTube:</b> 1-2 videos largos por semana (se cortan a reels verticales).',
+    '<b>Antes de un lanzamiento:</b> valida la idea con una encuesta en historias.',
+    'Un lead frío necesita <b>7-14 recursos</b> antes de contratar: ten paciencia con la siembra.',
+  ]));
+
+  const queSubir = card('📋 Qué subir (pilares de contenido)', li([
+    '<b>Números:</b> los 4 números (MAO · rehab · ARV · margen), por qué el contratista cuesta más.',
+    '<b>Criterio / búsqueda ★:</b> el Buy Box en 10 pasos, cómo inspeccionar una casa, dónde comprar por estado. (Es el cuello de botella real → máximo valor.)',
+    '<b>Financiamiento:</b> Harmony Lender, ITIN/DSCR, "no necesitas 2 años de empresa", cómo usar tu crédito.',
+    '<b>Mentalidad:</b> miedo a la deuda, criterio vs capital, "me jubilé a los 30", no actuar también pierde dinero.',
+    '<b>El juego:</b> "La Copa Mundial del Flip" — wholesaler, realtor, GC, arquitecto, prestamista.',
+    '<b>Sistema / acompañamiento:</b> mostrar mentores, el ejercicio real de una casa, mapa de ruta 30/60/90 días.',
+    '<b>Modelos:</b> Fix&Flip, Fix&Hold, BRRRR, Arbitraje. <b>Legado:</b> patrimonio, herencia, primera generación.',
+  ]));
+
+  const comoSubir = card('🎬 Cómo subir (mecánicas y edición)', li([
+    '<b>Repost reciclado:</b> copia el link de un reel +5M → <code>saveclip.app/es</code> → descarga → en CapCut pon tu @ encima de la marca de agua → copia el copy tal cual → publica y <b>oculta del perfil</b> (sube alcance sin ensuciar el feed).',
+    '<b>4 técnicas visuales:</b> time-lapse (antes→después de remodelación) · b-roll + texto grande · pantalla doble (comparación) · colores estridentes.',
+    '<b>B-roll escrito</b> (frase potente sobre lifestyle) y <b>flatlays</b> para limpiar el feed y dar autoridad.',
+    '<b>Hook con imagen absurda</b> para frenar el scroll.',
+    '<b>Edición:</b> corta cada 1-2s, subtítulos palabra por palabra (karaoke), quita los silencios, fondos dopaminérgicos.',
+    '<b>Texto en pantalla ≤ 12 palabras</b> (legible en mobile).',
+  ]));
+
+  const formulas = card('🧱 Las fórmulas (lo que genera la app)', `
+    <div class="grid sm:grid-cols-2 gap-3 text-sm">
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-fuchsia-400 font-semibold mb-1">REEL (Julio)</div>Hook → Chisme → Valor oculto → CTA (sígueme + comenta X). "Si no me sigues, no te llega."</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-sky-400 font-semibold mb-1">REEL que vende (Sell Your Knowledge)</div>Hook → Problema → Solución (nuevo paradigma) → Prueba social → CTA.</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-emerald-400 font-semibold mb-1">HISTORIAS · Método H.I.L.O.</div><b>H</b>ook → <b>I</b>dentificación → <b>L</b>leva (A→B con interacción) → <b>O</b>ferta + CTA de respuesta. Muestra débil vs estratégico.</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-amber-400 font-semibold mb-1">YOUTUBE (Richard)</div>Idea = remix (formato outlier + tema + vector viral) · título por palanca (miedo/curiosidad/deseo) · miniatura por capas.</div>
+    </div>`);
+
+  const embudo = card('🔻 El embudo (cómo se convierte)', li([
+    '<b>Reel</b> = atrae (alcance frío). <b>Historias</b> = venden (el vendedor). <b>Hand-raiser</b> = palabra clave → DM automático → conversación → llamada/venta.',
+    '3 tipos de secuencia de historias: <b>hand-raiser</b> (recurso gratis), <b>venta</b> (solo en cosecha), <b>autoridad/conexión</b> (humaniza).',
+    'Métrica que importa: no cuántos, sino <b>quiénes</b> responden y si terminan en llamada/venta.',
+  ]));
+
+  const metricas = card('📊 Qué mirar (métricas)', li([
+    'Retención ≥ 50% → tiende a volverse viral.',
+    'Comentarios · guardados · compartidos (la interacción manda).',
+    '% visita→seguidor · clics en bio · DMs respondidos · agendas desde el perfil.',
+    'Después de cada lanzamiento: qué historia/frame tuvo más respuestas → mejóralo el próximo.',
+  ]));
+
+  const fuentes = card('📚 Tu información, integrada aquí', `<p class="text-xs text-zinc-500 leading-relaxed">Esta guía y el generador se alimentan de TODO lo que subiste: la grabación con tu mentora, el deck de Julio Iero, el video de Richard (YouTube), la reunión de ideas de fix &amp; flip, el banco de conocimiento (29 dolores), el playbook VIRALIDAD, los carruseles de historias (monikmontanez / danaherrera) y el brief del Método H.I.L.O. Nada se perdió — todo está plasmado en lo que tienes que hacer.</p>`);
+
+  out.innerHTML = `
+    <div class="mb-4">
+      <h2 class="text-xl font-bold">Tu plan de contenido, día a día</h2>
+      <p class="text-sm text-zinc-500">Qué subir, cómo subirlo y cuándo. Toda tu estrategia en un solo lugar.</p>
+    </div>
+    <div class="space-y-4">
+      ${principios}${rutina}${mes}${queSubir}${comoSubir}${formulas}${embudo}${metricas}${fuentes}
+    </div>`;
+}
+
 // ---------- Settings ----------
 function openSettings() {
   document.getElementById('s-key').value = LS.key;
@@ -823,6 +913,7 @@ function setupTabs() {
       });
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
       document.getElementById('tab-' + tab).classList.remove('hidden');
+      if (tab === 'estrategia') renderEstrategia();
     });
   });
 }
