@@ -40,8 +40,12 @@ REGLAS DE EJECUCIÓN Y EDICIÓN:
 - Lenguaje simple, frases cortas, hablado como a un amigo.
 - Pantalla verde con fondos dopaminérgicos cuando aplique.
 - Cargar el hook con varios clips rápidos + sound design.
-- Técnicas visuales que funcionan (usa la que mejor sirva en 'edicion'): time-lapse (procesos como remodelaciones antes→después), b-roll + texto grande encima, pantalla doble (comparación/reacción), colores estridentes (amarillo/colores fuertes para frenar el scroll).
-- Para el HOOK puedes usar una imagen absurda/inesperada como scroll-stopper (estilo objeto fuera de contexto).
+PLAYBOOK VISUAL VIRALIDAD (técnicas transversales, usa la que mejor sirva):
+- 4 técnicas que funcionan: TIME-LAPSE (procesos como remodelaciones antes→después) · B-ROLL + TEXTO grande encima (estilo educativo disfrazado) · PANTALLA DOBLE (comparación/reacción) · COLORES ESTRIDENTES (amarillo/colores fuertes para frenar el scroll).
+- HOOK con imagen absurda/inesperada como scroll-stopper (objeto fuera de contexto).
+- B-ROLL ESCRITO: texto corto y potente sobre b-roll de lifestyle (caminando, café, obra), da autoridad sin vender.
+- REPOST/RECICLADO: se pueden reciclar clips virales (+5M) o de películas poniéndoles tu @ y tu caption (saveclip → CapCut con tu @ → copiar el copy original); publicar y ocultar del perfil para subir alcance.
+- FEED LIMPIO: carruseles de autoridad + flatlays para limpiar el perfil y subir el nivel de marca.
 
 Responde SIEMPRE en español neutro de LATAM. Sé concreto y grabable, nada genérico.`;
 
@@ -168,6 +172,10 @@ BIBLIOTECA DE CTAs: CTA_RESPUESTA ("Comenta '{PALABRA}' y te mando {recurso}", P
 
 REGLA ABURRE→CONECTA (reescribe el tema plano): lista de specs → info dinámica (beneficio+escenario+sensorial) · "vendo/disponible/escríbeme" → escasez + CTA de respuesta · solo foto → foto + hook pregunta · lista de opciones → lista + encuesta/quiz · "cómpralo/link" → venta comparativa.
 
+3 CRITERIOS de toda historia que vende (etiqueta en cada frame cuáles cumple): 1) ENLAZA CON TU PRODUCTO/OFERTA · 2) INVOLUCRA AL CLIENTE · 3) CUENTA ALGO MÁS QUE EL MOMENTO (contextualiza + activa deseo, no solo "lo que hiciste").
+MOTOR DE TRANSFORMACIÓN (de momento crudo a historia que vende): momento real → puente al dolor/deseo del avatar → enlaza con tu oferta → activa deseo → sticker específico → objetivo. Para CADA frame da TAMBIÉN su versión DÉBIL (lo genérico que pondría la mayoría, sobre ti) para visualizar el contraste débil vs estratégico (= aburre vs conecta).
+PATRONES QUE VENDEN (úsalos cuando encajen): hook de honestidad/vulnerabilidad ("voy a ser muy honesta contigo…") · lista de errores/creencias + sticker de TAP "toca si te sientes identificado" · auto-diagnóstico que SEGMENTA leads ("¿Cómo ves tu situación hoy? [Necesito ayuda / Creo que estoy bien]"; el que pide ayuda es lead caliente). Cada frame persigue 1 objetivo: retención, interacción o venta.
+
 VERTICALES (ajusta vocabulario):
 - flipmentoria (educación): A "quiero invertir pero no sé empezar" → B "cierro mi primer flip con sistema". Hooks fuertes: ERROR ("Si calculas el MAO a ojo, pierdes el deal"), CURIOSIDAD. CTA: "comenta FLIP y te mando la calculadora de MAO".
 - arbitraje (propiedades): A "propiedad vacía" → B "ocupada y rentando". Convierte specs en info dinámica. Hooks: ESCASEZ, VS ("renta tradicional VS arbitraje: el mismo cuarto, 3x el ingreso"). CTA: "responde CUARTO y te paso disponibilidad".
@@ -191,10 +199,13 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
     {
       "n": 1,
       "fase": "H|I|L|L-interaccion|O",
-      "texto_en_pantalla": "≤12 palabras, lo que va escrito en el frame",
+      "debil": "versión débil/aburrida del frame (lo genérico, sobre ti) para el contraste",
+      "texto_en_pantalla": "≤12 palabras, la versión ESTRATÉGICA que va escrita en el frame",
       "voz_o_caption": "lo que se dice/escribe completo",
-      "elemento_visual": "qué grabar/mostrar",
-      "sticker": "ninguno | encuesta: A / B | pregunta: ¿...? | quiz: ... | countdown",
+      "elemento_visual": "qué grabar/mostrar (aplica técnica visual: time-lapse, b-roll+texto, pantalla doble, colores estridentes)",
+      "sticker": "ninguno | encuesta: A / B | pregunta: ¿...? | quiz: ... | auto-diagnóstico: ¿...? [Necesito ayuda / Estoy bien] | tap: toca si te identificas | countdown",
+      "criterios": ["enlaza con producto", "involucra al cliente", "cuenta más que el momento"],
+      "objetivo_frame": "retención|interacción|venta",
       "nota_grabacion": "indicación práctica para Nicolás"
     }
   ],
@@ -723,16 +734,20 @@ function renderHistorias(s) {
 function frameCard(f) {
   const fi = FASE_INFO[f.fase] || { label: esc(f.fase || ''), color: 'bg-zinc-800 text-zinc-300' };
   const stick = f.sticker && f.sticker !== 'ninguno' ? `<div class="mt-2 text-[11px] bg-purple-950/40 border border-purple-900/40 rounded px-2 py-1 text-purple-200">🎯 ${esc(f.sticker)}</div>` : '';
+  const crit = Array.isArray(f.criterios) && f.criterios.length ? `<div class="flex flex-wrap gap-1 mt-2">${f.criterios.map(c => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300">✓ ${esc(c)}</span>`).join('')}</div>` : '';
   return `
   <div class="border-t border-zinc-800 pt-3 mt-3">
     <div class="flex items-center gap-2 mb-1.5">
       <span class="text-zinc-600 text-xs">${esc(String(f.n ?? ''))}</span>
       <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${fi.color}">${fi.label}</span>
+      ${f.objetivo_frame ? `<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">${esc(f.objetivo_frame)}</span>` : ''}
     </div>
+    ${f.debil ? `<div class="text-[11px] text-red-400/70 mb-1 line-through decoration-red-700/40">débil: ${esc(f.debil)}</div>` : ''}
     <div class="bg-zinc-950 rounded-lg p-2 text-sm font-semibold mb-1">📱 ${esc(f.texto_en_pantalla)}</div>
     ${f.voz_o_caption ? `<div class="text-sm text-zinc-300">${esc(f.voz_o_caption)}</div>` : ''}
     ${f.elemento_visual ? `<div class="text-[11px] text-zinc-500 mt-1">🎬 ${esc(f.elemento_visual)}</div>` : ''}
     ${stick}
+    ${crit}
     ${f.nota_grabacion ? `<div class="text-[10px] text-zinc-600 mt-1">↳ ${esc(f.nota_grabacion)}</div>` : ''}
   </div>`;
 }
@@ -768,7 +783,7 @@ function copyHistoria(btn) {
   const frames = Array.isArray(s.frames) ? s.frames : [];
   const cta = s.cta_final || {};
   const txt = `${s.titulo_secuencia} [${s.vertical} · ${s.objetivo}]\n\n` +
-    frames.map(f => `FRAME ${f.n} (${f.fase})\n  PANTALLA: ${f.texto_en_pantalla}\n  VOZ: ${f.voz_o_caption || ''}\n  VISUAL: ${f.elemento_visual || ''}${f.sticker && f.sticker !== 'ninguno' ? '\n  STICKER: ' + f.sticker : ''}${f.nota_grabacion ? '\n  NOTA: ' + f.nota_grabacion : ''}`).join('\n\n') +
+    frames.map(f => `FRAME ${f.n} (${f.fase})${f.debil ? '\n  DÉBIL: ' + f.debil : ''}\n  PANTALLA: ${f.texto_en_pantalla}\n  VOZ: ${f.voz_o_caption || ''}\n  VISUAL: ${f.elemento_visual || ''}${f.sticker && f.sticker !== 'ninguno' ? '\n  STICKER: ' + f.sticker : ''}${f.nota_grabacion ? '\n  NOTA: ' + f.nota_grabacion : ''}`).join('\n\n') +
     `\n\nCTA FINAL (${cta.tipo || ''}): Comenta ${cta.palabra_clave || ''} y te mando ${cta.recurso || ''}`;
   navigator.clipboard.writeText(txt);
   if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
