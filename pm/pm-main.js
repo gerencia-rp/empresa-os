@@ -9,8 +9,14 @@ const pmaState = {
   selectedPropertyId: null,           // para vista detalle
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(),   // 0-11
-  calendarView: 'month',                  // 'year' | 'month'
-  calendarFilterPropertyId: null,     // filtro de calendario (null = todas)
+  calendarView: 'timeline',               // 'timeline' (multi-unit) | 'single' (un solo listing)
+  calendarFilterPropertyId: null,
+  calendarSelectedUnitId: null,           // si seteado → vista single de esa unidad
+  calendarSelectedBookingId: null,        // panel derecho con detalles
+  calendarListingSearch: '',              // buscador del sidebar
+  calendarTimelineStart: null,            // fecha de inicio del timeline (ISO date)
+  calendarTimelineDays: 21,               // cuántos días mostrar en el timeline
+  calendarMonthDatePickerOpen: false,
   // Data
   properties: [],
   units: [],
@@ -724,155 +730,376 @@ function pmRenderCalendar() {
     : pmaState.units.filter(u => pmaState.properties.some(p => p.id === u.property_id));
   const allUnits = pmDedupeUnits(rawUnits);
   const dupesHidden = rawUnits.length - allUnits.length;
-  const byProperty = {};
-  allUnits.forEach(u => {
-    if (!byProperty[u.property_id]) byProperty[u.property_id] = [];
-    byProperty[u.property_id].push(u);
-  });
 
-  // Totales del año
-  let totalEmptyAll = 0, lostRevenueAll = 0, fullOccUnits = 0;
-  let totalDaysSum = 0, occupiedDaysSum = 0;
-  allUnits.forEach(u => {
-    const c = pmCalcUnitGaps(u, pmaState.calendarYear);
-    totalEmptyAll += c.totalEmpty;
-    lostRevenueAll += c.lostRevenue;
-    totalDaysSum += c.totalDays;
-    occupiedDaysSum += c.occupiedCount;
-    if (c.occPct === 100) fullOccUnits++;
-  });
-  const coverage = totalDaysSum ? Math.round(100 * occupiedDaysSum / totalDaysSum) : 0;
+  if (pmaState.calendarSelectedUnitId) {
+    const unit = allUnits.find(u => u.id === pmaState.calendarSelectedUnitId)
+              || pmaState.units.find(u => u.id === pmaState.calendarSelectedUnitId);
+    if (unit) return pmRenderSingleListing(unit, allUnits);
+  }
 
-  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const view = pmaState.calendarView || 'month';
-  const periodLabel = view === 'month'
-    ? `${monthNames[pmaState.calendarMonth]} ${pmaState.calendarYear}`
-    : `${pmaState.calendarYear}`;
+  const q = (pmaState.calendarListingSearch || '').toLowerCase().trim();
+  const filteredUnits = q
+    ? allUnits.filter(u => {
+        const p = pmaState.properties.find(x => x.id === u.property_id);
+        return (u.code||'').toLowerCase().includes(q)
+            || (u.name||'').toLowerCase().includes(q)
+            || (p?.name||'').toLowerCase().includes(q);
+      })
+    : allUnits;
 
-  const focusedProp = filter ? pmaState.properties.find(p => p.id === filter) : null;
+  if (!pmaState.calendarTimelineStart) {
+    pmaState.calendarTimelineStart = new Date().toISOString().slice(0,10);
+  }
+
   return `
-    <div class="space-y-3 p-1">
-      <!-- HEADER STICKY con navegación siempre visible -->
-      <div class="sticky top-0 z-30 bg-white border-b border-slate-200 -mx-1 px-3 py-2" style="margin-top:-4px;">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <div class="flex items-center gap-3 flex-wrap">
-            <!-- Navegación BIG ← → -->
-            <div class="inline-flex bg-slate-900 text-white rounded-lg overflow-hidden">
-              <button onclick="pmCalNavPrev()" class="px-3 py-2 hover:bg-slate-700 text-lg font-bold transition" title="Anterior (←)">←</button>
-              <button onclick="pmCalNavToday()" class="px-4 py-2 hover:bg-slate-700 text-xs font-bold border-l border-r border-slate-700 transition" title="Volver a hoy">HOY</button>
-              <button onclick="pmCalNavNext()" class="px-3 py-2 hover:bg-slate-700 text-lg font-bold transition" title="Siguiente (→)">→</button>
-            </div>
-            <!-- Periodo actual visible y grande -->
-            <div>
-              <div class="text-lg font-bold text-slate-900 leading-tight">${periodLabel}</div>
-              <div class="text-[10px] text-slate-500 uppercase tracking-wider">${view==='month'?'Vista mensual':'Vista anual'}${focusedProp?` · enfocado en una propiedad`:''}</div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <!-- Toggle vista -->
-            <div class="inline-flex bg-slate-100 rounded-lg p-0.5">
-              <button onclick="pmaState.calendarView='month';pmRender()" class="px-3 py-1.5 text-xs font-bold rounded ${view==='month'?'bg-white text-slate-900 shadow':'text-slate-500 hover:text-slate-700'}">📆 Mes</button>
-              <button onclick="pmaState.calendarView='year';pmRender()" class="px-3 py-1.5 text-xs font-bold rounded ${view==='year'?'bg-white text-slate-900 shadow':'text-slate-500 hover:text-slate-700'}">📊 Año</button>
-            </div>
-            ${focusedProp ? `
-              <button onclick="pmaState.calendarFilterPropertyId=null;pmRender()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded" title="Ver todas las propiedades">↩ Ver todas</button>
-            ` : `
-              <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1.5 max-w-[200px]">
-                <option value="">Todas las propiedades</option>
-                ${pmaState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
-              </select>
-            `}
-            <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Reserva</button>
-          </div>
-        </div>
-        ${focusedProp ? `
-          <div class="mt-2 bg-blue-50 border border-blue-200 rounded p-2 flex items-center gap-2 flex-wrap">
-            <span class="text-lg">🏠</span>
-            <strong class="text-sm text-blue-900">${(focusedProp.name||'').replace(/</g,'&lt;')}</strong>
-            <span class="text-[10px] text-blue-700">· ${pmUnitsOf(focusedProp.id).length} unidades · ${(focusedProp.address||'').replace(/</g,'&lt;')}</span>
-            <button onclick="pmaState.calendarFilterPropertyId=null;pmRender()" class="ml-auto text-[10px] text-blue-700 hover:underline">↩ Salir del foco</button>
-          </div>
-        ` : ''}
+    <div class="flex bg-white" style="height: calc(75vh - 60px); margin: -4px;">
+      ${pmRenderListingsSidebar(filteredUnits, allUnits.length)}
+      <div class="flex-1 flex flex-col overflow-hidden">
+        ${pmRenderTimelineHeader()}
+        ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900">⚠️ ${dupesHidden} unidades duplicadas fusionadas</div>` : ''}
+        <div class="flex-1 overflow-auto">${pmRenderTimelineGrid(filteredUnits)}</div>
       </div>
+      ${pmaState.calendarSelectedBookingId ? pmRenderBookingSidePanel(pmaState.calendarSelectedBookingId) : ''}
+    </div>
+  `;
+}
 
-      ${dupesHidden ? `<div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">⚠️ Se detectaron <strong>${dupesHidden} unidades duplicadas</strong> con el mismo código en la misma propiedad. Se muestran fusionadas. Para limpiarlas definitivamente, andá al tab Propiedades → click en la propiedad → eliminá los duplicados.</div>` : ''}
-
-      <!-- KPIs hero del año -->
-      ${allUnits.length ? `
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-          <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="text-[9px] uppercase font-bold text-slate-500">Cobertura</div>
-            <div class="text-2xl font-bold ${coverage>=80?'text-emerald-700':coverage>=50?'text-amber-700':'text-red-700'} mt-0.5">${coverage}%</div>
-            <div class="text-[10px] text-slate-500">${fullOccUnits}/${allUnits.length} al 100%</div>
-          </div>
-          <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="text-[9px] uppercase font-bold text-slate-500">Unidades</div>
-            <div class="text-2xl font-bold text-slate-900 mt-0.5">${allUnits.length}</div>
-            <div class="text-[10px] text-slate-500">${allUnits.filter(u => pmCalcUnitGaps(u, pmaState.calendarYear).totalEmpty > 0).length} con huecos</div>
-          </div>
-          <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="text-[9px] uppercase font-bold text-slate-500">Días vacíos</div>
-            <div class="text-2xl font-bold text-red-600 mt-0.5">${totalEmptyAll.toLocaleString()}</div>
-            <div class="text-[10px] text-slate-500">total año</div>
-          </div>
-          <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div class="text-[9px] uppercase font-bold text-red-700">Ingreso perdido</div>
-            <div class="text-2xl font-bold text-red-700 mt-0.5">$${(lostRevenueAll/1000).toFixed(0)}K</div>
-            <div class="text-[10px] text-red-600">estimado · ~$${lostRevenueAll.toLocaleString()}</div>
-          </div>
-          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-            <div class="text-[9px] uppercase font-bold text-emerald-700">Al 100%</div>
-            <div class="text-2xl font-bold text-emerald-700 mt-0.5">${fullOccUnits}</div>
-            <div class="text-[10px] text-emerald-600">de ${allUnits.length}</div>
-          </div>
+function pmRenderListingsSidebar(filteredUnits, totalCount) {
+  return `
+    <div class="border-r border-slate-200 bg-slate-50 flex flex-col" style="width:280px;flex-shrink:0;">
+      <div class="p-3 border-b border-slate-200 bg-white">
+        <div class="flex items-center justify-between mb-2">
+          <strong class="text-sm text-slate-900">${totalCount} anuncios</strong>
+          ${pmaState.calendarFilterPropertyId ? `<button onclick="pmaState.calendarFilterPropertyId=null;pmRender()" class="text-[10px] text-blue-600 hover:underline">↩ Todas</button>` : ''}
         </div>
-      ` : ''}
-
-      ${!allUnits.length ? `
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
-          <div class="text-4xl mb-2">📅</div>
-          <div class="text-sm text-slate-600">Sin unidades para mostrar. Cargá propiedades y unidades primero.</div>
-        </div>
-      ` : ''}
-
-      <!-- Timeline por cada propiedad -->
-      ${Object.entries(byProperty).map(([propId, units]) => {
-        const p = pmaState.properties.find(x => x.id === propId);
-        if (!p) return '';
-        let propLost = 0, propEmpty = 0, propOccSum = 0, propTotalSum = 0;
-        units.forEach(u => {
-          const c = pmCalcUnitGaps(u, pmaState.calendarYear);
-          propLost += c.lostRevenue;
-          propEmpty += c.totalEmpty;
-          propOccSum += c.occupiedCount;
-          propTotalSum += c.totalDays;
-        });
-        const propOccPct = propTotalSum ? Math.round(100 * propOccSum / propTotalSum) : 0;
-        const colorPct = propOccPct >= 80 ? 'text-emerald-600' : propOccPct >= 50 ? 'text-amber-600' : 'text-red-600';
-        return `
-          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="px-4 py-3 bg-slate-100 flex items-center justify-between flex-wrap gap-2">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-sm">🏠</span>
-                  <strong class="text-sm text-slate-900 truncate">${(p.name||'').replace(/</g,'&lt;')}</strong>
-                  <span class="text-[10px] bg-slate-700 text-white px-1.5 py-0.5 rounded font-bold">${units.length}u</span>
-                  <span class="text-sm font-bold ${colorPct}">${propOccPct}%</span>
-                </div>
-                ${propEmpty > 0 ? `<div class="text-[11px] text-red-700 mt-0.5">⚠️ ${propEmpty} días vacíos — ~$${propLost.toLocaleString()} perdidos</div>` : `<div class="text-[11px] text-emerald-700 mt-0.5">✓ Sin huecos detectados</div>`}
-              </div>
-              <div class="flex gap-1">
-                ${!focusedProp ? `<button onclick="pmaState.calendarFilterPropertyId='${p.id}';pmRender()" class="text-[11px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1 rounded" title="Ver solo esta propiedad en el calendario">🔍 Enfocar</button>` : ''}
-                <button onclick="pmaState.tab='properties';pmaState.expandedProperties=pmaState.expandedProperties||new Set();pmaState.expandedProperties.add('${p.id}');pmRender()" class="text-[11px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-3 py-1 rounded">Detalle →</button>
+        <input oninput="pmaState.calendarListingSearch=this.value;pmRender()" value="${(pmaState.calendarListingSearch||'').replace(/"/g,'&quot;')}" placeholder="🔍 Busca los anuncios..." class="w-full border border-slate-300 rounded-full px-3 py-1.5 text-xs"/>
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        ${filteredUnits.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin resultados</div>' : filteredUnits.map(u => {
+          const p = pmaState.properties.find(x => x.id === u.property_id);
+          const active = pmActiveBookingOf(u.id);
+          const dotColor = active ? 'bg-emerald-500' : 'bg-slate-300';
+          const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
+          return `<button onclick="pmaState.calendarSelectedUnitId='${u.id}';pmRender()" class="w-full px-3 py-2.5 hover:bg-white border-b border-slate-100 flex items-center gap-2 text-left transition">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-lg flex-shrink-0">${icon}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs font-bold text-slate-900 truncate">${(u.name||u.code||'').replace(/</g,'&lt;')}</div>
+              <div class="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                <span class="${dotColor} w-1.5 h-1.5 rounded-full inline-block"></span>
+                ${(p?.name||'—').replace(/</g,'&lt;').slice(0,30)}
               </div>
             </div>
-            ${view === 'month'
-              ? pmRenderMonthTimelineForUnits(units, pmaState.calendarYear, pmaState.calendarMonth)
-              : pmRenderTimelineForUnits(units, pmaState.calendarYear)
-            }
+          </button>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function pmRenderTimelineHeader() {
+  const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const start = new Date(pmaState.calendarTimelineStart + 'T00:00:00');
+  const monthLabel = `${months[start.getMonth()]} de ${start.getFullYear()}`;
+  return `
+    <div class="border-b border-slate-200 bg-white px-3 py-2 flex items-center justify-between flex-wrap gap-2 sticky top-0 z-20">
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <button onclick="pmaState.calendarMonthDatePickerOpen=!pmaState.calendarMonthDatePickerOpen;pmRender()" class="bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-bold flex items-center gap-2 hover:bg-slate-50">${monthLabel} <span class="text-slate-400">▾</span></button>
+          ${pmaState.calendarMonthDatePickerOpen ? pmRenderDatePicker() : ''}
+        </div>
+        <button onclick="pmCalTimelineToday()" class="bg-white border border-slate-300 rounded px-3 py-1.5 text-sm font-bold hover:bg-slate-50">Hoy</button>
+      </div>
+      <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva reserva</button>
+    </div>
+  `;
+}
+
+function pmRenderDatePicker() {
+  const start = new Date(pmaState.calendarTimelineStart + 'T00:00:00');
+  const year = start.getFullYear();
+  const month = start.getMonth();
+  const monthFirstDay = new Date(year, month, 1).getDay();
+  const monthDays = new Date(year, month + 1, 0).getDate();
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const offset = (monthFirstDay + 6) % 7;
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= monthDays; d++) cells.push(d);
+  return `
+    <div class="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-30" style="width:280px;" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between mb-2">
+        <button onclick="pmDpNav(-1)" class="text-slate-500 hover:text-slate-900 px-2 py-1">←</button>
+        <strong class="text-sm">${monthNames[month]} ${year}</strong>
+        <button onclick="pmDpNav(1)" class="text-slate-500 hover:text-slate-900 px-2 py-1">→</button>
+      </div>
+      <div class="grid grid-cols-7 gap-1 text-[10px] font-bold text-slate-500 text-center mb-1">
+        <div>L</div><div>Ma</div><div>Mi</div><div>J</div><div>V</div><div>S</div><div>D</div>
+      </div>
+      <div class="grid grid-cols-7 gap-1 text-xs">
+        ${cells.map(d => d ? `<button onclick="pmDpPick(${year},${month},${d})" class="w-full aspect-square hover:bg-emerald-100 rounded text-center">${d}</button>` : '<div></div>').join('')}
+      </div>
+    </div>
+  `;
+}
+
+function pmDpNav(delta) {
+  const start = new Date(pmaState.calendarTimelineStart + 'T00:00:00');
+  start.setMonth(start.getMonth() + delta);
+  pmaState.calendarTimelineStart = start.toISOString().slice(0,10);
+  pmRender();
+}
+function pmDpPick(year, month, day) {
+  pmaState.calendarTimelineStart = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  pmaState.calendarMonthDatePickerOpen = false;
+  pmRender();
+}
+function pmCalTimelineToday() {
+  pmaState.calendarTimelineStart = new Date().toISOString().slice(0,10);
+  pmRender();
+}
+window.pmDpNav = pmDpNav;
+window.pmDpPick = pmDpPick;
+window.pmCalTimelineToday = pmCalTimelineToday;
+
+function pmRenderTimelineGrid(units) {
+  if (!units.length) return '<div class="p-8 text-center text-slate-400 text-sm">Sin unidades para mostrar.</div>';
+  const colW = 55;
+  const startDate = new Date(pmaState.calendarTimelineStart + 'T00:00:00');
+  const daysCount = pmaState.calendarTimelineDays;
+  const days = Array.from({ length: daysCount }, (_, i) => {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayIdx = days.findIndex(d => d.getTime() === today.getTime());
+  const dows = ['D','L','Ma','Mi','J','V','S'];
+  const monthLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  return `
+    <div style="position:relative;">
+      <div style="min-width:${daysCount * colW}px;">
+        <div class="flex sticky top-0 bg-white border-b-2 border-slate-200 z-10" style="height:60px;">
+          ${days.map((d, i) => {
+            const isToday = i === todayIdx;
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            const showMonth = i === 0 || d.getDate() === 1;
+            return `<div style="width:${colW}px;border-right:1px solid #f1f5f9;${isWeekend?'background:#fafafa;':''}${isToday?'background:#fee2e2;':''};padding:6px 0;text-align:center;">
+              ${showMonth ? `<div style="font-size:9px;color:#64748b;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
+              <div style="font-size:10px;color:#94a3b8;">${dows[d.getDay()]}</div>
+              <div style="font-size:13px;${isToday?'color:#dc2626;font-weight:bold;':'color:#334155;'}">${d.getDate()}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${units.map(unit => {
+          const bks = pmBookingsOf(unit.id).filter(b => {
+            if (!b.start_date) return false;
+            if (!['activo','confirmado','finalizado','vencido'].includes(b.status)) return false;
+            const s = new Date(b.start_date + 'T00:00:00');
+            const e = b.end_date ? new Date(b.end_date + 'T00:00:00') : new Date(s.getTime() + 365*86400000);
+            return s <= days[daysCount-1] && e >= days[0];
+          });
+          return `<div class="flex relative hover:bg-slate-50 transition" style="border-bottom:1px solid #f1f5f9;height:50px;">
+            ${days.map((d, i) => {
+              const isToday = i === todayIdx;
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+              return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})" style="width:${colW}px;border-right:1px solid #f1f5f9;${isWeekend?'background:#fafbfc;':''}${isToday?'background:rgba(254,226,226,0.4);':''};cursor:pointer;background-image:linear-gradient(135deg,transparent 49.5%,#e2e8f0 49.5%,#e2e8f0 50.5%,transparent 50.5%);"></div>`;
+            }).join('')}
+            ${bks.map(b => {
+              const s = new Date(b.start_date + 'T00:00:00');
+              const e = b.end_date ? new Date(b.end_date + 'T00:00:00') : new Date(s.getTime() + 365*86400000);
+              const startIdx = Math.max(0, Math.floor((s - days[0]) / 86400000));
+              const endIdx = Math.min(daysCount - 1, Math.floor((e - days[0]) / 86400000));
+              const leftPx = startIdx * colW + 2;
+              const widthPx = (endIdx - startIdx + 1) * colW - 4;
+              const colorByType = {contrato_directo:'#10b981',airbnb:'#14b8a6',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#64748b'};
+              const bg = colorByType[b.booking_type] || colorByType.otro;
+              const isPast = b.end_date && new Date(b.end_date) < today;
+              const opacity = isPast ? 0.7 : 1;
+              const tenant = pmTenantName(b.tenant_id);
+              const isSelected = pmaState.calendarSelectedBookingId === b.id;
+              return `<div onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${b.id}';pmRender()" style="position:absolute;left:${leftPx}px;width:${widthPx}px;top:8px;bottom:8px;background:${bg};opacity:${opacity};border-radius:4px;padding:0 10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;box-shadow:${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 2px rgba(0,0,0,0.15);overflow:hidden;z-index:1;" title="${tenant}">
+                <span style="color:white;font-size:11px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${tenant} \$${Number(b.rent_amount||0).toLocaleString()}</span>
+                ${isPast ? '<span style="color:rgba(255,255,255,0.85);font-size:9px;font-weight:bold;">Huésped anterior</span>' : ''}
+              </div>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function pmCalTimelineShift(deltaDays) {
+  const start = new Date(pmaState.calendarTimelineStart + 'T00:00:00');
+  start.setDate(start.getDate() + deltaDays);
+  pmaState.calendarTimelineStart = start.toISOString().slice(0,10);
+  pmRender();
+}
+window.pmCalTimelineShift = pmCalTimelineShift;
+
+function pmRenderBookingSidePanel(bookingId) {
+  const b = pmaState.bookings.find(x => x.id === bookingId);
+  if (!b) return '';
+  const tenant = pmaState.tenants.find(t => t.id === b.tenant_id);
+  const unit = pmaState.units.find(u => u.id === b.unit_id);
+  const property = pmaState.properties.find(p => p.id === b.property_id);
+  const dur = (b.start_date && b.end_date) ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1 : null;
+  const isPast = b.end_date && new Date(b.end_date) < new Date();
+  const tagLabel = isPast ? 'Huésped anterior' : (b.status === 'confirmado' ? 'Próximo huésped' : 'Huésped actual');
+  const tagColor = isPast ? 'bg-slate-200 text-slate-700' : (b.status === 'confirmado' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800');
+  const platformLabel = {contrato_directo:'Contrato directo',airbnb:'Airbnb',vrbo:'VRBO',booking:'Booking',hospitable:'Hospitable',padsplit:'Padsplit',reserva_corta:'Reserva corta',otro:'Otro'}[b.booking_type] || b.booking_type;
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
+  return `
+    <div class="border-l border-slate-200 bg-white flex flex-col" style="width:340px;flex-shrink:0;overflow-y:auto;">
+      <div class="p-3 flex items-start justify-between border-b border-slate-200">
+        <button onclick="pmaState.calendarSelectedBookingId=null;pmRender()" class="text-slate-500 hover:text-slate-900 text-xl font-bold">×</button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div>
+          <h3 class="text-xl font-bold text-slate-900">Reservación</h3>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+            <span class="${tagColor} px-2 py-0.5 rounded font-bold uppercase text-[9px]">${tagLabel}</span>
+            <span>· ${dur||'—'} ${dur===1?'noche':'noches'}</span>
+            <span>· ${platformLabel}</span>
           </div>
-        `;
-      }).join('')}
+        </div>
+        <div class="flex items-center gap-3 py-3 border-y border-slate-100">
+          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 text-white flex items-center justify-center font-bold text-lg">${(tenant?.full_name||'?').charAt(0).toUpperCase()}</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-sm text-slate-900 truncate">${(tenant?.full_name || 'Sin inquilino').replace(/</g,'&lt;')}</div>
+            <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+              ${tenant?.phone ? `<a href="https://wa.me/${tenant.phone.replace(/\D/g,'')}" target="_blank" class="text-emerald-600 hover:underline">💬 WhatsApp</a>` : ''}
+              ${tenant?.email ? `<a href="mailto:${tenant.email}" class="text-blue-600 hover:underline">📧 Email</a>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between py-2 border-b border-slate-100"><span class="text-slate-500">Llegada</span><strong class="text-slate-900">${fmtDate(b.start_date)}</strong></div>
+          <div class="flex justify-between py-2 border-b border-slate-100"><span class="text-slate-500">Salida</span><strong class="text-slate-900">${fmtDate(b.end_date) || '∞'}</strong></div>
+          <div class="flex justify-between py-2 border-b border-slate-100"><span class="text-slate-500">Renta</span><strong class="text-emerald-700">\$${Number(b.rent_amount||0).toLocaleString()}/${b.rent_period||'mes'}</strong></div>
+          ${b.deposit ? `<div class="flex justify-between py-2 border-b border-slate-100"><span class="text-slate-500">Depósito</span><strong class="text-slate-900">\$${Number(b.deposit).toLocaleString()}</strong></div>` : ''}
+          <div class="flex justify-between py-2 border-b border-slate-100"><span class="text-slate-500">Propiedad</span><span class="text-slate-700 text-right text-xs">${(property?.name||'—').replace(/</g,'&lt;')}</span></div>
+          <div class="flex justify-between py-2 border-b border-slate-100"><span class="text-slate-500">Unidad</span><span class="text-slate-700 text-right text-xs"><span class="font-mono bg-slate-100 px-1 rounded">${(unit?.code||'—').replace(/</g,'&lt;')}</span></span></div>
+        </div>
+        ${b.notes ? `<div class="bg-slate-50 border border-slate-200 rounded p-2 text-xs"><div class="font-bold text-slate-700 mb-1">Notas</div><div class="text-slate-600 whitespace-pre-wrap">${(b.notes||'').replace(/</g,'&lt;')}</div></div>` : ''}
+        <button onclick="pmaState.calendarSelectedBookingId=null;pmEditBooking('${b.id}')" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3 rounded-lg">Ver itinerario completo</button>
+        ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="block text-center w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 font-bold text-sm py-2 rounded-lg">📄 Ver contrato</a>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function pmRenderSingleListing(unit, allUnits) {
+  const property = pmaState.properties.find(p => p.id === unit.property_id);
+  const monthsToShow = [
+    { year: pmaState.calendarYear, month: pmaState.calendarMonth },
+    { year: pmaState.calendarMonth === 11 ? pmaState.calendarYear + 1 : pmaState.calendarYear, month: (pmaState.calendarMonth + 1) % 12 }
+  ];
+  const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `
+    <div class="flex bg-white" style="height: calc(75vh - 60px); margin: -4px;">
+      <div class="border-r border-slate-200 bg-white flex flex-col" style="width:90px;flex-shrink:0;overflow-y:auto;">
+        ${allUnits.map(u => {
+          const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
+          const isSelected = u.id === unit.id;
+          return `<button onclick="pmaState.calendarSelectedUnitId='${u.id}';pmRender()" class="w-full p-2 hover:bg-slate-50 border-b border-slate-100 flex flex-col items-center gap-1 transition ${isSelected?'bg-slate-100':''}">
+            <div class="w-14 h-14 rounded-lg bg-gradient-to-br ${isSelected?'from-emerald-500 to-emerald-700 ring-2 ring-emerald-400':'from-slate-700 to-slate-900'} text-white flex items-center justify-center text-2xl flex-shrink-0">${icon}</div>
+            <div class="text-[9px] text-slate-600 truncate w-full text-center">${(u.code||'').replace(/</g,'&lt;')}</div>
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="border-b border-slate-200 px-5 py-3 flex items-center justify-between sticky top-0 bg-white z-20">
+          <div class="flex items-center gap-3">
+            <button onclick="pmaState.calendarSelectedUnitId=null;pmRender()" class="text-slate-500 hover:text-slate-900 text-sm font-bold">↩ Volver</button>
+            <div>
+              <div class="text-xs text-slate-500">Anuncio</div>
+              <div class="font-bold text-slate-900">${(property?.name||'').replace(/</g,'&lt;')} · ${(unit.name||unit.code||'').replace(/</g,'&lt;')}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="pmCalSingleNavMonth(-1)" class="bg-white border border-slate-300 rounded-full w-9 h-9 hover:bg-slate-50 text-sm font-bold">←</button>
+            <button onclick="pmaState.calendarMonth=new Date().getMonth();pmaState.calendarYear=new Date().getFullYear();pmRender()" class="bg-white border border-slate-300 rounded px-3 py-2 hover:bg-slate-50 text-xs font-bold">Hoy</button>
+            <button onclick="pmCalSingleNavMonth(1)" class="bg-white border border-slate-300 rounded-full w-9 h-9 hover:bg-slate-50 text-sm font-bold">→</button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-5 space-y-8">
+          ${monthsToShow.map(({year, month}) => pmRenderMonthAirbnbStyle(unit, year, month, monthNames)).join('')}
+        </div>
+      </div>
+      <div class="border-l border-slate-200 bg-white p-4 flex flex-col" style="width:280px;flex-shrink:0;overflow-y:auto;">
+        <h3 class="text-lg font-bold text-slate-900 mb-3">${(unit.name||unit.code||'').replace(/</g,'&lt;')}</h3>
+        <div class="space-y-2 text-sm">
+          <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Renta objetivo</div><div class="text-emerald-700 font-bold text-lg">\$${Number(unit.target_rent||0).toLocaleString()}</div><div class="text-[10px] text-slate-500">por mes</div></div>
+          <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Tipo</div><div class="text-sm">${unit.unit_type==='casa_completa'?'🏡 Casa completa':unit.unit_type==='estudio'?'🎨 Estudio':unit.unit_type==='apartamento'?'🏢 Apartamento':'🛏 Habitación'}</div></div>
+          ${unit.bath_type ? `<div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Baño</div><div class="text-sm capitalize">${unit.bath_type.replace(/_/g,' ')}</div></div>` : ''}
+          <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Código</div><div class="text-sm font-mono bg-slate-100 px-2 py-1 rounded inline-block">${(unit.code||'—').replace(/</g,'&lt;')}</div></div>
+          <div><div class="text-[10px] uppercase text-slate-500 font-bold">Propiedad</div><div class="text-xs text-slate-700">${(property?.name||'—').replace(/</g,'&lt;')}</div><div class="text-[10px] text-slate-500">${(property?.address||'').replace(/</g,'&lt;')}</div></div>
+        </div>
+        <div class="mt-4 space-y-2">
+          <button onclick="pmEditUnit('${unit.id}','${unit.property_id}')" class="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 text-xs font-bold py-2 rounded">✏️ Editar unidad</button>
+          <button onclick="pmEditBooking(null,'${unit.id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded">+ Nueva reserva</button>
+        </div>
+      </div>
+      ${pmaState.calendarSelectedBookingId ? pmRenderBookingSidePanel(pmaState.calendarSelectedBookingId) : ''}
+    </div>
+  `;
+}
+
+function pmCalSingleNavMonth(delta) {
+  let m = pmaState.calendarMonth + delta;
+  let y = pmaState.calendarYear;
+  while (m < 0) { m += 12; y -= 1; }
+  while (m > 11) { m -= 12; y += 1; }
+  pmaState.calendarMonth = m;
+  pmaState.calendarYear = y;
+  pmRender();
+}
+window.pmCalSingleNavMonth = pmCalSingleNavMonth;
+
+function pmRenderMonthAirbnbStyle(unit, year, month, monthNames) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysCount = lastDay.getDate();
+  const offset = (firstDay.getDay() + 6) % 7;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= daysCount; d++) cells.push(d);
+  const bks = pmBookingsOf(unit.id).filter(b => {
+    if (!['activo','confirmado','finalizado','vencido'].includes(b.status)) return false;
+    if (!b.start_date) return false;
+    const s = new Date(b.start_date);
+    const e = b.end_date ? new Date(b.end_date) : firstDay;
+    return s <= lastDay && e >= firstDay;
+  });
+  return `
+    <div>
+      <h2 class="text-3xl font-bold text-slate-900 mb-3 lowercase">${monthNames[month]}</h2>
+      <div class="grid grid-cols-7 gap-1 text-[11px] font-bold text-slate-500 mb-2">
+        <div class="text-center">lun.</div><div class="text-center">mar.</div><div class="text-center">mié.</div><div class="text-center">jue.</div><div class="text-center">vie.</div><div class="text-center">sáb.</div><div class="text-center">dom.</div>
+      </div>
+      <div class="grid grid-cols-7 gap-1">
+        ${cells.map(d => {
+          if (!d) return '<div></div>';
+          const dt = new Date(year, month, d);
+          const isPast = dt < today;
+          const isToday = dt.getTime() === today.getTime();
+          const bk = bks.find(b => {
+            const s = new Date(b.start_date);
+            const e = b.end_date ? new Date(b.end_date) : firstDay;
+            return dt >= s && dt <= e;
+          });
+          const colorByType = {contrato_directo:'bg-emerald-500 text-white',airbnb:'bg-rose-500 text-white',booking:'bg-blue-500 text-white',padsplit:'bg-violet-500 text-white',otro:'bg-slate-500 text-white'};
+          const bg = bk ? (colorByType[bk.booking_type] || colorByType.otro) : 'bg-white border-2 border-slate-100';
+          const textStyle = isPast && !bk ? 'text-slate-300 line-through' : 'text-slate-700';
+          return `<button onclick="${bk ? `pmaState.calendarSelectedBookingId='${bk.id}';pmRender()` : `pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})`}" class="aspect-square rounded-lg ${bg} ${isToday?'ring-2 ring-red-500 ring-offset-1':''} hover:shadow flex flex-col items-center justify-center transition cursor-pointer">
+            <div class="text-sm font-bold ${bk?'text-white':textStyle}">${d}</div>
+            ${unit.target_rent && !bk ? `<div class="text-[9px] ${isPast?'text-slate-300':'text-slate-500'}">\$${Math.round(unit.target_rent/30)}</div>` : ''}
+          </button>`;
+        }).join('')}
+      </div>
     </div>
   `;
 }
