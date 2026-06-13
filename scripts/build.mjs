@@ -49,7 +49,9 @@ const BUNDLE_FILES = [
   "edu/edu-calendar.js",
   "edu/edu-reports.js",
   "edu/edu-ceo-dashboard.js",
-  "edu-whatsapp.js"
+  "edu-whatsapp.js",
+  // 🆕 Property Management module
+  "pm/pm-main.js"
 ];
 
 // Archivos que se copian tal cual (no van al bundle)
