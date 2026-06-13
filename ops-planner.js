@@ -2713,9 +2713,7 @@ async function opApplyTemplate(templateId) {
   const { error } = await sb.from('ops_day_tasks').insert(rows);
   if (error) return alert('Error: ' + error.message);
   await opRefocusPlanner();
-    opRender();
-    alert(`✅ ${rows.length} tareas agregadas al ${opState.date}.`);
-  }, 100);
+  alert(`✅ ${rows.length} tareas agregadas al ${opState.date}.`);
 }
 
 // Editar plantilla (nombre, descripción)
