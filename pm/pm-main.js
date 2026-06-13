@@ -162,14 +162,16 @@ window.pmSetTab = pmSetTab;
 // ════════════════════════════════════════════════════════════════
 function pmRenderPropertiesList() {
   const props = pmaState.properties;
+  pmaState.expandedProperties = pmaState.expandedProperties || new Set();
   return `
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-xs uppercase font-bold text-slate-500">${props.length} propiedades · ${pmaState.units.length} unidades</div>
+          <div class="text-base font-bold text-slate-900">${props.length} propiedades — Click para ver unidades</div>
+          <div class="text-xs text-slate-500">${pmaState.units.length} unidades totales · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
         </div>
         <div class="flex gap-2">
-          <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">📥 Importar de Airtable</button>
+          <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Sync Airtable</button>
           <button onclick="pmEditProperty(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Propiedad</button>
         </div>
       </div>
@@ -181,50 +183,178 @@ function pmRenderPropertiesList() {
           <button onclick="pmEditProperty(null)" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded">+ Nueva Propiedad</button>
         </div>
       ` : `
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          ${props.map(p => {
-            const occ = pmOccupancyOf(p.id);
-            const fin = pmFinanceOf(p.id);
-            const units = pmUnitsOf(p.id);
-            const color = occ.pct >= 80 ? 'emerald' : occ.pct >= 50 ? 'amber' : 'red';
-            return `
-              <div class="bg-white border border-slate-200 hover:border-emerald-400 rounded-xl overflow-hidden cursor-pointer transition shadow-sm hover:shadow-md" onclick="pmSelectProperty('${p.id}')">
-                <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white px-4 py-3">
-                  <div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">${p.rental_model || 'mixto'}</div>
-                  <div class="font-bold text-sm mt-0.5 truncate">${(p.name||'').replace(/</g,'&lt;')}</div>
-                  <div class="text-[11px] text-slate-300 truncate">${(p.address||'').replace(/</g,'&lt;')}</div>
-                </div>
-                <div class="p-3 space-y-2">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-600">Ocupación</span>
-                    <strong class="text-${color}-700">${occ.occupied}/${occ.total} · ${occ.pct}%</strong>
-                  </div>
-                  <div class="w-full bg-slate-100 rounded-full h-2">
-                    <div class="bg-${color}-500 h-2 rounded-full transition-all" style="width:${occ.pct}%"></div>
-                  </div>
-                  <div class="grid grid-cols-3 gap-1 pt-2 border-t border-slate-100">
-                    <div class="text-center">
-                      <div class="text-[9px] text-slate-500 uppercase">Unidades</div>
-                      <div class="text-sm font-bold text-slate-900">${units.length}</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="text-[9px] text-slate-500 uppercase">Ingresos</div>
-                      <div class="text-sm font-bold text-emerald-700">$${Math.round(fin.ingresos).toLocaleString()}</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="text-[9px] text-slate-500 uppercase">Utilidad</div>
-                      <div class="text-sm font-bold ${fin.utilidad>=0?'text-emerald-700':'text-red-700'}">$${Math.round(fin.utilidad).toLocaleString()}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            `;
-          }).join('')}
+        <div class="space-y-2">
+          ${props.map(p => pmRenderPropertyCardInline(p)).join('')}
         </div>
       `}
     </div>
   `;
 }
+
+// Card expandible inline — estilo RentasPro
+function pmRenderPropertyCardInline(p) {
+  const expanded = pmaState.expandedProperties.has(p.id);
+  const units = pmUnitsOf(p.id);
+  const occupiedUnits = units.filter(u => pmActiveBookingOf(u.id));
+  const reservedUnits = units.filter(u => pmaState.bookings.find(b => b.unit_id === u.id && b.status === 'confirmado'));
+  const maintenanceUnits = units.filter(u => u.maintenance_status === 'en_mantenimiento' || u.is_active === false);
+  const freeUnits = Math.max(0, units.length - occupiedUnits.length - reservedUnits.length - maintenanceUnits.length);
+  const potentialMo = units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
+  const modelLabel = p.rental_model === 'casa_completa' ? '🏡 Casa Completa'
+                   : p.rental_model === 'por_habitaciones' ? '🛏 Habitaciones'
+                   : p.rental_model === 'por_estudios' ? '🎨 Estudios'
+                   : p.rental_model === 'por_apartamentos' ? '🏢 Apartamentos'
+                   : '🔀 Mixto';
+
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden ${expanded?'ring-2 ring-emerald-200':''}">
+      <!-- Header colapsado -->
+      <div class="px-4 py-3 cursor-pointer hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap" onclick="pmToggleExpandProperty('${p.id}')">
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+          <span class="text-slate-400 text-sm">${expanded?'▼':'▶'}</span>
+          <span class="text-2xl">🏠</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <strong class="text-sm text-slate-900 truncate">${(p.name||'').replace(/</g,'&lt;')}</strong>
+              <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase font-bold">${p.status||'activa'}</span>
+            </div>
+            <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
+              <span>📍 ${(p.address||'').replace(/</g,'&lt;')}</span>
+              ${p.zone ? `<span>· ${p.zone}</span>` : ''}
+              ${units.length ? `<span>· 🛏 ${units.length} unid.</span>` : ''}
+              ${p.sqft ? `<span>· ${p.sqft} sqft</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 text-right flex-shrink-0">
+          <div class="hidden md:block">
+            <div class="text-[9px] uppercase text-slate-500 font-bold">${modelLabel}</div>
+            <div class="text-[11px] text-slate-700">
+              ${units.length} unid · ${occupiedUnits.length} inq · $${potentialMo.toLocaleString()}/mes
+            </div>
+          </div>
+          <button onclick="event.stopPropagation();pmEditProperty('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1" title="Editar">✏️</button>
+          <button onclick="event.stopPropagation();pmDeleteProperty('${p.id}')" class="text-slate-400 hover:text-red-600 p-1" title="Eliminar">🗑</button>
+        </div>
+      </div>
+
+      ${expanded ? `
+        <div class="border-t border-slate-200 bg-slate-50/50 p-4 space-y-3">
+          <!-- TRAZABILIDAD: chips de unidades -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-[10px] uppercase font-bold text-slate-700 tracking-wider">● Trazabilidad</div>
+              <div class="text-[10px] text-slate-500">${units.filter(u=>u.is_active!==false).length} de ${units.length} activas</div>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              ${units.length ? units.map(u => {
+                const active = pmActiveBookingOf(u.id);
+                const reserved = pmaState.bookings.find(b => b.unit_id === u.id && b.status === 'confirmado');
+                const isMaint = u.maintenance_status === 'en_mantenimiento';
+                const isInactive = u.is_active === false;
+                const stateLabel = isMaint?'MANTEN.':isInactive?'INACTIVA':active?'ACTIVO':reserved?'RESERVADA':'LIBRE';
+                const stateColor = isMaint?'bg-amber-100 text-amber-800 border-amber-300':isInactive?'bg-slate-100 text-slate-600 border-slate-300':active?'bg-emerald-100 text-emerald-800 border-emerald-300':reserved?'bg-blue-100 text-blue-800 border-blue-300':'bg-red-50 text-red-700 border-red-200';
+                const dot = isMaint?'bg-amber-500':isInactive?'bg-slate-400':active?'bg-emerald-500':reserved?'bg-blue-500':'bg-red-400';
+                const icon = u.unit_type==='casa_completa'?'🏠':u.unit_type==='estudio'?'🎨':u.unit_type==='apartamento'?'🏢':'🛏';
+                return `<button onclick="pmEditUnit('${u.id}','${p.id}')" class="inline-flex items-center gap-1.5 ${stateColor} border text-[11px] font-bold px-2 py-1 rounded hover:shadow-sm transition">
+                  <span class="${dot} w-1.5 h-1.5 rounded-full"></span>
+                  <span>${icon} ${(u.code||'').replace(/</g,'&lt;')} - ${(u.name||u.code||'').replace(/</g,'&lt;')}</span>
+                  <span class="text-[9px] opacity-70">${stateLabel}</span>
+                </button>`;
+              }).join('') : '<div class="text-xs text-slate-400 italic">Sin unidades. Agregá la primera con el botón + Agregar Unidad.</div>'}
+            </div>
+          </div>
+
+          <!-- LISTA UNIDADES con detalle -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-[10px] uppercase font-bold text-slate-700 tracking-wider">⚙️ Unidades (${units.length})</div>
+              <button onclick="pmEditUnit(null,'${p.id}')" class="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold">+ Agregar Unidad</button>
+            </div>
+            <div class="space-y-1.5">
+              ${units.map(u => pmRenderUnitRow(u, p)).join('') || '<div class="text-xs text-slate-400 italic px-2 py-3 text-center bg-white rounded">Sin unidades.</div>'}
+            </div>
+          </div>
+
+          <!-- FOOTER con stats -->
+          <div class="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-slate-200">
+            <div class="flex items-center gap-3 text-xs flex-wrap">
+              <span class="flex items-center gap-1"><span class="bg-emerald-500 w-2 h-2 rounded-full"></span> <strong>${occupiedUnits.length}</strong> ocupadas</span>
+              <span class="flex items-center gap-1"><span class="bg-red-400 w-2 h-2 rounded-full"></span> <strong>${freeUnits}</strong> libres</span>
+              <span class="flex items-center gap-1"><span class="bg-blue-500 w-2 h-2 rounded-full"></span> <strong>${reservedUnits.length}</strong> reservadas</span>
+              <span class="flex items-center gap-1"><span class="bg-amber-500 w-2 h-2 rounded-full"></span> <strong>${maintenanceUnits.length}</strong> mant.</span>
+            </div>
+            <div class="text-xs">
+              <span class="text-slate-500">Potencial:</span> <strong class="text-emerald-700">$${potentialMo.toLocaleString()}/mes</strong>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function pmRenderUnitRow(u, p) {
+  const active = pmActiveBookingOf(u.id);
+  const reserved = pmaState.bookings.find(b => b.unit_id === u.id && b.status === 'confirmado');
+  const isMaint = u.maintenance_status === 'en_mantenimiento';
+  const isInactive = u.is_active === false;
+  const state = isMaint?'mantenimiento':isInactive?'inactiva':active?'ocupada':reserved?'reservada':'libre';
+  const stateLabel = state.charAt(0).toUpperCase()+state.slice(1);
+  const stateColor = isMaint?'bg-amber-100 text-amber-800':isInactive?'bg-slate-100 text-slate-600':active?'bg-emerald-100 text-emerald-800':reserved?'bg-blue-100 text-blue-800':'bg-red-50 text-red-700';
+  const borderColor = isMaint?'border-l-amber-500':isInactive?'border-l-slate-400':active?'border-l-emerald-500':reserved?'border-l-blue-500':'border-l-red-400';
+  const icon = u.unit_type==='casa_completa'?'🏠':u.unit_type==='estudio'?'🎨':u.unit_type==='apartamento'?'🏢':'🛏';
+  const typeLabel = u.unit_type==='casa_completa'?'Casa Completa':u.unit_type==='estudio'?'Estudio':u.unit_type==='apartamento'?'Apartamento':'Habitación';
+  const isOn = u.is_active !== false;
+  return `
+    <div class="bg-white border border-slate-200 border-l-4 ${borderColor} rounded p-2.5 hover:shadow-sm transition">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-xl">${icon}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <strong class="text-sm text-slate-900">${(u.code||'').replace(/</g,'&lt;')} - ${(u.name||u.code||'').replace(/</g,'&lt;')}</strong>
+            <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-semibold">${typeLabel}</span>
+            <span class="text-[10px] ${stateColor} px-1.5 py-0.5 rounded font-bold uppercase">${stateLabel}</span>
+          </div>
+          <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
+            ${u.bath_type ? `<span>${u.bath_type === 'compartido'?'Compartido':u.bath_type==='privado'?'Privado':u.bath_type==='privado_compartido'?'Privado+Compartido':u.bath_type} baño</span>` : ''}
+            ${active ? `<span>· 👤 ${pmTenantName(active.tenant_id)}</span>` : ''}
+            ${active && active.end_date ? `<span>· vence ${active.end_date}</span>` : ''}
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="text-right">
+            <div class="text-sm font-bold text-emerald-700">$${Number(u.target_rent||0).toLocaleString()}</div>
+            <div class="text-[9px] text-slate-500 uppercase">Mensual</div>
+          </div>
+          <button onclick="pmToggleUnitActive('${u.id}', ${!isOn})" class="relative inline-flex h-5 w-9 rounded-full transition ${isOn?'bg-emerald-500':'bg-slate-300'}" title="${isOn?'Desactivar':'Activar'}">
+            <span class="absolute ${isOn?'right-0.5':'left-0.5'} top-0.5 h-4 w-4 rounded-full bg-white shadow transition"></span>
+          </button>
+          <button onclick="pmEditBooking(null,'${u.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold px-2 py-1 rounded" title="Nueva reserva">+ Reserva</button>
+          <button onclick="pmEditUnit('${u.id}','${p.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function pmToggleExpandProperty(id) {
+  pmaState.expandedProperties = pmaState.expandedProperties || new Set();
+  if (pmaState.expandedProperties.has(id)) pmaState.expandedProperties.delete(id);
+  else pmaState.expandedProperties.add(id);
+  pmRender();
+}
+window.pmToggleExpandProperty = pmToggleExpandProperty;
+
+async function pmToggleUnitActive(unitId, makeActive) {
+  try {
+    await sb.from('pm_units').update({ is_active: makeActive }).eq('id', unitId);
+    const u = pmaState.units.find(x => x.id === unitId);
+    if (u) u.is_active = makeActive;
+    pmRender();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+window.pmToggleUnitActive = pmToggleUnitActive;
 
 function pmSelectProperty(id) {
   pmaState.selectedPropertyId = id;
@@ -338,6 +468,49 @@ function pmRenderPropertyDetail() {
 // TIMELINE de ocupación tipo Airbnb (anual)
 // Filas = unidades. Columnas = días del año o meses.
 // ════════════════════════════════════════════════════════════════
+// Calcula huecos + ocupación + $ perdido para una unidad en un año
+function pmCalcUnitGaps(unit, year) {
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31);
+  const totalDays = Math.floor((yearEnd - yearStart) / 86400000) + 1;
+  const dailyRate = (Number(unit.target_rent) || 0) / 30;
+  // Construir set de días ocupados
+  const occupied = new Array(totalDays).fill(false);
+  const bks = pmBookingsOf(unit.id).filter(b =>
+    b.start_date && ['activo','confirmado','finalizado','vencido'].includes(b.status)
+  );
+  bks.forEach(b => {
+    const s = new Date(b.start_date);
+    const e = b.end_date ? new Date(b.end_date) : yearEnd;
+    const dStart = Math.max(0, Math.floor((s - yearStart) / 86400000));
+    const dEnd   = Math.min(totalDays - 1, Math.floor((e - yearStart) / 86400000));
+    for (let i = dStart; i <= dEnd; i++) occupied[i] = true;
+  });
+  // Detectar bloques contiguos de huecos
+  const gaps = [];
+  let curStart = null;
+  for (let i = 0; i < totalDays; i++) {
+    if (!occupied[i]) {
+      if (curStart === null) curStart = i;
+    } else if (curStart !== null) {
+      gaps.push({ startIdx: curStart, endIdx: i - 1 });
+      curStart = null;
+    }
+  }
+  if (curStart !== null) gaps.push({ startIdx: curStart, endIdx: totalDays - 1 });
+  const totalEmpty = gaps.reduce((s, g) => s + (g.endIdx - g.startIdx + 1), 0);
+  const occupiedCount = totalDays - totalEmpty;
+  const occPct = Math.round(100 * occupiedCount / totalDays);
+  const lostRevenue = Math.round(totalEmpty * dailyRate);
+  // Convertir gaps a {start, end, days} con fechas reales
+  const gapsDated = gaps.map(g => {
+    const ss = new Date(yearStart.getTime() + g.startIdx * 86400000);
+    const ee = new Date(yearStart.getTime() + g.endIdx * 86400000);
+    return { start: ss, end: ee, days: g.endIdx - g.startIdx + 1, lost: Math.round((g.endIdx - g.startIdx + 1) * dailyRate) };
+  });
+  return { occPct, totalDays, occupiedCount, totalEmpty, lostRevenue, gaps: gapsDated, bookings: bks };
+}
+
 function pmRenderTimelineForUnits(units, year) {
   if (!units.length) return '<div class="p-4 text-center text-slate-400 text-xs italic">Sin unidades para mostrar.</div>';
   const yearStart = new Date(year, 0, 1);
@@ -345,72 +518,96 @@ function pmRenderTimelineForUnits(units, year) {
   const totalDays = Math.floor((yearEnd - yearStart) / 86400000) + 1;
   const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-  // Posición de "hoy" como % del año
   const todayPct = (year === new Date().getFullYear())
     ? Math.max(0, Math.min(100, 100 * Math.floor((new Date() - yearStart) / 86400000) / totalDays))
     : null;
 
-  // Para cada unidad, sus bookings overlapeando el año
+  // Calcular gaps por unidad
   const rows = units.map(u => {
-    const bks = pmBookingsOf(u.id).filter(b => {
-      const start = b.start_date ? new Date(b.start_date) : null;
-      const end = b.end_date ? new Date(b.end_date) : null;
-      if (!start) return false;
-      if (start > yearEnd) return false;
-      if (end && end < yearStart) return false;
-      return ['activo','confirmado','vencido','finalizado'].includes(b.status);
-    });
-    return { unit: u, bks };
+    const calc = pmCalcUnitGaps(u, year);
+    return { unit: u, ...calc };
   });
+
+  const fmtDate = (d) => `${d.getDate()} ${months[d.getMonth()]}`;
 
   return `
     <div class="overflow-x-auto">
-      <div style="min-width:900px;">
-        <!-- Header meses -->
-        <div class="flex border-b border-slate-200" style="padding-left:200px;">
-          ${months.map(m => `<div class="text-[10px] text-slate-500 font-bold uppercase text-center" style="flex:1;border-right:1px solid #f1f5f9;padding:4px 0;">${m}</div>`).join('')}
-        </div>
-        <!-- Rows -->
-        ${rows.map(({unit, bks}, idx) => `
-          <div class="flex items-center border-b border-slate-100 hover:bg-slate-50" style="min-height:36px;">
-            <div class="flex items-center gap-2" style="width:200px;padding:6px 8px;">
-              <span class="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold font-mono">${unit.code}</span>
-              <span class="text-xs font-semibold text-slate-700 truncate">${(unit.name||unit.code).replace(/</g,'&lt;')}</span>
-            </div>
-            <div class="relative flex-1" style="height:32px;background:#fafafa;border-left:1px solid #f1f5f9;">
-              ${bks.map(b => {
-                const start = new Date(Math.max(yearStart, new Date(b.start_date)));
-                const end = new Date(Math.min(yearEnd, b.end_date ? new Date(b.end_date) : yearEnd));
-                const left = 100 * Math.floor((start - yearStart) / 86400000) / totalDays;
-                const width = Math.max(0.5, 100 * Math.floor((end - start) / 86400000) / totalDays);
-                const colorByType = {
-                  contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
-                  airbnb:            'background:linear-gradient(135deg,#f43f5e,#e11d48);',
-                  booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
-                  vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
-                  hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
-                  reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                  otro:              'background:linear-gradient(135deg,#64748b,#475569);'
-                };
-                const bg = colorByType[b.booking_type] || colorByType.otro;
-                const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.5 : 1;
-                const tenant = pmTenantName(b.tenant_id);
-                const tooltip = `${tenant}\n${b.start_date} → ${b.end_date||'∞'}\n$${Number(b.rent_amount||0).toLocaleString()}/${b.rent_period}\n[${b.booking_type}]`;
-                return `<div onclick="event.stopPropagation();pmEditBooking('${b.id}')" title="${tooltip.replace(/"/g,'&quot;')}" style="position:absolute;left:${left}%;width:${width}%;top:4px;bottom:4px;${bg};opacity:${opacity};border-radius:4px;padding:0 4px;display:flex;align-items:center;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.2);">
-                  <span style="color:white;font-size:10px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${tenant.split(' ')[0]||'·'}</span>
-                </div>`;
-              }).join('')}
-              ${todayPct !== null ? `<div style="position:absolute;left:${todayPct}%;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;" title="Hoy"></div>` : ''}
-            </div>
+      <div style="min-width:1000px;">
+        <!-- Header con columnas: UNIDAD | % | meses -->
+        <div class="flex items-center border-b border-slate-200 bg-slate-100" style="font-size:10px;font-weight:bold;color:#475569;text-transform:uppercase;">
+          <div style="width:220px;padding:6px 8px;">Unidad</div>
+          <div style="width:50px;text-align:center;padding:6px 0;">%</div>
+          <div class="flex flex-1">
+            ${months.map(m => `<div style="flex:1;border-right:1px solid #e2e8f0;text-align:center;padding:6px 0;">${m}</div>`).join('')}
           </div>
-        `).join('')}
+        </div>
+        ${rows.map(({unit, occPct, totalEmpty, lostRevenue, gaps, bookings}) => {
+          const colorPct = occPct >= 80 ? 'text-emerald-600' : occPct >= 50 ? 'text-amber-600' : 'text-red-600';
+          return `
+            <div class="flex items-center border-b border-slate-100 hover:bg-slate-50" style="min-height:38px;">
+              <div class="flex items-center gap-2" style="width:220px;padding:6px 8px;">
+                <span class="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold font-mono">${(unit.code||'').replace(/</g,'&lt;')}</span>
+                <div class="min-w-0">
+                  <div class="text-xs font-semibold text-slate-700 truncate">${(unit.name||unit.code||'').replace(/</g,'&lt;')}</div>
+                  <div class="text-[9px] text-slate-500">${bookings.length} reserva${bookings.length===1?'':'s'}${unit.target_rent?` · $${Number(unit.target_rent).toLocaleString()}/mes`:''}</div>
+                </div>
+              </div>
+              <div style="width:50px;text-align:center;" class="${colorPct} font-bold text-sm">${occPct}%</div>
+              <div class="relative flex-1" style="height:34px;background:#fafafa;border-left:1px solid #e2e8f0;">
+                <!-- Background: bloques de huecos en rojo claro -->
+                ${gaps.map(g => {
+                  const left = 100 * Math.floor((g.start - yearStart) / 86400000) / totalDays;
+                  const width = Math.max(0.2, 100 * g.days / totalDays);
+                  const label = g.days >= 25 ? `${g.days}d vacío${g.lost?` · -$${(g.lost/1000).toFixed(1)}K`:''}` : '';
+                  return `<div title="${g.days} días vacíos · ~$${g.lost.toLocaleString()} perdidos" style="position:absolute;left:${left}%;width:${width}%;top:3px;bottom:3px;background:rgba(254,202,202,0.4);border:1px dashed #fca5a5;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#b91c1c;font-weight:bold;overflow:hidden;white-space:nowrap;">${label}</div>`;
+                }).join('')}
+                <!-- Bookings encima -->
+                ${bookings.filter(b => {
+                  const start = new Date(b.start_date);
+                  const end = b.end_date ? new Date(b.end_date) : yearEnd;
+                  return start <= yearEnd && end >= yearStart;
+                }).map(b => {
+                  const start = new Date(Math.max(yearStart, new Date(b.start_date)));
+                  const end = new Date(Math.min(yearEnd, b.end_date ? new Date(b.end_date) : yearEnd));
+                  const left = 100 * Math.floor((start - yearStart) / 86400000) / totalDays;
+                  const width = Math.max(0.5, 100 * Math.floor((end - start) / 86400000) / totalDays);
+                  const colorByType = {
+                    contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
+                    airbnb:            'background:linear-gradient(135deg,#f43f5e,#e11d48);',
+                    booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
+                    vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
+                    hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
+                    padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
+                    reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
+                    otro:              'background:linear-gradient(135deg,#64748b,#475569);'
+                  };
+                  const bg = colorByType[b.booking_type] || colorByType.otro;
+                  const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
+                  const tenant = pmTenantName(b.tenant_id);
+                  const tooltip = `${tenant}\n${b.start_date} → ${b.end_date||'∞'}\n$${Number(b.rent_amount||0).toLocaleString()}/${b.rent_period}\n[${b.booking_type}]`;
+                  return `<div onclick="event.stopPropagation();pmEditBooking('${b.id}')" title="${tooltip.replace(/"/g,'&quot;')}" style="position:absolute;left:${left}%;width:${width}%;top:5px;bottom:5px;${bg};opacity:${opacity};border-radius:4px;padding:0 5px;display:flex;align-items:center;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.2);z-index:1;">
+                    <span style="color:white;font-size:10px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${tenant.split(' ')[0]||'·'}</span>
+                  </div>`;
+                }).join('')}
+                ${todayPct !== null ? `<div style="position:absolute;left:${todayPct}%;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;" title="Hoy"></div>` : ''}
+              </div>
+            </div>
+            ${(totalEmpty > 0 && unit.target_rent) ? `
+              <div class="border-b border-slate-100 px-3 py-1 bg-red-50/30" style="padding-left:270px;">
+                <div class="text-[10px] text-red-700">⚠️ <strong>${totalEmpty} días vacíos</strong> — <strong>~$${lostRevenue.toLocaleString()} perdidos</strong></div>
+              </div>
+            ` : ''}
+          `;
+        }).join('')}
         <!-- Leyenda -->
-        <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-100">
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;"></span>Contrato directo</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#f43f5e,#e11d48);border-radius:2px;margin-right:3px;"></span>Airbnb</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;"></span>Booking</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:2px;margin-right:3px;"></span>Hospitable</span>
-          <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;"></span>Hoy</span>
+        <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50">
+          <span class="font-bold uppercase text-slate-500">Referencias:</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>👤 Contrato directo</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#f43f5e,#e11d48);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>🌐 Airbnb</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:rgba(254,202,202,0.6);border:1px dashed #fca5a5;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Hueco (sin ocupar)</span>
+          <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
         </div>
       </div>
     </div>
@@ -425,20 +622,36 @@ function pmRenderCalendar() {
   const allUnits = filter
     ? pmUnitsOf(filter)
     : pmaState.units.filter(u => pmaState.properties.some(p => p.id === u.property_id));
-  // Agrupar por propiedad
   const byProperty = {};
   allUnits.forEach(u => {
     if (!byProperty[u.property_id]) byProperty[u.property_id] = [];
     byProperty[u.property_id].push(u);
   });
 
+  // Totales del año
+  let totalEmptyAll = 0, lostRevenueAll = 0, fullOccUnits = 0;
+  let totalDaysSum = 0, occupiedDaysSum = 0;
+  allUnits.forEach(u => {
+    const c = pmCalcUnitGaps(u, pmaState.calendarYear);
+    totalEmptyAll += c.totalEmpty;
+    lostRevenueAll += c.lostRevenue;
+    totalDaysSum += c.totalDays;
+    occupiedDaysSum += c.occupiedCount;
+    if (c.occPct === 100) fullOccUnits++;
+  });
+  const coverage = totalDaysSum ? Math.round(100 * occupiedDaysSum / totalDaysSum) : 0;
+
   return `
     <div class="space-y-3 p-1">
-      <!-- Header con filtros -->
+      <!-- Header con título + filtros -->
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-xs uppercase font-bold text-slate-500">Calendario General · ${pmaState.calendarYear}</div>
-          <div class="text-[11px] text-slate-500">${allUnits.length} unidades · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📅</span>
+            <strong class="text-base text-slate-900">Calendario de Ocupación</strong>
+            <span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">${pmaState.calendarYear}</span>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-0.5">Meta: 100% ocupación — Detecta huecos y planifica rotaciones</div>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1">
@@ -446,11 +659,42 @@ function pmRenderCalendar() {
             ${pmaState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
           </select>
           <button onclick="pmaState.calendarYear--;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">←</button>
-          <span class="text-sm font-bold">${pmaState.calendarYear}</span>
+          <button onclick="pmaState.calendarYear=new Date().getFullYear();pmRender()" class="bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded text-xs">Hoy</button>
           <button onclick="pmaState.calendarYear++;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">→</button>
-          <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Reserva</button>
+          <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Reserva</button>
         </div>
       </div>
+
+      <!-- KPIs hero del año -->
+      ${allUnits.length ? `
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div class="bg-white border border-slate-200 rounded-lg p-3">
+            <div class="text-[9px] uppercase font-bold text-slate-500">Cobertura</div>
+            <div class="text-2xl font-bold ${coverage>=80?'text-emerald-700':coverage>=50?'text-amber-700':'text-red-700'} mt-0.5">${coverage}%</div>
+            <div class="text-[10px] text-slate-500">${fullOccUnits}/${allUnits.length} al 100%</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-lg p-3">
+            <div class="text-[9px] uppercase font-bold text-slate-500">Unidades</div>
+            <div class="text-2xl font-bold text-slate-900 mt-0.5">${allUnits.length}</div>
+            <div class="text-[10px] text-slate-500">${allUnits.filter(u => pmCalcUnitGaps(u, pmaState.calendarYear).totalEmpty > 0).length} con huecos</div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-lg p-3">
+            <div class="text-[9px] uppercase font-bold text-slate-500">Días vacíos</div>
+            <div class="text-2xl font-bold text-red-600 mt-0.5">${totalEmptyAll.toLocaleString()}</div>
+            <div class="text-[10px] text-slate-500">total año</div>
+          </div>
+          <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div class="text-[9px] uppercase font-bold text-red-700">Ingreso perdido</div>
+            <div class="text-2xl font-bold text-red-700 mt-0.5">$${(lostRevenueAll/1000).toFixed(0)}K</div>
+            <div class="text-[10px] text-red-600">estimado · ~$${lostRevenueAll.toLocaleString()}</div>
+          </div>
+          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <div class="text-[9px] uppercase font-bold text-emerald-700">Al 100%</div>
+            <div class="text-2xl font-bold text-emerald-700 mt-0.5">${fullOccUnits}</div>
+            <div class="text-[10px] text-emerald-600">de ${allUnits.length}</div>
+          </div>
+        </div>
+      ` : ''}
 
       ${!allUnits.length ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
@@ -463,15 +707,29 @@ function pmRenderCalendar() {
       ${Object.entries(byProperty).map(([propId, units]) => {
         const p = pmaState.properties.find(x => x.id === propId);
         if (!p) return '';
-        const occ = pmOccupancyOf(propId);
+        let propLost = 0, propEmpty = 0, propOccSum = 0, propTotalSum = 0;
+        units.forEach(u => {
+          const c = pmCalcUnitGaps(u, pmaState.calendarYear);
+          propLost += c.lostRevenue;
+          propEmpty += c.totalEmpty;
+          propOccSum += c.occupiedCount;
+          propTotalSum += c.totalDays;
+        });
+        const propOccPct = propTotalSum ? Math.round(100 * propOccSum / propTotalSum) : 0;
+        const colorPct = propOccPct >= 80 ? 'text-emerald-600' : propOccPct >= 50 ? 'text-amber-600' : 'text-red-600';
         return `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="px-4 py-2 bg-slate-100 flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <span class="text-xs font-bold text-slate-900">🏠 ${(p.name||'').replace(/</g,'&lt;')}</span>
-                <span class="text-[10px] text-slate-500 ml-2">${units.length} unidades · ${occ.pct}% ocup.</span>
+            <div class="px-4 py-3 bg-slate-100 flex items-center justify-between flex-wrap gap-2">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-sm">🏠</span>
+                  <strong class="text-sm text-slate-900 truncate">${(p.name||'').replace(/</g,'&lt;')}</strong>
+                  <span class="text-[10px] bg-slate-700 text-white px-1.5 py-0.5 rounded font-bold">${units.length}u</span>
+                  <span class="text-sm font-bold ${colorPct}">${propOccPct}%</span>
+                </div>
+                ${propEmpty > 0 ? `<div class="text-[11px] text-red-700 mt-0.5">⚠️ ${propEmpty} días vacíos — ~$${propLost.toLocaleString()} perdidos</div>` : `<div class="text-[11px] text-emerald-700 mt-0.5">✓ Sin huecos detectados</div>`}
               </div>
-              <button onclick="pmSelectProperty('${p.id}');pmaState.tab='properties';pmRender()" class="text-[10px] text-blue-600 hover:underline">Ver detalle →</button>
+              <button onclick="pmaState.tab='properties';pmaState.expandedProperties=pmaState.expandedProperties||new Set();pmaState.expandedProperties.add('${p.id}');pmRender()" class="text-[11px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-3 py-1 rounded">Ver propiedad →</button>
             </div>
             ${pmRenderTimelineForUnits(units, pmaState.calendarYear)}
           </div>
