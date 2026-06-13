@@ -421,6 +421,7 @@ function clRender() {
             ${CL_ZONAS.map(z => `<button onclick="clSetZonaFilter('${z}')" class="text-[10px] px-1.5 py-0.5 rounded ${clState.zonaFilter===z?'bg-slate-900 text-white':clZonaColor(z)}">${z}</button>`).join('')}
           </div>
           <button onclick="clOpenArmarDia()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Toma todo el backlog de una zona y lo agenda en este día agrupado por casa">🎯 Armar día</button>
+          <button onclick="clCopyForWhatsApp(clState.view==='week'?'week':'day')" class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-bold" title="Copia el cronograma como texto para mandar al equipo por WhatsApp">📱 Enviar al equipo</button>
         </div>
       </div>
 
@@ -1322,13 +1323,14 @@ function clRenderCasas() {
 }
 function clSetCasasSearch(v) {
   clState.casasSearch = v;
-  // Solo re-render del panel derecho (no recargar data)
-  clRender();
-  // Re-focus al input
-  setTimeout(() => {
+  // DEBOUNCE: re-render solo después de 250ms sin teclear — evita lag en 30+ casas.
+  if (clState._casasSearchTimer) clearTimeout(clState._casasSearchTimer);
+  clState._casasSearchTimer = setTimeout(() => {
+    clRender();
+    // Re-focus al input
     const inp = document.querySelector('input[oninput^="clSetCasasSearch"]');
     if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
-  }, 0);
+  }, 250);
 }
 function clToggleCasaExpand(key) {
   clState.casasExpanded[key] = !(clState.casasExpanded[key] !== false);
@@ -1507,6 +1509,163 @@ function clEditFromCasas(id, bucket) {
   _opOpenEditModal(t, bucket === 'backlog');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// UX HELPERS — toast, share-to-WhatsApp, debounce search
+// ═══════════════════════════════════════════════════════════════════
+
+// Toast no bloqueante (no usa alert) — feedback para guardados, errores, etc.
+function clToast(msg, type = 'info') {
+  const existing = document.getElementById('cl-toast');
+  if (existing) existing.remove();
+  const colors = {
+    info:    'bg-slate-900 text-white',
+    success: 'bg-emerald-600 text-white',
+    error:   'bg-red-600 text-white',
+    warn:    'bg-amber-500 text-slate-900'
+  };
+  const el = document.createElement('div');
+  el.id = 'cl-toast';
+  el.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] ${colors[type] || colors.info} px-4 py-2 rounded-full text-sm font-bold shadow-2xl transition-opacity`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; }, 2200);
+  setTimeout(() => { el.remove(); }, 2700);
+}
+window.clToast = clToast;
+
+// Loading overlay durante operaciones largas (drag drop guardar, armar día, etc)
+function clShowLoading(msg = 'Guardando…') {
+  let el = document.getElementById('cl-loading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cl-loading';
+    el.className = 'fixed inset-0 z-[9998] bg-slate-900/30 flex items-center justify-center pointer-events-auto';
+    el.innerHTML = `
+      <div class="bg-white rounded-xl px-5 py-4 shadow-2xl flex items-center gap-3">
+        <div class="w-5 h-5 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin"></div>
+        <div class="text-sm font-bold text-slate-900" id="cl-loading-msg">${msg}</div>
+      </div>`;
+    document.body.appendChild(el);
+  } else {
+    document.getElementById('cl-loading-msg').textContent = msg;
+    el.style.display = 'flex';
+  }
+}
+function clHideLoading() {
+  const el = document.getElementById('cl-loading');
+  if (el) el.remove();
+}
+window.clShowLoading = clShowLoading;
+window.clHideLoading = clHideLoading;
+
+// ═══════════════════════════════════════════════════════════════════
+// 📱 COPIAR CRONOGRAMA PARA WHATSAPP
+// Genera texto formateado del día actual (o semana) para mandar al equipo.
+// ═══════════════════════════════════════════════════════════════════
+function clCopyForWhatsApp(scope = 'day') {
+  const tasks = scope === 'week' ? clState.weekTasks : clState.dayTasks;
+  if (!tasks?.length) {
+    return clToast(`Sin tareas para ${scope === 'week' ? 'esta semana' : 'este día'}`, 'warn');
+  }
+
+  const dateLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
+  const fmtTime = (t) => (t || '').substring(0, 5);
+  const fmtDur = (m) => {
+    if (m >= 60) return `${Math.floor(m/60)}h${m%60 ? (m%60+'m') : ''}`;
+    return `${m}m`;
+  };
+  const propName = (t) => {
+    if (t.property_id) {
+      const p = clState.properties.find(x => x.id === t.property_id);
+      return p?.nickname || p?.address || '';
+    }
+    if (t.project_id) {
+      const p = clState.projects.find(x => x.id === t.project_id);
+      return p?.name || p?.address || '';
+    }
+    return '';
+  };
+
+  // Agrupar por fecha
+  const byDate = {};
+  tasks.forEach(t => {
+    const k = t.date || 'sin-fecha';
+    if (!byDate[k]) byDate[k] = [];
+    byDate[k].push(t);
+  });
+
+  const lines = [];
+  lines.push(`🧽 *CRONOGRAMA LIMPIEZA*`);
+  lines.push(`${scope === 'week' ? '📅 Semana' : '📆 Día'} · ${tasks.length} tareas\n`);
+
+  Object.keys(byDate).sort().forEach(d => {
+    if (d !== 'sin-fecha') lines.push(`*${dateLabel(d)}*`);
+    const dayTasks = [...byDate[d]].sort((a,b) => (a.start_time||'').localeCompare(b.start_time||''));
+
+    // Agrupar por zona dentro del día
+    const byZona = {};
+    dayTasks.forEach(t => {
+      const z = t.zona || 'Sin zona';
+      if (!byZona[z]) byZona[z] = [];
+      byZona[z].push(t);
+    });
+
+    Object.keys(byZona).forEach(z => {
+      lines.push(`\n📍 *Zona ${z}*`);
+      byZona[z].forEach((t, i) => {
+        const time = t.start_time ? `🕐 ${fmtTime(t.start_time)}` : '⏱';
+        const dur = fmtDur(t.duration_min || 30);
+        const prop = propName(t);
+        const propLine = prop ? `\n  🏠 ${prop}` : '';
+        const status = t.status === 'done' ? '✅ ' : (t.status === 'in_progress' ? '🔄 ' : '');
+        lines.push(`\n${i+1}. ${status}${time} · ${t.title} (${dur})${propLine}`);
+        if (t.materials?.length) {
+          lines.push(`  🧰 ${t.materials.slice(0, 5).join(', ')}${t.materials.length > 5 ? '…' : ''}`);
+        }
+        if (t.notes) {
+          lines.push(`  📝 ${t.notes.split('\n')[0].slice(0, 100)}${t.notes.length > 100 ? '…' : ''}`);
+        }
+      });
+    });
+    lines.push('');
+  });
+
+  const text = lines.join('\n').trim();
+
+  // Copiar al portapapeles + ofrecer abrir WhatsApp Web con el texto
+  navigator.clipboard?.writeText(text).then(() => {
+    clToast('📋 Cronograma copiado al portapapeles', 'success');
+    // Después de 1s, ofrecer abrir WhatsApp
+    setTimeout(() => {
+      if (confirm('✅ Texto copiado al portapapeles.\n\n¿Abrir WhatsApp Web para pegar al equipo?')) {
+        window.open('https://web.whatsapp.com/', '_blank');
+      }
+    }, 800);
+  }).catch(() => {
+    // Fallback: mostrar el texto en un textarea para copiar manual
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[9999] bg-slate-900/70 flex items-center justify-center p-4';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div class="bg-white rounded-xl p-4 max-w-2xl w-full" onclick="event.stopPropagation()">
+        <div class="font-bold mb-2">📱 Copiá este cronograma para WhatsApp</div>
+        <textarea class="w-full h-80 border border-slate-300 rounded p-2 font-mono text-xs">${text.replace(/</g,'&lt;')}</textarea>
+        <button onclick="this.parentElement.parentElement.remove()" class="mt-2 bg-slate-900 text-white px-3 py-1.5 rounded text-sm font-bold">Cerrar</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  });
+}
+window.clCopyForWhatsApp = clCopyForWhatsApp;
+
+// Debounce wrapper genérico
+function clDebounce(fn, ms = 250) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
 // ─── Navegación / filtros ───
 function clNav(delta) {
   const step = clState.view === 'week' ? 7 : 1;
@@ -1532,6 +1691,9 @@ function clSchedDragStart(id) { clState.draggedScheduledId = id; clState.dragged
 
 async function clDropOnSlot(slotTime, ev) {
   ev.preventDefault();
+  // Guard contra doble-trigger del drop
+  if (clState._dropping) return;
+  clState._dropping = true;
   let droppedId = null;
   let droppedTask = null;
 
@@ -1546,9 +1708,9 @@ async function clDropOnSlot(slotTime, ev) {
   } else if (clState.draggedTemplateId) {
     const tmpl = clState.tasks.find(x => x.id === clState.draggedTemplateId);
     clState.draggedTemplateId = null;
-    if (!tmpl) return;
+    if (!tmpl) { clState._dropping = false; return; }
     droppedTask = { duration_min: tmpl.default_duration_min || 30, travel_min: 0, title: tmpl.name };
-  } else return;
+  } else { clState._dropping = false; return; }
 
   // Detectar conflicto si el drop pone la tarea sobre otra
   const dur = droppedTask?.duration_min || 30;
@@ -1607,6 +1769,7 @@ async function clDropOnSlot(slotTime, ev) {
   // FIX CRÍTICO: si falla la persistencia, avisar al usuario en lugar de
   // re-render silencioso que da falsa sensación de éxito.
   if (opError) {
+    clState._dropping = false;
     const msg = opError.message || String(opError);
     if (/does not exist|relation/i.test(msg)) {
       clState.tablesError = msg;
@@ -1619,6 +1782,8 @@ async function clDropOnSlot(slotTime, ev) {
   }
   await clLoadAll();
   clRender();
+  clState._dropping = false;
+  clToast('✓ Tarea agendada', 'success');
 }
 
 // ─── + Pendiente (al backlog) ───
@@ -2720,7 +2885,9 @@ function clRenderPrintable(filteredDay) {
     <div class="bg-white p-4 sm:p-6 print:p-0" id="op-printable">
       <div class="sticky top-0 bg-amber-100 border-b border-amber-300 px-3 py-2 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 mb-4 flex justify-between items-center print:hidden z-20">
         <div class="text-xs text-amber-900"><strong>🖼️ Vista entregable</strong> — scrolleá ↓ para ver todo · 🖨️ para PDF completo</div>
-        <div class="flex gap-1">
+        <div class="flex gap-1 flex-wrap">
+          <button onclick="clCopyForWhatsApp('day')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-bold" title="Copia el cronograma del día como texto para pegar en WhatsApp">📱 WhatsApp · Día</button>
+          <button onclick="clCopyForWhatsApp('week')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-bold" title="Copia toda la semana">📱 WhatsApp · Semana</button>
           <button onclick="window.print()" class="text-xs bg-slate-900 text-white px-3 py-1 rounded font-bold">🖨️ Imprimir PDF</button>
           <button onclick="clSetView('day')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded font-bold">← Volver</button>
         </div>

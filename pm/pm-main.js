@@ -4,7 +4,7 @@
 // Depende de: sb, state, openModal, closeModal (de app.js / ui-toolkit)
 // ════════════════════════════════════════════════════════════════
 
-const pmState = {
+const pmaState = {
   tab: 'properties',                 // properties · calendar · bookings · finance
   selectedPropertyId: null,           // para vista detalle
   calendarYear: new Date().getFullYear(),
@@ -22,13 +22,13 @@ const pmState = {
   editingBooking: null,
   editingPayment: null
 };
-window.pmState = pmState;
+window.pmaState = pmaState;
 
 // ════════════════════════════════════════════════════════════════
 // CARGA DE DATOS
 // ════════════════════════════════════════════════════════════════
 async function pmLoadAll() {
-  pmState.loading = true;
+  pmaState.loading = true;
   pmRender();
   try {
     const [props, units, bookings, tenants, payments] = await Promise.all([
@@ -38,15 +38,15 @@ async function pmLoadAll() {
       sb.from('pm_tenants').select('*').order('full_name').catch(() => ({ data: [] })),
       sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(500).catch(() => ({ data: [] }))
     ]);
-    pmState.properties = props.data || [];
-    pmState.units = units.data || [];
-    pmState.bookings = bookings.data || [];
-    pmState.tenants = tenants.data || [];
-    pmState.payments = payments.data || [];
+    pmaState.properties = props.data || [];
+    pmaState.units = units.data || [];
+    pmaState.bookings = bookings.data || [];
+    pmaState.tenants = tenants.data || [];
+    pmaState.payments = payments.data || [];
   } catch (e) {
     console.warn('[pm] load error:', e);
   }
-  pmState.loading = false;
+  pmaState.loading = false;
   pmRender();
 }
 window.pmLoadAll = pmLoadAll;
@@ -55,14 +55,14 @@ window.pmLoadAll = pmLoadAll;
 // HELPERS de cálculo
 // ════════════════════════════════════════════════════════════════
 function pmUnitsOf(propertyId) {
-  return pmState.units.filter(u => u.property_id === propertyId);
+  return pmaState.units.filter(u => u.property_id === propertyId);
 }
 function pmBookingsOf(unitId) {
-  return pmState.bookings.filter(b => b.unit_id === unitId);
+  return pmaState.bookings.filter(b => b.unit_id === unitId);
 }
 function pmActiveBookingOf(unitId, date = new Date()) {
   const d = (typeof date === 'string') ? date : date.toISOString().slice(0,10);
-  return pmState.bookings.find(b =>
+  return pmaState.bookings.find(b =>
     b.unit_id === unitId
     && ['activo','confirmado'].includes(b.status)
     && b.start_date <= d
@@ -70,11 +70,11 @@ function pmActiveBookingOf(unitId, date = new Date()) {
   );
 }
 function pmTenantName(id) {
-  const t = pmState.tenants.find(x => x.id === id);
+  const t = pmaState.tenants.find(x => x.id === id);
   return t?.full_name || '—';
 }
 function pmPropertyName(id) {
-  const p = pmState.properties.find(x => x.id === id);
+  const p = pmaState.properties.find(x => x.id === id);
   return p?.name || '—';
 }
 function pmOccupancyOf(propertyId) {
@@ -85,7 +85,7 @@ function pmOccupancyOf(propertyId) {
 }
 function pmFinanceOf(propertyId, monthDate = null) {
   // monthDate: Date|null. null = all-time, else solo el mes específico
-  let pays = pmState.payments.filter(p => p.property_id === propertyId && p.status === 'pagado');
+  let pays = pmaState.payments.filter(p => p.property_id === propertyId && p.status === 'pagado');
   if (monthDate) {
     const ym = monthDate.toISOString().slice(0,7);
     pays = pays.filter(p => (p.paid_at || '').startsWith(ym));
@@ -99,8 +99,8 @@ function pmFinanceOf(propertyId, monthDate = null) {
 // LAUNCHER
 // ════════════════════════════════════════════════════════════════
 function openPmSystem() {
-  pmState.tab = pmState.tab || 'properties';
-  pmState.selectedPropertyId = null;
+  pmaState.tab = pmaState.tab || 'properties';
+  pmaState.selectedPropertyId = null;
   openModal('🏠 Property Management · Rental Profits', '<div id="pm-root" style="min-height:60vh;">Cargando…</div>');
   // Ensanchar modal
   setTimeout(() => {
@@ -117,7 +117,7 @@ window.openPmSystem = openPmSystem;
 function pmRender() {
   const root = document.getElementById('pm-root');
   if (!root) return;
-  if (pmState.loading) {
+  if (pmaState.loading) {
     root.innerHTML = '<div class="p-8 text-center text-slate-500">⏳ Cargando datos...</div>';
     return;
   }
@@ -127,12 +127,12 @@ function pmRender() {
       <div class="border-b border-slate-200 mb-3">
         <div class="flex gap-1 -mb-px overflow-x-auto">
           ${[
-            ['properties','🏘️ Propiedades', pmState.properties.length],
+            ['properties','🏘️ Propiedades', pmaState.properties.length],
             ['calendar','📅 Calendario', ''],
-            ['bookings','📋 Reservas', pmState.bookings.length],
+            ['bookings','📋 Reservas', pmaState.bookings.length],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
-            <button onclick="pmSetTab('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${pmState.tab===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">
+            <button onclick="pmSetTab('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${pmaState.tab===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">
               ${label}${count!==''?` <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${count}</span>`:''}
             </button>
           `).join('')}
@@ -140,10 +140,10 @@ function pmRender() {
       </div>
       <!-- Contenido del tab -->
       <div class="flex-1 overflow-y-auto" style="max-height:75vh;">
-        ${pmState.tab === 'properties' ? (pmState.selectedPropertyId ? pmRenderPropertyDetail() : pmRenderPropertiesList()) : ''}
-        ${pmState.tab === 'calendar'   ? pmRenderCalendar() : ''}
-        ${pmState.tab === 'bookings'   ? pmRenderBookings() : ''}
-        ${pmState.tab === 'finance'    ? pmRenderFinance() : ''}
+        ${pmaState.tab === 'properties' ? (pmaState.selectedPropertyId ? pmRenderPropertyDetail() : pmRenderPropertiesList()) : ''}
+        ${pmaState.tab === 'calendar'   ? pmRenderCalendar() : ''}
+        ${pmaState.tab === 'bookings'   ? pmRenderBookings() : ''}
+        ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
       </div>
     </div>
   `;
@@ -151,8 +151,8 @@ function pmRender() {
 window.pmRender = pmRender;
 
 function pmSetTab(tab) {
-  pmState.tab = tab;
-  pmState.selectedPropertyId = null;
+  pmaState.tab = tab;
+  pmaState.selectedPropertyId = null;
   pmRender();
 }
 window.pmSetTab = pmSetTab;
@@ -161,12 +161,12 @@ window.pmSetTab = pmSetTab;
 // TAB 1 · PROPIEDADES (lista)
 // ════════════════════════════════════════════════════════════════
 function pmRenderPropertiesList() {
-  const props = pmState.properties;
+  const props = pmaState.properties;
   return `
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-xs uppercase font-bold text-slate-500">${props.length} propiedades · ${pmState.units.length} unidades</div>
+          <div class="text-xs uppercase font-bold text-slate-500">${props.length} propiedades · ${pmaState.units.length} unidades</div>
         </div>
         <div class="flex gap-2">
           <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">📥 Importar de Airtable</button>
@@ -227,7 +227,7 @@ function pmRenderPropertiesList() {
 }
 
 function pmSelectProperty(id) {
-  pmState.selectedPropertyId = id;
+  pmaState.selectedPropertyId = id;
   pmRender();
 }
 window.pmSelectProperty = pmSelectProperty;
@@ -236,7 +236,7 @@ window.pmSelectProperty = pmSelectProperty;
 // TAB 1.b · DETALLE de propiedad (con desglose de unidades + calendario)
 // ════════════════════════════════════════════════════════════════
 function pmRenderPropertyDetail() {
-  const p = pmState.properties.find(x => x.id === pmState.selectedPropertyId);
+  const p = pmaState.properties.find(x => x.id === pmaState.selectedPropertyId);
   if (!p) return '<div class="p-4 text-slate-500">Propiedad no encontrada.</div>';
   const units = pmUnitsOf(p.id);
   const occ = pmOccupancyOf(p.id);
@@ -251,7 +251,7 @@ function pmRenderPropertyDetail() {
 
   return `
     <div class="space-y-3 p-1">
-      <button onclick="pmState.selectedPropertyId=null;pmRender()" class="text-xs text-slate-500 hover:text-slate-900">← Volver a propiedades</button>
+      <button onclick="pmaState.selectedPropertyId=null;pmRender()" class="text-xs text-slate-500 hover:text-slate-900">← Volver a propiedades</button>
 
       <!-- Header propiedad -->
       <div class="bg-gradient-to-br from-slate-900 to-blue-900 text-white rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
@@ -279,15 +279,15 @@ function pmRenderPropertyDetail() {
         <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-2">
           <div>
             <div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">📅 Calendario de ocupación</div>
-            <div class="text-sm font-bold mt-0.5">${pmState.calendarYear}</div>
+            <div class="text-sm font-bold mt-0.5">${pmaState.calendarYear}</div>
           </div>
           <div class="flex gap-1">
-            <button onclick="pmState.calendarYear--;pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-xs">←</button>
-            <button onclick="pmState.calendarYear=new Date().getFullYear();pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded text-xs">Hoy</button>
-            <button onclick="pmState.calendarYear++;pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-xs">→</button>
+            <button onclick="pmaState.calendarYear--;pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-xs">←</button>
+            <button onclick="pmaState.calendarYear=new Date().getFullYear();pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded text-xs">Hoy</button>
+            <button onclick="pmaState.calendarYear++;pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-xs">→</button>
           </div>
         </div>
-        ${pmRenderTimelineForUnits(units, pmState.calendarYear)}
+        ${pmRenderTimelineForUnits(units, pmaState.calendarYear)}
       </div>
 
       <!-- Desglose de unidades agrupadas -->
@@ -421,10 +421,10 @@ function pmRenderTimelineForUnits(units, year) {
 // TAB 2 · CALENDARIO GENERAL (todas las propiedades)
 // ════════════════════════════════════════════════════════════════
 function pmRenderCalendar() {
-  const filter = pmState.calendarFilterPropertyId;
+  const filter = pmaState.calendarFilterPropertyId;
   const allUnits = filter
     ? pmUnitsOf(filter)
-    : pmState.units.filter(u => pmState.properties.some(p => p.id === u.property_id));
+    : pmaState.units.filter(u => pmaState.properties.some(p => p.id === u.property_id));
   // Agrupar por propiedad
   const byProperty = {};
   allUnits.forEach(u => {
@@ -437,17 +437,17 @@ function pmRenderCalendar() {
       <!-- Header con filtros -->
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-xs uppercase font-bold text-slate-500">Calendario General · ${pmState.calendarYear}</div>
-          <div class="text-[11px] text-slate-500">${allUnits.length} unidades · ${pmState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
+          <div class="text-xs uppercase font-bold text-slate-500">Calendario General · ${pmaState.calendarYear}</div>
+          <div class="text-[11px] text-slate-500">${allUnits.length} unidades · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <select onchange="pmState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1">
+          <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1">
             <option value="">Todas las propiedades</option>
-            ${pmState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+            ${pmaState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
           </select>
-          <button onclick="pmState.calendarYear--;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">←</button>
-          <span class="text-sm font-bold">${pmState.calendarYear}</span>
-          <button onclick="pmState.calendarYear++;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">→</button>
+          <button onclick="pmaState.calendarYear--;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">←</button>
+          <span class="text-sm font-bold">${pmaState.calendarYear}</span>
+          <button onclick="pmaState.calendarYear++;pmRender()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-xs">→</button>
           <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Reserva</button>
         </div>
       </div>
@@ -461,7 +461,7 @@ function pmRenderCalendar() {
 
       <!-- Timeline por cada propiedad -->
       ${Object.entries(byProperty).map(([propId, units]) => {
-        const p = pmState.properties.find(x => x.id === propId);
+        const p = pmaState.properties.find(x => x.id === propId);
         if (!p) return '';
         const occ = pmOccupancyOf(propId);
         return `
@@ -471,9 +471,9 @@ function pmRenderCalendar() {
                 <span class="text-xs font-bold text-slate-900">🏠 ${(p.name||'').replace(/</g,'&lt;')}</span>
                 <span class="text-[10px] text-slate-500 ml-2">${units.length} unidades · ${occ.pct}% ocup.</span>
               </div>
-              <button onclick="pmSelectProperty('${p.id}');pmState.tab='properties';pmRender()" class="text-[10px] text-blue-600 hover:underline">Ver detalle →</button>
+              <button onclick="pmSelectProperty('${p.id}');pmaState.tab='properties';pmRender()" class="text-[10px] text-blue-600 hover:underline">Ver detalle →</button>
             </div>
-            ${pmRenderTimelineForUnits(units, pmState.calendarYear)}
+            ${pmRenderTimelineForUnits(units, pmaState.calendarYear)}
           </div>
         `;
       }).join('')}
@@ -486,13 +486,13 @@ function pmRenderCalendar() {
 // ════════════════════════════════════════════════════════════════
 function pmRenderBookings() {
   const today = new Date().toISOString().slice(0,10);
-  const all = pmState.bookings;
+  const all = pmaState.bookings;
   const activeOrFuture = all.filter(b => (b.end_date || '9999') >= today && b.status !== 'cancelado');
   const pastOrFinished = all.filter(b => (b.end_date || '') < today || b.status === 'finalizado' || b.status === 'cancelado');
 
   const renderRow = (b) => {
-    const u = pmState.units.find(x => x.id === b.unit_id);
-    const p = pmState.properties.find(x => x.id === b.property_id);
+    const u = pmaState.units.find(x => x.id === b.unit_id);
+    const p = pmaState.properties.find(x => x.id === b.property_id);
     const colorByType = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', otro: 'slate' };
     const col = colorByType[b.booking_type] || 'slate';
     return `
@@ -544,7 +544,7 @@ function pmRenderBookings() {
 // ════════════════════════════════════════════════════════════════
 function pmRenderFinance() {
   const total = { ingresos: 0, gastos: 0, utilidad: 0 };
-  const byProperty = pmState.properties.map(p => {
+  const byProperty = pmaState.properties.map(p => {
     const f = pmFinanceOf(p.id);
     total.ingresos += f.ingresos;
     total.gastos += f.gastos;
@@ -555,7 +555,7 @@ function pmRenderFinance() {
   return `
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="text-xs uppercase font-bold text-slate-500">Finanzas · ${pmState.payments.length} movimientos cargados</div>
+        <div class="text-xs uppercase font-bold text-slate-500">Finanzas · ${pmaState.payments.length} movimientos cargados</div>
         <div class="flex gap-2">
           <button onclick="pmEditPayment(null,'ingreso')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Ingreso</button>
           <button onclick="pmEditPayment(null,'gasto')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Gasto</button>
@@ -591,12 +591,12 @@ function pmRenderFinance() {
 
       <!-- Últimos movimientos -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700">Últimos movimientos · ${pmState.payments.length}</div>
-        ${pmState.payments.length ? `
+        <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700">Últimos movimientos · ${pmaState.payments.length}</div>
+        ${pmaState.payments.length ? `
           <table class="w-full text-xs">
             <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2">Fecha</th><th class="text-left px-3 py-2">Concepto</th><th class="text-left px-3 py-2">Propiedad</th><th class="text-left px-3 py-2">Cat</th><th class="text-right px-3 py-2">Monto</th><th class="text-center px-3 py-2">Estado</th></tr></thead>
             <tbody>
-              ${pmState.payments.slice(0, 50).map(pay => `
+              ${pmaState.payments.slice(0, 50).map(pay => `
                 <tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="pmEditPayment('${pay.id}')">
                   <td class="px-3 py-2">${pay.paid_at||pay.due_at||'—'}</td>
                   <td class="px-3 py-2 font-semibold">${(pay.concept||'').replace(/</g,'&lt;')}</td>
@@ -618,7 +618,7 @@ function pmRenderFinance() {
 // CRUD · MODALES (Propiedad, Unidad, Reserva, Pago, Inquilino)
 // ════════════════════════════════════════════════════════════════
 async function pmEditProperty(id) {
-  const p = id ? pmState.properties.find(x => x.id === id) : {};
+  const p = id ? pmaState.properties.find(x => x.id === id) : {};
   const isNew = !id;
   openModal((isNew?'+ Nueva':'✏️ Editar')+' Propiedad', `
     <div class="space-y-3">
@@ -691,7 +691,7 @@ window.pmDeleteProperty = pmDeleteProperty;
 
 // ── UNIDAD ──
 async function pmEditUnit(id, propertyId) {
-  const u = id ? pmState.units.find(x => x.id === id) : { property_id: propertyId };
+  const u = id ? pmaState.units.find(x => x.id === id) : { property_id: propertyId };
   const isNew = !id;
   openModal((isNew?'+ Nueva':'✏️ Editar')+' Unidad', `
     <div class="space-y-3">
@@ -745,16 +745,16 @@ window.pmDeleteUnit = pmDeleteUnit;
 
 // ── RESERVA ──
 async function pmEditBooking(id, unitId) {
-  const b = id ? pmState.bookings.find(x => x.id === id) : { unit_id: unitId, status: 'activo', booking_type: 'contrato_directo', rent_period: 'mensual' };
+  const b = id ? pmaState.bookings.find(x => x.id === id) : { unit_id: unitId, status: 'activo', booking_type: 'contrato_directo', rent_period: 'mensual' };
   const isNew = !id;
-  const unit = pmState.units.find(u => u.id === (b.unit_id || unitId));
+  const unit = pmaState.units.find(u => u.id === (b.unit_id || unitId));
   openModal((isNew?'+ Nueva':'✏️ Editar')+' Reserva', `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Unidad *</label>
           <select id="pm-bf-unit" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
             <option value="">— Elegir —</option>
-            ${pmState.units.map(u => { const p = pmState.properties.find(x=>x.id===u.property_id); return `<option value="${u.id}" ${(b.unit_id||unitId)===u.id?'selected':''}>${(p?.name||'').slice(0,20)} · ${u.code}</option>`; }).join('')}
+            ${pmaState.units.map(u => { const p = pmaState.properties.find(x=>x.id===u.property_id); return `<option value="${u.id}" ${(b.unit_id||unitId)===u.id?'selected':''}>${(p?.name||'').slice(0,20)} · ${u.code}</option>`; }).join('')}
           </select></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Tipo</label>
           <select id="pm-bf-type" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
@@ -764,7 +764,7 @@ async function pmEditBooking(id, unitId) {
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Inquilino</label>
         <select id="pm-bf-tenant" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
           <option value="">— Sin asociar —</option>
-          ${pmState.tenants.map(t => `<option value="${t.id}" ${b.tenant_id===t.id?'selected':''}>${(t.full_name||'').replace(/</g,'&lt;')}</option>`).join('')}
+          ${pmaState.tenants.map(t => `<option value="${t.id}" ${b.tenant_id===t.id?'selected':''}>${(t.full_name||'').replace(/</g,'&lt;')}</option>`).join('')}
         </select>
         <button onclick="pmQuickAddTenant()" class="text-[10px] text-blue-600 hover:underline mt-1">+ Crear nuevo inquilino</button></div>
       <div class="grid grid-cols-2 gap-2">
@@ -802,7 +802,7 @@ window.pmEditBooking = pmEditBooking;
 async function pmSaveBooking(id) {
   const unit_id = document.getElementById('pm-bf-unit').value;
   if (!unit_id) return alert('Elegí una unidad.');
-  const unit = pmState.units.find(u => u.id === unit_id);
+  const unit = pmaState.units.find(u => u.id === unit_id);
   const payload = {
     unit_id,
     property_id: unit?.property_id,
@@ -841,7 +841,7 @@ async function pmQuickAddTenant() {
   try {
     const { data } = await sb.from('pm_tenants').insert({ full_name: name, phone }).select().single();
     if (data) {
-      pmState.tenants.push(data);
+      pmaState.tenants.push(data);
       const sel = document.getElementById('pm-bf-tenant');
       if (sel) {
         const opt = document.createElement('option');
@@ -855,7 +855,7 @@ window.pmQuickAddTenant = pmQuickAddTenant;
 
 // ── PAGO / FINANZA ──
 async function pmEditPayment(id, defaultType) {
-  const pay = id ? pmState.payments.find(x => x.id === id) : { type: defaultType || 'ingreso', status: 'pendiente' };
+  const pay = id ? pmaState.payments.find(x => x.id === id) : { type: defaultType || 'ingreso', status: 'pendiente' };
   const isNew = !id;
   openModal((isNew?'+ Nuevo':'✏️ Editar')+(pay.type==='gasto'?' Gasto':' Ingreso'), `
     <div class="space-y-3">
@@ -882,7 +882,7 @@ async function pmEditPayment(id, defaultType) {
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Propiedad</label>
           <select id="pm-yf-prop" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
             <option value="">— Sin asignar —</option>
-            ${pmState.properties.map(p => `<option value="${p.id}" ${pay.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+            ${pmaState.properties.map(p => `<option value="${p.id}" ${pay.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
           </select></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Fecha pago</label>
           <input id="pm-yf-paid" type="date" value="${pay.paid_at||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>

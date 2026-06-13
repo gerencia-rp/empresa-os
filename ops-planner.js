@@ -270,6 +270,93 @@ async function opRefocusPlanner() {
 }
 window.opRefocusPlanner = opRefocusPlanner;
 
+// Toast no bloqueante para feedback rápido
+function opToast(msg, type = 'info') {
+  const existing = document.getElementById('op-toast');
+  if (existing) existing.remove();
+  const colors = { info: 'bg-slate-900 text-white', success: 'bg-emerald-600 text-white', error: 'bg-red-600 text-white', warn: 'bg-amber-500 text-slate-900' };
+  const el = document.createElement('div');
+  el.id = 'op-toast';
+  el.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] ${colors[type] || colors.info} px-4 py-2 rounded-full text-sm font-bold shadow-2xl transition-opacity`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; }, 2200);
+  setTimeout(() => { el.remove(); }, 2700);
+}
+window.opToast = opToast;
+
+// 📱 Copiar cronograma para WhatsApp (mismo flujo que cleaning)
+function opCopyForWhatsApp(scope = 'day') {
+  const tasks = scope === 'week' ? opState.weekTasks : opState.dayTasks;
+  if (!tasks?.length) return opToast(`Sin tareas para ${scope === 'week' ? 'esta semana' : 'este día'}`, 'warn');
+
+  const dateLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
+  const fmtTime = (t) => (t || '').substring(0, 5);
+  const fmtDur = (m) => m >= 60 ? `${Math.floor(m/60)}h${m%60 ? (m%60+'m') : ''}` : `${m}m`;
+  const propName = (t) => {
+    if (t.property_id) {
+      const p = opState.properties.find(x => x.id === t.property_id);
+      return p?.nickname || p?.address || '';
+    }
+    if (t.project_id) {
+      const p = opState.projects.find(x => x.id === t.project_id);
+      return p?.name || p?.address || '';
+    }
+    return '';
+  };
+
+  const byDate = {};
+  tasks.forEach(t => { const k = t.date || 'sin-fecha'; if (!byDate[k]) byDate[k] = []; byDate[k].push(t); });
+
+  const lines = [];
+  lines.push(`🧰 *CRONOGRAMA JUAN AUSTIN*`);
+  lines.push(`${scope === 'week' ? '📅 Semana' : '📆 Día'} · ${tasks.length} tareas\n`);
+
+  Object.keys(byDate).sort().forEach(d => {
+    if (d !== 'sin-fecha') lines.push(`*${dateLabel(d)}*`);
+    const dayTasks = [...byDate[d]].sort((a,b) => (a.start_time||'').localeCompare(b.start_time||''));
+    const byZona = {};
+    dayTasks.forEach(t => { const z = t.zona || 'Sin zona'; if (!byZona[z]) byZona[z] = []; byZona[z].push(t); });
+
+    Object.keys(byZona).forEach(z => {
+      lines.push(`\n📍 *Zona ${z}*`);
+      byZona[z].forEach((t, i) => {
+        const time = t.start_time ? `🕐 ${fmtTime(t.start_time)}` : '⏱';
+        const dur = fmtDur(t.duration_min || 30);
+        const prop = propName(t);
+        const propLine = prop ? `\n  🏠 ${prop}` : '';
+        const status = t.status === 'done' ? '✅ ' : (t.status === 'in_progress' ? '🔄 ' : '');
+        lines.push(`\n${i+1}. ${status}${time} · ${t.title} (${dur})${propLine}`);
+        if (t.materials?.length) lines.push(`  🧰 ${t.materials.slice(0, 5).join(', ')}${t.materials.length > 5 ? '…' : ''}`);
+        if (t.notes) lines.push(`  📝 ${t.notes.split('\n')[0].slice(0, 100)}${t.notes.length > 100 ? '…' : ''}`);
+      });
+    });
+    lines.push('');
+  });
+
+  const text = lines.join('\n').trim();
+  navigator.clipboard?.writeText(text).then(() => {
+    opToast('📋 Cronograma copiado al portapapeles', 'success');
+    setTimeout(() => {
+      if (confirm('✅ Texto copiado.\n\n¿Abrir WhatsApp Web para pegar a Juan?')) {
+        window.open('https://web.whatsapp.com/', '_blank');
+      }
+    }, 800);
+  }).catch(() => {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[9999] bg-slate-900/70 flex items-center justify-center p-4';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div class="bg-white rounded-xl p-4 max-w-2xl w-full" onclick="event.stopPropagation()">
+        <div class="font-bold mb-2">📱 Copiá este cronograma para WhatsApp</div>
+        <textarea class="w-full h-80 border border-slate-300 rounded p-2 font-mono text-xs">${text.replace(/</g,'&lt;')}</textarea>
+        <button onclick="this.parentElement.parentElement.remove()" class="mt-2 bg-slate-900 text-white px-3 py-1.5 rounded text-sm font-bold">Cerrar</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  });
+}
+window.opCopyForWhatsApp = opCopyForWhatsApp;
+
 // ─── Render principal ───
 function opRender() {
   const root = document.getElementById('op-root');
@@ -365,6 +452,7 @@ function opRender() {
             ${OP_ZONAS.map(z => `<button onclick="opSetZonaFilter('${z}')" class="text-[10px] px-1.5 py-0.5 rounded ${opState.zonaFilter===z?'bg-slate-900 text-white':opZonaColor(z)}">${z}</button>`).join('')}
           </div>
           <button onclick="opOpenArmarDia()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Toma todo el backlog de una zona y lo agenda en este día agrupado por casa">🎯 Armar día</button>
+          <button onclick="opCopyForWhatsApp(opState.view==='week'?'week':'day')" class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-bold" title="Copia el cronograma como texto para mandar a Juan por WhatsApp">📱 Enviar a Juan</button>
         </div>
       </div>
 

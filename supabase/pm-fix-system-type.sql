@@ -41,7 +41,7 @@ BEGIN
         name = 'Property Management',
         description = 'Propiedades, calendario de ocupación tipo Airbnb, reservas y finanzas.',
         icon = '🏠',
-        config = NULL  -- limpiar si tenía url tipo link
+        config = '{}'::jsonb   -- limpiar config (objeto vacío, no NULL)
     WHERE id::TEXT = v_system_id;
     RAISE NOTICE '✅ Sistema actualizado: id=%, area=%, type=pm-rental-mgmt', v_system_id, v_area_id;
   ELSE
