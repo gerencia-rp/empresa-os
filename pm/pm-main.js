@@ -29,23 +29,76 @@ window.pmaState = pmaState;
 // ════════════════════════════════════════════════════════════════
 async function pmLoadAll() {
   pmaState.loading = true;
+  pmaState.loadError = null;
   pmRender();
+  console.log('[pm] pmLoadAll iniciado');
+
+  // Verificar sesión activa
   try {
-    const [props, units, bookings, tenants, payments] = await Promise.all([
-      sb.from('pm_properties').select('*').order('name').catch(() => ({ data: [] })),
-      sb.from('pm_units').select('*').eq('is_active', true).order('code').catch(() => ({ data: [] })),
-      sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).catch(() => ({ data: [] })),
-      sb.from('pm_tenants').select('*').order('full_name').catch(() => ({ data: [] })),
-      sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(500).catch(() => ({ data: [] }))
-    ]);
-    pmaState.properties = props.data || [];
-    pmaState.units = units.data || [];
-    pmaState.bookings = bookings.data || [];
-    pmaState.tenants = tenants.data || [];
-    pmaState.payments = payments.data || [];
+    const sbAuth = (typeof sb !== 'undefined' && sb) ? sb : (window.sb || null);
+    if (!sbAuth) {
+      pmaState.loadError = 'No hay cliente Supabase disponible (sb). Reload la página.';
+      console.error('[pm]', pmaState.loadError);
+      pmaState.loading = false;
+      return pmRender();
+    }
+    const sess = await sbAuth.auth.getSession();
+    if (!sess?.data?.session?.access_token) {
+      pmaState.loadError = '⚠️ Sin sesión activa. Cerrá sesión (botón Salir abajo a la izquierda) y volvé a entrar.';
+      console.error('[pm]', pmaState.loadError);
+      pmaState.loading = false;
+      return pmRender();
+    }
+    console.log('[pm] Sesión OK · user:', sess.data.session.user?.email);
   } catch (e) {
-    console.warn('[pm] load error:', e);
+    pmaState.loadError = 'Error verificando sesión: ' + e.message;
+    pmaState.loading = false;
+    return pmRender();
   }
+
+  // Cargar cada tabla con error específico (NO usar .eq('is_active',true) — algunas units
+  // recién importadas pueden tener is_active null y se las saltearíamos)
+  const queries = [
+    { name: 'properties', q: () => sb.from('pm_properties').select('*').order('name') },
+    { name: 'units',      q: () => sb.from('pm_units').select('*').order('code') },
+    { name: 'bookings',   q: () => sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).limit(2000) },
+    { name: 'tenants',    q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
+    { name: 'payments',   q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) }
+  ];
+
+  const results = {};
+  for (const { name, q } of queries) {
+    try {
+      const r = await q();
+      if (r.error) {
+        console.error(`[pm] Error cargando ${name}:`, r.error);
+        results[name] = [];
+        pmaState.loadError = pmaState.loadError || `Error cargando ${name}: ${r.error.message}`;
+      } else {
+        results[name] = r.data || [];
+        console.log(`[pm] ${name}: ${results[name].length} registros`);
+      }
+    } catch (e) {
+      console.error(`[pm] Exception cargando ${name}:`, e);
+      results[name] = [];
+      pmaState.loadError = pmaState.loadError || `Exception cargando ${name}: ${e.message}`;
+    }
+  }
+
+  pmaState.properties = results.properties || [];
+  pmaState.units = results.units || [];
+  pmaState.bookings = results.bookings || [];
+  pmaState.tenants = results.tenants || [];
+  pmaState.payments = results.payments || [];
+
+  console.log('[pm] Carga completa:', {
+    properties: pmaState.properties.length,
+    units: pmaState.units.length,
+    bookings: pmaState.bookings.length,
+    tenants: pmaState.tenants.length,
+    payments: pmaState.payments.length
+  });
+
   pmaState.loading = false;
   pmRender();
 }
@@ -119,6 +172,23 @@ function pmRender() {
   if (!root) return;
   if (pmaState.loading) {
     root.innerHTML = '<div class="p-8 text-center text-slate-500">⏳ Cargando datos...</div>';
+    return;
+  }
+  if (pmaState.loadError) {
+    root.innerHTML = `
+      <div class="p-8">
+        <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
+          <div class="text-5xl mb-2">⚠️</div>
+          <div class="font-bold text-red-900 mb-2">No pude cargar los datos</div>
+          <div class="text-sm text-red-700 mb-4 whitespace-pre-wrap">${pmaState.loadError}</div>
+          <div class="flex gap-2 justify-center">
+            <button onclick="pmLoadAll()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded">🔄 Reintentar</button>
+            <button onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-sm font-bold px-4 py-2 rounded">Cerrar</button>
+          </div>
+          <div class="text-[10px] text-red-600 mt-3">Abrí la consola (F12 → Console) para ver el error completo</div>
+        </div>
+      </div>
+    `;
     return;
   }
   root.innerHTML = `
@@ -916,6 +986,33 @@ async function pmEditProperty(id) {
 }
 window.pmEditProperty = pmEditProperty;
 
+// Helper: reabre el modal del PM después de un CRUD (porque closeModal cierra el modal padre)
+async function pmAfterCrud(updateLocalFn) {
+  if (typeof updateLocalFn === 'function') updateLocalFn();
+  closeModal();
+  // Re-abrir el modal del PM con los datos refrescados
+  await new Promise(rs => setTimeout(rs, 80));
+  openPmSystem();
+}
+window.pmAfterCrud = pmAfterCrud;
+
+// Helper: ejecuta query Supabase con manejo de error claro
+async function pmExecQuery(qPromise, opLabel) {
+  try {
+    const r = await qPromise;
+    if (r && r.error) {
+      console.error('[pm]', opLabel, 'error:', r.error);
+      alert('⚠️ ' + opLabel + ' falló:\n\n' + (r.error.message || JSON.stringify(r.error)) + '\n\nVerificá: sesión activa, RLS, datos válidos.');
+      return null;
+    }
+    return r;
+  } catch (e) {
+    console.error('[pm]', opLabel, 'exception:', e);
+    alert('⚠️ ' + opLabel + ' excepción:\n\n' + (e.message || String(e)));
+    return null;
+  }
+}
+
 async function pmSaveProperty(id) {
   const payload = {
     name: document.getElementById('pm-pf-name').value.trim(),
@@ -931,19 +1028,20 @@ async function pmSaveProperty(id) {
     notes: document.getElementById('pm-pf-notes').value.trim() || null
   };
   if (!payload.name) return alert('El nombre es obligatorio.');
-  try {
-    if (id) await sb.from('pm_properties').update(payload).eq('id', id);
-    else await sb.from('pm_properties').insert(payload);
-    closeModal();
-    await pmLoadAll();
-  } catch (e) { alert('Error: ' + e.message); }
+  const r = id
+    ? await pmExecQuery(sb.from('pm_properties').update(payload).eq('id', id).select(), 'Update propiedad')
+    : await pmExecQuery(sb.from('pm_properties').insert(payload).select(), 'Crear propiedad');
+  if (!r) return; // error ya mostrado
+  console.log('[pm] propiedad guardada:', r.data);
+  await pmAfterCrud();
 }
 window.pmSaveProperty = pmSaveProperty;
 
 async function pmDeleteProperty(id) {
   if (!confirm('¿Eliminar esta propiedad y todas sus unidades/reservas?')) return;
-  try { await sb.from('pm_properties').delete().eq('id', id); closeModal(); await pmLoadAll(); }
-  catch (e) { alert('Error: ' + e.message); }
+  const r = await pmExecQuery(sb.from('pm_properties').delete().eq('id', id), 'Eliminar propiedad');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmDeleteProperty = pmDeleteProperty;
 
@@ -981,23 +1079,24 @@ async function pmSaveUnit(id, propertyId) {
     code: document.getElementById('pm-uf-code').value.trim(),
     name: document.getElementById('pm-uf-name').value.trim() || null,
     unit_type: document.getElementById('pm-uf-type').value,
-    target_rent: +document.getElementById('pm-uf-rent').value || null
+    target_rent: +document.getElementById('pm-uf-rent').value || null,
+    is_active: true
   };
   if (!payload.code) return alert('El código es obligatorio.');
   if (!payload.property_id) return alert('Falta propiedad.');
-  try {
-    if (id) await sb.from('pm_units').update(payload).eq('id', id);
-    else await sb.from('pm_units').insert(payload);
-    closeModal();
-    await pmLoadAll();
-  } catch (e) { alert('Error: ' + e.message); }
+  const r = id
+    ? await pmExecQuery(sb.from('pm_units').update(payload).eq('id', id).select(), 'Update unidad')
+    : await pmExecQuery(sb.from('pm_units').insert(payload).select(), 'Crear unidad');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmSaveUnit = pmSaveUnit;
 
 async function pmDeleteUnit(id) {
   if (!confirm('¿Eliminar esta unidad?')) return;
-  try { await sb.from('pm_units').delete().eq('id', id); closeModal(); await pmLoadAll(); }
-  catch (e) { alert('Error: ' + e.message); }
+  const r = await pmExecQuery(sb.from('pm_units').delete().eq('id', id), 'Eliminar unidad');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmDeleteUnit = pmDeleteUnit;
 
@@ -1076,19 +1175,19 @@ async function pmSaveBooking(id) {
     notes: document.getElementById('pm-bf-notes').value.trim() || null
   };
   if (!payload.start_date) return alert('La fecha de inicio es obligatoria.');
-  try {
-    if (id) await sb.from('pm_bookings').update(payload).eq('id', id);
-    else await sb.from('pm_bookings').insert(payload);
-    closeModal();
-    await pmLoadAll();
-  } catch (e) { alert('Error: ' + e.message); }
+  const r = id
+    ? await pmExecQuery(sb.from('pm_bookings').update(payload).eq('id', id).select(), 'Update reserva')
+    : await pmExecQuery(sb.from('pm_bookings').insert(payload).select(), 'Crear reserva');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmSaveBooking = pmSaveBooking;
 
 async function pmDeleteBooking(id) {
   if (!confirm('¿Eliminar esta reserva?')) return;
-  try { await sb.from('pm_bookings').delete().eq('id', id); closeModal(); await pmLoadAll(); }
-  catch (e) { alert('Error: ' + e.message); }
+  const r = await pmExecQuery(sb.from('pm_bookings').delete().eq('id', id), 'Eliminar reserva');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmDeleteBooking = pmDeleteBooking;
 
@@ -1167,19 +1266,19 @@ async function pmSavePayment(id) {
   };
   if (!payload.concept) return alert('El concepto es obligatorio.');
   if (!payload.amount) return alert('El monto es obligatorio.');
-  try {
-    if (id) await sb.from('pm_payments').update(payload).eq('id', id);
-    else await sb.from('pm_payments').insert(payload);
-    closeModal();
-    await pmLoadAll();
-  } catch (e) { alert('Error: ' + e.message); }
+  const r = id
+    ? await pmExecQuery(sb.from('pm_payments').update(payload).eq('id', id).select(), 'Update movimiento')
+    : await pmExecQuery(sb.from('pm_payments').insert(payload).select(), 'Crear movimiento');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmSavePayment = pmSavePayment;
 
 async function pmDeletePayment(id) {
   if (!confirm('¿Eliminar este movimiento?')) return;
-  try { await sb.from('pm_payments').delete().eq('id', id); closeModal(); await pmLoadAll(); }
-  catch (e) { alert('Error: ' + e.message); }
+  const r = await pmExecQuery(sb.from('pm_payments').delete().eq('id', id), 'Eliminar movimiento');
+  if (!r) return;
+  await pmAfterCrud();
 }
 window.pmDeletePayment = pmDeletePayment;
 
