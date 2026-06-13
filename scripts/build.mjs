@@ -59,6 +59,7 @@ const STATIC_COPY = [
   "config.public.js",
   "viral.html",
   "viral.js",
+  "base_conocimiento.json",
   "diag.html",
   "mi-plan.html",
   "favicon.ico",

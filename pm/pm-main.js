@@ -749,36 +749,50 @@ function pmRenderCalendar() {
     ? `${monthNames[pmaState.calendarMonth]} ${pmaState.calendarYear}`
     : `${pmaState.calendarYear}`;
 
+  const focusedProp = filter ? pmaState.properties.find(p => p.id === filter) : null;
   return `
     <div class="space-y-3 p-1">
-      <!-- Header con título + toggle vista + navegación -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="text-xl">📅</span>
-            <strong class="text-base text-slate-900">Calendario de Ocupación</strong>
-            <span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">${periodLabel}</span>
+      <!-- HEADER STICKY con navegación siempre visible -->
+      <div class="sticky top-0 z-30 bg-white border-b border-slate-200 -mx-1 px-3 py-2" style="margin-top:-4px;">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-3 flex-wrap">
+            <!-- Navegación BIG ← → -->
+            <div class="inline-flex bg-slate-900 text-white rounded-lg overflow-hidden">
+              <button onclick="pmCalNavPrev()" class="px-3 py-2 hover:bg-slate-700 text-lg font-bold transition" title="Anterior (←)">←</button>
+              <button onclick="pmCalNavToday()" class="px-4 py-2 hover:bg-slate-700 text-xs font-bold border-l border-r border-slate-700 transition" title="Volver a hoy">HOY</button>
+              <button onclick="pmCalNavNext()" class="px-3 py-2 hover:bg-slate-700 text-lg font-bold transition" title="Siguiente (→)">→</button>
+            </div>
+            <!-- Periodo actual visible y grande -->
+            <div>
+              <div class="text-lg font-bold text-slate-900 leading-tight">${periodLabel}</div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider">${view==='month'?'Vista mensual':'Vista anual'}${focusedProp?` · enfocado en una propiedad`:''}</div>
+            </div>
           </div>
-          <div class="text-[11px] text-slate-500 mt-0.5">${view==='month'?'Vista mensual — Click reserva para ver detalles':'Vista anual — Detecta huecos y planifica rotaciones'}</div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <!-- Toggle vista -->
+            <div class="inline-flex bg-slate-100 rounded-lg p-0.5">
+              <button onclick="pmaState.calendarView='month';pmRender()" class="px-3 py-1.5 text-xs font-bold rounded ${view==='month'?'bg-white text-slate-900 shadow':'text-slate-500 hover:text-slate-700'}">📆 Mes</button>
+              <button onclick="pmaState.calendarView='year';pmRender()" class="px-3 py-1.5 text-xs font-bold rounded ${view==='year'?'bg-white text-slate-900 shadow':'text-slate-500 hover:text-slate-700'}">📊 Año</button>
+            </div>
+            ${focusedProp ? `
+              <button onclick="pmaState.calendarFilterPropertyId=null;pmRender()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded" title="Ver todas las propiedades">↩ Ver todas</button>
+            ` : `
+              <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1.5 max-w-[200px]">
+                <option value="">Todas las propiedades</option>
+                ${pmaState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+              </select>
+            `}
+            <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Reserva</button>
+          </div>
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <!-- Toggle vista -->
-          <div class="inline-flex bg-slate-100 rounded-lg p-0.5">
-            <button onclick="pmaState.calendarView='month';pmRender()" class="px-3 py-1 text-xs font-bold rounded ${view==='month'?'bg-white text-slate-900 shadow':'text-slate-500'}">📆 Mes</button>
-            <button onclick="pmaState.calendarView='year';pmRender()" class="px-3 py-1 text-xs font-bold rounded ${view==='year'?'bg-white text-slate-900 shadow':'text-slate-500'}">📊 Año</button>
+        ${focusedProp ? `
+          <div class="mt-2 bg-blue-50 border border-blue-200 rounded p-2 flex items-center gap-2 flex-wrap">
+            <span class="text-lg">🏠</span>
+            <strong class="text-sm text-blue-900">${(focusedProp.name||'').replace(/</g,'&lt;')}</strong>
+            <span class="text-[10px] text-blue-700">· ${pmUnitsOf(focusedProp.id).length} unidades · ${(focusedProp.address||'').replace(/</g,'&lt;')}</span>
+            <button onclick="pmaState.calendarFilterPropertyId=null;pmRender()" class="ml-auto text-[10px] text-blue-700 hover:underline">↩ Salir del foco</button>
           </div>
-          <select onchange="pmaState.calendarFilterPropertyId=this.value||null;pmRender()" class="text-xs border border-slate-300 rounded px-2 py-1 max-w-[180px]">
-            <option value="">Todas las propiedades</option>
-            ${pmaState.properties.map(p => `<option value="${p.id}" ${filter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
-          </select>
-          <!-- Navegación temporal -->
-          <div class="inline-flex bg-white border border-slate-300 rounded-lg overflow-hidden">
-            <button onclick="pmCalNavPrev()" class="px-2 py-1 hover:bg-slate-100 text-sm">←</button>
-            <button onclick="pmCalNavToday()" class="px-3 py-1 hover:bg-slate-100 text-xs font-bold border-l border-r border-slate-300">Hoy</button>
-            <button onclick="pmCalNavNext()" class="px-2 py-1 hover:bg-slate-100 text-sm">→</button>
-          </div>
-          <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Reserva</button>
-        </div>
+        ` : ''}
       </div>
 
       ${dupesHidden ? `<div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">⚠️ Se detectaron <strong>${dupesHidden} unidades duplicadas</strong> con el mismo código en la misma propiedad. Se muestran fusionadas. Para limpiarlas definitivamente, andá al tab Propiedades → click en la propiedad → eliminá los duplicados.</div>` : ''}
@@ -847,7 +861,10 @@ function pmRenderCalendar() {
                 </div>
                 ${propEmpty > 0 ? `<div class="text-[11px] text-red-700 mt-0.5">⚠️ ${propEmpty} días vacíos — ~$${propLost.toLocaleString()} perdidos</div>` : `<div class="text-[11px] text-emerald-700 mt-0.5">✓ Sin huecos detectados</div>`}
               </div>
-              <button onclick="pmaState.tab='properties';pmaState.expandedProperties=pmaState.expandedProperties||new Set();pmaState.expandedProperties.add('${p.id}');pmRender()" class="text-[11px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-3 py-1 rounded">Ver propiedad →</button>
+              <div class="flex gap-1">
+                ${!focusedProp ? `<button onclick="pmaState.calendarFilterPropertyId='${p.id}';pmRender()" class="text-[11px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1 rounded" title="Ver solo esta propiedad en el calendario">🔍 Enfocar</button>` : ''}
+                <button onclick="pmaState.tab='properties';pmaState.expandedProperties=pmaState.expandedProperties||new Set();pmaState.expandedProperties.add('${p.id}');pmRender()" class="text-[11px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-3 py-1 rounded">Detalle →</button>
+              </div>
             </div>
             ${view === 'month'
               ? pmRenderMonthTimelineForUnits(units, pmaState.calendarYear, pmaState.calendarMonth)
@@ -1104,7 +1121,7 @@ function pmShowBookingDetail(bookingId) {
 
       <!-- Acciones -->
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
+        <button onclick="pmBackToPm()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">↩ Volver al calendario</button>
         ${tenant?.phone ? `<a href="https://wa.me/${(tenant.phone||'').replace(/\\D/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 py-2 rounded text-center">💬 WhatsApp</a>` : ''}
         ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded text-center">📄 Contrato</a>` : ''}
         <button onclick="closeModal();pmEditBooking('${b.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✏️ Editar reserva</button>
@@ -1113,6 +1130,13 @@ function pmShowBookingDetail(bookingId) {
   `);
 }
 window.pmShowBookingDetail = pmShowBookingDetail;
+
+// Helper · cierra el modal hijo y reabre el módulo PM (no destruye toda la sesión)
+function pmBackToPm() {
+  closeModal();
+  setTimeout(() => openPmSystem(), 80);
+}
+window.pmBackToPm = pmBackToPm;
 
 // Click sobre un día vacío del calendario → abrir form de nueva reserva pre-llenado
 function pmCreateBookingFromDay(unitId, year, month, day) {
