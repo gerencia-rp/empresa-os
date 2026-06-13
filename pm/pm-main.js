@@ -1240,8 +1240,10 @@ function pmRenderSingleListing(unit, allUnits) {
             <button onclick="pmCalSingleNavMonth(1)" class="bg-white border border-slate-300 rounded-full w-9 h-9 hover:bg-slate-50 text-sm font-bold">→</button>
           </div>
         </div>
-        <div class="flex-1 overflow-y-auto p-5 space-y-8">
-          ${monthsToShow.map(({year, month}) => pmRenderMonthAirbnbStyle(unit, year, month, monthNames)).join('')}
+        <div class="flex-1 overflow-y-auto p-3">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            ${monthsToShow.map(({year, month}) => pmRenderMonthAirbnbStyle(unit, year, month, monthNames)).join('')}
+          </div>
         </div>
       </div>
       <div class="border-l border-slate-200 bg-white p-4 flex flex-col" style="width:280px;flex-shrink:0;overflow-y:auto;">
@@ -1338,21 +1340,19 @@ function pmRenderMonthAirbnbStyle(unit, year, month, monthNames) {
             : 'rounded-md';
 
           if (bk) {
-            return `<button onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${bk.id}';pmRender()" class="${c.bg} ${c.text} ${roundClass} ${isToday?'ring-2 ring-red-500':''} hover:brightness-95 transition cursor-pointer relative overflow-hidden text-left ${isPast?'opacity-60':''}" style="height:62px;padding:5px 6px;">
-              <div class="flex items-start justify-between">
-                <span class="text-[11px] font-bold">${d}</span>
-                ${isBkStart ? `<span class="${c.dot} w-1.5 h-1.5 rounded-full mt-1"></span>` : ''}
+            return `<button title="${tenant} · $${Number(bk.rent_amount||0).toLocaleString()}" onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${bk.id}';pmRender()" class="${c.bg} ${c.text} ${roundClass} ${isToday?'ring-2 ring-red-500':''} hover:brightness-95 transition cursor-pointer relative overflow-hidden text-left ${isPast?'opacity-60':''}" style="height:46px;padding:3px 5px;">
+              <div class="flex items-start justify-between leading-none">
+                <span class="text-[10px] font-bold">${d}</span>
+                ${isBkStart ? `<span class="${c.dot} w-1.5 h-1.5 rounded-full"></span>` : ''}
               </div>
-              ${isBkStart ? `<div class="text-[9px] font-bold truncate mt-1">${tenant.replace(/</g,'&lt;')}</div>` : ''}
-              ${isBkStart && bk.rent_amount ? `<div class="text-[9px] opacity-80">$${Number(bk.rent_amount).toLocaleString()}</div>` : ''}
+              ${isBkStart ? `<div class="text-[8px] font-bold truncate mt-0.5 leading-tight">${tenant.slice(0,12).replace(/</g,'&lt;')}</div>` : ''}
             </button>`;
           }
           // Día libre: card blanca con número y precio sutil
-          const dayNumColor = isPast ? 'text-slate-300 line-through' : (isWeekend ? 'text-slate-600' : 'text-slate-800');
-          return `<button onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" class="bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 ${roundClass} ${isToday?'ring-2 ring-red-500 border-red-300':''} ${isWeekend?'bg-slate-50/60':''} transition cursor-pointer text-left" style="height:62px;padding:5px 6px;">
-            <div class="text-[11px] font-bold ${dayNumColor}">${d}</div>
-            ${unit.target_rent && !isPast ? `<div class="text-[9px] text-slate-400 mt-1">$${Math.round(unit.target_rent/30)}</div>` : ''}
-            ${isToday ? '<div class="text-[8px] text-red-600 font-bold mt-0.5 uppercase">Hoy</div>' : ''}
+          const dayNumColor = isPast ? 'text-slate-300 line-through' : (isWeekend ? 'text-slate-500' : 'text-slate-800');
+          return `<button title="Crear reserva el ${d}" onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" class="bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 ${roundClass} ${isToday?'ring-2 ring-red-500 border-red-300':''} ${isWeekend?'bg-slate-50/60':''} transition cursor-pointer text-left" style="height:46px;padding:3px 5px;">
+            <div class="text-[10px] font-bold ${dayNumColor} leading-none">${d}</div>
+            ${isToday ? '<div class="text-[7px] text-red-600 font-bold mt-1 uppercase leading-none">Hoy</div>' : (unit.target_rent && !isPast ? `<div class="text-[8px] text-slate-400 mt-1 leading-none">$${Math.round(unit.target_rent/30)}</div>` : '')}
           </button>`;
         }).join('')}
       </div>
