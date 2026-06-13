@@ -66,7 +66,8 @@ const STATIC_COPY = [
   "sw.js",
   "icon-192.png",
   "icon-512.png",
-  "supabase/cleaning-planner-schema.sql"  // copia para que el banner de error pueda servirlo al copy-to-clipboard
+  "supabase/cleaning-planner-schema.sql",  // copia para que el banner de error pueda servirlo al copy-to-clipboard
+  "supabase/cleaning-planner-cleanup-seed.sql"  // borrar seed de prueba
 ];
 
 async function fileExists(p) {

@@ -278,7 +278,7 @@ async function openCleaningPlanner(sys) {
   clState.sys = sys;
   if (!clState.date) clState.date = clDateOnly(new Date());
   await clLoadAll();
-  openModal(`🧰 ${sys.name}`, '<div id="op-root"></div>');
+  clOpenSubmodal(`🧰 ${sys.name}`, '<div id="op-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   clRender();
@@ -294,10 +294,32 @@ async function clRefocusPlanner() {
   }
   titleEl.textContent = `🧰 ${clState.sys.name}`;
   bodyEl.innerHTML = '<div id="op-root"></div>';
+  // Restaurar el botón X al comportamiento normal
+  _clRestoreCloseButton();
   try { await clLoadAll(); } catch (e) { console.warn('clLoadAll on refocus', e); }
   clRender();
 }
 window.clRefocusPlanner = clRefocusPlanner;
+
+// SUBMODAL wrapper — override del X para que vuelva al planner
+function clOpenSubmodal(title, html) {
+  openModal(title, html);
+  const headerBtn = document.querySelector('#modal > div > div:first-child button');
+  if (headerBtn) {
+    headerBtn.setAttribute('onclick', 'clRefocusPlanner()');
+    headerBtn.setAttribute('title', 'Volver al calendario');
+  }
+  window._clInSubmodal = true;
+}
+function _clRestoreCloseButton() {
+  const headerBtn = document.querySelector('#modal > div > div:first-child button');
+  if (headerBtn) {
+    headerBtn.setAttribute('onclick', 'closeModal()');
+    headerBtn.setAttribute('title', '');
+  }
+  window._clInSubmodal = false;
+}
+window.clOpenSubmodal = clOpenSubmodal;
 
 // ─── Render principal ───
 function clRender() {
@@ -1457,7 +1479,7 @@ function clOpenAddCasa(propId) {
       </div>
     </div>
   `;
-  openModal(isEdit ? '✏️ Editar casa' : '+ Nueva casa', html);
+  clOpenSubmodal(isEdit ? '✏️ Editar casa' : '+ Nueva casa', html);
 }
 
 async function clSaveCasa(propId) {
@@ -1856,7 +1878,7 @@ function clOpenAddPendiente() {
       </div>
     </div>
   `;
-  openModal('+ Pendiente al backlog', html);
+  clOpenSubmodal('+ Pendiente al backlog', html);
 }
 
 function clPendienteFromTemplate(sel) {
@@ -1954,7 +1976,7 @@ function clOpenArmarDia() {
       </div>
     </div>
   `;
-  openModal(`🎯 Armar día — ${clFmtDate(clState.date)}`, html);
+  clOpenSubmodal(`🎯 Armar día — ${clFmtDate(clState.date)}`, html);
 }
 
 async function clEjecutarArmarDia() {
@@ -2190,7 +2212,7 @@ function _opOpenEditModal(t, isBacklog) {
       </div>
     </div>
   `;
-  openModal(isBacklog ? `✏️ Editar pendiente` : `✏️ Editar tarea agendada`, html);
+  clOpenSubmodal(isBacklog ? `✏️ Editar pendiente` : `✏️ Editar tarea agendada`, html);
 }
 
 async function clSaveEdit(id, isBacklog) {
@@ -2434,7 +2456,7 @@ function clOpenAddLoose(presetTarget) {
       </div>
     </div>
   `;
-  openModal('+ Nueva tarea', html);
+  clOpenSubmodal('+ Nueva tarea', html);
 }
 
 // Pre-llena el form desde una plantilla seleccionada
@@ -2589,7 +2611,7 @@ function clOpenChecklist(taskId) {
       <button onclick="clRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
-  openModal(`📋 Entregables`, html);
+  clOpenSubmodal(`📋 Entregables`, html);
 }
 
 async function clToggleChecklistItem(taskId, idx) {
@@ -2698,7 +2720,7 @@ function clOpenManageRecurring() {
       <button onclick="clRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
-  openModal('⚙️ Tareas recurrentes', html);
+  clOpenSubmodal('⚙️ Tareas recurrentes', html);
 }
 
 async function clCreateRecurring() {
@@ -2804,7 +2826,7 @@ function clOpenApplyTemplate() {
       <button onclick="clRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
     </div>
   `;
-  openModal('📋 Aplicar plantilla de día', html);
+  clOpenSubmodal('📋 Aplicar plantilla de día', html);
 }
 
 // Aplicar plantilla — inserta todas las tareas al día actual
@@ -3031,7 +3053,7 @@ function clOpenConvertToRecurring(taskId) {
       </div>
     </div>
   `;
-  openModal('🔁 Convertir a recurrente', html);
+  clOpenSubmodal('🔁 Convertir a recurrente', html);
 }
 
 async function clConvertToRecurring(taskId) {
@@ -3238,7 +3260,7 @@ function clRenderEditDayTemplate() {
       </div>
     </div>
   `;
-  openModal('✏️ Editar plantilla de día', html);
+  clOpenSubmodal('✏️ Editar plantilla de día', html);
 }
 
 // Mutadores del state editable
@@ -3489,7 +3511,7 @@ function clOpenTemplateModal(tmpl, prefilledCategory) {
       </div>
     </div>
   `;
-  openModal(isEdit ? '✏️ Editar plantilla' : '+ Nueva plantilla de tarea', html);
+  clOpenSubmodal(isEdit ? '✏️ Editar plantilla' : '+ Nueva plantilla de tarea', html);
 }
 
 async function clSaveTemplate(id) {

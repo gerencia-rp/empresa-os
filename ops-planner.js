@@ -265,10 +265,59 @@ async function opRefocusPlanner() {
   }
   titleEl.textContent = `🧰 ${opState.sys.name}`;
   bodyEl.innerHTML = '<div id="op-root"></div>';
+  // Restaurar el botón X al comportamiento normal (cerrar modal entero)
+  _opRestoreCloseButton();
   try { await opLoadAll(); } catch (e) { console.warn('opLoadAll on refocus', e); }
   opRender();
 }
 window.opRefocusPlanner = opRefocusPlanner;
+
+// ═══════════════════════════════════════════════════════════════════
+// SUBMODAL — Cuando abrimos un sub-modal (editar, +Pendiente, etc) desde
+// dentro del planner, override del X y del backdrop para que vuelvan al
+// planner principal en lugar de CERRAR TODO el cronograma.
+// ═══════════════════════════════════════════════════════════════════
+function opOpenSubmodal(title, html) {
+  openModal(title, html);
+  // Override del botón X (×): que llame a opRefocusPlanner en vez de closeModal
+  const headerBtn = document.querySelector('#modal > div > div:first-child button');
+  if (headerBtn) {
+    headerBtn.setAttribute('onclick', 'opRefocusPlanner()');
+    headerBtn.setAttribute('title', 'Volver al calendario');
+  }
+  // Override del backdrop: click afuera del modal vuelve al planner (no cierra)
+  window._opInSubmodal = true;
+}
+function _opRestoreCloseButton() {
+  const headerBtn = document.querySelector('#modal > div > div:first-child button');
+  if (headerBtn) {
+    headerBtn.setAttribute('onclick', 'closeModal()');
+    headerBtn.setAttribute('title', '');
+  }
+  window._opInSubmodal = false;
+}
+window.opOpenSubmodal = opOpenSubmodal;
+
+// Interceptar click en backdrop: si estamos en un submodal del planner,
+// volver al planner en lugar de cerrar. Solo se instala una vez.
+(function _opInstallBackdropInterceptor() {
+  if (window._opBackdropInstalled) return;
+  window._opBackdropInstalled = true;
+  document.addEventListener('click', (e) => {
+    const modal = document.getElementById('modal');
+    if (!modal || e.target !== modal) return;
+    // Si estamos en un submodal del planner ops o cleaning, volver al planner
+    if (window._opInSubmodal && typeof opRefocusPlanner === 'function') {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      opRefocusPlanner();
+    } else if (window._clInSubmodal && typeof clRefocusPlanner === 'function') {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      clRefocusPlanner();
+    }
+  }, true); // capture: true → corre ANTES del listener de app.js
+})();
 
 // Toast no bloqueante para feedback rápido
 function opToast(msg, type = 'info') {
@@ -1473,7 +1522,7 @@ function opOpenAddCasa(propId) {
       </div>
     </div>
   `;
-  openModal(isEdit ? '✏️ Editar casa' : '+ Nueva casa', html);
+  opOpenSubmodal(isEdit ? '✏️ Editar casa' : '+ Nueva casa', html);
 }
 
 async function opSaveCasa(propId) {
@@ -1692,7 +1741,7 @@ function opOpenAddPendiente() {
       </div>
     </div>
   `;
-  openModal('+ Pendiente al backlog', html);
+  opOpenSubmodal('+ Pendiente al backlog', html);
 }
 
 function opPendienteFromTemplate(sel) {
@@ -1789,7 +1838,7 @@ function opOpenArmarDia() {
       </div>
     </div>
   `;
-  openModal(`🎯 Armar día — ${opFmtDate(opState.date)}`, html);
+  opOpenSubmodal(`🎯 Armar día — ${opFmtDate(opState.date)}`, html);
 }
 
 async function opEjecutarArmarDia() {
@@ -2025,7 +2074,7 @@ function _opOpenEditModal(t, isBacklog) {
       </div>
     </div>
   `;
-  openModal(isBacklog ? `✏️ Editar pendiente` : `✏️ Editar tarea agendada`, html);
+  opOpenSubmodal(isBacklog ? `✏️ Editar pendiente` : `✏️ Editar tarea agendada`, html);
 }
 
 async function opSaveEdit(id, isBacklog) {
@@ -2268,7 +2317,7 @@ function opOpenAddLoose(presetTarget) {
       </div>
     </div>
   `;
-  openModal('+ Nueva tarea', html);
+  opOpenSubmodal('+ Nueva tarea', html);
 }
 
 // Pre-llena el form desde una plantilla seleccionada
@@ -2422,7 +2471,7 @@ function opOpenChecklist(taskId) {
       <button onclick="opRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
-  openModal(`📋 Entregables`, html);
+  opOpenSubmodal(`📋 Entregables`, html);
 }
 
 async function opToggleChecklistItem(taskId, idx) {
@@ -2531,7 +2580,7 @@ function opOpenManageRecurring() {
       <button onclick="opRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">← Volver</button>
     </div>
   `;
-  openModal('⚙️ Tareas recurrentes', html);
+  opOpenSubmodal('⚙️ Tareas recurrentes', html);
 }
 
 async function opCreateRecurring() {
@@ -2637,7 +2686,7 @@ function opOpenApplyTemplate() {
       <button onclick="opRefocusPlanner()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
     </div>
   `;
-  openModal('📋 Aplicar plantilla de día', html);
+  opOpenSubmodal('📋 Aplicar plantilla de día', html);
 }
 
 // Aplicar plantilla — inserta todas las tareas al día actual
@@ -2866,7 +2915,7 @@ function opOpenConvertToRecurring(taskId) {
       </div>
     </div>
   `;
-  openModal('🔁 Convertir a recurrente', html);
+  opOpenSubmodal('🔁 Convertir a recurrente', html);
 }
 
 async function opConvertToRecurring(taskId) {
@@ -3073,7 +3122,7 @@ function opRenderEditDayTemplate() {
       </div>
     </div>
   `;
-  openModal('✏️ Editar plantilla de día', html);
+  opOpenSubmodal('✏️ Editar plantilla de día', html);
 }
 
 // Mutadores del state editable
@@ -3327,7 +3376,7 @@ function opOpenTemplateModal(tmpl, prefilledCategory) {
       </div>
     </div>
   `;
-  openModal(isEdit ? '✏️ Editar plantilla' : '+ Nueva plantilla de tarea', html);
+  opOpenSubmodal(isEdit ? '✏️ Editar plantilla' : '+ Nueva plantilla de tarea', html);
 }
 
 async function opSaveTemplate(id) {

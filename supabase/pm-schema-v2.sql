@@ -3,6 +3,14 @@
 -- IDEMPOTENTE: corré después de pm-schema.sql cuando quieras.
 -- ════════════════════════════════════════════════════════════════
 
+-- ── 0. DEFENSIVO: garantizar que external_id existe en todas las tablas ──
+--    (el schema original de bookings tiene external_ref, no external_id —
+--     este ADD COLUMN IF NOT EXISTS no rompe si ya existe.)
+ALTER TABLE pm_properties ADD COLUMN IF NOT EXISTS external_id TEXT;
+ALTER TABLE pm_units      ADD COLUMN IF NOT EXISTS external_id TEXT;
+ALTER TABLE pm_tenants    ADD COLUMN IF NOT EXISTS external_id TEXT;
+ALTER TABLE pm_bookings   ADD COLUMN IF NOT EXISTS external_id TEXT;
+
 -- ── 1. EXTENDER pm_properties ──────────────────────────────────
 ALTER TABLE pm_properties
   ADD COLUMN IF NOT EXISTS zone TEXT,             -- 'norte','sur','marlin','round_rock'
