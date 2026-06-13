@@ -19,8 +19,9 @@ const pmaState = {
   calendarMonthDatePickerOpen: false,
   calendarOccupancyFilter: 'all',         // 'all' | 'occupied' | 'free'
   calendarPlatformFilter: null,           // null | 'airbnb' | 'contrato_directo' | ...
-  calendarGroupByProperty: false,         // agrupar sidebar por propiedad
+  calendarGroupByProperty: true,          // agrupar sidebar por propiedad (default ON)
   calendarCollapsedProps: {},             // { propertyId: true } — qué grupos están colapsados
+  calendarGroupsInitialized: false,       // primera vez: colapsar todos
   // Data
   properties: [],
   units: [],
@@ -755,18 +756,50 @@ function pmRenderCalendar() {
     pmaState.calendarTimelineStart = new Date().toISOString().slice(0,10);
   }
 
+  // Primera vez con agrupado: colapsar todos los grupos (que el usuario abra los que quiera ver)
+  if (pmaState.calendarGroupByProperty && !pmaState.calendarGroupsInitialized) {
+    const propIds = [...new Set(filteredUnits.map(u => u.property_id))];
+    propIds.forEach(pid => { pmaState.calendarCollapsedProps[pid] = true; });
+    pmaState.calendarGroupsInitialized = true;
+  }
+
+  // Si está agrupado y sin búsqueda activa → el timeline solo muestra units de grupos EXPANDIDOS
+  let timelineUnits = filteredUnits;
+  if (pmaState.calendarGroupByProperty && !q) {
+    timelineUnits = filteredUnits.filter(u => !pmaState.calendarCollapsedProps[u.property_id]);
+  }
+
   return `
     <div class="flex bg-white" style="height: calc(75vh - 60px); margin: -4px;">
       ${pmRenderListingsSidebar(filteredUnits, allUnits.length)}
       <div class="flex-1 flex flex-col overflow-hidden">
         ${pmRenderTimelineHeader()}
         ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900">⚠️ ${dupesHidden} unidades duplicadas fusionadas</div>` : ''}
-        <div class="flex-1 overflow-auto">${pmRenderTimelineGrid(filteredUnits)}</div>
+        <div class="flex-1 overflow-auto">${timelineUnits.length === 0 && pmaState.calendarGroupByProperty ? `
+          <div class="p-12 text-center text-slate-400 text-sm">
+            <div class="text-5xl mb-3">📂</div>
+            <div class="font-bold text-slate-600 mb-1">Todas las propiedades están colapsadas</div>
+            <div class="text-xs">Haz click en una propiedad del sidebar (▶) para ver sus unidades en el timeline</div>
+            <button onclick="pmCalExpandAll()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg">Expandir todas</button>
+          </div>
+        ` : pmRenderTimelineGrid(timelineUnits)}</div>
       </div>
       ${pmaState.calendarSelectedBookingId ? pmRenderBookingSidePanel(pmaState.calendarSelectedBookingId) : ''}
     </div>
   `;
 }
+
+function pmCalExpandAll() {
+  pmaState.calendarCollapsedProps = {};
+  pmRender();
+}
+function pmCalCollapseAll() {
+  const propIds = [...new Set(pmaState.units.map(u => u.property_id))];
+  propIds.forEach(pid => { pmaState.calendarCollapsedProps[pid] = true; });
+  pmRender();
+}
+window.pmCalExpandAll = pmCalExpandAll;
+window.pmCalCollapseAll = pmCalCollapseAll;
 
 function pmRenderListingsSidebar(filteredUnits, totalCount) {
   // Stats globales (sobre todos los listings deduplicados)
@@ -810,24 +843,33 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
   if (listingsToShow.length === 0) {
     bodyHtml = '<div class="p-6 text-center text-xs text-slate-400"><div class="text-3xl mb-2">🔍</div>Sin resultados</div>';
   } else if (groupBy && !search) {
-    // Agrupar por propiedad
+    // Agrupar por propiedad — ordenado alfabéticamente
     const groups = {};
     listingsToShow.forEach(u => {
       if (!groups[u.property_id]) groups[u.property_id] = [];
       groups[u.property_id].push(u);
     });
-    bodyHtml = Object.keys(groups).map(pid => {
+    const groupedKeys = Object.keys(groups).sort((a, b) => {
+      const na = (pmaState.properties.find(x=>x.id===a)?.name||'').toLowerCase();
+      const nb = (pmaState.properties.find(x=>x.id===b)?.name||'').toLowerCase();
+      return na.localeCompare(nb);
+    });
+    bodyHtml = groupedKeys.map(pid => {
       const p = pmaState.properties.find(x => x.id === pid);
       const collapsed = pmaState.calendarCollapsedProps[pid];
       const items = groups[pid];
       const occ = items.filter(u => pmActiveBookingOf(u.id)).length;
+      const allOcc = occ === items.length && items.length > 0;
+      const noneOcc = occ === 0;
+      const indicatorColor = allOcc ? 'bg-emerald-500' : (noneOcc ? 'bg-slate-300' : 'bg-amber-400');
       return `<div>
-        <button onclick="pmCalToggleGroup('${pid}')" class="w-full px-3 py-2 bg-slate-100 hover:bg-slate-200 border-b border-slate-200 flex items-center justify-between text-left transition">
+        <button onclick="pmCalToggleGroup('${pid}')" class="w-full px-3 py-2.5 bg-slate-100 hover:bg-slate-200 border-b border-slate-200 flex items-center justify-between text-left transition group">
           <div class="flex items-center gap-2 min-w-0 flex-1">
-            <span class="text-slate-500 text-[10px]">${collapsed ? '▶' : '▼'}</span>
+            <span class="text-slate-400 text-[10px] w-3 transition-transform" style="${collapsed?'':'transform:rotate(90deg);'}">▶</span>
+            <span class="${indicatorColor} w-2 h-2 rounded-full flex-shrink-0"></span>
             <strong class="text-[11px] uppercase tracking-wide text-slate-700 truncate">${(p?.name||'Sin propiedad').replace(/</g,'&lt;')}</strong>
           </div>
-          <span class="text-[10px] text-slate-500 flex-shrink-0">${occ}/${items.length}</span>
+          <span class="text-[10px] text-slate-500 flex-shrink-0 bg-white px-1.5 py-0.5 rounded">${occ}<span class="opacity-60">/${items.length}</span></span>
         </button>
         ${collapsed ? '' : items.map(renderItem).join('')}
       </div>`;
@@ -844,7 +886,9 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
           <strong class="text-sm text-slate-900">${totalCount} <span class="text-slate-500 font-normal">anuncios</span></strong>
           <div class="flex items-center gap-1">
             ${pmaState.calendarFilterPropertyId ? `<button onclick="pmaState.calendarFilterPropertyId=null;pmRender()" class="text-[10px] text-blue-600 hover:underline">↩ Todas</button>` : ''}
-            <button onclick="pmaState.calendarGroupByProperty=!pmaState.calendarGroupByProperty;pmRender()" title="Agrupar por propiedad" class="text-[10px] px-2 py-1 rounded ${groupBy?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">⊞ Grupos</button>
+            ${groupBy ? `<button onclick="pmCalExpandAll()" title="Expandir todo" class="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-emerald-100 hover:text-emerald-700">⇊</button>
+            <button onclick="pmCalCollapseAll()" title="Colapsar todo" class="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200">⇈</button>` : ''}
+            <button onclick="pmaState.calendarGroupByProperty=!pmaState.calendarGroupByProperty;pmRender()" title="Agrupar por propiedad" class="text-[10px] px-2 py-1 rounded ${groupBy?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">⊞ ${groupBy?'Grupos ON':'Grupos'}</button>
           </div>
         </div>
         <!-- Buscador prominente -->
@@ -1011,7 +1055,8 @@ function pmRenderTimelineGrid(units) {
         const p = pmaState.properties.find(x => x.id === unit.property_id);
         const bks = pmBookingsOf(unit.id).filter(b => {
           if (!b.start_date) return false;
-          if (!['activo','confirmado','finalizado','vencido'].includes(b.status)) return false;
+          // Mostrar TODAS excepto canceladas (incluye pendientes, reservadas, futuras)
+          if (b.status === 'cancelado' || b.status === 'cancelled') return false;
           const s = new Date(b.start_date + 'T00:00:00');
           const e = b.end_date ? new Date(b.end_date + 'T00:00:00') : new Date(s.getTime() + 365*86400000);
           return s <= days[daysCount-1] && e >= days[0];
@@ -1208,7 +1253,7 @@ function pmRenderMonthAirbnbStyle(unit, year, month, monthNames) {
   for (let i = 0; i < offset; i++) cells.push(null);
   for (let d = 1; d <= daysCount; d++) cells.push(d);
   const bks = pmBookingsOf(unit.id).filter(b => {
-    if (!['activo','confirmado','finalizado','vencido'].includes(b.status)) return false;
+    if (b.status === 'cancelado' || b.status === 'cancelled') return false;
     if (!b.start_date) return false;
     const s = new Date(b.start_date);
     const e = b.end_date ? new Date(b.end_date) : firstDay;
@@ -1310,7 +1355,8 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
         </div>
         ${units.map(unit => {
           const allBks = pmBookingsOf(unit.id).filter(b => {
-            if (!['activo','confirmado','finalizado','vencido'].includes(b.status)) return false;
+            // Mostrar TODAS excepto canceladas (incluye pendientes, reservadas, futuras)
+          if (b.status === 'cancelado' || b.status === 'cancelled') return false;
             if (!b.start_date) return false;
             const s = new Date(b.start_date);
             const e = b.end_date ? new Date(b.end_date) : monthEnd;
