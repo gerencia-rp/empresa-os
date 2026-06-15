@@ -1279,27 +1279,9 @@ function pmDedupeUnits(units) {
     const score = (x) => (x.target_rent?2:0) + (x.bath_type?1:0) + new Date(x.created_at||0).getTime()/1e15;
     if (score(u) > score(existing)) map.set(key, u);
   });
-  // Si quedan unidades con mismo code pero distinto rent, des-ambiguar el code visual
-  // agregando un sufijo "(B)", "(C)", etc. para que el PM vea claro que son distintas
-  const units2 = Array.from(map.values());
-  const byCode = {};
-  units2.forEach(u => {
-    const k = `${u.property_id}|${(u.code||'').toUpperCase()}`;
-    if (!byCode[k]) byCode[k] = [];
-    byCode[k].push(u);
-  });
-  Object.values(byCode).forEach(arr => {
-    if (arr.length > 1) {
-      arr.sort((a,b) => (a.target_rent||0) - (b.target_rent||0));
-      arr.forEach((u, idx) => {
-        if (idx > 0) {
-          // Anotar variante en la copia local (sin tocar la DB)
-          u._displaySuffix = ` (${String.fromCharCode(65+idx)})`; // (B), (C)...
-        }
-      });
-    }
-  });
-  return units2;
+  // El sync ahora produce 1 pm_unit por unidad física (clave property+tipo),
+  // así que NO se agrega sufijo "(B)/(C)": cada unidad ya es única.
+  return Array.from(map.values());
 }
 
 function pmRenderCalendar() {

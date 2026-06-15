@@ -521,9 +521,21 @@ Deno.serve(async (req) => {
     });
 
     // ════════════════════════════════════════════════════════════
-    // 3) BOOKINGS desde Datos x Casa
+    // 3) BOOKINGS desde Datos x Casa (+ Base de datos Tenant en 3b)
     // ════════════════════════════════════════════════════════════
     const bookings: any[] = [];
+    const today0 = new Date().toISOString().slice(0, 10);
+    // Dedup de reservas: clave (unit_id + nombre inquilino + check_in)
+    const bookingKeys = new Set<string>();
+    const bkKey = (uid: string, nm: string | null, ci: string | null) => `${uid}|${slugify(nm || "")}|${ci || ""}`;
+    // Status SIEMPRE por fechas (se ignora el campo Estado de Airtable).
+    // Vocabulario interno activo/confirmado/finalizado ≡ active/upcoming/past
+    // (se mantiene en español para no romper el frontend ni los joins).
+    const deriveStatus = (ci: string | null, co: string | null): string => {
+      if (ci && ci > today0) return "confirmado";            // upcoming
+      if (co && co < today0) return "finalizado";            // past
+      return "activo";                                       // active (ci<=hoy<=co o sin co)
+    };
     for (const r of datosCasa) {
       const inquilino = r.fields?.[F.dxc_inquilino];
       if (!inquilino) continue;
@@ -535,24 +547,11 @@ Deno.serve(async (req) => {
       const tenantId = tenantIdRealByName[inquilino.toLowerCase()] || null;
       const fuentes = getMultiSel(r.fields?.[F.dxc_fuente]);
       const platformAcc = fuentes.find(f => /@|gmail|gerencia/i.test(f)) || null;
-      const estado = getSel(r.fields?.[F.dxc_estado]) || "";
       const obs = r.fields?.[F.dxc_obs] || null;
       const modelo = getSel(r.fields?.[F.dxc_modelo]) || "";
-
-      // Status derivado de ESTADO + fechas. Vocabulario interno (activo/confirmado/
-      // finalizado) ≡ active/upcoming/past del spec — se mantiene en español para no
-      // romper el frontend (pmActiveBookings filtra ['activo','confirmado']) ni los joins.
-      const today = new Date().toISOString().slice(0, 10);
       const checkOut = r.fields?.[F.dxc_fecha_out] || null;
-      let status: string;
-      if (checkOut && checkOut < today) status = "finalizado";                          // past
-      else if (startDate && startDate > today) status = "confirmado";                   // upcoming
-      else if (startDate && startDate <= today && (!checkOut || checkOut >= today)) status = "activo"; // active
-      else status = /ocupada/i.test(estado) ? "activo"
-                  : /reservado/i.test(estado) ? "confirmado"
-                  : /disponible/i.test(estado) ? "finalizado"
-                  : "activo";
 
+      bookingKeys.add(bkKey(unitInfo.id, inquilino, startDate));
       bookings.push({
         external_id: "booking-dxc-" + r.id,   // record_id de Airtable: único por reserva
         unit_id: unitInfo.id,
@@ -566,7 +565,7 @@ Deno.serve(async (req) => {
         rent_period: "mensual",
         deposit: r.fields?.[F.dxc_deposito] || 0,
         payment_day: getSel(r.fields?.[F.dxc_tiempo_pago]) || null,
-        status,
+        status: deriveStatus(startDate, checkOut),
         contract_status: inferContractStatus(obs),
         is_assistance_program: /programas de ayuda/i.test(modelo),
         contract_url: r.fields?.[F.dxc_drive] || null,
@@ -582,7 +581,60 @@ Deno.serve(async (req) => {
       }
     }
     stats.bookings = bookings.length;
-    console.log(`[pm-sync] pm_bookings: ${bookings.length} reservas creadas (N por unidad).`);
+    console.log(`[pm-sync] pm_bookings (Datos x Casa): ${bookings.length} reservas.`);
+
+    // ════════════════════════════════════════════════════════════
+    // 3b) BOOKINGS desde Base de datos Tenant — dedup por (unit+nombre+check_in)
+    //     Defensivo: solo crea la reserva si puede resolver la unidad física;
+    //     si no puede mapearla, la salta (no crea reservas huérfanas).
+    // ════════════════════════════════════════════════════════════
+    const tenantBookings: any[] = [];
+    let tenSkipped = 0, tenDeduped = 0;
+    for (const r of tenantsAt) {
+      const name = r.fields?.[F.ten_nombre];
+      const ci = r.fields?.[F.ten_fecha_in];
+      if (!name || !ci) continue;
+      const propId = findPropId(getSel(r.fields?.[F.ten_casa]) || (r.fields?.[F.ten_casa] as string) || null);
+      if (!propId) { tenSkipped++; continue; }
+      // Resolver la unidad física dentro de la propiedad
+      const propUnits = (dbUnits || []).filter((u: any) => u.property_id === propId);
+      let unit: any = null;
+      if (propUnits.length === 1) unit = propUnits[0];
+      else {
+        const ut = inferUnitType(getSel(r.fields?.[F.ten_tipo_renta]));
+        const ofType = propUnits.filter((u: any) => inferUnitType(u.name) === ut);
+        if (ofType.length === 1) unit = ofType[0];
+      }
+      if (!unit) { tenSkipped++; continue; }
+      const key = bkKey(unit.id, name, ci);
+      if (bookingKeys.has(key)) { tenDeduped++; continue; }   // ya existe (misma unidad+inquilino+check_in)
+      bookingKeys.add(key);
+      const co = r.fields?.[F.ten_fecha_out] || null;
+      tenantBookings.push({
+        external_id: "booking-ten-" + r.id,
+        unit_id: unit.id,
+        property_id: propId,
+        tenant_id: tenantIdRealByName[name.toLowerCase()] || null,
+        booking_type: inferBookingType([getSel(r.fields?.[F.ten_fuente]) || ""]),
+        start_date: ci,
+        end_date: co,
+        rent_amount: r.fields?.[F.ten_monto] || 0,
+        rent_period: "mensual",
+        payment_day: getSel(r.fields?.[F.ten_dia_pago]) || null,
+        status: deriveStatus(ci, co),
+        notes: r.fields?.[F.ten_comentario] || null
+      });
+    }
+    if (!dry_run && tenantBookings.length) {
+      for (let i = 0; i < tenantBookings.length; i += 50) {
+        const { error } = await supabase.from("pm_bookings").upsert(tenantBookings.slice(i, i + 50), { onConflict: "external_id" });
+        if (error) { errors.push("tenant bookings chunk " + i + ": " + error.message); break; }
+      }
+    }
+    stats.bookings_from_tenant = tenantBookings.length;
+    stats.bookings_tenant_deduped = tenDeduped;
+    stats.bookings_tenant_unmapped = tenSkipped;
+    console.log(`[pm-sync] pm_bookings (Tenant): ${tenantBookings.length} nuevas · ${tenDeduped} dedup · ${tenSkipped} sin mapear unidad`);
 
     // ════════════════════════════════════════════════════════════
     // 4) PAGOS (Pagos Rentas → ingresos)
