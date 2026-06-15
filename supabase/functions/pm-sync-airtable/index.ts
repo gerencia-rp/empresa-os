@@ -121,7 +121,30 @@ const F = {
   crn_fecha_in:   "fldJX2NTE5hroF8hv",
   crn_fecha_fin:  "fld6HGo7KPJ4d0AOj",
   crn_estado:     "fld9GDz5nrUylruZI",
-  crn_notes:      "fldYe07B6CU5KFCEY"
+  crn_notes:      "fldYe07B6CU5KFCEY",
+  // Gastos por casa (extra)
+  gst_drive:      "fldSWIEtwIV1JaPcd",
+  gst_factura:    "fldGw1KT0EBxwtLX0",
+  // Pagos (extra)
+  pag_comprob:    "fldjgaqPzrf5VuRSN",
+  // Gastos Por Plataforma → expenses(operational)
+  gpl_plataformas:"fldtpoBmbfCT6ebqp",
+  gpl_mes:        "fldO40Y62BLk4KDVw",
+  gpl_valor:      "fldZl3AVGCvH84rUZ",
+  gpl_plataforma: "fldvVDKmWuzxt1kyv",
+  gpl_coment:     "fldxbQbeOdZ9eiJP3",
+  gpl_factura:    "fld6OcM2NSiOXUewn",
+  // Gastos Equipo → payroll
+  geq_name:       "fldkhKgww24YXI49J",
+  geq_salario:    "fldeDHCUzfz8uLZOO",
+  geq_mes:        "fldwl9ZknNqLNWs68",
+  geq_factura:    "fldZ2QilHZmDd8mdI",
+  // Gastos Aseo y Podada → expenses(cleaning)
+  gas_plataformas:"fldzccg7TOxnjRrMW",
+  gas_mes:        "fldURODRKaGOhnTh3",
+  gas_valor:      "fld58RfGobqblHHgw",
+  gas_casa:       "fldDYEQZwMUDrVZbA",
+  gas_factura:    "fldcB0rNvrdiaxuSU"
 };
 
 // Mapear nombres legibles
@@ -139,6 +162,20 @@ function getMultiSel(cell: any): string[] {
 }
 function slugify(s: string): string {
   return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+}
+// Airtable attachment → primera URL
+function getAttachUrl(cell: any): string | null {
+  if (Array.isArray(cell) && cell[0]?.url) return cell[0].url;
+  return null;
+}
+// "Febrero 2026" / "Febrero" → { month:'febrero', year:2026|null }
+function parseMonthYear(raw: any): { month: string | null; year: number | null } {
+  const s = getSel(raw);
+  if (!s) return { month: null, year: null };
+  const ym = s.match(/(20\d{2})/);
+  const year = ym ? parseInt(ym[1]) : null;
+  const month = s.replace(/20\d{2}/, "").trim().toLowerCase() || null;
+  return { month, year };
 }
 function extractZip(addr: string): { zip?: string; city?: string; state?: string } {
   const m = (addr || "").match(/(\d{5})/);
@@ -233,25 +270,34 @@ async function fetchAllRecords(baseId: string, tableId: string, token: string): 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
-  const auth = await requireAuth(req);
-  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
+  // Cron: si el Bearer es el service_role key, es invocación server-side autorizada
+  // (solo quien tiene el service key puede hacerlo) → bypass requireAuth + usa token de env.
+  const bearer = (req.headers.get("authorization") || req.headers.get("Authorization") || "").replace(/^bearer /i, "").trim();
+  const isCron = !!SERVICE_KEY && bearer === SERVICE_KEY;
+  let userId: string | null = null;
+  if (!isCron) {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
+    userId = auth.user_id || null;
+  }
 
   let body: any = {};
-  try { body = await req.json(); } catch { return json({ ok: false, error: "JSON inválido" }, 400); }
+  try { body = await req.json(); } catch { body = {}; }
 
-  const { airtable_token, base_id, dry_run = false } = body;
-  if (!airtable_token) return json({ ok: false, error: "Falta airtable_token" }, 400);
-  if (!base_id)        return json({ ok: false, error: "Falta base_id" }, 400);
+  const dry_run = body.dry_run === true;
+  const airtable_token = body.airtable_token || Deno.env.get("AIRTABLE_API_KEY");
+  const base_id = body.base_id || Deno.env.get("AIRTABLE_BASE_ID") || "appzEnsuy4qPT6iHj";
+  if (!airtable_token) return json({ ok: false, error: "Falta airtable_token (body o AIRTABLE_API_KEY env)" }, 400);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
   const startMs = Date.now();
-  const stats: any = { properties: 0, units: 0, tenants: 0, bookings: 0, payments_in: 0, payments_out: 0, credentials: 0, tasks: 0 };
+  const stats: any = { properties: 0, units: 0, tenants: 0, bookings: 0, payments_in: 0, expenses_house: 0, expenses_operational: 0, expenses_cleaning: 0, payroll: 0, credentials: 0, wifi: 0, tasks: 0 };
   const errors: string[] = [];
 
   // Log inicio
   const { data: log } = await supabase.from("pm_sync_log").insert({
     source: "airtable",
-    user_id: auth.user_id || null,
+    user_id: userId,
     status: "running"
   }).select().single();
 
@@ -293,6 +339,19 @@ Deno.serve(async (req) => {
       if (p.external_id) propIdByExtId[p.external_id] = p.id;
       if (p.address) propIdByAddr[p.address] = p.id;
     });
+    // Lookup tolerante: exacto por slug, luego substring contra direcciones reales.
+    const findPropId = (name: string | null): string | null => {
+      if (!name) return null;
+      const exact = propIdByExtId["addr-" + slugify(name)];
+      if (exact) return exact;
+      const ns = slugify(name);
+      if (!ns) return null;
+      for (const p of (dbProps || [])) {
+        const a = slugify(p.address || "");
+        if (a && (a.includes(ns) || ns.includes(a))) return p.id;
+      }
+      return null;
+    };
 
     // 1b) Units (1 por fila de Datos x Casa). Code = slug(addr)-tipo
     const unitsArr: any[] = [];
@@ -329,9 +388,13 @@ Deno.serve(async (req) => {
     stats.units = unitsArr.length;
 
     // 1c) Bookings (de Datos x Casa, donde hay inquilino + fecha entrada)
-    const { data: dbUnits } = await supabase.from("pm_units").select("id, external_id, property_id");
+    const { data: dbUnits } = await supabase.from("pm_units").select("id, external_id, property_id, name");
     const unitIdByExtId: Record<string, { id: string; property_id: string }> = {};
-    (dbUnits || []).forEach((u: any) => { if (u.external_id) unitIdByExtId[u.external_id] = { id: u.id, property_id: u.property_id }; });
+    const unitIdByPropName: Record<string, string> = {}; // `${property_id}|${slug(name)}` → unit_id
+    (dbUnits || []).forEach((u: any) => {
+      if (u.external_id) unitIdByExtId[u.external_id] = { id: u.id, property_id: u.property_id };
+      if (u.property_id && u.name) unitIdByPropName[`${u.property_id}|${slugify(u.name)}`] = u.id;
+    });
 
     // Mapa nombre inquilino → tenant_id (lo construimos en step 2)
     // Por ahora, tenants básicos desde Datos x Casa (sin teléfono o con teléfono airtable)
@@ -447,55 +510,156 @@ Deno.serve(async (req) => {
       const paymentsIn: any[] = [];
       for (const r of pagos) {
         const casaName = getSel(r.fields?.[F.pag_casa]);
-        const propId = casaName ? (propIdByExtId["addr-" + slugify(casaName)] || null) : null;
+        const propId = findPropId(casaName);
+        const tipo = getSel(r.fields?.[F.pag_tipo]);
+        const unitId = (propId && tipo) ? (unitIdByPropName[`${propId}|${slugify(tipo)}`] || null) : null;
+        const inq = r.fields?.[F.pag_inq] || "";
+        const tenantId = inq ? (tenantIdRealByName[inq.toLowerCase()] || null) : null;
+        const { month, year } = { month: getSel(r.fields?.[F.pag_mes]), year: (() => { const y = getSel(r.fields?.[F.pag_año]); return y ? parseInt(y) : null; })() };
         paymentsIn.push({
+          external_id: "pay-" + r.id,
           booking_id: null,
           property_id: propId,
+          unit_id: unitId,
+          tenant_id: tenantId,
           type: "ingreso",
           category: "renta",
-          concept: `${r.fields?.[F.pag_inq] || ""} · ${getSel(r.fields?.[F.pag_mes]) || ""} ${getSel(r.fields?.[F.pag_año]) || ""}`.trim(),
+          concept: `${inq} · ${month || ""} ${year || ""}`.trim(),
           amount: r.fields?.[F.pag_monto] || 0,
           paid_at: r.fields?.[F.pag_fecha] || null,
-          payment_method: getSel(r.fields?.[F.pag_plat]),
+          month, year: isNaN(year as any) ? null : year,
+          platform: getSel(r.fields?.[F.pag_plat]),
+          payment_method: r.fields?.[F.pag_obs] || null,
+          proof_url: getAttachUrl(r.fields?.[F.pag_comprob]),
           status: "pagado",
           notes: r.fields?.[F.pag_obs] || null
         });
       }
       if (!dry_run && paymentsIn.length) {
         for (let i = 0; i < paymentsIn.length; i += 50) {
-          await supabase.from("pm_payments").insert(paymentsIn.slice(i, i + 50));
+          const { error } = await supabase.from("pm_payments").upsert(paymentsIn.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("pagos chunk " + i + ": " + error.message); break; }
         }
       }
       stats.payments_in = paymentsIn.length;
     } catch (e: any) { errors.push("pagos: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
-    // 5) GASTOS POR CASA → payments type=gasto
+    // 5) GASTOS POR CASA → pm_expenses (category='house')
     // ════════════════════════════════════════════════════════════
     try {
       const gastos = await fetchAllRecords(base_id, TABLE_IDS.gastos_casa, airtable_token);
-      const paymentsOut: any[] = [];
+      const exp: any[] = [];
       for (const r of gastos) {
-        const casaName = r.fields?.[F.gst_dir];
-        const propId = casaName ? (propIdByExtId["addr-" + slugify(casaName)] || null) : null;
-        paymentsOut.push({
-          property_id: propId,
-          type: "gasto",
-          category: getSel(r.fields?.[F.gst_tipo]) || "otro",
-          concept: getSel(r.fields?.[F.gst_tipo]) || "Gasto",
+        exp.push({
+          external_id: "exp-house-" + r.id,
+          category: "house",
+          subcategory: getSel(r.fields?.[F.gst_tipo]) || null,
+          property_id: findPropId(r.fields?.[F.gst_dir]),
           amount: r.fields?.[F.gst_valor] || 0,
-          paid_at: r.fields?.[F.gst_fecha] || null,
-          status: "pagado",
+          expense_date: r.fields?.[F.gst_fecha] || null,
+          month: getMultiSel(r.fields?.[F.gst_mes])[0]?.toLowerCase() || null,
+          description: getSel(r.fields?.[F.gst_tipo]) || "Gasto casa",
+          invoice_url: r.fields?.[F.gst_drive] || getAttachUrl(r.fields?.[F.gst_factura]),
+          paid: true,
           notes: r.fields?.[F.gst_obs] || null
         });
       }
-      if (!dry_run && paymentsOut.length) {
-        for (let i = 0; i < paymentsOut.length; i += 50) {
-          await supabase.from("pm_payments").insert(paymentsOut.slice(i, i + 50));
+      if (!dry_run && exp.length) {
+        for (let i = 0; i < exp.length; i += 50) {
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("gastos_casa chunk " + i + ": " + error.message); break; }
         }
       }
-      stats.payments_out = paymentsOut.length;
-    } catch (e: any) { errors.push("gastos: " + e.message); }
+      stats.expenses_house = exp.length;
+    } catch (e: any) { errors.push("gastos_casa: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // 5b) GASTOS POR PLATAFORMA → pm_expenses (category='operational')
+    // ════════════════════════════════════════════════════════════
+    try {
+      const gpl = await fetchAllRecords(base_id, TABLE_IDS.gastos_plat, airtable_token);
+      const exp: any[] = [];
+      for (const r of gpl) {
+        const { month, year } = parseMonthYear(r.fields?.[F.gpl_mes]);
+        exp.push({
+          external_id: "exp-oper-" + r.id,
+          category: "operational",
+          subcategory: r.fields?.[F.gpl_plataformas] || getSel(r.fields?.[F.gpl_plataforma]) || null,
+          property_id: null,
+          amount: r.fields?.[F.gpl_valor] || 0,
+          month, year,
+          description: r.fields?.[F.gpl_plataformas] || "Gasto plataforma",
+          invoice_url: getAttachUrl(r.fields?.[F.gpl_factura]),
+          paid: true,
+          notes: r.fields?.[F.gpl_coment] || null
+        });
+      }
+      if (!dry_run && exp.length) {
+        for (let i = 0; i < exp.length; i += 50) {
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("gastos_plat chunk " + i + ": " + error.message); break; }
+        }
+      }
+      stats.expenses_operational = exp.length;
+    } catch (e: any) { errors.push("gastos_plat: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // 5c) GASTOS ASEO Y PODADA → pm_expenses (category='cleaning')
+    // ════════════════════════════════════════════════════════════
+    try {
+      const gas = await fetchAllRecords(base_id, TABLE_IDS.gastos_aseo, airtable_token);
+      const exp: any[] = [];
+      for (const r of gas) {
+        const { month, year } = parseMonthYear(r.fields?.[F.gas_mes]);
+        const casa = getMultiSel(r.fields?.[F.gas_casa])[0] || null;
+        exp.push({
+          external_id: "exp-clean-" + r.id,
+          category: "cleaning",
+          subcategory: r.fields?.[F.gas_plataformas] || getSel(r.fields?.[F.gas_casa]) || null,
+          property_id: findPropId(casa),
+          amount: r.fields?.[F.gas_valor] || 0,
+          month, year,
+          description: r.fields?.[F.gas_plataformas] || "Aseo/Podada",
+          invoice_url: getAttachUrl(r.fields?.[F.gas_factura]),
+          paid: true,
+          notes: null
+        });
+      }
+      if (!dry_run && exp.length) {
+        for (let i = 0; i < exp.length; i += 50) {
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("gastos_aseo chunk " + i + ": " + error.message); break; }
+        }
+      }
+      stats.expenses_cleaning = exp.length;
+    } catch (e: any) { errors.push("gastos_aseo: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // 5d) GASTOS EQUIPO → pm_payroll
+    // ════════════════════════════════════════════════════════════
+    try {
+      const geq = await fetchAllRecords(base_id, TABLE_IDS.gastos_eq, airtable_token);
+      const rows: any[] = [];
+      for (const r of geq) {
+        const name = r.fields?.[F.geq_name] || getSel(r.fields?.[F.geq_name]);
+        if (!name) continue;
+        const { month, year } = parseMonthYear(r.fields?.[F.geq_mes]);
+        rows.push({
+          external_id: "payroll-" + r.id,
+          employee_name: name,
+          salary: r.fields?.[F.geq_salario] || 0,
+          month, year,
+          paid: true,
+          invoice_url: getAttachUrl(r.fields?.[F.geq_factura])
+        });
+      }
+      if (!dry_run && rows.length) {
+        const { error } = await supabase.from("pm_payroll").upsert(rows, { onConflict: "external_id" });
+        if (error) errors.push("payroll: " + error.message);
+      }
+      stats.payroll = rows.length;
+    } catch (e: any) { errors.push("gastos_eq: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
     // 6) ACCESOS → pm_credentials
@@ -522,22 +686,33 @@ Deno.serve(async (req) => {
     } catch (e: any) { errors.push("accesos: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
-    // 7) WIFI → enrich pm_properties (best-effort)
+    // 7) WIFI → pm_wifi_credentials (+ enrich pm_properties best-effort)
     // ════════════════════════════════════════════════════════════
     try {
       const wifis = await fetchAllRecords(base_id, TABLE_IDS.wifi, airtable_token);
+      const wifiRows: any[] = [];
       for (const r of wifis) {
         const dir = r.fields?.[F.wifi_dir];
         if (!dir) continue;
-        const propId = propIdByExtId["addr-" + slugify(dir)] || null;
-        if (!propId) continue;
-        if (!dry_run) {
+        const propId = findPropId(dir);
+        wifiRows.push({
+          external_id: "wifi-" + r.id,
+          property_id: propId,
+          network_name: r.fields?.[F.wifi_name] || null,
+          password_encrypted: r.fields?.[F.wifi_pass] || null
+        });
+        if (!dry_run && propId) {
           await supabase.from("pm_properties").update({
             wifi_name: r.fields?.[F.wifi_name] || null,
             wifi_pass: r.fields?.[F.wifi_pass] || null
           }).eq("id", propId);
         }
       }
+      if (!dry_run && wifiRows.length) {
+        const { error } = await supabase.from("pm_wifi_credentials").upsert(wifiRows, { onConflict: "external_id" });
+        if (error) errors.push("wifi_credentials: " + error.message);
+      }
+      stats.wifi = wifiRows.length;
     } catch (e: any) { errors.push("wifi: " + e.message); }
 
     // ════════════════════════════════════════════════════════════

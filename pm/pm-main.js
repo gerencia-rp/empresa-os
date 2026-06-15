@@ -83,6 +83,8 @@ async function pmLoadAll() {
     { name: 'bookings',   optional: false, q: () => sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).limit(2000) },
     { name: 'tenants',    optional: false, q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
     { name: 'payments',   optional: false, q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
+    { name: 'expenses',   optional: true,  q: () => sb.from('pm_expenses').select('*').order('expense_date', { ascending: false, nullsFirst: false }).limit(2000) },
+    { name: 'lastSync',   optional: true,  q: () => sb.from('pm_sync_log').select('*').eq('source','airtable').order('started_at', { ascending: false }).limit(1) },
     { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
   ];
 
@@ -118,7 +120,20 @@ async function pmLoadAll() {
   pmaState.units = results.units || [];
   pmaState.bookings = results.bookings || [];
   pmaState.tenants = results.tenants || [];
-  pmaState.payments = results.payments || [];
+  pmaState.expenses = results.expenses || [];
+  // pm_expenses se normaliza a forma "pago gasto" y se mergea para que Finanzas
+  // (que itera sobre payments con type/paid_at/property_id) los cuente sin más cambios.
+  const expAsPays = pmaState.expenses.map(e => ({
+    id: e.id, _src: 'expense',
+    type: 'gasto', status: 'pagado',
+    property_id: e.property_id || null,
+    amount: e.amount,
+    paid_at: e.expense_date || null,
+    category: e.category || 'gasto',
+    concept: e.description || e.subcategory || e.category || 'Gasto'
+  }));
+  pmaState.payments = [...(results.payments || []), ...expAsPays];
+  pmaState.lastSync = (results.lastSync || [])[0] || null;
   pmaState.feeds = results.feeds || [];
 
   console.log('[pm] Carga completa:', {
@@ -134,6 +149,19 @@ async function pmLoadAll() {
   pmRender();
 }
 window.pmLoadAll = pmLoadAll;
+
+// Indicador "Última sync: hace X" para el header (desde pm_sync_log)
+function pmSyncStatusLabel() {
+  const s = pmaState.lastSync;
+  if (!s) return '';
+  const ts = s.finished_at || s.started_at;
+  if (!ts) return '';
+  const mins = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
+  const rel = mins < 1 ? 'recién' : mins < 60 ? `hace ${mins} min` : mins < 1440 ? `hace ${Math.round(mins/60)} h` : `hace ${Math.round(mins/1440)} d`;
+  const color = s.status === 'success' ? 'text-emerald-600' : s.status === 'running' ? 'text-blue-600' : s.status === 'error' ? 'text-red-600' : 'text-amber-600';
+  const dot = s.status === 'running' ? '<span class="animate-pulse">●</span>' : '●';
+  return `<span class="text-[11px] ${color} font-semibold whitespace-nowrap" title="Estado: ${s.status||'?'}">${dot} Última sync: ${rel}</span>`;
+}
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS de cálculo
@@ -273,7 +301,8 @@ function pmRenderPropertiesList() {
           <div class="text-base font-bold text-slate-900">${props.length} propiedades — Click para ver unidades</div>
           <div class="text-xs text-slate-500">${pmaState.units.length} unidades totales · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex items-center gap-2">
+          ${pmSyncStatusLabel()}
           <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Sync Airtable</button>
           <button onclick="pmEditProperty(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Propiedad</button>
         </div>
@@ -1912,8 +1941,9 @@ function pmRenderFinance() {
             <tbody>
               ${(pmaState.financeShowOrphansOnly ? sortedPays.filter(p => !p.property_id) : sortedPays).slice(0, 50).map(pay => {
                 const propName = pay.property_id ? pmPropertyName(pay.property_id) : null;
+                const isExp = pay._src === 'expense';
                 return `
-                <tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onclick="pmEditPayment('${pay.id}')">
+                <tr class="border-t border-slate-100 hover:bg-slate-50 ${isExp?'':'cursor-pointer'}" ${isExp?'title="Gasto importado de Airtable (solo lectura)"':`onclick="pmEditPayment('${pay.id}')"`}>
                   <td class="px-3 py-2 whitespace-nowrap">${pay.paid_at||pay.due_at||'—'}</td>
                   <td class="px-3 py-2 font-semibold">${(pay.concept||'(sin concepto)').replace(/</g,'&lt;')}</td>
                   <td class="px-3 py-2 ${propName?'text-slate-600':'text-amber-700 font-bold'}">${propName ? propName.slice(0,28) : '⚠ Sin asignar'}</td>
@@ -2706,8 +2736,10 @@ async function pmStartAirtableSync(dryRun) {
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Inquilinos</div><div class="text-xl font-bold">${stats.tenants||0}</div></div>
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Reservas</div><div class="text-xl font-bold">${stats.bookings||0}</div></div>
           <div class="bg-emerald-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-emerald-700">Ingresos</div><div class="text-xl font-bold text-emerald-700">${stats.payments_in||0}</div></div>
-          <div class="bg-red-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-red-700">Gastos</div><div class="text-xl font-bold text-red-700">${stats.payments_out||0}</div></div>
+          <div class="bg-red-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-red-700">Gastos</div><div class="text-xl font-bold text-red-700">${(stats.expenses_house||0)+(stats.expenses_operational||0)+(stats.expenses_cleaning||0)}</div></div>
+          <div class="bg-amber-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-amber-700">Nómina</div><div class="text-xl font-bold text-amber-700">${stats.payroll||0}</div></div>
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Accesos</div><div class="text-xl font-bold">${stats.credentials||0}</div></div>
+          <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">WiFi</div><div class="text-xl font-bold">${stats.wifi||0}</div></div>
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Tareas</div><div class="text-xl font-bold">${stats.tasks||0}</div></div>
         </div>
         ${errs.length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">⚠️ ${errs.length} warnings (sync continuó pese a estos errores)</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${errs.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
