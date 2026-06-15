@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════════════
 
 const pmaState = {
-  tab: 'properties',                 // properties · calendar · bookings · finance · feeds
+  tab: 'dashboard',                  // dashboard (landing CEO) · properties · calendar · bookings · finance · feeds
   selectedPropertyId: null,           // para vista detalle
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(),   // 0-11
@@ -84,6 +84,7 @@ async function pmLoadAll() {
     { name: 'tenants',    optional: false, q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
     { name: 'payments',   optional: false, q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
     { name: 'expenses',   optional: true,  q: () => sb.from('pm_expenses').select('*').order('expense_date', { ascending: false, nullsFirst: false }).limit(2000) },
+    { name: 'payroll',    optional: true,  q: () => sb.from('pm_payroll').select('*').limit(1000) },
     { name: 'lastSync',   optional: true,  q: () => sb.from('pm_sync_log').select('*').eq('source','airtable').order('started_at', { ascending: false }).limit(1) },
     { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
   ];
@@ -133,6 +134,7 @@ async function pmLoadAll() {
     concept: e.description || e.subcategory || e.category || 'Gasto'
   }));
   pmaState.payments = [...(results.payments || []), ...expAsPays];
+  pmaState.payroll = results.payroll || [];
   pmaState.lastSync = (results.lastSync || [])[0] || null;
   pmaState.feeds = results.feeds || [];
 
@@ -211,7 +213,7 @@ function pmFinanceOf(propertyId, monthDate = null) {
 // LAUNCHER
 // ════════════════════════════════════════════════════════════════
 function openPmSystem() {
-  pmaState.tab = pmaState.tab || 'properties';
+  pmaState.tab = 'dashboard';   // landing CEO
   pmaState.selectedPropertyId = null;
   openModal('🏠 Property Management · Rental Profits', '<div id="pm-root" style="min-height:60vh;">Cargando…</div>');
   // Ensanchar modal
@@ -256,6 +258,7 @@ function pmRender() {
       <div class="border-b border-slate-200 mb-3">
         <div class="flex gap-1 -mb-px overflow-x-auto">
           ${[
+            ['dashboard','Resumen', ''],
             ['properties','🏘️ Propiedades', pmaState.properties.length],
             ['calendar','📅 Calendario', ''],
             ['bookings','📋 Reservas', pmaState.bookings.length],
@@ -270,6 +273,7 @@ function pmRender() {
       </div>
       <!-- Contenido del tab -->
       <div class="flex-1 overflow-y-auto" style="max-height:75vh;">
+        ${pmaState.tab === 'dashboard'  ? pmRenderDashboard() : ''}
         ${pmaState.tab === 'properties' ? (pmaState.selectedPropertyId ? pmRenderPropertyDetail() : pmRenderPropertiesList()) : ''}
         ${pmaState.tab === 'calendar'   ? pmRenderCalendar() : ''}
         ${pmaState.tab === 'bookings'   ? pmRenderBookings() : ''}
@@ -287,6 +291,197 @@ function pmSetTab(tab) {
   pmRender();
 }
 window.pmSetTab = pmSetTab;
+
+// ════════════════════════════════════════════════════════════════
+// TAB 0 · DASHBOARD CEO (landing) — pulso del negocio en 30 segundos
+// Sobrio (charcoal/blanco/dorado). Verde=positivo, rojo=crítico.
+// Todo se computa desde pmaState ya cargado.
+// ════════════════════════════════════════════════════════════════
+const PM_ES_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const PM_ES_MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function pmMoney(v){ const n=Math.round(Number(v)||0); return (n<0?'-$':'$')+Math.abs(n).toLocaleString(); }
+function pmInMonth(iso,y,m){ if(!iso) return false; return String(iso).slice(0,7) === `${y}-${String(m+1).padStart(2,'0')}`; }
+function pmPayrollForMonth(y,m){
+  return (pmaState.payroll||[]).filter(p=>Number(p.year)===y && PM_ES_MONTHS.indexOf((p.month||'').toLowerCase())===m)
+    .reduce((s,p)=>s+Number(p.salary||0),0);
+}
+function pmOccupancyAt(date){
+  const active = new Set(pmaState.properties.filter(p=>p.status==='activa').map(p=>p.id));
+  const units = pmaState.units.filter(u=>active.has(u.property_id));
+  const occ = units.filter(u=>pmActiveBookingOf(u.id, date)).length;
+  return { occupied: occ, total: units.length, pct: units.length?occ/units.length:0, units };
+}
+function pmCashflowOf(y,m){
+  const pays = pmaState.payments.filter(p=>p.status==='pagado');
+  const income = pays.filter(p=>p.type==='ingreso' && pmInMonth(p.paid_at,y,m)).reduce((s,p)=>s+Number(p.amount||0),0);
+  const gExp   = pays.filter(p=>p.type==='gasto'   && pmInMonth(p.paid_at,y,m)).reduce((s,p)=>s+Number(p.amount||0),0);
+  const payroll = pmPayrollForMonth(y,m);
+  return { income, gastos: gExp+payroll, net: income-gExp-payroll };
+}
+function pmCeoDismissed(){ try{ return new Set(JSON.parse(localStorage.getItem('pm_ceo_dismissed')||'[]')); }catch{ return new Set(); } }
+function pmCeoDismiss(key){ const s=pmCeoDismissed(); s.add(key); localStorage.setItem('pm_ceo_dismissed', JSON.stringify([...s])); pmRender(); }
+window.pmCeoDismiss = pmCeoDismiss;
+
+function pmCeoActions(){
+  const now=new Date(), dismissed=pmCeoDismissed(), actions=[];
+  const activeProps = pmaState.properties.filter(p=>p.status==='activa');
+  const activePropIds = new Set(activeProps.map(p=>p.id));
+  const activeBookings = pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
+  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate()-30);
+  const recentPayers = new Set(pmaState.payments.filter(p=>p.type==='ingreso' && p.tenant_id && p.paid_at && new Date(p.paid_at)>=cutoff).map(p=>p.tenant_id));
+  const late = activeBookings.filter(b=> b.tenant_id && !(b.start_date && new Date(b.start_date)>cutoff) && !recentPayers.has(b.tenant_id));
+  const in30 = new Date(now); in30.setDate(in30.getDate()+30);
+  const expiring = activeBookings.filter(b=> b.end_date && new Date(b.end_date)>=now && new Date(b.end_date)<=in30);
+  const negProps = activeProps.filter(p=>{ for(let i=1;i<=3;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); const f=pmFinanceOf(p.id,d); if(f.ingresos===0&&f.gastos===0) return false; if(f.utilidad>=0) return false; } return true; });
+
+  if(late.length) actions.push({ sev:'critical', key:'late-tenants', tab:'bookings', title:`${late.length} inquilino${late.length>1?'s':''} sin pago registrado +30 días`, q:'¿Iniciar proceso de salida o gestionar cobro?' });
+  negProps.slice(0,2).forEach(p=> actions.push({ sev:'critical', key:'negpnl-'+p.id, tab:'finance', title:`${p.name}: P&L negativo 3 meses seguidos`, q:'¿Vender / refinanciar / ajustar renta?' }));
+  if(expiring.length) actions.push({ sev:'important', key:'expiring-contracts', tab:'bookings', title:`${expiring.length} contrato${expiring.length>1?'s':''} termina${expiring.length>1?'n':''} en 30 días`, q:'Confirmar estrategia: renovar o re-rentar.' });
+  pmaState.units.filter(u=>activePropIds.has(u.property_id) && !pmActiveBookingOf(u.id)).map(u=>{
+    const bs = pmaState.bookings.filter(b=>b.unit_id===u.id && b.end_date).sort((a,b)=> a.end_date<b.end_date?1:-1);
+    const lastEnd = bs[0]?.end_date ? new Date(bs[0].end_date) : null;
+    return { u, days: lastEnd ? Math.round((now-lastEnd)/86400000) : null };
+  }).filter(x=> x.days===null || x.days>30).slice(0,2).forEach(({u,days})=>
+    actions.push({ sev:'important', key:'vacant-'+u.id, tab:'properties', title:`${pmPropertyName(u.property_id).slice(0,22)} · ${(u.name||u.code||'unidad')} vacía ${days?('hace '+days+'d'):'(sin historial)'}`, q:'¿Bajar precio / cambiar marketing?' }));
+  activeProps.map(p=>{ const cur=pmFinanceOf(p.id,new Date(now.getFullYear(),now.getMonth(),1)).utilidad; let s=0; for(let i=1;i<=3;i++) s+=pmFinanceOf(p.id,new Date(now.getFullYear(),now.getMonth()-i,1)).utilidad; return {p,cur,avg:s/3}; })
+    .filter(x=> x.cur>0 && x.avg>0 && x.cur>x.avg*1.2).sort((a,b)=>b.cur-a.cur).slice(0,1)
+    .forEach(({p,cur})=> actions.push({ sev:'opportunity', key:'oppy-'+p.id, tab:'finance', title:`${p.name} rindió ${pmMoney(cur)} este mes (sobre su promedio)`, q:'¿Replicar estrategia en otras casas?' }));
+
+  const ord={critical:0,important:1,opportunity:2};
+  return { all: actions.sort((a,b)=>ord[a.sev]-ord[b.sev]).filter(a=>!dismissed.has(a.key)).slice(0,5), lateCount:late.length, expiringCount:expiring.length, negCount:negProps.length };
+}
+
+function pmTrendSvg(trend){
+  const W=620,H=190,padL=12,padR=12,padT=14,padB=24,n=trend.length;
+  const max=Math.max(1,...trend.map(t=>Math.max(t.income,t.gastos)));
+  const x=i=> padL+(i*(W-padL-padR)/Math.max(1,n-1));
+  const yv=v=> H-padB-(v/max)*(H-padT-padB);
+  const path=k=> trend.map((t,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${yv(t[k]).toFixed(1)}`).join(' ');
+  const area=k=>`${path(k)} L${x(n-1).toFixed(1)},${H-padB} L${x(0).toFixed(1)},${H-padB} Z`;
+  const dots=(k,c)=> trend.map((t,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${yv(t[k]).toFixed(1)}" r="2.6" fill="${c}"><title>${t.label} · ${k==='income'?'Ingresos':'Gastos'}: ${pmMoney(t[k])}</title></circle>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:210px">
+    <path d="${area('income')}" fill="rgba(5,150,105,.07)"/><path d="${area('gastos')}" fill="rgba(220,38,38,.05)"/>
+    <path d="${path('income')}" fill="none" stroke="#059669" stroke-width="2"/><path d="${path('gastos')}" fill="none" stroke="#dc2626" stroke-width="2"/>
+    ${dots('income','#059669')}${dots('gastos','#dc2626')}
+    ${trend.map((t,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#94a3b8" text-anchor="middle">${t.label}</text>`).join('')}
+  </svg>`;
+}
+
+function pmRenderDashboard(){
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  const occ=pmOccupancyAt(now);
+  const occPrev=pmOccupancyAt(new Date(y,m-1,Math.min(now.getDate(),28)));
+  const cf=pmCashflowOf(y,m), cfPrev=pmCashflowOf(new Date(y,m-1,1).getFullYear(),(m+11)%12);
+  const empties=occ.units.filter(u=>!pmActiveBookingOf(u.id));
+  const potentialLost=empties.reduce((s,u)=>s+Number(u.target_rent||0),0);
+  const { all:actions, lateCount, expiringCount }=pmCeoActions();
+  const trend=[]; for(let i=5;i>=0;i--){ const d=new Date(y,m-i,1); const c=pmCashflowOf(d.getFullYear(),d.getMonth()); trend.push({ label:`${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income:c.income, gastos:c.gastos, net:c.net }); }
+  const t6i=trend.reduce((s,t)=>s+t.income,0), t6g=trend.reduce((s,t)=>s+t.gastos,0);
+
+  // Health
+  let health='yellow';
+  if(occ.pct>0.85 && cf.net>0 && expiringCount<2 && lateCount<3) health='green';
+  else if(occ.pct<0.70 || cf.net<0 || expiringCount>5 || lateCount>5) health='red';
+  const HB={ green:['🟢','NEGOCIO SANO','bg-emerald-50 border-emerald-200 text-emerald-900'], yellow:['🟡','ATENCIÓN','bg-amber-50 border-amber-200 text-amber-900'], red:['🔴','ACCIÓN REQUERIDA','bg-red-50 border-red-200 text-red-900'] }[health];
+
+  // Trends KPI
+  const occDelta=Math.round((occ.pct-occPrev.pct)*100);
+  const netDelta = cfPrev.net!==0 ? Math.round((cf.net-cfPrev.net)/Math.abs(cfPrev.net)*100) : (cf.net>0?100:0);
+  const arrow=(d)=> d>0?`<span class="text-emerald-600">↑${Math.abs(d)}</span>`:d<0?`<span class="text-red-600">↓${Math.abs(d)}</span>`:`<span class="text-slate-400">→0</span>`;
+
+  // Quick stats
+  const activeProps=pmaState.properties.filter(p=>p.status==='activa');
+  const activeBookings=pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
+  const activeTenants=new Set(activeBookings.map(b=>b.tenant_id).filter(Boolean)).size;
+  const rented=occ.units.filter(u=>Number(u.target_rent)>0);
+  const avgRent=rented.length?rented.reduce((s,u)=>s+Number(u.target_rent),0)/rented.length:0;
+  let gaps=[]; pmaState.units.forEach(u=>{ const bs=pmaState.bookings.filter(b=>b.unit_id===u.id && b.start_date).sort((a,b)=>a.start_date<b.start_date?-1:1); for(let i=1;i<bs.length;i++){ const pe=bs[i-1].end_date, ns=bs[i].start_date; if(pe&&ns&&ns>pe){ const g=Math.round((new Date(ns)-new Date(pe))/86400000); if(g>0&&g<400) gaps.push(g); } } });
+  const avgFill=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):null;
+
+  const SEV={ critical:['border-l-red-500','bg-red-50','text-red-700','CRÍTICO'], important:['border-l-amber-500','bg-amber-50','text-amber-700','IMPORTANTE'], opportunity:['border-l-emerald-500','bg-emerald-50','text-emerald-700','OPORTUNIDAD'] };
+
+  return `
+  <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
+  <div class="space-y-4 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
+
+    <!-- 1 · HEALTH -->
+    <div class="flex items-center justify-between flex-wrap gap-2 border ${HB[2]} rounded-xl px-4 py-3">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">${HB[0]}</span>
+        <div>
+          <div class="text-sm font-extrabold tracking-wide">${HB[1]}</div>
+          <div class="text-xs opacity-80">${occ.occupied}/${occ.total} unidades ocupadas · ${pmMoney(cf.net)} cashflow neto este mes</div>
+        </div>
+      </div>
+      ${pmSyncStatusLabel()}
+    </div>
+
+    <!-- 2 · KPIs -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <button onclick="pmSetTab('properties')" class="text-left bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition shadow-sm">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Ocupación</div>
+        <div class="text-3xl font-extrabold text-slate-900 mt-1">${Math.round(occ.pct*100)}%</div>
+        <div class="text-xs text-slate-500 mt-0.5">${occ.occupied} de ${occ.total} unidades</div>
+        <div class="text-[11px] font-bold mt-1">${arrow(occDelta)}<span class="text-slate-400 font-normal"> pp vs mes pasado</span></div>
+      </button>
+      <button onclick="pmSetTab('finance')" class="text-left bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition shadow-sm">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Cashflow del mes</div>
+        <div class="text-3xl font-extrabold mt-1 ${cf.net>=0?'text-emerald-700':'text-red-700'}">${pmMoney(cf.net)}</div>
+        <div class="text-xs text-slate-500 mt-0.5">Ing ${pmMoney(cf.income)} − Gas ${pmMoney(cf.gastos)}</div>
+        <div class="text-[11px] font-bold mt-1">${arrow(netDelta)}<span class="text-slate-400 font-normal">% vs mes pasado</span></div>
+      </button>
+      <button onclick="pmSetTab('properties')" class="text-left bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition shadow-sm">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Unidades vacías</div>
+        <div class="text-3xl font-extrabold text-slate-900 mt-1">${empties.length}</div>
+        <div class="text-xs text-slate-500 mt-0.5">Potencial perdido: <span class="font-bold text-red-600">${pmMoney(potentialLost)}/mes</span></div>
+        <div class="text-[10px] text-slate-400 mt-1 leading-tight">${empties.slice(0,3).map(u=>`${pmPropertyName(u.property_id).slice(0,16)} · ${(u.name||u.code||'').slice(0,14)}`).join('<br>')||'—'}</div>
+      </button>
+      <button onclick="document.getElementById('pm-ceo-actions')?.scrollIntoView({behavior:'smooth'})" class="text-left bg-slate-900 text-white hover:bg-slate-800 rounded-xl p-4 transition shadow-sm">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Decisiones tuyas</div>
+        <div class="text-3xl font-extrabold mt-1" style="color:#d4af37">${actions.length}</div>
+        <div class="text-xs text-slate-300 mt-0.5">requieren tu input</div>
+      </button>
+    </div>
+
+    <!-- 3 · TREND -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-sm font-bold text-slate-800">Ingresos vs Gastos · 6 meses</div>
+        <div class="flex gap-3 text-[11px]"><span class="text-emerald-600 font-bold">● Ingresos</span><span class="text-red-600 font-bold">● Gastos</span></div>
+      </div>
+      ${pmTrendSvg(trend)}
+      <div class="text-xs text-slate-500 text-center mt-1">Últimos 6 meses: <span class="text-emerald-700 font-bold">${pmMoney(t6i)}</span> ingresos · <span class="text-red-700 font-bold">${pmMoney(t6g)}</span> gastos · <span class="font-bold ${t6i-t6g>=0?'text-emerald-700':'text-red-700'}">${pmMoney(t6i-t6g)}</span> neto</div>
+    </div>
+
+    <!-- 4 · ACCIONES CEO -->
+    <div id="pm-ceo-actions" class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div class="text-sm font-bold text-slate-800 mb-2">Requiere tu atención <span class="text-[11px] font-normal text-slate-400">— decisiones, no operación</span></div>
+      ${actions.length ? `<div class="space-y-2">${actions.map(a=>{ const s=SEV[a.sev]; return `
+        <div class="flex items-start gap-3 border-l-4 ${s[0]} ${s[1]} rounded-r-lg pl-3 pr-2 py-2">
+          <div class="flex-1 min-w-0">
+            <div class="text-[9px] uppercase font-extrabold ${s[2]} tracking-wider">${s[3]}</div>
+            <div class="text-sm font-semibold text-slate-800 leading-snug">${a.title.replace(/</g,'&lt;')}</div>
+            <div class="text-xs text-slate-500">${a.q}</div>
+          </div>
+          <div class="flex flex-col gap-1 flex-shrink-0">
+            <button onclick="pmSetTab('${a.tab}')" class="text-[11px] font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-2 py-1 rounded whitespace-nowrap">Ver detalles</button>
+            <button onclick="pmCeoDismiss('${a.key}')" class="text-[11px] text-slate-400 hover:text-slate-600 px-2 py-0.5 whitespace-nowrap">✓ Atendido</button>
+          </div>
+        </div>`; }).join('')}</div>`
+        : `<div class="text-center py-6 text-slate-400 text-sm">✓ Nada requiere tu decisión ahora mismo.</div>`}
+    </div>
+
+    <!-- 5 · QUICK STATS -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      ${[
+        ['Propiedades activas', activeProps.length],
+        ['Inquilinos activos', activeTenants],
+        ['Renta promedio / unidad', pmMoney(avgRent)],
+        ['Días prom. para llenar', avgFill!==null?avgFill+' días':'—']
+      ].map(([l,v])=>`<div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${l}</div><div class="text-xl font-extrabold text-slate-900 mt-1">${v}</div></div>`).join('')}
+    </div>
+  </div>`;
+}
 
 // ════════════════════════════════════════════════════════════════
 // TAB 1 · PROPIEDADES (lista)
