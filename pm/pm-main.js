@@ -28,6 +28,14 @@ const pmaState = {
   tenantsFilter: 'activos',               // CRM Inquilinos: todos·activos·expiring·late·historico
   tenantsSearch: '',                      // buscador del tab Inquilinos
   tenantDetailId: null,                   // tenant_id → vista detalle CRM
+  payMonth: null,                         // tab Pagos: 'YYYY-MM' (null = mes actual)
+  payFilterProperty: null,                // tab Pagos: property_id
+  payFilterPlatform: null,                // tab Pagos: plataforma
+  expSubTab: 'house',                     // tab Gastos: house·operational·payroll
+  expMonth: null,                         // tab Gastos: 'YYYY-MM' (null = mes actual)
+  expFilterProperty: null,                // tab Gastos: property_id (sub-tab casa)
+  expFilterSubcat: null,                  // tab Gastos: subcategoría
+  payrollView: 'people',                  // sub-tab Nómina: people·monthly
   financePeriod: 'all',                   // 'all' | 'this_month' | 'this_year'
   financeTypeFilter: 'all',               // 'all' | 'ingreso' | 'gasto'
   financeSearch: '',                      // buscador de Finanzas
@@ -312,6 +320,8 @@ function pmRender() {
             ['calendar','📅 Calendario', ''],
             ['bookings','📋 Reservas', pmaState.bookings.length],
             ['tenants','👥 Inquilinos', pmaState.tenants.length],
+            ['payments','💵 Pagos', ''],
+            ['expenses','📤 Gastos', ''],
             ['feeds','📡 Feeds', pmaState.feeds.length],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
@@ -328,6 +338,8 @@ function pmRender() {
         ${pmaState.tab === 'calendar'   ? pmRenderCalendar() : ''}
         ${pmaState.tab === 'bookings'   ? pmRenderBookings() : ''}
         ${pmaState.tab === 'tenants'    ? (pmaState.tenantDetailId ? pmRenderTenantDetail() : pmRenderTenants()) : ''}
+        ${pmaState.tab === 'payments'   ? pmRenderPayments() : ''}
+        ${pmaState.tab === 'expenses'   ? pmRenderExpenses() : ''}
         ${pmaState.tab === 'feeds'      ? pmRenderFeeds() : ''}
         ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
       </div>
@@ -2602,25 +2614,10 @@ async function pmSaveMarkPayment(bookingId) {
   let proof_url = null;
   const file = fileEl?.files?.[0];
   if (file) {
-    try {
-      if (statusEl) statusEl.textContent = 'Subiendo comprobante…';
-      const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-      const path = `${b.id}/${Date.now()}.${ext}`;
-      let { error: upErr } = await sb.storage.from('payment-proofs').upload(path, file, { upsert: false });
-      if (upErr && /not found|does not exist|bucket/i.test(upErr.message)) {
-        // crear bucket si no existe (requiere permiso); luego reintentar
-        try { await sb.storage.createBucket('payment-proofs', { public: true }); } catch (e) { /* noop */ }
-        ({ error: upErr } = await sb.storage.from('payment-proofs').upload(path, file, { upsert: false }));
-      }
-      if (upErr) {
-        if (statusEl) statusEl.textContent = '⚠️ Comprobante no subido: ' + upErr.message + ' (se registra el pago sin adjunto)';
-      } else {
-        const { data: pub } = sb.storage.from('payment-proofs').getPublicUrl(path);
-        proof_url = pub?.publicUrl || path;
-      }
-    } catch (e) {
-      if (statusEl) statusEl.textContent = '⚠️ Error subiendo: ' + e.message;
-    }
+    if (statusEl) statusEl.textContent = 'Subiendo comprobante…';
+    const up = await pmUploadFile('payment-proofs', b.id, file);
+    if (up.url) proof_url = up.url;
+    else if (statusEl) statusEl.textContent = '⚠️ Comprobante no subido: ' + up.error + ' (se registra el pago sin adjunto)';
   }
 
   const payload = {
@@ -2671,6 +2668,655 @@ async function pmAddTenantNote(tenantId) {
   pmRender();
 }
 window.pmAddTenantNote = pmAddTenantNote;
+
+// ════════════════════════════════════════════════════════════════
+// Helpers compartidos Pagos/Gastos
+// ════════════════════════════════════════════════════════════════
+function pmCurrentYM() { return new Date().toISOString().slice(0,7); }
+function pmYmYear(ym) { return parseInt(ym.slice(0,4), 10); }
+function pmYmMonthIdx(ym) { return parseInt(ym.slice(5,7), 10) - 1; }
+function pmYmLabel(ym) { return `${PM_ES_MONTHS_SHORT[pmYmMonthIdx(ym)]} ${pmYmYear(ym)}`; }
+function pmYmShift(ym, delta) {
+  const d = new Date(pmYmYear(ym), pmYmMonthIdx(ym) + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function pmMonthlyRent(b) {
+  const amt = Number(b.rent_amount || 0);
+  switch (b.rent_period) {
+    case 'quincenal': return amt * 2;
+    case 'semana': return amt * 4.33;
+    case 'noche': return amt * 30;
+    case 'anual': return amt / 12;
+    default: return amt;  // mensual / estadia / otros
+  }
+}
+// Sube un archivo a un bucket (best-effort, crea bucket si falta). Devuelve {url}|{error}
+async function pmUploadFile(bucket, folder, file) {
+  try {
+    const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+    const path = `${folder}/${Date.now()}.${ext}`;
+    let { error } = await sb.storage.from(bucket).upload(path, file, { upsert: false });
+    if (error && /not found|does not exist|bucket/i.test(error.message)) {
+      try { await sb.storage.createBucket(bucket, { public: true }); } catch (e) { /* sin permiso: queda al SQL */ }
+      ({ error } = await sb.storage.from(bucket).upload(path, file, { upsert: false }));
+    }
+    if (error) return { error: error.message };
+    const { data: pub } = sb.storage.from(bucket).getPublicUrl(path);
+    return { url: pub?.publicUrl || path };
+  } catch (e) { return { error: e.message }; }
+}
+// Selector de mes reutilizable (← input month →). cb = nombre de fn que recibe el nuevo 'YYYY-MM'
+function pmMonthNav(ym, cbExpr) {
+  return `
+    <div class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+      <button onclick="${cbExpr.replace('%V%', `'${pmYmShift(ym,-1)}'`)}" class="px-2 py-1 text-slate-500 hover:text-slate-900 text-sm">‹</button>
+      <input type="month" value="${ym}" onchange="${cbExpr.replace('%V%','this.value')}" class="text-xs font-bold text-slate-800 border-0 outline-none bg-transparent w-[120px]"/>
+      <button onclick="${cbExpr.replace('%V%', `'${pmYmShift(ym,1)}'`)}" class="px-2 py-1 text-slate-500 hover:text-slate-900 text-sm">›</button>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB · PAGOS (cobranza de rentas)
+// ════════════════════════════════════════════════════════════════
+function pmRenderPayments() {
+  const ym = pmaState.payMonth || pmCurrentYM();
+  const propFilter = pmaState.payFilterProperty;
+  const platFilter = pmaState.payFilterPlatform;
+
+  // Pagos (ingresos) del mes
+  let pays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym));
+  // Plataformas presentes (para chips)
+  const platforms = [...new Set(pmaState.payments.filter(p => p.type==='ingreso' && p.platform).map(p => p.platform))].sort();
+  if (propFilter) pays = pays.filter(p => p.property_id === propFilter);
+  if (platFilter) pays = pays.filter(p => p.platform === platFilter);
+  pays = [...pays].sort((a,b) => (b.paid_at||'').localeCompare(a.paid_at||''));
+
+  const cobrado = pays.reduce((s,p) => s + Number(p.amount||0), 0);
+
+  // Leases activos → renta esperada + cobranza
+  const activeBs = pmActiveBookings().filter(b => !propFilter || b.property_id === propFilter);
+  const expected = activeBs.reduce((s,b) => s + pmMonthlyRent(b), 0);
+  const paidLeaseIds = new Set();
+  activeBs.forEach(b => {
+    const has = pmaState.payments.some(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym) &&
+      (p.booking_id === b.id || (b.tenant_id && p.tenant_id === b.tenant_id)));
+    if (has) paidLeaseIds.add(b.id);
+  });
+  const leasesPaid = paidLeaseIds.size;
+  const pendiente = Math.max(0, expected - cobrado);
+  const tasa = activeBs.length ? Math.round(100 * leasesPaid / activeBs.length) : 0;
+
+  // Próximos pagos en 7 días: leases activos no pagados cuyo día de pago cae en [hoy, hoy+7]
+  const now = new Date(); const in7 = new Date(now); in7.setDate(in7.getDate()+7);
+  const proximos = activeBs.filter(b => {
+    if (paidLeaseIds.has(b.id)) return false;
+    let day = parseInt((b.payment_day||'').replace(/\D/g,''), 10);
+    if (!day || day < 1 || day > 28) day = b.start_date ? new Date(b.start_date).getDate() : 1;
+    const cand = new Date(now.getFullYear(), now.getMonth(), day);
+    if (cand < now) cand.setMonth(cand.getMonth()+1);
+    return cand >= now && cand <= in7;
+  }).length;
+
+  const platLabel = (p) => (p||'—');
+  const card = (label, value, sub, accent) => `
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div>
+      <div class="text-2xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>
+      ${sub?`<div class="text-[11px] text-slate-500 mt-0.5">${sub}</div>`:''}
+    </div>`;
+
+  return `
+  <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
+  <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <div class="text-base font-bold text-slate-900">Pagos · ${pmYmLabel(ym)}</div>
+        <div class="text-xs text-slate-500">${pays.length} pagos registrados · ${leasesPaid}/${activeBs.length} leases cobrados</div>
+      </div>
+      <div class="flex items-center gap-2">
+        ${pmMonthNav(ym, 'pmSetPayMonth(%V%)')}
+        <button onclick="pmPickLeaseForPayment()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" style="border:1px solid #d4af37">+ Registrar pago</button>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      ${card('Cobrado este mes', pmMoney(cobrado), `Esperado ${pmMoney(expected)}`, 'text-emerald-700')}
+      ${card('Pendiente este mes', pmMoney(pendiente), `${activeBs.length-leasesPaid} leases sin cobrar`, pendiente>0?'text-amber-600':'text-slate-900')}
+      ${card('Próximos pagos 7 días', proximos, 'leases por vencer', proximos>0?'text-amber-600':'text-slate-900')}
+      ${card('Tasa de cobro', tasa+'%', `${leasesPaid} de ${activeBs.length} leases`, tasa>=80?'text-emerald-700':tasa>=50?'text-amber-600':'text-red-600')}
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
+      <select onchange="pmaState.payFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
+        <option value="">🏠 Todas las casas</option>
+        ${pmaState.properties.map(p => `<option value="${p.id}" ${propFilter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+      </select>
+      <div class="flex gap-1.5 flex-wrap text-[10px] font-bold">
+        <button onclick="pmaState.payFilterPlatform=null;pmRender()" class="px-2.5 py-1 rounded-full ${!platFilter?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">Todas</button>
+        ${platforms.map(pl => `<button onclick="pmaState.payFilterPlatform='${pl}';pmRender()" class="px-2.5 py-1 rounded-full ${platFilter===pl?'bg-[#d4af37] text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${platLabel(pl).replace(/</g,'&lt;')}</button>`).join('')}
+      </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <tr>
+            <th class="px-3 py-2 text-left">Fecha</th>
+            <th class="px-3 py-2 text-left">Inquilino</th>
+            <th class="px-3 py-2 text-left">Casa</th>
+            <th class="px-3 py-2 text-left">Unit</th>
+            <th class="px-3 py-2 text-right">Monto</th>
+            <th class="px-3 py-2 text-left">Plataforma</th>
+            <th class="px-3 py-2 text-center">Compr.</th>
+            <th class="px-3 py-2 text-center">Acc.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pays.length ? pays.map(p => {
+            const prop = pmaState.properties.find(x => x.id === p.property_id);
+            const unit = pmaState.units.find(x => x.id === p.unit_id);
+            const url = p.proof_url || p.attachment_url;
+            return `<tr class="border-t border-slate-100 hover:bg-slate-50">
+              <td class="px-3 py-2 whitespace-nowrap text-slate-700">${p.paid_at||'—'}</td>
+              <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,28)}</td>
+              <td class="px-3 py-2 text-slate-600">${(prop?.name||'—').replace(/</g,'&lt;').slice(0,20)}</td>
+              <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
+              <td class="px-3 py-2 text-right font-bold text-emerald-700">$${Number(p.amount||0).toLocaleString()}</td>
+              <td class="px-3 py-2 text-slate-600">${(p.platform||'—').replace(/</g,'&lt;')}</td>
+              <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
+              <td class="px-3 py-2 text-center">${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="8" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos en ${pmYmLabel(ym)}.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+function pmSetPayMonth(ym) { pmaState.payMonth = ym; pmRender(); }
+window.pmSetPayMonth = pmSetPayMonth;
+
+// Picker de lease para "Registrar pago" → reusa el modal de pmMarkPayment
+function pmPickLeaseForPayment() {
+  const act = pmActiveBookings().slice().sort((a,b) => pmTenantName(a.tenant_id).localeCompare(pmTenantName(b.tenant_id)));
+  openModal('💵 Registrar pago — elegí el lease', `
+    <div class="space-y-1 max-h-[60vh] overflow-y-auto">
+      ${act.length ? act.map(b => {
+        const prop = pmaState.properties.find(x => x.id === b.property_id);
+        const unit = pmaState.units.find(x => x.id === b.unit_id);
+        return `<button onclick="closeModal();setTimeout(()=>pmMarkPayment('${b.id}'),60)" class="w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded hover:bg-slate-50 border border-slate-100">
+          <div class="min-w-0">
+            <div class="text-sm font-bold text-slate-800 truncate">${pmTenantName(b.tenant_id).replace(/</g,'&lt;')}</div>
+            <div class="text-[11px] text-slate-500 truncate">🏠 ${(prop?.name||'—').replace(/</g,'&lt;').slice(0,24)} · 🛏 ${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</div>
+          </div>
+          <span class="text-sm font-bold text-emerald-700 whitespace-nowrap">$${Number(b.rent_amount||0).toLocaleString()}</span>
+        </button>`;
+      }).join('') : '<div class="text-sm text-slate-400 italic py-6 text-center">No hay leases activos.</div>'}
+    </div>`);
+}
+window.pmPickLeaseForPayment = pmPickLeaseForPayment;
+
+// ════════════════════════════════════════════════════════════════
+// TAB · GASTOS (3 sub-tabs: por casa · operativos · nómina)
+// ════════════════════════════════════════════════════════════════
+const PM_TEAM = ['Nicolás Lara','Daniel Lara','Lucas Lara','Juan Felipe','Nicolás Sánchez','Carlos Vasquez'];
+
+function pmRenderExpenses() {
+  const sub = pmaState.expSubTab || 'house';
+  const tabs = [['house','🏠 Por Casa'],['operational','🏢 Operativos'],['payroll','👔 Nómina']];
+  return `
+  <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
+  <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
+    <div class="flex gap-1 border-b border-slate-200">
+      ${tabs.map(([k,l]) => `<button onclick="pmaState.expSubTab='${k}';pmRender()" class="px-3 py-1.5 text-xs font-bold border-b-2 -mb-px transition ${sub===k?'border-[#d4af37] text-slate-900':'border-transparent text-slate-500 hover:text-slate-700'}">${l}</button>`).join('')}
+    </div>
+    ${sub === 'house' ? pmRenderHouseExpenses() : ''}
+    ${sub === 'operational' ? pmRenderOperationalExpenses() : ''}
+    ${sub === 'payroll' ? pmRenderPayrollTab() : ''}
+  </div>`;
+}
+
+// ── Sub-tab A: Gastos por Casa (house + cleaning) ──
+function pmRenderHouseExpenses() {
+  const ym = pmaState.expMonth || pmCurrentYM();
+  const propFilter = pmaState.expFilterProperty;
+  const subcatFilter = pmaState.expFilterSubcat;
+  const houseExp = pmaState.expenses.filter(e => ['house','cleaning'].includes(e.category));
+
+  let rows = houseExp.filter(e => (e.expense_date||'').startsWith(ym));
+  const subcats = [...new Set(houseExp.map(e => e.subcategory).filter(Boolean))].sort();
+  if (propFilter) rows = rows.filter(e => e.property_id === propFilter);
+  if (subcatFilter) rows = rows.filter(e => e.subcategory === subcatFilter);
+  rows = [...rows].sort((a,b) => (b.expense_date||'').localeCompare(a.expense_date||''));
+
+  const totalMonth = rows.reduce((s,e) => s + Number(e.amount||0), 0);
+  const paidSum = rows.filter(e => e.paid).reduce((s,e) => s + Number(e.amount||0), 0);
+  const pendSum = totalMonth - paidSum;
+  // Por casa este mes
+  const byProp = {};
+  houseExp.filter(e => (e.expense_date||'').startsWith(ym)).forEach(e => {
+    byProp[e.property_id] = (byProp[e.property_id]||0) + Number(e.amount||0);
+  });
+  const propEntries = Object.entries(byProp).sort((a,b) => b[1]-a[1]);
+  const topProp = propEntries[0];
+  const avgPerHouse = propEntries.length ? totalMonth / propEntries.length : 0;
+
+  const card = (label, value, sub2, accent) => `
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div>
+      <div class="text-xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>
+      ${sub2?`<div class="text-[11px] text-slate-500 mt-0.5">${sub2}</div>`:''}
+    </div>`;
+
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="text-sm font-bold text-slate-900">Gastos por Casa · ${pmYmLabel(ym)}</div>
+      <div class="flex items-center gap-2">
+        ${pmMonthNav(ym, 'pmSetExpMonth(%V%)')}
+        <button onclick="pmEditExpense(null,'house')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Registrar gasto</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      ${card('Gasto del mes', pmMoney(totalMonth), `${rows.length} movimientos`, 'text-red-600')}
+      ${card('Promedio por casa', pmMoney(avgPerHouse), `${propEntries.length} casas con gasto`)}
+      ${card('Casa con mayor gasto', topProp?pmPropertyName(topProp[0]).slice(0,16):'—', topProp?pmMoney(topProp[1]):'')}
+      ${card('Pagado vs pendiente', pmMoney(paidSum), `pendiente ${pmMoney(pendSum)}`, pendSum>0?'text-amber-600':'text-emerald-700')}
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
+      <select onchange="pmaState.expFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
+        <option value="">🏠 Todas las casas</option>
+        ${pmaState.properties.map(p => `<option value="${p.id}" ${propFilter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+      </select>
+      <select onchange="pmaState.expFilterSubcat=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
+        <option value="">📂 Todas las categorías</option>
+        ${subcats.map(s => `<option value="${s}" ${subcatFilter===s?'selected':''}>${(s||'').replace(/</g,'&lt;')}</option>`).join('')}
+      </select>
+    </div>
+
+    ${pmExpenseTable(rows, true)}
+  </div>`;
+}
+
+// ── Sub-tab B: Gastos Operativos Empresa ──
+function pmRenderOperationalExpenses() {
+  const ym = pmaState.expMonth || pmCurrentYM();
+  const subcatFilter = pmaState.expFilterSubcat;
+  const opExp = pmaState.expenses.filter(e => e.category === 'operational');
+
+  let rows = opExp.filter(e => (e.expense_date||'').startsWith(ym));
+  const subcats = [...new Set(opExp.map(e => e.subcategory).filter(Boolean))].sort();
+  if (subcatFilter) rows = rows.filter(e => e.subcategory === subcatFilter);
+  rows = [...rows].sort((a,b) => (b.expense_date||'').localeCompare(a.expense_date||''));
+  const totalMonth = rows.reduce((s,e) => s + Number(e.amount||0), 0);
+
+  // Por categoría (bar chart) del mes
+  const byCat = {};
+  rows.forEach(e => { byCat[e.subcategory||'(otro)'] = (byCat[e.subcategory||'(otro)']||0) + Number(e.amount||0); });
+  const catEntries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+  const maxCat = Math.max(1, ...catEntries.map(c => c[1]));
+
+  // Tendencia 12 meses
+  const trend = [];
+  for (let i=11; i>=0; i--) {
+    const m = pmYmShift(ym, -i);
+    const tot = opExp.filter(e => (e.expense_date||'').startsWith(m)).reduce((s,e) => s + Number(e.amount||0), 0);
+    trend.push({ label: PM_ES_MONTHS_SHORT[pmYmMonthIdx(m)], value: tot });
+  }
+
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="text-sm font-bold text-slate-900">Gastos Operativos · ${pmYmLabel(ym)}</div>
+      <div class="flex items-center gap-2">
+        ${pmMonthNav(ym, 'pmSetExpMonth(%V%)')}
+        <button onclick="pmEditExpense(null,'operational')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Registrar gasto</button>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total del mes</div>
+        <div class="text-3xl font-extrabold mt-1 text-red-600">${pmMoney(totalMonth)}</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">${rows.length} movimientos</div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4 lg:col-span-2">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Por categoría</div>
+        ${catEntries.length ? `<div class="space-y-1.5">${catEntries.slice(0,8).map(([cat,val]) => `
+          <div class="flex items-center gap-2 text-[11px]">
+            <span class="w-24 truncate text-slate-600">${(cat||'').replace(/</g,'&lt;')}</span>
+            <div class="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden"><div class="h-3 rounded-full" style="width:${Math.round(100*val/maxCat)}%;background:#d4af37"></div></div>
+            <span class="w-16 text-right font-bold text-slate-700">${pmMoney(val)}</span>
+          </div>`).join('')}</div>` : '<div class="text-xs text-slate-400 italic">Sin datos.</div>'}
+      </div>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-xl p-4">
+      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Tendencia 12 meses</div>
+      ${pmLineChart(trend)}
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
+      <select onchange="pmaState.expFilterSubcat=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
+        <option value="">📂 Todas las categorías</option>
+        ${subcats.map(s => `<option value="${s}" ${subcatFilter===s?'selected':''}>${(s||'').replace(/</g,'&lt;')}</option>`).join('')}
+      </select>
+    </div>
+
+    ${pmExpenseTable(rows, false)}
+  </div>`;
+}
+
+// Mini line chart genérico para tendencia (1 serie)
+function pmLineChart(series) {
+  const W=620,H=150,padL=12,padR=12,padT=14,padB=22,n=series.length;
+  const max=Math.max(1,...series.map(s=>s.value));
+  const x=i=> padL+(i*(W-padL-padR)/Math.max(1,n-1));
+  const yv=v=> H-padB-(v/max)*(H-padT-padB);
+  const path=series.map((s,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${yv(s.value).toFixed(1)}`).join(' ');
+  const area=`${path} L${x(n-1).toFixed(1)},${H-padB} L${x(0).toFixed(1)},${H-padB} Z`;
+  const dots=series.map((s,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${yv(s.value).toFixed(1)}" r="2.6" fill="#d4af37"><title>${s.label}: ${pmMoney(s.value)}</title></circle>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:160px">
+    <path d="${area}" fill="rgba(212,175,55,.08)"/>
+    <path d="${path}" fill="none" stroke="#d4af37" stroke-width="2"/>${dots}
+    ${series.map((s,i)=>`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9" fill="#94a3b8" text-anchor="middle">${s.label}</text>`).join('')}
+  </svg>`;
+}
+
+// Tabla de gastos compartida (withHouse = mostrar columna Casa)
+function pmExpenseTable(rows, withHouse) {
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <tr>
+            <th class="px-3 py-2 text-left">Fecha</th>
+            ${withHouse?'<th class="px-3 py-2 text-left">Casa</th>':''}
+            <th class="px-3 py-2 text-left">Categoría</th>
+            <th class="px-3 py-2 text-right">Monto</th>
+            <th class="px-3 py-2 text-center">Factura</th>
+            <th class="px-3 py-2 text-center">Pagado</th>
+            <th class="px-3 py-2 text-left">Notas</th>
+            <th class="px-3 py-2 text-center">Acc.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(e => {
+            const url = e.invoice_url;
+            const note = e.description || e.notes || '';
+            return `<tr class="border-t border-slate-100 hover:bg-slate-50">
+              <td class="px-3 py-2 whitespace-nowrap text-slate-700">${e.expense_date||'—'}</td>
+              ${withHouse?`<td class="px-3 py-2 text-slate-600">${(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
+              <td class="px-3 py-2 text-slate-700">${(e.subcategory||e.category||'—').replace(/</g,'&lt;')}</td>
+              <td class="px-3 py-2 text-right font-bold text-red-600">$${Number(e.amount||0).toLocaleString()}</td>
+              <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
+              <td class="px-3 py-2 text-center"><button onclick="pmToggleExpensePaid('${e.id}',${!e.paid})" title="${e.paid?'Pagado':'Pendiente'}">${e.paid?'✅':'⏳'}</button></td>
+              <td class="px-3 py-2 text-slate-500 max-w-[160px] truncate" title="${String(note).replace(/"/g,'&quot;')}">${String(note).replace(/</g,'&lt;').slice(0,40)}</td>
+              <td class="px-3 py-2 text-center"><button onclick="pmEditExpense('${e.id}')" class="text-slate-400 hover:text-slate-700">✏️</button></td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="${withHouse?8:7}" class="px-3 py-8 text-center text-slate-400 italic">Sin gastos en este período.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+function pmSetExpMonth(ym) { pmaState.expMonth = ym; pmRender(); }
+window.pmSetExpMonth = pmSetExpMonth;
+
+async function pmToggleExpensePaid(id, paid) {
+  const r = await pmExecQuery(sb.from('pm_expenses').update({ paid }).eq('id', id).select(), 'Actualizar gasto');
+  if (!r) return;
+  const e = pmaState.expenses.find(x => x.id === id);
+  if (e) e.paid = paid;
+  pmRender();
+}
+window.pmToggleExpensePaid = pmToggleExpensePaid;
+
+// ── Sub-tab C: Nómina del Equipo ──
+function pmRenderPayrollTab() {
+  const ym = pmaState.expMonth || pmCurrentYM();
+  const y = pmYmYear(ym);
+  const mes = PM_ES_MONTHS[pmYmMonthIdx(ym)];
+  const view = pmaState.payrollView || 'people';
+
+  const rowsMonth = (pmaState.payroll||[]).filter(p => Number(p.year)===y && (p.month||'').toLowerCase()===mes);
+  const rowFor = (name) => rowsMonth.find(p => (p.employee_name||'').toLowerCase() === name.toLowerCase());
+  // Salario estándar = último salario conocido de la persona
+  const lastSalary = {};
+  (pmaState.payroll||[]).slice().sort((a,b) => (Number(b.year)||0)-(Number(a.year)||0) || PM_ES_MONTHS.indexOf((b.month||'').toLowerCase())-PM_ES_MONTHS.indexOf((a.month||'').toLowerCase()))
+    .forEach(p => { const n=(p.employee_name||'').toLowerCase(); if(!(n in lastSalary) && p.salary) lastSalary[n]=Number(p.salary); });
+
+  // Lista de personas: equipo fijo + cualquiera presente en datos
+  const extra = [...new Set((pmaState.payroll||[]).map(p=>p.employee_name).filter(Boolean))].filter(n => !PM_TEAM.some(t => t.toLowerCase()===n.toLowerCase()));
+  const team = [...PM_TEAM, ...extra];
+
+  const totalMonth = rowsMonth.reduce((s,p) => s + Number(p.salary||0), 0);
+  const paidMonth = rowsMonth.filter(p=>p.paid).reduce((s,p) => s + Number(p.salary||0), 0);
+
+  const header = `
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="text-sm font-bold text-slate-900">Nómina · ${pmYmLabel(ym)}</div>
+      <div class="flex items-center gap-2">
+        <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
+          <button onclick="pmaState.payrollView='people';pmRender()" class="px-3 py-1 rounded-full ${view==='people'?'bg-white shadow text-slate-900':'text-slate-500'}">Por persona</button>
+          <button onclick="pmaState.payrollView='monthly';pmRender()" class="px-3 py-1 rounded-full ${view==='monthly'?'bg-white shadow text-slate-900':'text-slate-500'}">Mensual</button>
+        </div>
+        ${pmMonthNav(ym, 'pmSetExpMonth(%V%)')}
+      </div>
+    </div>`;
+
+  if (view === 'people') {
+    return `
+    <div class="space-y-3">
+      ${header}
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
+        ${team.map(name => {
+          const row = rowFor(name);
+          const salary = row ? Number(row.salary||0) : (lastSalary[name.toLowerCase()]||0);
+          const paid = !!row?.paid;
+          const initial = name.trim().charAt(0).toUpperCase();
+          return `<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0" style="background:#1e293b;border:2px solid #d4af37">${initial}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-bold text-slate-900 truncate">${name.replace(/</g,'&lt;')}</div>
+              <div class="text-[11px] text-slate-500">${salary?pmMoney(salary)+'/mes':'sin salario'}</div>
+              <div class="text-[11px] font-bold ${paid?'text-emerald-600':'text-amber-600'}">${paid?'✅ Pagado':'⏳ Pendiente'}</div>
+            </div>
+            ${!paid ? `<button onclick="pmPayrollMarkPaid('${ym}','${name.replace(/'/g,"\\'")}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2 py-1 rounded whitespace-nowrap">Marcar pagado</button>`
+                    : `<button onclick="pmPayrollMarkPaid('${ym}','${name.replace(/'/g,"\\'")}',false)" class="text-[11px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Revertir</button>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+        <div class="text-xs text-slate-600">Total nómina del mes: <strong class="text-slate-900">${pmMoney(totalMonth)}</strong> · pagado ${pmMoney(paidMonth)}</div>
+        <button onclick="pmGeneratePayroll('${ym}')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">Generar nómina del mes</button>
+      </div>
+    </div>`;
+  }
+
+  // Vista mensual: tabla
+  const sorted = [...rowsMonth].sort((a,b) => (a.employee_name||'').localeCompare(b.employee_name||''));
+  return `
+  <div class="space-y-3">
+    ${header}
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <tr><th class="px-3 py-2 text-left">Persona</th><th class="px-3 py-2 text-right">Salario</th><th class="px-3 py-2 text-center">Estado</th><th class="px-3 py-2 text-center">Factura</th><th class="px-3 py-2 text-center">Acc.</th></tr>
+        </thead>
+        <tbody>
+          ${sorted.length ? sorted.map(p => `<tr class="border-t border-slate-100 hover:bg-slate-50">
+            <td class="px-3 py-2 text-slate-800 font-semibold">${(p.employee_name||'—').replace(/</g,'&lt;')}</td>
+            <td class="px-3 py-2 text-right font-bold text-slate-700">$${Number(p.salary||0).toLocaleString()}</td>
+            <td class="px-3 py-2 text-center">${p.paid?'<span class="text-emerald-600 font-bold">✅ Pagado</span>':'<span class="text-amber-600 font-bold">⏳ Pendiente</span>'}</td>
+            <td class="px-3 py-2 text-center">${p.invoice_url?`<a href="${p.invoice_url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'—'}</td>
+            <td class="px-3 py-2 text-center"><button onclick="pmPayrollMarkPaid('${ym}','${(p.employee_name||'').replace(/'/g,"\\'")}',${!p.paid})" class="text-slate-400 hover:text-slate-700">${p.paid?'↩️':'✅'}</button></td>
+          </tr>`).join('') : '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-400 italic">Sin nómina generada para este mes. Usá «Generar nómina del mes».</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+      <div class="text-xs text-slate-600">Total: <strong class="text-slate-900">${pmMoney(totalMonth)}</strong></div>
+      <button onclick="pmGeneratePayroll('${ym}')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">Generar nómina del mes</button>
+    </div>
+  </div>`;
+}
+
+async function pmPayrollMarkPaid(ym, name, paid = true) {
+  const y = pmYmYear(ym);
+  const mes = PM_ES_MONTHS[pmYmMonthIdx(ym)];
+  const existing = (pmaState.payroll||[]).find(p => Number(p.year)===y && (p.month||'').toLowerCase()===mes && (p.employee_name||'').toLowerCase()===name.toLowerCase());
+  if (existing) {
+    const r = await pmExecQuery(sb.from('pm_payroll').update({ paid }).eq('id', existing.id).select(), 'Actualizar nómina');
+    if (!r) return;
+    existing.paid = paid;
+  } else {
+    // crear row con último salario conocido
+    const last = (pmaState.payroll||[]).filter(p => (p.employee_name||'').toLowerCase()===name.toLowerCase() && p.salary)
+      .sort((a,b) => (Number(b.year)||0)-(Number(a.year)||0))[0];
+    const payload = { employee_name: name, salary: last?Number(last.salary):0, month: mes, year: y, paid };
+    const r = await pmExecQuery(sb.from('pm_payroll').insert(payload).select(), 'Crear nómina');
+    if (!r) return;
+    if (r.data?.[0]) pmaState.payroll.push(r.data[0]);
+  }
+  pmRender();
+}
+window.pmPayrollMarkPaid = pmPayrollMarkPaid;
+
+async function pmGeneratePayroll(ym) {
+  const y = pmYmYear(ym);
+  const mes = PM_ES_MONTHS[pmYmMonthIdx(ym)];
+  const lastSalary = {};
+  (pmaState.payroll||[]).slice().sort((a,b) => (Number(b.year)||0)-(Number(a.year)||0))
+    .forEach(p => { const n=(p.employee_name||'').toLowerCase(); if(!(n in lastSalary) && p.salary) lastSalary[n]=Number(p.salary); });
+  const existing = new Set((pmaState.payroll||[]).filter(p => Number(p.year)===y && (p.month||'').toLowerCase()===mes).map(p => (p.employee_name||'').toLowerCase()));
+  const toCreate = PM_TEAM.filter(n => !existing.has(n.toLowerCase()))
+    .map(n => ({ employee_name: n, salary: lastSalary[n.toLowerCase()]||0, month: mes, year: y, paid: false }));
+  if (!toCreate.length) return alert('La nómina de ' + pmYmLabel(ym) + ' ya está generada para todo el equipo.');
+  if (!confirm(`Generar ${toCreate.length} registros de nómina pendientes para ${pmYmLabel(ym)}?`)) return;
+  const r = await pmExecQuery(sb.from('pm_payroll').insert(toCreate).select(), 'Generar nómina');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmGeneratePayroll = pmGeneratePayroll;
+
+// ── Registrar / editar Gasto ──
+async function pmEditExpense(id, defaultCat) {
+  const e = id ? pmaState.expenses.find(x => x.id === id) : { category: defaultCat || 'house', expense_date: new Date().toISOString().slice(0,10), paid: false };
+  const isNew = !id;
+  const cat = e.category || 'house';
+  const allSub = [...new Set(pmaState.expenses.map(x => x.subcategory).filter(Boolean))].sort();
+  openModal((isNew?'+ Registrar':'✏️ Editar')+' Gasto', `
+    <div class="space-y-3">
+      <div>
+        <label class="text-[10px] font-bold uppercase text-slate-600">Categoría *</label>
+        <div class="flex gap-2 mt-1" id="pm-ef-catwrap">
+          ${[['house','🏠 Por casa'],['cleaning','🧹 Limpieza'],['operational','🏢 Operativo']].map(([v,l]) => `
+            <label class="flex items-center gap-1 text-xs cursor-pointer border border-slate-300 rounded px-2 py-1.5 ${cat===v?'bg-slate-900 text-white':''}">
+              <input type="radio" name="pm-ef-cat" value="${v}" ${cat===v?'checked':''} onchange="pmEfToggleCat()" class="hidden"/>${l}
+            </label>`).join('')}
+        </div>
+      </div>
+      <div id="pm-ef-proprow" style="${cat==='operational'?'display:none':''}">
+        <label class="text-[10px] font-bold uppercase text-slate-600">Casa</label>
+        <select id="pm-ef-prop" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+          <option value="">— Elegir —</option>
+          ${pmaState.properties.map(p => `<option value="${p.id}" ${e.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Subcategoría</label>
+          <input id="pm-ef-subcat" list="pm-ef-subcats" value="${(e.subcategory||'').replace(/"/g,'&quot;')}" placeholder="Coa / Texas Gas / Arreglos…" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          <datalist id="pm-ef-subcats">${allSub.map(s => `<option value="${(s||'').replace(/"/g,'&quot;')}">`).join('')}</datalist></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Monto * $</label>
+          <input id="pm-ef-amount" type="number" step="0.01" value="${e.amount||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Fecha *</label>
+          <input id="pm-ef-date" type="date" value="${e.expense_date||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+        <div class="flex items-end"><label class="flex items-center gap-2 text-sm font-bold text-slate-700"><input id="pm-ef-paid" type="checkbox" ${e.paid?'checked':''}/> Pagado</label></div>
+      </div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Factura (imagen/PDF)</label>
+        <input id="pm-ef-file" type="file" accept="image/*,application/pdf" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs"/>
+        ${e.invoice_url?`<a href="${e.invoice_url}" target="_blank" class="text-[11px] text-blue-600 hover:underline">📎 Factura actual</a>`:''}</div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Descripción / notas</label>
+        <textarea id="pm-ef-desc" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(e.description||e.notes||'').replace(/</g,'&lt;')}</textarea></div>
+      <div id="pm-ef-status" class="text-[11px] text-slate-500"></div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        ${!isNew ? `<button onclick="pmDeleteExpense('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        <button id="pm-ef-save" onclick="pmSaveExpense('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Registrar':'Guardar'}</button>
+      </div>
+    </div>
+  `);
+}
+window.pmEditExpense = pmEditExpense;
+
+function pmEfToggleCat() {
+  const cat = document.querySelector('input[name="pm-ef-cat"]:checked')?.value;
+  const row = document.getElementById('pm-ef-proprow');
+  if (row) row.style.display = (cat === 'operational') ? 'none' : '';
+  document.querySelectorAll('#pm-ef-catwrap label').forEach(l => {
+    const on = l.querySelector('input')?.checked;
+    l.classList.toggle('bg-slate-900', on); l.classList.toggle('text-white', on);
+  });
+}
+window.pmEfToggleCat = pmEfToggleCat;
+
+async function pmSaveExpense(id) {
+  const cat = document.querySelector('input[name="pm-ef-cat"]:checked')?.value || 'house';
+  const amount = +document.getElementById('pm-ef-amount').value || 0;
+  const expense_date = document.getElementById('pm-ef-date').value || null;
+  const property_id = (cat === 'operational') ? null : (document.getElementById('pm-ef-prop').value || null);
+  const fileEl = document.getElementById('pm-ef-file');
+  const statusEl = document.getElementById('pm-ef-status');
+  const saveBtn = document.getElementById('pm-ef-save');
+  if (!amount) return alert('El monto es obligatorio.');
+  if (!expense_date) return alert('La fecha es obligatoria.');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando…'; }
+
+  let invoice_url = null;
+  const file = fileEl?.files?.[0];
+  if (file) {
+    if (statusEl) statusEl.textContent = 'Subiendo factura…';
+    const up = await pmUploadFile('invoices', property_id || cat, file);
+    if (up.url) invoice_url = up.url;
+    else if (statusEl) statusEl.textContent = '⚠️ Factura no subida: ' + up.error + ' (se guarda sin adjunto)';
+  }
+
+  const ymd = expense_date;
+  const payload = {
+    category: cat,
+    subcategory: document.getElementById('pm-ef-subcat').value.trim() || null,
+    property_id,
+    amount,
+    expense_date,
+    month: PM_ES_MONTHS[parseInt(ymd.slice(5,7),10)-1],
+    year: parseInt(ymd.slice(0,4), 10),
+    description: document.getElementById('pm-ef-desc').value.trim() || null,
+    paid: document.getElementById('pm-ef-paid').checked
+  };
+  if (invoice_url) payload.invoice_url = invoice_url;
+  const r = id
+    ? await pmExecQuery(sb.from('pm_expenses').update(payload).eq('id', id).select(), 'Update gasto')
+    : await pmExecQuery(sb.from('pm_expenses').insert(payload).select(), 'Crear gasto');
+  if (!r) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = id?'Guardar':'Registrar'; } return; }
+  await pmAfterCrud();
+}
+window.pmSaveExpense = pmSaveExpense;
+
+async function pmDeleteExpense(id) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  const r = await pmExecQuery(sb.from('pm_expenses').delete().eq('id', id), 'Eliminar gasto');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmDeleteExpense = pmDeleteExpense;
 
 // ════════════════════════════════════════════════════════════════
 // TAB 4 · FINANZAS
