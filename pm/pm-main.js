@@ -36,6 +36,11 @@ const pmaState = {
   expFilterProperty: null,                // tab Gastos: property_id (sub-tab casa)
   expFilterSubcat: null,                  // tab Gastos: subcategoría
   payrollView: 'people',                  // sub-tab Nómina: people·monthly
+  finPeriod: 'this_month',                // Finanzas: this_month·last3·ytd·custom
+  finCustomFrom: null,                    // Finanzas custom: 'YYYY-MM-DD'
+  finCustomTo: null,
+  pnlSortKey: 'net',                      // P&L por casa: columna de orden
+  pnlSortDir: 'desc',                     // asc·desc
   financePeriod: 'all',                   // 'all' | 'this_month' | 'this_year'
   financeTypeFilter: 'all',               // 'all' | 'ingreso' | 'gasto'
   financeSearch: '',                      // buscador de Finanzas
@@ -3319,161 +3324,370 @@ async function pmDeleteExpense(id) {
 window.pmDeleteExpense = pmDeleteExpense;
 
 // ════════════════════════════════════════════════════════════════
-// TAB 4 · FINANZAS
+// TAB 4 · FINANZAS — Dashboard ejecutivo + P&L por casa
 // ════════════════════════════════════════════════════════════════
+// Rango del período seleccionado → { fromISO, toISO, ymList, label }
+function pmFinRange() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const period = pmaState.finPeriod || 'this_month';
+  let from, to, label;
+  if (period === 'last3')      { from = new Date(y, m-2, 1); to = new Date(y, m+1, 0); label = 'Últimos 3 meses'; }
+  else if (period === 'ytd')   { from = new Date(y, 0, 1);   to = now;                 label = 'Año a la fecha'; }
+  else if (period === 'custom'){
+    from = pmaState.finCustomFrom ? new Date(pmaState.finCustomFrom+'T00:00:00') : new Date(y, m, 1);
+    to   = pmaState.finCustomTo   ? new Date(pmaState.finCustomTo+'T00:00:00')   : now;
+    label = `${iso(from)} → ${iso(to)}`;
+  } else { from = new Date(y, m, 1); to = new Date(y, m+1, 0); label = pmYmLabel(pmCurrentYM()); }
+  // Lista de YM cubiertos
+  const ymList = [];
+  let cur = new Date(from.getFullYear(), from.getMonth(), 1);
+  const end = new Date(to.getFullYear(), to.getMonth(), 1);
+  while (cur <= end) { ymList.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`); cur.setMonth(cur.getMonth()+1); }
+  return { fromISO: iso(from), toISO: iso(to), ymList, label, months: ymList.length };
+}
+function pmInRange(dateStr, r) { return dateStr && dateStr >= r.fromISO && dateStr <= r.toISO; }
+function pmPayrollInRange(r) {
+  return (pmaState.payroll||[]).filter(p => {
+    const idx = PM_ES_MONTHS.indexOf((p.month||'').toLowerCase());
+    if (idx < 0 || !p.year) return false;
+    return r.ymList.includes(`${p.year}-${String(idx+1).padStart(2,'0')}`);
+  }).reduce((s,p) => s + Number(p.salary||0), 0);
+}
+// Agregado P&L del período (ingresos, gastos por categoría, nómina, por casa)
+function pmFinAgg(r) {
+  const inc = pmaState.payments.filter(p => p.type==='ingreso' && pmInRange(p.paid_at, r));
+  const exp = pmaState.expenses.filter(e => pmInRange(e.expense_date, r));
+  const sum = (arr, f) => arr.reduce((s,x) => s + Number((f?f(x):x.amount)||0), 0);
+  const income = sum(inc);
+  const house = sum(exp.filter(e => e.category==='house'));
+  const cleaning = sum(exp.filter(e => e.category==='cleaning'));
+  const operational = sum(exp.filter(e => e.category==='operational'));
+  const payroll = pmPayrollInRange(r);
+  const net = income - house - cleaning - operational - payroll;
+
+  const activeProps = pmaState.properties.filter(p => p.status==='activa');
+  const payrollPerProp = activeProps.length ? payroll / activeProps.length : 0;
+  const props = activeProps.map(p => {
+    const occ = pmOccupancyOf(p.id);
+    const pIncome = sum(inc.filter(x => x.property_id===p.id));
+    const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house'));
+    const pClean = sum(exp.filter(e => e.property_id===p.id && e.category==='cleaning'));
+    const pNet = pIncome - pHouse - pClean - payrollPerProp;
+    const margin = pIncome > 0 ? pNet / pIncome : 0;
+    return { property: p, occ: occ.pct/100, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, net: pNet, margin };
+  });
+  return { income, house, cleaning, operational, payroll, net, props, activePropsCount: activeProps.length };
+}
+// Tendencia mensual (n meses hasta el fin del período) ingresos vs gastos totales
+function pmFinTrend(nMonths, anchorYm) {
+  const [ay, am] = anchorYm.split('-').map(Number);
+  const out = [];
+  for (let i = nMonths-1; i >= 0; i--) {
+    const d = new Date(ay, am-1-i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const income = pmaState.payments.filter(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym)).reduce((s,p)=>s+Number(p.amount||0),0);
+    const exps = pmaState.expenses.filter(e => (e.expense_date||'').startsWith(ym)).reduce((s,e)=>s+Number(e.amount||0),0);
+    const pr = (pmaState.payroll||[]).filter(p => Number(p.year)===d.getFullYear() && PM_ES_MONTHS.indexOf((p.month||'').toLowerCase())===d.getMonth()).reduce((s,p)=>s+Number(p.salary||0),0);
+    const gastos = exps + pr;
+    out.push({ ym, label: `${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income, gastos, net: income-gastos });
+  }
+  return out;
+}
+function pmFinSetPeriod(p) { pmaState.finPeriod = p; pmRender(); }
+window.pmFinSetPeriod = pmFinSetPeriod;
+function pmSetPnlSort(key) {
+  if (pmaState.pnlSortKey === key) pmaState.pnlSortDir = pmaState.pnlSortDir==='desc'?'asc':'desc';
+  else { pmaState.pnlSortKey = key; pmaState.pnlSortDir = 'desc'; }
+  pmRender();
+}
+window.pmSetPnlSort = pmSetPnlSort;
+
 function pmRenderFinance() {
-  // Filtros del tab
-  const period = pmaState.financePeriod || 'all'; // 'all' | 'this_month' | 'this_year'
-  const typeFilter = pmaState.financeTypeFilter || 'all'; // 'all' | 'ingreso' | 'gasto'
-  const searchQ = (pmaState.financeSearch || '').toLowerCase().trim();
-  const now = new Date();
-  const thisMonth = now.toISOString().slice(0,7);
-  const thisYear = String(now.getFullYear());
+  const r = pmFinRange();
+  const agg = pmFinAgg(r);
+  const anchorYm = r.ymList[r.ymList.length-1] || pmCurrentYM();
+  const trend = pmFinTrend(12, anchorYm);
+  const t12i = trend.reduce((s,t)=>s+t.income,0), t12g = trend.reduce((s,t)=>s+t.gastos,0);
+  const period = pmaState.finPeriod || 'this_month';
 
-  // Filtrar payments según el período + tipo + búsqueda
-  let filteredPays = pmaState.payments.filter(p => p.status === 'pagado');
-  if (period === 'this_month') filteredPays = filteredPays.filter(p => (p.paid_at||'').startsWith(thisMonth));
-  else if (period === 'this_year') filteredPays = filteredPays.filter(p => (p.paid_at||'').startsWith(thisYear));
-  if (typeFilter !== 'all') filteredPays = filteredPays.filter(p => p.type === typeFilter);
-  if (searchQ) filteredPays = filteredPays.filter(p =>
-    (p.concept||'').toLowerCase().includes(searchQ) ||
-    (p.category||'').toLowerCase().includes(searchQ) ||
-    (p.notes||'').toLowerCase().includes(searchQ)
-  );
+  // ── Métricas clave portafolio ──
+  const activeProps = pmaState.properties.filter(p => p.status==='activa');
+  const activePropIds = new Set(activeProps.map(p=>p.id));
+  const units = pmaState.units.filter(u => activePropIds.has(u.property_id));
+  const occUnits = units.filter(u => pmActiveBookingOf(u.id));
+  const occPct = units.length ? occUnits.length/units.length : 0;
+  const activeBs = pmActiveBookings().filter(b => activePropIds.has(b.property_id));
+  const monthlyRentRoll = activeBs.reduce((s,b)=>s+pmMonthlyRent(b),0);
+  const avgRentRoom = occUnits.length ? monthlyRentRoll/occUnits.length : 0;
+  const maintPerUnit = units.length ? (agg.house+agg.cleaning)/units.length : 0;
+  // ROI mensual ≈ margen neto del período (sin costo de adquisición en el schema)
+  const roiMensual = agg.income>0 ? agg.net/agg.income : 0;
+  // Días promedio rotación (gap entre reservas consecutivas por unidad)
+  let gaps=[]; pmaState.units.forEach(u=>{ const bs=pmaState.bookings.filter(b=>b.unit_id===u.id && b.start_date).sort((a,b)=>a.start_date<b.start_date?-1:1); for(let i=1;i<bs.length;i++){ const pe=bs[i-1].end_date, ns=bs[i].start_date; if(pe&&ns&&ns>pe){ const g=Math.round((new Date(ns)-new Date(pe))/86400000); if(g>0&&g<400) gaps.push(g); } } });
+  const avgRot = gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):null;
+  // Cap rate: requiere valor de adquisición (no está en el schema) → n/d
+  const capRate = null;
 
-  // Totales GLOBALES (de los filtrados, sin importar si tienen property o no)
-  const total = {
-    ingresos: filteredPays.filter(p => p.type === 'ingreso').reduce((s,p) => s + Number(p.amount||0), 0),
-    gastos: filteredPays.filter(p => p.type === 'gasto').reduce((s,p) => s + Number(p.amount||0), 0)
-  };
-  total.utilidad = total.ingresos - total.gastos;
+  // ── Alertas de rendimiento ──
+  const lowMargin = agg.props.filter(x => x.income>0 && x.margin < 0.20);
+  const lowOcc = activeProps.filter(p => (pmOccupancyOf(p.id).pct/100) < 0.70);
+  const risingExp = activeProps.filter(p => {
+    const e = []; for (let i=2;i>=0;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      e.push(pmaState.expenses.filter(x=>x.property_id===p.id && ['house','cleaning'].includes(x.category) && (x.expense_date||'').startsWith(ym)).reduce((s,x)=>s+Number(x.amount||0),0)); }
+    return e[0]>0 && e[1]>e[0] && e[2]>e[1];
+  });
 
-  // Pagos huérfanos (sin property_id)
-  const orphans = filteredPays.filter(p => !p.property_id);
-  const orphanIngresos = orphans.filter(p => p.type === 'ingreso').reduce((s,p) => s + Number(p.amount||0), 0);
-  const orphanGastos = orphans.filter(p => p.type === 'gasto').reduce((s,p) => s + Number(p.amount||0), 0);
+  // ── P&L rows ordenadas ──
+  const dir = pmaState.pnlSortDir==='asc'?1:-1;
+  const key = pmaState.pnlSortKey||'net';
+  const rows = [...agg.props].sort((a,b) => {
+    let va, vb;
+    if (key==='name') { va=(a.property.name||'').toLowerCase(); vb=(b.property.name||'').toLowerCase(); return va<vb?-dir:va>vb?dir:0; }
+    va = a[key]; vb = b[key];
+    return (Number(va||0)-Number(vb||0))*dir;
+  });
+  const marginRowCls = m => m>0.40 ? 'bg-emerald-50' : m>=0.20 ? 'bg-amber-50' : 'bg-red-50';
+  const sortArrow = k => key===k ? (pmaState.pnlSortDir==='desc'?' ▼':' ▲') : '';
+  const th = (k, label, align='right') => `<th class="px-3 py-2 text-${align} cursor-pointer hover:text-slate-900 select-none" onclick="pmSetPnlSort('${k}')">${label}${sortArrow(k)}</th>`;
 
-  // Por propiedad usando los pagos filtrados (no pmFinanceOf que ignora filtros)
-  const byProperty = pmaState.properties.map(p => {
-    const pays = filteredPays.filter(x => x.property_id === p.id);
-    const ingresos = pays.filter(x => x.type === 'ingreso').reduce((s,x) => s + Number(x.amount||0), 0);
-    const gastos = pays.filter(x => x.type === 'gasto').reduce((s,x) => s + Number(x.amount||0), 0);
-    return { property: p, ingresos, gastos, utilidad: ingresos - gastos, count: pays.length };
-  }).filter(r => r.count > 0).sort((a, b) => b.utilidad - a.utilidad);
-
-  // Ordenar filtrados por fecha desc para "últimos movimientos"
-  const sortedPays = [...filteredPays].sort((a,b) => (b.paid_at||b.due_at||'').localeCompare(a.paid_at||a.due_at||''));
-
-  const periodLabel = { all: 'Todos los tiempos', this_month: 'Este mes', this_year: 'Este año' }[period];
+  const kpi = (label, value, sub, accent) => `
+    <div class="bg-white border border-slate-200 rounded-xl p-3">
+      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div>
+      <div class="text-xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>
+      ${sub?`<div class="text-[10px] text-slate-500 mt-0.5">${sub}</div>`:''}
+    </div>`;
+  const metric = (label, value, sub) => `
+    <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div>
+      <div class="text-lg font-extrabold text-slate-900 mt-1">${value}</div>
+      ${sub?`<div class="text-[10px] text-slate-500 mt-0.5">${sub}</div>`:''}
+    </div>`;
+  const pBtn = (k, l) => `<button onclick="pmFinSetPeriod('${k}')" class="px-3 py-1 rounded-full ${period===k?'bg-slate-900 text-white':'text-slate-500 hover:text-slate-900'}">${l}</button>`;
 
   return `
-    <div class="space-y-3 p-1">
-      <!-- Header -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <div class="text-sm font-bold text-slate-900">Finanzas · <span class="text-slate-500 font-normal">${filteredPays.length} movimientos</span></div>
-          <div class="text-[11px] text-slate-500">${periodLabel}${typeFilter!=='all'?` · solo ${typeFilter}s`:''}${searchQ?` · busca "${searchQ}"`:''}</div>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="pmEditPayment(null,'ingreso')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">+ Ingreso</button>
-          <button onclick="pmEditPayment(null,'gasto')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">+ Gasto</button>
-        </div>
-      </div>
+  <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
+  <div class="space-y-4 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
 
-      <!-- Filtros -->
-      <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
+    <!-- Header + período -->
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <div class="text-base font-bold text-slate-900">Finanzas · Dashboard ejecutivo</div>
+        <div class="text-xs text-slate-500">${r.label} · ${agg.activePropsCount} casas activas</div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
         <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
-          <button onclick="pmaState.financePeriod='all';pmRender()" class="px-3 py-1 rounded-full ${period==='all'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Todo</button>
-          <button onclick="pmaState.financePeriod='this_year';pmRender()" class="px-3 py-1 rounded-full ${period==='this_year'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Este año</button>
-          <button onclick="pmaState.financePeriod='this_month';pmRender()" class="px-3 py-1 rounded-full ${period==='this_month'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Este mes</button>
+          ${pBtn('this_month','Mes actual')}${pBtn('last3','Últ. 3m')}${pBtn('ytd','YTD')}${pBtn('custom','Custom')}
         </div>
-        <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
-          <button onclick="pmaState.financeTypeFilter='all';pmRender()" class="px-3 py-1 rounded-full ${typeFilter==='all'?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-900'}">Todos</button>
-          <button onclick="pmaState.financeTypeFilter='ingreso';pmRender()" class="px-3 py-1 rounded-full ${typeFilter==='ingreso'?'bg-emerald-600 text-white':'text-emerald-600 hover:bg-emerald-50'}">Ingresos</button>
-          <button onclick="pmaState.financeTypeFilter='gasto';pmRender()" class="px-3 py-1 rounded-full ${typeFilter==='gasto'?'bg-red-600 text-white':'text-red-600 hover:bg-red-50'}">Gastos</button>
-        </div>
-        <div class="relative flex-1 min-w-[200px]">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input oninput="pmaState.financeSearch=this.value;pmRender()" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar concepto, categoría, notas…" class="w-full border border-slate-300 focus:border-emerald-500 rounded-full pl-8 pr-3 py-1.5 text-[11px] outline-none"/>
-        </div>
-      </div>
-
-      <!-- Totales -->
-      <div class="grid grid-cols-3 gap-2">
-        <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-lg p-3"><div class="text-[10px] uppercase font-bold text-emerald-800">Ingresos</div><div class="text-2xl font-bold text-emerald-700 mt-1">$${Math.round(total.ingresos).toLocaleString()}</div></div>
-        <div class="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-3"><div class="text-[10px] uppercase font-bold text-red-800">Gastos</div><div class="text-2xl font-bold text-red-700 mt-1">$${Math.round(total.gastos).toLocaleString()}</div></div>
-        <div class="bg-gradient-to-br ${total.utilidad>=0?'from-blue-50 to-blue-100 border-blue-200':'from-red-50 to-red-100 border-red-300'} border rounded-lg p-3"><div class="text-[10px] uppercase font-bold ${total.utilidad>=0?'text-blue-800':'text-red-800'}">Utilidad neta</div><div class="text-2xl font-bold ${total.utilidad>=0?'text-blue-700':'text-red-700'} mt-1">$${Math.round(total.utilidad).toLocaleString()}</div></div>
-      </div>
-
-      ${orphans.length ? `
-        <!-- Alerta: pagos huérfanos -->
-        <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-start gap-3">
-          <div class="text-2xl">⚠️</div>
-          <div class="flex-1 min-w-0">
-            <div class="font-bold text-sm text-amber-900">${orphans.length} ${orphans.length===1?'pago no está asignado':'pagos no están asignados'} a ninguna propiedad</div>
-            <div class="text-[11px] text-amber-800 mt-0.5">Estos movimientos ($${Math.round(orphanIngresos).toLocaleString()} ingresos, $${Math.round(orphanGastos).toLocaleString()} gastos) cuentan en el total global pero no en el rendimiento por propiedad. Para verlos discriminados, asigná la propiedad en cada uno.</div>
-            <button onclick="pmaState.financeShowOrphansOnly=!pmaState.financeShowOrphansOnly;pmRender()" class="mt-2 text-[10px] font-bold text-amber-900 underline hover:text-amber-700">${pmaState.financeShowOrphansOnly?'Ver todos':'Ver solo huérfanos'} →</button>
-          </div>
-        </div>
-      ` : ''}
-
-      <!-- Por propiedad -->
-      ${byProperty.length ? `
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700 flex items-center justify-between">
-            <span>Rendimiento por propiedad</span>
-            <span class="text-[10px] text-slate-500 font-normal">${byProperty.length} ${byProperty.length===1?'propiedad':'propiedades'} con movimientos</span>
-          </div>
-          <table class="w-full text-xs">
-            <thead class="bg-slate-50">
-              <tr><th class="text-left px-3 py-2">Propiedad</th><th class="text-center px-3 py-2">Movs</th><th class="text-right px-3 py-2">Ingresos</th><th class="text-right px-3 py-2">Gastos</th><th class="text-right px-3 py-2">Utilidad</th></tr>
-            </thead>
-            <tbody>
-              ${byProperty.map(r => `
-                <tr class="border-t border-slate-100 hover:bg-slate-50">
-                  <td class="px-3 py-2 font-semibold">${(r.property.name||'').replace(/</g,'&lt;')}</td>
-                  <td class="text-center px-3 py-2 text-slate-500">${r.count}</td>
-                  <td class="text-right px-3 py-2 text-emerald-700 font-bold">$${Math.round(r.ingresos).toLocaleString()}</td>
-                  <td class="text-right px-3 py-2 text-red-700">$${Math.round(r.gastos).toLocaleString()}</td>
-                  <td class="text-right px-3 py-2 font-bold ${r.utilidad>=0?'text-emerald-700':'text-red-700'}">$${Math.round(r.utilidad).toLocaleString()}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      ` : '<div class="text-xs text-slate-400 italic text-center py-4 bg-slate-50 rounded">Sin movimientos por propiedad en este período.</div>'}
-
-      <!-- Últimos movimientos -->
-      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700 flex items-center justify-between">
-          <span>Movimientos ${pmaState.financeShowOrphansOnly?'(solo huérfanos)':'recientes'}</span>
-          <span class="text-[10px] text-slate-500 font-normal">${sortedPays.length} en total · mostrando primeros 50</span>
-        </div>
-        ${sortedPays.length ? `
-          <div class="overflow-x-auto">
-          <table class="w-full text-xs">
-            <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2">Fecha</th><th class="text-left px-3 py-2">Concepto</th><th class="text-left px-3 py-2">Propiedad</th><th class="text-left px-3 py-2">Cat</th><th class="text-right px-3 py-2">Monto</th></tr></thead>
-            <tbody>
-              ${(pmaState.financeShowOrphansOnly ? sortedPays.filter(p => !p.property_id) : sortedPays).slice(0, 50).map(pay => {
-                const propName = pay.property_id ? pmPropertyName(pay.property_id) : null;
-                const isExp = pay._src === 'expense';
-                return `
-                <tr class="border-t border-slate-100 hover:bg-slate-50 ${isExp?'':'cursor-pointer'}" ${isExp?'title="Gasto importado de Airtable (solo lectura)"':`onclick="pmEditPayment('${pay.id}')"`}>
-                  <td class="px-3 py-2 whitespace-nowrap">${pay.paid_at||pay.due_at||'—'}</td>
-                  <td class="px-3 py-2 font-semibold">${(pay.concept||'(sin concepto)').replace(/</g,'&lt;')}</td>
-                  <td class="px-3 py-2 ${propName?'text-slate-600':'text-amber-700 font-bold'}">${propName ? propName.slice(0,28) : '⚠ Sin asignar'}</td>
-                  <td class="px-3 py-2 text-slate-500 text-[10px]">${(pay.category||'').replace(/</g,'&lt;')}</td>
-                  <td class="text-right px-3 py-2 font-bold ${pay.type==='ingreso'?'text-emerald-700':'text-red-700'} whitespace-nowrap">${pay.type==='ingreso'?'+':'-'}$${Number(pay.amount||0).toLocaleString()}</td>
-                </tr>
-              `; }).join('')}
-            </tbody>
-          </table>
-          </div>
-        ` : '<div class="p-4 text-center text-slate-400 text-xs italic">Sin movimientos que matcheen los filtros.</div>'}
+        ${period==='custom'?`<div class="flex items-center gap-1 text-[10px]">
+          <input type="date" value="${pmaState.finCustomFrom||''}" onchange="pmaState.finCustomFrom=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1"/>
+          <span class="text-slate-400">→</span>
+          <input type="date" value="${pmaState.finCustomTo||''}" onchange="pmaState.finCustomTo=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1"/>
+        </div>`:''}
       </div>
     </div>
-  `;
+
+    <!-- A · KPIs -->
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
+      ${kpi('Ingresos', pmMoney(agg.income), `${r.months} ${r.months===1?'mes':'meses'}`, 'text-emerald-700')}
+      ${kpi('Gastos casas', pmMoney(agg.house), 'category=house', 'text-red-600')}
+      ${kpi('Gastos aseo', pmMoney(agg.cleaning), 'category=cleaning', 'text-red-600')}
+      ${kpi('Nómina', pmMoney(agg.payroll), 'payroll', 'text-red-600')}
+      ${kpi('Operativos', pmMoney(agg.operational), 'category=operational', 'text-red-600')}
+      ${kpi('P&L Neto', pmMoney(agg.net), agg.income>0?`margen ${Math.round(roiMensual*100)}%`:'', agg.net>=0?'text-emerald-700':'text-red-600')}
+    </div>
+
+    <!-- A · Gráfico ingresos vs gastos 12m -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-sm font-bold text-slate-800">Ingresos vs Gastos · 12 meses</div>
+        <div class="flex gap-3 text-[11px]"><span class="text-emerald-600 font-bold">● Ingresos</span><span class="text-red-600 font-bold">● Gastos</span></div>
+      </div>
+      ${pmTrendSvg(trend)}
+      <div class="text-xs text-slate-500 text-center mt-1">12 meses: <span class="text-emerald-700 font-bold">${pmMoney(t12i)}</span> ingresos · <span class="text-red-700 font-bold">${pmMoney(t12g)}</span> gastos · <span class="font-bold ${t12i-t12g>=0?'text-emerald-700':'text-red-700'}">${pmMoney(t12i-t12g)}</span> neto</div>
+    </div>
+
+    <!-- B · P&L por casa -->
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div class="px-4 py-2 flex items-center justify-between" style="background:#1e293b">
+        <span class="text-xs font-bold uppercase tracking-wider text-white">P&L por casa</span>
+        <span class="text-[10px] font-bold" style="color:#d4af37">nómina prorrateada entre ${agg.activePropsCount} casas</span>
+      </div>
+      <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <tr>
+            ${th('name','Casa','left')}
+            ${th('occ','Ocup.')}
+            ${th('income','Ingresos')}
+            ${th('house','Gastos Casa')}
+            ${th('cleaning','Aseo')}
+            ${th('payrollPro','Nómina prorr.')}
+            ${th('net','NETO')}
+            ${th('margin','% margen')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map(x => `
+            <tr class="border-t border-slate-100 ${marginRowCls(x.margin)}">
+              <td class="px-3 py-2 font-semibold text-slate-800">${(x.property.name||'').replace(/</g,'&lt;').slice(0,28)}</td>
+              <td class="px-3 py-2 text-right text-slate-600">${Math.round(x.occ*100)}%</td>
+              <td class="px-3 py-2 text-right text-emerald-700 font-bold">${pmMoney(x.income)}</td>
+              <td class="px-3 py-2 text-right text-red-600">${pmMoney(x.house)}</td>
+              <td class="px-3 py-2 text-right text-red-600">${pmMoney(x.cleaning)}</td>
+              <td class="px-3 py-2 text-right text-slate-500">${pmMoney(x.payrollPro)}</td>
+              <td class="px-3 py-2 text-right font-extrabold ${x.net>=0?'text-emerald-700':'text-red-600'}">${pmMoney(x.net)}</td>
+              <td class="px-3 py-2 text-right font-bold ${x.margin>0.40?'text-emerald-700':x.margin>=0.20?'text-amber-700':'text-red-600'}">${x.income>0?Math.round(x.margin*100)+'%':'—'}</td>
+            </tr>`).join('') : '<tr><td colspan="8" class="px-3 py-8 text-center text-slate-400 italic">Sin casas activas con datos en el período.</td></tr>'}
+        </tbody>
+        ${rows.length ? `<tfoot class="bg-slate-100 font-bold"><tr>
+          <td class="px-3 py-2 text-slate-800">TOTAL</td>
+          <td class="px-3 py-2 text-right text-slate-600">${Math.round(occPct*100)}%</td>
+          <td class="px-3 py-2 text-right text-emerald-700">${pmMoney(agg.income)}</td>
+          <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.house)}</td>
+          <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.cleaning)}</td>
+          <td class="px-3 py-2 text-right text-slate-500">${pmMoney(agg.payroll)}</td>
+          <td class="px-3 py-2 text-right ${(agg.income-agg.house-agg.cleaning-agg.payroll)>=0?'text-emerald-700':'text-red-600'}">${pmMoney(agg.income-agg.house-agg.cleaning-agg.payroll)}</td>
+          <td class="px-3 py-2 text-right text-slate-700">${agg.income>0?Math.round((agg.income-agg.house-agg.cleaning-agg.payroll)/agg.income*100)+'%':'—'}</td>
+        </tr></tfoot>` : ''}
+      </table>
+      </div>
+    </div>
+
+    <!-- C · Métricas clave -->
+    <div>
+      <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Métricas clave</div>
+      <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
+        ${metric('Ocupación portafolio', Math.round(occPct*100)+'%', `${occUnits.length}/${units.length} unidades`)}
+        ${metric('Renta prom. / hab.', pmMoney(avgRentRoom), 'unidades ocupadas')}
+        ${metric('Cap rate anualiz.', capRate!=null?Math.round(capRate*100)+'%':'n/d', 'falta valor de compra')}
+        ${metric('ROI mensual', agg.income>0?Math.round(roiMensual*100)+'%':'—', 'neto / ingresos')}
+        ${metric('Mant. / unidad', pmMoney(maintPerUnit), 'casa+aseo del período')}
+        ${metric('Días rotación', avgRot!=null?avgRot+'d':'—', 'promedio entre leases')}
+      </div>
+    </div>
+
+    <!-- D · Alertas de rendimiento -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Alertas de rendimiento</div>
+      ${(lowMargin.length||lowOcc.length||risingExp.length) ? `<div class="space-y-2">
+        ${lowMargin.length?`<div class="flex items-start gap-2 border-l-4 border-l-red-500 bg-red-50 rounded-r-lg px-3 py-2">
+          <span class="text-[9px] uppercase font-extrabold text-red-700 tracking-wider mt-0.5">Crítico</span>
+          <div class="text-xs text-slate-700"><strong>${lowMargin.length}</strong> ${lowMargin.length===1?'casa con margen':'casas con margen'} &lt; 20% — revisar: ${lowMargin.slice(0,4).map(x=>x.property.name.replace(/</g,'&lt;').slice(0,18)).join(', ')}</div>
+        </div>`:''}
+        ${lowOcc.length?`<div class="flex items-start gap-2 border-l-4 border-l-amber-500 bg-amber-50 rounded-r-lg px-3 py-2">
+          <span class="text-[9px] uppercase font-extrabold text-amber-700 tracking-wider mt-0.5">Atención</span>
+          <div class="text-xs text-slate-700"><strong>${lowOcc.length}</strong> ${lowOcc.length===1?'casa con ocupación':'casas con ocupación'} &lt; 70%: ${lowOcc.slice(0,4).map(p=>p.name.replace(/</g,'&lt;').slice(0,18)).join(', ')}</div>
+        </div>`:''}
+        ${risingExp.length?`<div class="flex items-start gap-2 border-l-4 border-l-amber-500 bg-amber-50 rounded-r-lg px-3 py-2">
+          <span class="text-[9px] uppercase font-extrabold text-amber-700 tracking-wider mt-0.5">Tendencia</span>
+          <div class="text-xs text-slate-700"><strong>${risingExp.length}</strong> ${risingExp.length===1?'casa con gastos creciendo':'casas con gastos creciendo'} 2+ meses: ${risingExp.slice(0,4).map(p=>p.name.replace(/</g,'&lt;').slice(0,18)).join(', ')}</div>
+        </div>`:''}
+      </div>` : '<div class="text-center py-4 text-slate-400 text-sm">✓ Sin alertas de rendimiento en este momento.</div>'}
+    </div>
+
+    <!-- E · Reportes exportables -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Reportes exportables</div>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="pmFinReport('monthly')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg" style="border:1px solid #d4af37">📄 Reporte mensual (PDF)</button>
+        <button onclick="pmFinReport('investor')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">📊 Reporte por inversionista (PDF)</button>
+        <button onclick="pmFinReport('fiscal')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">💼 Reporte fiscal anual (PDF)</button>
+        <button onclick="pmFinExportCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">📈 Tendencias 12 meses (CSV)</button>
+      </div>
+    </div>
+  </div>`;
 }
+
+// ── Reportes (PDF vía ventana imprimible — patrón usado en el resto del repo) ──
+function pmOpenPrintReport(title, bodyHtml) {
+  const w = window.open('', '_blank');
+  if (!w) return alert('Habilitá pop-ups para generar el reporte.');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+    <style>
+      *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#1e293b;margin:32px;font-size:12px}
+      h1{font-size:20px;margin:0 0 4px} h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #d4af37;padding-bottom:3px;margin:22px 0 10px}
+      .sub{color:#64748b;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
+      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #e2e8f0} th{background:#f1f5f9;text-transform:uppercase;font-size:10px;color:#64748b}
+      th:first-child,td:first-child{text-align:left} .kpis{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0}
+      .kpi{border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;min-width:130px} .kpi .l{font-size:9px;text-transform:uppercase;color:#94a3b8;font-weight:bold}
+      .kpi .v{font-size:18px;font-weight:800;margin-top:2px} .pos{color:#047857} .neg{color:#dc2626}
+      .foot{margin-top:30px;color:#94a3b8;font-size:10px;border-top:1px solid #e2e8f0;padding-top:8px}
+      @media print{body{margin:14px}button{display:none}}
+    </style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><h1>Rental Profits</h1><div class="sub">${title}</div></div>
+      <button onclick="window.print()" style="background:#1e293b;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer">🖨️ Imprimir / PDF</button>
+    </div>
+    ${bodyHtml}
+    <div class="foot">Generado por Empresa OS · Property Management — ${new Date().toLocaleString()}</div>
+    <script>setTimeout(()=>window.print(),500)<\/script>
+    </body></html>`);
+  w.document.close();
+}
+
+function pmFinReport(kind) {
+  const r = pmFinRange();
+  const agg = pmFinAgg(r);
+  const kpiRow = `<div class="kpis">
+    <div class="kpi"><div class="l">Ingresos</div><div class="v pos">${pmMoney(agg.income)}</div></div>
+    <div class="kpi"><div class="l">Gastos casas</div><div class="v neg">${pmMoney(agg.house)}</div></div>
+    <div class="kpi"><div class="l">Aseo</div><div class="v neg">${pmMoney(agg.cleaning)}</div></div>
+    <div class="kpi"><div class="l">Nómina</div><div class="v neg">${pmMoney(agg.payroll)}</div></div>
+    <div class="kpi"><div class="l">Operativos</div><div class="v neg">${pmMoney(agg.operational)}</div></div>
+    <div class="kpi"><div class="l">P&L Neto</div><div class="v ${agg.net>=0?'pos':'neg'}">${pmMoney(agg.net)}</div></div>
+  </div>`;
+  const pnlTable = (rows) => `<table>
+    <thead><tr><th>Casa</th><th>Ocup.</th><th>Ingresos</th><th>Gastos Casa</th><th>Aseo</th><th>Nómina prorr.</th><th>NETO</th><th>% margen</th></tr></thead>
+    <tbody>${rows.map(x=>`<tr><td>${(x.property.name||'').replace(/</g,'&lt;')}</td><td>${Math.round(x.occ*100)}%</td><td>${pmMoney(x.income)}</td><td>${pmMoney(x.house)}</td><td>${pmMoney(x.cleaning)}</td><td>${pmMoney(x.payrollPro)}</td><td class="${x.net>=0?'pos':'neg'}">${pmMoney(x.net)}</td><td>${x.income>0?Math.round(x.margin*100)+'%':'—'}</td></tr>`).join('')}</tbody>
+  </table>`;
+  const sorted = [...agg.props].sort((a,b)=>b.net-a.net);
+
+  if (kind === 'investor') {
+    const body = `<h2>Reporte por inversionista · ${r.label}</h2>${kpiRow}
+      <h2>Rendimiento por propiedad</h2>${pnlTable(sorted)}
+      <p style="margin-top:14px;color:#64748b">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
+    return pmOpenPrintReport('Reporte por inversionista', body);
+  }
+  if (kind === 'fiscal') {
+    // Año en curso (o año del 'to')
+    const year = parseInt((r.toISO||'').slice(0,4),10) || new Date().getFullYear();
+    const yr = { fromISO:`${year}-01-01`, toISO:`${year}-12-31`, ymList: Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,'0')}`), label:String(year), months:12 };
+    const a = pmFinAgg(yr);
+    const months = pmFinTrend(12, `${year}-12`).filter(t=>t.ym.startsWith(String(year)));
+    const body = `<h2>Reporte fiscal anual · ${year}</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Ingresos ${year}</div><div class="v pos">${pmMoney(a.income)}</div></div>
+        <div class="kpi"><div class="l">Gastos totales</div><div class="v neg">${pmMoney(a.house+a.cleaning+a.operational+a.payroll)}</div></div>
+        <div class="kpi"><div class="l">Resultado neto</div><div class="v ${a.net>=0?'pos':'neg'}">${pmMoney(a.net)}</div></div>
+      </div>
+      <h2>Desglose mensual</h2>
+      <table><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr></thead>
+      <tbody>${months.map(m=>`<tr><td>${m.label}</td><td>${pmMoney(m.income)}</td><td>${pmMoney(m.gastos)}</td><td class="${m.net>=0?'pos':'neg'}">${pmMoney(m.net)}</td></tr>`).join('')}</tbody></table>
+      <h2>P&L por propiedad ${year}</h2>${pnlTable([...a.props].sort((x,y)=>y.net-x.net))}
+      <p style="margin-top:10px;color:#94a3b8">Para Excel: usá el botón «Tendencias 12 meses (CSV)» y abrilo en tu hoja de cálculo.</p>`;
+    return pmOpenPrintReport(`Reporte fiscal ${year}`, body);
+  }
+  // monthly (default)
+  const body = `<h2>Reporte mensual · ${r.label}</h2>${kpiRow}
+    <h2>P&L por casa</h2>${pnlTable(sorted)}`;
+  pmOpenPrintReport('Reporte mensual', body);
+}
+window.pmFinReport = pmFinReport;
+
+function pmFinExportCSV() {
+  const anchorYm = (pmFinRange().ymList.slice(-1)[0]) || pmCurrentYM();
+  const trend = pmFinTrend(12, anchorYm);
+  const rows = [['Mes','Ingresos','Gastos','Neto'], ...trend.map(t=>[t.label, Math.round(t.income), Math.round(t.gastos), Math.round(t.net)])];
+  const csv = rows.map(r => r.map(c => /[",\n]/.test(String(c))?`"${String(c).replace(/"/g,'""')}"`:c).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `rental-profits-tendencias-12m.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+window.pmFinExportCSV = pmFinExportCSV;
 
 // ════════════════════════════════════════════════════════════════
 // CRUD · MODALES (Propiedad, Unidad, Reserva, Pago, Inquilino)
