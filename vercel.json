@@ -3,6 +3,13 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "crons": [
+    { "path": "/api/cron/check-contracts", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/check-payments", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/check-services", "schedule": "0 9 * * 1" },
+    { "path": "/api/cron/check-tasks", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/check-occupancy", "schedule": "0 10 * * 1" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

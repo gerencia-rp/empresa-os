@@ -41,6 +41,17 @@ const pmaState = {
   finCustomTo: null,
   pnlSortKey: 'net',                      // P&L por casa: columna de orden
   pnlSortDir: 'desc',                     // asc·desc
+  opsSubTab: 'tasks',                     // Operación: tasks·services·comms·alerts
+  tasksView: 'calendar',                  // tasks: calendar·list
+  tasksListRange: '7',                    // list: '7'·'30'·'late'
+  opsCalMonth: null,                      // 'YYYY-MM' (null = mes actual)
+  commsTenantId: null,                    // Centro de comunicación: tenant elegido
+  commsTemplateKey: null,                 // template elegido
+  commsCustomText: null,                  // texto editado
+  alertSeverityFilter: null,              // panel alertas: critical·warning·info
+  alertCategoryFilter: null,              // contract·payment·service·task·occupancy
+  alertShowResolved: false,
+  alertsDropdownOpen: false,              // bell dropdown
   financePeriod: 'all',                   // 'all' | 'this_month' | 'this_year'
   financeTypeFilter: 'all',               // 'all' | 'ingreso' | 'gasto'
   financeSearch: '',                      // buscador de Finanzas
@@ -52,6 +63,8 @@ const pmaState = {
   tenants: [],
   payments: [],
   feeds: [],                          // 🆕 calendarios externos
+  alerts: [],                         // 🆕 alertas automáticas
+  templates: [],                      // 🆕 plantillas de mensajes
   loading: false,
   // Form state
   editingProperty: null,
@@ -106,7 +119,9 @@ async function pmLoadAll() {
     { name: 'wifi',       optional: true,  q: () => sb.from('pm_wifi_credentials').select('*').limit(500) },
     { name: 'tasks',      optional: true,  q: () => sb.from('pm_tasks').select('*').order('scheduled_date', { ascending: true, nullsFirst: false }).limit(1000) },
     { name: 'lastSync',   optional: true,  q: () => sb.from('pm_sync_log').select('*').eq('source','airtable').order('started_at', { ascending: false }).limit(1) },
-    { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
+    { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) },
+    { name: 'alerts',     optional: true,  q: () => sb.from('pm_alerts').select('*').order('created_at', { ascending: false }).limit(500) },
+    { name: 'templates',  optional: true,  q: () => sb.from('pm_message_templates').select('*').order('name') }
   ];
 
   const results = {};
@@ -160,6 +175,8 @@ async function pmLoadAll() {
   pmaState.tasks = results.tasks || [];
   pmaState.lastSync = (results.lastSync || [])[0] || null;
   pmaState.feeds = results.feeds || [];
+  pmaState.alerts = results.alerts || [];
+  pmaState.templates = results.templates || [];
 
   console.log('[pm] Carga completa:', {
     properties: pmaState.properties.length,
@@ -316,6 +333,7 @@ function pmRender() {
   }
   root.innerHTML = `
     <div class="flex flex-col" style="min-height:60vh;">
+      ${pmRenderAlertsBar()}
       <!-- Header con tabs -->
       <div class="border-b border-slate-200 mb-3">
         <div class="flex gap-1 -mb-px overflow-x-auto">
@@ -327,6 +345,7 @@ function pmRender() {
             ['tenants','👥 Inquilinos', pmaState.tenants.length],
             ['payments','💵 Pagos', ''],
             ['expenses','📤 Gastos', ''],
+            ['operations','🛠 Operación', ''],
             ['feeds','📡 Feeds', pmaState.feeds.length],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
@@ -345,6 +364,7 @@ function pmRender() {
         ${pmaState.tab === 'tenants'    ? (pmaState.tenantDetailId ? pmRenderTenantDetail() : pmRenderTenants()) : ''}
         ${pmaState.tab === 'payments'   ? pmRenderPayments() : ''}
         ${pmaState.tab === 'expenses'   ? pmRenderExpenses() : ''}
+        ${pmaState.tab === 'operations' ? pmRenderOperations() : ''}
         ${pmaState.tab === 'feeds'      ? pmRenderFeeds() : ''}
         ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
       </div>
@@ -4028,6 +4048,632 @@ async function pmDeletePayment(id) {
   await pmAfterCrud();
 }
 window.pmDeletePayment = pmDeletePayment;
+
+// ════════════════════════════════════════════════════════════════
+// 🔔 ALERTAS — barra contextual + bell dropdown
+// ════════════════════════════════════════════════════════════════
+function pmAlertSev(sev) {
+  return ({
+    critical: { label: 'Crítica', dot: 'bg-red-500',     txt: 'text-red-700',     bg: 'bg-red-50',     border: 'border-l-red-500' },
+    warning:  { label: 'Advert.', dot: 'bg-amber-500',   txt: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-l-amber-500' },
+    info:     { label: 'Info',    dot: 'bg-blue-500',    txt: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-l-blue-500' }
+  })[sev] || { label: sev||'—', dot: 'bg-slate-400', txt: 'text-slate-600', bg: 'bg-slate-50', border: 'border-l-slate-400' };
+}
+function pmActiveAlerts() { return (pmaState.alerts||[]).filter(a => !a.resolved); }
+function pmAlertCounts() {
+  const a = pmActiveAlerts();
+  return { total: a.length, unread: a.filter(x=>!x.read).length,
+    critical: a.filter(x=>x.severity==='critical').length,
+    warning: a.filter(x=>x.severity==='warning').length,
+    info: a.filter(x=>x.severity==='info').length };
+}
+
+function pmRenderAlertsBar() {
+  const c = pmAlertCounts();
+  const open = pmaState.alertsDropdownOpen;
+  const recent = pmActiveAlerts().slice(0, 10);
+  return `
+  <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+    <div class="text-[11px] text-slate-600">
+      ${c.total ? `🔔 <strong>${c.total}</strong> alertas activas: <span class="text-red-600 font-bold">${c.critical} críticas</span> · <span class="text-amber-600 font-bold">${c.warning} advertencias</span> · <span class="text-blue-600 font-bold">${c.info} informativas</span>`
+                : '<span class="text-slate-400">🔔 Sin alertas activas</span>'}
+    </div>
+    <div class="flex items-center gap-2 relative">
+      <button onclick="pmRunAlertChecks(this)" title="Generar alertas ahora" class="text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">↻ Revisar</button>
+      <button onclick="pmaState.alertsDropdownOpen=${open?'false':'true'};pmRender()" class="relative bg-white border border-slate-200 hover:bg-slate-50 rounded-lg px-2.5 py-1.5">
+        <span class="text-base leading-none">🔔</span>
+        ${c.unread ? `<span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">${c.unread}</span>` : ''}
+      </button>
+      ${open ? `
+        <div class="absolute right-0 top-full mt-1 w-[340px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100" style="background:#1e293b">
+            <span class="text-xs font-bold text-white">Alertas recientes</span>
+            <button onclick="pmAlertMarkAllRead()" class="text-[10px] font-bold" style="color:#d4af37">Marcar todas leídas</button>
+          </div>
+          <div class="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
+            ${recent.length ? recent.map(a => { const s = pmAlertSev(a.severity); return `
+              <div class="px-3 py-2 flex items-start gap-2 ${a.read?'':'bg-slate-50'}">
+                <span class="${s.dot} w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[11px] text-slate-700 leading-snug">${(a.message||'').replace(/</g,'&lt;')}</div>
+                  <div class="text-[9px] text-slate-400 mt-0.5">${(a.created_at||'').slice(0,16).replace('T',' ')}${a.property_id?` · ${pmPropertyName(a.property_id).slice(0,18)}`:''}</div>
+                </div>
+                ${!a.read?`<button onclick="pmAlertMarkRead('${a.id}')" title="Marcar leída" class="text-slate-300 hover:text-slate-600 text-xs">✓</button>`:''}
+              </div>`; }).join('') : '<div class="px-3 py-6 text-center text-slate-400 text-xs italic">Sin alertas.</div>'}
+          </div>
+          <button onclick="pmaState.alertsDropdownOpen=false;pmSetTab('operations');pmaState.opsSubTab='alerts';pmRender()" class="w-full text-center text-[11px] font-bold text-slate-700 hover:bg-slate-50 py-2 border-t border-slate-100">Ver todas las alertas →</button>
+        </div>` : ''}
+    </div>
+  </div>`;
+}
+
+async function pmRunAlertChecks(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Revisando…'; }
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token;
+    const base = (window.SUPABASE_URL || (sb?.supabaseUrl) || '').replace(/\/$/,'');
+    if (!token || !base) { alert('Sin sesión para invocar las alertas.'); return; }
+    const r = await fetch(`${base}/functions/v1/pm-alerts?check=all`, {
+      method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggered_by: 'ui' })
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) { alert('No se pudieron generar alertas: ' + (j.error||r.status)); return; }
+    // recargar alertas
+    const { data } = await sb.from('pm_alerts').select('*').order('created_at',{ascending:false}).limit(500);
+    pmaState.alerts = data || [];
+    pmRender();
+  } catch (e) { alert('Error: ' + e.message); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Revisar'; } }
+}
+window.pmRunAlertChecks = pmRunAlertChecks;
+
+async function pmAlertMarkRead(id) {
+  const r = await pmExecQuery(sb.from('pm_alerts').update({ read: true }).eq('id', id).select(), 'Marcar leída');
+  if (!r) return;
+  const a = pmaState.alerts.find(x => x.id === id); if (a) a.read = true;
+  pmRender();
+}
+window.pmAlertMarkRead = pmAlertMarkRead;
+
+async function pmAlertMarkAllRead() {
+  const ids = pmActiveAlerts().filter(a => !a.read).map(a => a.id);
+  if (!ids.length) return;
+  const r = await pmExecQuery(sb.from('pm_alerts').update({ read: true }).in('id', ids).select(), 'Marcar todas leídas');
+  if (!r) return;
+  pmaState.alerts.forEach(a => { if (ids.includes(a.id)) a.read = true; });
+  pmRender();
+}
+window.pmAlertMarkAllRead = pmAlertMarkAllRead;
+
+async function pmAlertResolve(id) {
+  const r = await pmExecQuery(sb.from('pm_alerts').update({ resolved: true, read: true }).eq('id', id).select(), 'Resolver alerta');
+  if (!r) return;
+  const a = pmaState.alerts.find(x => x.id === id); if (a) { a.resolved = true; a.read = true; }
+  pmRender();
+}
+window.pmAlertResolve = pmAlertResolve;
+
+async function pmAlertAssign(id) {
+  const who = prompt('Asignar alerta a (nombre del equipo):', PM_TEAM[0]);
+  if (who === null) return;
+  const r = await pmExecQuery(sb.from('pm_alerts').update({ assigned_to: who.trim() || null }).eq('id', id).select(), 'Asignar alerta');
+  if (!r) return;
+  const a = pmaState.alerts.find(x => x.id === id); if (a) a.assigned_to = who.trim() || null;
+  pmRender();
+}
+window.pmAlertAssign = pmAlertAssign;
+
+// ════════════════════════════════════════════════════════════════
+// TAB · OPERACIÓN (3 sub-tabs + panel de alertas)
+// ════════════════════════════════════════════════════════════════
+const PM_TASK_TYPES = {
+  aseo:                 { label: 'Aseo',       color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
+  cesped:               { label: 'Césped',     color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
+  inspeccion:           { label: 'Inspección', color: '#f59e0b', chip: 'bg-amber-100 text-amber-800' },
+  renovacion_contrato:  { label: 'Renovación', color: '#ef4444', chip: 'bg-red-100 text-red-800' }
+};
+function pmTaskMeta(t) { return PM_TASK_TYPES[t] || { label: 'Tarea', color: '#94a3b8', chip: 'bg-slate-100 text-slate-700' }; }
+function pmTaskDate(t) { return t.scheduled_date || (t.start_at ? String(t.start_at).slice(0,10) : null); }
+
+function pmRenderOperations() {
+  const sub = pmaState.opsSubTab || 'tasks';
+  const c = pmAlertCounts();
+  const tabs = [['tasks','📋 Cronograma'],['services','⚡ Servicios'],['comms','💬 Comunicación'],['alerts',`🔔 Alertas${c.total?` (${c.total})`:''}`]];
+  return `
+  <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
+  <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
+    <div class="flex gap-1 border-b border-slate-200">
+      ${tabs.map(([k,l]) => `<button onclick="pmaState.opsSubTab='${k}';pmRender()" class="px-3 py-1.5 text-xs font-bold border-b-2 -mb-px transition ${sub===k?'border-[#d4af37] text-slate-900':'border-transparent text-slate-500 hover:text-slate-700'}">${l}</button>`).join('')}
+    </div>
+    ${sub==='tasks'    ? pmRenderTasksSection() : ''}
+    ${sub==='services' ? pmRenderServices() : ''}
+    ${sub==='comms'    ? pmRenderComms() : ''}
+    ${sub==='alerts'   ? pmRenderAlertsPanel() : ''}
+  </div>`;
+}
+
+// ── Sub-tab A: Cronograma de tareas ──
+function pmRenderTasksSection() {
+  const view = pmaState.tasksView || 'calendar';
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
+        <button onclick="pmaState.tasksView='calendar';pmRender()" class="px-3 py-1 rounded-full ${view==='calendar'?'bg-white shadow text-slate-900':'text-slate-500'}">📅 Calendario</button>
+        <button onclick="pmaState.tasksView='list';pmRender()" class="px-3 py-1 rounded-full ${view==='list'?'bg-white shadow text-slate-900':'text-slate-500'}">📋 Lista</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="flex gap-2 text-[10px]">
+          ${Object.entries(PM_TASK_TYPES).map(([k,m])=>`<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${m.color}"></span>${m.label}</span>`).join('')}
+        </div>
+        <button onclick="pmEditTask(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Nueva tarea</button>
+      </div>
+    </div>
+    ${view==='calendar' ? pmRenderTasksCalendar() : pmRenderTasksList()}
+  </div>`;
+}
+
+function pmRenderTasksCalendar() {
+  const ym = pmaState.opsCalMonth || pmCurrentYM();
+  const y = pmYmYear(ym), mIdx = pmYmMonthIdx(ym);
+  const first = new Date(y, mIdx, 1);
+  const startDow = (first.getDay() + 6) % 7; // lunes=0
+  const daysInMonth = new Date(y, mIdx+1, 0).getDate();
+  const today = new Date().toISOString().slice(0,10);
+  const tasksByDay = {};
+  (pmaState.tasks||[]).forEach(t => { const d = pmTaskDate(t); if (d && d.startsWith(ym)) { const day = parseInt(d.slice(8,10),10); (tasksByDay[day] = tasksByDay[day]||[]).push(t); } });
+
+  const cells = [];
+  for (let i=0;i<startDow;i++) cells.push('<div class="bg-slate-50 rounded"></div>');
+  for (let day=1; day<=daysInMonth; day++) {
+    const ds = `${ym}-${String(day).padStart(2,'0')}`;
+    const ts = tasksByDay[day] || [];
+    cells.push(`
+      <div class="bg-white border border-slate-100 rounded p-1 min-h-[68px] ${ds===today?'ring-1 ring-[#d4af37]':''}">
+        <div class="text-[10px] font-bold ${ds===today?'text-[#b8941f]':'text-slate-400'}">${day}</div>
+        <div class="space-y-0.5 mt-0.5">
+          ${ts.slice(0,3).map(t => { const m=pmTaskMeta(t.task_type); const done=t.status==='completado'; return `
+            <button onclick="pmEditTask('${t.id}')" class="w-full text-left text-[9px] px-1 py-0.5 rounded truncate ${done?'opacity-40 line-through':''}" style="background:${m.color}22;color:${m.color}" title="${(t.title||'').replace(/"/g,'&quot;')}">${(t.title||'').replace(/</g,'&lt;').slice(0,18)}</button>`; }).join('')}
+          ${ts.length>3?`<div class="text-[8px] text-slate-400">+${ts.length-3} más</div>`:''}
+        </div>
+      </div>`);
+  }
+  const dows = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl p-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm font-bold text-slate-900">${PM_ES_MONTHS[mIdx]} ${y}</div>
+        ${pmMonthNav(ym, 'pmSetOpsCalMonth(%V%)')}
+      </div>
+      <div class="grid grid-cols-7 gap-1 text-[9px] font-bold text-slate-400 uppercase mb-1">${dows.map(d=>`<div class="text-center">${d}</div>`).join('')}</div>
+      <div class="grid grid-cols-7 gap-1">${cells.join('')}</div>
+    </div>`;
+}
+function pmSetOpsCalMonth(ym) { pmaState.opsCalMonth = ym; pmRender(); }
+window.pmSetOpsCalMonth = pmSetOpsCalMonth;
+
+function pmRenderTasksList() {
+  const range = pmaState.tasksListRange || '7';
+  const today = new Date().toISOString().slice(0,10);
+  const limit = new Date(); limit.setDate(limit.getDate() + (range==='30'?30:7)); const limitISO = limit.toISOString().slice(0,10);
+  const open = (pmaState.tasks||[]).filter(t => !['completado','cancelado'].includes(t.status));
+  let rows;
+  if (range==='late') rows = open.filter(t => { const d=pmTaskDate(t); return d && d < today; });
+  else rows = open.filter(t => { const d=pmTaskDate(t); return d && d >= today && d <= limitISO; });
+  rows = rows.sort((a,b) => (pmTaskDate(a)||'').localeCompare(pmTaskDate(b)||''));
+
+  const rb = (k,l) => `<button onclick="pmaState.tasksListRange='${k}';pmRender()" class="px-3 py-1 rounded-full ${range===k?'bg-slate-900 text-white':'text-slate-500 hover:text-slate-900'}">${l}</button>`;
+  return `
+    <div class="space-y-2">
+      <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold w-fit">
+        ${rb('7','Próximos 7 días')}${rb('30','Próximos 30 días')}${rb('late','Atrasadas')}
+      </div>
+      ${rows.length ? `<div class="space-y-1.5">${rows.map(pmRenderTaskRow).join('')}</div>`
+        : '<div class="text-xs text-slate-400 italic px-3 py-8 text-center bg-slate-50 rounded-lg">Sin tareas en este rango.</div>'}
+    </div>`;
+}
+
+function pmRenderTaskRow(t) {
+  const m = pmTaskMeta(t.task_type);
+  const d = pmTaskDate(t);
+  const today = new Date().toISOString().slice(0,10);
+  const late = d && d < today && !['completado','cancelado'].includes(t.status);
+  return `
+    <div class="bg-white border border-slate-200 border-l-4 rounded-lg p-2.5 flex items-center gap-3 flex-wrap" style="border-left-color:${m.color}">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[10px] ${m.chip} px-1.5 py-0.5 rounded font-bold">${m.label}</span>
+          <strong class="text-sm text-slate-900">${(t.title||'(sin título)').replace(/</g,'&lt;')}</strong>
+          ${late?'<span class="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">Atrasada</span>':''}
+          ${t.status==='completado'?'<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">Completada</span>':''}
+        </div>
+        <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+          <span>📅 ${d||'sin fecha'}</span>
+          ${t.property_id?`<span>· 🏠 ${pmPropertyName(t.property_id).replace(/</g,'&lt;').slice(0,22)}</span>`:''}
+          ${t.assignee?`<span>· 👤 ${(t.assignee||'').replace(/</g,'&lt;')}</span>`:''}
+        </div>
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        ${t.status!=='completado'?`<button onclick="pmTaskComplete('${t.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">✓ Completar</button>`:''}
+        <button onclick="pmTaskReschedule('${t.id}')" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded">↻ Reprogramar</button>
+        <button onclick="pmTaskReassign('${t.id}')" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded">👤 Reasignar</button>
+        <button onclick="pmEditTask('${t.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
+      </div>
+    </div>`;
+}
+
+async function pmTaskReassign(id) {
+  const who = prompt('Reasignar tarea a:', PM_TEAM[0]);
+  if (who === null) return;
+  const r = await pmExecQuery(sb.from('pm_tasks').update({ assignee: who.trim() || null }).eq('id', id).select(), 'Reasignar tarea');
+  if (!r) return;
+  pmaState.tasks = (pmaState.tasks||[]).map(t => t.id===id?{...t, assignee: who.trim()||null}:t);
+  pmRender();
+}
+window.pmTaskReassign = pmTaskReassign;
+
+async function pmEditTask(id) {
+  const t = id ? (pmaState.tasks||[]).find(x => x.id === id) : { status: 'pendiente', priority: 'media', scheduled_date: new Date().toISOString().slice(0,10) };
+  const isNew = !id;
+  openModal((isNew?'+ Nueva':'✏️ Editar')+' Tarea', `
+    <div class="space-y-3">
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Título *</label>
+        <input id="pm-kf-title" value="${(t.title||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Tipo</label>
+          <select id="pm-kf-type" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            <option value="">— Otro —</option>
+            ${Object.entries(PM_TASK_TYPES).map(([k,m])=>`<option value="${k}" ${t.task_type===k?'selected':''}>${m.label}</option>`).join('')}
+          </select></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Fecha programada</label>
+          <input id="pm-kf-date" type="date" value="${pmTaskDate(t)||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Propiedad</label>
+          <select id="pm-kf-prop" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            <option value="">— Ninguna —</option>
+            ${pmaState.properties.map(p=>`<option value="${p.id}" ${t.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+          </select></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Asignado a</label>
+          <input id="pm-kf-assignee" list="pm-kf-team" value="${(t.assignee||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
+          <datalist id="pm-kf-team">${PM_TEAM.map(n=>`<option value="${n}">`).join('')}</datalist></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Estado</label>
+          <select id="pm-kf-status" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${[['pendiente','Pendiente'],['en_progreso','En progreso'],['completado','Completada'],['cancelado','Saltada/Cancelada']].map(([v,l])=>`<option value="${v}" ${(t.status||'pendiente')===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Prioridad</label>
+          <select id="pm-kf-priority" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${[['baja','Baja'],['media','Media'],['alta','Alta'],['urgente','Urgente']].map(([v,l])=>`<option value="${v}" ${(t.priority||'media')===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>
+      </div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Notas</label>
+        <textarea id="pm-kf-notes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(t.notes||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        ${!isNew?`<button onclick="pmDeleteTask('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>`:''}
+        <button onclick="pmSaveTask('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
+      </div>
+    </div>`);
+}
+window.pmEditTask = pmEditTask;
+
+async function pmSaveTask(id) {
+  const payload = {
+    title: document.getElementById('pm-kf-title').value.trim(),
+    task_type: document.getElementById('pm-kf-type').value || null,
+    scheduled_date: document.getElementById('pm-kf-date').value || null,
+    property_id: document.getElementById('pm-kf-prop').value || null,
+    assignee: document.getElementById('pm-kf-assignee').value.trim() || null,
+    status: document.getElementById('pm-kf-status').value,
+    priority: document.getElementById('pm-kf-priority').value,
+    notes: document.getElementById('pm-kf-notes').value.trim() || null
+  };
+  if (!payload.title) return alert('El título es obligatorio.');
+  const r = id
+    ? await pmExecQuery(sb.from('pm_tasks').update(payload).eq('id', id).select(), 'Update tarea')
+    : await pmExecQuery(sb.from('pm_tasks').insert(payload).select(), 'Crear tarea');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmSaveTask = pmSaveTask;
+
+async function pmDeleteTask(id) {
+  if (!confirm('¿Eliminar esta tarea?')) return;
+  const r = await pmExecQuery(sb.from('pm_tasks').delete().eq('id', id), 'Eliminar tarea');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmDeleteTask = pmDeleteTask;
+
+// ── Sub-tab B: Servicios automáticos ──
+function pmRenderServices() {
+  const services = (pmaState.credentials||[]).filter(c => c.category === 'servicio' || c.auto_pay);
+  const byProp = {};
+  services.forEach(s => { const k = s.property_id || '_none'; (byProp[k] = byProp[k]||[]).push(s); });
+  const failed = services.filter(s => s.payment_failed);
+  const today = new Date().toISOString().slice(0,10);
+
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="text-sm font-bold text-slate-900">Servicios automáticos · ${services.length}</div>
+      <button onclick="pmEditService(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Servicio</button>
+    </div>
+    ${failed.length ? `<div class="bg-red-50 border border-red-300 rounded-lg p-3 text-xs text-red-800"><strong>⚠️ ${failed.length} servicio(s) con pago fallido:</strong> ${failed.map(s=>(s.name||'').replace(/</g,'&lt;')).join(', ')} — revisar.</div>` : ''}
+    ${Object.keys(byProp).length ? Object.entries(byProp).map(([pid, list]) => `
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-slate-50">🏠 ${pid==='_none'?'Sin casa asignada':pmPropertyName(pid).replace(/</g,'&lt;')}</div>
+        <div class="divide-y divide-slate-100">
+          ${list.map(s => {
+            const due = s.next_payment_date;
+            const soon = due && due >= today;
+            return `<div class="px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-slate-800">${(s.name||'—').replace(/</g,'&lt;')}
+                  ${s.auto_pay?'<span class="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold ml-1">AUTO</span>':''}
+                  ${s.payment_failed?'<span class="text-[9px] bg-red-100 text-red-800 px-1 py-0.5 rounded font-bold ml-1">FALLÓ</span>':''}
+                </div>
+                <div class="text-[11px] text-slate-500">${due?`Próximo pago: ${due}`:'sin fecha de pago'}${s.amount?` · $${Number(s.amount).toLocaleString()}`:''}</div>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                <button onclick="pmToggleServiceFailed('${s.id}',${!s.payment_failed})" class="text-[10px] font-bold px-2 py-1 rounded ${s.payment_failed?'bg-emerald-50 text-emerald-700':'bg-red-50 text-red-700'}">${s.payment_failed?'Marcar OK':'Marcar fallo'}</button>
+                <button onclick="pmEditService('${s.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('') : '<div class="text-xs text-slate-400 italic px-3 py-8 text-center bg-slate-50 rounded-lg">Sin servicios cargados. Agregá uno o marcá credenciales con categoría «servicio».</div>'}
+  </div>`;
+}
+
+async function pmToggleServiceFailed(id, failed) {
+  const r = await pmExecQuery(sb.from('pm_credentials').update({ payment_failed: failed }).eq('id', id).select(), 'Actualizar servicio');
+  if (!r) return;
+  const s = (pmaState.credentials||[]).find(x => x.id === id); if (s) s.payment_failed = failed;
+  pmRender();
+}
+window.pmToggleServiceFailed = pmToggleServiceFailed;
+
+async function pmEditService(id) {
+  const s = id ? (pmaState.credentials||[]).find(x => x.id === id) : { category: 'servicio', auto_pay: true };
+  const isNew = !id;
+  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Servicio', `
+    <div class="space-y-3">
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre *</label>
+        <input id="pm-sv-name" value="${(s.name||'').replace(/"/g,'&quot;')}" placeholder="Spectrum / Texas Gas / Coa…" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Casa</label>
+        <select id="pm-sv-prop" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+          <option value="">— Ninguna —</option>
+          ${pmaState.properties.map(p=>`<option value="${p.id}" ${s.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+        </select></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Próximo pago</label>
+          <input id="pm-sv-date" type="date" value="${s.next_payment_date||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Monto $</label>
+          <input id="pm-sv-amount" type="number" step="0.01" value="${s.amount||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      </div>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 text-sm font-bold text-slate-700"><input id="pm-sv-auto" type="checkbox" ${s.auto_pay?'checked':''}/> Pago automático</label>
+        <label class="flex items-center gap-2 text-sm font-bold text-slate-700"><input id="pm-sv-failed" type="checkbox" ${s.payment_failed?'checked':''}/> Pago falló</label>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button onclick="pmSaveService('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
+      </div>
+    </div>`);
+}
+window.pmEditService = pmEditService;
+
+async function pmSaveService(id) {
+  const payload = {
+    name: document.getElementById('pm-sv-name').value.trim(),
+    category: 'servicio',
+    property_id: document.getElementById('pm-sv-prop').value || null,
+    next_payment_date: document.getElementById('pm-sv-date').value || null,
+    amount: +document.getElementById('pm-sv-amount').value || null,
+    auto_pay: document.getElementById('pm-sv-auto').checked,
+    payment_failed: document.getElementById('pm-sv-failed').checked
+  };
+  if (!payload.name) return alert('El nombre es obligatorio.');
+  const r = id
+    ? await pmExecQuery(sb.from('pm_credentials').update(payload).eq('id', id).select(), 'Update servicio')
+    : await pmExecQuery(sb.from('pm_credentials').insert(payload).select(), 'Crear servicio');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmSaveService = pmSaveService;
+
+// ── Sub-tab C: Centro de comunicación ──
+function pmCommsFill(body, tenant) {
+  const b = tenant ? pmActiveBookingOfTenant(tenant.id) : null;
+  const prop = b ? pmaState.properties.find(p => p.id === b.property_id) : null;
+  const map = {
+    tenant_name: tenant?.full_name || '',
+    property_address: prop ? (prop.address || prop.name || '') : '',
+    amount: b ? Number(b.rent_amount||0).toLocaleString() : '',
+    due_date: '', start_date: b?.start_date || '', end_date: b?.end_date || '',
+    visit_date: '', reason: ''
+  };
+  return (body||'').replace(/\{\{(\w+)\}\}/g, (m, k) => (k in map && map[k]) ? map[k] : m);
+}
+
+function pmRenderComms() {
+  const tpls = pmaState.templates || [];
+  const selKey = pmaState.commsTemplateKey || (tpls[0]?.key) || null;
+  const tpl = tpls.find(t => t.key === selKey) || null;
+  const tenant = pmaState.commsTenantId ? pmaState.tenants.find(t => t.id === pmaState.commsTenantId) : null;
+  const rendered = pmaState.commsCustomText != null ? pmaState.commsCustomText : (tpl ? pmCommsFill(tpl.body, tenant) : '');
+
+  return `
+  <div class="grid lg:grid-cols-3 gap-3">
+    <!-- Plantillas -->
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="px-3 py-2 flex items-center justify-between" style="background:#1e293b">
+        <span class="text-xs font-bold text-white">Plantillas</span>
+        <button onclick="pmEditTemplate(null)" class="text-[10px] font-bold" style="color:#d4af37">+ Nueva</button>
+      </div>
+      <div class="divide-y divide-slate-100">
+        ${tpls.length ? tpls.map(t => `
+          <div class="px-3 py-2 flex items-center justify-between gap-2 cursor-pointer ${selKey===t.key?'bg-amber-50':''}" onclick="pmaState.commsTemplateKey='${t.key}';pmaState.commsCustomText=null;pmRender()">
+            <div class="min-w-0"><div class="text-sm font-semibold text-slate-800 truncate">${(t.name||'').replace(/</g,'&lt;')}</div>
+            <div class="text-[10px] text-slate-400">${(t.category||'').replace(/</g,'&lt;')}</div></div>
+            <button onclick="event.stopPropagation();pmEditTemplate('${t.key}')" class="text-slate-300 hover:text-slate-600 text-xs">✏️</button>
+          </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400 italic">Sin plantillas. Corré pm-operations-alerts.sql para sembrarlas.</div>'}
+      </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Inquilino</label>
+          <select onchange="pmaState.commsTenantId=this.value||null;pmaState.commsCustomText=null;pmRender()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            <option value="">— Elegir inquilino —</option>
+            ${pmaState.tenants.map(t => `<option value="${t.id}" ${pmaState.commsTenantId===t.id?'selected':''}>${(t.full_name||'').replace(/</g,'&lt;')}</option>`).join('')}
+          </select></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Plantilla</label>
+          <select onchange="pmaState.commsTemplateKey=this.value;pmaState.commsCustomText=null;pmRender()" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+            ${tpls.map(t => `<option value="${t.key}" ${selKey===t.key?'selected':''}>${(t.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+          </select></div>
+      </div>
+      ${tpl?.variables?.length ? `<div class="text-[10px] text-slate-400">Variables: ${tpl.variables.map(v=>`<code class="bg-slate-100 px-1 rounded">{{${v}}}</code>`).join(' ')}</div>` : ''}
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Mensaje (editable)</label>
+        <textarea id="pm-cm-text" oninput="pmaState.commsCustomText=this.value" rows="6" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">${(rendered||'').replace(/</g,'&lt;')}</textarea></div>
+      ${tenant && !((tenant.phone||'').replace(/\D/g,'')) ? '<div class="text-[11px] text-amber-600">⚠️ Este inquilino no tiene teléfono cargado.</div>' : ''}
+      <div class="flex gap-2">
+        <button onclick="pmCommsSend()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Enviar por WhatsApp</button>
+        <button onclick="pmCommsCopy()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold px-4 py-2 rounded">Copiar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function pmCommsText() {
+  const el = document.getElementById('pm-cm-text');
+  if (el) return el.value;
+  const tpl = (pmaState.templates||[]).find(t => t.key === pmaState.commsTemplateKey);
+  const tenant = pmaState.commsTenantId ? pmaState.tenants.find(t => t.id === pmaState.commsTenantId) : null;
+  return pmaState.commsCustomText != null ? pmaState.commsCustomText : (tpl ? pmCommsFill(tpl.body, tenant) : '');
+}
+function pmCommsSend() {
+  const tenant = pmaState.commsTenantId ? pmaState.tenants.find(t => t.id === pmaState.commsTenantId) : null;
+  if (!tenant) return alert('Elegí un inquilino primero.');
+  const phone = (tenant.phone||'').replace(/\D/g,'');
+  if (!phone) return alert('El inquilino no tiene teléfono.');
+  const text = encodeURIComponent(pmCommsText());
+  window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+}
+window.pmCommsSend = pmCommsSend;
+function pmCommsCopy() {
+  const text = pmCommsText();
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(()=>{ if(window.toast) toast('Mensaje copiado'); else alert('Copiado'); });
+  else alert(text);
+}
+window.pmCommsCopy = pmCommsCopy;
+
+async function pmEditTemplate(key) {
+  const t = key ? (pmaState.templates||[]).find(x => x.key === key) : { variables: [] };
+  const isNew = !key;
+  openModal((isNew?'+ Nueva':'✏️ Editar')+' Plantilla', `
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre *</label>
+          <input id="pm-tp-name" value="${(t.name||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Key ${isNew?'*':''}</label>
+          <input id="pm-tp-key" value="${(t.key||'').replace(/"/g,'&quot;')}" ${isNew?'':'disabled'} placeholder="payment_reminder" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm ${isNew?'':'bg-slate-100'}"/></div>
+      </div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Categoría</label>
+        <input id="pm-tp-cat" value="${(t.category||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Mensaje (usá {{variables}})</label>
+        <textarea id="pm-tp-body" rows="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">${(t.body||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        ${!isNew?`<button onclick="pmDeleteTemplate('${key}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>`:''}
+        <button onclick="pmSaveTemplate('${key||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
+      </div>
+    </div>`);
+}
+window.pmEditTemplate = pmEditTemplate;
+
+async function pmSaveTemplate(key) {
+  const body = document.getElementById('pm-tp-body').value;
+  const vars = [...new Set((body.match(/\{\{(\w+)\}\}/g)||[]).map(s => s.replace(/[{}]/g,'')))];
+  const payload = {
+    name: document.getElementById('pm-tp-name').value.trim(),
+    category: document.getElementById('pm-tp-cat').value.trim() || null,
+    body, variables: vars
+  };
+  if (!payload.name || !payload.body) return alert('Nombre y mensaje son obligatorios.');
+  let r;
+  if (key) r = await pmExecQuery(sb.from('pm_message_templates').update(payload).eq('key', key).select(), 'Update plantilla');
+  else {
+    payload.key = document.getElementById('pm-tp-key').value.trim();
+    if (!payload.key) return alert('La key es obligatoria.');
+    r = await pmExecQuery(sb.from('pm_message_templates').insert(payload).select(), 'Crear plantilla');
+  }
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmSaveTemplate = pmSaveTemplate;
+
+async function pmDeleteTemplate(key) {
+  if (!confirm('¿Eliminar esta plantilla?')) return;
+  const r = await pmExecQuery(sb.from('pm_message_templates').delete().eq('key', key), 'Eliminar plantilla');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmDeleteTemplate = pmDeleteTemplate;
+
+// ── Sub-tab D: Panel de alertas ──
+function pmRenderAlertsPanel() {
+  const sevF = pmaState.alertSeverityFilter;
+  const catF = pmaState.alertCategoryFilter;
+  let rows = (pmaState.alerts||[]).filter(a => pmaState.alertShowResolved ? true : !a.resolved);
+  if (sevF) rows = rows.filter(a => a.severity === sevF);
+  if (catF) rows = rows.filter(a => a.category === catF);
+  rows = rows.sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
+  const cats = [...new Set((pmaState.alerts||[]).map(a => a.category).filter(Boolean))];
+
+  const sevBtn = (k,l) => `<button onclick="pmaState.alertSeverityFilter=${k?`'${k}'`:'null'};pmRender()" class="px-2.5 py-1 rounded-full text-[10px] font-bold ${sevF===k||(!sevF&&!k)?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${l}</button>`;
+  const catBtn = (k,l) => `<button onclick="pmaState.alertCategoryFilter=${k?`'${k}'`:'null'};pmRender()" class="px-2.5 py-1 rounded-full text-[10px] font-bold ${catF===k||(!catF&&!k)?'bg-[#d4af37] text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${l}</button>`;
+
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex gap-1.5 flex-wrap">
+        ${sevBtn(null,'Todas')}${sevBtn('critical','Críticas')}${sevBtn('warning','Advert.')}${sevBtn('info','Info')}
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="pmaState.alertShowResolved=${pmaState.alertShowResolved?'false':'true'};pmRender()" class="text-[10px] font-bold px-2.5 py-1 rounded-full ${pmaState.alertShowResolved?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'}">${pmaState.alertShowResolved?'Ocultar resueltas':'Ver resueltas'}</button>
+        <button onclick="pmRunAlertChecks(this)" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100">↻ Revisar ahora</button>
+      </div>
+    </div>
+    <div class="flex gap-1.5 flex-wrap">${catBtn(null,'Todas las categorías')}${cats.map(c=>catBtn(c,c)).join('')}</div>
+
+    ${rows.length ? `<div class="space-y-1.5">${rows.map(a => { const s = pmAlertSev(a.severity); return `
+      <div class="bg-white border border-slate-200 border-l-4 ${s.border} rounded-lg p-2.5 flex items-start gap-3 ${a.resolved?'opacity-50':''}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-[9px] uppercase font-extrabold ${s.txt} tracking-wider">${s.label}</span>
+            ${a.category?`<span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded">${a.category}</span>`:''}
+            ${a.assigned_to?`<span class="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">👤 ${(a.assigned_to||'').replace(/</g,'&lt;')}</span>`:''}
+            ${a.read?'':'<span class="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded">nuevo</span>'}
+          </div>
+          <div class="text-sm text-slate-800 leading-snug mt-0.5">${(a.message||'').replace(/</g,'&lt;')}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${(a.created_at||'').slice(0,16).replace('T',' ')}${a.property_id?` · ${pmPropertyName(a.property_id).replace(/</g,'&lt;').slice(0,20)}`:''}</div>
+        </div>
+        <div class="flex flex-col gap-1 flex-shrink-0">
+          ${!a.resolved?`<button onclick="pmAlertResolve('${a.id}')" class="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded whitespace-nowrap">✓ Resolver</button>` : '<span class="text-[10px] text-emerald-600 font-bold">Resuelta</span>'}
+          ${!a.read?`<button onclick="pmAlertMarkRead('${a.id}')" class="text-[10px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Marcar leída</button>`:''}
+          <button onclick="pmAlertAssign('${a.id}')" class="text-[10px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Asignar</button>
+        </div>
+      </div>`; }).join('')}</div>`
+      : '<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Sin alertas con estos filtros. Usá «↻ Revisar ahora» para generarlas.</div>'}
+  </div>`;
+}
 
 // ════════════════════════════════════════════════════════════════
 // 📡 TAB 5 · FEEDS (calendarios iCal externos)
