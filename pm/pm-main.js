@@ -24,7 +24,10 @@ const pmaState = {
   calendarCollapsedProps: {},             // { propertyId: true } — qué grupos están colapsados
   calendarGroupsInitialized: false,       // primera vez: colapsar todos
   bookingsSearch: '',                     // buscador del tab Reservas
-  bookingsPlatformFilter: null,           // filtro de plataforma en tab Reservas
+  bookingsPlatformFilter: null,           // filtro de plataforma (fuente) en tab Reservas
+  bookingsFilterProperty: null,           // filtro por casa
+  bookingsFilterStatus: 'all',            // all·active·upcoming·past·expiring
+  bookingsFiltersLoaded: false,           // guard de carga desde localStorage
   tenantsFilter: 'activos',               // CRM Inquilinos: todos·activos·expiring·late·historico
   tenantsSearch: '',                      // buscador del tab Inquilinos
   tenantDetailId: null,                   // tenant_id → vista detalle CRM
@@ -65,6 +68,7 @@ const pmaState = {
   feeds: [],                          // 🆕 calendarios externos
   alerts: [],                         // 🆕 alertas automáticas
   templates: [],                      // 🆕 plantillas de mensajes
+  bookingHistory: [],                 // 🆕 movimientos de reserva entre unidades
   loading: false,
   // Form state
   editingProperty: null,
@@ -121,7 +125,8 @@ async function pmLoadAll() {
     { name: 'lastSync',   optional: true,  q: () => sb.from('pm_sync_log').select('*').eq('source','airtable').order('started_at', { ascending: false }).limit(1) },
     { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) },
     { name: 'alerts',     optional: true,  q: () => sb.from('pm_alerts').select('*').order('created_at', { ascending: false }).limit(500) },
-    { name: 'templates',  optional: true,  q: () => sb.from('pm_message_templates').select('*').order('name') }
+    { name: 'templates',  optional: true,  q: () => sb.from('pm_message_templates').select('*').order('name') },
+    { name: 'bookingHistory', optional: true, q: () => sb.from('pm_booking_history').select('*').order('moved_at', { ascending: false }).limit(2000) }
   ];
 
   const results = {};
@@ -177,6 +182,7 @@ async function pmLoadAll() {
   pmaState.feeds = results.feeds || [];
   pmaState.alerts = results.alerts || [];
   pmaState.templates = results.templates || [];
+  pmaState.bookingHistory = results.bookingHistory || [];
 
   console.log('[pm] Carga completa:', {
     properties: pmaState.properties.length,
@@ -2318,142 +2324,323 @@ window.pmCreateBookingFromDay = pmCreateBookingFromDay;
 // ════════════════════════════════════════════════════════════════
 // TAB 3 · RESERVAS (lista)
 // ════════════════════════════════════════════════════════════════
-function pmRenderBookings() {
-  const today = new Date().toISOString().slice(0,10);
-  const todayDate = new Date(today);
-  const all = pmaState.bookings;
-  const searchQ = (pmaState.bookingsSearch || '').toLowerCase().trim();
-  const platformFilter = pmaState.bookingsPlatformFilter || null;
+const PM_PLATFORM_LABEL = { contrato_directo: 'Contrato directo', airbnb: 'Airbnb', booking: 'Booking', vrbo: 'VRBO', hospitable: 'Hospitable', padsplit: 'Padsplit', reserva_corta: 'Reserva corta', otro: 'Otro' };
 
-  // Filtros activos
-  let filtered = all;
-  if (searchQ) {
-    filtered = filtered.filter(b => {
+function pmBookingsInitFilters() {
+  if (pmaState.bookingsFiltersLoaded) return;
+  pmaState.bookingsFiltersLoaded = true;
+  try {
+    const g = (k) => { const v = localStorage.getItem(k); return v === '' ? null : v; };
+    if (localStorage.getItem('pm_reservas_filter_property') !== null) pmaState.bookingsFilterProperty = g('pm_reservas_filter_property');
+    if (localStorage.getItem('pm_reservas_filter_platform') !== null) pmaState.bookingsPlatformFilter = g('pm_reservas_filter_platform');
+    if (localStorage.getItem('pm_reservas_filter_status') !== null) pmaState.bookingsFilterStatus = localStorage.getItem('pm_reservas_filter_status') || 'all';
+    if (localStorage.getItem('pm_reservas_filter_search') !== null) pmaState.bookingsSearch = localStorage.getItem('pm_reservas_filter_search') || '';
+  } catch (e) { /* localStorage no disponible */ }
+}
+function pmBookingsSetFilter(key, value) {
+  const map = { property: 'bookingsFilterProperty', platform: 'bookingsPlatformFilter', status: 'bookingsFilterStatus' };
+  pmaState[map[key]] = value;
+  try { localStorage.setItem('pm_reservas_filter_' + key, value == null ? '' : value); } catch (e) {}
+  pmRender();
+}
+window.pmBookingsSetFilter = pmBookingsSetFilter;
+function pmBookingsClearFilters() {
+  pmaState.bookingsFilterProperty = null;
+  pmaState.bookingsPlatformFilter = null;
+  pmaState.bookingsFilterStatus = 'all';
+  pmaState.bookingsSearch = '';
+  try { ['property','platform','status','search'].forEach(k => localStorage.removeItem('pm_reservas_filter_' + k)); } catch (e) {}
+  pmRender();
+}
+window.pmBookingsClearFilters = pmBookingsClearFilters;
+function pmBookingsHasFilters() {
+  return !!(pmaState.bookingsFilterProperty || pmaState.bookingsPlatformFilter
+    || (pmaState.bookingsFilterStatus && pmaState.bookingsFilterStatus !== 'all') || (pmaState.bookingsSearch || '').trim());
+}
+
+// Estatus por fechas (date-based)
+function pmBookingStatusKind(b, today) {
+  if (b.status === 'cancelado') return 'cancelled';
+  const start = b.start_date || '', end = b.end_date || '';
+  if (end && end < today) return 'past';
+  if (start && start > today) return 'upcoming';
+  return 'active'; // start<=hoy<=end (o sin end)
+}
+
+// Lista filtrada (casa AND fuente AND estatus AND búsqueda)
+function pmBookingsFilteredAll() {
+  const today = new Date().toISOString().slice(0,10);
+  const q = (pmaState.bookingsSearch || '').toLowerCase().trim();
+  const propF = pmaState.bookingsFilterProperty;
+  const platF = pmaState.bookingsPlatformFilter;
+  const statF = pmaState.bookingsFilterStatus || 'all';
+  return pmaState.bookings.filter(b => {
+    if (propF && b.property_id !== propF) return false;
+    if (platF && b.booking_type !== platF) return false;
+    if (statF !== 'all') {
+      const kind = pmBookingStatusKind(b, today);
+      if (statF === 'expiring') {
+        if (kind !== 'active' || !b.end_date) return false;
+        const d = Math.floor((new Date(b.end_date) - new Date(today)) / 86400000);
+        if (!(d >= 0 && d <= 30)) return false;
+      } else if (kind !== statF) return false;
+    }
+    if (q) {
       const u = pmaState.units.find(x => x.id === b.unit_id);
       const p = pmaState.properties.find(x => x.id === b.property_id);
       const t = pmaState.tenants.find(t => t.id === b.tenant_id);
-      return ((t?.full_name||'').toLowerCase().includes(searchQ)
-           || (p?.name||'').toLowerCase().includes(searchQ)
-           || (u?.code||'').toLowerCase().includes(searchQ)
-           || (u?.name||'').toLowerCase().includes(searchQ));
-    });
-  }
-  if (platformFilter) filtered = filtered.filter(b => b.booking_type === platformFilter);
-
-  const activeOrFuture = filtered.filter(b => (b.end_date || '9999') >= today && b.status !== 'cancelado');
-  const pastOrFinished = filtered.filter(b => (b.end_date || '') < today || b.status === 'finalizado' || b.status === 'cancelado');
-
-  // Ordenar por fecha de inicio descendente (más reciente primero)
-  activeOrFuture.sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
-  pastOrFinished.sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
-
-  // Próximas a vencer (≤30 días)
-  const venceProximo = activeOrFuture.filter(b => {
-    if (!b.end_date) return false;
-    const days = Math.floor((new Date(b.end_date) - todayDate) / 86400000);
-    return days >= 0 && days <= 30;
+      const hay = `${t?.full_name||''} ${p?.name||''} ${u?.code||''} ${u?.name||''} ${b.reservation_code||''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
   });
+}
 
-  // Conteos por plataforma para chips
-  const platformCounts = {};
-  all.forEach(b => { platformCounts[b.booking_type] = (platformCounts[b.booking_type] || 0) + 1; });
-  const platforms = Object.keys(platformCounts).sort((a,b) => platformCounts[b] - platformCounts[a]);
-  const platformLabel = { contrato_directo: 'Contrato', airbnb: 'Airbnb', booking: 'Booking', vrbo: 'VRBO', hospitable: 'Hospitable', padsplit: 'Padsplit', reserva_corta: 'Corta', otro: 'Otro' };
-
-  const renderRow = (b) => {
-    const u = pmaState.units.find(x => x.id === b.unit_id);
-    const p = pmaState.properties.find(x => x.id === b.property_id);
-    const t = pmaState.tenants.find(t => t.id === b.tenant_id);
-    const colorByType = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', padsplit: 'violet', otro: 'slate' };
-    const col = colorByType[b.booking_type] || 'slate';
-    // Días restantes
-    const daysLeft = b.end_date ? Math.floor((new Date(b.end_date) - todayDate) / 86400000) : null;
-    const venceBadge = (daysLeft != null && daysLeft >= 0 && daysLeft <= 30)
-      ? `<span class="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold animate-pulse">⏰ Vence en ${daysLeft}d</span>`
-      : (daysLeft != null && daysLeft < 0 && b.status !== 'finalizado')
-        ? `<span class="text-[10px] bg-red-100 text-red-900 px-1.5 py-0.5 rounded font-bold">⚠ Vencida hace ${-daysLeft}d</span>`
-        : '';
-    // Duración total
-    const durDays = (b.start_date && b.end_date) ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1 : null;
-    const durLabel = durDays ? (durDays >= 30 ? `${Math.round(durDays/30)} ${Math.round(durDays/30)===1?'mes':'meses'}` : `${durDays}d`) : '';
-    return `
-      <div class="border border-slate-200 rounded-lg p-3 hover:border-emerald-400 hover:shadow-sm transition group bg-white">
-        <div class="flex items-start justify-between gap-2 flex-wrap">
-          <div class="flex-1 min-w-0 cursor-pointer" onclick="pmEditBooking('${b.id}')">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] uppercase bg-${col}-100 text-${col}-800 px-1.5 py-0.5 rounded font-bold">${platformLabel[b.booking_type] || b.booking_type}</span>
-              <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase">${b.status}</span>
-              ${venceBadge}
-              <strong class="text-sm text-slate-900">${pmTenantName(b.tenant_id)}</strong>
-            </div>
-            <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
-              <span>📅 ${b.start_date||'?'} → ${b.end_date||'∞'}${durLabel?` <span class="text-slate-400">(${durLabel})</span>`:''}</span>
-              <span>·</span>
-              <span>🏠 ${(p?.name||'').replace(/</g,'&lt;').slice(0,30)}</span>
-              <span>·</span>
-              <span>🛏 ${((u?.code||u?.name||'') + (u?._displaySuffix||'')).replace(/</g,'&lt;')}</span>
-            </div>
+function pmRenderBookingRow(b) {
+  const today = new Date().toISOString().slice(0,10);
+  const todayDate = new Date(today);
+  const u = pmaState.units.find(x => x.id === b.unit_id);
+  const p = pmaState.properties.find(x => x.id === b.property_id);
+  const t = pmaState.tenants.find(t => t.id === b.tenant_id);
+  const colorByType = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', padsplit: 'violet', otro: 'slate' };
+  const col = colorByType[b.booking_type] || 'slate';
+  const daysLeft = b.end_date ? Math.floor((new Date(b.end_date) - todayDate) / 86400000) : null;
+  const venceBadge = (daysLeft != null && daysLeft >= 0 && daysLeft <= 30)
+    ? `<span class="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold animate-pulse">⏰ Vence en ${daysLeft}d</span>`
+    : (daysLeft != null && daysLeft < 0 && b.status !== 'finalizado')
+      ? `<span class="text-[10px] bg-red-100 text-red-900 px-1.5 py-0.5 rounded font-bold">⚠ Vencida hace ${-daysLeft}d</span>` : '';
+  const durDays = (b.start_date && b.end_date) ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1 : null;
+  const durLabel = durDays ? (durDays >= 30 ? `${Math.round(durDays/30)} ${Math.round(durDays/30)===1?'mes':'meses'}` : `${durDays}d`) : '';
+  const code = b.reservation_code || null;
+  return `
+    <div class="border border-slate-200 rounded-lg p-3 hover:border-[#d4af37] hover:shadow-sm transition group bg-white">
+      <div class="flex items-start justify-between gap-2 flex-wrap">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            ${code ? `<button onclick="event.stopPropagation();pmCopyText('${code}')" title="Copiar código" class="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 hover:bg-[#d4af37]/20 px-1.5 py-0.5 rounded">${code} ⧉</button>` : ''}
+            <span class="text-[10px] uppercase bg-${col}-100 text-${col}-800 px-1.5 py-0.5 rounded font-bold">${PM_PLATFORM_LABEL[b.booking_type] || b.booking_type}</span>
+            <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase">${b.status}</span>
+            ${venceBadge}
           </div>
-          <div class="text-right flex items-center gap-2">
-            ${t?.phone ? `<a href="https://wa.me/${t.phone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
-            ${t?.email ? `<a href="mailto:${t.email}" onclick="event.stopPropagation()" title="${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">📧</a>` : ''}
-            <div class="cursor-pointer" onclick="pmEditBooking('${b.id}')">
-              <div class="text-sm font-bold text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</div>
-              <div class="text-[10px] text-slate-500">/${b.rent_period||'mes'}</div>
-            </div>
+          <div class="flex items-center gap-2 flex-wrap mt-1 cursor-pointer" onclick="pmEditBooking('${b.id}')">
+            <strong class="text-sm text-slate-900 pm-tenant-name" title="${pmTenantName(b.tenant_id).replace(/"/g,'&quot;')}">${pmTenantName(b.tenant_id)}</strong>
+          </div>
+          <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-2 flex-wrap cursor-pointer" onclick="pmEditBooking('${b.id}')">
+            <span>📅 ${b.start_date||'?'} → ${b.end_date||'∞'}${durLabel?` <span class="text-slate-400">(${durLabel})</span>`:''}</span>
+            <span>·</span>
+            <span>🏠 ${(p?.name||'').replace(/</g,'&lt;').slice(0,30)}</span>
+            <span>·</span>
+            <span>🛏 ${((u?.code||u?.name||'')).replace(/</g,'&lt;')}</span>
+          </div>
+        </div>
+        <div class="text-right flex items-center gap-1.5 flex-shrink-0">
+          ${t?.phone ? `<a href="https://wa.me/${t.phone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
+          <button onclick="event.stopPropagation();pmMoveBooking('${b.id}')" title="Mover de unidad" class="bg-slate-50 hover:bg-slate-100 text-slate-600 p-1.5 rounded text-sm">↔</button>
+          <div class="cursor-pointer" onclick="pmEditBooking('${b.id}')">
+            <div class="text-sm font-bold text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</div>
+            <div class="text-[10px] text-slate-500">/${b.rent_period||'mes'}</div>
           </div>
         </div>
       </div>
-    `;
-  };
+    </div>`;
+}
+
+function pmBookingsListHtml() {
+  const today = new Date().toISOString().slice(0,10);
+  const filtered = pmBookingsFilteredAll();
+  const activeOrFuture = filtered.filter(b => (b.end_date || '9999') >= today && b.status !== 'cancelado')
+    .sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
+  const pastOrFinished = filtered.filter(b => (b.end_date || '') < today || b.status === 'finalizado' || b.status === 'cancelado')
+    .sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
+  return `
+    <div>
+      <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Actuales y futuras (${activeOrFuture.length})
+      </div>
+      ${activeOrFuture.length ? `<div class="space-y-2">${activeOrFuture.map(pmRenderBookingRow).join('')}</div>` : '<div class="text-xs text-slate-400 italic px-3 py-6 text-center bg-slate-50 rounded-lg">Sin reservas que matcheen tu búsqueda/filtro.</div>'}
+    </div>
+    ${pastOrFinished.length ? `
+      <div>
+        <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 mt-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span> Pasadas / finalizadas (${pastOrFinished.length}) ${pastOrFinished.length > 30 ? '<span class="opacity-50">— mostrando 30</span>' : ''}
+        </div>
+        <div class="space-y-2 opacity-60">${pastOrFinished.slice(0, 30).map(pmRenderBookingRow).join('')}</div>
+      </div>` : ''}
+  `;
+}
+
+// Live search SIN re-render total (el input vive fuera del container reescrito)
+function pmBookingsSearchInput(value) {
+  pmaState.bookingsSearch = value;
+  try { localStorage.setItem('pm_reservas_filter_search', value || ''); } catch (e) {}
+  clearTimeout(window.__pmBookSearchT);
+  window.__pmBookSearchT = setTimeout(() => {
+    const list = document.getElementById('pm-res-list');
+    if (list) list.innerHTML = pmBookingsListHtml();
+    const cnt = document.getElementById('pm-res-count');
+    if (cnt) cnt.innerHTML = pmBookingsCountLabel();
+    const clr = document.getElementById('pm-res-clearx');
+    if (clr) clr.style.display = value ? '' : 'none';
+  }, 150);
+}
+window.pmBookingsSearchInput = pmBookingsSearchInput;
+function pmBookingsCountLabel() {
+  const total = pmaState.bookings.length;
+  const shown = pmBookingsFilteredAll().length;
+  return pmBookingsHasFilters()
+    ? `Mostrando <strong>${shown}</strong> de ${total}`
+    : `${total} reservas`;
+}
+
+function pmCopyText(text) {
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => { if (window.toast) toast('Copiado: ' + text); }).catch(()=>{});
+  else { try { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); if (window.toast) toast('Copiado'); } catch (e) {} }
+}
+window.pmCopyText = pmCopyText;
+
+function pmRenderBookings() {
+  pmBookingsInitFilters();
+  const all = pmaState.bookings;
+  const searchQ = (pmaState.bookingsSearch || '');
+  const propF = pmaState.bookingsFilterProperty;
+  const platF = pmaState.bookingsPlatformFilter;
+  const statF = pmaState.bookingsFilterStatus || 'all';
+
+  // Conteos por fuente (booking_type) para chips
+  const platformCounts = {};
+  all.forEach(b => { platformCounts[b.booking_type] = (platformCounts[b.booking_type] || 0) + 1; });
+  const platforms = Object.keys(platformCounts).sort((a,b) => platformCounts[b] - platformCounts[a]);
+
+  // Casas con reservas (chips)
+  const propsWithBookings = pmaState.properties.filter(p => all.some(b => b.property_id === p.id));
+
+  const chip = (active, onclick, label, count) => `
+    <button onclick="${onclick}" class="px-2.5 py-1 rounded-full whitespace-nowrap border ${active?'text-white':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}" style="${active?'background:#d4af37;border-color:#d4af37':''}">${label}${count!=null?` <span class="opacity-70">${count}</span>`:''}</button>`;
+
+  const statuses = [['all','Todas'],['active','Activas'],['upcoming','Próximas'],['past','Pasadas'],['expiring','Por vencer 30d']];
 
   return `
     <div class="space-y-3 p-1">
-      <!-- Header con stats + acción -->
+      <!-- Header -->
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-sm font-bold text-slate-900">${all.length} reservas <span class="text-slate-500 font-normal">· ${activeOrFuture.length} actuales/futuras</span></div>
-          ${venceProximo.length ? `<div class="text-[11px] text-amber-700 font-bold mt-0.5">⏰ ${venceProximo.length} ${venceProximo.length===1?'vence':'vencen'} en ≤30 días</div>` : ''}
+          <div class="text-sm font-bold text-slate-900" id="pm-res-count">${pmBookingsCountLabel()}</div>
+          ${pmBookingsHasFilters() ? `<button onclick="pmBookingsClearFilters()" class="text-[11px] text-[#b8941f] hover:underline font-bold mt-0.5">✕ Limpiar filtros</button>` : ''}
         </div>
         <button onclick="pmEditBooking(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">+ Nueva Reserva</button>
       </div>
 
-      <!-- Buscador + chips de plataforma -->
-      <div class="space-y-2">
-        <div class="relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input oninput="pmaState.bookingsSearch=this.value;pmRender()" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar por inquilino, propiedad o código de unidad…" class="w-full border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-full pl-9 pr-9 py-2 text-xs outline-none transition"/>
-          ${searchQ ? `<button onclick="pmaState.bookingsSearch='';pmRender()" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>` : ''}
-        </div>
-        <div class="flex gap-1.5 flex-wrap text-[10px] font-bold">
-          <button onclick="pmaState.bookingsPlatformFilter=null;pmRender()" class="px-2.5 py-1 rounded-full ${!platformFilter?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">Todas <span class="opacity-70">${all.length}</span></button>
-          ${platforms.map(plat => {
-            const c = { contrato_directo: 'emerald', airbnb: 'rose', booking: 'blue', vrbo: 'violet', hospitable: 'sky', reserva_corta: 'amber', padsplit: 'violet', otro: 'slate' }[plat] || 'slate';
-            const active = platformFilter === plat;
-            return `<button onclick="pmaState.bookingsPlatformFilter='${plat}';pmRender()" class="px-2.5 py-1 rounded-full ${active?`bg-${c}-600 text-white`:`bg-${c}-50 text-${c}-700 hover:bg-${c}-100`}">${platformLabel[plat]||plat} ${platformCounts[plat]}</button>`;
-          }).join('')}
-        </div>
+      <!-- Buscador (estático: vive fuera del container que se reescribe) -->
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="pm-res-search" oninput="pmBookingsSearchInput(this.value)" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar por inquilino, casa, unidad o código RP-…" autocomplete="off" class="w-full border border-slate-300 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] rounded-full pl-9 pr-9 py-2 text-xs outline-none transition"/>
+        <button id="pm-res-clearx" onclick="document.getElementById('pm-res-search').value='';pmBookingsSearchInput('')" style="display:${searchQ?'':'none'}" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>
       </div>
 
-      <!-- Lista de actuales/futuras -->
-      <div>
-        <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Actuales y futuras (${activeOrFuture.length})
-        </div>
-        ${activeOrFuture.length ? `<div class="space-y-2">${activeOrFuture.map(renderRow).join('')}</div>` : '<div class="text-xs text-slate-400 italic px-3 py-6 text-center bg-slate-50 rounded-lg">Sin reservas que matcheen tu búsqueda/filtro.</div>'}
-      </div>
-
-      ${pastOrFinished.length ? `
-        <div>
-          <div class="text-[10px] font-bold uppercase text-slate-700 mb-2 mt-4 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span> Pasadas / finalizadas (${pastOrFinished.length}) ${pastOrFinished.length > 20 ? '<span class="opacity-50">— mostrando 20</span>' : ''}
+      <!-- Filtros -->
+      <div class="space-y-1.5 text-[10px] font-bold">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 uppercase w-12 flex-shrink-0">Casa</span>
+          <div class="flex gap-1.5 overflow-x-auto pb-1">
+            ${chip(!propF, "pmBookingsSetFilter('property',null)", 'Todas')}
+            ${propsWithBookings.map(p => chip(propF===p.id, `pmBookingsSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,18))).join('')}
           </div>
-          <div class="space-y-2 opacity-60">${pastOrFinished.slice(0, 20).map(renderRow).join('')}</div>
         </div>
-      ` : ''}
+        <div class="flex items-start gap-2">
+          <span class="text-slate-400 uppercase w-12 flex-shrink-0 mt-1">Fuente</span>
+          <div class="flex gap-1.5 flex-wrap">
+            ${chip(!platF, "pmBookingsSetFilter('platform',null)", 'Todas', all.length)}
+            ${platforms.map(plat => chip(platF===plat, `pmBookingsSetFilter('platform','${plat}')`, PM_PLATFORM_LABEL[plat]||plat, platformCounts[plat])).join('')}
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 uppercase w-12 flex-shrink-0">Estatus</span>
+          <div class="flex gap-1.5 flex-wrap">
+            ${statuses.map(([k,l]) => chip((statF||'all')===k, `pmBookingsSetFilter('status','${k}')`, l)).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista (este container se reescribe en la búsqueda en vivo) -->
+      <div id="pm-res-list" class="space-y-3">${pmBookingsListHtml()}</div>
     </div>
   `;
 }
+
+// ── Mover reserva de unidad (registra en pm_booking_history) ──
+function pmBookingHistoryOf(bookingId) {
+  return (pmaState.bookingHistory || []).filter(h => h.booking_id === bookingId)
+    .sort((a,b) => (b.moved_at||'').localeCompare(a.moved_at||''));
+}
+function pmUnitLabel(unitId) {
+  const u = pmaState.units.find(x => x.id === unitId);
+  if (!u) return '—';
+  const p = pmaState.properties.find(x => x.id === u.property_id);
+  return `${(p?.name||'').slice(0,18)} · ${u.code||u.name||''}`;
+}
+async function pmMoveBooking(id) {
+  const b = pmaState.bookings.find(x => x.id === id);
+  if (!b) return;
+  const curUnit = pmaState.units.find(u => u.id === b.unit_id);
+  // Opciones agrupadas por casa (optgroup), excluyendo la unidad actual
+  const byProp = {};
+  pmaState.units.forEach(u => { (byProp[u.property_id] = byProp[u.property_id] || []).push(u); });
+  const groups = Object.keys(byProp).sort((a,c) => (pmPropertyName(a)).localeCompare(pmPropertyName(c)))
+    .map(pid => `<optgroup label="${pmPropertyName(pid).replace(/"/g,'&quot;')}">${
+      byProp[pid].filter(u => u.id !== b.unit_id).map(u => `<option value="${u.id}">${(u.code||u.name||'').replace(/</g,'&lt;')}${u.target_rent?` · $${Number(u.target_rent).toLocaleString()}`:''}</option>`).join('')
+    }</optgroup>`).join('');
+  openModal('↔ Mover reserva de unidad', `
+    <div class="space-y-3">
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
+        <div class="text-[10px] uppercase font-bold text-slate-400">Reserva actual</div>
+        <div class="font-bold text-slate-800">${pmTenantName(b.tenant_id).replace(/</g,'&lt;')}${b.reservation_code?` <span class="text-[10px] font-mono text-slate-400">${b.reservation_code}</span>`:''}</div>
+        <div class="text-[11px] text-slate-500">🛏 ${pmUnitLabel(b.unit_id).replace(/</g,'&lt;')}</div>
+      </div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Mover a *</label>
+        <select id="pm-mv-unit" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+          <option value="">— Elegir unidad —</option>
+          ${groups}
+        </select></div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Motivo (opcional)</label>
+        <textarea id="pm-mv-reason" rows="2" placeholder="Ej. la unidad original necesita mantenimiento" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"></textarea></div>
+      <div id="pm-mv-status" class="text-[11px] text-slate-500"></div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button id="pm-mv-save" onclick="pmConfirmMoveBooking('${id}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">Confirmar movimiento</button>
+      </div>
+    </div>`);
+}
+window.pmMoveBooking = pmMoveBooking;
+
+async function pmConfirmMoveBooking(id) {
+  const b = pmaState.bookings.find(x => x.id === id);
+  if (!b) return;
+  const newUnitId = document.getElementById('pm-mv-unit').value;
+  const reason = document.getElementById('pm-mv-reason').value.trim() || null;
+  const statusEl = document.getElementById('pm-mv-status');
+  const saveBtn = document.getElementById('pm-mv-save');
+  if (!newUnitId) return alert('Elegí la unidad destino.');
+  if (newUnitId === b.unit_id) return alert('Esa es la unidad actual.');
+  const newUnit = pmaState.units.find(u => u.id === newUnitId);
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Moviendo…'; }
+  let movedBy = null;
+  try { const { data } = await sb.auth.getUser(); movedBy = data?.user?.email || null; } catch (e) {}
+
+  // 1) Registrar en histórico
+  const h = await pmExecQuery(sb.from('pm_booking_history').insert({
+    booking_id: b.id, moved_from_unit_id: b.unit_id, moved_to_unit_id: newUnitId,
+    moved_by: movedBy, reason
+  }).select(), 'Registrar movimiento');
+  if (!h) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Confirmar movimiento'; } return; }
+
+  // 2) Actualizar la reserva (unit + property destino)
+  const r = await pmExecQuery(sb.from('pm_bookings').update({
+    unit_id: newUnitId, property_id: newUnit?.property_id || b.property_id
+  }).eq('id', b.id).select(), 'Mover reserva');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmConfirmMoveBooking = pmConfirmMoveBooking;
 
 // ════════════════════════════════════════════════════════════════
 // TAB · INQUILINOS (CRM completo)
@@ -4127,8 +4314,17 @@ async function pmEditBooking(id, unitId) {
   const b = id ? pmaState.bookings.find(x => x.id === id) : { unit_id: unitId, status: 'activo', booking_type: 'contrato_directo', rent_period: 'mensual' };
   const isNew = !id;
   const unit = pmaState.units.find(u => u.id === (b.unit_id || unitId));
+  const hist = id ? pmBookingHistoryOf(id) : [];
+  const histHtml = (!isNew && (b.reservation_code || hist.length)) ? `
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1.5">
+        ${b.reservation_code ? `<div class="flex items-center justify-between"><span class="text-[10px] uppercase font-bold text-slate-400">Código</span><button onclick="pmCopyText('${b.reservation_code}')" class="text-[11px] font-mono font-bold text-slate-700 hover:text-[#b8941f]">${b.reservation_code} ⧉</button></div>` : ''}
+        ${hist.length ? `<div><div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Movimientos (${hist.length})</div>
+          ${hist.map(h => `<div class="text-[11px] text-slate-600">↔ De <strong>${pmUnitLabel(h.moved_from_unit_id).replace(/</g,'&lt;')}</strong> a <strong>${pmUnitLabel(h.moved_to_unit_id).replace(/</g,'&lt;')}</strong> · ${(h.moved_at||'').slice(0,10)}${h.moved_by?` · ${(h.moved_by||'').replace(/</g,'&lt;')}`:''}${h.reason?`<span class="text-slate-400"> — ${(h.reason||'').replace(/</g,'&lt;')}</span>`:''}</div>`).join('')}
+        </div>` : ''}
+      </div>` : '';
   openModal((isNew?'+ Nueva':'✏️ Editar')+' Reserva', `
     <div class="space-y-3">
+      ${histHtml}
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Unidad *</label>
           <select id="pm-bf-unit" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
