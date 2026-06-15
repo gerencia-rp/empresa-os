@@ -353,9 +353,14 @@ Deno.serve(async (req) => {
       return null;
     };
 
-    // 1b) Units (1 por fila de Datos x Casa). Code = slug(addr)-tipo
-    const unitsArr: any[] = [];
-    const unitIdByExternalRec: Record<string, string> = {}; // airtable rec id → unit external_id
+    // 1b) Units: UNA por unidad física = (property + tipo de alojamiento).
+    //     "Datos x Casa" tiene 1 fila por (unidad + inquilino + período), así que
+    //     varias filas comparten la misma unidad física → se AGRUPAN en 1 pm_unit.
+    //     external_id estable = "unit-" + slug(direccion) + "-" + slug(tipo)
+    //     (NO el record_id de Airtable, que es distinto por reserva).
+    const unitsByKey: Record<string, any> = {};
+    const unitIdByExternalRec: Record<string, string> = {}; // airtable rec id → unit external_id (estable, compartido)
+    let unitDupesAvoided = 0;
 
     for (const r of datosCasa) {
       const addr = getSel(r.fields?.[F.dxc_direccion]);
@@ -364,9 +369,11 @@ Deno.serve(async (req) => {
       const propExtId = "addr-" + slugify(addr);
       const propId = propIdByExtId[propExtId];
       if (!propId) continue;
+      const ext = "unit-" + slugify(addr) + "-" + slugify(tipo);   // clave compuesta estable
+      unitIdByExternalRec[r.id] = ext;                             // cada fila apunta a su unidad agrupada
+      if (unitsByKey[ext]) { unitDupesAvoided++; continue; }       // ya creada por otra reserva de la misma unidad
       const code = (slugify(addr).split("-").slice(0,2).join("-").toUpperCase()) + "-" + slugify(tipo).toUpperCase();
-      const ext = "unit-" + r.id;
-      unitsArr.push({
+      unitsByKey[ext] = {
         external_id: ext,
         property_id: propId,
         code,
@@ -378,14 +385,16 @@ Deno.serve(async (req) => {
         maintenance_status: inferMaintenanceStatus(getSel(r.fields?.[F.dxc_estado])),
         drive_url: r.fields?.[F.dxc_drive] || null,
         is_active: true
-      });
-      unitIdByExternalRec[r.id] = ext;
+      };
     }
+    const unitsArr = Object.values(unitsByKey);
     if (!dry_run && unitsArr.length) {
       const { error } = await supabase.from("pm_units").upsert(unitsArr, { onConflict: "external_id" });
       if (error) errors.push("units: " + error.message);
     }
     stats.units = unitsArr.length;
+    stats.units_dupes_avoided = unitDupesAvoided;
+    console.log(`[pm-sync] pm_units: ${unitsArr.length} únicas · ${unitDupesAvoided} duplicados de unidad evitados (filas Airtable: ${datosCasa.length})`);
 
     // 1c) Bookings (de Datos x Casa, donde hay inquilino + fecha entrada)
     const { data: dbUnits } = await supabase.from("pm_units").select("id, external_id, property_id, name");
@@ -469,23 +478,34 @@ Deno.serve(async (req) => {
       const obs = r.fields?.[F.dxc_obs] || null;
       const modelo = getSel(r.fields?.[F.dxc_modelo]) || "";
 
+      // Status derivado de ESTADO + fechas. Vocabulario interno (activo/confirmado/
+      // finalizado) ≡ active/upcoming/past del spec — se mantiene en español para no
+      // romper el frontend (pmActiveBookings filtra ['activo','confirmado']) ni los joins.
+      const today = new Date().toISOString().slice(0, 10);
+      const checkOut = r.fields?.[F.dxc_fecha_out] || null;
+      let status: string;
+      if (checkOut && checkOut < today) status = "finalizado";                          // past
+      else if (startDate && startDate > today) status = "confirmado";                   // upcoming
+      else if (startDate && startDate <= today && (!checkOut || checkOut >= today)) status = "activo"; // active
+      else status = /ocupada/i.test(estado) ? "activo"
+                  : /reservado/i.test(estado) ? "confirmado"
+                  : /disponible/i.test(estado) ? "finalizado"
+                  : "activo";
+
       bookings.push({
-        external_id: "booking-dxc-" + r.id,
+        external_id: "booking-dxc-" + r.id,   // record_id de Airtable: único por reserva
         unit_id: unitInfo.id,
         property_id: unitInfo.property_id,
         tenant_id: tenantId,
         booking_type: inferBookingType(fuentes),
         platform_account: platformAcc,
         start_date: startDate,
-        end_date: r.fields?.[F.dxc_fecha_out] || null,
+        end_date: checkOut,
         rent_amount: r.fields?.[F.dxc_pago] || 0,
         rent_period: "mensual",
         deposit: r.fields?.[F.dxc_deposito] || 0,
         payment_day: getSel(r.fields?.[F.dxc_tiempo_pago]) || null,
-        status: /ocupada/i.test(estado) ? "activo"
-              : /reservado/i.test(estado) ? "confirmado"
-              : /disponible/i.test(estado) ? "finalizado"
-              : "activo",
+        status,
         contract_status: inferContractStatus(obs),
         is_assistance_program: /programas de ayuda/i.test(modelo),
         contract_url: r.fields?.[F.dxc_drive] || null,
@@ -501,6 +521,7 @@ Deno.serve(async (req) => {
       }
     }
     stats.bookings = bookings.length;
+    console.log(`[pm-sync] pm_bookings: ${bookings.length} reservas creadas (N por unidad).`);
 
     // ════════════════════════════════════════════════════════════
     // 4) PAGOS (Pagos Rentas → ingresos)

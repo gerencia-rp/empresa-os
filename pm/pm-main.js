@@ -611,9 +611,11 @@ function pmRenderPropertiesList() {
 function pmRenderPropertyCardInline(p) {
   const expanded = pmaState.expandedProperties.has(p.id);
   const units = pmUnitsOf(p.id);
-  const occupiedUnits = units.filter(u => pmActiveBookingOf(u.id));
-  const reservedUnits = units.filter(u => pmaState.bookings.find(b => b.unit_id === u.id && b.status === 'confirmado'));
+  // Conteos por UNIDAD ÚNICA y mutuamente excluyentes (prioridad: mantenim. > ocupada > reservada > libre).
+  // Una unidad agrupada puede tener reserva activa + futura: cuenta como ocupada, no doble.
   const maintenanceUnits = units.filter(u => u.maintenance_status === 'en_mantenimiento' || u.is_active === false);
+  const occupiedUnits = units.filter(u => !maintenanceUnits.includes(u) && pmActiveBookingOf(u.id));
+  const reservedUnits = units.filter(u => !maintenanceUnits.includes(u) && !pmActiveBookingOf(u.id) && pmaState.bookings.find(b => b.unit_id === u.id && b.status === 'confirmado'));
   const freeUnits = Math.max(0, units.length - occupiedUnits.length - reservedUnits.length - maintenanceUnits.length);
   const potentialMo = units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const modelLabel = p.rental_model === 'casa_completa' ? '🏡 Casa Completa'
@@ -722,6 +724,21 @@ function pmRenderUnitRow(u, p) {
   const icon = u.unit_type==='casa_completa'?'🏠':u.unit_type==='estudio'?'🎨':u.unit_type==='apartamento'?'🏢':'🛏';
   const typeLabel = u.unit_type==='casa_completa'?'Casa Completa':u.unit_type==='estudio'?'Estudio':u.unit_type==='apartamento'?'Apartamento':'Habitación';
   const isOn = u.is_active !== false;
+  // Mini-cards: reserva actual + próximas (N bookings por unidad física agrupada)
+  const today = new Date().toISOString().slice(0,10);
+  const unitBookings = pmBookingsOf(u.id)
+    .filter(b => b.status !== 'cancelado' && (!b.end_date || b.end_date >= today))
+    .sort((a,b) => (a.start_date||'').localeCompare(b.start_date||''));
+  const bookingChip = (b) => {
+    const isActive = b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado'].includes(b.status);
+    const isUpcoming = b.start_date && b.start_date > today;
+    const cls = isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : isUpcoming ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-600';
+    const tag = isActive ? 'Actual' : isUpcoming ? 'Próxima' : (b.status||'');
+    return `<button onclick="event.stopPropagation();pmEditBooking('${b.id}')" class="text-left border ${cls} rounded px-1.5 py-1 text-[10px] leading-tight hover:shadow-sm" title="${tag}">
+      <span class="font-bold">${tag}</span> · ${pmTenantName(b.tenant_id).replace(/</g,'&lt;').slice(0,16)}<br>
+      <span class="opacity-70">${b.start_date||'?'} → ${b.end_date||'∞'} · $${Number(b.rent_amount||0).toLocaleString()}</span>
+    </button>`;
+  };
   return `
     <div class="bg-white border border-slate-200 border-l-4 ${borderColor} rounded p-2.5 hover:shadow-sm transition">
       <div class="flex items-center gap-3 flex-wrap">
@@ -750,6 +767,7 @@ function pmRenderUnitRow(u, p) {
           <button onclick="pmEditUnit('${u.id}','${p.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
         </div>
       </div>
+      ${unitBookings.length ? `<div class="mt-2 pl-9 flex flex-wrap gap-1.5">${unitBookings.slice(0,6).map(bookingChip).join('')}${unitBookings.length>6?`<span class="text-[10px] text-slate-400 self-center">+${unitBookings.length-6}</span>`:''}</div>` : ''}
     </div>
   `;
 }
