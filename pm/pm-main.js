@@ -310,6 +310,7 @@ window.openPmSystem = openPmSystem;
 function pmRender() {
   const root = document.getElementById('pm-root');
   if (!root) return;
+  pmEnsureResizerInfra();
   if (pmaState.loading) {
     root.innerHTML = '<div class="p-8 text-center text-slate-500">⏳ Cargando datos...</div>';
     return;
@@ -372,6 +373,87 @@ function pmRender() {
   `;
 }
 window.pmRender = pmRender;
+
+// ════════════════════════════════════════════════════════════════
+// Split panes redimensionables (divisor arrastrable) — vanilla JS, sin libs.
+// Listeners globales una sola vez (delegación por .pm-resize-handle). El ancho
+// persiste en localStorage y se reaplica inline en cada render del split, así
+// sobrevive a los re-render completos de innerHTML que hace pmRender().
+// ════════════════════════════════════════════════════════════════
+function pmSidebarWidth(key, def = 320) {
+  const v = parseInt(localStorage.getItem(key), 10);
+  return (v && v >= 220 && v <= 600) ? v : def;
+}
+function pmResizeHandle(targetSel, key, def = 320) {
+  return `<div class="pm-resize-handle" data-target="${targetSel}" data-key="${key}" data-default="${def}" title="Arrastrá para ajustar el ancho · doble-click para resetear"></div>`;
+}
+function pmEnsureResizerInfra() {
+  if (window.__pmResizerInit) return;
+  window.__pmResizerInit = true;
+
+  const st = document.createElement('style');
+  st.id = 'pm-resizer-styles';
+  st.textContent = `
+    .pm-split{display:flex;align-items:stretch}
+    .pm-split-sidebar{min-width:220px;max-width:600px;overflow-x:hidden}
+    .pm-split-main{flex:1;min-width:0;overflow-x:auto}
+    .pm-resize-handle{width:6px;cursor:col-resize;background:transparent;border-left:1px solid #2a2a2a;transition:background .15s;user-select:none;flex-shrink:0}
+    .pm-resize-handle:hover,.pm-resize-handle.is-dragging{background:#d4af37;border-color:#d4af37}
+    .pm-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    @media (max-width:767px){
+      .pm-split{flex-direction:column}
+      .pm-split-sidebar{flex:0 0 auto !important;max-width:none;width:100%;max-height:240px;overflow-y:auto}
+      .pm-resize-handle{display:none}
+    }`;
+  document.head.appendChild(st);
+
+  let dragging = false, startX = 0, startW = 0, sidebarEl = null, handleEl = null, saveKey = null;
+  const findSidebar = (h) => { const sel = h.getAttribute('data-target'); return sel ? document.querySelector(sel) : h.previousElementSibling; };
+  const begin = (clientX, target) => {
+    const handle = target && target.closest ? target.closest('.pm-resize-handle') : null;
+    if (!handle) return false;
+    const sidebar = findSidebar(handle);
+    if (!sidebar) return false;
+    dragging = true; startX = clientX; startW = sidebar.offsetWidth;
+    sidebarEl = sidebar; handleEl = handle; saveKey = handle.getAttribute('data-key');
+    handle.classList.add('is-dragging');
+    document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
+    return true;
+  };
+  const move = (clientX) => {
+    if (!dragging || !sidebarEl) return;
+    const w = Math.max(220, Math.min(600, startW + (clientX - startX)));
+    sidebarEl.style.flexBasis = w + 'px';
+  };
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (handleEl) handleEl.classList.remove('is-dragging');
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
+    if (saveKey && sidebarEl) { try { localStorage.setItem(saveKey, String(sidebarEl.offsetWidth)); } catch (e) {} }
+    sidebarEl = handleEl = saveKey = null;
+  };
+
+  document.addEventListener('mousedown', (e) => { if (begin(e.clientX, e.target)) e.preventDefault(); });
+  document.addEventListener('mousemove', (e) => move(e.clientX));
+  document.addEventListener('mouseup', end);
+  // Touch (mobile/iPad)
+  document.addEventListener('touchstart', (e) => { const t = e.touches && e.touches[0]; if (t) begin(t.clientX, e.target); }, { passive: true });
+  document.addEventListener('touchmove', (e) => { if (dragging) { const t = e.touches && e.touches[0]; if (t) { move(t.clientX); e.preventDefault(); } } }, { passive: false });
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', end);
+  // Doble-click en el handle → reset al ancho default
+  document.addEventListener('dblclick', (e) => {
+    const handle = e.target && e.target.closest ? e.target.closest('.pm-resize-handle') : null;
+    if (!handle) return;
+    const sidebar = findSidebar(handle);
+    const key = handle.getAttribute('data-key');
+    const def = parseInt(handle.getAttribute('data-default') || '320', 10);
+    if (sidebar) sidebar.style.flexBasis = def + 'px';
+    if (key) { try { localStorage.setItem(key, String(def)); } catch (e2) {} }
+  });
+}
+window.pmEnsureResizerInfra = pmEnsureResizerInfra;
 
 function pmSetTab(tab) {
   pmaState.tab = tab;
@@ -633,7 +715,7 @@ function pmRenderPropertyCardInline(p) {
           <span class="text-2xl">🏠</span>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <strong class="text-sm text-slate-900 truncate">${(p.name||'').replace(/</g,'&lt;')}</strong>
+              <strong class="text-sm text-slate-900 truncate" title="${(p.name||'').replace(/"/g,'&quot;')}">${(p.name||'').replace(/</g,'&lt;')}</strong>
               <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase font-bold">${p.status||'activa'}</span>
             </div>
             <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
@@ -1253,9 +1335,10 @@ function pmRenderCalendar() {
   }
 
   return `
-    <div class="flex bg-white" style="height: calc(75vh - 60px); margin: -4px;">
+    <div class="flex bg-white pm-split" style="height: calc(75vh - 60px); margin: -4px;">
       ${pmRenderListingsSidebar(filteredUnits, allUnits.length)}
-      <div class="flex-1 flex flex-col overflow-hidden">
+      ${pmResizeHandle('#pm-cal-sidebar', 'pm_calendar_sidebar_width', 320)}
+      <div class="flex-1 flex flex-col overflow-hidden pm-split-main">
         ${pmRenderTimelineHeader()}
         ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900 flex items-center justify-between"><span>⚠️ ${dupesHidden} ${dupesHidden===1?'registro duplicado':'registros duplicados'} fusionado${dupesHidden===1?'':'s'} (mismo código, tipo y renta)</span><span class="text-amber-700 italic">Si ves códigos como "ESTUDIO-1 (B)" son unidades distintas con mismo código en Airtable.</span></div>` : ''}
         <div class="flex-1 overflow-auto">${timelineUnits.length === 0 && pmaState.calendarGroupByProperty ? `
@@ -1305,20 +1388,21 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
     const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
     const platformColors = {contrato_directo:'#10b981',airbnb:'#f43f5e',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
     const dotColor = active ? (platformColors[active.booking_type] || '#10b981') : '#cbd5e1';
-    const statusLabel = active ? (tenant.length > 18 ? tenant.slice(0,17)+'…' : tenant) : 'Libre';
+    const statusLabel = active ? tenant : 'Libre';
     const statusClass = active ? 'text-emerald-700' : 'text-slate-400';
     const displayName = (u.name||u.code||'') + (u._displaySuffix || '');
-    return `<button onclick="pmaState.calendarSelectedUnitId='${u.id}';pmRender()" class="w-full px-3 py-2.5 hover:bg-white border-b border-slate-100 flex items-center gap-2.5 text-left transition group">
+    const fullTip = `${displayName}${p?.name ? ' — ' + p.name : ''}${active ? ' · ' + tenant : ' · Libre'}`;
+    return `<button onclick="pmaState.calendarSelectedUnitId='${u.id}';pmRender()" title="${fullTip.replace(/"/g,'&quot;')}" class="w-full px-3 py-2.5 hover:bg-white border-b border-slate-100 flex items-center gap-2.5 text-left transition group">
       <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-lg flex-shrink-0">${icon}</div>
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-bold text-slate-900 truncate">${displayName.replace(/</g,'&lt;')}</div>
-        <div class="text-[10px] text-slate-500 truncate">${(p?.name||'—').replace(/</g,'&lt;').slice(0,30)}${u.target_rent ? ` · $${Number(u.target_rent).toLocaleString()}/mes` : ''}</div>
-        <div class="text-[10px] ${statusClass} font-semibold truncate flex items-center gap-1 mt-0.5">
+        <div class="text-xs font-bold text-slate-900 pm-ellipsis" title="${displayName.replace(/"/g,'&quot;')}">${displayName.replace(/</g,'&lt;')}</div>
+        <div class="text-[10px] text-slate-500 pm-ellipsis" title="${(p?.name||'—').replace(/"/g,'&quot;')}">${(p?.name||'—').replace(/</g,'&lt;')}${u.target_rent ? ` · $${Number(u.target_rent).toLocaleString()}/mes` : ''}</div>
+        <div class="text-[10px] ${statusClass} font-semibold pm-ellipsis flex items-center gap-1 mt-0.5">
           <span style="background:${dotColor}" class="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"></span>
           ${statusLabel.replace(/</g,'&lt;')}
         </div>
       </div>
-      <span class="text-slate-300 group-hover:text-slate-500 text-xs">›</span>
+      <span class="text-slate-300 group-hover:text-slate-500 text-xs flex-shrink-0">›</span>
     </button>`;
   };
 
@@ -1351,7 +1435,7 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
           <div class="flex items-center gap-2 min-w-0 flex-1">
             <span class="text-slate-400 text-[10px] w-3 transition-transform" style="${collapsed?'':'transform:rotate(90deg);'}">▶</span>
             <span class="${indicatorColor} w-2 h-2 rounded-full flex-shrink-0"></span>
-            <strong class="text-[11px] uppercase tracking-wide text-slate-700 truncate">${(p?.name||'Sin propiedad').replace(/</g,'&lt;')}</strong>
+            <strong class="text-[11px] uppercase tracking-wide text-slate-700 pm-ellipsis" title="${(p?.name||'Sin propiedad').replace(/"/g,'&quot;')}">${(p?.name||'Sin propiedad').replace(/</g,'&lt;')}</strong>
           </div>
           <span class="text-[10px] text-slate-500 flex-shrink-0 bg-white px-1.5 py-0.5 rounded">${occ}<span class="opacity-60">/${items.length}</span></span>
         </button>
@@ -1363,7 +1447,7 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
   }
 
   return `
-    <div class="border-r border-slate-200 bg-slate-50 flex flex-col" style="width:300px;flex-shrink:0;">
+    <div id="pm-cal-sidebar" class="pm-split-sidebar border-r border-slate-200 bg-slate-50 flex flex-col" style="flex:0 0 ${pmSidebarWidth('pm_calendar_sidebar_width', 320)}px;">
       <div class="p-3 border-b border-slate-200 bg-white space-y-2">
         <!-- Header con contador + agrupar -->
         <div class="flex items-center justify-between">
