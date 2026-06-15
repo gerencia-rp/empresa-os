@@ -163,6 +163,49 @@ function getMultiSel(cell: any): string[] {
 function slugify(s: string): string {
   return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 }
+
+// ── Mapeo nombres cortos (Pagos Rentas / Tenant) → dirección completa ──
+// "Datos x Casa" usa direcciones completas; "Pagos Rentas" usa apodos cortos.
+const HOUSE_NICKNAME_MAP: Record<string, string> = {
+  "Barkbridge":   "4916 Barkbridge Trail, Austin, TX 78744",
+  "Bartlett":     "311 Bartlett St, Marlin, TX 76661",
+  "Bramble":      "512 Bramble Dr, Austin, TX 78745",
+  "Capitol":      "407 Capitol Dr, Austin, TX 78753",
+  "Capps":        "406 Capps St, Marlin, TX 76661",
+  "Childress":    "9909 Childress Dr, Austin, TX 78753",
+  "Dove Springs": "2315 Dove Springs Dr, Austin, TX 78744",
+  "Echo":         "1100 Echo Ln, Austin, TX 78745",
+  "Garden":       "1302 Garden Path Dr, Round Rock, TX 78664",
+  "Idlewood":     "6107 Idlewood Cove, Austin, TX 78745",
+  "Meadow":       "5702 Meadow Crest, Austin, TX 78744",
+  "Michelle":     "5003 Michelle Ct, Austin, TX 78744",
+  "Nesting Way":  "4905 Nesting Way, Austin, TX 78744",
+  "Picnic":       "1607 Picnic Cove, Round Rock, TX 78664",
+  "Shadow":       "6203 Shadow Bend, Austin, TX 78745",
+  "Stonleigh":    "6504 Stonleigh Pl, Austin, TX 78744",
+  "Virginia":     "902 Virginia Dr, Round Rock, TX 78664",
+  "Bethune":      "7105 Bethune Ave, Austin, TX 78752"
+};
+// Lookup case-insensitive del apodo
+const HOUSE_NICKNAME_LC: Record<string, string> = {};
+for (const k of Object.keys(HOUSE_NICKNAME_MAP)) HOUSE_NICKNAME_LC[k.toLowerCase().trim()] = HOUSE_NICKNAME_MAP[k];
+
+// Normaliza una dirección a una clave estable para hacer match entre tablas.
+function normalizeAddress(addr: string | null): string {
+  let s = (addr || "").toLowerCase();
+  s = s.replace(/[,.]/g, " ");
+  // Sufijos de calle → forma corta (consistente en ambos lados del match)
+  s = s.replace(/\bdrive\b/g, "dr").replace(/\bcourt\b/g, "ct").replace(/\bplace\b/g, "pl")
+       .replace(/\btrail\b/g, "trl").replace(/\blane\b/g, "ln").replace(/\bcove\b/g, "cv")
+       .replace(/\bstreet\b/g, "st").replace(/\bavenue\b/g, "ave");
+  // Quitar ciudad y estado
+  s = s.replace(/\bround rock\b/g, " ").replace(/\baustin\b/g, " ").replace(/\bmarlin\b/g, " ")
+       .replace(/\btexas\b/g, " ").replace(/\btx\b/g, " ");
+  // Quitar zip de 5 dígitos
+  s = s.replace(/\b\d{5}\b/g, " ");
+  // Colapsar espacios
+  return s.replace(/\s+/g, " ").trim();
+}
 // Airtable attachment → primera URL
 function getAttachUrl(cell: any): string | null {
   if (Array.isArray(cell) && cell[0]?.url) return cell[0].url;
@@ -335,13 +378,31 @@ Deno.serve(async (req) => {
     const { data: dbProps } = await supabase.from("pm_properties").select("id, external_id, address");
     const propIdByExtId: Record<string, string> = {};
     const propIdByAddr: Record<string, string> = {};
+    const propIdByNormAddr: Record<string, string> = {};   // dirección normalizada → property_id
     (dbProps || []).forEach((p: any) => {
       if (p.external_id) propIdByExtId[p.external_id] = p.id;
       if (p.address) propIdByAddr[p.address] = p.id;
+      const n = normalizeAddress(p.address || "");
+      if (n) propIdByNormAddr[n] = p.id;
     });
-    // Lookup tolerante: exacto por slug, luego substring contra direcciones reales.
+    stats.addresses_normalized = Object.keys(propIdByNormAddr).length;
+    let nicknameResolved = 0;
+
+    // Lookup tolerante:
+    //  1) apodo corto (HOUSE_NICKNAME_MAP) → dirección completa → normalizada → match exacto
+    //  2) substring sobre direcciones normalizadas
+    //  3) fallback histórico: external_id por slug, luego substring por slug
     const findPropId = (name: string | null): string | null => {
       if (!name) return null;
+      const full = HOUSE_NICKNAME_LC[name.toLowerCase().trim()] || name;
+      const usedNickname = !!HOUSE_NICKNAME_LC[name.toLowerCase().trim()];
+      const norm = normalizeAddress(full);
+      if (norm && propIdByNormAddr[norm]) { if (usedNickname) nicknameResolved++; return propIdByNormAddr[norm]; }
+      if (norm) {
+        for (const pn of Object.keys(propIdByNormAddr)) {
+          if (pn.includes(norm) || norm.includes(pn)) { if (usedNickname) nicknameResolved++; return propIdByNormAddr[pn]; }
+        }
+      }
       const exact = propIdByExtId["addr-" + slugify(name)];
       if (exact) return exact;
       const ns = slugify(name);
@@ -529,9 +590,17 @@ Deno.serve(async (req) => {
     try {
       const pagos = await fetchAllRecords(base_id, TABLE_IDS.pagos, airtable_token);
       const paymentsIn: any[] = [];
+      let paysLinked = 0, paysUnlinked = 0;
+      const unlinkedCasas: Record<string, number> = {};
       for (const r of pagos) {
         const casaName = getSel(r.fields?.[F.pag_casa]);
         const propId = findPropId(casaName);
+        if (propId) paysLinked++;
+        else {
+          paysUnlinked++;
+          if (casaName) unlinkedCasas[casaName] = (unlinkedCasas[casaName] || 0) + 1;
+          console.warn(`[pm-sync] ⚠️ pago SIN vincular · Casa="${casaName || "(vacío)"}" → property_id NULL`);
+        }
         const tipo = getSel(r.fields?.[F.pag_tipo]);
         const unitId = (propId && tipo) ? (unitIdByPropName[`${propId}|${slugify(tipo)}`] || null) : null;
         const inq = r.fields?.[F.pag_inq] || "";
@@ -563,6 +632,12 @@ Deno.serve(async (req) => {
         }
       }
       stats.payments_in = paymentsIn.length;
+      stats.payments_linked = paysLinked;
+      stats.payments_unlinked = paysUnlinked;
+      stats.payments_unlinked_casas = unlinkedCasas;
+      stats.payments_nickname_resolved = nicknameResolved;
+      console.log(`[pm-sync] pm_payments: ${paymentsIn.length} pagos · ${paysLinked} vinculados · ${paysUnlinked} sin vincular · ${nicknameResolved} resueltos vía apodo`);
+      if (paysUnlinked) console.warn(`[pm-sync] ⚠️ Casas sin match:`, JSON.stringify(unlinkedCasas));
     } catch (e: any) { errors.push("pagos: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
