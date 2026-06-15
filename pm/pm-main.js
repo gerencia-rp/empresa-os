@@ -4059,40 +4059,98 @@ function pmFinRange() {
   return { fromISO: iso(from), toISO: iso(to), ymList, label, months: ymList.length };
 }
 function pmInRange(dateStr, r) { return dateStr && dateStr >= r.fromISO && dateStr <= r.toISO; }
+// Índice de mes robusto (español, número, o inglés)
+function pmMonthIdx(m) {
+  if (m == null) return -1;
+  const s = String(m).trim().toLowerCase();
+  let i = PM_ES_MONTHS.indexOf(s);
+  if (i >= 0) return i;
+  const n = parseInt(s, 10);
+  if (n >= 1 && n <= 12) return n - 1;
+  const en = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  i = en.indexOf(s); if (i >= 0) return i;
+  return -1;
+}
 function pmPayrollInRange(r) {
   return (pmaState.payroll||[]).filter(p => {
-    const idx = PM_ES_MONTHS.indexOf((p.month||'').toLowerCase());
-    if (idx < 0 || !p.year) return false;
-    return r.ymList.includes(`${p.year}-${String(idx+1).padStart(2,'0')}`);
+    const idx = pmMonthIdx(p.month);
+    if (idx < 0) return false;
+    if (p.year) return r.ymList.includes(`${p.year}-${String(idx+1).padStart(2,'0')}`);
+    return r.ymList.some(ym => (parseInt(ym.slice(5,7),10)-1) === idx);  // sin año → match por mes
   }).reduce((s,p) => s + Number(p.salary||0), 0);
 }
-// Agregado P&L del período (ingresos, gastos por categoría, nómina, por casa)
+function pmIsAseo(e) { return e.category === 'cleaning' || /aseo|podada|cesped|césped|lawn|cleaning/i.test(e.subcategory||''); }
+// Agregado P&L del período (ingresos, gastos por categoría, nómina, breakdowns, por casa)
 function pmFinAgg(r) {
   const inc = pmaState.payments.filter(p => p.type==='ingreso' && pmInRange(p.paid_at, r));
   const exp = pmaState.expenses.filter(e => pmInRange(e.expense_date, r));
   const sum = (arr, f) => arr.reduce((s,x) => s + Number((f?f(x):x.amount)||0), 0);
   const income = sum(inc);
-  const house = sum(exp.filter(e => e.category==='house'));
-  const cleaning = sum(exp.filter(e => e.category==='cleaning'));
-  const operational = sum(exp.filter(e => e.category==='operational'));
+  const house = sum(exp.filter(e => e.category==='house' && !pmIsAseo(e)));
+  const cleaning = sum(exp.filter(e => pmIsAseo(e)));                 // aseo/podada/cleaning
+  const platform = sum(exp.filter(e => e.category==='platform'));
+  const operationalRaw = sum(exp.filter(e => e.category==='operational'));
+  const operational = operationalRaw + platform;                      // operativos = operational + platform
   const payroll = pmPayrollInRange(r);
-  const net = income - house - cleaning - operational - payroll;
+  const gastosTotal = house + cleaning + operational + payroll;
+  const noi = income - house - cleaning - operational - payroll;       // NOI = ingresos − gastos − operativos − nómina
+  const net = noi;
+  const margin = income > 0 ? noi / income : 0;
+
+  // Breakdowns
+  const incomeByPlatform = {}, incomeByModel = {}, expenseByCategory = {};
+  inc.forEach(p => {
+    const bk = pmPaymentBooking(p);
+    const plat = bk?.booking_type || 'otro';
+    incomeByPlatform[plat] = (incomeByPlatform[plat]||0) + Number(p.amount||0);
+    const prop = pmaState.properties.find(x => x.id === p.property_id);
+    const model = prop?.rental_model || 'sin_modelo';
+    incomeByModel[model] = (incomeByModel[model]||0) + Number(p.amount||0);
+  });
+  expenseByCategory['Utility/Casa'] = house;
+  expenseByCategory['Aseo & Podada'] = cleaning;
+  expenseByCategory['Operativos'] = operational;
+  expenseByCategory['Nómina'] = payroll;
 
   const activeProps = pmaState.properties.filter(p => p.status==='activa');
   const payrollPerProp = activeProps.length ? payroll / activeProps.length : 0;
+  const operativosPerProp = activeProps.length ? operational / activeProps.length : 0;
   const props = activeProps.map(p => {
-    // Ocupación basada en unidades rentables del modelo de renta
     const rentable = pmRentableUnitsOf(p.id);
-    const occRent = pmOccupiedRentableUnitsOf(p.id);
-    const occ = rentable ? occRent / rentable : 0;
+    const occ = rentable ? pmOccupiedRentableUnitsOf(p.id) / rentable : 0;
     const pIncome = sum(inc.filter(x => x.property_id===p.id));
-    const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house'));
-    const pClean = sum(exp.filter(e => e.property_id===p.id && e.category==='cleaning'));
-    const pNet = pIncome - pHouse - pClean - payrollPerProp;
-    const margin = pIncome > 0 ? pNet / pIncome : 0;
-    return { property: p, occ, rentable, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, net: pNet, margin };
+    const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house' && !pmIsAseo(e)));
+    const pClean = sum(exp.filter(e => e.property_id===p.id && pmIsAseo(e)));
+    const pNoi = pIncome - pHouse - pClean - payrollPerProp - operativosPerProp;
+    const margin = pIncome > 0 ? pNoi / pIncome : 0;
+    return { property: p, occ, rentable, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNoi, noi: pNoi, margin };
   });
-  return { income, house, cleaning, operational, payroll, net, props, activePropsCount: activeProps.length };
+  return { income, house, cleaning, platform, operational, payroll, gastosTotal, noi, net, margin,
+    incomeByPlatform, incomeByModel, expenseByCategory, props, activePropsCount: activeProps.length };
+}
+// Bar chart horizontal (entries [label,value])
+function pmBarChart(entries, accent = '#d4af37') {
+  const max = Math.max(1, ...entries.map(([, v]) => v));
+  return `<div class="space-y-1.5">${entries.map(([label, val]) => `
+    <div class="flex items-center gap-2 text-[11px]">
+      <span class="w-28 truncate text-slate-600" title="${(label||'').replace(/"/g,'&quot;')}">${(label||'').replace(/</g,'&lt;')}</span>
+      <div class="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden"><div class="h-3 rounded-full" style="width:${Math.round(100*val/max)}%;background:${accent}"></div></div>
+      <span class="w-16 text-right font-bold text-slate-700 whitespace-nowrap">${pmMoney(val)}</span>
+    </div>`).join('') || '<div class="text-xs text-slate-400 italic">Sin datos.</div>'}</div>`;
+}
+// Multi-línea SVG (series: [{label,color,values:[]}], labels: [])
+function pmMultiLineChart(labels, series) {
+  const W=640,H=200,padL=12,padR=12,padT=14,padB=24,n=labels.length;
+  const allVals = series.flatMap(s => s.values);
+  const max = Math.max(1, ...allVals), min = Math.min(0, ...allVals);
+  const x = i => padL + (i*(W-padL-padR)/Math.max(1,n-1));
+  const y = v => H-padB - ((v-min)/(max-min||1))*(H-padT-padB);
+  const path = vals => vals.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:210px">
+    ${series.map(s=>`<path d="${path(s.values)}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join('')}
+    ${labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#94a3b8" text-anchor="middle">${l}</text>`).join('')}
+  </svg>
+  <div class="flex gap-3 justify-center text-[11px] mt-1">${series.map(s=>`<span style="color:${s.color}" class="font-bold">● ${s.label}</span>`).join('')}</div>`;
 }
 // Tendencia mensual (n meses hasta el fin del período) ingresos vs gastos totales
 function pmFinTrend(nMonths, anchorYm) {
@@ -4118,9 +4176,19 @@ function pmSetPnlSort(key) {
 }
 window.pmSetPnlSort = pmSetPnlSort;
 
+function pmFinShiftRangeBack(r) {
+  const shift = (iso) => { const d = new Date(iso + 'T00:00:00'); d.setMonth(d.getMonth() - r.months); return d.toISOString().slice(0,10); };
+  const fromISO = shift(r.fromISO), toISO = shift(r.toISO);
+  const ymList = []; let cur = new Date(fromISO.slice(0,7) + '-01T00:00:00'); const end = new Date(toISO.slice(0,7) + '-01T00:00:00');
+  while (cur <= end) { ymList.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`); cur.setMonth(cur.getMonth()+1); }
+  return { fromISO, toISO, ymList, months: r.months, label: 'prev' };
+}
 function pmRenderFinance() {
   const r = pmFinRange();
   const agg = pmFinAgg(r);
+  const prevAgg = pmFinAgg(pmFinShiftRangeBack(r));
+  const delta = (cur, prev) => prev ? Math.round((cur - prev) / Math.abs(prev) * 100) : (cur > 0 ? 100 : 0);
+  const arrowD = (d) => d > 0 ? `<span class="text-emerald-600">↑${Math.abs(d)}%</span>` : d < 0 ? `<span class="text-red-600">↓${Math.abs(d)}%</span>` : `<span class="text-slate-400">→</span>`;
   const anchorYm = r.ymList[r.ymList.length-1] || pmCurrentYM();
   const trend = pmFinTrend(12, anchorYm);
   const t12i = trend.reduce((s,t)=>s+t.income,0), t12g = trend.reduce((s,t)=>s+t.gastos,0);
@@ -4205,24 +4273,61 @@ function pmRenderFinance() {
       </div>
     </div>
 
-    <!-- A · KPIs -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
-      ${kpi('Ingresos', pmMoney(agg.income), `${r.months} ${r.months===1?'mes':'meses'}`, 'text-emerald-700')}
-      ${kpi('Gastos casas', pmMoney(agg.house), 'category=house', 'text-red-600')}
-      ${kpi('Gastos aseo', pmMoney(agg.cleaning), 'category=cleaning', 'text-red-600')}
-      ${kpi('Nómina', pmMoney(agg.payroll), 'payroll', 'text-red-600')}
-      ${kpi('Operativos', pmMoney(agg.operational), 'category=operational', 'text-red-600')}
-      ${kpi('P&L Neto', pmMoney(agg.net), agg.income>0?`margen ${Math.round(roiMensual*100)}%`:'', agg.net>=0?'text-emerald-700':'text-red-600')}
+    <!-- SECCIÓN 1 · KPIs con delta MoM -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      ${kpi('Ingresos brutos', pmMoney(agg.income), arrowD(delta(agg.income, prevAgg.income))+' MoM', 'text-emerald-700')}
+      ${kpi('Gastos totales', pmMoney(agg.gastosTotal), arrowD(delta(agg.gastosTotal, prevAgg.gastosTotal))+' MoM', 'text-red-600')}
+      ${kpi('NOI', pmMoney(agg.noi), arrowD(delta(agg.noi, prevAgg.noi))+' MoM', agg.noi>=0?'text-emerald-700':'text-red-600')}
+      ${kpi('Cash flow neto', pmMoney(agg.net), arrowD(delta(agg.net, prevAgg.net))+' MoM', agg.net>=0?'text-emerald-700':'text-red-600')}
+      ${kpi('Margen NOI', (agg.income>0?Math.round(agg.margin*100):0)+'%', `objetivo 25-60%`, agg.margin>=0.25?'text-emerald-700':'text-amber-600')}
+      ${kpi('Ocupación', Math.round(occPct*100)+'%', `${occRentable}/${rentableTotal} uds`, occPct>=0.8?'text-emerald-700':'text-amber-600')}
+      ${kpi('Renta prom / unidad', pmMoney(avgRentRoom), 'uds rentables')}
+      ${kpi('Días vacancy prom.', avgRot!=null?avgRot+'d':'—', 'entre leases')}
     </div>
 
-    <!-- A · Gráfico ingresos vs gastos 12m -->
-    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-      <div class="flex items-center justify-between mb-1">
-        <div class="text-sm font-bold text-slate-800">Ingresos vs Gastos · 12 meses</div>
-        <div class="flex gap-3 text-[11px]"><span class="text-emerald-600 font-bold">● Ingresos</span><span class="text-red-600 font-bold">● Gastos</span></div>
+    <!-- SECCIÓN 2 · Origen de ingresos -->
+    <div class="grid lg:grid-cols-3 gap-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Ingresos por plataforma</div>
+        ${pmPieChart(Object.entries(agg.incomeByPlatform).map(([k,v])=>[PM_PLATFORM_LABEL[k]||k, v]).sort((a,b)=>b[1]-a[1]))}
       </div>
-      ${pmTrendSvg(trend)}
-      <div class="text-xs text-slate-500 text-center mt-1">12 meses: <span class="text-emerald-700 font-bold">${pmMoney(t12i)}</span> ingresos · <span class="text-red-700 font-bold">${pmMoney(t12g)}</span> gastos · <span class="font-bold ${t12i-t12g>=0?'text-emerald-700':'text-red-700'}">${pmMoney(t12i-t12g)}</span> neto</div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Ingresos por modelo</div>
+        ${pmPieChart(Object.entries(agg.incomeByModel).map(([k,v])=>[(k||'—').replace(/_/g,' '), v]).sort((a,b)=>b[1]-a[1]))}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Top 10 casas · ingresos</div>
+        ${pmBarChart([...agg.props].filter(x=>x.income>0).sort((a,b)=>b.income-a.income).slice(0,10).map(x=>[x.property.name, x.income]), '#10b981')}
+      </div>
+    </div>
+
+    <!-- SECCIÓN 3 · Detalle de gastos -->
+    <div class="grid lg:grid-cols-3 gap-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Gastos por categoría</div>
+        ${pmPieChart(Object.entries(agg.expenseByCategory).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]))}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Top 10 casas · gastos directos</div>
+        ${pmBarChart([...agg.props].map(x=>[x.property.name, x.house+x.cleaning]).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10), '#f43f5e')}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Costo operativo</div>
+        <div><div class="text-[10px] text-slate-400">Promedio por casa</div><div class="text-lg font-extrabold text-slate-900">${pmMoney(agg.gastosTotal/Math.max(1,agg.activePropsCount))}</div></div>
+        <div><div class="text-[10px] text-slate-400">Por unidad rentable</div><div class="text-lg font-extrabold text-slate-900">${pmMoney(rentableTotal?agg.gastosTotal/rentableTotal:0)}</div></div>
+        <div><div class="text-[10px] text-slate-400">% de ingresos (cost-to-income)</div><div class="text-lg font-extrabold ${agg.income&&agg.gastosTotal/agg.income<0.75?'text-emerald-700':'text-amber-600'}">${agg.income?Math.round(agg.gastosTotal/agg.income*100):0}%</div></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 5 · Tendencia 12 meses (multi-línea) -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div class="text-sm font-bold text-slate-800 mb-1">Tendencia 12 meses · Ingresos / Gastos / NOI</div>
+      ${pmMultiLineChart(trend.map(t=>t.label), [
+        { label:'Ingresos', color:'#10b981', values: trend.map(t=>t.income) },
+        { label:'Gastos', color:'#ef4444', values: trend.map(t=>t.gastos) },
+        { label:'NOI / Cash flow', color:'#8b5cf6', values: trend.map(t=>t.net) }
+      ])}
+      <div class="text-xs text-slate-500 text-center mt-1">12 meses: <span class="text-emerald-700 font-bold">${pmMoney(t12i)}</span> ingresos · <span class="text-red-700 font-bold">${pmMoney(t12g)}</span> gastos · <span class="font-bold ${t12i-t12g>=0?'text-emerald-700':'text-red-700'}">${pmMoney(t12i-t12g)}</span> NOI</div>
     </div>
 
     <!-- B · P&L por casa -->
@@ -4275,7 +4380,23 @@ function pmRenderFinance() {
       </div>
     </div>
 
-    <!-- C · Métricas clave -->
+    <!-- SECCIÓN 6 · Rankings -->
+    <div class="grid lg:grid-cols-3 gap-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[11px] uppercase font-bold text-emerald-700 tracking-wider mb-2">🏆 Top 5 más rentables</div>
+        ${[...agg.props].filter(x=>x.income>0).sort((a,b)=>b.noi-a.noi).slice(0,5).map(x=>`<div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-50"><span class="text-slate-700 truncate">${(x.property.name||'').replace(/</g,'&lt;').slice(0,22)}</span><span class="font-bold ${x.noi>=0?'text-emerald-700':'text-red-600'}">${pmMoney(x.noi)} · ${Math.round(x.margin*100)}%</span></div>`).join('')||'<div class="text-xs text-slate-400 italic">Sin datos.</div>'}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[11px] uppercase font-bold text-red-600 tracking-wider mb-2">⚠️ Bottom 5 menos rentables</div>
+        ${[...agg.props].filter(x=>x.income>0).sort((a,b)=>a.noi-b.noi).slice(0,5).map(x=>`<div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-50"><span class="text-slate-700 truncate">${(x.property.name||'').replace(/</g,'&lt;').slice(0,22)}</span><span class="font-bold ${x.noi>=0?'text-amber-600':'text-red-600'}">${pmMoney(x.noi)} · ${Math.round(x.margin*100)}%</span></div>`).join('')||'<div class="text-xs text-slate-400 italic">Sin datos.</div>'}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[11px] uppercase font-bold text-amber-600 tracking-wider mb-2">🔥 Casas en alerta</div>
+        ${(() => { const al = agg.props.filter(x => (x.income>0 && x.margin<0.20) || (pmOccupiedRentableUnitsOf(x.property.id)/Math.max(1,pmRentableUnitsOf(x.property.id)) < 0.7)); return al.length ? al.slice(0,8).map(x=>`<div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-50"><span class="text-slate-700 truncate">${(x.property.name||'').replace(/</g,'&lt;').slice(0,22)}</span><span class="font-bold text-red-600">${x.income>0?Math.round(x.margin*100)+'%':'sin ingr.'}</span></div>`).join('') : '<div class="text-xs text-emerald-600">✓ Ninguna en alerta.</div>'; })()}
+      </div>
+    </div>
+
+    <!-- C · Métricas clave + estratégicas -->
     <div>
       <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Métricas clave</div>
       <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
