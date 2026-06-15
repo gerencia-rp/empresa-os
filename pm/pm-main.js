@@ -7,6 +7,7 @@
 const pmaState = {
   tab: 'dashboard',                  // dashboard (landing CEO) · properties · calendar · bookings · finance · feeds
   selectedPropertyId: null,           // para vista detalle
+  pdTab: 'units',                     // sub-tab de la vista detalle: units·creds·pnl·docs·tasks
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(),   // 0-11
   calendarView: 'timeline',               // 'timeline' (multi-unit) | 'single' (un solo listing)
@@ -85,6 +86,9 @@ async function pmLoadAll() {
     { name: 'payments',   optional: false, q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
     { name: 'expenses',   optional: true,  q: () => sb.from('pm_expenses').select('*').order('expense_date', { ascending: false, nullsFirst: false }).limit(2000) },
     { name: 'payroll',    optional: true,  q: () => sb.from('pm_payroll').select('*').limit(1000) },
+    { name: 'credentials',optional: true,  q: () => sb.from('pm_credentials').select('*').limit(1000) },
+    { name: 'wifi',       optional: true,  q: () => sb.from('pm_wifi_credentials').select('*').limit(500) },
+    { name: 'tasks',      optional: true,  q: () => sb.from('pm_tasks').select('*').order('scheduled_date', { ascending: true, nullsFirst: false }).limit(1000) },
     { name: 'lastSync',   optional: true,  q: () => sb.from('pm_sync_log').select('*').eq('source','airtable').order('started_at', { ascending: false }).limit(1) },
     { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) }
   ];
@@ -135,6 +139,9 @@ async function pmLoadAll() {
   }));
   pmaState.payments = [...(results.payments || []), ...expAsPays];
   pmaState.payroll = results.payroll || [];
+  pmaState.credentials = results.credentials || [];
+  pmaState.wifi = results.wifi || [];
+  pmaState.tasks = results.tasks || [];
   pmaState.lastSync = (results.lastSync || [])[0] || null;
   pmaState.feeds = results.feeds || [];
 
@@ -692,19 +699,28 @@ window.pmSelectProperty = pmSelectProperty;
 // ════════════════════════════════════════════════════════════════
 // TAB 1.b · DETALLE de propiedad (con desglose de unidades + calendario)
 // ════════════════════════════════════════════════════════════════
+// Status badge de propiedad (mapea valores del schema a etiquetas del spec)
+function pmPropStatusBadge(status){
+  const map = { activa:['Activa','bg-emerald-100 text-emerald-800'], pausada:['Pausada','bg-amber-100 text-amber-800'], inactiva:['Pausada','bg-amber-100 text-amber-800'], en_remodelacion:['En remodelación','bg-blue-100 text-blue-800'], venta:['Venta','bg-purple-100 text-purple-800'], vendida:['Vendida','bg-slate-200 text-slate-700'] };
+  const [label,cls] = map[status] || [status||'—','bg-slate-100 text-slate-700'];
+  return `<span class="text-[10px] font-bold px-2 py-0.5 rounded ${cls}">${label}</span>`;
+}
+
 function pmRenderPropertyDetail() {
   const p = pmaState.properties.find(x => x.id === pmaState.selectedPropertyId);
   if (!p) return '<div class="p-4 text-slate-500">Propiedad no encontrada.</div>';
   const units = pmUnitsOf(p.id);
   const occ = pmOccupancyOf(p.id);
-  const fin = pmFinanceOf(p.id);
-  const grouped = {
-    casa_completa: units.filter(u => u.unit_type === 'casa_completa'),
-    apartamento:   units.filter(u => u.unit_type === 'apartamento'),
-    habitacion:    units.filter(u => u.unit_type === 'habitacion'),
-    estudio:       units.filter(u => u.unit_type === 'estudio')
-  };
-  const labels = { casa_completa: '🏡 Casa completa', apartamento: '🏢 Apartamentos', habitacion: '🛏 Habitaciones', estudio: '🎨 Estudios' };
+  const now = new Date();
+  const finMonth = pmFinanceOf(p.id, new Date(now.getFullYear(), now.getMonth(), 1));
+  // Inquilinos al día (con pago en los últimos 30d) vs total con inquilino
+  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate()-30);
+  const recentPayers = new Set(pmaState.payments.filter(x=>x.type==='ingreso' && x.tenant_id && x.paid_at && new Date(x.paid_at)>=cutoff).map(x=>x.tenant_id));
+  const propBookings = pmaState.bookings.filter(b=>b.property_id===p.id && ['activo','confirmado'].includes(b.status) && b.tenant_id);
+  const alDia = propBookings.filter(b=>recentPayers.has(b.tenant_id)).length;
+
+  const SUBTABS = [['units','Unidades'],['creds','Acceso y credenciales'],['pnl','Histórico P&L'],['docs','Documentos'],['tasks','Tareas']];
+  const pd = pmaState.pdTab || 'units';
 
   return `
     <div class="space-y-3 p-1">
@@ -713,7 +729,10 @@ function pmRenderPropertyDetail() {
       <!-- Header propiedad -->
       <div class="bg-gradient-to-br from-slate-900 to-blue-900 text-white rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <div class="text-[10px] uppercase font-bold text-blue-200 tracking-wider">${p.rental_model||'mixto'}</div>
+          <div class="flex items-center gap-2">
+            <div class="text-[10px] uppercase font-bold text-blue-200 tracking-wider">${p.rental_model||'mixto'}</div>
+            ${pmPropStatusBadge(p.status)}
+          </div>
           <div class="text-lg font-bold mt-1">${(p.name||'').replace(/</g,'&lt;')}</div>
           <div class="text-[11px] text-blue-200">${(p.address||'').replace(/</g,'&lt;')}</div>
         </div>
@@ -723,21 +742,45 @@ function pmRenderPropertyDetail() {
         </div>
       </div>
 
-      <!-- KPIs propiedad -->
+      <!-- Métricas rápidas (4 cards) -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Unidades</div><div class="text-xl font-bold text-slate-900 mt-1">${units.length}</div></div>
-        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Ocupación</div><div class="text-xl font-bold text-emerald-700 mt-1">${occ.pct}%</div><div class="text-[10px] text-slate-500">${occ.occupied}/${occ.total}</div></div>
-        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Ingresos</div><div class="text-xl font-bold text-emerald-700 mt-1">$${Math.round(fin.ingresos).toLocaleString()}</div></div>
-        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Utilidad</div><div class="text-xl font-bold ${fin.utilidad>=0?'text-emerald-700':'text-red-700'} mt-1">$${Math.round(fin.utilidad).toLocaleString()}</div></div>
+        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Ocupación</div><div class="text-xl font-bold text-emerald-700 mt-1">${occ.pct}%</div><div class="text-[10px] text-slate-500">${occ.occupied}/${occ.total} unidades</div></div>
+        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Inquilinos al día</div><div class="text-xl font-bold text-slate-900 mt-1">${alDia}<span class="text-sm text-slate-400">/${propBookings.length}</span></div></div>
+        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Ingresos mes</div><div class="text-xl font-bold text-emerald-700 mt-1">${pmMoney(finMonth.ingresos)}</div></div>
+        <div class="bg-white border border-slate-200 rounded p-3"><div class="text-[9px] uppercase text-slate-500 font-bold">Gastos mes</div><div class="text-xl font-bold text-red-700 mt-1">${pmMoney(finMonth.gastos)}</div></div>
       </div>
 
-      <!-- Calendario tipo Airbnb (timeline anual) -->
+      <!-- Sub-tabs -->
+      <div class="border-b border-slate-200">
+        <div class="flex gap-1 -mb-px overflow-x-auto">
+          ${SUBTABS.map(([k,l])=>`<button onclick="pmaState.pdTab='${k}';pmRender()" class="px-3 py-2 text-xs font-semibold border-b-2 transition whitespace-nowrap ${pd===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">${l}</button>`).join('')}
+        </div>
+      </div>
+
+      <div>
+        ${pd==='units' ? pmPdUnits(p, units) : ''}
+        ${pd==='creds' ? pmPdCreds(p) : ''}
+        ${pd==='pnl'   ? pmPdPnl(p) : ''}
+        ${pd==='docs'  ? pmPdDocs(p) : ''}
+        ${pd==='tasks' ? pmPdTasks(p) : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ─── TAB A · Unidades (timeline + tabla) ───────────────────────
+function pmPdUnits(p, units){
+  if(!units.length) return `
+    <div class="bg-amber-50 border border-amber-200 rounded p-4 text-center">
+      <div class="text-sm text-amber-900 mb-2">Esta propiedad no tiene unidades aún.</div>
+      <button onclick="pmEditUnit(null,'${p.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded">+ Agregar unidad</button>
+    </div>`;
+  const lastPayOf = (uid)=>{ const ps=pmaState.payments.filter(x=>x.unit_id===uid && x.type==='ingreso' && x.paid_at).sort((a,b)=>a.paid_at<b.paid_at?1:-1); return ps[0]?.paid_at || null; };
+  return `
+    <div class="space-y-3">
       <div class="bg-white border-2 border-slate-200 rounded-xl overflow-hidden">
         <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">📅 Calendario de ocupación</div>
-            <div class="text-sm font-bold mt-0.5">${pmaState.calendarYear}</div>
-          </div>
+          <div><div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">📅 Calendario de ocupación</div><div class="text-sm font-bold mt-0.5">${pmaState.calendarYear}</div></div>
           <div class="flex gap-1">
             <button onclick="pmaState.calendarYear--;pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-xs">←</button>
             <button onclick="pmaState.calendarYear=new Date().getFullYear();pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded text-xs">Hoy</button>
@@ -746,50 +789,136 @@ function pmRenderPropertyDetail() {
         </div>
         ${pmRenderTimelineForUnits(units, pmaState.calendarYear)}
       </div>
-
-      <!-- Desglose de unidades agrupadas -->
-      ${Object.entries(grouped).filter(([, us]) => us.length).map(([kind, us]) => `
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-4 py-2 text-xs font-bold uppercase text-slate-700 flex items-center justify-between">
-            <span>${labels[kind]} · ${us.length}</span>
-          </div>
-          <div class="divide-y divide-slate-100">
-            ${us.map(u => {
-              const active = pmActiveBookingOf(u.id);
-              return `
-                <div class="px-4 py-3 hover:bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="text-[10px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-bold font-mono">${u.code}</span>
-                      <span class="font-bold text-sm text-slate-900">${(u.name||u.code).replace(/</g,'&lt;')}</span>
-                      ${active ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">ocupada</span>' : '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">libre</span>'}
-                    </div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">
-                      ${u.target_rent ? `Renta objetivo: $${Number(u.target_rent).toLocaleString()}/mes` : 'Sin renta objetivo'}
-                      ${active ? ` · 👤 ${pmTenantName(active.tenant_id)} · ${active.start_date} → ${active.end_date||'∞'}` : ''}
-                    </div>
-                  </div>
-                  <div class="flex gap-1">
-                    <button onclick="pmEditBooking(null,'${u.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded">+ Reserva</button>
-                    <button onclick="pmEditUnit('${u.id}','${p.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2.5 py-1 rounded">✏️</button>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      `).join('')}
-
-      ${!units.length ? `
-        <div class="bg-amber-50 border border-amber-200 rounded p-4 text-center">
-          <div class="text-sm text-amber-900 mb-2">Esta propiedad no tiene unidades aún.</div>
-          <div class="text-xs text-amber-700 mb-3">Agregá las habitaciones / estudios / o marcala como casa completa.</div>
-          <button onclick="pmEditUnit(null,'${p.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded">+ Agregar unidad</button>
-        </div>
-      ` : ''}
-    </div>
-  `;
+      <div class="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50"><tr>
+            <th class="text-left px-3 py-2">Unidad</th><th class="text-left px-3 py-2">Baño</th><th class="text-left px-3 py-2">Estado</th>
+            <th class="text-left px-3 py-2">Inquilino</th><th class="text-right px-3 py-2">Renta</th><th class="text-left px-3 py-2">Desde→Hasta</th>
+            <th class="text-left px-3 py-2">Último pago</th><th class="text-right px-3 py-2">Acciones</th>
+          </tr></thead>
+          <tbody>
+            ${units.map(u=>{ const a=pmActiveBookingOf(u.id); const lp=lastPayOf(u.id); return `
+              <tr class="border-t border-slate-100 hover:bg-slate-50">
+                <td class="px-3 py-2"><span class="font-bold text-slate-900">${(u.name||u.code||'').replace(/</g,'&lt;')}</span></td>
+                <td class="px-3 py-2 text-slate-600">${(u.bath_type||u.bathroom_count||'—').replace(/</g,'&lt;')}</td>
+                <td class="px-3 py-2">${a?'<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">ocupada</span>':'<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">libre</span>'}</td>
+                <td class="px-3 py-2 text-slate-700">${a?pmTenantName(a.tenant_id).replace(/</g,'&lt;'):'—'}</td>
+                <td class="px-3 py-2 text-right font-semibold">${u.target_rent?pmMoney(u.target_rent):'—'}</td>
+                <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${a?`${a.start_date||'?'} → ${a.end_date||'∞'}`:'—'}</td>
+                <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${lp||'—'}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">
+                  <button onclick="pmEditUnit('${u.id}','${p.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2 py-1 rounded">Editar</button>
+                  <button onclick="pmEditBooking(null,'${u.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold px-2 py-1 rounded">Asignar</button>
+                </td>
+              </tr>`; }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
 }
+
+// ─── TAB B · Acceso y credenciales ─────────────────────────────
+function pmPdCreds(p){
+  const creds = (pmaState.credentials||[]).filter(c=>c.property_id===p.id);
+  const wifis = (pmaState.wifi||[]).filter(w=>w.property_id===p.id);
+  const iconFor = (cat)=>{ const c=(cat||'').toLowerCase(); if(/electr|energy|amigo|luz/.test(c))return'⚡'; if(/gas/.test(c))return'🔥'; if(/internet|spectrum|wifi|web/.test(c))return'🌐'; if(/bank|banco/.test(c))return'🏦'; if(/agua|water/.test(c))return'💧'; return'🔑'; };
+  const pwCell = (id, pw)=> pw ? `
+    <span id="cred-pw-${id}" data-pw="${encodeURIComponent(pw)}" data-shown="0" class="font-mono text-slate-700">••••••••</span>
+    <button onclick="pmCredToggle('${id}')" class="text-[10px] text-blue-600 hover:underline ml-1">Ver</button>
+    <button onclick="pmCredCopy('${id}')" class="text-[10px] text-slate-500 hover:underline ml-1">Copiar</button>` : '<span class="text-slate-400">—</span>';
+  if(!creds.length && !wifis.length) return '<div class="text-center py-8 text-slate-400 text-sm">Sin credenciales registradas para esta propiedad.</div>';
+  return `
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      ${wifis.map(w=>`
+        <div class="bg-gradient-to-br from-sky-50 to-white border border-sky-200 rounded-xl p-3">
+          <div class="flex items-center gap-2 text-sm font-bold text-slate-900">📡 WiFi <span class="text-[10px] font-normal text-sky-600">red</span></div>
+          <div class="text-xs text-slate-600 mt-1">SSID: <span class="font-mono font-semibold">${(w.network_name||'—').replace(/</g,'&lt;')}</span></div>
+          <div class="text-xs text-slate-600 mt-0.5">Clave: ${pwCell('wifi-'+w.id, w.password_encrypted)}</div>
+        </div>`).join('')}
+      ${creds.map(c=>`
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <div class="flex items-center gap-2 text-sm font-bold text-slate-900">${iconFor(c.category)} ${(c.name||'Servicio').replace(/</g,'&lt;')} ${c.category?`<span class="text-[10px] font-normal text-slate-400">${c.category}</span>`:''}</div>
+          ${c.username?`<div class="text-xs text-slate-600 mt-1">Usuario: <span class="font-mono">${(c.username||'').replace(/</g,'&lt;')}</span></div>`:''}
+          <div class="text-xs text-slate-600 mt-0.5">Clave: ${pwCell('cred-'+c.id, c.password_enc)}</div>
+          ${c.url?`<div class="text-xs mt-1"><a href="${c.url}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">🔗 Abrir portal</a></div>`:''}
+          ${c.notes?`<div class="text-[11px] text-slate-500 mt-1 italic">${(c.notes||'').replace(/</g,'&lt;')}</div>`:''}
+        </div>`).join('')}
+    </div>
+    <div class="text-[10px] text-amber-600 mt-3">⚠️ Las claves se muestran tal como vienen de Airtable (texto plano en DB). Encriptación real + audit log pendientes.</div>`;
+}
+
+// ─── TAB C · Histórico P&L ─────────────────────────────────────
+function pmPdPnl(p){
+  const now=new Date();
+  const rows=[]; const trend=[];
+  for(let i=11;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); const f=pmFinanceOf(p.id,d);
+    const label=`${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+    rows.push({label, ing:f.ingresos, gas:f.gastos, net:f.utilidad});
+    trend.push({label, income:f.ingresos, gastos:f.gastos}); }
+  const hasData = rows.some(r=>r.ing||r.gas);
+  if(!hasData) return '<div class="text-center py-8 text-slate-400 text-sm">Sin movimientos registrados para esta propiedad.</div>';
+  return `
+    <div class="space-y-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-1"><div class="text-sm font-bold text-slate-800">Ingresos vs Gastos · 12 meses</div><div class="flex gap-3 text-[11px]"><span class="text-emerald-600 font-bold">● Ingresos</span><span class="text-red-600 font-bold">● Gastos</span></div></div>
+        ${pmTrendSvg(trend.slice(-12))}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2">Mes</th><th class="text-right px-3 py-2">Ingresos</th><th class="text-right px-3 py-2">Gastos</th><th class="text-right px-3 py-2">Neto</th></tr></thead>
+          <tbody>${rows.slice().reverse().map(r=>`<tr class="border-t border-slate-100"><td class="px-3 py-2 font-semibold">${r.label}</td><td class="px-3 py-2 text-right text-emerald-700">${pmMoney(r.ing)}</td><td class="px-3 py-2 text-right text-red-700">${pmMoney(r.gas)}</td><td class="px-3 py-2 text-right font-bold ${r.net>=0?'text-emerald-700':'text-red-700'}">${pmMoney(r.net)}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ─── TAB D · Documentos y comprobantes ─────────────────────────
+function pmPdDocs(p){
+  const docs=[];
+  pmaState.bookings.filter(b=>b.property_id===p.id && b.contract_url).forEach(b=>docs.push({tipo:'Contrato', date:b.start_date, url:b.contract_url, label:pmTenantName(b.tenant_id)}));
+  pmaState.payments.filter(x=>x.property_id===p.id && x.proof_url).forEach(x=>docs.push({tipo:'Comprobante', date:x.paid_at, url:x.proof_url, label:x.concept||'Pago'}));
+  (pmaState.expenses||[]).filter(e=>e.property_id===p.id && e.invoice_url).forEach(e=>docs.push({tipo:'Factura', date:e.expense_date, url:e.invoice_url, label:e.description||e.subcategory||'Gasto'}));
+  docs.sort((a,b)=> (b.date||'')<(a.date||'')?-1:1);
+  if(!docs.length) return '<div class="text-center py-8 text-slate-400 text-sm">Sin documentos. Los comprobantes/facturas aparecen al sincronizar Airtable.</div>';
+  const badge={Contrato:'bg-blue-100 text-blue-800',Comprobante:'bg-emerald-100 text-emerald-800',Factura:'bg-amber-100 text-amber-800'};
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2">Tipo</th><th class="text-left px-3 py-2">Detalle</th><th class="text-left px-3 py-2">Fecha</th><th class="text-right px-3 py-2"></th></tr></thead>
+        <tbody>${docs.map(d=>`<tr class="border-t border-slate-100 hover:bg-slate-50"><td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${badge[d.tipo]||'bg-slate-100'}">${d.tipo}</span></td><td class="px-3 py-2 text-slate-700">${(d.label||'').replace(/</g,'&lt;').slice(0,50)}</td><td class="px-3 py-2 text-slate-500 whitespace-nowrap">${d.date||'—'}</td><td class="px-3 py-2 text-right"><a href="${d.url}" target="_blank" rel="noopener" class="text-blue-600 hover:underline font-bold">Abrir ↗</a></td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+// ─── TAB E · Tareas pendientes ─────────────────────────────────
+function pmPdTasks(p){
+  const tasks=(pmaState.tasks||[]).filter(t=>t.property_id===p.id && (t.status==='pendiente'||t.status==='pending'||t.status==='en_progreso')).sort((a,b)=> (a.scheduled_date||'9999')<(b.scheduled_date||'9999')?-1:1);
+  if(!tasks.length) return '<div class="text-center py-8 text-slate-400 text-sm">✓ Sin tareas pendientes para esta propiedad.</div>';
+  return `<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+    ${tasks.map(t=>`
+      <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-bold text-slate-900">${(t.task_type||t.title||'Tarea').replace(/</g,'&lt;')}</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">📅 ${t.scheduled_date||t.start_at?.slice(0,10)||'sin fecha'}${t.assigned_to||t.assignee?` · 👤 ${(t.assigned_to||t.assignee).replace(/</g,'&lt;')}`:''}</div>
+          ${t.notes?`<div class="text-[11px] text-slate-400 mt-1 italic">${(t.notes||'').replace(/</g,'&lt;').slice(0,80)}</div>`:''}
+        </div>
+        <div class="flex flex-col gap-1 flex-shrink-0">
+          <button onclick="pmTaskComplete('${t.id}')" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded whitespace-nowrap">✓ Completada</button>
+          <button onclick="pmTaskReschedule('${t.id}')" class="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-0.5 whitespace-nowrap">Reprogramar</button>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+// Helpers credenciales (toggle/copia, auto-hide 10s — sin re-render)
+const pmCredTimers = {};
+function pmCredToggle(id){ const el=document.getElementById('cred-pw-'+id); if(!el) return; const pw=decodeURIComponent(el.dataset.pw||''); if(el.dataset.shown==='1'){ el.textContent='••••••••'; el.dataset.shown='0'; clearTimeout(pmCredTimers[id]); } else { el.textContent=pw||'(vacío)'; el.dataset.shown='1'; clearTimeout(pmCredTimers[id]); pmCredTimers[id]=setTimeout(()=>{ if(el.isConnected){ el.textContent='••••••••'; el.dataset.shown='0'; } },10000); } }
+function pmCredCopy(id){ const el=document.getElementById('cred-pw-'+id); if(!el) return; const pw=decodeURIComponent(el.dataset.pw||''); navigator.clipboard?.writeText(pw); }
+window.pmCredToggle=pmCredToggle; window.pmCredCopy=pmCredCopy;
+
+async function pmTaskComplete(id){ try{ const {error}=await sb.from('pm_tasks').update({status:'completado'}).eq('id',id); if(error) return alert('No se pudo completar: '+error.message); pmaState.tasks=(pmaState.tasks||[]).map(t=>t.id===id?{...t,status:'completado'}:t); pmRender(); }catch(e){ alert('Error: '+e.message); } }
+async function pmTaskReschedule(id){ const d=prompt('Nueva fecha programada (YYYY-MM-DD):'); if(!d) return; try{ const {error}=await sb.from('pm_tasks').update({scheduled_date:d}).eq('id',id); if(error) return alert('No se pudo reprogramar: '+error.message); pmaState.tasks=(pmaState.tasks||[]).map(t=>t.id===id?{...t,scheduled_date:d}:t); pmRender(); }catch(e){ alert('Error: '+e.message); } }
+window.pmTaskComplete=pmTaskComplete; window.pmTaskReschedule=pmTaskReschedule;
 
 // ════════════════════════════════════════════════════════════════
 // TIMELINE de ocupación tipo Airbnb (anual)
