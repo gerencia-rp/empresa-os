@@ -30,7 +30,16 @@ const pmaState = {
   bookingsFiltersLoaded: false,           // guard de carga desde localStorage
   tenantsFilter: 'activos',               // CRM Inquilinos: todos·activos·expiring·late·historico
   tenantsSearch: '',                      // buscador del tab Inquilinos
+  tenantsFilterProperty: null,            // filtro por casa
+  tenantsFilterType: null,                // filtro por tipo de unidad
+  tenantsFiltersLoaded: false,
   tenantDetailId: null,                   // tenant_id → vista detalle CRM
+  payStatusFilter: 'all',                 // Pagos: all·aldia·proximo·atrasado·sincontrato
+  payRecurrenceFilter: null,              // mensual·quincenal·airbnb
+  paySearch: '',
+  payFiltersLoaded: false,
+  expStatusFilter: 'all',                 // Gastos: all·paid·pending
+  expFiltersLoaded: false,
   payMonth: null,                         // tab Pagos: 'YYYY-MM' (null = mes actual)
   payFilterProperty: null,                // tab Pagos: property_id
   payFilterPlatform: null,                // tab Pagos: plataforma
@@ -2326,6 +2335,59 @@ window.pmCreateBookingFromDay = pmCreateBookingFromDay;
 // ════════════════════════════════════════════════════════════════
 const PM_PLATFORM_LABEL = { contrato_directo: 'Contrato directo', airbnb: 'Airbnb', booking: 'Booking', vrbo: 'VRBO', hospitable: 'Hospitable', padsplit: 'Padsplit', reserva_corta: 'Reserva corta', otro: 'Otro' };
 
+// Chip de filtro reutilizable (dorado Mercury cuando activo)
+function pmChip(active, onclick, label, count) {
+  return `<button onclick="${onclick}" class="px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap border ${active?'text-white':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}" style="${active?'background:#d4af37;border-color:#d4af37':''}">${label}${count!=null?` <span class="opacity-70">${count}</span>`:''}</button>`;
+}
+function pmUnitTypeLabel(t) {
+  return ({ casa_completa:'Casa Completa', apartamento:'Apartamento', estudio:'Estudio', habitacion:'Habitación' })[t] || t || '—';
+}
+
+// ── Recurrencia de pago (deriva de booking.payment_day) ──
+function pmRecurrenceOf(paymentDay) {
+  const s = (paymentDay || '').toLowerCase();
+  if (!s) return { kind: 'mensual', label: '🗓 Mensual' };
+  if (/estad|airbnb|noche/.test(s)) return { kind: 'airbnb', label: '🏖 Airbnb' };
+  if (/dos\s*seman|quincen|biweek|cada.?2.?seman|2\s*seman/.test(s)) return { kind: 'quincenal', label: '⏱ Quincenal' };
+  if (/primeros?\s*3|1\s*-\s*3|3\s*primeros/.test(s)) return { kind: 'mensual', label: '🗓 Mensual (1-3)' };
+  if (/primeros?\s*5|1\s*-\s*5|5\s*primeros/.test(s)) return { kind: 'mensual', label: '🗓 Mensual (1-5)' };
+  const dayM = s.match(/(\d{1,2})\s*de\s*cada\s*mes/) || s.match(/d[ií]a\s*(\d{1,2})/) || s.match(/^\s*(\d{1,2})\s*$/);
+  if (dayM) return { kind: 'mensual', label: `🗓 Mensual día ${dayM[1]}` };
+  return { kind: 'mensual', label: '🗓 Mensual' };
+}
+function pmRecurrenceDay(paymentDay) {
+  const s = (paymentDay || '').toLowerCase();
+  const m = s.match(/(\d{1,2})\s*de\s*cada\s*mes/) || s.match(/d[ií]a\s*(\d{1,2})/) || s.match(/^\s*(\d{1,2})\s*$/) || s.match(/primeros?\s*(\d{1,2})/);
+  if (m) return Math.min(28, Math.max(1, parseInt(m[1], 10)));
+  return 1;
+}
+// Estatus de pago del inquilino (al día / próximo / atrasado / sin contrato)
+function pmTenantPayStatus(booking) {
+  if (!booking) return { key: 'sincontrato', label: '💤 Sin contrato', cls: 'text-slate-400 bg-slate-50' };
+  const rec = pmRecurrenceOf(booking.payment_day);
+  if (rec.kind === 'airbnb') return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  const today = new Date();
+  const lastPay = pmLastPaymentOf(booking.id);
+  const monthStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  if (lastPay && (lastPay.paid_at || '') >= monthStart) return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  const day = pmRecurrenceDay(booking.payment_day);
+  const due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
+  const diff = Math.floor((due - today) / 86400000);
+  if (diff < 0) return { key: 'atrasado', label: `🔴 Atrasado ${Math.abs(diff)}d`, cls: 'text-red-700 bg-red-50' };
+  if (diff <= 7) return { key: 'proximo', label: `⏰ Próximo (${diff}d)`, cls: 'text-amber-700 bg-amber-50' };
+  return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+}
+// Fecha esperada del próximo cobro de una reserva activa (para "Próximos cobros")
+function pmNextDueDate(booking) {
+  const rec = pmRecurrenceOf(booking.payment_day);
+  if (rec.kind === 'airbnb') return null;
+  const today = new Date();
+  const day = pmRecurrenceDay(booking.payment_day);
+  let due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
+  if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, Math.min(day, 28));
+  return due;
+}
+
 function pmBookingsInitFilters() {
   if (pmaState.bookingsFiltersLoaded) return;
   pmaState.bookingsFiltersLoaded = true;
@@ -2666,87 +2728,112 @@ function pmActiveBookingOfTenant(tenantId) {
   return act[0] || null;
 }
 
-function pmRenderTenants() {
+function pmTenantsInitFilters() {
+  if (pmaState.tenantsFiltersLoaded) return;
+  pmaState.tenantsFiltersLoaded = true;
+  try {
+    const g = (k) => { const v = localStorage.getItem(k); return (v === null || v === '') ? null : v; };
+    if (localStorage.getItem('pm_inquilinos_filter_status') !== null) pmaState.tenantsFilter = localStorage.getItem('pm_inquilinos_filter_status') || 'activos';
+    pmaState.tenantsFilterProperty = g('pm_inquilinos_filter_property');
+    pmaState.tenantsFilterType = g('pm_inquilinos_filter_type');
+    if (localStorage.getItem('pm_inquilinos_filter_search') !== null) pmaState.tenantsSearch = localStorage.getItem('pm_inquilinos_filter_search') || '';
+  } catch (e) {}
+}
+function pmTenantsSetFilter(key, value) {
+  const map = { status: 'tenantsFilter', property: 'tenantsFilterProperty', type: 'tenantsFilterType' };
+  pmaState[map[key]] = value;
+  try { localStorage.setItem('pm_inquilinos_filter_' + key, value == null ? '' : value); } catch (e) {}
+  pmRender();
+}
+window.pmTenantsSetFilter = pmTenantsSetFilter;
+function pmTenantsClearFilters() {
+  pmaState.tenantsFilter = 'activos'; pmaState.tenantsFilterProperty = null; pmaState.tenantsFilterType = null; pmaState.tenantsSearch = '';
+  try { ['status','property','type','search'].forEach(k => localStorage.removeItem('pm_inquilinos_filter_' + k)); } catch (e) {}
+  pmRender();
+}
+window.pmTenantsClearFilters = pmTenantsClearFilters;
+function pmTenantsHasFilters() {
+  return !!(pmaState.tenantsFilterProperty || pmaState.tenantsFilterType || (pmaState.tenantsSearch||'').trim() || (pmaState.tenantsFilter && pmaState.tenantsFilter !== 'activos'));
+}
+function pmTenantsFilteredRows() {
   const filter = pmaState.tenantsFilter || 'activos';
   const q = (pmaState.tenantsSearch || '').toLowerCase().trim();
-
-  // Conjuntos base
+  const propF = pmaState.tenantsFilterProperty, typeF = pmaState.tenantsFilterType;
   const activeBs = pmActiveBookings();
-  const expiringBs = pmExpiringIn(30);
-  const lateBs = pmLateBookings();
-  const expiringIds = new Set(expiringBs.map(b => b.id));
-  const lateIds = new Set(lateBs.map(b => b.id));
+  const expiringIds = new Set(pmExpiringIn(30).map(b => b.id));
+  const lateIds = new Set(pmLateBookings().map(b => b.id));
   const activeTenantIds = new Set(activeBs.map(b => b.tenant_id).filter(Boolean));
-
-  // Inquilinos históricos: tienen reservas pero ninguna activa
-  const historicTenants = pmaState.tenants.filter(t =>
-    !activeTenantIds.has(t.id) && pmaState.bookings.some(b => b.tenant_id === t.id));
-
-  const counters = {
-    activos: activeBs.length,
-    expiring: expiringBs.length,
-    late: lateBs.length,
-    historico: historicTenants.length
-  };
-
-  // Construir filas: una por reserva activa (+ históricos cuando aplica)
-  let rows = []; // { tenant, booking }
-  if (filter === 'historico') {
-    rows = historicTenants.map(t => ({ tenant: t, booking: null }));
-  } else {
+  const historicTenants = pmaState.tenants.filter(t => !activeTenantIds.has(t.id) && pmaState.bookings.some(b => b.tenant_id === t.id));
+  let rows;
+  if (filter === 'historico') rows = historicTenants.map(t => ({ tenant: t, booking: null }));
+  else {
     let bs = activeBs;
     if (filter === 'expiring') bs = activeBs.filter(b => expiringIds.has(b.id));
     else if (filter === 'late') bs = activeBs.filter(b => lateIds.has(b.id));
     rows = bs.map(b => ({ tenant: pmaState.tenants.find(t => t.id === b.tenant_id) || null, booking: b }));
     if (filter === 'todos') rows = rows.concat(historicTenants.map(t => ({ tenant: t, booking: null })));
   }
-
-  // Búsqueda por nombre / email
-  if (q) {
-    rows = rows.filter(({ tenant, booking }) => {
-      const t = tenant || {};
-      const p = booking ? pmaState.properties.find(x => x.id === booking.property_id) : null;
-      return ((t.full_name||'').toLowerCase().includes(q)
-           || (t.email||'').toLowerCase().includes(q)
-           || (t.phone||'').toLowerCase().includes(q)
-           || (p?.name||'').toLowerCase().includes(q));
-    });
-  }
-
-  // Orden: atrasados primero, luego por días restantes asc
+  if (propF) rows = rows.filter(r => r.booking && r.booking.property_id === propF);
+  if (typeF) rows = rows.filter(r => { if (!r.booking) return false; const u = pmaState.units.find(x => x.id === r.booking.unit_id); return u && u.unit_type === typeF; });
+  if (q) rows = rows.filter(({ tenant, booking }) => {
+    const t = tenant || {}; const p = booking ? pmaState.properties.find(x => x.id === booking.property_id) : null;
+    return ((t.full_name||'').toLowerCase().includes(q) || (t.email||'').toLowerCase().includes(q) || (t.phone||'').toLowerCase().includes(q) || (p?.name||'').toLowerCase().includes(q));
+  });
   rows.sort((a, b) => {
     const sa = pmTenantStatus(a.booking), sb = pmTenantStatus(b.booking);
     const ord = { late: 0, expiring: 1, aldia: 2, historico: 3 };
     if (ord[sa.key] !== ord[sb.key]) return ord[sa.key] - ord[sb.key];
-    const da = pmDaysLeft(a.booking?.end_date), db = pmDaysLeft(b.booking?.end_date);
-    return (da ?? 99999) - (db ?? 99999);
+    return (pmDaysLeft(a.booking?.end_date) ?? 99999) - (pmDaysLeft(b.booking?.end_date) ?? 99999);
   });
+  return rows;
+}
+function pmTenantsListHtml() {
+  const rows = pmTenantsFilteredRows();
+  return rows.length ? `<div class="space-y-2">${rows.map(pmRenderTenantCard).join('')}</div>`
+    : `<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Sin inquilinos que matcheen el filtro/búsqueda.</div>`;
+}
+function pmTenantsCountLabel() {
+  const shown = pmTenantsFilteredRows().length, total = pmaState.tenants.length;
+  return pmTenantsHasFilters() ? `Mostrando <strong>${shown}</strong> de ${total} inquilinos` : `${total} en base`;
+}
+function pmTenantsSearchInput(value) {
+  pmaState.tenantsSearch = value;
+  try { localStorage.setItem('pm_inquilinos_filter_search', value || ''); } catch (e) {}
+  clearTimeout(window.__pmTenSearchT);
+  window.__pmTenSearchT = setTimeout(() => {
+    const list = document.getElementById('pm-inq-list'); if (list) list.innerHTML = pmTenantsListHtml();
+    const cnt = document.getElementById('pm-inq-count'); if (cnt) cnt.innerHTML = pmTenantsCountLabel();
+    const clr = document.getElementById('pm-inq-clearx'); if (clr) clr.style.display = value ? '' : 'none';
+  }, 150);
+}
+window.pmTenantsSearchInput = pmTenantsSearchInput;
 
-  const filterBtn = (key, label, count, color) => `
-    <button onclick="pmaState.tenantsFilter='${key}';pmRender()" class="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition ${filter===key?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
-      ${label}${count!=null?` <span class="${filter===key?'text-[#d4af37]':'opacity-60'}">${count}</span>`:''}
-    </button>`;
-
-  const counterCard = (label, value, accent) => `
-    <div class="bg-white border border-slate-200 rounded-xl p-3">
-      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div>
-      <div class="text-2xl font-extrabold mt-1 ${accent}">${value}</div>
-    </div>`;
+function pmRenderTenants() {
+  pmTenantsInitFilters();
+  const filter = pmaState.tenantsFilter || 'activos';
+  const propF = pmaState.tenantsFilterProperty, typeF = pmaState.tenantsFilterType;
+  const searchQ = (pmaState.tenantsSearch || '');
+  const counters = { activos: pmActiveBookings().length, expiring: pmExpiringIn(30).length, late: pmLateBookings().length,
+    historico: pmaState.tenants.filter(t => { const ids = new Set(pmActiveBookings().map(b=>b.tenant_id)); return !ids.has(t.id) && pmaState.bookings.some(b=>b.tenant_id===t.id); }).length };
+  const propsWithT = pmaState.properties.filter(p => pmaState.bookings.some(b => b.property_id === p.id && b.tenant_id));
+  const types = ['casa_completa','apartamento','estudio','habitacion'];
+  const counterCard = (label, value, accent) => `<div class="bg-white border border-slate-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div><div class="text-2xl font-extrabold mt-1 ${accent}">${value}</div></div>`;
+  const statusChips = [['todos','Todos',null],['activos','Activos',counters.activos],['expiring','Próximos a salir 30d',counters.expiring],['late','Atrasados',counters.late],['historico','Histórico',counters.historico]];
 
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
-
-    <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div>
         <div class="text-base font-bold text-slate-900">Inquilinos · CRM</div>
-        <div class="text-xs text-slate-500">${pmaState.tenants.length} en base · ${counters.activos} con contrato activo</div>
+        <div class="text-xs text-slate-500" id="pm-inq-count">${pmTenantsCountLabel()}</div>
       </div>
-      <button onclick="pmEditTenant(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" style="border:1px solid #d4af37">+ Nuevo inquilino</button>
+      <div class="flex items-center gap-2">
+        ${pmTenantsHasFilters() ? `<button onclick="pmTenantsClearFilters()" class="text-[11px] text-[#b8941f] hover:underline font-bold">✕ Limpiar filtros</button>` : ''}
+        <button onclick="pmEditTenant(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" style="border:1px solid #d4af37">+ Nuevo inquilino</button>
+      </div>
     </div>
 
-    <!-- Contadores -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
       ${counterCard('Activos', counters.activos, 'text-slate-900')}
       ${counterCard('Próximos a salir', counters.expiring, counters.expiring?'text-amber-600':'text-slate-900')}
@@ -2754,25 +2841,24 @@ function pmRenderTenants() {
       ${counterCard('Histórico', counters.historico, 'text-slate-500')}
     </div>
 
-    <!-- Filtros + búsqueda -->
-    <div class="flex items-center gap-2 flex-wrap">
-      <div class="flex gap-1.5 flex-wrap">
-        ${filterBtn('todos','Todos', null)}
-        ${filterBtn('activos','Activos', counters.activos)}
-        ${filterBtn('expiring','Próximos a salir 30d', counters.expiring)}
-        ${filterBtn('late','Atrasados', counters.late)}
-        ${filterBtn('historico','Histórico', counters.historico)}
-      </div>
-      <div class="relative flex-1 min-w-[180px]">
-        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input oninput="pmaState.tenantsSearch=this.value;pmRender()" value="${q.replace(/"/g,'&quot;')}" placeholder="Buscar por nombre o email…" class="w-full border border-slate-300 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] rounded-full pl-9 pr-9 py-2 text-xs outline-none transition"/>
-        ${q ? `<button onclick="pmaState.tenantsSearch='';pmRender()" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>` : ''}
-      </div>
+    <!-- Buscador estático -->
+    <div class="relative">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="pm-inq-search" oninput="pmTenantsSearchInput(this.value)" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar por nombre, email o casa…" autocomplete="off" class="w-full border border-slate-300 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] rounded-full pl-9 pr-9 py-2 text-xs outline-none transition"/>
+      <button id="pm-inq-clearx" onclick="document.getElementById('pm-inq-search').value='';pmTenantsSearchInput('')" style="display:${searchQ?'':'none'}" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>
     </div>
 
-    <!-- Lista -->
-    ${rows.length ? `<div class="space-y-2">${rows.map(pmRenderTenantCard).join('')}</div>`
-      : `<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Sin inquilinos que matcheen el filtro/búsqueda.</div>`}
+    <!-- Filtros -->
+    <div class="space-y-1.5 text-[10px] font-bold">
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-14 flex-shrink-0">Estado</span>
+        <div class="flex gap-1.5 flex-wrap">${statusChips.map(([k,l,c]) => pmChip(filter===k, `pmTenantsSetFilter('status','${k}')`, l, c)).join('')}</div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-14 flex-shrink-0">Casa</span>
+        <div class="flex gap-1.5 overflow-x-auto pb-1">${pmChip(!propF, "pmTenantsSetFilter('property',null)", 'Todas')}${propsWithT.map(p => pmChip(propF===p.id, `pmTenantsSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,16))).join('')}</div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-14 flex-shrink-0">Tipo</span>
+        <div class="flex gap-1.5 flex-wrap">${pmChip(!typeF, "pmTenantsSetFilter('type',null)", 'Todos')}${types.map(tp => pmChip(typeF===tp, `pmTenantsSetFilter('type','${tp}')`, pmUnitTypeLabel(tp))).join('')}</div></div>
+    </div>
+
+    <div id="pm-inq-list">${pmTenantsListHtml()}</div>
   </div>`;
 }
 
@@ -3174,125 +3260,224 @@ function pmMonthNav(ym, cbExpr) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// TAB · PAGOS (cobranza de rentas)
+// TAB · PAGOS (cobranza de rentas) — recurrencia + estatus + filtros
 // ════════════════════════════════════════════════════════════════
+const PM_AIRTABLE_BASE = 'appzEnsuy4qPT6iHj';
+function pmAirtableLink(externalId, tableId) {
+  if (!externalId) return null;
+  const rec = externalId.replace(/^[a-z]+-/i, '');
+  return `https://airtable.com/${PM_AIRTABLE_BASE}/${tableId}/${rec}`;
+}
+function pmPaymentBooking(p) {
+  if (p.booking_id) { const b = pmaState.bookings.find(x => x.id === p.booking_id); if (b) return b; }
+  if (p.tenant_id) return pmActiveBookingOfTenant(p.tenant_id);
+  return null;
+}
+function pmPaymentsInitFilters() {
+  if (pmaState.payFiltersLoaded) return;
+  pmaState.payFiltersLoaded = true;
+  try {
+    const g = (k) => { const v = localStorage.getItem(k); return (v === null || v === '') ? null : v; };
+    pmaState.payFilterProperty = g('pm_pagos_filter_property');
+    pmaState.payFilterPlatform = g('pm_pagos_filter_platform');
+    pmaState.payRecurrenceFilter = g('pm_pagos_filter_recurrence');
+    if (localStorage.getItem('pm_pagos_filter_status') !== null) pmaState.payStatusFilter = localStorage.getItem('pm_pagos_filter_status') || 'all';
+    if (localStorage.getItem('pm_pagos_filter_period') !== null) pmaState.payPeriod = localStorage.getItem('pm_pagos_filter_period') || 'month';
+    if (localStorage.getItem('pm_pagos_filter_search') !== null) pmaState.paySearch = localStorage.getItem('pm_pagos_filter_search') || '';
+  } catch (e) {}
+}
+function pmPaymentsSetFilter(key, value) {
+  const map = { property: 'payFilterProperty', platform: 'payFilterPlatform', recurrence: 'payRecurrenceFilter', status: 'payStatusFilter', period: 'payPeriod' };
+  pmaState[map[key]] = value;
+  try { localStorage.setItem('pm_pagos_filter_' + key, value == null ? '' : value); } catch (e) {}
+  pmRender();
+}
+window.pmPaymentsSetFilter = pmPaymentsSetFilter;
+function pmPaymentsClearFilters() {
+  pmaState.payFilterProperty = null; pmaState.payFilterPlatform = null; pmaState.payRecurrenceFilter = null;
+  pmaState.payStatusFilter = 'all'; pmaState.payPeriod = 'month'; pmaState.paySearch = '';
+  try { ['property','platform','recurrence','status','period','search'].forEach(k => localStorage.removeItem('pm_pagos_filter_' + k)); } catch (e) {}
+  pmRender();
+}
+window.pmPaymentsClearFilters = pmPaymentsClearFilters;
+function pmPaymentsHasFilters() {
+  return !!(pmaState.payFilterProperty || pmaState.payFilterPlatform || pmaState.payRecurrenceFilter
+    || (pmaState.payStatusFilter && pmaState.payStatusFilter !== 'all') || (pmaState.payPeriod && pmaState.payPeriod !== 'month') || (pmaState.paySearch||'').trim());
+}
+function pmPaymentsFiltered() {
+  const period = pmaState.payPeriod || 'month';
+  const ym = pmCurrentYM(), prevYm = pmYmShift(ym, -1), yr = String(new Date().getFullYear());
+  let pays = pmaState.payments.filter(p => p.type === 'ingreso');
+  if (period === 'month') pays = pays.filter(p => (p.paid_at||'').startsWith(ym));
+  else if (period === 'prev') pays = pays.filter(p => (p.paid_at||'').startsWith(prevYm));
+  else if (period === 'year') pays = pays.filter(p => (p.paid_at||'').startsWith(yr));
+  if (pmaState.payFilterProperty) pays = pays.filter(p => p.property_id === pmaState.payFilterProperty);
+  if (pmaState.payFilterPlatform) pays = pays.filter(p => p.platform === pmaState.payFilterPlatform);
+  if (pmaState.payRecurrenceFilter) pays = pays.filter(p => { const b = pmPaymentBooking(p); return b && pmRecurrenceOf(b.payment_day).kind === pmaState.payRecurrenceFilter; });
+  if (pmaState.payStatusFilter && pmaState.payStatusFilter !== 'all') pays = pays.filter(p => pmTenantPayStatus(pmPaymentBooking(p)).key === pmaState.payStatusFilter);
+  const q = (pmaState.paySearch || '').toLowerCase().trim();
+  if (q) pays = pays.filter(p => `${p.tenant_id ? pmTenantName(p.tenant_id) : ''} ${p.concept||''} ${p.platform||''}`.toLowerCase().includes(q));
+  return pays.sort((a, b) => (b.paid_at||'').localeCompare(a.paid_at||''));
+}
+function pmPaymentsTableHtml() {
+  const pays = pmPaymentsFiltered();
+  return `
+    <table class="w-full text-xs">
+      <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+        <tr>
+          <th class="px-3 py-2 text-left">Fecha</th><th class="px-3 py-2 text-left">Inquilino</th>
+          <th class="px-3 py-2 text-left">Casa</th><th class="px-3 py-2 text-left">Unit</th>
+          <th class="px-3 py-2 text-right">Monto</th><th class="px-3 py-2 text-left">Plataforma</th>
+          <th class="px-3 py-2 text-left">Recurrencia</th><th class="px-3 py-2 text-left">Estatus</th>
+          <th class="px-3 py-2 text-center">Compr.</th><th class="px-3 py-2 text-center">Acc.</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pays.length ? pays.map(p => {
+          const prop = pmaState.properties.find(x => x.id === p.property_id);
+          const unit = pmaState.units.find(x => x.id === p.unit_id);
+          const url = p.proof_url || p.attachment_url;
+          const bk = pmPaymentBooking(p);
+          const rec = bk ? pmRecurrenceOf(bk.payment_day).label : '—';
+          const st = pmTenantPayStatus(bk);
+          const orphan = !p.property_id;
+          const atLink = (p._src === 'expense') ? null : pmAirtableLink(p.external_id, 'tblqJlSgnLNfn34dh');
+          return `<tr class="border-t border-slate-100 ${orphan ? 'bg-red-50' : 'hover:bg-slate-50'}">
+            <td class="px-3 py-2 whitespace-nowrap text-slate-700">${p.paid_at||'—'}</td>
+            <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,24)}</td>
+            <td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan ? `⚠️ Sin propiedad${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir en Airtable'}` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
+            <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
+            <td class="px-3 py-2 text-right font-bold text-emerald-700">$${Number(p.amount||0).toLocaleString()}</td>
+            <td class="px-3 py-2 text-slate-600">${(p.platform||'—').replace(/</g,'&lt;')}</td>
+            <td class="px-3 py-2 text-slate-600 whitespace-nowrap">${rec}</td>
+            <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${st.cls}">${st.label}</span></td>
+            <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
+            <td class="px-3 py-2 text-center">${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="10" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos con estos filtros.</td></tr>`}
+      </tbody>
+    </table>`;
+}
+function pmPaymentsCountLabel() {
+  const shown = pmPaymentsFiltered().length;
+  const total = pmaState.payments.filter(p => p.type === 'ingreso').length;
+  return pmPaymentsHasFilters() ? `Mostrando <strong>${shown}</strong> de ${total} pagos` : `${shown} pagos`;
+}
+function pmPaymentsSearchInput(value) {
+  pmaState.paySearch = value;
+  try { localStorage.setItem('pm_pagos_filter_search', value || ''); } catch (e) {}
+  clearTimeout(window.__pmPaySearchT);
+  window.__pmPaySearchT = setTimeout(() => {
+    const list = document.getElementById('pm-pay-list'); if (list) list.innerHTML = pmPaymentsTableHtml();
+    const cnt = document.getElementById('pm-pay-count'); if (cnt) cnt.innerHTML = pmPaymentsCountLabel();
+    const clr = document.getElementById('pm-pay-clearx'); if (clr) clr.style.display = value ? '' : 'none';
+  }, 150);
+}
+window.pmPaymentsSearchInput = pmPaymentsSearchInput;
+
 function pmRenderPayments() {
-  const ym = pmaState.payMonth || pmCurrentYM();
+  pmPaymentsInitFilters();
+  const ym = pmCurrentYM();
+  const now = new Date();
   const propFilter = pmaState.payFilterProperty;
-  const platFilter = pmaState.payFilterPlatform;
 
-  // Pagos (ingresos) del mes
-  let pays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym));
-  // Plataformas presentes (para chips)
-  const platforms = [...new Set(pmaState.payments.filter(p => p.type==='ingreso' && p.platform).map(p => p.platform))].sort();
-  if (propFilter) pays = pays.filter(p => p.property_id === propFilter);
-  if (platFilter) pays = pays.filter(p => p.platform === platFilter);
-  pays = [...pays].sort((a,b) => (b.paid_at||'').localeCompare(a.paid_at||''));
-
-  const cobrado = pays.reduce((s,p) => s + Number(p.amount||0), 0);
-
-  // Leases activos → renta esperada + cobranza
+  // Cards del mes actual (snapshot)
+  const monthPays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym) && (!propFilter || p.property_id === propFilter));
+  const cobrado = monthPays.reduce((s,p) => s + Number(p.amount||0), 0);
   const activeBs = pmActiveBookings().filter(b => !propFilter || b.property_id === propFilter);
-  const expected = activeBs.reduce((s,b) => s + pmMonthlyRent(b), 0);
-  const paidLeaseIds = new Set();
-  activeBs.forEach(b => {
-    const has = pmaState.payments.some(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym) &&
-      (p.booking_id === b.id || (b.tenant_id && p.tenant_id === b.tenant_id)));
-    if (has) paidLeaseIds.add(b.id);
-  });
-  const leasesPaid = paidLeaseIds.size;
-  const pendiente = Math.max(0, expected - cobrado);
-  const tasa = activeBs.length ? Math.round(100 * leasesPaid / activeBs.length) : 0;
+  const atrasados = activeBs.filter(b => pmTenantPayStatus(b).key === 'atrasado');
 
-  // Próximos pagos en 7 días: leases activos no pagados cuyo día de pago cae en [hoy, hoy+7]
-  const now = new Date(); const in7 = new Date(now); in7.setDate(in7.getDate()+7);
-  const proximos = activeBs.filter(b => {
-    if (paidLeaseIds.has(b.id)) return false;
-    let day = parseInt((b.payment_day||'').replace(/\D/g,''), 10);
-    if (!day || day < 1 || day > 28) day = b.start_date ? new Date(b.start_date).getDate() : 1;
-    const cand = new Date(now.getFullYear(), now.getMonth(), day);
-    if (cand < now) cand.setMonth(cand.getMonth()+1);
-    return cand >= now && cand <= in7;
-  }).length;
+  // Próximos cobros (7 días): activos no pagados este mes con próximo vencimiento ≤7d
+  const proximosList = activeBs.filter(b => {
+    const due = pmNextDueDate(b); if (!due) return false;
+    const diff = Math.floor((due - now) / 86400000);
+    if (!(diff >= 0 && diff <= 7)) return false;
+    const paid = pmaState.payments.some(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym) && (p.booking_id===b.id || (b.tenant_id && p.tenant_id===b.tenant_id)));
+    return !paid;
+  }).sort((a,b) => pmNextDueDate(a) - pmNextDueDate(b));
 
-  const platLabel = (p) => (p||'—');
-  const card = (label, value, sub, accent) => `
-    <div class="bg-white border border-slate-200 rounded-xl p-4">
-      <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div>
-      <div class="text-2xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>
-      ${sub?`<div class="text-[11px] text-slate-500 mt-0.5">${sub}</div>`:''}
-    </div>`;
+  const platforms = [...new Set(pmaState.payments.filter(p => p.type==='ingreso' && p.platform).map(p => p.platform))].sort();
+  const propsWithPay = pmaState.properties.filter(p => pmaState.payments.some(x => x.type==='ingreso' && x.property_id === p.id));
+  const card = (label, value, sub, accent) => `<div class="bg-white border border-slate-200 rounded-xl p-4"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div><div class="text-2xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>${sub?`<div class="text-[11px] text-slate-500 mt-0.5">${sub}</div>`:''}</div>`;
+  const searchQ = (pmaState.paySearch || '');
+  const statF = pmaState.payStatusFilter || 'all';
+  const recF = pmaState.payRecurrenceFilter;
+  const periodF = pmaState.payPeriod || 'month';
 
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
-
-    <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div>
-        <div class="text-base font-bold text-slate-900">Pagos · ${pmYmLabel(ym)}</div>
-        <div class="text-xs text-slate-500">${pays.length} pagos registrados · ${leasesPaid}/${activeBs.length} leases cobrados</div>
+        <div class="text-base font-bold text-slate-900">Pagos · cobranza</div>
+        <div class="text-xs text-slate-500" id="pm-pay-count">${pmPaymentsCountLabel()}</div>
       </div>
       <div class="flex items-center gap-2">
-        ${pmMonthNav(ym, 'pmSetPayMonth(%V%)')}
+        ${pmPaymentsHasFilters() ? `<button onclick="pmPaymentsClearFilters()" class="text-[11px] text-[#b8941f] hover:underline font-bold">✕ Limpiar filtros</button>` : ''}
         <button onclick="pmPickLeaseForPayment()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" style="border:1px solid #d4af37">+ Registrar pago</button>
       </div>
     </div>
 
-    <!-- Cards -->
+    <!-- Próximos cobros (7 días) -->
+    ${proximosList.length ? `
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+        <div class="text-[11px] uppercase font-bold text-amber-700 tracking-wider mb-2">⏰ Próximos cobros (7 días) · ${proximosList.length}</div>
+        <div class="flex gap-2 overflow-x-auto pb-1">
+          ${proximosList.map(b => {
+            const prop = pmaState.properties.find(x => x.id === b.property_id);
+            const unit = pmaState.units.find(x => x.id === b.unit_id);
+            const due = pmNextDueDate(b);
+            const t = pmaState.tenants.find(x => x.id === b.tenant_id);
+            const phone = (t?.phone||'').replace(/\D/g,'');
+            return `<div class="bg-white border border-amber-200 rounded-lg p-2.5 min-w-[210px] flex-shrink-0">
+              <div class="text-sm font-bold text-slate-800 truncate">${pmTenantName(b.tenant_id).replace(/</g,'&lt;')}</div>
+              <div class="text-[10px] text-slate-500 truncate">🏠 ${(prop?.name||'—').replace(/</g,'&lt;').slice(0,20)} · 🛏 ${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</div>
+              <div class="text-[11px] text-slate-600 mt-1">📅 ${due.toISOString().slice(0,10)} · <strong class="text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</strong> · ${pmRecurrenceOf(b.payment_day).label}</div>
+              <div class="flex gap-1.5 mt-1.5">
+                <button onclick="pmMarkPayment('${b.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1 rounded">Marcar pagado</button>
+                ${phone ? `<a href="https://wa.me/${phone}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs">💬</a>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
+
+    <!-- 4 cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-      ${card('Cobrado este mes', pmMoney(cobrado), `Esperado ${pmMoney(expected)}`, 'text-emerald-700')}
-      ${card('Pendiente este mes', pmMoney(pendiente), `${activeBs.length-leasesPaid} leases sin cobrar`, pendiente>0?'text-amber-600':'text-slate-900')}
-      ${card('Próximos pagos 7 días', proximos, 'leases por vencer', proximos>0?'text-amber-600':'text-slate-900')}
-      ${card('Tasa de cobro', tasa+'%', `${leasesPaid} de ${activeBs.length} leases`, tasa>=80?'text-emerald-700':tasa>=50?'text-amber-600':'text-red-600')}
+      ${card('Ingresos del mes', pmMoney(cobrado), pmYmLabel(ym), 'text-emerald-700')}
+      ${card('Pagos registrados', monthPays.length, 'este mes')}
+      ${card('Pagos atrasados', atrasados.length, 'inquilinos', atrasados.length?'text-red-600':'text-slate-900')}
+      ${card('Próximos 7 días', proximosList.length, 'por cobrar', proximosList.length?'text-amber-600':'text-slate-900')}
+    </div>
+
+    <!-- Buscador estático -->
+    <div class="relative">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="pm-pay-search" oninput="pmPaymentsSearchInput(this.value)" value="${searchQ.replace(/"/g,'&quot;')}" placeholder="Buscar por inquilino, concepto o plataforma…" autocomplete="off" class="w-full border border-slate-300 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] rounded-full pl-9 pr-9 py-2 text-xs outline-none transition"/>
+      <button id="pm-pay-clearx" onclick="document.getElementById('pm-pay-search').value='';pmPaymentsSearchInput('')" style="display:${searchQ?'':'none'}" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>
     </div>
 
     <!-- Filtros -->
-    <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
-      <select onchange="pmaState.payFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
-        <option value="">🏠 Todas las casas</option>
-        ${pmaState.properties.map(p => `<option value="${p.id}" ${propFilter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
-      </select>
-      <div class="flex gap-1.5 flex-wrap text-[10px] font-bold">
-        <button onclick="pmaState.payFilterPlatform=null;pmRender()" class="px-2.5 py-1 rounded-full ${!platFilter?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">Todas</button>
-        ${platforms.map(pl => `<button onclick="pmaState.payFilterPlatform='${pl}';pmRender()" class="px-2.5 py-1 rounded-full ${platFilter===pl?'bg-[#d4af37] text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${platLabel(pl).replace(/</g,'&lt;')}</button>`).join('')}
-      </div>
+    <div class="space-y-1.5 text-[10px] font-bold">
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Estatus</span><div class="flex gap-1.5 flex-wrap">
+        ${[['all','Todos'],['aldia','Al día'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['sincontrato','Sin contrato']].map(([k,l]) => pmChip(statF===k, `pmPaymentsSetFilter('status','${k}')`, l)).join('')}
+      </div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Casa</span><div class="flex gap-1.5 overflow-x-auto pb-1">
+        ${pmChip(!propFilter, "pmPaymentsSetFilter('property',null)", 'Todas')}${propsWithPay.map(p => pmChip(propFilter===p.id, `pmPaymentsSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,16))).join('')}
+      </div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Recurr.</span><div class="flex gap-1.5 flex-wrap">
+        ${pmChip(!recF, "pmPaymentsSetFilter('recurrence',null)", 'Todas')}${[['mensual','🗓 Mensual'],['quincenal','⏱ Quincenal'],['airbnb','🏖 Airbnb']].map(([k,l]) => pmChip(recF===k, `pmPaymentsSetFilter('recurrence','${k}')`, l)).join('')}
+      </div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Plataf.</span><div class="flex gap-1.5 flex-wrap">
+        ${pmChip(!pmaState.payFilterPlatform, "pmPaymentsSetFilter('platform',null)", 'Todas')}${platforms.map(pl => pmChip(pmaState.payFilterPlatform===pl, `pmPaymentsSetFilter('platform','${pl}')`, (pl||'').replace(/</g,'&lt;'))).join('')}
+      </div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Mes</span><div class="flex gap-1.5 flex-wrap">
+        ${[['month','Actual'],['prev','Anterior'],['year','Año'],['all','Todo']].map(([k,l]) => pmChip(periodF===k, `pmPaymentsSetFilter('period','${k}')`, l)).join('')}
+      </div></div>
     </div>
 
     <!-- Tabla -->
-    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <table class="w-full text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
-          <tr>
-            <th class="px-3 py-2 text-left">Fecha</th>
-            <th class="px-3 py-2 text-left">Inquilino</th>
-            <th class="px-3 py-2 text-left">Casa</th>
-            <th class="px-3 py-2 text-left">Unit</th>
-            <th class="px-3 py-2 text-right">Monto</th>
-            <th class="px-3 py-2 text-left">Plataforma</th>
-            <th class="px-3 py-2 text-center">Compr.</th>
-            <th class="px-3 py-2 text-center">Acc.</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${pays.length ? pays.map(p => {
-            const prop = pmaState.properties.find(x => x.id === p.property_id);
-            const unit = pmaState.units.find(x => x.id === p.unit_id);
-            const url = p.proof_url || p.attachment_url;
-            return `<tr class="border-t border-slate-100 hover:bg-slate-50">
-              <td class="px-3 py-2 whitespace-nowrap text-slate-700">${p.paid_at||'—'}</td>
-              <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,28)}</td>
-              <td class="px-3 py-2 text-slate-600">${(prop?.name||'—').replace(/</g,'&lt;').slice(0,20)}</td>
-              <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
-              <td class="px-3 py-2 text-right font-bold text-emerald-700">$${Number(p.amount||0).toLocaleString()}</td>
-              <td class="px-3 py-2 text-slate-600">${(p.platform||'—').replace(/</g,'&lt;')}</td>
-              <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
-              <td class="px-3 py-2 text-center">${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
-            </tr>`;
-          }).join('') : `<tr><td colspan="8" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos en ${pmYmLabel(ym)}.</td></tr>`}
-        </tbody>
-      </table>
-    </div>
+    <div id="pm-pay-list" class="bg-white border border-slate-200 rounded-xl overflow-x-auto">${pmPaymentsTableHtml()}</div>
   </div>`;
 }
 function pmSetPayMonth(ym) { pmaState.payMonth = ym; pmRender(); }
@@ -3338,30 +3523,85 @@ function pmRenderExpenses() {
   </div>`;
 }
 
+// Gráfico de torta SVG por categoría
+function pmPieChart(entries, size = 150) {
+  const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+  const colors = ['#d4af37','#10b981','#3b82f6','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#64748b','#a855f7','#14b8a6'];
+  let acc = 0; const cx = size/2, cy = size/2, r = size/2 - 2;
+  const arcs = entries.map(([cat, val], i) => {
+    const a0 = acc/total*2*Math.PI - Math.PI/2; acc += val; const a1 = acc/total*2*Math.PI - Math.PI/2;
+    if (entries.length === 1) return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}"><title>${cat}: ${pmMoney(val)}</title></circle>`;
+    const x0 = cx + r*Math.cos(a0), y0 = cy + r*Math.sin(a0), x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const large = (a1 - a0) > Math.PI ? 1 : 0;
+    return `<path d="M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r},${r} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z" fill="${colors[i%colors.length]}"><title>${(cat||'').replace(/</g,'&lt;')}: ${pmMoney(val)}</title></path>`;
+  }).join('');
+  const legend = entries.slice(0, 8).map(([cat, val], i) => `<div class="flex items-center gap-1.5 text-[10px]"><span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${colors[i%colors.length]}"></span><span class="text-slate-600 truncate">${(cat||'').replace(/</g,'&lt;')}</span><span class="ml-auto font-bold text-slate-700 whitespace-nowrap">${pmMoney(val)}</span></div>`).join('');
+  return `<div class="flex items-center gap-4"><svg viewBox="0 0 ${size} ${size}" style="width:${size}px;height:${size}px;flex-shrink:0">${arcs}</svg><div class="flex-1 space-y-1 min-w-0">${legend || '<div class="text-xs text-slate-400 italic">Sin datos.</div>'}</div></div>`;
+}
+
+function pmExpensesSetFilter(key, value) {
+  const map = { property: 'expFilterProperty', subcat: 'expFilterSubcat', status: 'expStatusFilter' };
+  pmaState[map[key]] = value;
+  try { localStorage.setItem('pm_gastos_filter_' + key, value == null ? '' : value); } catch (e) {}
+  pmRender();
+}
+window.pmExpensesSetFilter = pmExpensesSetFilter;
+function pmExpensesInitFilters() {
+  if (pmaState.expFiltersLoaded) return;
+  pmaState.expFiltersLoaded = true;
+  try {
+    const g = (k) => { const v = localStorage.getItem(k); return (v === null || v === '') ? null : v; };
+    pmaState.expFilterProperty = g('pm_gastos_filter_property');
+    pmaState.expFilterSubcat = g('pm_gastos_filter_subcat');
+    if (localStorage.getItem('pm_gastos_filter_status') !== null) pmaState.expStatusFilter = localStorage.getItem('pm_gastos_filter_status') || 'all';
+  } catch (e) {}
+}
+function pmExpensesClearFilters() {
+  pmaState.expFilterProperty = null; pmaState.expFilterSubcat = null; pmaState.expStatusFilter = 'all';
+  try { ['property','subcat','status'].forEach(k => localStorage.removeItem('pm_gastos_filter_' + k)); } catch (e) {}
+  pmRender();
+}
+window.pmExpensesClearFilters = pmExpensesClearFilters;
+
 // ── Sub-tab A: Gastos por Casa (house + cleaning) ──
 function pmRenderHouseExpenses() {
+  pmExpensesInitFilters();
   const ym = pmaState.expMonth || pmCurrentYM();
   const propFilter = pmaState.expFilterProperty;
   const subcatFilter = pmaState.expFilterSubcat;
+  const statusFilter = pmaState.expStatusFilter || 'all';
   const houseExp = pmaState.expenses.filter(e => ['house','cleaning'].includes(e.category));
 
   let rows = houseExp.filter(e => (e.expense_date||'').startsWith(ym));
   const subcats = [...new Set(houseExp.map(e => e.subcategory).filter(Boolean))].sort();
   if (propFilter) rows = rows.filter(e => e.property_id === propFilter);
   if (subcatFilter) rows = rows.filter(e => e.subcategory === subcatFilter);
+  if (statusFilter === 'paid') rows = rows.filter(e => e.paid);
+  else if (statusFilter === 'pending') rows = rows.filter(e => !e.paid);
   rows = [...rows].sort((a,b) => (b.expense_date||'').localeCompare(a.expense_date||''));
 
+  const monthAll = houseExp.filter(e => (e.expense_date||'').startsWith(ym));
   const totalMonth = rows.reduce((s,e) => s + Number(e.amount||0), 0);
   const paidSum = rows.filter(e => e.paid).reduce((s,e) => s + Number(e.amount||0), 0);
   const pendSum = totalMonth - paidSum;
+  // Sin casa
+  const orphanSum = monthAll.filter(e => !e.property_id).reduce((s,e) => s + Number(e.amount||0), 0);
+  const orphanCount = monthAll.filter(e => !e.property_id).length;
   // Por casa este mes
   const byProp = {};
-  houseExp.filter(e => (e.expense_date||'').startsWith(ym)).forEach(e => {
-    byProp[e.property_id] = (byProp[e.property_id]||0) + Number(e.amount||0);
-  });
+  monthAll.forEach(e => { if (e.property_id) byProp[e.property_id] = (byProp[e.property_id]||0) + Number(e.amount||0); });
   const propEntries = Object.entries(byProp).sort((a,b) => b[1]-a[1]);
   const topProp = propEntries[0];
-  const avgPerHouse = propEntries.length ? totalMonth / propEntries.length : 0;
+  // Top categorías + pie
+  const byCat = {};
+  monthAll.forEach(e => { const k = e.subcategory || '(otro)'; byCat[k] = (byCat[k]||0) + Number(e.amount||0); });
+  const catEntries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+  const top3 = catEntries.slice(0,3);
+  // Tendencia vs mes anterior
+  const prevYm = pmYmShift(ym, -1);
+  const prevTotal = houseExp.filter(e => (e.expense_date||'').startsWith(prevYm)).reduce((s,e) => s + Number(e.amount||0), 0);
+  const monthTotalAll = monthAll.reduce((s,e) => s + Number(e.amount||0), 0);
+  const trendPct = prevTotal ? Math.round((monthTotalAll - prevTotal)/prevTotal*100) : (monthTotalAll>0?100:0);
 
   const card = (label, value, sub2, accent) => `
     <div class="bg-white border border-slate-200 rounded-xl p-4">
@@ -3369,36 +3609,53 @@ function pmRenderHouseExpenses() {
       <div class="text-xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>
       ${sub2?`<div class="text-[11px] text-slate-500 mt-0.5">${sub2}</div>`:''}
     </div>`;
+  const hasF = propFilter || subcatFilter || statusFilter !== 'all';
 
   return `
   <div class="space-y-3">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div class="text-sm font-bold text-slate-900">Gastos por Casa · ${pmYmLabel(ym)}</div>
       <div class="flex items-center gap-2">
+        ${hasF ? `<button onclick="pmExpensesClearFilters()" class="text-[11px] text-[#b8941f] hover:underline font-bold">✕ Limpiar</button>` : ''}
         ${pmMonthNav(ym, 'pmSetExpMonth(%V%)')}
         <button onclick="pmEditExpense(null,'house')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Registrar gasto</button>
       </div>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-      ${card('Gasto del mes', pmMoney(totalMonth), `${rows.length} movimientos`, 'text-red-600')}
-      ${card('Promedio por casa', pmMoney(avgPerHouse), `${propEntries.length} casas con gasto`)}
-      ${card('Casa con mayor gasto', topProp?pmPropertyName(topProp[0]).slice(0,16):'—', topProp?pmMoney(topProp[1]):'')}
-      ${card('Pagado vs pendiente', pmMoney(paidSum), `pendiente ${pmMoney(pendSum)}`, pendSum>0?'text-amber-600':'text-emerald-700')}
+      ${card('Gasto del mes', pmMoney(monthTotalAll), `${monthAll.length} movimientos`, 'text-red-600')}
+      ${card('Gastos sin casa', pmMoney(orphanSum), `${orphanCount} ${orphanCount===1?'registro':'registros'} a corregir`, orphanSum>0?'text-red-600':'text-emerald-700')}
+      ${card('Top 3 categorías', top3.length?pmMoney(top3.reduce((s,[,v])=>s+v,0)):'—', top3.map(([c])=>c).join(', ').slice(0,28)||'—')}
+      ${card('Tendencia vs mes ant.', (trendPct>=0?'+':'')+trendPct+'%', `ant. ${pmMoney(prevTotal)}`, trendPct>0?'text-red-600':'text-emerald-700')}
     </div>
 
-    <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
-      <select onchange="pmaState.expFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
-        <option value="">🏠 Todas las casas</option>
-        ${pmaState.properties.map(p => `<option value="${p.id}" ${propFilter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}
-      </select>
-      <select onchange="pmaState.expFilterSubcat=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
-        <option value="">📂 Todas las categorías</option>
-        ${subcats.map(s => `<option value="${s}" ${subcatFilter===s?'selected':''}>${(s||'').replace(/</g,'&lt;')}</option>`).join('')}
-      </select>
+    <div class="grid lg:grid-cols-2 gap-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Desglose por categoría</div>
+        ${pmPieChart(catEntries)}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Pagado vs pendiente (filtrado)</div>
+        <div class="text-2xl font-extrabold text-emerald-700">${pmMoney(paidSum)} <span class="text-sm text-slate-400 font-normal">pagado</span></div>
+        <div class="text-sm font-bold ${pendSum>0?'text-amber-600':'text-slate-400'} mt-1">${pmMoney(pendSum)} pendiente</div>
+        ${topProp?`<div class="text-[11px] text-slate-500 mt-2">Casa con mayor gasto: <strong>${pmPropertyName(topProp[0]).replace(/</g,'&lt;').slice(0,20)}</strong> · ${pmMoney(topProp[1])}</div>`:''}
+      </div>
     </div>
 
-    ${pmExpenseTable(rows, true)}
+    <!-- Filtros -->
+    <div class="space-y-1.5 text-[10px] font-bold">
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Casa</span><div class="flex gap-1.5 overflow-x-auto pb-1">
+        ${pmChip(!propFilter, "pmExpensesSetFilter('property',null)", 'Todas')}${pmaState.properties.filter(p=>houseExp.some(e=>e.property_id===p.id)).map(p => pmChip(propFilter===p.id, `pmExpensesSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,16))).join('')}
+      </div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Categoría</span><div class="flex gap-1.5 overflow-x-auto pb-1">
+        ${pmChip(!subcatFilter, "pmExpensesSetFilter('subcat',null)", 'Todas')}${subcats.map(s => pmChip(subcatFilter===s, `pmExpensesSetFilter('subcat','${(s||'').replace(/'/g,"\\'")}')`, (s||'').replace(/</g,'&lt;').slice(0,16))).join('')}
+      </div></div>
+      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Estatus</span><div class="flex gap-1.5 flex-wrap">
+        ${[['all','Todos'],['paid','Pagado'],['pending','Pendiente']].map(([k,l]) => pmChip(statusFilter===k, `pmExpensesSetFilter('status','${k}')`, l)).join('')}
+      </div></div>
+    </div>
+
+    ${pmExpenseTable(rows, true, true)}
   </div>`;
 }
 
@@ -3488,7 +3745,7 @@ function pmLineChart(series) {
 }
 
 // Tabla de gastos compartida (withHouse = mostrar columna Casa)
-function pmExpenseTable(rows, withHouse) {
+function pmExpenseTable(rows, withHouse, flagOrphans) {
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <table class="w-full text-xs">
@@ -3508,9 +3765,11 @@ function pmExpenseTable(rows, withHouse) {
           ${rows.length ? rows.map(e => {
             const url = e.invoice_url;
             const note = e.description || e.notes || '';
-            return `<tr class="border-t border-slate-100 hover:bg-slate-50">
+            const orphan = flagOrphans && !e.property_id;
+            const atLink = e.external_id ? pmAirtableLink(e.external_id, e.category==='cleaning'?'tblxfX2no190lvLYo':'tblsihpE31f116RCR') : null;
+            return `<tr class="border-t border-slate-100 ${orphan?'bg-red-50':'hover:bg-slate-50'}">
               <td class="px-3 py-2 whitespace-nowrap text-slate-700">${e.expense_date||'—'}</td>
-              ${withHouse?`<td class="px-3 py-2 text-slate-600">${(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
+              ${withHouse?`<td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan?`⚠️ Sin casa${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir'}`:(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
               <td class="px-3 py-2 text-slate-700">${(e.subcategory||e.category||'—').replace(/</g,'&lt;')}</td>
               <td class="px-3 py-2 text-right font-bold text-red-600">$${Number(e.amount||0).toLocaleString()}</td>
               <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
