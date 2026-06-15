@@ -346,6 +346,7 @@ function pmLastPaymentOf(bookingId) {
 function openPmSystem() {
   pmaState.tab = 'dashboard';   // landing CEO
   pmaState.selectedPropertyId = null;
+  pmEnsureModalNav();
   openModal('🏠 Property Management · Rental Profits', '<div id="pm-root" style="min-height:60vh;">Cargando…</div>');
   // Ensanchar modal
   setTimeout(() => {
@@ -355,6 +356,75 @@ function openPmSystem() {
   pmLoadAll();
 }
 window.openPmSystem = openPmSystem;
+
+// ════════════════════════════════════════════════════════════════
+// Navegación jerárquica del modal: ESC / X / backdrop
+//   - En vista detalle (propiedad/inquilino/unidad/booking) → volver al listado
+//   - En listado → cerrar SOLO el modal (vuelve al dashboard de Rentas)
+//   - NUNCA cierra la sesión (closeModal solo oculta el modal)
+// ════════════════════════════════════════════════════════════════
+function pmIsActive() {
+  const m = document.getElementById('modal');
+  return !!(m && !m.classList.contains('hidden') && document.getElementById('pm-root'));
+}
+function pmCanGoBack() {
+  return !!((pmaState.tab === 'properties' && pmaState.selectedPropertyId)
+    || (pmaState.tab === 'tenants' && pmaState.tenantDetailId)
+    || (pmaState.tab === 'calendar' && (pmaState.calendarSelectedUnitId || pmaState.calendarSelectedBookingId)));
+}
+function pmGoBack() {
+  if (pmaState.tab === 'properties' && pmaState.selectedPropertyId) { pmaState.selectedPropertyId = null; pmRender(); return true; }
+  if (pmaState.tab === 'tenants' && pmaState.tenantDetailId) { pmaState.tenantDetailId = null; pmRender(); return true; }
+  if (pmaState.tab === 'calendar' && pmaState.calendarSelectedBookingId) { pmaState.calendarSelectedBookingId = null; pmRender(); return true; }
+  if (pmaState.tab === 'calendar' && pmaState.calendarSelectedUnitId) { pmaState.calendarSelectedUnitId = null; pmRender(); return true; }
+  return false;
+}
+window.pmGoBack = pmGoBack;
+function pmEnsureModalNav() {
+  if (window.__pmModalNavInit) return;
+  window.__pmModalNavInit = true;
+  const intercept = (e) => {
+    if (!pmIsActive()) return;                       // solo cuando el PM está visible
+    if (document.getElementById('ui-confirm-overlay') || document.getElementById('ui-prompt-overlay')) return;
+    if (pmCanGoBack()) { e.preventDefault(); e.stopImmediatePropagation(); pmGoBack(); }
+    // si no hay a dónde volver → dejar pasar: closeModal() cierra el modal (→ dashboard)
+  };
+  // Capture-phase: corre ANTES de los handlers de app.js (que llaman closeModal()).
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') intercept(e); }, true);
+  document.addEventListener('click', (e) => {
+    if (!pmIsActive()) return;
+    const modal = document.getElementById('modal');
+    const onX = e.target.closest && e.target.closest('#modal-close-x');
+    if (onX || e.target === modal) intercept(e);     // X o click en backdrop
+  }, true);
+}
+
+// Breadcrumb clickeable: Rentas › Property Mgmt › [Tab] › [Detalle]
+function pmTabLabel(t) {
+  return ({ dashboard: 'Resumen', properties: 'Propiedades', calendar: 'Calendario', bookings: 'Reservas',
+    tenants: 'Inquilinos', payments: 'Pagos', expenses: 'Gastos', operations: 'Operación', feeds: 'Feeds', finance: 'Finanzas' })[t] || t;
+}
+function pmBreadcrumb() {
+  const parts = [
+    { label: 'Rentas', onclick: 'closeModal()' },
+    { label: 'Property Mgmt', onclick: "pmSetTab('dashboard')" }
+  ];
+  if (pmaState.tab && pmaState.tab !== 'dashboard') parts.push({ label: pmTabLabel(pmaState.tab), onclick: `pmSetTab('${pmaState.tab}')` });
+  let detail = null;
+  if (pmaState.tab === 'properties' && pmaState.selectedPropertyId) detail = pmPropertyName(pmaState.selectedPropertyId);
+  else if (pmaState.tab === 'tenants' && pmaState.tenantDetailId) detail = pmTenantName(pmaState.tenantDetailId);
+  else if (pmaState.tab === 'calendar' && pmaState.calendarSelectedUnitId) { const u = pmaState.units.find(x => x.id === pmaState.calendarSelectedUnitId); detail = u ? (u.name || u.code) : 'Unidad'; }
+  if (detail) parts.push({ label: detail, current: true });
+  return `<nav class="flex items-center gap-1.5 text-[11px] text-slate-500 mb-2 flex-wrap">
+    ${parts.map((p, i) => {
+      const sep = i > 0 ? '<span class="text-slate-300">›</span>' : '';
+      const txt = (p.label || '').replace(/</g, '&lt;').slice(0, 32);
+      return (i === parts.length - 1)
+        ? `${sep}<span class="font-bold text-slate-800">${txt}</span>`
+        : `${sep}<button onclick="${p.onclick}" class="hover:text-[#b8941f] hover:underline">${txt}</button>`;
+    }).join(' ')}
+  </nav>`;
+}
 
 // ════════════════════════════════════════════════════════════════
 // RENDER ROOT — orquesta el tab activo
@@ -386,6 +456,7 @@ function pmRender() {
   }
   root.innerHTML = `
     <div class="flex flex-col" style="min-height:60vh;">
+      ${pmBreadcrumb()}
       ${pmRenderAlertsBar()}
       <!-- Header con tabs -->
       <div class="border-b border-slate-200 mb-3">
@@ -782,7 +853,7 @@ function pmRenderPropertyCardInline(p) {
           <span class="text-2xl">🏠</span>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <strong class="text-sm text-slate-900 truncate" title="${(p.name||'').replace(/"/g,'&quot;')}">${(p.name||'').replace(/</g,'&lt;')}</strong>
+              <strong class="text-sm text-slate-900 pm-clamp2 pm-property-name" title="${(p.name||'').replace(/"/g,'&quot;')}">${(p.name||'').replace(/</g,'&lt;')}</strong>
               <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase font-bold">${p.status||'activa'}</span>
             </div>
             <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
@@ -2542,7 +2613,7 @@ function pmRenderTenantCard({ tenant, booking }) {
         <div class="flex-1 min-w-0 cursor-pointer" onclick="pmOpenTenantDetail('${t.id}')">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="${st.dot} w-2 h-2 rounded-full"></span>
-            <strong class="text-sm text-slate-900 break-words" title="${(t.full_name||'').replace(/"/g,'&quot;')}">${name}</strong>
+            <strong class="text-sm text-slate-900 pm-clamp2 pm-tenant-name" title="${(t.full_name||'').replace(/"/g,'&quot;')}">${name}</strong>
             <span class="text-[10px] ${st.bg} ${st.txt} px-1.5 py-0.5 rounded font-bold uppercase">${st.label}</span>
             ${t.client_state ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${(t.client_state||'').replace(/</g,'&lt;')}</span>` : ''}
             ${daysBadge}
@@ -3732,7 +3803,7 @@ function pmRenderFinance() {
         <tbody>
           ${rows.length ? rows.map(x => `
             <tr class="border-t border-slate-100 ${marginRowCls(x.margin)}">
-              <td class="px-3 py-2 font-semibold text-slate-800">${(x.property.name||'').replace(/</g,'&lt;').slice(0,28)}<div class="text-[9px] font-normal text-slate-400 uppercase">${(x.property.rental_model||'').replace(/_/g,' ')}</div></td>
+              <td class="px-3 py-2 font-semibold text-slate-800"><div class="pm-clamp2" title="${(x.property.name||'').replace(/"/g,'&quot;')}">${(x.property.name||'').replace(/</g,'&lt;')}</div><div class="text-[9px] font-normal text-slate-400 uppercase">${(x.property.rental_model||'').replace(/_/g,' ')}</div></td>
               <td class="px-3 py-2 text-right text-slate-600">${x.rentable}</td>
               <td class="px-3 py-2 text-right text-slate-600">${Math.round(x.occ*100)}%</td>
               <td class="px-3 py-2 text-right text-emerald-700 font-bold">${pmMoney(x.income)}</td>
