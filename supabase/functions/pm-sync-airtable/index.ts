@@ -362,7 +362,11 @@ Deno.serve(async (req) => {
         address: addr,
         city, state, zip,
         zone: inferZone(getSel(r.fields?.[F.dxc_ubicacion])),
-        rental_model: inferRentalModel(getSel(r.fields?.[F.dxc_modelo])),
+        // rental_model NO se escribe en el sync: lo setea manualmente
+        // pm-rental-model.sql (vocabulario nuevo casa_completa/por_habitaciones/
+        // por_unidades/mixta). Omitirlo del upsert preserva el valor manual.
+        // (Re-habilitar acá sólo cuando Airtable tenga un campo "Modelo de Renta"
+        //  fiable con ese vocabulario.)
         drive_url: r.fields?.[F.dxc_drive] || null,
         status: "activa"
       };

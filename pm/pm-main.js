@@ -214,6 +214,18 @@ function pmUnitsOf(propertyId) {
 function pmBookingsOf(unitId) {
   return pmaState.bookings.filter(b => b.unit_id === unitId);
 }
+// Bookings de una unidad que puede estar "colapsada" (varias unidades físicas
+// en una sola línea de calendario, p.ej. por_habitaciones). Para unidades
+// normales equivale a pmBookingsOf(u.id).
+function pmMergedBookings(unitObj) {
+  const ids = unitObj._mergedUnitIds || [unitObj.id];
+  return ids.length === 1 ? pmBookingsOf(ids[0]) : pmaState.bookings.filter(b => ids.includes(b.unit_id));
+}
+function pmMergedActiveBooking(unitObj, date = new Date()) {
+  const ids = unitObj._mergedUnitIds || [unitObj.id];
+  for (const id of ids) { const a = pmActiveBookingOf(id, date); if (a) return a; }
+  return null;
+}
 function pmActiveBookingOf(unitId, date = new Date()) {
   const d = (typeof date === 'string') ? date : date.toISOString().slice(0,10);
   return pmaState.bookings.find(b =>
@@ -236,6 +248,46 @@ function pmOccupancyOf(propertyId) {
   if (!us.length) return { occupied: 0, total: 0, pct: 0 };
   const occ = us.filter(u => pmActiveBookingOf(u.id)).length;
   return { occupied: occ, total: us.length, pct: Math.round(100 * occ / us.length) };
+}
+// ── Conteo de UNIDADES RENTABLES por modelo de renta (réplica de la vista pm_rentable_units) ──
+//   casa_completa / por_habitaciones → 1 (la casa entera es la unidad rentable)
+//   por_unidades → N (cada estudio/apartamento/unidad)
+//   mixta → 1 (casa principal) + N (estudios/aptos anexos)
+function pmIsRentableSubunit(u) { return /estudio|apart|unidad/i.test(u.name || ''); }
+function pmRentableUnitsOf(propertyId) {
+  const p = pmaState.properties.find(x => x.id === propertyId);
+  const model = p?.rental_model || 'casa_completa';
+  const us = pmUnitsOf(propertyId);
+  if (model === 'por_unidades') return us.filter(pmIsRentableSubunit).length;
+  if (model === 'mixta') return 1 + us.filter(u => /estudio|apart/i.test(u.name || '')).length;
+  return 1; // casa_completa, por_habitaciones, default
+}
+// Unidades rentables OCUPADAS (numerador de ocupación). por_habitaciones/casa_completa
+// cuentan como ocupadas si tienen ≥1 booking activo.
+function pmOccupiedRentableUnitsOf(propertyId) {
+  const p = pmaState.properties.find(x => x.id === propertyId);
+  const model = p?.rental_model || 'casa_completa';
+  const us = pmUnitsOf(propertyId);
+  const anyActive = us.some(u => pmActiveBookingOf(u.id));
+  if (model === 'casa_completa' || model === 'por_habitaciones') return anyActive ? 1 : 0;
+  if (model === 'por_unidades') return us.filter(u => pmIsRentableSubunit(u) && pmActiveBookingOf(u.id)).length;
+  if (model === 'mixta') {
+    const subs = us.filter(u => /estudio|apart/i.test(u.name || ''));
+    const mains = us.filter(u => !/estudio|apart/i.test(u.name || ''));
+    const subOcc = subs.filter(u => pmActiveBookingOf(u.id)).length;
+    const mainOcc = mains.some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
+    return Math.min(mainOcc + subOcc, pmRentableUnitsOf(propertyId));
+  }
+  return anyActive ? 1 : 0;
+}
+// Totales del portafolio (solo propiedades activas)
+function pmTotalRentableUnits() {
+  return pmaState.properties.filter(p => p.status === 'activa')
+    .reduce((s, p) => s + pmRentableUnitsOf(p.id), 0);
+}
+function pmTotalOccupiedRentableUnits() {
+  return pmaState.properties.filter(p => p.status === 'activa')
+    .reduce((s, p) => s + pmOccupiedRentableUnitsOf(p.id), 0);
 }
 function pmFinanceOf(propertyId, monthDate = null) {
   // monthDate: Date|null. null = all-time, else solo el mes específico
@@ -486,10 +538,14 @@ function pmPayrollForMonth(y,m){
     .reduce((s,p)=>s+Number(p.salary||0),0);
 }
 function pmOccupancyAt(date){
+  // Ocupación sobre UNIDADES RENTABLES (no sobre pm_units físicas).
+  // Nota: el numerador/denominador "rentable" usa el booking activo de hoy
+  // (pmActiveBookingOf con default hoy); `date` se mantiene por compatibilidad.
   const active = new Set(pmaState.properties.filter(p=>p.status==='activa').map(p=>p.id));
   const units = pmaState.units.filter(u=>active.has(u.property_id));
-  const occ = units.filter(u=>pmActiveBookingOf(u.id, date)).length;
-  return { occupied: occ, total: units.length, pct: units.length?occ/units.length:0, units };
+  const total = pmTotalRentableUnits();
+  const occ = pmTotalOccupiedRentableUnits();
+  return { occupied: occ, total, pct: total?occ/total:0, units };
 }
 function pmCashflowOf(y,m){
   const pays = pmaState.payments.filter(p=>p.status==='pagado');
@@ -573,8 +629,9 @@ function pmRenderDashboard(){
   const activeProps=pmaState.properties.filter(p=>p.status==='activa');
   const activeBookings=pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
   const activeTenants=new Set(activeBookings.map(b=>b.tenant_id).filter(Boolean)).size;
-  const rented=occ.units.filter(u=>Number(u.target_rent)>0);
-  const avgRent=rented.length?rented.reduce((s,u)=>s+Number(u.target_rent),0)/rented.length:0;
+  const rentableTotal=pmTotalRentableUnits();
+  // Renta promedio / unidad = ingresos del mes / unidades rentables del portafolio
+  const avgRent=rentableTotal?cf.income/rentableTotal:0;
   let gaps=[]; pmaState.units.forEach(u=>{ const bs=pmaState.bookings.filter(b=>b.unit_id===u.id && b.start_date).sort((a,b)=>a.start_date<b.start_date?-1:1); for(let i=1;i<bs.length;i++){ const pe=bs[i-1].end_date, ns=bs[i].start_date; if(pe&&ns&&ns>pe){ const g=Math.round((new Date(ns)-new Date(pe))/86400000); if(g>0&&g<400) gaps.push(g); } } });
   const avgFill=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):null;
 
@@ -652,9 +709,10 @@ function pmRenderDashboard(){
     </div>
 
     <!-- 5 · QUICK STATS -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       ${[
         ['Propiedades activas', activeProps.length],
+        ['Unidades rentables', rentableTotal],
         ['Inquilinos activos', activeTenants],
         ['Renta promedio / unidad', pmMoney(avgRent)],
         ['Días prom. para llenar', avgFill!==null?avgFill+' días':'—']
@@ -1123,7 +1181,7 @@ function pmCalcUnitGaps(unit, year) {
   const dailyRate = (Number(unit.target_rent) || 0) / 30;
   // Construir set de días ocupados
   const occupied = new Array(totalDays).fill(false);
-  const bks = pmBookingsOf(unit.id).filter(b =>
+  const bks = pmMergedBookings(unit).filter(b =>
     b.start_date && ['activo','confirmado','finalizado','vencido'].includes(b.status)
   );
   bks.forEach(b => {
@@ -1284,13 +1342,35 @@ function pmDedupeUnits(units) {
   return Array.from(map.values());
 }
 
+// Colapsa unidades de propiedades 'por_habitaciones'/'casa_completa' a UNA línea
+// de calendario (la casa entera es la unidad rentable). 'por_unidades'/'mixta'
+// muestran sus unidades individuales. La línea colapsada lleva _mergedUnitIds
+// para que sus bookings se agreguen vía pmMergedBookings/pmMergedActiveBooking.
+function pmCollapseForCalendar(units) {
+  const byProp = {};
+  units.forEach(u => { (byProp[u.property_id] = byProp[u.property_id] || []).push(u); });
+  const out = [];
+  Object.keys(byProp).forEach(pid => {
+    const us = byProp[pid];
+    const model = pmaState.properties.find(x => x.id === pid)?.rental_model || 'casa_completa';
+    if ((model === 'por_habitaciones' || model === 'casa_completa') && us.length > 1) {
+      out.push({ ...us[0], _mergedUnitIds: us.map(x => x.id), _collapsed: true,
+        name: model === 'por_habitaciones' ? `Habitaciones (${us.length})` : (us[0].name || us[0].code) });
+    } else {
+      out.push(...us);
+    }
+  });
+  return out;
+}
+
 function pmRenderCalendar() {
   const filter = pmaState.calendarFilterPropertyId;
   let rawUnits = filter
     ? pmUnitsOf(filter)
     : pmaState.units.filter(u => pmaState.properties.some(p => p.id === u.property_id));
-  const allUnits = pmDedupeUnits(rawUnits);
-  const dupesHidden = rawUnits.length - allUnits.length;
+  const deduped = pmDedupeUnits(rawUnits);
+  const dupesHidden = rawUnits.length - deduped.length;   // solo dups reales (no colapsos)
+  const allUnits = pmCollapseForCalendar(deduped);
 
   if (pmaState.calendarSelectedUnitId) {
     const unit = allUnits.find(u => u.id === pmaState.calendarSelectedUnitId)
@@ -1360,7 +1440,7 @@ window.pmCalCollapseAll = pmCalCollapseAll;
 
 function pmRenderListingsSidebar(filteredUnits, totalCount) {
   // Stats globales (sobre todos los listings deduplicados)
-  const occCount = filteredUnits.filter(u => pmActiveBookingOf(u.id)).length;
+  const occCount = filteredUnits.filter(u => pmMergedActiveBooking(u)).length;
   const freeCount = filteredUnits.length - occCount;
   const occFilter = pmaState.calendarOccupancyFilter || 'all';
   const search = (pmaState.calendarListingSearch || '');
@@ -1368,13 +1448,13 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
 
   // Aplica filtro ocupada/libre
   let listingsToShow = filteredUnits;
-  if (occFilter === 'occupied') listingsToShow = filteredUnits.filter(u => pmActiveBookingOf(u.id));
-  else if (occFilter === 'free') listingsToShow = filteredUnits.filter(u => !pmActiveBookingOf(u.id));
+  if (occFilter === 'occupied') listingsToShow = filteredUnits.filter(u => pmMergedActiveBooking(u));
+  else if (occFilter === 'free') listingsToShow = filteredUnits.filter(u => !pmMergedActiveBooking(u));
 
   // Render de cada item (reutilizable)
   const renderItem = (u) => {
     const p = pmaState.properties.find(x => x.id === u.property_id);
-    const active = pmActiveBookingOf(u.id);
+    const active = pmMergedActiveBooking(u);
     const tenant = active ? pmTenantName(active.tenant_id) : null;
     const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
     const platformColors = {contrato_directo:'#10b981',airbnb:'#f43f5e',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
@@ -1417,7 +1497,7 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
       const p = pmaState.properties.find(x => x.id === pid);
       const collapsed = pmaState.calendarCollapsedProps[pid];
       const items = groups[pid];
-      const occ = items.filter(u => pmActiveBookingOf(u.id)).length;
+      const occ = items.filter(u => pmMergedActiveBooking(u)).length;
       const allOcc = occ === items.length && items.length > 0;
       const noneOcc = occ === 0;
       const indicatorColor = allOcc ? 'bg-emerald-500' : (noneOcc ? 'bg-slate-300' : 'bg-amber-400');
@@ -1612,7 +1692,7 @@ function pmRenderTimelineGrid(units) {
       <!-- FILAS DE UNIDADES -->
       ${units.map(unit => {
         const p = pmaState.properties.find(x => x.id === unit.property_id);
-        const bks = pmBookingsOf(unit.id).filter(b => {
+        const bks = pmMergedBookings(unit).filter(b => {
           if (!b.start_date) return false;
           // Mostrar TODAS excepto canceladas (incluye pendientes, reservadas, futuras)
           if (b.status === 'cancelado' || b.status === 'cancelled') return false;
@@ -1815,7 +1895,7 @@ function pmRenderMonthAirbnbStyle(unit, year, month, monthNames) {
   const cells = [];
   for (let i = 0; i < offset; i++) cells.push(null);
   for (let d = 1; d <= daysCount; d++) cells.push(d);
-  const bks = pmBookingsOf(unit.id).filter(b => {
+  const bks = pmMergedBookings(unit).filter(b => {
     if (b.status === 'cancelado' || b.status === 'cancelled') return false;
     if (!b.start_date) return false;
     const s = new Date(b.start_date);
@@ -1955,7 +2035,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
           </div>
         </div>
         ${units.map(unit => {
-          const allBks = pmBookingsOf(unit.id).filter(b => {
+          const allBks = pmMergedBookings(unit).filter(b => {
             // Mostrar TODAS excepto canceladas (incluye pendientes, reservadas, futuras)
           if (b.status === 'cancelado' || b.status === 'cancelled') return false;
             if (!b.start_date) return false;
@@ -3484,13 +3564,16 @@ function pmFinAgg(r) {
   const activeProps = pmaState.properties.filter(p => p.status==='activa');
   const payrollPerProp = activeProps.length ? payroll / activeProps.length : 0;
   const props = activeProps.map(p => {
-    const occ = pmOccupancyOf(p.id);
+    // Ocupación basada en unidades rentables del modelo de renta
+    const rentable = pmRentableUnitsOf(p.id);
+    const occRent = pmOccupiedRentableUnitsOf(p.id);
+    const occ = rentable ? occRent / rentable : 0;
     const pIncome = sum(inc.filter(x => x.property_id===p.id));
     const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house'));
     const pClean = sum(exp.filter(e => e.property_id===p.id && e.category==='cleaning'));
     const pNet = pIncome - pHouse - pClean - payrollPerProp;
     const margin = pIncome > 0 ? pNet / pIncome : 0;
-    return { property: p, occ: occ.pct/100, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, net: pNet, margin };
+    return { property: p, occ, rentable, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, net: pNet, margin };
   });
   return { income, house, cleaning, operational, payroll, net, props, activePropsCount: activeProps.length };
 }
@@ -3531,11 +3614,14 @@ function pmRenderFinance() {
   const activePropIds = new Set(activeProps.map(p=>p.id));
   const units = pmaState.units.filter(u => activePropIds.has(u.property_id));
   const occUnits = units.filter(u => pmActiveBookingOf(u.id));
-  const occPct = units.length ? occUnits.length/units.length : 0;
+  // Ocupación sobre UNIDADES RENTABLES (modelo de renta), no sobre pm_units físicas.
+  const rentableTotal = pmTotalRentableUnits();
+  const occRentable = pmTotalOccupiedRentableUnits();
+  const occPct = rentableTotal ? occRentable/rentableTotal : 0;
   const activeBs = pmActiveBookings().filter(b => activePropIds.has(b.property_id));
   const monthlyRentRoll = activeBs.reduce((s,b)=>s+pmMonthlyRent(b),0);
-  const avgRentRoom = occUnits.length ? monthlyRentRoll/occUnits.length : 0;
-  const maintPerUnit = units.length ? (agg.house+agg.cleaning)/units.length : 0;
+  const avgRentRoom = rentableTotal ? monthlyRentRoll/rentableTotal : 0;
+  const maintPerUnit = rentableTotal ? (agg.house+agg.cleaning)/rentableTotal : 0;
   // ROI mensual ≈ margen neto del período (sin costo de adquisición en el schema)
   const roiMensual = agg.income>0 ? agg.net/agg.income : 0;
   // Días promedio rotación (gap entre reservas consecutivas por unidad)
@@ -3633,6 +3719,7 @@ function pmRenderFinance() {
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
           <tr>
             ${th('name','Casa','left')}
+            ${th('rentable','Uds.')}
             ${th('occ','Ocup.')}
             ${th('income','Ingresos')}
             ${th('house','Gastos Casa')}
@@ -3645,7 +3732,8 @@ function pmRenderFinance() {
         <tbody>
           ${rows.length ? rows.map(x => `
             <tr class="border-t border-slate-100 ${marginRowCls(x.margin)}">
-              <td class="px-3 py-2 font-semibold text-slate-800">${(x.property.name||'').replace(/</g,'&lt;').slice(0,28)}</td>
+              <td class="px-3 py-2 font-semibold text-slate-800">${(x.property.name||'').replace(/</g,'&lt;').slice(0,28)}<div class="text-[9px] font-normal text-slate-400 uppercase">${(x.property.rental_model||'').replace(/_/g,' ')}</div></td>
+              <td class="px-3 py-2 text-right text-slate-600">${x.rentable}</td>
               <td class="px-3 py-2 text-right text-slate-600">${Math.round(x.occ*100)}%</td>
               <td class="px-3 py-2 text-right text-emerald-700 font-bold">${pmMoney(x.income)}</td>
               <td class="px-3 py-2 text-right text-red-600">${pmMoney(x.house)}</td>
@@ -3653,10 +3741,11 @@ function pmRenderFinance() {
               <td class="px-3 py-2 text-right text-slate-500">${pmMoney(x.payrollPro)}</td>
               <td class="px-3 py-2 text-right font-extrabold ${x.net>=0?'text-emerald-700':'text-red-600'}">${pmMoney(x.net)}</td>
               <td class="px-3 py-2 text-right font-bold ${x.margin>0.40?'text-emerald-700':x.margin>=0.20?'text-amber-700':'text-red-600'}">${x.income>0?Math.round(x.margin*100)+'%':'—'}</td>
-            </tr>`).join('') : '<tr><td colspan="8" class="px-3 py-8 text-center text-slate-400 italic">Sin casas activas con datos en el período.</td></tr>'}
+            </tr>`).join('') : '<tr><td colspan="9" class="px-3 py-8 text-center text-slate-400 italic">Sin casas activas con datos en el período.</td></tr>'}
         </tbody>
         ${rows.length ? `<tfoot class="bg-slate-100 font-bold"><tr>
           <td class="px-3 py-2 text-slate-800">TOTAL</td>
+          <td class="px-3 py-2 text-right text-slate-600">${rentableTotal}</td>
           <td class="px-3 py-2 text-right text-slate-600">${Math.round(occPct*100)}%</td>
           <td class="px-3 py-2 text-right text-emerald-700">${pmMoney(agg.income)}</td>
           <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.house)}</td>
@@ -3673,8 +3762,8 @@ function pmRenderFinance() {
     <div>
       <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Métricas clave</div>
       <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
-        ${metric('Ocupación portafolio', Math.round(occPct*100)+'%', `${occUnits.length}/${units.length} unidades`)}
-        ${metric('Renta prom. / hab.', pmMoney(avgRentRoom), 'unidades ocupadas')}
+        ${metric('Ocupación portafolio', Math.round(occPct*100)+'%', `${occRentable}/${rentableTotal} uds. rentables`)}
+        ${metric('Renta prom. / unidad', pmMoney(avgRentRoom), 'uds. rentables')}
         ${metric('Cap rate anualiz.', capRate!=null?Math.round(capRate*100)+'%':'n/d', 'falta valor de compra')}
         ${metric('ROI mensual', agg.income>0?Math.round(roiMensual*100)+'%':'—', 'neto / ingresos')}
         ${metric('Mant. / unidad', pmMoney(maintPerUnit), 'casa+aseo del período')}
@@ -3753,8 +3842,8 @@ function pmFinReport(kind) {
     <div class="kpi"><div class="l">P&L Neto</div><div class="v ${agg.net>=0?'pos':'neg'}">${pmMoney(agg.net)}</div></div>
   </div>`;
   const pnlTable = (rows) => `<table>
-    <thead><tr><th>Casa</th><th>Ocup.</th><th>Ingresos</th><th>Gastos Casa</th><th>Aseo</th><th>Nómina prorr.</th><th>NETO</th><th>% margen</th></tr></thead>
-    <tbody>${rows.map(x=>`<tr><td>${(x.property.name||'').replace(/</g,'&lt;')}</td><td>${Math.round(x.occ*100)}%</td><td>${pmMoney(x.income)}</td><td>${pmMoney(x.house)}</td><td>${pmMoney(x.cleaning)}</td><td>${pmMoney(x.payrollPro)}</td><td class="${x.net>=0?'pos':'neg'}">${pmMoney(x.net)}</td><td>${x.income>0?Math.round(x.margin*100)+'%':'—'}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>Casa</th><th>Uds.</th><th>Ocup.</th><th>Ingresos</th><th>Gastos Casa</th><th>Aseo</th><th>Nómina prorr.</th><th>NETO</th><th>% margen</th></tr></thead>
+    <tbody>${rows.map(x=>`<tr><td>${(x.property.name||'').replace(/</g,'&lt;')}</td><td>${x.rentable}</td><td>${Math.round(x.occ*100)}%</td><td>${pmMoney(x.income)}</td><td>${pmMoney(x.house)}</td><td>${pmMoney(x.cleaning)}</td><td>${pmMoney(x.payrollPro)}</td><td class="${x.net>=0?'pos':'neg'}">${pmMoney(x.net)}</td><td>${x.income>0?Math.round(x.margin*100)+'%':'—'}</td></tr>`).join('')}</tbody>
   </table>`;
   const sorted = [...agg.props].sort((a,b)=>b.net-a.net);
 
