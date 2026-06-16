@@ -238,12 +238,13 @@ async function opGenerateRecurring() {
 // ─── Entry ───
 async function openOpsPlanner(sys) {
   opState.sys = sys;
+  window.pmCurrentPlanner = 'ops';
   // Mutua exclusión con el planner de Limpieza (evita contexto stale → null error)
   if (typeof clState !== 'undefined' && clState) clState.sys = null;
   window._clInSubmodal = false; window._opInSubmodal = false;
   if (!opState.date) opState.date = opDateOnly(new Date());
   await opLoadAll();
-  openModal(`🧰 ${sys.name}`, '<div id="op-root"></div>');
+  openModal(`🔨 ${sys.name}`, '<div id="op-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   opRender();
@@ -270,7 +271,7 @@ async function opRefocusPlanner() {
     if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
       return openOpsPlanner(opState.sys);
     }
-    titleEl.textContent = `🧰 ${opState.sys?.name || 'Cronograma'}`;
+    titleEl.textContent = `🔨 ${opState.sys?.name || 'Cronograma Juan Austin'}`;
     bodyEl.innerHTML = '<div id="op-root"></div>';
     // Restaurar el botón X al comportamiento normal (cerrar modal entero)
     _opRestoreCloseButton();

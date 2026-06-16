@@ -276,12 +276,13 @@ async function clGenerateRecurring() {
 // ─── Entry ───
 async function openCleaningPlanner(sys) {
   clState.sys = sys;
+  window.pmCurrentPlanner = 'cleaning';
   // Mutua exclusión con el planner de Juan (evita contexto stale → null error)
   if (typeof opState !== 'undefined' && opState) opState.sys = null;
   window._opInSubmodal = false; window._clInSubmodal = false;
   if (!clState.date) clState.date = clDateOnly(new Date());
   await clLoadAll();
-  clOpenSubmodal(`🧰 ${sys.name}`, '<div id="op-root"></div>');
+  clOpenSubmodal(`🧹 ${sys.name}`, '<div id="op-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   clRender();
@@ -298,7 +299,7 @@ async function clRefocusPlanner() {
     if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
       return openCleaningPlanner(clState.sys);
     }
-    titleEl.textContent = `🧰 ${clState.sys?.name || 'Cronograma'}`;
+    titleEl.textContent = `🧹 ${clState.sys?.name || 'Cronograma Limpieza'}`;
     bodyEl.innerHTML = '<div id="op-root"></div>';
     // Restaurar el botón X al comportamiento normal
     _clRestoreCloseButton();
@@ -509,6 +510,11 @@ function clRender() {
 
 // ─── Panel Backlog ───
 function clRenderBacklogPanel(backlogByZona) {
+  // Limpieza: idealmente 0 pendientes (las limpiezas se auto-generan desde check-outs)
+  if (!clState.backlog.length) {
+    return `<div class="p-4 text-center text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg m-2">
+      ✓ Sin pendientes.<div class="text-[11px] text-emerald-600 mt-1 font-normal">Las limpiezas se generan automáticamente desde los check-outs.</div></div>`;
+  }
   const search = (clState.backlogSearch || '').toLowerCase().trim();
   const catF = clState.backlogCategoryFilter || 'all';
   const prioF = clState.backlogPriorityFilter || 'all';
