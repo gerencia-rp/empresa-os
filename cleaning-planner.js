@@ -276,6 +276,9 @@ async function clGenerateRecurring() {
 // ─── Entry ───
 async function openCleaningPlanner(sys) {
   clState.sys = sys;
+  // Mutua exclusión con el planner de Juan (evita contexto stale → null error)
+  if (typeof opState !== 'undefined' && opState) opState.sys = null;
+  window._opInSubmodal = false; window._clInSubmodal = false;
   if (!clState.date) clState.date = clDateOnly(new Date());
   await clLoadAll();
   clOpenSubmodal(`🧰 ${sys.name}`, '<div id="op-root"></div>');
@@ -286,18 +289,22 @@ async function openCleaningPlanner(sys) {
 
 // REFOCUS — vuelve al planner SIN cerrar el modal (ver opRefocusPlanner).
 async function clRefocusPlanner() {
-  const titleEl = document.getElementById('modal-title');
-  const bodyEl = document.getElementById('modal-body');
-  const modal = document.getElementById('modal');
-  if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
-    return openCleaningPlanner(clState.sys);
-  }
-  titleEl.textContent = `🧰 ${clState.sys.name}`;
-  bodyEl.innerHTML = '<div id="op-root"></div>';
-  // Restaurar el botón X al comportamiento normal
-  _clRestoreCloseButton();
-  try { await clLoadAll(); } catch (e) { console.warn('clLoadAll on refocus', e); }
-  clRender();
+  try {
+    // Guard: solo actuar si el planner de Limpieza está activo (clState.sys seteado).
+    if (!clState || !clState.sys) return;
+    const titleEl = document.getElementById('modal-title');
+    const bodyEl = document.getElementById('modal-body');
+    const modal = document.getElementById('modal');
+    if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
+      return openCleaningPlanner(clState.sys);
+    }
+    titleEl.textContent = `🧰 ${clState.sys?.name || 'Cronograma'}`;
+    bodyEl.innerHTML = '<div id="op-root"></div>';
+    // Restaurar el botón X al comportamiento normal
+    _clRestoreCloseButton();
+    try { await clLoadAll(); } catch (e) { console.warn('clLoadAll on refocus', e); }
+    clRender();
+  } catch (e) { console.warn('[clRefocusPlanner] aborted:', e); }
 }
 window.clRefocusPlanner = clRefocusPlanner;
 
@@ -306,10 +313,11 @@ function clOpenSubmodal(title, html) {
   openModal(title, html);
   const headerBtn = document.querySelector('#modal > div > div:first-child button');
   if (headerBtn) {
-    headerBtn.setAttribute('onclick', 'clRefocusPlanner()');
+    headerBtn.setAttribute('onclick', '_plannerSmartClose()');
     headerBtn.setAttribute('title', 'Volver al calendario');
   }
-  window._clInSubmodal = true;
+  // Flags mutuamente excluyentes
+  window._clInSubmodal = true; window._opInSubmodal = false;
 }
 function _clRestoreCloseButton() {
   const headerBtn = document.querySelector('#modal > div > div:first-child button');

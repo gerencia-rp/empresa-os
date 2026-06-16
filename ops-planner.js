@@ -238,6 +238,9 @@ async function opGenerateRecurring() {
 // ─── Entry ───
 async function openOpsPlanner(sys) {
   opState.sys = sys;
+  // Mutua exclusión con el planner de Limpieza (evita contexto stale → null error)
+  if (typeof clState !== 'undefined' && clState) clState.sys = null;
+  window._clInSubmodal = false; window._opInSubmodal = false;
   if (!opState.date) opState.date = opDateOnly(new Date());
   await opLoadAll();
   openModal(`🧰 ${sys.name}`, '<div id="op-root"></div>');
@@ -256,21 +259,53 @@ async function openOpsPlanner(sys) {
 //   → modal NUNCA se cierra durante el flujo de edit/guardar/cancelar.
 // ═══════════════════════════════════════════════════════════════════
 async function opRefocusPlanner() {
-  const titleEl = document.getElementById('modal-title');
-  const bodyEl = document.getElementById('modal-body');
-  const modal = document.getElementById('modal');
-  // Si el modal por algún motivo se cerró (ej. usuario hizo ESC), re-abrir entero
-  if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
-    return openOpsPlanner(opState.sys);
-  }
-  titleEl.textContent = `🧰 ${opState.sys.name}`;
-  bodyEl.innerHTML = '<div id="op-root"></div>';
-  // Restaurar el botón X al comportamiento normal (cerrar modal entero)
-  _opRestoreCloseButton();
-  try { await opLoadAll(); } catch (e) { console.warn('opLoadAll on refocus', e); }
-  opRender();
+  try {
+    // Guard: solo actuar si el planner de Juan está activo (opState.sys seteado).
+    // Si lo llaman desde otro contexto (ej. flag stale), no hacer nada.
+    if (!opState || !opState.sys) return;
+    const titleEl = document.getElementById('modal-title');
+    const bodyEl = document.getElementById('modal-body');
+    const modal = document.getElementById('modal');
+    // Si el modal por algún motivo se cerró (ej. usuario hizo ESC), re-abrir entero
+    if (!titleEl || !bodyEl || modal?.classList.contains('hidden')) {
+      return openOpsPlanner(opState.sys);
+    }
+    titleEl.textContent = `🧰 ${opState.sys?.name || 'Cronograma'}`;
+    bodyEl.innerHTML = '<div id="op-root"></div>';
+    // Restaurar el botón X al comportamiento normal (cerrar modal entero)
+    _opRestoreCloseButton();
+    try { await opLoadAll(); } catch (e) { console.warn('opLoadAll on refocus', e); }
+    opRender();
+  } catch (e) { console.warn('[opRefocusPlanner] aborted:', e); }
 }
 window.opRefocusPlanner = opRefocusPlanner;
+
+// Cierre "inteligente" del sub-modal: detecta cuál planner está activo y vuelve
+// a ÉL (no cierra todo el cronograma, no tira error si el contexto es null).
+function _plannerSmartClose() {
+  try {
+    if (typeof opState !== 'undefined' && opState && opState.sys) { opRefocusPlanner(); return; }
+    if (typeof clState !== 'undefined' && clState && clState.sys) { clRefocusPlanner(); return; }
+    // Sin planner activo → cerrar el modal normalmente
+    if (typeof closeModal === 'function') closeModal();
+  } catch (e) { console.warn('[plannerSmartClose]', e); }
+}
+window._plannerSmartClose = _plannerSmartClose;
+
+// ESC dentro de un sub-modal del planner → vuelve al calendario (no cierra todo).
+(function _opInstallEscHandler() {
+  if (window._opEscInstalled) return;
+  window._opEscInstalled = true;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const modal = document.getElementById('modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (window._opInSubmodal || window._clInSubmodal) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      _plannerSmartClose();
+    }
+  }, true);
+})();
 
 // ═══════════════════════════════════════════════════════════════════
 // SUBMODAL — Cuando abrimos un sub-modal (editar, +Pendiente, etc) desde
@@ -279,14 +314,14 @@ window.opRefocusPlanner = opRefocusPlanner;
 // ═══════════════════════════════════════════════════════════════════
 function opOpenSubmodal(title, html) {
   openModal(title, html);
-  // Override del botón X (×): que llame a opRefocusPlanner en vez de closeModal
+  // Override del botón X (×): cierre inteligente (vuelve al planner activo)
   const headerBtn = document.querySelector('#modal > div > div:first-child button');
   if (headerBtn) {
-    headerBtn.setAttribute('onclick', 'opRefocusPlanner()');
+    headerBtn.setAttribute('onclick', '_plannerSmartClose()');
     headerBtn.setAttribute('title', 'Volver al calendario');
   }
-  // Override del backdrop: click afuera del modal vuelve al planner (no cierra)
-  window._opInSubmodal = true;
+  // Flags mutuamente excluyentes
+  window._opInSubmodal = true; window._clInSubmodal = false;
 }
 function _opRestoreCloseButton() {
   const headerBtn = document.querySelector('#modal > div > div:first-child button');
@@ -306,15 +341,11 @@ window.opOpenSubmodal = opOpenSubmodal;
   document.addEventListener('click', (e) => {
     const modal = document.getElementById('modal');
     if (!modal || e.target !== modal) return;
-    // Si estamos en un submodal del planner ops o cleaning, volver al planner
-    if (window._opInSubmodal && typeof opRefocusPlanner === 'function') {
+    // Si estamos en un submodal del planner ops o cleaning, volver al planner activo
+    if (window._opInSubmodal || window._clInSubmodal) {
       e.stopImmediatePropagation();
       e.preventDefault();
-      opRefocusPlanner();
-    } else if (window._clInSubmodal && typeof clRefocusPlanner === 'function') {
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      clRefocusPlanner();
+      _plannerSmartClose();
     }
   }, true); // capture: true → corre ANTES del listener de app.js
 })();
