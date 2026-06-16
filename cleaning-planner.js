@@ -1542,7 +1542,7 @@ function clEditFromCasas(id, bucket) {
     ? clState.backlog.find(x => x.id === id)
     : clState.allUpcoming.find(x => x.id === id) || clState.dayTasks.find(x => x.id === id));
   if (!t) return;
-  _opOpenEditModal(t, bucket === 'backlog');
+  _clOpenEditModal(t, bucket === 'backlog');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2095,14 +2095,14 @@ async function clEjecutarArmarDia() {
 function clEditBacklog(id) {
   const t = clState.backlog.find(x => x.id === id);
   if (!t) return;
-  _opOpenEditModal(t, true);
+  _clOpenEditModal(t, true);
 }
 function clEditScheduled(id) {
   const t = clState.dayTasks.find(x => x.id === id);
   if (!t) return;
-  _opOpenEditModal(t, false);
+  _clOpenEditModal(t, false);
 }
-function _opOpenEditModal(t, isBacklog) {
+function _clOpenEditModal(t, isBacklog) {
   const propsOpts = clState.properties.map(p => `<option value="prop:${p.id}" ${t.property_id===p.id?'selected':''}>🏠 ${p.nickname || p.address}</option>`).join('');
   const projsOpts = clState.projects.map(p => `<option value="proj:${p.id}" ${t.project_id===p.id?'selected':''}>🏗️ ${p.name || p.address}</option>`).join('');
   const targetVal = t.property_id ? 'prop:'+t.property_id : t.project_id ? 'proj:'+t.project_id : '';
