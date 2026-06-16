@@ -2115,25 +2115,28 @@ function _opOpenEditModal(t, isBacklog) {
 }
 
 async function opSaveEdit(id, isBacklog) {
-  const target = document.getElementById('op-e-target').value || '';
+  // Null-safe: si el form no está, avisar en vez de no hacer nada en silencio.
+  const titleEl = document.getElementById('op-e-title');
+  if (!id || !titleEl) { try { opToast('No se pudo leer el formulario de la tarea', 'error'); } catch(e){} return; }
+  const target = document.getElementById('op-e-target')?.value || '';
   const property_id = target.startsWith('prop:') ? target.slice(5) : null;
   const project_id = target.startsWith('proj:') ? target.slice(5) : null;
   const payload = {
-    title: document.getElementById('op-e-title').value,
-    duration_min: +document.getElementById('op-e-dur').value || 30,
-    business: document.getElementById('op-e-business').value,
-    assignee: (document.getElementById('op-e-assignee') || {}).value || 'Juan',
-    zona: document.getElementById('op-e-zona').value || null,
-    priority: document.getElementById('op-e-priority').value,
+    title: titleEl.value,
+    duration_min: +(document.getElementById('op-e-dur')?.value) || 30,
+    business: document.getElementById('op-e-business')?.value || 'remodelacion',
+    assignee: document.getElementById('op-e-assignee')?.value || 'Juan',
+    zona: document.getElementById('op-e-zona')?.value || null,
+    priority: document.getElementById('op-e-priority')?.value || 'normal',
     property_id, project_id,
-    materials: (document.getElementById('op-e-materials').value || '').split(',').map(s => s.trim()).filter(Boolean),
-    notes: document.getElementById('op-e-notes').value || null,
+    materials: (document.getElementById('op-e-materials')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
+    notes: document.getElementById('op-e-notes')?.value || null,
     updated_at: new Date().toISOString()
   };
   if (!isBacklog) {
-    payload.start_time = document.getElementById('op-e-start').value;
-    payload.travel_min = +document.getElementById('op-e-travel').value || 0;
-    payload.status = document.getElementById('op-e-status').value;
+    payload.start_time = document.getElementById('op-e-start')?.value || null;
+    payload.travel_min = +(document.getElementById('op-e-travel')?.value) || 0;
+    payload.status = document.getElementById('op-e-status')?.value || 'planned';
   }
 
   // ─── Detección de conflictos de horario ───
