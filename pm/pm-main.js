@@ -53,8 +53,12 @@ const pmaState = {
   finCustomTo: null,
   pnlSortKey: 'net',                      // P&L por casa: columna de orden
   pnlSortDir: 'desc',                     // asc·desc
-  opsSubTab: 'tasks',                     // Operación: tasks·services·comms·alerts
-  tasksView: 'calendar',                  // tasks: calendar·list
+  opsSubTab: 'tasks',                     // Operación: tasks·utilities·services·comms·alerts
+  tasksView: 'calendar',                  // tasks: calendar·weekly·list·byassignee
+  opsFilterProperty: null,                // filtros globales Operación
+  opsFilterType: null,
+  opsFilterAssignee: null,
+  opsWeekStart: null,                     // ISO lunes de la semana mostrada
   tasksListRange: '7',                    // list: '7'·'30'·'late'
   opsCalMonth: null,                      // 'YYYY-MM' (null = mes actual)
   commsTenantId: null,                    // Centro de comunicación: tenant elegido
@@ -78,6 +82,7 @@ const pmaState = {
   alerts: [],                         // 🆕 alertas automáticas
   templates: [],                      // 🆕 plantillas de mensajes
   bookingHistory: [],                 // 🆕 movimientos de reserva entre unidades
+  utilities: [],                      // 🆕 recibos públicos (Spectrum/Gas/Water/Electric)
   loading: false,
   // Form state
   editingProperty: null,
@@ -135,7 +140,8 @@ async function pmLoadAll() {
     { name: 'feeds',      optional: true,  q: () => sb.from('pm_calendar_feeds').select('*').order('created_at', { ascending: false }) },
     { name: 'alerts',     optional: true,  q: () => sb.from('pm_alerts').select('*').order('created_at', { ascending: false }).limit(500) },
     { name: 'templates',  optional: true,  q: () => sb.from('pm_message_templates').select('*').order('name') },
-    { name: 'bookingHistory', optional: true, q: () => sb.from('pm_booking_history').select('*').order('moved_at', { ascending: false }).limit(2000) }
+    { name: 'bookingHistory', optional: true, q: () => sb.from('pm_booking_history').select('*').order('moved_at', { ascending: false }).limit(2000) },
+    { name: 'utilities',  optional: true,  q: () => sb.from('pm_utilities').select('*').order('service_name') }
   ];
 
   const results = {};
@@ -192,6 +198,7 @@ async function pmLoadAll() {
   pmaState.alerts = results.alerts || [];
   pmaState.templates = results.templates || [];
   pmaState.bookingHistory = results.bookingHistory || [];
+  pmaState.utilities = results.utilities || [];
 
   console.log('[pm] Carga completa:', {
     properties: pmaState.properties.length,
@@ -5000,50 +5007,166 @@ window.pmAlertAssign = pmAlertAssign;
 // TAB · OPERACIÓN (3 sub-tabs + panel de alertas)
 // ════════════════════════════════════════════════════════════════
 const PM_TASK_TYPES = {
-  aseo:                 { label: 'Aseo',       color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
-  cesped:               { label: 'Césped',     color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
-  inspeccion:           { label: 'Inspección', color: '#f59e0b', chip: 'bg-amber-100 text-amber-800' },
-  renovacion_contrato:  { label: 'Renovación', color: '#ef4444', chip: 'bg-red-100 text-red-800' }
+  cleaning:             { label: '🧹 Limpieza',  color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
+  aseo:                 { label: '🧹 Aseo',      color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
+  mantenimiento:        { label: '🔧 Manten.',   color: '#f97316', chip: 'bg-orange-100 text-orange-800' },
+  podada:               { label: '🌱 Podada',    color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
+  cesped:               { label: '🌱 Césped',    color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
+  plagas:               { label: '🐛 Plagas',    color: '#a855f7', chip: 'bg-purple-100 text-purple-800' },
+  inspeccion:           { label: '🚪 Inspección',color: '#f59e0b', chip: 'bg-amber-100 text-amber-800' },
+  renovacion_contrato:  { label: '📄 Renovación',color: '#ef4444', chip: 'bg-red-100 text-red-800' }
 };
 function pmTaskMeta(t) { return PM_TASK_TYPES[t] || { label: 'Tarea', color: '#94a3b8', chip: 'bg-slate-100 text-slate-700' }; }
 function pmTaskDate(t) { return t.scheduled_date || (t.start_at ? String(t.start_at).slice(0,10) : null); }
 
+function pmOpsTaskOpen(t) { return !['completado','cancelado'].includes(t.status); }
+function pmTasksFiltered(tasks) {
+  let r = tasks;
+  if (pmaState.opsFilterProperty) r = r.filter(t => t.property_id === pmaState.opsFilterProperty);
+  if (pmaState.opsFilterType) r = r.filter(t => t.task_type === pmaState.opsFilterType);
+  if (pmaState.opsFilterAssignee) r = r.filter(t => (t.assignee||'') === pmaState.opsFilterAssignee);
+  return r;
+}
+function pmOpsHeaderCards() {
+  const today = new Date().toISOString().slice(0,10);
+  const in7 = new Date(); in7.setDate(in7.getDate()+7); const in7ISO = in7.toISOString().slice(0,10);
+  const open = (pmaState.tasks||[]).filter(pmOpsTaskOpen);
+  const hoy = open.filter(t => pmTaskDate(t) === today).length;
+  const limpiezas = open.filter(t => (t.task_type==='cleaning'||t.task_type==='aseo') && pmTaskDate(t) >= today && pmTaskDate(t) <= in7ISO).length;
+  const utilVenc = (pmaState.utilities||[]).filter(u => { const s = pmUtilityStatus(u); return s.key==='due_soon' || s.key==='overdue'; }).length;
+  const alertas = pmActiveAlerts().length;
+  const card = (label, value, accent) => `<div class="bg-white border border-slate-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div><div class="text-2xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div></div>`;
+  return `<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+    ${card('Tareas pendientes hoy', hoy, hoy?'text-amber-600':'text-slate-900')}
+    ${card('Limpiezas esta semana', limpiezas, 'text-blue-600')}
+    ${card('Utilities por vencer 7d', utilVenc, utilVenc?'text-red-600':'text-slate-900')}
+    ${card('Alertas activas', alertas, alertas?'text-red-600':'text-slate-900')}
+  </div>`;
+}
+function pmOpsGlobalFilters() {
+  const props = pmaState.properties.filter(p => (pmaState.tasks||[]).some(t => t.property_id === p.id));
+  const assignees = [...new Set((pmaState.tasks||[]).map(t => t.assignee).filter(Boolean))];
+  const pF = pmaState.opsFilterProperty, tF = pmaState.opsFilterType, aF = pmaState.opsFilterAssignee;
+  const hasF = pF || tF || aF;
+  return `<div class="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+    <select onchange="pmaState.opsFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">🏠 Todas</option>${props.map(p=>`<option value="${p.id}" ${pF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+    <select onchange="pmaState.opsFilterType=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Todo tipo</option>${Object.entries(PM_TASK_TYPES).map(([k,m])=>`<option value="${k}" ${tF===k?'selected':''}>${m.label}</option>`).join('')}</select>
+    <select onchange="pmaState.opsFilterAssignee=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Todos</option>${PM_TEAM.concat(assignees.filter(a=>!PM_TEAM.includes(a))).map(a=>`<option value="${a}" ${aF===a?'selected':''}>${(a||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+    ${hasF?`<button onclick="pmaState.opsFilterProperty=null;pmaState.opsFilterType=null;pmaState.opsFilterAssignee=null;pmRender()" class="text-[#b8941f] hover:underline">✕ Limpiar</button>`:''}
+  </div>`;
+}
+
 function pmRenderOperations() {
   const sub = pmaState.opsSubTab || 'tasks';
   const c = pmAlertCounts();
-  const tabs = [['tasks','📋 Cronograma'],['services','⚡ Servicios'],['comms','💬 Comunicación'],['alerts',`🔔 Alertas${c.total?` (${c.total})`:''}`]];
+  const tabs = [['tasks','📋 Cronograma'],['utilities','💡 Utilities'],['services','⚡ Servicios'],['comms','💬 Comunicación'],['alerts',`🔔 Alertas${c.total?` (${c.total})`:''}`]];
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
-    <div class="flex gap-1 border-b border-slate-200">
-      ${tabs.map(([k,l]) => `<button onclick="pmaState.opsSubTab='${k}';pmRender()" class="px-3 py-1.5 text-xs font-bold border-b-2 -mb-px transition ${sub===k?'border-[#d4af37] text-slate-900':'border-transparent text-slate-500 hover:text-slate-700'}">${l}</button>`).join('')}
+    ${pmOpsHeaderCards()}
+    <div class="flex gap-1 border-b border-slate-200 overflow-x-auto">
+      ${tabs.map(([k,l]) => `<button onclick="pmaState.opsSubTab='${k}';pmRender()" class="px-3 py-1.5 text-xs font-bold border-b-2 -mb-px transition whitespace-nowrap ${sub===k?'border-[#d4af37] text-slate-900':'border-transparent text-slate-500 hover:text-slate-700'}">${l}</button>`).join('')}
     </div>
-    ${sub==='tasks'    ? pmRenderTasksSection() : ''}
-    ${sub==='services' ? pmRenderServices() : ''}
-    ${sub==='comms'    ? pmRenderComms() : ''}
-    ${sub==='alerts'   ? pmRenderAlertsPanel() : ''}
+    ${sub==='tasks'     ? pmRenderTasksSection() : ''}
+    ${sub==='utilities' ? pmRenderUtilities() : ''}
+    ${sub==='services'  ? pmRenderServices() : ''}
+    ${sub==='comms'     ? pmRenderComms() : ''}
+    ${sub==='alerts'    ? pmRenderAlertsPanel() : ''}
   </div>`;
 }
 
 // ── Sub-tab A: Cronograma de tareas ──
 function pmRenderTasksSection() {
   const view = pmaState.tasksView || 'calendar';
+  const vb = (k,l) => `<button onclick="pmaState.tasksView='${k}';pmRender()" class="px-3 py-1 rounded-full ${view===k?'bg-white shadow text-slate-900':'text-slate-500'}">${l}</button>`;
+  // Casas que necesitan visita esta semana
+  const today = new Date().toISOString().slice(0,10);
+  const in7 = new Date(); in7.setDate(in7.getDate()+7); const in7ISO = in7.toISOString().slice(0,10);
+  const needVisit = {};
+  (pmaState.tasks||[]).filter(pmOpsTaskOpen).forEach(t => { const d = pmTaskDate(t); if (d && d >= today && d <= in7ISO && t.property_id) needVisit[t.property_id] = (needVisit[t.property_id]||0)+1; });
+  const needVisitEntries = Object.entries(needVisit).sort((a,b)=>b[1]-a[1]);
   return `
   <div class="space-y-3">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
-        <button onclick="pmaState.tasksView='calendar';pmRender()" class="px-3 py-1 rounded-full ${view==='calendar'?'bg-white shadow text-slate-900':'text-slate-500'}">📅 Calendario</button>
-        <button onclick="pmaState.tasksView='list';pmRender()" class="px-3 py-1 rounded-full ${view==='list'?'bg-white shadow text-slate-900':'text-slate-500'}">📋 Lista</button>
+        ${vb('calendar','📅 Mes')}${vb('weekly','🗓 Semana')}${vb('list','📋 Lista')}${vb('byassignee','👥 Encargado')}
       </div>
       <div class="flex items-center gap-2">
-        <div class="flex gap-2 text-[10px]">
-          ${Object.entries(PM_TASK_TYPES).map(([k,m])=>`<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${m.color}"></span>${m.label}</span>`).join('')}
-        </div>
+        ${pmOpsGlobalFilters()}
         <button onclick="pmEditTask(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Nueva tarea</button>
       </div>
     </div>
-    ${view==='calendar' ? pmRenderTasksCalendar() : pmRenderTasksList()}
+
+    ${needVisitEntries.length ? `<div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+      <div class="text-[11px] uppercase font-bold text-amber-700 mb-1">🏠 Casas que necesitan visita esta semana</div>
+      <div class="flex gap-1.5 flex-wrap">${needVisitEntries.map(([pid,n])=>`<button onclick="pmaState.opsFilterProperty='${pid}';pmaState.tasksView='list';pmRender()" class="text-[11px] bg-white border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100">${pmPropertyName(pid).replace(/</g,'&lt;').slice(0,20)} <strong>${n}</strong></button>`).join('')}</div>
+    </div>` : ''}
+
+    ${view==='calendar' ? pmRenderTasksCalendar() : view==='weekly' ? pmRenderTasksWeekly() : view==='byassignee' ? pmRenderTasksByAssignee() : pmRenderTasksList()}
   </div>`;
+}
+
+function pmWeeklyTaskBtn(t) {
+  const m = pmTaskMeta(t.task_type);
+  return `<button onclick="pmEditTask('${t.id}')" class="w-full text-left text-[9px] px-1 py-0.5 rounded leading-tight" style="background:${m.color}22;color:${m.color}" title="${(t.title||'').replace(/"/g,'&quot;')}">${(t.title||'').replace(/</g,'&lt;').slice(0,22)}${t.assignee?`<br><span class='opacity-70'>${(t.assignee||'').slice(0,12)}</span>`:''}</button>`;
+}
+// Vista semanal (Lun-Dom)
+function pmRenderTasksWeekly() {
+  const base = pmaState.opsWeekStart ? new Date(pmaState.opsWeekStart+'T00:00:00') : (() => { const d = new Date(); const dow = (d.getDay()+6)%7; d.setDate(d.getDate()-dow); return d; })();
+  const monday = new Date(base); monday.setHours(0,0,0,0);
+  const today = new Date().toISOString().slice(0,10);
+  const days = Array.from({length:7}, (_,i) => { const d = new Date(monday); d.setDate(d.getDate()+i); return d; });
+  const dows = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const tasks = pmTasksFiltered((pmaState.tasks||[]).filter(pmOpsTaskOpen));
+  const shift = (n) => { const d = new Date(monday); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  return `
+    <div class="bg-white border border-slate-200 rounded-xl p-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm font-bold text-slate-900">Semana del ${monday.toISOString().slice(0,10)}</div>
+        <div class="flex items-center gap-1 text-sm">
+          <button onclick="pmaState.opsWeekStart='${shift(-7)}';pmRender()" class="px-2 text-slate-500 hover:text-slate-900">‹</button>
+          <button onclick="pmaState.opsWeekStart=null;pmRender()" class="text-[11px] font-bold text-slate-600">Hoy</button>
+          <button onclick="pmaState.opsWeekStart='${shift(7)}';pmRender()" class="px-2 text-slate-500 hover:text-slate-900">›</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-7 gap-1">
+        ${days.map((d,i) => { const ds = d.toISOString().slice(0,10); const ts = tasks.filter(t => pmTaskDate(t)===ds);
+          return `<div class="min-h-[120px] border border-slate-100 rounded p-1 ${ds===today?'ring-1 ring-[#d4af37]':''}">
+            <div class="text-[9px] font-bold ${ds===today?'text-[#b8941f]':'text-slate-400'} uppercase">${dows[i]} ${d.getDate()}</div>
+            <div class="space-y-1 mt-1">${ts.map(pmWeeklyTaskBtn).join('') || '<div class="text-[8px] text-slate-300">—</div>'}</div>
+          </div>`; }).join('')}
+      </div>
+    </div>`;
+}
+
+function pmAssigneeTaskBtn(t) {
+  const m = pmTaskMeta(t.task_type);
+  return `<button onclick="pmEditTask('${t.id}')" class="w-full text-left text-[11px] px-1.5 py-1 rounded flex items-center gap-1.5" style="background:${m.color}14"><span class="w-1.5 h-1.5 rounded-full" style="background:${m.color}"></span><span class="truncate">${(t.title||'').replace(/</g,'&lt;').slice(0,28)}</span><span class="ml-auto text-slate-400">${(pmTaskDate(t)||'').slice(5)}</span></button>`;
+}
+// Vista por encargado
+function pmRenderTasksByAssignee() {
+  const today = new Date().toISOString().slice(0,10);
+  const all = pmTasksFiltered(pmaState.tasks||[]);
+  const team = [...new Set(PM_TEAM.concat(all.map(t=>t.assignee).filter(Boolean)))];
+  const card = (name) => {
+    const ts = all.filter(t => (t.assignee||'') === name);
+    const done = ts.filter(t => t.status==='completado').length;
+    const pend = ts.filter(t => pmOpsTaskOpen(t) && (pmTaskDate(t)||'')>=today).length;
+    const late = ts.filter(t => pmOpsTaskOpen(t) && (pmTaskDate(t)||'9999')<today).length;
+    const week = ts.filter(t => { const d=pmTaskDate(t); if(!d||!pmOpsTaskOpen(t))return false; const in7=new Date();in7.setDate(in7.getDate()+7); return d>=today && d<=in7.toISOString().slice(0,10); });
+    return `<div class="bg-white border border-slate-200 rounded-xl p-3">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm" style="background:#1e293b;border:2px solid #d4af37">${name.charAt(0).toUpperCase()}</div>
+        <div class="font-bold text-sm text-slate-800">${name.replace(/</g,'&lt;')}</div>
+      </div>
+      <div class="flex gap-2 text-[11px] mb-2">
+        <span class="text-emerald-600 font-bold">✓ ${done}</span><span class="text-amber-600 font-bold">⏳ ${pend}</span><span class="text-red-600 font-bold">⚠ ${late}</span>
+      </div>
+      <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Esta semana (${week.length})</div>
+      <div class="space-y-1">${week.slice(0,6).map(pmAssigneeTaskBtn).join('') || '<div class="text-[10px] text-slate-400 italic">Sin tareas.</div>'}</div>
+    </div>`;
+  };
+  return `<div class="grid grid-cols-1 lg:grid-cols-3 gap-2">${team.map(card).join('')}</div>`;
 }
 
 function pmRenderTasksCalendar() {
@@ -5089,7 +5212,7 @@ function pmRenderTasksList() {
   const range = pmaState.tasksListRange || '7';
   const today = new Date().toISOString().slice(0,10);
   const limit = new Date(); limit.setDate(limit.getDate() + (range==='30'?30:7)); const limitISO = limit.toISOString().slice(0,10);
-  const open = (pmaState.tasks||[]).filter(t => !['completado','cancelado'].includes(t.status));
+  const open = pmTasksFiltered((pmaState.tasks||[]).filter(t => !['completado','cancelado'].includes(t.status)));
   let rows;
   if (range==='late') rows = open.filter(t => { const d=pmTaskDate(t); return d && d < today; });
   else rows = open.filter(t => { const d=pmTaskDate(t); return d && d >= today && d <= limitISO; });
@@ -5219,6 +5342,136 @@ async function pmDeleteTask(id) {
   await pmAfterCrud();
 }
 window.pmDeleteTask = pmDeleteTask;
+
+// ── Sub-tab: Utilities (recibos públicos) ──
+function pmUtilityStatus(u) {
+  const today = new Date(); const ym = today.toISOString().slice(0,7);
+  if (u.last_paid_date && String(u.last_paid_date).slice(0,7) === ym) return { key: 'paid', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50' };
+  const cut = u.cutoff_day ? new Date(today.getFullYear(), today.getMonth(), Math.min(u.cutoff_day, 28)) : null;
+  if (!cut) return { key: 'unknown', label: '—', cls: 'text-slate-400 bg-slate-50' };
+  const days = Math.floor((cut - today) / 86400000);
+  if (days < -14) return { key: 'cut', label: '❌ Cortado', cls: 'text-white bg-red-600' };
+  if (days < 0) return { key: 'overdue', label: `🔴 Vencido ${Math.abs(days)}d`, cls: 'text-red-700 bg-red-50' };
+  if (days <= 7) return { key: 'due_soon', label: `⏰ Por vencer (${days}d)`, cls: 'text-amber-700 bg-amber-50' };
+  return { key: 'ok', label: '🟢 Al día', cls: 'text-emerald-700 bg-emerald-50' };
+}
+function pmRenderUtilities() {
+  const utils = pmaState.utilities || [];
+  const pF = pmaState.opsFilterProperty;
+  let rows = pF ? utils.filter(u => u.property_id === pF) : utils;
+  rows = [...rows].sort((a,b) => (pmPropertyName(a.property_id)).localeCompare(pmPropertyName(b.property_id)) || (a.service_name||'').localeCompare(b.service_name||''));
+  const props = pmaState.properties.filter(p => utils.some(u => u.property_id === p.id));
+  const totalMonth = rows.reduce((s,u) => s + Number(u.monthly_amount||0), 0);
+  const overdue = rows.filter(u => ['overdue','cut'].includes(pmUtilityStatus(u).key)).length;
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <div class="text-sm font-bold text-slate-900">Utilities · ${rows.length} servicios</div>
+        <div class="text-xs text-slate-500">${pmMoney(totalMonth)}/mes estimado${overdue?` · <span class="text-red-600 font-bold">${overdue} vencidos</span>`:''}</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <select onchange="pmaState.opsFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">🏠 Todas</option>${props.map(p=>`<option value="${p.id}" ${pF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+        <button onclick="pmEditUtility(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Servicio</button>
+      </div>
+    </div>
+    ${rows.length ? `<div class="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold"><tr>
+          <th class="px-3 py-2 text-left">Casa</th><th class="px-3 py-2 text-left">Servicio</th><th class="px-3 py-2 text-left">Cuenta</th>
+          <th class="px-3 py-2 text-right">Monto</th><th class="px-3 py-2 text-left">Últ. pago</th><th class="px-3 py-2 text-left">Próx corte</th>
+          <th class="px-3 py-2 text-left">Status</th><th class="px-3 py-2 text-center">Acción</th>
+        </tr></thead>
+        <tbody>${rows.map(u => { const st = pmUtilityStatus(u); const cut = u.cutoff_day?`día ${u.cutoff_day}`:'—'; return `<tr class="border-t border-slate-100 ${['overdue','cut'].includes(st.key)?'bg-red-50':'hover:bg-slate-50'}">
+          <td class="px-3 py-2 text-slate-700">${pmPropertyName(u.property_id).replace(/</g,'&lt;').slice(0,18)}</td>
+          <td class="px-3 py-2 font-semibold text-slate-800">${(u.service_name||'').replace(/</g,'&lt;')}</td>
+          <td class="px-3 py-2 text-slate-500 font-mono">${(u.account_number||'—').replace(/</g,'&lt;')}</td>
+          <td class="px-3 py-2 text-right font-bold text-slate-700">${u.monthly_amount?'$'+Number(u.monthly_amount).toLocaleString():'—'}</td>
+          <td class="px-3 py-2 text-slate-600">${u.last_paid_date||'—'}${u.last_paid_amount?` · $${Number(u.last_paid_amount).toLocaleString()}`:''}${u.proof_url?` <a href="${u.proof_url}" target="_blank" class="text-blue-600">📎</a>`:''}</td>
+          <td class="px-3 py-2 text-slate-600">${cut}</td>
+          <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${st.cls}">${st.label}</span></td>
+          <td class="px-3 py-2 text-center whitespace-nowrap"><button onclick="pmMarkUtilityPaid('${u.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">Marcar pagado</button> <button onclick="pmEditUtility('${u.id}')" class="text-slate-400 hover:text-slate-700">✏️</button></td>
+        </tr>`; }).join('')}</tbody>
+      </table>
+    </div>` : '<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Sin servicios. Corré pm-operacion-utilities.sql para sembrarlos o agregá uno.</div>'}
+  </div>`;
+}
+async function pmMarkUtilityPaid(id) {
+  const u = (pmaState.utilities||[]).find(x => x.id == id);
+  if (!u) return;
+  const today = new Date().toISOString().slice(0,10);
+  openModal('💡 Marcar pagado — ' + (u.service_name||''), `
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Monto $</label><input id="pm-ut-amount" type="number" step="0.01" value="${u.monthly_amount||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Fecha *</label><input id="pm-ut-date" type="date" value="${today}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      </div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Comprobante</label><input id="pm-ut-file" type="file" accept="image/*,application/pdf" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs"/></div>
+      <div id="pm-ut-status" class="text-[11px] text-slate-500"></div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        <button id="pm-ut-save" onclick="pmSaveUtilityPaid('${id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">Registrar pago</button>
+      </div>
+    </div>`);
+}
+window.pmMarkUtilityPaid = pmMarkUtilityPaid;
+async function pmSaveUtilityPaid(id) {
+  const amount = +document.getElementById('pm-ut-amount').value || null;
+  const date = document.getElementById('pm-ut-date').value || null;
+  const fileEl = document.getElementById('pm-ut-file'); const statusEl = document.getElementById('pm-ut-status');
+  if (!date) return alert('La fecha es obligatoria.');
+  let proof_url = null;
+  const file = fileEl?.files?.[0];
+  if (file) { if (statusEl) statusEl.textContent = 'Subiendo…'; const up = await pmUploadFile('invoices', 'utility-'+id, file); if (up.url) proof_url = up.url; else if (statusEl) statusEl.textContent = '⚠️ ' + up.error; }
+  const payload = { last_paid_date: date, last_paid_amount: amount };
+  if (proof_url) payload.proof_url = proof_url;
+  const r = await pmExecQuery(sb.from('pm_utilities').update(payload).eq('id', id).select(), 'Marcar utility pagado');
+  if (!r) return;
+  await pmAfterCrud();
+}
+window.pmSaveUtilityPaid = pmSaveUtilityPaid;
+async function pmEditUtility(id) {
+  const u = id ? (pmaState.utilities||[]).find(x => x.id == id) : { status: 'active', billing_day: 1, cutoff_day: 20 };
+  const isNew = !id;
+  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Servicio (utility)', `
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Casa</label><select id="pm-uy-prop" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"><option value="">—</option>${pmaState.properties.map(p=>`<option value="${p.id}" ${u.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Servicio *</label><input id="pm-uy-name" value="${(u.service_name||'').replace(/"/g,'&quot;')}" placeholder="Spectrum / Texas Gas…" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Cuenta</label><input id="pm-uy-acct" value="${(u.account_number||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Monto $</label><input id="pm-uy-amount" type="number" value="${u.monthly_amount||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Día corte</label><input id="pm-uy-cutoff" type="number" value="${u.cutoff_day||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-slate-200">
+        <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
+        ${!isNew?`<button onclick="pmDeleteUtility('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>`:''}
+        <button onclick="pmSaveUtility('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
+      </div>
+    </div>`);
+}
+window.pmEditUtility = pmEditUtility;
+async function pmSaveUtility(id) {
+  const payload = {
+    property_id: document.getElementById('pm-uy-prop').value || null,
+    service_name: document.getElementById('pm-uy-name').value.trim(),
+    account_number: document.getElementById('pm-uy-acct').value.trim() || null,
+    monthly_amount: +document.getElementById('pm-uy-amount').value || null,
+    cutoff_day: +document.getElementById('pm-uy-cutoff').value || null
+  };
+  if (!payload.service_name) return alert('El servicio es obligatorio.');
+  const r = id ? await pmExecQuery(sb.from('pm_utilities').update(payload).eq('id', id).select(), 'Update utility')
+              : await pmExecQuery(sb.from('pm_utilities').insert(payload).select(), 'Crear utility');
+  if (!r) return; await pmAfterCrud();
+}
+window.pmSaveUtility = pmSaveUtility;
+async function pmDeleteUtility(id) {
+  if (!confirm('¿Eliminar este servicio?')) return;
+  const r = await pmExecQuery(sb.from('pm_utilities').delete().eq('id', id), 'Eliminar utility');
+  if (!r) return; await pmAfterCrud();
+}
+window.pmDeleteUtility = pmDeleteUtility;
 
 // ── Sub-tab B: Servicios automáticos ──
 function pmRenderServices() {
