@@ -725,6 +725,7 @@ Deno.serve(async (req) => {
           paid_at: r.fields?.[F.pag_fecha] || null,
           month, year: isNaN(year as any) ? null : year,
           platform: getSel(r.fields?.[F.pag_plat]),
+          casa_nickname: casaName || null,                 // FIX4: preserva el nombre de casa de Airtable
           payment_method: r.fields?.[F.pag_obs] || null,
           proof_url: getAttachUrl(r.fields?.[F.pag_comprob]),
           status: "pagado",
@@ -987,13 +988,18 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     // Persistir alertas de datos + auto-resolver las ya corregidas
     // ════════════════════════════════════════════════════════════
-    stats.data_warnings = warnings.length;
+    // Dedupe por dedup_key: un upsert con dedup_keys repetidos en el MISMO batch
+    // falla ("cannot affect row a second time"). Esto antes impedía escribir warnings.
+    const warnMap: Record<string, any> = {};
+    for (const w of warnings) warnMap[w.dedup_key] = w;
+    const uniqWarnings = Object.values(warnMap);
+    stats.data_warnings = uniqWarnings.length;
     if (!dry_run) {
       try {
         const nowISO = new Date().toISOString();
-        const detectedKeys = warnings.map(w => w.dedup_key);
-        for (let i = 0; i < warnings.length; i += 50) {
-          const chunk = warnings.slice(i, i + 50).map(w => ({ ...w, detected_at: nowISO, resolved: false, resolved_at: null }));
+        const detectedKeys = uniqWarnings.map((w: any) => w.dedup_key);
+        for (let i = 0; i < uniqWarnings.length; i += 50) {
+          const chunk = uniqWarnings.slice(i, i + 50).map((w: any) => ({ ...w, detected_at: nowISO, resolved: false, resolved_at: null }));
           const { error } = await supabase.from("pm_data_warnings").upsert(chunk, { onConflict: "dedup_key" });
           if (error) { errors.push("data_warnings: " + error.message); break; }
         }

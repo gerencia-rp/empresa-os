@@ -870,7 +870,7 @@ function pmRenderDashboard(){
   // Renta promedio / unidad = ingresos del mes / unidades rentables del portafolio
   const avgRent=rentableTotal?cf.income/rentableTotal:0;
   let gaps=[]; pmaState.units.forEach(u=>{ const bs=pmaState.bookings.filter(b=>b.unit_id===u.id && b.start_date).sort((a,b)=>a.start_date<b.start_date?-1:1); for(let i=1;i<bs.length;i++){ const pe=bs[i-1].end_date, ns=bs[i].start_date; if(pe&&ns&&ns>pe){ const g=Math.round((new Date(ns)-new Date(pe))/86400000); if(g>0&&g<400) gaps.push(g); } } });
-  const avgFill=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):null;
+  const avgFill=pmAvgVacancyDays();
 
   const SEV={ critical:['border-l-red-500','bg-red-50','text-red-700','CRÍTICO'], important:['border-l-amber-500','bg-amber-50','text-amber-700','IMPORTANTE'], opportunity:['border-l-emerald-500','bg-emerald-50','text-emerald-700','OPORTUNIDAD'] };
 
@@ -1030,6 +1030,18 @@ function pmDaysVacant(u) {
 function pmFreeUnitsNow() {
   const activePropIds = new Set(pmaState.properties.filter(p=>p.status==='activa').map(p=>p.id));
   return pmaState.units.filter(u => activePropIds.has(u.property_id) && pmUnitState(u)==='libre');
+}
+// FIX5: días promedio de vacancy = gaps entre reservas consecutivas + vacancy en curso
+function pmAvgVacancyDays() {
+  const todayISO = new Date().toISOString().slice(0,10);
+  const gaps = [];
+  pmaState.units.forEach(u => {
+    const bs = pmaState.bookings.filter(b => b.unit_id===u.id && b.start_date).sort((a,b)=>(a.start_date||'').localeCompare(b.start_date||''));
+    for (let i=1;i<bs.length;i++){ const pe=bs[i-1].end_date, ns=bs[i].start_date; if(pe&&ns&&ns>pe){ const g=Math.round((new Date(ns)-new Date(pe))/86400000); if(g>0&&g<400) gaps.push(g); } }
+    const last = bs.filter(b=>b.end_date).sort((a,b)=>(b.end_date||'').localeCompare(a.end_date||''))[0];
+    if (last && last.end_date < todayISO && !pmActiveBookingOf(u.id)) { const g=Math.round((new Date(todayISO)-new Date(last.end_date))/86400000); if(g>0&&g<400) gaps.push(g); }
+  });
+  return gaps.length ? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length) : null;
 }
 
 function pmShowFreeUnits() {
@@ -2719,10 +2731,11 @@ function pmTenantPayStatus(booking) {
 function pmNextDueDate(booking) {
   const rec = pmRecurrenceOf(booking.payment_day);
   if (rec.kind === 'airbnb') return null;
-  const today = new Date();
+  const today = new Date(); today.setHours(0,0,0,0);
   const day = pmRecurrenceDay(booking.payment_day);
   let due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
-  if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, Math.min(day, 28));
+  // si la fecha de este mes ya pasó hace +3 días, usar el próximo mes
+  if ((due - today) / 86400000 < -3) due = new Date(today.getFullYear(), today.getMonth() + 1, Math.min(day, 28));
   return due;
 }
 
@@ -3720,7 +3733,7 @@ function pmRenderPayments() {
   const proximosList = activeBs.filter(b => {
     const due = pmNextDueDate(b); if (!due) return false;
     const diff = Math.floor((due - now) / 86400000);
-    if (!(diff >= 0 && diff <= 7)) return false;
+    if (!(diff >= -3 && diff <= 7)) return false;   // incluye recién vencidos (3d gracia) + próximos 7d
     const paid = pmaState.payments.some(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym) && (p.booking_id===b.id || (b.tenant_id && p.tenant_id===b.tenant_id)));
     return !paid;
   }).sort((a,b) => pmNextDueDate(a) - pmNextDueDate(b));
@@ -4416,22 +4429,29 @@ function pmFinAgg(r) {
   const exp = pmaState.expenses.filter(e => pmInRange(e.expense_date, r) && (!scoped || scopeIds.has(e.property_id)));
   const sum = (arr, f) => arr.reduce((s,x) => s + Number((f?f(x):x.amount)||0), 0);
   const income = sum(inc);
-  const house = sum(exp.filter(e => e.category==='house' && !pmIsAseo(e)));
-  const cleaning = sum(exp.filter(e => pmIsAseo(e)));                 // aseo/podada/cleaning
-  const platform = sum(exp.filter(e => e.category==='platform'));
-  const operationalRaw = sum(exp.filter(e => e.category==='operational'));
-  const operational = operationalRaw + platform;                      // operativos = operational + platform
+  // Buckets de categoría (6) — FIX3
+  const isMaint = (e) => /mantenim|maintenance|repair|arreglo|reparac|plomer|electric/i.test(e.subcategory||'');
+  const aseoE  = exp.filter(e => pmIsAseo(e));
+  const maintE = exp.filter(e => !pmIsAseo(e) && isMaint(e));
+  const operE  = exp.filter(e => ['operational','platform'].includes(e.category));
+  const houseE = exp.filter(e => e.category==='house' && !pmIsAseo(e) && !isMaint(e));
+  const acc = new Set([...aseoE, ...maintE, ...operE, ...houseE].map(e => e.id));
+  const otrosE = exp.filter(e => !acc.has(e.id));
+  const house = sum(houseE), cleaning = sum(aseoE), operational = sum(operE), maintenance = sum(maintE), otros = sum(otrosE);
   const payroll = pmPayrollInRange(r);
-  const gastosTotal = house + cleaning + operational + payroll;
-  const noi = income - house - cleaning - operational - payroll;       // NOI = ingresos − gastos − operativos − nómina
-  const net = noi;
-  const margin = income > 0 ? noi / income : 0;
+  // FIX1+FIX3: Gastos directos = TODOS los pm_expenses; NOI = ingresos − directos;
+  //           Cash flow neto = NOI − nómina;  Gastos totales = directos + nómina.
+  const directos = sum(exp);
+  const noi = income - directos;
+  const net = noi - payroll;                 // cash flow neto (≠ NOI cuando hay nómina)
+  const gastosTotal = directos + payroll;
+  const margin = income > 0 ? noi / income : 0;   // FIX2: margen realista
 
   // Breakdowns
   const incomeByPlatform = {}, incomeByModel = {}, expenseByCategory = {};
   inc.forEach(p => {
     const bk = pmPaymentBooking(p);
-    const plat = bk?.booking_type || 'otro';
+    const plat = bk?.booking_type || pmNormalizePlatform(p.platform) || 'otro';   // FIX9
     incomeByPlatform[plat] = (incomeByPlatform[plat]||0) + Number(p.amount||0);
     const prop = pmaState.properties.find(x => x.id === p.property_id);
     const model = prop?.rental_model || 'sin_modelo';
@@ -4439,8 +4459,10 @@ function pmFinAgg(r) {
   });
   expenseByCategory['Utility/Casa'] = house;
   expenseByCategory['Aseo & Podada'] = cleaning;
-  expenseByCategory['Operativos'] = operational;
+  expenseByCategory['Operativos Plataforma'] = operational;
+  expenseByCategory['Maintenance'] = maintenance;
   expenseByCategory['Nómina'] = payroll;
+  expenseByCategory['Otros'] = otros;
 
   const activeProps = scopeProps;   // ya filtrado por casa/modelo
   const payrollPerProp = activeProps.length ? payroll / activeProps.length : 0;
@@ -4451,12 +4473,25 @@ function pmFinAgg(r) {
     const pIncome = sum(inc.filter(x => x.property_id===p.id));
     const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house' && !pmIsAseo(e)));
     const pClean = sum(exp.filter(e => e.property_id===p.id && pmIsAseo(e)));
-    const pNoi = pIncome - pHouse - pClean - payrollPerProp - operativosPerProp;
+    const pNoi = pIncome - pHouse - pClean - operativosPerProp;   // NOI por casa (antes de nómina)
+    const pNet = pNoi - payrollPerProp;                            // cash flow por casa
     const margin = pIncome > 0 ? pNoi / pIncome : 0;
-    return { property: p, occ, rentable, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNoi, noi: pNoi, margin };
+    return { property: p, occ, rentable, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNet, noi: pNoi, margin };
   });
-  return { income, house, cleaning, platform, operational, payroll, gastosTotal, noi, net, margin,
+  return { income, house, cleaning, operational, maintenance, otros, payroll, directos, gastosTotal, noi, net, margin,
     incomeByPlatform, incomeByModel, expenseByCategory, props, activePropsCount: activeProps.length };
+}
+// Normaliza plataforma de pago a un booking_type (FIX9)
+function pmNormalizePlatform(p) {
+  const s = (p||'').toLowerCase().trim();
+  if (!s) return null;
+  if (/directo|contrato/.test(s)) return 'contrato_directo';
+  if (/airbnb/.test(s)) return 'airbnb';
+  if (/padsplit/.test(s)) return 'padsplit';
+  if (/booking/.test(s)) return 'booking';
+  if (/vrbo/.test(s)) return 'vrbo';
+  if (/hospitable/.test(s)) return 'hospitable';
+  return 'otro';
 }
 // Bar chart horizontal (entries [label,value])
 function pmBarChart(entries, accent = '#d4af37') {
@@ -4574,7 +4609,7 @@ function pmRenderFinance() {
   const roiMensual = agg.income>0 ? agg.net/agg.income : 0;
   // Días promedio rotación (gap entre reservas consecutivas por unidad)
   let gaps=[]; pmaState.units.forEach(u=>{ const bs=pmaState.bookings.filter(b=>b.unit_id===u.id && b.start_date).sort((a,b)=>a.start_date<b.start_date?-1:1); for(let i=1;i<bs.length;i++){ const pe=bs[i-1].end_date, ns=bs[i].start_date; if(pe&&ns&&ns>pe){ const g=Math.round((new Date(ns)-new Date(pe))/86400000); if(g>0&&g<400) gaps.push(g); } } });
-  const avgRot = gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):null;
+  const avgRot = pmAvgVacancyDays();
   // Cap rate: requiere valor de adquisición (no está en el schema) → n/d
   const capRate = null;
 
@@ -4666,8 +4701,8 @@ function pmRenderFinance() {
         ${pmPieChart(Object.entries(agg.incomeByModel).map(([k,v])=>[(k||'—').replace(/_/g,' '), v]).sort((a,b)=>b[1]-a[1]))}
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Top 10 casas · ingresos</div>
-        ${pmBarChart([...agg.props].filter(x=>x.income>0).sort((a,b)=>b.income-a.income).slice(0,10).map(x=>[x.property.name, x.income]), '#10b981')}
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Casas por ingresos (todas)</div>
+        ${pmBarChart([...agg.props].sort((a,b)=>b.income-a.income).slice(0,18).map(x=>[x.property.name, x.income]), '#10b981')}
       </div>
     </div>
 
@@ -4743,8 +4778,8 @@ function pmRenderFinance() {
           <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.house)}</td>
           <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.cleaning)}</td>
           <td class="px-3 py-2 text-right text-slate-500">${pmMoney(agg.payroll)}</td>
-          <td class="px-3 py-2 text-right ${(agg.income-agg.house-agg.cleaning-agg.payroll)>=0?'text-emerald-700':'text-red-600'}">${pmMoney(agg.income-agg.house-agg.cleaning-agg.payroll)}</td>
-          <td class="px-3 py-2 text-right text-slate-700">${agg.income>0?Math.round((agg.income-agg.house-agg.cleaning-agg.payroll)/agg.income*100)+'%':'—'}</td>
+          <td class="px-3 py-2 text-right ${agg.net>=0?'text-emerald-700':'text-red-600'}">${pmMoney(agg.net)}</td>
+          <td class="px-3 py-2 text-right text-slate-700">${agg.income>0?Math.round(agg.margin*100)+'%':'—'}</td>
         </tr></tfoot>` : ''}
       </table>
       </div>
@@ -5712,6 +5747,8 @@ window.pmDeleteTask = pmDeleteTask;
 function pmUtilityStatus(u) {
   const today = new Date(); const ym = today.toISOString().slice(0,7);
   if (u.last_paid_date && String(u.last_paid_date).slice(0,7) === ym) return { key: 'paid', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50' };
+  // FIX11: sin historial real (seeded) → no contar como "por vencer"
+  if (!u.last_paid_date) return { key: 'sin_info', label: '— sin datos', cls: 'text-slate-400 bg-slate-50' };
   const cut = u.cutoff_day ? new Date(today.getFullYear(), today.getMonth(), Math.min(u.cutoff_day, 28)) : null;
   if (!cut) return { key: 'unknown', label: '—', cls: 'text-slate-400 bg-slate-50' };
   const days = Math.floor((cut - today) / 86400000);
