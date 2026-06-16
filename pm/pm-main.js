@@ -760,11 +760,11 @@ function pmRenderDashboard(){
         <div class="text-xs text-slate-500 mt-0.5">Ing ${pmMoney(cf.income)} − Gas ${pmMoney(cf.gastos)}</div>
         <div class="text-[11px] font-bold mt-1">${arrow(netDelta)}<span class="text-slate-400 font-normal">% vs mes pasado</span></div>
       </button>
-      <button onclick="pmSetTab('properties')" class="text-left bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition shadow-sm">
-        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Unidades vacías</div>
-        <div class="text-3xl font-extrabold text-slate-900 mt-1">${empties.length}</div>
+      <button onclick="pmShowFreeUnits()" class="text-left bg-white border-2 hover:shadow-md rounded-xl p-4 transition shadow-sm" style="border-color:#d4af37">
+        <div class="text-[10px] uppercase font-bold tracking-wider" style="color:#b8941f">Unidades libres ahora</div>
+        <div class="text-3xl font-extrabold text-slate-900 mt-1">${pmFreeUnitsNow().length}</div>
         <div class="text-xs text-slate-500 mt-0.5">Potencial perdido: <span class="font-bold text-red-600">${pmMoney(potentialLost)}/mes</span></div>
-        <div class="text-[10px] text-slate-400 mt-1 leading-tight">${empties.slice(0,3).map(u=>`${pmPropertyName(u.property_id).slice(0,16)} · ${(u.name||u.code||'').slice(0,14)}`).join('<br>')||'—'}</div>
+        <div class="text-[11px] font-bold mt-1" style="color:#b8941f">Ver lista →</div>
       </button>
       <button onclick="document.getElementById('pm-ceo-actions')?.scrollIntoView({behavior:'smooth'})" class="text-left bg-slate-900 text-white hover:bg-slate-800 rounded-xl p-4 transition shadow-sm">
         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Decisiones tuyas</div>
@@ -820,19 +820,20 @@ function pmRenderDashboard(){
 function pmRenderPropertiesList() {
   const props = pmaState.properties;
   pmaState.expandedProperties = pmaState.expandedProperties || new Set();
+  const view = pmaState.propsView || 'list';
+  const vb = (k,l) => `<button onclick="pmaState.propsView='${k}';pmRender()" class="px-3 py-1 rounded-full text-[11px] font-bold ${view===k?'bg-slate-900 text-white':'text-slate-500 hover:text-slate-900'}">${l}</button>`;
   return `
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <div class="text-base font-bold text-slate-900">${props.length} propiedades — Click para ver unidades</div>
-          <div class="text-xs text-slate-500">${pmaState.units.length} unidades totales · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
-        </div>
+        <div class="flex items-center bg-slate-100 rounded-full p-0.5">${vb('list','🏘️ Lista')}${vb('availability','🟢 Disponibilidad')}</div>
         <div class="flex items-center gap-2">
           ${pmSyncStatusLabel()}
           <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Sync Airtable</button>
           <button onclick="pmEditProperty(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Propiedad</button>
         </div>
       </div>
+      ${view === 'availability' ? pmRenderAvailability() : `
+      <div class="text-xs text-slate-500">${props.length} propiedades · ${pmaState.units.length} unidades · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
       ${!props.length ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
           <div class="text-5xl mb-2">🏠</div>
@@ -845,8 +846,170 @@ function pmRenderPropertiesList() {
           ${props.map(p => pmRenderPropertyCardInline(p)).join('')}
         </div>
       `}
+      `}
     </div>
   `;
+}
+
+// ════════════════════════════════════════════════════════════════
+// Disponibilidad en tiempo real + forecast 60 días
+// ════════════════════════════════════════════════════════════════
+function pmUnitState(u) {
+  const today = new Date().toISOString().slice(0,10);
+  if (u.maintenance_status === 'en_mantenimiento') return 'mantenimiento';
+  if (u.is_active === false) return 'inactiva';
+  if (pmActiveBookingOf(u.id)) return 'ocupada';
+  if (pmaState.bookings.some(b => b.unit_id===u.id && b.status==='confirmado' && (b.start_date||'') > today)) return 'reservada';
+  return 'libre';
+}
+const PM_UNIT_STATE = {
+  libre:        { label: 'Libre',          dot: '🟢', bg: 'bg-emerald-50 border-emerald-300', txt: 'text-emerald-700' },
+  reservada:    { label: 'Reservada',      dot: '🟡', bg: 'bg-amber-50 border-amber-300',     txt: 'text-amber-700' },
+  ocupada:      { label: 'Ocupada',        dot: '🔴', bg: 'bg-red-50 border-red-300',         txt: 'text-red-700' },
+  mantenimiento:{ label: 'Mantenimiento',  dot: '⚙️', bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600' },
+  inactiva:     { label: 'Inactiva',       dot: '⚪', bg: 'bg-slate-50 border-slate-200',      txt: 'text-slate-400' }
+};
+function pmLastBookingOf(unitId) {
+  return pmaState.bookings.filter(b => b.unit_id===unitId && b.end_date).sort((a,b)=>(b.end_date||'').localeCompare(a.end_date||''))[0] || null;
+}
+function pmDaysVacant(u) {
+  const last = pmLastBookingOf(u.id);
+  if (!last || !last.end_date) return null;
+  const d = Math.floor((new Date() - new Date(last.end_date+'T00:00:00'))/86400000);
+  return d > 0 ? d : 0;
+}
+function pmFreeUnitsNow() {
+  const activePropIds = new Set(pmaState.properties.filter(p=>p.status==='activa').map(p=>p.id));
+  return pmaState.units.filter(u => activePropIds.has(u.property_id) && pmUnitState(u)==='libre');
+}
+
+function pmShowFreeUnits() {
+  const free = pmFreeUnitsNow().sort((a,b)=>(pmDaysVacant(b)??0)-(pmDaysVacant(a)??0));
+  openModal('🟢 Unidades libres ahora · ' + free.length, `
+    <div class="max-h-[65vh] overflow-y-auto">
+      ${free.length ? `<table class="w-full text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0"><tr>
+          <th class="px-2 py-2 text-left">Casa</th><th class="px-2 py-2 text-left">Unidad</th><th class="px-2 py-2 text-right">Días vacía</th>
+          <th class="px-2 py-2 text-right">Renta sug.</th><th class="px-2 py-2 text-right">Última renta</th><th class="px-2 py-2 text-center">Acción</th>
+        </tr></thead>
+        <tbody>${free.map(u => { const dv = pmDaysVacant(u); const last = pmLastBookingOf(u.id); return `<tr class="border-t border-slate-100">
+          <td class="px-2 py-2 text-slate-700">${pmPropertyName(u.property_id).replace(/</g,'&lt;').slice(0,16)}</td>
+          <td class="px-2 py-2 font-semibold text-slate-800">${(u.code||u.name||'').replace(/</g,'&lt;')}</td>
+          <td class="px-2 py-2 text-right ${dv>30?'text-red-600 font-bold':'text-slate-600'}">${dv!=null?dv+'d':'—'}</td>
+          <td class="px-2 py-2 text-right text-emerald-700 font-bold">${u.target_rent?'$'+Number(u.target_rent).toLocaleString():'—'}</td>
+          <td class="px-2 py-2 text-right text-slate-500">${last?'$'+Number(last.rent_amount||0).toLocaleString():'—'}</td>
+          <td class="px-2 py-2 text-center whitespace-nowrap">
+            <button onclick="closeModal();setTimeout(()=>pmEditBooking(null,'${u.id}'),60)" title="Marcar reservada" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-1 rounded">Reservar</button>
+            <a href="https://www.airbnb.com/host/homes" target="_blank" title="Listar en Airbnb" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-1 rounded inline-block">Airbnb</a>
+            <button onclick="pmMarkMaintenance('${u.id}')" title="Marcar mantenimiento" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold px-1.5 py-1 rounded">⚙️</button>
+          </td>
+        </tr>`; }).join('')}</tbody>
+      </table>` : '<div class="text-center py-10 text-slate-400 text-sm">✓ No hay unidades libres ahora mismo.</div>'}
+    </div>`);
+}
+window.pmShowFreeUnits = pmShowFreeUnits;
+
+async function pmMarkMaintenance(unitId) {
+  const u = pmaState.units.find(x => x.id === unitId);
+  if (!u) return;
+  const active = pmActiveBookingOf(unitId) || pmaState.bookings.find(b => b.unit_id===unitId && b.status==='confirmado' && b.status!=='cancelado');
+  if (active) {
+    if (!confirm('⚠️ Esta unidad tiene una reserva ('+pmTenantName(active.tenant_id)+'). Hay que mover esa reserva antes. ¿Abrir "Mover reserva" para reubicarla en una unidad libre?')) return;
+    closeModal();
+    setTimeout(() => pmMoveBooking(active.id), 80);
+    return;
+  }
+  if (!confirm('¿Marcar '+(u.code||u.name||'la unidad')+' en mantenimiento?')) return;
+  const r = await pmExecQuery(sb.from('pm_units').update({ maintenance_status: 'en_mantenimiento' }).eq('id', unitId).select(), 'Marcar mantenimiento');
+  if (!r) return;
+  if (u) u.maintenance_status = 'en_mantenimiento';
+  closeModal(); pmRender();
+}
+window.pmMarkMaintenance = pmMarkMaintenance;
+
+function pmRenderAvailability() {
+  const activeProps = pmaState.properties.filter(p => p.status==='activa');
+  const activePropIds = new Set(activeProps.map(p=>p.id));
+  let units = pmaState.units.filter(u => activePropIds.has(u.property_id));
+  const stF = pmaState.availFilterState, propF = pmaState.availFilterProperty, typeF = pmaState.availFilterType;
+  if (propF) units = units.filter(u => u.property_id === propF);
+  if (typeF) units = units.filter(u => u.unit_type === typeF);
+  if (stF) units = units.filter(u => pmUnitState(u) === stF);
+  // counts
+  const counts = { libre:0, reservada:0, ocupada:0, mantenimiento:0 };
+  pmaState.units.filter(u=>activePropIds.has(u.property_id)).forEach(u=>{ const s=pmUnitState(u); if(counts[s]!=null) counts[s]++; });
+
+  // Próximamente libres (30d)
+  const today = new Date().toISOString().slice(0,10);
+  const in30 = new Date(); in30.setDate(in30.getDate()+30); const in30ISO = in30.toISOString().slice(0,10);
+  const freeingSoon = pmActiveBookings().filter(b => b.end_date && b.end_date >= today && b.end_date <= in30ISO && activePropIds.has(b.property_id))
+    .map(b => { const next = pmaState.bookings.find(x => x.unit_id===b.unit_id && x.id!==b.id && x.status!=='cancelado' && (x.start_date||'') >= (b.end_date||'')); return { b, next }; })
+    .sort((a,c) => (a.b.end_date||'').localeCompare(c.b.end_date||''));
+
+  // Forecast 60d (8 semanas): unidades libres por semana
+  const rentableUnits = pmaState.units.filter(u => activePropIds.has(u.property_id) && u.is_active!==false);
+  const weeks = [];
+  for (let w=0; w<9; w++) {
+    const ws = new Date(); ws.setDate(ws.getDate() + w*7); ws.setHours(0,0,0,0);
+    const we = new Date(ws); we.setDate(we.getDate()+6);
+    const wsISO = ws.toISOString().slice(0,10), weISO = we.toISOString().slice(0,10);
+    const occ = rentableUnits.filter(u => pmaState.bookings.some(b => b.unit_id===u.id && b.status!=='cancelado' && b.start_date && (b.start_date <= weISO) && ((b.end_date||'9999') >= wsISO))).length;
+    weeks.push({ label: `${ws.getDate()}/${ws.getMonth()+1}`, free: rentableUnits.length - occ, total: rentableUnits.length });
+  }
+  const maxFree = Math.max(1, ...weeks.map(w=>w.free));
+
+  const chip = (active, onclick, label, count, color) => `<button onclick="${onclick}" class="px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap border ${active?'text-white':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}" style="${active?`background:${color||'#d4af37'};border-color:${color||'#d4af37'}`:''}">${label}${count!=null?` ${count}`:''}</button>`;
+
+  return `
+    <div class="space-y-3">
+      <!-- Filtros -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        ${chip(!stF,"pmaState.availFilterState=null;pmRender()",'Todas')}
+        ${chip(stF==='libre',"pmaState.availFilterState='libre';pmRender()",'🟢 Libres',counts.libre,'#10b981')}
+        ${chip(stF==='reservada',"pmaState.availFilterState='reservada';pmRender()",'🟡 Reservadas',counts.reservada,'#f59e0b')}
+        ${chip(stF==='ocupada',"pmaState.availFilterState='ocupada';pmRender()",'🔴 Ocupadas',counts.ocupada,'#ef4444')}
+        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'⚙️ Mant.',counts.mantenimiento,'#64748b')}
+        <select onchange="pmaState.availFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs ml-1"><option value="">🏠 Todas</option>${activeProps.map(p=>`<option value="${p.id}" ${propF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+        <select onchange="pmaState.availFilterType=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Tipo</option>${['casa_completa','apartamento','estudio','habitacion'].map(t=>`<option value="${t}" ${typeF===t?'selected':''}>${pmUnitTypeLabel(t)}</option>`).join('')}</select>
+      </div>
+
+      <!-- Grid -->
+      <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-1.5">
+        ${units.map(u => { const s=pmUnitState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; return `
+          <button onclick="pmEditUnit('${u.id}','${u.property_id}')" title="${pmPropertyName(u.property_id).replace(/"/g,'&quot;')} · ${(u.code||u.name||'').replace(/"/g,'&quot;')} · ${meta.label}" class="border ${meta.bg} rounded-lg p-1.5 text-left hover:shadow-sm transition">
+            <div class="text-[13px]">${meta.dot}</div>
+            <div class="text-[9px] font-bold ${meta.txt} truncate">${(u.code||u.name||'').replace(/</g,'&lt;').slice(0,12)}</div>
+            <div class="text-[8px] text-slate-400 truncate">${pmPropertyName(u.property_id).replace(/</g,'&lt;').slice(0,12)}</div>
+          </button>`; }).join('') || '<div class="col-span-full text-xs text-slate-400 italic py-6 text-center">Sin unidades con ese filtro.</div>'}
+      </div>
+
+      <!-- Próximamente libres -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Próximamente libres (30 días) · ${freeingSoon.length}</div>
+        ${freeingSoon.length ? `<div class="space-y-1 mt-1">${freeingSoon.map(({b,next}) => { const u=pmaState.units.find(x=>x.id===b.unit_id); const days=Math.floor((new Date(b.end_date)-new Date(today))/86400000); return `
+          <div class="flex items-center justify-between gap-2 text-[11px] border-b border-slate-50 py-1.5">
+            <div class="min-w-0"><span class="font-bold text-slate-800">${pmPropertyName(b.property_id).replace(/</g,'&lt;').slice(0,16)}</span> · ${(u?.code||u?.name||'').replace(/</g,'&lt;')} <span class="text-slate-400">· sale ${pmTenantName(b.tenant_id).replace(/</g,'&lt;').slice(0,18)}</span></div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <span class="text-slate-500">se libera <strong>${b.end_date}</strong> (${days}d)</span>
+              <span class="text-emerald-700 font-bold">$${Number(b.rent_amount||0).toLocaleString()}</span>
+              ${next?'<span class="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold">✓ ya reservada</span>':'<span class="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold">sin reserva</span>'}
+            </div>
+          </div>`; }).join('')}</div>` : '<div class="text-xs text-slate-400 italic">Ninguna se libera en los próximos 30 días.</div>'}
+      </div>
+
+      <!-- Forecast 60d -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-3" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Forecast 60 días · unidades libres por semana</div>
+        <div class="flex items-end gap-2 h-32 mt-2">
+          ${weeks.map(w => `<div class="flex-1 flex flex-col items-center justify-end gap-1">
+            <div class="text-[10px] font-bold text-slate-700">${w.free}</div>
+            <div class="w-full rounded-t" style="height:${Math.round(100*w.free/maxFree)}%;min-height:3px;background:#d4af37"></div>
+            <div class="text-[8px] text-slate-400">${w.label}</div>
+          </div>`).join('')}
+        </div>
+        <div class="text-[10px] text-slate-400 text-center mt-2">de ${weeks[0]?.total||0} unidades rentables · cada barra = 1 semana</div>
+      </div>
+    </div>`;
 }
 
 // Card expandible inline — estilo RentasPro
