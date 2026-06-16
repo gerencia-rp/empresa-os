@@ -2115,6 +2115,7 @@ function _opOpenEditModal(t, isBacklog) {
 }
 
 async function opSaveEdit(id, isBacklog) {
+  console.log('%c[opSaveEdit] 🔨 PLANNER DE JUAN → PATCH ops_day_tasks id=' + id, 'color:#d97706;font-weight:bold');
   // Null-safe: si el form no está, avisar en vez de no hacer nada en silencio.
   const titleEl = document.getElementById('op-e-title');
   if (!id || !titleEl) { try { opToast('No se pudo leer el formulario de la tarea', 'error'); } catch(e){} return; }

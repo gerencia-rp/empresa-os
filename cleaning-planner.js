@@ -2227,6 +2227,7 @@ function _opOpenEditModal(t, isBacklog) {
 }
 
 async function clSaveEdit(id, isBacklog) {
+  console.log('%c[clSaveEdit] 🧹 PLANNER DE LIMPIEZA → PATCH clean_day_tasks id=' + id, 'color:#10b981;font-weight:bold');
   const target = document.getElementById('op-e-target').value || '';
   const property_id = target.startsWith('prop:') ? target.slice(5) : null;
   const project_id = target.startsWith('proj:') ? target.slice(5) : null;
