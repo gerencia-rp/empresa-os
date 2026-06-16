@@ -84,6 +84,7 @@ const pmaState = {
   templates: [],                      // 🆕 plantillas de mensajes
   bookingHistory: [],                 // 🆕 movimientos de reserva entre unidades
   utilities: [],                      // 🆕 recibos públicos (Spectrum/Gas/Water/Electric)
+  dataWarnings: [],                   // 🆕 alertas de integridad de datos (del sync)
   loading: false,
   // Form state
   editingProperty: null,
@@ -142,7 +143,8 @@ async function pmLoadAll() {
     { name: 'alerts',     optional: true,  q: () => sb.from('pm_alerts').select('*').order('created_at', { ascending: false }).limit(500) },
     { name: 'templates',  optional: true,  q: () => sb.from('pm_message_templates').select('*').order('name') },
     { name: 'bookingHistory', optional: true, q: () => sb.from('pm_booking_history').select('*').order('moved_at', { ascending: false }).limit(2000) },
-    { name: 'utilities',  optional: true,  q: () => sb.from('pm_utilities').select('*').order('service_name') }
+    { name: 'utilities',  optional: true,  q: () => sb.from('pm_utilities').select('*').order('service_name') },
+    { name: 'dataWarnings', optional: true, q: () => sb.from('pm_data_warnings').select('*').eq('resolved', false).order('detected_at', { ascending: false }).limit(500) }
   ];
 
   const results = {};
@@ -200,6 +202,7 @@ async function pmLoadAll() {
   pmaState.templates = results.templates || [];
   pmaState.bookingHistory = results.bookingHistory || [];
   pmaState.utilities = results.utilities || [];
+  pmaState.dataWarnings = results.dataWarnings || [];
 
   console.log('[pm] Carga completa:', {
     properties: pmaState.properties.length,
@@ -874,6 +877,11 @@ function pmRenderDashboard(){
       </div>
       ${pmSyncStatusLabel()}
     </div>
+
+    ${(pmaState.dataWarnings||[]).length ? `<button onclick="pmSetTab('operations');pmaState.opsSubTab='datawarn';pmRender()" class="w-full text-left bg-amber-50 border-2 border-amber-300 hover:bg-amber-100 rounded-xl px-4 py-3 flex items-center justify-between transition">
+      <div class="flex items-center gap-3"><span class="text-2xl">🔎</span><div><div class="text-sm font-extrabold text-amber-900">${pmaState.dataWarnings.length} inconsistencia${pmaState.dataWarnings.length>1?'s':''} de datos</div><div class="text-xs text-amber-700">Airtable tiene datos contradictorios — revisá y corregí</div></div></div>
+      <span class="text-amber-800 font-bold text-sm">Ver →</span>
+    </button>` : ''}
 
     <!-- 2 · KPIs -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -5354,7 +5362,8 @@ function pmOpsGlobalFilters() {
 function pmRenderOperations() {
   const sub = pmaState.opsSubTab || 'tasks';
   const c = pmAlertCounts();
-  const tabs = [['tasks','📋 Cronograma'],['utilities','💡 Utilities'],['services','⚡ Servicios'],['comms','💬 Comunicación'],['alerts',`🔔 Alertas${c.total?` (${c.total})`:''}`]];
+  const dwN = (pmaState.dataWarnings||[]).length;
+  const tabs = [['tasks','📋 Cronograma'],['utilities','💡 Utilities'],['datawarn',`🔎 Datos${dwN?` (${dwN})`:''}`],['services','⚡ Servicios'],['comms','💬 Comunicación'],['alerts',`🔔 Alertas${c.total?` (${c.total})`:''}`]];
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
@@ -5364,6 +5373,7 @@ function pmRenderOperations() {
     </div>
     ${sub==='tasks'     ? pmRenderTasksSection() : ''}
     ${sub==='utilities' ? pmRenderUtilities() : ''}
+    ${sub==='datawarn'  ? pmRenderDataWarnings() : ''}
     ${sub==='services'  ? pmRenderServices() : ''}
     ${sub==='comms'     ? pmRenderComms() : ''}
     ${sub==='alerts'    ? pmRenderAlertsPanel() : ''}
@@ -5767,6 +5777,61 @@ async function pmDeleteUtility(id) {
   if (!r) return; await pmAfterCrud();
 }
 window.pmDeleteUtility = pmDeleteUtility;
+
+// ── Sub-tab: Alertas de Datos (pm_data_warnings) ──
+const PM_WARN_META = {
+  contrato_vencido_activo: { label: 'Contrato vencido marcado Activo', icon: '🔴', table: 'tblbSJ4K8e7mSHT5E' },
+  ocupada_sin_inquilino:   { label: 'Unidad Ocupada sin inquilino',     icon: '🟠', table: 'tblbSJ4K8e7mSHT5E' },
+  pago_sin_casa:           { label: 'Pago sin casa válida',             icon: '💸', table: 'tblqJlSgnLNfn34dh' },
+  inquilino_sin_fecha_fin: { label: 'Inquilino activo sin Fecha Fin',   icon: '📅', table: 'tblxEHBbGylH1aF2F' },
+  direccion_no_matchea:    { label: 'Dirección no matchea entre tablas',icon: '🏠', table: 'tblxEHBbGylH1aF2F' },
+  gasto_sin_casa:          { label: 'Gasto sin casa',                   icon: '🧾', table: 'tblsihpE31f116RCR' },
+  fechas_invertidas:       { label: 'check_in posterior a check_out',   icon: '🔀', table: 'tblbSJ4K8e7mSHT5E' },
+  renta_cero:              { label: 'Renta = 0',                        icon: '0️⃣', table: 'tblbSJ4K8e7mSHT5E' },
+  inquilino_duplicado:     { label: 'Inquilino duplicado (solapado)',   icon: '👥', table: 'tblbSJ4K8e7mSHT5E' }
+};
+function pmWarnMeta(t) { return PM_WARN_META[t] || { label: t, icon: '⚠️', table: null }; }
+function pmRenderDataWarnings() {
+  const warns = pmaState.dataWarnings || [];
+  const byType = {};
+  warns.forEach(w => { (byType[w.warning_type] = byType[w.warning_type] || []).push(w); });
+  const types = Object.keys(byType).sort((a,b) => byType[b].length - byType[a].length);
+  return `
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <div class="text-sm font-bold text-slate-900">Alertas de Datos · ${warns.length} sin resolver</div>
+        <div class="text-xs text-slate-500">Inconsistencias detectadas en la última sync de Airtable</div>
+      </div>
+      <button onclick="pmRunAlertChecks && pmOpenAirtableImport && pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Re-sync</button>
+    </div>
+    ${warns.length ? types.map(t => { const meta = pmWarnMeta(t); const items = byType[t]; return `
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-3 py-2 bg-slate-50 flex items-center justify-between"><span class="text-[11px] font-bold text-slate-700">${meta.icon} ${meta.label}</span><span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">${items.length}</span></div>
+        <div class="divide-y divide-slate-100">${items.map(w => {
+          const d = w.details || {};
+          const desc = Object.entries(d).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>`${k.replace(/_/g,' ')}: <strong>${String(v).replace(/</g,'&lt;').slice(0,30)}</strong>`).join(' · ');
+          const recM = (w.entity_id||'').match(/rec[A-Za-z0-9]{10,}/);
+          const atUrl = (meta.table && recM) ? `https://airtable.com/${PM_AIRTABLE_BASE}/${meta.table}/${recM[0]}` : null;
+          return `<div class="px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+            <div class="text-[11px] text-slate-600 min-w-0">${desc||w.entity_id||''}${w.property_id?` <span class="text-slate-400">· ${pmPropertyName(w.property_id).slice(0,16)}</span>`:''}</div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              ${atUrl?`<a href="${atUrl}" target="_blank" class="text-[10px] text-blue-600 hover:underline">Airtable ↗</a>`:''}
+              <button onclick="pmResolveWarning('${w.id}')" class="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded">✓ Resuelto</button>
+            </div>
+          </div>`;
+        }).join('')}</div>
+      </div>`; }).join('')
+      : '<div class="text-center py-10 text-emerald-600 text-sm">✓ Sin inconsistencias de datos. ¡Airtable está limpio!</div>'}
+  </div>`;
+}
+async function pmResolveWarning(id) {
+  const r = await pmExecQuery(sb.from('pm_data_warnings').update({ resolved: true, resolved_at: new Date().toISOString() }).eq('id', id).select(), 'Resolver alerta de datos');
+  if (!r) return;
+  pmaState.dataWarnings = (pmaState.dataWarnings||[]).filter(w => String(w.id) !== String(id));
+  pmRender();
+}
+window.pmResolveWarning = pmResolveWarning;
 
 // ── Sub-tab B: Servicios automáticos ──
 function pmRenderServices() {

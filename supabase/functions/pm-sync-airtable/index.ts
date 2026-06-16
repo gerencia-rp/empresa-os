@@ -336,6 +336,12 @@ Deno.serve(async (req) => {
   const startMs = Date.now();
   const stats: any = { properties: 0, units: 0, tenants: 0, bookings: 0, payments_in: 0, expenses_house: 0, expenses_operational: 0, expenses_cleaning: 0, payroll: 0, credentials: 0, wifi: 0, tasks: 0 };
   const errors: string[] = [];
+  const todayISO = new Date().toISOString().slice(0, 10);
+  // Colector de alertas de integridad de datos (pm_data_warnings)
+  const warnings: any[] = [];
+  const addWarn = (warning_type: string, entity_type: string, entity_id: string, property_id: string | null, details: any) => {
+    warnings.push({ warning_type, entity_type, entity_id, property_id, details, dedup_key: `${warning_type}:${entity_id}`, resolved: false });
+  };
 
   // Log inicio
   const { data: log } = await supabase.from("pm_sync_log").insert({
@@ -507,6 +513,18 @@ Deno.serve(async (req) => {
         notes: r.fields?.[F.ten_comentario] || null
       });
       tenantIdByName[name.toLowerCase()] = ext;
+
+      // (d) inquilino activo sin Fecha Fin
+      const tEstado = getMultiSel(r.fields?.[F.ten_estado])[0] || "";
+      const tFin = r.fields?.[F.ten_fecha_out] || null;
+      if (/activo/i.test(tEstado) && !tFin) {
+        addWarn("inquilino_sin_fecha_fin", "tenant", ext, null, { inquilino: name, estado_airtable: tEstado });
+      }
+      // (e) casa del tenant que no matchea ninguna propiedad
+      const tCasa = getSel(r.fields?.[F.ten_casa]) || (r.fields?.[F.ten_casa] as string) || null;
+      if (tCasa && !findPropId(tCasa)) {
+        addWarn("direccion_no_matchea", "tenant", ext, null, { inquilino: name, casa: tCasa });
+      }
     }
     const allTenants = [...tenantsBasic.filter(t => !tenantsFromTbl.find(t2 => t2.full_name.toLowerCase() === t.full_name.toLowerCase())), ...tenantsFromTbl];
     if (!dry_run && allTenants.length) {
@@ -554,6 +572,24 @@ Deno.serve(async (req) => {
       const obs = r.fields?.[F.dxc_obs] || null;
       const modelo = getSel(r.fields?.[F.dxc_modelo]) || "";
       const checkOut = r.fields?.[F.dxc_fecha_out] || null;
+      const estadoAt = getSel(r.fields?.[F.dxc_estado]) || "";
+
+      // ── Warnings de integridad ──
+      // (a) contrato vencido marcado Activo/Ocupada en Airtable
+      if (checkOut && checkOut < todayISO && /activo|ocupad/i.test(estadoAt)) {
+        addWarn("contrato_vencido_activo", "booking", "booking-dxc-" + r.id, unitInfo.property_id,
+          { inquilino, casa: getSel(r.fields?.[F.dxc_direccion]), check_out: checkOut, estado_airtable: estadoAt });
+      }
+      // (g) check_in posterior a check_out
+      if (checkOut && startDate > checkOut) {
+        addWarn("fechas_invertidas", "booking", "booking-dxc-" + r.id, unitInfo.property_id,
+          { inquilino, check_in: startDate, check_out: checkOut });
+      }
+      // (h) renta = 0
+      if (!(r.fields?.[F.dxc_pago])) {
+        addWarn("renta_cero", "unit", unitExtId, unitInfo.property_id,
+          { inquilino, casa: getSel(r.fields?.[F.dxc_direccion]), tipo: getMultiSel(r.fields?.[F.dxc_tipo])[0] });
+      }
 
       bookingKeys.add(bkKey(unitInfo.id, inquilino, startDate));
       bookings.push({
@@ -586,6 +622,17 @@ Deno.serve(async (req) => {
     }
     stats.bookings = bookings.length;
     console.log(`[pm-sync] pm_bookings (Datos x Casa): ${bookings.length} reservas.`);
+
+    // (b) Unidad Ocupada sin inquilino
+    for (const r of datosCasa) {
+      const estadoAt = getSel(r.fields?.[F.dxc_estado]) || "";
+      const inq = r.fields?.[F.dxc_inquilino];
+      if (/ocupad/i.test(estadoAt) && !inq) {
+        const addr = getSel(r.fields?.[F.dxc_direccion]);
+        addWarn("ocupada_sin_inquilino", "unit", "unit-" + slugify(addr || "") + "-" + slugify(getMultiSel(r.fields?.[F.dxc_tipo])[0] || ""), propIdByExtId["addr-" + slugify(addr || "")] || null,
+          { casa: addr, tipo: getMultiSel(r.fields?.[F.dxc_tipo])[0], estado_airtable: estadoAt });
+      }
+    }
 
     // ════════════════════════════════════════════════════════════
     // 3b) BOOKINGS desde Base de datos Tenant — dedup por (unit+nombre+check_in)
@@ -656,6 +703,9 @@ Deno.serve(async (req) => {
           paysUnlinked++;
           if (casaName) unlinkedCasas[casaName] = (unlinkedCasas[casaName] || 0) + 1;
           console.warn(`[pm-sync] ⚠️ pago SIN vincular · Casa="${casaName || "(vacío)"}" → property_id NULL`);
+          // (c) pago sin casa válida
+          addWarn("pago_sin_casa", "payment", "pay-" + r.id, null,
+            { casa_airtable: casaName, inquilino: r.fields?.[F.pag_inq] || null, monto: r.fields?.[F.pag_monto] || null });
         }
         const tipo = getSel(r.fields?.[F.pag_tipo]);
         const unitId = (propId && tipo) ? (unitIdByPropName[`${propId}|${slugify(tipo)}`] || null) : null;
@@ -703,11 +753,15 @@ Deno.serve(async (req) => {
       const gastos = await fetchAllRecords(base_id, TABLE_IDS.gastos_casa, airtable_token);
       const exp: any[] = [];
       for (const r of gastos) {
+        const gPropId = findPropId(r.fields?.[F.gst_dir]);
+        // (f) gasto sin casa
+        if (!gPropId) addWarn("gasto_sin_casa", "expense", "exp-house-" + r.id, null,
+          { casa_airtable: r.fields?.[F.gst_dir] || null, tipo: getSel(r.fields?.[F.gst_tipo]), monto: r.fields?.[F.gst_valor] || null });
         exp.push({
           external_id: "exp-house-" + r.id,
           category: "house",
           subcategory: getSel(r.fields?.[F.gst_tipo]) || null,
-          property_id: findPropId(r.fields?.[F.gst_dir]),
+          property_id: gPropId,
           amount: r.fields?.[F.gst_valor] || 0,
           expense_date: r.fields?.[F.gst_fecha] || null,
           month: getMultiSel(r.fields?.[F.gst_mes])[0]?.toLowerCase() || null,
@@ -906,6 +960,50 @@ Deno.serve(async (req) => {
       }
       stats.tasks = tasks.length;
     } catch (e: any) { errors.push("cronograma: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // (i) Inquilino duplicado: mismo nombre + misma casa + fechas solapadas
+    // ════════════════════════════════════════════════════════════
+    try {
+      const byKey: Record<string, any[]> = {};
+      for (const r of datosCasa) {
+        const inq = r.fields?.[F.dxc_inquilino]; const ci = r.fields?.[F.dxc_fecha_in];
+        if (!inq || !ci) continue;
+        const addr = getSel(r.fields?.[F.dxc_direccion]) || "";
+        const k = slugify(inq) + "|" + slugify(addr);
+        (byKey[k] = byKey[k] || []).push({ recId: r.id, ci, co: r.fields?.[F.dxc_fecha_out] || "9999-12-31", inq, addr, propId: propIdByExtId["addr-" + slugify(addr)] || null });
+      }
+      for (const k of Object.keys(byKey)) {
+        const arr = byKey[k]; if (arr.length < 2) continue;
+        for (let a = 0; a < arr.length; a++) for (let b = a + 1; b < arr.length; b++) {
+          if (arr[a].ci <= arr[b].co && arr[b].ci <= arr[a].co) {  // solapan
+            addWarn("inquilino_duplicado", "booking", "booking-dxc-" + arr[b].recId, arr[b].propId,
+              { inquilino: arr[a].inq, casa: arr[a].addr, periodo_a: `${arr[a].ci}→${arr[a].co}`, periodo_b: `${arr[b].ci}→${arr[b].co}` });
+          }
+        }
+      }
+    } catch (e: any) { errors.push("dup-check: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // Persistir alertas de datos + auto-resolver las ya corregidas
+    // ════════════════════════════════════════════════════════════
+    stats.data_warnings = warnings.length;
+    if (!dry_run) {
+      try {
+        const nowISO = new Date().toISOString();
+        const detectedKeys = warnings.map(w => w.dedup_key);
+        for (let i = 0; i < warnings.length; i += 50) {
+          const chunk = warnings.slice(i, i + 50).map(w => ({ ...w, detected_at: nowISO, resolved: false, resolved_at: null }));
+          const { error } = await supabase.from("pm_data_warnings").upsert(chunk, { onConflict: "dedup_key" });
+          if (error) { errors.push("data_warnings: " + error.message); break; }
+        }
+        // Auto-resolver: unresolved cuyo dedup_key ya no se detecta
+        let q = supabase.from("pm_data_warnings").update({ resolved: true, resolved_at: nowISO }).eq("resolved", false);
+        if (detectedKeys.length) q = q.not("dedup_key", "in", `(${detectedKeys.map(x => `"${x}"`).join(",")})`);
+        await q;
+      } catch (e: any) { errors.push("data_warnings persist: " + e.message); }
+    }
+    console.log(`[pm-sync] data_warnings: ${warnings.length} detectadas`);
 
     // Cerrar log
     const status = errors.length === 0 ? "success" : "partial";
