@@ -49,7 +49,11 @@ const pmaState = {
   expFilterProperty: null,                // tab Gastos: property_id (sub-tab casa)
   expFilterSubcat: null,                  // tab Gastos: subcategoría
   payrollView: 'people',                  // sub-tab Nómina: people·monthly
-  finPeriod: 'this_month',                // Finanzas: this_month·last3·ytd·custom
+  finPeriod: 'this_month',                // Finanzas: this_month·last3·ytd·custom (legacy toggle)
+  finMonthSel: null,                      // Finanzas: 'YYYY-MM'|'ytd'|'last-3m'|...|'all-time' (null=mes actual)
+  finFilterProperty: null,                // Finanzas: filtrar dashboard por casa
+  finFilterPlatform: null,                // Finanzas: filtrar por plataforma
+  finFilterModel: null,                   // Finanzas: filtrar por modelo de renta
   finCustomFrom: null,                    // Finanzas custom: 'YYYY-MM-DD'
   finCustomTo: null,
   pnlSortKey: 'net',                      // P&L por casa: columna de orden
@@ -561,6 +565,14 @@ function pmEnsureResizerInfra() {
     .pm-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .pm-clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25}
     .pm-clamp1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+    .pm-filters-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+    .pm-filter-dropdown{display:flex;flex-direction:column;gap:3px;min-width:148px}
+    .pm-filter-dropdown label{font-size:10px;text-transform:uppercase;color:#94a3b8;font-weight:700;letter-spacing:.04em}
+    .pm-filter-select{padding:7px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;color:#334155;font-size:13px;cursor:pointer;transition:all .15s;max-width:220px}
+    .pm-filter-select:hover,.pm-filter-select:focus{border-color:#d4af37;outline:none}
+    .pm-filter-select.has-value{background:#fdf8e7;border-color:#d4af37;color:#92710f;font-weight:600}
+    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #cbd5e1;border-radius:6px;color:#64748b;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
+    .pm-clear-filters:hover{color:#92710f;border-color:#d4af37}
     @media (max-width:767px){
       .pm-split{flex-direction:column}
       .pm-split-sidebar{flex:0 0 auto !important;max-width:none;width:100%;max-height:240px;overflow-y:auto}
@@ -2645,6 +2657,22 @@ window.pmCreateBookingFromDay = pmCreateBookingFromDay;
 // ════════════════════════════════════════════════════════════════
 const PM_PLATFORM_LABEL = { contrato_directo: 'Contrato directo', airbnb: 'Airbnb', booking: 'Booking', vrbo: 'VRBO', hospitable: 'Hospitable', padsplit: 'Padsplit', reserva_corta: 'Reserva corta', otro: 'Otro' };
 
+// Dropdown de filtro reutilizable (estilo Mercury, dorado cuando tiene valor)
+//   options: [[value,label],...]; onchangeExpr recibe this.value (usar ||null afuera)
+function pmFilterSelect(label, icon, currentVal, options, onchangeExpr) {
+  const has = currentVal != null && currentVal !== '' && currentVal !== 'all';
+  return `<div class="pm-filter-dropdown"><label>${icon?icon+' ':''}${label}</label>
+    <select onchange="${onchangeExpr}" class="pm-filter-select${has?' has-value':''}">
+      ${options.map(([v,l]) => `<option value="${v}" ${String(currentVal==null?'':currentVal)===String(v)?'selected':''}>${(l||'').replace(/</g,'&lt;')}</option>`).join('')}
+    </select></div>`;
+}
+// Opciones de mes para dropdowns (últimos 12 meses + rangos)
+function pmMonthOptions(withRanges = true) {
+  const now = new Date(); const opts = [];
+  for (let i=0;i<12;i++){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; opts.push([ym, `${PM_ES_MONTHS[d.getMonth()].charAt(0).toUpperCase()+PM_ES_MONTHS[d.getMonth()].slice(1)} ${d.getFullYear()}`]); }
+  if (withRanges) opts.push(['ytd','YTD '+now.getFullYear()], ['last-3m','Últimos 3 meses'], ['last-6m','Últimos 6 meses'], ['last-12m','Últimos 12 meses'], ['all-time','Todo el histórico']);
+  return opts;
+}
 // Chip de filtro reutilizable (dorado Mercury cuando activo)
 function pmChip(active, onclick, label, count) {
   return `<button onclick="${onclick}" class="px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap border ${active?'text-white':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}" style="${active?'background:#d4af37;border-color:#d4af37':''}">${label}${count!=null?` <span class="opacity-70">${count}</span>`:''}</button>`;
@@ -2909,28 +2937,12 @@ function pmRenderBookings() {
         <button id="pm-res-clearx" onclick="document.getElementById('pm-res-search').value='';pmBookingsSearchInput('')" style="display:${searchQ?'':'none'}" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>
       </div>
 
-      <!-- Filtros -->
-      <div class="space-y-1.5 text-[10px] font-bold">
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400 uppercase w-12 flex-shrink-0">Casa</span>
-          <div class="flex gap-1.5 overflow-x-auto pb-1">
-            ${chip(!propF, "pmBookingsSetFilter('property',null)", 'Todas')}
-            ${propsWithBookings.map(p => chip(propF===p.id, `pmBookingsSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,18))).join('')}
-          </div>
-        </div>
-        <div class="flex items-start gap-2">
-          <span class="text-slate-400 uppercase w-12 flex-shrink-0 mt-1">Fuente</span>
-          <div class="flex gap-1.5 flex-wrap">
-            ${chip(!platF, "pmBookingsSetFilter('platform',null)", 'Todas', all.length)}
-            ${platforms.map(plat => chip(platF===plat, `pmBookingsSetFilter('platform','${plat}')`, PM_PLATFORM_LABEL[plat]||plat, platformCounts[plat])).join('')}
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400 uppercase w-12 flex-shrink-0">Estatus</span>
-          <div class="flex gap-1.5 flex-wrap">
-            ${statuses.map(([k,l]) => chip((statF||'all')===k, `pmBookingsSetFilter('status','${k}')`, l)).join('')}
-          </div>
-        </div>
+      <!-- Filtros (dropdowns) -->
+      <div class="pm-filters-bar">
+        ${pmFilterSelect('Casa', '🏠', propF, [['','Todas'], ...propsWithBookings.map(p=>[p.id, p.name||''])], "pmBookingsSetFilter('property', this.value||null)")}
+        ${pmFilterSelect('Fuente', '📡', platF, [['',`Todas (${all.length})`], ...platforms.map(pl=>[pl, `${PM_PLATFORM_LABEL[pl]||pl} (${platformCounts[pl]})`])], "pmBookingsSetFilter('platform', this.value||null)")}
+        ${pmFilterSelect('Estatus', '⚡', statF==='all'?'':statF, statuses.map(([k,l])=>[k==='all'?'':k, l]), "pmBookingsSetFilter('status', this.value||'all')")}
+        ${pmBookingsHasFilters()?`<button class="pm-clear-filters" onclick="pmBookingsClearFilters()">✕ Limpiar</button>`:''}
       </div>
 
       <!-- Lista (este container se reescribe en la búsqueda en vivo) -->
@@ -3158,14 +3170,12 @@ function pmRenderTenants() {
       <button id="pm-inq-clearx" onclick="document.getElementById('pm-inq-search').value='';pmTenantsSearchInput('')" style="display:${searchQ?'':'none'}" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>
     </div>
 
-    <!-- Filtros -->
-    <div class="space-y-1.5 text-[10px] font-bold">
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-14 flex-shrink-0">Estado</span>
-        <div class="flex gap-1.5 flex-wrap">${statusChips.map(([k,l,c]) => pmChip(filter===k, `pmTenantsSetFilter('status','${k}')`, l, c)).join('')}</div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-14 flex-shrink-0">Casa</span>
-        <div class="flex gap-1.5 overflow-x-auto pb-1">${pmChip(!propF, "pmTenantsSetFilter('property',null)", 'Todas')}${propsWithT.map(p => pmChip(propF===p.id, `pmTenantsSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,16))).join('')}</div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-14 flex-shrink-0">Tipo</span>
-        <div class="flex gap-1.5 flex-wrap">${pmChip(!typeF, "pmTenantsSetFilter('type',null)", 'Todos')}${types.map(tp => pmChip(typeF===tp, `pmTenantsSetFilter('type','${tp}')`, pmUnitTypeLabel(tp))).join('')}</div></div>
+    <!-- Filtros (dropdowns) -->
+    <div class="pm-filters-bar">
+      ${pmFilterSelect('Estado', '⚡', filter==='activos'?'':filter, statusChips.map(([k,l,c])=>[k==='activos'?'':k, l+(c!=null?` (${c})`:'')]), "pmTenantsSetFilter('status', this.value||'activos')")}
+      ${pmFilterSelect('Casa', '🏠', propF, [['','Todas'], ...propsWithT.map(p=>[p.id, p.name||''])], "pmTenantsSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Tipo', '🛏', typeF, [['','Todos'], ...types.map(tp=>[tp, pmUnitTypeLabel(tp)])], "pmTenantsSetFilter('type', this.value||null)")}
+      ${pmTenantsHasFilters()?`<button class="pm-clear-filters" onclick="pmTenantsClearFilters()">✕ Limpiar</button>`:''}
     </div>
 
     <div id="pm-inq-list">${pmTenantsListHtml()}</div>
@@ -3614,13 +3624,22 @@ function pmPaymentsHasFilters() {
   return !!(pmaState.payFilterProperty || pmaState.payFilterPlatform || pmaState.payRecurrenceFilter
     || (pmaState.payStatusFilter && pmaState.payStatusFilter !== 'all') || (pmaState.payPeriod && pmaState.payPeriod !== 'month') || (pmaState.paySearch||'').trim());
 }
+// ¿la fecha cae en el período? acepta 'YYYY-MM', 'ytd', 'last-Nm', 'all-time',
+// y los legacy 'month'/'prev'/'year'/'all'.
+function pmPeriodMatch(dateStr, period) {
+  const d = dateStr || '';
+  if (!period || period === 'all' || period === 'all-time') return true;
+  if (/^\d{4}-\d{2}$/.test(period)) return d.startsWith(period);
+  if (period === 'month') return d.startsWith(pmCurrentYM());
+  if (period === 'prev') return d.startsWith(pmYmShift(pmCurrentYM(), -1));
+  if (period === 'year' || period === 'ytd') return d.startsWith(String(new Date().getFullYear()));
+  const m = period.match(/^last-(\d+)m$/);
+  if (m) return d.slice(0,7) >= pmYmShift(pmCurrentYM(), -(parseInt(m[1],10)-1));
+  return true;
+}
 function pmPaymentsFiltered() {
   const period = pmaState.payPeriod || 'month';
-  const ym = pmCurrentYM(), prevYm = pmYmShift(ym, -1), yr = String(new Date().getFullYear());
-  let pays = pmaState.payments.filter(p => p.type === 'ingreso');
-  if (period === 'month') pays = pays.filter(p => (p.paid_at||'').startsWith(ym));
-  else if (period === 'prev') pays = pays.filter(p => (p.paid_at||'').startsWith(prevYm));
-  else if (period === 'year') pays = pays.filter(p => (p.paid_at||'').startsWith(yr));
+  let pays = pmaState.payments.filter(p => p.type === 'ingreso' && pmPeriodMatch(p.paid_at, period));
   if (pmaState.payFilterProperty) pays = pays.filter(p => p.property_id === pmaState.payFilterProperty);
   if (pmaState.payFilterPlatform) pays = pays.filter(p => p.platform === pmaState.payFilterPlatform);
   if (pmaState.payRecurrenceFilter) pays = pays.filter(p => { const b = pmPaymentBooking(p); return b && pmRecurrenceOf(b.payment_day).kind === pmaState.payRecurrenceFilter; });
@@ -3767,23 +3786,14 @@ function pmRenderPayments() {
       <button id="pm-pay-clearx" onclick="document.getElementById('pm-pay-search').value='';pmPaymentsSearchInput('')" style="display:${searchQ?'':'none'}" class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs">×</button>
     </div>
 
-    <!-- Filtros -->
-    <div class="space-y-1.5 text-[10px] font-bold">
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Estatus</span><div class="flex gap-1.5 flex-wrap">
-        ${[['all','Todos'],['aldia','Al día'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['sincontrato','Sin contrato']].map(([k,l]) => pmChip(statF===k, `pmPaymentsSetFilter('status','${k}')`, l)).join('')}
-      </div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Casa</span><div class="flex gap-1.5 overflow-x-auto pb-1">
-        ${pmChip(!propFilter, "pmPaymentsSetFilter('property',null)", 'Todas')}${propsWithPay.map(p => pmChip(propFilter===p.id, `pmPaymentsSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,16))).join('')}
-      </div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Recurr.</span><div class="flex gap-1.5 flex-wrap">
-        ${pmChip(!recF, "pmPaymentsSetFilter('recurrence',null)", 'Todas')}${[['mensual','🗓 Mensual'],['quincenal','⏱ Quincenal'],['airbnb','🏖 Airbnb']].map(([k,l]) => pmChip(recF===k, `pmPaymentsSetFilter('recurrence','${k}')`, l)).join('')}
-      </div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Plataf.</span><div class="flex gap-1.5 flex-wrap">
-        ${pmChip(!pmaState.payFilterPlatform, "pmPaymentsSetFilter('platform',null)", 'Todas')}${platforms.map(pl => pmChip(pmaState.payFilterPlatform===pl, `pmPaymentsSetFilter('platform','${pl}')`, (pl||'').replace(/</g,'&lt;'))).join('')}
-      </div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Mes</span><div class="flex gap-1.5 flex-wrap">
-        ${[['month','Actual'],['prev','Anterior'],['year','Año'],['all','Todo']].map(([k,l]) => pmChip(periodF===k, `pmPaymentsSetFilter('period','${k}')`, l)).join('')}
-      </div></div>
+    <!-- Filtros (dropdowns) -->
+    <div class="pm-filters-bar">
+      ${pmFilterSelect('Mes', '📅', periodF==='month'?pmCurrentYM():periodF, pmMonthOptions(), "pmPaymentsSetFilter('period', this.value)")}
+      ${pmFilterSelect('Estatus', '⚡', statF==='all'?'':statF, [['','Todos'],['aldia','Al día'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['sincontrato','Sin contrato']], "pmPaymentsSetFilter('status', this.value||'all')")}
+      ${pmFilterSelect('Casa', '🏠', propFilter, [['','Todas'], ...propsWithPay.map(p=>[p.id, p.name||''])], "pmPaymentsSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Recurrencia', '🔁', recF, [['','Todas'],['mensual','🗓 Mensual'],['quincenal','⏱ Quincenal'],['airbnb','🏖 Airbnb']], "pmPaymentsSetFilter('recurrence', this.value||null)")}
+      ${pmFilterSelect('Plataforma', '💳', pmaState.payFilterPlatform, [['','Todas'], ...platforms.map(pl=>[pl, pl])], "pmPaymentsSetFilter('platform', this.value||null)")}
+      ${pmPaymentsHasFilters()?`<button class="pm-clear-filters" onclick="pmPaymentsClearFilters()">✕ Limpiar</button>`:''}
     </div>
 
     <!-- Tabla -->
@@ -3952,17 +3962,13 @@ function pmRenderHouseExpenses() {
       </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="space-y-1.5 text-[10px] font-bold">
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Casa</span><div class="flex gap-1.5 overflow-x-auto pb-1">
-        ${pmChip(!propFilter, "pmExpensesSetFilter('property',null)", 'Todas')}${pmaState.properties.filter(p=>houseExp.some(e=>e.property_id===p.id)).map(p => pmChip(propFilter===p.id, `pmExpensesSetFilter('property','${p.id}')`, (p.name||'').replace(/</g,'&lt;').slice(0,16))).join('')}
-      </div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Categoría</span><div class="flex gap-1.5 overflow-x-auto pb-1">
-        ${pmChip(!subcatFilter, "pmExpensesSetFilter('subcat',null)", 'Todas')}${subcats.map(s => pmChip(subcatFilter===s, `pmExpensesSetFilter('subcat','${(s||'').replace(/'/g,"\\'")}')`, (s||'').replace(/</g,'&lt;').slice(0,16))).join('')}
-      </div></div>
-      <div class="flex items-center gap-2"><span class="text-slate-400 uppercase w-16 flex-shrink-0">Estatus</span><div class="flex gap-1.5 flex-wrap">
-        ${[['all','Todos'],['paid','Pagado'],['pending','Pendiente']].map(([k,l]) => pmChip(statusFilter===k, `pmExpensesSetFilter('status','${k}')`, l)).join('')}
-      </div></div>
+    <!-- Filtros (dropdowns) -->
+    <div class="pm-filters-bar">
+      ${pmFilterSelect('Mes', '📅', ym, pmMonthOptions(false), "pmSetExpMonth(this.value)")}
+      ${pmFilterSelect('Casa', '🏠', propFilter, [['','Todas'], ...pmaState.properties.filter(p=>houseExp.some(e=>e.property_id===p.id)).map(p=>[p.id, p.name||''])], "pmExpensesSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Categoría', '📂', subcatFilter, [['','Todas'], ...subcats.map(s=>[s, s])], "pmExpensesSetFilter('subcat', this.value||null)")}
+      ${pmFilterSelect('Estatus', '⚡', statusFilter==='all'?'':statusFilter, [['','Todos'],['paid','Pagado'],['pending','Pendiente']], "pmExpensesSetFilter('status', this.value||'all')")}
+      ${hasF?`<button class="pm-clear-filters" onclick="pmExpensesClearFilters()">✕ Limpiar</button>`:''}
     </div>
 
     ${pmExpenseTable(rows, true, true)}
@@ -4352,11 +4358,15 @@ window.pmDeleteExpense = pmDeleteExpense;
 function pmFinRange() {
   const now = new Date(), y = now.getFullYear(), m = now.getMonth();
   const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const period = pmaState.finPeriod || 'this_month';
+  const sel = pmaState.finMonthSel || (pmaState.finPeriod === 'last3' ? 'last-3m' : pmaState.finPeriod === 'ytd' ? 'ytd' : pmaState.finPeriod === 'custom' ? 'custom' : pmCurrentYM());
   let from, to, label;
-  if (period === 'last3')      { from = new Date(y, m-2, 1); to = new Date(y, m+1, 0); label = 'Últimos 3 meses'; }
-  else if (period === 'ytd')   { from = new Date(y, 0, 1);   to = now;                 label = 'Año a la fecha'; }
-  else if (period === 'custom'){
+  if (/^\d{4}-\d{2}$/.test(sel)) { const yy=+sel.slice(0,4), mm=+sel.slice(5,7)-1; from=new Date(yy,mm,1); to=new Date(yy,mm+1,0); label=pmYmLabel(sel); }
+  else if (sel === 'ytd' || sel === 'year') { from = new Date(y, 0, 1); to = now; label = 'YTD ' + y; }
+  else if (sel === 'last-3m' || sel === 'last3') { from = new Date(y, m-2, 1); to = new Date(y, m+1, 0); label = 'Últimos 3 meses'; }
+  else if (sel === 'last-6m') { from = new Date(y, m-5, 1); to = new Date(y, m+1, 0); label = 'Últimos 6 meses'; }
+  else if (sel === 'last-12m') { from = new Date(y, m-11, 1); to = new Date(y, m+1, 0); label = 'Últimos 12 meses'; }
+  else if (sel === 'all-time') { from = new Date(2020, 0, 1); to = now; label = 'Todo el histórico'; }
+  else if (sel === 'custom') {
     from = pmaState.finCustomFrom ? new Date(pmaState.finCustomFrom+'T00:00:00') : new Date(y, m, 1);
     to   = pmaState.finCustomTo   ? new Date(pmaState.finCustomTo+'T00:00:00')   : now;
     label = `${iso(from)} → ${iso(to)}`;
@@ -4391,9 +4401,19 @@ function pmPayrollInRange(r) {
 }
 function pmIsAseo(e) { return e.category === 'cleaning' || /aseo|podada|cesped|césped|lawn|cleaning/i.test(e.subcategory||''); }
 // Agregado P&L del período (ingresos, gastos por categoría, nómina, breakdowns, por casa)
+// Respeta los filtros globales del dashboard: casa, plataforma, modelo de renta.
 function pmFinAgg(r) {
-  const inc = pmaState.payments.filter(p => p.type==='ingreso' && pmInRange(p.paid_at, r));
-  const exp = pmaState.expenses.filter(e => pmInRange(e.expense_date, r));
+  const propF = pmaState.finFilterProperty, platF = pmaState.finFilterPlatform, modelF = pmaState.finFilterModel;
+  // Conjunto de propiedades en alcance (casa / modelo)
+  let scopeProps = pmaState.properties.filter(p => p.status === 'activa');
+  if (propF) scopeProps = scopeProps.filter(p => p.id === propF);
+  if (modelF) scopeProps = scopeProps.filter(p => (p.rental_model || 'casa_completa') === modelF);
+  const scopeIds = new Set(scopeProps.map(p => p.id));
+  const scoped = (propF || modelF);
+  const inc = pmaState.payments.filter(p => p.type==='ingreso' && pmInRange(p.paid_at, r)
+    && (!scoped || scopeIds.has(p.property_id))
+    && (!platF || (pmPaymentBooking(p)?.booking_type === platF)));
+  const exp = pmaState.expenses.filter(e => pmInRange(e.expense_date, r) && (!scoped || scopeIds.has(e.property_id)));
   const sum = (arr, f) => arr.reduce((s,x) => s + Number((f?f(x):x.amount)||0), 0);
   const income = sum(inc);
   const house = sum(exp.filter(e => e.category==='house' && !pmIsAseo(e)));
@@ -4422,7 +4442,7 @@ function pmFinAgg(r) {
   expenseByCategory['Operativos'] = operational;
   expenseByCategory['Nómina'] = payroll;
 
-  const activeProps = pmaState.properties.filter(p => p.status==='activa');
+  const activeProps = scopeProps;   // ya filtrado por casa/modelo
   const payrollPerProp = activeProps.length ? payroll / activeProps.length : 0;
   const operativosPerProp = activeProps.length ? operational / activeProps.length : 0;
   const props = activeProps.map(p => {
@@ -4477,8 +4497,40 @@ function pmFinTrend(nMonths, anchorYm) {
   }
   return out;
 }
-function pmFinSetPeriod(p) { pmaState.finPeriod = p; pmRender(); }
+function pmFinSetPeriod(p) {
+  pmaState.finPeriod = p;
+  pmaState.finMonthSel = p === 'this_month' ? pmCurrentYM() : p === 'last3' ? 'last-3m' : p === 'ytd' ? 'ytd' : p === 'custom' ? 'custom' : pmCurrentYM();
+  try { localStorage.setItem('pm_finanzas_month', pmaState.finMonthSel); } catch (e) {}
+  pmRender();
+}
 window.pmFinSetPeriod = pmFinSetPeriod;
+function pmFinSetMonth(v) { pmaState.finMonthSel = v; pmaState.finPeriod = (/^\d{4}-\d{2}$/.test(v)?'this_month':v==='last-3m'?'last3':v==='ytd'?'ytd':v==='custom'?'custom':'this_month'); try { localStorage.setItem('pm_finanzas_month', v); } catch(e){} pmRender(); }
+window.pmFinSetMonth = pmFinSetMonth;
+function pmFinSetFilter(key, value) {
+  const map = { property: 'finFilterProperty', platform: 'finFilterPlatform', model: 'finFilterModel' };
+  pmaState[map[key]] = value;
+  try { localStorage.setItem('pm_finanzas_' + key, value == null ? '' : value); } catch (e) {}
+  pmRender();
+}
+window.pmFinSetFilter = pmFinSetFilter;
+function pmFinClearFilters() {
+  pmaState.finFilterProperty = null; pmaState.finFilterPlatform = null; pmaState.finFilterModel = null;
+  try { ['property','platform','model'].forEach(k => localStorage.removeItem('pm_finanzas_' + k)); } catch (e) {}
+  pmRender();
+}
+window.pmFinClearFilters = pmFinClearFilters;
+function pmFinHasFilters() { return !!(pmaState.finFilterProperty || pmaState.finFilterPlatform || pmaState.finFilterModel); }
+function pmFinInitFilters() {
+  if (pmaState._finFiltersLoaded) return;
+  pmaState._finFiltersLoaded = true;
+  try {
+    const g = (k) => { const v = localStorage.getItem(k); return (v === null || v === '') ? null : v; };
+    pmaState.finFilterProperty = g('pm_finanzas_property');
+    pmaState.finFilterPlatform = g('pm_finanzas_platform');
+    pmaState.finFilterModel = g('pm_finanzas_model');
+    const ms = localStorage.getItem('pm_finanzas_month'); if (ms) pmaState.finMonthSel = ms;
+  } catch (e) {}
+}
 function pmSetPnlSort(key) {
   if (pmaState.pnlSortKey === key) pmaState.pnlSortDir = pmaState.pnlSortDir==='desc'?'asc':'desc';
   else { pmaState.pnlSortKey = key; pmaState.pnlSortDir = 'desc'; }
@@ -4494,6 +4546,7 @@ function pmFinShiftRangeBack(r) {
   return { fromISO, toISO, ymList, months: r.months, label: 'prev' };
 }
 function pmRenderFinance() {
+  pmFinInitFilters();
   const r = pmFinRange();
   const agg = pmFinAgg(r);
   const prevAgg = pmFinAgg(pmFinShiftRangeBack(r));
@@ -4569,18 +4622,25 @@ function pmRenderFinance() {
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div>
         <div class="text-base font-bold text-slate-900">Finanzas · Dashboard ejecutivo</div>
-        <div class="text-xs text-slate-500">${r.label} · ${agg.activePropsCount} casas activas</div>
+        <div class="text-xs text-slate-500">${r.label} · ${agg.activePropsCount} ${agg.activePropsCount===1?'casa':'casas'}${pmFinHasFilters()?' (filtrado)':''}</div>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
-          ${pBtn('this_month','Mes actual')}${pBtn('last3','Últ. 3m')}${pBtn('ytd','YTD')}${pBtn('custom','Custom')}
-        </div>
-        ${period==='custom'?`<div class="flex items-center gap-1 text-[10px]">
-          <input type="date" value="${pmaState.finCustomFrom||''}" onchange="pmaState.finCustomFrom=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1"/>
-          <span class="text-slate-400">→</span>
-          <input type="date" value="${pmaState.finCustomTo||''}" onchange="pmaState.finCustomTo=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1"/>
-        </div>`:''}
+      <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
+        ${pBtn('this_month','Mes actual')}${pBtn('last3','Últ. 3m')}${pBtn('ytd','YTD')}${pBtn('custom','Custom')}
       </div>
+    </div>
+
+    <!-- Filtros del dashboard (dropdowns) -->
+    <div class="pm-filters-bar">
+      ${pmFilterSelect('Período', '📅', pmaState.finMonthSel||pmCurrentYM(), [...pmMonthOptions(), ['custom','Custom (rango)']], "pmFinSetMonth(this.value)")}
+      ${pmFilterSelect('Casa', '🏠', pmaState.finFilterProperty, [['','Todas'], ...pmaState.properties.filter(p=>p.status==='activa').map(p=>[p.id, p.name||''])], "pmFinSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Plataforma', '💳', pmaState.finFilterPlatform, [['','Todas'], ...Object.entries(PM_PLATFORM_LABEL).map(([k,l])=>[k,l])], "pmFinSetFilter('platform', this.value||null)")}
+      ${pmFilterSelect('Modelo', '🏗', pmaState.finFilterModel, [['','Todos'],['casa_completa','Casa Completa'],['por_habitaciones','Por Habitaciones'],['mixta','Mixta'],['por_unidades','Por Unidades']], "pmFinSetFilter('model', this.value||null)")}
+      ${pmFinHasFilters()?`<button class="pm-clear-filters" onclick="pmFinClearFilters()">✕ Limpiar</button>`:''}
+      ${(pmaState.finMonthSel==='custom'||period==='custom')?`<div class="pm-filter-dropdown"><label>Rango</label><div class="flex items-center gap-1">
+        <input type="date" value="${pmaState.finCustomFrom||''}" onchange="pmaState.finCustomFrom=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1 text-xs"/>
+        <span class="text-slate-400">→</span>
+        <input type="date" value="${pmaState.finCustomTo||''}" onchange="pmaState.finCustomTo=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1 text-xs"/>
+      </div></div>`:''}
     </div>
 
     <!-- SECCIÓN 1 · KPIs con delta MoM -->
