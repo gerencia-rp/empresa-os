@@ -122,10 +122,10 @@ async function opLoadAll() {
 
   const [tRes, dRes, wRes, bRes, rRes, pRes, projRes, dtRes, durRes, rtRes] = await Promise.all([
     sb.from('ops_tasks').select('*').eq('active', true).order('category').order('name'),
-    sb.from('ops_day_tasks').select('*').eq('date', opState.date).order('start_time'),
-    sb.from('ops_day_tasks').select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time'),
-    sb.from('ops_day_tasks').select('*').is('date', null).order('priority', { ascending: false }).order('created_at'),
-    sb.from('ops_recurring').select('*').eq('active', true),
+    sb.from(getTaskTable()).select('*').eq('date', opState.date).order('start_time'),
+    sb.from(getTaskTable()).select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time'),
+    sb.from(getTaskTable()).select('*').is('date', null).order('priority', { ascending: false }).order('created_at'),
+    sb.from(getRecurringTable()).select('*').eq('active', true),
     sb.from('properties').select('id,address,nickname,property_type').order('address'),
     sb.from('remodel_projects').select('id,name,address,status').in('status', ['planning','active']),
     sb.from('ops_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
@@ -146,7 +146,7 @@ async function opLoadAll() {
 
   // Si estamos en vista 'casas', cargar TODO lo upcoming (hoy + futuro)
   if (opState.view === 'casas') {
-    const { data: up } = await sb.from('ops_day_tasks')
+    const { data: up } = await sb.from(getTaskTable())
       .select('*')
       .gte('date', opDateOnly(new Date()))
       .order('date').order('start_time');
@@ -162,7 +162,7 @@ async function opLoadAll() {
 // se quedan en su día y aparecen como "atrasadas / reprogramables" en el header.
 async function opAutoRollback() {
   const today = opDateOnly(new Date());
-  const { data: overdue } = await sb.from('ops_day_tasks')
+  const { data: overdue } = await sb.from(getTaskTable())
     .select('*')
     .lt('date', today)
     .in('status', ['planned','in_progress'])
@@ -173,7 +173,7 @@ async function opAutoRollback() {
 // Reprograma una tarea atrasada a otra fecha (default: hoy).
 async function opReprogramTask(id, newDate) {
   const target = newDate || opDateOnly(new Date());
-  await sb.from('ops_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     date: target,
     status: 'planned',
     updated_at: new Date().toISOString()
@@ -188,7 +188,7 @@ async function opReprogramAllOverdue(newDate) {
   const ids = (opState.overdue || []).map(t => t.id);
   if (!ids.length) return;
   if (!confirm(`Mover ${ids.length} tarea(s) atrasada(s) al ${target}?`)) return;
-  await sb.from('ops_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     date: target, status: 'planned', updated_at: new Date().toISOString()
   }).in('id', ids);
   await opLoadAll();
@@ -219,23 +219,29 @@ async function opGenerateRecurring() {
     });
   }
   if (rows.length) {
-    await sb.from('ops_day_tasks').insert(rows);
+    await sb.from(getTaskTable()).insert(rows);
     // Actualizar next_due
     for (const r of due) {
       const next = new Date(today + 'T00:00:00');
       next.setDate(next.getDate() + r.interval_days);
-      await sb.from('ops_recurring').update({
+      await sb.from(getRecurringTable()).update({
         last_generated: today,
         next_due: opDateOnly(next)
       }).eq('id', r.id);
     }
     // Recargar backlog
-    const { data: b } = await sb.from('ops_day_tasks').select('*').is('date', null).order('created_at');
+    const { data: b } = await sb.from(getTaskTable()).select('*').is('date', null).order('created_at');
     opState.backlog = b || [];
   }
 }
 
 // ─── Entry ───
+// Tabla de tareas según el planner ACTIVO (safety net: cualquier mutación
+// escribe a la tabla del cronograma abierto, no a una string hardcodeada).
+function getTaskTable() { return window.pmCurrentPlanner === 'cleaning' ? 'clean_day_tasks' : 'ops_day_tasks'; }
+function getRecurringTable() { return window.pmCurrentPlanner === 'cleaning' ? 'clean_recurring' : 'ops_recurring'; }
+window.getTaskTable = getTaskTable; window.getRecurringTable = getRecurringTable;
+
 async function openOpsPlanner(sys) {
   opState.sys = sys;
   window.pmCurrentPlanner = 'ops';
@@ -783,7 +789,7 @@ async function opCreateRecurringFromPanel() {
     zona: document.getElementById('op-r-zona').value || null,
     business: 'rentas'
   };
-  const { error } = await sb.from('ops_recurring').insert(payload);
+  const { error } = await sb.from(getRecurringTable()).insert(payload);
   if (error) return alert('Error: ' + error.message);
   await opLoadAll();
   opRender();
@@ -1110,7 +1116,7 @@ async function opQuickComplete(id) {
     update.actual_duration_min = actualMin;
     update.estimated_duration_min = estim;
   }
-  await sb.from('ops_day_tasks').update(update).eq('id', id);
+  await sb.from(getTaskTable()).update(update).eq('id', id);
   await opLoadAll();
   opRender();
 }
@@ -1135,7 +1141,7 @@ async function opInsertRouteToDay(routeCode) {
     estimated_duration_min: s.duration_min,
     created_by: state.user.id
   }));
-  const { error } = await sb.from('ops_day_tasks').insert(inserts);
+  const { error } = await sb.from(getTaskTable()).insert(inserts);
   if (error) return alert('Error: ' + error.message);
   await opLoadAll();
   opRender();
@@ -1143,7 +1149,7 @@ async function opInsertRouteToDay(routeCode) {
 }
 
 async function opQuickUndo(id) {
-  await sb.from('ops_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     status: 'planned',
     completed_at: null,
     updated_at: new Date().toISOString()
@@ -1154,7 +1160,7 @@ async function opQuickUndo(id) {
 
 async function opQuickSkip(id) {
   if (!confirm('¿Marcar esta tarea como NO REALIZADA (skip)? Queda en el histórico pero no se reasigna.')) return;
-  await sb.from('ops_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     status: 'skipped',
     updated_at: new Date().toISOString()
   }).eq('id', id);
@@ -1164,7 +1170,7 @@ async function opQuickSkip(id) {
 
 async function opQuickReprogramToday(id) {
   const today = opDateOnly(new Date());
-  await sb.from('ops_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     date: today,
     status: 'planned',
     updated_at: new Date().toISOString()
@@ -1177,7 +1183,7 @@ async function opDropOnWeekDay(dateStr, ev) {
   ev.preventDefault();
   if (opState.draggedScheduledId) {
     const id = opState.draggedScheduledId; opState.draggedScheduledId = null;
-    await sb.from('ops_day_tasks').update({ date: dateStr, updated_at: new Date().toISOString() }).eq('id', id);
+    await sb.from(getTaskTable()).update({ date: dateStr, updated_at: new Date().toISOString() }).eq('id', id);
   } else if (opState.draggedBacklogId) {
     const id = opState.draggedBacklogId; opState.draggedBacklogId = null;
     // Buscar hora libre: 8am si día vacío, sino end del último + 0
@@ -1187,7 +1193,7 @@ async function opDropOnWeekDay(dateStr, ev) {
       const last = existing[existing.length-1];
       startTime = opAddMin(last.start_time, last.duration_min);
     }
-    await sb.from('ops_day_tasks').update({ date: dateStr, start_time: startTime, updated_at: new Date().toISOString() }).eq('id', id);
+    await sb.from(getTaskTable()).update({ date: dateStr, start_time: startTime, updated_at: new Date().toISOString() }).eq('id', id);
   } else if (opState.draggedTemplateId) {
     const tmpl = opState.tasks.find(x => x.id === opState.draggedTemplateId);
     opState.draggedTemplateId = null;
@@ -1198,7 +1204,7 @@ async function opDropOnWeekDay(dateStr, ev) {
       const last = existing[existing.length-1];
       startTime = opAddMin(last.start_time, last.duration_min);
     }
-    await sb.from('ops_day_tasks').insert({
+    await sb.from(getTaskTable()).insert({
       date: dateStr, start_time: startTime,
       duration_min: tmpl.default_duration_min || 30,
       title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
@@ -1476,7 +1482,7 @@ async function opMarkDone(id, isDone) {
         else fb = 'ok';
       }
     }
-    await sb.from('ops_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       status: 'done',
       completed_at: now,
       started_at: t && t.started_at ? t.started_at : (t && t.date && t.start_time ? new Date(t.date+'T'+t.start_time).toISOString() : now),
@@ -1489,7 +1495,7 @@ async function opMarkDone(id, isDone) {
       await sb.rpc('fn_ops_register_actual', { p_task_id: t.task_id, p_actual: actual }).catch(() => {});
     }
   } else {
-    await sb.from('ops_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       status: 'planned',
       completed_at: null,
       updated_at: now
@@ -1681,7 +1687,7 @@ async function opDropOnSlot(slotTime, ev) {
   // Aplicar el drop ahora que el conflicto está resuelto
   if (droppedId) {
     // Reschedule existing task (scheduled or backlog)
-    await sb.from('ops_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       date: opState.date,
       start_time: slotTime,
       updated_at: new Date().toISOString()
@@ -1690,7 +1696,7 @@ async function opDropOnSlot(slotTime, ev) {
     // Nueva tarea desde plantilla
     const tmpl = opState.tasks.find(x => x.name === droppedTask.title);
     if (tmpl) {
-      await sb.from('ops_day_tasks').insert({
+      await sb.from(getTaskTable()).insert({
         date: opState.date, start_time: slotTime,
         duration_min: tmpl.default_duration_min || 30,
         title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
@@ -1811,7 +1817,7 @@ async function opCreatePendiente() {
     notes: document.getElementById('op-p-notes').value || null,
     created_by: state.user.id
   };
-  const { error } = await sb.from('ops_day_tasks').insert(payload);
+  const { error } = await sb.from(getTaskTable()).insert(payload);
   if (error) return alert(error.message);
   await opRefocusPlanner();
 }
@@ -1950,7 +1956,7 @@ async function opEjecutarArmarDia() {
 
   // Ejecutar actualizaciones
   for (const u of updates) {
-    await sb.from('ops_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       date: u.date,
       start_time: u.start_time,
       travel_min: u.travel_min,
@@ -1960,7 +1966,7 @@ async function opEjecutarArmarDia() {
 
   // Insertar almuerzo si corresponde
   if (lunchDur > 0) {
-    await sb.from('ops_day_tasks').insert({
+    await sb.from(getTaskTable()).insert({
       date: opState.date, start_time: lunchTime, duration_min: lunchDur,
       title: 'Tiempo Almuerzo', business: 'remodelacion', zona: null,
       created_by: state.user.id
@@ -2172,7 +2178,7 @@ async function opSaveEdit(id, isBacklog) {
     }
   }
 
-  const { error } = await sb.from('ops_day_tasks').update(payload).eq('id', id);
+  const { error } = await sb.from(getTaskTable()).update(payload).eq('id', id);
   if (error) return alert(error.message);
 
   // Manejar la sección de recurrencia
@@ -2184,7 +2190,7 @@ async function opSaveEdit(id, isBacklog) {
     // Crear nueva recurrencia
     const interval = +document.getElementById('op-e-recurring-interval').value || 7;
     const nextDue = document.getElementById('op-e-recurring-next').value || opDateOnly(new Date());
-    const { data: rec, error: rErr } = await sb.from('ops_recurring').insert({
+    const { data: rec, error: rErr } = await sb.from(getRecurringTable()).insert({
       base_task_id: currentTask.task_id || null,
       custom_title: payload.title,
       custom_duration_min: payload.duration_min,
@@ -2200,7 +2206,7 @@ async function opSaveEdit(id, isBacklog) {
       created_by: state.user.id
     }).select().single();
     if (!rErr && rec) {
-      await sb.from('ops_day_tasks').update({ recurring_id: rec.id }).eq('id', id);
+      await sb.from(getTaskTable()).update({ recurring_id: rec.id }).eq('id', id);
     } else if (rErr) {
       alert('Aviso: tarea guardada pero la recurrencia falló: ' + rErr.message);
     }
@@ -2208,7 +2214,7 @@ async function opSaveEdit(id, isBacklog) {
     // Actualizar la recurrencia existente
     const interval = +document.getElementById('op-e-recurring-interval').value || 7;
     const nextDue = document.getElementById('op-e-recurring-next').value || opDateOnly(new Date());
-    await sb.from('ops_recurring').update({
+    await sb.from(getRecurringTable()).update({
       custom_title: payload.title,
       custom_duration_min: payload.duration_min,
       custom_materials: payload.materials,
@@ -2223,8 +2229,8 @@ async function opSaveEdit(id, isBacklog) {
     }).eq('id', currentTask.recurring_id);
   } else if (!wantsRecurring && wasRecurring) {
     // Desactivar la recurrencia
-    await sb.from('ops_recurring').update({ active: false }).eq('id', currentTask.recurring_id);
-    await sb.from('ops_day_tasks').update({ recurring_id: null }).eq('id', id);
+    await sb.from(getRecurringTable()).update({ active: false }).eq('id', currentTask.recurring_id);
+    await sb.from(getTaskTable()).update({ recurring_id: null }).eq('id', id);
   }
 
   await opRefocusPlanner();
@@ -2236,21 +2242,21 @@ function opToggleRecurringFields(checked) {
 }
 
 async function opSendToBacklog(id, fromModal) {
-  await sb.from('ops_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).eq('id', id);
+  await sb.from(getTaskTable()).update({ date: null, start_time: null, updated_at: new Date().toISOString() }).eq('id', id);
   if (fromModal) { opRefocusPlanner(); }
   else { await opLoadAll(); opRender(); }
 }
 
 async function opDeleteBacklog(id) {
   if (!confirm('¿Borrar esta pendiente?')) return;
-  await sb.from('ops_day_tasks').delete().eq('id', id);
+  await sb.from(getTaskTable()).delete().eq('id', id);
   await opLoadAll();
   opRender();
 }
 
 async function opDeleteScheduled(id, fromModal) {
   if (!confirm('¿Eliminar esta tarea?')) return;
-  await sb.from('ops_day_tasks').delete().eq('id', id);
+  await sb.from(getTaskTable()).delete().eq('id', id);
   if (fromModal) { opRefocusPlanner(); }
   else { await opLoadAll(); opRender(); }
 }
@@ -2266,7 +2272,7 @@ async function opToggleDone(id) {
 async function opClearDay() {
   if (!confirm(`¿Vaciar el ${opState.date}?\n\nLas tareas agendadas vuelven al backlog (no se pierden).`)) return;
   const ids = opState.dayTasks.map(t => t.id);
-  if (ids.length) await sb.from('ops_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).in('id', ids);
+  if (ids.length) await sb.from(getTaskTable()).update({ date: null, start_time: null, updated_at: new Date().toISOString() }).in('id', ids);
   await opLoadAll();
   opRender();
 }
@@ -2451,7 +2457,7 @@ async function opCreateLoose() {
       business: project_id ? 'remodelacion' : 'rentas',
       active: true
     };
-    const { error } = await sb.from('ops_recurring').insert(payload);
+    const { error } = await sb.from(getRecurringTable()).insert(payload);
     if (error) return alert('Error: ' + error.message);
   } else {
     // Ocasional: inserta a ops_day_tasks en el día activo
@@ -2465,7 +2471,7 @@ async function opCreateLoose() {
       business: project_id ? 'remodelacion' : 'rentas',
       created_by: state.user.id
     };
-    const { error } = await sb.from('ops_day_tasks').insert(payload);
+    const { error } = await sb.from(getTaskTable()).insert(payload);
     if (error) return alert('Error: ' + error.message);
   }
   await opRefocusPlanner();
@@ -2517,46 +2523,46 @@ function opOpenChecklist(taskId) {
 }
 
 async function opToggleChecklistItem(taskId, idx) {
-  const { data: t } = await sb.from('ops_day_tasks').select('checklist,status').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist,status').eq('id', taskId).single();
   if (!t) return;
   const cl = t.checklist || [];
   if (!cl[idx]) return;
   cl[idx].done = !cl[idx].done;
   cl[idx].done_at = cl[idx].done ? new Date().toISOString() : null;
-  await sb.from('ops_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   await opLoadAll();
   opOpenChecklist(taskId);
 }
 async function opEditChecklistItem(taskId, idx, newText) {
-  const { data: t } = await sb.from('ops_day_tasks').select('checklist').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist').eq('id', taskId).single();
   if (!t) return;
   const cl = t.checklist || [];
   if (!cl[idx]) return;
   if ((cl[idx].item||'') === newText) return;
   cl[idx].item = newText;
-  await sb.from('ops_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   await opLoadAll();
 }
 async function opAddChecklistItem(taskId, text, input) {
   text = (text||'').trim();
   if (!text) return;
-  const { data: t } = await sb.from('ops_day_tasks').select('checklist').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist').eq('id', taskId).single();
   const cl = (t?.checklist || []).concat([{ item: text, done: false }]);
-  await sb.from('ops_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   if (input) input.value = '';
   await opLoadAll();
   opOpenChecklist(taskId);
 }
 async function opRemoveChecklistItem(taskId, idx) {
-  const { data: t } = await sb.from('ops_day_tasks').select('checklist').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist').eq('id', taskId).single();
   if (!t) return;
   const cl = (t.checklist || []).filter((_, i) => i !== idx);
-  await sb.from('ops_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   await opLoadAll();
   opOpenChecklist(taskId);
 }
 async function opMarkDoneFromChecklist(taskId) {
-  await sb.from('ops_day_tasks').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', taskId);
   await opRefocusPlanner();
 }
 
@@ -2635,7 +2641,7 @@ async function opCreateRecurring() {
     zona: document.getElementById('op-r-zona').value || null,
     business: 'rentas'
   };
-  const { error } = await sb.from('ops_recurring').insert(payload);
+  const { error } = await sb.from(getRecurringTable()).insert(payload);
   if (error) return alert(error.message);
   await opRefocusPlanner();
   opOpenManageRecurring();
@@ -2643,7 +2649,7 @@ async function opCreateRecurring() {
 
 async function opDeleteRecurring(id) {
   if (!confirm('¿Eliminar esta recurrente?')) return;
-  await sb.from('ops_recurring').update({ active: false }).eq('id', id);
+  await sb.from(getRecurringTable()).update({ active: false }).eq('id', id);
   await opRefocusPlanner();
   opOpenManageRecurring();
 }
@@ -2754,7 +2760,7 @@ async function opApplyTemplate(templateId) {
     created_by: state.user.id
   }));
   if (!rows.length) return alert('La plantilla no tiene tareas.');
-  const { error } = await sb.from('ops_day_tasks').insert(rows);
+  const { error } = await sb.from(getTaskTable()).insert(rows);
   if (error) return alert('Error: ' + error.message);
   await opRefocusPlanner();
   alert(`✅ ${rows.length} tareas agregadas al ${opState.date}.`);
@@ -2978,14 +2984,14 @@ async function opConvertToRecurring(taskId) {
     active: true,
     created_by: state.user.id
   };
-  const { data: recurring, error } = await sb.from('ops_recurring').insert(payload).select().single();
+  const { data: recurring, error } = await sb.from(getRecurringTable()).insert(payload).select().single();
   if (error) return alert('Error: ' + error.message);
 
   if (mode === 'replace') {
-    await sb.from('ops_day_tasks').delete().eq('id', taskId);
+    await sb.from(getTaskTable()).delete().eq('id', taskId);
   } else if (recurring?.id) {
     // Marcar la instancia actual como vinculada al recurrente
-    await sb.from('ops_day_tasks').update({ recurring_id: recurring.id }).eq('id', taskId);
+    await sb.from(getTaskTable()).update({ recurring_id: recurring.id }).eq('id', taskId);
   }
   await opRefocusPlanner();
   alert(`✅ Convertida en recurrente.\nSe generará cada ${interval} día${interval>1?'s':''} a partir del ${nextDue}.`);
@@ -2996,8 +3002,8 @@ async function opMakeTaskOneTime(taskId) {
   const t = opState.dayTasks.find(x => x.id === taskId);
   if (!t || !t.recurring_id) return;
   if (!confirm(`¿Desvincular "${t.title}" del recurrente?\n\nLa instancia de hoy se mantiene, pero NO se generarán más a futuro.`)) return;
-  await sb.from('ops_recurring').update({ active: false }).eq('id', t.recurring_id);
-  await sb.from('ops_day_tasks').update({ recurring_id: null }).eq('id', taskId);
+  await sb.from(getRecurringTable()).update({ active: false }).eq('id', t.recurring_id);
+  await sb.from(getTaskTable()).update({ recurring_id: null }).eq('id', taskId);
   await opLoadAll(); opRender();
   alert('✅ Recurrencia desactivada. La tarea de hoy queda como única.');
 }
@@ -3311,7 +3317,7 @@ async function opShiftTasksAfter(dateStr, fromStartMin, shiftMin, excludeIds = [
 
   // Aplicar en serie (Supabase no soporta batch update con valores distintos)
   for (const u of updates) {
-    await sb.from('ops_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       start_time: u.start_time,
       date: u.date,
       updated_at: new Date().toISOString()

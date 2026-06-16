@@ -154,10 +154,10 @@ async function clLoadAll() {
   // devuelve array vacío y guardamos el error para mostrarlo.
   const [tRes, dRes, wRes, bRes, rRes, pRes, projRes, dtRes, durRes, rtRes] = await Promise.all([
     _clSafeQuery(sb.from('clean_tasks').select('*').eq('active', true).order('category').order('name')),
-    _clSafeQuery(sb.from('clean_day_tasks').select('*').eq('date', clState.date).order('start_time')),
-    _clSafeQuery(sb.from('clean_day_tasks').select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time')),
-    _clSafeQuery(sb.from('clean_day_tasks').select('*').is('date', null).order('priority', { ascending: false }).order('created_at')),
-    _clSafeQuery(sb.from('clean_recurring').select('*').eq('active', true)),
+    _clSafeQuery(sb.from(getTaskTable()).select('*').eq('date', clState.date).order('start_time')),
+    _clSafeQuery(sb.from(getTaskTable()).select('*').gte('date', weekStart).lte('date', weekEnd).order('date').order('start_time')),
+    _clSafeQuery(sb.from(getTaskTable()).select('*').is('date', null).order('priority', { ascending: false }).order('created_at')),
+    _clSafeQuery(sb.from(getRecurringTable()).select('*').eq('active', true)),
     _clSafeQuery(sb.from('properties').select('id,address,nickname,property_type').order('address')),
     _clSafeQuery(sb.from('remodel_projects').select('id,name,address,status').in('status', ['planning','active'])),
     _clSafeQuery(sb.from('clean_day_templates').select('*').order('created_at', { ascending: false })),
@@ -186,7 +186,7 @@ async function clLoadAll() {
 
   if (clState.view === 'casas') {
     const upRes = await _clSafeQuery(
-      sb.from('clean_day_tasks').select('*').gte('date', clDateOnly(new Date())).order('date').order('start_time')
+      sb.from(getTaskTable()).select('*').gte('date', clDateOnly(new Date())).order('date').order('start_time')
     );
     clState.allUpcoming = upRes.data;
   }
@@ -200,7 +200,7 @@ async function clLoadAll() {
 // se quedan en su día y aparecen como "atrasadas / reprogramables" en el header.
 async function clAutoRollback() {
   const today = clDateOnly(new Date());
-  const { data: overdue } = await sb.from('clean_day_tasks')
+  const { data: overdue } = await sb.from(getTaskTable())
     .select('*')
     .lt('date', today)
     .in('status', ['planned','in_progress'])
@@ -211,7 +211,7 @@ async function clAutoRollback() {
 // Reprograma una tarea atrasada a otra fecha (default: hoy).
 async function clReprogramTask(id, newDate) {
   const target = newDate || clDateOnly(new Date());
-  await sb.from('clean_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     date: target,
     status: 'planned',
     updated_at: new Date().toISOString()
@@ -226,7 +226,7 @@ async function clReprogramAllOverdue(newDate) {
   const ids = (clState.overdue || []).map(t => t.id);
   if (!ids.length) return;
   if (!confirm(`Mover ${ids.length} tarea(s) atrasada(s) al ${target}?`)) return;
-  await sb.from('clean_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     date: target, status: 'planned', updated_at: new Date().toISOString()
   }).in('id', ids);
   await clLoadAll();
@@ -257,18 +257,18 @@ async function clGenerateRecurring() {
     });
   }
   if (rows.length) {
-    await sb.from('clean_day_tasks').insert(rows);
+    await sb.from(getTaskTable()).insert(rows);
     // Actualizar next_due
     for (const r of due) {
       const next = new Date(today + 'T00:00:00');
       next.setDate(next.getDate() + r.interval_days);
-      await sb.from('clean_recurring').update({
+      await sb.from(getRecurringTable()).update({
         last_generated: today,
         next_due: clDateOnly(next)
       }).eq('id', r.id);
     }
     // Recargar backlog
-    const { data: b } = await sb.from('clean_day_tasks').select('*').is('date', null).order('created_at');
+    const { data: b } = await sb.from(getTaskTable()).select('*').is('date', null).order('created_at');
     clState.backlog = b || [];
   }
 }
@@ -707,7 +707,7 @@ async function clCreateRecurringFromPanel() {
     zona: document.getElementById('op-r-zona').value || null,
     business: 'rentas'
   };
-  const { error } = await sb.from('clean_recurring').insert(payload);
+  const { error } = await sb.from(getRecurringTable()).insert(payload);
   if (error) return alert('Error: ' + error.message);
   await clLoadAll();
   clRender();
@@ -1034,7 +1034,7 @@ async function clQuickComplete(id) {
     update.actual_duration_min = actualMin;
     update.estimated_duration_min = estim;
   }
-  await sb.from('clean_day_tasks').update(update).eq('id', id);
+  await sb.from(getTaskTable()).update(update).eq('id', id);
   await clLoadAll();
   clRender();
 }
@@ -1059,7 +1059,7 @@ async function clInsertRouteToDay(routeCode) {
     estimated_duration_min: s.duration_min,
     created_by: state.user?.id || null
   }));
-  const { error } = await sb.from('clean_day_tasks').insert(inserts);
+  const { error } = await sb.from(getTaskTable()).insert(inserts);
   if (error) return alert('Error: ' + error.message);
   await clLoadAll();
   clRender();
@@ -1067,7 +1067,7 @@ async function clInsertRouteToDay(routeCode) {
 }
 
 async function clQuickUndo(id) {
-  await sb.from('clean_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     status: 'planned',
     completed_at: null,
     updated_at: new Date().toISOString()
@@ -1078,7 +1078,7 @@ async function clQuickUndo(id) {
 
 async function clQuickSkip(id) {
   if (!confirm('¿Marcar esta tarea como NO REALIZADA (skip)? Queda en el histórico pero no se reasigna.')) return;
-  await sb.from('clean_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     status: 'skipped',
     updated_at: new Date().toISOString()
   }).eq('id', id);
@@ -1088,7 +1088,7 @@ async function clQuickSkip(id) {
 
 async function clQuickReprogramToday(id) {
   const today = clDateOnly(new Date());
-  await sb.from('clean_day_tasks').update({
+  await sb.from(getTaskTable()).update({
     date: today,
     status: 'planned',
     updated_at: new Date().toISOString()
@@ -1102,7 +1102,7 @@ async function clDropOnWeekDay(dateStr, ev) {
   let opError = null;
   if (clState.draggedScheduledId) {
     const id = clState.draggedScheduledId; clState.draggedScheduledId = null;
-    const { error } = await sb.from('clean_day_tasks').update({ date: dateStr, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from(getTaskTable()).update({ date: dateStr, updated_at: new Date().toISOString() }).eq('id', id);
     opError = error;
   } else if (clState.draggedBacklogId) {
     const id = clState.draggedBacklogId; clState.draggedBacklogId = null;
@@ -1112,7 +1112,7 @@ async function clDropOnWeekDay(dateStr, ev) {
       const last = existing[existing.length-1];
       startTime = clAddMin(last.start_time, last.duration_min);
     }
-    const { error } = await sb.from('clean_day_tasks').update({ date: dateStr, start_time: startTime, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from(getTaskTable()).update({ date: dateStr, start_time: startTime, updated_at: new Date().toISOString() }).eq('id', id);
     opError = error;
   } else if (clState.draggedTemplateId) {
     const tmpl = clState.tasks.find(x => x.id === clState.draggedTemplateId);
@@ -1124,7 +1124,7 @@ async function clDropOnWeekDay(dateStr, ev) {
       const last = existing[existing.length-1];
       startTime = clAddMin(last.start_time, last.duration_min);
     }
-    const { error } = await sb.from('clean_day_tasks').insert({
+    const { error } = await sb.from(getTaskTable()).insert({
       date: dateStr, start_time: startTime,
       duration_min: tmpl.default_duration_min || 30,
       title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
@@ -1415,7 +1415,7 @@ async function clMarkDone(id, isDone) {
         else fb = 'ok';
       }
     }
-    await sb.from('clean_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       status: 'done',
       completed_at: now,
       started_at: t && t.started_at ? t.started_at : (t && t.date && t.start_time ? new Date(t.date+'T'+t.start_time).toISOString() : now),
@@ -1428,7 +1428,7 @@ async function clMarkDone(id, isDone) {
       await sb.rpc('fn_ops_register_actual', { p_task_id: t.task_id, p_actual: actual }).catch(() => {});
     }
   } else {
-    await sb.from('clean_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       status: 'planned',
       completed_at: null,
       updated_at: now
@@ -1781,7 +1781,7 @@ async function clDropOnSlot(slotTime, ev) {
   let opError = null;
   if (droppedId) {
     // Reschedule existing task (scheduled or backlog)
-    const { error } = await sb.from('clean_day_tasks').update({
+    const { error } = await sb.from(getTaskTable()).update({
       date: clState.date,
       start_time: slotTime,
       updated_at: new Date().toISOString()
@@ -1791,7 +1791,7 @@ async function clDropOnSlot(slotTime, ev) {
     // Nueva tarea desde plantilla
     const tmpl = clState.tasks.find(x => x.name === droppedTask.title);
     if (tmpl) {
-      const { error } = await sb.from('clean_day_tasks').insert({
+      const { error } = await sb.from(getTaskTable()).insert({
         date: clState.date, start_time: slotTime,
         duration_min: tmpl.default_duration_min || 30,
         title: tmpl.name, task_id: tmpl.id, business: tmpl.business,
@@ -1930,7 +1930,7 @@ async function clCreatePendiente() {
     notes: document.getElementById('op-p-notes').value || null,
     created_by: state.user?.id || null
   };
-  const { error } = await sb.from('clean_day_tasks').insert(payload);
+  const { error } = await sb.from(getTaskTable()).insert(payload);
   if (error) return alert(error.message);
     await clRefocusPlanner();
 }
@@ -2069,7 +2069,7 @@ async function clEjecutarArmarDia() {
 
   // Ejecutar actualizaciones
   for (const u of updates) {
-    await sb.from('clean_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       date: u.date,
       start_time: u.start_time,
       travel_min: u.travel_min,
@@ -2079,7 +2079,7 @@ async function clEjecutarArmarDia() {
 
   // Insertar almuerzo si corresponde
   if (lunchDur > 0) {
-    await sb.from('clean_day_tasks').insert({
+    await sb.from(getTaskTable()).insert({
       date: clState.date, start_time: lunchTime, duration_min: lunchDur,
       title: 'Tiempo Almuerzo', business: 'rentas', zona: null,
       created_by: state.user?.id || null
@@ -2280,7 +2280,7 @@ async function clSaveEdit(id, isBacklog) {
     }
   }
 
-  const { error } = await sb.from('clean_day_tasks').update(payload).eq('id', id);
+  const { error } = await sb.from(getTaskTable()).update(payload).eq('id', id);
   if (error) return alert(error.message);
 
   // Manejar la sección de recurrencia
@@ -2292,7 +2292,7 @@ async function clSaveEdit(id, isBacklog) {
     // Crear nueva recurrencia
     const interval = +document.getElementById('op-e-recurring-interval').value || 7;
     const nextDue = document.getElementById('op-e-recurring-next').value || clDateOnly(new Date());
-    const { data: rec, error: rErr } = await sb.from('clean_recurring').insert({
+    const { data: rec, error: rErr } = await sb.from(getRecurringTable()).insert({
       base_task_id: currentTask.task_id || null,
       custom_title: payload.title,
       custom_duration_min: payload.duration_min,
@@ -2308,7 +2308,7 @@ async function clSaveEdit(id, isBacklog) {
       created_by: state.user?.id || null
     }).select().single();
     if (!rErr && rec) {
-      await sb.from('clean_day_tasks').update({ recurring_id: rec.id }).eq('id', id);
+      await sb.from(getTaskTable()).update({ recurring_id: rec.id }).eq('id', id);
     } else if (rErr) {
       alert('Aviso: tarea guardada pero la recurrencia falló: ' + rErr.message);
     }
@@ -2316,7 +2316,7 @@ async function clSaveEdit(id, isBacklog) {
     // Actualizar la recurrencia existente
     const interval = +document.getElementById('op-e-recurring-interval').value || 7;
     const nextDue = document.getElementById('op-e-recurring-next').value || clDateOnly(new Date());
-    await sb.from('clean_recurring').update({
+    await sb.from(getRecurringTable()).update({
       custom_title: payload.title,
       custom_duration_min: payload.duration_min,
       custom_materials: payload.materials,
@@ -2331,8 +2331,8 @@ async function clSaveEdit(id, isBacklog) {
     }).eq('id', currentTask.recurring_id);
   } else if (!wantsRecurring && wasRecurring) {
     // Desactivar la recurrencia
-    await sb.from('clean_recurring').update({ active: false }).eq('id', currentTask.recurring_id);
-    await sb.from('clean_day_tasks').update({ recurring_id: null }).eq('id', id);
+    await sb.from(getRecurringTable()).update({ active: false }).eq('id', currentTask.recurring_id);
+    await sb.from(getTaskTable()).update({ recurring_id: null }).eq('id', id);
   }
 
   // BUG FIX: NO llamar closeModal() antes de refocus — el refocus reescribe
@@ -2348,21 +2348,21 @@ function clToggleRecurringFields(checked) {
 }
 
 async function clSendToBacklog(id, fromModal) {
-  await sb.from('clean_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).eq('id', id);
+  await sb.from(getTaskTable()).update({ date: null, start_time: null, updated_at: new Date().toISOString() }).eq('id', id);
   if (fromModal) { clRefocusPlanner(); }
   else { await clLoadAll(); clRender(); }
 }
 
 async function clDeleteBacklog(id) {
   if (!confirm('¿Borrar esta pendiente?')) return;
-  await sb.from('clean_day_tasks').delete().eq('id', id);
+  await sb.from(getTaskTable()).delete().eq('id', id);
   await clLoadAll();
   clRender();
 }
 
 async function clDeleteScheduled(id, fromModal) {
   if (!confirm('¿Eliminar esta tarea?')) return;
-  await sb.from('clean_day_tasks').delete().eq('id', id);
+  await sb.from(getTaskTable()).delete().eq('id', id);
   if (fromModal) { clRefocusPlanner(); }
   else { await clLoadAll(); clRender(); }
 }
@@ -2378,7 +2378,7 @@ async function clToggleDone(id) {
 async function clClearDay() {
   if (!confirm(`¿Vaciar el ${clState.date}?\n\nLas tareas agendadas vuelven al backlog (no se pierden).`)) return;
   const ids = clState.dayTasks.map(t => t.id);
-  if (ids.length) await sb.from('clean_day_tasks').update({ date: null, start_time: null, updated_at: new Date().toISOString() }).in('id', ids);
+  if (ids.length) await sb.from(getTaskTable()).update({ date: null, start_time: null, updated_at: new Date().toISOString() }).in('id', ids);
   await clLoadAll();
   clRender();
 }
@@ -2563,7 +2563,7 @@ async function clCreateLoose() {
       business: project_id ? 'remodelacion' : 'rentas',
       active: true
     };
-    const { error } = await sb.from('clean_recurring').insert(payload);
+    const { error } = await sb.from(getRecurringTable()).insert(payload);
     if (error) return alert('Error: ' + error.message);
   } else {
     // Ocasional: inserta a clean_day_tasks en el día activo
@@ -2577,7 +2577,7 @@ async function clCreateLoose() {
       business: project_id ? 'remodelacion' : 'rentas',
       created_by: state.user?.id || null
     };
-    const { error } = await sb.from('clean_day_tasks').insert(payload);
+    const { error } = await sb.from(getTaskTable()).insert(payload);
     if (error) return alert('Error: ' + error.message);
   }
     await clRefocusPlanner();
@@ -2629,46 +2629,46 @@ function clOpenChecklist(taskId) {
 }
 
 async function clToggleChecklistItem(taskId, idx) {
-  const { data: t } = await sb.from('clean_day_tasks').select('checklist,status').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist,status').eq('id', taskId).single();
   if (!t) return;
   const cl = t.checklist || [];
   if (!cl[idx]) return;
   cl[idx].done = !cl[idx].done;
   cl[idx].done_at = cl[idx].done ? new Date().toISOString() : null;
-  await sb.from('clean_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   await clLoadAll();
   clOpenChecklist(taskId);
 }
 async function clEditChecklistItem(taskId, idx, newText) {
-  const { data: t } = await sb.from('clean_day_tasks').select('checklist').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist').eq('id', taskId).single();
   if (!t) return;
   const cl = t.checklist || [];
   if (!cl[idx]) return;
   if ((cl[idx].item||'') === newText) return;
   cl[idx].item = newText;
-  await sb.from('clean_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   await clLoadAll();
 }
 async function clAddChecklistItem(taskId, text, input) {
   text = (text||'').trim();
   if (!text) return;
-  const { data: t } = await sb.from('clean_day_tasks').select('checklist').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist').eq('id', taskId).single();
   const cl = (t?.checklist || []).concat([{ item: text, done: false }]);
-  await sb.from('clean_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   if (input) input.value = '';
   await clLoadAll();
   clOpenChecklist(taskId);
 }
 async function clRemoveChecklistItem(taskId, idx) {
-  const { data: t } = await sb.from('clean_day_tasks').select('checklist').eq('id', taskId).single();
+  const { data: t } = await sb.from(getTaskTable()).select('checklist').eq('id', taskId).single();
   if (!t) return;
   const cl = (t.checklist || []).filter((_, i) => i !== idx);
-  await sb.from('clean_day_tasks').update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ checklist: cl, updated_at: new Date().toISOString() }).eq('id', taskId);
   await clLoadAll();
   clOpenChecklist(taskId);
 }
 async function clMarkDoneFromChecklist(taskId) {
-  await sb.from('clean_day_tasks').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', taskId);
+  await sb.from(getTaskTable()).update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', taskId);
   await clRefocusPlanner();
 }
 
@@ -2747,14 +2747,14 @@ async function clCreateRecurring() {
     zona: document.getElementById('op-r-zona').value || null,
     business: 'rentas'
   };
-  const { error } = await sb.from('clean_recurring').insert(payload);
+  const { error } = await sb.from(getRecurringTable()).insert(payload);
   if (error) return alert(error.message);
     await clRefocusPlanner(); clOpenManageRecurring();
 }
 
 async function clDeleteRecurring(id) {
   if (!confirm('¿Eliminar esta recurrente?')) return;
-  await sb.from('clean_recurring').update({ active: false }).eq('id', id);
+  await sb.from(getRecurringTable()).update({ active: false }).eq('id', id);
     await clRefocusPlanner(); clOpenManageRecurring();
 }
 
@@ -2864,7 +2864,7 @@ async function clApplyTemplate(templateId) {
     created_by: state.user?.id || null
   }));
   if (!rows.length) return alert('La plantilla no tiene tareas.');
-  const { error } = await sb.from('clean_day_tasks').insert(rows);
+  const { error } = await sb.from(getTaskTable()).insert(rows);
   if (error) return alert('Error: ' + error.message);
   await clRefocusPlanner();
   alert(`✅ ${rows.length} tareas agregadas al ${clState.date}.`);
@@ -3090,14 +3090,14 @@ async function clConvertToRecurring(taskId) {
     active: true,
     created_by: state.user?.id || null
   };
-  const { data: recurring, error } = await sb.from('clean_recurring').insert(payload).select().single();
+  const { data: recurring, error } = await sb.from(getRecurringTable()).insert(payload).select().single();
   if (error) return alert('Error: ' + error.message);
 
   if (mode === 'replace') {
-    await sb.from('clean_day_tasks').delete().eq('id', taskId);
+    await sb.from(getTaskTable()).delete().eq('id', taskId);
   } else if (recurring?.id) {
     // Marcar la instancia actual como vinculada al recurrente
-    await sb.from('clean_day_tasks').update({ recurring_id: recurring.id }).eq('id', taskId);
+    await sb.from(getTaskTable()).update({ recurring_id: recurring.id }).eq('id', taskId);
   }
   await clRefocusPlanner();
   alert(`✅ Convertida en recurrente.\nSe generará cada ${interval} día${interval>1?'s':''} a partir del ${nextDue}.`);
@@ -3108,8 +3108,8 @@ async function clMakeTaskOneTime(taskId) {
   const t = clState.dayTasks.find(x => x.id === taskId);
   if (!t || !t.recurring_id) return;
   if (!confirm(`¿Desvincular "${t.title}" del recurrente?\n\nLa instancia de hoy se mantiene, pero NO se generarán más a futuro.`)) return;
-  await sb.from('clean_recurring').update({ active: false }).eq('id', t.recurring_id);
-  await sb.from('clean_day_tasks').update({ recurring_id: null }).eq('id', taskId);
+  await sb.from(getRecurringTable()).update({ active: false }).eq('id', t.recurring_id);
+  await sb.from(getTaskTable()).update({ recurring_id: null }).eq('id', taskId);
   await clLoadAll(); clRender();
   alert('✅ Recurrencia desactivada. La tarea de hoy queda como única.');
 }
@@ -3424,7 +3424,7 @@ async function clShiftTasksAfter(dateStr, fromStartMin, shiftMin, excludeIds = [
 
   // Aplicar en serie (Supabase no soporta batch update con valores distintos)
   for (const u of updates) {
-    await sb.from('clean_day_tasks').update({
+    await sb.from(getTaskTable()).update({
       start_time: u.start_time,
       date: u.date,
       updated_at: new Date().toISOString()
