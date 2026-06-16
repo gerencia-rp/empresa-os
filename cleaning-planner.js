@@ -2067,7 +2067,7 @@ async function clEjecutarArmarDia() {
   if (lunchDur > 0) {
     await sb.from('clean_day_tasks').insert({
       date: clState.date, start_time: lunchTime, duration_min: lunchDur,
-      title: 'Tiempo Almuerzo', business: 'both', zona: null,
+      title: 'Tiempo Almuerzo', business: 'rentas', zona: null,
       created_by: state.user?.id || null
     });
   }

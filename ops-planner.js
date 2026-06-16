@@ -1930,7 +1930,7 @@ async function opEjecutarArmarDia() {
   if (lunchDur > 0) {
     await sb.from('ops_day_tasks').insert({
       date: opState.date, start_time: lunchTime, duration_min: lunchDur,
-      title: 'Tiempo Almuerzo', business: 'both', zona: null,
+      title: 'Tiempo Almuerzo', business: 'remodelacion', zona: null,
       created_by: state.user.id
     });
   }
@@ -2006,11 +2006,18 @@ function _opOpenEditModal(t, isBacklog) {
           </div>
         </div>
       `}
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-3 gap-2">
         <div>
-          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Empresa</label>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Cronograma</label>
           <select id="op-e-business" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
-            ${['both','rentas','remodelacion'].map(b => `<option value="${b}" ${t.business===b?'selected':''}>${b==='both'?'Ambas':b}</option>`).join('')}
+            ${[['remodelacion','🔨 Juan Austin (remodelación)'],['rentas','🧹 Limpieza (rentas)']].map(([b,l]) => `<option value="${b}" ${(t.business==='both'?'remodelacion':t.business)===b?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Encargado</label>
+          <select id="op-e-assignee" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">
+            ${['Juan','Pedro','Crew Norte','Crew Sur'].map(a => `<option value="${a}" ${(t.assignee||'Juan')===a?'selected':''}>${a}</option>`).join('')}
+            ${(t.assignee && !['Juan','Pedro','Crew Norte','Crew Sur'].includes(t.assignee)) ? `<option value="${(t.assignee||'').replace(/"/g,'&quot;')}" selected>${(t.assignee||'').replace(/</g,'&lt;')}</option>` : ''}
           </select>
         </div>
         <div>
@@ -2083,6 +2090,7 @@ async function opSaveEdit(id, isBacklog) {
     title: document.getElementById('op-e-title').value,
     duration_min: +document.getElementById('op-e-dur').value || 30,
     business: document.getElementById('op-e-business').value,
+    assignee: (document.getElementById('op-e-assignee') || {}).value || 'Juan',
     zona: document.getElementById('op-e-zona').value || null,
     priority: document.getElementById('op-e-priority').value,
     property_id, project_id,
