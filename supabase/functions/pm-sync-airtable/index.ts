@@ -3,23 +3,26 @@
 // Sincroniza la base Airtable de rentas → Supabase pm_*
 //
 /**
- * MAPEO OFICIAL Airtable → Property Manager (fuente única por módulo)
- *   Propiedades                           ← "Datos x Casa"
- *   Tenant/Calendario/Reservas/Inquilinos ← "Base de datos Tenant"
- *   Pagos                                 ← "Pagos Rentas"
- *   Gastos                                ← "Gastos por Casa" (observaciones, recibos, fechas)
+ * MAPEO OFICIAL Airtable → Property Manager (NO CRUZAR FUENTES)
+ *
+ * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
+ *                  agrupado por address_normalized
+ * pm_bookings    ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
+ * pm_tenants     ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
+ * pm_payments    ← "Pagos Rentas" (tblqJlSgnLNfn34dh), UNIQUE por external_id
+ * pm_expenses    ← "Gastos por Casa" (tblsihpE31f116RCR)
+ *
+ * TABLAS QUE EXISTEN PERO NO SON FUENTE DE LOS 6 MÓDULOS:
+ * - "Acceso a plataforma" (tblYrOKj2xOV1gAZe)          → pm_credentials (pestaña aparte)
+ * - "Cuentas de wifi" (tblga4BybYVBBRCTu)              → enrich pm_properties
+ * - "Gastos Por Plataforma" (tblrs9nCGsew8SvCR)        → pm_expenses (operativo) [DECISIÓN: entra]
+ * - "Gastos Equipo" (tbl21GE6fjUdU4sxF)               → pm_payroll          [DECISIÓN: entra]
+ * - "Gastos Aseo y Podada" (tblxfX2no190lvLYo)         → pm_expenses (aseo)  [DECISIÓN: entra]
+ * - "Cronograma Tareas Juan Austin" (tblHrLZFet9CxFMxP) → pm_tasks (ops)
  *
  * REGLA DE BOOKINGS: las reservas (calendario/ocupación) salen SOLO de
- * "Base de datos Tenant". "Datos x Casa" YA NO crea bookings (era doble fuente
- * que causaba doble conteo). De "Datos x Casa" se derivan pm_properties + pm_units
- * y se emiten WARNINGS de integridad, pero no reservas.
- *
- * TABLAS EXTRA (fuera del mapeo de 6 módulos; se mantienen porque alimentan
- * features reales — documentadas, no eliminadas):
- *   Acceso a plataforma            → pm_credentials   (pestaña credenciales)
- *   Cuentas de wifi                → enrich pm_properties
- *   Gastos Plataforma/Equipo/Aseo  → pm_expenses      (gasto operativo total)
- *   Cronograma Juan Austin         → pm_tasks
+ * "Base de datos Tenant". "Datos x Casa" NO crea bookings (era doble fuente);
+ * de ahí se derivan pm_properties + pm_units + conteos de unidades + warnings.
  */
 //
 // Tablas que sincroniza:
@@ -241,6 +244,24 @@ function parseMonthYear(raw: any): { month: string | null; year: number | null }
   const month = s.replace(/20\d{2}/, "").trim().toLowerCase() || null;
   return { month, year };
 }
+// FIX 3: fecha del gasto. Usa "Fecha" exacta si está; si no, deriva del "Mes"
+// (multiselect "enero".."diciembre", SIN año) usando el año del createdTime del
+// registro y día 1. Devuelve null si no hay ni fecha ni mes parseable.
+const MES_NUM: Record<string, string> = {
+  enero: "01", febrero: "02", marzo: "03", abril: "04", mayo: "05", junio: "06",
+  julio: "07", agosto: "08", septiembre: "09", setiembre: "09", octubre: "10",
+  noviembre: "11", diciembre: "12"
+};
+function expenseDate(fecha: any, mesCell: any, createdTime?: string): string | null {
+  if (fecha) return fecha;                                    // Fecha exacta de Airtable
+  const mesRaw = getMultiSel(mesCell)[0] || getSel(mesCell);  // "Mes" es multiselect
+  if (!mesRaw) return null;
+  const m = MES_NUM[mesRaw.trim().toLowerCase()];
+  if (!m) return null;
+  const year = (createdTime && /^\d{4}/.test(createdTime)) ? createdTime.slice(0, 4)
+             : String(new Date().getFullYear());             // año estimado (Mes no trae año)
+  return `${year}-${m}-01`;                                   // día 1 si no hay fecha exacta
+}
 function extractZip(addr: string): { zip?: string; city?: string; state?: string } {
   const m = (addr || "").match(/(\d{5})/);
   const zip = m?.[1];
@@ -377,30 +398,49 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     const datosCasa = await fetchAllRecords(base_id, TABLE_IDS.datos_casa, airtable_token);
 
-    // 1a) Deduplicar y crear properties por dirección
-    const propsByAddr: Record<string, any> = {};
+    // 1a) Deduplicar y crear properties por DIRECCIÓN NORMALIZADA (fuente única: Datos x Casa).
+    //     El "Tipo alojamiento" trae la IDENTIDAD de cada unidad física
+    //     (ej. "Estudio 1/2/3", "Habitación 1..6", "Apartamento 1/3", "Casa Completa"),
+    //     así que derivamos los conteos contando NOMBRES DISTINTOS de tipo por propiedad
+    //     (NO filas: cada unidad puede tener varias estadías).
+    const propsByNorm: Record<string, any> = {};
+    const tiposByNorm: Record<string, Set<string>> = {};
     for (const r of datosCasa) {
       const addr = getSel(r.fields?.[F.dxc_direccion]);
-      if (!addr || propsByAddr[addr]) continue;
+      if (!addr) continue;
+      const norm = normalizeAddress(addr);
+      if (!norm) continue;
+      if (!tiposByNorm[norm]) tiposByNorm[norm] = new Set<string>();
+      for (const t of getMultiSel(r.fields?.[F.dxc_tipo])) { const v = (t || "").trim(); if (v) tiposByNorm[norm].add(v); }
+      if (propsByNorm[norm]) continue;            // 1 propiedad por dirección normalizada
       const { zip, city, state } = extractZip(addr);
-      propsByAddr[addr] = {
-        external_id: "addr-" + slugify(addr),
+      propsByNorm[norm] = {
+        external_id: "addr-" + slugify(norm),
+        address_normalized: norm,
         name: addr,
         address: addr,
         city, state, zip,
         zone: inferZone(getSel(r.fields?.[F.dxc_ubicacion])),
-        // rental_model NO se escribe en el sync: lo setea manualmente
-        // pm-rental-model.sql (vocabulario nuevo casa_completa/por_habitaciones/
-        // por_unidades/mixta). Omitirlo del upsert preserva el valor manual.
-        // (Re-habilitar acá sólo cuando Airtable tenga un campo "Modelo de Renta"
-        //  fiable con ese vocabulario.)
+        // rental_model NO se escribe en el sync (lo setea pm-rental-model.sql);
+        // omitirlo del upsert preserva el valor manual.
         drive_url: r.fields?.[F.dxc_drive] || null,
         status: "activa"
       };
     }
-    const propsArr = Object.values(propsByAddr);
+    // 1a-bis) Derivar conteos de unidades desde los tipos DISTINTOS de cada propiedad.
+    //   estudios = #tipos /estudio/ · aptos = #tipos /apart/ ·
+    //   rentada_por_habitaciones = hay algún tipo /habitaci/ · casa_completa = hay "Casa Completa"
+    for (const [norm, p] of Object.entries(propsByNorm)) {
+      const tipos = Array.from(tiposByNorm[norm] || []);
+      p.cantidad_estudios = tipos.filter(t => /estudio/i.test(t)).length;
+      p.cantidad_aptos = tipos.filter(t => /apart/i.test(t)).length;
+      p.rentada_por_habitaciones = tipos.some(t => /habitaci/i.test(t));
+      p.cantidad_casa_completa = tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0;
+    }
+    const propsArr = Object.values(propsByNorm);
     if (!dry_run && propsArr.length) {
-      const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "external_id" });
+      // Upsert por address_normalized (requiere UNIQUE address_normalized — ver pm-data-sources-fix.sql)
+      const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "address_normalized" });
       if (error) errors.push("properties: " + error.message);
     }
     stats.properties = propsArr.length;
@@ -458,8 +498,8 @@ Deno.serve(async (req) => {
       const addr = getSel(r.fields?.[F.dxc_direccion]);
       if (!addr) continue;
       const tipo = getMultiSel(r.fields?.[F.dxc_tipo])[0] || "Habitación";
-      const propExtId = "addr-" + slugify(addr);
-      const propId = propIdByExtId[propExtId];
+      // La propiedad ahora se identifica por dirección normalizada
+      const propId = propIdByNormAddr[normalizeAddress(addr)] || propIdByExtId["addr-" + slugify(normalizeAddress(addr))];
       if (!propId) continue;
       const ext = "unit-" + slugify(addr) + "-" + slugify(tipo);   // clave compuesta estable
       unitIdByExternalRec[r.id] = ext;                             // cada fila apunta a su unidad agrupada
@@ -627,7 +667,7 @@ Deno.serve(async (req) => {
       const inq = r.fields?.[F.dxc_inquilino];
       if (/ocupad/i.test(estadoAt) && !inq) {
         const addr = getSel(r.fields?.[F.dxc_direccion]);
-        addWarn("ocupada_sin_inquilino", "unit", "unit-" + slugify(addr || "") + "-" + slugify(getMultiSel(r.fields?.[F.dxc_tipo])[0] || ""), propIdByExtId["addr-" + slugify(addr || "")] || null,
+        addWarn("ocupada_sin_inquilino", "unit", "unit-" + slugify(addr || "") + "-" + slugify(getMultiSel(r.fields?.[F.dxc_tipo])[0] || ""), propIdByNormAddr[normalizeAddress(addr || "")] || null,
           { casa: addr, tipo: getMultiSel(r.fields?.[F.dxc_tipo])[0], estado_airtable: estadoAt });
       }
     }
@@ -762,7 +802,7 @@ Deno.serve(async (req) => {
           subcategory: getSel(r.fields?.[F.gst_tipo]) || null,
           property_id: gPropId,
           amount: r.fields?.[F.gst_valor] || 0,
-          expense_date: r.fields?.[F.gst_fecha] || null,
+          expense_date: expenseDate(r.fields?.[F.gst_fecha], r.fields?.[F.gst_mes], r.createdTime),
           month: getMultiSel(r.fields?.[F.gst_mes])[0]?.toLowerCase() || null,
           description: getSel(r.fields?.[F.gst_tipo]) || "Gasto casa",
           invoice_url: r.fields?.[F.gst_drive] || getAttachUrl(r.fields?.[F.gst_factura]),
@@ -932,7 +972,7 @@ Deno.serve(async (req) => {
           title: r.fields?.[F.crn_tarea] || "Sin título",
           property_id: (() => {
             const casa = getSel(r.fields?.[F.crn_casa]);
-            return casa ? (propIdByExtId["addr-" + slugify(casa)] || null) : null;
+            return casa ? (propIdByNormAddr[normalizeAddress(casa)] || null) : null;
           })(),
           zone: inferZone(getSel(r.fields?.[F.crn_zona])),
           priority: (getSel(r.fields?.[F.crn_prio]) || "media").toLowerCase(),
@@ -970,7 +1010,7 @@ Deno.serve(async (req) => {
         if (!inq || !ci) continue;
         const addr = getSel(r.fields?.[F.dxc_direccion]) || "";
         const k = slugify(inq) + "|" + slugify(addr);
-        (byKey[k] = byKey[k] || []).push({ recId: r.id, ci, co: r.fields?.[F.dxc_fecha_out] || "9999-12-31", inq, addr, propId: propIdByExtId["addr-" + slugify(addr)] || null });
+        (byKey[k] = byKey[k] || []).push({ recId: r.id, ci, co: r.fields?.[F.dxc_fecha_out] || "9999-12-31", inq, addr, propId: propIdByNormAddr[normalizeAddress(addr)] || null });
       }
       for (const k of Object.keys(byKey)) {
         const arr = byKey[k]; if (arr.length < 2) continue;
