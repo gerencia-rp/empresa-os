@@ -3,16 +3,23 @@
 // Sincroniza la base Airtable de rentas → Supabase pm_*
 //
 /**
- * REGLA: pm_properties.address = Airtable "Datos x Casa".Dirección (fld1Thbg8RaXZXREv) LITERAL.
- * NUNCA transformar, recortar, normalizar ni reconstruir desde otros campos.
- * SOLO "Datos x Casa" inserta filas en pm_properties (upsert ON CONFLICT (address)).
- * "Base de datos Tenant" solo LEE el id por dirección; NO inserta.
- * Guard: una dirección sin coma (formato incompleto) NO se inserta (se registra warning).
+ * pm_properties es un MIRROR de Airtable "Datos x Casa" + campo "Dirección" (single select).
+ *
+ * - airtable_address_id (sel_xxx) es la LLAVE ESTABLE.
+ * - address es el texto LITERAL del option (.name); puede cambiar si el dueño lo edita.
+ * - Las options se leen de la METADATA (Meta API) → captura opciones aún sin filas.
+ * - Si una option desaparece de Airtable, la propiedad se marca active=false / status=inactiva
+ *   (NO se borra, para preservar bookings/payments históricos).
+ * - Si vuelve a aparecer, se reactiva (active=true / status=activa).
+ *
+ * SOLO el sync inserta/actualiza pm_properties (upsert ON CONFLICT (airtable_address_id)).
+ * NUNCA insertar con airtable_address_id NULL ni transformar address localmente.
+ * "Base de datos Tenant" solo LEE por address / airtable_address_id; NUNCA inserta.
  *
  * MAPEO OFICIAL Airtable → Property Manager (NO CRUZAR FUENTES)
  *
  * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
- *                  dedup por address LITERAL
+ *                  mirror por sel_id de "Dirección"
  * pm_bookings    ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
  * pm_tenants     ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
  * pm_payments    ← "Pagos Rentas" (tblqJlSgnLNfn34dh), UNIQUE por external_id
@@ -355,6 +362,27 @@ async function fetchAllRecords(baseId: string, tableId: string, token: string): 
   return all;
 }
 
+// Lee las options {id, name} de un campo single-select vía Meta API.
+// Devuelve null si la Meta API no está disponible (token sin scope schema.bases:read).
+// Captura TODAS las opciones, incluidas las que aún no tienen filas (mirror real).
+async function fetchFieldChoices(
+  baseId: string, tableId: string, fieldId: string, token: string
+): Promise<Array<{ id: string; name: string }> | null> {
+  try {
+    const r = await fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const t = (data.tables || []).find((x: any) => x.id === tableId);
+    const f = (t?.fields || []).find((x: any) => x.id === fieldId);
+    const choices = f?.options?.choices;
+    if (!Array.isArray(choices)) return null;
+    return choices.map((c: any) => ({ id: c.id, name: c.name }));
+  } catch {
+    return null;
+  }
+}
+
 // ────────────────────────────────────────────────────────────────
 // MAIN HANDLER
 // ────────────────────────────────────────────────────────────────
@@ -404,62 +432,99 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     const datosCasa = await fetchAllRecords(base_id, TABLE_IDS.datos_casa, airtable_token);
 
-    // 1a) Crear properties con DIRECCIÓN LITERAL de "Datos x Casa".Dirección.
-    //     REGLA: address = valor literal de Airtable. NUNCA transformar/recortar/normalizar.
-    //     Dedup por address literal (todas las filas de una casa usan el MISMO valor de
-    //     singleSelect). Guard: si la dirección no trae coma (formato completo
-    //     "Calle, Ciudad, TX ZIP"), se SALTA y se registra warning (no se inserta corto).
-    //     El "Tipo alojamiento" trae la IDENTIDAD de cada unidad ("Estudio 1/2/3",
-    //     "Habitación 1..6", "Apartamento 1/3", "Casa Completa") → conteos = tipos DISTINTOS.
-    const propsByAddr: Record<string, any> = {};
-    const tiposByAddr: Record<string, Set<string>> = {};
+    // 1a) PROPIEDADES = MIRROR de las options del single-select "Dirección".
+    //     Llave estable = airtable_address_id (sel_xxx). address = .name LITERAL.
+    //     Las options se leen de la METADATA (así capturamos opciones sin filas aún).
+    //     Fallback: si la Meta API no está disponible, se derivan de las filas
+    //     (no captura opciones sin filas; se loguea).
+    let dirChoices = await fetchFieldChoices(base_id, TABLE_IDS.datos_casa, F.dxc_direccion, airtable_token);
+    if (!dirChoices) {
+      const seen: Record<string, string> = {};
+      for (const r of datosCasa) { const c: any = r.fields?.[F.dxc_direccion]; if (c?.id && !seen[c.id]) seen[c.id] = c.name; }
+      dirChoices = Object.entries(seen).map(([id, name]) => ({ id, name }));
+      errors.push("meta API Dirección no disponible (scope schema.bases:read): opciones sin filas no se sincronizan; fallback a filas.");
+    }
+
+    // Tipos + #habitaciones + zona/drive por sel_id (para derivar modelo y enriquecer)
+    const tiposBySel: Record<string, Set<string>> = {};
+    const habBySel: Record<string, boolean> = {};
+    const zoneBySel: Record<string, string | null> = {};
+    const driveBySel: Record<string, string | null> = {};
     for (const r of datosCasa) {
-      const addr = getSel(r.fields?.[F.dxc_direccion]);
-      if (!addr) continue;
-      if (!addr.includes(",")) {                    // guard de formato completo
-        addWarn("direccion_sin_formato", "property", "addr-" + slugify(addr), null, { address: addr });
-        continue;
+      const c: any = r.fields?.[F.dxc_direccion]; if (!c?.id) continue;
+      if (!tiposBySel[c.id]) tiposBySel[c.id] = new Set<string>();
+      for (const t of getMultiSel(r.fields?.[F.dxc_tipo])) { const v = (t || "").trim(); if (v) tiposBySel[c.id].add(v); }
+      const nh = getSel(r.fields?.[F.dxc_habs]); if (nh && parseInt(nh) >= 1) habBySel[c.id] = true;
+      if (!(c.id in zoneBySel)) zoneBySel[c.id] = inferZone(getSel(r.fields?.[F.dxc_ubicacion]));
+      if (!driveBySel[c.id] && r.fields?.[F.dxc_drive]) driveBySel[c.id] = r.fields[F.dxc_drive];
+    }
+
+    // MIGRACIÓN: vincular filas existentes a su sel_id por address EXACTO o NORMALIZADO
+    // (one-time, idempotente). Evita insertar duplicados de las 18 ya cargadas.
+    if (!dry_run) {
+      const { data: existingProps } = await supabase.from("pm_properties").select("id, address, airtable_address_id");
+      const unlinkedByAddr: Record<string, string> = {};
+      const unlinkedByNorm: Record<string, string> = {};
+      for (const p of existingProps || []) {
+        if (p.airtable_address_id) continue;                 // ya vinculada
+        if (p.address) unlinkedByAddr[p.address] = p.id;
+        const n = normalizeAddress(p.address || ""); if (n && !unlinkedByNorm[n]) unlinkedByNorm[n] = p.id;
       }
-      if (!tiposByAddr[addr]) tiposByAddr[addr] = new Set<string>();
-      for (const t of getMultiSel(r.fields?.[F.dxc_tipo])) { const v = (t || "").trim(); if (v) tiposByAddr[addr].add(v); }
-      if (propsByAddr[addr]) continue;              // 1 propiedad por dirección literal
-      const { zip, city, state } = extractZip(addr);
-      propsByAddr[addr] = {
-        external_id: "addr-" + slugify(addr),
-        address_normalized: normalizeAddress(addr), // helper para matchear pagos/gastos (read-side)
-        name: addr,
-        address: addr,                              // ← LITERAL, sin transformar
+      for (const c of dirChoices) {
+        if (!c.id || !c.name) continue;
+        const pid = unlinkedByAddr[c.name] || unlinkedByNorm[normalizeAddress(c.name)];
+        if (pid) await supabase.from("pm_properties").update({ airtable_address_id: c.id }).eq("id", pid).is("airtable_address_id", null);
+      }
+    }
+
+    // Payloads (ANTI-FANTASMA: nunca id null; address = .name LITERAL, sin transformar).
+    const propsArr = dirChoices.filter(c => c.id && c.name).map(c => {
+      const tipos = Array.from(tiposBySel[c.id] || []);
+      const { zip, city, state } = extractZip(c.name);
+      return {
+        airtable_address_id: c.id,
+        external_id: "addr-" + slugify(c.name),
+        address_normalized: normalizeAddress(c.name),  // helper read-side (pagos/gastos)
+        name: c.name,
+        address: c.name,                               // ← LITERAL del option de Airtable
         city, state, zip,
-        zone: inferZone(getSel(r.fields?.[F.dxc_ubicacion])),
-        // rental_model NO se escribe en el sync (lo setea pm-rental-model.sql).
-        drive_url: r.fields?.[F.dxc_drive] || null,
-        status: "activa"
+        zone: zoneBySel[c.id] || null,
+        drive_url: driveBySel[c.id] || null,
+        cantidad_estudios: tipos.filter(t => /estudio/i.test(t)).length,
+        cantidad_aptos: tipos.filter(t => /apart|apto/i.test(t)).length,
+        rentada_por_habitaciones: tipos.some(t => /habitaci/i.test(t)) || !!habBySel[c.id],
+        cantidad_casa_completa: tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0,
+        status: "activa",
+        active: true,                                  // presente en Airtable ⇒ viva (reactiva si estaba inactiva)
+        updated_at: new Date().toISOString()
       };
-    }
-    // 1a-bis) Conteos de unidades desde tipos DISTINTOS por propiedad.
-    for (const [addr, p] of Object.entries(propsByAddr)) {
-      const tipos = Array.from(tiposByAddr[addr] || []);
-      p.cantidad_estudios = tipos.filter(t => /estudio/i.test(t)).length;
-      p.cantidad_aptos = tipos.filter(t => /apart/i.test(t)).length;
-      p.rentada_por_habitaciones = tipos.some(t => /habitaci/i.test(t));
-      p.cantidad_casa_completa = tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0;
-    }
-    const propsArr = Object.values(propsByAddr);
+    });
     if (!dry_run && propsArr.length) {
-      // Upsert por address LITERAL (requiere UNIQUE(address) — ver pm-data-sources-fix.sql)
-      const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "address" });
+      const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "airtable_address_id" });
       if (error) errors.push("properties: " + error.message);
+    }
+
+    // ARCHIVAR las que ya NO están en Airtable (no borrar → preserva bookings/payments).
+    const liveIds = propsArr.map(p => p.airtable_address_id);
+    if (!dry_run && liveIds.length) {
+      const { error: aerr } = await supabase.from("pm_properties")
+        .update({ active: false, status: "inactiva", updated_at: new Date().toISOString() })
+        .not("airtable_address_id", "is", null)
+        .not("airtable_address_id", "in", `(${liveIds.join(",")})`);
+      if (aerr) errors.push("archive properties: " + aerr.message);
     }
     stats.properties = propsArr.length;
 
-    // Map address → property_id
-    const { data: dbProps } = await supabase.from("pm_properties").select("id, external_id, address");
+    // Map address / sel_id → property_id
+    const { data: dbProps } = await supabase.from("pm_properties").select("id, external_id, address, airtable_address_id");
     const propIdByExtId: Record<string, string> = {};
     const propIdByAddr: Record<string, string> = {};
     const propIdByNormAddr: Record<string, string> = {};   // dirección normalizada → property_id
+    const propIdBySel: Record<string, string> = {};        // airtable_address_id (sel_xxx) → property_id
     (dbProps || []).forEach((p: any) => {
       if (p.external_id) propIdByExtId[p.external_id] = p.id;
       if (p.address) propIdByAddr[p.address] = p.id;
+      if (p.airtable_address_id) propIdBySel[p.airtable_address_id] = p.id;
       const n = normalizeAddress(p.address || "");
       if (n) propIdByNormAddr[n] = p.id;
     });
@@ -505,8 +570,9 @@ Deno.serve(async (req) => {
       const addr = getSel(r.fields?.[F.dxc_direccion]);
       if (!addr) continue;
       const tipo = getMultiSel(r.fields?.[F.dxc_tipo])[0] || "Habitación";
-      // La propiedad se identifica por dirección LITERAL (fallback normalizado para legacy)
-      const propId = propIdByAddr[addr] || propIdByNormAddr[normalizeAddress(addr)];
+      // La propiedad se identifica por sel_id de Dirección (estable); fallbacks literal/normalizado.
+      const selId = (r.fields?.[F.dxc_direccion] as any)?.id;
+      const propId = (selId && propIdBySel[selId]) || propIdByAddr[addr] || propIdByNormAddr[normalizeAddress(addr)];
       if (!propId) continue;
       const ext = "unit-" + slugify(addr) + "-" + slugify(tipo);   // clave compuesta estable
       unitIdByExternalRec[r.id] = ext;                             // cada fila apunta a su unidad agrupada
