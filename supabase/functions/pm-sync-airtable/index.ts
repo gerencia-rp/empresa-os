@@ -3,10 +3,16 @@
 // Sincroniza la base Airtable de rentas → Supabase pm_*
 //
 /**
+ * REGLA: pm_properties.address = Airtable "Datos x Casa".Dirección (fld1Thbg8RaXZXREv) LITERAL.
+ * NUNCA transformar, recortar, normalizar ni reconstruir desde otros campos.
+ * SOLO "Datos x Casa" inserta filas en pm_properties (upsert ON CONFLICT (address)).
+ * "Base de datos Tenant" solo LEE el id por dirección; NO inserta.
+ * Guard: una dirección sin coma (formato incompleto) NO se inserta (se registra warning).
+ *
  * MAPEO OFICIAL Airtable → Property Manager (NO CRUZAR FUENTES)
  *
  * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
- *                  agrupado por address_normalized
+ *                  dedup por address LITERAL
  * pm_bookings    ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
  * pm_tenants     ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
  * pm_payments    ← "Pagos Rentas" (tblqJlSgnLNfn34dh), UNIQUE por external_id
@@ -398,49 +404,50 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     const datosCasa = await fetchAllRecords(base_id, TABLE_IDS.datos_casa, airtable_token);
 
-    // 1a) Deduplicar y crear properties por DIRECCIÓN NORMALIZADA (fuente única: Datos x Casa).
-    //     El "Tipo alojamiento" trae la IDENTIDAD de cada unidad física
-    //     (ej. "Estudio 1/2/3", "Habitación 1..6", "Apartamento 1/3", "Casa Completa"),
-    //     así que derivamos los conteos contando NOMBRES DISTINTOS de tipo por propiedad
-    //     (NO filas: cada unidad puede tener varias estadías).
-    const propsByNorm: Record<string, any> = {};
-    const tiposByNorm: Record<string, Set<string>> = {};
+    // 1a) Crear properties con DIRECCIÓN LITERAL de "Datos x Casa".Dirección.
+    //     REGLA: address = valor literal de Airtable. NUNCA transformar/recortar/normalizar.
+    //     Dedup por address literal (todas las filas de una casa usan el MISMO valor de
+    //     singleSelect). Guard: si la dirección no trae coma (formato completo
+    //     "Calle, Ciudad, TX ZIP"), se SALTA y se registra warning (no se inserta corto).
+    //     El "Tipo alojamiento" trae la IDENTIDAD de cada unidad ("Estudio 1/2/3",
+    //     "Habitación 1..6", "Apartamento 1/3", "Casa Completa") → conteos = tipos DISTINTOS.
+    const propsByAddr: Record<string, any> = {};
+    const tiposByAddr: Record<string, Set<string>> = {};
     for (const r of datosCasa) {
       const addr = getSel(r.fields?.[F.dxc_direccion]);
       if (!addr) continue;
-      const norm = normalizeAddress(addr);
-      if (!norm) continue;
-      if (!tiposByNorm[norm]) tiposByNorm[norm] = new Set<string>();
-      for (const t of getMultiSel(r.fields?.[F.dxc_tipo])) { const v = (t || "").trim(); if (v) tiposByNorm[norm].add(v); }
-      if (propsByNorm[norm]) continue;            // 1 propiedad por dirección normalizada
+      if (!addr.includes(",")) {                    // guard de formato completo
+        addWarn("direccion_sin_formato", "property", "addr-" + slugify(addr), null, { address: addr });
+        continue;
+      }
+      if (!tiposByAddr[addr]) tiposByAddr[addr] = new Set<string>();
+      for (const t of getMultiSel(r.fields?.[F.dxc_tipo])) { const v = (t || "").trim(); if (v) tiposByAddr[addr].add(v); }
+      if (propsByAddr[addr]) continue;              // 1 propiedad por dirección literal
       const { zip, city, state } = extractZip(addr);
-      propsByNorm[norm] = {
-        external_id: "addr-" + slugify(norm),
-        address_normalized: norm,
+      propsByAddr[addr] = {
+        external_id: "addr-" + slugify(addr),
+        address_normalized: normalizeAddress(addr), // helper para matchear pagos/gastos (read-side)
         name: addr,
-        address: addr,
+        address: addr,                              // ← LITERAL, sin transformar
         city, state, zip,
         zone: inferZone(getSel(r.fields?.[F.dxc_ubicacion])),
-        // rental_model NO se escribe en el sync (lo setea pm-rental-model.sql);
-        // omitirlo del upsert preserva el valor manual.
+        // rental_model NO se escribe en el sync (lo setea pm-rental-model.sql).
         drive_url: r.fields?.[F.dxc_drive] || null,
         status: "activa"
       };
     }
-    // 1a-bis) Derivar conteos de unidades desde los tipos DISTINTOS de cada propiedad.
-    //   estudios = #tipos /estudio/ · aptos = #tipos /apart/ ·
-    //   rentada_por_habitaciones = hay algún tipo /habitaci/ · casa_completa = hay "Casa Completa"
-    for (const [norm, p] of Object.entries(propsByNorm)) {
-      const tipos = Array.from(tiposByNorm[norm] || []);
+    // 1a-bis) Conteos de unidades desde tipos DISTINTOS por propiedad.
+    for (const [addr, p] of Object.entries(propsByAddr)) {
+      const tipos = Array.from(tiposByAddr[addr] || []);
       p.cantidad_estudios = tipos.filter(t => /estudio/i.test(t)).length;
       p.cantidad_aptos = tipos.filter(t => /apart/i.test(t)).length;
       p.rentada_por_habitaciones = tipos.some(t => /habitaci/i.test(t));
       p.cantidad_casa_completa = tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0;
     }
-    const propsArr = Object.values(propsByNorm);
+    const propsArr = Object.values(propsByAddr);
     if (!dry_run && propsArr.length) {
-      // Upsert por address_normalized (requiere UNIQUE address_normalized — ver pm-data-sources-fix.sql)
-      const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "address_normalized" });
+      // Upsert por address LITERAL (requiere UNIQUE(address) — ver pm-data-sources-fix.sql)
+      const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "address" });
       if (error) errors.push("properties: " + error.message);
     }
     stats.properties = propsArr.length;
@@ -498,8 +505,8 @@ Deno.serve(async (req) => {
       const addr = getSel(r.fields?.[F.dxc_direccion]);
       if (!addr) continue;
       const tipo = getMultiSel(r.fields?.[F.dxc_tipo])[0] || "Habitación";
-      // La propiedad ahora se identifica por dirección normalizada
-      const propId = propIdByNormAddr[normalizeAddress(addr)] || propIdByExtId["addr-" + slugify(normalizeAddress(addr))];
+      // La propiedad se identifica por dirección LITERAL (fallback normalizado para legacy)
+      const propId = propIdByAddr[addr] || propIdByNormAddr[normalizeAddress(addr)];
       if (!propId) continue;
       const ext = "unit-" + slugify(addr) + "-" + slugify(tipo);   // clave compuesta estable
       unitIdByExternalRec[r.id] = ext;                             // cada fila apunta a su unidad agrupada

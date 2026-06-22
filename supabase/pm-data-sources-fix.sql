@@ -47,61 +47,71 @@ CREATE OR REPLACE FUNCTION pm_normalize_address(addr text) RETURNS text AS $$
   SELECT btrim(regexp_replace(s, '\s+', ' ', 'g')) FROM s4;
 $$ LANGUAGE sql IMMUTABLE;
 
--- 2) Columna address_normalized (nullable por ahora; se hace UNIQUE NOT NULL al final).
+-- 2) Columna address_normalized SOLO como helper de matcheo (pagos/gastos).
+--    La clave canónica de propiedad es el address LITERAL (con coma).
 ALTER TABLE pm_properties ADD COLUMN IF NOT EXISTS address_normalized TEXT;
 UPDATE pm_properties SET address_normalized = pm_normalize_address(address);
 
--- 3) MERGE de duplicados por address_normalized.
---    Ganador = el que tiene MÁS hijos (units+bookings+payments+expenses); desempata por id.
---    Los hijos de los perdedores se reapuntan al ganador; los perdedores se borran.
+-- 3) LIMPIEZA: las filas con dirección CORTA (sin coma) son legacy. Se reapuntan
+--    sus hijos a la fila LARGA (literal, con coma) que normaliza igual, y se borran.
 DO $$
-DECLARE r RECORD;
+DECLARE n_short INT; n_exact INT;
 BEGIN
-  CREATE TEMP TABLE _pm_merge ON COMMIT DROP AS
+  -- 3a) cortas (sin coma) → gemelo largo (con coma) por address_normalized
+  CREATE TEMP TABLE _pm_short ON COMMIT DROP AS
+  SELECT s.id AS loser_id,
+         (SELECT l.id FROM pm_properties l
+           WHERE l.address LIKE '%,%'
+             AND l.address_normalized = s.address_normalized
+           ORDER BY l.id LIMIT 1) AS winner_id
+    FROM pm_properties s
+   WHERE s.address NOT LIKE '%,%';
+
+  DELETE FROM _pm_short WHERE winner_id IS NULL;  -- corta sin gemelo largo → se deja (no perder data)
+
+  UPDATE pm_units    u  SET property_id = m.winner_id FROM _pm_short m WHERE u.property_id  = m.loser_id;
+  UPDATE pm_bookings bk SET property_id = m.winner_id FROM _pm_short m WHERE bk.property_id = m.loser_id;
+  UPDATE pm_payments pa SET property_id = m.winner_id FROM _pm_short m WHERE pa.property_id = m.loser_id;
+  UPDATE pm_expenses e  SET property_id = m.winner_id FROM _pm_short m WHERE e.property_id  = m.loser_id;
+  DELETE FROM pm_properties p USING _pm_short m WHERE p.id = m.loser_id;
+  GET DIAGNOSTICS n_short = ROW_COUNT;
+
+  -- 3b) duplicados EXACTOS de address literal (por si hay) → ganador = más hijos
+  CREATE TEMP TABLE _pm_dup ON COMMIT DROP AS
   WITH score AS (
-    SELECT p.id, p.address_normalized,
-           (SELECT count(*) FROM pm_units    u  WHERE u.property_id  = p.id)
-         + (SELECT count(*) FROM pm_bookings bk WHERE bk.property_id = p.id)
-         + (SELECT count(*) FROM pm_payments pa WHERE pa.property_id = p.id)
-         + (SELECT count(*) FROM pm_expenses e  WHERE e.property_id  = p.id) AS n
+    SELECT p.id, p.address,
+           (SELECT count(*) FROM pm_units u WHERE u.property_id=p.id)
+         + (SELECT count(*) FROM pm_bookings b WHERE b.property_id=p.id)
+         + (SELECT count(*) FROM pm_payments pa WHERE pa.property_id=p.id)
+         + (SELECT count(*) FROM pm_expenses e WHERE e.property_id=p.id) AS n
       FROM pm_properties p
-     WHERE p.address_normalized IS NOT NULL AND p.address_normalized <> ''
   ),
   ranked AS (
-    SELECT id, address_normalized,
-           first_value(id) OVER (PARTITION BY address_normalized ORDER BY n DESC, id ASC) AS winner_id,
-           row_number()    OVER (PARTITION BY address_normalized ORDER BY n DESC, id ASC) AS rn
+    SELECT id, address,
+           first_value(id) OVER (PARTITION BY address ORDER BY n DESC, id ASC) AS winner_id,
+           row_number()    OVER (PARTITION BY address ORDER BY n DESC, id ASC) AS rn
       FROM score
   )
   SELECT id AS loser_id, winner_id FROM ranked WHERE rn > 1;
 
-  -- Reapuntar hijos al ganador
-  UPDATE pm_units    u  SET property_id = m.winner_id FROM _pm_merge m WHERE u.property_id  = m.loser_id;
-  UPDATE pm_bookings bk SET property_id = m.winner_id FROM _pm_merge m WHERE bk.property_id = m.loser_id;
-  UPDATE pm_payments pa SET property_id = m.winner_id FROM _pm_merge m WHERE pa.property_id = m.loser_id;
-  UPDATE pm_expenses e  SET property_id = m.winner_id FROM _pm_merge m WHERE e.property_id  = m.loser_id;
-  -- Borrar perdedores
-  DELETE FROM pm_properties p USING _pm_merge m WHERE p.id = m.loser_id;
+  UPDATE pm_units    u  SET property_id = m.winner_id FROM _pm_dup m WHERE u.property_id  = m.loser_id;
+  UPDATE pm_bookings bk SET property_id = m.winner_id FROM _pm_dup m WHERE bk.property_id = m.loser_id;
+  UPDATE pm_payments pa SET property_id = m.winner_id FROM _pm_dup m WHERE pa.property_id = m.loser_id;
+  UPDATE pm_expenses e  SET property_id = m.winner_id FROM _pm_dup m WHERE e.property_id  = m.loser_id;
+  DELETE FROM pm_properties p USING _pm_dup m WHERE p.id = m.loser_id;
+  GET DIAGNOSTICS n_exact = ROW_COUNT;
 
-  GET DIAGNOSTICS r = ROW_COUNT;
-  RAISE NOTICE 'pm_properties: % duplicados eliminados por merge', r;
+  RAISE NOTICE 'pm_properties: % cortas reapuntadas+borradas · % duplicados exactos eliminados', n_short, n_exact;
 END $$;
 
--- 4) UNIQUE + NOT NULL en address_normalized (después del merge, sin violaciones).
+-- 4) UNIQUE en address LITERAL (después de limpiar, sin violaciones).
 DO $$ BEGIN
-  ALTER TABLE pm_properties ADD CONSTRAINT pm_properties_addr_norm_uniq UNIQUE (address_normalized);
+  ALTER TABLE pm_properties ADD CONSTRAINT pm_properties_address_unique UNIQUE (address);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
--- (Solo poner NOT NULL si no quedaron NULLs)
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pm_properties WHERE address_normalized IS NULL) THEN
-    ALTER TABLE pm_properties ALTER COLUMN address_normalized SET NOT NULL;
-  ELSE
-    RAISE NOTICE 'address_normalized tiene NULLs — no se aplicó NOT NULL';
-  END IF;
-END $$;
 
 -- ── Validación ──
--- SELECT count(*) AS propiedades FROM pm_properties;                       -- esperado ~18
--- SELECT address_normalized, count(*) FROM pm_properties
---   GROUP BY address_normalized HAVING count(*)>1;                          -- esperado 0 filas
--- SELECT count(*) AS pagos FROM pm_payments;                               -- esperado ~302
+-- SELECT count(*) AS propiedades FROM pm_properties;                 -- esperado 18
+-- SELECT address, count(*) FROM pm_properties
+--   GROUP BY address HAVING count(*)>1;                              -- esperado 0 filas
+-- SELECT address FROM pm_properties WHERE address NOT LIKE '%,%';    -- esperado 0 filas (sin cortas)
+-- SELECT count(*) AS pagos FROM pm_payments;                         -- esperado ~302

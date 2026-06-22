@@ -6727,6 +6727,13 @@ async function pmImportFromJSON() {
     external_id: r.id || r.airtable_id || null
   })).filter(p => p.name);
   if (!payload.length) return alert('No encontré propiedades válidas. Verificá que tengan "name".');
+  // GUARD: address debe ser el formato completo literal "Calle, Ciudad, TX ZIP" (con coma).
+  // La fuente oficial de propiedades es "Datos x Casa"; este import manual NO debe crear
+  // versiones cortas/transformadas que dupliquen filas.
+  const sinFormato = payload.filter(p => !p.address || !String(p.address).includes(','));
+  if (sinFormato.length) return alert(`❌ ${sinFormato.length} dirección(es) sin formato completo (falta coma "Calle, Ciudad, TX ZIP"):\n\n` +
+    sinFormato.slice(0,8).map(p => '• ' + (p.address || '(vacía)')).join('\n') +
+    '\n\nLa dirección debe ser LITERAL e idéntica a "Datos x Casa".Dirección. Corregí el JSON.');
   if (!confirm(`Se van a crear ${payload.length} propiedades. ¿Continuar?`)) return;
   try {
     await sb.from('pm_properties').insert(payload);
