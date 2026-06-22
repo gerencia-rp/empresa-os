@@ -2,14 +2,35 @@
 // 🔄 PM-SYNC-AIRTABLE · Edge Function
 // Sincroniza la base Airtable de rentas → Supabase pm_*
 //
+/**
+ * MAPEO OFICIAL Airtable → Property Manager (fuente única por módulo)
+ *   Propiedades                           ← "Datos x Casa"
+ *   Tenant/Calendario/Reservas/Inquilinos ← "Base de datos Tenant"
+ *   Pagos                                 ← "Pagos Rentas"
+ *   Gastos                                ← "Gastos por Casa" (observaciones, recibos, fechas)
+ *
+ * REGLA DE BOOKINGS: las reservas (calendario/ocupación) salen SOLO de
+ * "Base de datos Tenant". "Datos x Casa" YA NO crea bookings (era doble fuente
+ * que causaba doble conteo). De "Datos x Casa" se derivan pm_properties + pm_units
+ * y se emiten WARNINGS de integridad, pero no reservas.
+ *
+ * TABLAS EXTRA (fuera del mapeo de 6 módulos; se mantienen porque alimentan
+ * features reales — documentadas, no eliminadas):
+ *   Acceso a plataforma            → pm_credentials   (pestaña credenciales)
+ *   Cuentas de wifi                → enrich pm_properties
+ *   Gastos Plataforma/Equipo/Aseo  → pm_expenses      (gasto operativo total)
+ *   Cronograma Juan Austin         → pm_tasks
+ */
+//
 // Tablas que sincroniza:
-//   1. Datos x Casa       → pm_properties + pm_units + pm_bookings
-//   2. Base de datos Tenant → pm_tenants + pm_bookings (enriquece)
-//   3. Pagos Rentas       → pm_payments (ingresos)
-//   4. Gastos por casa    → pm_payments (gastos)
-//   5. Acceso a plataforma → pm_credentials
-//   6. Cuentas de wifi    → enrichment de pm_properties
-//   7. Cronograma Juan Austin → pm_tasks
+//   1. Datos x Casa        → pm_properties + pm_units  (+ warnings; NO bookings)
+//   2. Base de datos Tenant → pm_tenants + pm_bookings (ÚNICA fuente de reservas)
+//   3. Pagos Rentas        → pm_payments (ingresos)
+//   4. Gastos por casa     → pm_expenses (con observaciones, recibos, fecha)
+//   5. Acceso a plataforma → pm_credentials             [extra]
+//   6. Cuentas de wifi     → enrichment de pm_properties [extra]
+//   7. Gastos Plataforma/Equipo/Aseo → pm_expenses       [extra]
+//   8. Cronograma Juan Austin → pm_tasks                 [extra]
 //
 // Idempotente: usa external_id para detectar updates vs inserts.
 // ════════════════════════════════════════════════════════════════
@@ -543,9 +564,9 @@ Deno.serve(async (req) => {
     });
 
     // ════════════════════════════════════════════════════════════
-    // 3) BOOKINGS desde Datos x Casa (+ Base de datos Tenant en 3b)
+    // 3) Recorrida de Datos x Casa SOLO para warnings de integridad.
+    //    Las reservas se crean únicamente en 3b (Base de datos Tenant).
     // ════════════════════════════════════════════════════════════
-    const bookings: any[] = [];
     const today0 = new Date().toISOString().slice(0, 10);
     // Dedup de reservas: clave (unit_id + nombre inquilino + check_in)
     const bookingKeys = new Set<string>();
@@ -591,37 +612,14 @@ Deno.serve(async (req) => {
           { inquilino, casa: getSel(r.fields?.[F.dxc_direccion]), tipo: getMultiSel(r.fields?.[F.dxc_tipo])[0] });
       }
 
-      bookingKeys.add(bkKey(unitInfo.id, inquilino, startDate));
-      bookings.push({
-        external_id: "booking-dxc-" + r.id,   // record_id de Airtable: único por reserva
-        unit_id: unitInfo.id,
-        property_id: unitInfo.property_id,
-        tenant_id: tenantId,
-        booking_type: inferBookingType(fuentes),
-        platform_account: platformAcc,
-        start_date: startDate,
-        end_date: checkOut,
-        rent_amount: r.fields?.[F.dxc_pago] || 0,
-        rent_period: "mensual",
-        deposit: r.fields?.[F.dxc_deposito] || 0,
-        payment_day: getSel(r.fields?.[F.dxc_tiempo_pago]) || null,
-        status: deriveStatus(startDate, checkOut),
-        contract_status: inferContractStatus(obs),
-        is_assistance_program: /programas de ayuda/i.test(modelo),
-        contract_url: r.fields?.[F.dxc_drive] || null,
-        notes: obs
-      });
+      // ⛔ Datos x Casa YA NO crea bookings: la fuente única de reservas es
+      //    "Base de datos Tenant" (bloque 3b). Antes esto duplicaba el conteo
+      //    de ocupación. Acá solo se conservan los warnings de integridad de arriba.
+      // (Se omite mapear deriveStatus/modelo/tenantId/fuentes/platformAcc para bookings.)
+      void [deriveStatus, modelo, tenantId, fuentes, platformAcc, obs]; // evitar "unused"
     }
-    if (!dry_run && bookings.length) {
-      // Insertar en chunks de 50 para evitar payload grande
-      for (let i = 0; i < bookings.length; i += 50) {
-        const chunk = bookings.slice(i, i + 50);
-        const { error } = await supabase.from("pm_bookings").upsert(chunk, { onConflict: "external_id" });
-        if (error) { errors.push("bookings chunk " + i + ": " + error.message); break; }
-      }
-    }
-    stats.bookings = bookings.length;
-    console.log(`[pm-sync] pm_bookings (Datos x Casa): ${bookings.length} reservas.`);
+    stats.bookings = 0;
+    console.log(`[pm-sync] pm_bookings (Datos x Casa): 0 (deshabilitado — fuente única = Tenant).`);
 
     // (b) Unidad Ocupada sin inquilino
     for (const r of datosCasa) {

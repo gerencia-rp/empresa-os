@@ -284,8 +284,25 @@ function pmOccupancyOf(propertyId) {
 //   por_unidades → N (cada estudio/apartamento/unidad)
 //   mixta → 1 (casa principal) + N (estudios/aptos anexos)
 function pmIsRentableSubunit(u) { return /estudio|apart|unidad/i.test(u.name || ''); }
+// ¿La propiedad tiene los campos numéricos manuales cargados? (réplica de pm_has_manual_units)
+function pmHasManualUnits(p) {
+  return (+p?.cantidad_estudios || 0) > 0
+      || (+p?.cantidad_aptos || 0) > 0
+      || (+p?.cantidad_casa_completa || 0) > 0
+      || p?.rentada_por_habitaciones === true;
+}
 function pmRentableUnitsOf(propertyId) {
   const p = pmaState.properties.find(x => x.id === propertyId);
+  // 1) Si hay números manuales cargados, mandan (réplica de pm_calc_rentable_units).
+  //    Aditivo: casa_completa + (por_habitaciones?1:0) + estudios + aptos
+  //    (satisface el ejemplo "por hab + casa completa anexa + 2 estudios = 4").
+  if (pmHasManualUnits(p)) {
+    let n = (+p.cantidad_casa_completa || 0);
+    if (p.rentada_por_habitaciones === true) n += 1;
+    n += (+p.cantidad_estudios || 0) + (+p.cantidad_aptos || 0);
+    return n;
+  }
+  // 2) Fallback: lógica por rental_model + pm_units (la que ya existía)
   const model = p?.rental_model || 'casa_completa';
   const us = pmUnitsOf(propertyId);
   if (model === 'por_unidades') return us.filter(pmIsRentableSubunit).length;
@@ -299,16 +316,17 @@ function pmOccupiedRentableUnitsOf(propertyId) {
   const model = p?.rental_model || 'casa_completa';
   const us = pmUnitsOf(propertyId);
   const anyActive = us.some(u => pmActiveBookingOf(u.id));
-  if (model === 'casa_completa' || model === 'por_habitaciones') return anyActive ? 1 : 0;
-  if (model === 'por_unidades') return us.filter(u => pmIsRentableSubunit(u) && pmActiveBookingOf(u.id)).length;
-  if (model === 'mixta') {
+  let occ;
+  if (model === 'por_unidades') occ = us.filter(u => pmIsRentableSubunit(u) && pmActiveBookingOf(u.id)).length;
+  else if (model === 'mixta') {
     const subs = us.filter(u => /estudio|apart/i.test(u.name || ''));
     const mains = us.filter(u => !/estudio|apart/i.test(u.name || ''));
     const subOcc = subs.filter(u => pmActiveBookingOf(u.id)).length;
     const mainOcc = mains.some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
-    return Math.min(mainOcc + subOcc, pmRentableUnitsOf(propertyId));
-  }
-  return anyActive ? 1 : 0;
+    occ = mainOcc + subOcc;
+  } else occ = anyActive ? 1 : 0; // casa_completa, por_habitaciones, default
+  // Invariante: ocupadas nunca > rentables (clave para que libres+ocupadas=rentables)
+  return Math.min(occ, pmRentableUnitsOf(propertyId));
 }
 // Totales del portafolio (solo propiedades activas)
 function pmTotalRentableUnits() {
@@ -318,6 +336,10 @@ function pmTotalRentableUnits() {
 function pmTotalOccupiedRentableUnits() {
   return pmaState.properties.filter(p => p.status === 'activa')
     .reduce((s, p) => s + pmOccupiedRentableUnitsOf(p.id), 0);
+}
+// Unidades rentables LIBRES = rentables − ocupadas (invariante: libres+ocupadas=rentables)
+function pmFreeRentableUnits() {
+  return Math.max(0, pmTotalRentableUnits() - pmTotalOccupiedRentableUnits());
 }
 function pmFinanceOf(propertyId, monthDate = null) {
   // monthDate: Date|null. null = all-time, else solo el mes específico
@@ -347,6 +369,11 @@ function pmExpiringIn(days = 30) {
     const end = new Date(b.end_date);
     return end >= now && end <= limit;
   });
+}
+// "Por ingresar": reservas confirmadas cuyo check_in es a futuro (aún no activas).
+function pmUpcomingBookings() {
+  const today = new Date().toISOString().slice(0,10);
+  return pmaState.bookings.filter(b => b.status === 'confirmado' && b.start_date && b.start_date > today);
 }
 function pmLateBookings() {
   // Inquilino con reserva activa sin pago de renta registrado en los últimos 30 días.
@@ -911,7 +938,7 @@ function pmRenderDashboard(){
       </button>
       <button onclick="pmShowFreeUnits()" class="text-left bg-white border-2 hover:shadow-md rounded-xl p-4 transition shadow-sm" style="border-color:#d4af37">
         <div class="text-[10px] uppercase font-bold tracking-wider" style="color:#b8941f">Unidades libres ahora</div>
-        <div class="text-3xl font-extrabold text-slate-900 mt-1">${pmFreeUnitsNow().length}</div>
+        <div class="text-3xl font-extrabold text-slate-900 mt-1">${pmFreeRentableUnits()}</div>
         <div class="text-xs text-slate-500 mt-0.5">Potencial perdido: <span class="font-bold text-red-600">${pmMoney(potentialLost)}/mes</span></div>
         <div class="text-[11px] font-bold mt-1" style="color:#b8941f">Ver lista →</div>
       </button>
@@ -982,7 +1009,7 @@ function pmRenderPropertiesList() {
         </div>
       </div>
       ${view === 'availability' ? pmRenderAvailability() : `
-      <div class="text-xs text-slate-500">${props.length} propiedades · ${pmaState.units.length} unidades · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
+      <div class="text-xs text-slate-500">${props.length} propiedades · ${pmTotalRentableUnits()} unidades rentables (${pmTotalOccupiedRentableUnits()} ocupadas · ${pmFreeRentableUnits()} libres) · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
       ${!props.length ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
           <div class="text-5xl mb-2">🏠</div>
@@ -3101,12 +3128,16 @@ function pmTenantsFilteredRows() {
   const historicTenants = pmaState.tenants.filter(t => !activeTenantIds.has(t.id) && pmaState.bookings.some(b => b.tenant_id === t.id));
   let rows;
   if (filter === 'historico') rows = historicTenants.map(t => ({ tenant: t, booking: null }));
-  else {
+  else if (filter === 'upcoming') {
+    // Por ingresar: reservas a futuro (no entran en activeBs)
+    rows = pmUpcomingBookings().map(b => ({ tenant: pmaState.tenants.find(t => t.id === b.tenant_id) || null, booking: b }));
+  } else {
     let bs = activeBs;
     if (filter === 'expiring') bs = activeBs.filter(b => expiringIds.has(b.id));
     else if (filter === 'late') bs = activeBs.filter(b => lateIds.has(b.id));
     rows = bs.map(b => ({ tenant: pmaState.tenants.find(t => t.id === b.tenant_id) || null, booking: b }));
-    if (filter === 'todos') rows = rows.concat(historicTenants.map(t => ({ tenant: t, booking: null })));
+    if (filter === 'todos') rows = rows.concat(pmUpcomingBookings().map(b => ({ tenant: pmaState.tenants.find(t => t.id === b.tenant_id) || null, booking: b })))
+                                       .concat(historicTenants.map(t => ({ tenant: t, booking: null })));
   }
   if (propF) rows = rows.filter(r => r.booking && r.booking.property_id === propF);
   if (typeF) rows = rows.filter(r => { if (!r.booking) return false; const u = pmaState.units.find(x => x.id === r.booking.unit_id); return u && u.unit_type === typeF; });
@@ -3149,11 +3180,12 @@ function pmRenderTenants() {
   const propF = pmaState.tenantsFilterProperty, typeF = pmaState.tenantsFilterType;
   const searchQ = (pmaState.tenantsSearch || '');
   const counters = { activos: pmActiveBookings().length, expiring: pmExpiringIn(30).length, late: pmLateBookings().length,
+    upcoming: pmUpcomingBookings().length,
     historico: pmaState.tenants.filter(t => { const ids = new Set(pmActiveBookings().map(b=>b.tenant_id)); return !ids.has(t.id) && pmaState.bookings.some(b=>b.tenant_id===t.id); }).length };
   const propsWithT = pmaState.properties.filter(p => pmaState.bookings.some(b => b.property_id === p.id && b.tenant_id));
   const types = ['casa_completa','apartamento','estudio','habitacion'];
   const counterCard = (label, value, accent) => `<div class="bg-white border border-slate-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div><div class="text-2xl font-extrabold mt-1 ${accent}">${value}</div></div>`;
-  const statusChips = [['todos','Todos',null],['activos','Activos',counters.activos],['expiring','Próximos a salir 30d',counters.expiring],['late','Atrasados',counters.late],['historico','Histórico',counters.historico]];
+  const statusChips = [['todos','Todos',null],['activos','Activos',counters.activos],['upcoming','Por ingresar',counters.upcoming],['expiring','Próximos a salir 30d',counters.expiring],['late','Atrasados',counters.late],['historico','Histórico',counters.historico]];
 
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
