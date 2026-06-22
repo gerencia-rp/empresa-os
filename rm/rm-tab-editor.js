@@ -33,8 +33,71 @@ async function rmLoadFromForecast(forecastId) {
       archivo_nombre: '—'
     };
   }
+  if (typeof rmRestoreCrew === 'function') rmRestoreCrew(); // Nivel 2: cuadrilla por etapa (localStorage)
   rmState.tab = 'editor';
   rmRender();
+}
+
+// ─── NIVEL 2: cuadrilla por etapa (MO por persona) ───
+// Persistencia en localStorage por proyecto (sin tocar schema de Supabase).
+function rmCrewStorageKey() {
+  return 'rmCrew:' + (rmState.currentProject?.id || rmState.editName || 'draft');
+}
+function rmPersistCrew() {
+  try { localStorage.setItem(rmCrewStorageKey(), JSON.stringify(rmState.crewByPhase || {})); } catch {}
+}
+function rmRestoreCrew() {
+  try { rmState.crewByPhase = JSON.parse(localStorage.getItem(rmCrewStorageKey()) || '{}') || {}; }
+  catch { rmState.crewByPhase = {}; }
+}
+function rmAddCrew(phase) {
+  if (!rmState.crewByPhase[phase]) rmState.crewByPhase[phase] = [];
+  rmState.crewByPhase[phase].push({ nombre: '', tarifa: 0, horas: null }); // horas null = días×jornada
+  rmPersistCrew();
+  rmRenderTab();
+}
+function rmRemoveCrew(phase, idx) {
+  (rmState.crewByPhase[phase] || []).splice(idx, 1);
+  if (rmState.crewByPhase[phase] && !rmState.crewByPhase[phase].length) delete rmState.crewByPhase[phase];
+  rmPersistCrew();
+  rmRenderTab();
+}
+function rmSetCrew(phase, idx, field, value) {
+  const row = (rmState.crewByPhase[phase] || [])[idx];
+  if (!row) return;
+  if (field === 'nombre') row.nombre = value;
+  else if (field === 'horas') row.horas = (value === '' ? null : Math.max(0, +value || 0));
+  else row.tarifa = Math.max(0, +value || 0);
+  rmPersistCrew();
+  rmRenderTabDebounced();
+}
+// Render de la cuadrilla de una etapa + cálculo de MO_etapa = Σ(tarifa × horas)
+function rmRenderCrewForPhase(p, diasFase) {
+  const crew = rmState.crewByPhase[p] || [];
+  const jornada = +rmState.jornadaH || 0;
+  const horasDefault = (diasFase || 0) * jornada;
+  const moCrew = crew.filter(c => (+c.tarifa || 0) > 0).reduce((s, c) => {
+    const h = (c.horas != null && c.horas !== '') ? +c.horas : horasDefault;
+    return s + (+c.tarifa || 0) * (h || 0);
+  }, 0);
+  return `
+    <div class="pt-2 mt-2 border-t border-dashed border-purple-300">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-[10px] font-bold uppercase text-purple-700">👷 Cuadrilla de la etapa (MO por persona)</span>
+        ${crew.length ? `<span class="text-[10px] text-purple-700 font-bold">MO etapa = ${rmFmt(moCrew)}</span>` : ''}
+      </div>
+      <div class="text-[9px] text-slate-400 mb-1">Horas por defecto = ${diasFase ? diasFase.toFixed(1) : 0}d × ${jornada}h = ${horasDefault.toFixed(0)}h (editable por persona). Con ≥1 persona con tarifa, este MO reemplaza el labor por coeficiente de la etapa.</div>
+      ${crew.map((c, i) => `
+        <div class="grid grid-cols-[1fr_80px_70px_28px] gap-1 items-center mb-1">
+          <input value="${(c.nombre || '').replace(/"/g, '&quot;')}" oninput="rmSetCrew('${p}',${i},'nombre',this.value)" placeholder="Persona" class="border border-slate-300 rounded px-2 py-1 text-xs" />
+          <input type="number" min="0" step="0.5" value="${c.tarifa || ''}" onchange="rmSetCrew('${p}',${i},'tarifa',this.value)" placeholder="$/h" class="border border-slate-300 rounded px-2 py-1 text-xs" />
+          <input type="number" min="0" value="${c.horas != null ? c.horas : ''}" onchange="rmSetCrew('${p}',${i},'horas',this.value)" placeholder="${horasDefault.toFixed(0)}h" title="Horas (vacío = días×jornada)" class="border border-slate-300 rounded px-2 py-1 text-xs" />
+          <button onclick="rmRemoveCrew('${p}',${i})" class="text-red-500 hover:text-red-700 text-base leading-none" title="Quitar">×</button>
+        </div>
+      `).join('')}
+      <button onclick="rmAddCrew('${p}')" class="text-xs px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 rounded font-bold">+ Agregar persona a la cuadrilla</button>
+    </div>
+  `;
 }
 
 function rmRenderEditor(body) {
@@ -257,6 +320,9 @@ function rmRenderEditor(body) {
                 <div class="pt-2 mt-2 border-t border-dashed border-slate-300">
                   <button onclick="rmShowAddCustom('${p}')" class="text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-bold">+ Agregar item nuevo a esta etapa</button>
                 </div>
+
+                <!-- NIVEL 2: cuadrilla por persona de esta etapa -->
+                ${rmRenderCrewForPhase(p, e.byPhase[p]?.days || 0)}
               </div>
             </details>
           `;
@@ -331,6 +397,7 @@ function rmRenderEditor(body) {
               <div class="col-span-2"><label class="block text-[10px] text-slate-500">Markup al cliente %</label><input type="number" step="1" value="${rmState.markupPct}" onchange="rmState.markupPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 20-30% típico, 50% high-end</p></div>
               <div><label class="block text-[10px] text-slate-500">Crew (personas)</label><input type="number" value="${rmState.crewSize}" onchange="rmState.crewSize=Math.max(1,+this.value); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
               <div><label class="block text-[10px] text-slate-500">Días/semana</label><select onchange="rmState.workDays=+this.value; rmRenderTabPreservingFocus()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs"><option value="5" ${rmState.workDays===5?'selected':''}>5 (L-V)</option><option value="6" ${rmState.workDays===6?'selected':''}>6 (L-S)</option><option value="7" ${rmState.workDays===7?'selected':''}>7</option></select></div>
+              <div class="col-span-2"><label class="block text-[10px] text-slate-500">Jornada h/día (cuadrilla por etapa)</label><input type="number" min="1" max="24" value="${rmState.jornadaH}" onchange="rmState.jornadaH=Math.max(1,Math.min(24,+this.value)); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Horas por etapa = días × jornada (base del MO por persona)</p></div>
             </div>
           </div>
         </details>

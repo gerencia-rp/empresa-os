@@ -175,31 +175,49 @@ function fcCalcular(diag, opts = {}) {
   const coef = opts.coef || fcState.coef;
   const sqft = diag.sqft;
   const afect = diag.afectacion;
+  const duracionDias = +opts.duracionDias || 0;
+
+  // ── MO GLOBAL (Nivel 1): N personas × costo/hora × jornada × días_total ──
+  // Si opts no los trae, se leen del formulario de cuadrilla (crewSize / costoHora / jornadaH).
+  // Así toda llamada (render + exports) usa los mismos valores sin tocar cada call site.
+  const f = (typeof fcState !== 'undefined' && fcState.form) ? fcState.form : {};
+  const nGlobal   = opts.nGlobal   != null ? +opts.nGlobal   : (+f.crewSize || 0);
+  const costoHora = opts.costoHora != null ? +opts.costoHora : (+f.costoHora || 0);
+  const jornadaH  = opts.jornadaH  != null ? +opts.jornadaH  : (+f.jornadaH  || 0);
+  // El MO global manda solo si están las 4 entradas (>0). Si no, fallback al coeficiente.
+  const moGlobalActivo = nGlobal > 0 && costoHora > 0 && jornadaH > 0 && duracionDias > 0;
+  const moTotalGlobal  = moGlobalActivo ? nGlobal * costoHora * jornadaH * duracionDias : 0;
 
   // Suma de pesos ajustados para normalizar el cronograma
   const sumaPesos = FC_STAGES.reduce((s, e) => s + (coef[e].tiempo * (afect[e] / 100)), 0);
 
-  let subtotal = 0, totalMO = 0, totalMat = 0;
+  // 1ª pasada: material, MO referencia (coeficiente) y peso de tiempo por etapa
   const etapas = FC_STAGES.map(e => {
     const factor = (afect[e] || 0) / 100;
-    // Presupuesto por etapa (MO y material separados)
-    const mo  = coef[e].mo  * sqft * factor;
-    const mat = coef[e].mat * sqft * factor;
-    const sub = mo + mat;
-    subtotal += sub; totalMO += mo; totalMat += mat;
-    // Peso de tiempo ajustado por afectación y normalizado a 100%
+    const moCoef = coef[e].mo  * sqft * factor;   // MO referencia (coeficiente) — siempre se muestra
+    const mat    = coef[e].mat * sqft * factor;
     const pesoAjustado = coef[e].tiempo * factor;
     const pesoNorm = sumaPesos > 0 ? (pesoAjustado / sumaPesos) : 0;
     return {
       etapa: e, group: FC_STAGE_GROUP[e], afect: afect[e] || 0,
-      mo, mat, subtotal: sub,
+      moCoef, mat, mo: 0, subtotal: 0,
       pesoAjustado, pesoNormPct: pesoNorm * 100, dias: 0
     };
   });
 
   // Cronograma: días por etapa = duración total × peso normalizado
-  const duracionDias = +opts.duracionDias || 0;
   etapas.forEach(et => { et.dias = duracionDias * (et.pesoNormPct / 100); });
+
+  // 2ª pasada: MO por etapa = global prorrateado por días (si activo); sino coeficiente.
+  // Prorratear por días reparte el MO total cableado (N×$/h×jornada×días) entre etapas.
+  let subtotal = 0, totalMO = 0, totalMat = 0, totalMOCoef = 0;
+  etapas.forEach(et => {
+    et.mo = moGlobalActivo
+      ? (duracionDias > 0 ? moTotalGlobal * (et.dias / duracionDias) : 0)
+      : et.moCoef;
+    et.subtotal = et.mo + et.mat;
+    subtotal += et.subtotal; totalMO += et.mo; totalMat += et.mat; totalMOCoef += et.moCoef;
+  });
 
   // Otros costos (% del subtotal, promedio histórico)
   const otrosPct = opts.otrosCostosPct != null ? opts.otrosCostosPct : fcState.otrosCostosPct;
@@ -209,7 +227,8 @@ function fcCalcular(diag, opts = {}) {
   return {
     propiedad: diag.propiedad || '—',
     sqft, etapas,
-    subtotal, totalMO, totalMat,
+    subtotal, totalMO, totalMat, totalMOCoef,
+    moGlobalActivo, moTotalGlobal, nGlobal, costoHora, jornadaH,
     otrosPct, otrosCostos, presupuestoTotal,
     duracionDias, duracionSemanas: duracionDias / 7,
     ppsf: sqft ? presupuestoTotal / sqft : 0,
@@ -318,8 +337,9 @@ fcState.form = {
   afectacion: { 'Demolición':100, 'Cimentación':0, 'Externo':100, 'Estructura':100, 'Interno':100, 'Limpieza':100 },
   duracionDias: 0,
   otrosCostosPctOverride: null,  // si el usuario edita el % manualmente
-  crewSize: 1,
-  costoHora: 0
+  crewSize: 1,                   // N personas global → multiplica el MO total
+  costoHora: 0,                  // costo/hora global → multiplica el MO total
+  jornadaH: 8                    // jornada (h/día) global → multiplica el MO total
 };
 
 const FC_STAGE_ICON = { 'Demolición':'⛏️','Cimentación':'🏗️','Externo':'🏠','Estructura':'🪵','Interno':'🛏️','Limpieza':'🧹' };
@@ -406,13 +426,15 @@ function fcRenderTab(body) {
           ${fcState.diasPorSqft > 0 ? `<button onclick="fcSet('duracionDias', ${duracionSugerida})" class="mt-2 text-[11px] text-blue-600 hover:underline">↳ Usar estimado histórico: ${duracionSugerida} días (${fcState.diasPorSqft.toFixed(4)} días/sqft × ${f.sqft})</button>` : '<p class="text-[10px] text-slate-400 mt-1">Sin días/sqft histórico aún. Ingresá la duración manual o se calcula con ≥'+fcState.nThreshold+' casas completas.</p>'}
         </div>
 
-        <!-- Cuadrilla -->
+        <!-- Cuadrilla: N personas + costo/hora + jornada → cablean el MO total -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">👷 Cuadrilla</h3>
-          <div class="grid grid-cols-2 gap-2">
-            <div><label class="block text-[10px] text-slate-500 mb-0.5">Tamaño grupo</label><input type="number" min="1" value="${f.crewSize}" onchange="fcSet('crewSize', Math.max(1,+this.value))" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-            <div><label class="block text-[10px] text-slate-500 mb-0.5">Costo/hora $ ${fcState.costoHoraPromedio>0?`<span class="text-emerald-600">(auto $${fcState.costoHoraPromedio})</span>`:''}</label><input type="number" value="${f.costoHora}" onchange="fcSet('costoHora', +this.value)" placeholder="${fcState.costoHoraPromedio>0?fcState.costoHoraPromedio:'auto Airtable'}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">👷 Cuadrilla <span class="text-[9px] font-normal text-slate-400 normal-case">(MO = N × $/h × jornada × días)</span></h3>
+          <div class="grid grid-cols-3 gap-2">
+            <div><label class="block text-[10px] text-slate-500 mb-0.5">N° personas</label><input type="number" min="0" value="${f.crewSize}" onchange="fcSet('crewSize', Math.max(0,+this.value))" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+            <div><label class="block text-[10px] text-slate-500 mb-0.5">Costo/hora $ ${fcState.costoHoraPromedio>0?`<span class="text-emerald-600">(auto $${fcState.costoHoraPromedio})</span>`:''}</label><input type="number" min="0" value="${f.costoHora}" onchange="fcSet('costoHora', +this.value)" placeholder="${fcState.costoHoraPromedio>0?fcState.costoHoraPromedio:'auto Airtable'}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+            <div><label class="block text-[10px] text-slate-500 mb-0.5">Jornada h/día</label><input type="number" min="1" max="24" value="${f.jornadaH}" onchange="fcSet('jornadaH', Math.max(1,Math.min(24,+this.value)))" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
           </div>
+          <p class="text-[10px] text-slate-400 mt-1.5">Cargá N personas + costo/hora (>0) para que el MO use la cuadrilla. Si dejás costo/hora en 0, el MO cae al coeficiente $/ft².</p>
         </div>
       </div>
 
@@ -447,6 +469,7 @@ function fcRenderResultado(r, crew, otrosPct) {
         <div class="text-[10px] text-blue-700 uppercase font-bold">MO / Material</div>
         <div class="text-base font-bold text-blue-900">$${Math.round(r.totalMO/1000)}k / $${Math.round(r.totalMat/1000)}k</div>
         <div class="text-[10px] text-blue-700">${r.subtotal>0?Math.round(r.totalMO/r.subtotal*100):0}% / ${r.subtotal>0?Math.round(r.totalMat/r.subtotal*100):0}%</div>
+        <div class="text-[9px] mt-0.5 ${r.moGlobalActivo?'text-emerald-700':'text-slate-400'}">${r.moGlobalActivo?`MO cuadrilla: ${r.nGlobal}p × $${r.costoHora} × ${r.jornadaH}h × ${Math.round(r.duracionDias)}d`:'MO por coeficiente $/ft²'}</div>
       </div>
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
         <div class="text-[10px] text-amber-700 uppercase font-bold">Duración</div>
@@ -463,6 +486,7 @@ function fcRenderResultado(r, crew, otrosPct) {
             <th class="text-left p-2">Etapa</th>
             <th class="text-right p-2">% Afect</th>
             <th class="text-right p-2">MO $</th>
+            <th class="text-right p-2 text-slate-400" title="MO de referencia por coeficiente $/ft² (no es el cálculo activo si hay cuadrilla)">MO ref</th>
             <th class="text-right p-2">Material $</th>
             <th class="text-right p-2">Subtotal $</th>
             <th class="text-right p-2">% tiempo</th>
@@ -474,7 +498,8 @@ function fcRenderResultado(r, crew, otrosPct) {
             <tr class="border-t border-slate-100 ${e.subtotal===0?'opacity-40':''}">
               <td class="p-2 font-semibold">${FC_STAGE_ICON[e.etapa]} ${e.etapa}</td>
               <td class="p-2 text-right">${e.afect}%</td>
-              <td class="p-2 text-right">$${Math.round(e.mo).toLocaleString()}</td>
+              <td class="p-2 text-right ${r.moGlobalActivo?'font-semibold text-emerald-700':''}">$${Math.round(e.mo).toLocaleString()}</td>
+              <td class="p-2 text-right text-slate-400">$${Math.round(e.moCoef).toLocaleString()}</td>
               <td class="p-2 text-right">$${Math.round(e.mat).toLocaleString()}</td>
               <td class="p-2 text-right font-bold">$${Math.round(e.subtotal).toLocaleString()}</td>
               <td class="p-2 text-right text-slate-500">${e.pesoNormPct.toFixed(1)}%</td>
@@ -484,7 +509,8 @@ function fcRenderResultado(r, crew, otrosPct) {
           <tr class="border-t-2 border-slate-300 bg-slate-50 font-bold">
             <td class="p-2">Subtotal obra</td>
             <td class="p-2"></td>
-            <td class="p-2 text-right">$${Math.round(r.totalMO).toLocaleString()}</td>
+            <td class="p-2 text-right ${r.moGlobalActivo?'text-emerald-700':''}">$${Math.round(r.totalMO).toLocaleString()}</td>
+            <td class="p-2 text-right text-slate-400">$${Math.round(r.totalMOCoef).toLocaleString()}</td>
             <td class="p-2 text-right">$${Math.round(r.totalMat).toLocaleString()}</td>
             <td class="p-2 text-right">$${Math.round(r.subtotal).toLocaleString()}</td>
             <td class="p-2 text-right">100%</td>

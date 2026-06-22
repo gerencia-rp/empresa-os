@@ -164,6 +164,8 @@ const rmState = {
   markupPct: 25,
   crewSize: 3,
   workDays: 6,
+  jornadaH: 8,            // jornada (h/día) global del editor → horas por etapa = días × jornada
+  crewByPhase: {},        // Nivel 2: cuadrilla por etapa { phase: [{nombre, tarifa, horas}] } · horas null = días×jornada
   remodelType: 'heavy',
   showActuals: false, // toggle para editar reales
   actuals: {}, // code -> {real_cost, real_days, real_hours}
@@ -842,7 +844,25 @@ function rmCalcProject() {
     byPhase[a.phase].days = Math.max(byPhase[a.phase].days, a.start_offset + a.days);
   }
 
-  const totals = activities.reduce((a, x) => ({
+  // ── Nivel 2: cuadrilla detallada por etapa MANDA sobre el labor por coeficiente ──
+  // MO_etapa = Σ_persona (tarifa × horas) · horas por defecto = días_etapa × jornada (editable por persona).
+  const jornadaH = +rmState.jornadaH || 0;
+  for (const p of Object.keys(byPhase)) {
+    const crew = (rmState.crewByPhase?.[p] || []).filter(c => (+c.tarifa || 0) > 0);
+    if (!crew.length) continue;
+    const horasDefault = (byPhase[p].days || 0) * jornadaH;
+    const moCrew = crew.reduce((s, c) => {
+      const horas = (c.horas != null && c.horas !== '') ? +c.horas : horasDefault;
+      return s + (+c.tarifa || 0) * (horas || 0);
+    }, 0);
+    byPhase[p].laborCoef = byPhase[p].labor;   // MO referencia (coeficiente) para comparar
+    byPhase[p].labor = moCrew;                  // el detallado reemplaza el MO de la etapa
+    byPhase[p].crewActivo = true;
+    byPhase[p].total = byPhase[p].material + byPhase[p].labor + byPhase[p].equipment;
+  }
+
+  // Totales derivados de byPhase para que el override de cuadrilla impacte la cascada de pricing
+  const totals = Object.values(byPhase).reduce((a, x) => ({
     total: a.total + x.total, material: a.material + x.material, labor: a.labor + x.labor, equipment: a.equipment + x.equipment
   }), { total: 0, material: 0, labor: 0, equipment: 0 });
 
@@ -1249,6 +1269,7 @@ async function rmSaveProject() {
     if (result.data) rmState.currentProject = result.data;
   }
   if (result.error) return alert('Error: ' + result.error.message);
+  if (typeof rmPersistCrew === 'function') rmPersistCrew(); // re-guarda cuadrilla bajo la key del id ya asignado
   await rmLoadAll();
   rmRender();
   alert('✓ Proyecto guardado');
@@ -1278,6 +1299,7 @@ async function rmLoadProject(p) {
   rmState.photos = p.photos || [];
   rmState.tracking = p.progress || {};
   rmState.editTags = Array.isArray(p.tags) ? p.tags : [];
+  if (typeof rmRestoreCrew === 'function') rmRestoreCrew(); // Nivel 2: cuadrilla por etapa (localStorage)
   rmState.tab = 'editor';
   rmRender();
 }
