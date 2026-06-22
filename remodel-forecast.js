@@ -453,6 +453,8 @@ function fcRenderTab(body) {
 
 function fcRenderResultado(r, crew, otrosPct) {
   return `
+    <!-- Header con indicador de sincronización del MO -->
+    <div class="flex items-center justify-end">${typeof moSyncBadgeHtml === 'function' ? moSyncBadgeHtml() : ''}</div>
     <!-- KPIs -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
       <div class="bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-400 rounded-xl p-3">
@@ -974,13 +976,22 @@ async function fcSaveForecast() {
   const otrosPct = f.otrosCostosPctOverride != null ? f.otrosCostosPctOverride : fcState.otrosCostosPct;
   const r = fcCalcular({ propiedad: f.propiedad, sqft: f.sqft, afectacion: f.afectacion },
     { coef: fcState.coef, otrosCostosPct: otrosPct, duracionDias: f.duracionDias });
-  const { error } = await sb.from('remodel_forecasts').insert({
+  // Persistimos también el MO global (N en crew_size + costo/hora + jornada) por si las
+  // columnas mo_* ya están migradas. Si NO existen, el insert con esas keys fallaría, así que
+  // reintentamos sin ellas para no romper el guardado en DB viejas.
+  const base = {
     propiedad: f.propiedad, sqft: f.sqft, afectacion: f.afectacion,
     duracion_total_dias: r.duracionDias, crew_size: f.crewSize,
     presupuesto_total: r.presupuestoTotal, otros_costos: r.otrosCostos,
     resultado: r.etapas, created_by: state.user.id
-  });
+  };
+  const conMo = { ...base, mo_costo_hora: f.costoHora || null, mo_jornada_h: f.jornadaH || 8 };
+  let { error } = await sb.from('remodel_forecasts').insert(conMo);
+  if (error && /mo_costo_hora|mo_jornada_h|column/.test(error.message || '')) {
+    ({ error } = await sb.from('remodel_forecasts').insert(base)); // fallback sin columnas mo_*
+  }
   if (error) return alert('Error: ' + error.message + '\n\n(¿Corriste el SQL del Paso 2 con la tabla remodel_forecasts?)');
+  if (typeof moSetSync === 'function') moSetSync('synced'); // reflejar en el indicador
   // Auto-guardar también como diagnóstico reutilizable para el picker
   await fcSaveDiagnosis('pronostico', true).catch(() => {});
   await fcLoadConfig();

@@ -1,0 +1,16 @@
+-- ════════════════════════════════════════════════════════════════
+-- Migración de datos de MO existentes (localStorage → Supabase)
+-- ════════════════════════════════════════════════════════════════
+-- NO se puede migrar localStorage desde SQL: vive en el navegador de cada usuario.
+--
+-- La migración es PASIVA y la hace el frontend (remodel-pro.js):
+--   1. Al abrir un proyecto, si las columnas mo_* del row vienen NULL/vacías
+--      pero hay datos en localStorage (key "rmCrew:<id>"), el front hace
+--      UPDATE a Supabase con esos valores.
+--   2. Toast: "✓ Cuadrilla migrada a la nube".
+--   3. A partir de ahí, la fuente de verdad es la DB; localStorage = backup.
+--
+-- Idempotente por diseño: si la DB ya tiene datos, no se sobreescribe con local.
+--
+-- Este archivo queda como documentación del flujo. No ejecuta nada.
+SELECT 'mo migration is passive (frontend-driven) — nothing to run here' AS note;

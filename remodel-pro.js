@@ -165,6 +165,7 @@ const rmState = {
   crewSize: 3,
   workDays: 6,
   jornadaH: 8,            // jornada (h/día) global del editor → horas por etapa = días × jornada
+  costoHora: null,        // costo/hora global del proyecto (opcional; persiste en mo_costo_hora)
   crewByPhase: {},        // Nivel 2: cuadrilla por etapa { phase: [{nombre, tarifa, horas}] } · horas null = días×jornada
   remodelType: 'heavy',
   showActuals: false, // toggle para editar reales
@@ -1270,6 +1271,8 @@ async function rmSaveProject() {
   }
   if (result.error) return alert('Error: ' + result.error.message);
   if (typeof rmPersistCrew === 'function') rmPersistCrew(); // re-guarda cuadrilla bajo la key del id ya asignado
+  // Persistir MO en DB aparte (si las columnas mo_* no existen aún, queda en localStorage sin romper)
+  await moSaveProjectMo(rmState.currentProject?.id);
   await rmLoadAll();
   rmRender();
   alert('✓ Proyecto guardado');
@@ -1299,7 +1302,25 @@ async function rmLoadProject(p) {
   rmState.photos = p.photos || [];
   rmState.tracking = p.progress || {};
   rmState.editTags = Array.isArray(p.tags) ? p.tags : [];
-  if (typeof rmRestoreCrew === 'function') rmRestoreCrew(); // Nivel 2: cuadrilla por etapa (localStorage)
+  // ── MO: fuente de verdad = DB; fallback localStorage + migración pasiva ──
+  const dbCrew = (p.mo_crew_by_phase && typeof p.mo_crew_by_phase === 'object') ? p.mo_crew_by_phase : null;
+  const hasDbMo = (p.mo_crew_size != null) || (p.mo_costo_hora != null) || (dbCrew && Object.keys(dbCrew).length);
+  if (hasDbMo) {
+    rmState.crewSize = p.mo_crew_size != null ? p.mo_crew_size : rmState.crewSize;
+    rmState.costoHora = p.mo_costo_hora != null ? p.mo_costo_hora : null;
+    rmState.jornadaH = p.mo_jornada_h != null ? p.mo_jornada_h : 8;
+    rmState.crewByPhase = dbCrew || {};
+    if (typeof rmPersistCrew === 'function') rmPersistCrew(); // refresca backup local
+    moSync.status = 'synced'; moSync.at = Date.now();
+  } else {
+    // Proyecto viejo: levantar de localStorage y, si hay datos, migrarlos a la nube (pasivo).
+    if (typeof rmRestoreCrew === 'function') rmRestoreCrew();
+    if (Object.keys(rmState.crewByPhase || {}).length) {
+      moSaveProjectMo(p.id).then(ok => { if (ok && window.toast) window.toast('✓ Cuadrilla migrada a la nube', 'success'); });
+    } else {
+      moSync.status = 'idle';
+    }
+  }
   rmState.tab = 'editor';
   rmRender();
 }
@@ -1422,6 +1443,81 @@ let _rmRenderTimer = null;
 function rmRenderTabDebounced() {
   clearTimeout(_rmRenderTimer);
   _rmRenderTimer = setTimeout(() => rmRenderTabPreservingFocus(), 250);
+}
+
+// ════════════════════════════════════════════════════════════════
+// SINCRONIZACIÓN DEL MO (compartida Editor + Pronóstico)
+// Fuente de verdad = Supabase · localStorage = backup/offline.
+// ════════════════════════════════════════════════════════════════
+const moSync = { status: 'idle', at: 0, err: '', pending: null }; // idle|saving|synced|offline|error
+function moSyncAgo() {
+  if (!moSync.at) return '';
+  const s = Math.round((Date.now() - moSync.at) / 1000);
+  if (s < 60) return `hace ${s} seg`;
+  const m = Math.round(s / 60);
+  return `hace ${m} min`;
+}
+function moSyncBadgeHtml() {
+  const map = {
+    idle:    ['', ''],
+    saving:  ['💾 Guardando…', 'bg-amber-100 text-amber-800'],
+    synced:  [`☁️ Sincronizado · ${moSyncAgo()}`, 'bg-emerald-100 text-emerald-700'],
+    offline: ['⚠️ Modo offline', 'bg-orange-100 text-orange-800'],
+    error:   ['❌ Error de sync — reintentar', 'bg-red-100 text-red-700'],
+  };
+  const [txt, cls] = map[moSync.status] || map.idle;
+  if (!txt) return '<span id="mo-sync-badge"></span>';
+  const clickable = (moSync.status === 'error' || moSync.status === 'offline');
+  return `<span id="mo-sync-badge" class="text-[10px] px-2 py-0.5 rounded ${cls}" ${clickable ? 'onclick="moRetrySync()" style="cursor:pointer" title="Click para reintentar"' : moSync.status==='offline'?'title="Datos en local, se sincronizan al volver la red"':''}>${txt}</span>`;
+}
+function moSetSync(status, err) {
+  moSync.status = status; moSync.at = Date.now(); moSync.err = err || '';
+  const el = document.getElementById('mo-sync-badge');
+  if (el) el.outerHTML = moSyncBadgeHtml();
+}
+// Persiste los 4 campos de MO del proyecto en Supabase (update separado del save principal,
+// así si las columnas mo_* aún no existen NO rompe el guardado del proyecto).
+async function moSaveProjectMo(projectId) {
+  if (!projectId) return false;
+  const mo = {
+    mo_crew_size: (rmState.crewSize != null ? +rmState.crewSize : null),
+    mo_costo_hora: (rmState.costoHora != null && rmState.costoHora !== '' ? +rmState.costoHora : null),
+    mo_jornada_h: (rmState.jornadaH != null ? +rmState.jornadaH : 8),
+    mo_crew_by_phase: rmState.crewByPhase || {}
+  };
+  moSync.pending = { projectId, mo };
+  moSetSync('saving');
+  try {
+    const { error } = await sb.from('remodel_projects').update(mo).eq('id', projectId);
+    if (error) throw error;
+    moSync.pending = null;
+    moSetSync('synced');
+    return true;
+  } catch (e) {
+    // Falla (sin red, o columnas mo_* aún no migradas) → queda en localStorage, no rompe UI
+    moSetSync(navigator.onLine ? 'error' : 'offline', e.message);
+    return false;
+  } finally {
+    if (typeof rmPersistCrew === 'function') rmPersistCrew(); // backup local siempre
+  }
+}
+// Reintento manual (click en el badge) o automático al volver la red
+async function moRetrySync() {
+  if (moSync.pending) return moSaveProjectMo(moSync.pending.projectId);
+  if (rmState.currentProject?.id) return moSaveProjectMo(rmState.currentProject.id);
+}
+// Autosave con debounce de 2s ante cualquier cambio de MO
+let _moAutosaveTimer = null;
+function moScheduleAutosave() {
+  if (typeof rmPersistCrew === 'function') rmPersistCrew(); // local inmediato
+  if (!rmState.currentProject?.id) return;                  // sin proyecto guardado: solo local
+  clearTimeout(_moAutosaveTimer);
+  _moAutosaveTimer = setTimeout(() => moSaveProjectMo(rmState.currentProject.id), 2000);
+}
+// Re-sync automático cuando vuelve la conexión
+if (typeof window !== 'undefined' && !window._moOnlineHooked) {
+  window._moOnlineHooked = true;
+  window.addEventListener('online', () => { if (moSync.pending) moRetrySync(); });
 }
 
 function rmRenderTab() {

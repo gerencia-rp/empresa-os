@@ -33,6 +33,10 @@ async function rmLoadFromForecast(forecastId) {
       archivo_nombre: '—'
     };
   }
+  // Sembrar el MO global del pronóstico (si la columna existe en el row)
+  if (f.crew_size != null) rmState.crewSize = f.crew_size;
+  rmState.costoHora = f.mo_costo_hora != null ? f.mo_costo_hora : null;
+  rmState.jornadaH = f.mo_jornada_h != null ? f.mo_jornada_h : 8;
   if (typeof rmRestoreCrew === 'function') rmRestoreCrew(); // Nivel 2: cuadrilla por etapa (localStorage)
   rmState.tab = 'editor';
   rmRender();
@@ -53,13 +57,13 @@ function rmRestoreCrew() {
 function rmAddCrew(phase) {
   if (!rmState.crewByPhase[phase]) rmState.crewByPhase[phase] = [];
   rmState.crewByPhase[phase].push({ nombre: '', tarifa: 0, horas: null }); // horas null = días×jornada
-  rmPersistCrew();
+  moScheduleAutosave();
   rmRenderTab();
 }
 function rmRemoveCrew(phase, idx) {
   (rmState.crewByPhase[phase] || []).splice(idx, 1);
   if (rmState.crewByPhase[phase] && !rmState.crewByPhase[phase].length) delete rmState.crewByPhase[phase];
-  rmPersistCrew();
+  moScheduleAutosave();
   rmRenderTab();
 }
 function rmSetCrew(phase, idx, field, value) {
@@ -68,7 +72,7 @@ function rmSetCrew(phase, idx, field, value) {
   if (field === 'nombre') row.nombre = value;
   else if (field === 'horas') row.horas = (value === '' ? null : Math.max(0, +value || 0));
   else row.tarifa = Math.max(0, +value || 0);
-  rmPersistCrew();
+  moScheduleAutosave();
   rmRenderTabDebounced();
 }
 // Render de la cuadrilla de una etapa + cálculo de MO_etapa = Σ(tarifa × horas)
@@ -197,7 +201,10 @@ function rmRenderEditor(body) {
         ${taskadeBanner}
         <!-- Info -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Información del proyecto</h3>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-bold text-slate-700 uppercase">Información del proyecto</h3>
+            ${moSyncBadgeHtml()}
+          </div>
           <div class="grid grid-cols-3 gap-2">
             <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-0.5">Nombre *</label><input value="${rmEsc(rmState.editName)}" oninput="rmState.editName=this.value" placeholder="Ej: 1308 Denfield" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-semibold" /></div>
             <div><label class="block text-[10px] text-slate-500 mb-0.5">Sqft</label><input type="number" value="${rmState.editSqft}" onchange="rmState.editSqft=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
@@ -395,9 +402,9 @@ function rmRenderEditor(body) {
               </div>
               <div><label class="block text-[10px] text-slate-500">Design fees $</label><input type="number" value="${rmState.designFeesCost}" onchange="rmState.designFeesCost=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
               <div class="col-span-2"><label class="block text-[10px] text-slate-500">Markup al cliente %</label><input type="number" step="1" value="${rmState.markupPct}" onchange="rmState.markupPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 20-30% típico, 50% high-end</p></div>
-              <div><label class="block text-[10px] text-slate-500">Crew (personas)</label><input type="number" value="${rmState.crewSize}" onchange="rmState.crewSize=Math.max(1,+this.value); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
+              <div><label class="block text-[10px] text-slate-500">Crew (personas)</label><input type="number" value="${rmState.crewSize}" onchange="rmState.crewSize=Math.max(1,+this.value); moScheduleAutosave(); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>
               <div><label class="block text-[10px] text-slate-500">Días/semana</label><select onchange="rmState.workDays=+this.value; rmRenderTabPreservingFocus()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs"><option value="5" ${rmState.workDays===5?'selected':''}>5 (L-V)</option><option value="6" ${rmState.workDays===6?'selected':''}>6 (L-S)</option><option value="7" ${rmState.workDays===7?'selected':''}>7</option></select></div>
-              <div class="col-span-2"><label class="block text-[10px] text-slate-500">Jornada h/día (cuadrilla por etapa)</label><input type="number" min="1" max="24" value="${rmState.jornadaH}" onchange="rmState.jornadaH=Math.max(1,Math.min(24,+this.value)); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Horas por etapa = días × jornada (base del MO por persona)</p></div>
+              <div class="col-span-2"><label class="block text-[10px] text-slate-500">Jornada h/día (cuadrilla por etapa)</label><input type="number" min="1" max="24" value="${rmState.jornadaH}" onchange="rmState.jornadaH=Math.max(1,Math.min(24,+this.value)); moScheduleAutosave(); rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Horas por etapa = días × jornada (base del MO por persona)</p></div>
             </div>
           </div>
         </details>
