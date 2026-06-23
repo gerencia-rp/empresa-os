@@ -463,8 +463,10 @@ Deno.serve(async (req) => {
       if (probe.error) { MIRROR = false; errors.push("mirror cols ausentes (correr 2026-06-22-mirror-sync.sql): " + probe.error.message); }
     }
     const mirrorFields = () => MIRROR ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
-    // Diagnóstico de archivado
-    const archivedCount: Record<string, number> = {};
+    // Diagnóstico de archivado (pre-inicializado en 0 para que sea explícito cuando el archivado está OFF)
+    const archivedCount: Record<string, number> = {
+      pm_properties: 0, pm_units: 0, pm_tenants: 0, pm_bookings: 0, pm_payments: 0, pm_expenses: 0
+    };
     const archivedSamples: Record<string, any[]> = {};
     // Archiva (soft-delete) las filas de Airtable que ya no aparecieron en este run.
     // GATING (protección anti-wipe):
