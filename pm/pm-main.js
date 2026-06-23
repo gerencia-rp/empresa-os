@@ -352,11 +352,11 @@ function pmOccupiedRentableUnitsOf(propertyId) {
 }
 // Totales del portafolio (solo propiedades activas)
 function pmTotalRentableUnits() {
-  return pmaState.properties.filter(p => p.status === 'activa')
+  return pmaState.properties.filter(p => p.active !== false)
     .reduce((s, p) => s + pmRentableUnitsOf(p.id), 0);
 }
 function pmTotalOccupiedRentableUnits() {
-  return pmaState.properties.filter(p => p.status === 'activa')
+  return pmaState.properties.filter(p => p.active !== false)
     .reduce((s, p) => s + pmOccupiedRentableUnitsOf(p.id), 0);
 }
 // Unidades rentables LIBRES = rentables − ocupadas (invariante: libres+ocupadas=rentables)
@@ -702,7 +702,7 @@ function pmOccupancyAt(date){
   // Ocupación sobre UNIDADES RENTABLES (no sobre pm_units físicas).
   // Nota: el numerador/denominador "rentable" usa el booking activo de hoy
   // (pmActiveBookingOf con default hoy); `date` se mantiene por compatibilidad.
-  const active = new Set(pmaState.properties.filter(p=>p.status==='activa').map(p=>p.id));
+  const active = new Set(pmaState.properties.filter(p=>p.active!==false).map(p=>p.id));
   const units = pmaState.units.filter(u=>active.has(u.property_id));
   const total = pmTotalRentableUnits();
   const occ = pmTotalOccupiedRentableUnits();
@@ -728,7 +728,7 @@ window.pmCeoGoTenant = pmCeoGoTenant;
 
 function pmCeoActions(){
   const now=new Date(), actions=[];
-  const activeProps = pmaState.properties.filter(p=>p.status==='activa');
+  const activeProps = pmaState.properties.filter(p=>p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
   const activeBookings = pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
   const cutoff = new Date(now); cutoff.setDate(cutoff.getDate()-30);
@@ -912,7 +912,7 @@ function pmRenderDashboard(){
   const arrow=(d)=> d>0?`<span class="text-emerald-600">↑${Math.abs(d)}</span>`:d<0?`<span class="text-red-600">↓${Math.abs(d)}</span>`:`<span class="text-slate-400">→0</span>`;
 
   // Quick stats
-  const activeProps=pmaState.properties.filter(p=>p.status==='activa');
+  const activeProps=pmaState.properties.filter(p=>p.active!==false);
   const activeBookings=pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
   const activeTenants=new Set(activeBookings.map(b=>b.tenant_id).filter(Boolean)).size;
   const rentableTotal=pmTotalRentableUnits();
@@ -1078,7 +1078,7 @@ function pmDaysVacant(u) {
   return d > 0 ? d : 0;
 }
 function pmFreeUnitsNow() {
-  const activePropIds = new Set(pmaState.properties.filter(p=>p.status==='activa').map(p=>p.id));
+  const activePropIds = new Set(pmaState.properties.filter(p=>p.active!==false).map(p=>p.id));
   return pmaState.units.filter(u => activePropIds.has(u.property_id) && pmUnitState(u)==='libre');
 }
 // FIX5: días promedio de vacancy = gaps entre reservas consecutivas + vacancy en curso
@@ -1142,7 +1142,7 @@ async function pmMarkMaintenance(unitId) {
 window.pmMarkMaintenance = pmMarkMaintenance;
 
 function pmRenderAvailability() {
-  const activeProps = pmaState.properties.filter(p => p.status==='activa');
+  const activeProps = pmaState.properties.filter(p => p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
   let units = pmaState.units.filter(u => activePropIds.has(u.property_id));
   const stF = pmaState.availFilterState, propF = pmaState.availFilterProperty, typeF = pmaState.availFilterType;
@@ -1239,8 +1239,10 @@ function pmRenderPropertyCardInline(p) {
   const potentialMo = units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const modelLabel = p.rental_model === 'casa_completa' ? '🏡 Casa Completa'
                    : p.rental_model === 'por_habitaciones' ? '🛏 Habitaciones'
+                   : p.rental_model === 'por_unidades' ? '🏘 Unidades'
                    : p.rental_model === 'por_estudios' ? '🎨 Estudios'
                    : p.rental_model === 'por_apartamentos' ? '🏢 Apartamentos'
+                   : p.rental_model === 'mixta' ? '🔀 Mixta'
                    : '🔀 Mixto';
 
   return `
@@ -1253,7 +1255,7 @@ function pmRenderPropertyCardInline(p) {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <strong class="text-sm text-slate-900 pm-clamp2 pm-property-name" title="${(p.name||'').replace(/"/g,'&quot;')}">${(p.name||'').replace(/</g,'&lt;')}</strong>
-              <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase font-bold">${p.status||'activa'}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded uppercase font-bold ${p.active===false?'bg-red-100 text-red-700':'bg-emerald-100 text-emerald-800'}">${p.active===false?'INACTIVA':'ACTIVA'}</span>
             </div>
             <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
               <span>📍 ${(p.address||'').replace(/</g,'&lt;')}</span>
@@ -4479,7 +4481,7 @@ function pmIsAseo(e) { return e.category === 'cleaning' || /aseo|podada|cesped|c
 function pmFinAgg(r) {
   const propF = pmaState.finFilterProperty, platF = pmaState.finFilterPlatform, modelF = pmaState.finFilterModel;
   // Conjunto de propiedades en alcance (casa / modelo)
-  let scopeProps = pmaState.properties.filter(p => p.status === 'activa');
+  let scopeProps = pmaState.properties.filter(p => p.active !== false);
   if (propF) scopeProps = scopeProps.filter(p => p.id === propF);
   if (modelF) scopeProps = scopeProps.filter(p => (p.rental_model || 'casa_completa') === modelF);
   const scopeIds = new Set(scopeProps.map(p => p.id));
@@ -4654,7 +4656,7 @@ function pmRenderFinance() {
   const period = pmaState.finPeriod || 'this_month';
 
   // ── Métricas clave portafolio ──
-  const activeProps = pmaState.properties.filter(p => p.status==='activa');
+  const activeProps = pmaState.properties.filter(p => p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
   const units = pmaState.units.filter(u => activePropIds.has(u.property_id));
   const occUnits = units.filter(u => pmActiveBookingOf(u.id));
@@ -4728,7 +4730,7 @@ function pmRenderFinance() {
     <!-- Filtros del dashboard (dropdowns) -->
     <div class="pm-filters-bar">
       ${pmFilterSelect('Período', '📅', pmaState.finMonthSel||pmCurrentYM(), [...pmMonthOptions(), ['custom','Custom (rango)']], "pmFinSetMonth(this.value)")}
-      ${pmFilterSelect('Casa', '🏠', pmaState.finFilterProperty, [['','Todas'], ...pmaState.properties.filter(p=>p.status==='activa').map(p=>[p.id, p.name||''])], "pmFinSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Casa', '🏠', pmaState.finFilterProperty, [['','Todas'], ...pmaState.properties.filter(p=>p.active!==false).map(p=>[p.id, p.name||''])], "pmFinSetFilter('property', this.value||null)")}
       ${pmFilterSelect('Plataforma', '💳', pmaState.finFilterPlatform, [['','Todas'], ...Object.entries(PM_PLATFORM_LABEL).map(([k,l])=>[k,l])], "pmFinSetFilter('platform', this.value||null)")}
       ${pmFilterSelect('Modelo', '🏗', pmaState.finFilterModel, [['','Todos'],['casa_completa','Casa Completa'],['por_habitaciones','Por Habitaciones'],['mixta','Mixta'],['por_unidades','Por Unidades']], "pmFinSetFilter('model', this.value||null)")}
       ${pmFinHasFilters()?`<button class="pm-clear-filters" onclick="pmFinClearFilters()">✕ Limpiar</button>`:''}

@@ -101,7 +101,8 @@ function pmCurrentCompanyObj() {
 }
 function pmFilterByCompany(items, fieldName = 'company_id') {
   if (pmState.currentCompany === 'holding') return items;
-  return items.filter(x => x[fieldName] === pmState.currentCompany);
+  // Tolerar ítems sin el campo (ej. tablas sin company_id): NO filtrarlos (incluir).
+  return items.filter(x => x[fieldName] == null || x[fieldName] === pmState.currentCompany);
 }
 function pmFilterByArea(items) {
   // Para tablas que tienen .area en string (slug). Holding muestra todo.

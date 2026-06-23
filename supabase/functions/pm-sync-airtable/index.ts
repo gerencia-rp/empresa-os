@@ -552,6 +552,17 @@ Deno.serve(async (req) => {
     const propsArr = dirChoices.filter(c => c.id && c.name).map(c => {
       const tipos = Array.from(tiposBySel[c.id] || []);
       const { zip, city, state } = extractZip(c.name);
+      // Conteos derivados del "Tipo alojamiento" (identidad de cada unidad).
+      const nEstudios = tipos.filter(t => /estudio/i.test(t)).length;
+      const nAptos = tipos.filter(t => /apart|apto/i.test(t)).length;
+      const hayHab = tipos.some(t => /habitaci/i.test(t)) || !!habBySel[c.id];
+      const nCasa = tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0;
+      // rental_model derivado (vocabulario nuevo): casa+otros→mixta · estudios/aptos→por_unidades
+      //   · solo habitaciones→por_habitaciones · solo casa→casa_completa.
+      const rental_model = (nCasa > 0 && (nEstudios + nAptos > 0 || hayHab)) ? "mixta"
+        : (nEstudios + nAptos > 0) ? "por_unidades"
+        : hayHab ? "por_habitaciones"
+        : "casa_completa";
       return {
         airtable_address_id: c.id,
         external_id: "addr-" + slugify(c.name),
@@ -561,10 +572,11 @@ Deno.serve(async (req) => {
         city, state, zip,
         zone: zoneBySel[c.id] || null,
         drive_url: driveBySel[c.id] || null,
-        cantidad_estudios: tipos.filter(t => /estudio/i.test(t)).length,
-        cantidad_aptos: tipos.filter(t => /apart|apto/i.test(t)).length,
-        rentada_por_habitaciones: tipos.some(t => /habitaci/i.test(t)) || !!habBySel[c.id],
-        cantidad_casa_completa: tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0,
+        cantidad_estudios: nEstudios,
+        cantidad_aptos: nAptos,
+        rentada_por_habitaciones: hayHab,
+        cantidad_casa_completa: nCasa,
+        rental_model,                                  // BUG5: el sync ahora setea el modelo derivado
         status: "activa",
         active: true,                                  // presente en Airtable ⇒ viva (reactiva si estaba inactiva)
         ...(MIRROR ? { last_synced_at: nowISO, archived_at: null } : {}),
