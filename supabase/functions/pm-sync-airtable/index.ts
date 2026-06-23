@@ -3,20 +3,36 @@
 // Sincroniza la base Airtable de rentas → Supabase pm_*
 //
 /**
- * pm_properties es un MIRROR de Airtable "Datos x Casa" + campo "Dirección" (single select).
+ * ═════════════════════════════════════════════════════════════════
+ * Property Manager — MIRROR SYNC desde Airtable
+ * ═════════════════════════════════════════════════════════════════
  *
- * - airtable_address_id (sel_xxx) es la LLAVE ESTABLE.
- * - address es el texto LITERAL del option (.name); puede cambiar si el dueño lo edita.
- * - Las options se leen de la METADATA (Meta API) → captura opciones aún sin filas.
- * - Si una option desaparece de Airtable, la propiedad se marca active=false / status=inactiva
- *   (NO se borra, para preservar bookings/payments históricos).
- * - Si vuelve a aparecer, se reactiva (active=true / status=activa).
+ * MAPEO OFICIAL (NO MEZCLAR FUENTES):
+ *   🏠 Propiedades    ← "Datos x Casa" (option_id de Dirección)
+ *   📅 Calendario     ← "Base de datos Tenant"
+ *   🏡 Reservas       ← "Base de datos Tenant"
+ *   👥 Inquilinos     ← "Base de datos Tenant"
+ *   💰 Pagos          ← "Pagos Rentas"
+ *   💸 Gastos         ← "Gastos por Casa"
  *
- * SOLO el sync inserta/actualiza pm_properties (upsert ON CONFLICT (airtable_address_id)).
- * NUNCA insertar con airtable_address_id NULL ni transformar address localmente.
- * "Base de datos Tenant" solo LEE por address / airtable_address_id; NUNCA inserta.
+ * LLAVES ESTABLES:
+ *   pm_properties → airtable_address_id (option_id sel_xxx del select Dirección)
+ *   pm_tenants/bookings/payments/expenses/units → external_id (record_id de Airtable,
+ *     con prefijo: tenant-at-/booking-ten-/pay-/exp-/unit-). external_id ES la llave
+ *     estable record-id (equivale al airtable_record_id del spec).
  *
- * MAPEO OFICIAL Airtable → Property Manager (NO CRUZAR FUENTES)
+ * REGLAS:
+ * - SOLO syncProperties (bloque 1) INSERT/UPDATE pm_properties; los demás hacen LOOKUP
+ *   por property_id. NUNCA crear propiedad desde Tenant/Pagos/Gastos.
+ * - Soft delete: registro ausente en Airtable → active=false + archived_at (las propiedades
+ *   además status=inactiva). Hard delete PROHIBIDO. Reaparece → active=true.
+ *   Implementado con sello last_synced_at=nowISO por run + mirrorArchive() (no toca
+ *   registros manuales: solo filas con external_id/airtable_address_id NOT NULL).
+ * - address SIEMPRE LITERAL (.name del option); nunca derivar por código.
+ * - pm_units se mantiene DEDUPLICADA (1 por unidad física addr+tipo), NO por record_id.
+ * - Fallback: si las columnas del mirror no existen (migración 2026-06-22-mirror-sync.sql
+ *   no aplicada), MIRROR=false y el sync corre como antes (no rompe el deploy).
+ * - Idempotente.
  *
  * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
  *                  mirror por sel_id de "Dirección"
@@ -427,6 +443,31 @@ Deno.serve(async (req) => {
   }).select().single();
 
   try {
+    // ── MIRROR: helpers de soft-delete + sello de sincronización ──
+    // nowISO sella cada upsert de este run; las filas no vistas (last_synced_at != nowISO)
+    // se archivan (active=false). Fallback: si las columnas del mirror no existen aún
+    // (migración no aplicada), MIRROR=false y el sync corre como antes (sin romper deploy).
+    const nowISO = new Date().toISOString();
+    let MIRROR = true;
+    {
+      const probe = await supabase.from("pm_payments").select("active,last_synced_at,archived_at").limit(1);
+      if (probe.error) { MIRROR = false; errors.push("mirror cols ausentes (correr 2026-06-22-mirror-sync.sql): " + probe.error.message); }
+    }
+    const mirrorFields = () => MIRROR ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
+    // Archiva (soft-delete) las filas de Airtable que ya no aparecieron en este run.
+    // Solo toca filas con llave de Airtable (external_id/airtable_address_id NOT NULL),
+    // así NUNCA archiva registros manuales (creados en la app, sin llave).
+    const mirrorArchive = async (table: string, keyCol = "external_id", activeCol = "active") => {
+      if (dry_run || !MIRROR) return;
+      const upd: any = { archived_at: nowISO }; upd[activeCol] = false;
+      const { error, count } = await supabase.from(table)
+        .update(upd, { count: "exact" })
+        .eq(activeCol, true).not(keyCol, "is", null)
+        .or(`last_synced_at.is.null,last_synced_at.neq.${nowISO}`);
+      if (error) errors.push(`archive ${table}: ${error.message}`);
+      else (stats as any)[`${table}_archived`] = count || 0;
+    };
+
     // ════════════════════════════════════════════════════════════
     // 1) DATOS X CASA → properties + units + bookings
     // ════════════════════════════════════════════════════════════
@@ -496,22 +537,19 @@ Deno.serve(async (req) => {
         cantidad_casa_completa: tipos.some(t => /casa\s*completa/i.test(t)) ? 1 : 0,
         status: "activa",
         active: true,                                  // presente en Airtable ⇒ viva (reactiva si estaba inactiva)
-        updated_at: new Date().toISOString()
+        ...(MIRROR ? { last_synced_at: nowISO, archived_at: null } : {}),
+        updated_at: nowISO
       };
     });
     if (!dry_run && propsArr.length) {
       const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "airtable_address_id" });
       if (error) errors.push("properties: " + error.message);
     }
-
-    // ARCHIVAR las que ya NO están en Airtable (no borrar → preserva bookings/payments).
-    const liveIds = propsArr.map(p => p.airtable_address_id);
-    if (!dry_run && liveIds.length) {
-      const { error: aerr } = await supabase.from("pm_properties")
-        .update({ active: false, status: "inactiva", updated_at: new Date().toISOString() })
-        .not("airtable_address_id", "is", null)
-        .not("airtable_address_id", "in", `(${liveIds.join(",")})`);
-      if (aerr) errors.push("archive properties: " + aerr.message);
+    // ARCHIVAR (soft-delete) las options que ya NO están en Airtable; status inactiva para el front.
+    await mirrorArchive("pm_properties", "airtable_address_id", "active");
+    if (!dry_run && MIRROR) {
+      await supabase.from("pm_properties").update({ status: "inactiva" }).eq("active", false).eq("status", "activa");
+      await supabase.from("pm_properties").update({ status: "activa" }).eq("active", true).eq("status", "inactiva");
     }
     stats.properties = propsArr.length;
 
@@ -589,7 +627,8 @@ Deno.serve(async (req) => {
         access_codes: r.fields?.[F.dxc_accesos] || null,
         maintenance_status: inferMaintenanceStatus(getSel(r.fields?.[F.dxc_estado])),
         drive_url: r.fields?.[F.dxc_drive] || null,
-        is_active: true
+        is_active: true,
+        ...(MIRROR ? { last_synced_at: nowISO, archived_at: null } : {})
       };
     }
     const unitsArr = Object.values(unitsByKey);
@@ -597,6 +636,7 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from("pm_units").upsert(unitsArr, { onConflict: "external_id" });
       if (error) errors.push("units: " + error.message);
     }
+    await mirrorArchive("pm_units", "external_id", "is_active");   // soft-delete unidades ausentes
     stats.units = unitsArr.length;
     stats.units_dupes_avoided = unitDupesAvoided;
     console.log(`[pm-sync] pm_units: ${unitsArr.length} únicas · ${unitDupesAvoided} duplicados de unidad evitados (filas Airtable: ${datosCasa.length})`);
@@ -660,11 +700,13 @@ Deno.serve(async (req) => {
         addWarn("direccion_no_matchea", "tenant", ext, null, { inquilino: name, casa: tCasa });
       }
     }
-    const allTenants = [...tenantsBasic.filter(t => !tenantsFromTbl.find(t2 => t2.full_name.toLowerCase() === t.full_name.toLowerCase())), ...tenantsFromTbl];
+    const allTenants = [...tenantsBasic.filter(t => !tenantsFromTbl.find(t2 => t2.full_name.toLowerCase() === t.full_name.toLowerCase())), ...tenantsFromTbl]
+      .map(t => ({ ...t, ...mirrorFields() }));
     if (!dry_run && allTenants.length) {
       const { error } = await supabase.from("pm_tenants").upsert(allTenants, { onConflict: "external_id" });
       if (error) errors.push("tenants: " + error.message);
     }
+    await mirrorArchive("pm_tenants");   // soft-delete inquilinos ausentes en Airtable
     stats.tenants = allTenants.length;
 
     // Re-leer tenants para tener ID real
@@ -787,12 +829,14 @@ Deno.serve(async (req) => {
         notes: r.fields?.[F.ten_comentario] || null
       });
     }
-    if (!dry_run && tenantBookings.length) {
-      for (let i = 0; i < tenantBookings.length; i += 50) {
-        const { error } = await supabase.from("pm_bookings").upsert(tenantBookings.slice(i, i + 50), { onConflict: "external_id" });
+    const tenantBookingsM = tenantBookings.map(b => ({ ...b, ...mirrorFields() }));
+    if (!dry_run && tenantBookingsM.length) {
+      for (let i = 0; i < tenantBookingsM.length; i += 50) {
+        const { error } = await supabase.from("pm_bookings").upsert(tenantBookingsM.slice(i, i + 50), { onConflict: "external_id" });
         if (error) { errors.push("tenant bookings chunk " + i + ": " + error.message); break; }
       }
     }
+    await mirrorArchive("pm_bookings");   // soft-delete reservas ausentes en Airtable
     stats.bookings_from_tenant = tenantBookings.length;
     stats.bookings_tenant_deduped = tenDeduped;
     stats.bookings_tenant_unmapped = tenSkipped;
@@ -843,12 +887,14 @@ Deno.serve(async (req) => {
           notes: r.fields?.[F.pag_obs] || null
         });
       }
-      if (!dry_run && paymentsIn.length) {
-        for (let i = 0; i < paymentsIn.length; i += 50) {
-          const { error } = await supabase.from("pm_payments").upsert(paymentsIn.slice(i, i + 50), { onConflict: "external_id" });
+      const paymentsInM = paymentsIn.map(p => ({ ...p, ...mirrorFields() }));
+      if (!dry_run && paymentsInM.length) {
+        for (let i = 0; i < paymentsInM.length; i += 50) {
+          const { error } = await supabase.from("pm_payments").upsert(paymentsInM.slice(i, i + 50), { onConflict: "external_id" });
           if (error) { errors.push("pagos chunk " + i + ": " + error.message); break; }
         }
       }
+      await mirrorArchive("pm_payments");   // soft-delete pagos ausentes en Airtable
       stats.payments_in = paymentsIn.length;
       stats.payments_linked = paysLinked;
       stats.payments_unlinked = paysUnlinked;
@@ -885,7 +931,7 @@ Deno.serve(async (req) => {
       }
       if (!dry_run && exp.length) {
         for (let i = 0; i < exp.length; i += 50) {
-          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50), { onConflict: "external_id" });
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50).map(x => ({ ...x, ...mirrorFields() })), { onConflict: "external_id" });
           if (error) { errors.push("gastos_casa chunk " + i + ": " + error.message); break; }
         }
       }
@@ -915,7 +961,7 @@ Deno.serve(async (req) => {
       }
       if (!dry_run && exp.length) {
         for (let i = 0; i < exp.length; i += 50) {
-          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50), { onConflict: "external_id" });
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50).map(x => ({ ...x, ...mirrorFields() })), { onConflict: "external_id" });
           if (error) { errors.push("gastos_plat chunk " + i + ": " + error.message); break; }
         }
       }
@@ -946,12 +992,20 @@ Deno.serve(async (req) => {
       }
       if (!dry_run && exp.length) {
         for (let i = 0; i < exp.length; i += 50) {
-          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50), { onConflict: "external_id" });
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50).map(x => ({ ...x, ...mirrorFields() })), { onConflict: "external_id" });
           if (error) { errors.push("gastos_aseo chunk " + i + ": " + error.message); break; }
         }
       }
       stats.expenses_cleaning = exp.length;
     } catch (e: any) { errors.push("gastos_aseo: " + e.message); }
+
+    // Soft-delete de gastos ausentes — SOLO si las 3 fuentes de gastos sincronizaron ok
+    // (si alguna falló, no archivamos para no marcar como ausentes gastos que no se leyeron).
+    if (!errors.some(e => /gastos_|expenses|pm_expenses/i.test(e))) {
+      await mirrorArchive("pm_expenses");
+    } else {
+      errors.push("pm_expenses: archive omitido (alguna fuente de gastos falló este run)");
+    }
 
     // ════════════════════════════════════════════════════════════
     // 5d) GASTOS EQUIPO → pm_payroll

@@ -101,6 +101,35 @@ window.pmaState = pmaState;
 // ════════════════════════════════════════════════════════════════
 // CARGA DE DATOS
 // ════════════════════════════════════════════════════════════════
+// Filtra los registros archivados (active=false / is_active=false) salvo que el
+// usuario active "mostrar archivados". Mirror sync: lo que no está en Airtable
+// queda active=false pero NO se borra (historia preservada). Si la columna `active`
+// no existe aún (migración no aplicada), x.active es undefined → no filtra (fallback).
+function pmApplyActiveFilter() {
+  const raw = pmaState._raw || {};
+  const showArc = pmaState.showArchived;
+  const keep = (arr, col) => showArc ? (arr || []) : (arr || []).filter(x => x[col] !== false);
+  pmaState.properties = keep(raw.properties, 'active');
+  pmaState.units      = keep(raw.units, 'is_active');
+  pmaState.bookings   = keep(raw.bookings, 'active');
+  pmaState.tenants    = keep(raw.tenants, 'active');
+  pmaState.expenses   = keep(raw.expenses, 'active');
+  // pm_expenses se normaliza a forma "pago gasto" y se mergea con payments (Finanzas).
+  const expAsPays = pmaState.expenses.map(e => ({
+    id: e.id, _src: 'expense', type: 'gasto', status: 'pagado',
+    property_id: e.property_id || null, amount: e.amount,
+    paid_at: e.expense_date || null, category: e.category || 'gasto',
+    concept: e.description || e.subcategory || e.category || 'Gasto'
+  }));
+  pmaState.payments = [...keep(raw.payments, 'active'), ...expAsPays];
+}
+function pmToggleArchived() {
+  pmaState.showArchived = !pmaState.showArchived;
+  pmApplyActiveFilter();
+  pmRender();
+}
+window.pmToggleArchived = pmToggleArchived;
+
 async function pmLoadAll() {
   pmaState.loading = true;
   pmaState.loadError = null;
@@ -179,23 +208,16 @@ async function pmLoadAll() {
     }
   }
 
-  pmaState.properties = results.properties || [];
-  pmaState.units = results.units || [];
-  pmaState.bookings = results.bookings || [];
-  pmaState.tenants = results.tenants || [];
-  pmaState.expenses = results.expenses || [];
-  // pm_expenses se normaliza a forma "pago gasto" y se mergea para que Finanzas
-  // (que itera sobre payments con type/paid_at/property_id) los cuente sin más cambios.
-  const expAsPays = pmaState.expenses.map(e => ({
-    id: e.id, _src: 'expense',
-    type: 'gasto', status: 'pagado',
-    property_id: e.property_id || null,
-    amount: e.amount,
-    paid_at: e.expense_date || null,
-    category: e.category || 'gasto',
-    concept: e.description || e.subcategory || e.category || 'Gasto'
-  }));
-  pmaState.payments = [...(results.payments || []), ...expAsPays];
+  // Crudos (incluyen archivados) para poder togglear sin recargar.
+  pmaState._raw = {
+    properties: results.properties || [],
+    units: results.units || [],
+    bookings: results.bookings || [],
+    tenants: results.tenants || [],
+    payments: results.payments || [],
+    expenses: results.expenses || []
+  };
+  pmApplyActiveFilter();   // setea properties/units/bookings/tenants/expenses/payments según showArchived
   pmaState.payroll = results.payroll || [];
   pmaState.credentials = results.credentials || [];
   pmaState.wifi = results.wifi || [];
@@ -1004,6 +1026,7 @@ function pmRenderPropertiesList() {
         <div class="flex items-center bg-slate-100 rounded-full p-0.5">${vb('list','🏘️ Lista')}${vb('availability','🟢 Disponibilidad')}</div>
         <div class="flex items-center gap-2">
           ${pmSyncStatusLabel()}
+          <button onclick="pmToggleArchived()" class="text-xs font-bold px-3 py-1.5 rounded ${pmaState.showArchived?'bg-slate-800 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}" title="Mostrar/ocultar registros archivados (ya no están en Airtable)">📦 ${pmaState.showArchived?'Ocultar':'Mostrar'} archivados</button>
           <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Sync Airtable</button>
           <button onclick="pmEditProperty(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Propiedad</button>
         </div>
@@ -1421,6 +1444,12 @@ function pmRenderPropertyDetail() {
   return `
     <div class="space-y-3 p-1">
       <button onclick="pmaState.selectedPropertyId=null;pmRender()" class="text-xs text-slate-500 hover:text-slate-900">← Volver a propiedades</button>
+
+      ${p.active === false ? `
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 text-amber-900 text-xs">
+          📦 <strong>Propiedad archivada${p.archived_at?' el '+new Date(p.archived_at).toLocaleDateString('es-MX'):''}</strong> porque ya no está en Airtable "Datos x Casa".
+          Sus bookings y pagos históricos se preservan. Para reactivarla, agregala de vuelta en Airtable y corré el sync.
+        </div>` : ''}
 
       <!-- Header propiedad -->
       <div class="bg-gradient-to-br from-slate-900 to-blue-900 text-white rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
