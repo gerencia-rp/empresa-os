@@ -650,23 +650,10 @@ Deno.serve(async (req) => {
       if (u.property_id && u.name) unitIdByPropName[`${u.property_id}|${slugify(u.name)}`] = u.id;
     });
 
-    // Mapa nombre inquilino → tenant_id (lo construimos en step 2)
-    // Por ahora, tenants básicos desde Datos x Casa (sin teléfono o con teléfono airtable)
-    const tenantsBasic: any[] = [];
+    // REGLA: Inquilinos = SOLO "Base de datos Tenant". Se eliminó el cruce que creaba
+    // tenants desde "Datos x Casa" (tenantsBasic). Los nombres de DxC que no existan en
+    // Tenant se reportan como huérfanos (warning) y sus pagos quedan con tenant_id=null.
     const tenantIdByName: Record<string, string> = {};
-    for (const r of datosCasa) {
-      const name = r.fields?.[F.dxc_inquilino];
-      if (!name) continue;
-      if (tenantIdByName[name.toLowerCase()]) continue;
-      const ext = "tenant-name-" + slugify(name);
-      tenantsBasic.push({
-        external_id: ext,
-        full_name: name,
-        phone: r.fields?.[F.dxc_telefono] || null,
-        source: inferBookingType(getMultiSel(r.fields?.[F.dxc_fuente]))
-      });
-      tenantIdByName[name.toLowerCase()] = ext; // placeholder
-    }
 
     // ════════════════════════════════════════════════════════════
     // 2) TENANTS (Base de datos Tenant) — info más rica
@@ -700,8 +687,42 @@ Deno.serve(async (req) => {
         addWarn("direccion_no_matchea", "tenant", ext, null, { inquilino: name, casa: tCasa });
       }
     }
-    const allTenants = [...tenantsBasic.filter(t => !tenantsFromTbl.find(t2 => t2.full_name.toLowerCase() === t.full_name.toLowerCase())), ...tenantsFromTbl]
-      .map(t => ({ ...t, ...mirrorFields() }));
+    // ── REPORTE DE INQUILINOS HUÉRFANOS ──
+    // Huérfano = nombre de inquilino en "Datos x Casa" que NO existe en "Base de datos Tenant".
+    // Se registra warning con casa + cuántos pagos/bookings apuntan a él (para que el dueño
+    // lo agregue manualmente en Tenant). Sus pagos quedarán sin inquilino al desaparecer el cruce.
+    const tenantTableNames = new Set(
+      tenantsAt.map((r: any) => (r.fields?.[F.ten_nombre] || "").toString().toLowerCase().trim()).filter(Boolean)
+    );
+    const orphanByLc: Record<string, { name: string; casa: string }> = {};
+    for (const r of datosCasa) {
+      const nm = (r.fields?.[F.dxc_inquilino] || "").toString().trim();
+      if (!nm || tenantTableNames.has(nm.toLowerCase())) continue;
+      if (!orphanByLc[nm.toLowerCase()]) orphanByLc[nm.toLowerCase()] = { name: nm, casa: getSel(r.fields?.[F.dxc_direccion]) || "—" };
+    }
+    const orphanLcs = Object.keys(orphanByLc);
+    if (orphanLcs.length) {
+      const { data: exTen } = await supabase.from("pm_tenants").select("id, full_name");
+      const idByLcName: Record<string, string> = {};
+      (exTen || []).forEach((t: any) => { if (t.full_name) idByLcName[t.full_name.toLowerCase()] = t.id; });
+      for (const lc of orphanLcs) {
+        const o = orphanByLc[lc];
+        const tid = idByLcName[lc] || null;
+        let pays = 0, books = 0;
+        if (tid && !dry_run) {
+          const pc = await supabase.from("pm_payments").select("id", { count: "exact", head: true }).eq("tenant_id", tid);
+          const bc = await supabase.from("pm_bookings").select("id", { count: "exact", head: true }).eq("tenant_id", tid);
+          pays = pc.count || 0; books = bc.count || 0;
+        }
+        addWarn("tenant_orphan_from_datos_x_casa", "tenant", "tenant-name-" + slugify(o.name), findPropId(o.casa),
+          { inquilino: o.name, casa: o.casa, payments_count: pays, bookings_count: books,
+            detalle: "Inquilino en 'Datos x Casa' sin registro en 'Base de datos Tenant'. Agregalo en Tenant para vincular sus pagos/reservas." });
+      }
+      stats.tenant_orphans = orphanLcs.length;
+    }
+
+    // Inquilinos = SOLO "Base de datos Tenant"
+    const allTenants = tenantsFromTbl.map(t => ({ ...t, ...mirrorFields() }));
     if (!dry_run && allTenants.length) {
       const { error } = await supabase.from("pm_tenants").upsert(allTenants, { onConflict: "external_id" });
       if (error) errors.push("tenants: " + error.message);
@@ -709,13 +730,17 @@ Deno.serve(async (req) => {
     await mirrorArchive("pm_tenants");   // soft-delete inquilinos ausentes en Airtable
     stats.tenants = allTenants.length;
 
-    // Re-leer tenants para tener ID real
+    // Re-leer tenants para tener ID real. SOLO los de "Base de datos Tenant" (tenant-at-*)
+    // entran al mapa nombre→id: así un nombre huérfano (solo en Datos x Casa) NO resuelve
+    // y sus pagos/bookings quedan con tenant_id=null ("⚠️ Sin inquilino").
     const { data: dbTen } = await supabase.from("pm_tenants").select("id, external_id, full_name");
     const tenantIdRealByExtId: Record<string, string> = {};
     const tenantIdRealByName: Record<string, string> = {};
     (dbTen || []).forEach((t: any) => {
       if (t.external_id) tenantIdRealByExtId[t.external_id] = t.id;
-      if (t.full_name) tenantIdRealByName[t.full_name.toLowerCase()] = t.id;
+      if (t.full_name && typeof t.external_id === "string" && t.external_id.startsWith("tenant-at-")) {
+        tenantIdRealByName[t.full_name.toLowerCase()] = t.id;
+      }
     });
 
     // ════════════════════════════════════════════════════════════
