@@ -870,8 +870,20 @@ function renderEstrategia() {
 
   const embudo = card('🔻 El embudo (cómo se convierte)', li([
     '<b>Reel</b> = atrae (alcance frío). <b>Historias</b> = venden (el vendedor). <b>Hand-raiser</b> = palabra clave → DM automático → conversación → llamada/venta.',
-    '3 tipos de secuencia de historias: <b>hand-raiser</b> (recurso gratis), <b>venta</b> (solo en cosecha), <b>autoridad/conexión</b> (humaniza).',
+    '<b>3 secuencias de historias</b> (1 por día, 3-4 historias, alternando): <b>Lead Magnet</b> (hook de resultado → vehículo → CTA suave "comenta YO") · <b>CTA Directo</b> (muestra trabajo con clientes → CTA explícito "comenta DOC") · <b>Awareness</b> (momentos de trabajo + victorias, sin vender).',
+    'Espaciá las historias cada 30-90 min, renová el hilo cada 24h. La 1ª del día tiene más alcance.',
     'Métrica que importa: no cuántos, sino <b>quiénes</b> responden y si terminan en llamada/venta.',
+    'Automatiza el DM con ManyChat / Sell by Chat (responde 2-15 min después).',
+  ]));
+
+  const recursos = card('🎁 Recursos gratuitos (hand raisers)', li([
+    '<b>Qué es:</b> contenido gratis (video, PDF/Notion, plantilla, calculadora, mini-curso, audio) que inicia una <b>conversación calificada</b>. No es regalar por regalar.',
+    '<b>3 objetivos:</b> iniciar conversación · activar microcompromisos · generar confianza.',
+    '<b>Sube el nivel de conciencia:</b> inconsciente del problema → consciente del problema → consciente de la solución.',
+    '<b>Buen recurso:</b> genera conciencia del problema · se conecta a tu servicio · promesa específica · rápido de consumir · valor real.',
+    '<b>Narrativa (3 pasos):</b> muestra el problema → ponle polémica/drama/seriedad → preséntalo como herramienta que da claridad.',
+    '<b>Frecuencia:</b> 4-7 recursos/semana en reels+carruseles; historias 1-2 (cuenta chica) / 3-4 (cuenta grande).',
+    '<b>Reutiliza</b> el mismo recurso con 3 ángulos distintos. Un lead frío necesita <b>7-14 recursos</b> antes de contratar.',
   ]));
 
   const metricas = card('📊 Qué mirar (métricas)', li([
@@ -881,6 +893,20 @@ function renderEstrategia() {
     'Después de cada lanzamiento: qué historia/frame tuvo más respuestas → mejóralo el próximo.',
   ]));
 
+  const perfil = card('🪪 Optimización del perfil (tu landing del embudo)', `
+    <p class="text-sm text-zinc-400 mb-3">Tu perfil es la landing principal del embudo: en <b>5 segundos</b> debe quedar claro <b>qué haces, para quién, cómo y qué hacer ahora</b>. Vende el que transmite claridad, no el que grita más fuerte.</p>
+    ${li([
+      '<b>Foto:</b> tu cara en primer plano, fondo neutro, expresión cercana → confianza al instante. Sin logos confusos.',
+      '<b>Nombre visible:</b> <code>Nombre | Especialidad</code> (ej. "Nicolás | Inversión en Bienes Raíces"). Instagram lo indexa → te encuentran al buscar tu tema.',
+      '<b>Bio línea por línea:</b> (1) el resultado que ayudas a lograr · (2) resultados tuyos/de clientes · (3) método único (opcional) · (4) CTA claro.',
+      '<b>El diferencial debe ser específico:</b> ❌ "Ayudo a invertir en bienes raíces" → ✅ "Ayudo a latinos en USA a cerrar su primer flip sin perder su capital".',
+      '<b>Link en bio:</b> 1 solo link optimizado con objetivo único. NO un Linktree con 10 botones.',
+      '<b>Historias destacadas:</b> Sobre mí (de A a B) · Cómo trabajo (oferta + paso a paso) · Testimonios · FAQs.',
+      '<b>3 reels fijados:</b> (1) cómo trabajas / la oportunidad · (2) tu historia · (3) un caso de éxito fuerte (A→B).',
+      '<b>Feed:</b> coherencia de marca, limpio y profesional — refuerza la percepción de valor.',
+    ])}
+    <div class="mt-3 text-xs text-zinc-500"><b class="text-zinc-400">Pregúntate:</b> si alguien entra a tu perfil ahora, ¿entiende qué vendes en 5 segundos? ¿Te escribiría hoy y agendaría una llamada?</div>`);
+
   const fuentes = card('📚 Tu información, integrada aquí', `<p class="text-xs text-zinc-500 leading-relaxed">Esta guía y el generador se alimentan de TODO lo que subiste: la grabación con tu mentora, el deck de Julio Iero, el video de Richard (YouTube), la reunión de ideas de fix &amp; flip, el banco de conocimiento (29 dolores), el playbook VIRALIDAD, los carruseles de historias (monikmontanez / danaherrera) y el brief del Método H.I.L.O. Nada se perdió — todo está plasmado en lo que tienes que hacer.</p>`);
 
   out.innerHTML = `
@@ -889,7 +915,7 @@ function renderEstrategia() {
       <p class="text-sm text-zinc-500">Qué subir, cómo subirlo y cuándo. Toda tu estrategia en un solo lugar.</p>
     </div>
     <div class="space-y-4">
-      ${principios}${rutina}${mes}${queSubir}${comoSubir}${formulas}${embudo}${metricas}${fuentes}
+      ${principios}${perfil}${rutina}${mes}${queSubir}${comoSubir}${formulas}${embudo}${recursos}${metricas}${fuentes}
     </div>`;
 }
 

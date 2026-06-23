@@ -420,6 +420,15 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { body = {}; }
 
   const dry_run = body.dry_run === true;
+  // ── Archivado DESHABILITADO por defecto (anti-wipe) ──
+  // Se HABILITA solo con env DISABLE_ARCHIVE=false (o body.archive=true para un test puntual).
+  // Se fuerza OFF con body.archive=false. Env ausente ⇒ se asume "true" ⇒ archivado OFF.
+  const DISABLE_ARCHIVE_ENV = (Deno.env.get("DISABLE_ARCHIVE") ?? "true").toLowerCase();
+  let ARCHIVE_ENABLED = DISABLE_ARCHIVE_ENV === "false";
+  if (body.archive === true) ARCHIVE_ENABLED = true;
+  if (body.archive === false) ARCHIVE_ENABLED = false;
+  console.log(`[pm-sync] archive config · DISABLE_ARCHIVE=${Deno.env.get("DISABLE_ARCHIVE") ?? "(unset→true)"} · body.archive=${body.archive ?? "(none)"} · ARCHIVE_ENABLED=${ARCHIVE_ENABLED}`);
+  if (!ARCHIVE_ENABLED) console.log("[pm-sync] DISABLE_ARCHIVE=true detected → archivado OMITIDO este run (sync defensivo)");
   const airtable_token = body.airtable_token || Deno.env.get("AIRTABLE_API_KEY");
   const base_id = body.base_id || Deno.env.get("AIRTABLE_BASE_ID") || "appzEnsuy4qPT6iHj";
   if (!airtable_token) return json({ ok: false, error: "Falta airtable_token (body o AIRTABLE_API_KEY env)" }, 400);
@@ -454,18 +463,35 @@ Deno.serve(async (req) => {
       if (probe.error) { MIRROR = false; errors.push("mirror cols ausentes (correr 2026-06-22-mirror-sync.sql): " + probe.error.message); }
     }
     const mirrorFields = () => MIRROR ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
+    // Diagnóstico de archivado
+    const archivedCount: Record<string, number> = {};
+    const archivedSamples: Record<string, any[]> = {};
     // Archiva (soft-delete) las filas de Airtable que ya no aparecieron en este run.
-    // Solo toca filas con llave de Airtable (external_id/airtable_address_id NOT NULL),
-    // así NUNCA archiva registros manuales (creados en la app, sin llave).
-    const mirrorArchive = async (table: string, keyCol = "external_id", activeCol = "active") => {
+    // GATING (protección anti-wipe):
+    //   - sourceOK=false (la fuente tuvo error/upsert incompleto) → NO archiva.
+    //   - ARCHIVE_ENABLED=false (sync defensivo) → NO archiva.
+    //   - dry_run / !MIRROR → NO archiva.
+    // Solo toca filas con llave de Airtable (NOT NULL) → nunca archiva registros manuales.
+    // Filtro robusto en 2 pasos (lt + is null), evitando timestamps dentro de .or().
+    const mirrorArchive = async (table: string, keyCol: string, activeCol: string, sourceOK: boolean) => {
       if (dry_run || !MIRROR) return;
+      if (!ARCHIVE_ENABLED) return;   // archivado globalmente OFF (ya se logueó arriba); sin ruido por tabla
+      if (!sourceOK) { errors.push(`archive ${table}: OMITIDO (la fuente no sincronizó completa → se evita wipe)`); return; }
+      // Muestra de hasta 3 que se archivarían (para diagnóstico)
+      const baseSel = () => supabase.from(table).select(`id, ${keyCol}`).eq(activeCol, true).not(keyCol, "is", null);
+      const sampleA = await baseSel().lt("last_synced_at", nowISO).limit(3);
+      const sampleB = await baseSel().is("last_synced_at", null).limit(3);
+      archivedSamples[table] = [...(sampleA.data || []), ...(sampleB.data || [])].slice(0, 3).map((r: any) => r[keyCol] || r.id);
       const upd: any = { archived_at: nowISO }; upd[activeCol] = false;
-      const { error, count } = await supabase.from(table)
-        .update(upd, { count: "exact" })
-        .eq(activeCol, true).not(keyCol, "is", null)
-        .or(`last_synced_at.is.null,last_synced_at.neq.${nowISO}`);
-      if (error) errors.push(`archive ${table}: ${error.message}`);
-      else (stats as any)[`${table}_archived`] = count || 0;
+      let total = 0;
+      // (a) sello viejo (sincronizadas en un run anterior, ausentes en este)
+      const a = await supabase.from(table).update(upd, { count: "exact" }).eq(activeCol, true).not(keyCol, "is", null).lt("last_synced_at", nowISO);
+      if (a.error) { errors.push(`archive ${table} (lt): ${a.error.message}`); } else total += a.count || 0;
+      // (b) nunca selladas (last_synced_at NULL) — legacy sin sincronizar este run
+      const b = await supabase.from(table).update(upd, { count: "exact" }).eq(activeCol, true).not(keyCol, "is", null).is("last_synced_at", null);
+      if (b.error) { errors.push(`archive ${table} (null): ${b.error.message}`); } else total += b.count || 0;
+      archivedCount[table] = total;
+      (stats as any)[`${table}_archived`] = total;
     };
 
     // ════════════════════════════════════════════════════════════
@@ -478,12 +504,14 @@ Deno.serve(async (req) => {
     //     Las options se leen de la METADATA (así capturamos opciones sin filas aún).
     //     Fallback: si la Meta API no está disponible, se derivan de las filas
     //     (no captura opciones sin filas; se loguea).
+    let propertiesMetaOK = true;   // false si caemos al fallback (no podemos confiar el universo completo)
     let dirChoices = await fetchFieldChoices(base_id, TABLE_IDS.datos_casa, F.dxc_direccion, airtable_token);
     if (!dirChoices) {
+      propertiesMetaOK = false;     // ⚠️ sin Meta API NO archivamos propiedades (evita wipe)
       const seen: Record<string, string> = {};
       for (const r of datosCasa) { const c: any = r.fields?.[F.dxc_direccion]; if (c?.id && !seen[c.id]) seen[c.id] = c.name; }
       dirChoices = Object.entries(seen).map(([id, name]) => ({ id, name }));
-      errors.push("meta API Dirección no disponible (scope schema.bases:read): opciones sin filas no se sincronizan; fallback a filas.");
+      errors.push("meta API Dirección no disponible (scope schema.bases:read): fallback a filas; NO se archivan propiedades este run.");
     }
 
     // Tipos + #habitaciones + zona/drive por sel_id (para derivar modelo y enriquecer)
@@ -541,12 +569,14 @@ Deno.serve(async (req) => {
         updated_at: nowISO
       };
     });
+    let propsUpsertOK = true;
     if (!dry_run && propsArr.length) {
       const { error } = await supabase.from("pm_properties").upsert(propsArr, { onConflict: "airtable_address_id" });
-      if (error) errors.push("properties: " + error.message);
+      if (error) { errors.push("properties: " + error.message); propsUpsertOK = false; }
     }
-    // ARCHIVAR (soft-delete) las options que ya NO están en Airtable; status inactiva para el front.
-    await mirrorArchive("pm_properties", "airtable_address_id", "active");
+    // ARCHIVAR solo si Meta OK + upsert OK + hubo options (anti-wipe).
+    const propertiesSourceOK = propertiesMetaOK && propsUpsertOK && propsArr.length > 0;
+    await mirrorArchive("pm_properties", "airtable_address_id", "active", propertiesSourceOK);
     if (!dry_run && MIRROR) {
       await supabase.from("pm_properties").update({ status: "inactiva" }).eq("active", false).eq("status", "activa");
       await supabase.from("pm_properties").update({ status: "activa" }).eq("active", true).eq("status", "inactiva");
@@ -632,11 +662,13 @@ Deno.serve(async (req) => {
       };
     }
     const unitsArr = Object.values(unitsByKey);
+    let unitsUpsertOK = true;
     if (!dry_run && unitsArr.length) {
       const { error } = await supabase.from("pm_units").upsert(unitsArr, { onConflict: "external_id" });
-      if (error) errors.push("units: " + error.message);
+      if (error) { errors.push("units: " + error.message); unitsUpsertOK = false; }
     }
-    await mirrorArchive("pm_units", "external_id", "is_active");   // soft-delete unidades ausentes
+    // Solo archiva si propiedades OK (units cuelgan de props) + units OK + hubo filas.
+    await mirrorArchive("pm_units", "external_id", "is_active", propertiesSourceOK && unitsUpsertOK && unitsArr.length > 0);
     stats.units = unitsArr.length;
     stats.units_dupes_avoided = unitDupesAvoided;
     console.log(`[pm-sync] pm_units: ${unitsArr.length} únicas · ${unitDupesAvoided} duplicados de unidad evitados (filas Airtable: ${datosCasa.length})`);
@@ -723,11 +755,13 @@ Deno.serve(async (req) => {
 
     // Inquilinos = SOLO "Base de datos Tenant"
     const allTenants = tenantsFromTbl.map(t => ({ ...t, ...mirrorFields() }));
+    let tenantsUpsertOK = true;
     if (!dry_run && allTenants.length) {
       const { error } = await supabase.from("pm_tenants").upsert(allTenants, { onConflict: "external_id" });
-      if (error) errors.push("tenants: " + error.message);
+      if (error) { errors.push("tenants: " + error.message); tenantsUpsertOK = false; }
     }
-    await mirrorArchive("pm_tenants");   // soft-delete inquilinos ausentes en Airtable
+    // Solo archiva si la fetch de Tenant trajo filas (>0) y el upsert fue OK (anti-wipe).
+    await mirrorArchive("pm_tenants", "external_id", "active", tenantsUpsertOK && tenantsAt.length > 0 && allTenants.length > 0);
     stats.tenants = allTenants.length;
 
     // Re-leer tenants para tener ID real. SOLO los de "Base de datos Tenant" (tenant-at-*)
@@ -855,13 +889,15 @@ Deno.serve(async (req) => {
       });
     }
     const tenantBookingsM = tenantBookings.map(b => ({ ...b, ...mirrorFields() }));
+    let bookingsUpsertOK = true;
     if (!dry_run && tenantBookingsM.length) {
       for (let i = 0; i < tenantBookingsM.length; i += 50) {
         const { error } = await supabase.from("pm_bookings").upsert(tenantBookingsM.slice(i, i + 50), { onConflict: "external_id" });
-        if (error) { errors.push("tenant bookings chunk " + i + ": " + error.message); break; }
+        if (error) { errors.push("tenant bookings chunk " + i + ": " + error.message); bookingsUpsertOK = false; break; }
       }
     }
-    await mirrorArchive("pm_bookings");   // soft-delete reservas ausentes en Airtable
+    // Solo archiva si Tenant trajo filas, hubo bookings y NINGÚN chunk falló (anti-wipe parcial).
+    await mirrorArchive("pm_bookings", "external_id", "active", bookingsUpsertOK && tenantsAt.length > 0 && tenantBookingsM.length > 0);
     stats.bookings_from_tenant = tenantBookings.length;
     stats.bookings_tenant_deduped = tenDeduped;
     stats.bookings_tenant_unmapped = tenSkipped;
@@ -913,13 +949,15 @@ Deno.serve(async (req) => {
         });
       }
       const paymentsInM = paymentsIn.map(p => ({ ...p, ...mirrorFields() }));
+      let paymentsUpsertOK = true;
       if (!dry_run && paymentsInM.length) {
         for (let i = 0; i < paymentsInM.length; i += 50) {
           const { error } = await supabase.from("pm_payments").upsert(paymentsInM.slice(i, i + 50), { onConflict: "external_id" });
-          if (error) { errors.push("pagos chunk " + i + ": " + error.message); break; }
+          if (error) { errors.push("pagos chunk " + i + ": " + error.message); paymentsUpsertOK = false; break; }
         }
       }
-      await mirrorArchive("pm_payments");   // soft-delete pagos ausentes en Airtable
+      // Solo archiva si Pagos trajo filas, hubo pagos y ningún chunk falló (anti-wipe parcial).
+      await mirrorArchive("pm_payments", "external_id", "active", paymentsUpsertOK && pagos.length > 0 && paymentsInM.length > 0);
       stats.payments_in = paymentsIn.length;
       stats.payments_linked = paysLinked;
       stats.payments_unlinked = paysUnlinked;
@@ -1026,11 +1064,8 @@ Deno.serve(async (req) => {
 
     // Soft-delete de gastos ausentes — SOLO si las 3 fuentes de gastos sincronizaron ok
     // (si alguna falló, no archivamos para no marcar como ausentes gastos que no se leyeron).
-    if (!errors.some(e => /gastos_|expenses|pm_expenses/i.test(e))) {
-      await mirrorArchive("pm_expenses");
-    } else {
-      errors.push("pm_expenses: archive omitido (alguna fuente de gastos falló este run)");
-    }
+    const expensesSourceOK = !errors.some(e => /gastos_|expenses|pm_expenses/i.test(e));
+    await mirrorArchive("pm_expenses", "external_id", "active", expensesSourceOK);
 
     // ════════════════════════════════════════════════════════════
     // 5d) GASTOS EQUIPO → pm_payroll
@@ -1201,18 +1236,32 @@ Deno.serve(async (req) => {
     }
     console.log(`[pm-sync] data_warnings: ${warnings.length} detectadas`);
 
+    // Diagnóstico de archivado (para detectar wipes falsos por tabla)
+    const processedCount = {
+      properties: stats.properties || 0,
+      units: stats.units || 0,
+      tenants: stats.tenants || 0,
+      bookings: stats.bookings_from_tenant || 0,
+      payments: stats.payments_in || 0,
+      expenses: (stats.expenses_house || 0) + (stats.expenses_operational || 0) + (stats.expenses_cleaning || 0)
+    };
+
     // Cerrar log
     const status = errors.length === 0 ? "success" : "partial";
     if (log) {
       await supabase.from("pm_sync_log").update({
         status,
-        records_synced: stats,
+        records_synced: { ...stats, archivedCount, archive_enabled: ARCHIVE_ENABLED, mirror: MIRROR },
         error_message: errors.length ? errors.join("\n") : null,
         duration_ms: Date.now() - startMs,
         finished_at: new Date().toISOString()
       }).eq("id", log.id);
     }
-    return json({ ok: true, dry_run, stats, errors, duration_ms: Date.now() - startMs });
+    return json({
+      ok: true, dry_run, archive_enabled: ARCHIVE_ENABLED, mirror: MIRROR,
+      processedCount, archivedCount, archivedSamples,
+      stats, errors, duration_ms: Date.now() - startMs
+    });
   } catch (e: any) {
     if (log) {
       await supabase.from("pm_sync_log").update({
