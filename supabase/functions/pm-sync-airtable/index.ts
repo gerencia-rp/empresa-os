@@ -463,9 +463,19 @@ Deno.serve(async (req) => {
       if (probe.error) { MIRROR = false; errors.push("mirror cols ausentes (correr 2026-06-22-mirror-sync.sql): " + probe.error.message); }
     }
     const mirrorFields = () => MIRROR ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
+    // Probe aparte para las tablas auxiliares (payroll/credentials/wifi/tasks): si su
+    // migración (2026-06-23-mirror-sync-aux-tables.sql) no corrió, MIRROR_AUX=false y esas
+    // tablas siguen sincronizando sin mirror (no rompe su sync).
+    let MIRROR_AUX = MIRROR;
+    if (MIRROR) {
+      const pa = await supabase.from("pm_payroll").select("active,last_synced_at,archived_at").limit(1);
+      if (pa.error) { MIRROR_AUX = false; errors.push("mirror AUX cols ausentes (correr 2026-06-23-mirror-sync-aux-tables.sql): " + pa.error.message); }
+    }
+    const mirrorFieldsAux = () => MIRROR_AUX ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
     // Diagnóstico de archivado (pre-inicializado en 0 para que sea explícito cuando el archivado está OFF)
     const archivedCount: Record<string, number> = {
-      pm_properties: 0, pm_units: 0, pm_tenants: 0, pm_bookings: 0, pm_payments: 0, pm_expenses: 0
+      pm_properties: 0, pm_units: 0, pm_tenants: 0, pm_bookings: 0, pm_payments: 0, pm_expenses: 0,
+      pm_payroll: 0, pm_credentials: 0, pm_wifi_credentials: 0, pm_tasks: 0
     };
     const archivedSamples: Record<string, any[]> = {};
     // Archiva (soft-delete) las filas de Airtable que ya no aparecieron en este run.
@@ -1106,10 +1116,13 @@ Deno.serve(async (req) => {
           invoice_url: getAttachUrl(r.fields?.[F.geq_factura])
         });
       }
-      if (!dry_run && rows.length) {
-        const { error } = await supabase.from("pm_payroll").upsert(rows, { onConflict: "external_id" });
-        if (error) errors.push("payroll: " + error.message);
+      const rowsM = rows.map(x => ({ ...x, ...mirrorFieldsAux() }));
+      let payrollOK = true;
+      if (!dry_run && rowsM.length) {
+        const { error } = await supabase.from("pm_payroll").upsert(rowsM, { onConflict: "external_id" });
+        if (error) { errors.push("payroll: " + error.message); payrollOK = false; }
       }
+      await mirrorArchive("pm_payroll", "external_id", "active", MIRROR_AUX && payrollOK && rows.length > 0);
       stats.payroll = rows.length;
     } catch (e: any) { errors.push("gastos_eq: " + e.message); }
 
@@ -1130,10 +1143,13 @@ Deno.serve(async (req) => {
           notes: r.fields?.[F.acc_obs] || null
         });
       }
-      if (!dry_run && creds.length) {
-        const { error } = await supabase.from("pm_credentials").upsert(creds, { onConflict: "external_id" });
-        if (error) errors.push("credentials: " + error.message);
+      const credsM = creds.map(x => ({ ...x, ...mirrorFieldsAux() }));
+      let credsOK = true;
+      if (!dry_run && credsM.length) {
+        const { error } = await supabase.from("pm_credentials").upsert(credsM, { onConflict: "external_id" });
+        if (error) { errors.push("credentials: " + error.message); credsOK = false; }
       }
+      await mirrorArchive("pm_credentials", "external_id", "active", MIRROR_AUX && credsOK && creds.length > 0);
       stats.credentials = creds.length;
     } catch (e: any) { errors.push("accesos: " + e.message); }
 
@@ -1160,10 +1176,13 @@ Deno.serve(async (req) => {
           }).eq("id", propId);
         }
       }
-      if (!dry_run && wifiRows.length) {
-        const { error } = await supabase.from("pm_wifi_credentials").upsert(wifiRows, { onConflict: "external_id" });
-        if (error) errors.push("wifi_credentials: " + error.message);
+      const wifiRowsM = wifiRows.map(x => ({ ...x, ...mirrorFieldsAux() }));
+      let wifiOK = true;
+      if (!dry_run && wifiRowsM.length) {
+        const { error } = await supabase.from("pm_wifi_credentials").upsert(wifiRowsM, { onConflict: "external_id" });
+        if (error) { errors.push("wifi_credentials: " + error.message); wifiOK = false; }
       }
+      await mirrorArchive("pm_wifi_credentials", "external_id", "active", MIRROR_AUX && wifiOK && wifiRows.length > 0);
       stats.wifi = wifiRows.length;
     } catch (e: any) { errors.push("wifi: " + e.message); }
 
@@ -1198,12 +1217,15 @@ Deno.serve(async (req) => {
           notes: r.fields?.[F.crn_notes] || null
         });
       }
-      if (!dry_run && tasks.length) {
-        for (let i = 0; i < tasks.length; i += 50) {
-          const { error } = await supabase.from("pm_tasks").upsert(tasks.slice(i, i + 50), { onConflict: "external_id" });
-          if (error) { errors.push("tasks chunk " + i + ": " + error.message); break; }
+      const tasksM = tasks.map(x => ({ ...x, ...mirrorFieldsAux() }));
+      let tasksOK = true;
+      if (!dry_run && tasksM.length) {
+        for (let i = 0; i < tasksM.length; i += 50) {
+          const { error } = await supabase.from("pm_tasks").upsert(tasksM.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("tasks chunk " + i + ": " + error.message); tasksOK = false; break; }
         }
       }
+      await mirrorArchive("pm_tasks", "external_id", "active", MIRROR_AUX && tasksOK && tasks.length > 0);
       stats.tasks = tasks.length;
     } catch (e: any) { errors.push("cronograma: " + e.message); }
 
@@ -1263,7 +1285,11 @@ Deno.serve(async (req) => {
       tenants: stats.tenants || 0,
       bookings: stats.bookings_from_tenant || 0,
       payments: stats.payments_in || 0,
-      expenses: (stats.expenses_house || 0) + (stats.expenses_operational || 0) + (stats.expenses_cleaning || 0)
+      expenses: (stats.expenses_house || 0) + (stats.expenses_operational || 0) + (stats.expenses_cleaning || 0),
+      payroll: stats.payroll || 0,
+      credentials: stats.credentials || 0,
+      wifi: stats.wifi || 0,
+      tasks: stats.tasks || 0
     };
 
     // Cerrar log
