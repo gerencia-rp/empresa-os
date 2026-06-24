@@ -296,59 +296,54 @@ function pmPropertyName(id) {
   return p?.name || '—';
 }
 function pmOccupancyOf(propertyId) {
-  const us = pmUnitsOf(propertyId);
-  if (!us.length) return { occupied: 0, total: 0, pct: 0 };
-  const occ = us.filter(u => pmActiveBookingOf(u.id)).length;
-  return { occupied: occ, total: us.length, pct: Math.round(100 * occ / us.length) };
+  // Ocupación de la propiedad en términos de UNIDADES RENTABLES (no habitaciones).
+  const total = pmRentableUnitsOf(propertyId);
+  const occ = pmOccupiedRentableUnitsOf(propertyId);
+  return { occupied: occ, total, pct: total ? Math.round(100 * occ / total) : 0 };
 }
-// ── Conteo de UNIDADES RENTABLES por modelo de renta (réplica de la vista pm_rentable_units) ──
-//   casa_completa / por_habitaciones → 1 (la casa entera es la unidad rentable)
-//   por_unidades → N (cada estudio/apartamento/unidad)
-//   mixta → 1 (casa principal) + N (estudios/aptos anexos)
-function pmIsRentableSubunit(u) { return /estudio|apart|unidad/i.test(u.name || ''); }
-// ¿La propiedad tiene los campos numéricos manuales cargados? (réplica de pm_has_manual_units)
-function pmHasManualUnits(p) {
-  return (+p?.cantidad_estudios || 0) > 0
-      || (+p?.cantidad_aptos || 0) > 0
-      || (+p?.cantidad_casa_completa || 0) > 0
-      || p?.rentada_por_habitaciones === true;
+// ── REGLA DE UNIDADES RENTABLES (confirmada por el dueño) ──
+//   casa_completa     → 1 (la casa)
+//   por_habitaciones  → 1 (la casa entera; las habitaciones NO cuentan como unidades)
+//   por_unidades      → N (cada apartamento/estudio independiente)
+//   mixta             → 1 casa + N (apartamentos/estudios; las habitaciones NO suman)
+// Las habitaciones existen para vincular bookings/cobros, pero no entran al portafolio.
+function isRentableUnit(u) {
+  return ['casa_completa', 'apartamento', 'estudio'].includes(u?.unit_type);
+}
+// Subunidades rentables independientes de una propiedad (apartamentos/estudios; NO habitaciones, NO la casa)
+function pmRentableSubunitsOf(propertyId) {
+  return pmUnitsOf(propertyId).filter(u => u.unit_type === 'apartamento' || u.unit_type === 'estudio');
 }
 function pmRentableUnitsOf(propertyId) {
   const p = pmaState.properties.find(x => x.id === propertyId);
-  // 1) Si hay números manuales cargados, mandan (réplica de pm_calc_rentable_units).
-  //    Aditivo: casa_completa + (por_habitaciones?1:0) + estudios + aptos
-  //    (satisface el ejemplo "por hab + casa completa anexa + 2 estudios = 4").
-  if (pmHasManualUnits(p)) {
-    let n = (+p.cantidad_casa_completa || 0);
-    if (p.rentada_por_habitaciones === true) n += 1;
-    n += (+p.cantidad_estudios || 0) + (+p.cantidad_aptos || 0);
-    return n;
-  }
-  // 2) Fallback: lógica por rental_model + pm_units (la que ya existía)
   const model = p?.rental_model || 'casa_completa';
-  const us = pmUnitsOf(propertyId);
-  if (model === 'por_unidades') return us.filter(pmIsRentableSubunit).length;
-  if (model === 'mixta') return 1 + us.filter(u => /estudio|apart/i.test(u.name || '')).length;
-  return 1; // casa_completa, por_habitaciones, default
+  const subs = pmRentableSubunitsOf(propertyId).length;
+  if (model === 'por_unidades') return subs;          // N apartamentos/estudios
+  if (model === 'mixta') return 1 + subs;             // 1 casa + N apartamentos/estudios
+  return 1;                                           // casa_completa / por_habitaciones → 1
 }
-// Unidades rentables OCUPADAS (numerador de ocupación). por_habitaciones/casa_completa
-// cuentan como ocupadas si tienen ≥1 booking activo.
+// Estado "de la casa" (casa_completa o por_habitaciones / parte casa de mixta):
+// ocupada si CUALQUIER unit casa/habitación tiene booking activo (las habs no cuentan
+// como unidad pero sí indican que la casa está en uso).
+function pmHouseUnitsOf(propertyId) {
+  return pmUnitsOf(propertyId).filter(u => u.unit_type === 'casa_completa' || u.unit_type === 'habitacion');
+}
 function pmOccupiedRentableUnitsOf(propertyId) {
   const p = pmaState.properties.find(x => x.id === propertyId);
   const model = p?.rental_model || 'casa_completa';
-  const us = pmUnitsOf(propertyId);
-  const anyActive = us.some(u => pmActiveBookingOf(u.id));
+  const subActive = u => (u.unit_type === 'apartamento' || u.unit_type === 'estudio') && pmActiveBookingOf(u.id);
   let occ;
-  if (model === 'por_unidades') occ = us.filter(u => pmIsRentableSubunit(u) && pmActiveBookingOf(u.id)).length;
-  else if (model === 'mixta') {
-    const subs = us.filter(u => /estudio|apart/i.test(u.name || ''));
-    const mains = us.filter(u => !/estudio|apart/i.test(u.name || ''));
-    const subOcc = subs.filter(u => pmActiveBookingOf(u.id)).length;
-    const mainOcc = mains.some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
-    occ = mainOcc + subOcc;
-  } else occ = anyActive ? 1 : 0; // casa_completa, por_habitaciones, default
-  // Invariante: ocupadas nunca > rentables (clave para que libres+ocupadas=rentables)
-  return Math.min(occ, pmRentableUnitsOf(propertyId));
+  if (model === 'por_unidades') {
+    occ = pmUnitsOf(propertyId).filter(subActive).length;
+  } else if (model === 'mixta') {
+    const subOcc = pmUnitsOf(propertyId).filter(subActive).length;
+    const casaOcc = pmHouseUnitsOf(propertyId).some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
+    occ = casaOcc + subOcc;
+  } else {
+    // casa_completa / por_habitaciones: ocupada si cualquier unit (incl. habitaciones) está activa
+    occ = pmUnitsOf(propertyId).some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
+  }
+  return Math.min(occ, pmRentableUnitsOf(propertyId)); // invariante: ocupadas ≤ rentables
 }
 // Totales del portafolio (solo propiedades activas)
 function pmTotalRentableUnits() {
@@ -362,6 +357,39 @@ function pmTotalOccupiedRentableUnits() {
 // Unidades rentables LIBRES = rentables − ocupadas (invariante: libres+ocupadas=rentables)
 function pmFreeRentableUnits() {
   return Math.max(0, pmTotalRentableUnits() - pmTotalOccupiedRentableUnits());
+}
+// ── TILES rentables para la vista Disponibilidad ──
+// La casa (casa_completa / por_habitaciones / parte casa de mixta) = 1 tile;
+// cada apartamento/estudio = 1 tile; las habitaciones NO generan tile (no son unidad).
+function pmRentableTiles(propIds) {
+  const tiles = [];
+  for (const p of pmaState.properties.filter(x => x.active !== false && (!propIds || propIds.has(x.id)))) {
+    const model = p.rental_model || 'casa_completa';
+    const us = pmUnitsOf(p.id);
+    const subs = us.filter(u => u.unit_type === 'apartamento' || u.unit_type === 'estudio');
+    if (model !== 'por_unidades') {
+      // hay "casa": usar la unit casa_completa real, o sintetizar una (ej. por_habitaciones)
+      const casa = us.find(u => u.unit_type === 'casa_completa');
+      tiles.push(casa || { id: 'house-' + p.id, _house: true, property_id: p.id, name: 'Casa', code: 'CASA', unit_type: 'casa_completa' });
+    }
+    if (model === 'por_unidades' || model === 'mixta') subs.forEach(u => tiles.push(u));
+  }
+  return tiles;
+}
+// unidades físicas que determinan el estado de un tile (para casa = casa+habitaciones)
+function pmTileUnitIds(tile) {
+  if (tile._house || tile.unit_type === 'casa_completa') return pmHouseUnitsOf(tile.property_id).map(u => u.id);
+  return [tile.id];
+}
+function pmTileState(tile) {
+  if (!tile._house && tile.unit_type !== 'casa_completa') return pmUnitState(tile);
+  // estado de la casa entera
+  const ids = pmTileUnitIds(tile);
+  const today = new Date().toISOString().slice(0, 10);
+  if (ids.some(id => pmaState.units.find(u => u.id === id)?.maintenance_status === 'en_mantenimiento')) return 'mantenimiento';
+  if (ids.some(id => pmActiveBookingOf(id))) return 'ocupada';
+  if (ids.some(id => pmaState.bookings.some(b => b.unit_id === id && b.status === 'confirmado' && (b.start_date || '') > today))) return 'reservada';
+  return 'libre';
 }
 function pmFinanceOf(propertyId, monthDate = null) {
   // monthDate: Date|null. null = all-time, else solo el mes específico
@@ -1144,14 +1172,16 @@ window.pmMarkMaintenance = pmMarkMaintenance;
 function pmRenderAvailability() {
   const activeProps = pmaState.properties.filter(p => p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
-  let units = pmaState.units.filter(u => activePropIds.has(u.property_id));
   const stF = pmaState.availFilterState, propF = pmaState.availFilterProperty, typeF = pmaState.availFilterType;
+  // Tiles = UNIDADES RENTABLES (casa=1 tile, apto/estudio=1 c/u; habitaciones NO)
+  const allTiles = pmRentableTiles(activePropIds);
+  let units = allTiles.slice();
   if (propF) units = units.filter(u => u.property_id === propF);
   if (typeF) units = units.filter(u => u.unit_type === typeF);
-  if (stF) units = units.filter(u => pmUnitState(u) === stF);
-  // counts
+  if (stF) units = units.filter(u => pmTileState(u) === stF);
+  // counts (sobre tiles rentables)
   const counts = { libre:0, reservada:0, ocupada:0, mantenimiento:0 };
-  pmaState.units.filter(u=>activePropIds.has(u.property_id)).forEach(u=>{ const s=pmUnitState(u); if(counts[s]!=null) counts[s]++; });
+  allTiles.forEach(u=>{ const s=pmTileState(u); if(counts[s]!=null) counts[s]++; });
 
   // Próximamente libres (30d)
   const today = new Date().toISOString().slice(0,10);
@@ -1160,15 +1190,16 @@ function pmRenderAvailability() {
     .map(b => { const next = pmaState.bookings.find(x => x.unit_id===b.unit_id && x.id!==b.id && x.status!=='cancelado' && (x.start_date||'') >= (b.end_date||'')); return { b, next }; })
     .sort((a,c) => (a.b.end_date||'').localeCompare(c.b.end_date||''));
 
-  // Forecast 60d (8 semanas): unidades libres por semana
-  const rentableUnits = pmaState.units.filter(u => activePropIds.has(u.property_id) && u.is_active!==false);
+  // Forecast 60d (8 semanas): unidades RENTABLES libres por semana (tiles, no habitaciones)
+  const rentableTiles = allTiles;
+  const tileIdsCache = rentableTiles.map(t => pmTileUnitIds(t));
   const weeks = [];
   for (let w=0; w<9; w++) {
     const ws = new Date(); ws.setDate(ws.getDate() + w*7); ws.setHours(0,0,0,0);
     const we = new Date(ws); we.setDate(we.getDate()+6);
     const wsISO = ws.toISOString().slice(0,10), weISO = we.toISOString().slice(0,10);
-    const occ = rentableUnits.filter(u => pmaState.bookings.some(b => b.unit_id===u.id && b.status!=='cancelado' && b.start_date && (b.start_date <= weISO) && ((b.end_date||'9999') >= wsISO))).length;
-    weeks.push({ label: `${ws.getDate()}/${ws.getMonth()+1}`, free: rentableUnits.length - occ, total: rentableUnits.length });
+    const occ = tileIdsCache.filter(ids => ids.some(id => pmaState.bookings.some(b => b.unit_id===id && b.status!=='cancelado' && b.start_date && (b.start_date <= weISO) && ((b.end_date||'9999') >= wsISO)))).length;
+    weeks.push({ label: `${ws.getDate()}/${ws.getMonth()+1}`, free: rentableTiles.length - occ, total: rentableTiles.length });
   }
   const maxFree = Math.max(1, ...weeks.map(w=>w.free));
 
@@ -1189,8 +1220,8 @@ function pmRenderAvailability() {
 
       <!-- Grid -->
       <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-1.5">
-        ${units.map(u => { const s=pmUnitState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; return `
-          <button onclick="pmEditUnit('${u.id}','${u.property_id}')" title="${pmPropertyName(u.property_id).replace(/"/g,'&quot;')} · ${(u.code||u.name||'').replace(/"/g,'&quot;')} · ${meta.label}" class="border ${meta.bg} rounded-lg p-1.5 text-left hover:shadow-sm transition">
+        ${units.map(u => { const s=pmTileState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; const onclick=u._house?`pmToggleExpandProperty('${u.property_id}');pmSetTab('properties')`:`pmEditUnit('${u.id}','${u.property_id}')`; return `
+          <button onclick="${onclick}" title="${pmPropertyName(u.property_id).replace(/"/g,'&quot;')} · ${(u.code||u.name||'').replace(/"/g,'&quot;')} · ${meta.label}" class="border ${meta.bg} rounded-lg p-1.5 text-left hover:shadow-sm transition">
             <div class="text-[13px]">${meta.dot}</div>
             <div class="text-[9px] font-bold ${meta.txt} truncate">${(u.code||u.name||'').replace(/</g,'&lt;').slice(0,12)}</div>
             <div class="text-[8px] text-slate-400 truncate">${pmPropertyName(u.property_id).replace(/</g,'&lt;').slice(0,12)}</div>
@@ -1244,6 +1275,11 @@ function pmRenderPropertyCardInline(p) {
                    : p.rental_model === 'por_apartamentos' ? '🏢 Apartamentos'
                    : p.rental_model === 'mixta' ? '🔀 Mixta'
                    : '🔀 Mixto';
+  // Unidades RENTABLES (las habitaciones no cuentan): "1 unid" / "N unid" / "1 + N unid" (mixta)
+  const rentN = pmRentableUnitsOf(p.id);
+  const rentSubs = pmRentableSubunitsOf(p.id).length;
+  const rentLabel = p.rental_model === 'mixta' ? `1 + ${rentSubs} unid` : `${rentN} unid`;
+  const rentOcc = pmOccupiedRentableUnitsOf(p.id);
 
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden ${expanded?'ring-2 ring-emerald-200':''}">
@@ -1260,7 +1296,7 @@ function pmRenderPropertyCardInline(p) {
             <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
               <span>📍 ${(p.address||'').replace(/</g,'&lt;')}</span>
               ${p.zone ? `<span>· ${p.zone}</span>` : ''}
-              ${units.length ? `<span>· 🛏 ${units.length} unid.</span>` : ''}
+              <span>· 🏘 ${rentLabel}${units.length>rentN?` <span class="text-slate-400">(${units.length} físicas)</span>`:''}</span>
               ${p.sqft ? `<span>· ${p.sqft} sqft</span>` : ''}
             </div>
           </div>
@@ -1269,7 +1305,7 @@ function pmRenderPropertyCardInline(p) {
           <div class="hidden md:block">
             <div class="text-[9px] uppercase text-slate-500 font-bold">${modelLabel}</div>
             <div class="text-[11px] text-slate-700">
-              ${units.length} unid · ${occupiedUnits.length} inq · $${potentialMo.toLocaleString()}/mes
+              ${rentLabel} · ${rentOcc} ocup · $${potentialMo.toLocaleString()}/mes
             </div>
           </div>
           <button onclick="event.stopPropagation();pmEditProperty('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1" title="Editar">✏️</button>
