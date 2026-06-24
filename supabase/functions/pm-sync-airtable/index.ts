@@ -911,7 +911,13 @@ Deno.serve(async (req) => {
       }
     }
     // Solo archiva si Tenant trajo filas, hubo bookings y NINGÚN chunk falló (anti-wipe parcial).
+    // Reservas = SOLO "Base de datos Tenant": cualquier booking-* ausente del run (incluye los
+    // booking-dxc- legacy) se archiva. Los archivados pasan a status='finalizado'.
     await mirrorArchive("pm_bookings", "external_id", "active", bookingsUpsertOK && tenantsAt.length > 0 && tenantBookingsM.length > 0);
+    if (!dry_run && MIRROR && ARCHIVE_ENABLED) {
+      await supabase.from("pm_bookings").update({ status: "finalizado" })
+        .eq("active", false).in("status", ["activo", "confirmado"]);
+    }
     stats.bookings_from_tenant = tenantBookings.length;
     stats.bookings_tenant_deduped = tenDeduped;
     stats.bookings_tenant_unmapped = tenSkipped;
