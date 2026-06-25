@@ -1806,7 +1806,7 @@ function pmRenderTimelineForUnits(units, year) {
                   const width = Math.max(0.5, 100 * Math.floor((end - start) / 86400000) / totalDays);
                   const colorByType = {
                     contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
-                    airbnb:            'background:linear-gradient(135deg,#f43f5e,#e11d48);',
+                    airbnb:            'background:linear-gradient(135deg,#ec4899,#db2777);',
                     booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
                     vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
@@ -1836,7 +1836,7 @@ function pmRenderTimelineForUnits(units, year) {
         <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50">
           <span class="font-bold uppercase text-slate-500">Referencias:</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>👤 Contrato directo</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#f43f5e,#e11d48);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>🌐 Airbnb</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>🌐 Airbnb</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:rgba(254,202,202,0.6);border:1px dashed #fca5a5;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Hueco (sin ocupar)</span>
@@ -1987,7 +1987,7 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
     const active = pmMergedActiveBooking(u);
     const tenant = active ? pmTenantName(active.tenant_id) : null;
     const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
-    const platformColors = {contrato_directo:'#10b981',airbnb:'#f43f5e',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
+    const platformColors = {contrato_directo:'#10b981',airbnb:'#ec4899',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
     const dotColor = active ? (platformColors[active.booking_type] || '#10b981') : '#cbd5e1';
     const statusLabel = active ? tenant : 'Libre';
     const statusClass = active ? 'text-emerald-700' : 'text-slate-400';
@@ -2167,11 +2167,18 @@ window.pmDpPick = pmDpPick;
 window.pmCalTimelineToday = pmCalTimelineToday;
 
 // Estado visual de una reserva para el timeline (color por estado).
+// Paleta orientada a decisión: rojo SOLO = problema (atrasado). Naranja = atención
+// (contrato por vencer → renovar/rotar). Azul = futuro neutro. Verde = al día.
+const PM_CAL_VENCE_DIAS = 30;   // umbral "por vencer"
 function pmBookingCalState(b, lateSet) {
   const today = new Date().toISOString().slice(0,10);
   if (b.end_date && b.end_date < today) return { key:'finalizado', label:'Finalizado', color:'#94a3b8' };
-  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#f59e0b' };
+  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#3b82f6' };
   if (lateSet && lateSet.has(b.id)) return { key:'atrasado', label:'Atrasado', color:'#ef4444' };
+  if (b.end_date) {
+    const days = Math.floor((new Date(b.end_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+    if (days <= PM_CAL_VENCE_DIAS) return { key:'por_vencer', label:`Por vencer (${days}d)`, color:'#f97316', days };
+  }
   return { key:'activo', label:'Activo', color:'#10b981' };
 }
 // Iniciales para el avatar circular del inquilino.
@@ -2219,13 +2226,13 @@ function pmRenderCalControlBar(units) {
       <button onclick="pmCalSetColorBy('estado')" class="px-2 py-1 ${colorBy==='estado'?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}">Estado</button>
       <button onclick="pmCalSetColorBy('plataforma')" class="px-2 py-1 ${colorBy==='plataforma'?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}">Plataforma</button>
     </div>
-    ${pmFilterSelect('Estado','⚡', fS, [['','Todos'],['activo','Activo'],['entrante','Entrante'],['atrasado','Atrasado'],['finalizado','Finalizado']], "pmCalSetFilter('status', this.value||null)")}
+    ${pmFilterSelect('Estado','⚡', fS, [['','Todos'],['activo','Activo'],['por_vencer','Por vencer'],['entrante','Entrante'],['atrasado','Atrasado'],['finalizado','Finalizado']], "pmCalSetFilter('status', this.value||null)")}
     ${pmFilterSelect('Plataforma','💳', fP, [['','Todas'],['contrato_directo','Directo'],['airbnb','Airbnb'],['padsplit','Padsplit'],['booking','Booking'],['vrbo','VRBO']], "pmCalSetFilter('platform', this.value||null)")}
     ${pmFilterSelect('Tipo','🛏', fT, [['','Todos'],['casa_completa','Casa'],['apartamento','Apartamento'],['estudio','Estudio'],['habitacion','Habitación']], "pmCalSetFilter('type', this.value||null)")}
     ${(fS||fP||fT)?`<button onclick="pmCalClearFilters()" class="text-[10px] text-amber-700 font-bold hover:underline">✕ Limpiar</button>`:''}
     <span class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
       ${colorBy==='estado'
-        ? `<span>🟩 Activo</span><span>🟨 Entrante</span><span>🟥 Atrasado</span><span>⬜ Finalizado</span>`
+        ? `<span>🟩 Activo</span><span>🟠 Por vencer ≤${PM_CAL_VENCE_DIAS}d</span><span>🔵 Entrante</span><span>🟥 Atrasado</span><span>⬜ Finalizado</span>`
         : `<span class="italic">colores por canal/plataforma</span>`}
     </span>
   </div>`;
@@ -2255,7 +2262,7 @@ function pmRenderTimelineGrid(units) {
   const totalH = 60 + units.length * rowH;
   const platformLegend = [
     {key:'contrato_directo', label:'Contrato directo', color:'#10b981'},
-    {key:'airbnb', label:'Airbnb', color:'#f43f5e'},
+    {key:'airbnb', label:'Airbnb', color:'#ec4899'},
     {key:'booking', label:'Booking', color:'#3b82f6'},
     {key:'vrbo', label:'VRBO', color:'#8b5cf6'},
     {key:'hospitable', label:'Hospitable', color:'#0ea5e9'},
@@ -2328,7 +2335,7 @@ function pmRenderTimelineGrid(units) {
             const endIdx = Math.min(daysCount - 1, Math.floor((e - days[0]) / 86400000));
             const leftPx = labelW + startIdx * colW + 2;
             const widthPx = (endIdx - startIdx + 1) * colW - 4;
-            const colorByType = {contrato_directo:'#10b981',airbnb:'#f43f5e',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#64748b'};
+            const colorByType = {contrato_directo:'#10b981',airbnb:'#ec4899',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#64748b'};
             const stState = pmBookingCalState(b, lateSet);
             const bg = colorBy === 'estado' ? stState.color : (colorByType[b.booking_type] || colorByType.otro);
             const opacity = stState.key === 'finalizado' ? 0.7 : 1;
@@ -2339,13 +2346,17 @@ function pmRenderTimelineGrid(units) {
             const showAmount = widthPx > 150;
             const showTenant = widthPx > 64;
             const showPlat = widthPx > 110;
+            // Lado derecho: si está "por vencer" (modo estado) → countdown ⏳Nd; si no → icono plataforma.
+            const rightBadge = (colorBy === 'estado' && stState.key === 'por_vencer' && widthPx > 88)
+              ? `<span style="background:rgba(255,255,255,0.28);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:6px;flex-shrink:0;white-space:nowrap;" title="Vence en ${stState.days} días">⏳ ${stState.days}d</span>`
+              : (showPlat ? `<span style="color:rgba(255,255,255,0.9);font-size:11px;flex-shrink:0;" title="${b.booking_type||''}">${platformIcon}</span>` : '');
             const tip = `${tenant}${b.reservation_code?` · ${b.reservation_code}`:''} · ${b.start_date||'?'} → ${b.end_date||'∞'} · $${Number(b.rent_amount||0).toLocaleString()} · ${stState.label}`;
             return `<div onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${b.id}';pmRender()" style="position:absolute;left:${leftPx}px;width:${widthPx}px;top:7px;bottom:7px;background:${bg};opacity:${opacity};border-radius:8px;padding:0 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;box-shadow:${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18);overflow:hidden;z-index:6;transition:transform 0.1s,box-shadow 0.1s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 4px 10px rgba(0,0,0,0.25)'" onmouseout="this.style.transform='';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18)'" title="${tip.replace(/"/g,'&quot;')}">
               <span style="color:white;font-size:11px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:flex;align-items:center;gap:6px;min-width:0;">
                 <span style="background:rgba(255,255,255,0.28);width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;letter-spacing:-0.5px;flex-shrink:0;border:1px solid rgba(255,255,255,0.35);">${initials}</span>
                 <span style="overflow:hidden;text-overflow:ellipsis;">${showTenant ? tenant.replace(/</g,'&lt;') : ''}${showAmount ? ` · $${Number(b.rent_amount||0).toLocaleString()}` : ''}</span>
               </span>
-              ${showPlat ? `<span style="color:rgba(255,255,255,0.9);font-size:11px;flex-shrink:0;" title="${b.booking_type||''}">${platformIcon}</span>` : ''}
+              ${rightBadge}
             </div>`;
           }).join('')}
         </div>`;
@@ -2685,7 +2696,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
                   const widthPx = (endCol - startCol) * colWidth - 4;
                   const colorByType = {
                     contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
-                    airbnb:            'background:linear-gradient(135deg,#f43f5e,#e11d48);',
+                    airbnb:            'background:linear-gradient(135deg,#ec4899,#db2777);',
                     booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
                     vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
@@ -2708,7 +2719,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
         <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50 sticky bottom-0">
           <span class="font-bold uppercase text-slate-500">Click reserva → detalles · Click día vacío → nueva reserva</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Directo</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#f43f5e,#e11d48);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Airbnb</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Airbnb</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
           <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
