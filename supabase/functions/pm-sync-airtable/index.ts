@@ -36,8 +36,8 @@
  *
  * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
  *                  mirror por sel_id de "Dirección"
- * pm_bookings    ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
- * pm_tenants     ← "Base de datos Tenant" (tblxEHBbGylH1aF2F)
+ * pm_bookings    ← "Datos x Casa" (tblbSJ4K8e7mSHT5E)
+ * pm_tenants     ← "Datos x Casa" (tblbSJ4K8e7mSHT5E)
  * pm_payments    ← "Pagos Rentas" (tblqJlSgnLNfn34dh), UNIQUE por external_id
  * pm_expenses    ← "Gastos por Casa" (tblsihpE31f116RCR)
  *
@@ -49,14 +49,14 @@
  * - "Gastos Aseo y Podada" (tblxfX2no190lvLYo)         → pm_expenses (aseo)  [DECISIÓN: entra]
  * - "Cronograma Tareas Juan Austin" (tblHrLZFet9CxFMxP) → pm_tasks (ops)
  *
- * REGLA DE BOOKINGS: las reservas (calendario/ocupación) salen SOLO de
- * "Base de datos Tenant". "Datos x Casa" NO crea bookings (era doble fuente);
- * de ahí se derivan pm_properties + pm_units + conteos de unidades + warnings.
+ * REGLA DE BOOKINGS/TENANTS: reservas e inquilinos salen SOLO de "Datos x Casa".
+ * "Base de datos Tenant" = RESPALDO: el sync NO la lee. De Datos x Casa se derivan
+ * pm_properties + pm_units + pm_tenants + pm_bookings + conteos + warnings.
  */
 //
 // Tablas que sincroniza:
-//   1. Datos x Casa        → pm_properties + pm_units  (+ warnings; NO bookings)
-//   2. Base de datos Tenant → pm_tenants + pm_bookings (ÚNICA fuente de reservas)
+//   1. Datos x Casa        → pm_properties + pm_units + pm_tenants + pm_bookings (+ warnings)
+//   2. (Base de datos Tenant = respaldo, NO se lee)
 //   3. Pagos Rentas        → pm_payments (ingresos)
 //   4. Gastos por casa     → pm_expenses (con observaciones, recibos, fecha)
 //   5. Acceso a plataforma → pm_credentials             [extra]
@@ -250,7 +250,8 @@ function normalizeAddress(addr: string | null): string {
   // Sufijos de calle → forma corta (consistente en ambos lados del match)
   s = s.replace(/\bdrive\b/g, "dr").replace(/\bcourt\b/g, "ct").replace(/\bplace\b/g, "pl")
        .replace(/\btrail\b/g, "trl").replace(/\blane\b/g, "ln").replace(/\bcove\b/g, "cv")
-       .replace(/\bstreet\b/g, "st").replace(/\bavenue\b/g, "ave");
+       .replace(/\bstreet\b/g, "st").replace(/\bavenue\b/g, "ave")
+       .replace(/\bbnd\b/g, "bend");   // H: "6203 Shadow Bnd" ≡ "6203 Shadow Bend"
   // Quitar ciudad y estado
   s = s.replace(/\bround rock\b/g, " ").replace(/\baustin\b/g, " ").replace(/\bmarlin\b/g, " ")
        .replace(/\btexas\b/g, " ").replace(/\btx\b/g, " ");
@@ -706,100 +707,46 @@ Deno.serve(async (req) => {
       if (u.property_id && u.name) unitIdByPropName[`${u.property_id}|${slugify(u.name)}`] = u.id;
     });
 
-    // REGLA: Inquilinos = SOLO "Base de datos Tenant". Se eliminó el cruce que creaba
-    // tenants desde "Datos x Casa" (tenantsBasic). Los nombres de DxC que no existan en
-    // Tenant se reportan como huérfanos (warning) y sus pagos quedan con tenant_id=null.
-    const tenantIdByName: Record<string, string> = {};
-
     // ════════════════════════════════════════════════════════════
-    // 2) TENANTS (Base de datos Tenant) — info más rica
+    // 2) TENANTS = SOLO "Datos x Casa" (external_id = tenant-name-<slug>).
+    //    "Base de datos Tenant" = RESPALDO: el sync NO la lee.
+    //    Dedup por external_id (varias filas DxC comparten inquilino).
     // ════════════════════════════════════════════════════════════
-    const tenantsAt = await fetchAllRecords(base_id, TABLE_IDS.tenants, airtable_token);
-    const tenantsFromTbl: any[] = [];
-    for (const r of tenantsAt) {
-      const name = r.fields?.[F.ten_nombre];
+    const tenantsByExt: Record<string, any> = {};
+    for (const r of datosCasa) {
+      const name = (r.fields?.[F.dxc_inquilino] || "").toString().trim();
       if (!name) continue;
-      const ext = "tenant-at-" + r.id;
-      tenantsFromTbl.push({
+      const ext = "tenant-name-" + slugify(name);
+      if (tenantsByExt[ext]) continue;   // primer registro de ese inquilino gana
+      tenantsByExt[ext] = {
         external_id: ext,
         full_name: name,
-        phone: r.fields?.[F.ten_telefono] || null,
-        source: inferBookingType([getSel(r.fields?.[F.ten_fuente]) || ""]),
-        client_state: getMultiSel(r.fields?.[F.ten_estado])[0] || null,
-        ai_summary: (r.fields?.[F.ten_ai_summary]?.value || null),
-        notes: r.fields?.[F.ten_comentario] || null
-      });
-      tenantIdByName[name.toLowerCase()] = ext;
-
-      // (d) inquilino activo sin Fecha Fin
-      const tEstado = getMultiSel(r.fields?.[F.ten_estado])[0] || "";
-      const tFin = r.fields?.[F.ten_fecha_out] || null;
-      if (/activo/i.test(tEstado) && !tFin) {
-        addWarn("inquilino_sin_fecha_fin", "tenant", ext, null, { inquilino: name, estado_airtable: tEstado });
-      }
-      // (e) casa del tenant que no matchea ninguna propiedad
-      const tCasa = getSel(r.fields?.[F.ten_casa]) || (r.fields?.[F.ten_casa] as string) || null;
-      if (tCasa && !findPropId(tCasa)) {
-        addWarn("direccion_no_matchea", "tenant", ext, null, { inquilino: name, casa: tCasa });
-      }
+        phone: r.fields?.[F.dxc_telefono] || null,
+        source: inferBookingType(getMultiSel(r.fields?.[F.dxc_fuente])),
+        notes: r.fields?.[F.dxc_obs] || null
+      };
     }
-    // ── REPORTE DE INQUILINOS HUÉRFANOS ──
-    // Huérfano = nombre de inquilino en "Datos x Casa" que NO existe en "Base de datos Tenant".
-    // Se registra warning con casa + cuántos pagos/bookings apuntan a él (para que el dueño
-    // lo agregue manualmente en Tenant). Sus pagos quedarán sin inquilino al desaparecer el cruce.
-    const tenantTableNames = new Set(
-      tenantsAt.map((r: any) => (r.fields?.[F.ten_nombre] || "").toString().toLowerCase().trim()).filter(Boolean)
-    );
-    const orphanByLc: Record<string, { name: string; casa: string }> = {};
-    for (const r of datosCasa) {
-      const nm = (r.fields?.[F.dxc_inquilino] || "").toString().trim();
-      if (!nm || tenantTableNames.has(nm.toLowerCase())) continue;
-      if (!orphanByLc[nm.toLowerCase()]) orphanByLc[nm.toLowerCase()] = { name: nm, casa: getSel(r.fields?.[F.dxc_direccion]) || "—" };
-    }
-    const orphanLcs = Object.keys(orphanByLc);
-    if (orphanLcs.length) {
-      const { data: exTen } = await supabase.from("pm_tenants").select("id, full_name");
-      const idByLcName: Record<string, string> = {};
-      (exTen || []).forEach((t: any) => { if (t.full_name) idByLcName[t.full_name.toLowerCase()] = t.id; });
-      for (const lc of orphanLcs) {
-        const o = orphanByLc[lc];
-        const tid = idByLcName[lc] || null;
-        let pays = 0, books = 0;
-        if (tid && !dry_run) {
-          const pc = await supabase.from("pm_payments").select("id", { count: "exact", head: true }).eq("tenant_id", tid);
-          const bc = await supabase.from("pm_bookings").select("id", { count: "exact", head: true }).eq("tenant_id", tid);
-          pays = pc.count || 0; books = bc.count || 0;
-        }
-        addWarn("tenant_orphan_from_datos_x_casa", "tenant", "tenant-name-" + slugify(o.name), findPropId(o.casa),
-          { inquilino: o.name, casa: o.casa, payments_count: pays, bookings_count: books,
-            detalle: "Inquilino en 'Datos x Casa' sin registro en 'Base de datos Tenant'. Agregalo en Tenant para vincular sus pagos/reservas." });
-      }
-      stats.tenant_orphans = orphanLcs.length;
-    }
-
-    // Inquilinos = SOLO "Base de datos Tenant"
-    const allTenants = tenantsFromTbl.map(t => ({ ...t, ...mirrorFields() }));
+    const allTenants = Object.values(tenantsByExt).map(t => ({ ...t, ...mirrorFields() }));
     let tenantsUpsertOK = true;
     if (!dry_run && allTenants.length) {
       const { error } = await supabase.from("pm_tenants").upsert(allTenants, { onConflict: "external_id" });
       if (error) { errors.push("tenants: " + error.message); tenantsUpsertOK = false; }
     }
-    // Solo archiva si la fetch de Tenant trajo filas (>0) y el upsert fue OK (anti-wipe).
-    await mirrorArchive("pm_tenants", "external_id", "active", tenantsUpsertOK && tenantsAt.length > 0 && allTenants.length > 0);
+    // Solo archiva si DxC trajo filas, hubo tenants y el upsert fue OK (anti-wipe).
+    await mirrorArchive("pm_tenants", "external_id", "active", tenantsUpsertOK && datosCasa.length > 0 && allTenants.length > 0);
     stats.tenants = allTenants.length;
 
-    // Re-leer tenants para tener ID real. SOLO los de "Base de datos Tenant" (tenant-at-*)
-    // entran al mapa nombre→id: así un nombre huérfano (solo en Datos x Casa) NO resuelve
-    // y sus pagos/bookings quedan con tenant_id=null ("⚠️ Sin inquilino").
+    // Re-leer tenants para tener ID real. Mapa nombre→id SOLO desde tenant-name-*.
     const { data: dbTen } = await supabase.from("pm_tenants").select("id, external_id, full_name");
     const tenantIdRealByExtId: Record<string, string> = {};
     const tenantIdRealByName: Record<string, string> = {};
     (dbTen || []).forEach((t: any) => {
       if (t.external_id) tenantIdRealByExtId[t.external_id] = t.id;
-      if (t.full_name && typeof t.external_id === "string" && t.external_id.startsWith("tenant-at-")) {
+      if (t.full_name && typeof t.external_id === "string" && t.external_id.startsWith("tenant-name-")) {
         tenantIdRealByName[t.full_name.toLowerCase()] = t.id;
       }
     });
+    void tenantIdRealByExtId;
 
     // ════════════════════════════════════════════════════════════
     // 3) Recorrida de Datos x Casa SOLO para warnings de integridad.
@@ -809,6 +756,8 @@ Deno.serve(async (req) => {
     // Dedup de reservas: clave (unit_id + nombre inquilino + check_in)
     const bookingKeys = new Set<string>();
     const bkKey = (uid: string, nm: string | null, ci: string | null) => `${uid}|${slugify(nm || "")}|${ci || ""}`;
+    const dxcBookings: any[] = [];   // reservas creadas desde Datos x Casa (fuente única)
+    let dxcDeduped = 0;
     // Status SIEMPRE por fechas (se ignora el campo Estado de Airtable).
     // Vocabulario interno activo/confirmado/finalizado ≡ active/upcoming/past
     // (se mantiene en español para no romper el frontend ni los joins).
@@ -850,14 +799,29 @@ Deno.serve(async (req) => {
           { inquilino, casa: getSel(r.fields?.[F.dxc_direccion]), tipo: getMultiSel(r.fields?.[F.dxc_tipo])[0] });
       }
 
-      // ⛔ Datos x Casa YA NO crea bookings: la fuente única de reservas es
-      //    "Base de datos Tenant" (bloque 3b). Antes esto duplicaba el conteo
-      //    de ocupación. Acá solo se conservan los warnings de integridad de arriba.
-      // (Se omite mapear deriveStatus/modelo/tenantId/fuentes/platformAcc para bookings.)
-      void [deriveStatus, modelo, tenantId, fuentes, platformAcc, obs]; // evitar "unused"
+      // ── BOOKING desde Datos x Casa (FUENTE ÚNICA de reservas) ──
+      const bkk = bkKey(unitInfo.id, inquilino, startDate);
+      if (bookingKeys.has(bkk)) { dxcDeduped++; }
+      else {
+        bookingKeys.add(bkk);
+        dxcBookings.push({
+          external_id: "booking-dxc-" + r.id,
+          unit_id: unitInfo.id,
+          property_id: unitInfo.property_id,
+          tenant_id: tenantId,
+          booking_type: inferBookingType(fuentes),
+          start_date: startDate,
+          end_date: checkOut,
+          rent_amount: r.fields?.[F.dxc_pago] || 0,
+          rent_period: "mensual",
+          payment_day: getSel(r.fields?.[F.dxc_tiempo_pago]) || null,
+          platform_account: platformAcc,
+          status: deriveStatus(startDate, checkOut),
+          notes: obs
+        });
+      }
+      void modelo;
     }
-    stats.bookings = 0;
-    console.log(`[pm-sync] pm_bookings (Datos x Casa): 0 (deshabilitado — fuente única = Tenant).`);
 
     // (b) Unidad Ocupada sin inquilino
     for (const r of datosCasa) {
@@ -871,77 +835,51 @@ Deno.serve(async (req) => {
     }
 
     // ════════════════════════════════════════════════════════════
-    // 3b) BOOKINGS desde Base de datos Tenant — dedup por (unit+nombre+check_in)
-    //     Defensivo: solo crea la reserva si puede resolver la unidad física;
-    //     si no puede mapearla, la salta (no crea reservas huérfanas).
+    // 3b) UPSERT de reservas (Datos x Casa = fuente única).
+    //     Cualquier booking-* ausente del run (incluye booking-ten- legacy)
+    //     se archiva (anti-wipe gated) y pasa a status='finalizado'.
     // ════════════════════════════════════════════════════════════
-    const tenantBookings: any[] = [];
-    let tenSkipped = 0, tenDeduped = 0;
-    for (const r of tenantsAt) {
-      const name = r.fields?.[F.ten_nombre];
-      const ci = r.fields?.[F.ten_fecha_in];
-      if (!name || !ci) continue;
-      const propId = findPropId(getSel(r.fields?.[F.ten_casa]) || (r.fields?.[F.ten_casa] as string) || null);
-      if (!propId) { tenSkipped++; continue; }
-      // Resolver la unidad física dentro de la propiedad
-      const propUnits = (dbUnits || []).filter((u: any) => u.property_id === propId);
-      let unit: any = null;
-      if (propUnits.length === 1) unit = propUnits[0];
-      else {
-        const ut = inferUnitType(getSel(r.fields?.[F.ten_tipo_renta]));
-        const ofType = propUnits.filter((u: any) => inferUnitType(u.name) === ut);
-        if (ofType.length === 1) unit = ofType[0];
-      }
-      if (!unit) { tenSkipped++; continue; }
-      const key = bkKey(unit.id, name, ci);
-      if (bookingKeys.has(key)) { tenDeduped++; continue; }   // ya existe (misma unidad+inquilino+check_in)
-      bookingKeys.add(key);
-      const co = r.fields?.[F.ten_fecha_out] || null;
-      tenantBookings.push({
-        external_id: "booking-ten-" + r.id,
-        unit_id: unit.id,
-        property_id: propId,
-        tenant_id: tenantIdRealByName[name.toLowerCase()] || null,
-        booking_type: inferBookingType([getSel(r.fields?.[F.ten_fuente]) || ""]),
-        start_date: ci,
-        end_date: co,
-        rent_amount: r.fields?.[F.ten_monto] || 0,
-        rent_period: "mensual",
-        payment_day: getSel(r.fields?.[F.ten_dia_pago]) || null,
-        status: deriveStatus(ci, co),
-        notes: r.fields?.[F.ten_comentario] || null
-      });
-    }
-    const tenantBookingsM = tenantBookings.map(b => ({ ...b, ...mirrorFields() }));
+    const dxcBookingsM = dxcBookings.map(b => ({ ...b, ...mirrorFields() }));
     let bookingsUpsertOK = true;
-    if (!dry_run && tenantBookingsM.length) {
-      for (let i = 0; i < tenantBookingsM.length; i += 50) {
-        const { error } = await supabase.from("pm_bookings").upsert(tenantBookingsM.slice(i, i + 50), { onConflict: "external_id" });
-        if (error) { errors.push("tenant bookings chunk " + i + ": " + error.message); bookingsUpsertOK = false; break; }
+    if (!dry_run && dxcBookingsM.length) {
+      for (let i = 0; i < dxcBookingsM.length; i += 50) {
+        const { error } = await supabase.from("pm_bookings").upsert(dxcBookingsM.slice(i, i + 50), { onConflict: "external_id" });
+        if (error) { errors.push("dxc bookings chunk " + i + ": " + error.message); bookingsUpsertOK = false; break; }
       }
     }
-    // Solo archiva si Tenant trajo filas, hubo bookings y NINGÚN chunk falló (anti-wipe parcial).
-    // Reservas = SOLO "Base de datos Tenant": cualquier booking-* ausente del run (incluye los
-    // booking-dxc- legacy) se archiva. Los archivados pasan a status='finalizado'.
-    await mirrorArchive("pm_bookings", "external_id", "active", bookingsUpsertOK && tenantsAt.length > 0 && tenantBookingsM.length > 0);
+    // Solo archiva si DxC trajo filas, hubo bookings y NINGÚN chunk falló (anti-wipe parcial).
+    await mirrorArchive("pm_bookings", "external_id", "active", bookingsUpsertOK && datosCasa.length > 0 && dxcBookingsM.length > 0);
     if (!dry_run && MIRROR && ARCHIVE_ENABLED) {
       await supabase.from("pm_bookings").update({ status: "finalizado" })
         .eq("active", false).in("status", ["activo", "confirmado"]);
     }
-    stats.bookings_from_tenant = tenantBookings.length;
-    stats.bookings_tenant_deduped = tenDeduped;
-    stats.bookings_tenant_unmapped = tenSkipped;
-    console.log(`[pm-sync] pm_bookings (Tenant): ${tenantBookings.length} nuevas · ${tenDeduped} dedup · ${tenSkipped} sin mapear unidad`);
+    stats.bookings = dxcBookings.length;
+    stats.bookings_deduped = dxcDeduped;
+    console.log(`[pm-sync] pm_bookings (Datos x Casa): ${dxcBookings.length} nuevas · ${dxcDeduped} dedup`);
 
     // ════════════════════════════════════════════════════════════
     // 4) PAGOS (Pagos Rentas → ingresos)
     // ════════════════════════════════════════════════════════════
     try {
       const pagos = await fetchAllRecords(base_id, TABLE_IDS.pagos, airtable_token);
+      // (C) Reservas activas para vincular pago→booking por tenant+property+ventana de fechas.
+      //     En dry_run los booking-dxc- nuevos aún no están upserteados (warnings pueden sobre-reportar).
+      const { data: activeBookings } = await supabase.from("pm_bookings")
+        .select("id, tenant_id, property_id, start_date, end_date").eq("active", true);
+      const findBookingId = (tid: string | null, pid: string | null, paidAt: string | null): string | null => {
+        if (!tid || !pid || !paidAt) return null;
+        const b = (activeBookings || []).find((x: any) =>
+          x.tenant_id === tid && x.property_id === pid &&
+          (x.start_date || "") <= paidAt && (!x.end_date || paidAt <= x.end_date));
+        return b ? b.id : null;
+      };
       const paymentsIn: any[] = [];
-      let paysLinked = 0, paysUnlinked = 0;
+      let paysLinked = 0, paysUnlinked = 0, paysSkippedNoDate = 0, paysSinBooking = 0, paysSinTenant = 0;
       const unlinkedCasas: Record<string, number> = {};
       for (const r of pagos) {
+        // (E) Sin "Fecha de Pago" no se crea el pago (skip + counter).
+        const fechaPago = r.fields?.[F.pag_fecha] || null;
+        if (!fechaPago) { paysSkippedNoDate++; continue; }
         const casaName = getSel(r.fields?.[F.pag_casa]);
         const propId = findPropId(casaName);
         if (propId) paysLinked++;
@@ -956,11 +894,26 @@ Deno.serve(async (req) => {
         const tipo = getSel(r.fields?.[F.pag_tipo]);
         const unitId = (propId && tipo) ? (unitIdByPropName[`${propId}|${slugify(tipo)}`] || null) : null;
         const inq = r.fields?.[F.pag_inq] || "";
+        // (D) Match EXACTO de nombre completo → tenant-name-* (sin fuzzy). Sin match → warning.
         const tenantId = inq ? (tenantIdRealByName[inq.toLowerCase()] || null) : null;
+        if (inq && !tenantId) {
+          paysSinTenant++;
+          addWarn("pago_sin_tenant", "payment", "pay-" + r.id, propId,
+            { inquilino: inq, casa_airtable: casaName, monto: r.fields?.[F.pag_monto] || null,
+              detalle: "Nombre de pago sin inquilino tenant-name-* idéntico en Datos x Casa." });
+        }
+        // (C) Vincular pago a reserva activa; sin match → warning pago_sin_booking.
+        const bookingId = findBookingId(tenantId, propId, fechaPago);
+        if (!bookingId) {
+          paysSinBooking++;
+          addWarn("pago_sin_booking", "payment", "pay-" + r.id, propId,
+            { inquilino: inq, casa_airtable: casaName, paid_at: fechaPago, monto: r.fields?.[F.pag_monto] || null,
+              detalle: "Pago sin reserva activa que cubra la fecha (tenant+property+start≤paid_at≤end)." });
+        }
         const { month, year } = { month: getSel(r.fields?.[F.pag_mes]), year: (() => { const y = getSel(r.fields?.[F.pag_año]); return y ? parseInt(y) : null; })() };
         paymentsIn.push({
           external_id: "pay-" + r.id,
-          booking_id: null,
+          booking_id: bookingId,
           property_id: propId,
           unit_id: unitId,
           tenant_id: tenantId,
@@ -968,7 +921,7 @@ Deno.serve(async (req) => {
           category: "renta",
           concept: `${inq} · ${month || ""} ${year || ""}`.trim(),
           amount: r.fields?.[F.pag_monto] || 0,
-          paid_at: r.fields?.[F.pag_fecha] || null,
+          paid_at: fechaPago,
           month, year: isNaN(year as any) ? null : year,
           platform: getSel(r.fields?.[F.pag_plat]),
           casa_nickname: casaName || null,                 // FIX4: preserva el nombre de casa de Airtable
@@ -993,7 +946,10 @@ Deno.serve(async (req) => {
       stats.payments_unlinked = paysUnlinked;
       stats.payments_unlinked_casas = unlinkedCasas;
       stats.payments_nickname_resolved = nicknameResolved;
-      console.log(`[pm-sync] pm_payments: ${paymentsIn.length} pagos · ${paysLinked} vinculados · ${paysUnlinked} sin vincular · ${nicknameResolved} resueltos vía apodo`);
+      stats.payments_skipped_no_date = paysSkippedNoDate;
+      stats.payments_sin_booking = paysSinBooking;
+      stats.payments_sin_tenant = paysSinTenant;
+      console.log(`[pm-sync] pm_payments: ${paymentsIn.length} pagos · ${paysLinked} vinculados · ${paysUnlinked} sin vincular · ${paysSkippedNoDate} sin fecha (omitidos) · ${paysSinBooking} sin booking · ${paysSinTenant} sin tenant · ${nicknameResolved} resueltos vía apodo`);
       if (paysUnlinked) console.warn(`[pm-sync] ⚠️ Casas sin match:`, JSON.stringify(unlinkedCasas));
     } catch (e: any) { errors.push("pagos: " + e.message); }
 
@@ -1002,12 +958,22 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     try {
       const gastos = await fetchAllRecords(base_id, TABLE_IDS.gastos_casa, airtable_token);
+      // (H) Casas vendidas / fuera del sistema: sus gastos no matchean ninguna propiedad
+      //     y se archivan como legacy (active=false) para que no ensucien el dashboard.
+      const LEGACY_SOLD = new Set(
+        ["1109 Arcadia Ave", "14808 Cervin Cove", "3704 Commerce St", "5802 Blythewood Dr"].map(a => normalizeAddress(a))
+      );
       const exp: any[] = [];
+      let legacyArchived = 0;
       for (const r of gastos) {
-        const gPropId = findPropId(r.fields?.[F.gst_dir]);
-        // (f) gasto sin casa
-        if (!gPropId) addWarn("gasto_sin_casa", "expense", "exp-house-" + r.id, null,
-          { casa_airtable: r.fields?.[F.gst_dir] || null, tipo: getSel(r.fields?.[F.gst_tipo]), monto: r.fields?.[F.gst_valor] || null });
+        const gDir = r.fields?.[F.gst_dir];
+        const gPropId = findPropId(gDir);
+        const isLegacy = !gPropId && LEGACY_SOLD.has(normalizeAddress(gDir || ""));
+        if (isLegacy) legacyArchived++;
+        // (f) gasto sin casa — legacy vs a-corregir
+        if (!gPropId) addWarn(isLegacy ? "gasto_sin_propiedad_legacy" : "gasto_sin_casa", "expense", "exp-house-" + r.id, null,
+          { casa_airtable: gDir || null, tipo: getSel(r.fields?.[F.gst_tipo]), monto: r.fields?.[F.gst_valor] || null,
+            ...(isLegacy ? { detalle: "Casa vendida/fuera del sistema → gasto archivado como legacy." } : {}) });
         exp.push({
           external_id: "exp-house-" + r.id,
           category: "house",
@@ -1019,16 +985,23 @@ Deno.serve(async (req) => {
           description: getSel(r.fields?.[F.gst_tipo]) || "Gasto casa",
           invoice_url: r.fields?.[F.gst_drive] || getAttachUrl(r.fields?.[F.gst_factura]),
           paid: true,
-          notes: r.fields?.[F.gst_obs] || null
+          notes: r.fields?.[F.gst_obs] || null,
+          __legacy: isLegacy
         });
       }
       if (!dry_run && exp.length) {
         for (let i = 0; i < exp.length; i += 50) {
-          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50).map(x => ({ ...x, ...mirrorFields() })), { onConflict: "external_id" });
+          const { error } = await supabase.from("pm_expenses").upsert(exp.slice(i, i + 50).map(x => {
+            const { __legacy, ...row } = x;
+            return (__legacy && MIRROR)
+              ? { ...row, active: false, archived_at: nowISO, last_synced_at: nowISO }   // legacy: archivado
+              : { ...row, ...mirrorFields() };
+          }), { onConflict: "external_id" });
           if (error) { errors.push("gastos_casa chunk " + i + ": " + error.message); break; }
         }
       }
       stats.expenses_house = exp.length;
+      stats.expenses_house_legacy_archived = legacyArchived;
     } catch (e: any) { errors.push("gastos_casa: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
@@ -1283,7 +1256,7 @@ Deno.serve(async (req) => {
       properties: stats.properties || 0,
       units: stats.units || 0,
       tenants: stats.tenants || 0,
-      bookings: stats.bookings_from_tenant || 0,
+      bookings: stats.bookings || 0,
       payments: stats.payments_in || 0,
       expenses: (stats.expenses_house || 0) + (stats.expenses_operational || 0) + (stats.expenses_cleaning || 0),
       payroll: stats.payroll || 0,

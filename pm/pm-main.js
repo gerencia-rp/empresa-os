@@ -426,16 +426,18 @@ function pmUpcomingBookings() {
   return pmaState.bookings.filter(b => b.status === 'confirmado' && b.start_date && b.start_date > today);
 }
 function pmLateBookings() {
-  // Inquilino con reserva activa sin pago de renta registrado en los últimos 30 días.
+  // Renta esperada = 1 pago/mes desde start_date. Mes en curso sin pago (paid_at en ese mes)
+  // y ya pasado el día 5 → ATRASADO. Con pago en el mes → AL DÍA. Días 1-4 = gracia.
   const now = new Date();
-  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 30);
-  const recentPayers = new Set(pmaState.payments
-    .filter(p => p.type === 'ingreso' && p.tenant_id && p.paid_at && new Date(p.paid_at) >= cutoff)
-    .map(p => p.tenant_id));
+  if (now.getDate() < 5) return [];   // dentro de la gracia: nadie atrasado todavía
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const todayISO = now.toISOString().slice(0, 10);
+  const paidThisMonth = (b) => pmaState.payments.some(p =>
+    p.type === 'ingreso' && p.paid_at && String(p.paid_at).startsWith(ym) &&
+    (p.booking_id === b.id || (b.tenant_id && p.tenant_id === b.tenant_id)));
   return pmActiveBookings().filter(b =>
-    b.tenant_id
-    && !(b.start_date && new Date(b.start_date) > cutoff)   // recién iniciadas no cuentan como atrasadas
-    && !recentPayers.has(b.tenant_id)
+    b.start_date && b.start_date <= todayISO   // ya inició (no cuenta antes de empezar)
+    && !paidThisMonth(b)
   );
 }
 function pmLastPaymentOf(bookingId) {
@@ -4024,9 +4026,10 @@ function pmRenderHouseExpenses() {
   monthAll.forEach(e => { if (e.property_id) byProp[e.property_id] = (byProp[e.property_id]||0) + Number(e.amount||0); });
   const propEntries = Object.entries(byProp).sort((a,b) => b[1]-a[1]);
   const topProp = propEntries[0];
-  // Top categorías + pie
+  // Top categorías + pie — respeta el filtro de casa seleccionado (G)
+  const catBase = propFilter ? monthAll.filter(e => e.property_id === propFilter) : monthAll;
   const byCat = {};
-  monthAll.forEach(e => { const k = e.subcategory || '(otro)'; byCat[k] = (byCat[k]||0) + Number(e.amount||0); });
+  catBase.forEach(e => { const k = e.subcategory || '(otro)'; byCat[k] = (byCat[k]||0) + Number(e.amount||0); });
   const catEntries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
   const top3 = catEntries.slice(0,3);
   // Tendencia vs mes anterior
