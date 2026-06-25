@@ -254,7 +254,10 @@ function pmSyncStatusLabel() {
   const rel = mins < 1 ? 'recién' : mins < 60 ? `hace ${mins} min` : mins < 1440 ? `hace ${Math.round(mins/60)} h` : `hace ${Math.round(mins/1440)} d`;
   const color = s.status === 'success' ? 'text-emerald-600' : s.status === 'running' ? 'text-blue-600' : s.status === 'error' ? 'text-red-600' : 'text-amber-600';
   const dot = s.status === 'running' ? '<span class="animate-pulse">●</span>' : '●';
-  return `<span class="text-[11px] ${color} font-semibold whitespace-nowrap" title="Estado: ${s.status||'?'}">${dot} Última sync: ${rel}</span>`;
+  const stale = mins > 60
+    ? `<span class="ml-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="La última sincronización fue hace más de 1 hora">⚠️ Datos desactualizados</span>`
+    : '';
+  return `<span class="text-[11px] ${color} font-semibold whitespace-nowrap" title="Estado: ${s.status||'?'}">${dot} Última sync: ${rel}</span>${stale}`;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1262,7 +1265,16 @@ function pmRenderAvailability() {
 // Card expandible inline — estilo RentasPro
 function pmRenderPropertyCardInline(p) {
   const expanded = pmaState.expandedProperties.has(p.id);
-  const units = pmUnitsOf(p.id);
+  // Dedup de units fantasma: dos pm_units activas con mismo code+renta (legacy + nueva del mirror)
+  // → conservar UNA, prefiriendo la OCUPADA (luego reservada/activa). Same code + renta DISTINTA
+  // = unidades reales distintas (se conservan ambas).
+  const _uByKey = {};
+  for (const u of pmUnitsOf(p.id)) {
+    const k = `${(u.code||u.id)}|${u.target_rent||0}`;
+    const score = x => (pmActiveBookingOf(x.id)?4:0) + (pmaState.bookings.some(b=>b.unit_id===x.id&&b.status==='confirmado')?2:0) + (x.is_active!==false?1:0);
+    if (!_uByKey[k] || score(u) > score(_uByKey[k])) _uByKey[k] = u;
+  }
+  const units = Object.values(_uByKey);
   // Conteos por UNIDAD ÚNICA y mutuamente excluyentes (prioridad: mantenim. > ocupada > reservada > libre).
   // Una unidad agrupada puede tener reserva activa + futura: cuenta como ocupada, no doble.
   const maintenanceUnits = units.filter(u => u.maintenance_status === 'en_mantenimiento' || u.is_active === false);
@@ -3322,6 +3334,7 @@ function pmRenderTenantCard({ tenant, booking }) {
             <span class="${st.dot} w-2 h-2 rounded-full"></span>
             <strong class="text-sm text-slate-900 pm-clamp2 pm-tenant-name" title="${(t.full_name||'').replace(/"/g,'&quot;')}">${name}</strong>
             <span class="text-[10px] ${st.bg} ${st.txt} px-1.5 py-0.5 rounded font-bold uppercase">${st.label}</span>
+            ${(t.is_currently_renting === false && !booking) ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase" title="Inquilino histórico — no figura en Datos x Casa actual">⚪ Histórico</span>` : ''}
             ${t.client_state ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${(t.client_state||'').replace(/</g,'&lt;')}</span>` : ''}
             ${daysBadge}
           </div>
@@ -3343,6 +3356,8 @@ function pmRenderTenantCard({ tenant, booking }) {
           ${phoneDigits ? `<a href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
           ${t.email ? `<a href="mailto:${t.email}" onclick="event.stopPropagation()" title="${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">📧</a>` : ''}
           ${booking ? `<button onclick="event.stopPropagation();pmMarkPayment('${booking.id}')" title="Marcar pago" class="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded text-sm">💵</button>` : ''}
+          ${booking ? `<button onclick="event.stopPropagation();pmGoBookingFromTenant('${booking.id}')" title="Ver reserva" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">📅</button>` : ''}
+          <button onclick="event.stopPropagation();pmGoPaymentsForTenant('${t.id}')" title="Ver pagos" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">📑</button>
           <button onclick="event.stopPropagation();pmEditTenant('${t.id}')" title="Editar inquilino" class="text-slate-400 hover:text-slate-700 p-1.5 rounded text-sm">✏️</button>
           <button onclick="event.stopPropagation();pmOpenTenantDetail('${t.id}')" title="Ver detalle" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1 rounded">Detalle</button>
         </div>
@@ -3350,6 +3365,21 @@ function pmRenderTenantCard({ tenant, booking }) {
     </div>`;
 }
 
+// Navegación cruzada desde Inquilinos
+function pmGoBookingFromTenant(bookingId) {
+  pmaState.tab = 'calendar';
+  pmaState.calendarSelectedBookingId = bookingId;
+  pmRender();
+}
+window.pmGoBookingFromTenant = pmGoBookingFromTenant;
+function pmGoPaymentsForTenant(tenantId) {
+  pmaState.tab = 'payments';
+  pmaState.paySearch = pmTenantName(tenantId) || '';
+  pmaState.payPeriod = 'all-time';   // ver también pagos históricos del inquilino
+  try { localStorage.setItem('pm_pagos_filter_search', pmaState.paySearch); } catch (e) {}
+  pmRender();
+}
+window.pmGoPaymentsForTenant = pmGoPaymentsForTenant;
 function pmOpenTenantDetail(id) {
   pmaState.tenantDetailId = id;
   pmRender();
@@ -3561,8 +3591,18 @@ async function pmMarkPayment(bookingId) {
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Fecha pago *</label>
           <input id="pm-mp-date" type="date" value="${today}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
       </div>
-      <div><label class="text-[10px] font-bold uppercase text-slate-600">Plataforma</label>
-        <input id="pm-mp-platform" value="${(b.payment_platform||'').replace(/"/g,'&quot;')}" placeholder="zelle / venmo / airbnb / cashapp / efectivo" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Método</label>
+          <select id="pm-mp-method" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm bg-white">
+            ${['Zelle','CashApp','Airbnb','Cash','Cheque','Otro'].map(m=>`<option value="${m}">${m}</option>`).join('')}
+          </select></div>
+        <div><label class="text-[10px] font-bold uppercase text-slate-600">Plataforma</label>
+          <select id="pm-mp-platform" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm bg-white">
+            ${['Directo','Airbnb','Padsplit'].map(pl=>`<option value="${pl}" ${((b.payment_platform||'').toLowerCase()===pl.toLowerCase())?'selected':''}>${pl}</option>`).join('')}
+          </select></div>
+      </div>
+      <div><label class="text-[10px] font-bold uppercase text-slate-600">Observación / Comentario</label>
+        <textarea id="pm-mp-notes" maxlength="500" rows="2" placeholder="Opcional (máx 500)" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm resize-none"></textarea></div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Comprobante (imagen/PDF)</label>
         <input id="pm-mp-file" type="file" accept="image/*,application/pdf" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs"/></div>
       <div id="pm-mp-status" class="text-[11px] text-slate-500"></div>
@@ -3581,6 +3621,8 @@ async function pmSaveMarkPayment(bookingId) {
   const amount = +document.getElementById('pm-mp-amount').value || 0;
   const paid_at = document.getElementById('pm-mp-date').value || null;
   const platform = document.getElementById('pm-mp-platform').value.trim() || null;
+  const method = (document.getElementById('pm-mp-method')?.value || '').trim() || null;
+  const notes = (document.getElementById('pm-mp-notes')?.value || '').trim().slice(0,500) || null;
   const fileEl = document.getElementById('pm-mp-file');
   const statusEl = document.getElementById('pm-mp-status');
   const saveBtn = document.getElementById('pm-mp-save');
@@ -3609,7 +3651,8 @@ async function pmSaveMarkPayment(bookingId) {
     amount,
     paid_at,
     platform,
-    payment_method: platform,
+    payment_method: method || platform,
+    notes,
     proof_url,
     status: 'pagado'
   };
@@ -3618,6 +3661,14 @@ async function pmSaveMarkPayment(bookingId) {
   await pmAfterCrud();
 }
 window.pmSaveMarkPayment = pmSaveMarkPayment;
+
+// Archivar un pago sin casa como legacy (active=false) → desaparece del dashboard.
+async function pmArchivePaymentLegacy(id) {
+  if (!confirm('¿Archivar este pago sin casa como legacy? Dejará de aparecer en el dashboard (no se borra).')) return;
+  const r = await pmExecQuery(sb.from('pm_payments').update({ active: false, archived_at: new Date().toISOString() }).eq('id', id).select(), 'Archivar pago');
+  if (r) await pmAfterCrud();
+}
+window.pmArchivePaymentLegacy = pmArchivePaymentLegacy;
 
 // ── Agregar nota de seguimiento (escribe a pm_bookings o pm_tenants) ──
 async function pmAddTenantNote(tenantId) {
@@ -3788,14 +3839,14 @@ function pmPaymentsTableHtml() {
           return `<tr class="border-t border-slate-100 ${orphan ? 'bg-red-50' : 'hover:bg-slate-50'}">
             <td class="px-3 py-2 whitespace-nowrap text-slate-700">${p.paid_at||'—'}</td>
             <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,24)}</td>
-            <td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan ? `⚠️ Sin propiedad${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir en Airtable'}` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
+            <td class="px-3 py-2 ${orphan?'text-amber-700':'text-slate-600'}">${orphan ? `<span class="inline-flex items-center gap-1"><span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="Este pago no tiene casa asignada. ¿Vincular manualmente o archivar?">⚠️ Sin vincular</span>${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-[10px] text-blue-700 hover:underline font-bold">Vincular a casa…</button> <button onclick="pmArchivePaymentLegacy('${p.id}')" class="text-[10px] text-slate-500 hover:underline">Archivar</button>`}</span>` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
             <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
             <td class="px-3 py-2 text-right font-bold text-emerald-700">$${Number(p.amount||0).toLocaleString()}</td>
             <td class="px-3 py-2 text-slate-600">${(p.platform||'—').replace(/</g,'&lt;')}</td>
             <td class="px-3 py-2 text-slate-600 whitespace-nowrap">${rec}</td>
             <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${st.cls}">${st.label}</span></td>
             <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
-            <td class="px-3 py-2 text-center">${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
+            <td class="px-3 py-2 text-center whitespace-nowrap">${p._src==='expense'?'':`${bk?`<button onclick="pmMarkPayment('${bk.id}')" title="Marcar pago" class="text-amber-600 hover:text-amber-800 mr-1">💵</button>`:''}<button onclick="pmEditPayment('${p.id}')" title="Editar" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
           </tr>`;
         }).join('') : `<tr><td colspan="10" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos con estos filtros.</td></tr>`}
       </tbody>

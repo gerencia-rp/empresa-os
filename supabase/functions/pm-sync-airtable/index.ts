@@ -37,7 +37,7 @@
  * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
  *                  mirror por sel_id de "Dirección"
  * pm_bookings    ← "Datos x Casa" (tblbSJ4K8e7mSHT5E)
- * pm_tenants     ← "Datos x Casa" (tblbSJ4K8e7mSHT5E)
+ * pm_tenants     ← UNIÓN "Base de datos Tenant" (tenant-at-) + "Datos x Casa" (tenant-name-)
  * pm_payments    ← "Pagos Rentas" (tblqJlSgnLNfn34dh), UNIQUE por external_id
  * pm_expenses    ← "Gastos por Casa" (tblsihpE31f116RCR)
  *
@@ -49,14 +49,14 @@
  * - "Gastos Aseo y Podada" (tblxfX2no190lvLYo)         → pm_expenses (aseo)  [DECISIÓN: entra]
  * - "Cronograma Tareas Juan Austin" (tblHrLZFet9CxFMxP) → pm_tasks (ops)
  *
- * REGLA DE BOOKINGS/TENANTS: reservas e inquilinos salen SOLO de "Datos x Casa".
- * "Base de datos Tenant" = RESPALDO: el sync NO la lee. De Datos x Casa se derivan
- * pm_properties + pm_units + pm_tenants + pm_bookings + conteos + warnings.
+ * REGLA: reservas (bookings) SOLO de "Datos x Casa" (booking-dxc-). Inquilinos =
+ * UNIÓN de "Base de datos Tenant" (tenant-at-, histórico) + "Datos x Casa" (tenant-name-,
+ * solo nombres nuevos), dedup por nombre exacto, con flag is_currently_renting.
  */
 //
 // Tablas que sincroniza:
-//   1. Datos x Casa        → pm_properties + pm_units + pm_tenants + pm_bookings (+ warnings)
-//   2. (Base de datos Tenant = respaldo, NO se lee)
+//   1. Datos x Casa        → pm_properties + pm_units + pm_bookings + tenant-name- (+ warnings)
+//   2. Base de datos Tenant → pm_tenants (tenant-at-, histórico + datos ricos)
 //   3. Pagos Rentas        → pm_payments (ingresos)
 //   4. Gastos por casa     → pm_expenses (con observaciones, recibos, fecha)
 //   5. Acceso a plataforma → pm_credentials             [extra]
@@ -708,41 +708,86 @@ Deno.serve(async (req) => {
     });
 
     // ════════════════════════════════════════════════════════════
-    // 2) TENANTS = SOLO "Datos x Casa" (external_id = tenant-name-<slug>).
-    //    "Base de datos Tenant" = RESPALDO: el sync NO la lee.
-    //    Dedup por external_id (varias filas DxC comparten inquilino).
+    // 2) TENANTS = UNIÓN "Base de datos Tenant" (tenant-at-, histórico+rico)
+    //    + "Datos x Casa" (tenant-name-, SOLO si el nombre no está en Tenant).
+    //    Dedup por nombre exacto (case-insensitive, sin fuzzy).
+    //    is_currently_renting = nombre presente en DxC actual.
+    //    NO se archiva el histórico: mirrorArchive sella TODOS los tenant-at- cada
+    //    run (nunca los archiva); solo limpia tenant-name- obsoletos superados por un at-.
     // ════════════════════════════════════════════════════════════
-    const tenantsByExt: Record<string, any> = {};
+    // Probe de columna is_currently_renting (migración 2026-06-25); si falta, se omite el flag.
+    let TFLAG = true;
+    { const p = await supabase.from("pm_tenants").select("is_currently_renting").limit(1); if (p.error) { TFLAG = false; errors.push("col is_currently_renting ausente (correr 2026-06-25-tenants-is-currently-renting.sql)"); } }
+    const dxcNamesLc = new Set<string>();
+    for (const r of datosCasa) {
+      const nm = (r.fields?.[F.dxc_inquilino] || "").toString().trim().toLowerCase();
+      if (nm) dxcNamesLc.add(nm);
+    }
+    const tenantsAt = await fetchAllRecords(base_id, TABLE_IDS.tenants, airtable_token);
+    const tenantNamesAtLc = new Set<string>();
+    const allTenants: any[] = [];
+    for (const r of tenantsAt) {
+      const name = r.fields?.[F.ten_nombre];
+      if (!name) continue;
+      const lc = name.toString().trim().toLowerCase();
+      tenantNamesAtLc.add(lc);
+      allTenants.push({
+        external_id: "tenant-at-" + r.id,
+        full_name: name,
+        phone: r.fields?.[F.ten_telefono] || null,
+        source: inferBookingType([getSel(r.fields?.[F.ten_fuente]) || ""]),
+        client_state: getMultiSel(r.fields?.[F.ten_estado])[0] || null,
+        ai_summary: (r.fields?.[F.ten_ai_summary]?.value || null),
+        notes: r.fields?.[F.ten_comentario] || null,
+        ...(TFLAG ? { is_currently_renting: dxcNamesLc.has(lc) } : {}),
+        ...mirrorFields()
+      });
+    }
+    // tenant-name- SOLO para nombres de DxC que NO están en "Base de datos Tenant".
+    const seenTenName = new Set<string>();
+    let tenantsNameNew = 0;
     for (const r of datosCasa) {
       const name = (r.fields?.[F.dxc_inquilino] || "").toString().trim();
       if (!name) continue;
+      const lc = name.toLowerCase();
+      if (tenantNamesAtLc.has(lc)) continue;     // ya existe en Tenant → no duplicar
       const ext = "tenant-name-" + slugify(name);
-      if (tenantsByExt[ext]) continue;   // primer registro de ese inquilino gana
-      tenantsByExt[ext] = {
+      if (seenTenName.has(ext)) continue;
+      seenTenName.add(ext);
+      tenantsNameNew++;
+      allTenants.push({
         external_id: ext,
         full_name: name,
         phone: r.fields?.[F.dxc_telefono] || null,
         source: inferBookingType(getMultiSel(r.fields?.[F.dxc_fuente])),
-        notes: r.fields?.[F.dxc_obs] || null
-      };
+        notes: r.fields?.[F.dxc_obs] || null,
+        ...(TFLAG ? { is_currently_renting: true } : {}),
+        ...mirrorFields()
+      });
     }
-    const allTenants = Object.values(tenantsByExt).map(t => ({ ...t, ...mirrorFields() }));
     let tenantsUpsertOK = true;
     if (!dry_run && allTenants.length) {
-      const { error } = await supabase.from("pm_tenants").upsert(allTenants, { onConflict: "external_id" });
-      if (error) { errors.push("tenants: " + error.message); tenantsUpsertOK = false; }
+      for (let i = 0; i < allTenants.length; i += 50) {
+        const { error } = await supabase.from("pm_tenants").upsert(allTenants.slice(i, i + 50), { onConflict: "external_id" });
+        if (error) { errors.push("tenants chunk " + i + ": " + error.message); tenantsUpsertOK = false; break; }
+      }
     }
-    // Solo archiva si DxC trajo filas, hubo tenants y el upsert fue OK (anti-wipe).
-    await mirrorArchive("pm_tenants", "external_id", "active", tenantsUpsertOK && datosCasa.length > 0 && allTenants.length > 0);
+    // Archiva SOLO lo no sellado este run (tenant-name- obsoletos). Los tenant-at- se sellan
+    // todos cada run → nunca se archivan (son la historia). Gate anti-wipe: Tenant trajo filas.
+    await mirrorArchive("pm_tenants", "external_id", "active", tenantsUpsertOK && tenantsAt.length > 0 && allTenants.length > 0);
     stats.tenants = allTenants.length;
+    stats.tenants_at = tenantNamesAtLc.size;
+    stats.tenants_name_new = tenantsNameNew;
+    stats.tenants_currently_renting = dxcNamesLc.size;
 
-    // Re-leer tenants para tener ID real. Mapa nombre→id SOLO desde tenant-name-*.
+    // Re-leer tenants para ID real. Mapa nombre→id desde AMBOS prefijos (tenant-at- y tenant-name-).
     const { data: dbTen } = await supabase.from("pm_tenants").select("id, external_id, full_name");
     const tenantIdRealByExtId: Record<string, string> = {};
     const tenantIdRealByName: Record<string, string> = {};
     (dbTen || []).forEach((t: any) => {
       if (t.external_id) tenantIdRealByExtId[t.external_id] = t.id;
-      if (t.full_name && typeof t.external_id === "string" && t.external_id.startsWith("tenant-name-")) {
+      const ext = typeof t.external_id === "string" ? t.external_id : "";
+      if (t.full_name && (ext.startsWith("tenant-at-") || ext.startsWith("tenant-name-"))) {
         tenantIdRealByName[t.full_name.toLowerCase()] = t.id;
       }
     });
