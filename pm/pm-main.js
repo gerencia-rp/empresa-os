@@ -6735,35 +6735,14 @@ window.pmSyncAllFeeds = pmSyncAllFeeds;
 // Token + Base ID en localStorage del navegador. Idempotente.
 // ════════════════════════════════════════════════════════════════
 function pmOpenAirtableImport() {
-  const savedToken = localStorage.getItem('pm-airtable-token') || '';
-  const savedBaseId = localStorage.getItem('pm-airtable-base') || 'appzEnsuy4qPT6iHj';
-  openModal('🔄 Sync Airtable', `
+  openModal('🔄 Sincronizar con Airtable', `
     <div class="space-y-3 text-sm">
-      <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        Sincroniza tu base Airtable <code class="font-mono">${savedBaseId}</code> con el módulo PM.
-        Trae: propiedades, unidades, inquilinos, reservas, pagos, gastos, accesos y tareas.
-        <br><br>
-        🔐 <strong>Tu token NO se guarda en el servidor</strong> — solo en localStorage de este navegador.
-        Crealo en <a href="https://airtable.com/create/tokens" target="_blank" class="underline font-bold">airtable.com/create/tokens</a> con scopes:
-        <ul class="list-disc ml-5 mt-1">
-          <li><code>data.records:read</code></li>
-          <li><code>schema.bases:read</code></li>
-        </ul>
-        Y accesso a esta base específicamente.
-      </div>
-
-      <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Airtable Personal Access Token *</label>
-        <input id="pm-at-token" type="password" value="${savedToken.replace(/"/g,'&quot;')}" placeholder="patXXXX...." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/>
-      </div>
-
-      <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Base ID</label>
-        <input id="pm-at-base" value="${savedBaseId.replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/>
+      <div class="text-slate-600">
+        Trae propiedades, unidades, inquilinos, reservas, pagos, gastos, accesos y tareas desde Airtable.
       </div>
 
       <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
-        ⚠️ Primera sync: 30-90 segundos. <strong>No cierres la ventana.</strong> Hacé "Dry run" primero para ver qué se va a importar.
+        ⚠️ Primera sync: 30-90 segundos. <strong>No cierres la ventana.</strong>
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
@@ -6785,13 +6764,7 @@ function pmOpenAirtableImport() {
 window.pmOpenAirtableImport = pmOpenAirtableImport;
 
 async function pmStartAirtableSync(dryRun) {
-  const token = (document.getElementById('pm-at-token')?.value || '').trim();
-  const baseId = (document.getElementById('pm-at-base')?.value || '').trim();
-  if (!token) return alert('Falta el token de Airtable.');
-  if (!baseId) return alert('Falta el Base ID.');
-  localStorage.setItem('pm-airtable-token', token);
-  localStorage.setItem('pm-airtable-base', baseId);
-
+  // El Airtable PAT vive server-side (AIRTABLE_API_KEY). El usuario NO pega token.
   openModal('🔄 Sincronizando con Airtable...', `
     <div class="text-center py-8">
       <div class="text-5xl animate-pulse mb-3">🔄</div>
@@ -6819,7 +6792,7 @@ async function pmStartAirtableSync(dryRun) {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/pm-sync-airtable`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify({ airtable_token: token, base_id: baseId, dry_run: !!dryRun })
+      body: JSON.stringify({ dry_run: !!dryRun })   // token/base se leen del env server-side
     });
     const txt = await res.text();
     let r;

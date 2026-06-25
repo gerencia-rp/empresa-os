@@ -430,9 +430,12 @@ Deno.serve(async (req) => {
   if (body.archive === false) ARCHIVE_ENABLED = false;
   console.log(`[pm-sync] archive config · DISABLE_ARCHIVE=${Deno.env.get("DISABLE_ARCHIVE") ?? "(unset→true)"} · body.archive=${body.archive ?? "(none)"} · ARCHIVE_ENABLED=${ARCHIVE_ENABLED}`);
   if (!ARCHIVE_ENABLED) console.log("[pm-sync] DISABLE_ARCHIVE=true detected → archivado OMITIDO este run (sync defensivo)");
-  const airtable_token = body.airtable_token || Deno.env.get("AIRTABLE_API_KEY");
+  // Airtable PAT: env como fuente primaria (server-side); body.airtable_token solo fallback (testing).
+  const envToken = Deno.env.get("AIRTABLE_API_KEY");
+  const airtable_token = envToken || body.airtable_token;
+  console.log("[pm-sync] token source:", envToken ? "env" : (body.airtable_token ? "body" : "none"));
   const base_id = body.base_id || Deno.env.get("AIRTABLE_BASE_ID") || "appzEnsuy4qPT6iHj";
-  if (!airtable_token) return json({ ok: false, error: "Falta airtable_token (body o AIRTABLE_API_KEY env)" }, 400);
+  if (!airtable_token) return json({ ok: false, error: "Airtable token no configurado en el servidor (AIRTABLE_API_KEY)" }, 400);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
   const startMs = Date.now();
