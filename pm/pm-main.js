@@ -1907,7 +1907,7 @@ function pmRenderCalendar() {
   }
 
   const q = (pmaState.calendarListingSearch || '').toLowerCase().trim();
-  const filteredUnits = q
+  let filteredUnits = q
     ? allUnits.filter(u => {
         const p = pmaState.properties.find(x => x.id === u.property_id);
         return (u.code||'').toLowerCase().includes(q)
@@ -1915,6 +1915,7 @@ function pmRenderCalendar() {
             || (p?.name||'').toLowerCase().includes(q);
       })
     : allUnits;
+  if (pmaState.calendarFilterType) filteredUnits = filteredUnits.filter(u => u.unit_type === pmaState.calendarFilterType);
 
   if (!pmaState.calendarTimelineStart) {
     pmaState.calendarTimelineStart = new Date().toISOString().slice(0,10);
@@ -1939,6 +1940,7 @@ function pmRenderCalendar() {
       ${pmResizeHandle('#pm-cal-sidebar', 'pm_calendar_sidebar_width', 320)}
       <div class="flex-1 flex flex-col overflow-hidden pm-split-main">
         ${pmRenderTimelineHeader()}
+        ${pmRenderCalControlBar(timelineUnits)}
         ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900 flex items-center justify-between"><span>⚠️ ${dupesHidden} ${dupesHidden===1?'registro duplicado':'registros duplicados'} fusionado${dupesHidden===1?'':'s'} (mismo código, tipo y renta)</span><span class="text-amber-700 italic">Si ves códigos como "ESTUDIO-1 (B)" son unidades distintas con mismo código en Airtable.</span></div>` : ''}
         <div class="flex-1 overflow-auto">${timelineUnits.length === 0 && pmaState.calendarGroupByProperty ? `
           <div class="p-12 text-center text-slate-400 text-sm">
@@ -2164,6 +2166,71 @@ window.pmDpNav = pmDpNav;
 window.pmDpPick = pmDpPick;
 window.pmCalTimelineToday = pmCalTimelineToday;
 
+// Estado visual de una reserva para el timeline (color por estado).
+function pmBookingCalState(b, lateSet) {
+  const today = new Date().toISOString().slice(0,10);
+  if (b.end_date && b.end_date < today) return { key:'finalizado', label:'Finalizado', color:'#94a3b8' };
+  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#f59e0b' };
+  if (lateSet && lateSet.has(b.id)) return { key:'atrasado', label:'Atrasado', color:'#ef4444' };
+  return { key:'activo', label:'Activo', color:'#10b981' };
+}
+// Iniciales para el avatar circular del inquilino.
+function pmAvatarInitials(name) {
+  const parts = (name||'').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts[1]?.[0]||'')).toUpperCase();
+}
+// % de ocupación de las unidades visibles en la ventana actual (días cubiertos / días totales).
+function pmCalcOccupancy(units, startISO, days) {
+  if (!units.length) return 0;
+  const start = new Date(startISO + 'T00:00:00');
+  const winEnd = new Date(start.getTime() + (days-1)*86400000);
+  let occ = 0;
+  for (const u of units) {
+    const covered = new Set();
+    for (const b of pmMergedBookings(u)) {
+      if (!b.start_date || b.status==='cancelado' || b.status==='cancelled') continue;
+      const s = new Date(b.start_date + 'T00:00:00');
+      const e = b.end_date ? new Date(b.end_date + 'T00:00:00') : winEnd;
+      const from = Math.max(0, Math.floor((s-start)/86400000));
+      const to = Math.min(days-1, Math.floor((e-start)/86400000));
+      for (let i=from; i<=to; i++) covered.add(i);
+    }
+    occ += covered.size;
+  }
+  return Math.round(100 * occ / (units.length * days));
+}
+function pmCalSetColorBy(v){ pmaState.calendarColorBy = v; pmRender(); }
+function pmCalSetFilter(k, v){ const m={status:'calendarFilterStatus',platform:'calendarFilterPlatform',type:'calendarFilterType'}; pmaState[m[k]] = v; pmRender(); }
+function pmCalClearFilters(){ pmaState.calendarFilterStatus = pmaState.calendarFilterPlatform = pmaState.calendarFilterType = null; pmRender(); }
+window.pmCalSetColorBy = pmCalSetColorBy; window.pmCalSetFilter = pmCalSetFilter; window.pmCalClearFilters = pmCalClearFilters;
+
+// Barra de control del calendario: ocupación %, toggle de color y filtros estado/plataforma/tipo.
+function pmRenderCalControlBar(units) {
+  const occ = pmCalcOccupancy(units, pmaState.calendarTimelineStart, pmaState.calendarTimelineDays);
+  const colorBy = pmaState.calendarColorBy || 'estado';
+  const fS = pmaState.calendarFilterStatus, fP = pmaState.calendarFilterPlatform, fT = pmaState.calendarFilterType;
+  const occColor = occ>=80?'text-emerald-600':occ>=50?'text-amber-600':'text-red-600';
+  return `<div class="border-b border-slate-200 bg-slate-50 px-3 py-1.5 flex items-center gap-2 flex-wrap" style="font-size:11px;">
+    <span class="font-bold text-slate-700">Ocupación <span class="${occColor}" style="font-size:14px;">${occ}%</span> <span class="text-slate-400 font-normal">· ${units.length} unid · ${pmaState.calendarTimelineDays}d</span></span>
+    <span class="text-slate-300">·</span>
+    <span class="text-[10px] font-bold text-slate-500">Color:</span>
+    <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden text-[10px] font-bold">
+      <button onclick="pmCalSetColorBy('estado')" class="px-2 py-1 ${colorBy==='estado'?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}">Estado</button>
+      <button onclick="pmCalSetColorBy('plataforma')" class="px-2 py-1 ${colorBy==='plataforma'?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}">Plataforma</button>
+    </div>
+    ${pmFilterSelect('Estado','⚡', fS, [['','Todos'],['activo','Activo'],['entrante','Entrante'],['atrasado','Atrasado'],['finalizado','Finalizado']], "pmCalSetFilter('status', this.value||null)")}
+    ${pmFilterSelect('Plataforma','💳', fP, [['','Todas'],['contrato_directo','Directo'],['airbnb','Airbnb'],['padsplit','Padsplit'],['booking','Booking'],['vrbo','VRBO']], "pmCalSetFilter('platform', this.value||null)")}
+    ${pmFilterSelect('Tipo','🛏', fT, [['','Todos'],['casa_completa','Casa'],['apartamento','Apartamento'],['estudio','Estudio'],['habitacion','Habitación']], "pmCalSetFilter('type', this.value||null)")}
+    ${(fS||fP||fT)?`<button onclick="pmCalClearFilters()" class="text-[10px] text-amber-700 font-bold hover:underline">✕ Limpiar</button>`:''}
+    <span class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
+      ${colorBy==='estado'
+        ? `<span>🟩 Activo</span><span>🟨 Entrante</span><span>🟥 Atrasado</span><span>⬜ Finalizado</span>`
+        : `<span class="italic">colores por canal/plataforma</span>`}
+    </span>
+  </div>`;
+}
+
 function pmRenderTimelineGrid(units) {
   if (!units.length) return '<div class="p-8 text-center text-slate-400 text-sm">Sin unidades para mostrar.</div>';
   const colW = 55;
@@ -2178,6 +2245,9 @@ function pmRenderTimelineGrid(units) {
   });
   const today = new Date(); today.setHours(0,0,0,0);
   const todayIdx = days.findIndex(d => d.getTime() === today.getTime());
+  const lateSet = new Set(pmLateBookings().map(b => b.id));
+  const colorBy = pmaState.calendarColorBy || 'estado';
+  const fStatus = pmaState.calendarFilterStatus, fPlat = pmaState.calendarFilterPlatform;
   const dows = ['D','L','Ma','Mi','J','V','S'];
   const monthLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const gridW = daysCount * colW;
@@ -2226,7 +2296,10 @@ function pmRenderTimelineGrid(units) {
           if (b.status === 'cancelado' || b.status === 'cancelled') return false;
           const s = new Date(b.start_date + 'T00:00:00');
           const e = b.end_date ? new Date(b.end_date + 'T00:00:00') : new Date(s.getTime() + 365*86400000);
-          return s <= days[daysCount-1] && e >= days[0];
+          if (!(s <= days[daysCount-1] && e >= days[0])) return false;
+          if (fPlat && b.booking_type !== fPlat) return false;                       // filtro plataforma
+          if (fStatus && pmBookingCalState(b, lateSet).key !== fStatus) return false; // filtro estado
+          return true;
         });
         const hasBookings = bks.length > 0;
         const icon = unit.unit_type==='casa_completa'?'🏡' : unit.unit_type==='estudio'?'🎨' : unit.unit_type==='apartamento'?'🏢':'🛏';
@@ -2256,20 +2329,23 @@ function pmRenderTimelineGrid(units) {
             const leftPx = labelW + startIdx * colW + 2;
             const widthPx = (endIdx - startIdx + 1) * colW - 4;
             const colorByType = {contrato_directo:'#10b981',airbnb:'#f43f5e',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#64748b'};
-            const bg = colorByType[b.booking_type] || colorByType.otro;
-            const isPast = b.end_date && new Date(b.end_date) < today;
-            const opacity = isPast ? 0.65 : 1;
+            const stState = pmBookingCalState(b, lateSet);
+            const bg = colorBy === 'estado' ? stState.color : (colorByType[b.booking_type] || colorByType.otro);
+            const opacity = stState.key === 'finalizado' ? 0.7 : 1;
             const tenant = pmTenantName(b.tenant_id);
             const isSelected = pmaState.calendarSelectedBookingId === b.id;
             const platformIcon = {contrato_directo:'📝',airbnb:'🅰',booking:'🅱',vrbo:'V',hospitable:'H',padsplit:'P',reserva_corta:'⏱',otro:'•'}[b.booking_type] || '•';
-            const showAmount = widthPx > 130;
-            const showTenant = widthPx > 60;
-            return `<div onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${b.id}';pmRender()" style="position:absolute;left:${leftPx}px;width:${widthPx}px;top:7px;bottom:7px;background:${bg};opacity:${opacity};border-radius:6px;padding:0 10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;box-shadow:${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18);overflow:hidden;z-index:6;transition:transform 0.1s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 3px 6px rgba(0,0,0,0.22)'" onmouseout="this.style.transform='';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18)'" title="${tenant} · \$${Number(b.rent_amount||0).toLocaleString()}">
-              <span style="color:white;font-size:11px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:flex;align-items:center;gap:6px;">
-                <span style="background:rgba(255,255,255,0.2);width:18px;height:18px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;">${platformIcon}</span>
-                ${showTenant ? tenant : ''}${showAmount ? ` · \$${Number(b.rent_amount||0).toLocaleString()}` : ''}
+            const initials = pmAvatarInitials(tenant);
+            const showAmount = widthPx > 150;
+            const showTenant = widthPx > 64;
+            const showPlat = widthPx > 110;
+            const tip = `${tenant}${b.reservation_code?` · ${b.reservation_code}`:''} · ${b.start_date||'?'} → ${b.end_date||'∞'} · $${Number(b.rent_amount||0).toLocaleString()} · ${stState.label}`;
+            return `<div onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${b.id}';pmRender()" style="position:absolute;left:${leftPx}px;width:${widthPx}px;top:7px;bottom:7px;background:${bg};opacity:${opacity};border-radius:8px;padding:0 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;box-shadow:${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18);overflow:hidden;z-index:6;transition:transform 0.1s,box-shadow 0.1s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 4px 10px rgba(0,0,0,0.25)'" onmouseout="this.style.transform='';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18)'" title="${tip.replace(/"/g,'&quot;')}">
+              <span style="color:white;font-size:11px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;display:flex;align-items:center;gap:6px;min-width:0;">
+                <span style="background:rgba(255,255,255,0.28);width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;letter-spacing:-0.5px;flex-shrink:0;border:1px solid rgba(255,255,255,0.35);">${initials}</span>
+                <span style="overflow:hidden;text-overflow:ellipsis;">${showTenant ? tenant.replace(/</g,'&lt;') : ''}${showAmount ? ` · $${Number(b.rent_amount||0).toLocaleString()}` : ''}</span>
               </span>
-              ${isPast && widthPx > 200 ? '<span style="color:rgba(255,255,255,0.85);font-size:9px;font-weight:bold;text-transform:uppercase;flex-shrink:0;">Anterior</span>' : ''}
+              ${showPlat ? `<span style="color:rgba(255,255,255,0.9);font-size:11px;flex-shrink:0;" title="${b.booking_type||''}">${platformIcon}</span>` : ''}
             </div>`;
           }).join('')}
         </div>`;
