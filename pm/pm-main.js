@@ -1416,7 +1416,7 @@ function pmRenderUnitRow(u, p) {
         <span class="text-xl">${icon}</span>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <strong class="text-sm text-slate-900 break-words" title="${((u.code||'')+' - '+(u.name||u.code||'')).replace(/"/g,'&quot;')}">${(u.code||'').replace(/</g,'&lt;')} - ${(u.name||u.code||'').replace(/</g,'&lt;')}</strong>
+            <strong class="text-sm text-slate-900 break-words" title="Código generado automáticamente">${(u.name||u.code||'').replace(/</g,'&lt;')} <span class="text-[9px] text-slate-400 font-normal" title="Código generado automáticamente">(${(u.code||'').replace(/</g,'&lt;')})</span></strong>
             <span class="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-semibold">${typeLabel}</span>
             <span class="text-[10px] ${stateColor} px-1.5 py-0.5 rounded font-bold uppercase">${stateLabel}</span>
           </div>
@@ -3289,6 +3289,14 @@ function pmRenderTenants() {
       ${counterCard('Histórico', counters.historico, 'text-slate-500')}
     </div>
 
+    <!-- Tabs de estado (chips) -->
+    <div class="flex flex-wrap gap-1.5">
+      ${[['todos','TODOS',null],['activos','🟢 ACTIVOS',counters.activos],['historico','⚪ PASADOS',counters.historico],['upcoming','🔵 ENTRANTES',counters.upcoming],['expiring','🟡 PRÓXIMOS A SALIR',counters.expiring]].map(([k,l,c])=>{
+        const active = filter===k;
+        return `<button onclick="pmTenantsSetFilter('status','${k}')" class="text-[11px] font-bold px-3 py-1.5 rounded-full border transition ${active?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}">${l}${c!=null?` <span class="opacity-70">${c}</span>`:''}</button>`;
+      }).join('')}
+    </div>
+
     <!-- Buscador estático -->
     <div class="relative">
       <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -3334,7 +3342,7 @@ function pmRenderTenantCard({ tenant, booking }) {
             <span class="${st.dot} w-2 h-2 rounded-full"></span>
             <strong class="text-sm text-slate-900 pm-clamp2 pm-tenant-name" title="${(t.full_name||'').replace(/"/g,'&quot;')}">${name}</strong>
             <span class="text-[10px] ${st.bg} ${st.txt} px-1.5 py-0.5 rounded font-bold uppercase">${st.label}</span>
-            ${(t.is_currently_renting === false && !booking) ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase" title="Inquilino histórico — no figura en Datos x Casa actual">⚪ Histórico</span>` : ''}
+            ${(!booking && pmaState.bookings.some(b => b.tenant_id === t.id)) ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase" title="Inquilino histórico — sin reserva activa">⚪ Histórico</span>` : ''}
             ${t.client_state ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${(t.client_state||'').replace(/</g,'&lt;')}</span>` : ''}
             ${daysBadge}
           </div>
@@ -3658,6 +3666,34 @@ async function pmSaveMarkPayment(bookingId) {
   };
   const r = await pmExecQuery(sb.from('pm_payments').insert(payload).select(), 'Registrar pago');
   if (!r) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Registrar pago'; } return; }
+  const newId = Array.isArray(r) ? r[0]?.id : r?.id;
+
+  // Write-back a Airtable Pagos Rentas (best-effort: si falla, el pago ya quedó guardado).
+  try {
+    if (statusEl) statusEl.textContent = 'Sincronizando a Airtable…';
+    const prop = pmaState.properties.find(x => x.id === b.property_id);
+    const unit = pmaState.units.find(x => x.id === b.unit_id);
+    const sess = await sb.auth.getSession();
+    const tok = sess?.data?.session?.access_token;
+    if (tok) {
+      const res = await fetch(`${window.SUPABASE_URL}/functions/v1/pm-payment-writeback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
+        body: JSON.stringify({
+          inquilino: pmTenantName(b.tenant_id) || null,
+          casa: prop?.address || prop?.name || null,
+          tipo: unit?.name || null,
+          monto: amount, fecha: paid_at, plataforma: platform, observacion: notes
+        })
+      });
+      const wb = await res.json().catch(() => ({}));
+      if (wb?.ok && wb.record_id && newId) {
+        await sb.from('pm_payments').update({ external_id: 'pay-' + wb.record_id }).eq('id', newId);
+      } else if (!wb?.ok && statusEl) {
+        statusEl.textContent = '⚠️ Pago guardado, pero no se sincronizó a Airtable: ' + (wb?.error || 'error');
+      }
+    }
+  } catch (e) { /* best-effort: el pago local ya está */ }
   await pmAfterCrud();
 }
 window.pmSaveMarkPayment = pmSaveMarkPayment;

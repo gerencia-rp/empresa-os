@@ -36,8 +36,8 @@
  *
  * pm_properties  ← "Datos x Casa" (tblbSJ4K8e7mSHT5E),
  *                  mirror por sel_id de "Dirección"
- * pm_bookings    ← "Datos x Casa" (tblbSJ4K8e7mSHT5E)
- * pm_tenants     ← UNIÓN "Base de datos Tenant" (tenant-at-) + "Datos x Casa" (tenant-name-)
+ * pm_bookings    ← "Datos x Casa" (tblbSJ4K8e7mSHT5E), tenant_id por nombre exacto
+ * pm_tenants     ← "Base de datos Tenant" (tblxEHBbGylH1aF2F) — SOLO esta fuente
  * pm_payments    ← "Pagos Rentas" (tblqJlSgnLNfn34dh), UNIQUE por external_id
  * pm_expenses    ← "Gastos por Casa" (tblsihpE31f116RCR)
  *
@@ -49,14 +49,14 @@
  * - "Gastos Aseo y Podada" (tblxfX2no190lvLYo)         → pm_expenses (aseo)  [DECISIÓN: entra]
  * - "Cronograma Tareas Juan Austin" (tblHrLZFet9CxFMxP) → pm_tasks (ops)
  *
- * REGLA: reservas (bookings) SOLO de "Datos x Casa" (booking-dxc-). Inquilinos =
- * UNIÓN de "Base de datos Tenant" (tenant-at-, histórico) + "Datos x Casa" (tenant-name-,
- * solo nombres nuevos), dedup por nombre exacto, con flag is_currently_renting.
+ * REGLA: reservas (bookings) SOLO de "Datos x Casa" (booking-dxc-); su tenant_id se
+ * resuelve por nombre EXACTO contra tenant-at-. Inquilinos = SOLO "Base de datos Tenant"
+ * (tenant-at-). Si un inquilino de DxC no está en Tenant → warning inquilino_falta_en_tenant.
  */
 //
 // Tablas que sincroniza:
-//   1. Datos x Casa        → pm_properties + pm_units + pm_bookings + tenant-name- (+ warnings)
-//   2. Base de datos Tenant → pm_tenants (tenant-at-, histórico + datos ricos)
+//   1. Datos x Casa        → pm_properties + pm_units + pm_bookings (+ warnings)
+//   2. Base de datos Tenant → pm_tenants (tenant-at-, única fuente de inquilinos)
 //   3. Pagos Rentas        → pm_payments (ingresos)
 //   4. Gastos por casa     → pm_expenses (con observaciones, recibos, fecha)
 //   5. Acceso a plataforma → pm_credentials             [extra]
@@ -708,29 +708,17 @@ Deno.serve(async (req) => {
     });
 
     // ════════════════════════════════════════════════════════════
-    // 2) TENANTS = UNIÓN "Base de datos Tenant" (tenant-at-, histórico+rico)
-    //    + "Datos x Casa" (tenant-name-, SOLO si el nombre no está en Tenant).
-    //    Dedup por nombre exacto (case-insensitive, sin fuzzy).
-    //    is_currently_renting = nombre presente en DxC actual.
-    //    NO se archiva el histórico: mirrorArchive sella TODOS los tenant-at- cada
-    //    run (nunca los archiva); solo limpia tenant-name- obsoletos superados por un at-.
+    // 2) TENANTS = SOLO "Base de datos Tenant" (tenant-at-, datos ricos).
+    //    Match de pagos/bookings por nombre EXACTO (case-insensitive, sin fuzzy).
+    //    Carlos limpia los nombres en Airtable para que calcen con Pagos/DxC.
     // ════════════════════════════════════════════════════════════
-    // Probe de columna is_currently_renting (migración 2026-06-25); si falta, se omite el flag.
-    let TFLAG = true;
-    { const p = await supabase.from("pm_tenants").select("is_currently_renting").limit(1); if (p.error) { TFLAG = false; errors.push("col is_currently_renting ausente (correr 2026-06-25-tenants-is-currently-renting.sql)"); } }
-    const dxcNamesLc = new Set<string>();
-    for (const r of datosCasa) {
-      const nm = (r.fields?.[F.dxc_inquilino] || "").toString().trim().toLowerCase();
-      if (nm) dxcNamesLc.add(nm);
-    }
     const tenantsAt = await fetchAllRecords(base_id, TABLE_IDS.tenants, airtable_token);
     const tenantNamesAtLc = new Set<string>();
     const allTenants: any[] = [];
     for (const r of tenantsAt) {
       const name = r.fields?.[F.ten_nombre];
       if (!name) continue;
-      const lc = name.toString().trim().toLowerCase();
-      tenantNamesAtLc.add(lc);
+      tenantNamesAtLc.add(name.toString().trim().toLowerCase());
       allTenants.push({
         external_id: "tenant-at-" + r.id,
         full_name: name,
@@ -739,29 +727,6 @@ Deno.serve(async (req) => {
         client_state: getMultiSel(r.fields?.[F.ten_estado])[0] || null,
         ai_summary: (r.fields?.[F.ten_ai_summary]?.value || null),
         notes: r.fields?.[F.ten_comentario] || null,
-        ...(TFLAG ? { is_currently_renting: dxcNamesLc.has(lc) } : {}),
-        ...mirrorFields()
-      });
-    }
-    // tenant-name- SOLO para nombres de DxC que NO están en "Base de datos Tenant".
-    const seenTenName = new Set<string>();
-    let tenantsNameNew = 0;
-    for (const r of datosCasa) {
-      const name = (r.fields?.[F.dxc_inquilino] || "").toString().trim();
-      if (!name) continue;
-      const lc = name.toLowerCase();
-      if (tenantNamesAtLc.has(lc)) continue;     // ya existe en Tenant → no duplicar
-      const ext = "tenant-name-" + slugify(name);
-      if (seenTenName.has(ext)) continue;
-      seenTenName.add(ext);
-      tenantsNameNew++;
-      allTenants.push({
-        external_id: ext,
-        full_name: name,
-        phone: r.fields?.[F.dxc_telefono] || null,
-        source: inferBookingType(getMultiSel(r.fields?.[F.dxc_fuente])),
-        notes: r.fields?.[F.dxc_obs] || null,
-        ...(TFLAG ? { is_currently_renting: true } : {}),
         ...mirrorFields()
       });
     }
@@ -772,26 +737,39 @@ Deno.serve(async (req) => {
         if (error) { errors.push("tenants chunk " + i + ": " + error.message); tenantsUpsertOK = false; break; }
       }
     }
-    // Archiva SOLO lo no sellado este run (tenant-name- obsoletos). Los tenant-at- se sellan
-    // todos cada run → nunca se archivan (son la historia). Gate anti-wipe: Tenant trajo filas.
+    // Archiva lo no sellado este run (incluye tenant-name- legacy del deploy anterior). Anti-wipe.
     await mirrorArchive("pm_tenants", "external_id", "active", tenantsUpsertOK && tenantsAt.length > 0 && allTenants.length > 0);
     stats.tenants = allTenants.length;
     stats.tenants_at = tenantNamesAtLc.size;
-    stats.tenants_name_new = tenantsNameNew;
-    stats.tenants_currently_renting = dxcNamesLc.size;
 
-    // Re-leer tenants para ID real. Mapa nombre→id desde AMBOS prefijos (tenant-at- y tenant-name-).
+    // Re-leer tenants para ID real. Mapa nombre→id SOLO desde tenant-at-* (match exacto).
     const { data: dbTen } = await supabase.from("pm_tenants").select("id, external_id, full_name");
     const tenantIdRealByExtId: Record<string, string> = {};
     const tenantIdRealByName: Record<string, string> = {};
     (dbTen || []).forEach((t: any) => {
       if (t.external_id) tenantIdRealByExtId[t.external_id] = t.id;
-      const ext = typeof t.external_id === "string" ? t.external_id : "";
-      if (t.full_name && (ext.startsWith("tenant-at-") || ext.startsWith("tenant-name-"))) {
+      if (t.full_name && typeof t.external_id === "string" && t.external_id.startsWith("tenant-at-")) {
         tenantIdRealByName[t.full_name.toLowerCase()] = t.id;
       }
     });
     void tenantIdRealByExtId;
+
+    // (A3) Inquilinos en "Datos x Casa" que NO están en "Base de datos Tenant" → warning
+    //      inquilino_falta_en_tenant (para que Carlos los agregue en Airtable Tenant).
+    const seenOrphanTen = new Set<string>();
+    let tenantsMissing = 0;
+    for (const r of datosCasa) {
+      const nm = (r.fields?.[F.dxc_inquilino] || "").toString().trim();
+      if (!nm) continue;
+      const lc = nm.toLowerCase();
+      if (tenantNamesAtLc.has(lc) || seenOrphanTen.has(lc)) continue;
+      seenOrphanTen.add(lc);
+      tenantsMissing++;
+      addWarn("inquilino_falta_en_tenant", "tenant", "tenant-name-" + slugify(nm), findPropId(getSel(r.fields?.[F.dxc_direccion])),
+        { inquilino: nm, casa: getSel(r.fields?.[F.dxc_direccion]) || null,
+          detalle: "Inquilino en 'Datos x Casa' sin registro en 'Base de datos Tenant'. Agregalo en Tenant para vincular pagos/reservas." });
+    }
+    stats.tenants_missing_in_tenant = tenantsMissing;
 
     // ════════════════════════════════════════════════════════════
     // 3) Recorrida de Datos x Casa SOLO para warnings de integridad.
@@ -802,7 +780,7 @@ Deno.serve(async (req) => {
     const bookingKeys = new Set<string>();
     const bkKey = (uid: string, nm: string | null, ci: string | null) => `${uid}|${slugify(nm || "")}|${ci || ""}`;
     const dxcBookings: any[] = [];   // reservas creadas desde Datos x Casa (fuente única)
-    let dxcDeduped = 0;
+    let dxcDeduped = 0, dxcSinTenant = 0;
     // Status SIEMPRE por fechas (se ignora el campo Estado de Airtable).
     // Vocabulario interno activo/confirmado/finalizado ≡ active/upcoming/past
     // (se mantiene en español para no romper el frontend ni los joins).
@@ -849,6 +827,13 @@ Deno.serve(async (req) => {
       if (bookingKeys.has(bkk)) { dxcDeduped++; }
       else {
         bookingKeys.add(bkk);
+        // (B) tenant_id por nombre EXACTO contra tenant-at-; sin match → warning (booking igual se crea).
+        if (!tenantId) {
+          dxcSinTenant++;
+          addWarn("booking_sin_tenant", "booking", "booking-dxc-" + r.id, unitInfo.property_id,
+            { inquilino, casa: getSel(r.fields?.[F.dxc_direccion]), check_in: startDate,
+              detalle: "Reserva de Datos x Casa cuyo inquilino no existe (nombre exacto) en 'Base de datos Tenant'." });
+        }
         dxcBookings.push({
           external_id: "booking-dxc-" + r.id,
           unit_id: unitInfo.id,
@@ -900,7 +885,8 @@ Deno.serve(async (req) => {
     }
     stats.bookings = dxcBookings.length;
     stats.bookings_deduped = dxcDeduped;
-    console.log(`[pm-sync] pm_bookings (Datos x Casa): ${dxcBookings.length} nuevas · ${dxcDeduped} dedup`);
+    stats.bookings_sin_tenant = dxcSinTenant;
+    console.log(`[pm-sync] pm_bookings (Datos x Casa): ${dxcBookings.length} nuevas · ${dxcDeduped} dedup · ${dxcSinTenant} sin tenant`);
 
     // ════════════════════════════════════════════════════════════
     // 4) PAGOS (Pagos Rentas → ingresos)
@@ -939,13 +925,13 @@ Deno.serve(async (req) => {
         const tipo = getSel(r.fields?.[F.pag_tipo]);
         const unitId = (propId && tipo) ? (unitIdByPropName[`${propId}|${slugify(tipo)}`] || null) : null;
         const inq = r.fields?.[F.pag_inq] || "";
-        // (D) Match EXACTO de nombre completo → tenant-name-* (sin fuzzy). Sin match → warning.
+        // (D) Match EXACTO de nombre completo → tenant-at-* (sin fuzzy). Sin match → warning.
         const tenantId = inq ? (tenantIdRealByName[inq.toLowerCase()] || null) : null;
         if (inq && !tenantId) {
           paysSinTenant++;
           addWarn("pago_sin_tenant", "payment", "pay-" + r.id, propId,
             { inquilino: inq, casa_airtable: casaName, monto: r.fields?.[F.pag_monto] || null,
-              detalle: "Nombre de pago sin inquilino tenant-name-* idéntico en Datos x Casa." });
+              detalle: "Nombre de pago sin inquilino idéntico en 'Base de datos Tenant'." });
         }
         // (C) Vincular pago a reserva activa; sin match → warning pago_sin_booking.
         const bookingId = findBookingId(tenantId, propId, fechaPago);
