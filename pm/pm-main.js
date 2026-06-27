@@ -1898,7 +1898,10 @@ function pmRenderCalendar() {
     : pmaState.units.filter(u => pmaState.properties.some(p => p.id === u.property_id));
   const deduped = pmDedupeUnits(rawUnits);
   const dupesHidden = rawUnits.length - deduped.length;   // solo dups reales (no colapsos)
-  const allUnits = pmCollapseForCalendar(deduped);
+  // VISUALIZACIÓN: cada unidad física (incluidas habitaciones) es su propia fila en el
+  // calendario — NO se colapsan a "Habitaciones (N)". El conteo de unidades rentables del
+  // portafolio sigue excluyendo habitaciones (isRentableUnit), pero el timeline las muestra.
+  const allUnits = deduped;
 
   if (pmaState.calendarSelectedUnitId) {
     const unit = allUnits.find(u => u.id === pmaState.calendarSelectedUnitId)
@@ -2214,12 +2217,16 @@ window.pmCalSetColorBy = pmCalSetColorBy; window.pmCalSetFilter = pmCalSetFilter
 
 // Barra de control del calendario: ocupación %, toggle de color y filtros estado/plataforma/tipo.
 function pmRenderCalControlBar(units) {
-  const occ = pmCalcOccupancy(units, pmaState.calendarTimelineStart, pmaState.calendarTimelineDays);
+  // Ocupación: SOLO unidades rentables (habitaciones no cuentan). Si en la vista solo hay
+  // habitaciones (casa por_habitaciones expandida), cae a todas para no mostrar 0% engañoso.
+  const rentables = units.filter(isRentableUnit);
+  const occUnits = rentables.length ? rentables : units;
+  const occ = pmCalcOccupancy(occUnits, pmaState.calendarTimelineStart, pmaState.calendarTimelineDays);
   const colorBy = pmaState.calendarColorBy || 'estado';
   const fS = pmaState.calendarFilterStatus, fP = pmaState.calendarFilterPlatform, fT = pmaState.calendarFilterType;
   const occColor = occ>=80?'text-emerald-600':occ>=50?'text-amber-600':'text-red-600';
   return `<div class="border-b border-slate-200 bg-slate-50 px-3 py-1.5 flex items-center gap-2 flex-wrap" style="font-size:11px;">
-    <span class="font-bold text-slate-700">Ocupación <span class="${occColor}" style="font-size:14px;">${occ}%</span> <span class="text-slate-400 font-normal">· ${units.length} unid · ${pmaState.calendarTimelineDays}d</span></span>
+    <span class="font-bold text-slate-700">Ocupación <span class="${occColor}" style="font-size:14px;">${occ}%</span> <span class="text-slate-400 font-normal">· ${units.length} filas${rentables.length!==units.length?` (${rentables.length} rentables)`:''} · ${pmaState.calendarTimelineDays}d</span></span>
     <span class="text-slate-300">·</span>
     <span class="text-[10px] font-bold text-slate-500">Color:</span>
     <div class="flex items-center bg-white border border-slate-300 rounded-lg overflow-hidden text-[10px] font-bold">

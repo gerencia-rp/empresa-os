@@ -580,7 +580,9 @@ Deno.serve(async (req) => {
       return {
         airtable_address_id: c.id,
         external_id: "addr-" + slugify(c.name),
-        address_normalized: normalizeAddress(c.name),  // helper read-side (pagos/gastos)
+        // Igual fórmula que el índice único SQL: LOWER(REGEXP_REPLACE(address,'[^a-z0-9]','','gi')).
+        // Nunca NULL → habilita ON CONFLICT(address_normalized) sin warning.
+        address_normalized: (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
         name: c.name,
         address: c.name,                               // ← LITERAL del option de Airtable
         city, state, zip,
