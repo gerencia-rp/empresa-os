@@ -1861,8 +1861,9 @@ function pmDedupeUnits(units) {
     const key = `${u.property_id}|${(u.code||'').toUpperCase()}|${u.unit_type||''}|${rent}`;
     const existing = map.get(key);
     if (!existing) { map.set(key, u); return; }
-    // Solo si TODO matchea, conservar la más completa
-    const score = (x) => (x.target_rent?2:0) + (x.bath_type?1:0) + new Date(x.created_at||0).getTime()/1e15;
+    // Ante código duplicado (activa + inactiva del mirror), GANA la que tiene reserva activa,
+    // luego la activa, luego la más completa. Evita mostrar la habitación vacía en vez de la ocupada.
+    const score = (x) => (pmActiveBookingOf(x.id)?1000:0) + (x.is_active!==false?100:0) + (x.target_rent?2:0) + (x.bath_type?1:0) + new Date(x.created_at||0).getTime()/1e15;
     if (score(u) > score(existing)) map.set(key, u);
   });
   // El sync ahora produce 1 pm_unit por unidad física (clave property+tipo),
