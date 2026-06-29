@@ -935,11 +935,12 @@ function setupTabs() {
       const tab = btn.dataset.tab;
       document.querySelectorAll('.tab-btn').forEach(b => {
         const on = b.dataset.tab === tab;
-        b.className = 'tab-btn px-4 py-2 border-b-2 ' + (on ? 'border-fuchsia-500 text-white font-medium' : 'border-transparent text-zinc-500 hover:text-zinc-300');
+        b.className = 'tab-btn px-3 py-2 border-b-2 ' + (on ? 'border-accent text-white font-medium' : 'border-transparent text-zinc-400 hover:text-zinc-200');
       });
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
       document.getElementById('tab-' + tab).classList.remove('hidden');
       if (tab === 'estrategia') renderEstrategia();
+      if (window.OPERA_RENDERERS && window.OPERA_RENDERERS[tab]) window.OPERA_RENDERERS[tab]();
     });
   });
 }

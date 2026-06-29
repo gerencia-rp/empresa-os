@@ -3,53 +3,98 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Viral Studio · Generador de Contenido</title>
+<title>Opera tu Imperio · OS de marca personal</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: { primary:'#0B1F3A', accent:'#C8A864', light:'#F5F2EB', dark:'#1F2429',
+                billete:'#1E4D38', bordeaux:'#7A1F2B' },
+      fontFamily: { display:['"Playfair Display"','Georgia','serif'], sans:['Inter','system-ui','sans-serif'] }
+    } }
+  };
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
+  :root { --primary:#0B1F3A; --accent:#C8A864; --light:#F5F2EB; --dark:#1F2429; }
   body { font-family: 'Inter', system-ui, sans-serif; }
+  .font-display { font-family: 'Playfair Display', Georgia, serif; }
   .scrollbar-thin::-webkit-scrollbar { width: 7px; height: 7px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
-  .glow { box-shadow: 0 0 0 1px rgba(168,85,247,.25), 0 8px 40px -12px rgba(168,85,247,.45); }
+  .glow { box-shadow: 0 0 0 1px rgba(200,168,100,.3), 0 8px 40px -12px rgba(200,168,100,.45); }
   @keyframes pulse-dot { 0%,100%{opacity:.3} 50%{opacity:1} }
   .typing span { animation: pulse-dot 1.2s infinite; }
   .typing span:nth-child(2){animation-delay:.2s}
   .typing span:nth-child(3){animation-delay:.4s}
+  .nav-x { scrollbar-width: thin; }
+  .nav-x::-webkit-scrollbar { height: 5px; }
+  .nav-x::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
 </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+<body class="bg-dark text-zinc-100 min-h-screen">
 
 <!-- Top bar -->
-<header class="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur border-b border-zinc-800">
-  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div class="h-8 w-8 rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center font-bold text-sm">V</div>
-      <div>
-        <h1 class="font-bold leading-tight">Viral Studio</h1>
-        <p class="text-[11px] text-zinc-500 -mt-0.5">Marca personal · Bienes raíces & negocios</p>
+<header class="sticky top-0 z-40 bg-primary/90 backdrop-blur border-b border-accent/20">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <!-- Símbolo hexagonal -->
+      <svg viewBox="0 0 100 100" class="h-9 w-9 shrink-0" aria-hidden="true">
+        <polygon points="50,6 88,28 88,72 50,94 12,72 12,28" fill="none" stroke="#C8A864" stroke-width="5"/>
+        <polygon points="50,24 72,37 72,63 50,76 28,63 28,37" fill="none" stroke="#C8A864" stroke-width="3" opacity=".6"/>
+        <text x="50" y="60" text-anchor="middle" font-family="Playfair Display, serif" font-size="30" font-weight="800" fill="#C8A864">NL</text>
+      </svg>
+      <div class="min-w-0">
+        <h1 class="font-display font-extrabold text-accent leading-none text-lg sm:text-xl tracking-wide truncate">OPERA TU IMPERIO</h1>
+        <p class="text-[11px] text-light/50 -mt-0.5 truncate">Nicolás Lara · 4 empresas. Un método.</p>
       </div>
     </div>
-    <div class="flex items-center gap-2">
-      <span id="key-status" class="text-[11px] px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">Sin API key</span>
-      <button id="settings-btn" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">⚙ Ajustes</button>
+    <div class="flex items-center gap-2 shrink-0">
+      <span id="key-status" class="hidden sm:inline text-[11px] px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">Sin API key</span>
+      <button id="settings-btn" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">⚙ Ajustes</button>
     </div>
   </div>
-  <!-- Tabs -->
-  <nav class="max-w-6xl mx-auto px-5 flex gap-1 text-sm">
-    <button data-tab="reels" class="tab-btn px-4 py-2 border-b-2 border-fuchsia-500 text-white font-medium">🎬 Reels</button>
-    <button data-tab="carruseles" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">🖼️ Carruseles</button>
-    <button data-tab="historias" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">📲 Historias</button>
-    <button data-tab="youtube" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">▶️ YouTube</button>
-    <button data-tab="calendario" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">📅 Calendario</button>
-    <button data-tab="estrategia" class="tab-btn px-4 py-2 border-b-2 border-transparent text-zinc-500 hover:text-zinc-300">📖 Estrategia</button>
+  <!-- Tabs (13, agrupadas por sección, scroll horizontal en mobile) -->
+  <nav class="nav-x max-w-6xl mx-auto px-3 overflow-x-auto">
+    <div class="flex items-center gap-0.5 text-sm min-w-max py-1">
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Identidad</span>
+      <button data-tab="manifiesto" class="tab-btn px-3 py-2 border-b-2 border-accent text-white font-medium">🎯 Manifiesto</button>
+      <button data-tab="identidad" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">👤 Identidad</button>
+      <button data-tab="visual" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🎨 Visual</button>
+      <span class="w-px h-5 bg-zinc-700 mx-1"></span>
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Inteligencia</span>
+      <button data-tab="psicologia" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🧠 Psicología</button>
+      <button data-tab="redes" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📊 Mis Redes</button>
+      <span class="w-px h-5 bg-zinc-700 mx-1"></span>
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Ejecución</span>
+      <button data-tab="relaunch" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🚀 Re-Launch</button>
+      <button data-tab="calendario" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📅 Calendario</button>
+      <button data-tab="estrategia" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📖 Estrategia</button>
+      <span class="w-px h-5 bg-zinc-700 mx-1"></span>
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Producción</span>
+      <button data-tab="reels" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🎬 Reels</button>
+      <button data-tab="carruseles" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🖼️ Carruseles</button>
+      <button data-tab="historias" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📲 Historias</button>
+      <button data-tab="youtube" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">▶️ YouTube</button>
+      <button data-tab="biblioteca" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📚 Biblioteca</button>
+    </div>
   </nav>
 </header>
 
 <main class="max-w-6xl mx-auto px-5 py-6">
 
+  <!-- ===== TABS NUEVAS (render desde viral-opera.js) ===== -->
+  <section id="tab-manifiesto" class="tab-panel"></section>
+  <section id="tab-identidad" class="tab-panel hidden"></section>
+  <section id="tab-visual" class="tab-panel hidden"></section>
+  <section id="tab-psicologia" class="tab-panel hidden"></section>
+  <section id="tab-redes" class="tab-panel hidden"></section>
+  <section id="tab-relaunch" class="tab-panel hidden"></section>
+  <section id="tab-biblioteca" class="tab-panel hidden"></section>
+
   <!-- ===== REELS TAB ===== -->
-  <section id="tab-reels" class="tab-panel">
+  <section id="tab-reels" class="tab-panel hidden">
     <div class="grid md:grid-cols-[380px_1fr] gap-6">
       <!-- Controls -->
       <div class="space-y-4">
@@ -375,5 +420,6 @@
 </div>
 
 <script src="viral.js"></script>
+<script src="viral-opera.js"></script>
 </body>
 </html>
