@@ -186,3 +186,5 @@ Ver la lista de findings en commits `audit: ...` o leer el changelog que arranca
 - Batch 11-12: 7 archivos `rm/*` + `edu/*` extraídos.
 - Batch 13: MFA TOTP en login + perfil.
 - Batch 14: docs (este archivo).
+
+Migración a Mac nuevo: 2026-06-28 ✅
