@@ -320,6 +320,104 @@ function operaPickYT(op) {
 window.operaPickYT = operaPickYT;
 
 // =========================================================
+//  TAB: BIBLIOTECA  (15 reels + 10 carruseles + 5 historias + 5 YT + 10 TikToks)
+// =========================================================
+const ESTADOS = ['pendiente', 'producida', 'publicada'];
+const ESTADO_STYLE = {
+  pendiente: 'bg-zinc-800 text-zinc-300',
+  producida: 'bg-amber-900/50 text-amber-300',
+  publicada: 'bg-emerald-900/50 text-emerald-300',
+};
+let BIBLIO_FILTER = 'todos';
+function biblioEstado(id, def) { return OSTATE.get('estados', {})[id] || def || 'pendiente'; }
+function operaCycleEstado(id, def) {
+  const m = OSTATE.get('estados', {});
+  const cur = m[id] || def || 'pendiente';
+  m[id] = ESTADOS[(ESTADOS.indexOf(cur) + 1) % ESTADOS.length];
+  OSTATE.set('estados', m);
+  const out = document.getElementById('tab-biblioteca');
+  if (out) { out.dataset.rendered = ''; renderBiblioteca(); }
+}
+function operaFilterBiblio(f) {
+  BIBLIO_FILTER = f;
+  const out = document.getElementById('tab-biblioteca');
+  if (out) { out.dataset.rendered = ''; renderBiblioteca(); }
+}
+window.operaCycleEstado = operaCycleEstado;
+window.operaFilterBiblio = operaFilterBiblio;
+function copyPiece(type, id) {
+  const piece = (OPERA.biblioteca[type] || []).find(p => p.id === id);
+  if (!piece) return;
+  const lines = Object.entries(piece).filter(([k]) => !['id', 'estado'].includes(k)).map(([k, v]) =>
+    `${k.toUpperCase()}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+  navigator.clipboard.writeText(lines.join('\n'));
+  const btn = document.querySelector('[data-copy="' + id + '"]');
+  if (btn) { const t = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = t, 1200); }
+}
+window.copyPiece = copyPiece;
+function pieceHeader(type, id, title, tag) {
+  const est = biblioEstado(id);
+  return `<div class="flex items-start justify-between gap-2 mb-2">
+    <div class="min-w-0"><div class="font-semibold text-sm truncate">${E(title)}</div>${tag ? `<div class="text-[10px] uppercase tracking-wide text-accent/70">${E(tag)}</div>` : ''}</div>
+    <div class="flex items-center gap-1 shrink-0">
+      <button data-copy="${id}" onclick="copyPiece('${type}','${id}')" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button>
+      <button onclick="operaCycleEstado('${id}')" class="text-[10px] uppercase px-2 py-1 rounded ${ESTADO_STYLE[est]}">${est}</button>
+    </div>
+  </div>`;
+}
+function pieceWrap(type, piece, inner, title, tag) {
+  return `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-4">${pieceHeader(type, piece.id, title, tag)}${inner}</div>`;
+}
+function reelInner(r) {
+  const row = (lbl, val, c) => val ? `<div class="text-xs mt-1"><span class="${c || 'text-zinc-500'} font-semibold">${lbl}</span> ${E(val)}</div>` : '';
+  return row('🎣 Hook:', r.hook, 'text-accent') + row('🗣️ Chisme:', r.chisme) + row('💎 Valor:', r.valor, 'text-emerald-400') +
+    row('📣 CTA:', r.cta, 'text-purple-300') + row('🏛️', r.mecanicaHistorica, 'text-zinc-600');
+}
+function renderBiblioteca() {
+  const out = document.getElementById('tab-biblioteca');
+  if (!out || out.dataset.rendered) return;
+  ensureOpera().then(() => {
+    out.dataset.rendered = '1';
+    const b = OPERA.biblioteca;
+    const all = [].concat(b.reels, b.carruseles, b.historias, b.youtube, b.tiktoks);
+    const counts = { todos: all.length, pendiente: 0, producida: 0, publicada: 0 };
+    all.forEach(p => counts[biblioEstado(p.id)]++);
+    const pass = (p) => BIBLIO_FILTER === 'todos' || biblioEstado(p.id) === BIBLIO_FILTER;
+    const filtros = ['todos', 'pendiente', 'producida', 'publicada'].map(f =>
+      `<button onclick="operaFilterBiblio('${f}')" class="text-xs px-3 py-1.5 rounded-lg ${BIBLIO_FILTER === f ? 'bg-accent text-primary font-semibold' : 'bg-zinc-800 text-zinc-300'}">${f.charAt(0).toUpperCase() + f.slice(1)} (${counts[f]})</button>`).join('');
+
+    const grid = (items, fn) => `<div class="grid sm:grid-cols-2 gap-3">${items.filter(pass).map(fn).join('') || '<p class="text-xs text-zinc-600">— nada en este filtro —</p>'}</div>`;
+    const sec = (icon, tit, html) => `<div class="mb-6"><h3 class="font-display text-lg font-bold text-accent mb-3">${icon} ${tit}</h3>${html}</div>`;
+
+    const reels = grid(b.reels, r => pieceWrap('reels', r, reelInner(r), r.thumbnail, r.pilar));
+    const carr = grid(b.carruseles, c => {
+      const slides = Array.isArray(c.slides) ? `<ol class="text-xs text-zinc-400 mt-1 list-decimal list-inside space-y-0.5">${c.slides.map(s => `<li>${E(s)}</li>`).join('')}</ol>` :
+        `<div class="text-xs text-zinc-500 mt-1">${E(c.slides)} slides</div>`;
+      return pieceWrap('carruseles', c, (c.cover ? `<div class="text-xs text-accent">Cover: ${E(c.cover)}</div>` : '') + slides, c.tema);
+    });
+    const hist = grid(b.historias, h => {
+      const fr = h.frames || {};
+      const frHTML = Object.entries(fr).map(([k, v]) => `<div class="text-xs mt-0.5"><span class="text-accent font-bold">${k}:</span> ${E(v)}</div>`).join('');
+      return pieceWrap('historias', h, `<div class="text-[10px] uppercase text-emerald-300 mb-1">${E(h.objetivo)}</div>${frHTML}`, h.tema);
+    });
+    const yt = grid(b.youtube, v => {
+      const estr = Array.isArray(v.estructura) ? `<ul class="text-xs text-zinc-400 mt-1 space-y-0.5">${v.estructura.map(x => `<li>${E(x)}</li>`).join('')}</ul>` : '';
+      return pieceWrap('youtube', v, `<div class="text-xs text-zinc-500">${E(v.duracion)}${v.pilar ? ' · ' + E(v.pilar) : ''}</div>${estr}`, v.titulo);
+    });
+    const tt = grid(b.tiktoks, t => pieceWrap('tiktoks', t, '', t.hook, 'TikTok'));
+
+    out.innerHTML =
+      oHero('Biblioteca de contenido', '45 piezas listas para grabar · marcá su estado a medida que producís') +
+      `<div class="flex flex-wrap gap-2 mb-5 sticky top-0 bg-dark/0 z-10">${filtros}</div>` +
+      sec('🎬', 'Reels (' + b.reels.length + ')', reels) +
+      sec('🖼️', 'Carruseles (' + b.carruseles.length + ')', carr) +
+      sec('📲', 'Historias H.I.L.O. (' + b.historias.length + ')', hist) +
+      sec('▶️', 'YouTube (' + b.youtube.length + ')', yt) +
+      sec('🎵', 'TikToks (' + b.tiktoks.length + ')', tt);
+  }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
+}
+
+// =========================================================
 //  TAB: RE-LAUNCH
 // =========================================================
 function renderRelaunch() {
@@ -404,6 +502,7 @@ window.OPERA_RENDERERS = {
   psicologia: renderPsicologia,
   redes: renderRedes,
   relaunch: renderRelaunch,
+  biblioteca: renderBiblioteca,
   estrategia: amplificarEstrategia,
   calendario: bannerCalendario,
 };
