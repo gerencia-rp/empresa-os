@@ -1,0 +1,981 @@
+{
+  "$schema": "Opera tu Imperio · Data maestro · v1.0",
+  "version": "1.0",
+  "marca": {
+    "nombre": "Opera tu Imperio",
+    "owner": "Nicolás Lara",
+    "tagline": "4 empresas. Un método. Tu turno.",
+    "subtitulo": "Sistema operativo · Nicolás Lara · 4 empresas inmobiliarias",
+    "fechaActualizacion": "2026-06-29"
+  },
+
+  "identidad": {
+    "narrativaOficial": "Nicolás Lara construye y opera 4 empresas en el ecosistema inmobiliario que han facturado millones de dólares. En lugar de venderte humo, te muestra el sistema funcionando: rentas, fix & flip, remodelación y educación. Su mentoría no es teoría — es darte acceso al mismo sistema operativo con el que él escala. Cuando no está construyendo, está escalando montañas o cruzando océanos. Porque un buen operador no se define solo por sus números, sino por su capacidad de operar bajo presión en cualquier terreno.",
+
+    "esloganPrincipal": "OPERA TU IMPERIO.",
+
+    "manifiesto": [
+      "Esta es para los operadores.",
+      "Los que entendieron que comprar cursos no es invertir.",
+      "Los que medimos cada centavo antes de mover una pared.",
+      "Los que no le pedimos permiso al mercado — lo diseñamos.",
+      "",
+      "No somos los que prometen Lamborghinis sin haber pagado nunca un techo.",
+      "No somos los que enseñan teoría desde una oficina alquilada.",
+      "Somos los que aprendimos a operar antes de aprender a hablar.",
+      "",
+      "Construimos imperios.",
+      "No castillos de arena.",
+      "No esquemas.",
+      "Imperios.",
+      "",
+      "Cuatro empresas. Un método. Resultados que se miden en dólares, no en likes.",
+      "",
+      "Opera tu imperio."
+    ],
+
+    "variantesEslogan": [
+      { "contexto": "Eslogan principal — bio, posters, intros, cierres", "frase": "OPERA TU IMPERIO" },
+      { "contexto": "Hook agresivo TikTok", "frase": "Opera el juego." },
+      { "contexto": "Anti-establishment Reels", "frase": "No especulés. Operá." },
+      { "contexto": "Apertura formal YouTube", "frase": "Imperio por diseño." },
+      { "contexto": "Credibilidad Twitter/IG bio", "frase": "4 empresas. Un método." },
+      { "contexto": "Cierre / CTA", "frase": "Tu turno de operar." }
+    ]
+  },
+
+  "arquetipo": {
+    "nombre": "El Operador",
+    "fusion": "Constructor (Builder) + Sabio (Sage)",
+    "descripcion": "Confiable sin arrogancia · Calculador sin frío · Apasionado pero contenido · Generoso con conocimiento sin regalar todo · Habla con seguridad pero admite errores · Mira a cámara directo · Gesticula con propósito",
+    "loQueSos": [
+      "El Operador — confiable, capaz, calculador, con autoridad ganada",
+      "Mezcla Hormozi (sistema) + Naval (sabiduría) + Iman Gadzhi (aspiracional)",
+      "Con un toque MrBeast (escala visible) en los casos de éxito"
+    ],
+    "loQueNoSos": [
+      "El Rebelde (Andrew Tate) — demasiado polarizante",
+      "El Héroe Solitario (Cowboy Marlboro) — demasiado individualista para B2C",
+      "El Mago (Steve Jobs) — demasiado mítico",
+      "El Showman (Gary Vee) — demasiado caótico para un nicho serio",
+      "El Niño / Trickster (MrBeast) — demasiado infantil"
+    ],
+
+    "enemigoComun": {
+      "nombre": "Los Gurúes Especuladores",
+      "quienesSon": [
+        "Venden cursos sin haber operado nunca un sistema serio",
+        "Muestran Lamborghinis pero ningún edificio",
+        "Hablan de 'mindset' en lugar de procesos",
+        "Prometen resultados en 30 días sin método",
+        "Viven del marketing, no del negocio que dicen tener",
+        "Sus testimonios son sospechosos o pagados"
+      ],
+      "tablaEllosVsVos": [
+        { "ellos": "Hablan de mindset", "vos": "Mostrás métricas" },
+        { "ellos": "Muestran Lamborghinis", "vos": "Mostrás dashboards" },
+        { "ellos": "Prometen $10K en 30 días", "vos": "Documentás casos reales en meses reales" },
+        { "ellos": "Venden el sueño", "vos": "Vendés el sistema" },
+        { "ellos": "Marketing → Curso → Marketing", "vos": "Operación → Documentación → Mentoría" },
+        { "ellos": "Especulan", "vos": "Construyen" },
+        { "ellos": "Soñadores", "vos": "Operadores" }
+      ],
+      "frasesAntiEnemigo": [
+        "Si tu mentor no te puede mostrar el dashboard de SU negocio en vivo, no es mentor — es vendedor.",
+        "Yo no te enseño teoría. Te doy acceso al sistema que uso.",
+        "Los gurúes especulan. Los operadores construyen.",
+        "Lambo en thumbnail = curso vacío. Casi siempre.",
+        "Te enseñan a soñar. Yo te enseño a operar.",
+        "Si el método no tiene métricas, no es método. Es marketing."
+      ],
+      "reglaEtica": "NUNCA nombres personas específicas (no necesario, peligroso legal). Atacás al ARQUETIPO, no a personas."
+    },
+
+    "frasesRecurrentes": {
+      "bandera": [
+        "Opera tu imperio.",
+        "4 empresas. Un método.",
+        "No especulés. Operá.",
+        "Sistema sobre suerte.",
+        "Si no lo podés medir, no lo podés escalar."
+      ],
+      "puente": [
+        "Lo que nadie te cuenta es...",
+        "Esto es lo que YO hago, no lo que enseño.",
+        "Antes de [hacer X], hacé [Y].",
+        "Mirá esto:",
+        "Yo lo aprendí cagado a palos. Vos no tenés por qué."
+      ],
+      "cierre": [
+        "Tu turno de operar.",
+        "El sistema está ahí. Lo que falta es decisión.",
+        "Si te interesa, sabés dónde encontrarme.",
+        "Hablamos en el próximo.",
+        "Operadores construyen. Especuladores se quejan."
+      ]
+    },
+
+    "palabrasProhibidas": [
+      { "palabra": "Hack", "razon": "gurú vibe" },
+      { "palabra": "Secret / Secreto", "razon": "manipulación barata" },
+      { "palabra": "Easy money / plata fácil", "razon": "engaño" },
+      { "palabra": "Mindset", "razon": "vacío, sin contenido" },
+      { "palabra": "Manifestá / atraé", "razon": "pseudo-espiritualidad" },
+      { "palabra": "Vida soñada", "razon": "vacío" },
+      { "palabra": "Te enseño en 30 días", "razon": "promesa hueca" },
+      { "palabra": "Sin trabajar / pasivo (sin matices)", "razon": "falso" }
+    ],
+
+    "palabrasDeMarca": [
+      "Operar / Operador",
+      "Sistema",
+      "Método",
+      "Métricas",
+      "Imperio",
+      "Construir",
+      "Escalar",
+      "Documentar",
+      "Decisión",
+      "Marco / Framework"
+    ],
+
+    "tonoPorCanal": [
+      { "canal": "Instagram", "tono": "Cercano + autoritativo. Habla como un coach amigo. 'Mirá esto', 'te cuento', 'no te metas en X sin saber Y'." },
+      { "canal": "YouTube long form", "tono": "Profesor experimentado. Más estructurado. Pausas, ritmo." },
+      { "canal": "TikTok", "tono": "Directo + provocativo. Hook brutal en 3 seg." },
+      { "canal": "LinkedIn", "tono": "Profesional + datos. Tono más sobrio." },
+      { "canal": "WhatsApp Business", "tono": "Personal + accionable. Uso de audios." }
+    ]
+  },
+
+  "visual": {
+    "simbolo": {
+      "nombre": "Diamante hexagonal de 4 lados",
+      "significado": [
+        "4 lados visibles del cristal = tus 4 empresas",
+        "Estructura geométrica precisa = sistema, método (vs caos)",
+        "Diamante = valor permanente, premium (eco a De Beers)",
+        "Hexágono inscrito = orden, ingeniería, panal/colmena (productividad)",
+        "Letras N + L integradas = personalización sin ego excesivo"
+      ],
+      "ubicacion": [
+        "Watermark esquina inferior derecha en cada video",
+        "Avatar de TODAS las redes (mismo logo)",
+        "Intro 1 segundo en YouTube",
+        "Foto perfil con tu cara + símbolo de fondo sutil",
+        "Email signature",
+        "Material promocional"
+      ],
+      "versiones": [
+        "Símbolo solo (watermark)",
+        "Símbolo + 'NICOLÁS LARA'",
+        "Símbolo + 'OPERA TU IMPERIO'"
+      ]
+    },
+
+    "paletaColores": {
+      "primarios": [
+        { "nombre": "Azul marino profundo", "hex": "#0B1F3A", "uso": "Backgrounds principales, autoridad" },
+        { "nombre": "Dorado mate", "hex": "#C8A864", "uso": "Acentos, símbolo, highlights" },
+        { "nombre": "Blanco roto", "hex": "#F5F2EB", "uso": "Textos sobre azul, fondos limpios" }
+      ],
+      "secundarios": [
+        { "nombre": "Gris carbón", "hex": "#1F2429", "uso": "Texto principal" },
+        { "nombre": "Verde billete", "hex": "#1E4D38", "uso": "Métricas positivas, ROI" },
+        { "nombre": "Rojo bordeaux", "hex": "#7A1F2B", "uso": "Alertas, 'este error te cuesta...'" }
+      ],
+      "prohibidos": [
+        "Negro puro (#000000) — muy duro, sin sofisticación",
+        "Naranja brillante — gurú vibe",
+        "Rosa / pastel — fuera de arquetipo",
+        "Amarillo neón — gurú vibe",
+        "Multicolor / arcoíris — caótico"
+      ]
+    },
+
+    "tipografia": {
+      "display": "Playfair Display o Recoleta (serif moderna con autoridad clásica)",
+      "body": "Inter o Söhne (sans-serif limpio, técnico)",
+      "reglas": [
+        "NUNCA mezclar más de 2 tipografías",
+        "Display SOLO en headlines (1-3 líneas)",
+        "Body para todo lo demás",
+        "Bold con propósito — no todo bold"
+      ]
+    },
+
+    "vestimenta": {
+      "principios": [
+        "Calidad sobre marcas — no logos visibles",
+        "Atemporal sobre tendencias — clásicos modernos",
+        "Coherencia visual — paleta limitada",
+        "Funcional sobre ostentoso",
+        "Confortable para acción"
+      ],
+      "siempre": [
+        "Reloj — uno solo, de calidad pero discreto (Tudor, Omega, Apple Watch Ultra)",
+        "Anillo de matrimonio si aplica — humaniza",
+        "Camisa o polo de tela buena — no algodón cheap"
+      ],
+      "nunca": [
+        "Cadenas doradas visibles",
+        "Relojes ostentosos (Audemars Piguet, Patek visible)",
+        "Marcas con logos enormes (Gucci, Versace gritón)",
+        "Crocs / chanclas en contenido",
+        "Estampados ruidosos",
+        "Ropa de gimnasio en contenido de negocio"
+      ],
+      "escenarios": [
+        {
+          "id": "oficina",
+          "nombre": "Contenido de negocio (oficina/escritorio)",
+          "porcentaje": "70%",
+          "look": "El CEO accesible",
+          "elementos": {
+            "arriba": "Camisa Oxford blanca o azul claro, mangas remangadas hasta el codo",
+            "abajo": "Chinos color piedra o azul marino",
+            "calzado": "Zapatos Chelsea boots o derbies marrones",
+            "accesorios": "Reloj clásico + cinturón cuero marrón fino",
+            "pelo": "Prolijo, no producto excesivo",
+            "barba": "Corta, prolija (si tenés)"
+          }
+        },
+        {
+          "id": "reuniones",
+          "nombre": "Reuniones formales con clientes/inversores",
+          "look": "El operador serio",
+          "elementos": {
+            "arriba": "Blazer azul marino sobre camisa blanca (sin corbata)",
+            "abajo": "Pantalón de vestir gris o azul medio",
+            "calzado": "Zapatos derbies negros o marrón oscuro",
+            "accesorios": "Reloj + (opcional) pañuelo de bolsillo color sólido"
+          }
+        },
+        {
+          "id": "casual",
+          "nombre": "Contenido casual / behind the scenes",
+          "porcentaje": "20%",
+          "look": "El operador en acción",
+          "elementos": {
+            "arriba": "Polo de calidad (azul marino, beige, blanco), o suéter cuello redondo gris/azul",
+            "abajo": "Jeans azul oscuro o chinos color piedra",
+            "calzado": "Sneakers blanco limpio (Common Projects, AP1, NB 990) o botas",
+            "estilo": "Athleisure premium, NO gym wear"
+          }
+        },
+        {
+          "id": "deporteExtremo",
+          "nombre": "Deporte extremo (lifestyle/aventura)",
+          "look": "El operador que no le teme al riesgo",
+          "elementos": {
+            "ropa": "Ropa técnica de marca sin logos grandes (Arc'teryx, Patagonia, Salomon)",
+            "extras": "GoPro/cámara visible — comunica documentación",
+            "equipamiento": "Profesional (no improvisado)",
+            "regla": "NUNCA mezclar con escenario de negocio"
+          }
+        },
+        {
+          "id": "viajes",
+          "nombre": "Viajes / contenido aspiracional",
+          "porcentaje": "10%",
+          "look": "El operador global",
+          "elementos": {
+            "ropa": "Linen pants color piedra + camisa de lino blanca (vibe Mediterráneo)",
+            "calzado": "Sneakers blancos o sandalias premium (Birkenstock)",
+            "accesorios": "Sombrero panamá o gorra discreta",
+            "extras": "Mochila/maletín de cuero (no morral barato, no mochila de deporte)"
+          }
+        },
+        {
+          "id": "eventos",
+          "nombre": "Eventos / charlas / summits",
+          "look": "El operador como autoridad",
+          "elementos": {
+            "arriba": "Traje completo azul marino o gris carbón (cortes modernos, slim pero no tight) + camisa blanca",
+            "corbata": "Sin corbata (líder moderno) o corbata sólida discreta (azul/burgundy)",
+            "detalle": "Pin con tu símbolo de marca en la solapa",
+            "calzado": "Zapatos pulidos (oxford negros o marrón oscuro)"
+          }
+        }
+      ],
+      "uniformeSteveJobs": {
+        "70%": "Camisa azul/blanca + jeans/chinos (escenarios oficina + casual)",
+        "20%": "Blazer/traje (escenarios reuniones + eventos)",
+        "10%": "Aventura/viaje (deporte extremo + viajes)"
+      }
+    },
+
+    "gestos": {
+      "comoPararte": [
+        "Pies separados al ancho de hombros (estabilidad)",
+        "Peso distribuido equilibrado (no recargarte en una pierna)",
+        "Hombros atrás, pecho abierto (autoridad)",
+        "Cabeza alineada con la columna (no inclinada)",
+        "Centro de gravedad bajo (presencia)"
+      ],
+      "comoMirarCamara": [
+        "Directo al lente, no a la pantalla",
+        "Sin parpadear excesivamente (transmite mentira)",
+        "Pupila al centro de cámara, no errante",
+        "Sonrisa controlada — sonreís con los ojos, no con dientes excesivos",
+        "Para hooks fuertes: mirada seria + ceño leve fruncido (1-2 seg)"
+      ],
+      "manosSi": [
+        "Steepling (puntas de los dedos juntas formando triángulo) = confianza",
+        "Manos abiertas, palmas visibles = transparencia, honestidad",
+        "Apuntar con dedo + voz fuerte = autoridad (Uncle Sam moment)",
+        "Conteo en dedos ('1...2...3...') = listas claras"
+      ],
+      "manosNo": [
+        "Manos cruzadas defensivas",
+        "Tocarse la cara (inseguridad)",
+        "Tocarse el pelo / barba (nervios)",
+        "Gestos fuera del frame visible"
+      ],
+      "respiracion": [
+        "Respiración diafragmática antes de grabar (5 ciclos profundos)",
+        "Pausa breve antes del hook (genera anticipación)",
+        "No agitarte entre frases (controla las pausas)",
+        "Hablar al exhalar (más grave, más autoritativo)"
+      ],
+      "comoEntrar": [
+        "Ya estés en posición de poder desde el frame 1",
+        "NO entres caminando (pierde 2 segundos sagrados)",
+        "Hook ya sale de tu boca desde el frame 0",
+        "Expresión coherente con el hook (serio si es serio, intrigante si es intriga)"
+      ],
+      "comoCerrar": [
+        "Repetí el eslogan 'Opera tu imperio'",
+        "Mirá fijo a cámara 1 segundo después",
+        "NO sonrisa final excesiva (eso es teleshopping)",
+        "CTA verbal claro + visual (texto sobreimpreso)"
+      ]
+    }
+  },
+
+  "psicologia": {
+    "leyesUniversales": [
+      { "ley": 1, "nombre": "La identidad gana al producto", "explicacion": "No vendés mentoría — vendés convertirte en Inversor Sistemático." },
+      { "ley": 2, "nombre": "La emoción gana a la razón", "explicacion": "Tocá emoción ANTES que razón. Caso: Diamonds is Forever vendió amor, no piedras." },
+      { "ley": 3, "nombre": "Lo que se repite, se cree", "explicacion": "Goebbels lo formalizó. Tu mensaje central debe aparecer cientos de veces." },
+      { "ley": 4, "nombre": "El enemigo identificable une la tribu", "explicacion": "Vos vs 'Gurúes Especuladores'. Apple vs IBM. Trump vs establishment." },
+      { "ley": 5, "nombre": "La autoridad de proxy compra credibilidad", "explicacion": "Cita Buffett/Munger/Dalio aplicado a RE." },
+      { "ley": 6, "nombre": "Los pseudo-eventos generan free media", "explicacion": "Organizá eventos noticiables, premios, 'Estudio del Inversor LATAM 2026'." },
+      { "ley": 7, "nombre": "La estética simple atraviesa defensas", "explicacion": "'I Want YOU'. 'Just Do It'. 'OPERA TU IMPERIO'. 3-4 palabras." }
+    ],
+
+    "tacticasAplicadas": [
+      { "id": 1, "maestro": "Obama 2008", "tecnica": "Email list como activo #1", "tuAccion": "Build WhatsApp Business list + email" },
+      { "id": 2, "maestro": "Trump 2016", "tecnica": "A/B testing radical de creatives", "tuAccion": "20+ variantes por ad, 3-5 thumbnails por YT" },
+      { "id": 3, "maestro": "Trump 2016 / CA", "tecnica": "Targeting psicográfico (no demográfico)", "tuAccion": "Apuntar a 'mentalidad sistemática', no edad/ingreso" },
+      { "id": 4, "maestro": "Bukele", "tecnica": "Resultados visibles repetidos", "tuAccion": "Dashboards reales del Empresa OS publicados mensualmente" },
+      { "id": 5, "maestro": "Milei 2023", "tecnica": "TikTok > TV/blogs para LATAM joven", "tuAccion": "TikTok no es opcional, es core. Diario." },
+      { "id": 6, "maestro": "Milei + Trump + Bolsonaro", "tecnica": "Outsider del rubro tradicional", "tuAccion": "'Gurúes vs Operadores Reales'" },
+      { "id": 7, "maestro": "Apple Think Different", "tecnica": "Manifiesto sobre features", "tuAccion": "Manifiesto del 'Inversor Sistemático' filmado" },
+      { "id": 8, "maestro": "Apple Think Different", "tecnica": "Asociación con autoridades", "tuAccion": "Referencias a Buffett/Munger/Dalio aplicados a RE" },
+      { "id": 9, "maestro": "Old Spice", "tecnica": "Humor inesperado en industria seria", "tuAccion": "Contenido RE serio con punch humorístico" },
+      { "id": 10, "maestro": "Old Spice + Bukele", "tecnica": "Speed of execution + reaction", "tuAccion": "Reaccionar a noticias del rubro <24h" },
+      { "id": 11, "maestro": "Dollar Shave Club", "tecnica": "Producto/sistema visible desde seg 1", "tuAccion": "Empresa OS mostrado siempre" },
+      { "id": 12, "maestro": "DSC + Milei", "tecnica": "Producción auténtica > producción cara", "tuAccion": "$50 mic + iPhone vs producción glossy" },
+      { "id": 13, "maestro": "Red Bull", "tecnica": "Brand IS media (editorial constante)", "tuAccion": "Tu marca = canal de contenido, no anunciante" },
+      { "id": 14, "maestro": "Red Bull", "tecnica": "Eventos icónicos como ammo", "tuAccion": "Summit anual / demo day estudiantes" },
+      { "id": 15, "maestro": "MrBeast", "tecnica": "Retención obsesiva primeros 3 seg", "tuAccion": "Hook brutal en cada pieza, sin excepción" },
+      { "id": 16, "maestro": "MrBeast", "tecnica": "A/B test masivo de thumbnails (50+)", "tuAccion": "Mínimo 3 variantes en YouTube" },
+      { "id": 17, "maestro": "MrBeast", "tecnica": "Generosidad performada", "tuAccion": "Regalar valor/dinero/templates públicamente" },
+      { "id": 18, "maestro": "Hormozi", "tecnica": "Valor masivo gratis + funnel claro", "tuAccion": "E-book gratis → curso intro → mentoría premium" },
+      { "id": 19, "maestro": "Hormozi", "tecnica": "Frameworks con nombre propio", "tuAccion": "'Método Rental Profits', '7 Pilares', etc." },
+      { "id": 20, "maestro": "Hormozi + Gary Vee", "tecnica": "Repurpose maximalista (1→30 piezas)", "tuAccion": "Cada idea explotada en TODO formato y plataforma" },
+      { "id": 21, "maestro": "Gary Vee", "tecnica": "Documentar > crear", "tuAccion": "Filmar tu día normal" },
+      { "id": 22, "maestro": "Bernays", "tecnica": "Pseudo-evento", "tuAccion": "Publicar 'Estudio del Estado del Inversor Inmobiliario LATAM 2026'" },
+      { "id": 23, "maestro": "Bernays", "tecnica": "Reframe tabú como rebeldía", "tuAccion": "'Liberate del 9-to-5 con tu primera propiedad'" },
+      { "id": 24, "maestro": "Marlboro", "tecnica": "Uniforme visual consistente", "tuAccion": "Camisa azul oxford recurrente" },
+      { "id": 25, "maestro": "Marlboro", "tecnica": "Arquetipo universal", "tuAccion": "El Operador (Constructor + Sabio)" },
+      { "id": 26, "maestro": "De Beers", "tecnica": "Eslogan permanente", "tuAccion": "'OPERA TU IMPERIO' en cada pieza por 10 años" },
+      { "id": 27, "maestro": "De Beers", "tecnica": "Crear 'tradición' desde cero", "tuAccion": "'Los inversores serios SIEMPRE...'" },
+      { "id": 28, "maestro": "Goebbels (técnica neutra)", "tecnica": "Saturación multi-canal coordinada", "tuAccion": "TODO el contenido en TODOS los canales con mismos mensajes core" },
+      { "id": 29, "maestro": "Goebbels (técnica neutra)", "tecnica": "Centralización mensaje", "tuAccion": "3-5 mensajes core repetidos siempre" },
+      { "id": 30, "maestro": "Uncle Sam", "tecnica": "Thumbnails apuntando + contacto visual", "tuAccion": "Vos mirando cámara + gesto enfático" },
+      { "id": 31, "maestro": "Naval", "tecnica": "Densidad informativa", "tuAccion": "Cada pieza con insight propio" },
+      { "id": 32, "maestro": "Iman Gadzhi", "tecnica": "Comunidad alumni premium", "tuAccion": "Telegram/Discord cerrado para estudiantes pagos" }
+    ],
+
+    "casosHistoricos": [
+      {
+        "id": "bernays-torches",
+        "nombre": "Edward Bernays — 'Torches of Freedom' (1929)",
+        "categoria": "propaganda",
+        "contexto": "Sobrino de Freud. Pionero de PR moderna. Cliente: American Tobacco (Lucky Strike). Problema: cómo hacer que las mujeres fumen en público (tabú).",
+        "mecanica": [
+          "Consultar al psicólogo (A.A. Brill) — vincular cigarrillo con deseo profundo (libertad)",
+          "Crear pseudo-evento (no comprar publicidad) — desfile de Pascua NYC con debutantes",
+          "Acuñar término viral ('Torches of Freedom')",
+          "Amplificación mediática SIN mencionar a la marca"
+        ],
+        "metricas": "Consumo femenino: 5% (1923) → 12% (1929) en 6 años",
+        "leccionesParaNicolas": [
+          "Conectar producto a deseo profundo de identidad/libertad",
+          "Crear pseudo-eventos > comprar publicidad",
+          "Usar autoridad de proxy (psicólogo, científico, celebridad)",
+          "Reframe del tabú como rebeldía",
+          "Esconder al patrocinador"
+        ]
+      },
+      {
+        "id": "goebbels",
+        "nombre": "Joseph Goebbels — Propaganda Nazi (1933-1945)",
+        "categoria": "propaganda",
+        "notaEtica": "Estudio clínico de las MECÁNICAS sin endorsement de ideología. Las técnicas neutras se aplican en marketing moderno.",
+        "mecanica": [
+          "Centralización total del mensaje (una sola autoridad)",
+          "Repetición de afirmaciones grandes (Mein Kampf: 'big lie')",
+          "Inteligencia antes de propaganda (medir audiencia)",
+          "Saturación multi-medio (radio + cine + posters + eventos + educación)",
+          "Crear enemigo identificable",
+          "Asociación con valores aspiracionales",
+          "Producción de calidad cinematográfica (Riefenstahl)"
+        ],
+        "leccionesParaNicolas": [
+          "Centralización: una sola voz, brand consistente en todos los canales",
+          "Saturación: estar en TODAS las plataformas (Gary Vee tomó esto)",
+          "Inteligencia: investigar audiencia ANTES de crear",
+          "Producción premium consistente"
+        ]
+      },
+      {
+        "id": "marlboro-man",
+        "nombre": "Marlboro Man (1954-1999)",
+        "categoria": "publicitario",
+        "contexto": "Marlboro era cigarrillo 'femenino' ('Mild as May'). Burnett: reposicionamiento total con arquetipo cowboy.",
+        "mecanica": [
+          "Identificar arquetipo universal masculino",
+          "El cowboy: autoconfianza, autosuficiente, autónomo, enigmático, hombre de acción, simple, atemporal",
+          "Visual consistente por 45 años"
+        ],
+        "metricas": "1954: <1% market share → 1955: #4 cigarrillo más vendido en USA",
+        "leccionesParaNicolas": [
+          "Identificar arquetipo universal que tu audiencia aspira a ser",
+          "No vendas producto, vendé transformación de identidad",
+          "Visual consistente activa el arquetipo",
+          "Atemporal sobre tendencias",
+          "Simple sobre sophistication"
+        ]
+      },
+      {
+        "id": "de-beers",
+        "nombre": "De Beers — 'A Diamond is Forever' (1947-presente)",
+        "categoria": "publicitario",
+        "contexto": "Brief más ambicioso de la historia: 'manufacturar la demanda de una categoría entera'. En 1930s <10% de propuestas con diamante.",
+        "mecanica": [
+          "Crear tradición desde cero (parece ancestral)",
+          "Equiparar producto con valor emocional ('forever' = amor eterno)",
+          "Pseudo-norma social ('si no le das diamante, no la amás')",
+          "Hollywood + celebridades como vehículo",
+          "Pricing como prueba social ('2 sueldos de gasto')"
+        ],
+        "metricas": "Propuestas con diamante: <10% → >80% en 30 años. Slogan votado mejor del siglo XX.",
+        "leccionesParaNicolas": [
+          "Crear 'tradición' desde cero y hacerla parecer ancestral",
+          "Equiparar tu producto con valor emocional profundo",
+          "Generar pseudo-norma social",
+          "Premium pricing = filtro de seriedad"
+        ]
+      },
+      {
+        "id": "uncle-sam-rosie",
+        "nombre": "Uncle Sam 'I Want YOU' + Rosie the Riveter",
+        "categoria": "propaganda",
+        "contexto": "Posters icónicos de propaganda de Estado USA (WWI + WWII)",
+        "mecanica": [
+          "Contacto visual directo + apuntar con el dedo",
+          "Personificación del Estado (Uncle Sam = persona, no institución)",
+          "Llamada al deber moral",
+          "Empowerment al servicio del Estado (Rosie)",
+          "Estética simple + mensaje brutal (1 imagen, 4-5 palabras)"
+        ],
+        "leccionesParaNicolas": [
+          "Thumbnails: vos mirando a cámara + gesto enfático",
+          "Personificación de tu marca/sistema ('Yo te enseño')",
+          "Apelar a deber/propósito moral",
+          "Mensajes simples brutales (4-5 palabras)"
+        ]
+      },
+      {
+        "id": "apple-think-different",
+        "nombre": "Apple 'Think Different' (1997)",
+        "categoria": "publicitario",
+        "metricas": "Apple 1997: pérdida $1.05B → 1998: ganancia $309M. Reposicionó la marca para siempre.",
+        "mecanica": [
+          "Manifiesto sobre features",
+          "Identidad de tribu ('los que piensan diferente')",
+          "Asociación con íconos (Einstein, Gandhi, Lennon, MLK)",
+          "Visual consistente (B&W, simbolismo)",
+          "Reducción radical de oferta (14→4 productos)"
+        ],
+        "leccionesParaNicolas": [
+          "Manifiesto del 'Nuevo Inversor Sistemático' filmable",
+          "Asociación visual con autoridades del rubro",
+          "Reducción de oferta = focus extremo"
+        ]
+      },
+      {
+        "id": "old-spice",
+        "nombre": "Old Spice 'The Man Your Man Could Smell Like' (2010)",
+        "categoria": "publicitario",
+        "metricas": "Ventas: +60% en 5 meses, +125% en 6 meses (récord histórico). Views: 40M+80M. Earned media: 1B+ impresiones.",
+        "mecanica": [
+          "Humor absurdo + producción premium",
+          "Respuestas en video personalizadas a celebridades y usuarios",
+          "Velocidad: producción en tiempo real",
+          "Identidad icónica del talento"
+        ],
+        "leccionesParaNicolas": [
+          "Series de respuestas en video a comentarios (1 vez/mes)",
+          "Humor inesperado en industria seria",
+          "Speed of execution: <24h a noticias"
+        ]
+      },
+      {
+        "id": "dollar-shave-club",
+        "nombre": "Dollar Shave Club (2012)",
+        "categoria": "personal-brand",
+        "metricas": "Video $4,500. 12K subs en 24h. 4.75M views en 3 meses. 3M+ subs en 2016. Vendida a Unilever por $1B.",
+        "mecanica": [
+          "Producto en cámara desde el segundo 1",
+          "Honestidad brutal en el hook",
+          "Producción auténtica > producción cara ($4,500 vs Gillette)",
+          "Pain point claro + solución concreta",
+          "CTA único y simple"
+        ],
+        "leccionesParaNicolas": [
+          "Tu 'Dollar Shave Club video': 90 seg sobre por qué el método tradicional está roto + tu solución",
+          "Mostrar el sistema desde el segundo 1",
+          "Tono auténtico, no corporate"
+        ]
+      },
+      {
+        "id": "red-bull-stratos",
+        "nombre": "Red Bull Stratos (2012)",
+        "categoria": "publicitario",
+        "contexto": "Felix Baumgartner saltó desde 39km de altura (Mach 1.25). Red Bull = brand-as-media.",
+        "leccionesParaNicolas": [
+          "Eventos icónicos generan contenido por años",
+          "Tu marca como editorial constante (no anunciante)",
+          "Casos extremos como ammo"
+        ]
+      },
+      {
+        "id": "mrbeast",
+        "nombre": "MrBeast (Jimmy Donaldson)",
+        "categoria": "personal-brand",
+        "metricas": "432M subs (#1 mundial). $1.5B empresa. $85M ingresos 2024. 50+ variantes thumbnail por video.",
+        "mecanica": [
+          "Retención obsesiva primeros 3-5 seg",
+          "Thumbnails como ciencia (A/B test masivo)",
+          "Generosidad performada",
+          "Escala progresiva en contenido",
+          "Reinvertir 100% en producción"
+        ],
+        "leccionesParaNicolas": [
+          "Primeros 3 seg sagrados en TODO video",
+          "3-5 variantes de thumbnail por YouTube + A/B test",
+          "Generosidad performada: regalar templates/$ públicamente",
+          "Escala progresiva ('compré 1 → 5 → 18 propiedades')"
+        ]
+      },
+      {
+        "id": "hormozi",
+        "nombre": "Alex Hormozi",
+        "categoria": "personal-brand",
+        "metricas": "$25M+ en sales. Curso $100M Offers (libro gratis). Acquisition.com.",
+        "mecanica": [
+          "Valor masivo gratis (libros, frameworks)",
+          "Frameworks con nombre propio (Value Equation, Grand Slam Offer)",
+          "Repurpose maximalista (1 video → 30 piezas)",
+          "Funnel claro: gratis → libro → curso → mentoría",
+          "Consistencia diaria"
+        ],
+        "leccionesParaNicolas": [
+          "E-book gratis: 'El Sistema Operativo del Inversor Inmobiliario'",
+          "Frameworks con nombre: 'Método Rental Profits', 'Los 7 Pilares'",
+          "1 video largo YT → 30 piezas",
+          "Funnel: redes gratis → e-book → curso intro → mentoría premium"
+        ]
+      },
+      {
+        "id": "gary-vee",
+        "nombre": "Gary Vaynerchuk (GaryVee)",
+        "categoria": "personal-brand",
+        "metricas": "50M+ followers (20 años). 100+ posts/semana cross-platform. 3M+ followers TikTok.",
+        "mecanica": [
+          "Volumen extremo",
+          "Documentar > crear (DRock lo filma todo)",
+          "Repurpose maximalista (1 idea → 30-50 piezas)",
+          "Honestidad brutal",
+          "Cross-platform aggressive"
+        ],
+        "leccionesParaNicolas": [
+          "Documentar tu día normal",
+          "1 idea/semana → 30+ piezas en todos los canales",
+          "Reportar la cruda realidad (no solo wins)",
+          "Optimizar por REACH, no por followers"
+        ]
+      },
+      {
+        "id": "iman-gadzhi",
+        "nombre": "Iman Gadzhi",
+        "categoria": "personal-brand",
+        "metricas": "$25M+ en sales. Agency Navigator $1,499.",
+        "leccionesParaNicolas": [
+          "Aspiracional + cómo conseguirlo",
+          "Estética premium consistente",
+          "Casos de éxito documentados con números",
+          "Comunidad de alumni cerrada"
+        ]
+      },
+      {
+        "id": "naval",
+        "nombre": "Naval Ravikant",
+        "categoria": "personal-brand",
+        "mecanica": [
+          "Densidad informativa (cada tweet con insight propio)",
+          "Conceptos atemporales sobre tácticas pasajeras",
+          "Sin auto-promoción agresiva",
+          "Conversaciones largas (podcasts 2-3h)"
+        ],
+        "leccionesParaNicolas": [
+          "Para nicho premium: contenido denso LinkedIn / YouTube largo",
+          "Frameworks atemporales (no tácticas que mueren)",
+          "1 podcast largo/mes sobre temas de profundidad"
+        ]
+      },
+      {
+        "id": "obama-2008",
+        "nombre": "Barack Obama 2008",
+        "categoria": "politica",
+        "metricas": "$750M recaudado. $600M de 3M pequeños donantes. Email list 2.88M → $60M adicionales. Comunidad 10M.",
+        "leccionesParaNicolas": [
+          "Email/WhatsApp list = activo #1",
+          "A/B testing radical",
+          "Comunicación directa con base"
+        ]
+      },
+      {
+        "id": "trump-2016",
+        "nombre": "Donald Trump 2016",
+        "categoria": "politica",
+        "metricas": "$70M/mes en digital. $275M donaciones FB. $5.9M a Cambridge Analytica. 50M perfiles FB.",
+        "leccionesParaNicolas": [
+          "Targeting psicográfico (no demográfico)",
+          "Volumen extremo de creative + testing",
+          "Construir tu propia base de datos"
+        ]
+      },
+      {
+        "id": "bukele",
+        "nombre": "Nayib Bukele",
+        "categoria": "politica",
+        "metricas": "87.8% aprobación (Iudop-UCA). Twitter/TikTok/IG como plataformas oficiales.",
+        "leccionesParaNicolas": [
+          "Bypass total a medios tradicionales",
+          "Resultados visibles repetidos",
+          "Producción premium sin perder autenticidad"
+        ]
+      },
+      {
+        "id": "milei-2023",
+        "nombre": "Javier Milei 2023",
+        "categoria": "politica",
+        "metricas": "TikTok personal 1.5M (vs Massa 254K). @elpelucamilei: 2.4M + 44.2M likes.",
+        "leccionesParaNicolas": [
+          "TikTok no se puede ignorar para LATAM joven",
+          "Outsider del rubro tradicional",
+          "Director directo a cámara sin sobre-producción",
+          "Contratar gente joven que sepa la plataforma"
+        ]
+      }
+    ]
+  },
+
+  "misRedes": {
+    "instagram": {
+      "handle": "@soynicolaslara",
+      "url": "https://www.instagram.com/soynicolaslara/",
+      "seguidores": 47356,
+      "publicaciones": 631,
+      "seguidos": 753,
+      "verified": true,
+      "fotoActual": "Vos con polo blanco + casco de constructor",
+      "bioActual": "Entrepreneur 👷 Ayudo a latinos en USA hacer Fliipping minimizando riesgos con mi sistema de 5 etapas. +200 latinos generando...",
+      "linkActual": "rentalprofitss.com/2026/flip/lista?utm_source=bioig",
+      "highlightsActuales": ["¿Qué hago?", "Comunidad", "Eventos", "Viajes", "Quién soy", "Inicios 🏠", "Nueva"],
+      "problemas": [
+        "Typo en bio: 'Fliipping' (debería ser 'Flipping')",
+        "Bio limitada a Fix & Flip (no menciona las 4 empresas ni mentoría)",
+        "Foto perfil con casco limita a constructor, no proyecta CEO",
+        "Display name 'Inversor inmobiliario' es genérico"
+      ],
+      "bioNueva": [
+        "NICOLÁS LARA · CEO",
+        "4 empresas. Un método. Tu imperio.",
+        "🏢 Real Estate · Fix & Flip · Remodelación · Mentoría",
+        "📊 +20 propiedades · Portfolio +$5M · +200 estudiantes",
+        "⬇️ Operá tu imperio"
+      ],
+      "bioAlternativaCorta": [
+        "Operá tu imperio.",
+        "+200 latinos cierran su 1er flip sin perder capital",
+        "Sistema · Criterio · Acompañamiento",
+        "⬇ Comentá FLIP y te mando el plan"
+      ],
+      "highlightsNuevos": [
+        { "id": "imperio", "icono": "🎯", "nombre": "OPERA TU IMPERIO", "contenido": "Manifiesto + frases recurrentes", "mecanica": "Apple Think Different" },
+        { "id": "numeros", "icono": "📊", "nombre": "NÚMEROS", "contenido": "Dashboards reales, métricas mensuales", "mecanica": "Bukele" },
+        { "id": "casos", "icono": "🎓", "nombre": "CASOS", "contenido": "Felipe, Sergio, Ángela, Paula con números", "mecanica": "Iman Gadzhi" },
+        { "id": "comoTrabajo", "icono": "🛠️", "nombre": "CÓMO TRABAJO", "contenido": "Oferta + paso a paso mentoría", "mecanica": "Hormozi funnel" },
+        { "id": "faqs", "icono": "❓", "nombre": "FAQS", "contenido": "Preguntas frecuentes en video", "mecanica": "Old Spice respuestas" },
+        { "id": "detras", "icono": "🏔️", "nombre": "DETRÁS", "contenido": "Aventura + viajes + BTS", "mecanica": "Gary Vee documentar" }
+      ],
+      "tresReelsFijos": [
+        { "posicion": 1, "tipo": "Cómo trabajo / manifiesto", "mecanica": "Apple TD" },
+        { "posicion": 2, "tipo": "Mi historia / de 0 a 4 empresas", "mecanica": "Marlboro Constructor" },
+        { "posicion": 3, "tipo": "Caso real con números", "mecanica": "DSC testimonio auténtico" }
+      ],
+      "topReelsHistoricosConPauta": [
+        { "id": "DR3T6TkjRG6", "views": 708000, "tema": "¿ES BUENO RENTAR POR HABITACIONES?", "nota": "Tenía pauta — no replicar" },
+        { "id": "DR8WqLKjebC", "views": 274000, "nota": "Tenía pauta" },
+        { "id": "DI7W8zjSQgW", "views": 21000, "nota": "Mid-tier con pauta" }
+      ],
+      "viewsRecientes": "500-1000 (caída de 99.85% vs top con pauta)",
+      "objetivoMesUno": 49000
+    },
+
+    "tiktok": {
+      "handle": "@soynicolaslara",
+      "url": "https://www.tiktok.com/@soynicolaslara",
+      "seguidores": 640,
+      "seguidos": 229,
+      "likesAcumulados": 4034,
+      "displayActual": "Nicolas lara | Inversor Inmobi",
+      "bioActual": "Te enseño a hacer Fix & Flip con mi Sistema Flip Anti-Riesgos 🏠 +20 propiedades | Portfolio +$5M 💰 Aprende en mi próximo taller ⬇️ Pídeme el enlace por DM",
+      "viewsPromedio": "300-420 (63% reach excelente engagement)",
+      "problemas": [
+        "Pídeme el enlace por DM — fricción mata conversión",
+        "Display 'Inversor Inmobi' truncado y amateur",
+        "Solo Fix & Flip mencionado",
+        "Hooks débiles en thumbnails (auto-generados)"
+      ],
+      "displayNuevo": "Nicolás Lara | El Operador",
+      "bioNueva": [
+        "NICOLÁS LARA · 4 empresas",
+        "🏢 Real Estate · F&F · Mentoría",
+        "📊 +20 propiedades · +$5M portfolio",
+        "⬇️ Operá tu imperio"
+      ],
+      "objetivoMesUno": 1500
+    },
+
+    "youtube": {
+      "handle": "@Flippingrentalss",
+      "url": "https://www.youtube.com/@Flippingrentalss",
+      "subscribers": 5040,
+      "videos": 252,
+      "nombreCanal": "Flipping Rentals",
+      "banner": "Logo FLIPPING RENTALS + skyline (branding empresa)",
+      "fotoCanal": "2 hombres (vos + tu hermano)",
+      "reachPorVideo": "<2%",
+      "problemas": [
+        "Es un canal de EMPRESA, no marca personal",
+        "Posicionamiento limitado a Fix & Flip",
+        "Mucho contenido corto sin retención (videos 2-5min con 2-12 views)",
+        "Inconsistencia en publicación",
+        "Títulos duplicados canibalizando SEO"
+      ],
+      "topPerformers": [
+        { "titulo": "Cómo Ganamos $73,000 con UNA sola casa (Flip Real Paso a Paso)", "views": 325, "duracion": "16:15" },
+        { "titulo": "Así pasó Sergio de hacer Uber a generar $20,000 al mes con Airbnb", "views": 133, "duracion": "5:56" },
+        { "titulo": "Felipe compra su primera casa en 7 días", "views": 105, "duracion": "27:15" },
+        { "titulo": "La estrategia de hostales: 5 casas, $20K/mes, cero propiedades compradas", "views": 97, "duracion": "9:57" },
+        { "titulo": "Business Day - Estudiante Flipping Rentals Paula", "views": 96, "duracion": "16:52" }
+      ],
+      "formulaGanadora": "[Persona común con trabajo identificable] + [resultado en $ específico] + [tiempo concreto] + [10-50 min profundo paso a paso]",
+      "decisionPendiente": [
+        { "opcion": "A", "accion": "Crear canal NUEVO @nicolaslara", "ventaja": "Pureza marca personal", "desventaja": "Empezar de 0" },
+        { "opcion": "B", "accion": "Renombrar @Flippingrentalss → @nicolaslara (RECOMENDADA)", "ventaja": "Conservar 5K subs + 252 videos. URLs viejos siguen funcionando", "desventaja": "Cambio total de branding" },
+        { "opcion": "C", "accion": "Mantener Flipping Rentals con re-brand suave", "ventaja": "Conservador", "desventaja": "Menos potente" }
+      ],
+      "objetivoMesUno": 5300
+    },
+
+    "accionesInmediatas": [
+      { "id": "fix-typo", "accion": "Arreglar typo 'Fliipping' → 'Flipping' en bio IG", "tiempo": "2 min", "completado": false },
+      { "id": "cambiar-bio-ig", "accion": "Cambiar bio Instagram (versión Opera tu Imperio)", "tiempo": "5 min", "completado": false },
+      { "id": "cambiar-bio-tt", "accion": "Cambiar bio TikTok", "tiempo": "5 min", "completado": false },
+      { "id": "cambiar-display-tt", "accion": "Cambiar display name TikTok a 'Nicolás Lara | El Operador'", "tiempo": "2 min", "completado": false },
+      { "id": "decidir-yt", "accion": "Decidir handle YouTube (Opción A/B/C — recomendado B)", "tiempo": "5 min", "completado": false },
+      { "id": "sesion-fotos", "accion": "Sesión fotos profesional (escenarios 1, 2, 3, 4, 5)", "tiempo": "1 día", "completado": false },
+      { "id": "logo", "accion": "Contratar diseñador para logo hexagonal (3 versiones)", "tiempo": "$100-300, 5 días", "completado": false }
+    ]
+  },
+
+  "reLaunch": {
+    "preLaunch": [
+      { "dia": -7, "accion": "Stories teaser: 'Algo grande viene. 7 días.'", "completado": false },
+      { "dia": -6, "accion": "Story: 'He construido 4 empresas. Es hora de contarlo distinto.'", "completado": false },
+      { "dia": -5, "accion": "Story: encuesta '¿Quién quiere acceso al sistema?'", "completado": false },
+      { "dia": -4, "accion": "Story: behind the scenes sesión fotos nueva", "completado": false },
+      { "dia": -3, "accion": "Story: anuncio cambio de bio + tease manifiesto", "completado": false },
+      { "dia": -2, "accion": "Cambiar bio + foto perfil + historias destacadas", "completado": false },
+      { "dia": -1, "accion": "Story: 'Mañana lo publico. Eso me cambió a mí.'", "completado": false }
+    ],
+    "launchDay": {
+      "dia": 0,
+      "principal": "Publicar MANIFIESTO como reel pinned (60-90 seg, voz en off, b-roll de propiedades + equipo + aventura)",
+      "stories": "Los 3 reels fijados son los primeros del nuevo grid",
+      "cta": "Si querés operar conmigo, comentá IMPERIO"
+    },
+    "calendario30Dias": [
+      {
+        "semana": 1,
+        "tema": "Re-launch",
+        "dias": [
+          { "dia": "Lun", "pieza": "Manifiesto (reel pin)", "pilar": "Mentalidad" },
+          { "dia": "Mar", "pieza": "Reel #1 Buy Box", "pilar": "Criterio ★" },
+          { "dia": "Mié", "pieza": "Carrusel #1 10 criterios", "pilar": "Criterio ★" },
+          { "dia": "Jue", "pieza": "H.I.L.O. #1 Cobranza", "pilar": "Sistema" },
+          { "dia": "Vie", "pieza": "Reel #2 ITIN", "pilar": "Financiamiento" },
+          { "dia": "Sáb", "pieza": "Reel #3 4 Números", "pilar": "Números" },
+          { "dia": "Dom", "pieza": "Reel reciclado humor", "pilar": "Alcance" }
+        ]
+      },
+      {
+        "semana": 2,
+        "tema": "Tracción",
+        "dias": [
+          { "dia": "Lun", "pieza": "Reel #4 anti-gurú", "pilar": "Mentalidad" },
+          { "dia": "Mar", "pieza": "Carrusel #2 (4 números)", "pilar": "Números" },
+          { "dia": "Mié", "pieza": "Reel #5 sistema cobranza", "pilar": "Sistema" },
+          { "dia": "Jue", "pieza": "H.I.L.O. #2 4 números", "pilar": "Números" },
+          { "dia": "Vie", "pieza": "Reel #6 3 minutos casa", "pilar": "Criterio ★" },
+          { "dia": "Sáb", "pieza": "Reel #7 Copa Mundial", "pilar": "El juego" },
+          { "dia": "Dom", "pieza": "Reciclado", "pilar": "Alcance" }
+        ]
+      },
+      {
+        "semana": 3,
+        "tema": "Siembra + casos",
+        "dias": [
+          { "dia": "Lun", "pieza": "Reel #8 Legado", "pilar": "Modelos" },
+          { "dia": "Mar", "pieza": "Carrusel #3 (financiamiento)", "pilar": "Financiamiento" },
+          { "dia": "Mié", "pieza": "Reel #9 Top 5 estados", "pilar": "Criterio ★" },
+          { "dia": "Jue", "pieza": "H.I.L.O. #3 Caso Felipe", "pilar": "Casos" },
+          { "dia": "Vie", "pieza": "Reel #10 Harmony Lender", "pilar": "Financiamiento" },
+          { "dia": "Sáb", "pieza": "Reel #11 Deuda buena vs mala", "pilar": "Mentalidad" },
+          { "dia": "Dom", "pieza": "Reciclado", "pilar": "Alcance" }
+        ]
+      },
+      {
+        "semana": 4,
+        "tema": "COSECHA (vendés desde stories)",
+        "dias": [
+          { "dia": "Lun", "pieza": "Reel #12 Rehab budget", "pilar": "Números" },
+          { "dia": "Mar", "pieza": "Carrusel #4 (equipo de 5)", "pilar": "El juego" },
+          { "dia": "Mié", "pieza": "Reel #13 Lo que no cambiás", "pilar": "Criterio ★" },
+          { "dia": "Jue", "pieza": "STORIES VENTA + Reel #14 (sistema/acompañamiento)", "pilar": "Sistema" },
+          { "dia": "Vie", "pieza": "STORIES VENTA + Reel #15 Fix&Hold", "pilar": "Modelos" },
+          { "dia": "Sáb", "pieza": "STORIES VENTA + Carrusel #10 (manifiesto)", "pilar": "Mentalidad" },
+          { "dia": "Dom", "pieza": "Cierre + carrusel #5", "pilar": "Criterio ★" }
+        ]
+      }
+    ]
+  },
+
+  "biblioteca": {
+    "reels": [
+      { "id": "reel-1", "pilar": "Imperio", "thumbnail": "¿4 EMPRESAS O 1 GIGANTE?", "hook": "Muchos creen que hay que enfocarse en UNA cosa para ganar plata...", "chisme": "Yo construí 4 empresas porque entendí algo: cada una alimenta a la otra. Rental Profits me da cashflow. Fix & Flip me da capital. Remodelación me ahorra costos. Mi mentoría me da impacto.", "valor": "No es dispersión. Es ARQUITECTURA.", "cta": "Comentá IMPERIO. Operá tu imperio.", "mecanicaHistorica": "Marlboro arquetipo + Hormozi framework", "estado": "pendiente" },
+      { "id": "reel-2", "pilar": "Viral/Mito", "thumbnail": "¿NECESITÁS PLATA PARA INVERTIR?", "hook": "Si sos latino y crees que necesitás plata propia para invertir en bienes raíces...", "chisme": "Yo gestiono +20 propiedades y la mayoría las compré con CERO dinero propio.", "valor": "Hard money. Sellers. Joint ventures. Líneas de crédito comercial. El que entiende el dinero, juega otro juego.", "cta": "Comentá CRITERIO y te mando el plan. Operá tu imperio.", "mecanicaHistorica": "Bernays mito + Hormozi insight", "estado": "pendiente" },
+      { "id": "reel-3", "pilar": "Mentoría/Caso", "thumbnail": "DE UBER A $20K/MES", "hook": "Sergio manejaba Uber 12 horas al día. Hoy gana $20,000 al mes con Airbnb.", "chisme": "En 8 meses. Sin tener miles de dólares ahorrados.", "valor": "Aplicó EL MISMO SISTEMA que uso yo en Rental Profits. Tres claves: locación, sistema, ejecución.", "cta": "Comentá SERGIO. Operá tu imperio.", "mecanicaHistorica": "DSC testimonio + Iman casos", "estado": "pendiente" },
+      { "id": "reel-4", "pilar": "Imperio/Transparencia", "thumbnail": "ESTE MES FACTURÉ X", "hook": "Voy a hacer algo que pocos hacen. Voy a mostrarte mis números.", "chisme": "Este mes mis 4 empresas facturaron juntas $X. RP: $A. F&F: $B. Remodelación: $C. Mentoría: $D.", "valor": "No te lo cuento para presumir. Para que veas que es POSIBLE y para que distingas operador real de actor.", "cta": "Sistema sobre suerte. Operá tu imperio.", "mecanicaHistorica": "Bukele resultados visibles", "estado": "pendiente" },
+      { "id": "reel-5", "pilar": "Viral/Anti-gurú", "thumbnail": "LOS GURÚES TE MIENTEN", "hook": "Lo voy a decir y a varios no les va a gustar.", "chisme": "Los gurúes que ves con Lamborghini, posando frente a propiedades ALQUILADAS por una hora, vendiéndote 'libertad financiera'... la mayoría no opera nada.", "valor": "Yo te muestro mi negocio en vivo. Mis errores. Mis números. Porque opero. No actúo de operador.", "cta": "Si te cansaste del show, vení al método.", "mecanicaHistorica": "Trump controversia + Apple TD manifiesto", "estado": "pendiente" },
+      { "id": "reel-6", "pilar": "Aventura + Negocio", "thumbnail": "ESTO ME ENSEÑÓ A INVERTIR", "hook": "Salté de un avión y me di cuenta de algo que aplico al negocio.", "chisme": "En caída libre no controlás el viento. Solo tu cuerpo.", "valor": "En inversión inmobiliaria es igual. El paracaidista CONFÍA en su equipo, entrenamiento, decisión previa. El inversor también.", "cta": "Sistema sobre suerte. Operá tu imperio.", "mecanicaHistorica": "Red Bull aventura + Marlboro arquetipo", "estado": "pendiente" },
+      { "id": "reel-7", "pilar": "Imperio/Proceso", "thumbnail": "UN DÍA OPERANDO 4 EMPRESAS", "hook": "Te muestro qué hago en un día normal para mantener 4 empresas funcionando.", "chisme": "6 AM dashboards. 7 AM cardio. 8 AM stand-up con Carlos/Juan/Diego. 9-11 deep work. 11-12 reuniones. Tarde oportunidades + contenido.", "valor": "No es magia. Es ARQUITECTURA del día.", "cta": "En mi mentoría enseño cómo armar TU sistema diario.", "mecanicaHistorica": "Gary Vee documentar", "estado": "pendiente" },
+      { "id": "reel-8", "pilar": "Mentoría/Educativo", "thumbnail": "3 ERRORES QUE TE CUESTAN $50K", "hook": "Voy a contarte 3 errores que veo a TODOS los inversores nuevos.", "chisme": "Error 1: comprar enamorado de la casa, no de los números. Error 2: subestimar la remodelación (siempre +20% al budget). Error 3: pensar que cobrar renta es pasivo.", "valor": "Sin sistema, es trabajo. Con sistema, sí es pasivo.", "cta": "Comentá ERRORES. Operá tu imperio.", "mecanicaHistorica": "Hormozi framework", "estado": "pendiente" },
+      { "id": "reel-9", "pilar": "Viral/Hot take", "thumbnail": "DEJÁ DE COMPRAR CURSOS", "hook": "Quiero que dejes de comprar cursos de bienes raíces.", "chisme": "El 90% de la gente compra el curso, lo guarda en una carpeta, y no hace nada.", "valor": "Lo que necesitás no es OTRO curso. Es UN sistema y RENDICIÓN de cuentas.", "cta": "Si te animás a ejecutar, mi mentoría es real. Sino, ni te molestes.", "mecanicaHistorica": "DSC anti-corporate auténtico", "estado": "pendiente" },
+      { "id": "reel-10", "pilar": "Imperio/Vulnerabilidad", "thumbnail": "EL DÍA QUE CASI PIERDO $50K", "hook": "Hace 18 meses casi pierdo $50,000 en una propiedad.", "chisme": "La compré porque 'tenía buen feeling'. La remodelación estalló de presupuesto. El mercado se enfrió. Tuve que vender a pérdida.", "valor": "Lección: el feeling es el enemigo del operador. Hoy cada decisión pasa por 7 filtros.", "cta": "Los 7 filtros están en mi mentoría.", "mecanicaHistorica": "Gary Vee honestidad + Hormozi framework", "estado": "pendiente" },
+      { "id": "reel-11", "pilar": "Mentoría", "thumbnail": "FELIPE 7 DÍAS", "hook": "Felipe compró su primera casa en 7 días. Esto fue lo que hizo.", "mecanicaHistorica": "Iman casos", "estado": "pendiente" },
+      { "id": "reel-12", "pilar": "Imperio", "thumbnail": "MIS 4 INGRESOS", "hook": "Te muestro de dónde viene cada dólar de mis 4 empresas.", "mecanicaHistorica": "Bukele resultados", "estado": "pendiente" },
+      { "id": "reel-13", "pilar": "Viral", "thumbnail": "AIRBNB MURIÓ", "hook": "Si tu plan era arbitrar Airbnb, te tengo malas noticias.", "mecanicaHistorica": "Trump controversia", "estado": "pendiente" },
+      { "id": "reel-14", "pilar": "Aventura", "thumbnail": "EVEREST VS NEGOCIO", "hook": "Aprendí esto subiendo montañas que me sirve para invertir.", "mecanicaHistorica": "Red Bull", "estado": "pendiente" },
+      { "id": "reel-15", "pilar": "Mentoría", "thumbnail": "CASA EN $0", "hook": "Cómo conseguí mi primera casa con $0 propios.", "mecanicaHistorica": "Hormozi", "estado": "pendiente" }
+    ],
+
+    "carruseles": [
+      { "id": "carrusel-1", "tema": "4 EMPRESAS. UN MÉTODO.", "slides": ["Cover: 4 EMPRESAS + watermark", "🏠 Rental Profits — 18 propiedades activas", "🔨 Fix & Flip — ROI promedio X%", "🏗️ Remodelación — Obras + propias", "🎓 Mentoría — +200 estudiantes", "¿La clave? UN MÉTODO que se aplica a las 4", "1️⃣ Métricas en todo. Si no se mide, no se escala", "2️⃣ Sistemas, no improvisación", "3️⃣ Equipo capacitado, no tu propio tiempo", "CTA: Link en bio → Clase gratuita | Operá tu imperio"], "estado": "pendiente" },
+      { "id": "carrusel-2", "tema": "Cómo financié mi primera propiedad sin dinero propio", "cover": "$0 PROPIOS", "slides": 8, "estado": "pendiente" },
+      { "id": "carrusel-3", "tema": "Los 7 filtros para evaluar una propiedad", "cover": "7 FILTROS", "slides": 9, "estado": "pendiente" },
+      { "id": "carrusel-4", "tema": "Caso real: $73K con UNA casa", "cover": "$73K GANANCIA", "slides": 10, "estado": "pendiente" },
+      { "id": "carrusel-5", "tema": "Por qué cobrar renta NO es pasivo (y cómo hacerlo pasivo)", "cover": "RENTA = TRABAJO", "slides": 7, "estado": "pendiente" },
+      { "id": "carrusel-6", "tema": "5 errores que veo en inversores nuevos", "cover": "5 ERRORES", "slides": 8, "estado": "pendiente" },
+      { "id": "carrusel-7", "tema": "Tu primer Airbnb: paso a paso", "cover": "AIRBNB 101", "slides": 12, "estado": "pendiente" },
+      { "id": "carrusel-8", "tema": "Cómo armé mi equipo (las 6 personas que lo hacen posible)", "cover": "MI EQUIPO", "slides": 8, "estado": "pendiente" },
+      { "id": "carrusel-9", "tema": "Por qué hay que pensar como CEO desde la primera propiedad", "cover": "PENSÁ COMO CEO", "slides": 7, "estado": "pendiente" },
+      { "id": "carrusel-10", "tema": "Operá tu Imperio (manifiesto)", "cover": "MANIFIESTO", "slides": 9, "estado": "pendiente" }
+    ],
+
+    "historias": [
+      { "id": "hilo-1", "tema": "Mi sistema de cobranza", "objetivo": "Lead Magnet", "frames": { "H": "Cobrar renta sin enloquecerte — comparto mi sistema", "I": "Si tenés 1-3 propiedades y cobrar es un dolor de cabeza...", "L": "Antes (caos WhatsApp) → después (sistema auto) + encuesta", "O": "Comentá COBRO y te mando mi plantilla + flow ManyChat" }, "estado": "pendiente" },
+      { "id": "hilo-2", "tema": "Los 4 números", "objetivo": "Awareness", "frames": { "H": "Los 4 números que mirás antes de cualquier casa", "I": "Si ves casas y no sabés en qué fijarte...", "L": "Uno por slide con ejemplo real + quiz", "O": "Comentá NÚMEROS y te mando la calculadora" }, "estado": "pendiente" },
+      { "id": "hilo-3", "tema": "Caso Felipe", "objetivo": "CTA Directo", "frames": { "H": "Felipe — de Uber a $20K/mes en 8 meses", "I": "Si ves su antes, te ves vos", "L": "Timeline con métricas", "O": "Comentá FELIPE y te cuento su sistema completo" }, "estado": "pendiente" },
+      { "id": "hilo-4", "tema": "El día del CEO", "objetivo": "Awareness", "frames": { "H": "Un día normal en mis 4 empresas", "I": "Sin venta, solo documentar (Gary Vee)", "L": "Time-lapse con b-roll", "O": "Si te sirvió, mandame 🔥 en DM" }, "estado": "pendiente" },
+      { "id": "hilo-5", "tema": "Errores que cuestan $50K", "objetivo": "Lead Magnet", "frames": { "H": "Los 3 errores que casi me quiebran", "I": "Si arrancás sin saber esto, perdés", "L": "1 error por frame + ejemplo real", "O": "Comentá ERROR y te mando los 3 + cómo evitarlos" }, "estado": "pendiente" }
+    ],
+
+    "youtube": [
+      { "id": "yt-1", "titulo": "4 EMPRESAS. $5M EN PROPIEDADES. ESTO ES LO QUE NO TE CUENTAN LOS GURÚES.", "duracion": "18-22 min", "estructura": ["0:00-0:15 Hook brutal", "0:15-1:00 Authority + promesa", "1:00-3:00 Tu historia (storytelling)", "3:00-7:00 Las 4 empresas (1 min cada una)", "7:00-12:00 El método (4 principios)", "12:00-16:00 Caso real Felipe", "16:00-19:00 3 errores que casi me quiebran", "19:00-21:00 Cierre + CTA"], "estado": "pendiente" },
+      { "id": "yt-2", "titulo": "De Fix & Flip a 4 empresas: cómo escalé mi imperio inmobiliario", "duracion": "15 min", "pilar": "Imperio + Historia", "estado": "pendiente" },
+      { "id": "yt-3", "titulo": "Documenté 90 días gestionando 18 propiedades. Esto pasó.", "duracion": "25 min", "pilar": "Documentary", "estado": "pendiente" },
+      { "id": "yt-4", "titulo": "Yo no manejo Lamborghini. Manejo 4 empresas. Acá la diferencia.", "duracion": "12 min", "pilar": "Viral/anti-gurú", "estado": "pendiente" },
+      { "id": "yt-5", "titulo": "Los 5 sistemas que automatizan mi negocio (y cuánto me cuestan)", "duracion": "20 min", "pilar": "Mentoría/práctico", "estado": "pendiente" }
+    ],
+
+    "tiktoks": [
+      { "id": "tt-1", "hook": "Si tenés más de 30 años y no tenés propiedades, mirá esto.", "estado": "pendiente" },
+      { "id": "tt-2", "hook": "Esto es lo que los gurúes de bienes raíces NO te cuentan.", "estado": "pendiente" },
+      { "id": "tt-3", "hook": "Tengo 4 empresas. Acá te muestro cómo arranqué con $0.", "estado": "pendiente" },
+      { "id": "tt-4", "hook": "Mi competencia me odia por hacer este video.", "estado": "pendiente" },
+      { "id": "tt-5", "hook": "Probé el método de los gurúes y perdí $20K. Esto sí funciona.", "estado": "pendiente" },
+      { "id": "tt-6", "hook": "Si tu mentor maneja Lambo pero no te muestra su negocio: corré.", "estado": "pendiente" },
+      { "id": "tt-7", "hook": "Mi estudiante consiguió esto en 6 meses. Y vos seguís dudando.", "estado": "pendiente" },
+      { "id": "tt-8", "hook": "Esto que te voy a decir te va a costar plata si no lo aplicás.", "estado": "pendiente" },
+      { "id": "tt-9", "hook": "Los bancos me odian por enseñar esto. Pero acá va.", "estado": "pendiente" },
+      { "id": "tt-10", "hook": "En 60 segundos te voy a cambiar la forma de pensar la inversión.", "estado": "pendiente" }
+    ]
+  },
+
+  "kpis": {
+    "baseline": {
+      "fecha": "2026-06-29",
+      "instagram": { "seguidores": 47356, "publicaciones": 631 },
+      "tiktok": { "seguidores": 640, "likesAcumulados": 4034 },
+      "youtube": { "subscribers": 5040, "videos": 252, "reachPromedio": "<2%" }
+    },
+    "objetivosDia30": {
+      "instagram": { "seguidores": 49000, "crecimiento": "+3.5%" },
+      "tiktok": { "seguidores": 1500, "crecimiento": "+135%" },
+      "youtube": { "subscribers": 5300, "viewsPorVideo": "250+", "crecimiento": "+5%" },
+      "dms": "+100% nuevos por semana",
+      "comentariosConPalabraClave": "5+ por post",
+      "storiesViews": "+50%",
+      "linkClicks": "+50%"
+    },
+    "metricasSemanales": [
+      "Retención por reel (≥50% tiende a viralizar)",
+      "Comentarios (volumen + calidad — ¿usan palabra clave?)",
+      "Guardados (señal #1 de valor real)",
+      "Compartidos (señal #2 de viralidad)",
+      "% visita → seguidor",
+      "Clics en bio (conversión de perfil)",
+      "DMs respondidos (conversaciones de venta)",
+      "Agendas desde perfil (leads calientes)"
+    ]
+  }
+}
