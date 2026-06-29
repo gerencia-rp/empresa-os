@@ -320,6 +320,81 @@ function operaPickYT(op) {
 window.operaPickYT = operaPickYT;
 
 // =========================================================
+//  TAB: RE-LAUNCH
+// =========================================================
+function renderRelaunch() {
+  const out = document.getElementById('tab-relaunch');
+  if (!out || out.dataset.rendered) return;
+  ensureOpera().then(() => {
+    out.dataset.rendered = '1';
+    const rl = OPERA.reLaunch;
+    const pre = rl.preLaunch.map(p => {
+      const cid = 'pre-' + p.dia, on = operaChecked(cid);
+      return `<label data-check="${cid}" class="flex items-start gap-2 py-1.5 cursor-pointer ${on ? 'opacity-50' : ''}">
+        <input type="checkbox" ${on ? 'checked' : ''} onchange="operaToggleCheck('${cid}', this.checked)" class="mt-0.5 accent-[#C8A864]">
+        <span class="text-sm"><span class="text-accent font-bold">Día ${p.dia}</span> — ${E(p.accion)}</span>
+      </label>`;
+    }).join('');
+    const ld = rl.launchDay;
+    const ldCid = 'launch-0', ldOn = operaChecked(ldCid);
+    const PILAR_COLOR = { 'Criterio ★': 'text-accent', 'Números': 'text-sky-300', 'Financiamiento': 'text-emerald-300', 'Mentalidad': 'text-purple-300', 'Sistema': 'text-amber-300', 'Casos': 'text-pink-300', 'El juego': 'text-orange-300', 'Modelos': 'text-teal-300', 'Alcance': 'text-zinc-400' };
+    const semanas = rl.calendario30Dias.map(s => {
+      const dias = s.dias.map(d => {
+        const cid = 'cal-s' + s.semana + '-' + d.dia, on = operaChecked(cid);
+        const pc = PILAR_COLOR[d.pilar] || 'text-zinc-400';
+        return `<label data-check="${cid}" class="flex items-start gap-2 py-1 cursor-pointer ${on ? 'opacity-50' : ''}">
+          <input type="checkbox" ${on ? 'checked' : ''} onchange="operaToggleCheck('${cid}', this.checked)" class="mt-0.5 accent-[#C8A864]">
+          <span class="text-xs"><span class="text-zinc-500 w-8 inline-block">${E(d.dia)}</span> ${E(d.pieza)} <span class="${pc} text-[10px]">· ${E(d.pilar)}</span></span>
+        </label>`;
+      }).join('');
+      return `<div class="bg-primary/40 border border-zinc-800 rounded-lg p-3">
+        <div class="flex items-center justify-between mb-1.5"><div class="font-semibold text-sm">Semana ${s.semana}</div><span class="text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent">${E(s.tema)}</span></div>
+        <div class="divide-y divide-zinc-800/40">${dias}</div>
+      </div>`;
+    }).join('');
+    out.innerHTML =
+      oHero('Re-Launch · plan 30 días', 'Pre-launch (-7 a 0), día de lanzamiento y calendario de 4 semanas con tracking') +
+      oCard('⏳ Pre-Launch (-7 a -1)', `<div class="divide-y divide-zinc-800/50">${pre}</div>`) +
+      oCard('🚀 Día de lanzamiento',
+        `<label data-check="${ldCid}" class="flex items-start gap-2 cursor-pointer ${ldOn ? 'opacity-50' : ''} mb-2">
+          <input type="checkbox" ${ldOn ? 'checked' : ''} onchange="operaToggleCheck('${ldCid}', this.checked)" class="mt-1 accent-[#C8A864]">
+          <span class="text-sm font-semibold">${E(ld.principal)}</span>
+        </label>
+        <div class="text-sm text-zinc-300 mb-1">📌 ${E(ld.stories)}</div>
+        <div class="bg-accent/10 border border-accent/25 rounded-lg p-3 text-sm text-accent mt-2">📣 ${E(ld.cta)}</div>`) +
+      oCard('🗓️ Calendario 30 días', `<div class="grid sm:grid-cols-2 gap-3">${semanas}</div>`, 'Marcá cada pieza al publicarla');
+  }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
+}
+
+// =========================================================
+//  Amplificación de la tab Estrategia (eco histórico de las fórmulas)
+// =========================================================
+function amplificarEstrategia() {
+  const out = document.getElementById('tab-estrategia');
+  if (!out || out.dataset.opera) return;
+  ensureOpera().then(() => {
+    if (out.dataset.opera) return;
+    out.dataset.opera = '1';
+    const ecos = [
+      { f: 'REEL (Julio): Hook → Chisme → Valor → CTA', eco: 'Apple "Think Different" (manifiesto sobre features) + MrBeast (retención obsesiva primeros 3s). El chisme tapa el valor igual que Bernays escondía al patrocinador.' },
+      { f: 'REEL que vende (Sell Your Knowledge)', eco: 'Dollar Shave Club: producto/sistema en cámara desde el segundo 1 + honestidad brutal en el hook. Hormozi: valor masivo gratis con funnel claro.' },
+      { f: 'HISTORIAS · Método H.I.L.O.', eco: 'Obama 2008: la lista (DM/WhatsApp) como activo #1. La interacción (encuestas/quiz) = inteligencia de audiencia antes de vender (Goebbels, técnica neutra).' },
+      { f: 'YOUTUBE (Richard): idea = remix + título por palanca + miniatura por capas', eco: 'MrBeast: 50+ variantes de thumbnail A/B. Uncle Sam "I Want YOU": contacto visual directo + gesto enfático en la miniatura. De Beers: eslogan permanente en cada pieza.' },
+    ];
+    const card = document.createElement('div');
+    card.className = 'bg-primary/40 border border-accent/15 rounded-xl p-5 mt-4';
+    card.innerHTML = `<h3 class="font-display text-lg font-bold text-accent mb-3">🏛️ Eco histórico de las 4 fórmulas</h3>
+      <div class="space-y-3">${ecos.map(x => `
+        <div class="border-l-2 border-accent/40 pl-3">
+          <div class="text-sm font-semibold text-light">${E(x.f)}</div>
+          <div class="text-xs text-zinc-400 mt-0.5">${E(x.eco)}</div>
+        </div>`).join('')}</div>`;
+    const container = out.querySelector('.space-y-4') || out;
+    container.appendChild(card);
+  });
+}
+
+// =========================================================
 //  Dispatcher + init
 // =========================================================
 window.OPERA_RENDERERS = {
@@ -328,7 +403,20 @@ window.OPERA_RENDERERS = {
   visual: renderVisual,
   psicologia: renderPsicologia,
   redes: renderRedes,
+  relaunch: renderRelaunch,
+  estrategia: amplificarEstrategia,
+  calendario: bannerCalendario,
 };
+function bannerCalendario() {
+  const sec = document.getElementById('tab-calendario');
+  if (!sec || sec.dataset.opera) return;
+  sec.dataset.opera = '1';
+  const b = document.createElement('div');
+  b.className = 'bg-accent/10 border border-accent/25 rounded-xl p-3 mb-4 text-sm text-accent flex items-center justify-between gap-2';
+  b.innerHTML = `<span>📌 ¿Buscás el plan fijo de 30 días con tracking? Está en la tab <b>🚀 Re-Launch</b>.</span>
+    <button onclick="document.querySelector('[data-tab=relaunch]').click()" class="text-xs px-3 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 shrink-0">Ir a Re-Launch</button>`;
+  sec.insertBefore(b, sec.firstChild);
+}
 document.addEventListener('DOMContentLoaded', () => {
   ensureOpera();
   renderManifiesto(); // tab por defecto
