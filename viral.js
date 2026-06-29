@@ -113,14 +113,14 @@ DEVUELVE ESTRICTAMENTE UN JSON VÁLIDO (sin texto antes ni después, sin backtic
       "vector_viral": "el elemento universal que usa",
       "outlier_referencia": "qué formato/outlier imita y de qué nicho viene",
       "titulos": [ { "texto": "variante de título", "palanca": "miedo|curiosidad|deseo" } ],
-      "miniatura": { "formato": "", "composicion": "", "elementos": "", "texto_en_miniatura": "máx 3-4 palabras" },
+      "miniaturas": [ { "variante": "A|B|C", "formato": "", "composicion": "", "elementos": "", "texto_en_miniatura": "máx 3-4 palabras" } ],
       "guion": [ { "seccion": "hook|contexto|retencion|payoff|cta", "tiempo": "0:00-0:30", "contenido": "qué se dice/muestra" } ],
       "cortes_reels": [ "momento del video que se puede cortar a un reel vertical" ],
       "por_que_funciona": "1-2 frases"
     }
   ]
 }
-Genera 4-6 variantes de título (cubriendo las 3 palancas) y un guion de 5-8 secciones.`;
+Genera 4-6 variantes de título (cubriendo las 3 palancas), EXACTAMENTE 3 variantes de miniatura (A/B/C, distintas entre sí — mecánica MrBeast de testear thumbnails) y un guion de 5-8 secciones.`;
 
 const CAL_SCHEMA = `=== MODO CALENDARIO DE CONTENIDO ===
 Plan semanal, 2-3 posts/día, todos los días. Mezcla: VIRAL (alcance) + AUTORIDAD (b-roll escrito, carruseles) + HAND-RAISERS (recursos gratis) + VENTA (solo en cosecha, sobre todo por historias).
@@ -349,9 +349,10 @@ ${dolorPromptBlock(dolor)}${tema ? 'Tema/ángulo libre adicional: ' + tema : ''}
 Formato deseado: ${formato === 'auto' ? 'elige tú el mejor para cada uno (pueden variar)' : formato}
 ${cta ? 'CTA / palabra clave a usar: ' + cta : 'Inventa una palabra clave de comentario relevante.'}
 Cada reel debe usar un CHISME diferente para no repetir el gancho.`;
+  const amp = (document.getElementById('r-amplificada') && document.getElementById('r-amplificada').checked && window.operaAmplify) ? window.operaAmplify() : '';
 
   try {
-    const text = await callClaude(prompt, 1200 + Number(variantes) * 1500, REEL_SCHEMA);
+    const text = await callClaude(prompt + amp, 1200 + Number(variantes) * 1500, REEL_SCHEMA);
     const data = parseJSON(text);
     renderReels(data.reels || []);
   } catch (e) {
@@ -380,7 +381,10 @@ function reelCard(r, i) {
         <div class="text-[11px] uppercase tracking-wide text-fuchsia-400 font-semibold">${esc(r.formato)}</div>
         <h3 class="text-lg font-bold">${esc(r.titulo)}</h3>
       </div>
-      <button onclick="copyReel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
+      <div class="flex gap-1 shrink-0">
+        <button onclick="saveGen('reels', ${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">💾 Guardar</button>
+        <button onclick="copyReel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">📋 Copiar</button>
+      </div>
     </div>
     <div class="grid sm:grid-cols-2 gap-3 mb-4 text-sm">
       <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">🎣 HOOK</div>${esc(r.hook)}</div>
@@ -457,9 +461,10 @@ async function generarCarruseles() {
 ${dolorPromptBlock(dolor)}${tema ? 'Tema/ángulo libre adicional: ' + tema : ''}
 Plantilla a usar: ${plantilla === 'auto' ? 'elige la mejor para cada uno' : plantilla}
 ${cta ? 'CTA / palabra clave a usar: ' + cta : 'Inventa una palabra clave de comentario relevante.'}`;
+  const amp = (document.getElementById('c-amplificada') && document.getElementById('c-amplificada').checked && window.operaAmplify) ? window.operaAmplify() : '';
 
   try {
-    const text = await callClaude(prompt, 1200 + Number(variantes) * 1800, CARRUSEL_SCHEMA);
+    const text = await callClaude(prompt + amp, 1200 + Number(variantes) * 1800, CARRUSEL_SCHEMA);
     const data = parseJSON(text);
     renderCarruseles(data.carruseles || []);
   } catch (e) {
@@ -494,7 +499,10 @@ function carruselCard(c, i) {
         <div class="text-[11px] uppercase tracking-wide text-fuchsia-400 font-semibold">${esc(c.plantilla)}</div>
         <h3 class="text-lg font-bold">${esc(c.titulo)}</h3>
       </div>
-      <button onclick="copyCarrusel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
+      <div class="flex gap-1 shrink-0">
+        <button onclick="saveGen('carruseles', ${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">💾 Guardar</button>
+        <button onclick="copyCarrusel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">📋 Copiar</button>
+      </div>
     </div>
     <div class="flex gap-3 overflow-x-auto scrollbar-thin pb-2 mb-3">${slideEls}</div>
     <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 text-sm mb-2"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">📝 CAPTION</div>${esc(c.caption)}</div>
@@ -556,7 +564,7 @@ function youtubeCard(v, i) {
   const titulos = Array.isArray(v.titulos) ? v.titulos : [];
   const guion = Array.isArray(v.guion) ? v.guion : [];
   const cortes = Array.isArray(v.cortes_reels) ? v.cortes_reels : [];
-  const m = v.miniatura || {};
+  const minis = Array.isArray(v.miniaturas) ? v.miniaturas : (v.miniatura ? [v.miniatura] : []);
   const titulosEl = titulos.map(t => `
     <li class="flex items-start gap-2 text-sm py-1">
       <span class="text-[10px] uppercase font-bold ${palancaColor(t.palanca)} shrink-0 w-16">${esc(t.palanca || '')}</span>
@@ -583,9 +591,16 @@ function youtubeCard(v, i) {
       <div class="text-[11px] text-zinc-500 font-semibold mb-1">🏷️ TÍTULOS (por palanca)</div>
       <ul>${titulosEl}</ul>
     </div>
-    <div class="bg-zinc-950 rounded-lg p-3 text-sm mb-3">
-      <div class="text-[11px] text-zinc-500 font-semibold mb-1">🖼️ MINIATURA</div>
-      <div class="text-xs"><b class="text-zinc-400">Texto:</b> ${esc(m.texto_en_miniatura)} · <b class="text-zinc-400">Formato:</b> ${esc(m.formato)} · <b class="text-zinc-400">Composición:</b> ${esc(m.composicion)} · <b class="text-zinc-400">Elementos:</b> ${esc(m.elementos)}</div>
+    <div class="mb-3">
+      <div class="text-[11px] text-zinc-500 font-semibold mb-1">🖼️ MINIATURAS (3 variantes · A/B test)</div>
+      <div class="grid sm:grid-cols-3 gap-2">${minis.map((m, k) => `
+        <div class="bg-zinc-950 rounded-lg p-3">
+          <div class="text-[10px] uppercase font-bold text-accent mb-1">Variante ${esc(m.variante || String.fromCharCode(65 + k))}</div>
+          <div class="text-sm font-semibold mb-1">"${esc(m.texto_en_miniatura)}"</div>
+          <div class="text-[11px] text-zinc-400"><b>Formato:</b> ${esc(m.formato)}</div>
+          <div class="text-[11px] text-zinc-400"><b>Composición:</b> ${esc(m.composicion)}</div>
+          <div class="text-[11px] text-zinc-400"><b>Elementos:</b> ${esc(m.elementos)}</div>
+        </div>`).join('')}</div>
     </div>
     <details class="mb-3">
       <summary class="cursor-pointer text-xs font-semibold text-zinc-400 mb-2">🎬 Guion / retención (${guion.length})</summary>
@@ -599,12 +614,13 @@ function copyYoutube(i, btn) {
   const v = LAST_YT[i]; if (!v) return;
   const titulos = Array.isArray(v.titulos) ? v.titulos : [];
   const guion = Array.isArray(v.guion) ? v.guion : [];
-  const m = v.miniatura || {};
+  const minis = Array.isArray(v.miniaturas) ? v.miniaturas : (v.miniatura ? [v.miniatura] : []);
   const txt = `${v.titulo_principal}
 IDEA: ${v.idea} (outlier: ${v.outlier_referencia} | vector: ${v.vector_viral})
 TÍTULOS:
 ${titulos.map(t => `- [${t.palanca}] ${t.texto}`).join('\n')}
-MINIATURA: ${m.texto_en_miniatura} | formato: ${m.formato} | composición: ${m.composicion} | elementos: ${m.elementos}
+MINIATURAS:
+${minis.map((m, k) => `- ${m.variante || String.fromCharCode(65 + k)}: "${m.texto_en_miniatura}" | formato: ${m.formato} | composición: ${m.composicion} | elementos: ${m.elementos}`).join('\n')}
 GUION:
 ${guion.map(g => `${g.seccion} (${g.tiempo}): ${g.contenido}`).join('\n')}
 CORTES A REELS: ${(v.cortes_reels || []).join(' / ')}`;
@@ -919,6 +935,25 @@ function renderEstrategia() {
     </div>`;
 }
 
+// ---------- Guardar pieza generada en Biblioteca ----------
+function saveGen(kind, i, btn) {
+  const obj = kind === 'reels' ? LAST_REELS[i] : LAST_CARR[i];
+  if (!obj || !window.operaSave) return;
+  window.operaSave(kind, obj);
+  if (btn) { btn.textContent = '✓ Guardado'; setTimeout(() => { btn.textContent = '💾 Guardar'; }, 1500); }
+}
+
+// ---------- Indicador de fase del mes (siembra/cosecha) ----------
+function setFaseBadge() {
+  const el = document.getElementById('h-fase'); if (!el) return;
+  const d = new Date().getDate();
+  const cosecha = d >= 21 && d <= 27;
+  el.innerHTML = cosecha
+    ? '🌾 <b>Cosecha</b> (días 21-27): vendé desde historias con urgencia/escasez real. Máx 4-5 historias de venta esta semana.'
+    : '🌱 <b>Siembra</b> (días 1-20, 28+): valor + hand-raisers, sin vender de frente. CTA de respuesta, no link.';
+  el.className = 'text-[11px] px-3 py-2 rounded-lg ' + (cosecha ? 'bg-emerald-900/40 text-emerald-200' : 'bg-sky-900/30 text-sky-200');
+}
+
 // ---------- Settings ----------
 function openSettings() {
   document.getElementById('s-key').value = LS.key;
@@ -949,6 +984,7 @@ function setupTabs() {
 document.addEventListener('DOMContentLoaded', () => {
   refreshKeyStatus();
   setupTabs();
+  setFaseBadge();
   loadKB();
   document.getElementById('settings-btn').addEventListener('click', openSettings);
   document.getElementById('r-generate').addEventListener('click', generarReels);

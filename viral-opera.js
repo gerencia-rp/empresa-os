@@ -27,6 +27,43 @@ function operaToggleCheck(id, on) {
 function operaChecked(id) { return !!OSTATE.get('checks', {})[id]; }
 window.operaToggleCheck = operaToggleCheck;
 
+// Bloque "fórmula amplificada" inyectado al prompt de los generadores
+window.operaAmplify = function () {
+  if (!OPERA) return '';
+  const a = OPERA.arquetipo;
+  return `\n\n=== FÓRMULA AMPLIFICADA · VOZ DE MARCA "OPERA TU IMPERIO" ===
+Arquetipo: ${a.nombre} (${a.fusion}). ${a.descripcion}
+Enemigo a atacar (al ARQUETIPO, NUNCA a personas): ${a.enemigoComun.nombre} — ${a.enemigoComun.quienesSon.join('; ')}.
+Contraste Ellos vs Vos: ${a.enemigoComun.tablaEllosVsVos.map(r => r.ellos + ' → ' + r.vos).join(' | ')}.
+Frases bandera (insertá alguna): ${a.frasesRecurrentes.bandera.join(' / ')}.
+Cierres posibles: ${a.frasesRecurrentes.cierre.join(' / ')}.
+Palabras de marca: ${a.palabrasDeMarca.join(', ')}.
+Palabras PROHIBIDAS (jamás): ${a.palabrasProhibidas.map(p => p.palabra).join(', ')}.
+Eco histórico (aplicá mecánicas reales): Apple manifiesto, MrBeast retención 3s, De Beers eslogan permanente, Bernays pseudo-evento, Bukele resultados visibles.
+El eslogan "OPERA TU IMPERIO" debe aparecer o insinuarse. Tono rioplatense, directo. Mostrá sistema/métricas, no humo.`;
+};
+
+// Guardar piezas generadas por la IA en la biblioteca (localStorage)
+window.operaSave = function (kind, obj) {
+  if (!obj) return;
+  const saved = OSTATE.get('saved', []);
+  const title = obj.titulo || obj.titulo_principal || obj.thumbnail || obj.tema || obj.titulo_secuencia || '(sin título)';
+  saved.unshift({ kind, title, obj, ts: Date.now() });
+  OSTATE.set('saved', saved.slice(0, 100));
+};
+function operaRemoveSaved(idx) {
+  const saved = OSTATE.get('saved', []);
+  saved.splice(idx, 1); OSTATE.set('saved', saved);
+  const out = document.getElementById('tab-biblioteca');
+  if (out) { out.dataset.rendered = ''; renderBiblioteca(); }
+}
+function operaCopySaved(idx) {
+  const it = OSTATE.get('saved', [])[idx]; if (!it) return;
+  navigator.clipboard.writeText(JSON.stringify(it.obj, null, 2));
+}
+window.operaRemoveSaved = operaRemoveSaved;
+window.operaCopySaved = operaCopySaved;
+
 // ---------- Helpers de render ----------
 const E = (s) => (s == null ? '' : String(s)).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 function oHero(title, sub) {
@@ -406,9 +443,22 @@ function renderBiblioteca() {
     });
     const tt = grid(b.tiktoks, t => pieceWrap('tiktoks', t, '', t.hook, 'TikTok'));
 
+    const saved = OSTATE.get('saved', []);
+    const savedSec = saved.length ? sec('⭐', 'Guardados por vos (' + saved.length + ')',
+      `<div class="grid sm:grid-cols-2 gap-3">${saved.map((it, idx) => `
+        <div class="bg-primary/40 border border-accent/25 rounded-xl p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0"><div class="font-semibold text-sm truncate">${E(it.title)}</div><div class="text-[10px] uppercase text-accent/70">${E(it.kind)}</div></div>
+            <div class="flex gap-1 shrink-0">
+              <button onclick="operaCopySaved(${idx})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button>
+              <button onclick="operaRemoveSaved(${idx})" class="text-xs px-2 py-1 rounded bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">🗑</button>
+            </div>
+          </div>
+        </div>`).join('')}</div>`) : '';
     out.innerHTML =
       oHero('Biblioteca de contenido', '45 piezas listas para grabar · marcá su estado a medida que producís') +
       `<div class="flex flex-wrap gap-2 mb-5 sticky top-0 bg-dark/0 z-10">${filtros}</div>` +
+      savedSec +
       sec('🎬', 'Reels (' + b.reels.length + ')', reels) +
       sec('🖼️', 'Carruseles (' + b.carruseles.length + ')', carr) +
       sec('📲', 'Historias H.I.L.O. (' + b.historias.length + ')', hist) +

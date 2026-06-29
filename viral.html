@@ -137,7 +137,11 @@
             <label class="text-xs font-semibold text-zinc-400">CTA / palabra clave (opcional)</label>
             <input id="r-cta" placeholder="Ej: comenta TERRENO" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
           </div>
-          <button id="r-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar reels</button>
+          <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <input id="r-amplificada" type="checkbox" class="accent-[#C8A864]">
+            <span>🏛️ Fórmula amplificada (voz de marca + enemigo + mecánicas históricas)</span>
+          </label>
+          <button id="r-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar reels</button>
         </div>
         <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
           Cada reel sale con la fórmula de Julio: <b>hook → chisme → valor oculto → CTA</b>, formato, guion palabra-por-palabra con tomas e indicaciones de edición.
@@ -195,7 +199,11 @@
             <label class="text-xs font-semibold text-zinc-400">CTA / palabra clave (opcional)</label>
             <input id="c-cta" placeholder="Ej: comenta PATRIMONIO" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
           </div>
-          <button id="c-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar carruseles</button>
+          <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <input id="c-amplificada" type="checkbox" class="accent-[#C8A864]">
+            <span>🏛️ Fórmula amplificada (voz de marca + enemigo + mecánicas históricas)</span>
+          </label>
+          <button id="c-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar carruseles</button>
         </div>
         <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
           Plantillas validadas de Julio: <b>Referente famoso</b> y <b>Antes/después</b>, más la estructura <b>Educativa</b> (hook→problema→solución→prueba→CTA).
@@ -272,7 +280,8 @@
             <label class="text-xs font-semibold text-zinc-400">Palabra clave para DM (opcional)</label>
             <input id="h-palabra" placeholder="Ej: FLIP / CUARTO / HISTORIAS" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
           </div>
-          <button id="h-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar secuencia H.I.L.O.</button>
+          <div id="h-fase" class="text-[11px] px-3 py-2 rounded-lg bg-zinc-800 text-zinc-300"></div>
+          <button id="h-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar secuencia H.I.L.O.</button>
         </div>
         <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
           Método <b>H.I.L.O.™</b>: <b class="text-fuchsia-400">H</b>ook → <b class="text-sky-400">I</b>dentificación → <b class="text-amber-400">L</b>leva (A→B con interacción) → <b class="text-emerald-400">O</b>ferta + CTA de respuesta.
@@ -320,7 +329,7 @@
               <input id="y-cta" placeholder="Ej: link en descripción" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
             </div>
           </div>
-          <button id="y-generate" class="w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar videos</button>
+          <button id="y-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar videos</button>
         </div>
         <div class="text-[11px] text-zinc-600 leading-relaxed px-1">
           Método Richard/One of 10: <b>idea = remix</b> (formato + tema + vector viral), <b>títulos</b> por las 3 palancas (miedo/curiosidad/deseo), <b>miniatura por capas</b> y cortes a reels.
@@ -366,7 +375,7 @@
           <input id="cal-foco" placeholder="Ej: criterio y búsqueda de propiedades" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
         </div>
       </div>
-      <button id="cal-generate" class="mt-3 w-full bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar calendario</button>
+      <button id="cal-generate" class="mt-3 w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar calendario</button>
       <p class="text-[11px] text-zinc-600 mt-2">Mezcla viral + autoridad + hand-raisers + venta, con ritmo siembra/cosecha. Historias: 1 secuencia/día (hook 14h, secuencia 16h).</p>
     </div>
     <div id="cal-output" class="min-h-[200px]">
