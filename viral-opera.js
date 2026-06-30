@@ -658,9 +658,212 @@ function amplificarEstrategia() {
 }
 
 // =========================================================
+//  TAB: STUDIO (la estrella — producción con context injection)
+// =========================================================
+const STUDIO = { tipo: 'reel' };
+const STUDIO_TIPOS = [
+  { id: 'reel', label: '🎬 Reel' }, { id: 'carrusel', label: '🖼️ Carrusel' }, { id: 'historia', label: '📲 Story' },
+  { id: 'youtube', label: '▶️ YouTube' }, { id: 'manifiesto', label: '💬 Manifiesto' }, { id: 'post', label: '📝 Post' },
+];
+function waitForKB(cb, tries) {
+  tries = tries || 0;
+  if (typeof KB !== 'undefined' && KB) return cb(KB);
+  if (tries > 40) return;
+  setTimeout(() => waitForKB(cb, tries + 1), 150);
+}
+function fillStudioDolores() {
+  const sel = document.getElementById('st-dolor'); if (!sel) return;
+  waitForKB((kb) => {
+    if (sel.dataset.filled) return; sel.dataset.filled = '1';
+    sel.innerHTML = '<option value="">— Elegí un dolor (opcional) —</option>';
+    kb.categorias.forEach(c => {
+      const grp = document.createElement('optgroup'); grp.label = c.nombre;
+      kb.preguntas.filter(q => q.categoria === c.id).forEach(q => {
+        const o = document.createElement('option'); o.value = q.id; o.textContent = q.pregunta; grp.appendChild(o);
+      });
+      if (grp.children.length) sel.appendChild(grp);
+    });
+  });
+}
+function studioRandomDolor() {
+  const sel = document.getElementById('st-dolor');
+  waitForKB((kb) => { const q = kb.preguntas[Math.floor(Math.random() * kb.preguntas.length)]; if (sel) sel.value = q.id; });
+}
+window.studioRandomDolor = studioRandomDolor;
+function studioPickType(t) {
+  STUDIO.tipo = t;
+  document.querySelectorAll('[data-stype]').forEach(b => {
+    const on = b.dataset.stype === t;
+    b.className = 'stype-btn px-3 py-3 rounded-xl text-sm font-semibold border ' + (on ? 'bg-accent text-primary border-accent' : 'bg-primary/40 text-zinc-300 border-zinc-800 hover:border-accent/40');
+  });
+  const fr = document.getElementById('st-formato-row'); if (fr) fr.style.display = (t === 'reel') ? '' : 'none';
+}
+window.studioPickType = studioPickType;
+function renderStudio() {
+  const out = document.getElementById('tab-studio'); if (!out || out.dataset.rendered) return;
+  ensureOpera().then(() => {
+    out.dataset.rendered = '1';
+    const data = OPERA;
+    const tipos = STUDIO_TIPOS.map(t => `<button data-stype="${t.id}" onclick="studioPickType('${t.id}')" class="stype-btn px-3 py-3 rounded-xl text-sm font-semibold border ${t.id === STUDIO.tipo ? 'bg-accent text-primary border-accent' : 'bg-primary/40 text-zinc-300 border-zinc-800 hover:border-accent/40'}">${t.label}</button>`).join('');
+    const enemigoOpts = `<option value="auto">⚙️ Auto (según dolor)</option>`
+      + `<option value="principal">${E(data.arquetipo.enemigos.principal.nombre)}</option>`
+      + `<option value="invisible">${E(data.arquetipo.enemigos.invisible.nombre)}</option>`
+      + data.arquetipo.enemigos.tacticos.map(t => `<option value="${t.id}">${E(t.nombre)}</option>`).join('');
+    const tacticaOpts = `<option value="auto">⚙️ Auto (según tipo)</option>`
+      + data.psicologia.tacticasAplicadas.map(t => `<option value="${t.id}">${E(t.maestro)} — ${E(t.tecnica)}</option>`).join('');
+    const fld = (label, inner) => `<div><label class="text-xs font-semibold text-zinc-400">${label}</label>${inner}</div>`;
+    const selCls = 'mt-1 w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none';
+    out.innerHTML =
+      oHero('Studio', 'Producí contenido con toda tu estrategia inyectada automáticamente') +
+      `<div class="bg-primary/40 border border-accent/15 rounded-xl p-4 mb-4">
+        <div class="text-xs font-semibold text-zinc-400 mb-2">¿QUÉ CREÁS HOY?</div>
+        <div class="grid grid-cols-3 gap-2">${tipos}</div>
+      </div>
+      <div class="grid md:grid-cols-[400px_1fr] gap-6">
+        <div class="space-y-3 bg-primary/40 border border-accent/15 rounded-xl p-4">
+          ${fld('📌 Para quién (avatar)', `<select id="st-avatar" class="${selCls}"><option value="avatar2">Avatar 2 — Empleado empezando (default)</option><option value="avatar1">Avatar 1 — Flipper escalando</option></select>`)}
+          ${fld('🎯 Dolor del avatar', `<div class="flex gap-2"><select id="st-dolor" class="${selCls} flex-1"><option value="">— cargando… —</option></select><button onclick="studioRandomDolor()" class="mt-1 px-3 rounded-lg bg-accent/15 text-accent text-sm shrink-0">🎲</button></div>`)}
+          ${fld('👹 Enemigo a atacar', `<select id="st-enemigo" class="${selCls}">${enemigoOpts}</select>`)}
+          ${fld('🧠 Táctica psicológica', `<select id="st-tactica" class="${selCls}">${tacticaOpts}</select>`)}
+          ${fld('📅 Fase del mes', `<select id="st-fase" class="${selCls}"><option value="auto">⚙️ Auto (según fecha)</option><option value="siembra">Siembra (valor)</option><option value="cosecha">Cosecha (venta)</option></select>`)}
+          ${fld('✍️ Tema / ángulo libre (opcional)', `<textarea id="st-tema" rows="2" placeholder="Ej: cómo financiar el primer flip con ITIN" class="${selCls} resize-none"></textarea>`)}
+          <details class="text-sm">
+            <summary class="cursor-pointer text-xs font-semibold text-accent">⚙️ Configuración avanzada</summary>
+            <div class="space-y-2 mt-2">
+              <div id="st-formato-row">${fld('Formato (reel)', `<select id="st-formato" class="${selCls}"><option value="">Automático</option><option>Manita</option><option>Doble</option><option>Ranking</option><option>Sketch</option><option>Mano arriba</option><option>Entrevista en calle</option></select>`)}</div>
+              ${fld('Variantes', `<select id="st-variantes" class="${selCls}"><option>1</option><option selected>3</option><option>5</option></select>`)}
+              ${fld('CTA / palabra clave DM', `<input id="st-cta" placeholder="auto (MÉTODO, BUYBOX…)" class="${selCls}">`)}
+              ${fld('Modelo IA', `<input id="st-model" placeholder="auto (el de Ajustes)" class="${selCls}">`)}
+            </div>
+          </details>
+          <button id="st-generate" onclick="studioGenerate(this)" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-3 rounded-lg glow text-base">⚡ Generar contenido potenciado</button>
+        </div>
+        <div>
+          <div id="st-context" class="mb-4"></div>
+          <div id="st-output" class="min-h-[200px]"><div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-16"><div><div class="text-4xl mb-2">🎯</div><p class="text-sm">Elegí tipo + config y dale a Generar.<br>Toda tu marca se inyecta automáticamente.</p></div></div></div>
+        </div>
+      </div>`;
+    fillStudioDolores();
+  }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
+}
+function studioCollectParams() {
+  const v = id => (document.getElementById(id) || {}).value || '';
+  return {
+    tipoContenido: STUDIO.tipo, avatarDestino: v('st-avatar') || 'avatar2', dolor: v('st-dolor'),
+    enemigo: v('st-enemigo') || 'auto', tactica: v('st-tactica') || 'auto', faseDelMes: v('st-fase') || 'auto',
+    tema: v('st-tema'), formato: v('st-formato'), variantes: v('st-variantes') || '3',
+    palabraClaveDM: v('st-cta'), model: v('st-model'),
+  };
+}
+function studioContextPanel(ctx, estTokens) {
+  const row = (k, val) => val ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-emerald-400">✓</span><span class="text-zinc-400">${k}:</span><span class="text-zinc-200">${E(val)}</span></div>` : '';
+  return `<div class="bg-primary/40 border border-accent/15 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold text-accent uppercase tracking-wide">Contexto inyectado (transparente)</div>
+    <span class="text-[10px] text-zinc-500">~${estTokens} tokens</span></div>
+    ${row('Eslogan', ctx.eslogan)}${row('Framework', ctx.framework)}${row('Tagline', ctx.tagline)}${row('Arquetipo', ctx.arquetipo)}
+    ${row('Enemigo (' + ctx.enemigoTipo + ')', ctx.enemigo)}${row('Táctica', ctx.tactica)}${row('Avatar', ctx.avatar)}${row('Dolor', ctx.dolor)}${row('Fase', ctx.fase)}
+    <div class="flex gap-2 text-xs py-0.5"><span class="text-emerald-400">✓</span><span class="text-zinc-200">${ctx.prohibidasCount} palabras prohibidas bloqueadas · ${ctx.marcaCount} de marca priorizadas · validador activo</span></div>
+    <details class="mt-1"><summary class="cursor-pointer text-[11px] text-zinc-500">ver prompt completo enviado al API</summary><pre id="st-rawprompt" class="text-[10px] text-zinc-500 whitespace-pre-wrap mt-1 max-h-60 overflow-auto"></pre></details>
+  </div>`;
+}
+function flattenVariante(v) {
+  const parts = [v.thumbnail_text, v.hook, v.chisme, v.valor_oculto, v.cta, v.caption_corta, v.caption_larga, v.mecanica_aplicada];
+  if (Array.isArray(v.slides)) v.slides.forEach(s => parts.push(s.texto));
+  if (Array.isArray(v.frames)) v.frames.forEach(f => parts.push(f.texto_en_pantalla, f.voz));
+  if (Array.isArray(v.titulos)) v.titulos.forEach(t => parts.push(t.texto));
+  if (Array.isArray(v.lineas)) parts.push(v.lineas.join(' '));
+  return parts.filter(Boolean).join('\n');
+}
+let STUDIO_LAST = [];
+async function studioGenerate(btn) {
+  if (!window.ContextBuilder) { alert('Context builder no cargó.'); return; }
+  const params = studioCollectParams();
+  let build;
+  try { build = window.ContextBuilder.build(params); } catch (e) { document.getElementById('st-output').innerHTML = `<p class="text-sm text-red-400">${E(e.message)}</p>`; return; }
+  const estTokens = Math.round((build.system.length + build.userPrompt.length) / 4);
+  document.getElementById('st-context').innerHTML = studioContextPanel(build.contexto, estTokens);
+  const pre = document.getElementById('st-rawprompt'); if (pre) pre.textContent = build.system + '\n\n----- USER -----\n' + build.userPrompt;
+  const out = document.getElementById('st-output');
+  out.innerHTML = `<div class="border border-zinc-800 rounded-xl py-16 flex flex-col items-center text-zinc-500"><div class="typing text-3xl mb-3"><span>●</span><span>●</span><span>●</span></div><p id="st-status" class="text-sm">Generando con tu marca inyectada…</p></div>`;
+  btn.disabled = true; btn.classList.add('opacity-50', 'pointer-events-none');
+  const n = Number(params.variantes) || 3;
+  try {
+    let userPrompt = build.userPrompt, variantes = [], attempt = 0, exhausted = false;
+    for (attempt = 1; attempt <= 3; attempt++) {
+      const text = await window.callClaudeMessages([{ role: 'user', content: userPrompt }],
+        { system: build.system, max_tokens: 1500 + n * 1500, model: params.model || undefined });
+      let parsed; try { parsed = parseJSON(text); } catch (e) { parsed = {}; }
+      variantes = parsed.variantes || parsed.reels || (Array.isArray(parsed) ? parsed : []);
+      const errs = [];
+      variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v)); if (!r.ok) errs.push.apply(errs, r.errores); });
+      if (!variantes.length) throw new Error('La IA no devolvió variantes válidas. Reintentá.');
+      if (!errs.length) break;
+      if (attempt < 3) {
+        const st = document.getElementById('st-status'); if (st) st.textContent = `Validando… corrigiendo (intento ${attempt + 1}/3)`;
+        userPrompt = build.userPrompt + window.Validator.feedbackPrompt({ errores: Array.from(new Set(errs)) });
+      } else { exhausted = true; }
+    }
+    STUDIO_LAST = variantes;
+    renderStudioCards(variantes, params.tipoContenido, exhausted);
+  } catch (e) {
+    out.innerHTML = `<div class="border border-red-900/50 bg-red-950/20 rounded-xl p-5 text-sm text-red-300"><b>Error:</b> ${E(e.message)}</div>`;
+  } finally { btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); }
+}
+window.studioGenerate = studioGenerate;
+function studioCard(v, i, tipo) {
+  const val = window.Validator.validate(flattenVariante(v));
+  const badge = (ok, txt) => `<span class="text-[10px] px-1.5 py-0.5 rounded ${ok ? 'bg-emerald-900/50 text-emerald-300' : 'bg-bordeaux/40 text-red-300'}">${ok ? '✓' : '✗'} ${txt}</span>`;
+  const f = (lbl, txt, c) => txt ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase ${c || 'text-zinc-500'} font-semibold mb-0.5">${lbl}</div><div class="text-sm">${E(txt)}</div></div>` : '';
+  let extra = '';
+  if (Array.isArray(v.slides)) extra = `<div class="flex gap-2 overflow-x-auto scrollbar-thin pb-2 mb-2">${v.slides.map(s => `<div class="shrink-0 w-40 bg-dark border border-zinc-800 rounded-lg p-2"><div class="text-[9px] uppercase text-accent">slide ${E(String(s.n ?? ''))} · ${E(s.tipo || '')}</div><div class="text-xs mt-1">${E(s.texto)}</div><div class="text-[9px] text-zinc-600 mt-1">📷 ${E(s.visual || '')}</div></div>`).join('')}</div>`;
+  if (Array.isArray(v.frames)) extra = v.frames.map(fr => `<div class="border-l-2 border-accent/40 pl-2 mb-1.5"><span class="text-[10px] uppercase text-accent">${E(fr.fase || '')}</span><div class="text-sm">${E(fr.texto_en_pantalla)}</div>${fr.voz ? `<div class="text-xs text-zinc-400">${E(fr.voz)}</div>` : ''}${fr.sticker && fr.sticker !== 'ninguno' ? `<div class="text-[10px] text-purple-300">🎯 ${E(fr.sticker)}</div>` : ''}</div>`).join('');
+  if (Array.isArray(v.titulos)) extra += `<div class="mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-1">Títulos</div>${v.titulos.map(t => `<div class="text-xs"><span class="text-accent">[${E(t.palanca || '')}]</span> ${E(t.texto)}</div>`).join('')}</div>`;
+  if (Array.isArray(v.miniaturas)) extra += `<div class="grid grid-cols-3 gap-1 mb-2">${v.miniaturas.map(m => `<div class="bg-dark rounded p-2 text-[10px]"><b class="text-accent">${E(m.variante || '')}</b> "${E(m.texto_en_miniatura)}"<div class="text-zinc-500">${E(m.composicion || '')}</div></div>`).join('')}</div>`;
+  if (Array.isArray(v.lineas)) extra = `<div class="bg-dark rounded-lg p-3 mb-2">${v.lineas.map(l => `<div class="font-display text-base text-light">${E(l)}</div>`).join('')}</div>`;
+  return `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-4 mb-4">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div class="min-w-0"><div class="text-[10px] uppercase text-accent/70">${E(tipo)} · variante ${i + 1}</div><div class="font-display font-bold text-light">${E(v.thumbnail_text || '')}</div></div>
+      <div class="flex gap-1 shrink-0">
+        <button onclick="studioCopy(${i},this)" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button>
+        <button onclick="studioSave(${i},this)" class="text-xs px-2 py-1 rounded bg-accent/15 text-accent hover:bg-accent/25">💾</button>
+        <button onclick="studioExport(${i})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📥</button>
+      </div>
+    </div>
+    ${f('🎣 Hook', v.hook, 'text-accent')}${f('🗣️ Chisme', v.chisme)}${extra}${f('💎 Valor oculto', v.valor_oculto, 'text-emerald-400')}${f('📣 CTA', v.cta, 'text-purple-300')}
+    ${v.caption_larga ? `<details class="mb-2"><summary class="cursor-pointer text-[11px] text-zinc-500">caption larga</summary><div class="text-sm text-zinc-300 mt-1">${E(v.caption_larga)}</div></details>` : ''}
+    <div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-zinc-600 mr-1">${E(v.mecanica_aplicada || '')}</span>${badge(val.errores.length === 0, 'reglas')}${badge(val.palabrasDeMarcaUsadas.length >= 3, val.palabrasDeMarcaUsadas.length + ' marca')}${badge(val.frasesUsadas.length >= 1, 'frase')}</div>
+    ${val.errores.length ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${E(val.errores.join(' · '))}</div>` : ''}
+  </div>`;
+}
+function renderStudioCards(variantes, tipo, exhausted) {
+  const out = document.getElementById('st-output');
+  const warn = exhausted ? `<div class="bg-amber-950/30 border border-amber-900/40 rounded-lg p-2 text-[11px] text-amber-200 mb-3">⚠ Tras 3 intentos quedaron observaciones de validación. Te muestro el mejor resultado — revisá o regenerá.</div>` : '';
+  out.innerHTML = warn + `<div class="flex justify-end mb-2"><button onclick="studioGenerate(document.getElementById('st-generate'))" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">🔄 Regenerar todo</button></div>` +
+    variantes.map((v, i) => studioCard(v, i, tipo)).join('');
+}
+function studioPlainText(v) {
+  let t = `${v.thumbnail_text || ''}\nHOOK: ${v.hook || ''}\nCHISME: ${v.chisme || ''}\nVALOR: ${v.valor_oculto || ''}\nCTA: ${v.cta || ''}`;
+  if (Array.isArray(v.slides)) t += '\n' + v.slides.map(s => `SLIDE ${s.n ?? ''} (${s.tipo || ''}): ${s.texto}`).join('\n');
+  if (Array.isArray(v.frames)) t += '\n' + v.frames.map(f => `[${f.fase}] ${f.texto_en_pantalla} | ${f.voz || ''}`).join('\n');
+  if (Array.isArray(v.titulos)) t += '\nTÍTULOS: ' + v.titulos.map(x => `[${x.palanca}] ${x.texto}`).join(' / ');
+  if (Array.isArray(v.lineas)) t = (v.thumbnail_text || '') + '\n' + v.lineas.join('\n');
+  if (v.caption_larga) t += '\nCAPTION: ' + v.caption_larga;
+  return t;
+}
+function studioCopy(i, btn) { const v = STUDIO_LAST[i]; if (!v) return; navigator.clipboard.writeText(studioPlainText(v)); if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋', 1200); } }
+function studioSave(i, btn) { const v = STUDIO_LAST[i]; if (!v || !window.operaSave) return; window.operaSave(STUDIO.tipo, Object.assign({ thumbnail: v.thumbnail_text }, v)); if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '💾', 1200); } }
+function studioExport(i) {
+  const v = STUDIO_LAST[i]; if (!v) return;
+  const blob = new Blob([studioPlainText(v)], { type: 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `studio-${STUDIO.tipo}-${i + 1}.txt`; a.click(); URL.revokeObjectURL(a.href);
+}
+window.studioCopy = studioCopy; window.studioSave = studioSave; window.studioExport = studioExport;
+
+// =========================================================
 //  Dispatcher + init
 // =========================================================
 window.OPERA_RENDERERS = {
+  studio: renderStudio,
   manifiesto: renderManifiesto,
   identidad: renderIdentidad,
   visual: renderVisual,
@@ -677,5 +880,5 @@ window.OPERA_RENDERERS = {
 };
 document.addEventListener('DOMContentLoaded', () => {
   ensureOpera();
-  renderManifiesto(); // tab por defecto
+  renderStudio(); // tab por defecto (v3)
 });

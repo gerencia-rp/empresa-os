@@ -58,8 +58,11 @@
   <!-- Tabs (13, agrupadas por sección, scroll horizontal en mobile) -->
   <nav class="nav-x max-w-6xl mx-auto px-3 overflow-x-auto">
     <div class="flex items-center gap-0.5 text-sm min-w-max py-1">
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Producción</span>
+      <button data-tab="studio" class="tab-btn px-3 py-2 border-b-2 border-accent text-white font-medium">🎯 Studio</button>
+      <span class="w-px h-5 bg-zinc-700 mx-1"></span>
       <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Identidad</span>
-      <button data-tab="manifiesto" class="tab-btn px-3 py-2 border-b-2 border-accent text-white font-medium">🎯 Manifiesto</button>
+      <button data-tab="manifiesto" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🎯 Manifiesto</button>
       <button data-tab="identidad" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">👤 Identidad</button>
       <button data-tab="visual" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🎨 Visual</button>
       <span class="w-px h-5 bg-zinc-700 mx-1"></span>
@@ -92,8 +95,11 @@
 
 <main class="max-w-6xl mx-auto px-5 py-6">
 
+  <!-- ===== STUDIO (v3 — tab por defecto) ===== -->
+  <section id="tab-studio" class="tab-panel"></section>
+
   <!-- ===== TABS NUEVAS (render desde viral-opera.js) ===== -->
-  <section id="tab-manifiesto" class="tab-panel"></section>
+  <section id="tab-manifiesto" class="tab-panel hidden"></section>
   <section id="tab-identidad" class="tab-panel hidden"></section>
   <section id="tab-visual" class="tab-panel hidden"></section>
   <section id="tab-psicologia" class="tab-panel hidden"></section>
