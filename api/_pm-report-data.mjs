@@ -57,36 +57,50 @@ const money = (n) => Math.round((n || 0) * 100) / 100;
 // ════════════════════════════════════════════════════════════════
 export async function fetchWeeklyData(cfg, now = new Date()) {
   const [units, props, alerts] = await Promise.all([
-    rest(cfg, "pm_units?select=property_id,status,name,code,target_rent&is_active=eq.true"),
-    rest(cfg, "pm_properties?select=id,name&active=eq.true"),
+    rest(cfg, "pm_units?select=property_id,status,name,code,target_rent,unit_type&is_active=eq.true"),
+    rest(cfg, "pm_properties?select=id,name,total_units&active=eq.true"),
     rest(cfg, "pm_alerts?select=severity,category,message,property_id,created_at&resolved=eq.false&order=created_at.desc"),
   ]);
   const nameById = Object.fromEntries(props.map((p) => [p.id, p.name]));
+  const totalUnitsById = Object.fromEntries(props.map((p) => [p.id, p.total_units]));
 
   const isOcc = (s) => /ocupad/i.test(s || "");
   const isRes = (s) => /reservad/i.test(s || "");
-  const isFree = (s) => /disponible|libre|vacante/i.test(s || "");
+  const INDEP = ["casa_completa", "apartamento", "estudio"];
 
-  const total = units.length;
-  const occupied = units.filter((u) => isOcc(u.status)).length;
-  const reserved = units.filter((u) => isRes(u.status)).length;
-  const free = units.filter((u) => isFree(u.status)).length;
-  const occupancyPct = total ? Math.round(((occupied + reserved) / total) * 100) : 0;
-
-  // Por casa: ocupación = (ocupada+reservada)/total de sus unidades.
+  // REGLA DE UNIDADES (igual que el front): casa=1, estudio=1, apto=1, y TODAS las
+  // habitaciones de la casa juntas=1. Ocupación con la misma definición.
   const byProp = {};
   for (const u of units) {
     const pid = u.property_id || "—";
-    (byProp[pid] ||= { id: pid, name: nameById[pid] || "Sin casa", total: 0, occ: 0, res: 0, free: 0, freeUnits: [] });
-    const b = byProp[pid];
-    b.total++;
-    if (isOcc(u.status)) b.occ++;
-    else if (isRes(u.status)) b.res++;
-    else { b.free++; b.freeUnits.push(u.name || u.code || "Unidad"); }
+    (byProp[pid] ||= { id: pid, name: nameById[pid] || "Sin casa", indep: [], rooms: [] });
+    if (u.unit_type === "habitacion") byProp[pid].rooms.push(u);
+    else if (INDEP.includes(u.unit_type)) byProp[pid].indep.push(u);
+    else byProp[pid].indep.push(u); // tipo desconocido → cuenta como independiente
   }
-  const houses = Object.values(byProp).map((b) => ({
-    ...b, pct: b.total ? Math.round(((b.occ + b.res) / b.total) * 100) : 0,
-  }));
+  const houses = Object.values(byProp).map((b) => {
+    const indepTotal = b.indep.length;
+    const hasRooms = b.rooms.length > 0 ? 1 : 0;
+    let total = indepTotal + hasRooms;
+    if (!total) total = Math.max(1, parseInt(totalUnitsById[b.id]) || 1);
+    const indepOcc = b.indep.filter((u) => isOcc(u.status)).length;
+    const roomsOcc = hasRooms && b.rooms.some((u) => isOcc(u.status)) ? 1 : 0;
+    const occ = Math.min(indepOcc + roomsOcc, total);
+    const indepRes = b.indep.filter((u) => isRes(u.status) && !isOcc(u.status)).length;
+    const roomsRes = (hasRooms && !b.rooms.some((u) => isOcc(u.status)) && b.rooms.some((u) => isRes(u.status))) ? 1 : 0;
+    const res = indepRes + roomsRes;
+    const free = Math.max(0, total - occ - res);
+    // Lista de libres (independientes libres + "Habitaciones" si el grupo está libre)
+    const freeUnits = b.indep.filter((u) => !isOcc(u.status) && !isRes(u.status)).map((u) => u.name || u.code || "Unidad");
+    if (hasRooms && !roomsOcc && !roomsRes) freeUnits.push(b.rooms.length > 1 ? `Habitaciones (${b.rooms.length})` : "Habitación");
+    return { id: b.id, name: b.name, total, occ, res, free, freeUnits, pct: total ? Math.round(((occ + res) / total) * 100) : 0 };
+  });
+
+  const total = houses.reduce((s, h) => s + h.total, 0);
+  const occupied = houses.reduce((s, h) => s + h.occ, 0);
+  const reserved = houses.reduce((s, h) => s + h.res, 0);
+  const free = houses.reduce((s, h) => s + h.free, 0);
+  const occupancyPct = total ? Math.round(((occupied + reserved) / total) * 100) : 0;
   // Baja ocupación: peor primero (las que tienen al menos 1 libre).
   const lowOccupancy = houses.filter((h) => h.free > 0).sort((a, b) => a.pct - b.pct || b.free - a.free);
 

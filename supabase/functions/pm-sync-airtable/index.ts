@@ -402,6 +402,7 @@ Deno.serve(async (req) => {
         wifi_name: r.fields?.[F.casa_wifi_nombre] || null,
         wifi_pass: r.fields?.[F.casa_wifi_clave] || null,
         access_code: r.fields?.[F.casa_acceso] != null ? String(r.fields[F.casa_acceso]) : null,
+        total_units: (() => { const v = parseInt(String(r.fields?.[F.casa_unidades] ?? "").replace(/[^0-9]/g, "")); return isNaN(v) ? null : v; })(),
         drive_url: r.fields?.[F.casa_drive] || null,
         status: isInactive ? "inactiva" : "activa",
         active: !isInactive,
