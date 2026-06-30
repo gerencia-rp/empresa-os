@@ -248,8 +248,10 @@ REGLAS DURAS: hook ≤25 palabras · si hook menciona $ → desarrollo con desgl
   };
 
   // --- Auto-detección de estilo de REEL (America vs Default) ---
-  // Base: SECCIÓN 4 del doc maestro. Extendido con 'sin plata' para cubrir
-  // frases tipo "flip de 47K sin plata".
+  // TUNEADO vs DOC: keywords base = SECCIÓN 4 de PATRONES-VIRALES-MAESTRO.md.
+  // Se AGREGÓ 'sin plata' — sin esto "flip de 47K sin plata" da score 1 (<2) y
+  // cae al default. Mismo criterio que detectarEstiloCarrusel: auto-detección real
+  // sobre fidelidad literal al doc.
   function detectarEstiloReel(input_idea, dolor, tema) {
     const keywords_america = [
       'cuánto cuesta', 'cuánto gané', 'sobrino', 'vecino', 'vecina',
@@ -267,8 +269,10 @@ REGLAS DURAS: hook ≤25 palabras · si hook menciona $ → desarrollo con desgl
   }
 
   // --- Auto-detección de estilo de CARRUSEL (Ramiro vs Alejandra) ---
-  // Base: SECCIÓN 4 del doc maestro. Extendido con 'peor'/'mi peor' (alejandra)
-  // para cubrir frases confesionales cortas tipo "mi peor GC".
+  // TUNEADO vs DOC: keywords base = SECCIÓN 4 de PATRONES-VIRALES-MAESTRO.md.
+  // Se AGREGARON 'peor'/'mi peor' (alejandra) — sin esto "mi peor GC" da empate
+  // y cae al default (ramiro). Decisión del CEO: prioridad a la auto-detección que
+  // funciona con frases reales cortas por sobre la fidelidad literal al doc.
   function detectarEstiloCarrusel(input_idea, dolor, tema) {
     const keywords_ramiro = [
       'sistema', 'tutorial', 'pasos', 'cómo hacer', 'fórmula',
