@@ -64,7 +64,8 @@ const TABLE_IDS = {
   pagos:      "tbl5p63dUEhrzgHVJ",
   gastos:     "tblGBQ5xn9Zp6YrTN",
   accesos:    "tblfb63Yhn0NIMDNw",
-  tareas:     "tbl1Xyxex7Ve9j8QS"
+  tareas:     "tbl1Xyxex7Ve9j8QS",
+  unidades:   "tblItO7iMZT9QS87y"
 };
 
 const F = {
@@ -99,6 +100,19 @@ const F = {
   res_estado:     "flda3APWY41IFIkU0",
   res_casa:       "fldBi4LqUYkX7Yu2f",  // link → Casas
   res_inquilino:  "fldZJGnRFauzi8kM1",  // link → Inquilinos
+  res_unidad_link:"fldPbGSnYMEhbX79X",  // link → Unidades (tabla dedicada)
+  // Unidades (🚪 tabla dedicada)
+  uni_unidad:     "fld1YmPcUiBlHbcye",
+  uni_tipo:       "fldq2nGAAzyFsYbUU",
+  uni_etiqueta:   "fldQUeZq6LlBDUTob",
+  uni_estado:     "fldPXwcneyhx7GPfB",  // Ocupada / Disponible / Reservada
+  uni_casa:       "fldkVcVVoAInhf6H1",  // link → Casas
+  uni_inquilino:  "fld36cAgIi5WfX1Vm",  // link → Inquilinos (actual)
+  uni_banos_cant: "fldUrTYKTmnJFMa9G",
+  uni_banos_tipo: "fldgzt12iBgwvrJce",
+  uni_mobiliario: "fldVfGtDVG0MdKpeh",
+  uni_accesos:    "fldvyq3nl4rwZPiF8",
+  uni_obs:        "fldqZKuz5F1VGFhr7",
   // Pagos
   pag_pago:       "fldc3bGGY0JZMeODz",
   pag_monto:      "fld4plr3PqxUksUgo",
@@ -479,45 +493,90 @@ Deno.serve(async (req) => {
     });
 
     // ════════════════════════════════════════════════════════════
-    // 3) RESERVAS → pm_units (derivadas) + pm_bookings
+    // 3) UNIDADES (tabla dedicada) → pm_units · RESERVAS → pm_bookings
     // ════════════════════════════════════════════════════════════
     const reservas = await fetchAllRecords(base_id, TABLE_IDS.reservas, airtable_token);
 
-    // 3a) Units = 1 por (Casa + "Unidad / Habitación") distinta.
-    const unitsByKey: Record<string, any> = {};
-    let unitDupesAvoided = 0;
-    for (const r of reservas) {
-      const casaRec = linkedId(r.fields?.[F.res_casa]);
-      const propId = casaRec ? propIdByCasaRec[casaRec] : null;
-      if (!propId) continue;
-      const unidad = (getSel(r.fields?.[F.res_unidad]) || "Habitación").toString().trim();
-      const ext = "unit-" + casaRec + "-" + slugify(unidad);
-      if (unitsByKey[ext]) { unitDupesAvoided++; continue; }
-      const code = slugify(propNameByCasaRec[casaRec] || "").split("-").slice(0, 2).join("-").toUpperCase() + "-" + slugify(unidad).toUpperCase();
-      unitsByKey[ext] = {
-        external_id: ext,
+    // 3a) pm_units = 1 fila por registro de la tabla "Unidades" (tblItO7iMZT9QS87y).
+    //     external_id = "unit-{recId}". Ocupación desde el campo Estado de la unidad
+    //     (Ocupada/Disponible/Reservada) → pm_units.status, NO desde reservas.
+    const unidades = await fetchAllRecords(base_id, TABLE_IDS.unidades, airtable_token);
+    const mapUnitStatus = (s: string | null): string | null => {
+      const v = (s || "").toLowerCase();
+      if (/ocupad/.test(v))                   return "ocupada";
+      if (/reservad/.test(v))                 return "reservada";
+      if (/disponible|libre|vacante/.test(v)) return "disponible";
+      return null;
+    };
+    const unitsArr: any[] = [];
+    let unitsSinCasa = 0;
+    for (const r of unidades) {
+      const casaRec = linkedId(r.fields?.[F.uni_casa]);
+      const propId = casaRec ? (propIdByCasaRec[casaRec] || null) : null;
+      if (!propId) {
+        unitsSinCasa++;
+        addWarn("unidad_sin_casa", "unit", "unit-" + r.id, null, { unidad: r.fields?.[F.uni_unidad] || r.id });
+        continue;
+      }
+      const nombre = (r.fields?.[F.uni_unidad] || "Unidad").toString().trim();
+      const etiqueta = (r.fields?.[F.uni_etiqueta] || "").toString().trim();
+      const banosCant = parseInt(String(r.fields?.[F.uni_banos_cant] ?? "").replace(/[^0-9]/g, ""));
+      unitsArr.push({
+        external_id: "unit-" + r.id,
         property_id: propId,
-        code,
-        name: unidad,
-        unit_type: inferUnitType(unidad),
+        code: etiqueta || (slugify(propNameByCasaRec[casaRec] || "").split("-").slice(0, 2).join("-").toUpperCase() + "-" + slugify(nombre).toUpperCase()),
+        name: nombre,
+        unit_type: inferUnitType(getSel(r.fields?.[F.uni_tipo]) || nombre),
+        status: mapUnitStatus(getSel(r.fields?.[F.uni_estado])),
+        bath_type: r.fields?.[F.uni_banos_tipo] || null,
+        bathroom_count: isNaN(banosCant) ? null : banosCant,
+        access_codes: r.fields?.[F.uni_accesos] || null,
+        decoration: r.fields?.[F.uni_mobiliario] || null,
+        notes: r.fields?.[F.uni_obs] || null,
         is_active: true,
         ...(MIRROR ? { last_synced_at: nowISO, archived_at: null } : {})
-      };
+      });
     }
-    const unitsArr = Object.values(unitsByKey);
     let unitsUpsertOK = true;
     if (!dry_run && unitsArr.length) {
-      const { error } = await supabase.from("pm_units").upsert(unitsArr, { onConflict: "external_id" });
-      if (error) { errors.push("units: " + error.message); unitsUpsertOK = false; }
+      for (let i = 0; i < unitsArr.length; i += 50) {
+        const { error } = await supabase.from("pm_units").upsert(unitsArr.slice(i, i + 50), { onConflict: "external_id" });
+        if (error) { errors.push("units chunk " + i + ": " + error.message); unitsUpsertOK = false; break; }
+      }
     }
     await mirrorArchive("pm_units", "external_id", "is_active", propertiesSourceOK && unitsUpsertOK && unitsArr.length > 0);
     stats.units = unitsArr.length;
-    stats.units_dupes_avoided = unitDupesAvoided;
+    stats.units_sin_casa = unitsSinCasa;
 
-    // Mapa (property_id|slug(unidad)) → unit_id
-    const { data: dbUnits } = await supabase.from("pm_units").select("id, property_id, name");
+    // Migración de esquema (one-time): desactiva las units VIEJAS derivadas de Reservas.
+    // Su external_id era "unit-{casaRec}-{slug}" → empieza con "unit-rec" (el casaRec es recId)
+    // PERO tiene "-slug" después. Las nuevas (tabla Unidades) son canónicas: "unit-{recId}" exacto
+    // (/^unit-rec[A-Za-z0-9]{14}$/). Reversible (is_active=false). Limpieza de cambio de esquema,
+    // independiente de DISABLE_ARCHIVE (que rige el soft-delete de ausentes en Airtable).
+    let unitsLegacyDeactivated = 0;
+    if (!dry_run && unitsUpsertOK && unitsArr.length > 0) {
+      const isCanonical = (e: string) => /^unit-rec[A-Za-z0-9]{14}$/.test(e);
+      const { data: actUnits } = await supabase.from("pm_units").select("id, external_id").eq("is_active", true);
+      const legacyIds = (actUnits || [])
+        .filter((u: any) => typeof u.external_id === "string" && u.external_id.startsWith("unit-") && !isCanonical(u.external_id))
+        .map((u: any) => u.id);
+      if (legacyIds.length) {
+        const leg = await supabase.from("pm_units").update({ is_active: false, archived_at: nowISO }).in("id", legacyIds);
+        if (leg.error) errors.push("units legacy deactivate: " + leg.error.message);
+        else unitsLegacyDeactivated = legacyIds.length;
+      }
+    }
+    stats.units_legacy_deactivated = unitsLegacyDeactivated;
+
+    // Mapas: recId de Unidad → unit_id (para linkear bookings por "Unidad (link)" de Reservas)
+    //        + (property_id|slug(name)) → unit_id (fallback por texto de "Unidad / Habitación").
+    const { data: dbUnits } = await supabase.from("pm_units").select("id, property_id, name, external_id");
+    const unitIdByRec: Record<string, string> = {};
     const unitIdByPropName: Record<string, string> = {};
     (dbUnits || []).forEach((u: any) => {
+      if (typeof u.external_id === "string" && u.external_id.startsWith("unit-rec")) {
+        unitIdByRec[u.external_id.slice("unit-".length)] = u.id;
+      }
       if (u.property_id && u.name) unitIdByPropName[`${u.property_id}|${slugify(u.name)}`] = u.id;
     });
 
@@ -534,7 +593,9 @@ Deno.serve(async (req) => {
       const propId = casaRec ? propIdByCasaRec[casaRec] : null;
       if (!propId) { resSinCasa++; addWarn("reserva_sin_casa", "booking", "booking-" + r.id, null, { reserva: r.fields?.[F.res_nombre] || r.id }); continue; }
       const unidad = (getSel(r.fields?.[F.res_unidad]) || "Habitación").toString().trim();
-      const unitId = unitIdByPropName[`${propId}|${slugify(unidad)}`] || null;
+      // unit_id: 1º por "Unidad (link)" de Reservas → recId de la tabla Unidades; 2º fallback por texto.
+      const unidadRec = linkedId(r.fields?.[F.res_unidad_link]);
+      const unitId = (unidadRec && unitIdByRec[unidadRec]) || unitIdByPropName[`${propId}|${slugify(unidad)}`] || null;
       const inqRec = linkedId(r.fields?.[F.res_inquilino]);
       const tenantId = inqRec ? (tenantIdByRec[inqRec] || null) : null;
       if (!tenantId) {

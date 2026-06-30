@@ -290,6 +290,9 @@ function pmActiveBookingOf(unitId, date = new Date()) {
     && (!b.end_date || b.end_date >= d)
   );
 }
+// Ocupación de una unidad: derivada de su Estado (Airtable Unidades) vía pmUnitState,
+// no de las reservas. (pmUnitState está hoisted; ver su definición más abajo.)
+function pmUnitOccupied(u) { return !!u && pmUnitState(u) === 'ocupada'; }
 function pmTenantName(id) {
   const t = pmaState.tenants.find(x => x.id === id);
   return t?.full_name || '—';
@@ -334,17 +337,17 @@ function pmHouseUnitsOf(propertyId) {
 function pmOccupiedRentableUnitsOf(propertyId) {
   const p = pmaState.properties.find(x => x.id === propertyId);
   const model = p?.rental_model || 'casa_completa';
-  const subActive = u => (u.unit_type === 'apartamento' || u.unit_type === 'estudio') && pmActiveBookingOf(u.id);
+  const subActive = u => (u.unit_type === 'apartamento' || u.unit_type === 'estudio') && pmUnitOccupied(u);
   let occ;
   if (model === 'por_unidades') {
     occ = pmUnitsOf(propertyId).filter(subActive).length;
   } else if (model === 'mixta') {
     const subOcc = pmUnitsOf(propertyId).filter(subActive).length;
-    const casaOcc = pmHouseUnitsOf(propertyId).some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
+    const casaOcc = pmHouseUnitsOf(propertyId).some(u => pmUnitOccupied(u)) ? 1 : 0;
     occ = casaOcc + subOcc;
   } else {
-    // casa_completa / por_habitaciones: ocupada si cualquier unit (incl. habitaciones) está activa
-    occ = pmUnitsOf(propertyId).some(u => pmActiveBookingOf(u.id)) ? 1 : 0;
+    // casa_completa / por_habitaciones: ocupada si cualquier unit (incl. habitaciones) está ocupada (Estado)
+    occ = pmUnitsOf(propertyId).some(u => pmUnitOccupied(u)) ? 1 : 0;
   }
   return Math.min(occ, pmRentableUnitsOf(propertyId)); // invariante: ocupadas ≤ rentables
 }
@@ -389,8 +392,11 @@ function pmTileState(tile) {
   // estado de la casa entera
   const ids = pmTileUnitIds(tile);
   const today = new Date().toISOString().slice(0, 10);
-  if (ids.some(id => pmaState.units.find(u => u.id === id)?.maintenance_status === 'en_mantenimiento')) return 'mantenimiento';
-  if (ids.some(id => pmActiveBookingOf(id))) return 'ocupada';
+  const us = ids.map(id => pmaState.units.find(u => u.id === id)).filter(Boolean);
+  if (us.some(u => u.maintenance_status === 'en_mantenimiento')) return 'mantenimiento';
+  // Ocupación/reserva desde el Estado de la unidad (Airtable); reservada también si hay confirmada futura.
+  if (us.some(u => pmUnitOccupied(u))) return 'ocupada';
+  if (us.some(u => pmUnitState(u) === 'reservada')) return 'reservada';
   if (ids.some(id => pmaState.bookings.some(b => b.unit_id === id && b.status === 'confirmado' && (b.start_date || '') > today))) return 'reservada';
   return 'libre';
 }
@@ -776,7 +782,7 @@ function pmCeoActions(){
   if(late.length) actions.push({ sev:'critical', key:'late-tenants', tab:'bookings', sig:late.length, title:`${late.length} inquilino${late.length>1?'s':''} sin pago registrado +30 días`, q:'¿Iniciar proceso de salida o gestionar cobro?' });
   negProps.slice(0,2).forEach(p=> actions.push({ sev:'critical', key:'negpnl-'+p.id, tab:'finance', sig:negMonthsOf(p.id), title:`${p.name}: P&L negativo ${negMonthsOf(p.id)} meses seguidos`, q:'¿Vender / refinanciar / ajustar renta?' }));
   if(expiring.length) actions.push({ sev:'important', key:'expiring-contracts', tab:'bookings', sig:expiring.length, title:`${expiring.length} contrato${expiring.length>1?'s':''} termina${expiring.length>1?'n':''} en 30 días`, q:'Confirmar estrategia: renovar o re-rentar.' });
-  pmaState.units.filter(u=>activePropIds.has(u.property_id) && !pmActiveBookingOf(u.id)).map(u=>{
+  pmaState.units.filter(u=>activePropIds.has(u.property_id) && !pmUnitOccupied(u)).map(u=>{
     const bs = pmaState.bookings.filter(b=>b.unit_id===u.id && b.end_date).sort((a,b)=> a.end_date<b.end_date?1:-1);
     const lastEnd = bs[0]?.end_date ? new Date(bs[0].end_date) : null;
     return { u, days: lastEnd ? Math.round((now-lastEnd)/86400000) : null };
@@ -927,7 +933,7 @@ function pmRenderDashboard(){
   const occ=pmOccupancyAt(now);
   const occPrev=pmOccupancyAt(new Date(y,m-1,Math.min(now.getDate(),28)));
   const cf=pmCashflowOf(y,m), cfPrev=pmCashflowOf(new Date(y,m-1,1).getFullYear(),(m+11)%12);
-  const empties=occ.units.filter(u=>!pmActiveBookingOf(u.id));
+  const empties=occ.units.filter(u=>!pmUnitOccupied(u));
   const potentialLost=empties.reduce((s,u)=>s+Number(u.target_rent||0),0);
   const { all:actions, lateCount, expiringCount }=pmCeoActions();
   const trend=[]; for(let i=5;i>=0;i--){ const d=new Date(y,m-i,1); const c=pmCashflowOf(d.getFullYear(),d.getMonth()); trend.push({ label:`${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income:c.income, gastos:c.gastos, net:c.net }); }
@@ -1090,6 +1096,13 @@ function pmUnitState(u) {
   const today = new Date().toISOString().slice(0,10);
   if (u.maintenance_status === 'en_mantenimiento') return 'mantenimiento';
   if (u.is_active === false) return 'inactiva';
+  // Ocupación desde el Estado de la unidad (Airtable Unidades: Ocupada/Disponible/Reservada).
+  // Fallback a reservas si la unit no tiene status sincronizado.
+  if (u.status) {
+    if (/ocupad/i.test(u.status))   return 'ocupada';
+    if (/reservad/i.test(u.status)) return 'reservada';
+    if (/disponible|libre|vacante/i.test(u.status)) return 'libre';
+  }
   if (pmActiveBookingOf(u.id)) return 'ocupada';
   if (pmaState.bookings.some(b => b.unit_id===u.id && b.status==='confirmado' && (b.start_date||'') > today)) return 'reservada';
   return 'libre';
@@ -1278,8 +1291,9 @@ function pmRenderPropertyCardInline(p) {
   // Conteos por UNIDAD ÚNICA y mutuamente excluyentes (prioridad: mantenim. > ocupada > reservada > libre).
   // Una unidad agrupada puede tener reserva activa + futura: cuenta como ocupada, no doble.
   const maintenanceUnits = units.filter(u => u.maintenance_status === 'en_mantenimiento' || u.is_active === false);
-  const occupiedUnits = units.filter(u => !maintenanceUnits.includes(u) && pmActiveBookingOf(u.id));
-  const reservedUnits = units.filter(u => !maintenanceUnits.includes(u) && !pmActiveBookingOf(u.id) && pmaState.bookings.find(b => b.unit_id === u.id && b.status === 'confirmado'));
+  // Ocupada/Reservada desde el Estado de la unidad (pmUnitState ya prioriza ocupada > reservada).
+  const occupiedUnits = units.filter(u => !maintenanceUnits.includes(u) && pmUnitState(u) === 'ocupada');
+  const reservedUnits = units.filter(u => !maintenanceUnits.includes(u) && pmUnitState(u) === 'reservada');
   const freeUnits = Math.max(0, units.length - occupiedUnits.length - reservedUnits.length - maintenanceUnits.length);
   const potentialMo = units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const modelLabel = p.rental_model === 'casa_completa' ? '🏡 Casa Completa'
@@ -4886,7 +4900,7 @@ function pmRenderFinance() {
   const activeProps = pmaState.properties.filter(p => p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
   const units = pmaState.units.filter(u => activePropIds.has(u.property_id));
-  const occUnits = units.filter(u => pmActiveBookingOf(u.id));
+  const occUnits = units.filter(u => pmUnitOccupied(u));
   // Ocupación sobre UNIDADES RENTABLES (modelo de renta), no sobre pm_units físicas.
   const rentableTotal = pmTotalRentableUnits();
   const occRentable = pmTotalOccupiedRentableUnits();
@@ -6172,6 +6186,7 @@ const PM_WARN_META = {
   pago_link_faltante:      { label: 'Pago sin vínculo (Casa/Inquilino)',icon: '💸', table: 'tbl5p63dUEhrzgHVJ' },
   pago_sin_casa:           { label: 'Pago sin casa válida',             icon: '💸', table: 'tbl5p63dUEhrzgHVJ' },
   reserva_sin_casa:        { label: 'Reserva sin casa enlazada',        icon: '🏚️', table: 'tblzz3fokkBprEpIm' },
+  unidad_sin_casa:         { label: 'Unidad sin casa enlazada',         icon: '🚪', table: 'tblItO7iMZT9QS87y' },
   reserva_sin_fecha:       { label: 'Reserva sin Fecha de Entrada',     icon: '📅', table: 'tblzz3fokkBprEpIm' },
   booking_sin_tenant:      { label: 'Reserva sin inquilino enlazado',   icon: '👤', table: 'tblzz3fokkBprEpIm' },
   inquilino_sin_fecha_fin: { label: 'Inquilino activo sin Fecha Fin',   icon: '📅', table: 'tblXuFC9azHTZGjmE' },
