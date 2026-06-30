@@ -467,8 +467,21 @@ function renderRecursos() {
         ${t.tipPro ? `<div class="text-[11px] text-amber-300/90 mt-2">💡 ${E(t.tipPro)}</div>` : ''}
       </div>`).join('');
     const pres = r.presupuestoSugerido;
+    const ccUrl = 'https://ads.tiktok.com/business/creativecenter/inspiration/popular/pc/en';
+    const tiktokCard = `<div class="bg-primary/40 border border-accent/25 rounded-xl p-4 mb-4">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div><div class="font-display font-bold text-accent">🎵 Trending Sounds — TikTok Creative Center</div><div class="text-[11px] text-zinc-500">Top videos/sounds/hashtags por país (USA/MX/CO/ES) · gratis, oficial</div></div>
+        <a href="${ccUrl}" target="_blank" rel="noopener" class="text-xs px-3 py-2 rounded-lg bg-accent text-primary font-semibold shrink-0">Abrir Creative Center ↗</a>
+      </div>
+      <details><summary class="cursor-pointer text-[11px] text-zinc-500">intentar verlo embebido (TikTok suele bloquear el iframe)</summary>
+        <iframe src="${ccUrl}" class="w-full h-72 rounded-lg border border-zinc-800 mt-2 bg-dark" loading="lazy" referrerpolicy="no-referrer"></iframe>
+        <div class="text-[10px] text-zinc-600 mt-1">Si queda en blanco, usá el botón de arriba — es lo esperado.</div>
+      </details>
+    </div>`;
     out.innerHTML =
-      oHero('Recursos & Tendencias', r.descripcion) +
+      oHero('Tendencias', 'Sonidos, hashtags y formatos que funcionan AHORA + 10 apps externas') +
+      tiktokCard +
+      `<div class="text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wide">Las 10 apps recomendadas</div>` +
       `<div class="grid sm:grid-cols-2 gap-3 mb-4">${apps}</div>` +
       oCard('🗓️ Guía de uso semanal', oList(r.guiaUso)) +
       oCard('💸 Presupuesto sugerido', `<div class="grid sm:grid-cols-3 gap-3 text-sm">
