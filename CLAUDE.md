@@ -24,7 +24,7 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
   - Edge Functions (Deno runtime) para lógica server-side y sincronización  
   - Storage para archivos  
   - Auth para login (Magic Link)  
-- **Source of truth:** Airtable (base `appzEnsuy4qPT6iHj` — "Empresa Rentas")  
+- **Source of truth:** Airtable (base `apptTKRYbx6gu701i` — base NUEVA limpia, cutover 2026-06-29). La base vieja `appzEnsuy4qPT6iHj` ("Empresa Rentas") quedó **deprecada**.  
 - **Deploy:** Vercel auto-deploy on `git push origin main`  
 - **Hosting de funciones serverless adicionales:** `api/` carpeta del repo (Vercel Functions, Node runtime)  
 - **Cron jobs:** Vercel Cron Jobs (definidos en `vercel.json`)
@@ -44,23 +44,36 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ## 🗄️ Mapeo Airtable → Supabase DB
 
-Este mapeo cambió varias veces durante el desarrollo. **Decisión final (vigente):**
+**Base NUEVA `apptTKRYbx6gu701i` (vigente desde cutover 2026-06-29).** 5 tablas con
+**linked records reales** → se eliminó TODO el fuzzy matching (nicknames, match por nombre, normalizeAddress).
 
-| Tabla DB (Supabase) | Fuente Airtable | Notas |
-| :---- | :---- | :---- |
-| `pm_properties` | DxC (Datos por Casa) | Address único, dedup por `address_normalized` |
-| `pm_units` | DxC | Cada habitación/unidad es una fila individual |
-| `pm_bookings` | DxC | Reservas activas e históricas |
-| `pm_tenants` | **Tenant** (Base de datos Tenant) | NO híbrido — solo desde Tenant. No fuzzy matching: siempre nombre \+ apellido completos |
-| `pm_payments` | Pagos Rentas | Estado: Pagado, Pendiente, Por vencer, Retrasado |
-| `gastos` | 4 sources | Combinación de varias tablas Airtable |
-| `pm_payroll`, `pm_credentials`, `pm_wifi_credentials`, `pm_tasks` | Tablas dedicadas en Airtable | Mirror sync |
+| Tabla DB (Supabase) | Tabla Airtable | Table ID | Notas |
+| :---- | :---- | :---- | :---- |
+| `pm_properties` | **Casas** | `tblisRfa2IW02ltCL` | 1 fila = 1 propiedad. Llave estable `airtable_address_id` = recId de la Casa |
+| `pm_tenants` | **Inquilinos** | `tblXuFC9azHTZGjmE` | external_id = `tenant-{recId}` |
+| `pm_bookings` | **Reservas** | `tblzz3fokkBprEpIm` | enlaza Casa + Inquilino. Saltea reservas sin Fecha Entrada (start_date NOT NULL) |
+| `pm_units` | derivadas de **Reservas** | — | 1 por (Casa + "Unidad / Habitación"). external_id = `unit-{casaRecId}-{slug}` |
+| `pm_payments` | **Pagos** | `tbl5p63dUEhrzgHVJ` | **resuelve tenant/property/booking por LINKED RECORD IDs** (Inquilino/Casa/Reserva) + backfill desde la Reserva |
+| `pm_expenses` | **Gastos** | `tblGBQ5xn9Zp6YrTN` | 1 sola tabla (antes 4). property por linked Casa. category derivada de "Tipo de Gasto" |
 
-### Tabla `Tenant` para Inquilinos (decisión final)
+### Resolución de pagos (regla CRÍTICA)
 
-- **NO usar híbrido (DxC \+ Tenant).** Solo Tenant es la fuente.  
-- Carlos debe mantener nombres+apellidos correctos en Airtable Tenant.  
-- No hay fuzzy matching automático para evitar mezclar inquilinos distintos con nombres parecidos.
+- `pm_payments` resuelve `tenant_id`/`property_id`/`booking_id` por los **linked record IDs**
+  de Airtable (campos Inquilino `fld01OK8T8TJl8ZXb`, Casa `fld0RYuPMMUpcgnoF`, Reserva `fldU0KUvfPEdpp1tY`).
+- **NO hay fuzzy matching ni match por nombre.** Si el pago no enlaza Casa/Inquilino → warning `pago_link_faltante`.
+- La base nueva tiene un campo "Revisar inquilino" (checkbox) + "Conciliación IA" que rellena el agente de conciliación.
+
+### Tablas que NO existen en la base nueva
+
+- Credenciales/Accesos, WiFi, Nómina (Gastos Equipo), Cronograma de tareas **no tienen fuente** en la base nueva.
+  Esas secciones se **removieron** del sync. Sus pestañas en el front quedan vacías hasta que se creen tablas equivalentes.
+
+### Migración de propiedades (cutover)
+
+- `pm_properties` **no tiene unique constraint usable para ON CONFLICT** (`airtable_address_id` sin unique;
+  `address_normalized` es índice PARCIAL). El sync hace **INSERT/UPDATE explícito por fila**.
+- Las 18 propiedades viejas se **re-vincularon por `address_normalized`** (se les seteó `airtable_address_id` = recId
+  de la Casa nueva) para conservar su `id` y no duplicar.
 
 ---
 
@@ -85,16 +98,32 @@ Este mapeo cambió varias veces durante el desarrollo. **Decisión final (vigent
 - Registros con `last_synced_at` anterior al inicio del sync → se marcan `active=false, archived_at=now()`.  
 - Si `DISABLE_ARCHIVE=true`, este paso se saltea.
 
+### Cómo correr el sync (server-side, sin Docker)
+
+El `pm-sync-airtable` se invoca por HTTP. Para autenticar como cron se usa la **secret key** del proyecto
+(`sb_secret_...`, obtenible con `supabase projects api-keys --reveal`) en el header `Authorization: Bearer`
+(la JWT legacy NO sirve: el secret `SUPABASE_SERVICE_ROLE_KEY` está en formato nuevo).
+
+```shell
+curl -s -X POST "https://nezbaljfhhyznhltpjnk.supabase.co/functions/v1/pm-sync-airtable" \
+  -H "Authorization: Bearer sb_secret_..." -H "Content-Type: application/json" \
+  -d '{"dry_run":false,"archive":false}'
+```
+
+- `dry_run:true` → no escribe (OJO: en dry_run el linking property→units/bookings/payments da 0 porque NO upsertea props primero; es artefacto, no bug).
+- `archive:false` → no archiva (anti-wipe). `archive:true` → purga el residuo no visto este run.
+- Cutover 2026-06-29: sync real verificado (21 props, 49 units, 81 tenants, 53 bookings, 275 pagos, 106 gastos) + purga del residuo de la base vieja (quedó `active=false`, recuperable).
+
 ---
 
 ## 🎨 Frontend (Property Manager)
 
 **Archivos clave:**
 
-- `pm/pm-main.js` (\~485 KB) — núcleo del PM: calendario, dedup, reservas, ocupación  
-- `pm/pm-dashboard.js` — dashboard  
+- `pm/pm-main.js` (\~485 KB) — núcleo del PM: calendario, dedup, reservas, ocupación, dashboard, pagos, gastos, alertas. Todo el PM vive acá (NO existe `pm-dashboard.js`, aunque docs viejas lo mencionen).  
 - `pm/pm-*.css` — estilos  
-- `index.html` \+ `app.js` — shell de la aplicación, navegación
+- `index.html` \+ `app.js` — shell de la aplicación, navegación  
+- IDs hardcodeados de Airtable en `pm-main.js`: `PM_AIRTABLE_BASE` (base nueva) + table IDs en los links "Abrir en Airtable" (`pmAirtableLink`) + `PM_WARN_META`. Si cambia la base, actualizar los 3.
 
 ### Calendario (regla CRÍTICA dedup units)
 
@@ -136,7 +165,7 @@ Todas en `supabase/functions/`:
 
 | Función | Propósito | Notas |
 | :---- | :---- | :---- |
-| `pm-sync-airtable` | Sync principal Airtable → DB | El más crítico. v24+ |
+| `pm-sync-airtable` | Sync principal Airtable → DB | El más crítico. v26+ (base nueva, linked records) |
 | `pm-payment-writeback` | Write pagos → Airtable | Usa `WRITEBACK_SAFE_MODE` |
 | `pm-alerts` | Genera alertas (pagos, contratos, ocupación) |  |
 | `pm-daily-push`, `pm-daily-close`, `pm-weekly-review` | Cron jobs PM | Vercel Cron los dispara |
@@ -301,22 +330,22 @@ En la raíz del repo:
 
 ---
 
-## 🎯 Estado actual del proyecto (28 Jun 2026\)
+## 🎯 Estado actual del proyecto (29 Jun 2026 — Cutover base nueva)
 
-- ✅ Migración a Mac nuevo completada (commit `ec8d5d3`)  
-- ✅ Property Manager funcionando con todos los fixes de la semana  
-- ✅ Calendario con habitaciones individuales \+ dedup correcto  
-- ✅ Token Airtable server-side (Carlos no pasta token cada vez)  
-- ✅ Mirror sync defensivo activo  
-- ✅ Write-back de pagos en safe mode  
-- ✅ 18 propiedades activas, dedup correcto por `address_normalized`  
-- ✅ Viral content generation app deployed en `/viral`
+- ✅ **Cutover a base Airtable nueva `apptTKRYbx6gu701i`** (commit `2983a74`). Esquema limpio con linked records, sin fuzzy.
+- ✅ `pm-sync-airtable` remapeada y deployada (v26). Pagos resueltos por linked record IDs.
+- ✅ Sync real + purga del residuo viejo corridos y verificados (solo data nueva activa).
+- ✅ Front (`pm-main.js`) apuntando a la base nueva, pusheado a main.
+- ✅ Property Manager funcionando, calendario con habitaciones individuales + dedup.
+- ✅ Viral content generation app deployed en `/viral`.
 
-**Pendientes conocidos (no urgentes):**
+**Pendientes conocidos:**
 
-- Twilio SMS \+ WhatsApp integration completa (Task \#3 backlog)  
-- Carlos manual cleanup de Airtable Tenant nombres  
-- Posible refactor de `pm-main.js` (485KB es grande, modularizar)
+- ⏳ Setear secret `AIRTABLE_BASE_ID=apptTKRYbx6gu701i` en Supabase (hoy el código usa el default; el secret no está seteado).
+- ⏳ Validar las 6 secciones del PM en la UI con la data nueva.
+- Carlos: completar enlaces (Casa/Inquilino/Reserva) en Pagos sin link y Fechas de Entrada faltantes en Reservas (ver alertas de datos).
+- Twilio SMS + WhatsApp integration completa (backlog).
+- Posible refactor de `pm-main.js` (485KB, modularizar).
 
 ---
 
@@ -329,9 +358,9 @@ Cuando arranques una sesión en este repo:
 3. **Si descubrís algo nuevo importante:** actualizá este archivo antes de cerrar la sesión.  
 4. **Si encontrás contradicciones** entre este archivo y el código actual: pregntá al usuario qué prevalece antes de hacer cambios.  
 5. **Idioma:** español rioplatense informal. Directo, claro, sin floritura.  
-6. **Estilo de trabajo:** proactivo. Si vas a tocar pm-main.js, leé pm-dashboard.js también. Si vas a tocar una edge function, verificá quién la llama.  
+6. **Estilo de trabajo:** proactivo. Todo el PM vive en `pm-main.js` (no hay `pm-dashboard.js`). Si vas a tocar una edge function, verificá quién la llama.  
 7. **Antes de commits/push:** mostrá el diff y pedí confirmación si el cambio toca producción.
 
 ---
 
-*Última actualización: 28 Jun 2026 — Migración Mac nuevo*  
+*Última actualización: 29 Jun 2026 — Cutover a base Airtable nueva `apptTKRYbx6gu701i` (linked records, sin fuzzy)*  
