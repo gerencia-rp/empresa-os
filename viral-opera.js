@@ -921,6 +921,7 @@ function studioContextPanel(ctx, estTokens) {
     <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold text-accent uppercase tracking-wide">Contexto inyectado (transparente)</div>
     <span class="text-[10px] text-zinc-500">~${estTokens} tokens</span></div>
     ${ctx.tipo ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">Tipo:</span><span class="text-accent font-semibold uppercase">${E(ctx.tipo)}</span></div>` : ''}
+    ${ctx.rag ? `<div class="flex gap-2 text-xs py-0.5 text-emerald-300"><span>📈</span><span>Inspirado en ${ctx.rag.count} ${ctx.tipo || 'pieza'}s exitosos similares (avg ${NUM(ctx.rag.avgViews)} views)</span></div>` : ''}
     ${row('Eslogan', ctx.eslogan)}${row('Framework', ctx.framework)}${row('Tagline', ctx.tagline)}${row('Arquetipo', ctx.arquetipo)}
     ${row('Enemigo (' + ctx.enemigoTipo + ')', ctx.enemigo)}${row('Táctica', ctx.tactica)}${row('Avatar', ctx.avatar)}${row('Dolor', ctx.dolor)}${row('Fase', ctx.fase)}
     <div class="flex gap-2 text-xs py-0.5"><span class="text-emerald-400">✓</span><span class="text-zinc-200">${ctx.prohibidasCount} palabras prohibidas bloqueadas · ${ctx.marcaCount} de marca priorizadas · validador activo</span></div>
@@ -936,6 +937,20 @@ function flattenVariante(v) {
   return parts.filter(Boolean).join('\n');
 }
 let STUDIO_LAST = [];
+async function studioFetchRag(mode, params) {
+  try {
+    if (!(window.Memory && window.Memory.enabled() && window.Memory.searchSimilar)) return [];
+    const q = mode === 'libre'
+      ? ((document.getElementById('st-idea') || {}).value || '')
+      : [params.tema, params.dolor, params.enemigo].filter(v => v && v !== 'auto').join(' ');
+    if (!q.trim()) return [];
+    const sims = await window.Memory.searchSimilar(q, 5);
+    return (sims || []).filter(s => (s.similarity || 0) > 0.65).map(s => {
+      const ov = s.output_variantes; const v0 = Array.isArray(ov) ? ov[0] : (ov && ov.variantes ? ov.variantes[0] : null);
+      return { hook: v0 && v0.hook, desarrollo: (v0 && (v0.chisme || v0.valor_oculto)) || '', cta: v0 && v0.cta, views: s.views || 0, similarity: Math.round((s.similarity || 0) * 100) / 100 };
+    });
+  } catch (e) { return []; }
+}
 function studioResolveAuto(dec) {
   if (!dec || !OPERA) return null;
   const av = OPERA.avatares[dec.avatar_id];
@@ -964,12 +979,14 @@ async function studioGenerate(btn) {
   if (!window.ContextBuilder) { alert('Context builder no cargó.'); return; }
   const mode = (typeof studioMode === 'function') ? studioMode() : 'guiado';
   const params = studioCollectParams();
+  const ragExamples = await studioFetchRag(mode, params);
+  params.ragExamples = ragExamples;
   let build;
   try {
     if (mode === 'libre') {
       const idea = (document.getElementById('st-idea') || {}).value || '';
       if (!idea.trim()) { document.getElementById('st-idea').focus(); btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); return; }
-      build = window.ContextBuilder.buildLibre({ tipoContenido: STUDIO.tipo, idea, variantes: params.variantes, formato: params.formato, palabraClaveDM: params.palabraClaveDM });
+      build = window.ContextBuilder.buildLibre({ tipoContenido: STUDIO.tipo, idea, variantes: params.variantes, formato: params.formato, palabraClaveDM: params.palabraClaveDM, ragExamples });
     } else {
       build = window.ContextBuilder.build(params);
     }
@@ -1026,7 +1043,7 @@ async function studioGenerate(btn) {
         validador_errores: valAgg.reduce((a, v) => a.concat(v.errores), []),
         validador_warnings: valAgg.reduce((a, v) => a.concat(v.warnings), []),
         estado: 'producida',
-      }).then(() => studioToast('Guardado en memoria ✓')).catch(() => {});
+      }).then((r) => { studioToast('Guardado en memoria ✓'); if (r && r.id && window.Memory.embedGeneration) window.Memory.embedGeneration(r.id); }).catch(() => {});
     }
   } catch (e) {
     out.innerHTML = `<div class="border border-red-900/50 bg-red-950/20 rounded-xl p-5 text-sm text-red-300"><b>Error:</b> ${E(e.message)}</div>`;

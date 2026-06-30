@@ -70,6 +70,19 @@
     manifiesto: 'Declaración de identidad de tribu (estilo Apple Think Different): líneas cortas, contundentes, sin CTA de venta directo.',
   };
   const CAMPOS_BASE = `"thumbnail_text" (texto de portada, ≤5 palabras), "hook", "chisme", "valor_oculto", "cta", "caption_corta", "caption_larga", "palabra_clave_dm", "mecanica_aplicada"`;
+  // Bloque RAG: ejemplos del historial con buenas métricas (Fase 4).
+  function ragBlock(examples) {
+    if (!examples || examples.length < 3) return '';
+    const lines = examples.slice(0, 4).map((e, i) =>
+      `Ejemplo ${i + 1} (similarity ${e.similarity}, views ${e.views}):\n  HOOK: ${e.hook || ''}\n  ${e.desarrollo || ''}\n  CTA: ${e.cta || ''}`).join('\n\n');
+    return `\n\n═══ EJEMPLOS DE TU HISTORIAL (RAG) ═══
+Estos outputs tuyos pasados son SIMILARES y obtuvieron buenas métricas. Aprendé de la estructura/hook/CTA. NO copies — adaptá.\n\n${lines}`;
+  }
+  function ragMeta(examples) {
+    if (!examples || examples.length < 3) return null;
+    const avg = Math.round(examples.reduce((a, e) => a + (e.views || 0), 0) / examples.length);
+    return { count: examples.length, avgViews: avg };
+  }
   function tipoExtra(tipo) {
     return {
       carrusel: `, "slides": [ { "n": 1, "tipo": "hook|problema|solucion|prueba|cta", "texto": "", "visual": "" } ]`,
@@ -126,7 +139,7 @@ SIEMPRE pedir palabra clave por DM en MAYÚSCULAS ("Comentá MÉTODO y te paso X
 NO prometer "multiplicar capital". SÍ promesa aterrizada ("tu primer flip sin perder capital"), números específicos ($73K, 8 meses, +200 alumnos), caso real si encaja, y todo termina en algo aplicable hoy.
 
 === FÓRMULA (${tipo}) ===
-${FORMULAS[tipo] || FORMULAS.reel}`;
+${FORMULAS[tipo] || FORMULAS.reel}` + ragBlock(p.ragExamples);
 
     const userPrompt = `=== PARÁMETROS DE ESTA PIEZA ===
 AVATAR DESTINO: ${avatar.nombre} — ${avatar.perfil}
@@ -164,6 +177,7 @@ ${schemaPorTipo(tipo)}`;
       prohibidasCount: arq.palabrasProhibidas.length,
       marcaCount: arq.palabrasDeMarca.length,
       validador: true,
+      rag: ragMeta(p.ragExamples),
     };
     return { system, userPrompt, contexto, resueltos: { enemigo, tactica, fase, avatar, dolor }, tipo };
   }
@@ -212,7 +226,7 @@ TÁCTICAS:
 ${tacticaCat}
 FASE DEL MES HOY: ${fase} (siembra = valor sin vender; cosecha = vender desde stories)
 DOLORES DEL BANCO:
-${doloresCat}`;
+${doloresCat}` + ragBlock(p.ragExamples);
 
     const userPrompt = `=== MODO LIBRE ===
 El usuario te da una idea cruda. Decidí internamente qué avatar_id, dolor_id (del banco, o null si ninguno encaja), enemigo_id, tactica_id y fase aplican mejor, y generá el contenido.
@@ -229,6 +243,7 @@ Devolvé SOLO un JSON válido (sin backticks) con esta forma:
       eslogan: id.esloganPrincipal, framework: id.framework, tagline: id.tagline, arquetipo: arq.nombre,
       enemigo: null, enemigoTipo: 'auto', tactica: null, avatar: null, dolor: null, fase: null,
       prohibidasCount: arq.palabrasProhibidas.length, marcaCount: arq.palabrasDeMarca.length, validador: true, libre: true,
+      rag: ragMeta(p.ragExamples),
     };
     return { system, userPrompt, contexto, tipo };
   }

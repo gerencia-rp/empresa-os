@@ -50,6 +50,7 @@
     getDashboard() { return call('get-dashboard', {}); },
     extractMetricsFromImage(data) { return call('extract-metrics-from-image', data); },
     searchSimilar(query_text, top_k) { return call('search-similar-generations', { query_text, top_k: top_k || 5 }).then(r => r.results || []).catch(() => []); },
+    embedGeneration(generation_id) { return call('generate-embedding', { generation_id }).catch(() => null); },
     computeInsights() { return call('compute-insights', {}); },
     getInsights() { return call('get-insights', {}); },
     markInsightRead(id) { return call('mark-insight-read', { id }); },
