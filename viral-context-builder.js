@@ -249,14 +249,14 @@ REGLAS DURAS: hook ≤25 palabras · si hook menciona $ → desarrollo con desgl
 
   // --- Auto-detección de estilo de REEL (America vs Default) ---
   // TUNEADO vs DOC: keywords base = SECCIÓN 4 de PATRONES-VIRALES-MAESTRO.md.
-  // Se AGREGÓ 'sin plata' — sin esto "flip de 47K sin plata" da score 1 (<2) y
-  // cae al default. Mismo criterio que detectarEstiloCarrusel: auto-detección real
-  // sobre fidelidad literal al doc.
+  // Se AGREGARON 'sin plata' y 'poner un peso' — sin esto "flip de 47K sin plata"
+  // y "Mi primer flip de 47K sin poner un peso" dan score 1 (<2) y caen al default.
+  // Mismo criterio que detectarEstiloCarrusel: auto-detección real > fidelidad al doc.
   function detectarEstiloReel(input_idea, dolor, tema) {
     const keywords_america = [
       'cuánto cuesta', 'cuánto gané', 'sobrino', 'vecino', 'vecina',
       'desglose', 'partida', 'capital', 'sin papeles',
-      'sin dinero', 'sin un peso', 'sin plata', 'opcion 1', 'opcion 2',
+      'sin dinero', 'sin un peso', 'sin plata', 'poner un peso', 'opcion 1', 'opcion 2',
       'maleta', 'maleta del', 'contratista vs', 'wholesaler vs',
       'peor error', 'que nunca hace', 'dialogo',
       'flip de', 'gané', 'hice', 'recién llegado',

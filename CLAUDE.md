@@ -20,6 +20,7 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 - **Frontend:** Vanilla JavaScript (NO React, NO Next.js, NO frameworks de SPA). HTML \+ JS \+ CSS puros. Deploy estático en Vercel.  
 - **Backend:** Supabase  
+  - ⚠️ **PROD SUPABASE = `nezbaljfhhyznhltpjnk`** (`nezbaljfhhyznhltpjnk.supabase.co`). **NUNCA correr SQL/migraciones en otro proyecto.** Hay varias bases en la cuenta; verificá el `<ref>` (URL del SQL Editor / `supabase/.temp/project-ref`) antes de ejecutar. Para queries server-side: `supabase db query --linked "..."`.  
   - PostgreSQL para data  
   - Edge Functions (Deno runtime) para lógica server-side y sincronización  
   - Storage para archivos  
