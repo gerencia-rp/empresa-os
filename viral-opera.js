@@ -562,6 +562,33 @@ window.tfRun = tfRun;
 const ESTADOS = ['pendiente', 'producida', 'publicada'];
 const ESTADO_STYLE = { pendiente: 'bg-zinc-800 text-zinc-300', producida: 'bg-amber-900/50 text-amber-300', publicada: 'bg-emerald-900/50 text-emerald-300' };
 let BIBLIO_FILTER = 'todos';
+let BIBLIO_SEARCH = '';
+function operaSearchBiblio(v) { BIBLIO_SEARCH = v; const out = document.getElementById('tab-biblioteca'); if (out) { out.dataset.rendered = ''; renderBiblioteca(); } }
+window.operaSearchBiblio = operaSearchBiblio;
+// Llevar una pieza de la biblioteca a Studio (precarga tipo + tema y salta a la tab)
+function studioFromReel(id) {
+  const r = (OPERA.biblioteca.reels || []).find(p => p.id === id); if (!r) return;
+  studioLoadPiece({ tipo: 'reel', tema: r.tema + ' — ' + (r.hook || '') });
+}
+window.studioFromReel = studioFromReel;
+let STUDIO_PENDING = null;
+function studioLoadPiece(payload) {
+  STUDIO_PENDING = payload;
+  const btn = document.querySelector('[data-tab="studio"]'); if (btn) btn.click();
+  waitForEl('st-tema', applyStudioPending);
+}
+function waitForEl(id, cb, tries) {
+  tries = tries || 0; const el = document.getElementById(id);
+  if (el) return cb(); if (tries > 40) return; setTimeout(() => waitForEl(id, cb, tries + 1), 100);
+}
+function applyStudioPending() {
+  const p = STUDIO_PENDING; if (!p) return; STUDIO_PENDING = null;
+  if (p.tipo && typeof studioPickType === 'function') studioPickType(p.tipo);
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  set('st-tema', p.tema); set('st-avatar', p.avatar); set('st-enemigo', p.enemigo); set('st-dolor', p.dolor);
+  const g = document.getElementById('st-generate'); if (g) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+window.studioLoadPiece = studioLoadPiece;
 function biblioEstado(id) { return OSTATE.get('estados', {})[id] || 'pendiente'; }
 function operaCycleEstado(id) {
   const m = OSTATE.get('estados', {}); const cur = m[id] || 'pendiente';
@@ -583,7 +610,9 @@ function renderBiblioteca() {
     const reels = OPERA.biblioteca.reels || [];
     const counts = { todos: reels.length, pendiente: 0, producida: 0, publicada: 0 };
     reels.forEach(p => counts[biblioEstado(p.id)]++);
-    const pass = p => BIBLIO_FILTER === 'todos' || biblioEstado(p.id) === BIBLIO_FILTER;
+    const q = (BIBLIO_SEARCH || '').toLowerCase();
+    const matchSearch = p => !q || [p.thumbnail, p.tema, p.hook, p.chisme, p.valor].filter(Boolean).join(' ').toLowerCase().includes(q);
+    const pass = p => (BIBLIO_FILTER === 'todos' || biblioEstado(p.id) === BIBLIO_FILTER) && matchSearch(p);
     const filtros = ['todos', 'pendiente', 'producida', 'publicada'].map(f =>
       `<button onclick="operaFilterBiblio('${f}')" class="text-xs px-3 py-1.5 rounded-lg ${BIBLIO_FILTER === f ? 'bg-accent text-primary font-semibold' : 'bg-zinc-800 text-zinc-300'}">${f[0].toUpperCase() + f.slice(1)} (${counts[f]})</button>`).join('');
     const cards = reels.filter(pass).map(r => {
@@ -598,15 +627,18 @@ function renderBiblioteca() {
           </div>
         </div>
         ${row('🎣 Hook:', r.hook, 'text-accent')}${row('🗣️ Chisme:', r.chisme)}${row('💎 Valor:', r.valor, 'text-emerald-400')}${row('📣 CTA:', r.cta, 'text-purple-300')}${row('🏛️', r.mecanica, 'text-zinc-600')}
+        <button onclick="studioFromReel('${r.id}')" class="mt-3 w-full text-xs px-3 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 font-semibold">🎯 Llevar a Studio</button>
       </div>`;
-    }).join('') || '<p class="text-xs text-zinc-600">— nada en este filtro —</p>';
+    }).join('') || '<p class="text-xs text-zinc-600">— nada en este filtro/búsqueda —</p>';
     const saved = OSTATE.get('saved', []);
     const savedSec = saved.length ? `<div class="mt-6"><h3 class="font-display text-lg font-bold text-accent mb-3">⭐ Guardados por vos (${saved.length})</h3>
       <div class="grid sm:grid-cols-2 gap-3">${saved.map((it, idx) => `<div class="bg-primary/40 border border-accent/25 rounded-xl p-4"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-sm truncate">${E(it.title)}</div><div class="text-[10px] uppercase text-accent/70">${E(it.kind)}</div></div><div class="flex gap-1 shrink-0"><button onclick="operaCopySaved(${idx})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button><button onclick="operaRemoveSaved(${idx})" class="text-xs px-2 py-1 rounded bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">🗑</button></div></div></div>`).join('')}</div></div>` : '';
     out.innerHTML =
       oHero('Biblioteca de contenido', '15 reels reescritos con foco F&F + framework Anti-Riesgos™') +
-      `<div class="flex flex-wrap gap-2 mb-5">${filtros}</div>` +
+      `<input id="biblio-search" value="${E(BIBLIO_SEARCH || '')}" oninput="operaSearchBiblio(this.value)" placeholder="🔎 Buscar por tema, hook, palabra…" class="w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none mb-3">
+      <div class="flex flex-wrap gap-2 mb-5">${filtros}</div>` +
       `<div class="grid sm:grid-cols-2 gap-3">${cards}</div>` + savedSec;
+    const si = document.getElementById('biblio-search'); if (si && q) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
 
