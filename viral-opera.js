@@ -643,6 +643,38 @@ function renderBiblioteca() {
 }
 
 // =========================================================
+//  TAB: CALENDARIO (v3 — funde Re-Launch + Estrategia + fase auto; conserva generador)
+// =========================================================
+function renderCalendario() {
+  const out = document.getElementById('tab-calendario'); if (!out || out.dataset.opera) return;
+  ensureOpera().then(() => {
+    out.dataset.opera = '1';
+    const d = new Date().getDate();
+    const fase = (window.ContextBuilder ? window.ContextBuilder.getCurrentFase() : (d >= 21 && d <= 27 ? 'cosecha' : 'siembra'));
+    const cosecha = fase === 'cosecha';
+    const faseBanner = `<div class="rounded-xl p-3 mb-4 text-sm ${cosecha ? 'bg-emerald-900/30 border border-emerald-900/50 text-emerald-200' : 'bg-sky-900/25 border border-sky-900/40 text-sky-200'}">
+      ${cosecha ? '🌾 <b>Cosecha</b> (días 21-27): vendé desde stories con urgencia/escasez real. Máx 4-5 historias de venta esta semana.' : '🌱 <b>Siembra</b> (días 1-20, 28+): valor + hand-raisers, sin vender de frente. CTA de respuesta, no link.'}
+      <span class="text-[11px] opacity-70"> · hoy es ${d} del mes</span></div>`;
+    const top = document.createElement('div');
+    top.innerHTML = oHero('Calendario', 'Plan de re-launch con tracking + ritmo del mes + generador de semanas') +
+      faseBanner +
+      `<div id="cal-relaunch-mount" class="mb-4"></div>
+       <details class="bg-primary/40 border border-accent/15 rounded-xl mb-4"><summary class="cursor-pointer px-4 py-3 font-display font-bold text-accent">📖 Playbook operativo (principios, rutina, fórmulas)</summary><div class="px-4 pb-4" id="cal-estrategia-mount"></div></details>
+       <div class="text-xs text-zinc-400 mb-2 font-semibold">🗓️ Generar semanas custom ⬇️</div>`;
+    out.insertBefore(top, out.firstChild);
+    // Mover Re-Launch (plan 30 días + tracking) adentro
+    renderRelaunch();
+    const rl = document.getElementById('tab-relaunch'), rlMount = document.getElementById('cal-relaunch-mount');
+    if (rl && rlMount) { rl.classList.remove('tab-panel', 'hidden'); rlMount.appendChild(rl); }
+    // Mover Estrategia (playbook) adentro
+    if (typeof renderEstrategia === 'function') renderEstrategia();
+    amplificarEstrategia();
+    const es = document.getElementById('tab-estrategia'), esMount = document.getElementById('cal-estrategia-mount');
+    if (es && esMount) { es.classList.remove('tab-panel', 'hidden'); esMount.appendChild(es); }
+  }).catch(e => { /* el generador estático sigue funcionando */ });
+}
+
+// =========================================================
 //  TAB: RE-LAUNCH (v2: pre-launch + launch day)
 // =========================================================
 function renderRelaunch() {
@@ -935,7 +967,7 @@ window.OPERA_RENDERERS = {
   avatares: renderAvatares,
   relaunch: renderRelaunch,
   estrategia: amplificarEstrategia,
-  reels: null, carruseles: null, historias: null, youtube: null, calendario: null,
+  reels: null, carruseles: null, historias: null, youtube: null, calendario: renderCalendario,
   recursos: renderRecursos,
   transformador: renderTransformador,
   biblioteca: renderBiblioteca,
