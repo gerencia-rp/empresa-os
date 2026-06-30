@@ -58,6 +58,7 @@ const BUNDLE_FILES = [
 const STATIC_COPY = [
   "config.public.js",
   "viral.html",
+  "viral-memory.js",
   "viral.js",
   "viral-opera.js",
   "viral-context-builder.js",

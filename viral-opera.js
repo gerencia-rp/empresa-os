@@ -616,6 +616,26 @@ function copyReelLib(id) {
   const b = document.querySelector('[data-copy="' + id + '"]'); if (b) { b.textContent = '✓'; setTimeout(() => b.textContent = '📋', 1200); }
 }
 window.copyReelLib = copyReelLib;
+function loadBiblioMemory() {
+  const el = document.getElementById('biblio-memory'); if (!el) return;
+  if (!window.Memory || !window.Memory.enabled()) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="text-xs text-zinc-600">🧠 Cargando lo que generaste…</div>`;
+  window.Memory.listGenerations({ limit: 50 }).then(gens => {
+    if (!gens.length) { el.innerHTML = `<div class="text-xs text-zinc-600">🧠 Memoria: todavía no generaste nada. Lo que crees en Studio aparece acá.</div>`; return; }
+    const cards = gens.map(g => {
+      const v0 = Array.isArray(g.output_variantes) ? g.output_variantes[0] : (g.output_variantes && g.output_variantes.variantes ? g.output_variantes.variantes[0] : null);
+      const titulo = (v0 && (v0.thumbnail_text || v0.hook)) || g.input_idea || '(sin título)';
+      const fecha = g.created_at ? new Date(g.created_at).toLocaleDateString('es') : '';
+      return `<div class="bg-primary/40 border border-accent/20 rounded-xl p-3">
+        <div class="flex items-center justify-between gap-2 mb-1"><span class="text-[10px] uppercase text-accent/70">${E(g.tipo)} · ${E(g.modo)}</span><span class="text-[10px] text-zinc-500">${E(fecha)}</span></div>
+        <div class="text-sm font-semibold truncate">${E(titulo)}</div>
+        ${v0 && v0.hook ? `<div class="text-xs text-zinc-400 mt-1 line-clamp-2">${E(v0.hook)}</div>` : ''}
+        <div class="text-[10px] text-zinc-600 mt-1">estado: ${E(g.estado || 'producida')}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<h3 class="font-display text-lg font-bold text-accent mb-2">🧠 Generadas (memoria · ${gens.length})</h3><div class="grid sm:grid-cols-2 gap-3">${cards}</div>`;
+  }).catch(() => { el.innerHTML = `<div class="text-xs text-zinc-600">🧠 Memoria no disponible ahora.</div>`; });
+}
 function renderBiblioteca() {
   const out = document.getElementById('tab-biblioteca'); if (!out || out.dataset.rendered) return;
   ensureOpera().then(() => {
@@ -647,11 +667,14 @@ function renderBiblioteca() {
     const savedSec = saved.length ? `<div class="mt-6"><h3 class="font-display text-lg font-bold text-accent mb-3">⭐ Guardados por vos (${saved.length})</h3>
       <div class="grid sm:grid-cols-2 gap-3">${saved.map((it, idx) => `<div class="bg-primary/40 border border-accent/25 rounded-xl p-4"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-sm truncate">${E(it.title)}</div><div class="text-[10px] uppercase text-accent/70">${E(it.kind)}</div></div><div class="flex gap-1 shrink-0"><button onclick="operaCopySaved(${idx})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button><button onclick="operaRemoveSaved(${idx})" class="text-xs px-2 py-1 rounded bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">🗑</button></div></div></div>`).join('')}</div></div>` : '';
     out.innerHTML =
-      oHero('Biblioteca de contenido', '15 reels reescritos con foco F&F + framework Anti-Riesgos™') +
+      oHero('Biblioteca de contenido', '15 reels base + lo que generaste (memoria)') +
+      `<div id="biblio-memory" class="mb-6"></div>` +
+      `<h3 class="font-display text-lg font-bold text-accent mb-2">📋 Reels base (semilla)</h3>` +
       `<input id="biblio-search" value="${E(BIBLIO_SEARCH || '')}" oninput="operaSearchBiblio(this.value)" placeholder="🔎 Buscar por tema, hook, palabra…" class="w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none mb-3">
       <div class="flex flex-wrap gap-2 mb-5">${filtros}</div>` +
       `<div class="grid sm:grid-cols-2 gap-3">${cards}</div>` + savedSec;
     const si = document.getElementById('biblio-search'); if (si && q) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+    loadBiblioMemory();
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
 
@@ -961,11 +984,12 @@ async function studioGenerate(btn) {
   const timer = setInterval(() => { const el = document.getElementById('st-timer'); if (el) el.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
   const n = Number(params.variantes) || 2;
   try {
-    let userPrompt = build.userPrompt, variantes = [], attempt = 0, exhausted = false;
+    let userPrompt = build.userPrompt, variantes = [], attempt = 0, exhausted = false, dec = null;
     for (attempt = 1; attempt <= 3; attempt++) {
       const text = await window.callClaudeMessages([{ role: 'user', content: userPrompt }],
         { system: build.system, max_tokens: 1500 + n * 1500, model: params.model || undefined });
       let parsed; try { parsed = parseJSON(text); } catch (e) { parsed = {}; }
+      if (parsed.decisiones_auto) dec = parsed.decisiones_auto;
       if (mode === 'libre' && parsed.decisiones_auto) {
         const ctxEl = document.getElementById('st-context');
         if (ctxEl) ctxEl.innerHTML = autoDecisionsBlock(parsed.decisiones_auto) + studioContextPanel(build.contexto, estTokens);
@@ -983,11 +1007,34 @@ async function studioGenerate(btn) {
     }
     STUDIO_LAST = variantes;
     renderStudioCards(variantes, params.tipoContenido, exhausted);
+    // Persistir en memoria (falla suave, no bloquea la UI)
+    if (window.Memory && window.Memory.enabled()) {
+      const valAgg = variantes.map(v => window.Validator.validate(flattenVariante(v), null, params.tipoContenido));
+      window.Memory.saveGeneration({
+        tipo: params.tipoContenido, modo: mode,
+        input_idea: mode === 'libre' ? ((document.getElementById('st-idea') || {}).value || '') : null,
+        input_config: mode === 'guiado' ? { avatar: params.avatarDestino, dolor: params.dolor, enemigo: params.enemigo, tactica: params.tactica, fase: params.faseDelMes, tema: params.tema } : null,
+        decisiones_auto: dec,
+        output_variantes: variantes,
+        prompt_completo: build.system + '\n\n----- USER -----\n' + build.userPrompt,
+        tokens_usados: estTokens,
+        validador_errores: valAgg.reduce((a, v) => a.concat(v.errores), []),
+        validador_warnings: valAgg.reduce((a, v) => a.concat(v.warnings), []),
+        estado: 'producida',
+      }).then(() => studioToast('Guardado en memoria ✓')).catch(() => {});
+    }
   } catch (e) {
     out.innerHTML = `<div class="border border-red-900/50 bg-red-950/20 rounded-xl p-5 text-sm text-red-300"><b>Error:</b> ${E(e.message)}</div>`;
   } finally { clearInterval(timer); btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); }
 }
 window.studioGenerate = studioGenerate;
+function studioToast(msg) {
+  let t = document.getElementById('opera-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'opera-toast'; t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-billete text-light text-sm px-4 py-2 rounded-lg shadow-lg border border-emerald-700'; document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity = '1';
+  setTimeout(() => { t.style.transition = 'opacity .5s'; t.style.opacity = '0'; }, 1800);
+}
+window.studioToast = studioToast;
 function studioCard(v, i, tipo) {
   const val = window.Validator.validate(flattenVariante(v), null, tipo);
   const badge = (ok, txt) => `<span class="text-[10px] px-1.5 py-0.5 rounded ${ok ? 'bg-emerald-900/50 text-emerald-300' : 'bg-bordeaux/40 text-red-300'}">${ok ? '✓' : '✗'} ${txt}</span>`;

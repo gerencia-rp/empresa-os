@@ -74,13 +74,29 @@ CONTEXTO DE MARCA:
     const inp = document.getElementById('ag-input');
     if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); agenteSend(); } });
     scrollMsgs();
+    // Rehidratar desde Supabase (si hay memoria configurada y el chat local está vacío)
+    if (window.Memory && window.Memory.enabled()) {
+      const sid = window.Memory.getCurrentSessionId();
+      window.Memory.getChatHistory(sid, 50).then(msgs => {
+        if (msgs && msgs.length && getChat().length <= msgs.length) {
+          setChat(msgs.map(m => ({ role: m.role, content: m.content })));
+          refreshMsgs();
+        }
+      }).catch(() => {});
+    }
   }
   function scrollMsgs() { const m = document.getElementById('ag-messages'); if (m) m.scrollTop = m.scrollHeight; }
   function refreshMsgs() { const m = document.getElementById('ag-messages'); if (m) m.innerHTML = bubbles(); scrollMsgs(); }
 
+  function persist(role, content) {
+    if (window.Memory && window.Memory.enabled()) {
+      try { window.Memory.saveChatMessage(window.Memory.getCurrentSessionId(), role, content).catch(() => {}); } catch (e) {}
+    }
+  }
   async function send(text) {
     text = (text || '').trim(); if (!text) return;
     const chat = getChat(); chat.push({ role: 'user', content: text }); setChat(chat); refreshMsgs();
+    persist('user', text);
     const inp = document.getElementById('ag-input'); if (inp) inp.value = '';
     const m = document.getElementById('ag-messages');
     if (m) { m.insertAdjacentHTML('beforeend', `<div id="ag-typing" class="flex justify-start mb-2"><div class="bg-primary/50 border border-zinc-800 rounded-2xl px-3 py-2 text-sm typing"><span>●</span><span>●</span><span>●</span></div></div>`); scrollMsgs(); }
@@ -89,6 +105,7 @@ CONTEXTO DE MARCA:
       const history = getChat().slice(-10).map(x => ({ role: x.role, content: x.content }));
       const reply = await window.callClaudeMessages(history, { system: agentSystem(), max_tokens: 1200, model: MODEL });
       const chat2 = getChat(); chat2.push({ role: 'assistant', content: reply }); setChat(chat2);
+      persist('assistant', reply);
       refreshMsgs(); renderActions(text);
     } catch (e) {
       const t = document.getElementById('ag-typing'); if (t) t.remove();
@@ -109,7 +126,7 @@ CONTEXTO DE MARCA:
   // API global
   window.agenteSend = () => send((document.getElementById('ag-input') || {}).value);
   window.agenteQuick = (i) => send(QUICK[i].prompt);
-  window.agenteNueva = () => { setChat([]); refreshMsgs(); const a = document.getElementById('ag-actions'); if (a) a.innerHTML = ''; };
+  window.agenteNueva = () => { setChat([]); if (window.Memory && window.Memory.enabled()) window.Memory.newSession(); refreshMsgs(); const a = document.getElementById('ag-actions'); if (a) a.innerHTML = ''; };
   window.agenteBorrar = () => { if (confirm('¿Borrar toda la conversación?')) window.agenteNueva(); };
   window.agenteToStudio = (tema) => { if (window.studioLoadPiece) window.studioLoadPiece({ tipo: 'reel', tema }); };
 
