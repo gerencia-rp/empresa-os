@@ -34,9 +34,45 @@
         </div>
       </div>
       <div id="metrics-modal"></div>
+      <div id="metrics-insights" class="mb-4"></div>
       <div id="metrics-dash"><div class="text-sm text-zinc-500">Cargando dashboard…</div></div>`;
+    loadInsights();
     loadDashboard();
   }
+
+  // ---------- Insights ----------
+  function humanize(text) {
+    const d = D(); if (!d || !text) return text;
+    let t = String(text);
+    const en = d.arquetipo.enemigos;
+    const pairs = [['principal', en.principal.nombre], ['invisible', en.invisible.nombre]];
+    en.tacticos.forEach(e => pairs.push([e.id, e.nombre]));
+    Object.keys(d.avatares).forEach(k => pairs.push([k, d.avatares[k].nombre]));
+    pairs.forEach(([id, name]) => { t = t.replace(new RegExp('"' + id + '"', 'g'), '"' + name + '"'); });
+    return t;
+  }
+  function dismissed() { try { return JSON.parse(localStorage.getItem('metricsInsightsDismissed')) || []; } catch { return []; } }
+  function loadInsights() {
+    const el = document.getElementById('metrics-insights'); if (!el) return;
+    window.Memory.computeInsights().then(r => {
+      if (r.need_more) {
+        el.innerHTML = `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-3 text-[13px] text-zinc-400">🧠 Llevás <b class="text-accent">${r.count || 0}</b> publicación(es) con métricas. Necesitás al menos <b>3</b> para que el sistema detecte patrones.</div>`;
+        return;
+      }
+      const ins = (r.insights || []).filter(x => !dismissed().includes(x.headline));
+      if (!ins.length) { el.innerHTML = ''; return; }
+      const prioC = { alta: 'border-accent/50 bg-accent/10', media: 'border-zinc-700 bg-primary/40', baja: 'border-zinc-800 bg-primary/30' };
+      const cards = ins.map(x => `<div class="rounded-xl border ${prioC[x.priority] || prioC.media} p-3">
+        <div class="flex items-start justify-between gap-2"><div class="font-display font-bold text-accent text-sm">${Eh(humanize(x.headline))}</div><button onclick="metricsDismiss('${Eh(x.headline).replace(/'/g, "")}')" class="text-zinc-600 hover:text-zinc-300 text-xs">✕</button></div>
+        <div class="text-[13px] text-zinc-200 mt-1">${Eh(humanize(x.detail))}</div>
+        ${(x.evidence_ids && x.evidence_ids.length) ? `<div class="text-[10px] text-zinc-500 mt-1">Basado en ${x.evidence_ids.length} pieza(s)</div>` : ''}
+        <div class="text-[9px] uppercase text-zinc-600 mt-1">${Eh(x.tipo)} · prioridad ${Eh(x.priority || 'media')}</div>
+      </div>`).join('');
+      el.innerHTML = `<div class="flex items-center justify-between mb-2"><h3 class="font-display text-lg font-bold text-accent">🧠 Insights</h3><button onclick="metricsMarkRead('${r.id || ''}')" class="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">Marcar leídos</button></div><div class="grid sm:grid-cols-2 gap-3">${cards}</div>`;
+    }).catch(e => { el.innerHTML = `<div class="text-xs text-red-400">Insights: ${Eh(e.message)}</div>`; });
+  }
+  window.metricsDismiss = (headline) => { const d = dismissed(); d.push(headline); localStorage.setItem('metricsInsightsDismissed', JSON.stringify(d)); loadInsights(); };
+  window.metricsMarkRead = (id) => { if (id && window.Memory.markInsightRead) window.Memory.markInsightRead(id).catch(() => {}); const el = document.getElementById('metrics-insights'); if (el) el.innerHTML = ''; };
 
   // ---------- Dashboard ----------
   function kpiCard(label, value, sub) {
