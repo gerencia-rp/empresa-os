@@ -65,6 +65,7 @@
       <button data-tab="recursos" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🔥 Tendencias</button>
       <button data-tab="calendario" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📅 Calendario</button>
       <button data-tab="agente" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">💬 Agente</button>
+      <button data-tab="metricas" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📊 Métricas</button>
       <span class="w-px h-5 bg-zinc-700 mx-1"></span>
       <button data-tab="marca" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">⚙️ Marca</button>
     </div>
@@ -81,6 +82,9 @@
 
   <!-- ===== AGENTE (chat conversacional) ===== -->
   <section id="tab-agente" class="tab-panel hidden"></section>
+
+  <!-- ===== MÉTRICAS (carga manual + dashboard) ===== -->
+  <section id="tab-metricas" class="tab-panel hidden"></section>
 
   <!-- ===== Secciones fuente (las mueve el acordeón MARCA) ===== -->
   <section id="tab-manifiesto" class="tab-panel hidden"></section>
@@ -473,5 +477,6 @@
 <script src="viral-context-builder.js"></script>
 <script src="viral-validator.js"></script>
 <script src="viral-agente.js"></script>
+<script src="viral-metrics.js"></script>
 </body>
 </html>

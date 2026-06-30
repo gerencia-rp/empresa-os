@@ -45,5 +45,8 @@
     listGenerations(filters) {
       return call('list-generations', filters || {}).then(r => r.generations || []);
     },
+    markAsPublished(data) { return call('mark-as-published', data); },
+    saveMetrics(data) { return call('save-metrics', data); },
+    getDashboard() { return call('get-dashboard', {}); },
   };
 })();

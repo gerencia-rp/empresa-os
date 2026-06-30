@@ -1,6 +1,5 @@
 // ════════════════════════════════════════════════════════════════
-// list-generations · lista paginada de content_generations con filtros
-// Filtros: estado, tipo. Paginación: limit (def 50), offset (def 0).
+// mark-as-published · crea fila en content_published + estado='publicada'
 // ════════════════════════════════════════════════════════════════
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -8,13 +7,9 @@ import { corsHeaders, corsResponse } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 function authOk(req: Request): boolean {
-  // La anon key es pública (config.public.js). Seguridad real: RLS + service role + CORS.
-  // Acá solo exigimos que venga un Bearer (anon o service).
-  const b = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  return !!b;
+  return !!(req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
 }
 
 Deno.serve(async (req) => {
@@ -23,19 +18,21 @@ Deno.serve(async (req) => {
   if (!authOk(req)) return corsResponse(req, { error: "No autorizado" }, 401);
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const limit = Math.min(Number(body.limit) || 50, 200);
-    const offset = Number(body.offset) || 0;
+    const body = await req.json();
+    if (!body.generation_id || !body.plataforma) {
+      return corsResponse(req, { error: "Faltan campos: generation_id, plataforma" }, 400);
+    }
     const db = createClient(SUPABASE_URL, SERVICE_KEY);
-    let q = db.from("content_generations")
-      .select("id, created_at, tipo, modo, input_idea, input_config, decisiones_auto, output_variantes, tokens_usados, estado, content_published(id, plataforma)", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-    if (body.estado) q = q.eq("estado", body.estado);
-    if (body.tipo) q = q.eq("tipo", body.tipo);
-    const { data, error, count } = await q;
+    const { data, error } = await db.from("content_published").insert({
+      generation_id: body.generation_id,
+      plataforma: body.plataforma,
+      url_post: body.url_post ?? null,
+      caption_final: body.caption_final ?? null,
+      notas: body.notas ?? null,
+    }).select("id").single();
     if (error) return corsResponse(req, { error: error.message }, 500);
-    return corsResponse(req, { generations: data || [], total: count ?? null });
+    await db.from("content_generations").update({ estado: "publicada" }).eq("id", body.generation_id);
+    return corsResponse(req, { published_id: data.id });
   } catch (e) {
     return corsResponse(req, { error: String((e as Error).message || e) }, 500);
   }
