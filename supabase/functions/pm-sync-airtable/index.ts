@@ -62,7 +62,9 @@ const TABLE_IDS = {
   inquilinos: "tblXuFC9azHTZGjmE",
   reservas:   "tblzz3fokkBprEpIm",
   pagos:      "tbl5p63dUEhrzgHVJ",
-  gastos:     "tblGBQ5xn9Zp6YrTN"
+  gastos:     "tblGBQ5xn9Zp6YrTN",
+  accesos:    "tblfb63Yhn0NIMDNw",
+  tareas:     "tbl1Xyxex7Ve9j8QS"
 };
 
 const F = {
@@ -73,6 +75,10 @@ const F = {
   casa_unidades:  "fldsr8FGN6y5OsaEr",
   casa_estado:    "fldmRNmQdq6ocx3q2",
   casa_notas:     "fldueu9f3umYV27z7",
+  casa_wifi_nombre: "fldnukNsOSGMk1nEQ",
+  casa_wifi_clave:  "fldMlhg35OmZwJA5i",
+  casa_drive:       "fldohaq4JEfOuYiCj",
+  casa_habitaciones:"fldFsDu4p97kXAwh9",
   // Inquilinos
   inq_nombre:     "flddqJeRovK6Hoxx0",
   inq_telefono:   "fldr9V8dpcuFQhvS0",
@@ -113,7 +119,29 @@ const F = {
   gst_fecha:      "fldHnaieHa4XRCS7A",
   gst_mes:        "fldc2AxqIU7xJldZE",
   gst_factura:    "fldFGenqtv8piockd",
-  gst_casa:       "fld3NuV9K8Wxg86bL"   // link → Casas
+  gst_casa:       "fld3NuV9K8Wxg86bL",  // link → Casas
+  gst_ambito:     "fldhHLYaoS8VhfuTZ",  // Ámbito (Casa/Plataforma/Equipo)
+  // Accesos (🔑)
+  acc_servicio:   "fldiAGNHPO8ieYrcF",
+  acc_categoria:  "fldCmDi12qdwmFD9c",
+  acc_usuario:    "fldV2yIKzsCNnnRB3",
+  acc_clave:      "fldzyp9gzUMexAZ5p",
+  acc_link:       "fldRROMLIDcJU052K",
+  acc_casa:       "fldzsUenXndDo2ohg",  // link → Casas
+  acc_obs:        "fld4JiSfJ5ONWsZKC",
+  // Tareas Mantenimiento (🧰)
+  tar_tarea:      "fldEd9t1iefWE9OQS",
+  tar_zona:       "fldrOszIeKNeTiYx4",
+  tar_prioridad:  "fldLmsIBdL3WNp3rK",
+  tar_estado:     "fldAGv4oBnxUyOyor",
+  tar_encargado:  "fldp0nl9KXSO2fbIw",
+  tar_casa:       "fld4ANLcBe4EDfWXp",  // link → Casas
+  tar_notas:      "fldDa8aajDSFDsTuB",
+  tar_tiempo_t:   "fld7g92lruRr5Kuzp",  // Tiempo de tarea
+  tar_tiempo_v:   "fldGTuyvXQOS9hUvS",  // Tiempo de traslado
+  tar_fecha_in:   "fldkqbeFyuwEMKL0W",
+  tar_fecha_fin:  "fldeANm7gqbw1CW7U",
+  tar_herramientas:"fld5j8O8TZJlNd0oM"
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -218,7 +246,7 @@ function inferZone(z: string | null): string | null {
 function inferExpenseCategory(tipo: string | null): string {
   const s = (tipo || "").toLowerCase();
   if (/aseo|podad|limpie|jard/.test(s))            return "cleaning";
-  if (/plataforma|software|suscrip|servicio/.test(s)) return "operational";
+  if (/plataforma|software|suscrip|servicio|equipo|n[oó]mina|salario/.test(s)) return "operational";
   return "house";
 }
 
@@ -304,9 +332,18 @@ Deno.serve(async (req) => {
       if (probe.error) { MIRROR = false; errors.push("mirror cols ausentes (correr 2026-06-22-mirror-sync.sql): " + probe.error.message); }
     }
     const mirrorFields = () => MIRROR ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
+    // Probe aparte para tablas auxiliares (credentials/tasks): si su migración
+    // (2026-06-23-mirror-sync-aux-tables.sql) no corrió, MIRROR_AUX=false y siguen sin mirror.
+    let MIRROR_AUX = MIRROR;
+    if (MIRROR) {
+      const pa = await supabase.from("pm_credentials").select("active,last_synced_at,archived_at").limit(1);
+      if (pa.error) { MIRROR_AUX = false; errors.push("mirror AUX cols ausentes (2026-06-23-mirror-sync-aux-tables.sql): " + pa.error.message); }
+    }
+    const mirrorFieldsAux = () => MIRROR_AUX ? { active: true, last_synced_at: nowISO, archived_at: null } : {};
 
     const archivedCount: Record<string, number> = {
-      pm_properties: 0, pm_units: 0, pm_tenants: 0, pm_bookings: 0, pm_payments: 0, pm_expenses: 0
+      pm_properties: 0, pm_units: 0, pm_tenants: 0, pm_bookings: 0, pm_payments: 0, pm_expenses: 0,
+      pm_credentials: 0, pm_tasks: 0
     };
     const archivedSamples: Record<string, any[]> = {};
     // Archiva (soft-delete) filas no vistas en este run. GATED anti-wipe (ver reglas arriba).
@@ -358,6 +395,9 @@ Deno.serve(async (req) => {
         city, state, zip,
         zone: inferZone(getSel(r.fields?.[F.casa_zona])),
         rental_model: inferRentalModel(getSel(r.fields?.[F.casa_modelo])),
+        wifi_name: r.fields?.[F.casa_wifi_nombre] || null,
+        wifi_pass: r.fields?.[F.casa_wifi_clave] || null,
+        drive_url: r.fields?.[F.casa_drive] || null,
         status: isInactive ? "inactiva" : "activa",
         active: !isInactive,
         ...(MIRROR ? { last_synced_at: nowISO, archived_at: isInactive ? nowISO : null } : {}),
@@ -642,15 +682,18 @@ Deno.serve(async (req) => {
         const casaRec = linkedId(r.fields?.[F.gst_casa]);
         const propId = casaRec ? (propIdByCasaRec[casaRec] || null) : null;
         const tipo = getSel(r.fields?.[F.gst_tipo]);
-        if (!propId) {
+        const ambito = getSel(r.fields?.[F.gst_ambito]);
+        // Gasto de "Equipo"/"Plataforma" suele NO tener Casa (es operativo, no por propiedad) → no es warning.
+        const esOperativo = /equipo|plataforma|software|nómina|nomina/i.test(ambito || "");
+        if (!propId && !esOperativo) {
           gastosSinCasa++;
           addWarn("gasto_sin_casa", "expense", "exp-" + r.id, null,
-            { concepto: r.fields?.[F.gst_concepto] || null, tipo, monto: r.fields?.[F.gst_valor] || null });
+            { concepto: r.fields?.[F.gst_concepto] || null, tipo, ambito, monto: r.fields?.[F.gst_valor] || null });
         }
         exp.push({
           external_id: "exp-" + r.id,
-          category: inferExpenseCategory(tipo),
-          subcategory: tipo || null,
+          category: inferExpenseCategory(ambito || tipo),
+          subcategory: tipo || ambito || null,
           property_id: propId,
           amount: r.fields?.[F.gst_valor] || 0,
           expense_date: expenseDate(r.fields?.[F.gst_fecha], r.fields?.[F.gst_mes], r.createdTime),
@@ -673,6 +716,77 @@ Deno.serve(async (req) => {
       stats.expenses = exp.length;
       stats.expenses_sin_casa = gastosSinCasa;
     } catch (e: any) { errors.push("gastos: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // 6) ACCESOS → pm_credentials (🔑) · property por LINKED Casa
+    // ════════════════════════════════════════════════════════════
+    try {
+      const accesos = await fetchAllRecords(base_id, TABLE_IDS.accesos, airtable_token);
+      const creds: any[] = [];
+      for (const r of accesos) {
+        const casaRec = linkedId(r.fields?.[F.acc_casa]);
+        creds.push({
+          external_id: "cred-" + r.id,
+          name: r.fields?.[F.acc_servicio] || "Sin nombre",
+          category: getSel(r.fields?.[F.acc_categoria]) || "otro",
+          username: r.fields?.[F.acc_usuario] || null,
+          password_enc: r.fields?.[F.acc_clave] || null,
+          url: r.fields?.[F.acc_link] || null,
+          property_id: casaRec ? (propIdByCasaRec[casaRec] || null) : null,
+          notes: r.fields?.[F.acc_obs] || null,
+          ...mirrorFieldsAux()
+        });
+      }
+      let credsUpsertOK = true;
+      if (!dry_run && creds.length) {
+        for (let i = 0; i < creds.length; i += 50) {
+          const { error } = await supabase.from("pm_credentials").upsert(creds.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("accesos chunk " + i + ": " + error.message); credsUpsertOK = false; break; }
+        }
+      }
+      await mirrorArchive("pm_credentials", "external_id", "active", MIRROR_AUX && credsUpsertOK && accesos.length > 0 && creds.length > 0);
+      stats.credentials = creds.length;
+    } catch (e: any) { errors.push("accesos: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
+    // 7) TAREAS MANTENIMIENTO → pm_tasks (🧰) · property por LINKED Casa
+    // ════════════════════════════════════════════════════════════
+    try {
+      const tareas = await fetchAllRecords(base_id, TABLE_IDS.tareas, airtable_token);
+      const tasks: any[] = [];
+      for (const r of tareas) {
+        const casaRec = linkedId(r.fields?.[F.tar_casa]);
+        const estado = (getSel(r.fields?.[F.tar_estado]) || "").toLowerCase();
+        const status = /complet|hech|termin/.test(estado) ? "completado"
+          : /progres|curso/.test(estado) ? "en_progreso"
+          : /cancel/.test(estado) ? "cancelado"
+          : "pendiente";
+        tasks.push({
+          external_id: "task-" + r.id,
+          title: r.fields?.[F.tar_tarea] || "Sin título",
+          property_id: casaRec ? (propIdByCasaRec[casaRec] || null) : null,
+          zone: inferZone(getSel(r.fields?.[F.tar_zona])),
+          priority: (getSel(r.fields?.[F.tar_prioridad]) || "media").toLowerCase(),
+          task_duration: r.fields?.[F.tar_tiempo_t] || null,
+          travel_time: r.fields?.[F.tar_tiempo_v] || null,
+          assignee: r.fields?.[F.tar_encargado] || null,
+          status,
+          start_at: r.fields?.[F.tar_fecha_in] || null,
+          finish_at: r.fields?.[F.tar_fecha_fin] || null,
+          notes: [r.fields?.[F.tar_notas], r.fields?.[F.tar_herramientas]].filter(Boolean).join(" · ") || null,
+          ...mirrorFieldsAux()
+        });
+      }
+      let tasksUpsertOK = true;
+      if (!dry_run && tasks.length) {
+        for (let i = 0; i < tasks.length; i += 50) {
+          const { error } = await supabase.from("pm_tasks").upsert(tasks.slice(i, i + 50), { onConflict: "external_id" });
+          if (error) { errors.push("tareas chunk " + i + ": " + error.message); tasksUpsertOK = false; break; }
+        }
+      }
+      await mirrorArchive("pm_tasks", "external_id", "active", MIRROR_AUX && tasksUpsertOK && tareas.length > 0 && tasks.length > 0);
+      stats.tasks = tasks.length;
+    } catch (e: any) { errors.push("tareas: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
     // Persistir alertas de datos + auto-resolver las ya corregidas
@@ -702,7 +816,9 @@ Deno.serve(async (req) => {
       tenants: stats.tenants || 0,
       bookings: stats.bookings || 0,
       payments: stats.payments_in || 0,
-      expenses: stats.expenses || 0
+      expenses: stats.expenses || 0,
+      credentials: stats.credentials || 0,
+      tasks: stats.tasks || 0
     };
 
     const status = errors.length === 0 ? "success" : "partial";

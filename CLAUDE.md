@@ -54,7 +54,12 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 | `pm_bookings` | **Reservas** | `tblzz3fokkBprEpIm` | enlaza Casa + Inquilino. Saltea reservas sin Fecha Entrada (start_date NOT NULL) |
 | `pm_units` | derivadas de **Reservas** | — | 1 por (Casa + "Unidad / Habitación"). external_id = `unit-{casaRecId}-{slug}` |
 | `pm_payments` | **Pagos** | `tbl5p63dUEhrzgHVJ` | **resuelve tenant/property/booking por LINKED RECORD IDs** (Inquilino/Casa/Reserva) + backfill desde la Reserva |
-| `pm_expenses` | **Gastos** | `tblGBQ5xn9Zp6YrTN` | 1 sola tabla (antes 4). property por linked Casa. category derivada de "Tipo de Gasto" |
+| `pm_expenses` | **Gastos** | `tblGBQ5xn9Zp6YrTN` | 1 sola tabla (antes 4). property por linked Casa. category derivada de "Ámbito" (Casa/Plataforma/Equipo) → fallback "Tipo de Gasto" |
+| `pm_credentials` | **Accesos** | `tblfb63Yhn0NIMDNw` | 🔑 servicios/claves por casa. external_id = `cred-{recId}`, property por linked Casa |
+| `pm_tasks` | **Tareas Mantenimiento** | `tbl1Xyxex7Ve9j8QS` | 🧰 cronograma. external_id = `task-{recId}`. OJO: convive con tareas auto-generadas por la app (external_id NULL, no se archivan) |
+| WiFi (enrich `pm_properties`) | campos en **Casas** | — | `WiFi Nombre` `fldnukNsOSGMk1nEQ`, `WiFi Clave` `fldMlhg35OmZwJA5i`, `Drive` `fldohaq4JEfOuYiCj` → wifi_name/wifi_pass/drive_url |
+
+**Nota:** la base nueva también tiene una tabla dedicada **🚪 Unidades** (`tblItO7iMZT9QS87y`) que hoy NO se usa — `pm_units` se sigue derivando de Reservas. Migrar a la tabla Unidades es una mejora futura.
 
 ### Resolución de pagos (regla CRÍTICA)
 
@@ -63,10 +68,10 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 - **NO hay fuzzy matching ni match por nombre.** Si el pago no enlaza Casa/Inquilino → warning `pago_link_faltante`.
 - La base nueva tiene un campo "Revisar inquilino" (checkbox) + "Conciliación IA" que rellena el agente de conciliación.
 
-### Tablas que NO existen en la base nueva
+### Nómina (Gastos Equipo)
 
-- Credenciales/Accesos, WiFi, Nómina (Gastos Equipo), Cronograma de tareas **no tienen fuente** en la base nueva.
-  Esas secciones se **removieron** del sync. Sus pestañas en el front quedan vacías hasta que se creen tablas equivalentes.
+- La base nueva NO tiene tabla `pm_payroll` separada: los gastos de equipo/nómina entran como filas de **Gastos**
+  con `Ámbito = Equipo` (category `operational`). `pm_payroll` viejo quedó deprecado.
 
 ### Migración de propiedades (cutover)
 
