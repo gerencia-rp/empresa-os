@@ -7128,31 +7128,31 @@ async function pmAuthToken() {
   } catch (e) { return null; }
 }
 
-async function pmApiPdf(path, params) {
+// Genera el PDF con el CHROME del usuario (chromium real): pide el HTML al endpoint
+// (auth con JWT del usuario) y lo abre en una ventana que dispara "Guardar como PDF".
+// Confiable y sin depender de chromium serverless.
+async function pmPrintReportHTML(path, params, okMsg) {
   const token = await pmAuthToken();
-  if (!token) { toast('Iniciá sesión para generar el PDF.', 'error'); return null; }
-  const qs = new URLSearchParams(params).toString();
-  toast('⏳ Generando PDF…', 'info');
-  const r = await fetch(`/api/${path}?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) {
-    let msg = r.status; try { msg = (await r.json()).error || msg; } catch (e) {}
-    toast('Error generando PDF: ' + msg, 'error');
-    return null;
-  }
-  return r;
-}
-
-async function pmOpenPdfBlob(r, okMsg) {
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-  toast(okMsg || '✅ PDF generado', 'success');
+  if (!token) { toast('Iniciá sesión para generar el PDF.', 'error'); return; }
+  const qs = new URLSearchParams({ ...params, format: 'html' }).toString();
+  toast('⏳ Generando…', 'info');
+  let html;
+  try {
+    const r = await fetch(`/api/${path}?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) { let m = r.status; try { m = (await r.json()).error || m; } catch (e) {} return toast('Error: ' + m, 'error'); }
+    html = await r.text();
+  } catch (e) { return toast('Error: ' + e.message, 'error'); }
+  // Inyecta auto-print (Guardar como PDF) antes de cerrar el body.
+  const autoPrint = "<scr" + "ipt>window.addEventListener('load',function(){setTimeout(function(){window.focus();window.print();},400)});</scr" + "ipt>";
+  const printable = html.includes('</body>') ? html.replace('</body>', autoPrint + '</body>') : html + autoPrint;
+  const w = window.open('', '_blank');
+  if (!w) return toast('Permití las ventanas emergentes (popups) para generar el PDF.', 'error');
+  w.document.open(); w.document.write(printable); w.document.close();
+  toast(okMsg || '✅ Usá "Guardar como PDF" en el diálogo de impresión', 'success', { duration: 5000 });
 }
 
 async function pmOpenReport(type) {
-  const r = await pmApiPdf('pm-report', { type });
-  if (r) await pmOpenPdfBlob(r, '✅ Reporte ' + (type === 'monthly' ? 'mensual' : 'semanal') + ' generado');
+  await pmPrintReportHTML('pm-report', { type }, '✅ Reporte ' + (type === 'monthly' ? 'mensual' : 'semanal') + ' — Guardar como PDF');
 }
 window.pmOpenReport = pmOpenReport;
 
@@ -7175,8 +7175,7 @@ window.pmSendReport = pmSendReport;
 async function pmGenerateWelcomeGuide(propertyId, unitId) {
   const params = { property_id: propertyId };
   if (unitId) params.unit_id = unitId;
-  const r = await pmApiPdf('pm-welcome-guide', params);
-  if (r) await pmOpenPdfBlob(r, '✅ Guía de Bienvenida generada');
+  await pmPrintReportHTML('pm-welcome-guide', params, '✅ Guía de Bienvenida — Guardar como PDF');
 }
 window.pmGenerateWelcomeGuide = pmGenerateWelcomeGuide;
 
