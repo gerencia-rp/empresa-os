@@ -931,7 +931,7 @@ function studioContextPanel(ctx, estTokens) {
     <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold text-accent uppercase tracking-wide">Contexto inyectado (transparente)</div>
     <span class="text-[10px] text-zinc-500">~${estTokens} tokens</span></div>
     ${ctx.tipo ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">Tipo:</span><span class="text-accent font-semibold uppercase">${E(ctx.tipo)}</span>${ctx.estilo ? `<span class="text-zinc-400">· Estilo:</span><span class="text-orange-400 font-semibold">${E(ctx.estilo)}</span>` : ''}</div>` : ''}
-    ${ctx.rag ? `<div class="flex gap-2 text-xs py-0.5 text-emerald-300"><span>📈</span><span>Inspirado en ${ctx.rag.count} ${ctx.tipo || 'pieza'}s exitosos similares (avg ${NUM(ctx.rag.avgViews)} views)</span></div>` : ''}
+    ${ctx.rag ? `<div class="flex gap-2 text-xs py-0.5 text-emerald-300"><span>📈</span><span>Inspirado en ${ctx.rag.count} ${ctx.tipo || 'pieza'}s exitosos similares (avg ${NUM(ctx.rag.avgViews)} views)</span></div>` : (ctx.ragInsuficiente ? `<div class="flex gap-2 text-xs py-0.5 text-zinc-500"><span>📭</span><span>Sin historial suficiente — generá más piezas para activar RAG.</span></div>` : '')}
     ${row('Eslogan', ctx.eslogan)}${row('Framework', ctx.framework)}${row('Tagline', ctx.tagline)}${row('Arquetipo', ctx.arquetipo)}
     ${row('Enemigo (' + ctx.enemigoTipo + ')', ctx.enemigo)}${row('Táctica', ctx.tactica)}${row('Avatar', ctx.avatar)}${row('Dolor', ctx.dolor)}${row('Fase', ctx.fase)}
     <div class="flex gap-2 text-xs py-0.5"><span class="text-emerald-400">✓</span><span class="text-zinc-200">${ctx.prohibidasCount} palabras prohibidas bloqueadas · ${ctx.marcaCount} de marca priorizadas · validador activo</span></div>
@@ -1005,6 +1005,7 @@ async function studioGenerate(btn) {
       build = window.ContextBuilder.build(params);
     }
   } catch (e) { document.getElementById('st-output').innerHTML = `<p class="text-sm text-red-400">${E(e.message)}</p>`; return; }
+  build.contexto.ragInsuficiente = !!(window.Memory && window.Memory.enabled() && (ragExamples || []).length < 3);
   const estTokens = Math.round((build.system.length + build.userPrompt.length) / 4);
   document.getElementById('st-context').innerHTML = (mode === 'libre' ? '<div class="text-[11px] text-zinc-500 mb-2">🤖 Modo Libre: la IA decide avatar/dolor/enemigo/táctica/fase. Lo verás acá tras generar.</div>' : '') + studioContextPanel(build.contexto, estTokens);
   const pre = document.getElementById('st-rawprompt'); if (pre) pre.textContent = build.system + '\n\n----- USER -----\n' + build.userPrompt;

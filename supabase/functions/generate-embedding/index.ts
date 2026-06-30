@@ -23,10 +23,11 @@ function provider(): string | null { return VOYAGE ? "voyage" : (OPENAI ? "opena
 async function embed(text: string): Promise<{ vec: number[]; dim: number; provider: string }> {
   const p = provider();
   if (p === "voyage") {
+    // voyage-3-lite con output_dimension=512 (Matryoshka) → coincide con la tabla VECTOR(512).
     const r = await fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
       headers: { "content-type": "application/json", "authorization": "Bearer " + VOYAGE },
-      body: JSON.stringify({ model: "voyage-3-lite", input: text }),
+      body: JSON.stringify({ model: "voyage-3-lite", input: text, output_dimension: 512 }),
     });
     if (!r.ok) throw new Error("Voyage " + r.status + ": " + (await r.text()).slice(0, 200));
     const d = await r.json();
