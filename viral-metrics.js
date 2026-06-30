@@ -155,11 +155,56 @@
     el.dataset.pub = publishedId;
     el.innerHTML = `<div class="bg-dark/50 border border-emerald-900/40 rounded-lg p-3">
       <div class="text-[11px] uppercase text-emerald-300 font-bold mb-2">Cargar números</div>
+      <div class="bg-primary/40 border border-accent/25 rounded-lg p-2 mb-3">
+        <label class="text-[11px] text-accent font-semibold cursor-pointer flex items-center gap-2">
+          📸 Subir pantallazo (autocompleta con IA)
+          <input type="file" accept="image/*" onchange="metricsOcr(this)" class="text-[11px] text-zinc-400">
+        </label>
+        <div id="m-ocr" class="text-[11px] text-zinc-500 mt-1"></div>
+      </div>
       <div class="grid grid-cols-2 gap-2">${METRIC_FIELDS.map(f => `<label class="block"><span class="text-[11px] text-zinc-400">${f.label}</span><input id="mf-${f.id}" type="number" min="0" ${f.pct ? 'max="100"' : ''} class="mt-0.5 w-full bg-dark border border-zinc-800 rounded px-2 py-1.5 text-sm focus:border-accent outline-none"></label>`).join('')}</div>
       <button onclick="metricsSave('${publishedId}')" class="w-full bg-accent text-primary font-semibold py-2 rounded text-sm mt-3">💾 Guardar métricas</button>
       <div id="m-saveerr" class="text-[11px] mt-1"></div>
     </div>`;
   }
+  // Comprime una imagen a <~1.5MB y devuelve { base64, mediaType }
+  function fileToCompressedB64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 1400, scale = Math.min(1, maxW / img.width);
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          const dataUrl = c.toDataURL('image/jpeg', 0.85);
+          resolve({ base64: dataUrl.split(',')[1], mediaType: 'image/jpeg' });
+        };
+        img.onerror = reject; img.src = reader.result;
+      };
+      reader.onerror = reject; reader.readAsDataURL(file);
+    });
+  }
+  function ocr(input) {
+    const file = input.files && input.files[0]; if (!file) return;
+    const box = document.getElementById('m-ocr');
+    if (file.size > 5 * 1024 * 1024 && !/^image\//.test(file.type)) { if (box) box.textContent = 'Archivo no válido.'; return; }
+    if (box) box.innerHTML = '⏳ Leyendo con IA…';
+    fileToCompressedB64(file).then(({ base64, mediaType }) =>
+      window.Memory.extractMetricsFromImage({ image_base64: base64, media_type: mediaType })
+    ).then(r => {
+      if (r.raw) { if (box) box.innerHTML = `<span class="text-amber-300">No pude parsear. Llená manual.</span>`; return; }
+      const ex = r.extracted || {};
+      let filled = 0;
+      METRIC_FIELDS.forEach(f => {
+        if (ex[f.id] != null && !isNaN(ex[f.id])) { const e = document.getElementById('mf-' + f.id); if (e) { e.value = ex[f.id]; filled++; } }
+      });
+      const col = r.confidence === 'high' ? 'text-emerald-400' : (r.confidence === 'low' ? 'text-red-400' : 'text-amber-300');
+      if (box) box.innerHTML = `<span class="${col}">✓ ${filled} campos · confianza ${r.confidence || '?'}</span>${r.notes ? ` · <span class="text-zinc-500">${Eh(r.notes)}</span>` : ''} — revisá y corregí antes de guardar.`;
+    }).catch(e => { if (box) box.innerHTML = `<span class="text-red-400">Error OCR: ${Eh(e.message)}</span>`; });
+  }
+  window.metricsOcr = ocr;
   function saveMetrics(publishedId) {
     const payload = { published_id: publishedId };
     let bad = '';
