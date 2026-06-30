@@ -18,7 +18,7 @@
     return new RegExp('(^|[^a-záéíóúüñ])' + esc + '($|[^a-záéíóúüñ])', 'i').test(hay);
   }
 
-  function validate(textGenerado, data) {
+  function validate(textGenerado, data, tipo) {
     data = data || getData();
     const text = String(textGenerado || '');
     const errores = [], warnings = [];
@@ -40,11 +40,15 @@
     const frasesUsadas = frases.filter(f => text.toLowerCase().indexOf(String(f).toLowerCase()) !== -1);
     if (frasesUsadas.length === 0) warnings.push('No usa ninguna frase recurrente (mínimo 1).');
 
-    // 4. CTA con palabra DM en MAYÚSCULAS (error duro).
+    // 4. CTA con palabra DM en MAYÚSCULAS.
     // Verbo "comentá" case-insensitive; el TOKEN se testea sin /i (debe ser real mayúscula).
+    // El manifiesto NO lleva CTA-DM (estilo Apple Think Different) → solo warning.
     const mCta = text.match(/coment[aá]([^.]{0,40})/i);
     const ctaPideDM = (mCta && /[A-ZÁÉÍÓÚÑ]{3,}/.test(mCta[1])) || /\b[A-ZÁÉÍÓÚÑ]{3,}\b[^.]{0,30}\bDM\b/.test(text);
-    if (!ctaPideDM) errores.push('El CTA no pide una palabra clave por DM en MAYÚSCULAS (ej: "Comentá MÉTODO").');
+    if (!ctaPideDM) {
+      const msg = 'El CTA no pide una palabra clave por DM en MAYÚSCULAS (ej: "Comentá MÉTODO").';
+      if (tipo === 'manifiesto') warnings.push(msg); else errores.push(msg);
+    }
 
     // 5. Promesa amplia (error duro)
     if (/multiplic\w* (tu )?(capital|dinero|plata)/i.test(text)) errores.push('Promesa amplia "multiplicar capital" — usar "primer flip sin perder capital".');

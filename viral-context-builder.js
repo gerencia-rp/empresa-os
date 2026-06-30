@@ -160,6 +160,7 @@ ${schemaPorTipo(tipo)}`;
       avatar: avatar.nombre,
       dolor: dolor ? dolor.pregunta : null,
       fase,
+      tipo,
       prohibidasCount: arq.palabrasProhibidas.length,
       marcaCount: arq.palabrasDeMarca.length,
       validador: true,

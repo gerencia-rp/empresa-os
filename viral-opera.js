@@ -849,7 +849,7 @@ function renderStudio() {
             <summary class="cursor-pointer text-xs font-semibold text-accent">⚙️ Configuración avanzada</summary>
             <div class="space-y-2 mt-2">
               <div id="st-formato-row">${fld('Formato (reel)', `<select id="st-formato" class="${selCls}"><option value="">Automático</option><option>Manita</option><option>Doble</option><option>Ranking</option><option>Sketch</option><option>Mano arriba</option><option>Entrevista en calle</option></select>`)}</div>
-              ${fld('Variantes', `<select id="st-variantes" class="${selCls}"><option>1</option><option selected>3</option><option>5</option></select>`)}
+              ${fld('Variantes', `<select id="st-variantes" class="${selCls}"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>`)}
               ${fld('CTA / palabra clave DM', `<input id="st-cta" placeholder="auto (MÉTODO, BUYBOX…)" class="${selCls}">`)}
               ${fld('Modelo IA', `<input id="st-model" placeholder="auto (el de Ajustes)" class="${selCls}">`)}
             </div>
@@ -897,6 +897,7 @@ function studioContextPanel(ctx, estTokens) {
   return `<div class="bg-primary/40 border border-accent/15 rounded-xl p-4">
     <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold text-accent uppercase tracking-wide">Contexto inyectado (transparente)</div>
     <span class="text-[10px] text-zinc-500">~${estTokens} tokens</span></div>
+    ${ctx.tipo ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">Tipo:</span><span class="text-accent font-semibold uppercase">${E(ctx.tipo)}</span></div>` : ''}
     ${row('Eslogan', ctx.eslogan)}${row('Framework', ctx.framework)}${row('Tagline', ctx.tagline)}${row('Arquetipo', ctx.arquetipo)}
     ${row('Enemigo (' + ctx.enemigoTipo + ')', ctx.enemigo)}${row('Táctica', ctx.tactica)}${row('Avatar', ctx.avatar)}${row('Dolor', ctx.dolor)}${row('Fase', ctx.fase)}
     <div class="flex gap-2 text-xs py-0.5"><span class="text-emerald-400">✓</span><span class="text-zinc-200">${ctx.prohibidasCount} palabras prohibidas bloqueadas · ${ctx.marcaCount} de marca priorizadas · validador activo</span></div>
@@ -954,9 +955,11 @@ async function studioGenerate(btn) {
   document.getElementById('st-context').innerHTML = (mode === 'libre' ? '<div class="text-[11px] text-zinc-500 mb-2">🤖 Modo Libre: la IA decide avatar/dolor/enemigo/táctica/fase. Lo verás acá tras generar.</div>' : '') + studioContextPanel(build.contexto, estTokens);
   const pre = document.getElementById('st-rawprompt'); if (pre) pre.textContent = build.system + '\n\n----- USER -----\n' + build.userPrompt;
   const out = document.getElementById('st-output');
-  out.innerHTML = `<div class="border border-zinc-800 rounded-xl py-16 flex flex-col items-center text-zinc-500"><div class="typing text-3xl mb-3"><span>●</span><span>●</span><span>●</span></div><p id="st-status" class="text-sm">Generando con tu marca inyectada…</p></div>`;
+  out.innerHTML = `<div class="border border-zinc-800 rounded-xl py-16 flex flex-col items-center text-zinc-500"><div class="typing text-3xl mb-3"><span>●</span><span>●</span><span>●</span></div><p id="st-status" class="text-sm">Generando con tu marca inyectada…</p><p class="text-[11px] text-zinc-600 mt-1">⏱ <span id="st-timer">0</span>s · cada variante tarda ~20-40s; si valida, reintenta hasta 3×</p></div>`;
   btn.disabled = true; btn.classList.add('opacity-50', 'pointer-events-none');
-  const n = Number(params.variantes) || 3;
+  const t0 = Date.now();
+  const timer = setInterval(() => { const el = document.getElementById('st-timer'); if (el) el.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
+  const n = Number(params.variantes) || 2;
   try {
     let userPrompt = build.userPrompt, variantes = [], attempt = 0, exhausted = false;
     for (attempt = 1; attempt <= 3; attempt++) {
@@ -970,7 +973,7 @@ async function studioGenerate(btn) {
       }
       variantes = parsed.variantes || parsed.reels || (Array.isArray(parsed) ? parsed : []);
       const errs = [];
-      variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v)); if (!r.ok) errs.push.apply(errs, r.errores); });
+      variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v), null, params.tipoContenido); if (!r.ok) errs.push.apply(errs, r.errores); });
       if (!variantes.length) throw new Error('La IA no devolvió variantes válidas. Reintentá.');
       if (!errs.length) break;
       if (attempt < 3) {
@@ -982,11 +985,11 @@ async function studioGenerate(btn) {
     renderStudioCards(variantes, params.tipoContenido, exhausted);
   } catch (e) {
     out.innerHTML = `<div class="border border-red-900/50 bg-red-950/20 rounded-xl p-5 text-sm text-red-300"><b>Error:</b> ${E(e.message)}</div>`;
-  } finally { btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); }
+  } finally { clearInterval(timer); btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); }
 }
 window.studioGenerate = studioGenerate;
 function studioCard(v, i, tipo) {
-  const val = window.Validator.validate(flattenVariante(v));
+  const val = window.Validator.validate(flattenVariante(v), null, tipo);
   const badge = (ok, txt) => `<span class="text-[10px] px-1.5 py-0.5 rounded ${ok ? 'bg-emerald-900/50 text-emerald-300' : 'bg-bordeaux/40 text-red-300'}">${ok ? '✓' : '✗'} ${txt}</span>`;
   const f = (lbl, txt, c) => txt ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase ${c || 'text-zinc-500'} font-semibold mb-0.5">${lbl}</div><div class="text-sm">${E(txt)}</div></div>` : '';
   let extra = '';
