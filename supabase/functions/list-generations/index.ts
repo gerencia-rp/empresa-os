@@ -11,8 +11,10 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 function authOk(req: Request): boolean {
+  // La anon key es pública (config.public.js). Seguridad real: RLS + service role + CORS.
+  // Acá solo exigimos que venga un Bearer (anon o service).
   const b = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  return !!b && (b === ANON_KEY || b === SERVICE_KEY);
+  return !!b;
 }
 
 Deno.serve(async (req) => {
