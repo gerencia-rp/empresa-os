@@ -302,54 +302,52 @@ function pmPropertyName(id) {
   return p?.name || '—';
 }
 function pmOccupancyOf(propertyId) {
-  // Ocupación de la propiedad en términos de UNIDADES RENTABLES (no habitaciones).
+  // Ocupación de la propiedad en términos de UNIDADES (regla del dueño, ver abajo).
   const total = pmRentableUnitsOf(propertyId);
   const occ = pmOccupiedRentableUnitsOf(propertyId);
   return { occupied: occ, total, pct: total ? Math.round(100 * occ / total) : 0 };
 }
-// ── REGLA DE UNIDADES RENTABLES (confirmada por el dueño) ──
-//   casa_completa     → 1 (la casa)
-//   por_habitaciones  → 1 (la casa entera; las habitaciones NO cuentan como unidades)
-//   por_unidades      → N (cada apartamento/estudio independiente)
-//   mixta             → 1 casa + N (apartamentos/estudios; las habitaciones NO suman)
-// Las habitaciones existen para vincular bookings/cobros, pero no entran al portafolio.
-function isRentableUnit(u) {
-  return ['casa_completa', 'apartamento', 'estudio'].includes(u?.unit_type);
-}
-// Subunidades rentables independientes de una propiedad (apartamentos/estudios; NO habitaciones, NO la casa)
+// ── REGLA DE UNIDADES (confirmada por el dueño · jun 2026) ──
+//   Cada casa_completa = 1, cada estudio = 1, cada apartamento = 1, y TODAS las
+//   habitaciones de la casa juntas = 1 (6 habitaciones = 1 unidad).
+//   Ej: casa completa + 3 estudios = 4 unidades · 407 Capitol = 4.
+//   Es MODEL-AGNÓSTICO: se calcula desde las unidades reales (no del rental_model).
+//   Equivale a Casas.Unidades de Airtable (fldsr8FGN6y5OsaEr → pm_properties.total_units).
+//   La ocupación (% y libres) usa la MISMA definición.
+const PM_INDEP_TYPES = ['casa_completa', 'apartamento', 'estudio'];
+function isRentableUnit(u) { return PM_INDEP_TYPES.includes(u?.unit_type); }
+function pmIndepUnitsOf(propertyId) { return pmUnitsOf(propertyId).filter(u => PM_INDEP_TYPES.includes(u.unit_type)); }
+function pmRoomsOf(propertyId) { return pmUnitsOf(propertyId).filter(u => u.unit_type === 'habitacion'); }
+// Subunidades rentables independientes (compat: apartamentos/estudios)
 function pmRentableSubunitsOf(propertyId) {
   return pmUnitsOf(propertyId).filter(u => u.unit_type === 'apartamento' || u.unit_type === 'estudio');
 }
-function pmRentableUnitsOf(propertyId) {
-  const p = pmaState.properties.find(x => x.id === propertyId);
-  const model = p?.rental_model || 'casa_completa';
-  const subs = pmRentableSubunitsOf(propertyId).length;
-  if (model === 'por_unidades') return subs;          // N apartamentos/estudios
-  if (model === 'mixta') return 1 + subs;             // 1 casa + N apartamentos/estudios
-  return 1;                                           // casa_completa / por_habitaciones → 1
-}
-// Estado "de la casa" (casa_completa o por_habitaciones / parte casa de mixta):
-// ocupada si CUALQUIER unit casa/habitación tiene booking activo (las habs no cuentan
-// como unidad pero sí indican que la casa está en uso).
+// Unidades casa+habitaciones (para estado agregado del grupo)
 function pmHouseUnitsOf(propertyId) {
   return pmUnitsOf(propertyId).filter(u => u.unit_type === 'casa_completa' || u.unit_type === 'habitacion');
 }
-function pmOccupiedRentableUnitsOf(propertyId) {
+function pmRentableUnitsOf(propertyId) {
+  const indep = pmIndepUnitsOf(propertyId).length;          // casa_completa + estudios + aptos
+  const hasRoom = pmRoomsOf(propertyId).length > 0 ? 1 : 0;  // todas las habitaciones juntas = 1
+  const n = indep + hasRoom;
+  if (n > 0) return n;
+  // Fallback si la casa aún no tiene unidades cargadas: Casas.Unidades (Airtable) → total_units.
   const p = pmaState.properties.find(x => x.id === propertyId);
-  const model = p?.rental_model || 'casa_completa';
-  const subActive = u => (u.unit_type === 'apartamento' || u.unit_type === 'estudio') && pmUnitOccupied(u);
-  let occ;
-  if (model === 'por_unidades') {
-    occ = pmUnitsOf(propertyId).filter(subActive).length;
-  } else if (model === 'mixta') {
-    const subOcc = pmUnitsOf(propertyId).filter(subActive).length;
-    const casaOcc = pmHouseUnitsOf(propertyId).some(u => pmUnitOccupied(u)) ? 1 : 0;
-    occ = casaOcc + subOcc;
-  } else {
-    // casa_completa / por_habitaciones: ocupada si cualquier unit (incl. habitaciones) está ocupada (Estado)
-    occ = pmUnitsOf(propertyId).some(u => pmUnitOccupied(u)) ? 1 : 0;
-  }
-  return Math.min(occ, pmRentableUnitsOf(propertyId)); // invariante: ocupadas ≤ rentables
+  return Math.max(1, parseInt(p?.total_units) || 1);
+}
+function pmOccupiedRentableUnitsOf(propertyId) {
+  const indepOcc = pmIndepUnitsOf(propertyId).filter(u => pmUnitOccupied(u)).length;
+  const rooms = pmRoomsOf(propertyId);
+  const roomsOcc = rooms.length && rooms.some(u => pmUnitOccupied(u)) ? 1 : 0; // grupo habitaciones ocupado si ≥1 ocupada
+  return Math.min(indepOcc + roomsOcc, pmRentableUnitsOf(propertyId));
+}
+// Reservadas (mismo criterio de colapso de habitaciones; no cuenta si ya está ocupada)
+function pmReservedRentableUnitsOf(propertyId) {
+  const isRes = u => pmUnitState(u) === 'reservada';
+  const indepRes = pmIndepUnitsOf(propertyId).filter(u => isRes(u) && !pmUnitOccupied(u)).length;
+  const rooms = pmRoomsOf(propertyId);
+  const roomsRes = (!rooms.some(u => pmUnitOccupied(u)) && rooms.some(isRes)) ? 1 : 0;
+  return indepRes + roomsRes;
 }
 // Totales del portafolio (solo propiedades activas)
 function pmTotalRentableUnits() {
@@ -364,40 +362,39 @@ function pmTotalOccupiedRentableUnits() {
 function pmFreeRentableUnits() {
   return Math.max(0, pmTotalRentableUnits() - pmTotalOccupiedRentableUnits());
 }
-// ── TILES rentables para la vista Disponibilidad ──
-// La casa (casa_completa / por_habitaciones / parte casa de mixta) = 1 tile;
-// cada apartamento/estudio = 1 tile; las habitaciones NO generan tile (no son unidad).
+// ── TILES para la vista Disponibilidad (misma regla de unidades) ──
+// Cada casa_completa / estudio / apartamento = 1 tile; TODAS las habitaciones
+// de la casa juntas = 1 tile sintético "Habitaciones".
 function pmRentableTiles(propIds) {
   const tiles = [];
   for (const p of pmaState.properties.filter(x => x.active !== false && (!propIds || propIds.has(x.id)))) {
-    const model = p.rental_model || 'casa_completa';
-    const us = pmUnitsOf(p.id);
-    const subs = us.filter(u => u.unit_type === 'apartamento' || u.unit_type === 'estudio');
-    if (model !== 'por_unidades') {
-      // hay "casa": usar la unit casa_completa real, o sintetizar una (ej. por_habitaciones)
-      const casa = us.find(u => u.unit_type === 'casa_completa');
-      tiles.push(casa || { id: 'house-' + p.id, _house: true, property_id: p.id, name: 'Casa', code: 'CASA', unit_type: 'casa_completa' });
-    }
-    if (model === 'por_unidades' || model === 'mixta') subs.forEach(u => tiles.push(u));
+    pmIndepUnitsOf(p.id).forEach(u => tiles.push(u));          // casa_completa + estudios + aptos
+    const rooms = pmRoomsOf(p.id);
+    if (rooms.length) tiles.push({                              // grupo de habitaciones = 1 tile
+      id: 'rooms-' + p.id, _roomsGroup: true, _roomIds: rooms.map(r => r.id),
+      property_id: p.id, code: 'HAB', unit_type: 'habitacion',
+      name: rooms.length > 1 ? `Habitaciones (${rooms.length})` : 'Habitación',
+    });
   }
   return tiles;
 }
-// unidades físicas que determinan el estado de un tile (para casa = casa+habitaciones)
+// unidades físicas que determinan el estado de un tile
 function pmTileUnitIds(tile) {
-  if (tile._house || tile.unit_type === 'casa_completa') return pmHouseUnitsOf(tile.property_id).map(u => u.id);
+  if (tile._roomsGroup) return tile._roomIds;
   return [tile.id];
 }
 function pmTileState(tile) {
-  if (!tile._house && tile.unit_type !== 'casa_completa') return pmUnitState(tile);
-  // estado de la casa entera
-  const ids = pmTileUnitIds(tile);
+  if (!tile._roomsGroup) {
+    if (tile.maintenance_status === 'en_mantenimiento') return 'mantenimiento';
+    return pmUnitState(tile);   // casa_completa / estudio / apto = unidad real
+  }
+  // grupo de habitaciones: estado agregado
   const today = new Date().toISOString().slice(0, 10);
-  const us = ids.map(id => pmaState.units.find(u => u.id === id)).filter(Boolean);
+  const us = tile._roomIds.map(id => pmaState.units.find(u => u.id === id)).filter(Boolean);
   if (us.some(u => u.maintenance_status === 'en_mantenimiento')) return 'mantenimiento';
-  // Ocupación/reserva desde el Estado de la unidad (Airtable); reservada también si hay confirmada futura.
   if (us.some(u => pmUnitOccupied(u))) return 'ocupada';
   if (us.some(u => pmUnitState(u) === 'reservada')) return 'reservada';
-  if (ids.some(id => pmaState.bookings.some(b => b.unit_id === id && b.status === 'confirmado' && (b.start_date || '') > today))) return 'reservada';
+  if (tile._roomIds.some(id => pmaState.bookings.some(b => b.unit_id === id && b.status === 'confirmado' && (b.start_date || '') > today))) return 'reservada';
   return 'libre';
 }
 function pmFinanceOf(propertyId, monthDate = null) {
@@ -522,7 +519,7 @@ function pmEnsureModalNav() {
 // Breadcrumb clickeable: Rentas › Property Mgmt › [Tab] › [Detalle]
 function pmTabLabel(t) {
   return ({ dashboard: 'Resumen', properties: 'Propiedades', calendar: 'Calendario', bookings: 'Reservas',
-    tenants: 'Inquilinos', payments: 'Pagos', expenses: 'Gastos', operations: 'Operación', feeds: 'Feeds', finance: 'Finanzas' })[t] || t;
+    tenants: 'Inquilinos', payments: 'Pagos', expenses: 'Gastos', operations: 'Operación', finance: 'Finanzas' })[t] || t;
 }
 function pmBreadcrumb() {
   const parts = [
@@ -590,7 +587,6 @@ function pmRender() {
             ['payments','💵 Pagos', ''],
             ['expenses','📤 Gastos', ''],
             ['operations','🛠 Operación', ''],
-            ['feeds','📡 Feeds', pmaState.feeds.length],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
             <button onclick="pmSetTab('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${pmaState.tab===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">
@@ -609,7 +605,6 @@ function pmRender() {
         ${pmaState.tab === 'payments'   ? pmRenderPayments() : ''}
         ${pmaState.tab === 'expenses'   ? pmRenderExpenses() : ''}
         ${pmaState.tab === 'operations' ? pmRenderOperations() : ''}
-        ${pmaState.tab === 'feeds'      ? pmRenderFeeds() : ''}
         ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
       </div>
     </div>
@@ -1238,7 +1233,7 @@ function pmRenderAvailability() {
 
       <!-- Grid -->
       <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-1.5">
-        ${units.map(u => { const s=pmTileState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; const onclick=u._house?`pmToggleExpandProperty('${u.property_id}');pmSetTab('properties')`:`pmEditUnit('${u.id}','${u.property_id}')`; return `
+        ${units.map(u => { const s=pmTileState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; const onclick=u._roomsGroup?`pmToggleExpandProperty('${u.property_id}');pmSetTab('properties')`:`pmEditUnit('${u.id}','${u.property_id}')`; return `
           <button onclick="${onclick}" title="${pmPropertyName(u.property_id).replace(/"/g,'&quot;')} · ${(u.code||u.name||'').replace(/"/g,'&quot;')} · ${meta.label}" class="border ${meta.bg} rounded-lg p-1.5 text-left hover:shadow-sm transition">
             <div class="text-[13px]">${meta.dot}</div>
             <div class="text-[9px] font-bold ${meta.txt} truncate">${(u.code||u.name||'').replace(/</g,'&lt;').slice(0,12)}</div>
@@ -1303,10 +1298,9 @@ function pmRenderPropertyCardInline(p) {
                    : p.rental_model === 'por_apartamentos' ? '🏢 Apartamentos'
                    : p.rental_model === 'mixta' ? '🔀 Mixta'
                    : '🔀 Mixto';
-  // Unidades RENTABLES (las habitaciones no cuentan): "1 unid" / "N unid" / "1 + N unid" (mixta)
+  // Unidades (regla: casa=1, estudio=1, apto=1, todas las habitaciones juntas=1)
   const rentN = pmRentableUnitsOf(p.id);
-  const rentSubs = pmRentableSubunitsOf(p.id).length;
-  const rentLabel = p.rental_model === 'mixta' ? `1 + ${rentSubs} unid` : `${rentN} unid`;
+  const rentLabel = `${rentN} unid`;
   const rentOcc = pmOccupiedRentableUnitsOf(p.id);
 
   return `
@@ -1461,9 +1455,22 @@ function pmToggleExpandProperty(id) {
   pmaState.expandedProperties = pmaState.expandedProperties || new Set();
   if (pmaState.expandedProperties.has(id)) pmaState.expandedProperties.delete(id);
   else pmaState.expandedProperties.add(id);
-  pmRender();
+  pmPreserveScroll(pmRender);
 }
 window.pmToggleExpandProperty = pmToggleExpandProperty;
+
+// Conserva la posición de scroll del contenedor del PM al re-renderizar (evita el
+// salto al inicio al expandir una casa). Captura scrollTop antes y lo restaura después.
+function pmPreserveScroll(fn) {
+  const sel = '#pm-root .overflow-y-auto';
+  const before = document.querySelector(sel);
+  const top = before ? before.scrollTop : 0;
+  fn();
+  const restore = () => { const el = document.querySelector(sel); if (el) el.scrollTop = top; };
+  restore();
+  requestAnimationFrame(restore);   // por si el layout se asienta en el próximo frame
+}
+window.pmPreserveScroll = pmPreserveScroll;
 
 async function pmToggleUnitActive(unitId, makeActive) {
   try {
@@ -1528,6 +1535,8 @@ function pmRenderPropertyDetail() {
           <div class="text-[11px] text-blue-200">${(p.address||'').replace(/</g,'&lt;')}</div>
         </div>
         <div class="flex gap-2">
+          <button onclick="pmGenerateWelcomeGuide('${p.id}')" class="bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold px-3 py-1.5 rounded" title="Generar PDF de la guía de check-in">📄 Guía de Bienvenida</button>
+          <button onclick="pmSendWelcomeGuide('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded" title="Enviar al huésped por correo o WhatsApp">Enviar al huésped ›</button>
           <button onclick="pmEditProperty('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">✏️ Editar</button>
           <button onclick="pmEditUnit(null,'${p.id}')" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded">+ Unidad</button>
         </div>
@@ -1952,8 +1961,10 @@ function pmRenderCalendar() {
     timelineUnits = filteredUnits.filter(u => !pmaState.calendarCollapsedProps[u.property_id]);
   }
 
-  return `
-    <div class="flex bg-white pm-split" style="height: calc(75vh - 60px); margin: -4px;">
+  const fs = !!pmaState.calendarFullscreen;
+  const splitH = fs ? 'calc(100vh - 92px)' : 'calc(82vh - 56px)';   // más alto por defecto + modo full
+  const inner = `
+    <div class="flex bg-white pm-split" style="height: ${splitH}; margin: -4px;">
       ${pmRenderListingsSidebar(filteredUnits, allUnits.length)}
       ${pmResizeHandle('#pm-cal-sidebar', 'pm_calendar_sidebar_width', 320)}
       <div class="flex-1 flex flex-col overflow-hidden pm-split-main">
@@ -1972,7 +1983,22 @@ function pmRenderCalendar() {
       ${pmaState.calendarSelectedBookingId ? pmRenderBookingSidePanel(pmaState.calendarSelectedBookingId) : ''}
     </div>
   `;
+  if (fs) {
+    return `<div class="fixed inset-0 z-[70] bg-white flex flex-col" style="padding:8px 12px;">
+      <div class="flex items-center justify-between mb-1.5">
+        <div class="font-bold text-slate-800 text-sm">📅 Calendario · pantalla completa</div>
+        <button onclick="pmCalToggleFullscreen()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded">✕ Salir de pantalla completa</button>
+      </div>
+      ${inner}
+    </div>`;
+  }
+  return inner;
 }
+function pmCalToggleFullscreen() {
+  pmaState.calendarFullscreen = !pmaState.calendarFullscreen;
+  pmRender();
+}
+window.pmCalToggleFullscreen = pmCalToggleFullscreen;
 
 function pmCalExpandAll() {
   pmaState.calendarCollapsedProps = {};
@@ -2252,7 +2278,8 @@ function pmRenderCalControlBar(units) {
     ${pmFilterSelect('Plataforma','💳', fP, [['','Todas'],['contrato_directo','Directo'],['airbnb','Airbnb'],['padsplit','Padsplit'],['booking','Booking'],['vrbo','VRBO']], "pmCalSetFilter('platform', this.value||null)")}
     ${pmFilterSelect('Tipo','🛏', fT, [['','Todos'],['casa_completa','Casa'],['apartamento','Apartamento'],['estudio','Estudio'],['habitacion','Habitación']], "pmCalSetFilter('type', this.value||null)")}
     ${(fS||fP||fT)?`<button onclick="pmCalClearFilters()" class="text-[10px] text-amber-700 font-bold hover:underline">✕ Limpiar</button>`:''}
-    <span class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
+    <button onclick="pmCalToggleFullscreen()" class="ml-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1" title="Ver el calendario más grande">${pmaState.calendarFullscreen?'✕ Salir':'⛶ Pantalla completa'}</button>
+    <span class="flex items-center gap-2 text-[10px] text-slate-500">
       ${colorBy==='estado'
         ? `<span>🟩 Activo</span><span>🟠 Por vencer ≤${PM_CAL_VENCE_DIAS}d</span><span>🔵 Entrante</span><span>🟥 Atrasado</span><span>⬜ Finalizado</span>`
         : `<span class="italic">colores por canal/plataforma</span>`}
@@ -4968,6 +4995,16 @@ function pmRenderFinance() {
       </div>
     </div>
 
+    <!-- 📄 Reportes PDF (chromium headless) -->
+    <div class="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-2">
+      <span class="text-[11px] font-bold text-slate-500 px-1">📄 Reportes PDF</span>
+      <button onclick="pmOpenReport('weekly')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded">Generar semanal (operación)</button>
+      <button onclick="pmSendReport('weekly')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded" title="Enviar por correo o WhatsApp">Enviar ›</button>
+      <span class="text-slate-300">·</span>
+      <button onclick="pmOpenReport('monthly')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded">Generar mensual (finanzas)</button>
+      <button onclick="pmSendReport('monthly')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded" title="Enviar por correo o WhatsApp">Enviar ›</button>
+    </div>
+
     <!-- Filtros del dashboard (dropdowns) -->
     <div class="pm-filters-bar">
       ${pmFilterSelect('Período', '📅', pmaState.finMonthSel||pmCurrentYM(), [...pmMonthOptions(), ['custom','Custom (rango)']], "pmFinSetMonth(this.value)")}
@@ -5295,7 +5332,26 @@ async function pmAfterCrud(updateLocalFn) {
 window.pmAfterCrud = pmAfterCrud;
 
 // Helper: ejecuta query Supabase con manejo de error claro
+// Tablas espejo de Airtable: la app NUNCA escribe ahí (fuente de verdad = Airtable).
+// pm_tasks / pm_alerts / pm_data_warnings son capa propia → sí pueden escribirse.
+const PM_RO_MIRROR_TABLES = new Set(['pm_properties','pm_units','pm_bookings','pm_booking_history','pm_tenants','pm_payments','pm_expenses','pm_payroll','pm_credentials','pm_utilities','pm_wifi_credentials','pm_calendar_feeds','pm_message_templates']);
 async function pmExecQuery(qPromise, opLabel) {
+  // 🔒 Red de seguridad solo-lectura: bloquea cualquier escritura a datos-Airtable
+  // aunque se escapara algún botón/función (choke point de casi todas las escrituras).
+  try {
+    if (window.PM_READONLY && qPromise) {
+      const m = String(qPromise.method || 'GET').toUpperCase();
+      if (m !== 'GET' && m !== 'HEAD') {
+        let table = '';
+        try { table = String(qPromise.url?.pathname || qPromise.url || '').split('/rest/v1/')[1].split(/[?\/]/)[0]; } catch (e) {}
+        if (PM_RO_MIRROR_TABLES.has(table)) {
+          console.warn('[pm] escritura BLOQUEADA (solo-lectura):', m, table, '·', opLabel);
+          if (window.toast) toast('📖 Solo lectura: cargá o editá estos datos en Airtable. La app solo muestra y reporta.', 'info');
+          return null;
+        }
+      }
+    }
+  } catch (e) { /* si no se puede inspeccionar, sigue (las fns ya están guardadas) */ }
   try {
     const r = await qPromise;
     if (r && r.error) {
@@ -5710,6 +5766,7 @@ window.pmAlertAssign = pmAlertAssign;
 // ════════════════════════════════════════════════════════════════
 const PM_TASK_TYPES = {
   cleaning:             { label: '🧹 Limpieza',  color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
+  recepcion:            { label: '🛎️ Recepción', color: '#0ea5e9', chip: 'bg-sky-100 text-sky-800' },
   aseo:                 { label: '🧹 Aseo',      color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
   mantenimiento:        { label: '🔧 Manten.',   color: '#f97316', chip: 'bg-orange-100 text-orange-800' },
   podada:               { label: '🌱 Podada',    color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
@@ -6993,3 +7050,149 @@ async function pmImportFromJSON() {
   } catch (e) { alert('Error: ' + e.message); }
 }
 window.pmImportFromJSON = pmImportFromJSON;
+
+// ════════════════════════════════════════════════════════════════
+// 📖 MODO SOLO-LECTURA (2026-06-30)
+// La fuente de verdad es Airtable (apptTKRYbx6gu701i). La app NO escribe
+// en datos espejados desde Airtable: propiedades, unidades, inquilinos,
+// reservas, pagos, gastos, servicios/credenciales y feeds. Escribir ahí
+// desincroniza (y "+ Nueva Propiedad" además rompía el check constraint
+// pm_properties_rental_model_check). La app SÍ opera su capa propia:
+// tareas (turnover/recepción) y alertas/warnings — esas no viven en Airtable.
+// ════════════════════════════════════════════════════════════════
+const PM_READONLY = true;
+window.PM_READONLY = PM_READONLY;
+
+// Funciones de escritura a datos-Airtable que quedan inhabilitadas.
+const PM_RO_BLOCKED_FNS = [
+  'pmEditProperty','pmDeleteProperty','pmSaveProperty','pmImportFromJSON',
+  'pmEditUnit','pmDeleteUnit','pmSaveUnit','pmMarkMaintenance','pmToggleUnitActive',
+  'pmEditBooking','pmDeleteBooking','pmSaveBooking','pmCreateBookingFromDay',
+  'pmMoveBooking','pmConfirmMoveBooking','pmCeoRenew',
+  'pmEditTenant','pmDeleteTenant','pmSaveTenant','pmAddTenantNote','pmQuickAddTenant',
+  'pmMarkPayment','pmSaveMarkPayment','pmEditPayment','pmDeletePayment','pmSavePayment','pmArchivePaymentLegacy',
+  'pmEditExpense','pmDeleteExpense','pmSaveExpense','pmToggleExpensePaid',
+  'pmPayrollMarkPaid','pmGeneratePayroll',
+  'pmEditService','pmSaveService','pmEditUtility','pmSaveUtility','pmDeleteUtility','pmMarkUtilityPaid','pmSaveUtilityPaid','pmSetServicePaymentFailed',
+  'pmEditFeed','pmDeleteFeed','pmSaveFeed','pmSyncFeed','pmSyncAllFeeds',
+  'pmEditTemplate','pmDeleteTemplate','pmSaveTemplate'
+];
+
+function pmReadOnlyNotice() {
+  if (window.toast) toast('📖 Solo lectura: cargá o editá estos datos en Airtable (fuente de verdad). La app solo muestra y reporta.', 'info', { duration: 4500 });
+  return undefined;
+}
+window.pmReadOnlyNotice = pmReadOnlyNotice;
+
+if (PM_READONLY) {
+  // Sobrescribe el binding global de cada fn de escritura → tanto onclick inline
+  // como llamadas directas resuelven al guard (no-op + aviso). Defensa de fondo:
+  // aunque un botón quedara visible, no escribe nada.
+  PM_RO_BLOCKED_FNS.forEach(fn => { try { window[fn] = pmReadOnlyNotice; } catch (e) {} });
+}
+
+// Barrido post-render: oculta los <button> de escritura (los que invocan una fn
+// bloqueada). Se limita a <button> para no romper celdas clickeables del calendario.
+const PM_RO_BTN_RE = new RegExp('\\b(' + PM_RO_BLOCKED_FNS.join('|') + ')\\s*\\(');
+function pmApplyReadOnlyDOM() {
+  if (!PM_READONLY) return;
+  const root = document.getElementById('pm-root');
+  if (!root) return;
+  root.querySelectorAll('button[onclick]').forEach(btn => {
+    if (PM_RO_BTN_RE.test(btn.getAttribute('onclick') || '')) btn.style.display = 'none';
+  });
+}
+window.pmApplyReadOnlyDOM = pmApplyReadOnlyDOM;
+
+// Hook al render: corre el barrido después de cada pmRender (re-oculta tras re-render).
+if (typeof window.pmRender === 'function' && !window.__pmRenderRO) {
+  window.__pmRenderRO = true;
+  const _pmRenderOrig = window.pmRender;
+  window.pmRender = function () {
+    const r = _pmRenderOrig.apply(this, arguments);
+    try { pmApplyReadOnlyDOM(); } catch (e) {}
+    return r;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════
+// 📄 REPORTES + GUÍA DE BIENVENIDA (PDF chromium vía /api/*)
+// La app es solo-lectura: estos endpoints solo LEEN y renderizan PDF.
+// Auth: JWT del usuario logueado (Supabase) en Authorization: Bearer.
+// ════════════════════════════════════════════════════════════════
+async function pmAuthToken() {
+  try {
+    const client = (typeof sb !== 'undefined' && sb) ? sb : window.sb;
+    const s = await client.auth.getSession();
+    return s?.data?.session?.access_token || null;
+  } catch (e) { return null; }
+}
+
+async function pmApiPdf(path, params) {
+  const token = await pmAuthToken();
+  if (!token) { toast('Iniciá sesión para generar el PDF.', 'error'); return null; }
+  const qs = new URLSearchParams(params).toString();
+  toast('⏳ Generando PDF…', 'info');
+  const r = await fetch(`/api/${path}?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) {
+    let msg = r.status; try { msg = (await r.json()).error || msg; } catch (e) {}
+    toast('Error generando PDF: ' + msg, 'error');
+    return null;
+  }
+  return r;
+}
+
+async function pmOpenPdfBlob(r, okMsg) {
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast(okMsg || '✅ PDF generado', 'success');
+}
+
+async function pmOpenReport(type) {
+  const r = await pmApiPdf('pm-report', { type });
+  if (r) await pmOpenPdfBlob(r, '✅ Reporte ' + (type === 'monthly' ? 'mensual' : 'semanal') + ' generado');
+}
+window.pmOpenReport = pmOpenReport;
+
+async function pmSendReport(type) {
+  const ch = await promptDialog('Enviar por (escribí "email" o "whatsapp"):', {defaultValue: 'whatsapp'});
+  if (!ch) return;
+  const channel = /mail|correo/i.test(ch) ? 'email' : 'whatsapp';
+  const to = await promptDialog(channel === 'email' ? 'Correo destino:' : 'WhatsApp destino (+1...):', {});
+  if (!to) return;
+  toast('⏳ Generando y enviando…', 'info');
+  const token = await pmAuthToken();
+  const qs = new URLSearchParams({ type, send: channel, to }).toString();
+  const r = await fetch(`/api/pm-report?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+  const out = await r.json().catch(() => ({}));
+  if (r.ok && out.ok) toast('✅ Reporte enviado por ' + channel, 'success');
+  else toast('Error al enviar: ' + (out.error || r.status), 'error');
+}
+window.pmSendReport = pmSendReport;
+
+async function pmGenerateWelcomeGuide(propertyId, unitId) {
+  const params = { property_id: propertyId };
+  if (unitId) params.unit_id = unitId;
+  const r = await pmApiPdf('pm-welcome-guide', params);
+  if (r) await pmOpenPdfBlob(r, '✅ Guía de Bienvenida generada');
+}
+window.pmGenerateWelcomeGuide = pmGenerateWelcomeGuide;
+
+async function pmSendWelcomeGuide(propertyId, unitId) {
+  const ch = await promptDialog('Enviar al huésped por (escribí "email" o "whatsapp"):', {defaultValue: 'whatsapp'});
+  if (!ch) return;
+  const channel = /mail|correo/i.test(ch) ? 'email' : 'whatsapp';
+  const to = await promptDialog(channel === 'email' ? 'Correo del huésped:' : 'WhatsApp del huésped (+1...):', {});
+  if (!to) return;
+  toast('⏳ Generando y enviando…', 'info');
+  const token = await pmAuthToken();
+  const params = { property_id: propertyId, send: channel, to };
+  if (unitId) params.unit_id = unitId;
+  const r = await fetch(`/api/pm-welcome-guide?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const out = await r.json().catch(() => ({}));
+  if (r.ok && out.ok) toast('✅ Guía enviada por ' + channel, 'success');
+  else toast('Error al enviar: ' + (out.error || r.status), 'error');
+}
+window.pmSendWelcomeGuide = pmSendWelcomeGuide;

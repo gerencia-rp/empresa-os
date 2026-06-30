@@ -64,7 +64,7 @@ const TABLE_IDS = {
   pagos:      "tbl5p63dUEhrzgHVJ",
   gastos:     "tblGBQ5xn9Zp6YrTN",
   accesos:    "tblfb63Yhn0NIMDNw",
-  tareas:     "tbl1Xyxex7Ve9j8QS",
+  // tareas: ELIMINADA de Airtable (2026-06-30) — pm_tasks ahora es 100% app-generada
   unidades:   "tblItO7iMZT9QS87y"
 };
 
@@ -80,6 +80,7 @@ const F = {
   casa_wifi_clave:  "fldMlhg35OmZwJA5i",
   casa_drive:       "fldohaq4JEfOuYiCj",
   casa_habitaciones:"fldFsDu4p97kXAwh9",
+  casa_acceso:      "fldKuVpYVzh7JzRP8",  // Código de acceso (keypad principal de la Casa)
   // Inquilinos
   inq_nombre:     "flddqJeRovK6Hoxx0",
   inq_telefono:   "fldr9V8dpcuFQhvS0",
@@ -143,20 +144,8 @@ const F = {
   acc_clave:      "fldzyp9gzUMexAZ5p",
   acc_link:       "fldRROMLIDcJU052K",
   acc_casa:       "fldzsUenXndDo2ohg",  // link → Casas
-  acc_obs:        "fld4JiSfJ5ONWsZKC",
-  // Tareas Mantenimiento (🧰)
-  tar_tarea:      "fldEd9t1iefWE9OQS",
-  tar_zona:       "fldrOszIeKNeTiYx4",
-  tar_prioridad:  "fldLmsIBdL3WNp3rK",
-  tar_estado:     "fldAGv4oBnxUyOyor",
-  tar_encargado:  "fldp0nl9KXSO2fbIw",
-  tar_casa:       "fld4ANLcBe4EDfWXp",  // link → Casas
-  tar_notas:      "fldDa8aajDSFDsTuB",
-  tar_tiempo_t:   "fld7g92lruRr5Kuzp",  // Tiempo de tarea
-  tar_tiempo_v:   "fldGTuyvXQOS9hUvS",  // Tiempo de traslado
-  tar_fecha_in:   "fldkqbeFyuwEMKL0W",
-  tar_fecha_fin:  "fldeANm7gqbw1CW7U",
-  tar_herramientas:"fld5j8O8TZJlNd0oM"
+  acc_obs:        "fld4JiSfJ5ONWsZKC"
+  // Tareas Mantenimiento (🧰): tabla ELIMINADA de Airtable (2026-06-30), campos tar_* removidos.
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -412,6 +401,8 @@ Deno.serve(async (req) => {
         rental_model: inferRentalModel(getSel(r.fields?.[F.casa_modelo])),
         wifi_name: r.fields?.[F.casa_wifi_nombre] || null,
         wifi_pass: r.fields?.[F.casa_wifi_clave] || null,
+        access_code: r.fields?.[F.casa_acceso] != null ? String(r.fields[F.casa_acceso]) : null,
+        total_units: (() => { const v = parseInt(String(r.fields?.[F.casa_unidades] ?? "").replace(/[^0-9]/g, "")); return isNaN(v) ? null : v; })(),
         drive_url: r.fields?.[F.casa_drive] || null,
         status: isInactive ? "inactiva" : "activa",
         active: !isInactive,
@@ -661,6 +652,80 @@ Deno.serve(async (req) => {
     });
 
     // ════════════════════════════════════════════════════════════
+    // 3c) OPERACIÓN INTELIGENTE → auto-tareas en pm_tasks (capa propia del PM)
+    //     · Reserva Histórica (check-out) → tarea de LIMPIEZA / turnover.
+    //     · Reserva Activa/Reservada con entrada próxima → tarea de RECEPCIÓN.
+    //     Idempotente por external_id (auto-clean-/auto-reception-{resRec}) con
+    //     ignoreDuplicates → NO resucita tareas ya completadas por el equipo.
+    //     Ventanas de fecha acotadas → la lista queda operativamente relevante.
+    // ════════════════════════════════════════════════════════════
+    try {
+      const dayMs = 86400000;
+      const dOff = (n: number) => new Date(Date.now() + n * dayMs).toISOString().slice(0, 10);
+      const cleanFromISO = dOff(-14);   // check-out reciente (últimos 14 días)
+      const cleanToISO   = dOff(1);     // hasta mañana inclusive
+      const recFromISO   = dOff(-3);    // recién ingresado (últimos 3 días)
+      const recToISO     = dOff(7);     // o ingresa en los próximos 7 días
+      const autoTasks: any[] = [];
+      for (const r of reservas) {
+        const casaRec = linkedId(r.fields?.[F.res_casa]);
+        const propId = casaRec ? (propIdByCasaRec[casaRec] || null) : null;
+        if (!propId) continue;
+        const estado = (getSel(r.fields?.[F.res_estado]) || "").toLowerCase();
+        const checkIn = (r.fields?.[F.res_fecha_in] ? String(r.fields[F.res_fecha_in]).slice(0, 10) : null);
+        const checkOut = (r.fields?.[F.res_fecha_out] ? String(r.fields[F.res_fecha_out]).slice(0, 10) : null);
+        const unidad = (getSel(r.fields?.[F.res_unidad]) || "Unidad").toString().trim();
+        const propName = propNameByCasaRec[casaRec] || "Casa";
+        const unitId = bookingByResRec[r.id]?.unit_id || null;
+        const loc = propName + " · " + unidad;
+
+        // LIMPIEZA / turnover: Reserva Histórica con check-out en la ventana.
+        const esHistorica = /hist|salid|finaliz|complet|cerrad|pasad/.test(estado);
+        if (esHistorica && checkOut && checkOut >= cleanFromISO && checkOut <= cleanToISO) {
+          autoTasks.push({
+            external_id: "auto-clean-" + r.id,
+            title: "🧹 Limpieza turnover — " + loc,
+            task_type: "cleaning",
+            property_id: propId,
+            unit_id: unitId,
+            scheduled_date: checkOut,
+            status: "pendiente",
+            priority: "alta",
+            auto_generated: true,
+            active: true,
+            notes: "Turnover automático tras check-out (" + checkOut + "). Limpiar y preparar la unidad para el próximo huésped.",
+            zone: "unidad"
+          });
+        }
+        // RECEPCIÓN: Reserva Activa o Reservada con check-in en la ventana.
+        const esEntrada = /activ|reservad|confirm/.test(estado);
+        if (esEntrada && checkIn && checkIn >= recFromISO && checkIn <= recToISO) {
+          autoTasks.push({
+            external_id: "auto-reception-" + r.id,
+            title: "🛎️ Recepción — " + loc,
+            task_type: "recepcion",
+            property_id: propId,
+            unit_id: unitId,
+            scheduled_date: checkIn,
+            status: "pendiente",
+            priority: "alta",
+            auto_generated: true,
+            active: true,
+            notes: "Recepción automática (entrada " + checkIn + "). Preparar la unidad, entregar accesos y enviar la guía de bienvenida.",
+            zone: "unidad"
+          });
+        }
+      }
+      if (!dry_run && autoTasks.length) {
+        for (let i = 0; i < autoTasks.length; i += 50) {
+          const { error } = await supabase.from("pm_tasks").upsert(autoTasks.slice(i, i + 50), { onConflict: "external_id", ignoreDuplicates: true });
+          if (error) { errors.push("auto-tasks chunk " + i + ": " + error.message); break; }
+        }
+      }
+      stats.auto_tasks = autoTasks.length;
+    } catch (e: any) { errors.push("auto-tasks: " + e.message); }
+
+    // ════════════════════════════════════════════════════════════
     // 4) PAGOS → pm_payments · resuelto por LINKED RECORD IDs (sin fuzzy)
     // ════════════════════════════════════════════════════════════
     try {
@@ -812,44 +877,13 @@ Deno.serve(async (req) => {
     } catch (e: any) { errors.push("accesos: " + e.message); }
 
     // ════════════════════════════════════════════════════════════
-    // 7) TAREAS MANTENIMIENTO → pm_tasks (🧰) · property por LINKED Casa
+    // 7) TAREAS MANTENIMIENTO → ELIMINADO (2026-06-30)
+    //    La tabla "Tareas Mantenimiento" fue borrada de Airtable.
+    //    pm_tasks ahora vive 100% en el task system propio del PM
+    //    (tareas auto-generadas por la app: turnover/recepción).
+    //    NO se sincroniza ni se archiva desde Airtable.
     // ════════════════════════════════════════════════════════════
-    try {
-      const tareas = await fetchAllRecords(base_id, TABLE_IDS.tareas, airtable_token);
-      const tasks: any[] = [];
-      for (const r of tareas) {
-        const casaRec = linkedId(r.fields?.[F.tar_casa]);
-        const estado = (getSel(r.fields?.[F.tar_estado]) || "").toLowerCase();
-        const status = /complet|hech|termin/.test(estado) ? "completado"
-          : /progres|curso/.test(estado) ? "en_progreso"
-          : /cancel/.test(estado) ? "cancelado"
-          : "pendiente";
-        tasks.push({
-          external_id: "task-" + r.id,
-          title: r.fields?.[F.tar_tarea] || "Sin título",
-          property_id: casaRec ? (propIdByCasaRec[casaRec] || null) : null,
-          zone: inferZone(getSel(r.fields?.[F.tar_zona])),
-          priority: (getSel(r.fields?.[F.tar_prioridad]) || "media").toLowerCase(),
-          task_duration: r.fields?.[F.tar_tiempo_t] || null,
-          travel_time: r.fields?.[F.tar_tiempo_v] || null,
-          assignee: r.fields?.[F.tar_encargado] || null,
-          status,
-          start_at: r.fields?.[F.tar_fecha_in] || null,
-          finish_at: r.fields?.[F.tar_fecha_fin] || null,
-          notes: [r.fields?.[F.tar_notas], r.fields?.[F.tar_herramientas]].filter(Boolean).join(" · ") || null,
-          ...mirrorFieldsAux()
-        });
-      }
-      let tasksUpsertOK = true;
-      if (!dry_run && tasks.length) {
-        for (let i = 0; i < tasks.length; i += 50) {
-          const { error } = await supabase.from("pm_tasks").upsert(tasks.slice(i, i + 50), { onConflict: "external_id" });
-          if (error) { errors.push("tareas chunk " + i + ": " + error.message); tasksUpsertOK = false; break; }
-        }
-      }
-      await mirrorArchive("pm_tasks", "external_id", "active", MIRROR_AUX && tasksUpsertOK && tareas.length > 0 && tasks.length > 0);
-      stats.tasks = tasks.length;
-    } catch (e: any) { errors.push("tareas: " + e.message); }
+    stats.tasks = 0;
 
     // ════════════════════════════════════════════════════════════
     // Persistir alertas de datos + auto-resolver las ya corregidas
