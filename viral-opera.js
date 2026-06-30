@@ -1013,7 +1013,12 @@ async function studioGenerate(btn) {
       window.Memory.saveGeneration({
         tipo: params.tipoContenido, modo: mode,
         input_idea: mode === 'libre' ? ((document.getElementById('st-idea') || {}).value || '') : null,
-        input_config: mode === 'guiado' ? { avatar: params.avatarDestino, dolor: params.dolor, enemigo: params.enemigo, tactica: params.tactica, fase: params.faseDelMes, tema: params.tema } : null,
+        input_config: mode === 'guiado' ? {
+          avatar: params.avatarDestino, dolor: params.dolor,
+          enemigo: (build.resueltos && build.resueltos.enemigo && build.resueltos.enemigo.id) || params.enemigo,
+          tactica: (build.resueltos && build.resueltos.tactica && build.resueltos.tactica.id) || params.tactica,
+          fase: (build.resueltos && build.resueltos.fase) || params.faseDelMes, tema: params.tema,
+        } : null,
         decisiones_auto: dec,
         output_variantes: variantes,
         prompt_completo: build.system + '\n\n----- USER -----\n' + build.userPrompt,

@@ -40,16 +40,16 @@
     const en = data.arquetipo.enemigos;
     const tid = DOLOR_A_ENEMIGO[dolorId];
     const tac = tid && en.tacticos.find(e => e.id === tid);
-    if (tac) return { nombre: tac.nombre, tipo: 'táctico', frase: tac.frase, solucion: tac.tuSolucion, pain: tac.pain };
-    return { nombre: en.principal.nombre, tipo: 'principal', frase: (en.principal.frasesAntiEnemigo || [])[0] || '', solucion: 'Mostrar métricas, dashboards y casos reales con números.' };
+    if (tac) return { id: tac.id, nombre: tac.nombre, tipo: 'táctico', frase: tac.frase, solucion: tac.tuSolucion, pain: tac.pain };
+    return { id: 'principal', nombre: en.principal.nombre, tipo: 'principal', frase: (en.principal.frasesAntiEnemigo || [])[0] || '', solucion: 'Mostrar métricas, dashboards y casos reales con números.' };
   }
   function resolveEnemigo(enemigo, dolorId, data) {
     if (!enemigo || enemigo === 'auto') return autoSelectEnemigo(dolorId, data);
     const en = data.arquetipo.enemigos;
-    if (enemigo === 'principal' || enemigo === 'gurues') return { nombre: en.principal.nombre, tipo: 'principal', frase: (en.principal.frasesAntiEnemigo || [])[0] || '', solucion: 'Métricas y casos reales.' };
-    if (enemigo === 'invisible') return { nombre: en.invisible.nombre, tipo: 'invisible', frase: (en.invisible.frasesAntiEnemigo || [])[0] || '', solucion: 'Todo output termina en algo aplicable hoy.' };
+    if (enemigo === 'principal' || enemigo === 'gurues') return { id: 'principal', nombre: en.principal.nombre, tipo: 'principal', frase: (en.principal.frasesAntiEnemigo || [])[0] || '', solucion: 'Métricas y casos reales.' };
+    if (enemigo === 'invisible') return { id: 'invisible', nombre: en.invisible.nombre, tipo: 'invisible', frase: (en.invisible.frasesAntiEnemigo || [])[0] || '', solucion: 'Todo output termina en algo aplicable hoy.' };
     const tac = en.tacticos.find(e => e.id === enemigo);
-    return tac ? { nombre: tac.nombre, tipo: 'táctico', frase: tac.frase, solucion: tac.tuSolucion, pain: tac.pain } : autoSelectEnemigo(dolorId, data);
+    return tac ? { id: tac.id, nombre: tac.nombre, tipo: 'táctico', frase: tac.frase, solucion: tac.tuSolucion, pain: tac.pain } : autoSelectEnemigo(dolorId, data);
   }
   function resolveTactica(tactica, tipoContenido, objetivo, data) {
     const tacs = data.psicologia.tacticasAplicadas;
