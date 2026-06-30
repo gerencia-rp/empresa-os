@@ -3878,7 +3878,7 @@ function pmMonthNav(ym, cbExpr) {
 // ════════════════════════════════════════════════════════════════
 // TAB · PAGOS (cobranza de rentas) — recurrencia + estatus + filtros
 // ════════════════════════════════════════════════════════════════
-const PM_AIRTABLE_BASE = 'appzEnsuy4qPT6iHj';
+const PM_AIRTABLE_BASE = 'apptTKRYbx6gu701i';
 function pmAirtableLink(externalId, tableId) {
   if (!externalId) return null;
   const rec = externalId.replace(/^[a-z]+-/i, '');
@@ -3966,7 +3966,7 @@ function pmPaymentsTableHtml() {
           const rec = bk ? pmRecurrenceOf(bk.payment_day).label : '—';
           const st = pmTenantPayStatus(bk);
           const orphan = !p.property_id;
-          const atLink = (p._src === 'expense') ? null : pmAirtableLink(p.external_id, 'tblqJlSgnLNfn34dh');
+          const atLink = (p._src === 'expense') ? null : pmAirtableLink(p.external_id, 'tbl5p63dUEhrzgHVJ');
           return `<tr class="border-t border-slate-100 ${orphan ? 'bg-red-50' : 'hover:bg-slate-50'}">
             <td class="px-3 py-2 whitespace-nowrap text-slate-700">${p.paid_at||'—'}</td>
             <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,24)}</td>
@@ -4379,7 +4379,7 @@ function pmExpenseTable(rows, withHouse, flagOrphans) {
             const url = e.invoice_url;
             const note = e.description || e.notes || '';
             const orphan = flagOrphans && !e.property_id;
-            const atLink = e.external_id ? pmAirtableLink(e.external_id, e.category==='cleaning'?'tblxfX2no190lvLYo':'tblsihpE31f116RCR') : null;
+            const atLink = e.external_id ? pmAirtableLink(e.external_id, 'tblGBQ5xn9Zp6YrTN') : null;
             return `<tr class="border-t border-slate-100 ${orphan?'bg-red-50':'hover:bg-slate-50'}">
               <td class="px-3 py-2 whitespace-nowrap text-slate-700">${e.expense_date||'—'}</td>
               ${withHouse?`<td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan?`⚠️ Sin casa${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir'}`:(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
@@ -6161,15 +6161,19 @@ window.pmDeleteUtility = pmDeleteUtility;
 
 // ── Sub-tab: Alertas de Datos (pm_data_warnings) ──
 const PM_WARN_META = {
-  contrato_vencido_activo: { label: 'Contrato vencido marcado Activo', icon: '🔴', table: 'tblbSJ4K8e7mSHT5E' },
-  ocupada_sin_inquilino:   { label: 'Unidad Ocupada sin inquilino',     icon: '🟠', table: 'tblbSJ4K8e7mSHT5E' },
-  pago_sin_casa:           { label: 'Pago sin casa válida',             icon: '💸', table: 'tblqJlSgnLNfn34dh' },
-  inquilino_sin_fecha_fin: { label: 'Inquilino activo sin Fecha Fin',   icon: '📅', table: 'tblxEHBbGylH1aF2F' },
-  direccion_no_matchea:    { label: 'Dirección no matchea entre tablas',icon: '🏠', table: 'tblxEHBbGylH1aF2F' },
-  gasto_sin_casa:          { label: 'Gasto sin casa',                   icon: '🧾', table: 'tblsihpE31f116RCR' },
-  fechas_invertidas:       { label: 'check_in posterior a check_out',   icon: '🔀', table: 'tblbSJ4K8e7mSHT5E' },
-  renta_cero:              { label: 'Renta = 0',                        icon: '0️⃣', table: 'tblbSJ4K8e7mSHT5E' },
-  inquilino_duplicado:     { label: 'Inquilino duplicado (solapado)',   icon: '👥', table: 'tblbSJ4K8e7mSHT5E' }
+  contrato_vencido_activo: { label: 'Contrato vencido marcado Activo', icon: '🔴', table: 'tblzz3fokkBprEpIm' },
+  ocupada_sin_inquilino:   { label: 'Unidad Ocupada sin inquilino',     icon: '🟠', table: 'tblisRfa2IW02ltCL' },
+  pago_link_faltante:      { label: 'Pago sin vínculo (Casa/Inquilino)',icon: '💸', table: 'tbl5p63dUEhrzgHVJ' },
+  pago_sin_casa:           { label: 'Pago sin casa válida',             icon: '💸', table: 'tbl5p63dUEhrzgHVJ' },
+  reserva_sin_casa:        { label: 'Reserva sin casa enlazada',        icon: '🏚️', table: 'tblzz3fokkBprEpIm' },
+  reserva_sin_fecha:       { label: 'Reserva sin Fecha de Entrada',     icon: '📅', table: 'tblzz3fokkBprEpIm' },
+  booking_sin_tenant:      { label: 'Reserva sin inquilino enlazado',   icon: '👤', table: 'tblzz3fokkBprEpIm' },
+  inquilino_sin_fecha_fin: { label: 'Inquilino activo sin Fecha Fin',   icon: '📅', table: 'tblXuFC9azHTZGjmE' },
+  direccion_no_matchea:    { label: 'Dirección no matchea entre tablas',icon: '🏠', table: 'tblXuFC9azHTZGjmE' },
+  gasto_sin_casa:          { label: 'Gasto sin casa',                   icon: '🧾', table: 'tblGBQ5xn9Zp6YrTN' },
+  fechas_invertidas:       { label: 'check_in posterior a check_out',   icon: '🔀', table: 'tblzz3fokkBprEpIm' },
+  renta_cero:              { label: 'Renta = 0',                        icon: '0️⃣', table: 'tblisRfa2IW02ltCL' },
+  inquilino_duplicado:     { label: 'Inquilino duplicado (solapado)',   icon: '👥', table: 'tblzz3fokkBprEpIm' }
 };
 function pmWarnMeta(t) { return PM_WARN_META[t] || { label: t, icon: '⚠️', table: null }; }
 function pmRenderDataWarnings() {
