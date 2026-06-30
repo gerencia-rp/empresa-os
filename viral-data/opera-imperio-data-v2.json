@@ -11,7 +11,6 @@
     "3 tabs nuevas: Sistema F&F con herramientas, Transformador, Recursos & Tendencias",
     "15 reels reescritos con foco F&F + framework Anti-Riesgos™"
   ],
-
   "marca": {
     "nombre": "Flippeá con método",
     "owner": "Nicolás Lara",
@@ -21,17 +20,13 @@
     "focoPrincipal": "Fix & Flip (95% del mensaje)",
     "subcomunicacion": "Rental Profits + Empresa Remodelación + Mentoría (5% del mensaje, como CREDIBILIDAD)"
   },
-
   "identidad": {
     "esloganPrincipal": "Flippeá con método.",
     "framework": "Sistema Flip Anti-Riesgos™",
     "tagline": "4 empresas operando · +200 alumnos · 1 sistema",
     "fraseMaestra": "Los gurúes te venden teoría. Yo te doy el sistema.",
-
     "narrativaOficial": "Nicolás Lara ejecuta Fix & Flip en USA con un método propio (Sistema Flip Anti-Riesgos™) validado en sus propias operaciones y replicado por +200 alumnos. Detrás del sistema hay 4 empresas operando: Rental Profits (rentas), Empresa Remodelación (obras), Fix & Flip (su core) y Mentoría (donde lo enseña). No vende cursos. Vende reducción de riesgo + construcción de patrimonio inmobiliario para latinos en USA que quieren ejecutar su primer flip rentable.",
-
     "promesaPrincipal": "Completa tus primeros 2 flips con una metodología validada que reduce los errores más costosos del proceso y te permite construir una base sólida para invertir en bienes raíces a largo plazo.",
-
     "manifiesto": [
       "Esta es para los que están cansados de la teoría.",
       "Los que vieron mil cursos y no compraron una sola casa.",
@@ -50,24 +45,45 @@
       "",
       "Tu turno."
     ],
-
     "variantesEslogan": [
-      { "contexto": "Eslogan principal — bio, posters, intros", "frase": "Flippeá con método" },
-      { "contexto": "Framework — branded asset", "frase": "Sistema Flip Anti-Riesgos™" },
-      { "contexto": "Hook agresivo TikTok", "frase": "Flippeá con método, no con suerte" },
-      { "contexto": "Anti-establishment Reels", "frase": "Sin gurúes. Con sistema." },
-      { "contexto": "Promesa aterrizada", "frase": "Tu primer flip, sin perder capital" },
-      { "contexto": "Transformación Avatar 2", "frase": "De ahorrista a flipper" },
-      { "contexto": "Credibilidad/bio", "frase": "4 empresas operando · 1 sistema" },
-      { "contexto": "Cierre/CTA", "frase": "Tu próximo flip empieza por el método" }
+      {
+        "contexto": "Eslogan principal — bio, posters, intros",
+        "frase": "Flippeá con método"
+      },
+      {
+        "contexto": "Framework — branded asset",
+        "frase": "Sistema Flip Anti-Riesgos™"
+      },
+      {
+        "contexto": "Hook agresivo TikTok",
+        "frase": "Flippeá con método, no con suerte"
+      },
+      {
+        "contexto": "Anti-establishment Reels",
+        "frase": "Sin gurúes. Con sistema."
+      },
+      {
+        "contexto": "Promesa aterrizada",
+        "frase": "Tu primer flip, sin perder capital"
+      },
+      {
+        "contexto": "Transformación Avatar 2",
+        "frase": "De ahorrista a flipper"
+      },
+      {
+        "contexto": "Credibilidad/bio",
+        "frase": "4 empresas operando · 1 sistema"
+      },
+      {
+        "contexto": "Cierre/CTA",
+        "frase": "Tu próximo flip empieza por el método"
+      }
     ]
   },
-
   "arquetipo": {
     "nombre": "El Operador con Método",
     "fusion": "Operador (Hormozi) + Sabio (Naval) + Educador concreto (Iman Gadzhi)",
     "descripcion": "Confiable, calculador, generoso con el método, intolerante con la improvisación. El que cuando habla, cita números y casos reales. El que no esconde su error de $50K — lo enseña.",
-
     "enemigos": {
       "principal": {
         "nombre": "Los Gurúes",
@@ -164,7 +180,6 @@
         }
       ]
     },
-
     "frasesRecurrentes": {
       "bandera": [
         "Flippeá con método.",
@@ -188,22 +203,45 @@
         "Hablamos en el próximo."
       ]
     },
-
     "palabrasProhibidas": [
-      "Hack", "Secret", "Secreto", "Easy money", "Plata fácil", "Mindset",
-      "Manifestá", "Atraé", "Vida soñada", "Te enseño en 30 días",
-      "Pasivo (sin matices)", "Sin trabajar", "Imperio (decisión usuario)",
-      "Hazte millonario", "Rich"
+      "Hack",
+      "Secret",
+      "Secreto",
+      "Easy money",
+      "Plata fácil",
+      "Mindset",
+      "Manifestá",
+      "Atraé",
+      "Vida soñada",
+      "Te enseño en 30 días",
+      "Pasivo (sin matices)",
+      "Sin trabajar",
+      "Imperio (decisión usuario)",
+      "Hazte millonario",
+      "Rich"
     ],
-
     "palabrasDeMarca": [
-      "Flippear", "Flip", "Método", "Sistema", "Anti-Riesgos",
-      "Métricas", "Operar", "Operador", "Construir", "Validar",
-      "Patrimonio", "Reducir riesgo", "Primer flip", "Documentar",
-      "Decisión", "Buy Box", "MAO", "ARV", "Hard money"
+      "Flippear",
+      "Flip",
+      "Método",
+      "Sistema",
+      "Anti-Riesgos",
+      "Métricas",
+      "Operar",
+      "Operador",
+      "Construir",
+      "Validar",
+      "Patrimonio",
+      "Reducir riesgo",
+      "Primer flip",
+      "Documentar",
+      "Decisión",
+      "Buy Box",
+      "MAO",
+      "ARV",
+      "Hard money"
     ]
   },
-
   "avatares": {
     "avatar1": {
       "nombre": "El Flipper con Experiencia que quiere ESCALAR",
@@ -240,7 +278,6 @@
       ]
     }
   },
-
   "sistemaFlipAntiRiesgos": {
     "nombre": "Sistema Flip Anti-Riesgos™",
     "descripcion": "El método validado en 4 empresas operando. 5 fases ejecutables paso a paso.",
@@ -250,100 +287,320 @@
       "Cada paso tiene una herramienta concreta",
       "Cada hito tiene una métrica medible"
     ],
-
     "fases": [
       {
         "numero": 1,
         "nombre": "Preparación del inversionista",
         "objetivo": "Llegar al primer deal con la estructura financiera + legal correcta",
-        "items": ["Finanzas personales", "Crédito", "LLC", "Acceso a capital"],
+        "items": [
+          "Finanzas personales",
+          "Crédito",
+          "LLC",
+          "Acceso a capital"
+        ],
         "herramientas": [
-          { "tipo": "checklist", "nombre": "Setup financiero 30 días", "descripcion": "20 puntos para tener todo listo para tu primer deal" },
-          { "tipo": "calculadora", "nombre": "Calculadora de capital disponible", "descripcion": "Cuánto podés invertir realmente sin perder liquidez" },
-          { "tipo": "plantilla", "nombre": "Documentos LLC (templates)", "descripcion": "Operating agreement + EIN walkthrough" },
-          { "tipo": "guia", "nombre": "Lenders para latinos: 5 opciones validadas", "descripcion": "Harmony, Kiavi, RCN, Civic, Lima One — contactos y procesos" }
+          {
+            "tipo": "checklist",
+            "nombre": "Setup financiero 30 días",
+            "descripcion": "20 puntos para tener todo listo para tu primer deal"
+          },
+          {
+            "tipo": "calculadora",
+            "nombre": "Calculadora de capital disponible",
+            "descripcion": "Cuánto podés invertir realmente sin perder liquidez"
+          },
+          {
+            "tipo": "plantilla",
+            "nombre": "Documentos LLC (templates)",
+            "descripcion": "Operating agreement + EIN walkthrough"
+          },
+          {
+            "tipo": "guia",
+            "nombre": "Lenders para latinos: 5 opciones validadas",
+            "descripcion": "Harmony, Kiavi, RCN, Civic, Lima One — contactos y procesos"
+          }
         ]
       },
       {
         "numero": 2,
         "nombre": "Adquisición inteligente",
         "objetivo": "Encontrar y cerrar deals que pasen los 7 filtros",
-        "items": ["Análisis", "Due diligence", "Negociación"],
+        "items": [
+          "Análisis",
+          "Due diligence",
+          "Negociación"
+        ],
         "herramientas": [
-          { "tipo": "wizard", "nombre": "Buy Box Builder (10 pasos)", "descripcion": "Construye tu Buy Box personalizado en 10 preguntas" },
-          { "tipo": "calculadora", "nombre": "Calculadora 4 Números", "descripcion": "MAO + Rehab + ARV + Margen — te dice si comprás" },
-          { "tipo": "checklist", "nombre": "Inspección 30 segundos", "descripcion": "Los 5 checks visuales antes de entrar al living" },
-          { "tipo": "guia", "nombre": "Negociación: 7 movimientos validados", "descripcion": "Scripts para negociar con wholesaler, seller, agent" }
+          {
+            "tipo": "wizard",
+            "nombre": "Buy Box Builder (10 pasos)",
+            "descripcion": "Construye tu Buy Box personalizado en 10 preguntas"
+          },
+          {
+            "tipo": "calculadora",
+            "nombre": "Calculadora 4 Números",
+            "descripcion": "MAO + Rehab + ARV + Margen — te dice si comprás"
+          },
+          {
+            "tipo": "checklist",
+            "nombre": "Inspección 30 segundos",
+            "descripcion": "Los 5 checks visuales antes de entrar al living"
+          },
+          {
+            "tipo": "guia",
+            "nombre": "Negociación: 7 movimientos validados",
+            "descripcion": "Scripts para negociar con wholesaler, seller, agent"
+          }
         ]
       },
       {
         "numero": 3,
         "nombre": "Ejecución protegida",
         "objetivo": "Remodelación a tiempo y a costo, sin que el GC te robe",
-        "items": ["Remodelación", "Contratistas", "Presupuesto"],
+        "items": [
+          "Remodelación",
+          "Contratistas",
+          "Presupuesto"
+        ],
         "herramientas": [
-          { "tipo": "matriz", "nombre": "Matriz de selección de GC", "descripcion": "12 preguntas + 5 documentos a pedir antes de contratar" },
-          { "tipo": "plantilla", "nombre": "Contrato GC blindado", "descripcion": "Cláusulas de pago por hitos + penalidades por retraso + materiales" },
-          { "tipo": "calculadora", "nombre": "Presupuesto Rehab + 20%", "descripcion": "Calculadora automática que suma 20% buffer" },
-          { "tipo": "checklist", "nombre": "Visita semanal a obra", "descripcion": "Los 15 puntos a chequear cada semana" }
+          {
+            "tipo": "matriz",
+            "nombre": "Matriz de selección de GC",
+            "descripcion": "12 preguntas + 5 documentos a pedir antes de contratar"
+          },
+          {
+            "tipo": "plantilla",
+            "nombre": "Contrato GC blindado",
+            "descripcion": "Cláusulas de pago por hitos + penalidades por retraso + materiales"
+          },
+          {
+            "tipo": "calculadora",
+            "nombre": "Presupuesto Rehab + 20%",
+            "descripcion": "Calculadora automática que suma 20% buffer"
+          },
+          {
+            "tipo": "checklist",
+            "nombre": "Visita semanal a obra",
+            "descripcion": "Los 15 puntos a chequear cada semana"
+          }
         ]
       },
       {
         "numero": 4,
         "nombre": "Salida rentable",
         "objetivo": "Vender con margen protegido (o refinanciar si conviene)",
-        "items": ["Venta", "Refinanciación", "Estrategia de liquidez"],
+        "items": [
+          "Venta",
+          "Refinanciación",
+          "Estrategia de liquidez"
+        ],
         "herramientas": [
-          { "tipo": "calculadora", "nombre": "Vender vs Hold (BRRRR)", "descripcion": "Te dice cuál estrategia te da más ROI" },
-          { "tipo": "guia", "nombre": "Listing optimizado: 12 elementos", "descripcion": "Fotos, descripción, precio, timing, agent vs FSBO" },
-          { "tipo": "checklist", "nombre": "Closing sin sorpresas", "descripcion": "20 puntos pre-closing para que no se caiga" }
+          {
+            "tipo": "calculadora",
+            "nombre": "Vender vs Hold (BRRRR)",
+            "descripcion": "Te dice cuál estrategia te da más ROI"
+          },
+          {
+            "tipo": "guia",
+            "nombre": "Listing optimizado: 12 elementos",
+            "descripcion": "Fotos, descripción, precio, timing, agent vs FSBO"
+          },
+          {
+            "tipo": "checklist",
+            "nombre": "Closing sin sorpresas",
+            "descripcion": "20 puntos pre-closing para que no se caiga"
+          }
         ]
       },
       {
         "numero": 5,
         "nombre": "Escala patrimonial",
         "objetivo": "Repetir, sistematizar, construir portafolio",
-        "items": ["Repetición", "Sistema", "Portafolio"],
+        "items": [
+          "Repetición",
+          "Sistema",
+          "Portafolio"
+        ],
         "herramientas": [
-          { "tipo": "plantilla", "nombre": "Plan 12 meses: 4 flips", "descripcion": "Calendario realista de cómo hacer 4 flips en el primer año" },
-          { "tipo": "guia", "nombre": "Cuándo armar tu equipo", "descripcion": "Los 5 roles a contratar y en qué orden" },
-          { "tipo": "calculadora", "nombre": "ROI portafolio a 5 años", "descripcion": "Simulador de patrimonio según ritmo de flips" }
+          {
+            "tipo": "plantilla",
+            "nombre": "Plan 12 meses: 4 flips",
+            "descripcion": "Calendario realista de cómo hacer 4 flips en el primer año"
+          },
+          {
+            "tipo": "guia",
+            "nombre": "Cuándo armar tu equipo",
+            "descripcion": "Los 5 roles a contratar y en qué orden"
+          },
+          {
+            "tipo": "calculadora",
+            "nombre": "ROI portafolio a 5 años",
+            "descripcion": "Simulador de patrimonio según ritmo de flips"
+          }
         ]
       }
     ]
   },
-
   "psicologia": {
     "leyesUniversales": [
-      { "ley": 1, "nombre": "Ejecución gana a teoría", "explicacion": "Toda info teórica que no termina en herramienta = perdida.", "herramienta": "Tab Recursos: cada artículo tiene su plantilla/calculadora asociada" },
-      { "ley": 2, "nombre": "La identidad gana al producto", "explicacion": "No vendés un curso — vendés convertirte en flipper sistemático.", "herramienta": "Manifiesto filmado como reel pin" },
-      { "ley": 3, "nombre": "El enemigo identificable une la tribu", "explicacion": "Los Gurúes vs Los Operadores con Método.", "herramienta": "Generador de hooks anti-enemigo" },
-      { "ley": 4, "nombre": "La autoridad proxy compra credibilidad", "explicacion": "4 empresas operando = prueba social automática.", "herramienta": "Tab Mis Redes: dashboards mensuales de las 4" },
-      { "ley": 5, "nombre": "Lo que se repite, se cree", "explicacion": "Sistema Flip Anti-Riesgos™ en cada cierre.", "herramienta": "Toggle 'fórmula amplificada' en generadores que inyecta el framework" },
-      { "ley": 6, "nombre": "Los pseudo-eventos generan free media", "explicacion": "Eventos = contenido + autoridad + leads.", "herramienta": "Generador de pseudo-eventos (5 ideas/click)" },
-      { "ley": 7, "nombre": "Estética simple atraviesa defensas", "explicacion": "3-4 palabras > párrafo elaborado.", "herramienta": "Validador de hook (cuenta palabras + sugiere recortes)" }
+      {
+        "ley": 1,
+        "nombre": "Ejecución gana a teoría",
+        "explicacion": "Toda info teórica que no termina en herramienta = perdida.",
+        "herramienta": "Tab Recursos: cada artículo tiene su plantilla/calculadora asociada"
+      },
+      {
+        "ley": 2,
+        "nombre": "La identidad gana al producto",
+        "explicacion": "No vendés un curso — vendés convertirte en flipper sistemático.",
+        "herramienta": "Manifiesto filmado como reel pin"
+      },
+      {
+        "ley": 3,
+        "nombre": "El enemigo identificable une la tribu",
+        "explicacion": "Los Gurúes vs Los Operadores con Método.",
+        "herramienta": "Generador de hooks anti-enemigo"
+      },
+      {
+        "ley": 4,
+        "nombre": "La autoridad proxy compra credibilidad",
+        "explicacion": "4 empresas operando = prueba social automática.",
+        "herramienta": "Tab Mis Redes: dashboards mensuales de las 4"
+      },
+      {
+        "ley": 5,
+        "nombre": "Lo que se repite, se cree",
+        "explicacion": "Sistema Flip Anti-Riesgos™ en cada cierre.",
+        "herramienta": "Toggle 'fórmula amplificada' en generadores que inyecta el framework"
+      },
+      {
+        "ley": 6,
+        "nombre": "Los pseudo-eventos generan free media",
+        "explicacion": "Eventos = contenido + autoridad + leads.",
+        "herramienta": "Generador de pseudo-eventos (5 ideas/click)"
+      },
+      {
+        "ley": 7,
+        "nombre": "Estética simple atraviesa defensas",
+        "explicacion": "3-4 palabras > párrafo elaborado.",
+        "herramienta": "Validador de hook (cuenta palabras + sugiere recortes)"
+      }
     ],
-
     "tacticasAplicadas": [
-      { "id": 1, "maestro": "Hormozi", "tecnica": "Framework con nombre propio", "tuVersion": "Sistema Flip Anti-Riesgos™", "herramientaApp": "Toggle 'inyectar framework' en cada output" },
-      { "id": 2, "maestro": "Hormozi", "tecnica": "Valor masivo gratis", "tuVersion": "Tab Recursos: plantillas/calculadoras descargables sin email", "herramientaApp": "Sistema de descargas trackeadas" },
-      { "id": 3, "maestro": "MrBeast", "tecnica": "Retención obsesiva 3 seg", "tuVersion": "Hook brutal en cada reel", "herramientaApp": "Validador de hook (analiza primeros 3 seg)" },
-      { "id": 4, "maestro": "MrBeast", "tecnica": "A/B test thumbnails 50+", "tuVersion": "Generar 3-5 variantes por video", "herramientaApp": "Generador de thumbnails (3 variantes auto)" },
-      { "id": 5, "maestro": "Apple TD", "tecnica": "Manifiesto sobre features", "tuVersion": "Manifiesto 'Flippeá con método'", "herramientaApp": "Tab Manifiesto: texto + video + copy generado" },
-      { "id": 6, "maestro": "Trump 2016", "tecnica": "Controversia productiva", "tuVersion": "Anti-gurúes (sin nombrar)", "herramientaApp": "Generador de hooks polémicos defendibles" },
-      { "id": 7, "maestro": "Milei 2023", "tecnica": "TikTok directo a cámara", "tuVersion": "1-2 TikToks/día con la cara", "herramientaApp": "Tab Tendencias: trending sounds para tu nicho" },
-      { "id": 8, "maestro": "Bukele", "tecnica": "Resultados visibles repetidos", "tuVersion": "Dashboards mensuales públicos", "herramientaApp": "Generador de carrusel 'Reporte mensual'" },
-      { "id": 9, "maestro": "Old Spice", "tecnica": "Humor en industria seria", "tuVersion": "Punch humorístico en contenido educativo", "herramientaApp": "Toggle 'agregar humor' al generar reels" },
-      { "id": 10, "maestro": "DSC", "tecnica": "Producción auténtica > cara", "tuVersion": "iPhone + lavalier mic", "herramientaApp": "Guía técnica en Recursos" },
-      { "id": 11, "maestro": "Obama 2008", "tecnica": "Lista de leads como activo #1", "tuVersion": "WhatsApp Business + email", "herramientaApp": "Tracker de DMs por palabra clave" },
-      { "id": 12, "maestro": "Gary Vee", "tecnica": "Documentar > crear", "tuVersion": "Filmar tu día normal en F&F", "herramientaApp": "Generador de stories 'detrás del flip'" },
-      { "id": 13, "maestro": "Bernays", "tecnica": "Pseudo-evento", "tuVersion": "Reportes públicos + estudios del rubro", "herramientaApp": "Generador 'Estudio del Flipper Latino 2026'" },
-      { "id": 14, "maestro": "Marlboro", "tecnica": "Arquetipo + uniforme visual", "tuVersion": "El Operador con Método + camisa azul oxford", "herramientaApp": "Guía visual de vestuario por escenario" },
-      { "id": 15, "maestro": "De Beers", "tecnica": "Eslogan permanente", "tuVersion": "'Flippeá con método' en CADA pieza", "herramientaApp": "Auto-insertar al final si toggle activo" },
-      { "id": 16, "maestro": "Iman Gadzhi", "tecnica": "Comunidad alumni cerrada", "tuVersion": "Telegram/Discord premium de alumnos", "herramientaApp": "Link a comunidad + tracker de invitaciones" }
+      {
+        "id": 1,
+        "maestro": "Hormozi",
+        "tecnica": "Framework con nombre propio",
+        "tuVersion": "Sistema Flip Anti-Riesgos™",
+        "herramientaApp": "Toggle 'inyectar framework' en cada output"
+      },
+      {
+        "id": 2,
+        "maestro": "Hormozi",
+        "tecnica": "Valor masivo gratis",
+        "tuVersion": "Tab Recursos: plantillas/calculadoras descargables sin email",
+        "herramientaApp": "Sistema de descargas trackeadas"
+      },
+      {
+        "id": 3,
+        "maestro": "MrBeast",
+        "tecnica": "Retención obsesiva 3 seg",
+        "tuVersion": "Hook brutal en cada reel",
+        "herramientaApp": "Validador de hook (analiza primeros 3 seg)"
+      },
+      {
+        "id": 4,
+        "maestro": "MrBeast",
+        "tecnica": "A/B test thumbnails 50+",
+        "tuVersion": "Generar 3-5 variantes por video",
+        "herramientaApp": "Generador de thumbnails (3 variantes auto)"
+      },
+      {
+        "id": 5,
+        "maestro": "Apple TD",
+        "tecnica": "Manifiesto sobre features",
+        "tuVersion": "Manifiesto 'Flippeá con método'",
+        "herramientaApp": "Tab Manifiesto: texto + video + copy generado"
+      },
+      {
+        "id": 6,
+        "maestro": "Trump 2016",
+        "tecnica": "Controversia productiva",
+        "tuVersion": "Anti-gurúes (sin nombrar)",
+        "herramientaApp": "Generador de hooks polémicos defendibles"
+      },
+      {
+        "id": 7,
+        "maestro": "Milei 2023",
+        "tecnica": "TikTok directo a cámara",
+        "tuVersion": "1-2 TikToks/día con la cara",
+        "herramientaApp": "Tab Tendencias: trending sounds para tu nicho"
+      },
+      {
+        "id": 8,
+        "maestro": "Bukele",
+        "tecnica": "Resultados visibles repetidos",
+        "tuVersion": "Dashboards mensuales públicos",
+        "herramientaApp": "Generador de carrusel 'Reporte mensual'"
+      },
+      {
+        "id": 9,
+        "maestro": "Old Spice",
+        "tecnica": "Humor en industria seria",
+        "tuVersion": "Punch humorístico en contenido educativo",
+        "herramientaApp": "Toggle 'agregar humor' al generar reels"
+      },
+      {
+        "id": 10,
+        "maestro": "DSC",
+        "tecnica": "Producción auténtica > cara",
+        "tuVersion": "iPhone + lavalier mic",
+        "herramientaApp": "Guía técnica en Recursos"
+      },
+      {
+        "id": 11,
+        "maestro": "Obama 2008",
+        "tecnica": "Lista de leads como activo #1",
+        "tuVersion": "WhatsApp Business + email",
+        "herramientaApp": "Tracker de DMs por palabra clave"
+      },
+      {
+        "id": 12,
+        "maestro": "Gary Vee",
+        "tecnica": "Documentar > crear",
+        "tuVersion": "Filmar tu día normal en F&F",
+        "herramientaApp": "Generador de stories 'detrás del flip'"
+      },
+      {
+        "id": 13,
+        "maestro": "Bernays",
+        "tecnica": "Pseudo-evento",
+        "tuVersion": "Reportes públicos + estudios del rubro",
+        "herramientaApp": "Generador 'Estudio del Flipper Latino 2026'"
+      },
+      {
+        "id": 14,
+        "maestro": "Marlboro",
+        "tecnica": "Arquetipo + uniforme visual",
+        "tuVersion": "El Operador con Método + camisa azul oxford",
+        "herramientaApp": "Guía visual de vestuario por escenario"
+      },
+      {
+        "id": 15,
+        "maestro": "De Beers",
+        "tecnica": "Eslogan permanente",
+        "tuVersion": "'Flippeá con método' en CADA pieza",
+        "herramientaApp": "Auto-insertar al final si toggle activo"
+      },
+      {
+        "id": 16,
+        "maestro": "Iman Gadzhi",
+        "tecnica": "Comunidad alumni cerrada",
+        "tuVersion": "Telegram/Discord premium de alumnos",
+        "herramientaApp": "Link a comunidad + tracker de invitaciones"
+      }
     ]
   },
-
   "misRedes": {
     "instagram": {
       "handle": "@soynicolaslara",
@@ -356,17 +613,50 @@
       ],
       "fotoPerfil": "Vos en camisa azul oxford, fondo neutro, mirada cámara",
       "highlights": [
-        { "nombre": "MÉTODO", "icono": "🎯", "contenido": "Manifiesto + Sistema Flip Anti-Riesgos™" },
-        { "nombre": "PRIMER FLIP", "icono": "🏠", "contenido": "Path 30/60/90 paso a paso" },
-        { "nombre": "CASOS", "icono": "📊", "contenido": "Felipe, Sergio, Ángela, Paula con números" },
-        { "nombre": "EQUIPO", "icono": "👥", "contenido": "Las 4 empresas operando (credibilidad)" },
-        { "nombre": "HERRAMIENTAS", "icono": "🛠️", "contenido": "Plantillas, calculadoras, checklists" },
-        { "nombre": "ANTI-GURÚES", "icono": "🚫", "contenido": "Lo que NO te dicen los gurúes" }
+        {
+          "nombre": "MÉTODO",
+          "icono": "🎯",
+          "contenido": "Manifiesto + Sistema Flip Anti-Riesgos™"
+        },
+        {
+          "nombre": "PRIMER FLIP",
+          "icono": "🏠",
+          "contenido": "Path 30/60/90 paso a paso"
+        },
+        {
+          "nombre": "CASOS",
+          "icono": "📊",
+          "contenido": "Felipe, Sergio, Ángela, Paula con números"
+        },
+        {
+          "nombre": "EQUIPO",
+          "icono": "👥",
+          "contenido": "Las 4 empresas operando (credibilidad)"
+        },
+        {
+          "nombre": "HERRAMIENTAS",
+          "icono": "🛠️",
+          "contenido": "Plantillas, calculadoras, checklists"
+        },
+        {
+          "nombre": "ANTI-GURÚES",
+          "icono": "🚫",
+          "contenido": "Lo que NO te dicen los gurúes"
+        }
       ],
       "reelsFijos": [
-        { "pos": 1, "tipo": "Manifiesto: Flippeá con método" },
-        { "pos": 2, "tipo": "Tu historia: de 0 a 4 empresas (foco F&F)" },
-        { "pos": 3, "tipo": "Caso Felipe: $73K en 6 meses con el sistema" }
+        {
+          "pos": 1,
+          "tipo": "Manifiesto: Flippeá con método"
+        },
+        {
+          "pos": 2,
+          "tipo": "Tu historia: de 0 a 4 empresas (foco F&F)"
+        },
+        {
+          "pos": 3,
+          "tipo": "Caso Felipe: $73K en 6 meses con el sistema"
+        }
       ]
     },
     "tiktok": {
@@ -386,7 +676,6 @@
       "descripcion": "Te enseño Fix & Flip con el Sistema Flip Anti-Riesgos™. Detrás del método hay 4 empresas operando y +200 alumnos ejecutando. Suscribite si querés tu primer flip sin perder capital."
     }
   },
-
   "biblioteca": {
     "reels": [
       {
@@ -541,10 +830,8 @@
       }
     ]
   },
-
   "recursosYTendencias": {
     "descripcion": "Apps, links y herramientas externas para sacar tendencias, sonidos virales, hashtags y formatos que funcionan AHORA. Todo accesible desde la app con explicación de uso.",
-
     "tendencias": [
       {
         "categoria": "TikTok",
@@ -552,7 +839,13 @@
         "url": "https://ads.tiktok.com/business/creativecenter/inspiration/popular",
         "costo": "GRATIS",
         "tipo": "Oficial TikTok",
-        "queTeDa": ["Top videos del momento por país/categoría", "Trending sounds (audios virales)", "Trending hashtags", "Top creators", "Trending products"],
+        "queTeDa": [
+          "Top videos del momento por país/categoría",
+          "Trending sounds (audios virales)",
+          "Trending hashtags",
+          "Top creators",
+          "Trending products"
+        ],
         "comoSacarlo": [
           "1. Entrá al link (sin login obligatorio)",
           "2. Seleccioná país: United States (para latinos USA) o México/Colombia/España según target",
@@ -568,8 +861,14 @@
         "url": "https://tokboard.com",
         "costo": "Plan free + paid desde $29/mes",
         "tipo": "Tracker no-oficial",
-        "queTeDa": ["Top 100 sounds por país", "Top hashtags", "Tendencias por nicho"],
-        "comoSacarlo": ["Búsqueda por keyword 'real estate' + filtro por país"]
+        "queTeDa": [
+          "Top 100 sounds por país",
+          "Top hashtags",
+          "Tendencias por nicho"
+        ],
+        "comoSacarlo": [
+          "Búsqueda por keyword 'real estate' + filtro por país"
+        ]
       },
       {
         "categoria": "TikTok",
@@ -577,8 +876,16 @@
         "url": "https://pentos.co",
         "costo": "Desde $50/mes",
         "tipo": "Analytics profesional",
-        "queTeDa": ["Análisis de un creator específico", "Comparativa entre creators", "Trending sounds por nicho"],
-        "comoSacarlo": ["Crear cuenta", "Agregar 5-10 creators del nicho real estate", "Ver qué formatos repiten"]
+        "queTeDa": [
+          "Análisis de un creator específico",
+          "Comparativa entre creators",
+          "Trending sounds por nicho"
+        ],
+        "comoSacarlo": [
+          "Crear cuenta",
+          "Agregar 5-10 creators del nicho real estate",
+          "Ver qué formatos repiten"
+        ]
       },
       {
         "categoria": "Instagram",
@@ -586,8 +893,15 @@
         "url": "https://business.facebook.com",
         "costo": "GRATIS",
         "tipo": "Oficial Meta",
-        "queTeDa": ["Tendencias en Reels", "Audio populares", "Mejores horarios de tu audiencia"],
-        "comoSacarlo": ["Conectar tu cuenta @soynicolaslara", "Sección 'Inspiración' o 'Trends'"]
+        "queTeDa": [
+          "Tendencias en Reels",
+          "Audio populares",
+          "Mejores horarios de tu audiencia"
+        ],
+        "comoSacarlo": [
+          "Conectar tu cuenta @soynicolaslara",
+          "Sección 'Inspiración' o 'Trends'"
+        ]
       },
       {
         "categoria": "Instagram",
@@ -595,8 +909,16 @@
         "url": "https://predis.ai",
         "costo": "Free tier + paid desde $32/mes",
         "tipo": "AI analytics + content gen",
-        "queTeDa": ["Análisis de competidores", "Sugerencias de posts", "Predicción de engagement"],
-        "comoSacarlo": ["Conectar IG", "Agregar competidores del nicho", "Ver qué tipo de contenido funciona mejor"]
+        "queTeDa": [
+          "Análisis de competidores",
+          "Sugerencias de posts",
+          "Predicción de engagement"
+        ],
+        "comoSacarlo": [
+          "Conectar IG",
+          "Agregar competidores del nicho",
+          "Ver qué tipo de contenido funciona mejor"
+        ]
       },
       {
         "categoria": "Cross-platform",
@@ -604,8 +926,13 @@
         "url": "https://trendpop.social",
         "costo": "Desde $99/mes",
         "tipo": "Profesional",
-        "queTeDa": ["Tendencias TikTok + IG en tiempo real", "Búsqueda por nicho/idioma/región"],
-        "comoSacarlo": ["Filtrar por idioma español + nicho real estate"]
+        "queTeDa": [
+          "Tendencias TikTok + IG en tiempo real",
+          "Búsqueda por nicho/idioma/región"
+        ],
+        "comoSacarlo": [
+          "Filtrar por idioma español + nicho real estate"
+        ]
       },
       {
         "categoria": "Scraping",
@@ -613,8 +940,16 @@
         "url": "https://apify.com/clockworks/tiktok-scraper",
         "costo": "Pay per use, ~$30-50/mes",
         "tipo": "Scraping automatizable",
-        "queTeDa": ["Top videos por keyword/hashtag", "Métricas detalladas", "Schedule diario automático"],
-        "comoSacarlo": ["Crear actor", "Configurar keywords (ej: 'fix and flip', 'real estate latino')", "Schedule diario → recibís data en CSV/JSON"]
+        "queTeDa": [
+          "Top videos por keyword/hashtag",
+          "Métricas detalladas",
+          "Schedule diario automático"
+        ],
+        "comoSacarlo": [
+          "Crear actor",
+          "Configurar keywords (ej: 'fix and flip', 'real estate latino')",
+          "Schedule diario → recibís data en CSV/JSON"
+        ]
       },
       {
         "categoria": "YouTube",
@@ -622,8 +957,15 @@
         "url": "https://vidiq.com",
         "costo": "Free + paid desde $7.50/mes",
         "tipo": "Analytics + SEO",
-        "queTeDa": ["Trending keywords YouTube", "Análisis de competidores", "Optimización de títulos/tags"],
-        "comoSacarlo": ["Extensión Chrome", "Buscar 'fix and flip' → ver qué títulos rankean"]
+        "queTeDa": [
+          "Trending keywords YouTube",
+          "Análisis de competidores",
+          "Optimización de títulos/tags"
+        ],
+        "comoSacarlo": [
+          "Extensión Chrome",
+          "Buscar 'fix and flip' → ver qué títulos rankean"
+        ]
       },
       {
         "categoria": "Hashtags",
@@ -631,8 +973,14 @@
         "url": "https://hashtagsforlikes.co",
         "costo": "Desde $13/mes",
         "tipo": "Hashtag research",
-        "queTeDa": ["Hashtags más usados por nicho", "Crecimiento de hashtag", "Hashtags relacionados"],
-        "comoSacarlo": ["Buscar 'fixandflip' + 'realestatelatino' → te da lista priorizada"]
+        "queTeDa": [
+          "Hashtags más usados por nicho",
+          "Crecimiento de hashtag",
+          "Hashtags relacionados"
+        ],
+        "comoSacarlo": [
+          "Buscar 'fixandflip' + 'realestatelatino' → te da lista priorizada"
+        ]
       },
       {
         "categoria": "Sonidos",
@@ -640,11 +988,15 @@
         "url": "https://trendpop.social/sounds",
         "costo": "Incluido en Trendpop",
         "tipo": "Trending sounds en vivo",
-        "queTeDa": ["Top sounds TikTok últimas 24h/7d/30d", "Filtrable por país"],
-        "comoSacarlo": ["Filtrar últimas 24h + USA + crecimiento > 200%"]
+        "queTeDa": [
+          "Top sounds TikTok últimas 24h/7d/30d",
+          "Filtrable por país"
+        ],
+        "comoSacarlo": [
+          "Filtrar últimas 24h + USA + crecimiento > 200%"
+        ]
       }
     ],
-
     "guiaUso": [
       "1. Cada lunes: revisá TikTok Creative Center + Trendpop Sounds (15 min)",
       "2. Anotá los 5 sounds que estén subiendo en tu nicho",
@@ -653,17 +1005,14 @@
       "5. Para competidores: Pentos o Predis.ai con 5-10 creators top del nicho",
       "6. Para data en bulk: Apify schedule diario"
     ],
-
     "presupuestoSugerido": {
       "minimo": "GRATIS — solo TikTok Creative Center + Meta Business Suite + VidIQ free",
       "intermedio": "$50/mes — agregar Trendpop o Apify",
       "pro": "$200/mes — Trendpop + Predis.ai + Hashtagsforlikes + VidIQ paid"
     }
   },
-
   "transformador": {
     "descripcion": "Toma contenido viral de OTROS (cualquier nicho/idioma) y lo transforma a tu marca + tu nicho + tu vocabulario.",
-
     "tiposDeTransformacion": [
       {
         "id": "copy-to-copy",
@@ -694,7 +1043,6 @@
         "tecnica": "Claude identifica el método H/I/L/O en la secuencia original y replica con tu contenido"
       }
     ],
-
     "configuracion": {
       "nichoDestino": "Fix & Flip (default)",
       "tono": "El Operador con Método (default)",
@@ -702,22 +1050,48 @@
       "incluirFramework": "Sí — inyectar Sistema Flip Anti-Riesgos™ donde encaje",
       "ctaPalabraClave": "Generar automático según tema (MÉTODO, BUYBOX, FELIPE, GC, etc.)"
     },
-
     "ejemploDeUso": {
       "input": "Copy viral de un creator de fitness: 'No vas al gym a SUDAR. Vas al gym a GANAR. Cada pesa que levantás es un voto por la versión que querés ser. Los que entendieron esto, no se saltean entrenamientos. ¿Sos de los que se compromete o de los que se justifica?'",
       "output": "No flippeás casas para SUDAR. Flippeás para GANAR patrimonio. Cada deal que cerrás con método es un voto por el operador que querés ser. Los que entendieron esto, no improvisan compras. ¿Sos de los que ejecuta con sistema o de los que se justifica con 'algún día'? Comentá MÉTODO."
     }
   },
-
   "reLaunch": {
     "preLaunch": [
-      { "dia": -7, "accion": "Stories teaser: 'Algo grande viene. 7 días.'", "completado": false },
-      { "dia": -6, "accion": "Story: 'He construido 4 empresas. Es hora de contarte CÓMO con el sistema'", "completado": false },
-      { "dia": -5, "accion": "Story: encuesta '¿Tu primer flip te da miedo?' SÍ/NO", "completado": false },
-      { "dia": -4, "accion": "Story: BTS sesión de fotos nueva (uniforme visual)", "completado": false },
-      { "dia": -3, "accion": "Story: tease del Sistema Flip Anti-Riesgos™ (las 5 fases)", "completado": false },
-      { "dia": -2, "accion": "Cambiar bio + foto + highlights", "completado": false },
-      { "dia": -1, "accion": "Story: 'Mañana lanzo el manifiesto. Eso me cambió a mí.'", "completado": false }
+      {
+        "dia": -7,
+        "accion": "Stories teaser: 'Algo grande viene. 7 días.'",
+        "completado": false
+      },
+      {
+        "dia": -6,
+        "accion": "Story: 'He construido 4 empresas. Es hora de contarte CÓMO con el sistema'",
+        "completado": false
+      },
+      {
+        "dia": -5,
+        "accion": "Story: encuesta '¿Tu primer flip te da miedo?' SÍ/NO",
+        "completado": false
+      },
+      {
+        "dia": -4,
+        "accion": "Story: BTS sesión de fotos nueva (uniforme visual)",
+        "completado": false
+      },
+      {
+        "dia": -3,
+        "accion": "Story: tease del Sistema Flip Anti-Riesgos™ (las 5 fases)",
+        "completado": false
+      },
+      {
+        "dia": -2,
+        "accion": "Cambiar bio + foto + highlights",
+        "completado": false
+      },
+      {
+        "dia": -1,
+        "accion": "Story: 'Mañana lanzo el manifiesto. Eso me cambió a mí.'",
+        "completado": false
+      }
     ],
     "launchDay": {
       "principal": "Publicar MANIFIESTO 'Flippeá con método' como reel pin",
@@ -725,7 +1099,6 @@
       "cta": "Comentá MÉTODO"
     }
   },
-
   "kpis": {
     "baseline": {
       "instagram": 47356,
@@ -740,5 +1113,16 @@
       "leadsCualificadosMensuales": 50,
       "estudiantesNuevosMensuales": 5
     }
+  },
+  "estilos_contenido": {
+    "carrusel": {
+      "ramiro_style": {
+        "nombre": "Ramiro Style — Pasos + CTA palabra DM",
+        "fuente_inspiracion": "@ramiro.cubria",
+        "descripcion": "Carrusel técnico 6-8 slides: portada con badge naranja → PASO N con screenshot real → RESULTADO con bullets → CTA COMENTÁ PALABRA.",
+        "ver_seccion": "ESTILO 1 en docs/marketing/PATRONES-VIRALES-MAESTRO.md"
+      }
+    },
+    "reel": {}
   }
 }

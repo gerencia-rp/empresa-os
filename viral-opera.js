@@ -913,6 +913,7 @@ function studioCollectParams() {
     enemigo: v('st-enemigo') || 'auto', tactica: v('st-tactica') || 'auto', faseDelMes: v('st-fase') || 'auto',
     tema: v('st-tema'), formato: v('st-formato'), variantes: v('st-variantes') || '3',
     palabraClaveDM: v('st-cta'), model: v('st-model'),
+    estiloCarrusel: v('st-estilo-carrusel') || 'auto', estiloReel: v('st-estilo-reel') || 'auto',
   };
 }
 function studioContextPanel(ctx, estTokens) {
@@ -920,7 +921,7 @@ function studioContextPanel(ctx, estTokens) {
   return `<div class="bg-primary/40 border border-accent/15 rounded-xl p-4">
     <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold text-accent uppercase tracking-wide">Contexto inyectado (transparente)</div>
     <span class="text-[10px] text-zinc-500">~${estTokens} tokens</span></div>
-    ${ctx.tipo ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">Tipo:</span><span class="text-accent font-semibold uppercase">${E(ctx.tipo)}</span></div>` : ''}
+    ${ctx.tipo ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">Tipo:</span><span class="text-accent font-semibold uppercase">${E(ctx.tipo)}</span>${ctx.estilo ? `<span class="text-zinc-400">· Estilo:</span><span class="text-orange-400 font-semibold">${E(ctx.estilo)}</span>` : ''}</div>` : ''}
     ${ctx.rag ? `<div class="flex gap-2 text-xs py-0.5 text-emerald-300"><span>📈</span><span>Inspirado en ${ctx.rag.count} ${ctx.tipo || 'pieza'}s exitosos similares (avg ${NUM(ctx.rag.avgViews)} views)</span></div>` : ''}
     ${row('Eslogan', ctx.eslogan)}${row('Framework', ctx.framework)}${row('Tagline', ctx.tagline)}${row('Arquetipo', ctx.arquetipo)}
     ${row('Enemigo (' + ctx.enemigoTipo + ')', ctx.enemigo)}${row('Táctica', ctx.tactica)}${row('Avatar', ctx.avatar)}${row('Dolor', ctx.dolor)}${row('Fase', ctx.fase)}
@@ -929,8 +930,11 @@ function studioContextPanel(ctx, estTokens) {
   </div>`;
 }
 function flattenVariante(v) {
-  const parts = [v.thumbnail_text, v.hook, v.chisme, v.valor_oculto, v.cta, v.caption_corta, v.caption_larga, v.mecanica_aplicada];
-  if (Array.isArray(v.slides)) v.slides.forEach(s => parts.push(s.texto));
+  const parts = [v.thumbnail_text, v.hook, v.chisme, v.desarrollo, v.valor_oculto, v.cta, v.caption, v.caption_corta, v.caption_larga, v.mecanica_aplicada];
+  if (Array.isArray(v.slides)) v.slides.forEach(s => {
+    parts.push(s.texto, s.titulo, s.subtitulo, s.instruccion, s.boton, s.headline_top, s.headline_bottom);
+    if (Array.isArray(s.bullets)) parts.push(s.bullets.join(' '));
+  });
   if (Array.isArray(v.frames)) v.frames.forEach(f => parts.push(f.texto_en_pantalla, f.voz));
   if (Array.isArray(v.titulos)) v.titulos.forEach(t => parts.push(t.texto));
   if (Array.isArray(v.lineas)) parts.push(v.lineas.join(' '));
@@ -986,7 +990,7 @@ async function studioGenerate(btn) {
     if (mode === 'libre') {
       const idea = (document.getElementById('st-idea') || {}).value || '';
       if (!idea.trim()) { document.getElementById('st-idea').focus(); btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); return; }
-      build = window.ContextBuilder.buildLibre({ tipoContenido: STUDIO.tipo, idea, variantes: params.variantes, formato: params.formato, palabraClaveDM: params.palabraClaveDM, ragExamples });
+      build = window.ContextBuilder.buildLibre({ tipoContenido: STUDIO.tipo, idea, variantes: params.variantes, formato: params.formato, palabraClaveDM: params.palabraClaveDM, estiloCarrusel: params.estiloCarrusel, estiloReel: params.estiloReel, ragExamples });
     } else {
       build = window.ContextBuilder.build(params);
     }
@@ -1015,6 +1019,9 @@ async function studioGenerate(btn) {
       variantes = parsed.variantes || parsed.reels || (Array.isArray(parsed) ? parsed : []);
       const errs = [];
       variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v), null, params.tipoContenido); if (!r.ok) errs.push.apply(errs, r.errores); });
+      if (build.estilo && window.Validator.validateStyle) {
+        variantes.forEach(v => { const r = window.Validator.validateStyle(v, params.tipoContenido, build.estilo); if (r && !r.ok) errs.push.apply(errs, r.errores); });
+      }
       if (!variantes.length) throw new Error('La IA no devolvió variantes válidas. Reintentá.');
       if (!errs.length) break;
       if (attempt < 3) {
@@ -1062,7 +1069,13 @@ function studioCard(v, i, tipo) {
   const badge = (ok, txt) => `<span class="text-[10px] px-1.5 py-0.5 rounded ${ok ? 'bg-emerald-900/50 text-emerald-300' : 'bg-bordeaux/40 text-red-300'}">${ok ? '✓' : '✗'} ${txt}</span>`;
   const f = (lbl, txt, c) => txt ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase ${c || 'text-zinc-500'} font-semibold mb-0.5">${lbl}</div><div class="text-sm">${E(txt)}</div></div>` : '';
   let extra = '';
-  if (Array.isArray(v.slides)) extra = `<div class="flex gap-2 overflow-x-auto scrollbar-thin pb-2 mb-2">${v.slides.map(s => `<div class="shrink-0 w-40 bg-dark border border-zinc-800 rounded-lg p-2"><div class="text-[9px] uppercase text-accent">slide ${E(String(s.n ?? ''))} · ${E(s.tipo || '')}</div><div class="text-xs mt-1">${E(s.texto)}</div><div class="text-[9px] text-zinc-600 mt-1">📷 ${E(s.visual || '')}</div></div>`).join('')}</div>`;
+  if (Array.isArray(v.slides)) extra = `<div class="flex gap-2 overflow-x-auto scrollbar-thin pb-2 mb-2">${v.slides.map(s => {
+    const badge = s.badge ? `<div class="text-[8px] uppercase font-bold text-orange-400 mb-0.5">${E(s.badge)}</div>` : '';
+    const titulo = s.titulo || s.headline_top || s.texto || '';
+    const body = s.instruccion || s.subtitulo || (Array.isArray(s.bullets) ? s.bullets.map(b => '• ' + b).join('\n') : '') || s.boton || s.headline_bottom || '';
+    const meta = s.screenshot || s.visual || s.foto_autor || '';
+    return `<div class="shrink-0 w-44 bg-dark border border-zinc-800 rounded-lg p-2"><div class="text-[9px] uppercase text-accent">slide ${E(String(s.n ?? ''))} · ${E(s.tipo || '')}</div>${badge}<div class="text-xs mt-1 font-semibold ${s.palabra_naranja ? 'text-light' : ''}">${E(titulo)}</div>${body ? `<div class="text-[10px] text-zinc-400 mt-1 whitespace-pre-line">${E(body)}</div>` : ''}${meta ? `<div class="text-[9px] text-zinc-600 mt-1">📷 ${E(meta)}</div>` : ''}</div>`;
+  }).join('')}</div>`;
   if (Array.isArray(v.frames)) extra = v.frames.map(fr => `<div class="border-l-2 border-accent/40 pl-2 mb-1.5"><span class="text-[10px] uppercase text-accent">${E(fr.fase || '')}</span><div class="text-sm">${E(fr.texto_en_pantalla)}</div>${fr.voz ? `<div class="text-xs text-zinc-400">${E(fr.voz)}</div>` : ''}${fr.sticker && fr.sticker !== 'ninguno' ? `<div class="text-[10px] text-purple-300">🎯 ${E(fr.sticker)}</div>` : ''}</div>`).join('');
   if (Array.isArray(v.titulos)) extra += `<div class="mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-1">Títulos</div>${v.titulos.map(t => `<div class="text-xs"><span class="text-accent">[${E(t.palanca || '')}]</span> ${E(t.texto)}</div>`).join('')}</div>`;
   if (Array.isArray(v.miniaturas)) extra += `<div class="grid grid-cols-3 gap-1 mb-2">${v.miniaturas.map(m => `<div class="bg-dark rounded p-2 text-[10px]"><b class="text-accent">${E(m.variante || '')}</b> "${E(m.texto_en_miniatura)}"<div class="text-zinc-500">${E(m.composicion || '')}</div></div>`).join('')}</div>`;
