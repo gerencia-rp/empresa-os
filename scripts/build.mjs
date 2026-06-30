@@ -62,6 +62,7 @@ const STATIC_COPY = [
   "viral-opera.js",
   "viral-context-builder.js",
   "viral-validator.js",
+  "viral-agente.js",
   "base_conocimiento.json",
   "viral-data/opera-imperio-data.json",
   "viral-data/opera-imperio-data-v2.json",
