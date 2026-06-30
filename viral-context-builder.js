@@ -188,10 +188,83 @@ FEW-SHOTS CANÓNICOS para Fix & Flip (imitá estructura/voz, NO copies literal �
 REGLAS DURAS: 6 a 10 slides · slide 1 portada_confesional con headline_top + headline_bottom (sandwich) + foto_autor · hook con al menos 30% en MAYÚSCULAS · caption 200-500 chars con al menos 1 emoji emocional · slide final puede ser conversacional (NO requiere palabra DM en mayúsculas).`;
   }
 
+  // --- AMERICA STYLE — reel diálogo + desglose + CTA palabra (creator construcción USA-LATAM) ---
+  const AMERICA_FEWSHOTS = `
+EJEMPLO 1 — "NÚMERO + acción + tiempo":
+{"estilo":"america_style","patron":"numero_accion_tiempo","duracion_estimada_seg":60,"hook":"Hice 47 mil dólares en mi último flip, lo cerré en 4 meses sin poner un peso mío.","desarrollo":"Compré la casa por debajo del 70% del ARV en una zona donde los wholesalers ni siquiera miran. Refinancié con un hard money lender que me prestó el 100% de compra y rehab. Mi rehab fue solo cosmética: pintura, pisos, cocina nueva. Vendí 8 días después de listarla porque el comparable del barrio venía subiendo.","cta":"Y si vos también querés aprender a calcular el MAO real sin ilusionarte, escribí MAO en los comentarios y te paso mi calculadora.","cta_palabra":"MAO"}
+
+EJEMPLO 2 — "DIÁLOGO escena":
+{"estilo":"america_style","patron":"dialogo_escena","duracion_estimada_seg":70,"hook":"Sobrino, ¿cuánto pagaste por tu primer flip? Cero dólares.","desarrollo":"Pero cómo cero dólares. Es que conseguí un hard money que me prestó el 100% de compra y rehab. Pero entonces tenías que tener buen crédito. No, con ITIN, sin social security. Y de dónde sacaste para los closing costs. Me los financió el seller, le pedí seller credit de 6 mil dólares. Sobrino, enséñame.","cta":"Tío, mirá, escribí FLIP en los comentarios y te paso el script exacto que usé.","cta_palabra":"FLIP"}
+
+EJEMPLO 3 — "OPOSICIÓN binaria":
+{"estilo":"america_style","patron":"oposicion_binaria","duracion_estimada_seg":75,"hook":"Este es el wholesaler. Este es el flipper.","desarrollo":"El wholesaler cobra 5 mil por deal y se queda corriendo sin parar. El flipper cobra entre 30 a 80 mil por deal y trabaja 3 deals al año. El wholesaler vive de volumen. El flipper vive de margen. Pero el flipper necesita dinero. Sí. Y de dónde lo saca. Capital privado, hard money, partners. Pero entonces el wholesaler es más fácil. Más fácil sí, pero más techo te pone.","cta":"Si querés ver mi sistema completo para arrancar como flipper sin capital propio, escribí MÉTODO en los comentarios.","cta_palabra":"MÉTODO"}
+
+EJEMPLO 4 — "PEOR ERROR":
+{"estilo":"america_style","patron":"peor_error","duracion_estimada_seg":50,"hook":"¿Cuál es el peor error del flipper principiante? Confiar en cualquier GC con buena verba.","desarrollo":"Yo perdí 40 mil dólares en mi tercer flip por eso. Firmé contrato genérico, pagué 50 por adelantado, y el GC desapareció a los 2 meses. Hoy uso una matriz de vetting de 12 preguntas, un contrato blindado con milestones de pago y cláusulas anti-abandono.","cta":"Si querés mi matriz exacta y el contrato, escribí GC en los comentarios.","cta_palabra":"GC"}
+
+EJEMPLO 5 — "COMPARATIVA binaria":
+{"estilo":"america_style","patron":"comparativa_binaria","duracion_estimada_seg":65,"hook":"Para ganar 200 mil dólares en 12 meses tenés 3 caminos.","desarrollo":"1: hacer 12 wholesales de 17 mil cada uno, trabajando todos los meses sin parar. 2: hacer 4 flips medianos de 50 mil de ganancia, 4 meses cada uno. 3: hacer 1 flip grande de 200 mil de ganancia, 8 meses, capital y nervios de acero. Yo elegí la opción 2 porque me da margen y escala razonable.","cta":"Si querés ver el case study completo de mi último flip de 47 mil, escribí PRIMER en los comentarios.","cta_palabra":"PRIMER"}
+
+EJEMPLO 6 — "PROVOCACIÓN al avatar":
+{"estilo":"america_style","patron":"provocacion_avatar","duracion_estimada_seg":55,"hook":"Recién llegaste a Estados Unidos. ¿Querés ahorrar 5 años para tu primera propiedad o flippear ya con dinero ajeno?","desarrollo":"La mayoría elige ahorrar y termina en el ciclo de la renta para siempre. Yo elegí flippear con capital privado y hoy tengo 4 empresas operando. Lo único que necesitás es saber 3 cosas: cómo calcular el MAO real, cómo conseguir el dinero sin papeles, y cómo vetear al GC.","cta":"Si querés que te pase los 3 templates, escribí SISTEMA en los comentarios.","cta_palabra":"SISTEMA"}
+
+EJEMPLO 7 — "RESPUESTA SUTIL" (al creador que dijo "remodelar es el peor negocio" — sin nombrarlo, respetuoso pero contundente):
+{"estilo":"america_style","patron":"respuesta_sutil","hook":"Hay creadores que dicen que remodelar es el peor negocio.","desarrollo":"Yo gané 200 mil dólares el año pasado con 4 flips. ¿Sabés por qué a ellos les va mal y a mí no? Yo tengo un sistema. Sé exactamente cuánto puedo pagar por una casa antes de mirarla. Sé qué partidas del rehab tienen riesgo. Sé cómo elegir un GC sin que me robe. No es magia, es método.","cta":"Si querés que te muestre qué hace que un flip sea predecible, escribí MÉTODO en los comentarios.","cta_palabra":"MÉTODO"}`;
+
+  const AMERICA_SYSTEM = `
+
+═══ ESTILO: AMERICA STYLE (reel diálogo + desglose + CTA palabra, inspirado en creator construcción USA-LATAM) ═══
+Estructura narrativa universal (siempre la misma): [HOOK 3-5s] → [DESARROLLO 15-90s] → [CTA palabra 5-10s]. Total 30-90 segundos.
+Tono: español latam coloquial, factual, con cifras reales y desglose. Avatar: latino en EE.UU., contratista que quiere escalar.
+Hook (≤25 palabras) con UNO de estos patrones: NÚMERO + acción + tiempo · PREGUNTA directa · DIÁLOGO escena (sobrino/vecina) · PROVOCACIÓN al avatar · OPOSICIÓN binaria (contratista vs desarrollador) · PEOR ERROR.
+Si el hook menciona una cifra en dólares → el desarrollo DEBE traer el desglose o el cómo con números reales.
+CTA EXACTO: "Si querés [PROMESA], escribí la palabra PALABRA en los comentarios y te [LO QUE RECIBÍS]." (PALABRA en MAYÚSCULAS, 1 sola palabra).
+NUNCA: hooks vagos ("Hola amigos..."), CTAs débiles ("síganme"), cifras sin desglose, lenguaje gurú ("desbloqueá tu potencial"). Respetuoso con el trabajador.
+
+FEW-SHOTS CANÓNICOS para Fix & Flip (imitá estructura/voz, NO copies literal — adaptá al tema pedido):${AMERICA_FEWSHOTS}`;
+
+  function americaSchema() {
+    return `Devolvé SOLO un JSON válido (sin backticks, sin texto fuera) con esta forma EXACTA para america_style:
+{ "variantes": [ {
+  "estilo": "america_style",
+  "patron": "numero_accion_tiempo|pregunta_directa|dialogo_escena|provocacion_avatar|oposicion_binaria|peor_error|comparativa_binaria|respuesta_sutil",
+  "thumbnail_text": "texto de portada ≤5 palabras",
+  "duracion_estimada_seg": 60,
+  "hook": "máximo 25 palabras",
+  "desarrollo": "el cuerpo del reel (con desglose/cifras si el hook menciona dinero)",
+  "cta": "Si querés ..., escribí PALABRA en los comentarios y te ...",
+  "cta_palabra": "PALABRA",
+  "caption_corta": "", "caption_larga": "", "palabra_clave_dm": "PALABRA",
+  "mecanica_aplicada": "qué patrón usaste",
+  "validador": { "usa_palabras_marca": [], "evita_palabras_prohibidas": true, "tiene_frase_recurrente": true, "cta_pide_dm": true }
+} ] }
+REGLAS DURAS: hook ≤25 palabras · si hook menciona $ → desarrollo con desglose · CTA con (escribí|comentá) + PALABRA en MAYÚSCULAS + "comentarios" · cta_palabra 1 sola palabra MAYÚSCULAS (3-10 chars) · duración estimada 30-90s · primera persona.`;
+  }
+
   const STYLES = {
     ramiro_style: { tipo: 'carrusel', system: RAMIRO_SYSTEM, schema: ramiroSchema },
     alejandra_style: { tipo: 'carrusel', system: ALEJANDRA_SYSTEM, schema: alejandraSchema },
+    america_style: { tipo: 'reel', system: AMERICA_SYSTEM, schema: americaSchema },
   };
+
+  // --- Auto-detección de estilo de REEL (America vs Default) ---
+  // Base: SECCIÓN 4 del doc maestro. Extendido con 'sin plata' para cubrir
+  // frases tipo "flip de 47K sin plata".
+  function detectarEstiloReel(input_idea, dolor, tema) {
+    const keywords_america = [
+      'cuánto cuesta', 'cuánto gané', 'sobrino', 'vecino', 'vecina',
+      'desglose', 'partida', 'capital', 'sin papeles',
+      'sin dinero', 'sin un peso', 'sin plata', 'opcion 1', 'opcion 2',
+      'maleta', 'maleta del', 'contratista vs', 'wholesaler vs',
+      'peor error', 'que nunca hace', 'dialogo',
+      'flip de', 'gané', 'hice', 'recién llegado',
+      'latino', 'inmigrante', 'sin social', 'itin',
+    ];
+    const texto = (String(input_idea || '') + ' ' + String(dolor || '') + ' ' + String(tema || '')).toLowerCase();
+    const score = keywords_america.filter(k => texto.includes(k)).length;
+    if (score >= 2) return 'america_style';
+    return 'default';
+  }
 
   // --- Auto-detección de estilo de CARRUSEL (Ramiro vs Alejandra) ---
   // Base: SECCIÓN 4 del doc maestro. Extendido con 'peor'/'mi peor' (alejandra)
@@ -400,5 +473,5 @@ ${STYLES[estilo] ? STYLES[estilo].schema() : `{ "variantes": [ { ${CAMPOS_BASE}$
     return { system, userPrompt, contexto, tipo, estilo };
   }
 
-  window.ContextBuilder = { build, buildLibre, getCurrentFase, autoSelectEnemigo, resolveEstilo, detectarEstiloCarrusel, DOLOR_A_ENEMIGO };
+  window.ContextBuilder = { build, buildLibre, getCurrentFase, autoSelectEnemigo, resolveEstilo, detectarEstiloCarrusel, detectarEstiloReel, DOLOR_A_ENEMIGO };
 })();

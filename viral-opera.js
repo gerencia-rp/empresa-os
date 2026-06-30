@@ -859,6 +859,9 @@ function renderStudio() {
         <div id="st-estilo-carrusel-row" class="mt-3" style="display:none">
           ${fld('🎨 Estilo del carrusel', `<select id="st-estilo-carrusel" class="${selCls}"><option value="auto">✨ Auto (Claude decide según tema)</option><option value="ramiro_style">🤖 Ramiro Style (tutorial, sistemático)</option><option value="alejandra_style">🎬 Alejandra Style (confesional, storytelling)</option></select>`)}
         </div>
+        <div id="st-estilo-reel-row" class="mt-3" style="display:none">
+          ${fld('🎨 Estilo del reel', `<select id="st-estilo-reel" class="${selCls}"><option value="auto">✨ Auto (Claude decide)</option><option value="america_style">🇺🇸 America Style (diálogo + desglose, latam-USA)</option><option value="default">📝 Default (formato actual)</option></select>`)}
+        </div>
       </div>
       <div class="grid md:grid-cols-[400px_1fr] gap-6">
         <div class="space-y-3 bg-primary/40 border border-accent/15 rounded-xl p-4">
@@ -891,6 +894,7 @@ function renderStudio() {
       </div>`;
     fillStudioDolores();
     studioApplyMode(studioMode());
+    studioPickType(STUDIO.tipo); // sincroniza filas de formato/estilo según el tipo inicial
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
 // --- Modo Guiado / Libre ---
@@ -1097,7 +1101,7 @@ function studioCard(v, i, tipo) {
         <button onclick="studioExport(${i})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📥</button>
       </div>
     </div>
-    ${f('🎣 Hook', v.hook, 'text-accent')}${f('🗣️ Chisme', v.chisme)}${extra}${f('💎 Valor oculto', v.valor_oculto, 'text-emerald-400')}${f('📣 CTA', v.cta, 'text-purple-300')}
+    ${f('🎣 Hook', v.hook, 'text-accent')}${f('🗣️ Chisme', v.chisme)}${f('🎬 Desarrollo', v.desarrollo)}${extra}${f('💎 Valor oculto', v.valor_oculto, 'text-emerald-400')}${f('📣 CTA', v.cta, 'text-purple-300')}${v.duracion_estimada_seg ? `<div class="text-[10px] text-zinc-600 mb-1">⏱ ${E(String(v.duracion_estimada_seg))}s${v.patron ? ' · ' + E(v.patron) : ''}</div>` : ''}
     ${v.caption ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-0.5">📝 Caption</div><div class="text-sm text-zinc-300">${E(v.caption)}</div></div>` : ''}
     ${v.caption_larga ? `<details class="mb-2"><summary class="cursor-pointer text-[11px] text-zinc-500">caption larga</summary><div class="text-sm text-zinc-300 mt-1">${E(v.caption_larga)}</div></details>` : ''}
     <div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-zinc-600 mr-1">${E(v.mecanica_aplicada || '')}</span>${badge(val.errores.length === 0, 'reglas')}${STUDIO_LAST_ESTILO ? badge(valStyle.ok, 'estilo') : ''}${badge(val.palabrasDeMarcaUsadas.length >= 3, val.palabrasDeMarcaUsadas.length + ' marca')}${badge(val.frasesUsadas.length >= 1, 'frase')}</div>

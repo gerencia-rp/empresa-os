@@ -1129,6 +1129,13 @@
         "ver_seccion": "ESTILO 2 en docs/marketing/PATRONES-VIRALES-MAESTRO.md"
       }
     },
-    "reel": {}
+    "reel": {
+      "america_style": {
+        "nombre": "America Style — Diálogo + Desglose + CTA palabra",
+        "fuente_inspiracion": "Creator construcción USA-LATAM",
+        "descripcion": "Reel 30-90s: HOOK ≤25 palabras → DESARROLLO con desglose/cifras → CTA escribí PALABRA en los comentarios. Incluye patrón respuesta_sutil.",
+        "ver_seccion": "ESTILO 3 en docs/marketing/PATRONES-VIRALES-MAESTRO.md"
+      }
+    }
   }
 }

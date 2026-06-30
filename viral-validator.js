@@ -47,8 +47,9 @@
     const ctaPideDM = (mCta && /[A-ZÁÉÍÓÚÑ]{3,}/.test(mCta[1])) || /\b[A-ZÁÉÍÓÚÑ]{3,}\b[^.]{0,30}\bDM\b/.test(text);
     if (!ctaPideDM) {
       const msg = 'El CTA no pide una palabra clave por DM en MAYÚSCULAS (ej: "Comentá MÉTODO").';
-      // manifiesto (Apple Think Different) y alejandra_style (CTA conversacional) → solo warning
-      if (tipo === 'manifiesto' || estilo === 'alejandra_style') warnings.push(msg); else errores.push(msg);
+      // manifiesto (Apple Think Different), alejandra_style (CTA conversacional) y
+      // america_style (CTA "escribí PALABRA en los comentarios", validado en validateAmerica) → solo warning
+      if (tipo === 'manifiesto' || estilo === 'alejandra_style' || estilo === 'america_style') warnings.push(msg); else errores.push(msg);
     }
 
     // 5. Promesa amplia (error duro)
@@ -102,10 +103,27 @@
     return { ok: e.length === 0, errores: e };
   }
 
+  function validateAmerica(v) {
+    const e = [];
+    const hook = String(v.hook || '');
+    const palabras = hook.trim().split(/\s+/).filter(Boolean);
+    if (palabras.length > 25) e.push(`america_style: el hook debe tener ≤25 palabras (tiene ${palabras.length}).`);
+    const desarrollo = String(v.desarrollo || '');
+    if (/\$|\d+\s*(mil|k\b|dólares|dolares)/i.test(hook) && !/\d/.test(desarrollo)) e.push('america_style: el hook menciona una cifra pero el desarrollo no trae desglose/números.');
+    const cta = String(v.cta || '');
+    if (!/(escrib[ií]|coment[aá]|deja[r]?)[^.]*\b[A-ZÁÉÍÓÚÑ]{3,}\b[^.]*comentario/i.test(cta)) e.push('america_style: el CTA debe decir "escribí PALABRA en los comentarios" (PALABRA en MAYÚSCULAS).');
+    const pal = String(v.cta_palabra || '');
+    if (!/^[A-ZÁÉÍÓÚÑ]{3,10}$/.test(pal)) e.push('america_style: cta_palabra debe ser 1 sola palabra en MAYÚSCULAS (3-10 chars).');
+    const dur = Number(v.duracion_estimada_seg);
+    if (!(dur >= 30 && dur <= 90)) e.push(`america_style: duración estimada debe ser 30-90s (es ${v.duracion_estimada_seg ?? 's/d'}).`);
+    return { ok: e.length === 0, errores: e };
+  }
+
   function validateStyle(variant, tipo, estilo) {
     if (!variant || !estilo) return { ok: true, errores: [] };
     if (estilo === 'ramiro_style') return validateRamiro(variant);
     if (estilo === 'alejandra_style') return validateAlejandra(variant);
+    if (estilo === 'america_style') return validateAmerica(variant);
     return { ok: true, errores: [] };
   }
 
