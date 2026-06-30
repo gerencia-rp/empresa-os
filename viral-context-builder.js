@@ -468,6 +468,7 @@ ${STYLES[estilo] ? STYLES[estilo].schema() : `{ "variantes": [ { ${CAMPOS_BASE}$
     "validador": { "usa_palabras_marca": [], "evita_palabras_prohibidas": true, "tiene_frase_recurrente": true, "cta_pide_dm": true } } ] }`}`;
 
     const contexto = {
+      tipo,
       eslogan: id.esloganPrincipal, framework: id.framework, tagline: id.tagline, arquetipo: arq.nombre,
       enemigo: null, enemigoTipo: 'auto', tactica: null, avatar: null, dolor: null, fase: null,
       prohibidasCount: arq.palabrasProhibidas.length, marcaCount: arq.palabrasDeMarca.length, validador: true, libre: true,
