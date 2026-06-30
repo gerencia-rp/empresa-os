@@ -821,7 +821,13 @@ function renderStudio() {
     const selCls = 'mt-1 w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none';
     out.innerHTML =
       oHero('Studio', 'Producí contenido con toda tu estrategia inyectada automáticamente') +
-      `<div class="bg-primary/40 border border-accent/15 rounded-xl p-4 mb-4">
+      `<div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="document.querySelector('[data-tab=marca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">⚙️ Marca</button>
+        <button onclick="document.querySelector('[data-tab=biblioteca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">📚 Biblioteca</button>
+        <button onclick="document.querySelector('[data-tab=recursos]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">🔥 Tendencias</button>
+        <button onclick="document.querySelector('[data-tab=agente]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">💬 Agente</button>
+      </div>
+      <div class="bg-primary/40 border border-accent/15 rounded-xl p-4 mb-4">
         <div class="text-xs font-semibold text-zinc-400 mb-2">¿QUÉ CREÁS HOY?</div>
         <div class="grid grid-cols-3 gap-2">${tipos}</div>
       </div>
