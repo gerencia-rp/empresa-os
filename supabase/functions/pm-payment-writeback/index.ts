@@ -1,23 +1,27 @@
-// Write-back: crea un registro de pago en Airtable "Pagos Rentas" desde la app.
+// Write-back: crea un registro de pago en Airtable "Pagos" (base NUEVA) desde la app.
 // Best-effort: si falla, el pago ya quedó guardado en pm_payments (no se pierde).
+//
+// BASE NUEVA apptTKRYbx6gu701i (cutover 2026-06-29): Pagos enlaza Inquilino/Casa/Reserva
+// por LINKED RECORD ID (no texto/single-select). El front manda los recIds (tenant_rec,
+// casa_rec, reserva_rec) que saca de pmaState (tenant.external_id, property.airtable_address_id,
+// booking.external_id). Plataforma sigue siendo single-select (se valida en SAFE_MODE).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const AIRTABLE_KEY = Deno.env.get("AIRTABLE_API_KEY")!;
-const BASE_ID = Deno.env.get("AIRTABLE_BASE_ID") || "appzEnsuy4qPT6iHj";
-const PAGOS_TABLE = "tblqJlSgnLNfn34dh";
-// SAFE_MODE (default ON): NO usa typecast; valida que Casa/Plataforma/Tipo existan EXACTO
-// como opción en Airtable. Si no → 500 "opción_no_existe" (no crea opciones nuevas).
+const BASE_ID = Deno.env.get("AIRTABLE_BASE_ID") || "apptTKRYbx6gu701i";
+const PAGOS_TABLE = "tbl5p63dUEhrzgHVJ";
+// SAFE_MODE (default ON): NO usa typecast; valida que Plataforma exista EXACTO como opción.
 // Apagar con env WRITEBACK_SAFE_MODE=false una vez validado que los nombres están limpios.
 const SAFE_MODE = (Deno.env.get("WRITEBACK_SAFE_MODE") ?? "true").toLowerCase() !== "false";
-// Field IDs de "Pagos Rentas"
+// Field IDs de "Pagos" (base nueva)
 const F = {
-  inq:   "fldfuAgnhxOcLOF6s",   // Inquilino (texto)
-  casa:  "fldi8Xbv68PwMBfyH",   // Casa (single-select)
-  tipo:  "fldnWnsVeieiIi2VQ",   // Tipo/Unidad (single-select)
-  plat:  "fldjRoQFc8oU6TP1U",   // Plataforma (single-select)
-  fecha: "fldvN5b0F88ZMz0VE",   // Fecha de Pago (date)
-  monto: "fldLtAtolVlJMmVuX",   // Monto (number)
-  obs:   "fldi5nc7sag6tkzqX"    // Observación (texto)
+  pago:    "fldc3bGGY0JZMeODz",   // Pago (primary, texto)
+  monto:   "fld4plr3PqxUksUgo",   // Monto (currency)
+  fecha:   "fld6lAfD9vg7fUv6T",   // Fecha de Pago (date)
+  plat:    "fldfrgInDS8MQp12Z",   // Plataforma (single-select)
+  inq:     "fld01OK8T8TJl8ZXb",   // Inquilino (linked record)
+  casa:    "fld0RYuPMMUpcgnoF",   // Casa (linked record)
+  reserva: "fldU0KUvfPEdpp1tY"    // Reserva (linked record)
 };
 
 const cors = {
@@ -51,30 +55,26 @@ Deno.serve(async (req) => {
     if (!token) return json({ ok: false, error: "Falta AIRTABLE_API_KEY" }, 500);
 
     const fields: Record<string, any> = {};
-    if (body.inquilino)   fields[F.inq]   = String(body.inquilino);
-    if (body.casa)        fields[F.casa]  = String(body.casa);
-    if (body.tipo)        fields[F.tipo]  = String(body.tipo);
-    if (body.plataforma)  fields[F.plat]  = String(body.plataforma);
-    if (body.fecha)       fields[F.fecha] = String(body.fecha);
-    if (body.monto != null) fields[F.monto] = Number(body.monto);
-    if (body.observacion) fields[F.obs]   = String(body.observacion).slice(0, 500);
+    if (body.concepto)      fields[F.pago]    = String(body.concepto).slice(0, 200);
+    if (body.monto != null) fields[F.monto]   = Number(body.monto);
+    if (body.fecha)         fields[F.fecha]   = String(body.fecha);
+    if (body.plataforma)    fields[F.plat]    = String(body.plataforma);
+    // Linked records: arrays de record IDs de Airtable (recXXXXXXXXXXXXXX).
+    if (body.tenant_rec)    fields[F.inq]     = [String(body.tenant_rec)];
+    if (body.casa_rec)      fields[F.casa]    = [String(body.casa_rec)];
+    if (body.reserva_rec)   fields[F.reserva] = [String(body.reserva_rec)];
     if (!Object.keys(fields).length) return json({ ok: false, error: "Sin campos para escribir" }, 400);
 
-    // GUARDRAIL: en SAFE_MODE validamos las opciones de los single-select antes de crear.
-    if (SAFE_MODE) {
+    // GUARDRAIL: en SAFE_MODE validamos la opción de Plataforma (único single-select) antes de crear.
+    if (SAFE_MODE && body.plataforma) {
       const choices = await getChoices(token);
       if (!choices) return json({ ok: false, safe_mode: true,
         error: "no_puedo_validar_opciones", detail: "Meta API no disponible (token sin scope schema.bases:read). En SAFE_MODE no se crea el record." }, 500);
-      const bad: string[] = [];
-      const chk = (fieldId: string, val: any, label: string) => {
-        if (val && choices[fieldId] && !choices[fieldId].has(String(val))) bad.push(`${label}: '${val}'`);
-      };
-      chk(F.casa, body.casa, "Casa");
-      chk(F.plat, body.plataforma, "Plataforma");
-      chk(F.tipo, body.tipo, "Tipo");
-      if (bad.length) return json({ ok: false, safe_mode: true,
-        error: "opción_no_existe", detail: bad.join("; "),
-        hint: "Corregí el nombre o creá la opción en Airtable, o apagá SAFE_MODE (WRITEBACK_SAFE_MODE=false)." }, 500);
+      if (choices[F.plat] && !choices[F.plat].has(String(body.plataforma))) {
+        return json({ ok: false, safe_mode: true,
+          error: "opción_no_existe", detail: `Plataforma: '${body.plataforma}'`,
+          hint: "Corregí el nombre o creá la opción en Airtable, o apagá SAFE_MODE (WRITEBACK_SAFE_MODE=false)." }, 500);
+      }
     }
 
     const r = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${PAGOS_TABLE}`, {

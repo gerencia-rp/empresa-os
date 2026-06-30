@@ -3771,14 +3771,20 @@ async function pmSaveMarkPayment(bookingId) {
     const sess = await sb.auth.getSession();
     const tok = sess?.data?.session?.access_token;
     if (tok) {
+      // Base nueva: Pagos enlaza Inquilino/Casa/Reserva por LINKED RECORD ID.
+      // Los recIds salen de pmaState: tenant.external_id (tenant-{rec}),
+      // property.airtable_address_id (recId de la Casa), booking.external_id (booking-{rec}).
+      const tenant = pmaState.tenants.find(x => x.id === b.tenant_id);
+      const stripRec = (ext, pfx) => (typeof ext === 'string' && ext.startsWith(pfx)) ? ext.slice(pfx.length) : null;
       const res = await fetch(`${window.SUPABASE_URL}/functions/v1/pm-payment-writeback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
         body: JSON.stringify({
-          inquilino: pmTenantName(b.tenant_id) || null,
-          casa: prop?.address || prop?.name || null,
-          tipo: unit?.name || null,
-          monto: amount, fecha: paid_at, plataforma: platform, observacion: notes
+          tenant_rec:  stripRec(tenant?.external_id, 'tenant-'),
+          casa_rec:    prop?.airtable_address_id || null,
+          reserva_rec: stripRec(b.external_id, 'booking-'),
+          concepto: `Renta ${paid_at} — ${pmTenantName(b.tenant_id)}`,
+          monto: amount, fecha: paid_at, plataforma: platform
         })
       });
       const wb = await res.json().catch(() => ({}));
