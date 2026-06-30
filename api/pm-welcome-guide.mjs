@@ -1,7 +1,7 @@
 // Endpoint Guía de Bienvenida (Vercel Node Function).
 //   GET/POST /api/pm-welcome-guide?property_id=...[&unit_id=...][&format=pdf|html][&send=whatsapp|email&to=...]
 // Auth: Bearer service key o JWT de usuario logueado.
-import { reportConfig, fetchWelcomeGuideData } from "./_pm-report-data.mjs";
+import { reportConfig, reportConfigUser, fetchWelcomeGuideData } from "./_pm-report-data.mjs";
 import { welcomeGuideHTML } from "./_pm-report-templates.mjs";
 import { renderPDF } from "./_pm-pdf.mjs";
 import { verifyAuth } from "./_pm-auth.mjs";
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   const send = (q.send || "").toLowerCase();
 
   try {
-    const cfg = reportConfig();
+    const cfg = auth.via === "service" ? reportConfig() : reportConfigUser(auth.token);
     const data = await fetchWelcomeGuideData(cfg, propertyId, q.unit_id || null);
     const html = welcomeGuideHTML(data);
     const slug = (data.address || "guia").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);

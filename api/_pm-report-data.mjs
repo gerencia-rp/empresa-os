@@ -7,17 +7,31 @@
 // ════════════════════════════════════════════════════════════════
 
 const DEFAULT_URL = "https://nezbaljfhhyznhltpjnk.supabase.co";
+// Anon key PÚBLICA (misma que config.public.js). Segura de exponer: la seguridad la
+// da RLS. Permite que los endpoints de usuario lean pm_* con el JWT del usuario
+// SIN depender de SUPABASE_SERVICE_ROLE_KEY (que puede no estar seteada en Vercel).
+export const PUBLIC_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lemJhbGpmaGh5em5obHRwam5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1NDA2MTgsImV4cCI6MjA5NDExNjYxOH0.bfCAuX5CZhyHDHkbbLewfrKayfzP6ZsH9JuqcAn8AUU";
 
+export function supabaseUrl(env = process.env) {
+  return (env.SUPABASE_URL || DEFAULT_URL).replace(/\/$/, "");
+}
+
+// Config server (cron): service key como apikey + bearer (lee sin RLS). Lanza si falta.
 export function reportConfig(env = process.env) {
-  const supabaseUrl = (env.SUPABASE_URL || DEFAULT_URL).replace(/\/$/, "");
   const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SB_SECRET || "";
   if (!key) throw new Error("Falta SUPABASE_SERVICE_ROLE_KEY");
-  return { supabaseUrl, key };
+  return { supabaseUrl: supabaseUrl(env), apikey: key, bearer: key };
+}
+
+// Config usuario (botón en la app): anon key como apikey + JWT del usuario como bearer
+// → lee pm_* respetando RLS, igual que el navegador. No necesita service key.
+export function reportConfigUser(userJWT, env = process.env) {
+  return { supabaseUrl: supabaseUrl(env), apikey: env.SUPABASE_ANON_KEY || PUBLIC_ANON_KEY, bearer: userJWT };
 }
 
 async function rest(cfg, path) {
   const r = await fetch(`${cfg.supabaseUrl}/rest/v1/${path}`, {
-    headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+    headers: { apikey: cfg.apikey, Authorization: `Bearer ${cfg.bearer}` },
   });
   if (!r.ok) throw new Error(`REST ${path} → ${r.status} ${await r.text()}`);
   return r.json();

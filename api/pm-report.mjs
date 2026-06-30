@@ -4,7 +4,7 @@
 //   · format=pdf (default) → PDF inline (chromium headless).
 //   · format=html          → HTML (preview / debug).
 //   · send=email|whatsapp  → genera + envía, devuelve JSON {ok,...}.
-import { reportConfig, fetchWeeklyData, fetchMonthlyData, prevMonth } from "./_pm-report-data.mjs";
+import { reportConfig, reportConfigUser, fetchWeeklyData, fetchMonthlyData, prevMonth } from "./_pm-report-data.mjs";
 import { weeklyReportHTML, monthlyReportHTML, BRAND } from "./_pm-report-templates.mjs";
 import { renderPDF } from "./_pm-pdf.mjs";
 import { verifyAuth } from "./_pm-auth.mjs";
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
   const send = (q.send || "").toLowerCase();
 
   try {
-    const cfg = reportConfig();
+    const cfg = auth.via === "service" ? reportConfig() : reportConfigUser(auth.token);
     let html, filename, title, summary;
     if (type === "monthly") {
       const m = parseMonth(q.month) || prevMonth(new Date());
