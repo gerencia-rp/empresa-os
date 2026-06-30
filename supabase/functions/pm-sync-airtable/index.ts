@@ -113,6 +113,7 @@ const F = {
   uni_mobiliario: "fldVfGtDVG0MdKpeh",
   uni_accesos:    "fldvyq3nl4rwZPiF8",
   uni_obs:        "fldqZKuz5F1VGFhr7",
+  uni_renta:      "fldgT2qWEHUJ8juCK",  // Renta objetivo (currency)
   // Pagos
   pag_pago:       "fldc3bGGY0JZMeODz",
   pag_monto:      "fld4plr3PqxUksUgo",
@@ -528,6 +529,7 @@ Deno.serve(async (req) => {
         name: nombre,
         unit_type: inferUnitType(getSel(r.fields?.[F.uni_tipo]) || nombre),
         status: mapUnitStatus(getSel(r.fields?.[F.uni_estado])),
+        target_rent: (typeof r.fields?.[F.uni_renta] === "number") ? r.fields[F.uni_renta] : null,
         bath_type: r.fields?.[F.uni_banos_tipo] || null,
         bathroom_count: isNaN(banosCant) ? null : banosCant,
         access_codes: r.fields?.[F.uni_accesos] || null,
