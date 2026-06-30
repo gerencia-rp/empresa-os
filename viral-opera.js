@@ -826,6 +826,8 @@ function studioPickType(t) {
     b.className = 'stype-btn px-3 py-3 rounded-xl text-sm font-semibold border ' + (on ? 'bg-accent text-primary border-accent' : 'bg-primary/40 text-zinc-300 border-zinc-800 hover:border-accent/40');
   });
   const fr = document.getElementById('st-formato-row'); if (fr) fr.style.display = (t === 'reel') ? '' : 'none';
+  const ec = document.getElementById('st-estilo-carrusel-row'); if (ec) ec.style.display = (t === 'carrusel') ? '' : 'none';
+  const er = document.getElementById('st-estilo-reel-row'); if (er) er.style.display = (t === 'reel') ? '' : 'none';
 }
 window.studioPickType = studioPickType;
 function renderStudio() {
@@ -854,6 +856,9 @@ function renderStudio() {
       <div class="bg-primary/40 border border-accent/15 rounded-xl p-4 mb-4">
         <div class="text-xs font-semibold text-zinc-400 mb-2">¿QUÉ CREÁS HOY?</div>
         <div class="grid grid-cols-3 gap-2">${tipos}</div>
+        <div id="st-estilo-carrusel-row" class="mt-3" style="display:none">
+          ${fld('🎨 Estilo del carrusel', `<select id="st-estilo-carrusel" class="${selCls}"><option value="auto">✨ Auto (Claude decide según tema)</option><option value="ramiro_style">🤖 Ramiro Style (tutorial, sistemático)</option><option value="alejandra_style">🎬 Alejandra Style (confesional, storytelling)</option></select>`)}
+        </div>
       </div>
       <div class="grid md:grid-cols-[400px_1fr] gap-6">
         <div class="space-y-3 bg-primary/40 border border-accent/15 rounded-xl p-4">
@@ -941,6 +946,7 @@ function flattenVariante(v) {
   return parts.filter(Boolean).join('\n');
 }
 let STUDIO_LAST = [];
+let STUDIO_LAST_ESTILO = null;
 async function studioFetchRag(mode, params) {
   try {
     if (!(window.Memory && window.Memory.enabled() && window.Memory.searchSimilar)) return [];
@@ -1018,7 +1024,7 @@ async function studioGenerate(btn) {
       }
       variantes = parsed.variantes || parsed.reels || (Array.isArray(parsed) ? parsed : []);
       const errs = [];
-      variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v), null, params.tipoContenido); if (!r.ok) errs.push.apply(errs, r.errores); });
+      variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v), null, params.tipoContenido, build.estilo); if (!r.ok) errs.push.apply(errs, r.errores); });
       if (build.estilo && window.Validator.validateStyle) {
         variantes.forEach(v => { const r = window.Validator.validateStyle(v, params.tipoContenido, build.estilo); if (r && !r.ok) errs.push.apply(errs, r.errores); });
       }
@@ -1030,10 +1036,11 @@ async function studioGenerate(btn) {
       } else { exhausted = true; }
     }
     STUDIO_LAST = variantes;
+    STUDIO_LAST_ESTILO = build.estilo || null;
     renderStudioCards(variantes, params.tipoContenido, exhausted);
     // Persistir en memoria (falla suave, no bloquea la UI)
     if (window.Memory && window.Memory.enabled()) {
-      const valAgg = variantes.map(v => window.Validator.validate(flattenVariante(v), null, params.tipoContenido));
+      const valAgg = variantes.map(v => window.Validator.validate(flattenVariante(v), null, params.tipoContenido, build.estilo));
       window.Memory.saveGeneration({
         tipo: params.tipoContenido, modo: mode,
         input_idea: mode === 'libre' ? ((document.getElementById('st-idea') || {}).value || '') : null,
@@ -1065,7 +1072,8 @@ function studioToast(msg) {
 }
 window.studioToast = studioToast;
 function studioCard(v, i, tipo) {
-  const val = window.Validator.validate(flattenVariante(v), null, tipo);
+  const val = window.Validator.validate(flattenVariante(v), null, tipo, STUDIO_LAST_ESTILO);
+  const valStyle = STUDIO_LAST_ESTILO && window.Validator.validateStyle ? window.Validator.validateStyle(v, tipo, STUDIO_LAST_ESTILO) : { ok: true, errores: [] };
   const badge = (ok, txt) => `<span class="text-[10px] px-1.5 py-0.5 rounded ${ok ? 'bg-emerald-900/50 text-emerald-300' : 'bg-bordeaux/40 text-red-300'}">${ok ? '✓' : '✗'} ${txt}</span>`;
   const f = (lbl, txt, c) => txt ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase ${c || 'text-zinc-500'} font-semibold mb-0.5">${lbl}</div><div class="text-sm">${E(txt)}</div></div>` : '';
   let extra = '';
@@ -1090,9 +1098,10 @@ function studioCard(v, i, tipo) {
       </div>
     </div>
     ${f('🎣 Hook', v.hook, 'text-accent')}${f('🗣️ Chisme', v.chisme)}${extra}${f('💎 Valor oculto', v.valor_oculto, 'text-emerald-400')}${f('📣 CTA', v.cta, 'text-purple-300')}
+    ${v.caption ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-0.5">📝 Caption</div><div class="text-sm text-zinc-300">${E(v.caption)}</div></div>` : ''}
     ${v.caption_larga ? `<details class="mb-2"><summary class="cursor-pointer text-[11px] text-zinc-500">caption larga</summary><div class="text-sm text-zinc-300 mt-1">${E(v.caption_larga)}</div></details>` : ''}
-    <div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-zinc-600 mr-1">${E(v.mecanica_aplicada || '')}</span>${badge(val.errores.length === 0, 'reglas')}${badge(val.palabrasDeMarcaUsadas.length >= 3, val.palabrasDeMarcaUsadas.length + ' marca')}${badge(val.frasesUsadas.length >= 1, 'frase')}</div>
-    ${val.errores.length ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${E(val.errores.join(' · '))}</div>` : ''}
+    <div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-zinc-600 mr-1">${E(v.mecanica_aplicada || '')}</span>${badge(val.errores.length === 0, 'reglas')}${STUDIO_LAST_ESTILO ? badge(valStyle.ok, 'estilo') : ''}${badge(val.palabrasDeMarcaUsadas.length >= 3, val.palabrasDeMarcaUsadas.length + ' marca')}${badge(val.frasesUsadas.length >= 1, 'frase')}</div>
+    ${(val.errores.length || valStyle.errores.length) ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${E([].concat(val.errores, valStyle.errores).join(' · '))}</div>` : ''}
   </div>`;
 }
 function renderStudioCards(variantes, tipo, exhausted) {

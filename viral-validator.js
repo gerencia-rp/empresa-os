@@ -18,7 +18,7 @@
     return new RegExp('(^|[^a-záéíóúüñ])' + esc + '($|[^a-záéíóúüñ])', 'i').test(hay);
   }
 
-  function validate(textGenerado, data, tipo) {
+  function validate(textGenerado, data, tipo, estilo) {
     data = data || getData();
     const text = String(textGenerado || '');
     const errores = [], warnings = [];
@@ -47,7 +47,8 @@
     const ctaPideDM = (mCta && /[A-ZÁÉÍÓÚÑ]{3,}/.test(mCta[1])) || /\b[A-ZÁÉÍÓÚÑ]{3,}\b[^.]{0,30}\bDM\b/.test(text);
     if (!ctaPideDM) {
       const msg = 'El CTA no pide una palabra clave por DM en MAYÚSCULAS (ej: "Comentá MÉTODO").';
-      if (tipo === 'manifiesto') warnings.push(msg); else errores.push(msg);
+      // manifiesto (Apple Think Different) y alejandra_style (CTA conversacional) → solo warning
+      if (tipo === 'manifiesto' || estilo === 'alejandra_style') warnings.push(msg); else errores.push(msg);
     }
 
     // 5. Promesa amplia (error duro)
@@ -84,9 +85,27 @@
     return { ok: e.length === 0, errores: e };
   }
 
+  const EMOJI_EMO_RE = /🥲|🥹|🔥|🎬|💔|😤/;
+  function validateAlejandra(v) {
+    const e = [];
+    const slides = Array.isArray(v.slides) ? v.slides : [];
+    if (slides.length < 6 || slides.length > 10) e.push(`alejandra_style: el carrusel debe tener 6-10 slides (tiene ${slides.length}).`);
+    const s1 = slides[0] || {};
+    if (!s1.headline_top || !s1.headline_bottom || !s1.foto_autor) e.push('alejandra_style: el slide 1 necesita headline_top + headline_bottom (sandwich) + foto_autor.');
+    const hook = String(v.hook || s1.headline_top || '');
+    const letras = hook.replace(/[^a-záéíóúñA-ZÁÉÍÓÚÑ]/g, '');
+    const caps = hook.replace(/[^A-ZÁÉÍÓÚÑ]/g, '');
+    if (letras.length && caps.length / letras.length < 0.3) e.push('alejandra_style: el hook debe tener al menos 30% en MAYÚSCULAS.');
+    const cap = String(v.caption || '');
+    if (cap.length < 200 || cap.length > 500) e.push(`alejandra_style: caption debe tener 200-500 chars (tiene ${cap.length}).`);
+    if (!EMOJI_EMO_RE.test(cap)) e.push('alejandra_style: caption debe incluir al menos 1 emoji emocional (🥲 🥹 🔥 🎬 💔 😤).');
+    return { ok: e.length === 0, errores: e };
+  }
+
   function validateStyle(variant, tipo, estilo) {
     if (!variant || !estilo) return { ok: true, errores: [] };
     if (estilo === 'ramiro_style') return validateRamiro(variant);
+    if (estilo === 'alejandra_style') return validateAlejandra(variant);
     return { ok: true, errores: [] };
   }
 

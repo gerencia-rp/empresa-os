@@ -146,9 +146,78 @@ FEW-SHOTS CANÓNICOS para Fix & Flip (imitá estructura/voz, NO copies literal �
 REGLAS DURAS: 6 a 8 slides · slide 1 portada con badge + título + palabra_naranja · slides intermedios "PASO N" + título (verbo) + screenshot real · penúltimo RESULTADO con 4-5 bullets · último CTA con botón COMENTÁ "PALABRA" en MAYÚSCULAS · caption con formato exacto: Comentá PALABRA ⬇️`;
   }
 
+  // --- ALEJANDRA STYLE — carrusel confesional (@alrinconoficial) ---
+  const ALEJANDRA_FEWSHOTS = `
+EJEMPLO 1 — patrón "DECLARACIÓN ENOJADA":
+{"estilo":"alejandra_style","caption":"Hace 4 años yo era de los que perdían $20K-$40K por flip por confiar en cualquier GC con buena verba 😤 Hasta que entendí que el problema NO era el GC, ERA YO. Yo no tenía un sistema de vetting. Yo no tenía un contrato blindado. Yo no tenía milestones de pago. Hoy mi sistema cierra flips sin sorpresas. Si querés que te mande la matriz de vetting + el contrato exacto que uso, comentá GC. 🔥","slides":[{"n":1,"tipo":"portada_confesional","headline_top":"ODIO VER FLIPPERS PERDIENDO $40K","highlight_top_color":"rojo","highlight_top_palabras":["$40K"],"foto_autor":"Nicolás con cara seria, fondo de obra inconclusa","headline_bottom":"POR CONFIAR EN GCs SIN VETEAR","highlight_bottom_color":"amarillo","highlight_bottom_palabras":["SIN VETEAR"]},{"n":2,"tipo":"antes","texto":"Yo era de los que firmaba contratos genéricos sin leer..."},{"n":3,"tipo":"antes","texto":"Pagaba 50% por adelantado porque 'todos lo hacen'..."},{"n":4,"tipo":"quiebre","texto":"Hasta que perdí $40K en mi tercer flip y dije BASTA."},{"n":5,"tipo":"aprendizaje","bullets":["✅ Vetear es 70% del éxito","✅ Pagar en milestones es no negociable","✅ El contrato blindado vale más que cualquier curso"]},{"n":6,"tipo":"cta_conversacional","texto":"¿Querés mi matriz exacta? Comentá GC abajo."}]}
+
+EJEMPLO 2 — patrón "STORYTELLING PERSONAL":
+{"estilo":"alejandra_style","caption":"Esta era yo en 2022. Empleado en una financiera ganando $4.500/mes en pesos. Sintiéndome atrapado. Mirando a flippers en YouTube y pensando 'eso no es para mí'. Hoy tengo 4 empresas operando y +200 alumnos. ¿La clave? Dejé de creer en gurúes y empecé a aplicar UN sistema. 🔥","slides":[{"n":1,"tipo":"portada_confesional","headline_top":"ESTA ERA YO EN 2022","highlight_top_palabras":["2022"],"foto_autor":"Nicolás joven con traje, en oficina de banco","headline_bottom":"GANANDO $4.500/MES Y ATRAPADO","highlight_bottom_color":"rojo","highlight_bottom_palabras":["ATRAPADO"]}]}
+
+EJEMPLO 3 — patrón "CONTROVERSIA ANTI-AUTORIDAD":
+{"estilo":"alejandra_style","caption":"Lo que NO te cuentan los gurúes de Real Estate es que ellos NUNCA hicieron un flip real 🥲 Viven de tu suscripción, de tu evento, de tu curso. NO de las propiedades. Por eso te enseñan TODO menos lo que importa: vetting, contratos, MAO real, salida defensiva. Yo NO vendo cursos. Yo OPERO. 🔥","slides":[{"n":1,"tipo":"portada_confesional","headline_top":"LOS GURÚES VIVEN DE","foto_autor":"Nicolás señalando con cara seria","headline_bottom":"QUE NUNCA HAGAS UN FLIP","highlight_bottom_color":"amarillo","highlight_bottom_palabras":["NUNCA"]}]}`;
+
+  const ALEJANDRA_SYSTEM = `
+
+═══ ESTILO: ALEJANDRA STYLE (carrusel confesional, inspirado en @alrinconoficial) ═══
+Estructura visual (6-10 slides): PORTADA con foto del autor GRANDE central + headline en CAJA NEGRA arriba Y abajo (sandwich), MAYÚSCULAS, con palabras clave en AMARILLO/ROJO → slides ANTES/PROBLEMA en primera persona vulnerable ("Yo era de los que...") → slide QUIEBRE ("Hasta que entendí que...") → slides APRENDIZAJE con 3-5 lecciones (bullets con emoji) → CTA CONVERSACIONAL (pregunta/invitación, más suave que Ramiro).
+Tono: storytelling personal, vulnerable real, primera persona, autoridad por experiencia.
+Hook (portada) con UNO de estos patrones: DECLARACIÓN ENOJADA ("ODIO VER QUE...") · STORYTELLING PERSONAL CON NÚMERO ("ESTA ERA YO EN 2022...") · CONTROVERSIA ANTI-AUTORIDAD ("LOS GURÚES VIVEN DE...") · URGENCIA EDUCATIVA · IRONÍA DOLOROSA.
+Caption LARGO (200-500 chars), coloquial, vulnerable, con al menos 1 emoji emocional (🥲 🥹 🔥 🎬 💔 😤). Estructura: contexto → quiebre → aprendizaje → CTA suave.
+
+FEW-SHOTS CANÓNICOS para Fix & Flip (imitá estructura/voz, NO copies literal — adaptá al tema pedido):${ALEJANDRA_FEWSHOTS}`;
+
+  function alejandraSchema() {
+    return `Devolvé SOLO un JSON válido (sin backticks, sin texto fuera) con esta forma EXACTA para alejandra_style:
+{ "variantes": [ {
+  "estilo": "alejandra_style",
+  "thumbnail_text": "texto de portada ≤5 palabras",
+  "hook": "el headline de la portada (en MAYÚSCULAS)",
+  "caption": "caption largo narrativo (200-500 chars, primera persona, con emoji emocional)",
+  "caption_corta": "", "caption_larga": "", "palabra_clave_dm": "PALABRA (opcional, CTA suave)",
+  "mecanica_aplicada": "qué patrón de hook usaste",
+  "slides": [
+    { "n": 1, "tipo": "portada_confesional", "headline_top": "DECLARACIÓN EN MAYÚSCULAS", "headline_bottom": "CONTINUACIÓN EN MAYÚSCULAS", "highlight_top_color": "amarillo|rojo", "highlight_top_palabras": [], "highlight_bottom_color": "amarillo|rojo", "highlight_bottom_palabras": [], "foto_autor": "descripción de la foto" },
+    { "n": 2, "tipo": "antes", "texto": "Yo era de los que..." },
+    { "n": 3, "tipo": "quiebre", "texto": "Hasta que entendí que..." },
+    { "n": 4, "tipo": "aprendizaje", "bullets": ["✅ lección 1", "✅ lección 2", "✅ lección 3"] },
+    { "n": 5, "tipo": "cta_conversacional", "texto": "pregunta/invitación suave al lector" }
+  ],
+  "validador": { "usa_palabras_marca": [], "evita_palabras_prohibidas": true, "tiene_frase_recurrente": true, "cta_pide_dm": true }
+} ] }
+REGLAS DURAS: 6 a 10 slides · slide 1 portada_confesional con headline_top + headline_bottom (sandwich) + foto_autor · hook con al menos 30% en MAYÚSCULAS · caption 200-500 chars con al menos 1 emoji emocional · slide final puede ser conversacional (NO requiere palabra DM en mayúsculas).`;
+  }
+
   const STYLES = {
     ramiro_style: { tipo: 'carrusel', system: RAMIRO_SYSTEM, schema: ramiroSchema },
+    alejandra_style: { tipo: 'carrusel', system: ALEJANDRA_SYSTEM, schema: alejandraSchema },
   };
+
+  // --- Auto-detección de estilo de CARRUSEL (Ramiro vs Alejandra) ---
+  // Base: SECCIÓN 4 del doc maestro. Extendido con 'peor'/'mi peor' (alejandra)
+  // para cubrir frases confesionales cortas tipo "mi peor GC".
+  function detectarEstiloCarrusel(input_idea, dolor, tema) {
+    const keywords_ramiro = [
+      'sistema', 'tutorial', 'pasos', 'cómo hacer', 'fórmula',
+      'método', 'plantilla', 'herramienta', 'calculadora', 'framework',
+      'reemplazar', 'automatizar', 'ia', 'tecnología', 'configurar',
+      'paso a paso', 'guía técnica', 'buy box', 'matriz', 'contrato',
+    ];
+    const keywords_alejandra = [
+      'mi historia', 'me pasó', 'aprendí', 'fracasé', 'estancado',
+      'estafado', 'engañado', 'descubrí', 'realidad', 'verdad',
+      'mentira', 'gurúes', 'mafia', 'industria', 'antes era',
+      'hace x años', 'transformación', 'cambio de vida', 'mindset',
+      'odio ver', 'me molesta', 'cansé', 'reflexión',
+      'peor flip', 'peor experiencia', 'me arrepiento', 'peor', 'mi peor',
+    ];
+    const texto = (String(input_idea || '') + ' ' + String(dolor || '') + ' ' + String(tema || '')).toLowerCase();
+    const score_ramiro = keywords_ramiro.filter(k => texto.includes(k)).length;
+    const score_alejandra = keywords_alejandra.filter(k => texto.includes(k)).length;
+    if (score_alejandra > score_ramiro) return 'alejandra_style';
+    if (score_ramiro > score_alejandra) return 'ramiro_style';
+    return 'ramiro_style'; // default cuando empate
+  }
 
   // Resuelve el estilo efectivo según tipo + selección del usuario (o auto-detección).
   function resolveEstilo(tipo, p) {
@@ -331,5 +400,5 @@ ${STYLES[estilo] ? STYLES[estilo].schema() : `{ "variantes": [ { ${CAMPOS_BASE}$
     return { system, userPrompt, contexto, tipo, estilo };
   }
 
-  window.ContextBuilder = { build, buildLibre, getCurrentFase, autoSelectEnemigo, resolveEstilo, DOLOR_A_ENEMIGO };
+  window.ContextBuilder = { build, buildLibre, getCurrentFase, autoSelectEnemigo, resolveEstilo, detectarEstiloCarrusel, DOLOR_A_ENEMIGO };
 })();

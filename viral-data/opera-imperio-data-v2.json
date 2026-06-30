@@ -1121,6 +1121,12 @@
         "fuente_inspiracion": "@ramiro.cubria",
         "descripcion": "Carrusel técnico 6-8 slides: portada con badge naranja → PASO N con screenshot real → RESULTADO con bullets → CTA COMENTÁ PALABRA.",
         "ver_seccion": "ESTILO 1 en docs/marketing/PATRONES-VIRALES-MAESTRO.md"
+      },
+      "alejandra_style": {
+        "nombre": "Alejandra Style — Confesional + Headlines TV News",
+        "fuente_inspiracion": "@alrinconoficial",
+        "descripcion": "Carrusel confesional 6-10 slides: portada foto autor central + headline sandwich MAYÚSCULAS → ANTES → QUIEBRE → APRENDIZAJE bullets → CTA conversacional. Caption largo 200-500 chars con emoji emocional.",
+        "ver_seccion": "ESTILO 2 en docs/marketing/PATRONES-VIRALES-MAESTRO.md"
       }
     },
     "reel": {}
