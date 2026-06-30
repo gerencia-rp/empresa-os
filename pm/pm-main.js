@@ -522,7 +522,7 @@ function pmEnsureModalNav() {
 // Breadcrumb clickeable: Rentas › Property Mgmt › [Tab] › [Detalle]
 function pmTabLabel(t) {
   return ({ dashboard: 'Resumen', properties: 'Propiedades', calendar: 'Calendario', bookings: 'Reservas',
-    tenants: 'Inquilinos', payments: 'Pagos', expenses: 'Gastos', operations: 'Operación', feeds: 'Feeds', finance: 'Finanzas' })[t] || t;
+    tenants: 'Inquilinos', payments: 'Pagos', expenses: 'Gastos', operations: 'Operación', finance: 'Finanzas' })[t] || t;
 }
 function pmBreadcrumb() {
   const parts = [
@@ -590,7 +590,6 @@ function pmRender() {
             ['payments','💵 Pagos', ''],
             ['expenses','📤 Gastos', ''],
             ['operations','🛠 Operación', ''],
-            ['feeds','📡 Feeds', pmaState.feeds.length],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
             <button onclick="pmSetTab('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${pmaState.tab===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">
@@ -609,7 +608,6 @@ function pmRender() {
         ${pmaState.tab === 'payments'   ? pmRenderPayments() : ''}
         ${pmaState.tab === 'expenses'   ? pmRenderExpenses() : ''}
         ${pmaState.tab === 'operations' ? pmRenderOperations() : ''}
-        ${pmaState.tab === 'feeds'      ? pmRenderFeeds() : ''}
         ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
       </div>
     </div>
@@ -1528,6 +1526,8 @@ function pmRenderPropertyDetail() {
           <div class="text-[11px] text-blue-200">${(p.address||'').replace(/</g,'&lt;')}</div>
         </div>
         <div class="flex gap-2">
+          <button onclick="pmGenerateWelcomeGuide('${p.id}')" class="bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold px-3 py-1.5 rounded" title="Generar PDF de la guía de check-in">📄 Guía de Bienvenida</button>
+          <button onclick="pmSendWelcomeGuide('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded" title="Enviar al huésped por correo o WhatsApp">Enviar al huésped ›</button>
           <button onclick="pmEditProperty('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">✏️ Editar</button>
           <button onclick="pmEditUnit(null,'${p.id}')" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded">+ Unidad</button>
         </div>
@@ -4968,6 +4968,16 @@ function pmRenderFinance() {
       </div>
     </div>
 
+    <!-- 📄 Reportes PDF (chromium headless) -->
+    <div class="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-2">
+      <span class="text-[11px] font-bold text-slate-500 px-1">📄 Reportes PDF</span>
+      <button onclick="pmOpenReport('weekly')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded">Generar semanal (operación)</button>
+      <button onclick="pmSendReport('weekly')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded" title="Enviar por correo o WhatsApp">Enviar ›</button>
+      <span class="text-slate-300">·</span>
+      <button onclick="pmOpenReport('monthly')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded">Generar mensual (finanzas)</button>
+      <button onclick="pmSendReport('monthly')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded" title="Enviar por correo o WhatsApp">Enviar ›</button>
+    </div>
+
     <!-- Filtros del dashboard (dropdowns) -->
     <div class="pm-filters-bar">
       ${pmFilterSelect('Período', '📅', pmaState.finMonthSel||pmCurrentYM(), [...pmMonthOptions(), ['custom','Custom (rango)']], "pmFinSetMonth(this.value)")}
@@ -5710,6 +5720,7 @@ window.pmAlertAssign = pmAlertAssign;
 // ════════════════════════════════════════════════════════════════
 const PM_TASK_TYPES = {
   cleaning:             { label: '🧹 Limpieza',  color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
+  recepcion:            { label: '🛎️ Recepción', color: '#0ea5e9', chip: 'bg-sky-100 text-sky-800' },
   aseo:                 { label: '🧹 Aseo',      color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
   mantenimiento:        { label: '🔧 Manten.',   color: '#f97316', chip: 'bg-orange-100 text-orange-800' },
   podada:               { label: '🌱 Podada',    color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
@@ -6993,3 +7004,147 @@ async function pmImportFromJSON() {
   } catch (e) { alert('Error: ' + e.message); }
 }
 window.pmImportFromJSON = pmImportFromJSON;
+
+// ════════════════════════════════════════════════════════════════
+// 📖 MODO SOLO-LECTURA (2026-06-30)
+// La fuente de verdad es Airtable (apptTKRYbx6gu701i). La app NO escribe
+// en datos espejados desde Airtable: propiedades, unidades, inquilinos,
+// reservas, pagos, gastos, servicios/credenciales y feeds. Escribir ahí
+// desincroniza (y "+ Nueva Propiedad" además rompía el check constraint
+// pm_properties_rental_model_check). La app SÍ opera su capa propia:
+// tareas (turnover/recepción) y alertas/warnings — esas no viven en Airtable.
+// ════════════════════════════════════════════════════════════════
+const PM_READONLY = true;
+window.PM_READONLY = PM_READONLY;
+
+// Funciones de escritura a datos-Airtable que quedan inhabilitadas.
+const PM_RO_BLOCKED_FNS = [
+  'pmEditProperty','pmDeleteProperty','pmSaveProperty','pmImportFromJSON',
+  'pmEditUnit','pmDeleteUnit','pmSaveUnit','pmMarkMaintenance','pmToggleUnitActive',
+  'pmEditBooking','pmDeleteBooking','pmSaveBooking','pmCreateBookingFromDay',
+  'pmEditTenant','pmDeleteTenant','pmSaveTenant','pmAddTenantNote',
+  'pmMarkPayment','pmSaveMarkPayment','pmEditPayment','pmDeletePayment','pmSavePayment','pmArchivePaymentLegacy',
+  'pmEditExpense','pmDeleteExpense','pmSaveExpense',
+  'pmEditService','pmSaveService','pmEditUtility','pmMarkUtilityPaid','pmSetServicePaymentFailed',
+  'pmEditFeed','pmDeleteFeed','pmSaveFeed','pmSyncFeed','pmSyncAllFeeds',
+  'pmEditTemplate','pmDeleteTemplate','pmSaveTemplate'
+];
+
+function pmReadOnlyNotice() {
+  if (window.toast) toast('📖 Solo lectura: cargá o editá estos datos en Airtable (fuente de verdad). La app solo muestra y reporta.', 'info', { duration: 4500 });
+  return undefined;
+}
+window.pmReadOnlyNotice = pmReadOnlyNotice;
+
+if (PM_READONLY) {
+  // Sobrescribe el binding global de cada fn de escritura → tanto onclick inline
+  // como llamadas directas resuelven al guard (no-op + aviso). Defensa de fondo:
+  // aunque un botón quedara visible, no escribe nada.
+  PM_RO_BLOCKED_FNS.forEach(fn => { try { window[fn] = pmReadOnlyNotice; } catch (e) {} });
+}
+
+// Barrido post-render: oculta los <button> de escritura (los que invocan una fn
+// bloqueada). Se limita a <button> para no romper celdas clickeables del calendario.
+const PM_RO_BTN_RE = new RegExp('\\b(' + PM_RO_BLOCKED_FNS.join('|') + ')\\s*\\(');
+function pmApplyReadOnlyDOM() {
+  if (!PM_READONLY) return;
+  const root = document.getElementById('pm-root');
+  if (!root) return;
+  root.querySelectorAll('button[onclick]').forEach(btn => {
+    if (PM_RO_BTN_RE.test(btn.getAttribute('onclick') || '')) btn.style.display = 'none';
+  });
+}
+window.pmApplyReadOnlyDOM = pmApplyReadOnlyDOM;
+
+// Hook al render: corre el barrido después de cada pmRender (re-oculta tras re-render).
+if (typeof window.pmRender === 'function' && !window.__pmRenderRO) {
+  window.__pmRenderRO = true;
+  const _pmRenderOrig = window.pmRender;
+  window.pmRender = function () {
+    const r = _pmRenderOrig.apply(this, arguments);
+    try { pmApplyReadOnlyDOM(); } catch (e) {}
+    return r;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════
+// 📄 REPORTES + GUÍA DE BIENVENIDA (PDF chromium vía /api/*)
+// La app es solo-lectura: estos endpoints solo LEEN y renderizan PDF.
+// Auth: JWT del usuario logueado (Supabase) en Authorization: Bearer.
+// ════════════════════════════════════════════════════════════════
+async function pmAuthToken() {
+  try {
+    const client = (typeof sb !== 'undefined' && sb) ? sb : window.sb;
+    const s = await client.auth.getSession();
+    return s?.data?.session?.access_token || null;
+  } catch (e) { return null; }
+}
+
+async function pmApiPdf(path, params) {
+  const token = await pmAuthToken();
+  if (!token) { toast('Iniciá sesión para generar el PDF.', 'error'); return null; }
+  const qs = new URLSearchParams(params).toString();
+  toast('⏳ Generando PDF…', 'info');
+  const r = await fetch(`/api/${path}?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) {
+    let msg = r.status; try { msg = (await r.json()).error || msg; } catch (e) {}
+    toast('Error generando PDF: ' + msg, 'error');
+    return null;
+  }
+  return r;
+}
+
+async function pmOpenPdfBlob(r, okMsg) {
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast(okMsg || '✅ PDF generado', 'success');
+}
+
+async function pmOpenReport(type) {
+  const r = await pmApiPdf('pm-report', { type });
+  if (r) await pmOpenPdfBlob(r, '✅ Reporte ' + (type === 'monthly' ? 'mensual' : 'semanal') + ' generado');
+}
+window.pmOpenReport = pmOpenReport;
+
+async function pmSendReport(type) {
+  const ch = await promptDialog('Enviar por (escribí "email" o "whatsapp"):', {defaultValue: 'whatsapp'});
+  if (!ch) return;
+  const channel = /mail|correo/i.test(ch) ? 'email' : 'whatsapp';
+  const to = await promptDialog(channel === 'email' ? 'Correo destino:' : 'WhatsApp destino (+1...):', {});
+  if (!to) return;
+  toast('⏳ Generando y enviando…', 'info');
+  const token = await pmAuthToken();
+  const qs = new URLSearchParams({ type, send: channel, to }).toString();
+  const r = await fetch(`/api/pm-report?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+  const out = await r.json().catch(() => ({}));
+  if (r.ok && out.ok) toast('✅ Reporte enviado por ' + channel, 'success');
+  else toast('Error al enviar: ' + (out.error || r.status), 'error');
+}
+window.pmSendReport = pmSendReport;
+
+async function pmGenerateWelcomeGuide(propertyId, unitId) {
+  const params = { property_id: propertyId };
+  if (unitId) params.unit_id = unitId;
+  const r = await pmApiPdf('pm-welcome-guide', params);
+  if (r) await pmOpenPdfBlob(r, '✅ Guía de Bienvenida generada');
+}
+window.pmGenerateWelcomeGuide = pmGenerateWelcomeGuide;
+
+async function pmSendWelcomeGuide(propertyId, unitId) {
+  const ch = await promptDialog('Enviar al huésped por (escribí "email" o "whatsapp"):', {defaultValue: 'whatsapp'});
+  if (!ch) return;
+  const channel = /mail|correo/i.test(ch) ? 'email' : 'whatsapp';
+  const to = await promptDialog(channel === 'email' ? 'Correo del huésped:' : 'WhatsApp del huésped (+1...):', {});
+  if (!to) return;
+  toast('⏳ Generando y enviando…', 'info');
+  const token = await pmAuthToken();
+  const params = { property_id: propertyId, send: channel, to };
+  if (unitId) params.unit_id = unitId;
+  const r = await fetch(`/api/pm-welcome-guide?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token}` } });
+  const out = await r.json().catch(() => ({}));
+  if (r.ok && out.ok) toast('✅ Guía enviada por ' + channel, 'success');
+  else toast('Error al enviar: ' + (out.error || r.status), 'error');
+}
+window.pmSendWelcomeGuide = pmSendWelcomeGuide;

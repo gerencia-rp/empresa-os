@@ -335,7 +335,24 @@ En la raíz del repo:
 
 ---
 
-## 🎯 Estado actual del proyecto (29 Jun 2026 — Cutover base nueva)
+## 🎯 Estado (30 Jun 2026 — Solo-lectura + reportes + guía) · rama `feat/pm-reportes-mejoras`
+
+- 🧹 **Sync limpio:** se eliminó el mapeo de la tabla **Tareas Mantenimiento** (borrada de Airtable). `pm_tasks` ahora es 100% app (auto-tareas). Tareas viejas `task-*` archivadas (active=false).
+- 📊 **Ocupación exacta:** `pm_units` desde la tabla **Unidades** dedicada (status = Estado real Ocupada/Disponible/Reservada) + `target_rent` desde "Renta objetivo". El front lee `u.status` (pmUnitState).
+- 📖 **App de SOLO-LECTURA:** módulo al final de `pm-main.js` (`PM_READONLY`) que (a) reemplaza las fns de escritura a datos-Airtable por un guard con toast y (b) barre `<button>` post-render para ocultarlos (`pmApplyReadOnlyDOM`, hook sobre `window.pmRender`). NO bloquea tareas/alertas (capa propia). Lista en `PM_RO_BLOCKED_FNS`.
+- 🗑 **Tab Feeds eliminada** del PM.
+- 🤖 **Auto-tareas** (en el sync, idempotentes por `external_id` `auto-clean-`/`auto-reception-` con `ignoreDuplicates`): Reserva Histórica→**limpieza/turnover** (task_type `cleaning`); Activa/Reservada con entrada próxima→**recepción** (task_type `recepcion`). Ventanas: clean check-out [-14,+1]d, recepción check-in [-3,+7]d.
+- 📄 **Reportes PDF (chromium headless, `@sparticuz/chromium`+`puppeteer-core`):**
+  - `api/pm-report.mjs` (`?type=weekly|monthly&month=YYYY-MM&format=pdf|html&send=email|whatsapp&to=`) — auth: service key o JWT de usuario (`api/_pm-auth.mjs`).
+  - Datos en `api/_pm-report-data.mjs`, diseño en `api/_pm-report-templates.mjs` (branding Ever Home).
+  - Crons: `report-weekly` (lun 13:00 UTC) + `report-monthly` (día 1, mes anterior) en `vercel.json`.
+  - Front: tab Finanzas → "Generar semanal/mensual" + "Enviar ›" (`pmOpenReport`/`pmSendReport`).
+- 🏠 **Guía de Bienvenida:** `api/pm-welcome-guide.mjs?property_id=&unit_id=`. Botón en ficha de Casa (`pmGenerateWelcomeGuide`/`pmSendWelcomeGuide`). WiFi + keypad desde `pm_properties.access_code` (nueva col, migración `20260630020000`, sync mapea Casas `fldKuVpYVzh7JzRP8`) con fallback parse de `pm_units.access_codes`.
+- 📤 **Envío:** `api/_pm-send.mjs` — WhatsApp (sube PDF a bucket público `pm-reports` + link vía `whatsapp-send`) y correo (Resend, `RESEND_API_KEY`). Env crons: `REPORT_EMAIL_TO`/`REPORT_WHATSAPP_TO`.
+- ⚠️ **Deps nuevas** (`package.json`): `@sparticuz/chromium`, `puppeteer-core`. Verificar memoria/`maxDuration` de las funciones en Vercel.
+- Demo local de los 3 PDFs: `OUT=/tmp SUPABASE_SERVICE_ROLE_KEY=... node scripts/demo-pdfs.mjs` (usa Chrome local).
+
+## 🎯 Estado anterior (29 Jun 2026 — Cutover base nueva)
 
 - ✅ **Cutover a base Airtable nueva `apptTKRYbx6gu701i`** (commit `2983a74`). Esquema limpio con linked records, sin fuzzy.
 - ✅ `pm-sync-airtable` remapeada y deployada (v26). Pagos resueltos por linked record IDs.
