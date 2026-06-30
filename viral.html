@@ -46,8 +46,8 @@
         <text x="50" y="60" text-anchor="middle" font-family="Playfair Display, serif" font-size="30" font-weight="800" fill="#C8A864">NL</text>
       </svg>
       <div class="min-w-0">
-        <h1 class="font-display font-extrabold text-accent leading-none text-lg sm:text-xl tracking-wide truncate">OPERA TU IMPERIO</h1>
-        <p class="text-[11px] text-light/50 -mt-0.5 truncate">Nicolás Lara · 4 empresas. Un método.</p>
+        <h1 class="font-display font-extrabold text-accent leading-none text-lg sm:text-xl tracking-wide truncate">FLIPPEÁ CON MÉTODO</h1>
+        <p class="text-[11px] text-light/50 -mt-0.5 truncate">Sistema Flip Anti-Riesgos™ · 4 empresas operando · +200 alumnos</p>
       </div>
     </div>
     <div class="flex items-center gap-2 shrink-0">
@@ -67,6 +67,10 @@
       <button data-tab="psicologia" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🧠 Psicología</button>
       <button data-tab="redes" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📊 Mis Redes</button>
       <span class="w-px h-5 bg-zinc-700 mx-1"></span>
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Sistema</span>
+      <button data-tab="sistema" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🛠️ Sistema Flip</button>
+      <button data-tab="avatares" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🎭 Avatares</button>
+      <span class="w-px h-5 bg-zinc-700 mx-1"></span>
       <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Ejecución</span>
       <button data-tab="relaunch" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🚀 Re-Launch</button>
       <button data-tab="calendario" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📅 Calendario</button>
@@ -77,7 +81,11 @@
       <button data-tab="carruseles" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🖼️ Carruseles</button>
       <button data-tab="historias" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📲 Historias</button>
       <button data-tab="youtube" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">▶️ YouTube</button>
+      <button data-tab="transformador" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">🔄 Transformador</button>
       <button data-tab="biblioteca" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📚 Biblioteca</button>
+      <span class="w-px h-5 bg-zinc-700 mx-1"></span>
+      <span class="text-[9px] uppercase tracking-widest text-accent/50 font-bold px-2">Recursos</span>
+      <button data-tab="recursos" class="tab-btn px-3 py-2 border-b-2 border-transparent text-zinc-400 hover:text-zinc-200">📱 Recursos & Tendencias</button>
     </div>
   </nav>
 </header>
@@ -90,7 +98,11 @@
   <section id="tab-visual" class="tab-panel hidden"></section>
   <section id="tab-psicologia" class="tab-panel hidden"></section>
   <section id="tab-redes" class="tab-panel hidden"></section>
+  <section id="tab-sistema" class="tab-panel hidden"></section>
+  <section id="tab-avatares" class="tab-panel hidden"></section>
   <section id="tab-relaunch" class="tab-panel hidden"></section>
+  <section id="tab-transformador" class="tab-panel hidden"></section>
+  <section id="tab-recursos" class="tab-panel hidden"></section>
   <section id="tab-biblioteca" class="tab-panel hidden"></section>
 
   <!-- ===== REELS TAB ===== -->
@@ -137,9 +149,16 @@
             <label class="text-xs font-semibold text-zinc-400">CTA / palabra clave (opcional)</label>
             <input id="r-cta" placeholder="Ej: comenta TERRENO" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
           </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎭 Avatar destino</label>
+            <select id="r-avatar" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none">
+              <option value="avatar2" selected>Avatar 2 — Empleado empezando (seguridad)</option>
+              <option value="avatar1">Avatar 1 — Flipper escalando (sistema)</option>
+            </select>
+          </div>
           <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
             <input id="r-amplificada" type="checkbox" class="accent-[#C8A864]">
-            <span>🏛️ Fórmula amplificada (voz de marca + enemigo + mecánicas históricas)</span>
+            <span>🏛️ Fórmula amplificada (marca + enemigo dual + framework Anti-Riesgos™)</span>
           </label>
           <button id="r-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar reels</button>
         </div>
@@ -199,9 +218,16 @@
             <label class="text-xs font-semibold text-zinc-400">CTA / palabra clave (opcional)</label>
             <input id="c-cta" placeholder="Ej: comenta PATRIMONIO" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
           </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎭 Avatar destino</label>
+            <select id="c-avatar" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none">
+              <option value="avatar2" selected>Avatar 2 — Empleado empezando (seguridad)</option>
+              <option value="avatar1">Avatar 1 — Flipper escalando (sistema)</option>
+            </select>
+          </div>
           <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
             <input id="c-amplificada" type="checkbox" class="accent-[#C8A864]">
-            <span>🏛️ Fórmula amplificada (voz de marca + enemigo + mecánicas históricas)</span>
+            <span>🏛️ Fórmula amplificada (marca + enemigo dual + framework Anti-Riesgos™)</span>
           </label>
           <button id="c-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar carruseles</button>
         </div>
@@ -280,6 +306,17 @@
             <label class="text-xs font-semibold text-zinc-400">Palabra clave para DM (opcional)</label>
             <input id="h-palabra" placeholder="Ej: FLIP / CUARTO / HISTORIAS" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
           </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎭 Avatar destino</label>
+            <select id="h-avatar" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none">
+              <option value="avatar2" selected>Avatar 2 — Empleado empezando (seguridad)</option>
+              <option value="avatar1">Avatar 1 — Flipper escalando (sistema)</option>
+            </select>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <input id="h-amplificada" type="checkbox" class="accent-[#C8A864]">
+            <span>🏛️ Fórmula amplificada (marca + framework Anti-Riesgos™)</span>
+          </label>
           <div id="h-fase" class="text-[11px] px-3 py-2 rounded-lg bg-zinc-800 text-zinc-300"></div>
           <button id="h-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar secuencia H.I.L.O.</button>
         </div>
@@ -329,6 +366,17 @@
               <input id="y-cta" placeholder="Ej: link en descripción" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none" />
             </div>
           </div>
+          <div>
+            <label class="text-xs font-semibold text-zinc-400">🎭 Avatar destino</label>
+            <select id="y-avatar" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none">
+              <option value="avatar2" selected>Avatar 2 — Empleado empezando (seguridad)</option>
+              <option value="avatar1">Avatar 1 — Flipper escalando (sistema)</option>
+            </select>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <input id="y-amplificada" type="checkbox" class="accent-[#C8A864]">
+            <span>🏛️ Fórmula amplificada (marca + framework Anti-Riesgos™)</span>
+          </label>
           <button id="y-generate" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-2.5 rounded-lg glow">⚡ Generar videos</button>
         </div>
         <div class="text-[11px] text-zinc-600 leading-relaxed px-1">

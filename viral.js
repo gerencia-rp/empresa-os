@@ -284,12 +284,12 @@ Nunca prometas riqueza fácil. Enfoca siempre criterio sobre capital.`;
 // Por defecto usa el proxy del servidor (/api/claude) con la key guardada como
 // variable de entorno en Vercel — no hay que meter nada en el navegador.
 // Si el usuario pone su propia key en Ajustes, la usa directamente (override).
-async function callClaude(userPrompt, maxTokens = 4000, schema = '') {
+async function callClaudeMessages(messages, opts = {}) {
   const body = JSON.stringify({
-    model: LS.model,
-    max_tokens: maxTokens,
-    system: ESTRATEGIA + (schema ? '\n\n' + schema : '') + brandFacts(),
-    messages: [{ role: 'user', content: userPrompt }],
+    model: opts.model || LS.model,
+    max_tokens: opts.max_tokens || 4000,
+    system: opts.system || '',
+    messages,
   });
   let res;
   if (LS.key) {
@@ -316,6 +316,14 @@ async function callClaude(userPrompt, maxTokens = 4000, schema = '') {
   }
   const data = await res.json();
   return (data.content || []).map(b => b.text || '').join('');
+}
+window.callClaudeMessages = callClaudeMessages;
+
+async function callClaude(userPrompt, maxTokens = 4000, schema = '') {
+  return callClaudeMessages([{ role: 'user', content: userPrompt }], {
+    max_tokens: maxTokens,
+    system: ESTRATEGIA + (schema ? '\n\n' + schema : '') + brandFacts(),
+  });
 }
 
 function parseJSON(text) {
@@ -349,7 +357,7 @@ ${dolorPromptBlock(dolor)}${tema ? 'Tema/ángulo libre adicional: ' + tema : ''}
 Formato deseado: ${formato === 'auto' ? 'elige tú el mejor para cada uno (pueden variar)' : formato}
 ${cta ? 'CTA / palabra clave a usar: ' + cta : 'Inventa una palabra clave de comentario relevante.'}
 Cada reel debe usar un CHISME diferente para no repetir el gancho.`;
-  const amp = (document.getElementById('r-amplificada') && document.getElementById('r-amplificada').checked && window.operaAmplify) ? window.operaAmplify() : '';
+  const amp = ampBlock('r') + avatarBlock('r');
 
   try {
     const text = await callClaude(prompt + amp, 1200 + Number(variantes) * 1500, REEL_SCHEMA);
@@ -461,7 +469,7 @@ async function generarCarruseles() {
 ${dolorPromptBlock(dolor)}${tema ? 'Tema/ángulo libre adicional: ' + tema : ''}
 Plantilla a usar: ${plantilla === 'auto' ? 'elige la mejor para cada uno' : plantilla}
 ${cta ? 'CTA / palabra clave a usar: ' + cta : 'Inventa una palabra clave de comentario relevante.'}`;
-  const amp = (document.getElementById('c-amplificada') && document.getElementById('c-amplificada').checked && window.operaAmplify) ? window.operaAmplify() : '';
+  const amp = ampBlock('c') + avatarBlock('c');
 
   try {
     const text = await callClaude(prompt + amp, 1200 + Number(variantes) * 1800, CARRUSEL_SCHEMA);
@@ -540,7 +548,7 @@ ${cta ? 'CTA a usar: ' + cta : ''}
 Cada video debe usar un VECTOR VIRAL distinto.`;
 
   try {
-    const text = await callClaude(prompt, 1500 + Number(variantes) * 2200, YT_SCHEMA);
+    const text = await callClaude(prompt + ampBlock('y') + avatarBlock('y'), 1500 + Number(variantes) * 2200, YT_SCHEMA);
     const data = parseJSON(text);
     renderYoutube(data.videos || []);
   } catch (e) {
@@ -736,7 +744,7 @@ Palabra clave para DM: ${palabra || 'invéntala según el tema (ej. FLIP, CUARTO
 Aplica la regla aburre→conecta al tema, sigue las 4 fases H.I.L.O., incluye SIEMPRE un frame "L-interaccion" y cierra con CTA de respuesta.`;
 
   try {
-    const text = await callClaude(prompt, 1200 + nFrames * 700, HISTORIA_SCHEMA);
+    const text = await callClaude(prompt + ampBlock('h') + avatarBlock('h'), 1200 + nFrames * 700, HISTORIA_SCHEMA);
     const data = parseJSON(text);
     renderHistorias(data);
   } catch (e) {
@@ -933,6 +941,16 @@ function renderEstrategia() {
     <div class="space-y-4">
       ${principios}${perfil}${rutina}${mes}${queSubir}${comoSubir}${formulas}${embudo}${recursos}${metricas}${fuentes}
     </div>`;
+}
+
+// ---------- Bloques de marca/avatar para los generadores ----------
+function ampBlock(prefix) {
+  const cb = document.getElementById(prefix + '-amplificada');
+  return (cb && cb.checked && window.operaAmplify) ? window.operaAmplify() : '';
+}
+function avatarBlock(prefix) {
+  const sel = document.getElementById(prefix + '-avatar');
+  return (sel && window.operaAvatarBlock) ? window.operaAvatarBlock(sel.value) : '';
 }
 
 // ---------- Guardar pieza generada en Biblioteca ----------
