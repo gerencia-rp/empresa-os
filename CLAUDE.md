@@ -345,14 +345,15 @@ En la raíz del repo:
 - 📖 **App de SOLO-LECTURA:** módulo al final de `pm-main.js` (`PM_READONLY`) que (a) reemplaza las fns de escritura a datos-Airtable por un guard con toast y (b) barre `<button>` post-render para ocultarlos (`pmApplyReadOnlyDOM`, hook sobre `window.pmRender`). NO bloquea tareas/alertas (capa propia). Lista en `PM_RO_BLOCKED_FNS`.
 - 🗑 **Tab Feeds eliminada** del PM.
 - 🤖 **Auto-tareas** (en el sync, idempotentes por `external_id` `auto-clean-`/`auto-reception-` con `ignoreDuplicates`): Reserva Histórica→**limpieza/turnover** (task_type `cleaning`); Activa/Reservada con entrada próxima→**recepción** (task_type `recepcion`). Ventanas: clean check-out [-14,+1]d, recepción check-in [-3,+7]d.
-- 📄 **Reportes PDF (chromium headless, `@sparticuz/chromium`+`puppeteer-core`):**
-  - `api/pm-report.mjs` (`?type=weekly|monthly&month=YYYY-MM&format=pdf|html&send=email|whatsapp&to=`) — auth: service key o JWT de usuario (`api/_pm-auth.mjs`).
-  - Datos en `api/_pm-report-data.mjs`, diseño en `api/_pm-report-templates.mjs` (branding Ever Home).
-  - Crons: `report-weekly` (lun 13:00 UTC) + `report-monthly` (día 1, mes anterior) en `vercel.json`.
+- 📄 **Reportes PDF (impresión del navegador = chromium real del usuario):**
+  - `api/pm-report.mjs` (`?type=weekly|monthly&month=YYYY-MM&format=html|pdf&send=email|whatsapp&to=`) — auth: service key o JWT de usuario (`api/_pm-auth.mjs`, valida con anon key).
+  - **El front pide `format=html` y dispara "Guardar como PDF" del navegador** (`pmPrintReportHTML`). El render chromium serverless (`@sparticuz/chromium`) FALLA en Vercel por `libnss3.so` → NO se usa para la app; `format=pdf` queda best-effort.
+  - Datos `api/_pm-report-data.mjs` (lee con service key si está, si no con JWT del usuario+RLS), diseño `api/_pm-report-templates.mjs` (branding Ever Home).
+  - Crons `report-weekly` (lun 13:00 UTC) + `report-monthly` (día 1) → envían **email HTML / resumen WhatsApp** (sin chromium). En `vercel.json`.
   - Front: tab Finanzas → "Generar semanal/mensual" + "Enviar ›" (`pmOpenReport`/`pmSendReport`).
-- 🏠 **Guía de Bienvenida:** `api/pm-welcome-guide.mjs?property_id=&unit_id=`. Botón en ficha de Casa (`pmGenerateWelcomeGuide`/`pmSendWelcomeGuide`). WiFi + keypad desde `pm_properties.access_code` (nueva col, migración `20260630020000`, sync mapea Casas `fldKuVpYVzh7JzRP8`) con fallback parse de `pm_units.access_codes`.
-- 📤 **Envío:** `api/_pm-send.mjs` — WhatsApp (sube PDF a bucket público `pm-reports` + link vía `whatsapp-send`) y correo (Resend, `RESEND_API_KEY`). Env crons: `REPORT_EMAIL_TO`/`REPORT_WHATSAPP_TO`.
-- ⚠️ **Deps nuevas** (`package.json`): `@sparticuz/chromium`, `puppeteer-core`. Verificar memoria/`maxDuration` de las funciones en Vercel.
+- 🏠 **Guía de Bienvenida:** `api/pm-welcome-guide.mjs?property_id=&unit_id=` (mismo patrón print). Botón en ficha de Casa. WiFi + keypad desde `pm_properties.access_code` (col nueva, migración `20260630020000`, sync mapea Casas `fldKuVpYVzh7JzRP8`) con fallback parse de `pm_units.access_codes`.
+- 📤 **Envío** `api/_pm-send.mjs`: email=Resend (`RESEND_API_KEY`) con el HTML como cuerpo; WhatsApp=texto vía `whatsapp-send`. Sin PDF adjunto (no hay chromium server). Env: `REPORT_EMAIL_TO`/`REPORT_WHATSAPP_TO`.
+- ⚠️ **PENDIENTE Vercel (para crons + datos completos):** setear **`SUPABASE_SERVICE_ROLE_KEY`** (el `sb_secret_...`) en Vercel env — NUNCA estuvo seteada (los crons `sync-airtable`/alertas tampoco corrían). Con eso: reportes leen completo (sin RLS), crons y sync diario funcionan. Para envío real: `RESEND_API_KEY`, `REPORT_EMAIL_TO`/`REPORT_WHATSAPP_TO` (+ tokens WhatsApp Cloud).
 - Demo local de los 3 PDFs: `OUT=/tmp SUPABASE_SERVICE_ROLE_KEY=... node scripts/demo-pdfs.mjs` (usa Chrome local).
 
 ## 🎯 Estado anterior (29 Jun 2026 — Cutover base nueva)
