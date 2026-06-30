@@ -827,18 +827,24 @@ function renderStudio() {
         <button onclick="document.querySelector('[data-tab=recursos]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">🔥 Tendencias</button>
         <button onclick="document.querySelector('[data-tab=agente]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">💬 Agente</button>
       </div>
+      `+ studioModeToggle() +`
       <div class="bg-primary/40 border border-accent/15 rounded-xl p-4 mb-4">
         <div class="text-xs font-semibold text-zinc-400 mb-2">¿QUÉ CREÁS HOY?</div>
         <div class="grid grid-cols-3 gap-2">${tipos}</div>
       </div>
       <div class="grid md:grid-cols-[400px_1fr] gap-6">
         <div class="space-y-3 bg-primary/40 border border-accent/15 rounded-xl p-4">
+          <div id="st-libre-fields">
+            ${fld('💭 ¿Qué querés decir hoy?', `<textarea id="st-idea" rows="5" placeholder="Contame la idea, el ángulo, el problema, lo que sea — yo me encargo del resto (avatar, dolor, enemigo, táctica y fase los elijo automáticamente)." class="${selCls} resize-none"></textarea>`)}
+          </div>
+          <div id="st-guiado-fields" class="space-y-3">
           ${fld('📌 Para quién (avatar)', `<select id="st-avatar" class="${selCls}"><option value="avatar2">Avatar 2 — Empleado empezando (default)</option><option value="avatar1">Avatar 1 — Flipper escalando</option></select>`)}
           ${fld('🎯 Dolor del avatar', `<div class="flex gap-2"><select id="st-dolor" class="${selCls} flex-1"><option value="">— cargando… —</option></select><button onclick="studioRandomDolor()" class="mt-1 px-3 rounded-lg bg-accent/15 text-accent text-sm shrink-0">🎲</button></div>`)}
           ${fld('👹 Enemigo a atacar', `<select id="st-enemigo" class="${selCls}">${enemigoOpts}</select>`)}
           ${fld('🧠 Táctica psicológica', `<select id="st-tactica" class="${selCls}">${tacticaOpts}</select>`)}
           ${fld('📅 Fase del mes', `<select id="st-fase" class="${selCls}"><option value="auto">⚙️ Auto (según fecha)</option><option value="siembra">Siembra (valor)</option><option value="cosecha">Cosecha (venta)</option></select>`)}
           ${fld('✍️ Tema / ángulo libre (opcional)', `<textarea id="st-tema" rows="2" placeholder="Ej: cómo financiar el primer flip con ITIN" class="${selCls} resize-none"></textarea>`)}
+          </div>
           <details class="text-sm">
             <summary class="cursor-pointer text-xs font-semibold text-accent">⚙️ Configuración avanzada</summary>
             <div class="space-y-2 mt-2">
@@ -856,8 +862,27 @@ function renderStudio() {
         </div>
       </div>`;
     fillStudioDolores();
+    studioApplyMode(studioMode());
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
+// --- Modo Guiado / Libre ---
+function studioMode() { return localStorage.getItem('viralStudioMode') || 'guiado'; }
+function studioModeToggle() {
+  const m = studioMode();
+  const btn = (id, label, on) => `<button onclick="studioSetMode('${id}')" class="flex-1 px-3 py-2 rounded-lg text-sm font-semibold ${on ? 'bg-accent text-primary' : 'bg-primary/40 text-zinc-300 border border-zinc-800'}">${on ? '●' : '○'} ${label}</button>`;
+  return `<div class="flex gap-2 mb-4">${btn('guiado', 'Modo Guiado', m === 'guiado')}${btn('libre', 'Modo Libre', m === 'libre')}</div>`;
+}
+function studioApplyMode(m) {
+  const g = document.getElementById('st-guiado-fields'), l = document.getElementById('st-libre-fields');
+  if (g) g.style.display = (m === 'libre') ? 'none' : '';
+  if (l) l.style.display = (m === 'libre') ? '' : 'none';
+}
+function studioSetMode(m) {
+  localStorage.setItem('viralStudioMode', m);
+  // re-render el toggle (estilos) sin perder el resto
+  const out = document.getElementById('tab-studio'); if (out) { out.dataset.rendered = ''; renderStudio(); }
+}
+window.studioSetMode = studioSetMode;
 function studioCollectParams() {
   const v = id => (document.getElementById(id) || {}).value || '';
   return {
@@ -887,13 +912,46 @@ function flattenVariante(v) {
   return parts.filter(Boolean).join('\n');
 }
 let STUDIO_LAST = [];
+function studioResolveAuto(dec) {
+  if (!dec || !OPERA) return null;
+  const av = OPERA.avatares[dec.avatar_id];
+  const tac = OPERA.psicologia.tacticasAplicadas.find(t => String(t.id) === String(dec.tactica_id));
+  let enNombre = dec.enemigo_id;
+  const en = OPERA.arquetipo.enemigos;
+  if (dec.enemigo_id === 'principal') enNombre = en.principal.nombre;
+  else if (dec.enemigo_id === 'invisible') enNombre = en.invisible.nombre;
+  else { const t = en.tacticos.find(e => e.id === dec.enemigo_id); if (t) enNombre = t.nombre; }
+  const dolor = (dec.dolor_id && typeof findPregunta === 'function') ? findPregunta(dec.dolor_id) : null;
+  return {
+    avatar: av ? av.nombre : dec.avatar_id, dolor: dolor ? dolor.pregunta : (dec.dolor_id || '—'),
+    enemigo: enNombre, tactica: tac ? (tac.maestro + ' — ' + tac.tecnica) : dec.tactica_id, fase: dec.fase, razon: dec.razon,
+  };
+}
+function autoDecisionsBlock(dec) {
+  const r = studioResolveAuto(dec); if (!r) return '';
+  const row = (k, v) => v ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">${k}:</span><span class="text-zinc-100">${E(v)}</span></div>` : '';
+  return `<div class="bg-accent/10 border border-accent/30 rounded-xl p-4 mb-2">
+    <div class="text-xs font-bold text-accent uppercase tracking-wide mb-2">🤖 Decisiones automáticas</div>
+    ${row('Avatar', r.avatar)}${row('Dolor', r.dolor)}${row('Enemigo', r.enemigo)}${row('Táctica', r.tactica)}${row('Fase', r.fase)}
+    ${r.razon ? `<div class="text-[11px] text-zinc-500 mt-1 italic">${E(r.razon)}</div>` : ''}
+  </div>`;
+}
 async function studioGenerate(btn) {
   if (!window.ContextBuilder) { alert('Context builder no cargó.'); return; }
+  const mode = (typeof studioMode === 'function') ? studioMode() : 'guiado';
   const params = studioCollectParams();
   let build;
-  try { build = window.ContextBuilder.build(params); } catch (e) { document.getElementById('st-output').innerHTML = `<p class="text-sm text-red-400">${E(e.message)}</p>`; return; }
+  try {
+    if (mode === 'libre') {
+      const idea = (document.getElementById('st-idea') || {}).value || '';
+      if (!idea.trim()) { document.getElementById('st-idea').focus(); btn.disabled = false; btn.classList.remove('opacity-50', 'pointer-events-none'); return; }
+      build = window.ContextBuilder.buildLibre({ tipoContenido: STUDIO.tipo, idea, variantes: params.variantes, formato: params.formato, palabraClaveDM: params.palabraClaveDM });
+    } else {
+      build = window.ContextBuilder.build(params);
+    }
+  } catch (e) { document.getElementById('st-output').innerHTML = `<p class="text-sm text-red-400">${E(e.message)}</p>`; return; }
   const estTokens = Math.round((build.system.length + build.userPrompt.length) / 4);
-  document.getElementById('st-context').innerHTML = studioContextPanel(build.contexto, estTokens);
+  document.getElementById('st-context').innerHTML = (mode === 'libre' ? '<div class="text-[11px] text-zinc-500 mb-2">🤖 Modo Libre: la IA decide avatar/dolor/enemigo/táctica/fase. Lo verás acá tras generar.</div>' : '') + studioContextPanel(build.contexto, estTokens);
   const pre = document.getElementById('st-rawprompt'); if (pre) pre.textContent = build.system + '\n\n----- USER -----\n' + build.userPrompt;
   const out = document.getElementById('st-output');
   out.innerHTML = `<div class="border border-zinc-800 rounded-xl py-16 flex flex-col items-center text-zinc-500"><div class="typing text-3xl mb-3"><span>●</span><span>●</span><span>●</span></div><p id="st-status" class="text-sm">Generando con tu marca inyectada…</p></div>`;
@@ -905,6 +963,11 @@ async function studioGenerate(btn) {
       const text = await window.callClaudeMessages([{ role: 'user', content: userPrompt }],
         { system: build.system, max_tokens: 1500 + n * 1500, model: params.model || undefined });
       let parsed; try { parsed = parseJSON(text); } catch (e) { parsed = {}; }
+      if (mode === 'libre' && parsed.decisiones_auto) {
+        const ctxEl = document.getElementById('st-context');
+        if (ctxEl) ctxEl.innerHTML = autoDecisionsBlock(parsed.decisiones_auto) + studioContextPanel(build.contexto, estTokens);
+        const pre2 = document.getElementById('st-rawprompt'); if (pre2) pre2.textContent = build.system + '\n\n----- USER -----\n' + build.userPrompt;
+      }
       variantes = parsed.variantes || parsed.reels || (Array.isArray(parsed) ? parsed : []);
       const errs = [];
       variantes.forEach(v => { const r = window.Validator.validate(flattenVariante(v)); if (!r.ok) errs.push.apply(errs, r.errores); });

@@ -70,15 +70,17 @@
     manifiesto: 'Declaración de identidad de tribu (estilo Apple Think Different): líneas cortas, contundentes, sin CTA de venta directo.',
   };
   const CAMPOS_BASE = `"thumbnail_text" (texto de portada, ≤5 palabras), "hook", "chisme", "valor_oculto", "cta", "caption_corta", "caption_larga", "palabra_clave_dm", "mecanica_aplicada"`;
-  function schemaPorTipo(tipo) {
-    const extra = {
+  function tipoExtra(tipo) {
+    return {
       carrusel: `, "slides": [ { "n": 1, "tipo": "hook|problema|solucion|prueba|cta", "texto": "", "visual": "" } ]`,
       historia: `, "frames": [ { "fase": "H|I|L|L-interaccion|O", "texto_en_pantalla": "", "voz": "", "sticker": "" } ]`,
       youtube: `, "titulos": [ { "texto": "", "palanca": "miedo|curiosidad|deseo" } ], "miniaturas": [ { "variante": "A", "texto_en_miniatura": "", "composicion": "" } ]`,
       manifiesto: `, "lineas": [ "línea 1", "línea 2" ]`,
     }[tipo] || '';
+  }
+  function schemaPorTipo(tipo) {
     return `Devolvé SOLO un JSON válido (sin backticks, sin texto fuera) con esta forma:
-{ "variantes": [ { ${CAMPOS_BASE}${extra},
+{ "variantes": [ { ${CAMPOS_BASE}${tipoExtra(tipo)},
   "validador": { "usa_palabras_marca": [], "evita_palabras_prohibidas": true, "tiene_frase_recurrente": true, "cta_pide_dm": true } } ] }`;
   }
 
@@ -165,5 +167,70 @@ ${schemaPorTipo(tipo)}`;
     return { system, userPrompt, contexto, resueltos: { enemigo, tactica, fase, avatar, dolor }, tipo };
   }
 
-  window.ContextBuilder = { build, getCurrentFase, autoSelectEnemigo, DOLOR_A_ENEMIGO };
+  // ---- MODO LIBRE: Claude auto-decide avatar/dolor/enemigo/táctica/fase ----
+  function buildLibre(params) {
+    const data = getData();
+    if (!data) throw new Error('OPERA (data v2) no está cargada todavía.');
+    const p = params || {};
+    const tipo = p.tipoContenido || 'reel';
+    const id = data.identidad, arq = data.arquetipo, marca = data.marca, fr = arq.frasesRecurrentes;
+    const fase = getCurrentFase();
+    const avatarCat = Object.keys(data.avatares).map(k => `${k}: ${data.avatares[k].nombre} — ${data.avatares[k].anguloMarketing}`).join('\n');
+    const enemyCat = `principal: ${arq.enemigos.principal.nombre}\ninvisible: ${arq.enemigos.invisible.nombre}\n`
+      + arq.enemigos.tacticos.map(e => `${e.id}: ${e.nombre} — "${e.frase}" (solución: ${e.tuSolucion})`).join('\n');
+    const tacticaCat = data.psicologia.tacticasAplicadas.map(t => `${t.id}: ${t.maestro} — ${t.tecnica}`).join('\n');
+    const doloresCat = (typeof KB !== 'undefined' && KB && KB.preguntas) ? KB.preguntas.map(q => `${q.id}: ${q.pregunta}`).join('\n') : '(banco no disponible — usá dolor_id null)';
+
+    const system = `Sos un asistente de creatividad y marketing para Nicolás Lara, operador de Fix & Flip con +20 propiedades y 4 empresas inmobiliarias operando.
+Tu trabajo: a partir de una IDEA cruda del usuario, DECIDIR internamente la mejor estrategia y generar contenido que suene EXACTAMENTE como él. Cero contenido genérico.
+
+=== CONTEXTO DE MARCA (obligatorio respetar) ===
+ESLOGAN: "${id.esloganPrincipal}" · FRAMEWORK: ${id.framework} · TAGLINE: "${id.tagline}" · FRASE MAESTRA: "${id.fraseMaestra}"
+ARQUETIPO: ${arq.nombre} — ${arq.descripcion}
+TONO: directo, español rioplatense, técnico-accesible. FOCO: ${marca.focoPrincipal}. Las otras empresas (${marca.subcomunicacion}) SOLO como CREDIBILIDAD.
+
+=== PALABRAS PROHIBIDAS (NUNCA usar) ===
+${arq.palabrasProhibidas.join(', ')}
+=== PALABRAS DE MARCA (usar al menos 3) ===
+${arq.palabrasDeMarca.join(', ')}
+=== FRASES RECURRENTES (usar al menos 1) ===
+${[].concat(fr.bandera, fr.cierre).join(' · ')}
+=== REGLAS DE CTA ===
+SIEMPRE palabra clave por DM en MAYÚSCULAS ("Comentá MÉTODO y te paso X"). NUNCA "link en bio".
+=== REGLAS DE EJECUTABILIDAD ===
+NO prometer "multiplicar capital". SÍ promesa aterrizada + números reales + algo aplicable hoy.
+=== FÓRMULA (${tipo}) ===
+${FORMULAS[tipo] || FORMULAS.reel}
+
+=== CATÁLOGO DISPONIBLE (elegí lo más coherente con la idea; NO se lo muestres al usuario, usalo para decidir) ===
+AVATARES:
+${avatarCat}
+ENEMIGOS (atacar al ARQUETIPO, nunca a personas):
+${enemyCat}
+TÁCTICAS:
+${tacticaCat}
+FASE DEL MES HOY: ${fase} (siembra = valor sin vender; cosecha = vender desde stories)
+DOLORES DEL BANCO:
+${doloresCat}`;
+
+    const userPrompt = `=== MODO LIBRE ===
+El usuario te da una idea cruda. Decidí internamente qué avatar_id, dolor_id (del banco, o null si ninguno encaja), enemigo_id, tactica_id y fase aplican mejor, y generá el contenido.
+
+IDEA DEL USUARIO: "${p.idea || ''}"
+TIPO: ${tipo} · VARIANTES: ${p.variantes || 3}${p.formato ? ' · FORMATO: ' + p.formato : ''} · PALABRA CLAVE DM: ${p.palabraClaveDM || 'elegí la más relevante'}
+
+Devolvé SOLO un JSON válido (sin backticks) con esta forma:
+{ "decisiones_auto": { "avatar_id": "avatar1|avatar2", "dolor_id": "qXXX o null", "enemigo_id": "id del enemigo (principal|invisible|contratistas|wholesalers|bancos|cursosIngles|compradorEmocional|algunDia|acumuladores|lamboAlquilado|coachWhatsapp|9a5)", "tactica_id": número, "fase": "siembra|cosecha", "razon": "1 frase de por qué" },
+  "variantes": [ { ${CAMPOS_BASE}${tipoExtra(tipo)},
+    "validador": { "usa_palabras_marca": [], "evita_palabras_prohibidas": true, "tiene_frase_recurrente": true, "cta_pide_dm": true } } ] }`;
+
+    const contexto = {
+      eslogan: id.esloganPrincipal, framework: id.framework, tagline: id.tagline, arquetipo: arq.nombre,
+      enemigo: null, enemigoTipo: 'auto', tactica: null, avatar: null, dolor: null, fase: null,
+      prohibidasCount: arq.palabrasProhibidas.length, marcaCount: arq.palabrasDeMarca.length, validador: true, libre: true,
+    };
+    return { system, userPrompt, contexto, tipo };
+  }
+
+  window.ContextBuilder = { build, buildLibre, getCurrentFase, autoSelectEnemigo, DOLOR_A_ENEMIGO };
 })();
