@@ -3,6 +3,12 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "functions": {
+    "api/pm-report.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
+    "api/pm-welcome-guide.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
+    "api/cron/report-weekly.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
+    "api/cron/report-monthly.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 }
+  },
   "crons": [
     { "path": "/api/cron/sync-airtable", "schedule": "0 6 * * *" },
     { "path": "/api/cron/check-contracts", "schedule": "0 8 * * *" },
