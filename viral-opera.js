@@ -658,6 +658,35 @@ function amplificarEstrategia() {
 }
 
 // =========================================================
+//  TAB: MARCA (acordeón — engine + consulta; reusa los renders existentes)
+// =========================================================
+function renderMarca() {
+  const out = document.getElementById('tab-marca'); if (!out || out.dataset.rendered) return;
+  ensureOpera().then(ensureVisual).then(() => {
+    out.dataset.rendered = '1';
+    const secs = [
+      { fn: renderManifiesto, id: 'tab-manifiesto', icon: '🧭', title: 'Quién soy', sub: 'Manifiesto, narrativa, eslogan, foco' },
+      { fn: renderIdentidad, id: 'tab-identidad', icon: '🗣️', title: 'Cómo hablo / Quién me ataca', sub: 'Arquetipo, enemigo dual + 10 tácticos, frases, palabras' },
+      { fn: renderVisual, id: 'tab-visual', icon: '🎨', title: 'Cómo me veo', sub: 'Símbolo, paleta, tipografía, vestuario, gestos' },
+      { fn: renderPsicologia, id: 'tab-psicologia', icon: '🧠', title: 'Cómo persuado', sub: '7 leyes + 16 tácticas históricas' },
+      { fn: renderAvatares, id: 'tab-avatares', icon: '🎭', title: 'Mis avatares', sub: 'Flipper escalando vs Empleado empezando' },
+      { fn: renderRedes, id: 'tab-redes', icon: '📊', title: 'Mis redes', sub: 'Bios nuevas, handle YT, KPIs' },
+    ];
+    out.innerHTML = oHero('Marca', 'Tu estrategia completa — el engine que alimenta Studio. Tocá cada sección para desplegar.') +
+      secs.map((s, i) => `<details class="bg-primary/40 border border-accent/15 rounded-xl mb-2" ${i === 0 ? 'open' : ''}>
+        <summary class="cursor-pointer px-4 py-3 select-none"><span class="font-display font-bold text-accent">${s.icon} ${E(s.title)}</span><span class="text-xs text-zinc-500 ml-2">${E(s.sub)}</span></summary>
+        <div class="px-4 pb-4" id="marca-mount-${s.id}"></div>
+      </details>`).join('');
+    // Mover cada sección fuente dentro de su mount y dispararla (interactividad nativa).
+    secs.forEach(s => {
+      s.fn(); // captura su nodo y lo llena (async, data cacheada)
+      const src = document.getElementById(s.id), mount = document.getElementById('marca-mount-' + s.id);
+      if (src && mount) { src.classList.remove('tab-panel', 'hidden'); mount.appendChild(src); }
+    });
+  }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
+}
+
+// =========================================================
 //  TAB: STUDIO (la estrella — producción con context injection)
 // =========================================================
 const STUDIO = { tipo: 'reel' };
@@ -864,6 +893,7 @@ window.studioCopy = studioCopy; window.studioSave = studioSave; window.studioExp
 // =========================================================
 window.OPERA_RENDERERS = {
   studio: renderStudio,
+  marca: renderMarca,
   manifiesto: renderManifiesto,
   identidad: renderIdentidad,
   visual: renderVisual,
