@@ -959,7 +959,10 @@ async function studioFetchRag(mode, params) {
       : [params.tema, params.dolor, params.enemigo].filter(v => v && v !== 'auto').join(' ');
     if (!q.trim()) return [];
     const sims = await window.Memory.searchSimilar(q, 5);
-    return (sims || []).filter(s => (s.similarity || 0) > 0.65).map(s => {
+    // Umbral calibrado para voyage-3-lite @512 dims (Matryoshka) con retrieval
+    // summary-vs-idea: piezas del mismo tema dan cosine ~0.50-0.71, no >0.65.
+    // 0.45 hace que el RAG efectivamente se active con data real (0.65 nunca disparaba).
+    return (sims || []).filter(s => (s.similarity || 0) > 0.45).map(s => {
       const ov = s.output_variantes; const v0 = Array.isArray(ov) ? ov[0] : (ov && ov.variantes ? ov.variantes[0] : null);
       return { hook: v0 && v0.hook, desarrollo: (v0 && (v0.chisme || v0.valor_oculto)) || '', cta: v0 && v0.cta, views: s.views || 0, similarity: Math.round((s.similarity || 0) * 100) / 100 };
     });
