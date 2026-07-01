@@ -1214,6 +1214,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'loan-calc') return openLoanCalculator(sys);
   if (sys.type === 'deep-analyzer') return openPropertyAnalyzer(sys);
   if (sys.type === 'remodel-pro') return openRemodelPro(sys);
+  if (sys.type === 'command-center') return openCommandCenter(sys);
   if (sys.type === 'cronograma') return openCronograma(sys);
   // Cronogramas viejos (Juan Austin / Limpieza / Planner Semanal) → redirigen al unificado.
   // "Juan" y "Limpieza" ahora son FILTROS de equipo dentro del Cronograma unificado.

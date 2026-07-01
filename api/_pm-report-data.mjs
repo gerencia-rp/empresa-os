@@ -114,7 +114,8 @@ export async function fetchWeeklyData(cfg, now = new Date()) {
   const occupied = houses.reduce((s, h) => s + h.occ, 0);
   const reserved = houses.reduce((s, h) => s + h.res, 0);
   const free = houses.reduce((s, h) => s + h.free, 0);
-  const occupancyPct = total ? Math.round(((occupied + reserved) / total) * 100) : 0;
+  // Ocupación = ocupadas / total rentable (un solo número en toda la app). Reservadas aparte.
+  const occupancyPct = total ? Math.round((occupied / total) * 100) : 0;
   // Baja ocupación: peor primero (las que tienen al menos 1 libre).
   const lowOccupancy = houses.filter((h) => h.free > 0).sort((a, b) => a.pct - b.pct || b.free - a.free);
 
