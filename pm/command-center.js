@@ -9,7 +9,9 @@ const CC = {
   props: [], units: [], pay: [], exp: [], book: [], tenants: [], tasks: [], alerts: [],
   _charts: [], chat: [], chatBusy: false,
   memories: [], memLoaded: false, memBusy: false,
+  daily: { text: '', loading: false, error: null }, chatLoaded: false,
 };
+const CC_CHAT_SESSION = 'main';
 window.CC = CC;
 
 const CC_MONEY = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n || 0)).toLocaleString('en-US');
@@ -103,6 +105,13 @@ function ccInjectCSS() {
   #cc-overlay .insight .ic{font-size:8px;margin-top:6px}#cc-overlay .ic.r{color:var(--neg)}#cc-overlay .ic.y{color:var(--amber)}#cc-overlay .ic.g{color:var(--pos)}#cc-overlay .ic.b{color:var(--a2)}
   #cc-overlay .insight .tx{font-size:12px;line-height:1.5;color:#d6ddec}#cc-overlay .insight .tx b{color:#fff;font-weight:650}
   #cc-overlay .tag{display:inline-block;font-size:9px;letter-spacing:.7px;color:var(--mut2);margin-top:5px;font-weight:700}
+  #cc-overlay .iaction{font-size:11px;color:var(--a1);margin-top:5px;font-weight:500;opacity:.92}
+  #cc-overlay .daybanner{display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px 18px;border-radius:14px;
+    background:linear-gradient(90deg,rgba(138,123,255,.12),rgba(79,141,255,.06));border:1px solid rgba(138,123,255,.24);backdrop-filter:blur(12px)}
+  #cc-overlay .daytxt{font-size:13px;line-height:1.55;color:#e6ebf5}#cc-overlay .daytxt b,#cc-overlay .daytxt strong{color:#fff}
+  #cc-overlay .daytxt p{margin:0 0 4px}#cc-overlay .daytxt p:last-child{margin:0}
+  #cc-overlay .dayre{flex-shrink:0;background:rgba(255,255,255,.06);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px}
+  #cc-overlay .dayre:hover{color:#fff;border-color:rgba(138,123,255,.5)}#cc-overlay .dayre:disabled{opacity:.5;cursor:default}
   #cc-overlay .ask{display:flex;gap:8px;margin-top:14px}
   #cc-overlay .ask input{flex:1;background:rgba(6,9,16,.72);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
   #cc-overlay .ask input::placeholder{color:var(--mut2)}
@@ -167,6 +176,7 @@ async function openCommandCenter(sys) {
   ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable…</div></main></div><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ccLoadAll();
+  if (!CC.chatLoaded) { try { await ccLoadChat(); } catch (e) {} }
   ccRender();
 }
 window.openCommandCenter = openCommandCenter;
@@ -219,7 +229,12 @@ function ccCompute() {
   CC.units.forEach(u => { const h = H[u.property_id]; if (!h) return; h.units.push(u); h.pot += Number(u.target_rent || 0); });
   CC.pay.forEach(p => { if (inMonth(p.paid_at) && H[p.property_id]) H[p.property_id].inc += Number(p.amount || 0); });
   CC.exp.forEach(e => { if (inMonth(e.expense_date) && H[e.property_id]) { H[e.property_id].exp += Number(e.amount || 0); if (ccIsHipo(e)) H[e.property_id].hipo += Number(e.amount || 0); } });
-  const houses = Object.values(H).map(h => { const r = ccRentable(h.units); return { ...h, net: h.inc - h.exp, total: r.total, occ: r.occ, res: r.res, free: r.free, mant: r.mant, pct: r.total ? Math.round(r.occ / r.total * 100) : 0 }; });
+  const houses = Object.values(H).map(h => {
+    const r = ccRentable(h.units);
+    // Renta esperada de las unidades OCUPADAS (para detectar "ocupada sin ingresos").
+    const occRent = h.units.filter(u => ccUnitState(u) === 'ocupada').reduce((s, u) => s + Number(u.target_rent || 0), 0);
+    return { ...h, net: h.inc - h.exp, total: r.total, occ: r.occ, res: r.res, free: r.free, mant: r.mant, pct: r.total ? Math.round(r.occ / r.total * 100) : 0, occRent };
+  });
 
   // Global rentable (suma por casa, coherente con las fichas)
   const totalU = houses.reduce((s, h) => s + h.total, 0);
@@ -238,30 +253,48 @@ function ccCompute() {
 // ─── INSIGHTS (reglas rankeadas por $ de impacto) ───
 function ccInsights(comp) {
   const { houses, kpi, mb } = comp;
-  const money = n => Math.round(n);
   const ins = [];
-  // 1) Casas en rojo (peor primero) con causa
-  houses.filter(h => h.net < 0 && (h.inc > 0 || h.exp > 0)).sort((a, b) => a.net - b.net).forEach(h => {
+  // 0) OCUPADA SIN INGRESOS (cobranza/registro) — ocupada pero $0 (o casi) facturado.
+  // El monto que DEBERÍA entrar es la renta de las unidades ocupadas (occRent).
+  houses.filter(h => h.occ > 0 && h.occRent > 0 && h.inc < h.occRent * 0.35)
+    .sort((a, b) => (b.occRent - b.inc) - (a.occRent - a.inc)).forEach(h => {
+      const falta = h.occRent - h.inc;
+      ins.push({ sev: 'critical', impact: falta, tag: 'COBRANZA / REGISTRO', sec: 'finanzas',
+        tx: `<b>${CC_ESC(h.name)}</b> está <b>ocupada</b> (${h.occ} u.) pero solo facturó ${CC_MONEY(h.inc)} de ~${CC_MONEY(h.occRent)} esperados. Faltan <b>${CC_MONEY(falta)}/mes</b> — es problema de <b>cobranza o registro</b>, no de ocupación.`,
+        action: `Revisar los pagos de ${h.name.split(',')[0]} en Airtable (¿faltan cargar? ¿inquilino sin pagar?)` });
+    });
+  // 1) Casas en rojo (peor primero) con causa — excluye las ya marcadas por cobranza.
+  const cobranzaNames = new Set(ins.map(i => i.tx));
+  houses.filter(h => h.net < 0 && (h.inc > 0 || h.exp > 0) && !(h.occ > 0 && h.occRent > 0 && h.inc < h.occRent * 0.35))
+    .sort((a, b) => a.net - b.net).forEach(h => {
     const causa = h.free > 0 ? `${h.free} unidad(es) libre(s)` : (h.hipo > h.inc ? `hipoteca ${CC_MONEY(h.hipo)} > ingreso ${CC_MONEY(h.inc)}` : 'gastos altos');
-    ins.push({ sev: 'critical', impact: Math.abs(h.net), tag: 'CRÍTICO · CASHFLOW', tx: `<b>${CC_ESC(h.name)}</b> arrastra <b>${CC_MONEY(-h.net)}/mes</b> (${causa}).`, sec: 'finanzas' });
+    ins.push({ sev: 'critical', impact: Math.abs(h.net), tag: 'CRÍTICO · CASHFLOW', sec: 'finanzas',
+      tx: `<b>${CC_ESC(h.name)}</b> arrastra <b>${CC_MONEY(-h.net)}/mes</b> (${causa}).`,
+      action: h.free > 0 ? `Colocar las ${h.free} unidad(es) libre(s) de ${h.name.split(',')[0]}` : `Revisar gastos e hipoteca de ${h.name.split(',')[0]} en Airtable` });
   });
   // 2) Unidades libres / potencial perdido
   if (kpi.potFree > 0) {
     const peor = houses.filter(h => h.free > 0).sort((a, b) => b.free - a.free)[0];
-    ins.push({ sev: 'opportunity', impact: kpi.potFree, tag: 'OPORTUNIDAD', tx: `<b>${kpi.freeU} unidades libres</b> = <b>${CC_MONEY(kpi.potFree)}/mes</b> en juego${peor ? `. ${CC_ESC(peor.name)} (${peor.free} libres) es la prioridad de turnover` : ''}.`, sec: 'propiedades' });
+    ins.push({ sev: 'opportunity', impact: kpi.potFree, tag: 'OPORTUNIDAD', sec: 'propiedades',
+      tx: `<b>${kpi.freeU} unidades libres</b> = <b>${CC_MONEY(kpi.potFree)}/mes</b> en juego${peor ? `. ${CC_ESC(peor.name)} (${peor.free} libres) es la prioridad de turnover` : ''}.`,
+      action: peor ? `Arrancar turnover/publicación de ${peor.name.split(',')[0]}` : 'Priorizar turnover de las unidades libres' });
   }
   // 3) Ocupación baja por zona
   const Z = {}; houses.forEach(h => { const z = h.zone || 'sin'; (Z[z] = Z[z] || { o: 0, t: 0, free: 0 }); Z[z].o += h.occ + h.res; Z[z].t += h.total; Z[z].free += h.free; });
-  Object.entries(Z).filter(([z, v]) => v.t && v.o / v.t < 0.7).sort((a, b) => b[1].free - a[1].free).forEach(([z, v]) => ins.push({ sev: 'warning', impact: v.free * 800, tag: 'OCUPACIÓN', tx: `Zona <b>${ccZoneLabel(z === 'sin' ? null : z)}</b>: ocupación ${Math.round(v.o / v.t * 100)}% (${v.free} libres).`, sec: 'propiedades' }));
+  Object.entries(Z).filter(([z, v]) => v.t && v.o / v.t < 0.7).sort((a, b) => b[1].free - a[1].free).forEach(([z, v]) => ins.push({ sev: 'warning', impact: v.free * 800, tag: 'OCUPACIÓN', sec: 'propiedades',
+    tx: `Zona <b>${ccZoneLabel(z === 'sin' ? null : z)}</b>: ocupación ${Math.round(v.o / v.t * 100)}% (${v.free} libres).`, action: `Enfocar publicación en zona ${ccZoneLabel(z === 'sin' ? null : z)}` }));
   // 4) Reservas por vencer (30 días)
   const today = new Date().toISOString().slice(0, 10); const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
   const venc = CC.book.filter(b => b.end_date && b.end_date >= today && b.end_date <= in30 && ['activo', 'confirmado'].includes(b.status));
-  if (venc.length) ins.push({ sev: 'warning', impact: venc.length * 1000, tag: 'RESERVAS', tx: `<b>${venc.length} reserva(s)</b> vencen en 30 días — renovar o preparar turnover.`, sec: 'reservas' });
+  if (venc.length) ins.push({ sev: 'warning', impact: venc.length * 1000, tag: 'RESERVAS', sec: 'reservas',
+    tx: `<b>${venc.length} reserva(s)</b> vencen en 30 días — renovar o preparar turnover.`, action: 'Contactar inquilinos por renovación y avisar a limpieza' });
   // 5) Outliers de gasto (hipoteca)
   const hipos = houses.filter(h => h.hipo > 0).map(h => h.hipo); const meanH = hipos.reduce((s, v) => s + v, 0) / (hipos.length || 1);
-  houses.filter(h => h.hipo > meanH * 1.5).sort((a, b) => b.hipo - a.hipo).slice(0, 2).forEach(h => ins.push({ sev: 'warning', impact: h.hipo, tag: 'OUTLIER GASTO', tx: `<b>${CC_ESC(h.name)}</b>: hipoteca ${CC_MONEY(h.hipo)}/mes, muy sobre el promedio (${CC_MONEY(meanH)}).`, sec: 'finanzas' }));
+  houses.filter(h => h.hipo > meanH * 1.5).sort((a, b) => b.hipo - a.hipo).slice(0, 2).forEach(h => ins.push({ sev: 'warning', impact: h.hipo, tag: 'OUTLIER GASTO', sec: 'finanzas',
+    tx: `<b>${CC_ESC(h.name)}</b>: hipoteca ${CC_MONEY(h.hipo)}/mes, muy sobre el promedio (${CC_MONEY(meanH)}).`, action: `Chequear términos del préstamo de ${h.name.split(',')[0]} (¿HML por refinanciar?)` }));
   // 6) Memoria / contexto (informativo)
-  ins.push({ sev: 'info', impact: 0, tag: 'MEMORIA', tx: `La <b>hipoteca</b> entra como gasto fijo por casa desde su fecha real → NOI por casa exacto. Cashflow de ${mb.label}: <b>${CC_MONEY(kpi.cashflow)}</b>.`, sec: 'analitica' });
+  ins.push({ sev: 'info', impact: 0, tag: 'MEMORIA', sec: 'analitica',
+    tx: `La <b>hipoteca</b> entra como gasto fijo por casa desde su fecha real → NOI por casa exacto. Cashflow de ${mb.label}: <b>${CC_MONEY(kpi.cashflow)}</b>.` });
   const rank = { critical: 0, warning: 1, opportunity: 1, info: 3 };
   ins.sort((a, b) => (rank[a.sev] - rank[b.sev]) || (b.impact - a.impact));
   return ins;
@@ -329,6 +362,8 @@ function ccRender() {
   requestAnimationFrame(() => ccMountCharts(comp));
   // Cargar memorias del Cerebro la primera vez que se entra a esa sección.
   if (CC.section === 'cerebro' && !CC.memLoaded) ccLoadMemories();
+  // Resumen del día: generar una vez al entrar al Command Center.
+  if (CC.section === 'command' && !CC.daily.text && !CC.daily.loading) ccDailySummary();
 }
 window.ccRender = ccRender;
 async function ccReload() { await ccLoadAll(); ccRender(); }
@@ -362,6 +397,7 @@ function ccSecCommand(comp) {
   const propName = id => CC.props.find(p => p.id === id)?.name || '';
   return `
     ${ccHeader('Command Center', 'Rentas', 'Todo el negocio de rentas en una sola vista — propiedades, reservas, operación y finanzas.')}
+    <div class="daybanner" id="cc-daybanner">${ccDailyHTML()}</div>
     <div class="grid kpis">
       <div class="card kpi occ"><div><div class="lab">Ocupación</div>
         <div class="meta" style="margin-top:10px">${kpi.occU} de ${kpi.totalU} unidades<br><span class="${kpi.occPct >= 80 ? 'up' : 'warn'}">${kpi.occU} ocupadas · ${kpi.resU} reservadas · ${kpi.freeU} libres</span></div></div>
@@ -381,7 +417,7 @@ function ccSecCommand(comp) {
         <div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div>
         <canvas id="cc-cf" height="132"></canvas></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>ANÁLISIS EN VIVO · REGLAS</span></div></div>
-        ${insights.slice(0, 3).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}<div class="tag">${i.tag}</div></div></div>`).join('')}
+        ${insights.slice(0, 3).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${CC_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}</div></div></div>`).join('')}
         <div class="ask"><input id="cc-ask" placeholder="Preguntá a tu copiloto…" onkeydown="if(event.key==='Enter')ccAsk()"><button onclick="ccAsk()">Enviar</button></div>
         <div class="chips"><span class="chip" onclick="ccGo('cerebro')">Ver todos los insights</span><span class="chip" onclick="ccGo('finanzas')">¿Casas en rojo?</span></div></div>
     </div>
@@ -427,7 +463,7 @@ function ccSecCerebro(comp) {
     </div></div>
     <div class="grid" style="margin-top:16px"><div class="card">
       <div class="bh"><div class="orb" style="width:26px;height:26px"></div><div><b>Análisis en vivo</b><span>${insights.length} INSIGHTS · RANKEADOS POR $ (REGLAS · SIN IA)</span></div></div>
-      ${insights.map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}<div class="tag">${i.tag}${i.impact ? ` · ${CC_MONEY(i.impact)}` : ''}</div></div>
+      ${insights.map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${CC_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}${i.impact ? ` · ${CC_MONEY(i.impact)}` : ''}</div></div>
         ${i.sec ? `<span class="chip" style="margin-left:auto;align-self:center" onclick="ccGo('${i.sec}')">Ver →</span>` : ''}</div>`).join('')}
     </div></div>
     ${ccMemCardHTML()}`;
@@ -478,7 +514,9 @@ async function ccSendChat(question) {
       const err = data.error || `Error (HTTP ${r.status}).`;
       CC.chat.push({ role: 'assistant', content: err, error: true });
     } else {
-      CC.chat.push({ role: 'assistant', content: data.answer || 'Sin respuesta.' });
+      const answer = data.answer || 'Sin respuesta.';
+      CC.chat.push({ role: 'assistant', content: answer });
+      ccPersistChat(question, answer);
     }
   } catch (e) {
     CC.chat.pop();
@@ -562,6 +600,54 @@ async function ccMemPost(method, body) {
   } catch (e) { if (window.toast) toast('⚠️ ' + (e.message || e), 'error'); }
 }
 window.ccMemAdd = ccMemAdd; window.ccMemToggle = ccMemToggle; window.ccMemEdit = ccMemEdit; window.ccSaveToMemory = ccSaveToMemory;
+
+// ─── RESUMEN DEL DÍA (generado por el Cerebro, arriba del Command Center) ───
+function ccDailyHTML() {
+  const d = CC.daily;
+  const inner = d.loading
+    ? '<span class="daytxt shimmer">El Cerebro está leyendo tus números…</span>'
+    : d.error
+      ? `<span class="daytxt" style="color:#f0687a">${CC_ESC(d.error)}</span>`
+      : d.text
+        ? `<span class="daytxt">${ccMdSafe(d.text)}</span>`
+        : '<span class="daytxt" style="color:var(--mut2)">El Cerebro puede resumirte el día. Tocá ⟳ para generarlo.</span>';
+  return `<div class="orb" style="width:30px;height:30px;flex-shrink:0"></div>
+    <div style="flex:1">${inner}</div>
+    <button class="dayre" title="Regenerar resumen" onclick="ccDailySummary(true)" ${d.loading ? 'disabled' : ''}>⟳</button>`;
+}
+function ccRenderDaily() { const el = document.getElementById('cc-daybanner'); if (el) el.innerHTML = ccDailyHTML(); }
+async function ccDailySummary(force) {
+  if (CC.daily.loading) return;
+  if (CC.daily.text && !force) return;
+  CC.daily.loading = true; CC.daily.error = null; ccRenderDaily();
+  try {
+    const snapshot = ccSnapshot(ccCompute());
+    const q = 'Generá el RESUMEN DEL DÍA en 2-3 frases cortas para el CEO: (1) estado general del portafolio con el número clave, (2) lo más urgente hoy, (3) UNA acción concreta sugerida. Directo, sin saludo, sin markdown de títulos.';
+    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, snapshot, history: [] }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { CC.daily.error = data.error || 'No se pudo generar el resumen.'; }
+    else { CC.daily.text = data.answer || ''; }
+  } catch (e) { CC.daily.error = e.message || String(e); }
+  finally { CC.daily.loading = false; ccRenderDaily(); }
+}
+window.ccDailySummary = ccDailySummary;
+
+// ─── PERSISTENCIA DEL CHAT (pm_brain_chat vía sb del usuario, authenticated) ───
+async function ccLoadChat() {
+  CC.chatLoaded = true;
+  try {
+    const { data, error } = await sb.from('pm_brain_chat').select('rol,texto,fecha').eq('session_id', CC_CHAT_SESSION).order('fecha', { ascending: true }).limit(40);
+    if (!error && Array.isArray(data)) CC.chat = data.map(m => ({ role: m.rol === 'assistant' ? 'assistant' : 'user', content: m.texto }));
+  } catch (e) { /* chat vacío si falla */ }
+}
+async function ccPersistChat(question, answer) {
+  try {
+    await sb.from('pm_brain_chat').insert([
+      { session_id: CC_CHAT_SESSION, rol: 'user', texto: question },
+      { session_id: CC_CHAT_SESSION, rol: 'assistant', texto: answer },
+    ]);
+  } catch (e) { /* no bloquear el chat si falla la persistencia */ }
+}
 
 // ─── SECCIÓN: PROPIEDADES ───
 function ccSecPropiedades(comp) {
