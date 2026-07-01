@@ -436,12 +436,13 @@ Deno.serve(async (req) => {
     stats.properties_inserted = propsInserted;
     stats.properties_updated = propsUpdated;
 
-    // Mapa recId de Casa → property_id
-    const { data: dbProps } = await supabase.from("pm_properties").select("id, name, airtable_address_id");
+    // Mapa recId de Casa → property_id / name / zone (para las auto-tareas del cronograma)
+    const { data: dbProps } = await supabase.from("pm_properties").select("id, name, zone, airtable_address_id");
     const propIdByCasaRec: Record<string, string> = {};
     const propNameByCasaRec: Record<string, string> = {};
+    const propZoneByCasaRec: Record<string, string | null> = {};
     (dbProps || []).forEach((p: any) => {
-      if (p.airtable_address_id) { propIdByCasaRec[p.airtable_address_id] = p.id; propNameByCasaRec[p.airtable_address_id] = p.name; }
+      if (p.airtable_address_id) { propIdByCasaRec[p.airtable_address_id] = p.id; propNameByCasaRec[p.airtable_address_id] = p.name; propZoneByCasaRec[p.airtable_address_id] = p.zone || null; }
     });
 
     // ════════════════════════════════════════════════════════════
@@ -677,10 +678,11 @@ Deno.serve(async (req) => {
         const checkOut = (r.fields?.[F.res_fecha_out] ? String(r.fields[F.res_fecha_out]).slice(0, 10) : null);
         const unidad = (getSel(r.fields?.[F.res_unidad]) || "Unidad").toString().trim();
         const propName = propNameByCasaRec[casaRec] || "Casa";
+        const propZone = propZoneByCasaRec[casaRec] || null;   // zona real de la Casa (Airtable)
         const unitId = bookingByResRec[r.id]?.unit_id || null;
         const loc = propName + " · " + unidad;
 
-        // LIMPIEZA / turnover: Reserva Histórica con check-out en la ventana.
+        // LIMPIEZA / turnover: Reserva Histórica con check-out en la ventana. Equipo = Limpieza.
         const esHistorica = /hist|salid|finaliz|complet|cerrad|pasad/.test(estado);
         if (esHistorica && checkOut && checkOut >= cleanFromISO && checkOut <= cleanToISO) {
           autoTasks.push({
@@ -694,11 +696,12 @@ Deno.serve(async (req) => {
             priority: "alta",
             auto_generated: true,
             active: true,
+            assignee: "Limpieza",
+            zone: propZone,
             notes: "Turnover automático tras check-out (" + checkOut + "). Limpiar y preparar la unidad para el próximo huésped.",
-            zone: "unidad"
           });
         }
-        // RECEPCIÓN: Reserva Activa o Reservada con check-in en la ventana.
+        // RECEPCIÓN: Reserva Activa o Reservada con check-in en la ventana. Equipo = Limpieza.
         const esEntrada = /activ|reservad|confirm/.test(estado);
         if (esEntrada && checkIn && checkIn >= recFromISO && checkIn <= recToISO) {
           autoTasks.push({
@@ -712,8 +715,9 @@ Deno.serve(async (req) => {
             priority: "alta",
             auto_generated: true,
             active: true,
+            assignee: "Limpieza",
+            zone: propZone,
             notes: "Recepción automática (entrada " + checkIn + "). Preparar la unidad, entregar accesos y enviar la guía de bienvenida.",
-            zone: "unidad"
           });
         }
       }
