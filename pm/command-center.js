@@ -614,7 +614,7 @@ async function ccSendChat(question) {
 }
 window.ccSendChat = ccSendChat;
 
-// ─── MEMORIA DEL CEREBRO (pm_brain_memory vía /api/brain-memory) ───
+// ─── MEMORIA DEL CEREBRO (pm_brain_memory vía /api/brain-chat?resource=memory) ───
 async function ccAuthToken() {
   try { const s = await sb.auth.getSession(); return s?.data?.session?.access_token || ''; } catch (e) { return ''; }
 }
@@ -622,7 +622,7 @@ async function ccLoadMemories() {
   CC.memLoaded = true;
   try {
     const tok = await ccAuthToken();
-    const r = await fetch('/api/brain-memory', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} });
+    const r = await fetch('/api/brain-chat?resource=memory', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} });
     const d = await r.json().catch(() => ({}));
     CC.memories = r.ok ? (d.memories || []) : [];
     CC._memErr = r.ok ? null : (d.error || 'Error cargando memorias');
@@ -679,7 +679,7 @@ async function ccSaveToMemory(idx) {
 async function ccMemPost(method, body) {
   try {
     const tok = await ccAuthToken();
-    const r = await fetch('/api/brain-memory', { method, headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify(body) });
+    const r = await fetch('/api/brain-chat?resource=memory', { method, headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { if (window.toast) toast('⚠️ ' + (d.error || 'No se pudo guardar la memoria'), 'error'); return; }
     CC.memLoaded = false; await ccLoadMemories();

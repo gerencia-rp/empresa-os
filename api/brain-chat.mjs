@@ -1,13 +1,58 @@
-// 🧠 Cerebro IA · Chat (Fase 2) — endpoint de negocio para Property OS.
-// Recibe un SNAPSHOT compacto de datos reales (armado en el front desde pm_*),
-// una pregunta y el historial de la charla; arma el system prompt de analista
-// (SOLO LECTURA, cita números reales, no inventa) y llama a la API de Claude.
+// 🧠 Cerebro IA · endpoint unificado (Fase 2 chat + Fase 3 memoria RAG).
+// Chat: recibe snapshot + pregunta + historial, arma system prompt de analista
+//   (SOLO LECTURA, cita números reales) y llama a Claude (ANTHROPIC_API_KEY).
+// Memoria (?resource=memory): CRUD de pm_brain_memory (list/crear/editar/desactivar).
+//   Se fusionó acá para no pasar el límite de 12 Serverless Functions del plan Hobby.
 //
-// La API key vive SOLO en el servidor: env ANTHROPIC_API_KEY (Vercel → Settings).
-// El navegador nunca la ve. SOLO LECTURA: este endpoint no escribe nada.
-//
-// Fase 3 (memoria RAG con pgvector + VoyageAI) vía recallMemories().
-import { recallMemories } from './_brain.mjs';
+// La API key vive SOLO en el servidor. El navegador nunca la ve.
+import { recallMemories, embed, sbREST, vecLiteral } from './_brain.mjs';
+
+// ─── MEMORIA (pm_brain_memory) ───
+const MEM_TIPOS = ['hecho', 'decisión', 'aprendizaje', 'nota'];
+function bearerOf(req) { return (req.headers['authorization'] || req.headers['Authorization'] || '').replace(/^Bearer\s+/i, '').trim(); }
+async function memoryHandler(req, res) {
+  const bearer = bearerOf(req);
+  try {
+    if (req.method === 'GET') {
+      const rows = await sbREST('pm_brain_memory?select=id,tipo,texto,fuente,fecha,activo,embedding&order=activo.desc,fecha.desc', { bearer });
+      const out = (rows || []).map(m => ({ id: m.id, tipo: m.tipo, texto: m.texto, fuente: m.fuente, fecha: m.fecha, activo: m.activo, has_embedding: !!m.embedding }));
+      res.status(200).json({ memories: out });
+      return;
+    }
+    if (!bearer) { res.status(401).json({ error: 'Falta sesión (JWT).' }); return; }
+    const b = jsonSafe(req.body, {}) || {};
+    if (req.method === 'POST') {
+      const texto = String(b.texto || '').trim();
+      if (!texto) { res.status(400).json({ error: 'Falta el texto de la memoria.' }); return; }
+      const tipo = MEM_TIPOS.includes(b.tipo) ? b.tipo : 'nota';
+      const fuente = String(b.fuente || 'manual').slice(0, 80);
+      const vec = await embed(`${tipo}: ${texto}`);
+      const row = { tipo, texto, fuente, activo: true };
+      if (vec) row.embedding = vecLiteral(vec);
+      const created = await sbREST('pm_brain_memory', { method: 'POST', body: row, bearer, prefer: 'return=representation' });
+      res.status(200).json({ ok: true, memory: Array.isArray(created) ? created[0] : created, embedded: !!vec });
+      return;
+    }
+    if (req.method === 'PATCH') {
+      const id = String(b.id || '').trim();
+      if (!id) { res.status(400).json({ error: 'Falta id.' }); return; }
+      const patch = { updated_at: new Date().toISOString() };
+      if (typeof b.activo === 'boolean') patch.activo = b.activo;
+      if (MEM_TIPOS.includes(b.tipo)) patch.tipo = b.tipo;
+      if (typeof b.texto === 'string' && b.texto.trim()) {
+        patch.texto = b.texto.trim();
+        const vec = await embed(`${patch.tipo || b.tipo || 'nota'}: ${patch.texto}`);
+        if (vec) patch.embedding = vecLiteral(vec);
+      }
+      const updated = await sbREST(`pm_brain_memory?id=eq.${id}`, { method: 'PATCH', body: patch, bearer, prefer: 'return=representation' });
+      res.status(200).json({ ok: true, memory: Array.isArray(updated) ? updated[0] : updated });
+      return;
+    }
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch (e) {
+    res.status(500).json({ error: e.message || String(e) });
+  }
+}
 
 const MODEL = 'claude-opus-4-8';
 const MAX_TOKENS = 1400;
@@ -43,6 +88,8 @@ ${snap}${buildMemoryBlock(memory)}`;
 }
 
 export default async function handler(req, res) {
+  // Routing: ?resource=memory → CRUD de memoria; si no → chat.
+  if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
