@@ -167,24 +167,42 @@ async function ccLoadAll() {
 // ════════════════════════════════════════════════════════════════
 // MOTOR DE CÁLCULO (por casa, KPIs, insights)
 // ════════════════════════════════════════════════════════════════
+// REGLA DE UNIDADES (misma en toda la app): casa_completa=1, estudio=1, apto=1, y TODAS
+// las habitaciones de la casa juntas=1. Ocupación = ocupadas / total rentable.
+const CC_INDEP = ['casa_completa', 'apartamento', 'estudio'];
+function ccRentable(units) {
+  const indep = units.filter(u => CC_INDEP.includes(u.unit_type));
+  const rooms = units.filter(u => u.unit_type === 'habitacion');
+  const hasR = rooms.length ? 1 : 0;
+  const roomsOcc = rooms.some(u => ccUnitState(u) === 'ocupada');
+  const occ = indep.filter(u => ccUnitState(u) === 'ocupada').length + (hasR && roomsOcc ? 1 : 0);
+  const res = indep.filter(u => ccUnitState(u) === 'reservada' && ccUnitState(u) !== 'ocupada').length + (hasR && !roomsOcc && rooms.some(u => ccUnitState(u) === 'reservada') ? 1 : 0);
+  const mant = indep.filter(u => ccUnitState(u) === 'mant').length;
+  const total = indep.length + hasR;
+  return { total, occ, res, mant, free: Math.max(0, total - occ - res - mant), rooms: rooms.length };
+}
 function ccCompute() {
   const mb = ccMonthBounds();
   const inMonth = d => d && d >= mb.from && d <= mb.to;
   const H = {};
-  CC.props.forEach(p => H[p.id] = { id: p.id, name: p.name, zone: p.zone, model: p.rental_model, inc: 0, exp: 0, hipo: 0, units: [], occ: 0, res: 0, free: 0, mant: 0, pot: 0 });
-  CC.units.forEach(u => { const h = H[u.property_id]; if (!h) return; h.units.push(u); const s = ccUnitState(u); h[s === 'ocupada' ? 'occ' : s === 'reservada' ? 'res' : s === 'mant' ? 'mant' : 'free']++; h.pot += Number(u.target_rent || 0); });
+  CC.props.forEach(p => H[p.id] = { id: p.id, name: p.name, zone: p.zone, model: p.rental_model, inc: 0, exp: 0, hipo: 0, units: [], pot: 0 });
+  CC.units.forEach(u => { const h = H[u.property_id]; if (!h) return; h.units.push(u); h.pot += Number(u.target_rent || 0); });
   CC.pay.forEach(p => { if (inMonth(p.paid_at) && H[p.property_id]) H[p.property_id].inc += Number(p.amount || 0); });
   CC.exp.forEach(e => { if (inMonth(e.expense_date) && H[e.property_id]) { H[e.property_id].exp += Number(e.amount || 0); if (ccIsHipo(e)) H[e.property_id].hipo += Number(e.amount || 0); } });
-  const houses = Object.values(H).map(h => ({ ...h, net: h.inc - h.exp, total: h.units.length, pct: h.units.length ? Math.round((h.occ + h.res) / h.units.length * 100) : 0 }));
+  const houses = Object.values(H).map(h => { const r = ccRentable(h.units); return { ...h, net: h.inc - h.exp, total: r.total, occ: r.occ, res: r.res, free: r.free, mant: r.mant, pct: r.total ? Math.round(r.occ / r.total * 100) : 0 }; });
 
-  const totalU = CC.units.length, occU = CC.units.filter(u => ccUnitState(u) === 'ocupada').length, resU = CC.units.filter(u => ccUnitState(u) === 'reservada').length, freeU = CC.units.filter(u => ccUnitState(u) === 'libre').length;
+  // Global rentable (suma por casa, coherente con las fichas)
+  const totalU = houses.reduce((s, h) => s + h.total, 0);
+  const occU = houses.reduce((s, h) => s + h.occ, 0);
+  const resU = houses.reduce((s, h) => s + h.res, 0);
+  const freeU = houses.reduce((s, h) => s + h.free, 0);
   const inc = CC.pay.filter(p => inMonth(p.paid_at)).reduce((s, p) => s + Number(p.amount || 0), 0);
   const expT = CC.exp.filter(e => inMonth(e.expense_date)).reduce((s, e) => s + Number(e.amount || 0), 0);
   const potTotal = CC.units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const potFree = CC.units.filter(u => ccUnitState(u) === 'libre').reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const capture = potTotal ? Math.round((potTotal - potFree) / potTotal * 100) : 0;
 
-  return { mb, houses, kpi: { totalU, occU, resU, freeU, occPct: totalU ? Math.round((occU + resU) / totalU * 100) : 0, inc, expT, cashflow: inc - expT, potTotal, potFree, capture } };
+  return { mb, houses, kpi: { totalU, occU, resU, freeU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, inc, expT, cashflow: inc - expT, potTotal, potFree, capture } };
 }
 
 // ─── INSIGHTS (reglas rankeadas por $ de impacto) ───
@@ -287,7 +305,7 @@ function ccSecCommand(comp) {
     ${ccHeader('Command Center', 'Rentas', 'Todo el negocio de rentas en una sola vista — propiedades, reservas, operación y finanzas.')}
     <div class="grid kpis">
       <div class="card kpi occ"><div><div class="lab">Ocupación</div>
-        <div class="meta" style="margin-top:10px">${kpi.occU + kpi.resU} de ${kpi.totalU} unidades<br><span class="${kpi.occPct >= 80 ? 'up' : 'warn'}">${kpi.occU} ocupadas · ${kpi.resU} reservadas</span></div></div>
+        <div class="meta" style="margin-top:10px">${kpi.occU} de ${kpi.totalU} unidades<br><span class="${kpi.occPct >= 80 ? 'up' : 'warn'}">${kpi.occU} ocupadas · ${kpi.resU} reservadas · ${kpi.freeU} libres</span></div></div>
         <div class="ring" style="background:conic-gradient(from -90deg,var(--a1),var(--a2) ${kpi.occPct}%,rgba(255,255,255,.07) 0)"><i>${kpi.occPct}%</i></div></div>
       <div class="card kpi"><div class="lab">Cashflow del mes · ${comp.mb.label}</div>
         <div class="big ${cf < 0 ? 'down' : 'up'}">${CC_MONEY(cf)}</div>

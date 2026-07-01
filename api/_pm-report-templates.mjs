@@ -92,7 +92,7 @@ function barColor(pct) { return pct >= 80 ? "var(--green-d)" : pct >= 50 ? "var(
 export function weeklyReportHTML(d) {
   const o = d.occupancy;
   const occBanner = o.pct >= 85
-    ? `<div class="banner ok">✅ <span>Ocupación saludable: <b>${o.pct}%</b> (${o.occupied + o.reserved}/${o.total} unidades ocupadas o reservadas).</span></div>`
+    ? `<div class="banner ok">✅ <span>Ocupación saludable: <b>${o.pct}%</b> (${o.occupied}/${o.total} unidades ocupadas · ${o.reserved} reservadas).</span></div>`
     : `<div class="banner warn">⚠️ <span>Ocupación en <b>${o.pct}%</b> — hay <b>${o.free}</b> unidad(es) libre(s) para colocar.</span></div>`;
 
   const lowRows = d.lowOccupancy.slice(0, 12).map((h) => `
@@ -112,7 +112,7 @@ export function weeklyReportHTML(d) {
       <div class="sec">${occBanner}</div>
       <div class="sec">
         <div class="grid g4">
-          <div class="kpi neutral"><div class="lbl">Ocupación global</div><div class="val">${o.pct}%</div><div class="note">${o.occupied + o.reserved}/${o.total} unidades</div></div>
+          <div class="kpi neutral"><div class="lbl">Ocupación global</div><div class="val">${o.pct}%</div><div class="note">${o.occupied}/${o.total} unidades ocupadas</div></div>
           <div class="kpi good"><div class="lbl">Ocupadas</div><div class="val">${o.occupied}</div><div class="note">+ ${o.reserved} reservadas</div></div>
           <div class="kpi ${o.free > 0 ? "bad" : "good"}"><div class="lbl">Libres</div><div class="val">${o.free}</div><div class="note">para colocar</div></div>
           <div class="kpi ${d.criticalAlerts.length ? "bad" : "good"}"><div class="lbl">Alertas críticas</div><div class="val">${d.criticalAlerts.length}</div><div class="note">${d.warningCount} advertencias</div></div>

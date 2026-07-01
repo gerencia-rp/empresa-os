@@ -1303,12 +1303,16 @@ function pmRenderPropertyCardInline(p) {
                    : p.rental_model === 'por_apartamentos' ? '🏢 Apartamentos'
                    : p.rental_model === 'mixta' ? '🔀 Mixta'
                    : '🔀 Mixto';
-  // Encabezado y pie de la ficha: conteo FÍSICO por unidad (coherente con los badges).
-  // Entre paréntesis se muestra el conteo "rentable" (regla hab juntas=1) usado en el
-  // dashboard/reportes, solo cuando difiere (casas por habitaciones).
+  // REGLA DE UNIDADES (única en toda la app): habitaciones de la casa juntas = 1.
+  // El label de "unidades" y la ocupación usan el conteo RENTABLE; las habitaciones
+  // físicas se muestran como detalle entre paréntesis. Los badges de abajo siguen
+  // mostrando el Estado de cada habitación (drill-down).
   const rentN = pmRentableUnitsOf(p.id);
-  const physLabel = `${units.length} unid`;
-  const rentNote = rentN !== units.length ? ` (${rentN} rentable${rentN===1?'':'s'})` : '';
+  const rentOcc = pmOccupiedRentableUnitsOf(p.id);
+  const rentRes = pmReservedRentableUnitsOf(p.id);
+  const rentFree = Math.max(0, rentN - rentOcc - rentRes);
+  const physLabel = `${rentN} unid`;
+  const rentNote = units.length !== rentN ? ` (${units.length} habitaciones)` : '';
 
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden ${expanded?'ring-2 ring-emerald-200':''}">
@@ -1334,7 +1338,7 @@ function pmRenderPropertyCardInline(p) {
           <div class="hidden md:block">
             <div class="text-[9px] uppercase text-slate-500 font-bold">${modelLabel}</div>
             <div class="text-[11px] text-slate-700">
-              ${physLabel} · ${occupiedUnits.length} ocup · ${freeUnits} disp · $${potentialMo.toLocaleString()}/mes
+              ${physLabel} · ${rentOcc} ocup · ${rentFree} disp · $${potentialMo.toLocaleString()}/mes
             </div>
           </div>
           <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1.5 rounded" title="Generar la Guía de Bienvenida / Check-in en PDF">📄 Guía Check-in</button>
