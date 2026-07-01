@@ -111,6 +111,15 @@ function ffInjectCSS() {
   #ff-overlay .cbub.err{border-color:rgba(240,104,122,.4);color:var(--neg)}#ff-overlay .cbub.think{color:var(--mut2);font-style:italic}
   #ff-overlay .cbub p{margin:0 0 6px}#ff-overlay .cbub p:last-child{margin:0}#ff-overlay .cbub ul,#ff-overlay .cbub ol{margin:4px 0 6px 18px}#ff-overlay .cbub li{margin:3px 0}
   @keyframes ffblink{0%,100%{opacity:.35}50%{opacity:1}}#ff-overlay .cbub.think::after{content:"▋";animation:ffblink 1s infinite}
+  #ff-overlay .uwbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  #ff-overlay .uwbar label{font-size:12px;color:var(--mut)}#ff-overlay .uwtag{font-size:11px;color:var(--a1)}
+  #ff-overlay .uwrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  #ff-overlay .uwrow label{font-size:11.5px;color:var(--mut);flex:1}
+  #ff-overlay .uwbar select,#ff-overlay .uwrow input,#ff-overlay .uwrow select{background:var(--glass);border:1px solid var(--glassb);border-radius:9px;color:var(--ink);font-size:12px;padding:8px 10px;outline:none}
+  #ff-overlay .uwrow input{width:132px;text-align:right}#ff-overlay .uwrow select{width:150px}
+  #ff-overlay .uwrow input:focus,#ff-overlay .uwrow select:focus,#ff-overlay .uwbar select:focus{border-color:var(--a2)}
+  #ff-overlay .uwres{margin-top:10px;padding-top:10px;border-top:1px solid var(--glassb)}
+  #ff-overlay .uwbig{font-size:22px;font-weight:760;letter-spacing:-.4px}#ff-overlay .uwsub{font-size:10.5px;color:var(--mut2);margin-top:3px;line-height:1.5}
   /* KANBAN */
   #ff-overlay .kan{display:flex;gap:13px;overflow-x:auto;padding-bottom:8px}
   #ff-overlay .kcol{flex:1;min-width:210px}
@@ -265,7 +274,7 @@ const FF_NAV = [
   ['command', '◧', 'Command Center', null],
   ['deals', '▦', 'Deals & Pipeline', () => FF.deals.length],
   ['propiedades', '⌂', 'Propiedades', null],
-  ['underwriting', '∑', 'Underwriting', 'soon'],
+  ['underwriting', '∑', 'Underwriting', null],
   ['inversionistas', '◍', 'Inversionistas', () => FF.investors.length || null],
   ['finanzas', '$', 'Finanzas · QuickBooks', 'soon'],
   ['analitica', '▤', 'Analítica & KPIs', 'soon'],
@@ -281,7 +290,7 @@ function ffRender() {
   ffDestroyCharts();
   main.innerHTML = ({
     command: () => ffSecCommand(comp), deals: () => ffSecDeals(comp), propiedades: () => ffSecPropiedades(comp),
-    underwriting: () => ffSoon('Underwriting & Calculadoras', 'MAO, estimador de remodelación calibrado con tus 25+ deals, HML, cash-out refi, predictor de cashflow y ARV.'),
+    underwriting: () => ffSecUnderwriting(comp),
     inversionistas: () => ffSecInversionistas(comp),
     finanzas: () => ffSoon('Finanzas · QuickBooks', 'P&L / balance / cashflow + conciliación Airtable↔QuickBooks (overhead ~$146k fuera de libros, gap de intereses, cap table de inversionistas).'),
     analitica: () => ffSoon('Analítica & KPIs', 'Tendencias, margen por deal, capital desplegado por etapa, velocidad de venta, ROI por estrategia.'),
@@ -442,10 +451,115 @@ async function ffAsk(q) {
 window.ffAsk = ffAsk;
 
 // ════════════════════════════════════════════════════════════════
+// UNDERWRITING & CALCULADORAS (leen de la base, no re-ingresan)
+// ════════════════════════════════════════════════════════════════
+function ffNum(id, def) { const el = document.getElementById(id); const v = el ? parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) : NaN; return isNaN(v) ? (def || 0) : v; }
+// Calibración $/sqft desde los deals reales (para el estimador).
+function ffCalib() {
+  const psf = FF.deals.filter(d => Number(d.remodel_est) > 0 && Number(d.sqft) > 0).map(d => Number(d.remodel_est) / Number(d.sqft)).sort((a, b) => a - b);
+  const pct = q => psf.length ? psf[Math.min(psf.length - 1, Math.floor(q * psf.length))] : 0;
+  return { n: psf.length, min: psf[0] || 0, max: psf[psf.length - 1] || 0, p33: pct(0.33), p66: pct(0.66), avg: psf.reduce((s, v) => s + v, 0) / (psf.length || 1) };
+}
+function ffSecUnderwriting(comp) {
+  FF.uw = FF.uw || {}; const cal = ffCalib();
+  const deals = comp.deals; const sel = FF.uw.dealId ? deals.find(d => d.id === FF.uw.dealId) : null;
+  // Defaults del deal seleccionado (o vacíos)
+  const dv = sel ? { arv: sel.arv, rem: Math.round(sel.remComplete), hold: Math.round(sel.holding), buy: sel.purchase, sqft: sel.sqft || '', payoff: Math.round(sel.allIn), app: sel.appraisal || sel.arv } : { arv: '', rem: '', hold: '', buy: '', sqft: '', payoff: '', app: '' };
+  // Semáforo de recuperación del déficit
+  const semColor = m => m == null ? 'var(--mut2)' : (m <= 12 ? 'var(--pos)' : m <= 36 ? 'var(--amber)' : 'var(--neg)');
+  const recRows = deals.filter(d => d.arv > 0).map(d => {
+    const roi = d.allIn ? d.margin / d.allIn : 0;
+    const monthlyNet = Math.max(1, Math.round(d.arv * 0.005)); // proxy neto mensual ~0.5% ARV
+    const rec = d.deficit < 0 ? Math.round(-d.deficit / monthlyNet) : 0;
+    return { ...d, roi, rec: d.deficit < 0 ? rec : null };
+  }).sort((a, b) => (b.rec || 0) - (a.rec || 0));
+  // Ingeniería inversa: casas que NO nacen en déficit (net ≥ -15k) → su fórmula de draw.
+  const sanas = deals.filter(d => d.dr && Number(d.dr.net_total) > -15000).sort((a, b) => Number(b.dr.net_total) - Number(a.dr.net_total)).slice(0, 6);
+  return `${ffHeader('Underwriting', 'Calculadoras', 'Todas leen de la base — elegí un deal para autocompletar. MAO, remodelación calibrada, HML, refi, ROI y recuperación del déficit.')}
+    <div class="uwbar"><label>Autocompletar desde deal:</label>
+      <select id="ff-uw-deal" onchange="ffUwPick(this.value)"><option value="">— elegí un deal —</option>${deals.map(d => `<option value="${d.id}"${sel && sel.id === d.id ? ' selected' : ''}>${FF_ESC(ffShort(d.address))} (${FF_STAGE_LBL[d.stage]})</option>`).join('')}</select>
+      ${sel ? `<span class="uwtag">${FF_ESC(ffShort(sel.address))} · ARV ${FF_MONEY(sel.arv)} · all-in ${FF_MONEY(sel.allIn)}</span>` : ''}</div>
+    <div class="grid row3">
+      <div class="card"><div class="chart-h"><div class="t">MAO · Máxima Oferta</div><div class="k">ARV×75% − costos</div></div>
+        ${ffUwIn('mao-arv', 'ARV', dv.arv)}${ffUwIn('mao-rem', 'Remodelación', dv.rem)}${ffUwIn('mao-hold', 'Holding', dv.hold)}
+        ${ffUwIn('mao-close', 'Cierre (%ARV)', 2)}${ffUwIn('mao-lend', 'Lender fees (%)', 2)}${ffUwIn('mao-cont', 'Contingencia (%rem)', 10)}
+        <div class="uwres" id="ff-mao-res"></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Estimador de remodelación</div><div class="k">calibrado · ${cal.n} deals</div></div>
+        ${ffUwIn('est-sqft', 'Sqft', dv.sqft)}
+        <div class="uwrow"><label>Alcance</label><select id="ff-est-scope" onchange="ffEstim()"><option value="ligero">Ligero ($${Math.round(cal.min)}–${Math.round(cal.p33)}/sqft)</option><option value="medio" selected>Medio ($${Math.round(cal.p33)}–${Math.round(cal.p66)}/sqft)</option><option value="pesado">Pesado ($${Math.round(cal.p66)}–${Math.round(cal.max)}/sqft)</option></select></div>
+        <div class="uwres" id="ff-est-res"></div>
+        <div style="border-top:1px solid var(--glassb);margin:10px 0;padding-top:10px"><div class="k" style="margin-bottom:6px">Validá un monto:</div>${ffUwIn('est-val', 'Monto remodelación', dv.rem)}<div class="uwres" id="ff-est-val"></div></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Préstamo / HML</div><div class="k">pago mensual</div></div>
+        ${ffUwIn('hml-amt', 'Monto préstamo', dv.payoff)}${ffUwIn('hml-rate', 'Tasa anual (%)', 12)}
+        <div class="uwrow"><label>Tipo</label><select id="ff-hml-type" onchange="ffHml()"><option value="io" selected>Solo interés (HML)</option><option value="am">Amortizado</option></select></div>
+        ${ffUwIn('hml-term', 'Plazo (meses)', 360)}<div class="uwres" id="ff-hml-res"></div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Cash-out refi</div><div class="k">appraisal×75% − payoff · regla: no superar el pago actual</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>${ffUwIn('refi-app', 'Appraisal', dv.app)}${ffUwIn('refi-ltv', 'LTV (%)', 75)}${ffUwIn('refi-payoff', 'Payoff (deuda actual)', dv.payoff)}</div>
+          <div>${ffUwIn('refi-rate', 'Tasa refi (%)', 7)}${ffUwIn('refi-cur', 'Pago actual/mes', sel ? Math.round(sel.hml_payment || sel.holding / 6) : '')}<div class="uwres" id="ff-refi-res"></div></div></div></div>
+      <div class="card"><div class="chart-h"><div class="t">🔁 Ingeniería inversa · la fórmula que funciona</div><div class="k">casas que NO nacen en déficit</div></div>
+        <div class="k" style="margin-bottom:8px">El draw que cubrió la operación (Remodelación → Rentas). Aplicá esta estructura a deals nuevos.</div>
+        <table class="ptable"><thead><tr><th>Casa</th><th>Draw total</th><th>Remod.</th><th>Holding</th><th>Resultado</th></tr></thead><tbody>
+        ${sanas.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_MONEY(d.dr.total_draws)}</td><td>${FF_MONEY(d.dr.remodel_complete)}</td><td>${FF_MONEY(Number(d.dr.interest_hml || 0) + Number(d.dr.services_hml || 0) + Number(d.dr.interest_until_rent || 0))}</td><td class="up">${FF_MONEY(d.dr.net_total)}</td></tr>`).join('')}</tbody></table></div>
+    </div>
+    <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">ROI y recuperación del déficit</div><div class="k">semáforo: &lt;12m 🟢 · 12–36m 🟡 · &gt;36m 🔴 (neto mensual ~0.5% ARV)</div></div>
+      <table class="ptable"><thead><tr><th>Casa</th><th>Estrat.</th><th>All-in</th><th>Margen/Equity</th><th>ROI</th><th>Déficit</th><th>Recuperación</th></tr></thead><tbody>
+      ${recRows.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td>${Math.round(d.roi * 100)}%</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${d.rec != null ? `<span style="color:${semColor(d.rec)};font-weight:700">${d.rec} meses</span>` : '<span class="up">sin déficit ✓</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function ffUwIn(id, label, val) { return `<div class="uwrow"><label>${label}</label><input id="ff-${id}" value="${val === '' || val == null ? '' : val}" oninput="ffUwCalc()" inputmode="decimal"></div>`; }
+function ffUwPick(id) { FF.uw = FF.uw || {}; FF.uw.dealId = id || null; ffRender(); }
+window.ffUwPick = ffUwPick;
+function ffUwCalc() { ffMao(); ffEstim(); ffValRemod(); ffHml(); ffRefi(); }
+window.ffUwCalc = ffUwCalc;
+function ffMao() {
+  const arv = ffNum('ff-mao-arv'), rem = ffNum('ff-mao-rem'), hold = ffNum('ff-mao-hold');
+  const close = arv * ffNum('ff-mao-close', 2) / 100, lend = arv * 0.75 * ffNum('ff-mao-lend', 2) / 100, cont = rem * ffNum('ff-mao-cont', 10) / 100;
+  const mao = arv * 0.75 - rem - hold - close - lend - cont;
+  const buy = FF.uw.dealId ? (FF.deals.find(d => d.id === FF.uw.dealId)?.purchase_price || 0) : 0;
+  const el = document.getElementById('ff-mao-res'); if (!el) return;
+  el.innerHTML = arv > 0 ? `<div class="uwbig">${FF_MONEY(mao)}</div><div class="uwsub">máxima oferta recomendada${buy ? ` · compra real ${FF_MONEY(buy)} <b class="${buy <= mao ? 'up' : 'down'}">${buy <= mao ? '✓ bajo MAO' : '⚠ sobre MAO'}</b>` : ''}</div>` : '<div class="uwsub">Ingresá el ARV.</div>';
+}
+window.ffMao = ffMao;
+function ffEstim() {
+  const cal = ffCalib(); const sqft = ffNum('ff-est-sqft'); const scope = (document.getElementById('ff-est-scope') || {}).value || 'medio';
+  const rng = scope === 'ligero' ? [cal.min, cal.p33] : scope === 'pesado' ? [cal.p66, cal.max] : [cal.p33, cal.p66];
+  const el = document.getElementById('ff-est-res'); if (!el) return;
+  el.innerHTML = sqft > 0 ? `<div class="uwbig">${FF_MONEY(sqft * rng[0])} – ${FF_MONEY(sqft * rng[1])}</div><div class="uwsub">estimado (${scope}) · $${Math.round(rng[0])}–${Math.round(rng[1])}/sqft calibrado</div>` : '<div class="uwsub">Ingresá los sqft.</div>';
+  ffValRemod();
+}
+window.ffEstim = ffEstim;
+function ffValRemod() {
+  const cal = ffCalib(); const sqft = ffNum('ff-est-sqft'); const val = ffNum('ff-est-val');
+  const el = document.getElementById('ff-est-val'); if (!el) return;
+  if (!(sqft > 0 && val > 0)) { el.innerHTML = '<div class="uwsub">Sqft + monto para validar.</div>'; return; }
+  const psf = val / sqft; const dentro = psf >= cal.min && psf <= cal.max;
+  el.innerHTML = `<div class="uwbig" style="color:${dentro ? 'var(--pos)' : 'var(--neg)'}">$${Math.round(psf)}/sqft ${dentro ? '✓' : '⚠ FUERA DE RANGO'}</div><div class="uwsub">rango real $${Math.round(cal.min)}–${Math.round(cal.max)}/sqft${dentro ? '' : ' · revisá el monto (posible error de carga)'}</div>`;
+}
+window.ffValRemod = ffValRemod;
+function ffHml() {
+  const amt = ffNum('ff-hml-amt'), rate = ffNum('ff-hml-rate', 12) / 100, type = (document.getElementById('ff-hml-type') || {}).value, n = ffNum('ff-hml-term', 360);
+  let pago; if (type === 'am' && n > 0) { const r = rate / 12; pago = r ? amt * r / (1 - Math.pow(1 + r, -n)) : amt / n; } else pago = amt * rate / 12;
+  const el = document.getElementById('ff-hml-res'); if (!el) return;
+  el.innerHTML = amt > 0 ? `<div class="uwbig">${FF_MONEY(pago)}/mes</div><div class="uwsub">${type === 'am' ? `amortizado ${n}m` : 'solo interés (HML)'} · ${Math.round(rate * 100)}% anual</div>` : '<div class="uwsub">Ingresá el monto.</div>';
+}
+window.ffHml = ffHml;
+function ffRefi() {
+  const app = ffNum('ff-refi-app'), ltv = ffNum('ff-refi-ltv', 75) / 100, payoff = ffNum('ff-refi-payoff'), rate = ffNum('ff-refi-rate', 7) / 100, cur = ffNum('ff-refi-cur');
+  const newLoan = app * ltv; const cashOut = newLoan - payoff; const newPay = newLoan * rate / 12;
+  const el = document.getElementById('ff-refi-res'); if (!el) return;
+  const supera = cur > 0 && newPay > cur;
+  el.innerHTML = app > 0 ? `<div class="uwbig ${cashOut >= 0 ? 'up' : 'down'}">${FF_MONEY(cashOut)}</div><div class="uwsub">cash-out · nuevo pago ${FF_MONEY(newPay)}/mes${cur ? ` <b class="${supera ? 'down' : 'up'}">${supera ? '⚠ supera el pago actual' : '✓ ≤ pago actual'}</b>` : ''}</div>` : '<div class="uwsub">Ingresá el appraisal.</div>';
+}
+window.ffRefi = ffRefi;
+
+// ════════════════════════════════════════════════════════════════
 // CHARTS
 // ════════════════════════════════════════════════════════════════
 function ffDestroyCharts() { FF._charts.forEach(c => { try { c.destroy(); } catch (e) {} }); FF._charts = []; }
 function ffMountCharts(comp) {
+  if (document.getElementById('ff-mao-res')) ffUwCalc(); // calcula al montar Underwriting
   if (!window.Chart) return;
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} FF._charts.push(new Chart(el, cfg)); };
   const ax = { grid: { color: ffGridC() }, ticks: { color: ffAx(), font: { size: 10 } } };
