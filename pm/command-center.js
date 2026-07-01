@@ -7,7 +7,7 @@
 const CC = {
   sys: null, section: 'command', loading: false, loadError: null,
   props: [], units: [], pay: [], exp: [], book: [], tenants: [], tasks: [], alerts: [],
-  _charts: [],
+  _charts: [], chat: [], chatBusy: false,
 };
 window.CC = CC;
 
@@ -109,6 +109,18 @@ function ccInjectCSS() {
   #cc-overlay .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
   #cc-overlay .chip{font-size:11px;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}
   #cc-overlay .chip:hover{color:#fff;border-color:rgba(138,123,255,.45)}
+  #cc-overlay .cc-chat{margin-top:14px;display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto;padding-right:4px}
+  #cc-overlay .cc-chat:empty{display:none}
+  #cc-overlay .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+  #cc-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3);color:#eaf2ff}
+  #cc-overlay .cbub.a{align-self:flex-start;background:rgba(255,255,255,.04);border:1px solid var(--glassb);color:#d6ddec}
+  #cc-overlay .cbub.a b{color:#fff}#cc-overlay .cbub.a strong{color:#fff}
+  #cc-overlay .cbub.err{border-color:rgba(240,104,122,.4);color:#f7b9c2}
+  #cc-overlay .cbub.think{color:var(--mut2);font-style:italic}
+  #cc-overlay .cbub p{margin:0 0 6px}#cc-overlay .cbub p:last-child{margin:0}
+  #cc-overlay .cbub ul{margin:4px 0 6px 18px;list-style:disc}#cc-overlay .cbub ol{margin:4px 0 6px 20px;list-style:decimal}
+  #cc-overlay .cbub li{margin:3px 0;padding-left:2px}#cc-overlay .cbub li p{display:inline;margin:0}
+  @keyframes ccblink{0%,100%{opacity:.35}50%{opacity:1}}#cc-overlay .cbub.think::after{content:"▋";animation:ccblink 1s infinite}
   #cc-overlay .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #cc-overlay .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.07);font-weight:700}
   #cc-overlay .ptable td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -237,6 +249,33 @@ function ccInsights(comp) {
   return ins;
 }
 
+// ─── SNAPSHOT compacto para el Cerebro (Fase 2, chat) ───
+// Solo números y nombres reales. Se manda al endpoint /api/brain-chat.
+function ccSnapshot(comp) {
+  const { kpi, houses, mb } = comp;
+  const insights = ccInsights(comp);
+  const stripTags = s => String(s || '').replace(/<[^>]+>/g, '');
+  const today = new Date().toISOString().slice(0, 10);
+  const open = CC.tasks.filter(t => t.status !== 'completado' && t.status !== 'cancelado');
+  return {
+    mes: mb.label,
+    portafolio: {
+      casas: CC.props.length, unidades_rentables: kpi.totalU,
+      ocupadas: kpi.occU, reservadas: kpi.resU, libres: kpi.freeU, ocupacion_pct: kpi.occPct,
+      ingresos_mes: kpi.inc, gastos_mes: kpi.expT, cashflow_mes: kpi.cashflow,
+      renta_potencial_mes: kpi.potTotal, potencial_sin_cobrar: kpi.potFree, captura_pct: kpi.capture,
+      inquilinos: CC.tenants.length, tareas_abiertas: open.length, tareas_atrasadas: open.filter(t => t.scheduled_date && t.scheduled_date < today).length,
+    },
+    casas: houses.filter(h => h.total).map(h => ({
+      nombre: h.name, zona: ccZoneLabel(h.zone), modelo: h.model,
+      unidades: h.total, ocupadas: h.occ, libres: h.free, ocupacion_pct: h.pct,
+      ingreso: Math.round(h.inc), gasto: Math.round(h.exp), hipoteca: Math.round(h.hipo),
+      cashflow: Math.round(h.net), renta_potencial: Math.round(h.pot),
+    })).sort((a, b) => a.cashflow - b.cashflow),
+    insights_top: insights.slice(0, 12).map(i => ({ tipo: i.sev, tag: i.tag, detalle: stripTags(i.tx), impacto_usd: Math.round(i.impact) })),
+  };
+}
+
 // ════════════════════════════════════════════════════════════════
 // RENDER
 // ════════════════════════════════════════════════════════════════
@@ -361,20 +400,74 @@ function ccSecCerebro(comp) {
       <div class="card kpi"><div class="lab">Oportunidad recuperable</div><div class="big glow">${CC_MONEY(comp.kpi.potFree)}</div><div class="meta">colocando ${comp.kpi.freeU} unidades libres</div></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card brain">
-      <div class="bh"><div class="orb"></div><div><b>Análisis en vivo</b><span>${insights.length} INSIGHTS · RANKEADOS POR $</span></div></div>
+      <div class="bh"><div class="orb"></div><div><b>Chateá con el Cerebro</b><span>PREGUNTÁ SOBRE TUS NÚMEROS · SOLO LECTURA</span></div></div>
+      <div id="cc-chat" class="cc-chat">${ccChatHTML()}</div>
+      <div class="ask"><input id="cc-ask" placeholder="Preguntá a tu copiloto…" onkeydown="if(event.key==='Enter')ccAsk()"><button onclick="ccAsk()">Enviar</button></div>
+      <div class="chips"><span class="chip" onclick="ccAsk('¿Cuáles son las casas en rojo este mes y por qué?')">¿Casas en rojo y por qué?</span><span class="chip" onclick="ccAsk('¿Qué unidades libres conviene colocar primero para recuperar más plata?')">¿Qué colocar primero?</span><span class="chip" onclick="ccAsk('Dame un resumen ejecutivo del mes en 4 puntos.')">Resumen ejecutivo</span></div>
+    </div></div>
+    <div class="grid" style="margin-top:16px"><div class="card">
+      <div class="bh"><div class="orb" style="width:26px;height:26px"></div><div><b>Análisis en vivo</b><span>${insights.length} INSIGHTS · RANKEADOS POR $ (REGLAS · SIN IA)</span></div></div>
       ${insights.map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}<div class="tag">${i.tag}${i.impact ? ` · ${CC_MONEY(i.impact)}` : ''}</div></div>
         ${i.sec ? `<span class="chip" style="margin-left:auto;align-self:center" onclick="ccGo('${i.sec}')">Ver →</span>` : ''}</div>`).join('')}
-      <div class="ask"><input id="cc-ask" placeholder="Preguntá a tu copiloto (Fase 2 — requiere ANTHROPIC_API_KEY)…" onkeydown="if(event.key==='Enter')ccAsk()"><button onclick="ccAsk()">Enviar</button></div>
-      <div class="chips"><span class="chip" onclick="ccAsk('¿Cuáles son las casas en rojo este mes?')">¿Casas en rojo este mes?</span><span class="chip" onclick="ccAsk('Proyectá el cashflow a 3 meses')">Proyectá el cashflow a 3 meses</span><span class="chip" onclick="ccAsk('¿Qué unidades conviene colocar primero?')">¿Qué colocar primero?</span></div>
     </div></div>`;
 }
+// Render de las burbujas del chat (markdown seguro si marked+DOMPurify están).
+function ccMdSafe(t) {
+  try { if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(String(t))); } catch (e) {}
+  return CC_ESC(t);
+}
+function ccChatHTML() {
+  return CC.chat.map(m => m.role === 'user'
+    ? `<div class="cbub u">${CC_ESC(m.content)}</div>`
+    : `<div class="cbub a${m.error ? ' err' : ''}${m.thinking ? ' think' : ''}">${m.thinking ? 'Pensando' : ccMdSafe(m.content)}</div>`).join('');
+}
+function ccRenderChat() {
+  const el = document.getElementById('cc-chat'); if (!el) return;
+  el.innerHTML = ccChatHTML();
+  el.scrollTop = el.scrollHeight;
+}
 async function ccAsk(q) {
-  const inp = document.getElementById('cc-ask'); const question = q || (inp ? inp.value.trim() : '');
-  if (!question) return;
-  // Fase 2: /api/brain-chat con ANTHROPIC_API_KEY. Placeholder por ahora.
-  if (window.toast) toast('💬 El chat del Cerebro (Fase 2) necesita ANTHROPIC_API_KEY en Vercel. Los insights automáticos (Fase 1) ya funcionan abajo.', 'info', { duration: 5000 });
+  const inp = document.getElementById('cc-ask'); const question = (q || (inp ? inp.value.trim() : '')).trim();
+  if (!question || CC.chatBusy) return;
+  if (inp) inp.value = '';
+  // El chat vive en la sección Cerebro. Si estamos en otra, saltamos ahí y disparamos.
+  if (!document.getElementById('cc-chat')) { ccGo('cerebro'); setTimeout(() => ccSendChat(question), 80); return; }
+  ccSendChat(question);
 }
 window.ccAsk = ccAsk;
+
+async function ccSendChat(question) {
+  if (CC.chatBusy) return;
+  CC.chatBusy = true;
+  CC.chat.push({ role: 'user', content: question });
+  CC.chat.push({ role: 'assistant', content: '', thinking: true });
+  ccRenderChat();
+  // Historial previo (sin la pregunta recién pusheada ni el "pensando").
+  const history = CC.chat.filter(m => !m.thinking && !m.error).slice(0, -1)
+    .map(m => ({ role: m.role, content: m.content }));
+  const snapshot = ccSnapshot(ccCompute());
+  try {
+    const r = await fetch('/api/brain-chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question, snapshot, history }),
+    });
+    const data = await r.json().catch(() => ({}));
+    CC.chat.pop(); // saca el "pensando"
+    if (!r.ok) {
+      const err = data.error || `Error (HTTP ${r.status}).`;
+      CC.chat.push({ role: 'assistant', content: err, error: true });
+    } else {
+      CC.chat.push({ role: 'assistant', content: data.answer || 'Sin respuesta.' });
+    }
+  } catch (e) {
+    CC.chat.pop();
+    CC.chat.push({ role: 'assistant', content: 'No pude conectar con el Cerebro: ' + (e.message || e), error: true });
+  } finally {
+    CC.chatBusy = false;
+    ccRenderChat();
+  }
+}
+window.ccSendChat = ccSendChat;
 
 // ─── SECCIÓN: PROPIEDADES ───
 function ccSecPropiedades(comp) {
