@@ -161,6 +161,13 @@ function ccInjectCSS() {
   #cc-overlay .op-zone{margin-left:auto;font-size:9.5px;padding:2px 9px;border-radius:20px;color:var(--mut)}
   #cc-overlay .z-n{background:rgba(69,227,198,.12)}#cc-overlay .z-s{background:rgba(255,255,255,.05)}
   #cc-overlay .empty-sec{padding:60px;text-align:center;color:var(--mut2)}
+  #cc-overlay .dqcat{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}#cc-overlay .dqcat:last-child{border-bottom:none}
+  #cc-overlay .dqhead{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:640;color:#e6ebf5;margin-bottom:7px}
+  #cc-overlay .dqcount{font-size:10px;font-weight:700;background:rgba(240,104,122,.14);color:var(--neg);padding:2px 9px;border-radius:20px}
+  #cc-overlay .dqrow{display:flex;gap:12px;font-size:11.5px;padding:3px 0 3px 22px;color:var(--mut)}
+  #cc-overlay .dqitem{color:#cdd6e6;min-width:150px;font-weight:500}#cc-overlay .dqdetail{color:var(--mut2)}
+  #cc-overlay .dqmore{font-size:11px;color:var(--mut2);padding:3px 0 3px 22px}
+  #cc-overlay .dqnote{font-size:11px;color:var(--a1);padding:6px 0 2px 22px;opacity:.9}#cc-overlay .dqnote b{color:#7ff0dc}
   `;
   document.head.appendChild(st);
 }
@@ -327,6 +334,46 @@ function ccSnapshot(comp) {
   };
 }
 
+// ─── CALIDAD DE DATOS (accionable; la app NO escribe, se corrige en Airtable) ───
+function ccDataQuality(comp) {
+  const pName = id => (CC.props.find(p => p.id === id)?.name || 'Sin casa').split(',')[0];
+  const cats = [];
+  const push = (cat, icon, tabla, items) => { if (items.length) cats.push({ cat, icon, tabla, items }); };
+  // 1) Ocupadas sin ingreso (cobranza/registro)
+  push('Ocupadas sin ingreso registrado', '💸', 'Pagos', comp.houses
+    .filter(h => h.occ > 0 && h.occRent > 0 && h.inc < h.occRent * 0.35)
+    .sort((a, b) => (b.occRent - b.inc) - (a.occRent - a.inc))
+    .map(h => ({ item: h.name.split(',')[0], detail: `${h.occ} u. ocupada(s) · facturó ${CC_MONEY(h.inc)} de ~${CC_MONEY(h.occRent)}` })));
+  // 2) Unidades sin renta objetivo
+  push('Unidades sin renta objetivo', '🏷️', 'Unidades', CC.units
+    .filter(u => !Number(u.target_rent) && ccUnitState(u) !== 'libre')
+    .map(u => ({ item: `${pName(u.property_id)} · ${CC_ESC(u.name || u.unit_type || 'unidad')}`, detail: 'Renta objetivo vacía' })));
+  // 3) Reservas sin fecha de entrada
+  push('Reservas sin fecha de entrada', '📅', 'Reservas', CC.book
+    .filter(b => !b.start_date)
+    .map(b => ({ item: pName(b.property_id), detail: `estado ${b.status || '—'} · sin Fecha Entrada` })));
+  // 4) Gastos sin monto
+  push('Gastos sin monto', '🧾', 'Gastos', CC.exp
+    .filter(e => !Number(e.amount))
+    .slice(0, 30)
+    .map(e => ({ item: pName(e.property_id), detail: `${CC_ESC(e.subcategory || e.category || 'gasto')} · monto vacío` })));
+  const total = cats.reduce((s, c) => s + c.items.length, 0);
+  return { cats, total };
+}
+function ccDataQualityCard(comp) {
+  const dq = ccDataQuality(comp);
+  const notaTabla = t => `Corregir en Airtable → tabla <b>${t}</b>`;
+  return `<div class="grid" style="margin-top:16px"><div class="card">
+    <div class="chart-h"><div class="t">🔎 Calidad de datos${dq.total ? ` · <span class="down">${dq.total} para revisar</span>` : ' · <span class="up">todo en orden ✓</span>'}</div><div class="k">la app no escribe — se corrige en Airtable</div></div>
+    ${dq.total ? dq.cats.map(c => `<div class="dqcat">
+      <div class="dqhead"><span>${c.icon} ${c.cat}</span><span class="dqcount">${c.items.length}</span></div>
+      ${c.items.slice(0, 6).map(it => `<div class="dqrow"><span class="dqitem">${it.item}</span><span class="dqdetail">${it.detail}</span></div>`).join('')}
+      ${c.items.length > 6 ? `<div class="dqmore">+ ${c.items.length - 6} más…</div>` : ''}
+      <div class="dqnote">➜ ${notaTabla(c.tabla)}</div>
+    </div>`).join('') : '<div style="color:#48d69c;font-size:12.5px;padding:12px 0">No se detectaron inconsistencias de datos. 🎉</div>'}
+  </div></div>`;
+}
+
 // ════════════════════════════════════════════════════════════════
 // RENDER
 // ════════════════════════════════════════════════════════════════
@@ -431,7 +478,8 @@ function ccSecCommand(comp) {
     <div class="grid" style="margin-top:16px"><div class="card">
       <div class="chart-h"><div class="t">Propiedades · estado & rentabilidad</div><div class="k">${CC.props.length} casas · ${kpi.totalU} unidades</div></div>
       ${ccPropTable(rankHouses)}
-    </div></div>`;
+    </div></div>
+    ${ccDataQualityCard(comp)}`;
 }
 
 function ccPropTable(houses) {
