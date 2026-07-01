@@ -495,6 +495,7 @@ Deno.serve(async (req) => {
     const unidades = await fetchAllRecords(base_id, TABLE_IDS.unidades, airtable_token);
     const mapUnitStatus = (s: string | null): string | null => {
       const v = (s || "").toLowerCase();
+      if (/mantenim/.test(v))                 return "mantenimiento";
       if (/ocupad/.test(v))                   return "ocupada";
       if (/reservad/.test(v))                 return "reservada";
       if (/disponible|libre|vacante/.test(v)) return "disponible";
