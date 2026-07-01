@@ -1,0 +1,462 @@
+// ════════════════════════════════════════════════════════════════
+// 🏗️ FIX & FLIP · COMMAND CENTER — app unificada (dark/light, mismo sistema que Rentas).
+// Fuente de verdad = Airtable "Flipping Rentals matriz" (applMXFyPq1hXj7iN) vía ff_* (SOLO LECTURA).
+// Fase 1: Command Center + Deals & Pipeline (Kanban) + Insights + toggle claro/oscuro.
+// ════════════════════════════════════════════════════════════════
+const FF = {
+  sys: null, section: 'command', loading: false, loadError: null,
+  deals: [], draws: [], investors: [], _charts: [],
+};
+window.FF = FF;
+
+const FF_MONEY = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n || 0)).toLocaleString('en-US');
+const FF_K = n => { const a = Math.abs(n); return (n < 0 ? '-$' : '$') + (a >= 1000 ? (a / 1000).toFixed(a >= 100000 ? 0 : 1) + 'k' : Math.round(a)); };
+const FF_ESC = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const FF_STAGES = [
+  ['adquirida', 'Adquirida', 'st-adq'], ['en_rehab', 'En Rehab', 'st-reh'], ['en_venta', 'En Venta', 'st-ven'],
+  ['rentada', 'Rentada', 'st-ren'], ['refinanciada', 'Refinanciada', 'st-ref'], ['vendida', 'Vendida', 'st-vnd'],
+];
+const FF_STAGE_LBL = Object.fromEntries(FF_STAGES.map(s => [s[0], s[1]]));
+function ffShort(addr) { return String(addr || '').split(',')[0].trim(); }
+function ffAx() { return posGetTheme() === 'light' ? '#64748b' : '#5b6780'; }
+function ffGridC() { return posGetTheme() === 'light' ? 'rgba(15,23,42,.06)' : 'rgba(255,255,255,.05)'; }
+
+// ─── CSS (mismo look del ecosistema, scoped bajo #ff-overlay, con tema claro) ───
+function ffInjectCSS() {
+  if (document.getElementById('ff-styles')) return;
+  const st = document.createElement('style'); st.id = 'ff-styles';
+  st.textContent = `
+  #ff-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
+    --bg:#06080d;--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
+    --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
+    --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#070a11,#05070c);
+    color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
+  #ff-overlay[data-theme="light"]{
+    --bg:#eef2f8;--ink:#0f1c2e;--mut:#48566e;--mut2:#8595ac;--glass:rgba(255,255,255,.82);--glassb:rgba(15,23,42,.09);
+    --a1:#12b5a0;--a2:#2f6ef0;--a3:#6b5bef;--pos:#0ea371;--neg:#e0455f;--amber:#c98a1e;
+    --mesh1:rgba(18,181,160,.10);--mesh2:rgba(47,110,240,.10);--mesh3:rgba(107,91,239,.08);--bggrad:linear-gradient(180deg,#f6f8fc,#eaf0f8)}
+  #ff-overlay *{box-sizing:border-box;margin:0;padding:0}
+  #ff-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
+    radial-gradient(760px 520px at 8% -6%,var(--mesh1),transparent 58%),
+    radial-gradient(820px 560px at 100% 4%,var(--mesh2),transparent 56%),
+    radial-gradient(700px 620px at 70% 118%,var(--mesh3),transparent 60%),var(--bggrad)}
+  #ff-overlay .gridfx{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(var(--glassb) 1px,transparent 1px),linear-gradient(90deg,var(--glassb) 1px,transparent 1px);
+    background-size:44px 44px;-webkit-mask:radial-gradient(circle at 50% 30%,#000,transparent 78%);mask:radial-gradient(circle at 50% 30%,#000,transparent 78%)}
+  #ff-overlay .app{position:relative;z-index:1;display:grid;grid-template-columns:244px minmax(0,1fr);min-height:100vh}
+  #ff-overlay .side{padding:22px 15px;position:sticky;top:0;height:100vh;background:linear-gradient(180deg,rgba(12,16,26,.72),rgba(7,10,17,.72));border-right:1px solid var(--glassb);backdrop-filter:blur(16px);display:flex;flex-direction:column}
+  #ff-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
+  #ff-overlay .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
+  #ff-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#04121a;font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
+  #ff-overlay .brand b{font-size:15px;font-weight:750}#ff-overlay .brand span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.4px;margin-top:2px}
+  #ff-overlay .navlbl{font-size:9px;letter-spacing:1.8px;color:var(--mut2);text-transform:uppercase;padding:12px 12px 7px;font-weight:700}
+  #ff-overlay .nav{display:flex;flex-direction:column;gap:2px}
+  #ff-overlay .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:500;transition:.16s;position:relative;cursor:pointer}
+  #ff-overlay .nav a .i{width:16px;text-align:center;opacity:.85;font-size:13px}
+  #ff-overlay .nav a:hover{background:var(--glass);color:var(--ink)}
+  #ff-overlay .nav a.on{color:var(--ink);background:linear-gradient(90deg,rgba(69,227,198,.16),rgba(79,141,255,.06));box-shadow:inset 0 0 0 1px var(--glassb)}
+  #ff-overlay .nav a.on::before{content:"";position:absolute;left:-15px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--a1),var(--a2));box-shadow:0 0 10px var(--a1)}
+  #ff-overlay .nav a .b{margin-left:auto;font-size:10px;color:var(--mut2)}
+  #ff-overlay .side .foot{margin-top:auto;font-size:10.5px;color:var(--mut2);line-height:1.7;border-top:1px solid var(--glassb);padding-top:12px}
+  #ff-overlay .side .foot b{color:var(--a1)}
+  #ff-overlay .main{padding:24px 32px 46px;max-width:1620px}
+  #ff-overlay .top{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px;padding-right:96px}
+  #ff-overlay .top h1{font-size:23px;font-weight:760;letter-spacing:-.3px}
+  #ff-overlay .top h1 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #ff-overlay .sub{color:var(--mut);font-size:12.5px;margin-top:5px}
+  #ff-overlay .pills{margin-left:auto;display:flex;gap:9px;align-items:center}
+  #ff-overlay .pill{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:8px 13px;border-radius:22px;backdrop-filter:blur(10px)}
+  #ff-overlay .cdot{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1);animation:ffpulse 2s infinite}@keyframes ffpulse{0%,100%{opacity:1}50%{opacity:.35}}
+  #ff-overlay .pill.ai{background:linear-gradient(90deg,rgba(138,123,255,.22),rgba(79,141,255,.14));border-color:rgba(138,123,255,.4);color:var(--ink);cursor:pointer}
+  #ff-overlay .shimmer{background:linear-gradient(90deg,var(--a3) 30%,var(--a2) 50%,var(--a3) 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ffsh 3s linear infinite}@keyframes ffsh{to{background-position:-200% 0}}
+  #ff-overlay .ffclose,#ff-overlay .pos-theme-btn{position:fixed;top:16px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
+  #ff-overlay .ffclose{right:20px}#ff-overlay .pos-theme-btn{right:62px}
+  #ff-overlay .ffclose:hover,#ff-overlay .pos-theme-btn:hover{color:var(--ink);border-color:var(--a2)}
+  #ff-overlay .grid{display:grid;gap:16px}#ff-overlay .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+  #ff-overlay .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:16px;padding:19px;backdrop-filter:blur(18px);box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 26px 60px -34px rgba(0,0,0,.9);transition:.2s;overflow:hidden}
+  #ff-overlay[data-theme="light"] .card{box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
+  #ff-overlay .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent)}
+  #ff-overlay[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(15,23,42,.12),transparent)}
+  #ff-overlay .card:hover{transform:translateY(-2px);border-color:var(--a2)}
+  #ff-overlay .lab{font-size:10px;letter-spacing:1.5px;color:var(--mut2);text-transform:uppercase;font-weight:700}
+  #ff-overlay .kpi .big{font-size:31px;font-weight:780;margin-top:9px;letter-spacing:-.8px}
+  #ff-overlay .kpi .meta{font-size:11.5px;color:var(--mut);margin-top:7px;line-height:1.5}
+  #ff-overlay .glow{text-shadow:0 0 22px rgba(69,227,198,.4)}
+  #ff-overlay[data-theme="light"] .glow{text-shadow:none}
+  #ff-overlay .up{color:var(--pos)}#ff-overlay .down{color:var(--neg)}#ff-overlay .warn{color:var(--amber)}
+  #ff-overlay .row2{grid-template-columns:1.6fr minmax(0,1fr);margin-top:16px}#ff-overlay .row3{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px}
+  #ff-overlay .chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  #ff-overlay .chart-h .t{font-size:13.5px;font-weight:640}#ff-overlay .chart-h .k{font-size:11px;color:var(--mut2)}
+  #ff-overlay .legend{display:flex;gap:14px;font-size:11px;color:var(--mut)}#ff-overlay .legend b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+  #ff-overlay canvas{max-width:100%}
+  #ff-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(138,123,255,.28)}
+  #ff-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,123,255,.10),rgba(79,141,255,.05))}
+  #ff-overlay .bh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  #ff-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#a9f5e6,#45e3c6 30%,#4f8dff 70%,#2a2f66);box-shadow:0 0 22px rgba(79,141,255,.55)}
+  #ff-overlay .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ffspin 6s linear infinite;opacity:.7}@keyframes ffspin{to{transform:rotate(360deg)}}
+  #ff-overlay .bh b{font-size:14px}#ff-overlay .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.5px;margin-top:2px}
+  #ff-overlay .insight{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--glassb)}#ff-overlay .insight:last-of-type{border-bottom:none}
+  #ff-overlay .insight .ic{font-size:8px;margin-top:6px}#ff-overlay .ic.r{color:var(--neg)}#ff-overlay .ic.y{color:var(--amber)}#ff-overlay .ic.g{color:var(--pos)}#ff-overlay .ic.b{color:var(--a2)}
+  #ff-overlay .insight .tx{font-size:12px;line-height:1.5;color:var(--ink)}#ff-overlay .insight .tx b{font-weight:650}
+  #ff-overlay .iaction{font-size:11px;color:var(--a1);margin-top:5px;font-weight:500}
+  #ff-overlay .tag{display:inline-block;font-size:9px;letter-spacing:.7px;color:var(--mut2);margin-top:5px;font-weight:700}
+  #ff-overlay .chip{font-size:11px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}#ff-overlay .chip:hover{color:var(--ink);border-color:var(--a2)}
+  #ff-overlay .ask{display:flex;gap:8px;margin-top:14px}
+  #ff-overlay .ask input{flex:1;background:var(--glass);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
+  #ff-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
+  #ff-overlay .cc-chat{display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto}#ff-overlay .cc-chat:empty{display:none}
+  #ff-overlay .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+  #ff-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3);color:var(--ink)}
+  #ff-overlay .cbub.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb);color:var(--ink)}
+  #ff-overlay .cbub.err{border-color:rgba(240,104,122,.4);color:var(--neg)}#ff-overlay .cbub.think{color:var(--mut2);font-style:italic}
+  #ff-overlay .cbub p{margin:0 0 6px}#ff-overlay .cbub p:last-child{margin:0}#ff-overlay .cbub ul,#ff-overlay .cbub ol{margin:4px 0 6px 18px}#ff-overlay .cbub li{margin:3px 0}
+  @keyframes ffblink{0%,100%{opacity:.35}50%{opacity:1}}#ff-overlay .cbub.think::after{content:"▋";animation:ffblink 1s infinite}
+  /* KANBAN */
+  #ff-overlay .kan{display:flex;gap:13px;overflow-x:auto;padding-bottom:8px}
+  #ff-overlay .kcol{flex:1;min-width:210px}
+  #ff-overlay .kcol-h{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;padding:0 4px 10px}
+  #ff-overlay .kcol-h .cnt{background:var(--glass);border:1px solid var(--glassb);border-radius:20px;padding:1px 8px;color:var(--ink)}
+  #ff-overlay .kcard{background:var(--glass);border:1px solid var(--glassb);border-radius:13px;padding:13px;margin-bottom:10px;transition:.16s;cursor:default}
+  #ff-overlay .kcard:hover{transform:translateY(-2px);border-color:var(--a2)}
+  #ff-overlay .kcard .addr{font-size:12.5px;font-weight:640;color:var(--ink);margin-bottom:3px}
+  #ff-overlay .kcard .meta{font-size:10.5px;color:var(--mut2);margin-bottom:9px}
+  #ff-overlay .kstrat{font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px}
+  #ff-overlay .kstrat.flip{background:rgba(79,141,255,.15);color:var(--a2)}#ff-overlay .kstrat.hold{background:rgba(69,227,198,.14);color:var(--a1)}
+  #ff-overlay .krow{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--mut)}#ff-overlay .krow b{color:var(--ink);font-weight:600}
+  #ff-overlay .kbar{height:4px;border-radius:4px;background:var(--glassb);overflow:hidden;margin-top:8px}#ff-overlay .kbar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
+  #ff-overlay .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}
+  #ff-overlay .b-ok{background:rgba(72,214,156,.13);color:var(--pos)}#ff-overlay .b-red{background:rgba(240,104,122,.13);color:var(--neg)}#ff-overlay .b-warn{background:rgba(231,182,94,.13);color:var(--amber)}
+  #ff-overlay .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
+  #ff-overlay .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--glassb);font-weight:700}
+  #ff-overlay .ptable td{padding:11px 8px;border-bottom:1px solid var(--glassb)}
+  #ff-overlay .ptable tr:hover td{background:var(--glass)}
+  #ff-overlay .empty-sec{padding:56px;text-align:center;color:var(--mut2)}
+  #ff-overlay .soon{display:inline-block;font-size:9px;font-weight:700;color:var(--a2);background:rgba(79,141,255,.12);padding:2px 8px;border-radius:12px;margin-left:8px}
+  #ff-overlay .card,#ff-overlay .main{animation:fffade .35s ease}@keyframes fffade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (max-width:960px){
+    #ff-overlay{overflow-x:hidden}#ff-overlay .app{grid-template-columns:minmax(0,1fr)}
+    #ff-overlay .side{position:sticky;top:0;height:auto;padding:12px 14px}#ff-overlay .side .navlbl,#ff-overlay .side .foot{display:none}
+    #ff-overlay .nav{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:5px}#ff-overlay .nav a{white-space:nowrap;flex-shrink:0}#ff-overlay .nav a.on::before{display:none}
+    #ff-overlay .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#ff-overlay .row2,#ff-overlay .row3{grid-template-columns:minmax(0,1fr)}
+    #ff-overlay .top{flex-direction:column;padding-right:104px}#ff-overlay .pills{margin-left:0;flex-wrap:wrap}
+  }`;
+  document.head.appendChild(st);
+}
+
+// ════════════════════════════════════════════════════════════════
+// ENTRADA + CARGA
+// ════════════════════════════════════════════════════════════════
+async function openFFCommandCenter(sys) {
+  FF.sys = sys; FF.section = 'command';
+  ffInjectCSS();
+  let ov = document.getElementById('ff-overlay');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'ff-overlay'; document.body.appendChild(ov); }
+  posApplyTheme(ov);
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
+  document.body.style.overflow = 'hidden';
+  await ffLoadAll();
+  ffRender();
+}
+window.openFFCommandCenter = openFFCommandCenter;
+function closeFFCommandCenter() { const ov = document.getElementById('ff-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; ffDestroyCharts(); }
+window.closeFFCommandCenter = closeFFCommandCenter;
+function ffToggleTheme() { posToggleTheme(); ffRender(); }
+window.ffToggleTheme = ffToggleTheme;
+
+async function ffLoadAll() {
+  FF.loading = true; FF.loadError = null;
+  try {
+    const [deals, draws, inv] = await Promise.all([
+      sb.from('ff_deals').select('*').eq('active', true),
+      sb.from('ff_draws').select('*').eq('active', true),
+      sb.from('ff_investors').select('*').eq('active', true),
+    ]);
+    if (deals.error) throw deals.error;
+    FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
+  } catch (e) { FF.loadError = e.message || String(e); }
+  finally { FF.loading = false; }
+}
+
+// ════════════════════════════════════════════════════════════════
+// CÁLCULO (join deals+draws → all-in, margen/déficit)
+// ════════════════════════════════════════════════════════════════
+function ffCompute() {
+  const drawByNorm = {}; FF.draws.forEach(d => drawByNorm[d.address_norm] = d);
+  const deals = FF.deals.map(d => {
+    const dr = drawByNorm[d.address_norm] || null;
+    const purchase = Number(d.purchase_price || 0);
+    const remComplete = dr ? Number(dr.remodel_complete || 0) : Number(d.remodel_est || 0) * 1.3;
+    const holding = dr ? (Number(dr.interest_hml || 0) + Number(dr.services_hml || 0) + Number(dr.interest_until_rent || 0) + Number(dr.furniture || 0) + Number(dr.other_costs || 0)) : 0;
+    const allIn = purchase + remComplete + holding;
+    const arv = Number(d.arv || 0);
+    const margin = arv - allIn; // margen bruto (antes de costos de venta)
+    const marginPct = arv ? margin / arv : 0;
+    const allInPct = arv ? allIn / arv : 0;
+    const deficit = dr ? Number(dr.net_total || 0) : 0; // <0 = déficit (cash inyectado)
+    const equity = arv - allIn; // equity potencial
+    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, isFlip: d.strategy === 'flip' };
+  });
+  const active = deals.filter(d => d.stage !== 'vendida');
+  const kpi = {
+    total: deals.length, activos: active.length,
+    capital: active.reduce((s, d) => s + d.allIn, 0),
+    arvTotal: deals.reduce((s, d) => s + d.arv, 0),
+    equity: active.reduce((s, d) => s + Math.max(0, d.equity), 0),
+    deficitAcum: deals.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
+    flips: deals.filter(d => d.isFlip).length, holds: deals.filter(d => d.strategy === 'hold').length,
+    investors: FF.investors.length,
+  };
+  return { deals, kpi };
+}
+
+// ─── INSIGHTS (reglas rankeadas por $) ───
+function ffInsights(comp) {
+  const { deals } = comp; const ins = [];
+  // 1) Error de remodelación (interno ≫ estimado) — Bartlett/Capps $189k
+  deals.filter(d => d.dr && Number(d.dr.remodel_internal) > Number(d.remodel_est || 0) * 2 && Number(d.dr.remodel_internal) >= 100000)
+    .sort((a, b) => Number(b.dr.remodel_internal) - Number(a.dr.remodel_internal)).forEach(d => {
+      const gap = Number(d.dr.remodel_internal) - Number(d.remodel_est || 0);
+      ins.push({ sev: 'critical', impact: gap, tag: 'ERROR DE DATOS', sec: 'deals',
+        tx: `<b>${FF_ESC(ffShort(d.address))}</b>: la remodelación cargada en Draws es <b>${FF_MONEY(d.dr.remodel_internal)}</b> vs estimado <b>${FF_MONEY(d.remodel_est)}</b> — infla el déficit ~${FF_MONEY(gap)}. Casi seguro un error de carga.`,
+        action: `Corregir "Pago Remodelación (Interno)" de ${ffShort(d.address)} en Airtable (Desglose Draws)` });
+    });
+  // 2) Appraisal > ARV (Capitol)
+  deals.filter(d => d.appraisal > 0 && d.arv > 0 && d.appraisal > d.arv * 1.05)
+    .sort((a, b) => (b.appraisal - b.arv) - (a.appraisal - a.arv)).forEach(d => {
+      ins.push({ sev: 'warning', impact: d.appraisal - d.arv, tag: 'APPRAISAL > ARV', sec: 'deals',
+        tx: `<b>${FF_ESC(ffShort(d.address))}</b>: el appraisal (<b>${FF_MONEY(d.appraisal)}</b>) supera el ARV (<b>${FF_MONEY(d.arv)}</b>) por ${FF_MONEY(d.appraisal - d.arv)}. Revisar si el ARV está subestimado o el appraisal inflado (afecta refi y equity).`,
+        action: `Revisar ARV vs appraisal de ${ffShort(d.address)}` });
+    });
+  // 3) Déficit acumulado > $20k (excluye los del error de datos)
+  deals.filter(d => d.deficit < -20000 && !(d.dr && Number(d.dr.remodel_internal) >= 100000))
+    .sort((a, b) => a.deficit - b.deficit).forEach(d => {
+      ins.push({ sev: 'critical', impact: -d.deficit, tag: 'DÉFICIT > $20K', sec: 'deals',
+        tx: `<b>${FF_ESC(ffShort(d.address))}</b> arrastra un déficit de <b>${FF_MONEY(-d.deficit)}</b> (regla: OK si flujo+ y acumulado < $20k). Revisar recuperación vía refi o venta.`,
+        action: `Plan de recuperación para ${ffShort(d.address)} (refi / venta)` });
+    });
+  // 4) All-in > 75% ARV (regla de compra)
+  deals.filter(d => d.stage !== 'vendida' && d.arv > 0 && d.allInPct > 0.78 && d.allIn > 0)
+    .sort((a, b) => b.allInPct - a.allInPct).slice(0, 4).forEach(d => {
+      ins.push({ sev: 'warning', impact: d.allIn - d.arv * 0.75, tag: 'ALL-IN > 75% ARV', sec: 'deals',
+        tx: `<b>${FF_ESC(ffShort(d.address))}</b>: all-in ${FF_MONEY(d.allIn)} = <b>${Math.round(d.allInPct * 100)}% del ARV</b> (regla ≤ 75%). Margen ajustado.`,
+        action: `Revisar costos de ${ffShort(d.address)} (¿remodelación/holding altos?)` });
+    });
+  // 5) Deals sin desglose de costos (underwriting incompleto)
+  const sinDraw = deals.filter(d => !d.dr && d.stage !== 'vendida');
+  if (sinDraw.length) ins.push({ sev: 'warning', impact: 5000 * sinDraw.length, tag: 'UNDERWRITING', sec: 'deals',
+    tx: `<b>${sinDraw.length} deal(s)</b> sin desglose de costos (Draws): ${sinDraw.slice(0, 3).map(d => FF_ESC(ffShort(d.address))).join(', ')}${sinDraw.length > 3 ? '…' : ''}. Sin all-in ni margen calculable.`,
+    action: 'Completar el Desglose Draws de esos deals en Airtable' });
+  // 6) Conocidos del negocio (info · se cargan en la memoria del Cerebro en Fase 2)
+  ins.push({ sev: 'info', impact: 146000, tag: 'OVERHEAD FUERA DE QB', sec: 'finanzas',
+    tx: `Hay ~<b>$146k</b> de overhead (equipo + plataformas Fix&Flip) que vive fuera de QuickBooks. Sumarlo para P&L real.`, action: 'Conciliar Gastos Equipo + Plataformas contra QuickBooks' });
+  ins.push({ sev: 'info', impact: 46000, tag: 'GAP DE INTERESES', sec: 'finanzas',
+    tx: `Gap estimado de <b>~$46k</b> de intereses HML no reflejado en libros. Revisar en la conciliación Airtable↔QuickBooks.`, action: 'Revisar intereses HML vs QuickBooks' });
+  ins.push({ sev: 'warning', impact: 0, tag: 'CONTRATO', sec: 'deals',
+    tx: `<b>9909 Childress</b>: contrato/documentación pendiente de firma (dato del negocio). Verificar antes de avanzar.`, action: 'Confirmar firma de contrato de Childress' });
+  const rank = { critical: 0, warning: 1, info: 3 };
+  ins.sort((a, b) => (rank[a.sev] - rank[b.sev]) || (b.impact - a.impact));
+  return ins;
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════════════════
+const FF_NAV = [
+  ['command', '◧', 'Command Center', null],
+  ['deals', '▦', 'Deals & Pipeline', () => FF.deals.length],
+  ['propiedades', '⌂', 'Propiedades', null],
+  ['underwriting', '∑', 'Underwriting', 'soon'],
+  ['inversionistas', '◍', 'Inversionistas', () => FF.investors.length || null],
+  ['finanzas', '$', 'Finanzas · QuickBooks', 'soon'],
+  ['analitica', '▤', 'Analítica & KPIs', 'soon'],
+  ['cerebro', '◆', 'Cerebro IA', null],
+];
+function ffRender() {
+  const ov = document.getElementById('ff-overlay'); if (!ov) return;
+  posApplyTheme(ov);
+  const side = ov.querySelector('.side'), main = ov.querySelector('.main');
+  if (FF.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">⚠️</div><div style="color:var(--neg);margin-top:10px">${FF_ESC(FF.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ffReload()">Reintentar</button></div>`; return; }
+  const comp = ffCompute();
+  side.innerHTML = ffSidebar();
+  ffDestroyCharts();
+  main.innerHTML = ({
+    command: () => ffSecCommand(comp), deals: () => ffSecDeals(comp), propiedades: () => ffSecPropiedades(comp),
+    underwriting: () => ffSoon('Underwriting & Calculadoras', 'MAO, estimador de remodelación calibrado con tus 25+ deals, HML, cash-out refi, predictor de cashflow y ARV.'),
+    inversionistas: () => ffSecInversionistas(comp),
+    finanzas: () => ffSoon('Finanzas · QuickBooks', 'P&L / balance / cashflow + conciliación Airtable↔QuickBooks (overhead ~$146k fuera de libros, gap de intereses, cap table de inversionistas).'),
+    analitica: () => ffSoon('Analítica & KPIs', 'Tendencias, margen por deal, capital desplegado por etapa, velocidad de venta, ROI por estrategia.'),
+    cerebro: () => ffSecCerebro(comp),
+  }[FF.section] || (() => ffSecCommand(comp)))();
+  requestAnimationFrame(() => ffMountCharts(comp));
+}
+window.ffRender = ffRender;
+async function ffReload() { await ffLoadAll(); ffRender(); }
+window.ffReload = ffReload;
+function ffGo(s) { FF.section = s; ffRender(); document.getElementById('ff-overlay')?.scrollTo(0, 0); }
+window.ffGo = ffGo;
+
+function ffSidebar() {
+  return `<div class="brand"><div class="logo">FF</div><div><b>Fix &amp; Flip OS</b><span>RENTAL PROFITS</span></div></div>
+    <div class="navlbl">Fix &amp; Flip</div>
+    <nav class="nav">${FF_NAV.map(([k, i, l, cnt]) => {
+      const badge = cnt === 'soon' ? '<span class="soon">pronto</span>' : (typeof cnt === 'function' && cnt() ? `<span class="b">${cnt()}</span>` : '');
+      return `<a class="${FF.section === k ? 'on' : ''}" onclick="ffGo('${k}')"><span class="i">${i}</span> ${l}${badge}</a>`;
+    }).join('')}</nav>
+    <div class="foot">Fuente de verdad · <b>Airtable</b> + QuickBooks<br>Solo lectura · sincronizado</div>`;
+}
+function ffHeader(title, accent, sub) {
+  return `<div class="top"><div><h1>${title} · <span>${accent}</span></h1><div class="sub">${sub}</div></div>
+    <div class="pills"><div class="pill"><span class="cdot"></span> Airtable en vivo</div>
+    <div class="pill ai" onclick="ffGo('cerebro')">◆ <span class="shimmer">Cerebro IA</span></div></div></div>`;
+}
+function ffStratBadge(d) { return d.strategy === 'flip' ? '<span class="kstrat flip">FLIP</span>' : (d.strategy === 'hold' ? '<span class="kstrat hold">HOLD</span>' : ''); }
+
+// ─── COMMAND CENTER ───
+function ffSecCommand(comp) {
+  const { kpi, deals } = comp; const insights = ffInsights(comp);
+  const crit = insights.filter(i => i.sev === 'critical').length;
+  const rehab = deals.filter(d => d.stage === 'en_rehab').length, venta = deals.filter(d => d.stage === 'en_venta').length;
+  return `${ffHeader('Command Center', 'Fix &amp; Flip', 'Todo el negocio de Fix &amp; Flip en una vista — pipeline, capital, márgenes, inversionistas y Cerebro.')}
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">Deals activos</div><div class="big">${kpi.activos}</div><div class="meta">${kpi.flips} flip · ${kpi.holds} hold · ${rehab} en rehab · ${venta} en venta</div></div>
+      <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big glow">${FF_MONEY(kpi.capital)}</div><div class="meta">all-in de deals activos (compra + remod + holding)</div></div>
+      <div class="card kpi"><div class="lab">ARV del portafolio</div><div class="big">${FF_MONEY(kpi.arvTotal)}</div><div class="meta">equity potencial <span class="up">${FF_MONEY(kpi.equity)}</span></div></div>
+      <div class="card kpi"><div class="lab">Alertas del Cerebro</div><div class="big">${insights.length}</div><div class="meta"><span class="down">${crit} críticas</span> · déficit acum. <span class="down">${FF_MONEY(kpi.deficitAcum)}</span></div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Capital por etapa del pipeline</div><div class="k">all-in US$</div></div><canvas id="ff-stage" height="150"></canvas></div>
+      <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>ANÁLISIS EN VIVO · REGLAS</span></div></div>
+        ${insights.slice(0, 3).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${FF_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}</div></div></div>`).join('')}
+        <div class="ask"><input id="ff-ask" placeholder="Preguntá al Cerebro de Fix &amp; Flip…" onkeydown="if(event.key==='Enter')ffAsk()"><button onclick="ffAsk()">Enviar</button></div>
+        <div style="margin-top:11px"><span class="chip" onclick="ffGo('cerebro')">Ver todos los insights</span></div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Margen / déficit por deal</div><div class="k">verde = margen · rojo = déficit</div></div><canvas id="ff-margin" height="240"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Deals por etapa</div><div class="k">${kpi.total} total</div></div><canvas id="ff-donut" height="240"></canvas></div>
+    </div>
+    <div class="grid" style="margin-top:16px"><div class="card">
+      <div class="chart-h"><div class="t">Pipeline resumido</div><div class="k">${kpi.activos} activos · abrí Deals para el Kanban</div></div>
+      ${ffDealTable(deals.filter(d => d.stage !== 'vendida').sort((a, b) => a.deficit - b.deficit).slice(0, 10))}
+    </div></div>`;
+}
+function ffDealTable(deals) {
+  const badge = d => d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
+  return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrat.</th><th>All-in</th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
+    ${deals.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_STAGE_LBL[d.stage] || d.stage}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${badge(d)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ─── DEALS & PIPELINE (Kanban) ───
+function ffSecDeals(comp) {
+  const { deals, kpi } = comp;
+  const cols = FF_STAGES.map(([k, lbl]) => ({ k, lbl, items: deals.filter(d => d.stage === k) }));
+  return `${ffHeader('Deals &amp; Pipeline', 'Kanban', `${kpi.total} deals · ${kpi.flips} flip / ${kpi.holds} hold · capital ${FF_MONEY(kpi.capital)}`)}
+    <div class="kan">${cols.map(c => `<div class="kcol">
+      <div class="kcol-h"><span>${c.lbl}</span><span class="cnt">${c.items.length}</span></div>
+      ${c.items.sort((a, b) => a.deficit - b.deficit).map(d => ffKanCard(d)).join('') || '<div style="color:var(--mut2);font-size:11px;padding:8px 4px">—</div>'}
+    </div>`).join('')}</div>`;
+}
+function ffKanCard(d) {
+  const capturePct = d.arv ? Math.min(100, Math.round(d.allInPct * 100)) : 0;
+  return `<div class="kcard">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
+    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.dr ? '' : ' · <span style="color:var(--amber)">sin draws</span>'}</div>
+    <div class="krow"><span>All-in</span><b>${FF_MONEY(d.allIn)}</b></div>
+    <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>
+    <div class="krow"><span>${d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${(d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}">${d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
+    <div class="kbar"><i style="width:${capturePct}%;background:${d.allInPct > 0.75 ? 'linear-gradient(90deg,var(--amber),var(--neg))' : 'linear-gradient(90deg,var(--a1),var(--a2))'}"></i></div>
+    <div style="font-size:9px;color:var(--mut2);margin-top:4px">all-in ${Math.round(d.allInPct * 100)}% del ARV${d.invLabel ? ' · ' + FF_ESC(d.invLabel) : ''}</div>
+  </div>`;
+}
+
+// ─── PROPIEDADES ───
+function ffSecPropiedades(comp) {
+  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades`)}
+    <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => a.deficit - b.deficit))}</div></div>`;
+}
+// ─── INVERSIONISTAS ───
+function ffSecInversionistas(comp) {
+  const inv = FF.investors;
+  return `${ffHeader('Inversionistas', 'Fix &amp; Flip', `${inv.length} inversionistas · modelos parametrizados en Fase 2`)}
+    ${inv.length ? `<div class="grid"><div class="card"><table class="ptable"><thead><tr><th>Inversionista</th><th>Etiqueta</th><th>Ciudad</th><th>Socio</th></tr></thead><tbody>
+      ${inv.slice(0, 40).map(x => `<tr><td>${FF_ESC(x.name || '—')}</td><td>${FF_ESC(x.label || '—')}</td><td>${FF_ESC(x.city || '—')}</td><td>${FF_ESC(x.has_partner || '—')}</td></tr>`).join('')}</tbody></table></div></div>`
+      : ffSoon('Inversionistas', 'Los inversionistas y los 4 modelos parametrizados (15–18%, split 50/50) se cargan en la Fase 2.')}`;
+}
+function ffSoon(title, desc) {
+  return `${ffHeader(title.split('·')[0].trim(), 'Fase 2', desc)}
+    <div class="grid"><div class="card empty-sec">
+      <div class="orb" style="margin:0 auto 14px"></div>
+      <div style="color:var(--ink);font-size:15px;font-weight:600">${title} <span class="soon">Fase 2</span></div>
+      <div style="margin-top:8px;max-width:520px;margin-inline:auto">${desc}</div>
+    </div></div>`;
+}
+// ─── CEREBRO IA ───
+function ffSecCerebro(comp) {
+  const insights = ffInsights(comp);
+  const drain = insights.filter(i => i.sev === 'critical').reduce((s, i) => s + i.impact, 0);
+  return `${ffHeader('Cerebro IA', 'Insights', 'Motor de reglas sobre tus deals reales — rankeado por impacto en dólares.')}
+    <div class="grid kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div class="card kpi"><div class="lab">Insights activos</div><div class="big">${insights.length}</div><div class="meta">${insights.filter(i => i.sev === 'critical').length} críticos</div></div>
+      <div class="card kpi"><div class="lab">Impacto crítico detectado</div><div class="big down">${FF_MONEY(drain)}</div><div class="meta">errores + déficits + gaps</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big down">${FF_MONEY(comp.kpi.deficitAcum)}</div><div class="meta">suma de deals en rojo</div></div>
+    </div>
+    <div class="grid" style="margin-top:16px"><div class="card brain">
+      <div class="bh"><div class="orb"></div><div><b>Chateá con el Cerebro</b><span>PREGUNTÁ SOBRE TUS DEALS · SOLO LECTURA</span></div></div>
+      <div id="ff-chat" class="cc-chat" style="margin-top:6px"></div>
+      <div class="ask"><input id="ff-ask" placeholder="Preguntá al Cerebro de Fix &amp; Flip…" onkeydown="if(event.key==='Enter')ffAsk()"><button onclick="ffAsk()">Enviar</button></div>
+      <div style="margin-top:11px;display:flex;gap:7px;flex-wrap:wrap"><span class="chip" onclick="ffAsk('¿Qué deals tienen error de datos o déficit alto?')">¿Errores / déficit?</span><span class="chip" onclick="ffAsk('¿Cuáles deals violan la regla de all-in ≤ 75% del ARV?')">¿All-in > 75%?</span></div>
+    </div></div>
+    <div class="grid" style="margin-top:16px"><div class="card">
+      <div class="bh"><div class="orb" style="width:26px;height:26px"></div><div><b>Análisis en vivo</b><span>${insights.length} INSIGHTS · RANKEADOS POR $</span></div></div>
+      ${insights.map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${FF_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}${i.impact ? ` · ${FF_MONEY(i.impact)}` : ''}</div></div></div>`).join('')}
+    </div></div>`;
+}
+// Chat (reusa /api/brain-chat con snapshot de Fix & Flip). Memoria FF se siembra en Fase 2.
+FF.chat = [];
+function ffSnapshot(comp) {
+  return {
+    negocio: 'Fix & Flip (Rental Profits)', mes: new Date().toISOString().slice(0, 7),
+    portafolio: { deals: comp.kpi.total, activos: comp.kpi.activos, flips: comp.kpi.flips, holds: comp.kpi.holds, capital_desplegado: Math.round(comp.kpi.capital), arv_total: Math.round(comp.kpi.arvTotal), equity_potencial: Math.round(comp.kpi.equity), deficit_acumulado: Math.round(comp.kpi.deficitAcum) },
+    reglas: ['all-in ≤ 75% del ARV', 'déficit OK si flujo+ y acumulado < $20k', 'inversionista 15–18%, split 50/50', 'refi no supera el pago actual'],
+    deals: comp.deals.map(d => ({ dir: ffShort(d.address), etapa: FF_STAGE_LBL[d.stage], estrategia: d.strategy, compra: d.purchase, remodelacion: Math.round(d.remComplete), all_in: Math.round(d.allIn), arv: d.arv, appraisal: d.appraisal, margen: Math.round(d.margin), all_in_pct_arv: Math.round(d.allInPct * 100), deficit: Math.round(d.deficit) })),
+    insights: ffInsights(comp).slice(0, 10).map(i => ({ tag: i.tag, detalle: i.tx.replace(/<[^>]+>/g, ''), impacto: Math.round(i.impact) })),
+  };
+}
+function ffChatHTML() {
+  return FF.chat.map(m => m.role === 'user' ? `<div class="cbub u">${FF_ESC(m.content)}</div>` : `<div class="cbub a${m.error ? ' err' : ''}${m.thinking ? ' think' : ''}">${m.thinking ? 'Pensando' : (window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(m.content)) : FF_ESC(m.content))}</div>`).join('');
+}
+function ffRenderChat() { const el = document.getElementById('ff-chat'); if (el) { el.innerHTML = ffChatHTML(); el.scrollTop = el.scrollHeight; } }
+async function ffAsk(q) {
+  const inp = document.getElementById('ff-ask'); const question = (q || (inp ? inp.value.trim() : '')).trim();
+  if (!question || FF.chatBusy) return; if (inp) inp.value = '';
+  if (!document.getElementById('ff-chat')) { ffGo('cerebro'); setTimeout(() => ffAsk(question), 80); return; }
+  FF.chatBusy = true; FF.chat.push({ role: 'user', content: question }); FF.chat.push({ role: 'assistant', content: '', thinking: true }); ffRenderChat();
+  const history = FF.chat.filter(m => !m.thinking && !m.error).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+  try {
+    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, snapshot: ffSnapshot(ffCompute()), history }) });
+    const data = await r.json().catch(() => ({})); FF.chat.pop();
+    FF.chat.push(r.ok ? { role: 'assistant', content: data.answer || 'Sin respuesta.' } : { role: 'assistant', content: data.error || `Error (HTTP ${r.status}).`, error: true });
+  } catch (e) { FF.chat.pop(); FF.chat.push({ role: 'assistant', content: 'No pude conectar: ' + (e.message || e), error: true }); }
+  finally { FF.chatBusy = false; ffRenderChat(); }
+}
+window.ffAsk = ffAsk;
+
+// ════════════════════════════════════════════════════════════════
+// CHARTS
+// ════════════════════════════════════════════════════════════════
+function ffDestroyCharts() { FF._charts.forEach(c => { try { c.destroy(); } catch (e) {} }); FF._charts = []; }
+function ffMountCharts(comp) {
+  if (!window.Chart) return;
+  const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} FF._charts.push(new Chart(el, cfg)); };
+  const ax = { grid: { color: ffGridC() }, ticks: { color: ffAx(), font: { size: 10 } } };
+  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 10 } } }, y: ax } };
+  // capital por etapa
+  const byStage = FF_STAGES.map(([k, lbl]) => ({ lbl, v: comp.deals.filter(d => d.stage === k).reduce((s, d) => s + d.allIn, 0) / 1000 }));
+  mk('ff-stage', { type: 'bar', data: { labels: byStage.map(x => x.lbl), datasets: [{ data: byStage.map(x => x.v), borderRadius: 5, backgroundColor: '#4f8dff' }] }, options: gext });
+  // margen/déficit por deal
+  const md = comp.deals.filter(d => d.arv > 0).map(d => ({ n: ffShort(d.address).slice(0, 16), v: (d.deficit < 0 ? d.deficit : d.margin) })).sort((a, b) => a.v - b.v).slice(0, 14);
+  mk('ff-margin', { type: 'bar', data: { labels: md.map(x => x.n), datasets: [{ data: md.map(x => Math.round(x.v / 1000)), borderRadius: 4, backgroundColor: md.map(x => x.v >= 0 ? '#48d69c' : '#f0687a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 9 } } } } } });
+  // deals por etapa (donut)
+  const dc = FF_STAGES.map(([k, lbl]) => ({ lbl, n: comp.deals.filter(d => d.stage === k).length })).filter(x => x.n);
+  mk('ff-donut', { type: 'doughnut', data: { labels: dc.map(x => x.lbl), datasets: [{ data: dc.map(x => x.n), backgroundColor: ['#4f8dff', '#45e3c6', '#e7b65e', '#8a7bff', '#48d69c', '#93a0b6'], borderColor: posGetTheme() === 'light' ? '#fff' : '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } });
+}
