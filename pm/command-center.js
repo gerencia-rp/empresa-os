@@ -160,6 +160,15 @@ function ccInjectCSS() {
   #cc-overlay .op-time{color:var(--mut2);font-variant-numeric:tabular-nums;width:46px;font-size:11.5px}
   #cc-overlay .op-zone{margin-left:auto;font-size:9.5px;padding:2px 9px;border-radius:20px;color:var(--mut)}
   #cc-overlay .z-n{background:rgba(69,227,198,.12)}#cc-overlay .z-s{background:rgba(255,255,255,.05)}
+  #cc-overlay .op-eq{font-size:9.5px;color:var(--a2);background:rgba(79,141,255,.12);padding:1px 7px;border-radius:12px;margin-left:6px}
+  #cc-overlay .tbtn{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--mut);width:28px;height:26px;border-radius:7px;cursor:pointer;font-size:12px}
+  #cc-overlay .tbtn:hover{color:#fff;border-color:rgba(69,227,198,.5)}
+  #cc-overlay .reptools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glassb)}
+  #cc-overlay .reptitle{font-size:12px;font-weight:650;color:#e6ebf5}
+  #cc-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}
+  #cc-overlay .repbtn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--ink)}
+  #cc-overlay .repbtn:hover{filter:brightness(1.08)}#cc-overlay .rephint{font-size:10.5px;color:var(--mut2);margin-left:auto}
+  #cc-overlay .rtask{font-size:9.5px;padding:2px 8px;border-radius:12px;background:rgba(69,227,198,.12);color:var(--a1)}
   #cc-overlay .empty-sec{padding:60px;text-align:center;color:var(--mut2)}
   #cc-overlay .dqcat{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}#cc-overlay .dqcat:last-child{border-bottom:none}
   #cc-overlay .dqhead{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:640;color:#e6ebf5;margin-bottom:7px}
@@ -471,8 +480,8 @@ function ccSecCommand(comp) {
     <div class="grid row3">
       <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><canvas id="cc-house" height="240"></canvas></div>
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">${CC_K(kpi.expT)}</div></div><canvas id="cc-donut" height="240"></canvas></div>
-      <div class="card"><div class="chart-h"><div class="t">Operación de hoy</div><div class="k">Juan + Limpieza</div></div>
-        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> ${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 30)} <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#5b6780;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
+      <div class="card"><div class="chart-h"><div class="t">Operación de hoy</div><div class="k">cronograma real · ${todayTasks.length} tareas</div></div>
+        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#5b6780;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
         <div style="margin-top:13px;font-size:11px;color:var(--mut)"><span class="chip" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</span></div></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card">
@@ -482,15 +491,21 @@ function ccSecCommand(comp) {
     ${ccDataQualityCard(comp)}`;
 }
 
-function ccPropTable(houses) {
+function ccPropTable(houses, opts = {}) {
   const modelLbl = m => ({ casa_completa: 'Casa Completa', por_habitaciones: 'Habitaciones', por_unidades: 'Unidades', mixta: 'Mixta', por_estudios: 'Estudios', por_apartamentos: 'Apartamentos' }[m] || 'Mixta');
   const badge = h => h.net < -1000 ? '<span class="badge b-red">En rojo</span>' : h.pct < 70 ? '<span class="badge b-warn">Baja ocup.</span>' : h.net < 0 ? '<span class="badge b-warn">Vigilar</span>' : '<span class="badge b-ok">Sana</span>';
-  return `<table class="ptable"><thead><tr><th>Casa</th><th>Zona</th><th>Modelo</th><th>Ocupación</th><th>Renta pot.</th><th>Cashflow</th><th>Estado</th></tr></thead><tbody>
-    ${houses.slice(0, 12).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 30)}</td><td>${ccZoneLabel(h.zone)}</td><td>${modelLbl(h.model)} · ${h.total}u</td>
+  const lim = opts.limit || 12; const guide = !!opts.guide;
+  return `<table class="ptable"><thead><tr><th>Casa</th><th>Zona</th><th>Modelo</th><th>Ocupación</th><th>Renta pot.</th><th>Cashflow</th><th>Estado</th>${guide ? '<th>Guía</th>' : ''}</tr></thead><tbody>
+    ${houses.slice(0, lim).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 30)}</td><td>${ccZoneLabel(h.zone)}</td><td>${modelLbl(h.model)} · ${h.total}u</td>
       <td><span class="mini-bar"><i style="width:${h.pct}%"></i></span>${h.pct}%</td><td>${CC_MONEY(h.pot)}</td>
-      <td class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td>${badge(h)}</td></tr>`).join('')}
+      <td class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td>${badge(h)}</td>${guide ? `<td><button class="tbtn" title="Guía de Bienvenida (check-in) en PDF" onclick="ccWelcomeGuide('${h.id}')">📄</button></td>` : ''}</tr>`).join('')}
   </tbody></table>`;
 }
+// Puentes a las funciones de reportes/guía de pm-main (SOLO LECTURA: generan PDF vía impresión).
+function ccWelcomeGuide(id) { if (window.pmGenerateWelcomeGuide) window.pmGenerateWelcomeGuide(id); else if (window.toast) toast('La guía se genera desde el Property Manager.', 'info'); }
+function ccReport(type) { if (window.pmOpenReport) window.pmOpenReport(type); else if (window.toast) toast('El reporte se genera desde el Property Manager.', 'info'); }
+function ccSendReport(type) { if (window.pmSendReport) window.pmSendReport(type); }
+window.ccWelcomeGuide = ccWelcomeGuide; window.ccReport = ccReport; window.ccSendReport = ccSendReport;
 
 // ─── SECCIÓN: CEREBRO IA ───
 function ccSecCerebro(comp) {
@@ -699,9 +714,10 @@ async function ccPersistChat(question, answer) {
 
 // ─── SECCIÓN: PROPIEDADES ───
 function ccSecPropiedades(comp) {
-  const houses = [...comp.houses].filter(h => h.total).sort((a, b) => a.pct - b.pct || a.net - b.net);
-  return `${ccHeader('Propiedades', 'Rentas', `${CC.props.length} casas · ${comp.kpi.totalU} unidades · ocupación ${comp.kpi.occPct}%`)}
-    <div class="grid"><div class="card">${ccPropTable([...comp.houses].sort((a, b) => a.net - b.net))}</div></div>`;
+  return `${ccHeader('Propiedades', 'Rentas', `${CC.props.length} casas · ${comp.kpi.totalU} unidades (regla) · ocupación ${comp.kpi.occPct}%`)}
+    <div class="grid"><div class="card">
+      <div class="chart-h"><div class="t">Todas las propiedades</div><div class="k">📄 = Guía de Bienvenida (check-in)</div></div>
+      ${ccPropTable([...comp.houses].filter(h => h.total).sort((a, b) => a.net - b.net), { guide: true, limit: 99 })}</div></div>`;
 }
 // ─── SECCIÓN: FINANZAS ───
 function ccSecFinanzas(comp) {
@@ -709,6 +725,13 @@ function ccSecFinanzas(comp) {
   const rojo = houses.filter(h => h.net < 0 && (h.inc > 0 || h.exp > 0)).sort((a, b) => a.net - b.net);
   const top = houses.filter(h => h.net > 0).sort((a, b) => b.net - a.net).slice(0, 6);
   return `${ccHeader('Finanzas', comp.mb.label, `Ingresos ${CC_MONEY(kpi.inc)} · Gastos ${CC_MONEY(kpi.expT)} · Cashflow ${CC_MONEY(kpi.cashflow)}`)}
+    <div class="reptools">
+      <span class="reptitle">📄 Reportes (PDF)</span>
+      <button class="repbtn" onclick="ccReport('weekly')">Generar semanal (operación)</button>
+      <button class="repbtn" onclick="ccReport('monthly')">Generar mensual (finanzas)</button>
+      <button class="repbtn ghost" onclick="ccSendReport('monthly')">Compartir ›</button>
+      <span class="rephint">Números unificados (regla ${kpi.totalU}u). Se genera con "Guardar como PDF".</span>
+    </div>
     <div class="grid kpis" style="grid-template-columns:repeat(3,1fr)">
       <div class="card kpi"><div class="lab">Ingresos del mes</div><div class="big up">${CC_MONEY(kpi.inc)}</div></div>
       <div class="card kpi"><div class="lab">Gastos del mes</div><div class="big down">${CC_MONEY(kpi.expT)}</div></div>
@@ -725,10 +748,13 @@ function ccSecReservas(comp) {
   const activas = CC.book.filter(b => ['activo', 'confirmado'].includes(b.status));
   const tName = id => CC.tenants.find(t => t.id === id)?.full_name || '—';
   const pName = id => CC.props.find(p => p.id === id)?.name || '—';
-  return `${ccHeader('Reservas', 'Calendario', `${CC.book.length} reservas · ${activas.length} activas`)}
-    <div class="grid"><div class="card"><div class="chart-h"><div class="t">Reservas activas</div><div class="k">${activas.length}</div></div>
-      <table class="ptable"><thead><tr><th>Casa</th><th>Inquilino</th><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody>
-      ${activas.slice(0, 20).map(b => `<tr><td>${CC_ESC(pName(b.property_id)).slice(0, 26)}</td><td>${CC_ESC(tName(b.tenant_id)).slice(0, 22)}</td><td>${b.start_date || '—'}</td><td>${b.end_date || '∞'}</td><td><span class="badge ${b.end_date && b.end_date < new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) ? 'b-warn' : 'b-ok'}">${b.status}</span></td></tr>`).join('')}</tbody></table>
+  // Cadena viva: cada reserva puede tener su tarea de turnover/recepción (auto-generada en el sync).
+  const relTask = b => CC.tasks.find(t => t.property_id === b.property_id && ['cleaning', 'recepcion'].includes(t.task_type) && !['completado', 'cancelado'].includes(t.status));
+  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#5b6780">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? '🧹 turnover' : '🛎 recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
+  return `${ccHeader('Reservas', 'Calendario', `${CC.book.length} reservas · ${activas.length} activas · cadena reserva → turnover → gasto → KPI`)}
+    <div class="grid"><div class="card"><div class="chart-h"><div class="t">Reservas activas</div><div class="k">reserva → tarea de operación</div></div>
+      <table class="ptable"><thead><tr><th>Casa</th><th>Inquilino</th><th>Entrada</th><th>Salida</th><th>Estado</th><th>Operación</th></tr></thead><tbody>
+      ${activas.slice(0, 20).map(b => `<tr><td>${CC_ESC(pName(b.property_id)).slice(0, 26)}</td><td>${CC_ESC(tName(b.tenant_id)).slice(0, 22)}</td><td>${b.start_date || '—'}</td><td>${b.end_date || '∞'}</td><td><span class="badge ${b.end_date && b.end_date < new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) ? 'b-warn' : 'b-ok'}">${b.status}</span></td><td>${taskChip(b)}</td></tr>`).join('')}</tbody></table>
       <div style="margin-top:12px"><span class="chip" onclick="closeCommandCenter();setTimeout(()=>{document.querySelector('[data-sys-type=pm-dashboard]')?.click()},150)">Abrir Calendario clásico</span></div></div></div>`;
 }
 // ─── SECCIÓN: OPERACIÓN ───
