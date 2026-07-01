@@ -6,7 +6,8 @@
 // La API key vive SOLO en el servidor: env ANTHROPIC_API_KEY (Vercel → Settings).
 // El navegador nunca la ve. SOLO LECTURA: este endpoint no escribe nada.
 //
-// Fase 3 (memoria RAG con pgvector + VoyageAI) se engancha en buildMemoryBlock().
+// Fase 3 (memoria RAG con pgvector + VoyageAI) vía recallMemories().
+import { recallMemories } from './_brain.mjs';
 
 const MODEL = 'claude-opus-4-8';
 const MAX_TOKENS = 1400;
@@ -64,10 +65,14 @@ export default async function handler(req, res) {
   // El historial debe alternar y empezar en user; si el último ya es user, lo dejamos igual.
   messages.push({ role: 'user', content: question });
 
+  // RAG: recuperar memorias relevantes (similitud si hay embeddings; si no, recientes).
+  let mem = { rows: [], mode: 'none' };
+  try { mem = await recallMemories(question, 6); } catch { /* memoria opcional */ }
+
   const payload = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    system: buildSystem(body.snapshot, body.memory),
+    system: buildSystem(body.snapshot, mem.rows),
     messages,
   };
 
@@ -89,7 +94,7 @@ export default async function handler(req, res) {
     }
     const answer = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim()
       || 'No obtuve respuesta. Probá de nuevo.';
-    res.status(200).json({ answer, usage: data.usage || null });
+    res.status(200).json({ answer, usage: data.usage || null, memory_used: mem.rows.length, memory_mode: mem.mode });
   } catch (e) {
     res.status(502).json({ error: 'Error llamando a Claude: ' + (e.message || String(e)) });
   }

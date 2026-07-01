@@ -8,6 +8,7 @@ const CC = {
   sys: null, section: 'command', loading: false, loadError: null,
   props: [], units: [], pay: [], exp: [], book: [], tenants: [], tasks: [], alerts: [],
   _charts: [], chat: [], chatBusy: false,
+  memories: [], memLoaded: false, memBusy: false,
 };
 window.CC = CC;
 
@@ -121,6 +122,23 @@ function ccInjectCSS() {
   #cc-overlay .cbub ul{margin:4px 0 6px 18px;list-style:disc}#cc-overlay .cbub ol{margin:4px 0 6px 20px;list-style:decimal}
   #cc-overlay .cbub li{margin:3px 0;padding-left:2px}#cc-overlay .cbub li p{display:inline;margin:0}
   @keyframes ccblink{0%,100%{opacity:.35}50%{opacity:1}}#cc-overlay .cbub.think::after{content:"▋";animation:ccblink 1s infinite}
+  #cc-overlay .cbub .memsave{display:block;margin-top:8px;background:rgba(138,123,255,.14);border:1px solid rgba(138,123,255,.3);color:#c9c2ff;font-size:10px;padding:3px 9px;border-radius:7px;cursor:pointer}
+  #cc-overlay .cbub .memsave:hover{background:rgba(138,123,255,.25);color:#fff}
+  #cc-overlay .memadd{display:flex;gap:8px;margin:6px 0 14px;flex-wrap:wrap}
+  #cc-overlay .memadd select{background:rgba(6,9,16,.72);border:1px solid var(--glassb);border-radius:10px;color:var(--ink);font-size:12px;padding:9px 10px;outline:none}
+  #cc-overlay .memadd input{flex:1;min-width:220px;background:rgba(6,9,16,.72);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:12px;outline:none}
+  #cc-overlay .memadd input::placeholder{color:var(--mut2)}
+  #cc-overlay .memadd button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 15px;border-radius:10px;cursor:pointer;font-size:12px}
+  #cc-overlay .memrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+  #cc-overlay .memrow.off{opacity:.42}
+  #cc-overlay .memtipo{flex-shrink:0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.05);color:var(--mut);white-space:nowrap;margin-top:1px}
+  #cc-overlay .memtipo.t-hecho{background:rgba(79,141,255,.14);color:#8fb6ff}#cc-overlay .memtipo.t-dec{background:rgba(69,227,198,.14);color:var(--a1)}
+  #cc-overlay .memtipo.t-aprendizaje{background:rgba(231,182,94,.14);color:var(--amber)}#cc-overlay .memtipo.t-nota{background:rgba(255,255,255,.06);color:var(--mut)}
+  #cc-overlay .memtxt{flex:1;font-size:12.5px;line-height:1.55;color:#d6ddec}
+  #cc-overlay .memmeta{font-size:10px;color:var(--mut2);margin-top:4px}
+  #cc-overlay .memacts{display:flex;gap:5px;flex-shrink:0}
+  #cc-overlay .memacts button{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--mut);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:12px}
+  #cc-overlay .memacts button:hover{color:#fff;border-color:rgba(255,255,255,.2)}
   #cc-overlay .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #cc-overlay .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.07);font-weight:700}
   #cc-overlay .ptable td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -309,6 +327,8 @@ function ccRender() {
   }[CC.section] || (() => ccSecCommand(comp)))();
   // Charts después de pintar el DOM
   requestAnimationFrame(() => ccMountCharts(comp));
+  // Cargar memorias del Cerebro la primera vez que se entra a esa sección.
+  if (CC.section === 'cerebro' && !CC.memLoaded) ccLoadMemories();
 }
 window.ccRender = ccRender;
 async function ccReload() { await ccLoadAll(); ccRender(); }
@@ -409,7 +429,8 @@ function ccSecCerebro(comp) {
       <div class="bh"><div class="orb" style="width:26px;height:26px"></div><div><b>Análisis en vivo</b><span>${insights.length} INSIGHTS · RANKEADOS POR $ (REGLAS · SIN IA)</span></div></div>
       ${insights.map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}<div class="tag">${i.tag}${i.impact ? ` · ${CC_MONEY(i.impact)}` : ''}</div></div>
         ${i.sec ? `<span class="chip" style="margin-left:auto;align-self:center" onclick="ccGo('${i.sec}')">Ver →</span>` : ''}</div>`).join('')}
-    </div></div>`;
+    </div></div>
+    ${ccMemCardHTML()}`;
 }
 // Render de las burbujas del chat (markdown seguro si marked+DOMPurify están).
 function ccMdSafe(t) {
@@ -417,9 +438,9 @@ function ccMdSafe(t) {
   return CC_ESC(t);
 }
 function ccChatHTML() {
-  return CC.chat.map(m => m.role === 'user'
+  return CC.chat.map((m, idx) => m.role === 'user'
     ? `<div class="cbub u">${CC_ESC(m.content)}</div>`
-    : `<div class="cbub a${m.error ? ' err' : ''}${m.thinking ? ' think' : ''}">${m.thinking ? 'Pensando' : ccMdSafe(m.content)}</div>`).join('');
+    : `<div class="cbub a${m.error ? ' err' : ''}${m.thinking ? ' think' : ''}">${m.thinking ? 'Pensando' : ccMdSafe(m.content)}${(!m.thinking && !m.error) ? `<button class="memsave" title="Guardar en la memoria del Cerebro" onclick="ccSaveToMemory(${idx})">🧠 Guardar</button>` : ''}</div>`).join('');
 }
 function ccRenderChat() {
   const el = document.getElementById('cc-chat'); if (!el) return;
@@ -468,6 +489,79 @@ async function ccSendChat(question) {
   }
 }
 window.ccSendChat = ccSendChat;
+
+// ─── MEMORIA DEL CEREBRO (pm_brain_memory vía /api/brain-memory) ───
+async function ccAuthToken() {
+  try { const s = await sb.auth.getSession(); return s?.data?.session?.access_token || ''; } catch (e) { return ''; }
+}
+async function ccLoadMemories() {
+  CC.memLoaded = true;
+  try {
+    const tok = await ccAuthToken();
+    const r = await fetch('/api/brain-memory', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} });
+    const d = await r.json().catch(() => ({}));
+    CC.memories = r.ok ? (d.memories || []) : [];
+    CC._memErr = r.ok ? null : (d.error || 'Error cargando memorias');
+  } catch (e) { CC.memories = []; CC._memErr = e.message || String(e); }
+  ccRenderMemList();
+}
+const CC_MEM_TIPO = { hecho: '📌 Hecho', 'decisión': '🎯 Decisión', aprendizaje: '💡 Aprendizaje', nota: '📝 Nota' };
+function ccMemCardHTML() {
+  return `<div class="grid" style="margin-top:16px"><div class="card">
+    <div class="bh"><div class="orb" style="width:26px;height:26px"></div><div><b>Memoria del Cerebro</b><span>LO QUE EL CEREBRO RECUERDA · SE INYECTA EN EL CHAT</span></div></div>
+    <div class="memadd">
+      <select id="cc-mem-tipo">${Object.entries(CC_MEM_TIPO).map(([k, v]) => `<option value="${k}"${k === 'hecho' ? ' selected' : ''}>${v}</option>`).join('')}</select>
+      <input id="cc-mem-txt" placeholder="Agregá un hecho, decisión o aprendizaje que el Cerebro deba recordar…" onkeydown="if(event.key==='Enter')ccMemAdd()">
+      <button onclick="ccMemAdd()">+ Guardar</button>
+    </div>
+    <div id="cc-memlist">${ccMemListHTML()}</div>
+  </div></div>`;
+}
+function ccMemListHTML() {
+  if (!CC.memLoaded) return '<div style="color:#5b6780;font-size:12px;padding:14px 0">⏳ Cargando memoria…</div>';
+  if (CC._memErr) return `<div style="color:#f0687a;font-size:12px;padding:14px 0">${CC_ESC(CC._memErr)}</div>`;
+  if (!CC.memories.length) return '<div style="color:#5b6780;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
+  return CC.memories.map(m => `<div class="memrow${m.activo ? '' : ' off'}">
+    <span class="memtipo t-${m.tipo === 'decisión' ? 'dec' : m.tipo}">${CC_MEM_TIPO[m.tipo] || m.tipo}</span>
+    <div class="memtxt">${CC_ESC(m.texto)}<div class="memmeta">${m.fuente || 'manual'} · ${(m.fecha || '').slice(0, 10)}${m.has_embedding ? ' · 🔎 vectorizada' : ''}</div></div>
+    <div class="memacts">
+      <button title="Editar" onclick="ccMemEdit('${m.id}')">✎</button>
+      <button title="${m.activo ? 'Desactivar' : 'Activar'}" onclick="ccMemToggle('${m.id}',${!m.activo})">${m.activo ? '🚫' : '↺'}</button>
+    </div></div>`).join('');
+}
+function ccRenderMemList() { const el = document.getElementById('cc-memlist'); if (el) el.innerHTML = ccMemListHTML(); }
+async function ccMemAdd() {
+  if (CC.memBusy) return;
+  const txt = document.getElementById('cc-mem-txt'); const tipo = document.getElementById('cc-mem-tipo');
+  const texto = (txt ? txt.value : '').trim(); if (!texto) return;
+  CC.memBusy = true; if (txt) txt.value = '';
+  await ccMemPost('POST', { tipo: tipo ? tipo.value : 'nota', texto, fuente: 'manual' });
+  CC.memBusy = false;
+}
+async function ccMemToggle(id, activo) { await ccMemPost('PATCH', { id, activo }); }
+async function ccMemEdit(id) {
+  const m = CC.memories.find(x => x.id === id); if (!m) return;
+  const nuevo = window.prompt('Editar memoria:', m.texto); if (nuevo === null || !nuevo.trim() || nuevo.trim() === m.texto) return;
+  await ccMemPost('PATCH', { id, texto: nuevo.trim() });
+}
+async function ccSaveToMemory(idx) {
+  const m = CC.chat[idx]; if (!m || m.role !== 'assistant') return;
+  const texto = window.prompt('Guardar en memoria del Cerebro (editá si querés):', m.content.slice(0, 500));
+  if (texto === null || !texto.trim()) return;
+  if (!document.getElementById('cc-memlist')) { ccGo('cerebro'); await new Promise(r => setTimeout(r, 120)); }
+  await ccMemPost('POST', { tipo: 'aprendizaje', texto: texto.trim(), fuente: 'chat' });
+  if (window.toast) toast('🧠 Guardado en la memoria del Cerebro.', 'success');
+}
+async function ccMemPost(method, body) {
+  try {
+    const tok = await ccAuthToken();
+    const r = await fetch('/api/brain-memory', { method, headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { if (window.toast) toast('⚠️ ' + (d.error || 'No se pudo guardar la memoria'), 'error'); return; }
+    CC.memLoaded = false; await ccLoadMemories();
+  } catch (e) { if (window.toast) toast('⚠️ ' + (e.message || e), 'error'); }
+}
+window.ccMemAdd = ccMemAdd; window.ccMemToggle = ccMemToggle; window.ccMemEdit = ccMemEdit; window.ccSaveToMemory = ccSaveToMemory;
 
 // ─── SECCIÓN: PROPIEDADES ───
 function ccSecPropiedades(comp) {
