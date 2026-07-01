@@ -708,13 +708,42 @@ function ccSecInquilinos(comp) {
     <div class="grid"><div class="card"><table class="ptable"><thead><tr><th>Inquilino</th><th>Teléfono</th><th>Estado</th></tr></thead><tbody>
     ${CC.tenants.slice(0, 30).map(t => `<tr><td>${CC_ESC(t.full_name || '—')}</td><td>${CC_ESC(t.phone || '—')}</td><td><span class="badge b-ok">${CC_ESC(t.client_state || 'activo')}</span></td></tr>`).join('')}</tbody></table></div></div>`;
 }
-// ─── SECCIÓN: ANALÍTICA ───
+// ─── SECCIÓN: ANALÍTICA & KPIs ───
 function ccSecAnalitica(comp) {
-  const { kpi } = comp;
-  return `${ccHeader('Analítica', 'KPIs', 'Tendencias e indicadores del portafolio.')}
-    <div class="grid row2"><div class="card"><div class="chart-h"><div class="t">Ingresos vs Gastos · 6 meses</div>
-      <div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div><canvas id="cc-cf" height="150"></canvas></div>
-      <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><canvas id="cc-house" height="260"></canvas></div></div>`;
+  const { kpi, houses } = comp;
+  const withData = houses.filter(h => h.inc > 0 || h.exp > 0);
+  const best = [...withData].sort((a, b) => b.net - a.net)[0];
+  const worst = [...withData].sort((a, b) => a.net - b.net)[0];
+  const noiRank = [...houses].filter(h => h.total).map(h => ({ ...h, noi: h.inc - (h.exp - h.hipo) })).sort((a, b) => b.noi - a.noi);
+  // Ocupación por zona (regla)
+  const Z = {}; houses.forEach(h => { const z = ccZoneLabel(h.zone); (Z[z] = Z[z] || { o: 0, t: 0 }); Z[z].o += h.occ; Z[z].t += h.total; });
+  const zoneRows = Object.entries(Z).filter(([, v]) => v.t).map(([z, v]) => ({ z, pct: Math.round(v.o / v.t * 100), o: v.o, t: v.t })).sort((a, b) => b.pct - a.pct);
+  return `${ccHeader('Analítica', 'KPIs', `Tendencias e indicadores del portafolio · ${CC.props.length} casas · ${kpi.totalU} unidades (regla) · ${kpi.occPct}% ocupación`)}
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">Cashflow del mes</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div><div class="meta">${comp.mb.label} · ing ${CC_K(kpi.inc)} / gas ${CC_K(kpi.expT)}</div></div>
+      <div class="card kpi"><div class="lab">Mejor casa</div><div class="big up" style="font-size:20px">${best ? CC_ESC(best.name.split(',')[0]) : '—'}</div><div class="meta">${best ? CC_MONEY(best.net) + '/mes' : ''}</div></div>
+      <div class="card kpi"><div class="lab">Peor casa</div><div class="big down" style="font-size:20px">${worst ? CC_ESC(worst.name.split(',')[0]) : '—'}</div><div class="meta">${worst ? CC_MONEY(worst.net) + '/mes' : ''}</div></div>
+      <div class="card kpi"><div class="lab">Captura de renta</div><div class="big glow">${kpi.capture}%</div><div class="meta">${CC_MONEY(kpi.potTotal - kpi.potFree)} de ${CC_MONEY(kpi.potTotal)} potencial · <span class="warn">${CC_MONEY(kpi.potFree)} sin cobrar</span></div></div>
+    </div>
+    <div class="grid row2" style="margin-top:16px">
+      <div class="card"><div class="chart-h"><div class="t">Ingresos vs Gastos · 12 meses</div><div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div><canvas id="cc-an-ie" height="150"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Cashflow mensual · 12 meses</div><div class="k">rojo = pérdida</div></div><canvas id="cc-an-cf" height="150"></canvas></div>
+    </div>
+    <div class="grid row2" style="margin-top:16px">
+      <div class="card"><div class="chart-h"><div class="t">Ocupación mensual · 12 meses</div><div class="k">estimada por reservas · regla</div></div><canvas id="cc-an-occ" height="150"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Ocupación por zona</div><div class="k">${kpi.occPct}% global</div></div>
+        ${zoneRows.map(z => `<div class="op-item"><span style="width:110px">${CC_ESC(z.z)}</span><span class="mini-bar" style="width:140px"><i style="width:${z.pct}%"></i></span><span style="margin-left:auto">${z.pct}% · ${z.o}/${z.t}</span></div>`).join('')}</div>
+    </div>
+    <div class="grid row2" style="margin-top:16px">
+      <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><canvas id="cc-an-noibar" height="300"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · ${comp.mb.label}</div><div class="k">${CC_K(kpi.expT)}</div></div><canvas id="cc-an-donut" height="300"></canvas></div>
+    </div>
+    <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">Evolución de gastos por tipo · 6 meses</div><div class="k">miles US$</div></div><canvas id="cc-an-exptrend" height="150"></canvas></div></div>
+    <div class="grid" style="margin-top:16px"><div class="card">
+      <div class="chart-h"><div class="t">NOI y cashflow por casa</div><div class="k">NOI = ingreso − gastos operativos (sin hipoteca)</div></div>
+      <table class="ptable"><thead><tr><th>Casa</th><th>Zona</th><th>Ocup.</th><th>Ingreso</th><th>Gastos op.</th><th>Hipoteca</th><th>NOI</th><th>Cashflow</th></tr></thead><tbody>
+      ${noiRank.map(h => `<tr><td>${CC_ESC(h.name.split(',')[0]).slice(0, 24)}</td><td>${ccZoneLabel(h.zone)}</td><td>${h.pct}%</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.exp - h.hipo)}</td><td>${CC_MONEY(h.hipo)}</td><td class="${h.noi >= 0 ? 'up' : 'down'}">${CC_MONEY(h.noi)}</td><td class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -729,6 +758,48 @@ function ccTrend6() {
   const inc = months.map(({ y, m }) => CC.pay.filter(p => p.paid_at && p.paid_at.slice(0, 7) === `${y}-${String(m).padStart(2, '0')}`).reduce((s, p) => s + Number(p.amount || 0), 0) / 1000);
   const exp = months.map(({ y, m }) => CC.exp.filter(e => e.expense_date && e.expense_date.slice(0, 7) === `${y}-${String(m).padStart(2, '0')}`).reduce((s, e) => s + Number(e.amount || 0), 0) / 1000);
   return { labels: months.map(x => MES[x.m - 1]), inc, exp };
+}
+// Serie mensual configurable (n meses). Devuelve labels + ingresos/gastos/cashflow (en $).
+function ccMonthsSeries(n = 12) {
+  const now = new Date(); const months = [];
+  for (let i = n - 1; i >= 0; i--) { const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1); months.push({ y: d.getFullYear(), m: d.getMonth() + 1 }); }
+  const MES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const key = ({ y, m }) => `${y}-${String(m).padStart(2, '0')}`;
+  const inc = months.map(mm => CC.pay.filter(p => p.paid_at && p.paid_at.slice(0, 7) === key(mm)).reduce((s, p) => s + Number(p.amount || 0), 0));
+  const exp = months.map(mm => CC.exp.filter(e => e.expense_date && e.expense_date.slice(0, 7) === key(mm)).reduce((s, e) => s + Number(e.amount || 0), 0));
+  return { labels: months.map(x => `${MES[x.m - 1]}${x.m === 1 ? " '" + String(x.y).slice(2) : ''}`), keys: months.map(key), inc, exp, cf: inc.map((v, i) => v - exp[i]) };
+}
+// Ocupación mensual estimada por RESERVAS (regla de unidades: habitaciones juntas=1).
+function ccOccSeries(n = 12) {
+  const now = new Date(); const months = [];
+  for (let i = n - 1; i >= 0; i--) { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)); months.push({ from: d.toISOString().slice(0, 10), to: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10) }); }
+  const MES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const unitById = {}; CC.units.forEach(u => unitById[u.id] = u);
+  const overlaps = (b, mf, mt) => b.start_date && b.start_date <= mt && (!b.end_date || b.end_date >= mf);
+  const pct = months.map(({ from, to }) => {
+    // por casa: indep ocupada si su unidad tiene reserva; grupo habitaciones ocupado si alguna hab. tiene reserva.
+    let occ = 0, total = 0;
+    CC.props.forEach(p => {
+      const us = CC.units.filter(u => u.property_id === p.id);
+      const indep = us.filter(u => CC_INDEP.includes(u.unit_type));
+      const rooms = us.filter(u => u.unit_type === 'habitacion');
+      const hasR = rooms.length ? 1 : 0; total += indep.length + hasR;
+      // Ocupada en el mes si alguna reserva de esa unidad solapa el mes (cualquier estado = ocupación real/histórica).
+      const bkOfUnit = uid => CC.book.some(b => b.unit_id === uid && overlaps(b, from, to));
+      occ += indep.filter(u => bkOfUnit(u.id)).length + (hasR && rooms.some(u => bkOfUnit(u.id)) ? 1 : 0);
+    });
+    return total ? Math.round(occ / total * 100) : 0;
+  });
+  const labels = []; for (let i = n - 1; i >= 0; i--) { const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 1); labels.push(MES[d.getMonth()]); }
+  return { labels, pct };
+}
+// Gastos por tipo por mes (últimos n meses) → series apiladas.
+function ccExpTypeSeries(n = 6) {
+  const s = ccMonthsSeries(n);
+  const bucket = e => { const t = (e.subcategory || '').toLowerCase(); if (/hipotec/.test(t)) return 'Hipoteca'; if (/servicio|públic|publico/.test(t)) return 'Servicios'; if (/nómina|nomina|equipo/.test(t)) return 'Nómina'; if (/plataforma/.test(t)) return 'Plataforma'; if (/aseo|podada|mantenim/.test(t)) return 'Mantenim.'; return 'Otros'; };
+  const tipos = ['Hipoteca', 'Servicios', 'Mantenim.', 'Nómina', 'Plataforma', 'Otros'];
+  const series = tipos.map(tp => s.keys.map(k => CC.exp.filter(e => e.expense_date && e.expense_date.slice(0, 7) === k && bucket(e) === tp).reduce((a, e) => a + Number(e.amount || 0), 0) / 1000));
+  return { labels: s.labels, tipos, series };
 }
 function ccMountCharts(comp) {
   if (!window.Chart) return;
@@ -754,4 +825,21 @@ function ccMountCharts(comp) {
   const byB = {}; CC.exp.filter(e => inM(e.expense_date)).forEach(e => byB[bucket(e)] = (byB[bucket(e)] || 0) + Number(e.amount || 0));
   const bl = Object.keys(byB), bv = Object.values(byB);
   mk('cc-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4f8dff', '#45e3c6', '#8a7bff', '#3a6f74', '#4a5568', '#e7b65e'], borderColor: '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
+
+  // ─── Charts de ANALÍTICA (solo si la sección está activa) ───
+  if (document.getElementById('cc-an-ie')) {
+    const s12 = ccMonthsSeries(12); const inc12 = s12.inc.map(v => v / 1000), exp12 = s12.exp.map(v => v / 1000), cf12 = s12.cf.map(v => v / 1000);
+    const ieEl = document.getElementById('cc-an-ie'); const ictx = ieEl.getContext('2d');
+    mk('cc-an-ie', { type: 'line', data: { labels: s12.labels, datasets: [
+      { label: 'Ingresos', data: inc12, borderColor: '#48d69c', backgroundColor: grad(ictx, 'rgba(72,214,156,.18)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
+      { label: 'Gastos', data: exp12, borderColor: '#f0687a', backgroundColor: grad(ictx, 'rgba(240,104,122,.12)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: gext });
+    mk('cc-an-cf', { type: 'bar', data: { labels: s12.labels, datasets: [{ data: cf12, borderRadius: 4, backgroundColor: cf12.map(v => v >= 0 ? '#48d69c' : '#f0687a') }] }, options: gext });
+    const occ = ccOccSeries(12);
+    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#4f8dff', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(79,141,255,.18)', 'rgba(79,141,255,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#5b6780', font: { size: 10 }, callback: v => v + '%' } } } } });
+    const hn = [...comp.houses].filter(h => h.inc > 0 || h.exp > 0).sort((a, b) => b.net - a.net);
+    mk('cc-an-noibar', { type: 'bar', data: { labels: hn.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hn.map(h => h.net), borderRadius: 4, backgroundColor: hn.map(h => h.net >= 0 ? '#48d69c' : '#f0687a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#93a0b6', font: { size: 9 } } } } } });
+    mk('cc-an-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4f8dff', '#45e3c6', '#8a7bff', '#3a6f74', '#4a5568', '#e7b65e'], borderColor: '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
+    const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#f0687a', 'Servicios': '#4f8dff', 'Mantenim.': '#45e3c6', 'Nómina': '#8a7bff', 'Plataforma': '#e7b65e', 'Otros': '#4a5568' };
+    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#5b6780', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
+  }
 }
