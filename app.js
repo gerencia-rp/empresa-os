@@ -214,6 +214,8 @@ async function onLogin(user) {
   showApp();
   await loadData();
   render();
+  // 🌐 Flipping Rentals OS — shell del ecosistema (routing + niveles) sobre el panel clásico.
+  if (window.osInit) osInit();
 }
 
 // ============================================================
