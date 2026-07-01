@@ -1380,7 +1380,7 @@ function pmRenderPropertyCardInline(p) {
           <!-- LISTA UNIDADES con detalle -->
           <div>
             <div class="flex items-center justify-between mb-2">
-              <div class="text-[10px] uppercase font-bold text-slate-700 tracking-wider">⚙️ Unidades (${units.length})</div>
+              <div class="text-[10px] uppercase font-bold text-slate-700 tracking-wider">⚙️ Unidades y habitaciones (${units.length})</div>
               <button onclick="pmEditUnit(null,'${p.id}')" class="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold">+ Agregar Unidad</button>
             </div>
             <div class="space-y-1.5">
