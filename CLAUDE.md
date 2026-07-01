@@ -4,6 +4,16 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (1 Jul 2026 — Property OS · Command Center + Cerebro IA) · rama `feat/cerebro-full` (mergeada a main)
+
+- 🛰️ **Command Center** (`pm/command-center.js`, ~90KB): app unificada de Rentas, dark (mockup `docs/Property_OS_Mockup_RentalProfits.html`: #06080d, vidrio, gradiente teal→azul, orbe vivo). Sidebar 8 secciones (Command/Propiedades/Reservas/Operación/Inquilinos/Finanzas/Analítica/Cerebro IA). Se abre desde `systems` con `type='command-center'` (dispatch en `app.js`). **SOLO LECTURA** de datos de Airtable (no escribe NINGUNA tabla espejo); sólo escribe memoria/chat del Cerebro.
+- 🧠 **Cerebro IA (3 fases):** (1) **Insights por reglas** (sin costo IA) rankeados por $; incluye **"Ocupada sin ingresos"** (cobranza/registro). (2) **Chat** `/api/brain-chat` → Claude `claude-opus-4-8` (env `ANTHROPIC_API_KEY`, ya en Vercel — la usa el módulo viral). (3) **Memoria RAG**: `pm_brain_memory`+`pm_brain_chat`+RPC `match_brain_memory` (pgvector, migración `20260701000000`), embeddings **Voyage `voyage-3-lite` 512d** vía `api/_brain.mjs` (Vercel env `VOYAGE_API_KEY` → fallback edge function `generate-embedding` que sí tiene la key en Supabase Secrets → degradar a "recientes"). `/api/brain-memory` = CRUD. Seed de 7 memorias (`20260701000100`). **Resumen del día** generado por el Cerebro arriba del Command Center.
+- 📊 **Regla de unidades (34) en TODA la app** (Command Center, pm-main dashboard/ficha, Analítica, reportes). Ocupación oficial = ocupadas/34 ≈ **82%**. Ningún tab muestra 49 (físico) como "unidades". Panel **Calidad de datos** accionable (ocupadas sin ingreso, unidades sin renta objetivo, reservas sin fecha, gastos sin monto → "Corregir en Airtable → tabla X").
+- 🔌 **Interconexión:** "Operación de hoy" = `pm_tasks` real (cronograma); cadena reserva→turnover/recepción→gasto→KPI (auto-tareas del sync). Reportes PDF + Guía de Bienvenida accesibles desde el CC (cablean `pmOpenReport`/`pmGenerateWelcomeGuide`).
+- ⚠️ **PENDIENTE — Vercel no deploya:** el auto-deploy GitHub→Vercel dejó de dispararse ~1 Jul 08:30 local. Todo el código Cerebro está en `main` pero **prod sigue en el build de la Fase 2** (`bundle.290960c6cca4`, `/api/brain-memory`=404). El build compila bien (`npm run build` local OK); el problema es el trigger/estado del proyecto en Vercel → revisar Dashboard/Deployments o Redeploy manual. La parte Supabase (RAG + seed + embeddings) YA está en prod (aditiva).
+
+---
+
 ## 🏢 Contexto del negocio
 
 **Empresa:** Rental Profits — Gestión de propiedades en alquiler (Property Management).
