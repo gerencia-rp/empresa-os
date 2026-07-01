@@ -38,6 +38,7 @@ const BUNDLE_FILES = [
   "ops-planner.js",
   "cleaning-planner.js",
   "pm/cronograma.js",
+  "pm/command-center.js",
   "remodel-dashboard.js",
   "clickup-dashboard.js",
   "pm-dashboard.js",
