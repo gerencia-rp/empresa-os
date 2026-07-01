@@ -928,7 +928,8 @@ function pmRenderDashboard(){
   const occ=pmOccupancyAt(now);
   const occPrev=pmOccupancyAt(new Date(y,m-1,Math.min(now.getDate(),28)));
   const cf=pmCashflowOf(y,m), cfPrev=pmCashflowOf(new Date(y,m-1,1).getFullYear(),(m+11)%12);
-  const empties=occ.units.filter(u=>!pmUnitOccupied(u));
+  // Potencial perdido = SOLO unidades Disponibles (no reservadas ni en mantenimiento).
+  const empties=occ.units.filter(u=>pmUnitState(u)==='libre');
   const potentialLost=empties.reduce((s,u)=>s+Number(u.target_rent||0),0);
   const { all:actions, lateCount, expiringCount }=pmCeoActions();
   const trend=[]; for(let i=5;i>=0;i--){ const d=new Date(y,m-i,1); const c=pmCashflowOf(d.getFullYear(),d.getMonth()); trend.push({ label:`${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income:c.income, gastos:c.gastos, net:c.net }); }
@@ -1238,7 +1239,7 @@ function pmRenderAvailability() {
 
       <!-- Grid -->
       <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-1.5">
-        ${units.map(u => { const s=pmTileState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; const onclick=u._roomsGroup?`pmToggleExpandProperty('${u.property_id}');pmSetTab('properties')`:`pmEditUnit('${u.id}','${u.property_id}')`; return `
+        ${units.map(u => { const s=pmTileState(u); const meta=PM_UNIT_STATE[s]||PM_UNIT_STATE.inactiva; const onclick=`pmToggleExpandProperty('${u.property_id}');pmSetTab('properties')`; return `
           <button onclick="${onclick}" title="${pmPropertyName(u.property_id).replace(/"/g,'&quot;')} · ${(u.code||u.name||'').replace(/"/g,'&quot;')} · ${meta.label}" class="border ${meta.bg} rounded-lg p-1.5 text-left hover:shadow-sm transition">
             <div class="text-[13px]">${meta.dot}</div>
             <div class="text-[9px] font-bold ${meta.txt} truncate">${(u.code||u.name||'').replace(/</g,'&lt;').slice(0,12)}</div>
@@ -1387,9 +1388,9 @@ function pmRenderPropertyCardInline(p) {
           <div class="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-slate-200">
             <div class="flex items-center gap-3 text-xs flex-wrap">
               <span class="flex items-center gap-1"><span class="bg-emerald-500 w-2 h-2 rounded-full"></span> <strong>${occupiedUnits.length}</strong> ocupadas</span>
-              <span class="flex items-center gap-1"><span class="bg-red-400 w-2 h-2 rounded-full"></span> <strong>${freeUnits}</strong> libres</span>
               <span class="flex items-center gap-1"><span class="bg-blue-500 w-2 h-2 rounded-full"></span> <strong>${reservedUnits.length}</strong> reservadas</span>
-              <span class="flex items-center gap-1"><span class="bg-amber-500 w-2 h-2 rounded-full"></span> <strong>${maintenanceUnits.length}</strong> mant.</span>
+              <span class="flex items-center gap-1"><span class="bg-amber-500 w-2 h-2 rounded-full"></span> <strong>${freeUnits}</strong> disponibles</span>
+              <span class="flex items-center gap-1"><span class="bg-slate-500 w-2 h-2 rounded-full"></span> <strong>${maintenanceUnits.length}</strong> mant.</span>
             </div>
             <div class="text-xs">
               <span class="text-slate-500">Potencial:</span> <strong class="text-emerald-700">$${potentialMo.toLocaleString()}/mes</strong>
@@ -4813,12 +4814,13 @@ function pmFinAgg(r) {
     const rentable = pmRentableUnitsOf(p.id);
     const occ = rentable ? pmOccupiedRentableUnitsOf(p.id) / rentable : 0;
     const pIncome = sum(inc.filter(x => x.property_id===p.id));
-    const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house' && !pmIsAseo(e)));
-    const pClean = sum(exp.filter(e => e.property_id===p.id && pmIsAseo(e)));
-    const pNoi = pIncome - pHouse - pClean - operativosPerProp;   // NOI por casa (antes de nómina)
+    const pHipoteca = sum(exp.filter(e => e.property_id===p.id && isHipo(e)));
+    const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house' && !isHipo(e) && !pmIsAseo(e)));
+    const pClean = sum(exp.filter(e => e.property_id===p.id && !isHipo(e) && pmIsAseo(e)));
+    const pNoi = pIncome - pHipoteca - pHouse - pClean - operativosPerProp;   // NOI por casa (antes de nómina)
     const pNet = pNoi - payrollPerProp;                            // cash flow por casa
     const margin = pIncome > 0 ? pNoi / pIncome : 0;
-    return { property: p, occ, rentable, income: pIncome, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNet, noi: pNoi, margin };
+    return { property: p, occ, rentable, income: pIncome, hipoteca: pHipoteca, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNet, noi: pNoi, margin };
   });
   return { income, house, cleaning, operational, maintenance, hipoteca, otros, payroll, directos, gastosTotal, noi, net, margin,
     incomeByPlatform, incomeByModel, expenseByCategory, props, activePropsCount: activeProps.length };
@@ -5101,7 +5103,8 @@ function pmRenderFinance() {
             ${th('rentable','Uds.')}
             ${th('occ','Ocup.')}
             ${th('income','Ingresos')}
-            ${th('house','Gastos Casa')}
+            ${th('hipoteca','Hipoteca')}
+            ${th('house','Servicios')}
             ${th('cleaning','Aseo')}
             ${th('payrollPro','Nómina prorr.')}
             ${th('net','NETO')}
@@ -5115,18 +5118,20 @@ function pmRenderFinance() {
               <td class="px-3 py-2 text-right text-slate-600">${x.rentable}</td>
               <td class="px-3 py-2 text-right text-slate-600">${Math.round(x.occ*100)}%</td>
               <td class="px-3 py-2 text-right text-emerald-700 font-bold">${pmMoney(x.income)}</td>
+              <td class="px-3 py-2 text-right text-red-600">${pmMoney(x.hipoteca)}</td>
               <td class="px-3 py-2 text-right text-red-600">${pmMoney(x.house)}</td>
               <td class="px-3 py-2 text-right text-red-600">${pmMoney(x.cleaning)}</td>
               <td class="px-3 py-2 text-right text-slate-500">${pmMoney(x.payrollPro)}</td>
               <td class="px-3 py-2 text-right font-extrabold ${x.net>=0?'text-emerald-700':'text-red-600'}">${pmMoney(x.net)}</td>
               <td class="px-3 py-2 text-right font-bold ${x.margin>0.40?'text-emerald-700':x.margin>=0.20?'text-amber-700':'text-red-600'}">${x.income>0?Math.round(x.margin*100)+'%':'—'}</td>
-            </tr>`).join('') : '<tr><td colspan="9" class="px-3 py-8 text-center text-slate-400 italic">Sin casas activas con datos en el período.</td></tr>'}
+            </tr>`).join('') : '<tr><td colspan="10" class="px-3 py-8 text-center text-slate-400 italic">Sin casas activas con datos en el período.</td></tr>'}
         </tbody>
         ${rows.length ? `<tfoot class="bg-slate-100 font-bold"><tr>
           <td class="px-3 py-2 text-slate-800">TOTAL</td>
           <td class="px-3 py-2 text-right text-slate-600">${rentableTotal}</td>
           <td class="px-3 py-2 text-right text-slate-600">${Math.round(occPct*100)}%</td>
           <td class="px-3 py-2 text-right text-emerald-700">${pmMoney(agg.income)}</td>
+          <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.hipoteca)}</td>
           <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.house)}</td>
           <td class="px-3 py-2 text-right text-red-600">${pmMoney(agg.cleaning)}</td>
           <td class="px-3 py-2 text-right text-slate-500">${pmMoney(agg.payroll)}</td>
@@ -5238,8 +5243,8 @@ function pmFinReport(kind) {
     <div class="kpi"><div class="l">P&L Neto</div><div class="v ${agg.net>=0?'pos':'neg'}">${pmMoney(agg.net)}</div></div>
   </div>`;
   const pnlTable = (rows) => `<table>
-    <thead><tr><th>Casa</th><th>Uds.</th><th>Ocup.</th><th>Ingresos</th><th>Gastos Casa</th><th>Aseo</th><th>Nómina prorr.</th><th>NETO</th><th>% margen</th></tr></thead>
-    <tbody>${rows.map(x=>`<tr><td>${(x.property.name||'').replace(/</g,'&lt;')}</td><td>${x.rentable}</td><td>${Math.round(x.occ*100)}%</td><td>${pmMoney(x.income)}</td><td>${pmMoney(x.house)}</td><td>${pmMoney(x.cleaning)}</td><td>${pmMoney(x.payrollPro)}</td><td class="${x.net>=0?'pos':'neg'}">${pmMoney(x.net)}</td><td>${x.income>0?Math.round(x.margin*100)+'%':'—'}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>Casa</th><th>Uds.</th><th>Ocup.</th><th>Ingresos</th><th>Hipoteca</th><th>Servicios</th><th>Aseo</th><th>Nómina prorr.</th><th>NETO</th><th>% margen</th></tr></thead>
+    <tbody>${rows.map(x=>`<tr><td>${(x.property.name||'').replace(/</g,'&lt;')}</td><td>${x.rentable}</td><td>${Math.round(x.occ*100)}%</td><td>${pmMoney(x.income)}</td><td>${pmMoney(x.hipoteca)}</td><td>${pmMoney(x.house)}</td><td>${pmMoney(x.cleaning)}</td><td>${pmMoney(x.payrollPro)}</td><td class="${x.net>=0?'pos':'neg'}">${pmMoney(x.net)}</td><td>${x.income>0?Math.round(x.margin*100)+'%':'—'}</td></tr>`).join('')}</tbody>
   </table>`;
   const sorted = [...agg.props].sort((a,b)=>b.net-a.net);
 
@@ -6764,7 +6769,7 @@ async function pmEditFeed(id) {
         </label>
         <label class="flex items-center gap-2 text-xs">
           <input id="pm-ff-auto" type="checkbox" ${f.auto_sync!==false?'checked':''}/>
-          <span>Sync automático</span>
+          <span>Sincronización automática</span>
         </label>
       </div>
       <div>
@@ -7111,7 +7116,18 @@ function pmApplyReadOnlyDOM() {
   const root = document.getElementById('pm-root');
   if (!root) return;
   root.querySelectorAll('button[onclick]').forEach(btn => {
-    if (PM_RO_BTN_RE.test(btn.getAttribute('onclick') || '')) btn.style.display = 'none';
+    if (!PM_RO_BTN_RE.test(btn.getAttribute('onclick') || '')) return;
+    const txt = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+    // Botón de ACCIÓN puro (chico, sin info) → ocultar. Botón que MUESTRA info
+    // (ej. chip de reserva con inquilino/fechas) → neutralizar pero dejar visible.
+    const showsInfo = !!btn.querySelector('br') || txt.length > 24;
+    if (showsInfo) {
+      btn.removeAttribute('onclick');
+      btn.style.cursor = 'default';
+      btn.classList.remove('hover:shadow-sm', 'hover:bg-slate-50', 'hover:bg-slate-100', 'hover:bg-emerald-100', 'hover:bg-amber-100');
+    } else {
+      btn.style.display = 'none';
+    }
   });
 }
 window.pmApplyReadOnlyDOM = pmApplyReadOnlyDOM;
