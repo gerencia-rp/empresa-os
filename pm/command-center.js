@@ -177,7 +177,30 @@ function ccInjectCSS() {
   #cc-overlay .dqitem{color:#cdd6e6;min-width:150px;font-weight:500}#cc-overlay .dqdetail{color:var(--mut2)}
   #cc-overlay .dqmore{font-size:11px;color:var(--mut2);padding:3px 0 3px 22px}
   #cc-overlay .dqnote{font-size:11px;color:var(--a1);padding:6px 0 2px 22px;opacity:.9}#cc-overlay .dqnote b{color:#7ff0dc}
-  `;
+  #cc-overlay .main,#cc-overlay .card,#cc-overlay .nav a,#cc-overlay .daybanner{animation:ccfade .35s ease}
+  @keyframes ccfade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (max-width:960px){
+    #cc-overlay{overflow-x:hidden}
+    #cc-overlay .app{grid-template-columns:minmax(0,1fr)}
+    #cc-overlay .main{min-width:0;max-width:100%}
+    #cc-overlay canvas{max-width:100%!important}
+    #cc-overlay .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #cc-overlay .grid{grid-template-columns:minmax(0,1fr)}
+    #cc-overlay .side{position:sticky;top:0;height:auto;flex-direction:column;gap:8px;padding:12px 14px;z-index:3}
+    #cc-overlay .side .navlbl,#cc-overlay .side .foot{display:none}
+    #cc-overlay .brand{padding:2px 4px 8px}
+    #cc-overlay .nav{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:5px;padding-bottom:4px}
+    #cc-overlay .nav a{white-space:nowrap;flex-shrink:0;padding:8px 11px;font-size:12px}
+    #cc-overlay .nav a .b{display:none}#cc-overlay .nav a.on::before{display:none}
+    #cc-overlay .main{padding:16px 14px 40px}
+    #cc-overlay .row2,#cc-overlay .row3{grid-template-columns:minmax(0,1fr)}
+    #cc-overlay .top{flex-direction:column;padding-right:46px}#cc-overlay .pills{margin-left:0;flex-wrap:wrap}
+    #cc-overlay .top h1{font-size:20px}
+    #cc-overlay .ptable{display:block;overflow-x:auto;min-width:0;font-size:11.5px}
+    #cc-overlay .reptools .rephint{margin-left:0;width:100%}
+    #cc-overlay .ccclose{top:12px;right:12px}
+  }
+  @media (max-width:560px){ #cc-overlay .kpis{grid-template-columns:minmax(0,1fr)} #cc-overlay .kpi .big{font-size:27px} }`;
   document.head.appendChild(st);
 }
 
@@ -879,7 +902,7 @@ function ccMountCharts(comp) {
   if (!window.Chart) return;
   const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#5b6780', font: { size: 10 } } };
   const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#5b6780', font: { size: 10 } } }, y: ax } };
-  const mk = (id, cfg) => { const el = document.getElementById(id); if (el) CC._charts.push(new Chart(el, cfg)); };
+  const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} CC._charts.push(new Chart(el, cfg)); };
   const grad = (ctx, c1, c2) => { const g = ctx.createLinearGradient(0, 0, 0, 150); g.addColorStop(0, c1); g.addColorStop(1, c2); return g; };
   // sparklines
   const spark = (id, data, color) => mk(id, { type: 'line', data: { labels: data.map((_, i) => i), datasets: [{ data, borderColor: color, borderWidth: 1.8, tension: .4, pointRadius: 0, fill: false }] }, options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false } } } });
