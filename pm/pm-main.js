@@ -3014,8 +3014,11 @@ function pmTenantPayStatus(booking) {
   const monthStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
   if (lastPay && (lastPay.paid_at || '') >= monthStart) return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
   const day = pmRecurrenceDay(booking.payment_day);
+  // Normalizar a medianoche AMBAS fechas: si no, la hora actual hace que el floor dé el mismo
+  // "2d" para todos (bug). Días reales = hoy(00:00) − vencimiento(00:00).
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
-  const diff = Math.floor((due - today) / 86400000);
+  const diff = Math.round((due - t0) / 86400000);
   if (diff < 0) return { key: 'atrasado', label: `🔴 Atrasado ${Math.abs(diff)}d`, cls: 'text-red-700 bg-red-50' };
   if (diff <= 7) return { key: 'proximo', label: `⏰ Próximo (${diff}d)`, cls: 'text-amber-700 bg-amber-50' };
   return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
@@ -4846,13 +4849,15 @@ function pmFinAgg(r) {
   const otrosE = exp.filter(e => !acc.has(e.id));
   const house = sum(houseE), cleaning = sum(aseoE), operational = sum(operE), maintenance = sum(maintE), hipoteca = sum(hipoE), otros = sum(otrosE);
   const payroll = pmPayrollInRange(r);
-  // FIX1+FIX3: Gastos directos = TODOS los pm_expenses; NOI = ingresos − directos;
-  //           Cash flow neto = NOI − nómina;  Gastos totales = directos + nómina.
+  // Gastos directos = TODOS los pm_expenses (incl. hipoteca).
+  // NOI (Net Operating Income) = ingresos − gastos OPERATIVOS, EXCLUYE la deuda (hipoteca).
+  // Cash flow neto = NOI − servicio de deuda (hipoteca) − nómina. (Por eso NOI ≠ cash flow neto.)
   const directos = sum(exp);
-  const noi = income - directos;
-  const net = noi - payroll;                 // cash flow neto (≠ NOI cuando hay nómina)
+  const opex = directos - hipoteca;               // gastos operativos (sin deuda)
+  const noi = income - opex;                       // NOI = ingresos − opex
+  const net = noi - hipoteca - payroll;            // cash flow neto = NOI − deuda − nómina
   const gastosTotal = directos + payroll;
-  const margin = income > 0 ? noi / income : 0;   // FIX2: margen realista
+  const margin = income > 0 ? noi / income : 0;   // margen operativo
 
   // Breakdowns
   const incomeByPlatform = {}, incomeByModel = {}, expenseByCategory = {};
@@ -4882,8 +4887,8 @@ function pmFinAgg(r) {
     const pHipoteca = sum(exp.filter(e => e.property_id===p.id && isHipo(e)));
     const pHouse = sum(exp.filter(e => e.property_id===p.id && e.category==='house' && !isHipo(e) && !pmIsAseo(e)));
     const pClean = sum(exp.filter(e => e.property_id===p.id && !isHipo(e) && pmIsAseo(e)));
-    const pNoi = pIncome - pHipoteca - pHouse - pClean - operativosPerProp;   // NOI por casa (antes de nómina)
-    const pNet = pNoi - payrollPerProp;                            // cash flow por casa
+    const pNoi = pIncome - pHouse - pClean - operativosPerProp;    // NOI por casa (operativo, SIN deuda)
+    const pNet = pNoi - pHipoteca - payrollPerProp;               // cash flow por casa (− deuda − nómina)
     const margin = pIncome > 0 ? pNoi / pIncome : 0;
     return { property: p, occ, rentable, income: pIncome, hipoteca: pHipoteca, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNet, noi: pNoi, margin };
   });
@@ -5101,8 +5106,8 @@ function pmRenderFinance() {
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
       ${kpi('Ingresos cobrados (plata real)', pmMoney(agg.income), arrowD(delta(agg.income, prevAgg.income))+' MoM · '+r.label+(r.months===1?' '+pmMonthBadge(r.ymList[0]):''), 'text-emerald-700')}
       ${kpi('Gastos totales', pmMoney(agg.gastosTotal), arrowD(delta(agg.gastosTotal, prevAgg.gastosTotal))+' MoM', 'text-red-600')}
-      ${kpi('NOI', pmMoney(agg.noi), arrowD(delta(agg.noi, prevAgg.noi))+' MoM', agg.noi>=0?'text-emerald-700':'text-red-600')}
-      ${kpi('Cash flow neto', pmMoney(agg.net), arrowD(delta(agg.net, prevAgg.net))+' MoM', agg.net>=0?'text-emerald-700':'text-red-600')}
+      ${kpi('NOI (operativo, antes de deuda)', pmMoney(agg.noi), arrowD(delta(agg.noi, prevAgg.noi))+' MoM · ingresos − opex', agg.noi>=0?'text-emerald-700':'text-red-600')}
+      ${kpi('Cash flow neto (después de deuda)', pmMoney(agg.net), arrowD(delta(agg.net, prevAgg.net))+' MoM · NOI − hipoteca − nómina', agg.net>=0?'text-emerald-700':'text-red-600')}
       ${kpi('Margen NOI', (agg.income>0?Math.round(agg.margin*100):0)+'%', `objetivo 25-60%`, agg.margin>=0.25?'text-emerald-700':'text-amber-600')}
       ${kpi('Ocupación', Math.round(occPct*100)+'%', `${occRentable}/${rentableTotal} uds`, occPct>=0.8?'text-emerald-700':'text-amber-600')}
       ${kpi('Renta prom / unidad', pmMoney(avgRentRoom), 'uds rentables')}
@@ -5149,9 +5154,9 @@ function pmRenderFinance() {
       ${pmMultiLineChart(trend.map(t=>t.label), [
         { label:'Ingresos', color:'#10b981', values: trend.map(t=>t.income) },
         { label:'Gastos', color:'#ef4444', values: trend.map(t=>t.gastos) },
-        { label:'NOI / Cash flow', color:'#8b5cf6', values: trend.map(t=>t.net) }
+        { label:'Cash flow neto', color:'#8b5cf6', values: trend.map(t=>t.net) }
       ])}
-      <div class="text-xs text-slate-500 text-center mt-1">12 meses: <span class="text-emerald-700 font-bold">${pmMoney(t12i)}</span> ingresos · <span class="text-red-700 font-bold">${pmMoney(t12g)}</span> gastos · <span class="font-bold ${t12i-t12g>=0?'text-emerald-700':'text-red-700'}">${pmMoney(t12i-t12g)}</span> NOI</div>
+      <div class="text-xs text-slate-500 text-center mt-1">12 meses: <span class="text-emerald-700 font-bold">${pmMoney(t12i)}</span> ingresos · <span class="text-red-700 font-bold">${pmMoney(t12g)}</span> gastos · <span class="font-bold ${t12i-t12g>=0?'text-emerald-700':'text-red-700'}">${pmMoney(t12i-t12g)}</span> neto</div>
     </div>
 
     <!-- B · P&L por casa -->

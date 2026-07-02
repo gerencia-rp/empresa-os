@@ -3,7 +3,7 @@
 // Routing real (History API), 3 niveles + áreas transversales Operación/Contable.
 // Diseño Property OS (dark/light vía pos-theme). SOLO LECTURA de datos (Airtable/QuickBooks).
 // ════════════════════════════════════════════════════════════════
-const OS = { route: { view: 'global' }, loaded: false, loadErr: null, ff: [], props: [], units: [], pay: [], book: [], tenants: [], tasks: [], investors: [], _charts: [], chat: [] };
+const OS = { route: { view: 'global' }, loaded: false, loadErr: null, ff: [], draws: [], props: [], units: [], pay: [], book: [], tenants: [], tasks: [], investors: [], _charts: [], chat: [] };
 window.OS = OS;
 
 const OS_M = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n || 0)).toLocaleString('en-US');
@@ -238,8 +238,9 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, props, units, pay, book, tenants, tasks, inv] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
+      sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units').eq('active', true),
       sb.from('pm_units').select('id,property_id,status,target_rent,unit_type,is_active').eq('is_active', true),
       sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
@@ -248,7 +249,7 @@ async function osLoad() {
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
     ]);
-    OS.ff = ff.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
+    OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
     OS.book = book.data || []; OS.tenants = tenants.data || []; OS.tasks = tasks.data || []; OS.investors = inv.data || [];
     OS.loaded = true;
   } catch (e) { OS.loadErr = e.message || String(e); }
@@ -276,13 +277,37 @@ function osMonthBadge(ym) {
   const avgTxt = (i.avg && i.incompleto && !i.enCurso) ? ` · prom. previo ${i.avg}` : '';
   return `<span class="osbadge ${i.incompleto ? 'warn' : 'ok'}">${i.count} pagos cargados · ${nota}${avgTxt}</span>`;
 }
+// Conteo de alertas Fix & Flip con las MISMAS reglas que el FF Command Center (ffInsights) →
+// una sola fuente por métrica. Mantener en sync con ff-command-center.js · ffInsights.
+function osFFAlertCount(deals) {
+  let n = 0;
+  n += deals.filter(d => d.dr && Number(d.dr.remodel_internal) > Number(d.remodel_est || 0) * 2 && Number(d.dr.remodel_internal) >= 100000).length; // error de datos
+  n += deals.filter(d => Number(d.appraisal) > 0 && d.arv > 0 && Number(d.appraisal) > d.arv * 1.05).length; // appraisal > ARV
+  n += deals.filter(d => d.deficit < -20000 && !(d.dr && Number(d.dr.remodel_internal) >= 100000)).length; // déficit > $20k
+  n += Math.min(4, deals.filter(d => d.stage !== 'vendida' && d.arv > 0 && d.allInPct > 0.78 && d.allIn > 0).length); // all-in > 78% ARV (máx 4)
+  if (deals.filter(d => !d.dr && d.stage !== 'vendida').length) n += 1; // deals sin draws
+  n += 3; // conocidos del negocio: overhead + gap intereses + contrato Childress
+  return n;
+}
 function osCompute() {
   // FIX & FLIP
-  const drawN = {}; // (draws no cargados en OS; usamos remodel_est×1.3 como proxy si no hay)
-  const ff = OS.ff.map(d => { const arv = Number(d.arv || 0); const allIn = Number(d.purchase_price || 0) + Number(d.remodel_est || 0) * 1.3; return { ...d, arv, allIn }; });
+  // MISMA fórmula que el Fix & Flip Command Center (ffCompute) — una sola fuente por métrica.
+  // all-in = compra + remodelación(draws) + holding(draws); si no hay draw → remodel_est×1.3 (proxy).
+  const drawByNorm = {}; OS.draws.forEach(dr => { drawByNorm[dr.address_norm] = dr; });
+  const ff = OS.ff.map(d => {
+    const dr = drawByNorm[d.address_norm] || null;
+    const arv = Number(d.arv || 0);
+    const remComplete = dr ? Number(dr.remodel_complete || 0) : Number(d.remodel_est || 0) * 1.3;
+    const holding = dr ? (Number(dr.interest_hml || 0) + Number(dr.services_hml || 0) + Number(dr.interest_until_rent || 0) + Number(dr.furniture || 0) + Number(dr.other_costs || 0)) : 0;
+    const allIn = Number(d.purchase_price || 0) + remComplete + holding;
+    const allInPct = arv ? allIn / arv : 0;
+    const deficit = dr ? Number(dr.net_total || 0) : 0;
+    return { ...d, dr, arv, remComplete, holding, allIn, allInPct, deficit };
+  });
   const ffActive = ff.filter(d => d.stage !== 'vendida');
   const ffCapital = ffActive.reduce((s, d) => s + d.allIn, 0);
   const ffArv = ff.reduce((s, d) => s + d.arv, 0);
+  const ffAlertas = osFFAlertCount(ff);
   // RENTAS (regla de unidades = habitaciones juntas 1)
   const mb = osMonthBounds(); const inM = x => x && x >= mb.from && x <= mb.to;
   let totalU = 0, occU = 0;
@@ -293,7 +318,7 @@ function osCompute() {
   const cobranza = osCobranza(mb);
   return {
     mb,
-    ff: { deals: ff.length, activos: ffActive.length, capital: ffCapital, arv: ffArv, list: ff },
+    ff: { deals: ff.length, activos: ffActive.length, capital: ffCapital, arv: ffArv, alertas: ffAlertas, list: ff },
     rentas: { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
     cobranza,
     holding: { capital: ffCapital, arv: ffArv, unidades: totalU + ff.length, ingresosMes: rentInc, deudaCobranza: cobranza.total },
@@ -395,7 +420,7 @@ function osGlobal(comp) {
 // ─── NIVEL 2 · EMPRESA ───
 function osEmpresa(comp) {
   const e = OS_EMPRESAS[OS.route.empresa]; const isFF = OS.route.empresa === 'fix-and-flip', isR = OS.route.empresa === 'rentas';
-  const kpis = isFF ? [['Deals activos', comp.ff.activos, `${comp.ff.deals} total`], ['Capital desplegado', OS_M(comp.ff.capital), 'all-in'], ['ARV portafolio', OS_M(comp.ff.arv), ''], ['Alertas', osInsights(comp).filter(i => i.tag.includes('FIX')).length || '—', 'Cerebro FF']]
+  const kpis = isFF ? [['Deals activos', comp.ff.activos, `de ${comp.ff.deals} totales`], ['Capital desplegado', OS_M(comp.ff.capital), 'all-in (compra+remod+holding)'], ['ARV portafolio', OS_M(comp.ff.arv), ''], ['Alertas', comp.ff.alertas || '—', 'mismo conteo que el Command Center']]
     : isR ? [['Ocupación', comp.rentas.occPct + '%', `${comp.rentas.ocupadas}/${comp.rentas.unidades}`], ['Ingresos/mes', OS_M(comp.rentas.ingresos), comp.mb.label], ['Casas', comp.rentas.casas, ''], ['Deuda cobranza', OS_M(comp.cobranza.total), 'contrato − real']]
     : [['—', '—', 'datos próximamente']];
   return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag}</div>
