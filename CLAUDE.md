@@ -4,6 +4,17 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (1 Jul 2026 — Flipping Rentals OS: shell del holding + Fix & Flip completo) · EN VIVO
+
+- 🌐 **Flipping Rentals OS** (`os/os.js`): shell del ecosistema con **routing real (History API)** montado tras el login sobre el panel clásico (accesible con "⚙︎ Admin"). Niveles: **Global** (`/`, KPIs consolidados + 4 empresas + áreas Operación/Contable + Cerebro del Holding), **Empresa** (`/fix-and-flip`, `/rentas`, `/remodelacion`, `/educacion`), **áreas** `/operacion` (cronograma + cobranza = contrato − plata real) y `/contable` (conciliación QB + cap table), **apps** (`/fix-and-flip/underwriting` etc. abren la sección del Command Center). 404 con diseño. Título "Flipping Rentals OS" + OG.
+- ⚠️ **ROUTING SPA (gotcha resuelto):** el rewrite de `vercel.json` DEBE apuntar a **`/`**, NO a `/index.html` — con `cleanUrls:true`, `/index.html` da 308→`/` y el rewrite falla (404). Config vigente: `rewrites:[{source:"/((?!api/|assets/|viral|diag|mi-plan|.*\\.).*)",destination:"/"}]` (excluye api, assets, las páginas standalone y archivos con extensión). Rewrites por-ruta también fallaban por lo mismo.
+- 🏗️ **Fix & Flip completo** (`pm/ff-command-center.js`, área fix-flip, mirror `ff_*` de Airtable `applMXFyPq1hXj7iN`, SOLO LECTURA): Command Center (Kanban + insights), **Underwriting** (MAO, estimador calibrado \$7–100/sqft con validador de rango, HML, cash-out refi, ROI + recuperación con semáforo, ingeniería inversa), **Inversionistas** (CRM depurado 18 + 4 modelos + cap table + buy-out capital+15% + propuestas + alerta contrato sin firmar), **Finanzas/QuickBooks** (P&L cockpit, gastos por tipo, rentabilidad por casa, conciliación). Tablas: `ff_deals` (28), `ff_draws` (24), `ff_investors` (19, migración `20260701100000`).
+- 🎨 **Tema claro/oscuro** en TODO el ecosistema (`pm/pos-theme.js`, `[data-theme="light"]`, persistido en localStorage; toggle ◐). Aplicado a OS, Rentas CC y FF CC.
+- 🧠 **Cerebro** reusado (chat `/api/brain-chat` + memoria RAG `pm_brain_memory`); sembrado con reglas de Rentas (`seed`) y Fix & Flip (`ff-seed`): all-in ≤75% ARV, déficit OK si flujo+ y acum <\$20k, inversionista 15–18%, split 50/50, buy-out capital+15%, refi ≤ pago actual, Harmony solo intereses, CPI+3–5%, depósitos no son renta, **registrar la plata real no el contrato**.
+- 💾 **Deploy por CLI** (el auto-deploy de GitHub estaba caído por el límite de funciones, ya resuelto): `VERCEL_TOKEN=<token> npx vercel@latest deploy --prod --yes`. Node en Vercel = 24.x (dashboard).
+
+---
+
 ## 🎯 Estado (1 Jul 2026 — Property OS · Command Center + Cerebro IA) · rama `feat/cerebro-full` (mergeada a main)
 
 - 🛰️ **Command Center** (`pm/command-center.js`, ~90KB): app unificada de Rentas, dark (mockup `docs/Property_OS_Mockup_RentalProfits.html`: #06080d, vidrio, gradiente teal→azul, orbe vivo). Sidebar 8 secciones (Command/Propiedades/Reservas/Operación/Inquilinos/Finanzas/Analítica/Cerebro IA). Se abre desde `systems` con `type='command-center'` (dispatch en `app.js`). **SOLO LECTURA** de datos de Airtable (no escribe NINGUNA tabla espejo); sólo escribe memoria/chat del Cerebro.
