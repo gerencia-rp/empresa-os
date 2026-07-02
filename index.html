@@ -115,8 +115,8 @@
 
 <!-- config.public.js carga primero (commiteado, anon keys safe-to-expose con RLS).
      config.js carga después (gitignored, override local opcional). -->
-<script src="config.public.js"></script>
-<script src="config.js" onerror="this.remove()"></script>
+<script src="/config.public.js"></script>
+<script src="/config.js" onerror="this.remove()"></script>
 <!-- Bundle único generado por scripts/build.js (concatena los .js en orden
      y agrega hash). En dev local (sin build), index.html sigue cargando los
      scripts uno por uno mediante el fallback abajo si "bundle" no existe. -->

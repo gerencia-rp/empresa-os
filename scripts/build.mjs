@@ -149,7 +149,7 @@ async function main() {
   const indexHtml = await fs.readFile(path.join(ROOT, "index.html"), "utf8");
   const replaced = indexHtml.replace(
     /<!--\[BUNDLE\]-->[\s\S]*?<!--\[\/BUNDLE\]-->/,
-    `<script src="${bundleName}"></script>`
+    `<script src="/${bundleName}"></script>`   // absoluto: en deep-links (/rentas/…) un path relativo resolvería a /rentas/assets/… (404)
   );
   await fs.writeFile(path.join(DIST, "index.html"), replaced, "utf8");
 
