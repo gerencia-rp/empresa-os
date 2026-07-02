@@ -16,9 +16,9 @@ const OS_EMPRESAS = {
   'fix-and-flip': { key: 'fix-flip', name: 'Fix & Flip', icon: '🏗️', tag: 'Compra · remodela · vende/refi', apps: [
     { k: 'command-center', name: 'Command Center', icon: '◧', fn: "osOpenApp('fix-and-flip','command-center')" },
     { k: 'deals', name: 'Deals & Pipeline', icon: '▦', fn: "osOpenApp('fix-and-flip','deals')" },
-    { k: 'underwriting', name: 'Underwriting', icon: '∑', soon: true },
-    { k: 'inversionistas', name: 'Inversionistas', icon: '◍', soon: true },
-    { k: 'finanzas', name: 'Finanzas · QuickBooks', icon: '$', soon: true },
+    { k: 'underwriting', name: 'Underwriting', icon: '∑', fn: "osOpenApp('fix-and-flip','underwriting')" },
+    { k: 'inversionistas', name: 'Inversionistas', icon: '◍', fn: "osOpenApp('fix-and-flip','inversionistas')" },
+    { k: 'finanzas', name: 'Finanzas · QuickBooks', icon: '$', fn: "osOpenApp('fix-and-flip','finanzas')" },
   ] },
   'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
     { k: 'command-center', name: 'Command Center', icon: '◧', fn: "osOpenApp('rentas','command-center')" },
@@ -376,7 +376,7 @@ function osAppView(comp) {
 function osOpenApp(empresa, app, fromRoute) {
   if (!fromRoute) osNav(`/${empresa}/${app}`);
   OS._returnTo = `/${empresa}`;
-  if (empresa === 'fix-and-flip') { if (window.openFFCommandCenter) { openFFCommandCenter({ name: 'Fix & Flip' }); if (app === 'deals') setTimeout(() => window.ffGo && ffGo('deals'), 400); } }
+  if (empresa === 'fix-and-flip') { if (window.openFFCommandCenter) { openFFCommandCenter({ name: 'Fix & Flip' }); const sec = { deals: 'deals', underwriting: 'underwriting', inversionistas: 'inversionistas', finanzas: 'finanzas', analitica: 'analitica' }[app]; if (sec && sec !== 'command-center') setTimeout(() => window.ffGo && ffGo(sec), 450); } }
   else if (empresa === 'rentas') { if (window.openCommandCenter) openCommandCenter({ name: 'Rentas' }); }
 }
 window.osOpenApp = osOpenApp;
