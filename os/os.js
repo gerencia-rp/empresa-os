@@ -125,6 +125,49 @@ function osInjectCSS() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// RE-SKIN base sobre los sistemas clásicos (CAPA de estilos — no toca markup/lógica).
+// Mapea el look Tailwind viejo → tokens nuevos. El modo oscuro es el que más aporta
+// (la UI vieja es light-only); en claro es pulido mínimo para no arriesgar layouts.
+// ════════════════════════════════════════════════════════════════
+function osInjectReskin() {
+  if (document.getElementById('os-reskin')) return;
+  const st = document.createElement('style'); st.id = 'os-reskin';
+  const D = 'html[data-osreskin="dark"]'; const L = 'html[data-osreskin="light"]';
+  st.textContent = `
+  /* chrome del modal (ambos temas): más redondeado + tipografía del sistema nuevo */
+  html[data-osreskin] #modal{transition:none}
+  html[data-osreskin] #modal > div{border-radius:18px !important}
+  ${L} #modal > div{box-shadow:0 24px 70px -26px rgba(15,23,42,.42) !important}
+  /* ───────── DARK ───────── */
+  ${D} #modal{background:rgba(4,7,12,.66) !important}
+  ${D} #modal > div{background:#0f151e !important;color:#e7ecf5 !important;border:1px solid rgba(255,255,255,.1) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
+  ${D} #modal .bg-white,${D} #modal .bg-slate-50,${D} #modal .bg-slate-100,${D} #modal .bg-gray-50,${D} #modal .bg-gray-100,${D} #modal .bg-neutral-50,${D} #modal .bg-neutral-100{background-color:#151d28 !important}
+  ${D} #modal .bg-slate-800,${D} #modal .bg-slate-900,${D} #modal .bg-gray-800,${D} #modal .bg-gray-900{background-color:#1b2634 !important}
+  ${D} #modal .text-slate-900,${D} #modal .text-slate-800,${D} #modal .text-slate-700,${D} #modal .text-slate-600,${D} #modal .text-gray-900,${D} #modal .text-gray-800,${D} #modal .text-gray-700,${D} #modal .text-black{color:#e7ecf5 !important}
+  ${D} #modal .text-slate-500,${D} #modal .text-slate-400,${D} #modal .text-gray-500,${D} #modal .text-gray-400{color:#93a0b6 !important}
+  ${D} #modal .border,${D} #modal .border-b,${D} #modal .border-t,${D} #modal .border-slate-200,${D} #modal .border-slate-100,${D} #modal .border-slate-300,${D} #modal .border-gray-200,${D} #modal .border-gray-100,${D} #modal .border-gray-300{border-color:rgba(255,255,255,.1) !important}
+  ${D} #modal .divide-slate-200 > *+*,${D} #modal .divide-gray-200 > *+*,${D} #modal .divide-slate-100 > *+*{border-color:rgba(255,255,255,.08) !important}
+  ${D} #modal input,${D} #modal select,${D} #modal textarea{background-color:#0b1119 !important;color:#e7ecf5 !important;border-color:rgba(255,255,255,.14) !important}
+  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#5b6780 !important}
+  ${D} #modal table th{color:#93a0b6 !important}
+  ${D} #modal tr:hover td{background:rgba(255,255,255,.03) !important}
+  ${D} #modal .shadow,${D} #modal .shadow-sm,${D} #modal .shadow-md,${D} #modal .shadow-lg{box-shadow:none !important}
+  ${D} #modal .hover\\:bg-slate-50:hover,${D} #modal .hover\\:bg-slate-100:hover,${D} #modal .hover\\:bg-gray-50:hover,${D} #modal .hover\\:bg-gray-100:hover{background-color:rgba(255,255,255,.05) !important}
+  /* botón primario oscuro (bg-slate-900) → acento del sistema nuevo */
+  ${D} #modal button.bg-slate-900,${D} #modal .bg-slate-900.text-white,${D} #modal a.bg-slate-900{background:linear-gradient(135deg,#45e3c6,#4f8dff) !important;color:#04121a !important;border:none !important}
+  /* shell viejo detrás (sidebar) — se ve poco tras el backdrop, pero lo dejamos coherente */
+  ${D} #app header.bg-white{background-color:#0f151e !important}
+  ${L} #modal button.bg-slate-900,${L} #modal .bg-slate-900.text-white{background:linear-gradient(135deg,#12b5a0,#2f6ef0) !important;color:#fff !important}
+  `;
+  document.head.appendChild(st);
+}
+function osApplyReskin() {
+  const t = (window.posGetTheme && posGetTheme()) || 'dark';
+  document.documentElement.setAttribute('data-osreskin', t);
+}
+window.osApplyReskin = osApplyReskin;
+
+// ════════════════════════════════════════════════════════════════
 // ROUTER (History API)
 // ════════════════════════════════════════════════════════════════
 function osParse(path) {
@@ -154,7 +197,7 @@ function osNav(path, replace) {
 window.osNav = osNav;
 function osInit() {
   if (OS._init) return; OS._init = true;
-  osInjectCSS();
+  osInjectCSS(); osInjectReskin();
   window.addEventListener('popstate', () => { OS.route = osParse(); document.title = osTitle(OS.route); osRender(); });
   // Interceptar clicks en [data-osnav]
   document.addEventListener('click', e => { const a = e.target.closest('[data-osnav]'); if (a) { e.preventDefault(); osNav(a.getAttribute('data-osnav')); } });
@@ -168,7 +211,7 @@ function osMount() {
   posApplyTheme(root);
   root.innerHTML = '<div class="bgfx"></div><div class="wrap"><div style="padding:60px;color:#5b6780">⏳ Cargando Flipping Rentals OS…</div></div>';
 }
-function osToggleTheme() { posToggleTheme(); osRender(); }
+function osToggleTheme() { posToggleTheme(); osApplyReskin(); osRender(); }
 window.osToggleTheme = osToggleTheme;
 
 async function osLoad() {
@@ -419,6 +462,7 @@ window.osOpenSystem = osOpenSystem;
 function osEnterClassic(returnTo, label) {
   OS._classicOpen = true; OS._returnTo = returnTo || '/';
   const root = document.getElementById('os-root'); if (root) root.style.display = 'none';
+  osInjectReskin(); osApplyReskin();
   osInjectReturnBar(label);
   // Envolver closeModal UNA vez para volver al OS cuando el sistema (modal) se cierra.
   if (!OS._closeWrapped && typeof window.closeModal === 'function') {
