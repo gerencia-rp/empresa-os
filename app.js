@@ -30,16 +30,29 @@ const isAdmin = () => state.role === 'admin';
 // AUTH
 // ============================================================
 async function initAuth() {
-  // Suscribir ANTES de getSession: en deep-link/refresh a una ruta de sistema, la sesión
-  // persistida puede resolver por INITIAL_SESSION (carrera) — así no caemos al login.
+  // NO mostrar el login hasta CONFIRMAR que no hay sesión. En el full-load de un deep-link
+  // (/rentas/property-manager, F5, etc.) getSession puede resolver antes de que Supabase restaure
+  // la sesión persistida; la autoridad es el evento INITIAL_SESSION de onAuthStateChange.
+  document.getElementById('auth-screen')?.classList.add('hidden'); // ocultar login hasta decidir
+  let authDecided = false, authSettled = false;
+  const showLogin = () => { if (authDecided || window._appShown) return; authDecided = true; showAuth(); };
+  const enter = (user) => { if (window._appShown) return; authDecided = true; onLogin(user); };
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT') { if (window._appShown) location.reload(); return; }
-    // Restaurar sesión si aparece (INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED) y aún no entramos.
-    if (session && session.user && !window._appShown) { onLogin(session.user); }
+    // Ignorar un SIGNED_OUT ESPURIO durante la carga inicial (race de refresh en full-load de deep-links):
+    // solo recargar por un logout REAL, ya asentada la app.
+    if (event === 'SIGNED_OUT') { if (window._appShown && authSettled) location.reload(); return; }
+    if (session && session.user) { enter(session.user); return; }
+    // INITIAL_SESSION SIN sesión → recién ahí sabemos que no hay login y lo mostramos.
+    if (event === 'INITIAL_SESSION') showLogin();
   });
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) await onLogin(session.user);
-  else if (!window._appShown) showAuth();
+  setTimeout(() => { authSettled = true; }, 3000);
+  // getSession en paralelo: si ya hay sesión persistida, entrar directo (sin esperar el evento).
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session && session.user) { enter(session.user); return; }
+  } catch (e) {}
+  // Red de seguridad: si INITIAL_SESSION no llegó y no hay sesión, mostrar login tras una gracia.
+  setTimeout(showLogin, 2000);
 }
 
 function showAuth() {
@@ -209,6 +222,7 @@ async function onLogin(user) {
   if (window._appShown && state.user && state.user.id === user.id) return; // ya logueado (evita doble init por la carrera de auth)
   window._appShown = true;
   state.user = user;
+  showApp();  // ocultar login / mostrar la app YA — antes de cargar perfil/datos (así nunca queda pegado en login)
   const { data: profile } = await sb.from('profiles').select('role,allowed_areas').eq('id', user.id).single();
   state.role = profile?.role || 'viewer';
   state.allowedAreas = profile?.allowed_areas || [];
