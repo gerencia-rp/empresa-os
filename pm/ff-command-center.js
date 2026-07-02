@@ -120,6 +120,7 @@ function ffInjectCSS() {
   #ff-overlay .uwrow input:focus,#ff-overlay .uwrow select:focus,#ff-overlay .uwbar select:focus{border-color:var(--a2)}
   #ff-overlay .uwres{margin-top:10px;padding-top:10px;border-top:1px solid var(--glassb)}
   #ff-overlay .uwbig{font-size:22px;font-weight:760;letter-spacing:-.4px}#ff-overlay .uwsub{font-size:10.5px;color:var(--mut2);margin-top:3px;line-height:1.5}
+  #ff-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}#ff-overlay .repbtn:hover{filter:brightness(1.08)}
   /* KANBAN */
   #ff-overlay .kan{display:flex;gap:13px;overflow-x:auto;padding-bottom:8px}
   #ff-overlay .kcol{flex:1;min-width:210px}
@@ -276,8 +277,8 @@ const FF_NAV = [
   ['propiedades', '⌂', 'Propiedades', null],
   ['underwriting', '∑', 'Underwriting', null],
   ['inversionistas', '◍', 'Inversionistas', () => FF.investors.length || null],
-  ['finanzas', '$', 'Finanzas · QuickBooks', 'soon'],
-  ['analitica', '▤', 'Analítica & KPIs', 'soon'],
+  ['finanzas', '$', 'Finanzas · QuickBooks', null],
+  ['analitica', '▤', 'Analítica & KPIs', null],
   ['cerebro', '◆', 'Cerebro IA', null],
 ];
 function ffRender() {
@@ -292,8 +293,8 @@ function ffRender() {
     command: () => ffSecCommand(comp), deals: () => ffSecDeals(comp), propiedades: () => ffSecPropiedades(comp),
     underwriting: () => ffSecUnderwriting(comp),
     inversionistas: () => ffSecInversionistas(comp),
-    finanzas: () => ffSoon('Finanzas · QuickBooks', 'P&L / balance / cashflow + conciliación Airtable↔QuickBooks (overhead ~$146k fuera de libros, gap de intereses, cap table de inversionistas).'),
-    analitica: () => ffSoon('Analítica & KPIs', 'Tendencias, margen por deal, capital desplegado por etapa, velocidad de venta, ROI por estrategia.'),
+    finanzas: () => ffSecFinanzas(comp),
+    analitica: () => ffSecFinanzas(comp),
     cerebro: () => ffSecCerebro(comp),
   }[FF.section] || (() => ffSecCommand(comp)))();
   requestAnimationFrame(() => ffMountCharts(comp));
@@ -384,12 +385,105 @@ function ffSecPropiedades(comp) {
     <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => a.deficit - b.deficit))}</div></div>`;
 }
 // ─── INVERSIONISTAS ───
+const FF_OWN = /flipping\s*rentals/i; // la propia empresa (se saca del CRM de inversionistas)
+const FF_MODELOS = [
+  { k: 'vender-sociedad', name: 'Vender · Sociedad', terms: 'Aporta capital · <b>split 50/50</b> de la ganancia de la venta', ret: '50% de la ganancia', contrato: 'JV / sociedad (venta)' },
+  { k: 'vender-servicio', name: 'Vender · Servicio', terms: 'Aporta capital · la empresa cobra <b>fee de servicio</b> · el inversionista se lleva la ganancia', ret: 'Ganancia − fee', contrato: 'Servicio (fee de gestión)' },
+  { k: 'rentar-sociedad', name: 'Rentar · Sociedad', terms: 'Aporta capital · <b>split 50/50</b> del cashflow + equity de la refi', ret: '50% cashflow + equity', contrato: 'JV / sociedad (hold)' },
+  { k: 'rentar-servicio', name: 'Rentar · Servicio', terms: 'Aporta capital · <b>15–18% anual fijo</b> · la empresa opera', ret: '15–18% anual', contrato: 'Servicio (renta fija)' },
+];
 function ffSecInversionistas(comp) {
-  const inv = FF.investors;
-  return `${ffHeader('Inversionistas', 'Fix &amp; Flip', `${inv.length} inversionistas · modelos parametrizados en Fase 2`)}
-    ${inv.length ? `<div class="grid"><div class="card"><table class="ptable"><thead><tr><th>Inversionista</th><th>Etiqueta</th><th>Ciudad</th><th>Socio</th></tr></thead><tbody>
-      ${inv.slice(0, 40).map(x => `<tr><td>${FF_ESC(x.name || '—')}</td><td>${FF_ESC(x.label || '—')}</td><td>${FF_ESC(x.city || '—')}</td><td>${FF_ESC(x.has_partner || '—')}</td></tr>`).join('')}</tbody></table></div></div>`
-      : ffSoon('Inversionistas', 'Los inversionistas y los 4 modelos parametrizados (15–18%, split 50/50) se cargan en la Fase 2.')}`;
+  const all = FF.investors;
+  const crm = all.filter(x => !FF_OWN.test(x.name || '')); // saca la propia empresa
+  const isLLC = x => /LLC/i.test(x.name || '');
+  const byRango = {}; crm.forEach(x => { const r = x.ranges || 's/d'; byRango[r] = (byRango[r] || 0) + 1; });
+  const conSocio = crm.filter(x => (x.has_partner || '').toUpperCase() === 'SI').length;
+  const aporteBase = Math.round((comp.deals.reduce((s, d) => s + d.allIn, 0) / (comp.deals.length || 1)) / 1000) * 1000;
+  return `${ffHeader('Inversionistas', 'CRM + Modelos', `${crm.length} inversionistas (sin la propia empresa) · ${crm.filter(isLLC).length} LLCs · ${conSocio} con socio`)}
+    <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="card kpi"><div class="lab">Inversionistas</div><div class="big">${crm.length}</div><div class="meta">CRM depurado (sin Flipping Rentals LLC)</div></div>
+      <div class="card kpi"><div class="lab">VIP (+5 casas)</div><div class="big glow">${byRango['+5 casas'] || 0}</div><div class="meta">Blanco ${byRango['2-4 casas'] || 0} · Azul ${byRango['1 casa'] || 0} · Amarillo ${byRango['0 casas'] || 0}</div></div>
+      <div class="card kpi"><div class="lab">Con socio</div><div class="big">${conSocio}</div><div class="meta">sociedades a documentar</div></div>
+      <div class="card kpi"><div class="lab">Contratos sin firmar</div><div class="big down">1</div><div class="meta"><span class="down">9909 Childress</span> · pendiente</div></div>
+    </div>
+    <div class="chart-h" style="margin:24px 4px 12px"><div class="t">4 modelos parametrizados</div><div class="k">vender/rentar × sociedad/servicio · elegí para generar propuesta</div></div>
+    <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      ${FF_MODELOS.map(m => `<div class="card"><div style="display:flex;justify-content:space-between;align-items:start"><div class="an" style="font-size:14px;font-weight:700">${m.name}</div><span class="kstrat ${m.k.startsWith('vender') ? 'flip' : 'hold'}">${m.ret}</span></div>
+        <div style="font-size:12px;color:var(--mut);margin-top:6px;line-height:1.5">${m.terms}</div>
+        <div style="font-size:10.5px;color:var(--mut2);margin-top:8px">Contrato: <b style="color:var(--ink)">${m.contrato}</b></div>
+        <button class="repbtn" style="margin-top:11px" onclick="ffPropuesta('${m.k}')">✎ Generar propuesta</button></div>`).join('')}
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Cap table · rentabilidad y buy-out</div><div class="k">buy-out = capital + 15%</div></div>
+        <div class="uwrow"><label>Aporte base (configurable)</label><input id="ff-cap-base" value="${aporteBase}" oninput="ffCapCalc()" inputmode="decimal"></div>
+        <div class="uwres" id="ff-cap-res"></div>
+        <div class="meta" style="margin-top:8px">Parametrico: los aportes reales por inversionista se vinculan al deal en Airtable. Rentabilidad 15–18%; buy-out del capital + 15%.</div></div>
+      <div class="card"><div class="chart-h"><div class="t">CRM · inversionistas</div><div class="k">persona vs LLC · casco</div></div>
+        <table class="ptable"><thead><tr><th>Inversionista</th><th>Tipo</th><th>Casco</th><th>Etapa</th><th>Ciudad</th></tr></thead><tbody>
+        ${crm.map(x => `<tr><td>${FF_ESC(x.name || '—')}${(x.has_partner || '').toUpperCase() === 'SI' ? ` <span style="color:var(--a2);font-size:10px">+socio${x.partner_name ? ' ' + FF_ESC(x.partner_name) : ''}</span>` : ''}</td><td>${isLLC(x) ? '<span class="badge b-warn">LLC</span>' : '<span class="badge b-ok">Persona</span>'}</td><td>${FF_ESC(x.ranges || '—')}</td><td style="font-size:11px">${FF_ESC((x.stage || '—')).slice(0, 26)}</td><td>${FF_ESC(x.city || '—')}</td></tr>`).join('')}</tbody></table></div>
+    </div>`;
+}
+function ffCapCalc() {
+  const base = ffNum('ff-cap-base', 75000); const el = document.getElementById('ff-cap-res'); if (!el) return;
+  const r15 = base * 0.15, r165 = base * 0.165, r18 = base * 0.18, buyout = base * 1.15;
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:12.5px">
+    <div><div class="uwsub">Rentabilidad 15%/año</div><b class="up">${FF_MONEY(r15)}</b></div>
+    <div><div class="uwsub">Rentabilidad 18%/año</div><b class="up">${FF_MONEY(r18)}</b></div>
+    <div><div class="uwsub">Punto medio 16.5%</div><b>${FF_MONEY(r165)}</b></div>
+    <div><div class="uwsub">Buy-out (capital+15%)</div><b class="glow">${FF_MONEY(buyout)}</b></div></div>`;
+}
+window.ffCapCalc = ffCapCalc;
+function ffPropuesta(modelK) {
+  const m = FF_MODELOS.find(x => x.k === modelK); if (!m) return;
+  ffAsk(`Generá una PROPUESTA de inversión clara y profesional para el modelo "${m.name}" (${m.terms.replace(/<[^>]+>/g, '')}). Incluí: resumen del modelo, números de ejemplo con un aporte típico del portafolio, la rentabilidad (${m.ret}), el contrato (${m.contrato}), y las reglas del negocio (all-in ≤75% ARV, buy-out capital+15%). Español neutro, tono cercano pero profesional.`);
+}
+window.ffPropuesta = ffPropuesta;
+
+// ─── FINANZAS · QuickBooks + Analítica (cockpit) ───
+function ffGastosPorTipo() {
+  const d = FF.draws; const g = {
+    'Intereses': d.reduce((s, x) => s + Number(x.interest_hml || 0) + Number(x.interest_until_rent || 0), 0),
+    'Remodelación': d.reduce((s, x) => s + Number(x.remodel_complete || 0), 0),
+    'Servicios': d.reduce((s, x) => s + Number(x.services_hml || 0), 0),
+    'Muebles': d.reduce((s, x) => s + Number(x.furniture || 0), 0),
+    'Otros': d.reduce((s, x) => s + Number(x.other_costs || 0), 0),
+  };
+  const total = Object.values(g).reduce((s, v) => s + v, 0);
+  return { g, total, intPct: total ? Math.round(g['Intereses'] / total * 100) : 0 };
+}
+function ffSecFinanzas(comp) {
+  const gt = ffGastosPorTipo();
+  const invertido = comp.deals.reduce((s, d) => s + d.allIn, 0);
+  const equity = comp.deals.reduce((s, d) => s + Math.max(0, d.equity), 0);
+  const deficit = comp.deals.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0);
+  const best = [...comp.deals].filter(d => d.arv > 0).sort((a, b) => b.margin - a.margin).slice(0, 6);
+  const worst = [...comp.deals].filter(d => d.arv > 0).sort((a, b) => a.margin - b.margin).slice(0, 6);
+  return `${ffHeader('Finanzas', 'QuickBooks + Cockpit', `Invertido ${FF_MONEY(invertido)} · equity ${FF_MONEY(equity)} · déficit ${FF_MONEY(deficit)} · interés ${gt.intPct}% del gasto`)}
+    <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="card kpi"><div class="lab">Capital invertido</div><div class="big glow">${FF_MONEY(invertido)}</div><div class="meta">all-in del portafolio</div></div>
+      <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${FF_MONEY(equity)}</div><div class="meta">ARV − all-in (positivo)</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big down">${FF_MONEY(deficit)}</div><div class="meta">casas en rojo (incl. error de datos)</div></div>
+      <div class="card kpi"><div class="lab">Intereses / gasto</div><div class="big warn">${gt.intPct}%</div><div class="meta">${FF_MONEY(gt.g['Intereses'])} de ${FF_MONEY(gt.total)}</div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">del desglose de draws</div></div><canvas id="ff-fin-donut" height="230"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
+        <table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th>Impacto</th></tr></thead><tbody>
+        <tr><td>Overhead de equipo + plataformas fuera de libros</td><td><span class="badge b-warn">Fuera de QB</span></td><td class="down">~$146k</td></tr>
+        <tr><td>Intereses HML no reflejados</td><td><span class="badge b-warn">Gap</span></td><td class="down">~$46k</td></tr>
+        <tr><td>Obligación a inversionistas (pasivo)</td><td><span class="badge b-warn">Cap table</span></td><td>—</td></tr>
+        <tr><td>Remodelación (draws)</td><td><span class="badge b-ok">Conciliado</span></td><td>${FF_MONEY(gt.g['Remodelación'])}</td></tr>
+        </tbody></table>
+        <div class="meta" style="margin-top:10px">P&L / balance / cashflow completos de QuickBooks llegan con el conector QB. Hoy: gastos reales del Airtable + los gaps conocidos.</div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Mejores por margen</div><div class="k">rentabilidad por casa</div></div>
+        <table class="ptable"><thead><tr><th>Casa</th><th>All-in</th><th>ARV</th><th>Margen</th></tr></thead><tbody>
+        ${best.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="up">${FF_MONEY(d.margin)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="card"><div class="chart-h"><div class="t">Peores por margen</div><div class="k">a corregir/recuperar</div></div>
+        <table class="ptable"><thead><tr><th>Casa</th><th>All-in</th><th>ARV</th><th>Margen</th></tr></thead><tbody>
+        ${worst.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="down">${FF_MONEY(d.margin)}</td></tr>`).join('')}</tbody></table></div>
+    </div>`;
 }
 function ffSoon(title, desc) {
   return `${ffHeader(title.split('·')[0].trim(), 'Fase 2', desc)}
@@ -560,6 +654,7 @@ window.ffRefi = ffRefi;
 function ffDestroyCharts() { FF._charts.forEach(c => { try { c.destroy(); } catch (e) {} }); FF._charts = []; }
 function ffMountCharts(comp) {
   if (document.getElementById('ff-mao-res')) ffUwCalc(); // calcula al montar Underwriting
+  if (document.getElementById('ff-cap-res')) ffCapCalc(); // cap table al montar Inversionistas
   if (!window.Chart) return;
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} FF._charts.push(new Chart(el, cfg)); };
   const ax = { grid: { color: ffGridC() }, ticks: { color: ffAx(), font: { size: 10 } } };
@@ -573,4 +668,7 @@ function ffMountCharts(comp) {
   // deals por etapa (donut)
   const dc = FF_STAGES.map(([k, lbl]) => ({ lbl, n: comp.deals.filter(d => d.stage === k).length })).filter(x => x.n);
   mk('ff-donut', { type: 'doughnut', data: { labels: dc.map(x => x.lbl), datasets: [{ data: dc.map(x => x.n), backgroundColor: ['#4f8dff', '#45e3c6', '#e7b65e', '#8a7bff', '#48d69c', '#93a0b6'], borderColor: posGetTheme() === 'light' ? '#fff' : '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } });
+  // Finanzas: gastos por tipo
+  if (document.getElementById('ff-fin-donut')) { const gt = ffGastosPorTipo(); const gl = Object.keys(gt.g), gv = Object.values(gt.g).map(v => Math.round(v / 1000));
+    mk('ff-fin-donut', { type: 'doughnut', data: { labels: gl, datasets: [{ data: gv, backgroundColor: ['#f0687a', '#4f8dff', '#45e3c6', '#e7b65e', '#8a7bff'], borderColor: posGetTheme() === 'light' ? '#fff' : '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } }); }
 }
