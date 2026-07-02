@@ -4,7 +4,7 @@
 // seguro cachearlo de forma indefinida; si cambia el hash, el index.html nuevo
 // referencia un filename distinto y la versión vieja se va por ttl natural.
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = `empresa-os-${CACHE_VERSION}`;
 const SHELL = [
   '/',

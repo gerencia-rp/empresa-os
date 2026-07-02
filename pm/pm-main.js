@@ -550,9 +550,26 @@ function pmInjectTheme() {
   ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#e7ecf5 !important}
   ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#93a0b6 !important}
   /* barras de reserva (gradientes por tipo) y marcador HOY (#ef4444) se conservan */
-  /* ══════════════ LIGHT (pulido, respeta el nativo) ══════════════ */
-  ${L} #modal > div,html[data-osreskin="light"] #modal > div{box-shadow:0 24px 70px -26px rgba(15,23,42,.42) !important}
-  ${L} button.bg-slate-900,${L} .bg-slate-900.text-white{background:linear-gradient(135deg,#12b5a0,#2f6ef0) !important;color:#fff !important}
+  /* ══════════════ LIGHT premium (parejo al oscuro, no el blanco plano viejo) ══════════════ */
+  html[data-osreskin="light"] #modal > div{background:#f4f7fb !important;border:1px solid #e4eaf2 !important;box-shadow:0 30px 80px -30px rgba(15,23,42,.4) !important;border-radius:18px !important}
+  html[data-osreskin="light"] #modal #modal-title{color:#0f1c2e !important}
+  ${L}{color:#0f1c2e}
+  ${L} .bg-slate-50,${L} .bg-gray-50{background-color:#eef2f8 !important}
+  ${L} .bg-slate-100,${L} .bg-gray-100{background-color:#e7edf5 !important}
+  ${L} .text-slate-900,${L} .text-slate-800{color:#0f1c2e !important}
+  ${L} .text-slate-700,${L} .text-slate-600{color:#33415a !important}
+  ${L} .text-slate-500,${L} .text-slate-400{color:#64748b !important}
+  ${L} .border-slate-200,${L} .border-slate-100,${L} .border-gray-200,${L} .border-gray-100{border-color:#e3e9f1 !important}
+  /* cards blancas → borde + sombra premium (profundidad, no blanco plano) */
+  ${L} .bg-white{background-color:#ffffff !important;border-color:#e6ecf4}
+  ${L} .rounded-xl.bg-white,${L} .rounded-lg.bg-white,${L} .rounded-2xl.bg-white,${L} .bg-white.rounded-xl,${L} .bg-white.rounded-lg,${L} .bg-white.shadow-sm,${L} .bg-white.shadow{border:1px solid #e6ecf4 !important;box-shadow:0 10px 26px -18px rgba(15,23,42,.22) !important}
+  /* acentos del OS en claro */
+  ${L} .text-emerald-700,${L} .text-emerald-600,${L} .text-emerald-500{color:#0ea371 !important}
+  ${L} .border-emerald-500{border-color:#12b5a0 !important}
+  ${L} .text-blue-700,${L} .text-blue-600{color:#2f6ef0 !important}
+  /* botón primario oscuro (bg-slate-900) → gradiente acento */
+  ${L} button.bg-slate-900,${L} .bg-slate-900.text-white{background:linear-gradient(135deg,#12b5a0,#2f6ef0) !important;color:#fff !important;border:none !important}
+  ${L} .pm-filter-select{border-radius:9px !important}
   `;
   document.head.appendChild(st);
 }
