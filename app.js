@@ -30,12 +30,16 @@ const isAdmin = () => state.role === 'admin';
 // AUTH
 // ============================================================
 async function initAuth() {
+  // Suscribir ANTES de getSession: en deep-link/refresh a una ruta de sistema, la sesión
+  // persistida puede resolver por INITIAL_SESSION (carrera) — así no caemos al login.
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') { if (window._appShown) location.reload(); return; }
+    // Restaurar sesión si aparece (INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED) y aún no entramos.
+    if (session && session.user && !window._appShown) { onLogin(session.user); }
+  });
   const { data: { session } } = await sb.auth.getSession();
   if (session) await onLogin(session.user);
-  else showAuth();
-  sb.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT') location.reload();
-  });
+  else if (!window._appShown) showAuth();
 }
 
 function showAuth() {
@@ -202,6 +206,8 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 });
 
 async function onLogin(user) {
+  if (window._appShown && state.user && state.user.id === user.id) return; // ya logueado (evita doble init por la carrera de auth)
+  window._appShown = true;
   state.user = user;
   const { data: profile } = await sb.from('profiles').select('role,allowed_areas').eq('id', user.id).single();
   state.role = profile?.role || 'viewer';

@@ -4,6 +4,18 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🏛️ PILARES FUNDAMENTALES (aplican SIEMPRE, en cada tarea)
+
+Estos 5 pilares son la base permanente del producto. Respetalos en todo cambio de acá en adelante:
+
+1. **DATOS DESDE AIRTABLE, NUNCA HARDCODEADOS.** Ningún dato fijo/mockeado en la UI ni en la lógica. Todos los números vienen de la fuente real (Airtable / QuickBooks / Supabase espejo). Si no hay dato → **estado vacío claro** (skeleton / "sin datos"), nunca inventar ni hardcodear un número de ejemplo.
+2. **USABLE POR CUALQUIERA (agnóstico a la fuente).** Cada sistema debe poder funcionar con: (a) nuestra base Airtable, (b) la base Airtable de un tercero, o (c) datos manuales — **sin cambiar su lógica**. Implementar una **CAPA DE DATOS (adaptador)** por sistema, desacoplada de la UI/lógica, con la **misma interfaz** para los 3 orígenes (mismo shape de entrada/salida). La UI consume el adaptador, no la fuente directa.
+3. **MODULAR / PORTABLE / VENDIBLE.** Cada sistema debe poder extraerse o transferirse **individualmente** a otra plataforma: autocontenido (UI + lógica + adaptador), dependencias explícitas, interfaces claras. Evitar acoplamientos globales ocultos.
+4. **CADA PROCESO ALIMENTA EL REGISTRO DE AGENTES IA.** Por cada proceso repetitivo, documentar qué agente/equipo de IA podría delegarlo (qué input consume, qué output produce, qué decisión toma un humano). Mantener ese registro vivo.
+5. **ECOSISTEMA CON PUENTES ABIERTOS.** Fix & Flip ↔ Rentas ↔ Remodelación conectados; APIs/contratos abiertos entre módulos; la **CASA (`property_id`) es la clave común** que cruza empresas. Sin silos: una casa fluye Fix&Flip → Remodelación → Rentas → refi/venta con la misma identidad.
+
+---
+
 ## 🎯 Estado (1 Jul 2026 — Flipping Rentals OS: shell del holding + Fix & Flip completo) · EN VIVO
 
 - 🌐 **Flipping Rentals OS** (`os/os.js`): shell del ecosistema con **routing real (History API)** montado tras el login sobre el panel clásico (accesible con "⚙︎ Admin"). Niveles: **Global** (`/`, KPIs consolidados + 4 empresas + áreas Operación/Contable + Cerebro del Holding), **Empresa** (`/fix-and-flip`, `/rentas`, `/remodelacion`, `/educacion`), **áreas** `/operacion` (cronograma + cobranza = contrato − plata real) y `/contable` (conciliación QB + cap table), **apps** (`/fix-and-flip/underwriting` etc. abren la sección del Command Center). 404 con diseño. Título "Flipping Rentals OS" + OG.
