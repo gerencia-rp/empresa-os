@@ -468,9 +468,95 @@ function openPmSystem() {
     const md = document.querySelector('#modal > div');
     if (md) { md.classList.remove('max-w-3xl'); md.classList.add('max-w-7xl'); }
   }, 50);
+  pmInjectTheme();
   pmLoadAll();
 }
 window.openPmSystem = openPmSystem;
+
+// ════════════════════════════════════════════════════════════════
+// 🎨 TEMA (diseño nuevo dentro de PM). SOLO ESTILOS — no toca lógica/markup/datos.
+//   Cubre TODA la paleta Tailwind que usa pm-main + clases propias + estilos inline
+//   del calendario. Se sincroniza con el tema del OS vía html[data-osreskin].
+// ════════════════════════════════════════════════════════════════
+function pmInjectTheme() {
+  if (document.getElementById('pm-theme-css')) return;
+  const D = 'html[data-osreskin="dark"] #pm-root';
+  const L = 'html[data-osreskin="light"] #pm-root';
+  const st = document.createElement('style'); st.id = 'pm-theme-css';
+  st.textContent = `
+  /* ══ panel del modal de PM (ambos temas): coherente con el OS ══ */
+  html[data-osreskin] #modal > div{border-radius:18px !important}
+  html[data-osreskin="dark"] #modal > div{background:#0e141d !important;border:1px solid rgba(255,255,255,.09) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
+  html[data-osreskin="dark"] #modal .border-b,html[data-osreskin="dark"] #modal > div > .px-6{border-color:rgba(255,255,255,.09) !important}
+  html[data-osreskin="dark"] #modal #modal-title{color:#e7ecf5 !important}
+  html[data-osreskin="dark"] #modal #modal-close-x{color:#93a0b6 !important}
+  /* ══════════════ DARK ══════════════ */
+  ${D}{color:#e7ecf5}
+  /* fondos: blanco + neutros claros → superficies oscuras */
+  ${D} .bg-white{background-color:#111925 !important}
+  ${D} .bg-slate-50,${D} .bg-gray-50,${D} .bg-zinc-50,${D} .bg-neutral-50,${D} .bg-stone-50,${D} .bg-slate-100,${D} .bg-gray-100,${D} .bg-zinc-100{background-color:#161f2b !important}
+  ${D} .bg-slate-200,${D} .bg-gray-200,${D} .bg-slate-300,${D} .bg-gray-300{background-color:#212c3b !important}
+  ${D} .bg-slate-700,${D} .bg-slate-800,${D} .bg-slate-900,${D} .bg-gray-800,${D} .bg-gray-900{background-color:#1a2434 !important;color:#e7ecf5}
+  ${D} .hover\\:bg-slate-50:hover,${D} .hover\\:bg-slate-100:hover,${D} .hover\\:bg-gray-50:hover,${D} .hover\\:bg-gray-100:hover,${D} .hover\\:bg-slate-200:hover{background-color:rgba(255,255,255,.05) !important}
+  /* texto: neutros oscuros → claros */
+  ${D} .text-slate-900,${D} .text-slate-800,${D} .text-slate-700,${D} .text-slate-600,${D} .text-gray-900,${D} .text-gray-800,${D} .text-gray-700,${D} .text-gray-600,${D} .text-zinc-800,${D} .text-black{color:#e7ecf5 !important}
+  ${D} .text-slate-500,${D} .text-slate-400,${D} .text-gray-500,${D} .text-gray-400,${D} .text-zinc-500{color:#95a3b8 !important}
+  ${D} .text-slate-300,${D} .text-gray-300{color:#9aa7bc !important}
+  /* bordes */
+  ${D} .border,${D} .border-t,${D} .border-b,${D} .border-l,${D} .border-r,${D} .border-2,${D} .border-slate-100,${D} .border-slate-200,${D} .border-slate-300,${D} .border-gray-100,${D} .border-gray-200,${D} .border-gray-300,${D} .divide-slate-200>*+*,${D} .divide-gray-200>*+*{border-color:rgba(255,255,255,.1) !important}
+  /* inputs / selects / textarea */
+  ${D} input,${D} select,${D} textarea{background-color:#0b1119 !important;color:#e7ecf5 !important;border-color:rgba(255,255,255,.15) !important}
+  ${D} input::placeholder,${D} textarea::placeholder{color:#5b6780 !important}
+  ${D} .shadow,${D} .shadow-sm,${D} .shadow-md,${D} .shadow-lg,${D} .shadow-xl{box-shadow:none !important}
+  /* bg-slate-900 = superficie oscura elevada (cards de acento Y botones) — texto claro, sin gradiente
+     para no romper el contraste de las cards con sublabels muted */
+  /* ── colores semánticos: tints claros → tinte oscuro (mismo semáforo) ── */
+  ${D} .bg-emerald-50,${D} .bg-emerald-100,${D} .bg-green-50,${D} .bg-green-100{background-color:rgba(16,185,129,.14) !important}
+  ${D} .bg-emerald-200,${D} .bg-green-200{background-color:rgba(16,185,129,.24) !important}
+  ${D} .bg-amber-50,${D} .bg-amber-100,${D} .bg-yellow-50,${D} .bg-yellow-100,${D} .bg-orange-50,${D} .bg-orange-100{background-color:rgba(231,182,94,.15) !important}
+  ${D} .bg-amber-200,${D} .bg-yellow-200{background-color:rgba(231,182,94,.26) !important}
+  ${D} .bg-red-50,${D} .bg-red-100,${D} .bg-red-200,${D} .bg-rose-50,${D} .bg-rose-100{background-color:rgba(240,104,122,.15) !important}
+  ${D} .bg-blue-50,${D} .bg-blue-100,${D} .bg-sky-50,${D} .bg-sky-100,${D} .bg-indigo-50,${D} .bg-indigo-100{background-color:rgba(79,141,255,.15) !important}
+  ${D} .bg-blue-200,${D} .bg-sky-200{background-color:rgba(79,141,255,.26) !important}
+  ${D} .bg-purple-50,${D} .bg-purple-100,${D} .bg-violet-50,${D} .bg-violet-100,${D} .bg-pink-50,${D} .bg-pink-100{background-color:rgba(138,123,255,.16) !important}
+  ${D} .text-emerald-900,${D} .text-emerald-800,${D} .text-emerald-700,${D} .text-emerald-600,${D} .text-green-700,${D} .text-green-600{color:#5fe0b0 !important}
+  ${D} .text-amber-900,${D} .text-amber-800,${D} .text-amber-700,${D} .text-amber-600,${D} .text-yellow-700,${D} .text-orange-600,${D} .text-orange-700{color:#e8c06a !important}
+  ${D} .text-red-900,${D} .text-red-800,${D} .text-red-700,${D} .text-red-600,${D} .text-rose-700,${D} .text-rose-600{color:#f28ba0 !important}
+  ${D} .text-blue-900,${D} .text-blue-800,${D} .text-blue-700,${D} .text-blue-600,${D} .text-sky-700,${D} .text-sky-600,${D} .text-indigo-700{color:#8fb6ff !important}
+  ${D} .text-purple-700,${D} .text-purple-600,${D} .text-violet-700,${D} .text-violet-600,${D} .text-pink-700{color:#b9adff !important}
+  ${D} .border-emerald-200,${D} .border-emerald-300{border-color:rgba(16,185,129,.4) !important}
+  ${D} .border-amber-200,${D} .border-amber-300{border-color:rgba(231,182,94,.4) !important}
+  ${D} .border-red-200,${D} .border-red-300{border-color:rgba(240,104,122,.4) !important}
+  ${D} .border-blue-200,${D} .border-sky-200{border-color:rgba(79,141,255,.4) !important}
+  /* botones sólidos semánticos: mantener saturado, texto legible */
+  ${D} .bg-emerald-500,${D} .bg-emerald-600,${D} .bg-emerald-700{background-color:#0ea371 !important;color:#04121a !important}
+  ${D} .bg-red-500,${D} .bg-red-600,${D} .bg-red-700{background-color:#dc4b63 !important;color:#fff !important}
+  ${D} .bg-blue-500,${D} .bg-blue-600{background-color:#3b7fe0 !important;color:#fff !important}
+  ${D} .bg-amber-500,${D} .bg-amber-600{background-color:#c98a1e !important;color:#04121a !important}
+  /* tabs activos (border-emerald-500 / text-emerald-700) */
+  ${D} .border-emerald-500{border-color:#45e3c6 !important}
+  /* ── clases propias de pm ── */
+  ${D} .pm-filter-select,${D} .pm-filter-select:hover{background:#0b1119 !important;border-color:rgba(255,255,255,.15) !important;color:#e7ecf5 !important}
+  ${D} .pm-filter-select.has-value{background:rgba(212,175,55,.16) !important;border-color:#d4af37 !important;color:#ecd28f !important}
+  ${D} .pm-filter-dropdown label{color:#93a0b6 !important}
+  ${D} .pm-clear-filters{border-color:rgba(255,255,255,.15) !important;color:#93a0b6 !important}
+  ${D} .pm-resize-handle{border-color:rgba(255,255,255,.1) !important}
+  ${D} .pm-split-sidebar{background:#0d141d !important}
+  /* ── calendario: estilos INLINE (override por atributo) ── */
+  ${D} [style*="background:#fafafa"],${D} [style*="background: #fafafa"],${D} [style*="background:#f8fafc"],${D} [style*="background: #f8fafc"],${D} [style*="background:#f1f5f9"]{background:#0d141d !important}
+  ${D} [style*="background:#fff"],${D} [style*="background: #fff"],${D} [style*="background:#ffffff"]{background:#111925 !important}
+  ${D} [style*="solid #f1f5f9"]{border-color:rgba(255,255,255,.07) !important}
+  ${D} [style*="solid #e2e8f0"],${D} [style*="solid #cbd5e1"]{border-color:rgba(255,255,255,.1) !important}
+  ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#e7ecf5 !important}
+  ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#93a0b6 !important}
+  /* barras de reserva (gradientes por tipo) y marcador HOY (#ef4444) se conservan */
+  /* ══════════════ LIGHT (pulido, respeta el nativo) ══════════════ */
+  ${L} #modal > div,html[data-osreskin="light"] #modal > div{box-shadow:0 24px 70px -26px rgba(15,23,42,.42) !important}
+  ${L} button.bg-slate-900,${L} .bg-slate-900.text-white{background:linear-gradient(135deg,#12b5a0,#2f6ef0) !important;color:#fff !important}
+  `;
+  document.head.appendChild(st);
+}
+window.pmInjectTheme = pmInjectTheme;
 
 // ════════════════════════════════════════════════════════════════
 // Navegación jerárquica del modal: ESC / X / backdrop
