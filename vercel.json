@@ -4,16 +4,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/operacion", "destination": "/index.html" },
-    { "source": "/contable", "destination": "/index.html" },
-    { "source": "/fix-and-flip", "destination": "/index.html" },
-    { "source": "/fix-and-flip/:path*", "destination": "/index.html" },
-    { "source": "/rentas", "destination": "/index.html" },
-    { "source": "/rentas/:path*", "destination": "/index.html" },
-    { "source": "/remodelacion", "destination": "/index.html" },
-    { "source": "/remodelacion/:path*", "destination": "/index.html" },
-    { "source": "/educacion", "destination": "/index.html" },
-    { "source": "/educacion/:path*", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/pm-report.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
