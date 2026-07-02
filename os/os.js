@@ -75,6 +75,9 @@ function osInjectCSS() {
   #os-root .lab{font-size:10px;letter-spacing:1.4px;color:var(--mut2);text-transform:uppercase;font-weight:700}
   #os-root .big{font-size:29px;font-weight:780;margin-top:8px;letter-spacing:-.6px}#os-root .glow{text-shadow:0 0 22px rgba(69,227,198,.35)}#os-root[data-theme="light"] .glow{text-shadow:none}
   #os-root .meta{font-size:11.5px;color:var(--mut);margin-top:6px;line-height:1.5}
+  #os-root .osbadge{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 9px;border-radius:20px;margin-top:7px;letter-spacing:.2px}
+  #os-root .osbadge.warn{background:rgba(231,182,94,.16);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
+  #os-root .osbadge.ok{background:rgba(72,214,156,.14);color:var(--pos);border:1px solid rgba(72,214,156,.3)}
   #os-root .up{color:var(--pos)}#os-root .down{color:var(--neg)}#os-root .warn{color:var(--amber)}
   #os-root .unit{cursor:pointer}#os-root .unit:hover{transform:translateY(-3px);border-color:var(--a2)}
   #os-root .unit .ico{font-size:26px}#os-root .unit .un{font-size:16px;font-weight:700;margin-top:9px}#os-root .unit .ut{font-size:11.5px;color:var(--mut2);margin-top:3px;min-height:30px}
@@ -257,6 +260,22 @@ async function osLoad() {
 const OS_INDEP = ['casa_completa', 'apartamento', 'estudio'];
 function osUnitState(u) { const s = (u.status || '').toLowerCase(); if (/mantenim/.test(s)) return 'mant'; if (/ocupad/.test(s)) return 'ocupada'; if (/reservad/.test(s)) return 'reservada'; return 'libre'; }
 function osMonthBounds() { const d = new Date(); const y = d.getUTCFullYear(), m = d.getUTCMonth(); const py = m === 0 ? y - 1 : y, pm = m === 0 ? 12 : m; const mm = String(pm).padStart(2, '0'); const last = new Date(Date.UTC(py, pm, 0)).getUTCDate(); const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']; return { from: `${py}-${mm}-01`, to: `${py}-${mm}-${String(last).padStart(2, '0')}`, label: `${MES[pm - 1]} ${py}` }; }
+// Indicador de COMPLETITUD DE CARGA del mes (mismo criterio que PM): nº de pagos cargados vs
+// promedio de meses previos → un número bajo se lee como carga incompleta, no como mal mes.
+function osYmShift(ym, delta) { const y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + delta; const dt = new Date(y, m, 1); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`; }
+function osMonthLoadInfo(ym) {
+  const cnt = yy => OS.pay.filter(p => (p.paid_at || '').startsWith(yy)).length;
+  const n = cnt(ym); const priors = []; for (let i = 1; i <= 3; i++) { const c = cnt(osYmShift(ym, -i)); if (c > 0) priors.push(c); }
+  const avg = priors.length ? priors.reduce((s, x) => s + x, 0) / priors.length : 0;
+  const nowd = new Date(); const curYm = `${nowd.getFullYear()}-${String(nowd.getMonth() + 1).padStart(2, '0')}`;
+  const enCurso = ym === curYm; const incompleto = enCurso || (avg > 0 && n < avg * 0.7);
+  return { count: n, avg: Math.round(avg), incompleto, enCurso };
+}
+function osMonthBadge(ym) {
+  const i = osMonthLoadInfo(ym); const nota = i.enCurso ? 'en curso' : i.incompleto ? 'carga en progreso' : 'carga completa';
+  const avgTxt = (i.avg && i.incompleto && !i.enCurso) ? ` · prom. previo ${i.avg}` : '';
+  return `<span class="osbadge ${i.incompleto ? 'warn' : 'ok'}">${i.count} pagos cargados · ${nota}${avgTxt}</span>`;
+}
 function osCompute() {
   // FIX & FLIP
   const drawN = {}; // (draws no cargados en OS; usamos remodel_est×1.3 como proxy si no hay)
@@ -351,7 +370,7 @@ function osGlobal(comp) {
     <div class="grid k4">
       <div class="card"><div class="lab">Capital desplegado (F&F)</div><div class="big glow">${OS_M(h.capital)}</div><div class="meta">${comp.ff.activos} deals activos · ARV ${OS_K(comp.ff.arv)}</div></div>
       <div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>
-      <div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real recibida (rentas)</div></div>
+      <div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada (rentas)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
       <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
@@ -416,7 +435,7 @@ function osContable(comp) {
   const capRows = OS.investors;
   return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
     <div class="grid k4">
-      <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real · ${comp.mb.label}</div></div>
+      <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
       <div class="card"><div class="lab">Overhead fuera de QB</div><div class="big warn">~$146k</div><div class="meta">equipo + plataformas F&F</div></div>
       <div class="card"><div class="lab">Gap de intereses</div><div class="big warn">~$46k</div><div class="meta">HML no reflejado en libros</div></div>
       <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(comp.cobranza.total)}</div><div class="meta">por cobrar (rentas)</div></div>

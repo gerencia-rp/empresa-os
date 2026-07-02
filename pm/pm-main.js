@@ -960,12 +960,14 @@ function pmRenderDashboard(){
   const now=new Date(), y=now.getFullYear(), m=now.getMonth();
   const occ=pmOccupancyAt(now);
   const occPrev=pmOccupancyAt(new Date(y,m-1,Math.min(now.getDate(),28)));
-  const cf=pmCashflowOf(y,m), cfPrev=pmCashflowOf(new Date(y,m-1,1).getFullYear(),(m+11)%12);
+  // Período financiero = ÚLTIMO MES CERRADO (default unificado); la ocupación sí es de "ahora".
+  const fym=pmDefaultYM(), fy=pmYmYear(fym), fm=pmYmMonthIdx(fym);
+  const cf=pmCashflowOf(fy,fm), cfPrev=pmCashflowOf(new Date(fy,fm-1,1).getFullYear(),(fm+11)%12);
   // Potencial perdido = SOLO unidades Disponibles (no reservadas ni en mantenimiento).
   const empties=occ.units.filter(u=>pmUnitState(u)==='libre');
   const potentialLost=empties.reduce((s,u)=>s+Number(u.target_rent||0),0);
   const { all:actions, lateCount, expiringCount }=pmCeoActions();
-  const trend=[]; for(let i=5;i>=0;i--){ const d=new Date(y,m-i,1); const c=pmCashflowOf(d.getFullYear(),d.getMonth()); trend.push({ label:`${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income:c.income, gastos:c.gastos, net:c.net }); }
+  const trend=[]; for(let i=5;i>=0;i--){ const d=new Date(fy,fm-i,1); const c=pmCashflowOf(d.getFullYear(),d.getMonth()); trend.push({ label:`${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income:c.income, gastos:c.gastos, net:c.net }); }
   const t6i=trend.reduce((s,t)=>s+t.income,0), t6g=trend.reduce((s,t)=>s+t.gastos,0);
 
   // Health
@@ -1021,10 +1023,11 @@ function pmRenderDashboard(){
         <div class="text-[11px] font-bold mt-1">${arrow(occDelta)}<span class="text-slate-400 font-normal"> pp vs mes pasado</span></div>
       </button>
       <button onclick="pmSetTab('finance')" class="text-left bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition shadow-sm">
-        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Cashflow del mes</div>
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Cashflow · ${pmYmLabelC(fym)}</div>
         <div class="text-3xl font-extrabold mt-1 ${cf.net>=0?'text-emerald-700':'text-red-700'}">${pmMoney(cf.net)}</div>
         <div class="text-xs text-slate-500 mt-0.5">Ing ${pmMoney(cf.income)} − Gas ${pmMoney(cf.gastos)}</div>
         <div class="text-[11px] font-bold mt-1">${arrow(netDelta)}<span class="text-slate-400 font-normal">% vs mes pasado</span></div>
+        <div class="mt-2">${pmMonthBadge(fym)}</div>
       </button>
       <button onclick="pmShowFreeUnits()" class="text-left bg-white border-2 hover:shadow-md rounded-xl p-4 transition shadow-sm" style="border-color:#d4af37">
         <div class="text-[10px] uppercase font-bold tracking-wider" style="color:#b8941f">Unidades libres ahora</div>
@@ -3926,6 +3929,31 @@ window.pmAddTenantNote = pmAddTenantNote;
 // Helpers compartidos Pagos/Gastos
 // ════════════════════════════════════════════════════════════════
 function pmCurrentYM() { return new Date().toISOString().slice(0,7); }
+// Default de período UNIFICADO en toda la app = ÚLTIMO MES CERRADO (mes anterior al actual).
+// El mes en curso (actual) se rotula "en curso". (Pilar: mismo criterio en PM y OS.)
+function pmDefaultYM() { const n = new Date(); let y = n.getFullYear(), m = n.getMonth() - 1; if (m < 0) { m = 11; y -= 1; } return `${y}-${String(m + 1).padStart(2, '0')}`; }
+function pmYmIsCurrent(ym) { return ym === pmCurrentYM(); }
+function pmYmLabelC(ym) { return pmYmLabel(ym) + (pmYmIsCurrent(ym) ? ' · en curso' : ''); }
+// Indicador de COMPLETITUD DE CARGA del mes: nº de pagos cargados vs promedio de meses previos.
+// Un mes con muchos menos pagos que el histórico se lee como "carga en progreso", no como mal mes.
+// (Pilar #1: no se maquilla el dato — se muestra el real + el contexto de completitud.)
+function pmMonthLoadInfo(ym) {
+  const cnt = (yy) => pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at || '').startsWith(yy)).length;
+  const n = cnt(ym);
+  const priors = []; for (let i = 1; i <= 3; i++) { const c = cnt(pmYmShift(ym, -i)); if (c > 0) priors.push(c); }
+  const avg = priors.length ? priors.reduce((s, x) => s + x, 0) / priors.length : 0;
+  const enCurso = pmYmIsCurrent(ym);
+  const incompleto = enCurso || (avg > 0 && n < avg * 0.7);
+  return { count: n, avg: Math.round(avg), incompleto, enCurso };
+}
+function pmMonthBadge(ym) {
+  const i = pmMonthLoadInfo(ym);
+  const nota = i.enCurso ? 'en curso' : i.incompleto ? 'carga en progreso' : 'carga completa';
+  const cls = i.incompleto ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+  const avgTxt = (i.avg && i.incompleto && !i.enCurso) ? ` · prom. previo ${i.avg}` : '';
+  return `<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cls}" title="Pagos cargados este mes vs promedio de meses previos">${i.count} pagos cargados · ${nota}${avgTxt}</span>`;
+}
+window.pmMonthLoadInfo = pmMonthLoadInfo; window.pmMonthBadge = pmMonthBadge;
 function pmYmYear(ym) { return parseInt(ym.slice(0,4), 10); }
 function pmYmMonthIdx(ym) { return parseInt(ym.slice(5,7), 10) - 1; }
 function pmYmLabel(ym) { return `${PM_ES_MONTHS_SHORT[pmYmMonthIdx(ym)]} ${pmYmYear(ym)}`; }
@@ -4095,7 +4123,7 @@ window.pmPaymentsSearchInput = pmPaymentsSearchInput;
 
 function pmRenderPayments() {
   pmPaymentsInitFilters();
-  const ym = pmCurrentYM();
+  const ym = pmaState.payMonth || pmDefaultYM();   // default unificado = último mes cerrado
   const now = new Date();
   const propFilter = pmaState.payFilterProperty;
 
@@ -4162,7 +4190,7 @@ function pmRenderPayments() {
 
     <!-- 4 cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-      ${card('Ingresos del mes', pmMoney(cobrado), pmYmLabel(ym), 'text-emerald-700')}
+      ${card('Ingresos cobrados', pmMoney(cobrado), pmYmLabelC(ym), 'text-emerald-700')}<div class="mt-2">${pmMonthBadge(ym)}</div>
       ${card('Pagos registrados', monthPays.length, 'este mes')}
       ${card('Pagos atrasados', atrasados.length, 'inquilinos', atrasados.length?'text-red-600':'text-slate-900')}
       ${card('Próximos 7 días', proximosList.length, 'por cobrar', proximosList.length?'text-amber-600':'text-slate-900')}
@@ -4275,7 +4303,7 @@ window.pmExpensesClearFilters = pmExpensesClearFilters;
 // ── Sub-tab A: Gastos por Casa (house + cleaning) ──
 function pmRenderHouseExpenses() {
   pmExpensesInitFilters();
-  const ym = pmaState.expMonth || pmCurrentYM();
+  const ym = pmaState.expMonth || pmDefaultYM();
   const propFilter = pmaState.expFilterProperty;
   const subcatFilter = pmaState.expFilterSubcat;
   const statusFilter = pmaState.expStatusFilter || 'all';
@@ -4367,7 +4395,7 @@ function pmRenderHouseExpenses() {
 
 // ── Sub-tab B: Gastos Operativos Empresa ──
 function pmRenderOperationalExpenses() {
-  const ym = pmaState.expMonth || pmCurrentYM();
+  const ym = pmaState.expMonth || pmDefaultYM();
   const subcatFilter = pmaState.expFilterSubcat;
   const opExp = pmaState.expenses.filter(e => e.category === 'operational');
 
@@ -4502,7 +4530,7 @@ window.pmToggleExpensePaid = pmToggleExpensePaid;
 
 // ── Sub-tab C: Nómina del Equipo ──
 function pmRenderPayrollTab() {
-  const ym = pmaState.expMonth || pmCurrentYM();
+  const ym = pmaState.expMonth || pmDefaultYM();
   const y = pmYmYear(ym);
   const mes = PM_ES_MONTHS[pmYmMonthIdx(ym)];
   const view = pmaState.payrollView || 'people';
@@ -4748,7 +4776,7 @@ window.pmDeleteExpense = pmDeleteExpense;
 function pmFinRange() {
   const now = new Date(), y = now.getFullYear(), m = now.getMonth();
   const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const sel = pmaState.finMonthSel || (pmaState.finPeriod === 'last3' ? 'last-3m' : pmaState.finPeriod === 'ytd' ? 'ytd' : pmaState.finPeriod === 'custom' ? 'custom' : pmCurrentYM());
+  const sel = pmaState.finMonthSel || (pmaState.finPeriod === 'last3' ? 'last-3m' : pmaState.finPeriod === 'ytd' ? 'ytd' : pmaState.finPeriod === 'custom' ? 'custom' : pmDefaultYM());
   let from, to, label;
   if (/^\d{4}-\d{2}$/.test(sel)) { const yy=+sel.slice(0,4), mm=+sel.slice(5,7)-1; from=new Date(yy,mm,1); to=new Date(yy,mm+1,0); label=pmYmLabel(sel); }
   else if (sel === 'ytd' || sel === 'year') { from = new Date(y, 0, 1); to = now; label = 'YTD ' + y; }
@@ -5071,7 +5099,7 @@ function pmRenderFinance() {
 
     <!-- SECCIÓN 1 · KPIs con delta MoM -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-      ${kpi('Ingresos brutos', pmMoney(agg.income), arrowD(delta(agg.income, prevAgg.income))+' MoM', 'text-emerald-700')}
+      ${kpi('Ingresos cobrados (plata real)', pmMoney(agg.income), arrowD(delta(agg.income, prevAgg.income))+' MoM · '+r.label+(r.months===1?' '+pmMonthBadge(r.ymList[0]):''), 'text-emerald-700')}
       ${kpi('Gastos totales', pmMoney(agg.gastosTotal), arrowD(delta(agg.gastosTotal, prevAgg.gastosTotal))+' MoM', 'text-red-600')}
       ${kpi('NOI', pmMoney(agg.noi), arrowD(delta(agg.noi, prevAgg.noi))+' MoM', agg.noi>=0?'text-emerald-700':'text-red-600')}
       ${kpi('Cash flow neto', pmMoney(agg.net), arrowD(delta(agg.net, prevAgg.net))+' MoM', agg.net>=0?'text-emerald-700':'text-red-600')}
