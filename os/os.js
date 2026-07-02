@@ -111,15 +111,36 @@ function osInjectCSS() {
   #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--glass);border:1px solid rgba(138,123,255,.3);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}
   #os-root .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   @media (max-width:900px){#os-root .wrap{padding:16px 14px 40px}#os-root .k4,#os-root .k3,#os-root .k2{grid-template-columns:minmax(0,1fr)}#os-root .k4.units{grid-template-columns:repeat(2,minmax(0,1fr))}}
-  /* ── Barra "Volver al OS" sobre los sistemas clásicos ── */
-  #os-return-bar{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:12px;
-    padding:7px 8px 7px 8px;border-radius:13px;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
-    background:rgba(10,14,22,.86);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(14px);box-shadow:0 14px 40px -14px rgba(0,0,0,.7)}
-  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.92);border-color:rgba(15,23,42,.12);box-shadow:0 14px 40px -16px rgba(15,23,42,.35)}
-  #os-return-bar button{background:linear-gradient(135deg,#45e3c6,#4f8dff);border:none;color:#04121a;font-weight:750;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer}
-  #os-return-bar button:hover{filter:brightness(1.08)}
-  #os-return-bar .osrb-brand{font-size:11px;color:#93a0b6;letter-spacing:.3px}#os-return-bar[data-theme="light"] .osrb-brand{color:#48566e}#os-return-bar .osrb-brand b{color:#eef2f8}#os-return-bar[data-theme="light"] .osrb-brand b{color:#0f1c2e}
-  #os-return-bar .osrb-theme{background:rgba(255,255,255,.08);color:#93a0b6;font-weight:400;padding:8px 11px}#os-return-bar[data-theme="light"] .osrb-theme{background:rgba(15,23,42,.06);color:#48566e}
+  /* ── TOPBAR del OS sobre los sistemas en PÁGINA COMPLETA (marco de empresa) ── */
+  #os-return-bar{position:fixed;top:0;left:0;right:0;z-index:2147483000;display:flex;align-items:center;gap:14px;height:54px;padding:0 20px;
+    font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:rgba(8,11,18,.72);border-bottom:1px solid rgba(255,255,255,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.82);border-bottom-color:rgba(15,23,42,.08)}
+  #os-return-bar .osrb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#45e3c6,#4f8dff);display:grid;place-items:center;color:#04121a;font-weight:900;font-size:12px;cursor:pointer;flex-shrink:0}
+  #os-return-bar .osrb-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:#93a0b6;min-width:0}
+  #os-return-bar .osrb-crumb a{color:#93a0b6;cursor:pointer;text-decoration:none;white-space:nowrap}#os-return-bar .osrb-crumb a:hover{color:#eef2f8}
+  #os-return-bar .osrb-crumb b{color:#eef2f8;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#5b6780}
+  #os-return-bar[data-theme="light"] .osrb-crumb,#os-return-bar[data-theme="light"] .osrb-crumb a{color:#48566e}#os-return-bar[data-theme="light"] .osrb-crumb b{color:#0f1c2e}
+  #os-return-bar .osrb-back{margin-left:auto;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#eef2f8;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  #os-return-bar .osrb-back:hover{border-color:#4f8dff}
+  #os-return-bar[data-theme="light"] .osrb-back{background:rgba(15,23,42,.05);border-color:rgba(15,23,42,.12);color:#0f1c2e}
+  #os-return-bar .osrb-theme{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#93a0b6;font-size:13px;padding:8px 11px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  #os-return-bar[data-theme="light"] .osrb-theme{background:rgba(15,23,42,.05);border-color:rgba(15,23,42,.12);color:#48566e}
+  /* ── #modal como PÁGINA COMPLETA (no modal flotante): ocupa todo, mesh de fondo, sin backdrop ── */
+  #modal.os-syspage{padding:0 !important;display:block !important;overflow-y:auto;background:transparent}
+  html[data-osreskin="dark"] #modal.os-syspage{background:
+    radial-gradient(760px 520px at 6% -6%,rgba(69,227,198,.13),transparent 58%),
+    radial-gradient(820px 560px at 100% 2%,rgba(79,141,255,.14),transparent 56%),
+    radial-gradient(700px 620px at 74% 120%,rgba(138,123,255,.1),transparent 60%),
+    linear-gradient(180deg,#070a11,#05070c) !important}
+  html[data-osreskin="light"] #modal.os-syspage{background:
+    radial-gradient(760px 520px at 6% -6%,rgba(18,181,160,.1),transparent 58%),
+    radial-gradient(820px 560px at 100% 2%,rgba(47,110,240,.1),transparent 56%),
+    linear-gradient(180deg,#f6f8fc,#eaf0f8) !important}
+  #modal.os-syspage > div.bg-white{max-width:1520px !important;width:calc(100% - 40px) !important;margin:72px auto 28px !important;min-height:calc(100vh - 100px);max-height:none !important;height:auto !important;background:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;backdrop-filter:none !important;overflow:visible !important}
+  #modal.os-syspage #modal-body{max-height:none !important;overflow:visible !important;padding:0 !important}
+  /* ocultar el header propio del modal (título+×): el topbar del OS ya da contexto y "Volver" */
+  #modal.os-syspage > div.bg-white > div:first-child{display:none !important}
+  @media (max-width:640px){#modal.os-syspage > div.bg-white{width:calc(100% - 20px) !important;margin-top:64px !important}#os-return-bar .osrb-back{padding:7px 10px}}
   `;
   document.head.appendChild(st);
 }
@@ -153,11 +174,8 @@ function osInjectReskin() {
   ${D} #modal tr:hover td{background:rgba(255,255,255,.03) !important}
   ${D} #modal .shadow,${D} #modal .shadow-sm,${D} #modal .shadow-md,${D} #modal .shadow-lg{box-shadow:none !important}
   ${D} #modal .hover\\:bg-slate-50:hover,${D} #modal .hover\\:bg-slate-100:hover,${D} #modal .hover\\:bg-gray-50:hover,${D} #modal .hover\\:bg-gray-100:hover{background-color:rgba(255,255,255,.05) !important}
-  /* botón primario oscuro (bg-slate-900) → acento del sistema nuevo */
-  ${D} #modal button.bg-slate-900,${D} #modal .bg-slate-900.text-white,${D} #modal a.bg-slate-900{background:linear-gradient(135deg,#45e3c6,#4f8dff) !important;color:#04121a !important;border:none !important}
-  /* shell viejo detrás (sidebar) — se ve poco tras el backdrop, pero lo dejamos coherente */
-  ${D} #app header.bg-white{background-color:#0f151e !important}
-  ${L} #modal button.bg-slate-900,${L} #modal .bg-slate-900.text-white{background:linear-gradient(135deg,#12b5a0,#2f6ef0) !important;color:#fff !important}
+  /* bg-slate-900 lo maneja el sistema de diseño compartido (superficie oscura elevada, no gradiente,
+     para no romper las cards de acento con sublabels muted). */
   /* Property Manager tiene su tema COMPLETO propio (pmInjectTheme en pm-main.js). */
   `;
   document.head.appendChild(st);
@@ -453,19 +471,25 @@ function osOpenSystem(sysType, empresaSlug) {
     if (s) { found = s; areaId = aid; break; }
   }
   if (!found || !window.openSystem) { if (window.toast) toast('No encontré ese sistema en tu cuenta todavía.', 'error'); return; }
-  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), OS_EMPRESAS[empresaSlug]?.name || 'panel');
-  openSystem(areaId, found.id); // lógica intacta (abre su modal/overlay)
+  const e = OS_EMPRESAS[empresaSlug];
+  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), (e ? `${e.icon} ${e.name}` : 'Panel'), found.name || 'Sistema');
+  openSystem(areaId, found.id); // lógica intacta (abre su modal)
+  // convertir el modal en PÁGINA COMPLETA (sin backdrop, ocupa todo el marco del OS)
+  const m = document.getElementById('modal'); if (m) m.classList.add('os-syspage');
 }
 window.osOpenSystem = osOpenSystem;
 
 // ─── Puente OS ↔ sistemas clásicos: oculta el OS mientras el sistema está abierto y
 //     lo restaura al cerrar (×, ESC, backdrop o "Volver"). No toca la lógica del sistema.
-function osEnterClassic(returnTo, label) {
+function osEnterClassic(returnTo, empresaLabel, sysName) {
   OS._classicOpen = true; OS._returnTo = returnTo || '/';
+  OS._sysEmpresa = empresaLabel || 'Panel'; OS._sysName = sysName || 'Sistema';
+  // el OS se oculta; el sistema se muestra a PÁGINA COMPLETA con su propio marco (topbar + mesh).
   const root = document.getElementById('os-root'); if (root) root.style.display = 'none';
+  const app = document.getElementById('app'); if (app) app.style.visibility = 'hidden'; // shell viejo fuera de vista
   osInjectReskin(); osApplyReskin();
-  osInjectReturnBar(label);
-  // Envolver closeModal UNA vez para volver al OS cuando el sistema (modal) se cierra.
+  osInjectReturnBar(OS._sysEmpresa, OS._sysName);
+  // Envolver closeModal UNA vez para volver al OS cuando el sistema se cierra.
   if (!OS._closeWrapped && typeof window.closeModal === 'function') {
     OS._closeWrapped = true; const orig = window.closeModal;
     window.closeModal = function () { const r = orig.apply(this, arguments); if (OS._classicOpen) osExitClassic(); return r; };
@@ -474,17 +498,19 @@ function osEnterClassic(returnTo, label) {
 function osExitClassic() {
   if (!OS._classicOpen) return; OS._classicOpen = false;
   document.getElementById('os-return-bar')?.remove();
-  try { const m = document.getElementById('modal'); if (m && !m.classList.contains('hidden')) m.classList.add('hidden'); } catch (e) {}
+  try { const m = document.getElementById('modal'); if (m) { m.classList.remove('os-syspage'); if (!m.classList.contains('hidden')) m.classList.add('hidden'); } } catch (e) {}
+  const app = document.getElementById('app'); if (app) app.style.visibility = '';
   const root = document.getElementById('os-root'); if (root) root.style.display = '';
   osNav(OS._returnTo || '/');
 }
 window.osExitClassic = osExitClassic;
-function osInjectReturnBar(label) {
+function osInjectReturnBar(empresaLabel, sysName) {
   document.getElementById('os-return-bar')?.remove();
   const t = (window.posGetTheme && posGetTheme()) || 'dark';
   const bar = document.createElement('div'); bar.id = 'os-return-bar'; bar.setAttribute('data-theme', t);
-  bar.innerHTML = `<button onclick="osExitClassic()">← Volver a ${OS_E(label || 'Flipping Rentals OS')}</button>
-    <span class="osrb-brand"><b>Flipping Rentals OS</b></span>
+  bar.innerHTML = `<div class="osrb-logo" onclick="osExitClassic()" title="Volver al panel">FR</div>
+    <div class="osrb-crumb"><a onclick="osExitClassic()">${OS_E(empresaLabel || 'Panel')}</a><span class="sep">›</span><b>${OS_E(sysName || 'Sistema')}</b></div>
+    <button class="osrb-back" onclick="osExitClassic()">← Volver</button>
     <button class="osrb-theme" onclick="osReturnBarTheme()" title="Tema claro/oscuro">◐</button>`;
   document.body.appendChild(bar);
 }
