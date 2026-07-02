@@ -39,6 +39,17 @@ function ccInjectCSS() {
     --bg:#06080d;--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
     --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
+  #cc-overlay[data-theme="light"]{
+    --bg:#eef2f8;--ink:#0f1c2e;--mut:#48566e;--mut2:#8595ac;--glass:rgba(255,255,255,.82);--glassb:rgba(15,23,42,.09);
+    --a1:#12b5a0;--a2:#2f6ef0;--a3:#6b5bef;--pos:#0ea371;--neg:#e0455f;--amber:#c98a1e}
+  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(18,181,160,.1),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(47,110,240,.1),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.08),transparent 60%),linear-gradient(180deg,#f6f8fc,#eaf0f8)}
+  #cc-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
+  #cc-overlay[data-theme="light"] .card{box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
+  #cc-overlay[data-theme="light"] .glow{text-shadow:none}#cc-overlay[data-theme="light"] .ring i{background:#f6f8fc}
+  #cc-overlay[data-theme="light"] .shimmer{background:linear-gradient(90deg,var(--a3) 30%,var(--a2) 50%,var(--a3) 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+  #cc-overlay[data-theme="light"] .pill.ai,#cc-overlay[data-theme="light"] .cbub.u{color:var(--ink)}
+  #cc-overlay .pos-theme-btn{position:fixed;top:16px;right:62px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
+  #cc-overlay .pos-theme-btn:hover{color:var(--ink);border-color:var(--a2)}
   #cc-overlay *{box-sizing:border-box;margin:0;padding:0}
   #cc-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
     radial-gradient(760px 520px at 8% -6%,rgba(69,227,198,.14),transparent 58%),
@@ -63,7 +74,7 @@ function ccInjectCSS() {
   #cc-overlay .side .foot{margin-top:auto;font-size:10.5px;color:var(--mut2);line-height:1.7;border-top:1px solid rgba(255,255,255,.05);padding-top:12px}
   #cc-overlay .side .foot b{color:var(--a1)}
   #cc-overlay .main{padding:24px 32px 46px;max-width:1560px}
-  #cc-overlay .top{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px;padding-right:52px}
+  #cc-overlay .top{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px;padding-right:104px}
   #cc-overlay .top h1{font-size:23px;font-weight:760;letter-spacing:-.3px}
   #cc-overlay .top h1 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
   #cc-overlay .sub{color:var(--mut);font-size:12.5px;margin-top:5px}
@@ -212,7 +223,8 @@ async function openCommandCenter(sys) {
   ccInjectCSS();
   let ov = document.getElementById('cc-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'cc-overlay'; document.body.appendChild(ov); }
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable…</div></main></div><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
+  if (window.posApplyTheme) posApplyTheme(ov);
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ccLoadAll();
   if (!CC.chatLoaded) { try { await ccLoadChat(); } catch (e) {} }
@@ -221,6 +233,8 @@ async function openCommandCenter(sys) {
 window.openCommandCenter = openCommandCenter;
 function closeCommandCenter() { const ov = document.getElementById('cc-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; ccDestroyCharts(); }
 window.closeCommandCenter = closeCommandCenter;
+function ccToggleTheme() { if (window.posToggleTheme) posToggleTheme(); ccRender(); }
+window.ccToggleTheme = ccToggleTheme;
 
 async function ccLoadAll() {
   CC.loading = true; CC.loadError = null;
