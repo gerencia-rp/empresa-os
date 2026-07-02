@@ -50,6 +50,19 @@ function ccInjectCSS() {
   #cc-overlay[data-theme="light"] .pill.ai,#cc-overlay[data-theme="light"] .cbub.u{color:var(--ink)}
   #cc-overlay .pos-theme-btn{position:fixed;top:16px;right:62px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
   #cc-overlay .pos-theme-btn:hover{color:var(--ink);border-color:var(--a2)}
+  /* ── QA modo claro: emparejar texto/paneles hardcodeados dark-first (contraste AA) ── */
+  #cc-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(107,91,239,.1),rgba(47,110,240,.05))}
+  #cc-overlay[data-theme="light"] .daytxt,#cc-overlay[data-theme="light"] .daytxt b,#cc-overlay[data-theme="light"] .daytxt strong{color:var(--ink)}
+  #cc-overlay[data-theme="light"] .insight .tx,#cc-overlay[data-theme="light"] .insight .tx b{color:var(--ink)}
+  #cc-overlay[data-theme="light"] .cbub.u,#cc-overlay[data-theme="light"] .cbub.a,#cc-overlay[data-theme="light"] .cbub.a b,#cc-overlay[data-theme="light"] .cbub.a strong{color:var(--ink)}
+  #cc-overlay[data-theme="light"] .cbub.err{color:var(--neg)}
+  #cc-overlay[data-theme="light"] .memtxt,#cc-overlay[data-theme="light"] .reptitle,#cc-overlay[data-theme="light"] .dqhead,#cc-overlay[data-theme="light"] .dqitem{color:var(--ink)}
+  #cc-overlay[data-theme="light"] .cbub .memsave{color:var(--a3)}
+  #cc-overlay[data-theme="light"] .dqnote b{color:var(--a1)}#cc-overlay[data-theme="light"] .memtipo.t-hecho{color:var(--a2)}
+  #cc-overlay[data-theme="light"] .dayre:hover,#cc-overlay[data-theme="light"] .chip:hover,#cc-overlay[data-theme="light"] .cbub .memsave:hover,#cc-overlay[data-theme="light"] .memacts button:hover,#cc-overlay[data-theme="light"] .tbtn:hover{color:var(--ink)}
+  /* sparklines detrás del texto (evita "gráfica encima del texto") */
+  #cc-overlay .kpi .lab,#cc-overlay .kpi .big,#cc-overlay .kpi .meta{position:relative;z-index:2}
+  #cc-overlay .kpi .meta{padding-right:96px}
   #cc-overlay *{box-sizing:border-box;margin:0;padding:0}
   #cc-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
     radial-gradient(760px 520px at 8% -6%,rgba(69,227,198,.14),transparent 58%),
@@ -96,7 +109,7 @@ function ccInjectCSS() {
   #cc-overlay .kpi .meta{font-size:11.5px;color:var(--mut);margin-top:7px;line-height:1.5}
   #cc-overlay .glow{text-shadow:0 0 22px rgba(69,227,198,.4)}
   #cc-overlay .up{color:var(--pos)}#cc-overlay .down{color:var(--neg)}#cc-overlay .warn{color:var(--amber)}
-  #cc-overlay .spark{position:absolute;right:14px;bottom:12px;width:94px;height:36px}
+  #cc-overlay .spark{position:absolute;right:14px;bottom:12px;width:88px;height:34px;z-index:1;opacity:.7;pointer-events:none}
   #cc-overlay .ring{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 24px -4px rgba(69,227,198,.35)}
   #cc-overlay .ring i{width:50px;height:50px;border-radius:50%;background:#0a0e16;display:grid;place-items:center;font-style:normal;font-weight:760;font-size:15px}
   #cc-overlay .kpi.occ{display:flex;gap:15px;align-items:center}
@@ -497,13 +510,13 @@ function ccSecCommand(comp) {
         <div class="ring" style="background:conic-gradient(from -90deg,var(--a1),var(--a2) ${kpi.occPct}%,rgba(255,255,255,.07) 0)"><i>${kpi.occPct}%</i></div></div>
       <div class="card kpi"><div class="lab">Cashflow del mes · ${comp.mb.label}</div>
         <div class="big ${cf < 0 ? 'down' : 'up'}">${CC_MONEY(cf)}</div>
-        <div class="meta">Ingresos ${CC_K(kpi.inc)} · Gastos ${CC_K(kpi.expT)}${kpi.expT > kpi.inc ? ' · <span class="warn">hipoteca cargada</span>' : ''}</div><canvas class="spark" id="cc-sp1"></canvas></div>
+        <div class="meta">Ingresos ${CC_K(kpi.inc)} · Gastos ${CC_K(kpi.expT)}${kpi.expT > kpi.inc ? ' · <span class="warn">hipoteca cargada</span>' : ''}</div></div>
       <div class="card kpi"><div class="lab">Renta potencial / mes</div>
         <div class="big glow">${CC_MONEY(kpi.potTotal)}</div>
-        <div class="meta">Captura ${kpi.capture}% · <span class="warn">${CC_MONEY(kpi.potFree)} sin cobrar (${kpi.freeU} libres)</span></div><canvas class="spark" id="cc-sp2"></canvas></div>
+        <div class="meta">Captura ${kpi.capture}% · <span class="warn">${CC_MONEY(kpi.potFree)} sin cobrar (${kpi.freeU} libres)</span></div></div>
       <div class="card kpi"><div class="lab">Alertas del cerebro</div>
         <div class="big">${insights.length}</div>
-        <div class="meta"><span class="down">${crit} críticas</span> · ${insights.length - crit} por revisar · accionables</div><canvas class="spark" id="cc-sp3"></canvas></div>
+        <div class="meta"><span class="down">${crit} críticas</span> · ${insights.length - crit} por revisar · accionables</div></div>
     </div>
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Ingresos vs Gastos · 6 meses</div>
@@ -921,9 +934,6 @@ function ccMountCharts(comp) {
   // sparklines
   const spark = (id, data, color) => mk(id, { type: 'line', data: { labels: data.map((_, i) => i), datasets: [{ data, borderColor: color, borderWidth: 1.8, tension: .4, pointRadius: 0, fill: false }] }, options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false } } } });
   const tr = ccTrend6();
-  spark('cc-sp1', tr.inc.map((v, i) => v - tr.exp[i]), '#f0687a');
-  spark('cc-sp2', [comp.kpi.potTotal / 1000, comp.kpi.potTotal / 1000], '#45e3c6');
-  spark('cc-sp3', [3, 4, 5, 6, comp.kpi.freeU, ccInsights(comp).length], '#93a0b6');
   // ingresos vs gastos
   const cfEl = document.getElementById('cc-cf');
   if (cfEl) { const ctx = cfEl.getContext('2d'); mk('cc-cf', { type: 'line', data: { labels: tr.labels, datasets: [{ label: 'Ingresos', data: tr.inc, borderColor: '#48d69c', backgroundColor: grad(ctx, 'rgba(72,214,156,.20)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }, { label: 'Gastos', data: tr.exp, borderColor: '#f0687a', backgroundColor: grad(ctx, 'rgba(240,104,122,.14)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }] }, options: gext }); }
