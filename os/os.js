@@ -22,17 +22,17 @@ const OS_EMPRESAS = {
   ] },
   'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
     { k: 'command-center', name: 'Command Center', icon: '◧', fn: "osOpenApp('rentas','command-center')" },
-    { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenSystem('rentas','pm-rental-mgmt')" },
-    { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenSystem('rentas','cronograma')" },
+    { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenApp('rentas','property-manager')" },
+    { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('rentas','cronograma')" },
   ] },
   'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · SOW · cronogramas', apps: [
-    { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenSystem('remodelacion','remodel-pro')" },
-    { k: 'dashboard', name: 'Dashboard de Obras', icon: '▤', fn: "osOpenSystem('remodelacion','remodel-dashboard')" },
-    { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenSystem('remodelacion','cronograma')" },
+    { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
+    { k: 'dashboard', name: 'Dashboard de Obras', icon: '▤', fn: "osOpenApp('remodelacion','dashboard')" },
+    { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('remodelacion','cronograma')" },
   ] },
   'educacion': { key: 'education', name: 'Educación', icon: '🎓', tag: 'Universidad de Real Estate', apps: [
-    { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenSystem('education','edu-manager')" },
-    { k: 'reportes', name: 'Informes Ejecutivos', icon: '▤', fn: "osOpenSystem('education','edu-reports')" },
+    { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
+    { k: 'reportes', name: 'Informes Ejecutivos', icon: '▤', fn: "osOpenApp('educacion','reportes')" },
   ] },
 };
 const OS_AREAS = {
@@ -111,6 +111,15 @@ function osInjectCSS() {
   #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--glass);border:1px solid rgba(138,123,255,.3);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}
   #os-root .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   @media (max-width:900px){#os-root .wrap{padding:16px 14px 40px}#os-root .k4,#os-root .k3,#os-root .k2{grid-template-columns:minmax(0,1fr)}#os-root .k4.units{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  /* ── Barra "Volver al OS" sobre los sistemas clásicos ── */
+  #os-return-bar{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;display:flex;align-items:center;gap:12px;
+    padding:7px 8px 7px 8px;border-radius:13px;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    background:rgba(10,14,22,.86);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(14px);box-shadow:0 14px 40px -14px rgba(0,0,0,.7)}
+  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.92);border-color:rgba(15,23,42,.12);box-shadow:0 14px 40px -16px rgba(15,23,42,.35)}
+  #os-return-bar button{background:linear-gradient(135deg,#45e3c6,#4f8dff);border:none;color:#04121a;font-weight:750;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer}
+  #os-return-bar button:hover{filter:brightness(1.08)}
+  #os-return-bar .osrb-brand{font-size:11px;color:#93a0b6;letter-spacing:.3px}#os-return-bar[data-theme="light"] .osrb-brand{color:#48566e}#os-return-bar .osrb-brand b{color:#eef2f8}#os-return-bar[data-theme="light"] .osrb-brand b{color:#0f1c2e}
+  #os-return-bar .osrb-theme{background:rgba(255,255,255,.08);color:#93a0b6;font-weight:400;padding:8px 11px}#os-return-bar[data-theme="light"] .osrb-theme{background:rgba(15,23,42,.06);color:#48566e}
   `;
   document.head.appendChild(st);
 }
@@ -267,7 +276,7 @@ function osShell(inner) {
   return `<div class="bgfx"></div><div class="wrap">
     <div class="bar"><div class="logo" data-osnav="/" style="cursor:pointer">FR</div><div class="brandt"><b>Flipping Rentals OS</b><span>RENTAL PROFITSS · HOLDING</span></div>
       <div class="crumbs">${osCrumbs()}</div>
-      <div class="barr"><button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ibtn" onclick="osOpenAdmin()" title="Panel de administración / sistemas">⚙︎ Admin</button></div>
+      <div class="barr"><button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
     </div>${inner}</div>`;
 }
 function osOpenAdmin() { const root = document.getElementById('os-root'); if (root) root.style.display = 'none'; if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 }); }
@@ -373,20 +382,69 @@ function osAppView(comp) {
   setTimeout(() => osOpenApp(r.empresa, r.app, true), 30);
   return osEmpresa(comp);
 }
+// Apps que son SISTEMAS CLÁSICOS (viven en app.js, abren como modal/overlay) → tipo de sistema.
+const OS_APP_SYS = {
+  'rentas/property-manager': 'pm-rental-mgmt', 'rentas/cronograma': 'cronograma',
+  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/dashboard': 'remodel-dashboard', 'remodelacion/cronograma': 'cronograma',
+  'educacion/manager': 'edu-manager', 'educacion/reportes': 'edu-reports',
+};
 function osOpenApp(empresa, app, fromRoute) {
   if (!fromRoute) osNav(`/${empresa}/${app}`);
   OS._returnTo = `/${empresa}`;
-  if (empresa === 'fix-and-flip') { if (window.openFFCommandCenter) { openFFCommandCenter({ name: 'Fix & Flip' }); const sec = { deals: 'deals', underwriting: 'underwriting', inversionistas: 'inversionistas', finanzas: 'finanzas', analitica: 'analitica' }[app]; if (sec && sec !== 'command-center') setTimeout(() => window.ffGo && ffGo(sec), 450); } }
-  else if (empresa === 'rentas') { if (window.openCommandCenter) openCommandCenter({ name: 'Rentas' }); }
+  // Command Centers nuevos (overlays propios z>os-root → no hace falta ocultar el OS).
+  if (empresa === 'fix-and-flip') { if (window.openFFCommandCenter) { openFFCommandCenter({ name: 'Fix & Flip' }); const sec = { deals: 'deals', underwriting: 'underwriting', inversionistas: 'inversionistas', finanzas: 'finanzas', analitica: 'analitica' }[app]; if (sec && sec !== 'command-center') setTimeout(() => window.ffGo && ffGo(sec), 450); } return; }
+  if (empresa === 'rentas' && app === 'command-center') { if (window.openCommandCenter) openCommandCenter({ name: 'Rentas' }); return; }
+  // Sistemas clásicos → dispatch de app.js, con el OS oculto + barra Volver.
+  const sysType = OS_APP_SYS[`${empresa}/${app}`];
+  if (sysType) return osOpenSystem(sysType, empresa);
 }
 window.osOpenApp = osOpenApp;
-function osOpenSystem(areaId, sysType) {
-  // Abre un sistema clásico del área (pm-main, remodel-pro, etc.) vía el dispatch de app.js.
-  const sys = (state.systems[areaId] || []).find(s => s.type === sysType) || (state.systems[areaId] || []).find(s => s.type === sysType);
-  if (sys && window.openSystem) { const root = document.getElementById('os-root'); openSystem(areaId, sys.id); }
-  else if (window.toast) toast('Abrí esta app desde el panel clásico (⚙︎ Admin).', 'info');
+
+function osOpenSystem(sysType, empresaSlug) {
+  // Busca el sistema por TIPO en TODAS las áreas (state.systems se indexa por id de área real, no por empresa).
+  let found = null, areaId = null;
+  const sysMap = (typeof state !== 'undefined' && state && state.systems) || {};
+  for (const [aid, list] of Object.entries(sysMap)) {
+    const s = (list || []).find(x => x.type === sysType);
+    if (s) { found = s; areaId = aid; break; }
+  }
+  if (!found || !window.openSystem) { if (window.toast) toast('No encontré ese sistema en tu cuenta todavía.', 'error'); return; }
+  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), OS_EMPRESAS[empresaSlug]?.name || 'panel');
+  openSystem(areaId, found.id); // lógica intacta (abre su modal/overlay)
 }
 window.osOpenSystem = osOpenSystem;
+
+// ─── Puente OS ↔ sistemas clásicos: oculta el OS mientras el sistema está abierto y
+//     lo restaura al cerrar (×, ESC, backdrop o "Volver"). No toca la lógica del sistema.
+function osEnterClassic(returnTo, label) {
+  OS._classicOpen = true; OS._returnTo = returnTo || '/';
+  const root = document.getElementById('os-root'); if (root) root.style.display = 'none';
+  osInjectReturnBar(label);
+  // Envolver closeModal UNA vez para volver al OS cuando el sistema (modal) se cierra.
+  if (!OS._closeWrapped && typeof window.closeModal === 'function') {
+    OS._closeWrapped = true; const orig = window.closeModal;
+    window.closeModal = function () { const r = orig.apply(this, arguments); if (OS._classicOpen) osExitClassic(); return r; };
+  }
+}
+function osExitClassic() {
+  if (!OS._classicOpen) return; OS._classicOpen = false;
+  document.getElementById('os-return-bar')?.remove();
+  try { const m = document.getElementById('modal'); if (m && !m.classList.contains('hidden')) m.classList.add('hidden'); } catch (e) {}
+  const root = document.getElementById('os-root'); if (root) root.style.display = '';
+  osNav(OS._returnTo || '/');
+}
+window.osExitClassic = osExitClassic;
+function osInjectReturnBar(label) {
+  document.getElementById('os-return-bar')?.remove();
+  const t = (window.posGetTheme && posGetTheme()) || 'dark';
+  const bar = document.createElement('div'); bar.id = 'os-return-bar'; bar.setAttribute('data-theme', t);
+  bar.innerHTML = `<button onclick="osExitClassic()">← Volver a ${OS_E(label || 'Flipping Rentals OS')}</button>
+    <span class="osrb-brand"><b>Flipping Rentals OS</b></span>
+    <button class="osrb-theme" onclick="osReturnBarTheme()" title="Tema claro/oscuro">◐</button>`;
+  document.body.appendChild(bar);
+}
+function osReturnBarTheme() { if (window.posToggleTheme) posToggleTheme(); const b = document.getElementById('os-return-bar'); if (b) b.setAttribute('data-theme', posGetTheme()); if (window.osApplyReskin) osApplyReskin(); }
+window.osReturnBarTheme = osReturnBarTheme;
 
 function os404() {
   return `<div class="empty" style="padding:90px 40px"><div style="font-size:54px">🧭</div><h1 style="margin-top:14px">Página no encontrada</h1><div class="sub">La ruta <b>${OS_E(OS.route.path || location.pathname)}</b> no existe en Flipping Rentals OS.</div><button class="cbtn" style="padding:10px 18px;margin-top:8px" data-osnav="/">← Volver al Panel Global</button></div>`;
