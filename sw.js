@@ -1,37 +1,44 @@
-// Empresa OS · Service Worker
-// Strategy: network-first para shell HTML, cache-first para assets con hash.
-// El bundle de JS ya tiene hash en el filename (bundle.XXXX.js), entonces es
-// seguro cachearlo de forma indefinida; si cambia el hash, el index.html nuevo
-// referencia un filename distinto y la versión vieja se va por ttl natural.
+// Empresa OS · Service Worker — KILL SWITCH (auto-destructivo).
+//
+// El SW cacheaba assets y servía versiones VIEJAS aunque ya se hubiera deployado
+// lo nuevo (el CEO veía el bundle viejo, incluso inconsistente en incógnito).
+// La app NO es una PWA offline crítica, así que la solución de raíz es NO tener SW:
+// este worker se auto-desregistra, borra TODAS las caches y recarga los clients una
+// vez, para que a partir de ahí todo salga siempre de la red (deploy instantáneo).
+//
+// Los usuarios que ya tienen el SW viejo instalado reciben este sw.js en el próximo
+// chequeo de actualización → se limpia solo. NO hay fetch handler: nada de caché.
 
-const CACHE_VERSION = 'v6';
-const CACHE_NAME = `empresa-os-${CACHE_VERSION}`;
-const SHELL = [
-  '/',
-  '/index.html',
-  '/config.public.js',
-  '/manifest.webmanifest'
-];
-
-self.addEventListener('install', (ev) => {
-  ev.waitUntil(
-    caches.open(CACHE_NAME).then(c => c.addAll(SHELL).catch(() => {}))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener('install', () => {
+  // activar de inmediato, sin esperar
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (ev) => {
-  ev.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  ev.waitUntil((async () => {
+    try {
+      // 1) borrar TODAS las caches (build viejo versionado por hash y cualquier otra)
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch (e) {}
+    try {
+      // 2) tomar control y desregistrarse a sí mismo
+      await self.clients.claim();
+      await self.registration.unregister();
+    } catch (e) {}
+    try {
+      // 3) recargar cada ventana controlada UNA vez → sirve el bundle fresco desde la red
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach(c => { try { c.navigate(c.url); } catch (e) {} });
+    } catch (e) {}
+  })());
 });
 
-// Notification click: enfoca la app o abre la URL adjunta en data.url
+// SIN fetch handler → el navegador va siempre a la red (nada desde caché).
+// Se mantiene notificationclick por si llega un push (no cachea nada).
 self.addEventListener('notificationclick', (ev) => {
   ev.notification.close();
-  const target = ev.notification.data?.url || '/';
+  const target = (ev.notification.data && ev.notification.data.url) || '/';
   ev.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
       for (const c of clients) {
@@ -44,39 +51,4 @@ self.addEventListener('notificationclick', (ev) => {
       return self.clients.openWindow(target);
     })
   );
-});
-
-self.addEventListener('fetch', (ev) => {
-  const req = ev.request;
-  const url = new URL(req.url);
-
-  // Solo GET, mismo origen
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
-
-  // Nunca cachear llamadas a APIs (supabase, anthropic, etc.) — siempre fresh
-  if (url.pathname.startsWith('/functions/') || url.search.includes('access_token')) return;
-
-  // Assets con hash (bundle.XXXX.js) — cache first
-  if (url.pathname.startsWith('/assets/')) {
-    ev.respondWith(
-      caches.match(req).then(hit => hit || fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
-        return res;
-      }))
-    );
-    return;
-  }
-
-  // HTML / config — network first, fallback a cache si hay offline
-  if (url.pathname === '/' || url.pathname.endsWith('.html') || url.pathname.endsWith('.webmanifest')) {
-    ev.respondWith(
-      fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(req, copy)).catch(() => {});
-        return res;
-      }).catch(() => caches.match(req).then(hit => hit || caches.match('/')))
-    );
-    return;
-  }
 });
