@@ -4,39 +4,100 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/|assets/|viral|diag|mi-plan|.*\\.).*)",
+      "destination": "/"
+    }
   ],
   "functions": {
-    "api/pm-report.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
-    "api/pm-welcome-guide.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
-    "api/cron/report-weekly.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 },
-    "api/cron/report-monthly.mjs": { "includeFiles": "node_modules/@sparticuz/chromium/bin/**", "maxDuration": 60, "memory": 1024 }
+    "api/pm-report.mjs": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**",
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/pm-welcome-guide.mjs": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**",
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/cron/report-weekly.mjs": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**",
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/cron/report-monthly.mjs": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**",
+      "maxDuration": 60,
+      "memory": 1024
+    }
   },
   "crons": [
-    { "path": "/api/cron/sync-airtable", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/check-contracts", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/check-payments", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/check-services", "schedule": "0 9 * * 1" },
-    { "path": "/api/cron/check-tasks", "schedule": "0 7 * * *" },
-    { "path": "/api/cron/check-occupancy", "schedule": "0 10 * * 1" },
-    { "path": "/api/cron/report-weekly", "schedule": "0 13 * * 1" },
-    { "path": "/api/cron/report-monthly", "schedule": "0 13 1 * *" }
+    {
+      "path": "/api/cron/sync-airtable",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/check-contracts",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/check-payments",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/check-services",
+      "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/check-tasks",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/check-occupancy",
+      "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/cron/report-weekly",
+      "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/cron/report-monthly",
+      "schedule": "0 13 1 * *"
+    }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=()" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(), microphone=(), camera=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
         {
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://nezbaljfhhyznhltpjnk.supabase.co wss://nezbaljfhhyznhltpjnk.supabase.co https://api.anthropic.com; frame-src 'self' https://airtable.com https://calendar.google.com https://ads.tiktok.com https://www.tiktok.com; object-src 'none'; base-uri 'self'; form-action 'self'"
