@@ -245,21 +245,27 @@ async function saveSystemData(system) {
 // PWA · Service worker + Install banner
 // ============================================================
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW register failed:', err));
-  });
-  // Cache-busting: cuando un SW NUEVO toma control (deploy nuevo), recargar 1 vez
-  // automáticamente para servir el bundle fresco — sin hard-refresh manual.
-  // Solo si YA había un SW controlando (evita recargar en la primera visita).
-  if (navigator.serviceWorker.controller) {
-    let _swRefreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (_swRefreshing) return;
-      _swRefreshing = true;
-      window.location.reload();
-    });
+  // ⚠️ SERVICE WORKER DESACTIVADO (kill switch). Cacheaba assets y servía versiones
+  // VIEJAS aunque ya se hubiera deployado lo nuevo (bundle viejo, inconsistente en
+  // incógnito). La app no es una PWA offline crítica → el deploy debe verse SIEMPRE al
+  // instante. No registramos SW nuevo y limpiamos cualquier SW/caché viejo que exista.
+  // (El propio /sw.js quedó auto-destructivo para los que ya lo tienen instalado.)
+  try {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => { try { r.unregister(); } catch (e) {} });
+    }).catch(() => {});
+  } catch (e) {}
+  if (window.caches && caches.keys) {
+    caches.keys().then(keys => keys.forEach(k => { try { caches.delete(k); } catch (e) {} })).catch(() => {});
   }
-  // Cuando el SW emite navigate (desde notification click) → cambiar de URL
+  // Si un SW deja de controlar la pestaña (transición limpia), recargar UNA vez.
+  let _swGone = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (_swGone) return;
+    _swGone = true;
+    window.location.reload();
+  });
+  // navigate desde notification click (si algún día vuelve el push)
   navigator.serviceWorker.addEventListener('message', (ev) => {
     if (ev.data?.type === 'navigate' && ev.data.url) {
       window.location.href = ev.data.url;
