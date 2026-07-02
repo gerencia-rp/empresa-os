@@ -21,7 +21,6 @@ const OS_EMPRESAS = {
     { k: 'finanzas', name: 'Finanzas · QuickBooks', icon: '$', fn: "osOpenApp('fix-and-flip','finanzas')" },
   ] },
   'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
-    { k: 'command-center', name: 'Command Center', icon: '◧', fn: "osOpenApp('rentas','command-center')" },
     { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenApp('rentas','property-manager')" },
     { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('rentas','cronograma')" },
   ] },
@@ -455,7 +454,8 @@ function osOpenApp(empresa, app, fromRoute) {
   OS._returnTo = `/${empresa}`;
   // Command Centers nuevos (overlays propios z>os-root → no hace falta ocultar el OS).
   if (empresa === 'fix-and-flip') { if (window.openFFCommandCenter) { openFFCommandCenter({ name: 'Fix & Flip' }); const sec = { deals: 'deals', underwriting: 'underwriting', inversionistas: 'inversionistas', finanzas: 'finanzas', analitica: 'analitica' }[app]; if (sec && sec !== 'command-center') setTimeout(() => window.ffGo && ffGo(sec), 450); } return; }
-  if (empresa === 'rentas' && app === 'command-center') { if (window.openCommandCenter) openCommandCenter({ name: 'Rentas' }); return; }
+  // El "Command Center" de Rentas se removió (duplicaba a Property Manager) → redirigir.
+  if (empresa === 'rentas' && app === 'command-center') { return osNav('/rentas/property-manager'); }
   // Sistemas clásicos → dispatch de app.js, con el OS oculto + barra Volver.
   const sysType = OS_APP_SYS[`${empresa}/${app}`];
   if (sysType) return osOpenSystem(sysType, empresa);
