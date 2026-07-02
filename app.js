@@ -248,6 +248,17 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW register failed:', err));
   });
+  // Cache-busting: cuando un SW NUEVO toma control (deploy nuevo), recargar 1 vez
+  // automáticamente para servir el bundle fresco — sin hard-refresh manual.
+  // Solo si YA había un SW controlando (evita recargar en la primera visita).
+  if (navigator.serviceWorker.controller) {
+    let _swRefreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swRefreshing) return;
+      _swRefreshing = true;
+      window.location.reload();
+    });
+  }
   // Cuando el SW emite navigate (desde notification click) → cambiar de URL
   navigator.serviceWorker.addEventListener('message', (ev) => {
     if (ev.data?.type === 'navigate' && ev.data.url) {
