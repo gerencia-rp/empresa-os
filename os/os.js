@@ -179,6 +179,17 @@ function osInjectReskin() {
   /* botones sólidos de acción semántica: mantener saturado + texto legible */
   ${D} #pm-root .bg-emerald-600,${D} #pm-root .bg-emerald-700,${D} #pm-root .bg-emerald-500{background-color:#0ea371 !important;color:#04121a !important}
   /* inputs de PM que no son .pm-filter-select (Tailwind) ya los cubre el base #modal */
+  /* ── CALENDARIO: celdas/bordes/labels con estilo INLINE (override por atributo) ── */
+  ${D} #pm-root [style*="background:#fafafa"],${D} #pm-root [style*="background: #fafafa"]{background:#0d141d !important}
+  ${D} #pm-root [style*="background:#f8fafc"],${D} #pm-root [style*="background: #f8fafc"]{background:#0d141d !important}
+  ${D} #pm-root [style*="background:#f1f5f9"],${D} #pm-root [style*="background: #f1f5f9"]{background:#0d141d !important}
+  ${D} #pm-root [style*="solid #f1f5f9"]{border-color:rgba(255,255,255,.07) !important}
+  ${D} #pm-root [style*="solid #e2e8f0"],${D} #pm-root [style*="solid #cbd5e1"]{border-color:rgba(255,255,255,.1) !important}
+  ${D} #pm-root [style*="color:#1e293b"],${D} #pm-root [style*="color: #1e293b"]{color:#e7ecf5 !important}
+  ${D} #pm-root [style*="color:#334155"],${D} #pm-root [style*="color:#475569"],${D} #pm-root [style*="color:#0f172a"]{color:#e7ecf5 !important}
+  ${D} #pm-root [style*="color:#64748b"],${D} #pm-root [style*="color:#94a3b8"]{color:#93a0b6 !important}
+  ${D} #pm-root [style*="background:#fff"],${D} #pm-root [style*="background: #fff"],${D} #pm-root [style*="background:#ffffff"]{background:#151d28 !important}
+  /* barras de reserva (gradientes por tipo) y marcador "Hoy" (#ef4444) se conservan tal cual */
   /* LIGHT: pulido mínimo, respeta el look nativo */
   ${L} #pm-root .pm-filter-select.has-value{background:#fdf8e7 !important}
   `;
