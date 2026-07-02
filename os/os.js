@@ -158,6 +158,29 @@ function osInjectReskin() {
   /* shell viejo detrás (sidebar) — se ve poco tras el backdrop, pero lo dejamos coherente */
   ${D} #app header.bg-white{background-color:#0f151e !important}
   ${L} #modal button.bg-slate-900,${L} #modal .bg-slate-900.text-white{background:linear-gradient(135deg,#12b5a0,#2f6ef0) !important;color:#fff !important}
+  /* ═══════ PROPERTY MANAGER (pm-main: clases propias + pastels de estado) ═══════ */
+  /* clases propias (hardcodeadas light-only) */
+  ${D} #pm-root .pm-filter-select,${D} #pm-root .pm-filter-select:hover{background:#0b1119 !important;border-color:rgba(255,255,255,.14) !important;color:#e7ecf5 !important}
+  ${D} #pm-root .pm-filter-select.has-value{background:rgba(212,175,55,.16) !important;border-color:#d4af37 !important;color:#ecd28f !important}
+  ${D} #pm-root .pm-filter-dropdown label{color:#93a0b6 !important}
+  ${D} #pm-root .pm-clear-filters{border-color:rgba(255,255,255,.14) !important;color:#93a0b6 !important}
+  ${D} #pm-root .pm-resize-handle{border-color:rgba(255,255,255,.1) !important}
+  ${D} #pm-root .pm-split-sidebar{background:#0f151e !important;border-color:rgba(255,255,255,.1) !important}
+  /* pastels de estado → tinte oscuro (mismo semáforo, fondo coherente) */
+  ${D} #pm-root .bg-emerald-50,${D} #pm-root .bg-emerald-100,${D} #pm-root .bg-green-50,${D} #pm-root .bg-green-100{background-color:rgba(16,185,129,.15) !important}
+  ${D} #pm-root .bg-amber-50,${D} #pm-root .bg-amber-100,${D} #pm-root .bg-yellow-50,${D} #pm-root .bg-yellow-100{background-color:rgba(231,182,94,.15) !important}
+  ${D} #pm-root .bg-red-50,${D} #pm-root .bg-red-100,${D} #pm-root .bg-red-200,${D} #pm-root .bg-rose-50,${D} #pm-root .bg-rose-100{background-color:rgba(240,104,122,.15) !important}
+  ${D} #pm-root .bg-blue-50,${D} #pm-root .bg-blue-100,${D} #pm-root .bg-indigo-50{background-color:rgba(79,141,255,.15) !important}
+  ${D} #pm-root .text-emerald-600,${D} #pm-root .text-emerald-700,${D} #pm-root .text-emerald-800,${D} #pm-root .text-green-700{color:#5fe0b0 !important}
+  ${D} #pm-root .text-amber-600,${D} #pm-root .text-amber-700,${D} #pm-root .text-amber-800,${D} #pm-root .text-yellow-700{color:#e8c06a !important}
+  ${D} #pm-root .text-red-600,${D} #pm-root .text-red-700,${D} #pm-root .text-red-800,${D} #pm-root .text-rose-700{color:#f28ba0 !important}
+  ${D} #pm-root .text-blue-600,${D} #pm-root .text-blue-700,${D} #pm-root .text-blue-800,${D} #pm-root .text-indigo-700{color:#8fb6ff !important}
+  ${D} #pm-root .border-r,${D} #pm-root .border-l,${D} #pm-root .border-emerald-200,${D} #pm-root .border-amber-200,${D} #pm-root .border-red-200{border-color:rgba(255,255,255,.1) !important}
+  /* botones sólidos de acción semántica: mantener saturado + texto legible */
+  ${D} #pm-root .bg-emerald-600,${D} #pm-root .bg-emerald-700,${D} #pm-root .bg-emerald-500{background-color:#0ea371 !important;color:#04121a !important}
+  /* inputs de PM que no son .pm-filter-select (Tailwind) ya los cubre el base #modal */
+  /* LIGHT: pulido mínimo, respeta el look nativo */
+  ${L} #pm-root .pm-filter-select.has-value{background:#fdf8e7 !important}
   `;
   document.head.appendChild(st);
 }
