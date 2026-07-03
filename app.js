@@ -1264,6 +1264,7 @@ function openInternalSystem(sys) {
   if (sys.type === 'ops-planner') return openCronograma({ ...sys, name: 'Cronograma', _equipo: 'juan' });
   if (sys.type === 'cleaning-planner') return openCronograma({ ...sys, name: 'Cronograma', _equipo: 'limpieza' });
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
+  if (sys.type === 'remodel-command-center') return openRemodelCommandCenter(sys);
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
   if (sys.type === 'pm-rental-mgmt') return openPmSystem();
