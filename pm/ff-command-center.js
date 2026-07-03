@@ -18,6 +18,32 @@ const FF_STAGES = [
 ];
 const FF_STAGE_LBL = Object.fromEntries(FF_STAGES.map(s => [s[0], s[1]]));
 function ffShort(addr) { return String(addr || '').split(',')[0].trim(); }
+// ─── CALIDAD DE DATOS (no cambia la fuente; marca lo imposible/incompleto) ───
+const FF_FINISHED = ['vendida', 'refinanciada', 'rentada']; // resultado realizado (obra terminada + monetizada)
+function ffDataQuality(d) {
+  const sinDatos = !(Number(d.allIn) > 0) || !(Number(d.arv) > 0);              // casa esqueleto (all-in/ARV = 0)
+  const revisar = !sinDatos && Number(d.allInPct) > 1.0;                        // all-in > 100% ARV = imposible (error de carga, ej. $189k)
+  const preliminar = !sinDatos && !revisar && !FF_FINISHED.includes(d.stage);   // obra NO finalizada → resultado en curso, no final
+  const flags = [];
+  if (sinDatos) flags.push('sin datos');
+  if (revisar) flags.push('dato a revisar');
+  if (preliminar) flags.push('preliminar');
+  return { sinDatos, revisar, preliminar, confiable: !sinDatos && !revisar, flags };
+}
+function ffDQBadge(dq) {
+  if (!dq || !dq.flags.length) return '';
+  if (dq.revisar) return `<span class="ff-dq ff-dq-rev" title="all-in > 100% del ARV — imposible, probable error de carga">⚠ dato a revisar</span>`;
+  if (dq.sinDatos) return `<span class="ff-dq ff-dq-nd" title="all-in y/o ARV en 0 — casa esqueleto sin datos">◌ sin datos</span>`;
+  if (dq.preliminar) return `<span class="ff-dq ff-dq-pre" title="obra no finalizada — resultado en curso, no final">⏳ preliminar</span>`;
+  return '';
+}
+// Indicador GLOBAL de calidad de datos: cuántos deals hay que revisar + la lista.
+function ffDQBar(comp) {
+  const k = comp.kpi; const flagged = k.revisar + k.sinDatos;
+  if (!flagged && !k.preliminar) return `<div class="ff-dqbar clean"><div><div class="t">✓ Datos consistentes</div><div class="d">${k.confiablesN}/${k.total} deals confiables · sin valores imposibles</div></div></div>`;
+  const revNames = k.revisarList.map(d => `${FF_ESC(ffShort(d.address))} (${Math.round(d.allInPct * 100)}%)`).join(', ');
+  return `<div class="ff-dqbar"><div><div class="t">⚠ ${flagged} deal(s) con datos a revisar</div><div class="d">${k.revisar} imposibles (all-in > 100% ARV) · ${k.sinDatos} sin datos · ${k.preliminar} preliminares (obra en curso). <b>Excluidos de promedios/márgenes.</b></div></div>${revNames ? `<div class="lst">${revNames}</div>` : ''}</div>`;
+}
 function ffAx() { return posGetTheme() === 'light' ? '#64748b' : '#5b6780'; }
 function ffGridC() { return posGetTheme() === 'light' ? 'rgba(15,23,42,.06)' : 'rgba(255,255,255,.05)'; }
 
@@ -135,6 +161,14 @@ function ffInjectCSS() {
   #ff-overlay .krow{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--mut)}#ff-overlay .krow b{color:var(--ink);font-weight:600}
   #ff-overlay .kbar{height:4px;border-radius:4px;background:var(--glassb);overflow:hidden;margin-top:8px}#ff-overlay .kbar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
   #ff-overlay .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}
+  #ff-overlay .ff-dq{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.2px}
+  #ff-overlay .ff-dq-rev{background:rgba(240,104,122,.16);color:var(--neg);border:1px solid rgba(240,104,122,.35)}
+  #ff-overlay .ff-dq-nd{background:var(--glass);color:var(--mut);border:1px solid var(--glassb)}
+  #ff-overlay .ff-dq-pre{background:rgba(231,182,94,.15);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
+  #ff-overlay .ff-dqbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 16px;border-radius:13px;background:rgba(240,104,122,.08);border:1px solid rgba(240,104,122,.22)}
+  #ff-overlay .ff-dqbar.clean{background:rgba(72,214,156,.08);border-color:rgba(72,214,156,.22)}
+  #ff-overlay .ff-dqbar .t{font-size:12.5px;font-weight:700}#ff-overlay .ff-dqbar .d{font-size:11px;color:var(--mut)}
+  #ff-overlay .ff-dqbar .lst{font-size:11px;color:var(--mut);margin-left:auto;text-align:right;max-width:60%}
   #ff-overlay .b-ok{background:rgba(72,214,156,.13);color:var(--pos)}#ff-overlay .b-red{background:rgba(240,104,122,.13);color:var(--neg)}#ff-overlay .b-warn{background:rgba(231,182,94,.13);color:var(--amber)}
   #ff-overlay .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #ff-overlay .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--glassb);font-weight:700}
@@ -204,17 +238,29 @@ function ffCompute() {
     const allInPct = arv ? allIn / arv : 0;
     const deficit = dr ? Number(dr.net_total || 0) : 0; // <0 = déficit (cash inyectado)
     const equity = arv - allIn; // equity potencial
-    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, isFlip: d.strategy === 'flip' };
+    const dq = ffDataQuality({ allIn, arv, allInPct, stage: d.stage });
+    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip' };
   });
   const active = deals.filter(d => d.stage !== 'vendida');
+  // "confiables" = sin flags 'dato a revisar' / 'sin datos'. Los promedios/margen/déficit del
+  // portafolio se calculan SOLO sobre estos (no contaminar con datos imposibles/incompletos).
+  const confiables = deals.filter(d => d.dq.confiable);
+  const activeConf = confiables.filter(d => d.stage !== 'vendida');
+  const revisarList = deals.filter(d => d.dq.revisar);
   const kpi = {
     total: deals.length, activos: active.length,
-    capital: active.reduce((s, d) => s + d.allIn, 0),
+    capital: active.reduce((s, d) => s + d.allIn, 0),   // capital = money desplegado (total); los flagged van con badge
     arvTotal: deals.reduce((s, d) => s + d.arv, 0),
-    equity: active.reduce((s, d) => s + Math.max(0, d.equity), 0),
-    deficitAcum: deals.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
+    // Equity y déficit acumulado: SOLO deals confiables (los del error $189k los distorsionan)
+    equity: activeConf.reduce((s, d) => s + Math.max(0, d.equity), 0),
+    deficitAcum: confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
+    marginPctAvg: activeConf.length ? activeConf.reduce((s, d) => s + d.marginPct, 0) / activeConf.length : 0,
     flips: deals.filter(d => d.isFlip).length, holds: deals.filter(d => d.strategy === 'hold').length,
     investors: FF.investors.length,
+    // Calidad de datos
+    revisar: revisarList.length, sinDatos: deals.filter(d => d.dq.sinDatos).length,
+    preliminar: deals.filter(d => d.dq.preliminar).length, confiablesN: confiables.length,
+    revisarList,
   };
   return { deals, kpi };
 }
@@ -327,6 +373,7 @@ function ffSecCommand(comp) {
   const crit = insights.filter(i => i.sev === 'critical').length;
   const rehab = deals.filter(d => d.stage === 'en_rehab').length, venta = deals.filter(d => d.stage === 'en_venta').length;
   return `${ffHeader('Command Center', 'Fix &amp; Flip', 'Todo el negocio de Fix &amp; Flip en una vista — pipeline, capital, márgenes, inversionistas y Cerebro.')}
+    ${ffDQBar(comp)}
     <div class="grid kpis">
       <div class="card kpi"><div class="lab">Deals activos</div><div class="big">${kpi.activos}</div><div class="meta">${kpi.flips} flip · ${kpi.holds} hold · ${rehab} en rehab · ${venta} en venta</div></div>
       <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big glow">${FF_MONEY(kpi.capital)}</div><div class="meta">all-in de deals activos (compra + remod + holding)</div></div>
@@ -361,6 +408,7 @@ function ffSecDeals(comp) {
   const { deals, kpi } = comp;
   const cols = FF_STAGES.map(([k, lbl]) => ({ k, lbl, items: deals.filter(d => d.stage === k) }));
   return `${ffHeader('Deals &amp; Pipeline', 'Kanban', `${kpi.total} deals · ${kpi.flips} flip / ${kpi.holds} hold · capital ${FF_MONEY(kpi.capital)}`)}
+    ${ffDQBar(comp)}
     <div class="kan">${cols.map(c => `<div class="kcol">
       <div class="kcol-h"><span>${c.lbl}</span><span class="cnt">${c.items.length}</span></div>
       ${c.items.sort((a, b) => a.deficit - b.deficit).map(d => ffKanCard(d)).join('') || '<div style="color:var(--mut2);font-size:11px;padding:8px 4px">—</div>'}
@@ -368,8 +416,9 @@ function ffSecDeals(comp) {
 }
 function ffKanCard(d) {
   const capturePct = d.arv ? Math.min(100, Math.round(d.allInPct * 100)) : 0;
-  return `<div class="kcard">
+  return `<div class="kcard"${d.dq.revisar ? ' style="border-color:rgba(240,104,122,.4)"' : ''}>
     <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
+    ${d.dq.flags.length ? `<div style="margin:5px 0 2px">${ffDQBadge(d.dq)}</div>` : ''}
     <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.dr ? '' : ' · <span style="color:var(--amber)">sin draws</span>'}</div>
     <div class="krow"><span>All-in</span><b>${FF_MONEY(d.allIn)}</b></div>
     <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>
@@ -454,15 +503,18 @@ function ffGastosPorTipo() {
 function ffSecFinanzas(comp) {
   const gt = ffGastosPorTipo();
   const invertido = comp.deals.reduce((s, d) => s + d.allIn, 0);
-  const equity = comp.deals.reduce((s, d) => s + Math.max(0, d.equity), 0);
-  const deficit = comp.deals.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0);
-  const best = [...comp.deals].filter(d => d.arv > 0).sort((a, b) => b.margin - a.margin).slice(0, 6);
-  const worst = [...comp.deals].filter(d => d.arv > 0).sort((a, b) => a.margin - b.margin).slice(0, 6);
+  // equity y déficit acumulado: SOLO deals confiables (el error $189k los distorsiona) → comp.kpi
+  const equity = comp.kpi.equity;
+  const deficit = comp.kpi.deficitAcum;
+  // Rentabilidad por casa: solo deals confiables (los flagged no compiten en mejores/peores por margen)
+  const best = [...comp.deals].filter(d => d.arv > 0 && d.dq.confiable).sort((a, b) => b.margin - a.margin).slice(0, 6);
+  const worst = [...comp.deals].filter(d => d.arv > 0 && d.dq.confiable).sort((a, b) => a.margin - b.margin).slice(0, 6);
   return `${ffHeader('Finanzas', 'QuickBooks + Cockpit', `Invertido ${FF_MONEY(invertido)} · equity ${FF_MONEY(equity)} · déficit ${FF_MONEY(deficit)} · interés ${gt.intPct}% del gasto`)}
+    ${ffDQBar(comp)}
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       <div class="card kpi"><div class="lab">Capital invertido</div><div class="big glow">${FF_MONEY(invertido)}</div><div class="meta">all-in del portafolio</div></div>
       <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${FF_MONEY(equity)}</div><div class="meta">ARV − all-in (positivo)</div></div>
-      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big down">${FF_MONEY(deficit)}</div><div class="meta">casas en rojo (incl. error de datos)</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big down">${FF_MONEY(deficit)}</div><div class="meta">casas en rojo · deals confiables (error de datos excluido)</div></div>
       <div class="card kpi"><div class="lab">Intereses / gasto</div><div class="big warn">${gt.intPct}%</div><div class="meta">${FF_MONEY(gt.g['Intereses'])} de ${FF_MONEY(gt.total)}</div></div>
     </div>
     <div class="grid row2">
@@ -479,10 +531,10 @@ function ffSecFinanzas(comp) {
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Mejores por margen</div><div class="k">rentabilidad por casa</div></div>
         <table class="ptable"><thead><tr><th>Casa</th><th>All-in</th><th>ARV</th><th>Margen</th></tr></thead><tbody>
-        ${best.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="up">${FF_MONEY(d.margin)}</td></tr>`).join('')}</tbody></table></div>
+        ${best.map(d => `<tr><td>${FF_ESC(ffShort(d.address))} ${d.dq.preliminar ? ffDQBadge(d.dq) : ''}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="up">${FF_MONEY(d.margin)}</td></tr>`).join('')}</tbody></table></div>
       <div class="card"><div class="chart-h"><div class="t">Peores por margen</div><div class="k">a corregir/recuperar</div></div>
         <table class="ptable"><thead><tr><th>Casa</th><th>All-in</th><th>ARV</th><th>Margen</th></tr></thead><tbody>
-        ${worst.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="down">${FF_MONEY(d.margin)}</td></tr>`).join('')}</tbody></table></div>
+        ${worst.map(d => `<tr><td>${FF_ESC(ffShort(d.address))} ${d.dq.preliminar ? ffDQBadge(d.dq) : ''}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="down">${FF_MONEY(d.margin)}</td></tr>`).join('')}</tbody></table></div>
     </div>`;
 }
 function ffSoon(title, desc) {
@@ -593,10 +645,10 @@ function ffSecUnderwriting(comp) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>${ffUwIn('refi-app', 'Appraisal', dv.app)}${ffUwIn('refi-ltv', 'LTV (%)', 75)}${ffUwIn('refi-payoff', 'Payoff (deuda actual)', dv.payoff)}</div>
           <div>${ffUwIn('refi-rate', 'Tasa refi (%)', 7)}${ffUwIn('refi-cur', 'Pago actual/mes', sel ? Math.round(sel.hml_payment || sel.holding / 6) : '')}<div class="uwres" id="ff-refi-res"></div></div></div></div>
-      <div class="card"><div class="chart-h"><div class="t">🔁 Ingeniería inversa · la fórmula que funciona</div><div class="k">casas que NO nacen en déficit</div></div>
+      <div class="card"><div class="chart-h"><div class="t">🔁 Ingeniería inversa · la fórmula que funciona</div><div class="k">casas que NO nacen en déficit · ⏳ = resultado preliminar (obra en curso)</div></div>
         <div class="k" style="margin-bottom:8px">El draw que cubrió la operación (Remodelación → Rentas). Aplicá esta estructura a deals nuevos.</div>
         <table class="ptable"><thead><tr><th>Casa</th><th>Draw total</th><th>Remod.</th><th>Holding</th><th>Resultado</th></tr></thead><tbody>
-        ${sanas.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_MONEY(d.dr.total_draws)}</td><td>${FF_MONEY(d.dr.remodel_complete)}</td><td>${FF_MONEY(Number(d.dr.interest_hml || 0) + Number(d.dr.services_hml || 0) + Number(d.dr.interest_until_rent || 0))}</td><td class="up">${FF_MONEY(d.dr.net_total)}</td></tr>`).join('')}</tbody></table></div>
+        ${sanas.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}${d.dq.preliminar ? ' ' + ffDQBadge(d.dq) : ''}</td><td>${FF_MONEY(d.dr.total_draws)}</td><td>${FF_MONEY(d.dr.remodel_complete)}</td><td>${FF_MONEY(Number(d.dr.interest_hml || 0) + Number(d.dr.services_hml || 0) + Number(d.dr.interest_until_rent || 0))}</td><td class="${d.dq.preliminar ? 'warn' : 'up'}">${FF_MONEY(d.dr.net_total)}${d.dq.preliminar ? ' <span style="font-size:9px">prelim.</span>' : ''}</td></tr>`).join('')}</tbody></table></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">ROI y recuperación del déficit</div><div class="k">semáforo: &lt;12m 🟢 · 12–36m 🟡 · &gt;36m 🔴 (neto mensual ~0.5% ARV)</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Estrat.</th><th>All-in</th><th>Margen/Equity</th><th>ROI</th><th>Déficit</th><th>Recuperación</th></tr></thead><tbody>
