@@ -1297,12 +1297,36 @@ async function wpConfirmPostpone(id) {
 // Reprograma una actividad a nuevo día
 async function wpReprogramTask(id, newDate) {
   if (!newDate) return;
+  const prev = (wpState.activities || []).find(a => a.id === id);
+  const oldDate = prev && prev.date;
   await sb.from('weekly_activities').update({
     date: newDate, status: 'planned', updated_at: new Date().toISOString()
   }).eq('id', id);
   await wpLoadAll();
   wpRender();
+  if (prev && prev.is_critical && oldDate) { const delta = Math.round((new Date(newDate) - new Date(oldDate)) / 86400000); if (delta) await wpCascadeReschedule(prev, delta); }
 }
+// Bloque 4.1 — cascada: al mover una actividad crítica, recorre sus sucesores dependientes (depends_on del catálogo).
+async function wpCascadeReschedule(movedAct, deltaDays) {
+  if (!movedAct.activity_code || !deltaDays) return;
+  const proj = movedAct.project_id;
+  const catByCode = {}; (wpState.catalog || []).forEach(c => catByCode[c.code] = c);
+  const shifted = new Set([movedAct.id]); let frontier = [movedAct.activity_code]; const toShift = [];
+  while (frontier.length && toShift.length < 200) {
+    const codes = new Set(frontier); frontier = [];
+    (wpState.activities || []).forEach(a => {
+      if (a.project_id !== proj || shifted.has(a.id) || a.status === 'done') return;
+      const cat = catByCode[a.activity_code];
+      if (cat && (cat.depends_on || []).some(dep => codes.has(dep))) { toShift.push(a); shifted.add(a.id); frontier.push(a.activity_code); }
+    });
+  }
+  if (!toShift.length) return;
+  if (!confirm(`Es una actividad crítica. ¿Recorrer en cascada sus ${toShift.length} sucesor(es) dependiente(s) ${deltaDays > 0 ? '+' : ''}${deltaDays} día(s)? (se actualiza la desviación y la fecha de entrega)`)) return;
+  for (const a of toShift) { const nd = wpDateOnly(wpAddDays(new Date(a.date + 'T00:00:00'), deltaDays)); await sb.from('weekly_activities').update({ date: nd, updated_at: new Date().toISOString() }).eq('id', a.id); }
+  await wpLoadAll(); wpRender();
+  if (window.toast) toast(`Cascada: ${toShift.length} sucesor(es) recorrido(s) ${deltaDays > 0 ? '+' : ''}${deltaDays}d.`, 'success');
+}
+window.wpCascadeReschedule = wpCascadeReschedule;
 
 // Reprograma TODAS las atrasadas
 async function wpReprogramAllOverdue(newDate) {

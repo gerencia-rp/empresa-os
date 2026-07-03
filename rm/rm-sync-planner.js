@@ -34,7 +34,7 @@ async function rmSyncToPlanner() {
 
     // Crear 1 entry por día de duración (para verlo en cada día del Planner)
     for (let i = 0; i < Math.min(days, 30); i++) {
-      const date = rmAddDays(activityStart, i);
+      const date = (typeof rmAddWorkDays === "function" ? rmAddWorkDays(activityStart, i) : rmAddDays(activityStart, i));
       const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
       const dayLabel = days > 1 ? ` (día ${i+1}/${days})` : '';
       inserts.push({
