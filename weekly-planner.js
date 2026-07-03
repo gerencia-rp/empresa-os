@@ -124,8 +124,62 @@ function wpCheckDeps(act, allHomeActs) {
 }
 
 // ─── ENTRY ───
+// ─── C) Reskin premium (glass, claro/oscuro, densidad, estados consistentes) — SOLO visual, no toca lógica/data.
+//    Capa CSS scopeada a #wp-root; los estados (done/atrasada/aplazada/crítica) se remapean a tokens del OS.
+function wpInjectTheme() {
+  if (document.getElementById('wp-theme-css')) return;
+  const st = document.createElement('style'); st.id = 'wp-theme-css';
+  st.textContent = `
+  /* ===== Planner Semanal — diseño premium OS ===== */
+  #modal:has(#wp-root) > div{max-width:96vw !important;width:1500px;border-radius:20px;border:1px solid rgba(15,23,42,.08);box-shadow:0 40px 90px -40px rgba(2,6,23,.5)}
+  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;--wa1:#12b5a0;--wa2:#2f6ef0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#0f1c2e;--wmut:#64748b;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
+  #wp-root .rounded,#wp-root .rounded-lg{border-radius:10px}
+  /* Toolbar: pills uniformes, densidad */
+  #wp-root [onclick^="wpNav"],#wp-root button[onclick]{transition:.15s}
+  #wp-root .flex.items-center.justify-between.mb-3{gap:10px}
+  #wp-root .border-2{border-width:1px}
+  /* Celda calendario: glass + hover + hoy */
+  #wp-root td{transition:background .15s}
+  #wp-root td:hover{background:rgba(47,110,240,.04)}
+  #wp-root table{border-collapse:separate;border-spacing:0}
+  #wp-root thead th{position:sticky;top:0;z-index:2;backdrop-filter:blur(8px)}
+  /* Chips de estado — color CONSISTENTE (barra izquierda) */
+  #wp-root .border-2.rounded{border-radius:9px;box-shadow:0 1px 2px rgba(2,6,23,.04)}
+  #wp-root .bg-emerald-50{background:rgba(14,163,113,.10) !important;border-color:rgba(14,163,113,.4) !important}
+  #wp-root .bg-blue-50.border-blue-300{background:rgba(47,110,240,.10) !important;border-color:rgba(47,110,240,.4) !important}
+  #wp-root .bg-rose-50{background:rgba(224,69,95,.10) !important;border-left-color:var(--wneg) !important}
+  #wp-root .bg-amber-50{background:rgba(192,125,22,.12) !important}
+  #wp-root .bg-red-50{background:rgba(224,69,95,.09) !important}
+  #wp-root .bg-red-600{background:var(--wneg) !important}#wp-root .bg-amber-600{background:var(--wamb) !important}#wp-root .bg-emerald-600{background:var(--wpos) !important}
+  /* ===== MODO OSCURO ===== */
+  html[data-osreskin="dark"] #modal:has(#wp-root) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;border-color:rgba(255,255,255,.08) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root{--wink:#e7ecf5;--wmut:#8792a5;--wsurf:rgba(255,255,255,.05);--wglass:rgba(255,255,255,.04);--wbord:rgba(255,255,255,.09);color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root .text-slate-900,html[data-osreskin="dark"] #wp-root .font-bold{color:#e7ecf5 !important}
+  html[data-osreskin="dark"] #wp-root .text-slate-700,html[data-osreskin="dark"] #wp-root .text-slate-600{color:#c5cede !important}
+  html[data-osreskin="dark"] #wp-root .text-slate-500,html[data-osreskin="dark"] #wp-root .text-slate-400{color:#8792a5 !important}
+  html[data-osreskin="dark"] #wp-root .bg-white{background:rgba(255,255,255,.045) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root .bg-slate-50,html[data-osreskin="dark"] #wp-root .bg-slate-100{background:rgba(255,255,255,.06) !important;color:#c5cede}
+  html[data-osreskin="dark"] #wp-root .border-slate-200,html[data-osreskin="dark"] #wp-root .border-slate-300,html[data-osreskin="dark"] #wp-root .border-b,html[data-osreskin="dark"] #wp-root .border-r{border-color:rgba(255,255,255,.09) !important}
+  html[data-osreskin="dark"] #wp-root td:hover{background:rgba(79,141,255,.07)}
+  html[data-osreskin="dark"] #wp-root .bg-slate-900{background:linear-gradient(135deg,#1b2436,#141b29) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root .bg-emerald-50{background:rgba(72,214,156,.13) !important;border-color:rgba(72,214,156,.34) !important}
+  html[data-osreskin="dark"] #wp-root .bg-emerald-50 .text-slate-900,html[data-osreskin="dark"] #wp-root .bg-emerald-50 *{color:#c9f3e2}
+  html[data-osreskin="dark"] #wp-root .bg-blue-50{background:rgba(79,141,255,.14) !important;border-color:rgba(79,141,255,.36) !important}
+  html[data-osreskin="dark"] #wp-root .bg-rose-50{background:rgba(240,104,122,.14) !important}
+  html[data-osreskin="dark"] #wp-root .bg-amber-50{background:rgba(231,182,94,.14) !important}
+  html[data-osreskin="dark"] #wp-root .bg-red-50{background:rgba(240,104,122,.12) !important}
+  html[data-osreskin="dark"] #wp-root .bg-violet-50,html[data-osreskin="dark"] #wp-root .bg-violet-100{background:rgba(138,123,255,.16) !important}html[data-osreskin="dark"] #wp-root .text-violet-700{color:#b9aeff !important}
+  html[data-osreskin="dark"] #wp-root .bg-blue-50.border-blue-300,html[data-osreskin="dark"] #wp-root .text-blue-800,html[data-osreskin="dark"] #wp-root .text-blue-700{color:#8fb4ff !important}
+  html[data-osreskin="dark"] #wp-root .bg-emerald-50.text-emerald-700,html[data-osreskin="dark"] #wp-root .text-emerald-700{color:#5fe0b8 !important}
+  html[data-osreskin="dark"] #wp-root input,html[data-osreskin="dark"] #wp-root select{background:rgba(255,255,255,.06) !important;color:#e7ecf5 !important;border-color:rgba(255,255,255,.12) !important}
+  html[data-osreskin="dark"] #wp-root select option{background:#141b29;color:#e7ecf5}`;
+  document.head.appendChild(st);
+}
+window.wpInjectTheme = wpInjectTheme;
+
 async function openWeeklyPlanner(sys) {
   wpState.sys = sys;
+  wpInjectTheme();
   await wpLoadAll();
   // Generar tareas recurrentes vencidas (silencioso)
   try { await wpGenerateRecurringDue(); await wpLoadAll(); } catch(e) { console.warn('recurring', e); }
@@ -184,6 +238,7 @@ function wpBackToPlanner(opts) {
 window.wpBackToPlanner = wpBackToPlanner;
 
 function wpRender() {
+  wpInjectTheme();
   const root = document.getElementById('wp-root');
   if (!root) return;
   const days = Array.from({length: 7}, (_, i) => wpAddDays(wpState.weekStart, i));
