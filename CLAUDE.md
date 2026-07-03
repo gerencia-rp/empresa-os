@@ -4,6 +4,17 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (3 Jul 2026 — Remodelación pro completa + QA pre-lanzamiento) · EN VIVO
+
+- 🏗️ **Remodelación end-to-end** (Estimador Pro `remodel-pro.js` + `rm/*` · Planner `weekly-planner.js` · CC `remodel-command-center.js` · Ficha en `os/os.js`). Todo SOLO-LECTURA de datos de negocio; escribe solo lo operativo (actividades, hitos, etc.). Bases Airtable Remodelación `appwFRqnkyyRljOld`.
+- 📅 **Planner Semanal**: recursos FIJOS por obra, actividad multi-día (`group_id`), pago Crew×Hora, **baseline/desviación por triggers** (`weekly_activities.baseline_date` + `weekly_activity_moves` + vista `remodel_stage_deviation`, migr `20260703100000`), reporte PDF (día/semana/mes, `wpOpenReport`), **ruta crítica** (`is_critical`, chip 🎯, diálogo de atrasadas `wpCheckCriticalLate`), **cascada** de dependientes al mover una crítica (`wpCascadeReschedule` por `depends_on` del catálogo), y **SIN DOMINGOS** (grilla lun–sáb, `wpDaysDiff` no cuenta domingos). Genera cronograma en **días laborables** (`rmAddWorkDays`).
+- 🧮 **Estimador**: al **guardar** auto-genera el cronograma en el Planner (`rmAutoGenPlanner`, baseline, 1ª vez, no pisa ediciones); pronósticos **editar/soft-delete/dedup por dirección**; **seguimiento por propiedad** + import Excel de avance; historial **comparar 3**; tab **🏗 Obra Pro** (hitos plan-vs-real + draws, inspecciones/hold points, punch list, calendario laboral) → tablas `remodel_milestones/inspections/punch_list/calendar` (migr `20260703270000`, RLS + soft-delete).
+- 📊 **CC Remodelación**: KPIs de gestión + **Estimado vs Real** + pipeline por `Procesos` (5 etapas) + **Líderes** (productividad $/sqft, hrs/sqft desde `remodel_worker_pay_summary`) + **Gestión EVM** (CPI/SPI por casa) + calibración (`remodel_obra_calibration`) + export CSV. Ficha de Obra en el OS (`osCasa`).
+- ✅ **QA pre-lanzamiento (3 agentes + smoke test headless)**: **52 superficies, 0 pageerrors, 0 crashes** (OS deep-links, FF CC, RC, PM, Estimador 17 tabs, Planner). Todos los `.js` pasan `node --check`. Migraciones **aditivas** (sin DROP/TRUNCATE, RLS). Data intacta (354 activ, 31 proyectos, 3364 hrs). Bugs corregidos: `os.js` div sin cerrar en Ficha de Obra + import Excel del Planner no escribía `is_critical` + 2 landmines. Bundle en vivo `96f5d44740cf`.
+- ⚠️ **Deuda técnica menor conocida** (no bloquea venta): Obra Pro usa `prompt()` (funcional; se puede hacer inline); cascada solo en reprogramar (no drag&drop); días laborables = fin de semana en la generación (feriados de `remodel_calendar` cargables pero aún no aplicados al cálculo).
+
+---
+
 ## 🏛️ PILARES FUNDAMENTALES (aplican SIEMPRE, en cada tarea)
 
 Estos 5 pilares son la base permanente del producto. Respetalos en todo cambio de acá en adelante:
