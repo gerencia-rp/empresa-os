@@ -49,6 +49,7 @@ async function rmSyncToPlanner() {
         end_hour: 17,
         status: 'planned',
         priority: i === 0 ? 'normal' : 'low',
+        is_critical: !!(e.cpm && e.cpm.criticalPath && e.cpm.criticalPath.includes(code)),
         created_by: state.user.id
       });
     }

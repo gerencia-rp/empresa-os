@@ -186,7 +186,7 @@ function wpInjectTheme() {
   #wp-root .wp-acard[data-st="progress"] .wp-ac-st{background:rgba(47,110,240,.13);color:var(--wa2)}
   #wp-root .wp-ac-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#wp-root .wp-ac-tags:empty{display:none}
   #wp-root .wp-chip{font-size:8.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(100,116,139,.13);color:var(--wmut);border:none;cursor:pointer;line-height:1.4}
-  #wp-root .wp-chip.est{background:rgba(138,123,255,.15);color:#7b5bef}
+  #wp-root .wp-chip.est{background:rgba(138,123,255,.15);color:#7b5bef}#wp-root .wp-chip.crit{background:rgba(224,69,95,.15);color:var(--wneg)}
   #wp-root .wp-chip.ok{background:rgba(14,163,113,.13);color:var(--wpos)}
   #wp-root .wp-res{font-size:8.5px;padding:2px 7px;border-radius:20px;background:rgba(47,110,240,.11);color:var(--wa2);font-weight:600;white-space:nowrap}
   #wp-root .wp-ac-warn{font-size:9px;color:var(--wneg);font-weight:700;margin-top:5px}
@@ -302,6 +302,7 @@ async function openWeeklyPlanner(sys) {
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   wpRender();
+  setTimeout(wpCheckCriticalLate, 400);
 }
 
 // Vuelve al planner desde cualquier sub-vista SIN cerrar el modal global ni
@@ -606,7 +607,7 @@ function wpRenderCell(home, date, conflicts) {
     const matchProj = a.project_id === home.id;
     const matchName = !a.project_id && home.id.startsWith('name:') && a.property_name === home.id.slice(5);
     return (matchProj || matchName) && a.date === dateStr && wpActPassesFilters(a);
-  });
+  }).sort((x, y) => (y.is_critical ? 1 : 0) - (x.is_critical ? 1 : 0));
   const cellDone = cellActs.filter(a => a.status === 'done').length;
   const cellProgress = cellActs.length ? Math.round(cellDone/cellActs.length*100) : 0;
 
@@ -626,7 +627,7 @@ function wpRenderCell(home, date, conflicts) {
           const allHomeActs = wpState.activities.filter(x => x.project_id === home.id || (!x.project_id && home.id.startsWith('name:') && x.property_name === home.id.slice(5)));
           const depCheck = a.status === 'done' ? { satisfied: true, blockers: [], minDate: null } : wpCheckDeps(a, allHomeActs);
           const hasDepIssue = !depCheck.satisfied;
-          const isCritical = a.priority === 'critical' || a.priority === 'urgent';
+          const isCritical = a.priority === 'critical' || a.priority === 'urgent' || a.is_critical;
           const isPostponed = (a.notes || '').includes('[APLAZADA');
           const isLate = a.status !== 'done' && a.status !== 'cancelled' && new Date(a.date) < new Date(wpDateOnly(new Date()));
           // A) estado primario → borde/punto sutil (mismo lenguaje que la vista Desviación)
@@ -651,7 +652,7 @@ function wpRenderCell(home, date, conflicts) {
                     ${stLabel ? `<span class="wp-ac-st" title="${st==='critical'?'Ruta crítica':st==='postponed'?'Tarea aplazada':st==='dep'?'Dependencias no listas: '+depCheck.blockers.map(b=>b.code).join(', '):''}">${stLabel}</span>` : ''}
                   </div>
                   <div class="wp-ac-tags">
-                    ${(a.notes||'').startsWith('[Estimador]') ? '<span class="wp-chip est" title="Viene del Estimador">📐 EST</span>' : ''}
+                    ${a.is_critical ? '<span class="wp-chip crit" title="Ruta crítica — un atraso mueve la entrega">🎯 CRÍTICA</span>' : ''}${(a.notes||'').startsWith('[Estimador]') ? '<span class="wp-chip est" title="Viene del Estimador">📐 EST</span>' : ''}
                     ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip ok" title="Checklist + materiales">✅ ${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip" title="Agregar checklist + materiales">+ ✅</button>`}
                     ${(a.materials||[]).length > 0 ? `<span class="wp-chip" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
                     ${acts.map(r => `<span class="wp-res" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}
@@ -5421,3 +5422,20 @@ function wpOpenReport(range) {
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
 }
 window.wpOpenReport = wpOpenReport;
+
+// Bloque 3.2 — al abrir el Planner, avisar de actividades CRÍTICAS atrasadas (de cualquier proyecto).
+function wpCheckCriticalLate() {
+  const today = wpDateOnly(new Date());
+  const late = (wpState.activities || []).filter(a => a.is_critical && a.status !== 'done' && a.status !== 'cancelled' && a.date && a.date < today);
+  if (!late.length) return;
+  const esc = x => String(x == null ? '' : x).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const rows = late.map(a => ({ casa: a.property_name || '—', name: (a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''), dias: Math.round((new Date(today) - new Date(a.date)) / 86400000), date: a.date })).sort((a, b) => b.dias - a.dias);
+  const html = `<div id="wp-cl"><div style="font-size:12px;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:12px"><b>⚠ ${late.length} actividad(es) de RUTA CRÍTICA atrasadas.</b> Cada día perdido empuja la fecha de entrega. Reprogramá o completá con prioridad.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:6px;color:#64748b;font-size:10px;text-transform:uppercase">Casa</th><th style="text-align:left;padding:6px;color:#64748b;font-size:10px;text-transform:uppercase">Actividad</th><th style="text-align:right;padding:6px;color:#64748b;font-size:10px;text-transform:uppercase">Atraso</th></tr></thead><tbody>
+    ${rows.map(r => `<tr style="border-top:1px solid #eef2f8"><td style="padding:7px 6px;font-weight:600">${esc(r.casa)}</td><td style="padding:7px 6px">${esc(r.name)} <span style="color:#94a3b8;font-size:10px">· ${r.date}</span></td><td style="padding:7px 6px;text-align:right;color:#e0455f;font-weight:700">${r.dias}d</td></tr>`).join('')}
+    </tbody></table>
+    <div style="margin-top:14px;text-align:right"><button onclick="wpBackToPlanner()" style="background:#0f1c2e;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">Ir al Planner →</button></div></div>`;
+  openModal('🚨 Ruta crítica atrasada', html);
+  const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-7xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-2xl'); }
+}
+window.wpCheckCriticalLate = wpCheckCriticalLate;
