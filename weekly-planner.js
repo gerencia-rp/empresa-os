@@ -244,7 +244,31 @@ function wpInjectTheme() {
   @media (max-width:820px){#wp-dev .dv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
   html[data-osreskin="dark"] #wp-dev{--dink:#e7ecf5;--dmut:#8792a5;--dbord:rgba(255,255,255,.09);--dglass:rgba(255,255,255,.04)}
   html[data-osreskin="dark"] #modal:has(#wp-dev) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;color:#e7ecf5}
-  html[data-osreskin="dark"] #wp-dev .dv-track{background:rgba(255,255,255,.06)}`;
+  html[data-osreskin="dark"] #wp-dev .dv-track{background:rgba(255,255,255,.06)}
+  /* 1.4 Reporte PDF (papel blanco imprimible) */
+  #wp-report .wr-tab{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid var(--wbord);background:var(--wglass);color:var(--wmut);cursor:pointer;font-weight:600}
+  #wp-report .wr-tab.on{background:#0f1c2e;color:#fff;border-color:#0f1c2e}
+  html[data-osreskin="dark"] #wp-report .wr-tab.on{background:var(--wa2);border-color:var(--wa2)}
+  #wp-report .wr-print{font-size:12px;padding:7px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#12b5a0,#2f6ef0);color:#fff;font-weight:700;cursor:pointer}
+  #wp-report .wr-doc{background:#fff;color:#1a2436;border-radius:12px;padding:24px;border:1px solid #e5e9f0}
+  #wp-report .wr-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f1c2e;padding-bottom:12px;margin-bottom:14px}
+  #wp-report .wr-title{font-size:17px;font-weight:800;color:#0f1c2e}
+  #wp-report .wr-sub{font-size:12px;color:#64748b;margin-top:2px}
+  #wp-report .wr-brand{font-size:11px;font-weight:700;color:#12b5a0;text-align:right}
+  #wp-report .wr-kpis{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  #wp-report .wr-k{flex:1;min-width:88px;background:#f6f8fc;border:1px solid #e5e9f0;border-radius:9px;padding:10px 12px;text-align:center}
+  #wp-report .wr-kn{font-size:22px;font-weight:800;color:#0f1c2e}#wp-report .wr-kl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:700;margin-top:2px}
+  #wp-report .wr-home{margin-bottom:14px}
+  #wp-report .wr-hh{font-size:13px;font-weight:800;color:#0f1c2e;background:#eef2f8;padding:6px 10px;border-radius:7px;display:flex;justify-content:space-between}
+  #wp-report .wr-hc{color:#64748b;font-weight:700}
+  #wp-report .wr-t{width:100%;border-collapse:collapse;font-size:12px}
+  #wp-report .wr-t td{padding:6px 10px;border-bottom:1px solid #eef2f8;color:#1a2436}
+  #wp-report .wr-d{color:#64748b;white-space:nowrap;width:120px;text-transform:capitalize}
+  #wp-report .wr-st{color:#94a3b8;font-size:10px}
+  #wp-report .wr-bd{text-align:right;white-space:nowrap}
+  #wp-report .wr-b{font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px}
+  #wp-report .wr-done{background:#d1fae5;color:#0ea371}#wp-report .wr-late{background:#fee2e2;color:#e0455f}#wp-report .wr-inc{background:#fef3c7;color:#c07d16}
+  @media print { body > *:not(#modal){display:none !important} #modal{position:static !important;background:#fff !important;padding:0 !important} #modal > div{max-width:100% !important;box-shadow:none !important;border:none !important;background:#fff !important} #modal-title,#modal-close-x,.no-print{display:none !important} #wp-report .wr-doc{border:none;padding:0} }`;
   document.head.appendChild(st);
 }
 window.wpInjectTheme = wpInjectTheme;
@@ -454,6 +478,7 @@ function wpRender() {
           <button onclick="wpOpenWorkerMobile()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Vista del día optimizada para celular del líder/obrero">📱 Vista obrero</button>
           <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
           <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold" title="Plan inicial vs Real — desviacion por tarea/etapa/casa + Cerebro de planeacion">📉 Desviación</button>
+          <button onclick="wpOpenReport('semana')" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Reporte imprimible dia/semana/mes con estado por actividad">📄 PDF</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
             <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
             ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
@@ -5352,3 +5377,47 @@ function wpOpenCrewPay(casaNorm) {
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
 }
 window.wpOpenCrewPay = wpOpenCrewPay;
+
+// ─── BLOQUE 1.4: Reporte PDF (día/semana/mes) con estado por actividad + resumen ───
+function wpOpenReport(range) {
+  range = range || 'semana';
+  const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const today = wpDateOnly(new Date());
+  let from, to, label;
+  if (range === 'dia') { from = to = today; label = 'Día — ' + new Date(today + 'T00:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }); }
+  else if (range === 'mes') { const d = new Date(); from = wpDateOnly(new Date(d.getFullYear(), d.getMonth(), 1)); to = wpDateOnly(new Date(d.getFullYear(), d.getMonth() + 1, 0)); label = 'Mes — ' + d.toLocaleDateString('es', { month: 'long', year: 'numeric' }); }
+  else { from = wpDateOnly(wpState.weekStart || new Date()); to = wpDateOnly(wpAddDays(wpState.weekStart || new Date(), 6)); label = 'Semana — ' + new Date(from + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' }) + ' a ' + new Date(to + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' }); }
+  let acts = (wpState.activities || []).filter(a => a.date >= from && a.date <= to && a.status !== 'cancelled');
+  acts = wpFilterActsByHouse(acts, wpState.houseFilter || 'all');
+  const stOf = a => a.status === 'done' ? 'done' : (a.date < today ? 'late' : 'inc');
+  const total = acts.length, done = acts.filter(a => stOf(a) === 'done').length, late = acts.filter(a => stOf(a) === 'late').length, inc = acts.filter(a => stOf(a) === 'inc').length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const byHome = {}; acts.forEach(a => { const k = a.property_name || '—'; (byHome[k] = byHome[k] || []).push(a); });
+  const badge = st => st === 'done' ? '<span class="wr-b wr-done">COMPLETADA</span>' : st === 'late' ? '<span class="wr-b wr-late">ATRASADA</span>' : '<span class="wr-b wr-inc">INCOMPLETA</span>';
+  const homesHtml = Object.keys(byHome).sort().map(h => {
+    const list = byHome[h].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    return `<div class="wr-home"><div class="wr-hh">${esc(h)} <span class="wr-hc">${list.filter(a => stOf(a) === 'done').length}/${list.length}</span></div>
+      <table class="wr-t"><tbody>${list.map(a => `<tr><td class="wr-d">${new Date(a.date + 'T00:00:00').toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}</td><td>${esc((a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''))}${a.stage ? ` <span class="wr-st">· ${esc(a.stage)}</span>` : ''}</td><td class="wr-bd">${badge(stOf(a))}</td></tr>`).join('')}</tbody></table></div>`;
+  }).join('') || '<div style="padding:20px;text-align:center;color:#888">Sin actividades en el rango.</div>';
+  const tab = (r, t) => `<button onclick="wpOpenReport('${r}')" class="wr-tab ${range === r ? 'on' : ''}">${t}</button>`;
+  const html = `<div id="wp-report">
+    <div class="wr-controls no-print" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      ${tab('dia', 'Día')}${tab('semana', 'Semana')}${tab('mes', 'Mes')}
+      <button onclick="window.print()" class="wr-print" style="margin-left:auto">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+    <div class="wr-doc">
+      <div class="wr-head"><div><div class="wr-title">Reporte de obra — Planner Semanal</div><div class="wr-sub">${esc(label)}${wpState.houseFilter && wpState.houseFilter !== 'all' ? ' · casa filtrada' : ' · todas las casas'}</div></div><div class="wr-brand">Ever Home · Remodelación</div></div>
+      <div class="wr-kpis">
+        <div class="wr-k"><div class="wr-kn">${total}</div><div class="wr-kl">Actividades</div></div>
+        <div class="wr-k"><div class="wr-kn" style="color:#0ea371">${done}</div><div class="wr-kl">Completadas</div></div>
+        <div class="wr-k"><div class="wr-kn" style="color:#e0455f">${late}</div><div class="wr-kl">Atrasadas</div></div>
+        <div class="wr-k"><div class="wr-kn" style="color:#c07d16">${inc}</div><div class="wr-kl">Incompletas</div></div>
+        <div class="wr-k"><div class="wr-kn">${pct}%</div><div class="wr-kl">Avance</div></div>
+      </div>
+      ${homesHtml}
+    </div>
+  </div>`;
+  openModal('📄 Reporte del Planner', html);
+  const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
+}
+window.wpOpenReport = wpOpenReport;
