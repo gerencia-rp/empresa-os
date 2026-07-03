@@ -338,8 +338,8 @@ function wpRender() {
   wpInjectTheme();
   const root = document.getElementById('wp-root');
   if (!root) return;
-  const days = Array.from({length: 7}, (_, i) => wpAddDays(wpState.weekStart, i));
-  const weekLabel = `${wpFmtDate(days[0])} → ${wpFmtDate(days[6])}`;
+  const days = Array.from({length: 6}, (_, i) => wpAddDays(wpState.weekStart, i)); // lun-sáb (sin domingo, día no laboral)
+  const weekLabel = `${wpFmtDate(days[0])} → ${wpFmtDate(days[days.length - 1])}`;
 
   // Filtrar proyectos completados/cancelados — no se muestran en grid
   const hiddenProjectIds = new Set(wpState.projects.filter(p => p.status === 'completed' || p.status === 'cancelled').map(p => p.id));
@@ -911,7 +911,7 @@ function wpNewActivity(homeId, homeName, dateStr) {
   const stages = [...new Set((wpState.activities || []).map(a => a.stage).filter(Boolean))].sort();
   const team = wpTeamOf(homeId).filter(r => r.type === 'crew' || r.type === 'specialist');
   const crews = team.length ? team : (wpState.resources || []).filter(r => r.type === 'crew' || r.type === 'specialist');
-  const weekDays = Array.from({ length: 7 }, (_, i) => wpDateOnly(wpAddDays(wpState.weekStart || new Date(), i)));
+  const weekDays = Array.from({ length: 6 }, (_, i) => wpDateOnly(wpAddDays(wpState.weekStart || new Date(), i))); // sin domingo
   const dl = d => new Date(d + 'T00:00:00').toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
   const html = `<div id="wp-na" class="space-y-3" data-house="${esc(homeId)}" data-hname="${esc(homeName)}" data-date="${dateStr}">
     <input id="wp-na-name" placeholder="Nombre de la actividad (ej. Drywall planta alta)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
@@ -5268,7 +5268,14 @@ function wpDoIcsExport() {
 //    Lee baseline_date (día planeado original) vs date (real) de weekly_activities. NO escribe data.
 // ════════════════════════════════════════════════════════════
 const wpDevState = { house: 'all' };
-function wpDaysDiff(a, b) { if (!a || !b) return 0; return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000); }
+function wpDaysDiff(a, b) {
+  if (!a || !b) return 0;
+  let start = new Date(a + 'T00:00:00'), end = new Date(b + 'T00:00:00');
+  const sign = end < start ? -1 : 1; if (sign < 0) { const t = start; start = end; end = t; }
+  let count = 0; const cur = new Date(start);
+  while (cur < end) { cur.setDate(cur.getDate() + 1); if (cur.getDay() !== 0) count++; } // no cuenta domingos
+  return sign * count;
+}
 function wpHouseNameOf(a) { return a.property_name || ((wpState.projects || []).find(p => p.id === a.project_id) || {}).name || '—'; }
 
 function wpCalcDeviation(houseFilter) {
