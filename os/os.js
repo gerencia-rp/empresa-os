@@ -27,6 +27,7 @@ const OS_EMPRESAS = {
   'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · SOW · cronogramas', apps: [
     { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
     { k: 'dashboard', name: 'Dashboard de Obras', icon: '▤', fn: "osOpenApp('remodelacion','dashboard')" },
+    { k: 'planner', name: 'Planner Semanal', icon: '🗓', fn: "osOpenApp('remodelacion','planner')" },
     { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('remodelacion','cronograma')" },
   ] },
   'educacion': { key: 'education', name: 'Educación', icon: '🎓', tag: 'Universidad de Real Estate', apps: [
@@ -611,7 +612,7 @@ function osAppView(comp) {
 // Apps que son SISTEMAS CLÁSICOS (viven en app.js, abren como modal/overlay) → tipo de sistema.
 const OS_APP_SYS = {
   'rentas/property-manager': 'pm-rental-mgmt', 'rentas/cronograma': 'cronograma',
-  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/dashboard': 'remodel-dashboard', 'remodelacion/cronograma': 'cronograma',
+  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/dashboard': 'remodel-dashboard', 'remodelacion/cronograma': 'cronograma', 'remodelacion/planner': 'weekly-planner',
   'educacion/manager': 'edu-manager', 'educacion/reportes': 'edu-reports',
 };
 function osOpenApp(empresa, app, fromRoute) {

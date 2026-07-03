@@ -906,7 +906,7 @@ function rmCalcProject() {
 // ─── DB ───
 async function rmLoadAll() {
   const [{ data: projects }, { data: houses }, dyn] = await Promise.all([
-    sb.from('remodel_projects').select('*').order('updated_at', { ascending: false }),
+    sb.from('remodel_projects').select('*').is('archived_at', null).order('updated_at', { ascending: false }),
     sb.from('remodel_calibration_houses').select('*').order('name'),
     sb.from('remodel_dynamic_benchmarks').select('*').then(r => r.data || []).catch(() => []),
     rmLoadCatalog(),           // S2-G4
@@ -2100,8 +2100,10 @@ function rmRenderProjects(body) {
 }
 
 async function rmDeleteProject(id) {
-  if (!confirm('¿Borrar este proyecto?')) return;
-  await sb.from('remodel_projects').delete().eq('id', id);
+  // SOFT-DELETE (causa raíz de la pérdida): archiva en vez de borrar en duro → reversible.
+  if (!confirm('¿Archivar este proyecto? (reversible — no se borra la data)')) return;
+  const { error } = await sb.from('remodel_projects').update({ archived_at: new Date().toISOString() }).eq('id', id);
+  if (error) { if (window.toast) toast('No pude archivar: ' + error.message, 'error'); return; }
   await rmLoadAll();
   rmRender();
 }

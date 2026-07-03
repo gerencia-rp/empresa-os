@@ -1256,9 +1256,11 @@ function openInternalSystem(sys) {
   if (sys.type === 'command-center') return openCommandCenter(sys);
   if (sys.type === 'ff-command-center') return openFFCommandCenter(sys);
   if (sys.type === 'cronograma') return openCronograma(sys);
-  // Cronogramas viejos (Juan Austin / Limpieza / Planner Semanal) → redirigen al unificado.
-  // "Juan" y "Limpieza" ahora son FILTROS de equipo dentro del Cronograma unificado.
-  if (sys.type === 'weekly-planner') return openCronograma(sys);
+  // Planner Semanal = PLAN DE OBRA (Excel del Estimador → calendario día a día por casa). Es su PROPIA
+  // pantalla (openWeeklyPlanner), NO el cronograma de operación. El commit 86b6fda la había redirigido
+  // por error a openCronograma → "desaparecía". Restaurado a su pantalla original.
+  if (sys.type === 'weekly-planner') return (typeof openWeeklyPlanner === 'function') ? openWeeklyPlanner(sys) : openCronograma(sys);
+  // Cronogramas viejos de OPERACIÓN (Juan Austin / Limpieza) sí son filtros del Cronograma unificado.
   if (sys.type === 'ops-planner') return openCronograma({ ...sys, name: 'Cronograma', _equipo: 'juan' });
   if (sys.type === 'cleaning-planner') return openCronograma({ ...sys, name: 'Cronograma', _equipo: 'limpieza' });
   if (sys.type === 'remodel-dashboard') return openRemodelDashboard(sys);
