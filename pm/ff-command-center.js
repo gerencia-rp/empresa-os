@@ -165,6 +165,7 @@ function ffInjectCSS() {
   #ff-overlay .ff-dq-rev{background:rgba(240,104,122,.16);color:var(--neg);border:1px solid rgba(240,104,122,.35)}
   #ff-overlay .ff-dq-nd{background:var(--glass);color:var(--mut);border:1px solid var(--glassb)}
   #ff-overlay .ff-dq-pre{background:rgba(231,182,94,.15);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
+  #ff-overlay .kficha{margin-top:8px;font-size:10px;font-weight:600;color:var(--a2);cursor:pointer;border-top:1px solid var(--glassb);padding-top:7px}#ff-overlay .kficha:hover{color:var(--a1)}
   #ff-overlay .ff-dqbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 16px;border-radius:13px;background:rgba(240,104,122,.08);border:1px solid rgba(240,104,122,.22)}
   #ff-overlay .ff-dqbar.clean{background:rgba(72,214,156,.08);border-color:rgba(72,214,156,.22)}
   #ff-overlay .ff-dqbar .t{font-size:12.5px;font-weight:700}#ff-overlay .ff-dqbar .d{font-size:11px;color:var(--mut)}
@@ -425,6 +426,7 @@ function ffKanCard(d) {
     <div class="krow"><span>${d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${(d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}">${d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
     <div class="kbar"><i style="width:${capturePct}%;background:${d.allInPct > 0.75 ? 'linear-gradient(90deg,var(--amber),var(--neg))' : 'linear-gradient(90deg,var(--a1),var(--a2))'}"></i></div>
     <div style="font-size:9px;color:var(--mut2);margin-top:4px">all-in ${Math.round(d.allInPct * 100)}% del ARV${d.invLabel ? ' · ' + FF_ESC(d.invLabel) : ''}</div>
+    <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${window.osSlug ? osSlug(d.address) : ''}')">🏠 Ver ficha de casa →</div>
   </div>`;
 }
 
