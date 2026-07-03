@@ -620,7 +620,7 @@ function ffSecUnderwriting(comp) {
     const monthlyNet = Math.max(1, Math.round(d.arv * 0.005)); // proxy neto mensual ~0.5% ARV
     const rec = d.deficit < 0 ? Math.round(-d.deficit / monthlyNet) : 0;
     return { ...d, roi, rec: d.deficit < 0 ? rec : null };
-  }).sort((a, b) => (b.rec || 0) - (a.rec || 0));
+  }).sort((a, b) => (a.dq.revisar - b.dq.revisar) || ((b.rec || 0) - (a.rec || 0))); // datos a revisar al fondo
   // Ingeniería inversa: casas que NO nacen en déficit (net ≥ -15k) → su fórmula de draw.
   const sanas = deals.filter(d => d.dr && Number(d.dr.net_total) > -15000).sort((a, b) => Number(b.dr.net_total) - Number(a.dr.net_total)).slice(0, 6);
   return `${ffHeader('Underwriting', 'Calculadoras', 'Todas leen de la base — elegí un deal para autocompletar. MAO, remodelación calibrada, HML, refi, ROI y recuperación del déficit.')}
@@ -654,7 +654,10 @@ function ffSecUnderwriting(comp) {
     </div>
     <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">ROI y recuperación del déficit</div><div class="k">semáforo: &lt;12m 🟢 · 12–36m 🟡 · &gt;36m 🔴 (neto mensual ~0.5% ARV)</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Estrat.</th><th>All-in</th><th>Margen/Equity</th><th>ROI</th><th>Déficit</th><th>Recuperación</th></tr></thead><tbody>
-      ${recRows.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td>${Math.round(d.roi * 100)}%</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${d.rec != null ? `<span style="color:${semColor(d.rec)};font-weight:700">${d.rec} meses</span>` : '<span class="up">sin déficit ✓</span>'}</td></tr>`).join('')}</tbody></table></div></div>`;
+      ${recRows.map(d => d.dq.revisar
+        ? `<tr style="opacity:.75"><td>${FF_ESC(ffShort(d.address))} ${ffDQBadge(d.dq)}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td style="color:var(--mut2)">${FF_MONEY(d.margin)}</td><td style="color:var(--mut2)">—</td><td style="color:var(--mut2)">—</td><td><span style="color:var(--neg);font-weight:700">excluido</span></td></tr>`
+        : `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td>${Math.round(d.roi * 100)}%</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${d.rec != null ? `<span style="color:${semColor(d.rec)};font-weight:700">${d.rec} meses</span>` : '<span class="up">sin déficit ✓</span>'}</td></tr>`).join('')}</tbody></table>
+        <div class="meta" style="margin-top:8px">Las filas <b>⚠ dato a revisar</b> (all-in &gt; 100% del ARV) se excluyen del ROI y del semáforo — el margen/déficit está distorsionado por el error de carga.</div></div></div>`;
 }
 function ffUwIn(id, label, val) { return `<div class="uwrow"><label>${label}</label><input id="ff-${id}" value="${val === '' || val == null ? '' : val}" oninput="ffUwCalc()" inputmode="decimal"></div>`; }
 function ffUwPick(id) { FF.uw = FF.uw || {}; FF.uw.dealId = id || null; ffRender(); }
