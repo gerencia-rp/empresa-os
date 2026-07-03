@@ -749,6 +749,7 @@ const rmFmt2 = n => '$' + (n || 0).toFixed(2);
 const rmEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function rmFmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('es-MX', {day:'numeric', month:'short'}); }
+function rmAddWorkDays(start, n) { let d = new Date(start); let added = 0; while (added < n) { d.setDate(d.getDate() + 1); const dw = d.getDay(); if (dw !== 0 && dw !== 6) added++; } while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1); return d; }
 function rmAddDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 
 // ─── S3-G3 · CPM (Critical Path Method) ───
@@ -3540,7 +3541,7 @@ async function rmAutoGenPlanner(projectId, projectName) {
     if (cfg.start_offset) activityStart = rmAddDays(activityStart, cfg.start_offset);
     const days = cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)));
     for (let i = 0; i < Math.min(days, 30); i++) {
-      const date = rmAddDays(activityStart, i);
+      const date = rmAddWorkDays(activityStart, i);
       const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
       inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', is_critical: !!(e.cpm && e.cpm.criticalPath && e.cpm.criticalPath.includes(code)), created_by: state.user.id });
     }
