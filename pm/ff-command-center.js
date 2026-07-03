@@ -9,7 +9,7 @@ const FF = {
 };
 window.FF = FF;
 
-const FF_MONEY = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n || 0)).toLocaleString('en-US');
+const FF_MONEY = n => posMoney(n); // #10: formato único compartido
 const FF_K = n => { const a = Math.abs(n); return (n < 0 ? '-$' : '$') + (a >= 1000 ? (a / 1000).toFixed(a >= 100000 ? 0 : 1) + 'k' : Math.round(a)); };
 const FF_ESC = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const FF_STAGES = [

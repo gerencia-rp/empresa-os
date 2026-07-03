@@ -3,11 +3,11 @@
 // Routing real (History API), 3 niveles + áreas transversales Operación/Contable.
 // Diseño Property OS (dark/light vía pos-theme). SOLO LECTURA de datos (Airtable/QuickBooks).
 // ════════════════════════════════════════════════════════════════
-const OS = { route: { view: 'global' }, loaded: false, loadErr: null, ff: [], draws: [], props: [], units: [], pay: [], book: [], tenants: [], tasks: [], investors: [], _charts: [], chat: [] };
+const OS = { route: { view: 'global' }, loaded: false, loadErr: null, ff: [], draws: [], props: [], units: [], pay: [], book: [], tenants: [], tasks: [], investors: [], remodel: [], edu: null, _charts: [], chat: [] };
 window.OS = OS;
 
-const OS_M = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n || 0)).toLocaleString('en-US');
-const OS_K = n => { const a = Math.abs(n); return (n < 0 ? '-$' : '$') + (a >= 1000 ? (a / 1000).toFixed(a >= 100000 ? 0 : 1) + 'k' : Math.round(a)); };
+const OS_M = n => posMoney(n);              // #10: formato único (exacto con separador)
+const OS_K = n => posMoneyK(n);             // #10: formato único (compacto $X.XXM / $XXXk)
 const OS_E = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function osAx() { return posGetTheme() === 'light' ? '#64748b' : '#5b6780'; }
 
@@ -238,7 +238,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units').eq('active', true),
@@ -248,9 +248,12 @@ async function osLoad() {
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
+      sb.from('remodel_at_properties').select('proceso,avance_pct,ganancia,fecha_real_fin'),
+      sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
     ]);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
     OS.book = book.data || []; OS.tenants = tenants.data || []; OS.tasks = tasks.data || []; OS.investors = inv.data || [];
+    OS.remodel = remodel.data || []; OS.edu = (edu.data && edu.data[0]) || null;
     OS.loaded = true;
   } catch (e) { OS.loadErr = e.message || String(e); }
 }
@@ -322,6 +325,13 @@ function osCompute() {
     rentas: { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
     cobranza,
     holding: { capital: ffCapital, arv: ffArv, unidades: totalU + ff.length, ingresosMes: rentInc, deudaCobranza: cobranza.total },
+    remodel: {
+      obras: OS.remodel.length,
+      activas: OS.remodel.filter(o => !o.fecha_real_fin).length,
+      avance: (() => { const a = OS.remodel.map(o => Number(o.avance_pct || 0)).filter(x => x > 0); return a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : 0; })(),
+      ganancia: OS.remodel.reduce((s, o) => s + Number(o.ganancia || 0), 0),
+    },
+    educacion: OS.edu ? { activos: Number(OS.edu.activos || 0), conPlan: Number(OS.edu.con_plan_activo || 0), nuevos: Number(OS.edu.nuevos_30d || 0), antiguedad: Math.round(Number(OS.edu.antiguedad_promedio_dias || 0)) } : null,
   };
 }
 function osCobranza(mb) {
@@ -402,8 +412,8 @@ function osGlobal(comp) {
       <div><div class="grid k2 units">
         ${unitCard('fix-and-flip', OS_EMPRESAS['fix-and-flip'], `<div class="kv"><span>Capital</span><b>${OS_K(comp.ff.capital)}</b></div><div class="kv"><span>Deals</span><b>${comp.ff.deals}</b></div>`)}
         ${unitCard('rentas', OS_EMPRESAS['rentas'], `<div class="kv"><span>Ocupación</span><b>${comp.rentas.occPct}%</b></div><div class="kv"><span>Ingresos/mes</span><b>${OS_K(comp.rentas.ingresos)}</b></div>`)}
-        ${unitCard('remodelacion', OS_EMPRESAS['remodelacion'], `<div class="kv"><span>Obras</span><b>—</b></div>`)}
-        ${unitCard('educacion', OS_EMPRESAS['educacion'], `<div class="kv"><span>Programa</span><b>—</b></div>`)}
+        ${unitCard('remodelacion', OS_EMPRESAS['remodelacion'], `<div class="kv"><span>Obras activas</span><b>${comp.remodel.activas}</b></div><div class="kv"><span>Avance prom.</span><b>${comp.remodel.avance}%</b></div>`)}
+        ${unitCard('educacion', OS_EMPRESAS['educacion'], `<div class="kv"><span>Alumnos activos</span><b>${comp.educacion ? comp.educacion.activos : '—'}</b></div><div class="kv"><span>Nuevos (30d)</span><b>${comp.educacion ? comp.educacion.nuevos : '—'}</b></div>`)}
       </div>
       <div class="grid k2" style="margin-top:16px">
         <div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>
@@ -419,9 +429,12 @@ function osGlobal(comp) {
 
 // ─── NIVEL 2 · EMPRESA ───
 function osEmpresa(comp) {
-  const e = OS_EMPRESAS[OS.route.empresa]; const isFF = OS.route.empresa === 'fix-and-flip', isR = OS.route.empresa === 'rentas';
+  const e = OS_EMPRESAS[OS.route.empresa]; const emp = OS.route.empresa;
+  const isFF = emp === 'fix-and-flip', isR = emp === 'rentas', isRemo = emp === 'remodelacion', isEdu = emp === 'educacion';
   const kpis = isFF ? [['Deals activos', comp.ff.activos, `de ${comp.ff.deals} totales`], ['Capital desplegado', OS_M(comp.ff.capital), 'all-in (compra+remod+holding)'], ['ARV portafolio', OS_M(comp.ff.arv), ''], ['Alertas', comp.ff.alertas || '—', 'mismo conteo que el Command Center']]
     : isR ? [['Ocupación', comp.rentas.occPct + '%', `${comp.rentas.ocupadas}/${comp.rentas.unidades}`], ['Ingresos/mes', OS_M(comp.rentas.ingresos), comp.mb.label], ['Casas', comp.rentas.casas, ''], ['Deuda cobranza', OS_M(comp.cobranza.total), 'contrato − real']]
+    : isRemo ? [['Obras activas', comp.remodel.activas, `de ${comp.remodel.obras} totales`], ['Avance promedio', comp.remodel.avance + '%', 'de las obras'], ['Ganancia proyectada', OS_M(comp.remodel.ganancia), 'valor − costos'], ['Obras totales', comp.remodel.obras, 'histórico']]
+    : isEdu ? (comp.educacion ? [['Alumnos activos', comp.educacion.activos, `${comp.educacion.conPlan} con plan`], ['Nuevos (30d)', comp.educacion.nuevos, ''], ['Antigüedad prom.', comp.educacion.antiguedad + 'd', 'en el programa'], ['Con plan activo', comp.educacion.conPlan, `de ${comp.educacion.activos}`]] : [['Sin datos', '—', 'no hay snapshot de educación cargado']])
     : [['—', '—', 'datos próximamente']];
   return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag}</div>
     <div class="grid k4">${kpis.map(k => `<div class="card"><div class="lab">${k[0]}</div><div class="big">${k[1]}</div><div class="meta">${k[2]}</div></div>`).join('')}</div>
