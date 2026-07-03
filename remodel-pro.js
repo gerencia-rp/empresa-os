@@ -1281,6 +1281,7 @@ async function rmSaveProject() {
 
 async function rmLoadProject(p) {
   rmState.currentProject = p;
+  rmState.obraPro = null;
   await Promise.all([
     rmLoadActuals(p.id),
     rmLoadVersionsAndCOs(p.id),
@@ -1394,6 +1395,7 @@ function rmRender() {
     { id: 'seguimiento', label: '🔄 Seguimiento' },
     { id: 'gantt', label: '📅 Cronograma' },
     { id: 'sow', label: '📋 SOW (Lender)' },
+    { id: 'obrapro', label: '🏗 Obra Pro' },
     { id: 'versions', label: rmState.currentProject ? `📜 Historial (${rmState.versions.length}v · ${rmState.changeOrders.length}CO)` : '📜 Historial' },
     { id: 'crew', label: `👷 Crew (${rmState.crew.length})` },
     { id: 'purchases', label: '🛒 Lista compra' },
@@ -1532,6 +1534,7 @@ function rmRenderTab() {
   if (rmState.tab === 'seguimiento') return rmRenderSeguimiento(body);
   if (rmState.tab === 'gantt') return rmRenderGantt(body);
   if (rmState.tab === 'sow') return rmRenderSow(body);
+  if (rmState.tab === 'obrapro') return rmRenderObraPro(body);
   if (rmState.tab === 'versions') return rmRenderVersions(body);
   if (rmState.tab === 'crew') return rmRenderCrew(body);
   if (rmState.tab === 'purchases') return rmRenderPurchases(body);
@@ -3547,3 +3550,89 @@ async function rmAutoGenPlanner(projectId, projectName) {
   if (window.toast) toast(`Cronograma generado en el Planner (${inserts.length} actividades-día, con baseline).`, 'success');
 }
 window.rmAutoGenPlanner = rmAutoGenPlanner;
+
+// ════════════════════════════════════════════════════════════
+// 🏗 BLOQUE 4 — Obra Pro: hitos, inspecciones/hold points, punch list, calendario laboral
+// ════════════════════════════════════════════════════════════
+async function rmLoadObraPro(projectId) {
+  if (!projectId) { rmState.obraPro = { milestones: [], inspections: [], punch: [] }; return; }
+  const [m, i, pu] = await Promise.all([
+    sb.from('remodel_milestones').select('*').eq('project_id', projectId).is('archived_at', null).order('plan_date', { nullsFirst: false }).then(r => r.data || []).catch(() => []),
+    sb.from('remodel_inspections').select('*').eq('project_id', projectId).is('archived_at', null).order('plan_date', { nullsFirst: false }).then(r => r.data || []).catch(() => []),
+    sb.from('remodel_punch_list').select('*').eq('project_id', projectId).is('archived_at', null).order('created_at').then(r => r.data || []).catch(() => [])
+  ]);
+  rmState.obraPro = { milestones: m, inspections: i, punch: pu };
+}
+function rmRenderObraPro(body) {
+  if (!rmState.currentProject) { body.innerHTML = '<div class="text-center py-12 text-slate-500">Cargá un proyecto desde <b>📁 Proyectos</b> para su capa de obra (hitos, inspecciones, punch list).</div>'; return; }
+  if (!rmState.obraPro) { rmLoadObraPro(rmState.currentProject.id).then(() => rmRenderTab()); body.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">Cargando obra…</div>'; return; }
+  const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const { milestones, inspections, punch } = rmState.obraPro;
+  const dlt = (dp, dr) => dp && dr ? Math.round((new Date(dr) - new Date(dp)) / 86400000) : null;
+  const holdOpen = inspections.filter(i => i.hold_point && i.status !== 'aprobada').length;
+  body.innerHTML = `
+    <div class="space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-lg font-bold">🏗 Obra Pro — ${esc(rmState.editName || rmState.currentProject.name)}</h2>
+        ${holdOpen ? `<span class="text-xs bg-red-50 text-red-700 border border-red-200 rounded px-2 py-1 font-bold">⛔ ${holdOpen} hold point(s) sin aprobar — bloquean avance</span>` : '<span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-1 font-bold">✓ Sin hold points abiertos</span>'}
+      </div>
+
+      <div class="border border-slate-200 rounded-lg p-3">
+        <div class="flex items-center justify-between mb-2"><b class="text-sm">🎯 Hitos (plan vs real)</b><button onclick="rmAddMilestone()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Hito</button></div>
+        ${milestones.length ? `<table class="w-full text-xs"><thead><tr><th class="text-left p-1 text-slate-500">Hito</th><th class="text-left p-1 text-slate-500">Plan</th><th class="text-left p-1 text-slate-500">Real</th><th class="text-right p-1 text-slate-500">Desvío</th><th class="text-right p-1 text-slate-500">Draw</th><th class="p-1"></th></tr></thead><tbody>
+          ${milestones.map(m => { const d = dlt(m.plan_date, m.real_date); return `<tr class="border-t border-slate-100"><td class="p-1 font-semibold">${esc(m.nombre || m.tipo)}</td><td class="p-1">${m.plan_date || '—'}</td><td class="p-1">${m.real_date || '<span class="text-slate-400">pendiente</span>'}</td><td class="p-1 text-right ${d > 0 ? 'text-red-600' : d < 0 ? 'text-emerald-600' : ''}">${d != null ? (d > 0 ? '+' : '') + d + 'd' : '—'}</td><td class="p-1 text-right">${m.draw_amount ? '$' + Math.round(m.draw_amount).toLocaleString() : '—'}</td><td class="p-1 text-right"><button onclick="rmMilestoneReal('${m.id}')" class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 rounded font-bold" title="Marcar fecha real (hoy)">✓ real</button> <button onclick="rmArchiveObra('remodel_milestones','${m.id}')" class="text-[10px] text-red-500">🗑</button></td></tr>`; }).join('')}
+        </tbody></table>` : '<div class="text-xs text-slate-400">Sin hitos. Agregá permisos, inspecciones, pre-entrega, entrega.</div>'}
+        <div class="text-[10px] text-slate-400 mt-1">Draw schedule: cada hito puede tener su monto de draw (ligado a hitos).</div>
+      </div>
+
+      <div class="border border-slate-200 rounded-lg p-3">
+        <div class="flex items-center justify-between mb-2"><b class="text-sm">🔎 Inspecciones / Hold points</b><button onclick="rmAddInspection()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Inspección</button></div>
+        ${inspections.length ? `<table class="w-full text-xs"><thead><tr><th class="text-left p-1 text-slate-500">Etapa</th><th class="text-left p-1 text-slate-500">Tipo</th><th class="text-left p-1 text-slate-500">Hold</th><th class="text-left p-1 text-slate-500">Estado</th><th class="p-1"></th></tr></thead><tbody>
+          ${inspections.map(i => `<tr class="border-t border-slate-100"><td class="p-1">${esc(i.stage || '—')}</td><td class="p-1 font-semibold">${esc(i.tipo || '—')}</td><td class="p-1">${i.hold_point ? '⛔ sí' : 'no'}</td><td class="p-1"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${i.status === 'aprobada' ? 'bg-emerald-100 text-emerald-700' : i.status === 'rechazada' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">${i.status || 'pendiente'}</span></td><td class="p-1 text-right"><button onclick="rmInspStatus('${i.id}','aprobada')" class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 rounded font-bold">✓</button> <button onclick="rmInspStatus('${i.id}','rechazada')" class="text-[10px] bg-red-50 text-red-700 px-1.5 rounded font-bold">✗</button> <button onclick="rmArchiveObra('remodel_inspections','${i.id}')" class="text-[10px] text-red-500">🗑</button></td></tr>`).join('')}
+        </tbody></table>` : '<div class="text-xs text-slate-400">Sin inspecciones. Un hold point pendiente bloquea el avance de su etapa.</div>'}
+      </div>
+
+      <div class="border border-slate-200 rounded-lg p-3">
+        <div class="flex items-center justify-between mb-2"><b class="text-sm">📋 Punch list ${punch.filter(x => x.status === 'abierto').length ? `<span class="text-red-600">(${punch.filter(x => x.status === 'abierto').length} abiertos)</span>` : ''}</b><button onclick="rmAddPunch()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Ítem</button></div>
+        ${punch.length ? punch.map(p => `<div class="flex items-center justify-between text-xs py-1 border-t border-slate-100"><div><span class="font-semibold ${p.status === 'resuelto' ? 'line-through text-slate-400' : ''}">${esc(p.item)}</span> <span class="text-slate-400">· ${esc(p.stage || 's/etapa')}${p.severity === 'alta' ? ' · 🔴 alta' : ''}</span></div><div><button onclick="rmPunchToggle('${p.id}','${p.status === 'abierto' ? 'resuelto' : 'abierto'}')" class="text-[10px] ${p.status === 'abierto' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'} px-1.5 rounded font-bold">${p.status === 'abierto' ? '✓ resolver' : 'reabrir'}</button> <button onclick="rmArchiveObra('remodel_punch_list','${p.id}')" class="text-[10px] text-red-500">🗑</button></div></div>`).join('') : '<div class="text-xs text-slate-400">Sin ítems de punch list.</div>'}
+      </div>
+
+      <div class="border border-slate-200 rounded-lg p-3">
+        <div class="flex items-center justify-between mb-1"><b class="text-sm">📆 Calendario laboral</b><button onclick="rmAddHoliday()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Día no laborable</button></div>
+        <div class="text-[11px] text-slate-500">Los fines de semana + feriados cargados se excluyen de los días-plan del cronograma (días laborables reales).</div>
+      </div>
+    </div>`;
+}
+async function rmAddMilestone() {
+  const nombre = prompt('Hito (ej. Permiso de construcción, Inspección final, Entrega):'); if (!nombre) return;
+  const plan = prompt('Fecha planeada (YYYY-MM-DD, opcional):') || null;
+  const draw = prompt('Monto de draw asociado (opcional):'); 
+  await sb.from('remodel_milestones').insert({ project_id: rmState.currentProject.id, tipo: 'hito', nombre, plan_date: plan, draw_amount: draw ? +draw : null, created_by: state.user.id });
+  await rmLoadObraPro(rmState.currentProject.id); rmRenderTab();
+}
+async function rmMilestoneReal(id) { await sb.from('remodel_milestones').update({ real_date: new Date().toISOString().slice(0, 10), status: 'cumplido' }).eq('id', id); await rmLoadObraPro(rmState.currentProject.id); rmRenderTab(); }
+async function rmAddInspection() {
+  const tipo = prompt('Tipo de inspección (ej. Foundation, Rough-in, Final):'); if (!tipo) return;
+  const stage = prompt('Etapa (opcional):') || null;
+  const hold = confirm('¿Es hold point? (bloquea el avance hasta aprobar) — Aceptar = sí');
+  await sb.from('remodel_inspections').insert({ project_id: rmState.currentProject.id, tipo, stage, hold_point: hold, status: 'pendiente', created_by: state.user.id });
+  await rmLoadObraPro(rmState.currentProject.id); rmRenderTab();
+}
+async function rmInspStatus(id, status) { await sb.from('remodel_inspections').update({ status, real_date: new Date().toISOString().slice(0, 10) }).eq('id', id); await rmLoadObraPro(rmState.currentProject.id); rmRenderTab(); }
+async function rmAddPunch() {
+  const item = prompt('Ítem de punch list (ej. Retocar pintura baño):'); if (!item) return;
+  const stage = prompt('Etapa (opcional):') || null;
+  const sev = confirm('¿Severidad alta? Aceptar = alta') ? 'alta' : 'normal';
+  await sb.from('remodel_punch_list').insert({ project_id: rmState.currentProject.id, item, stage, severity: sev, status: 'abierto', created_by: state.user.id });
+  await rmLoadObraPro(rmState.currentProject.id); rmRenderTab();
+}
+async function rmPunchToggle(id, status) { await sb.from('remodel_punch_list').update({ status }).eq('id', id); await rmLoadObraPro(rmState.currentProject.id); rmRenderTab(); }
+async function rmAddHoliday() {
+  const fecha = prompt('Día no laborable (YYYY-MM-DD):'); if (!fecha) return;
+  const motivo = prompt('Motivo (feriado/lluvia/otro):') || 'feriado';
+  const { error } = await sb.from('remodel_calendar').upsert({ fecha, tipo: motivo, motivo }, { onConflict: 'fecha' });
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('Día no laborable agregado', 'success'); else alert('Agregado');
+}
+async function rmArchiveObra(table, id) { if (!confirm('¿Archivar? (reversible)')) return; await sb.from(table).update({ archived_at: new Date().toISOString() }).eq('id', id); await rmLoadObraPro(rmState.currentProject.id); rmRenderTab(); }
+window.rmAddMilestone = rmAddMilestone; window.rmMilestoneReal = rmMilestoneReal; window.rmAddInspection = rmAddInspection; window.rmInspStatus = rmInspStatus; window.rmAddPunch = rmAddPunch; window.rmPunchToggle = rmPunchToggle; window.rmAddHoliday = rmAddHoliday; window.rmArchiveObra = rmArchiveObra;
