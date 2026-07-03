@@ -50,21 +50,24 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names] = await Promise.all([
+    const [p, a, l, names, crews] = await Promise.all([
       sb.from('remodel_at_properties').select('*').order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
-      sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => [])
+      sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => []),
+      sb.from('remodel_crew_rates').select('airtable_id, nombre').then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
+    (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
     RC.obras = (p.data || []).map(o => ({ ...o, lider: rcResolveName(o.lider) }));
     RC.alerts = a.data || [];
     RC.syncLog = (l.data && l.data[0]) || null;
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
-  if (Array.isArray(v)) return v.map(rcResolveName).join(', ');
-  if (typeof v === 'string' && /^rec[A-Za-z0-9]{14}$/.test(v)) return RC.names[v] || v;
+  if (Array.isArray(v)) return v.map(rcResolveName).filter(Boolean).join(', ');
+  if (typeof v === 'string' && v.includes(',')) return v.split(',').map(x => rcResolveName(x.trim())).filter(Boolean).join(', ');
+  if (typeof v === 'string' && /^rec[A-Za-z0-9]{14,20}$/.test(v)) return RC.names[v] || v;
   return v || '';
 }
 
@@ -115,7 +118,24 @@ function rcCompute() {
       if (d > 10) compAlerts.push({ sev: 'y', obra: rcShort(o.address), t: `Cerró con ${d} días de atraso (estimado ${fe}, real ${fr}).` });
     }
   });
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  // C) ESTIMADO vs REAL por casa (finalizadas confiables): presupuesto (est) vs monto_real (real)
+  const evr = fin.filter(o => (+o.presupuesto_interno || 0) > 0 && ((+o.monto_real || o.dq.gasto) > 0)).map(o => {
+    const est = +o.presupuesto_interno || 0, real = +o.monto_real || o.dq.gasto;
+    return { address: rcShort(o.address), lider: (o.lider || '—'), est, real, devAbs: real - est, devPct: Math.round((real - est) / est * 100), devDias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null };
+  });
+  const evrTot = { est: evr.reduce((s, x) => s + x.est, 0), real: evr.reduce((s, x) => s + x.real, 0) };
+  evrTot.devAbs = evrTot.real - evrTot.est; evrTot.devPct = evrTot.est > 0 ? Math.round(evrTot.devAbs / evrTot.est * 100) : 0;
+  const topDesv = [...evr].sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct)).slice(0, 8);
+  const desvCostoProm = evr.length ? Math.round(evr.reduce((s, x) => s + x.devPct, 0) / evr.length) : 0;
+  const _dias = fin.map(o => o.retraso_dias).filter(d => d != null).map(Number);
+  const desvDiasProm = _dias.length ? Math.round(_dias.reduce((s, x) => s + x, 0) / _dias.length) : 0;
+  const _rent = fin.map(o => o.rentabilidad).filter(r => r != null).map(Number);
+  const rentProm = _rent.length ? +(_rent.reduce((s, x) => s + x, 0) / _rent.length).toFixed(1) : 0;
+  const _conDias = fin.filter(o => o.retraso_dias != null);
+  const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
+  const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
+  const gastoTipo = { material: matHist, labor: labHist, total: matHist + labHist };
+  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -128,6 +148,9 @@ function rcInsights(c) {
   }
   if (c.pipelineProj > 0) ins.push({ s: 'b', t: `Pipeline proyectado de <b>${RC_M(c.pipelineProj)}</b> en ${c.activas.length} obra(s) en curso — <b>proyectado, aún no realizado</b>.` });
   if (c.sinDatosN > 0) ins.push({ s: 'y', t: `${c.sinDatosN} obra(s) sin datos de gasto/valor — cargar en Airtable para incluir en KPIs.` });
+  if (c.desvCostoProm > 5) ins.push({ s: 'r', t: `Desviación de costo promedio <b>+${c.desvCostoProm}%</b> sobre presupuesto. Recomendación: recalibrar el Estimador (revisá $/sqft por etapa) y apretar cotización de material.` });
+  if (c.desvDiasProm > 7) ins.push({ s: 'y', t: `Atraso promedio <b>+${c.desvDiasProm} días</b> vs estimado. Recomendación: sumar buffer de inspecciones/lead-times al cronograma.` });
+  if (c.topDesv[0] && Math.abs(c.topDesv[0].devPct) > 20) ins.push({ s: 'r', t: `Mayor desvío: <b>${RC_E(c.topDesv[0].address)}</b> (${c.topDesv[0].devPct > 0 ? '+' : ''}${c.topDesv[0].devPct}% vs presupuesto). Revisar carga o alcance.` });
   ins.push({ s: 'g', t: `Ganancia histórica realizada: <b>${RC_M(c.gananciaHist)}</b> en ${c.fin.length} obras finalizadas (margen ${c.margenHist}%).` });
   return ins;
 }
@@ -151,6 +174,7 @@ window.rcPull = rcPull;
 // ─── Render ───
 const RC_NAV = [
   ['command', '◆', 'Command Center'],
+  ['evr', '⇄', 'Estimado vs Real'],
   ['obras', '▤', 'Obras'],
   ['lideres', '◈', 'Líderes'],
   ['cerebro', '✦', 'Cerebro de obra'],
@@ -161,7 +185,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, obras: rcSecObras, lideres: rcSecLideres, cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
@@ -177,7 +201,7 @@ function rcSidebar(c) {
 }
 function rcHeader(title, sub) {
   return `<div class="top"><div><h1><span>${title}</span></h1><div class="sub">${sub}</div></div>
-    <div class="pills"><span class="pill"><span class="cdot"></span>Airtable en vivo</span><button id="rc-pull" class="pullbtn" onclick="rcPull()">↻ Pull Airtable</button></div></div>`;
+    <div class="pills"><span class="pill"><span class="cdot"></span>Airtable en vivo</span><button class="pullbtn" style="background:var(--glass);color:var(--ink);border:1px solid var(--glassb)" onclick="rcExportCSV()">⤓ Exportar</button><button id="rc-pull" class="pullbtn" onclick="rcPull()">↻ Pull Airtable</button></div></div>`;
 }
 
 function rcSecCommand(c) {
@@ -188,6 +212,12 @@ function rcSecCommand(c) {
       <div class="card kpi"><div class="lab">Obras en curso</div><div class="big">${c.activas.length}</div><div class="meta">avance promedio ${c.avgAvance}%</div></div>
       <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big">${RC_K(c.capitalActivo)}</div><div class="meta">en obras activas · presup. ${RC_K(c.presupActivo)}</div></div>
       <div class="card kpi"><div class="lab">Pipeline <span class="warn">proyectado</span></div><div class="big warn">${RC_K(c.pipelineProj)}</div><div class="meta">NO realizado · ${c.pipeline.length} en pre-construcción</div></div>
+    </div>
+    <div class="grid kpis" style="margin-top:14px">
+      <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">histórico (${c.fin.length} finalizadas)</div></div>
+      <div class="card kpi"><div class="lab">Desviación de costo prom</div><div class="big ${c.desvCostoProm>0?'down':'up'}">${c.desvCostoProm>0?'+':''}${c.desvCostoProm}%</div><div class="meta">real vs presupuesto · ${c.enPresupPct}% en presup.</div></div>
+      <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">${c.aTiempoPct}% a tiempo</div></div>
+      <div class="card kpi"><div class="lab">Alertas</div><div class="big ${c.compAlerts.length?'down':'up'}">${c.compAlerts.length}</div><div class="meta">sobre-presupuesto / atraso</div></div>
     </div>
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Alertas críticas</div><div class="k">${c.compAlerts.length} activas</div></div>
@@ -263,3 +293,45 @@ async function rcAsk(q) {
   rcRenderChat();
 }
 window.rcAsk = rcAsk;
+
+// ─── C) Sección Estimado vs Real ───
+function rcSecEvR(c) {
+  const chip = pct => pct > 5 ? `<span class="down">+${pct}%</span>` : pct < -5 ? `<span class="up">${pct}%</span>` : `<span>${pct > 0 ? '+' : ''}${pct}%</span>`;
+  const gt = c.gastoTipo, matPct = gt.total ? Math.round(gt.material / gt.total * 100) : 0;
+  const rows = [...c.evr].sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct));
+  return rcHeader('Estimado vs Real', 'Presupuesto (estimado) vs monto real por casa — desviación $ y %, y días estimados vs reales. Guard: solo finalizadas confiables.') + `
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">Presupuesto (estimado)</div><div class="big">${RC_K(c.evrTot.est)}</div><div class="meta">${c.evr.length} obras</div></div>
+      <div class="card kpi"><div class="lab">Monto real</div><div class="big">${RC_K(c.evrTot.real)}</div><div class="meta">gastado real</div></div>
+      <div class="card kpi"><div class="lab">Desviación $</div><div class="big ${c.evrTot.devAbs > 0 ? 'down' : 'up'}">${c.evrTot.devAbs > 0 ? '+' : ''}${RC_K(c.evrTot.devAbs)}</div><div class="meta">real − estimado</div></div>
+      <div class="card kpi"><div class="lab">Desviación %</div><div class="big ${c.evrTot.devPct > 0 ? 'down' : 'up'}">${c.evrTot.devPct > 0 ? '+' : ''}${c.evrTot.devPct}%</div><div class="meta">agregado</div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">Top desviaciones — por casa</div><div class="k">${c.evr.length} finalizadas</div></div>
+        <table class="ptable"><thead><tr><th>Casa</th><th>Líder</th><th>Estimado</th><th>Real</th><th>Desv $</th><th>Desv %</th><th>Días</th><th>Rent.</th></tr></thead><tbody>
+        ${rows.length ? rows.map(x => `<tr><td><b>${RC_E(x.address)}</b></td><td>${RC_E(x.lider)}</td><td>${RC_M(x.est)}</td><td>${RC_M(x.real)}</td><td class="${x.devAbs > 0 ? 'down' : 'up'}">${x.devAbs > 0 ? '+' : ''}${RC_M(x.devAbs)}</td><td>${chip(x.devPct)}</td><td class="${(x.devDias || 0) > 0 ? 'down' : ''}">${x.devDias != null ? x.devDias + 'd' : '—'}</td><td class="${(x.rent || 0) >= 0 ? 'up' : 'down'}">${x.rent != null ? x.rent + '%' : '—'}</td></tr>`).join('') : '<tr><td colspan="8" class="meta" style="padding:16px">Sin finalizadas con presupuesto cargado.</td></tr>'}
+        </tbody></table></div>
+      <div class="card"><div class="chart-h"><div class="t">Gasto por tipo (histórico)</div></div>
+        <div class="krow"><span>Material</span><b>${RC_M(gt.material)} · ${matPct}%</b></div>
+        <div class="kbar"><i style="width:${matPct}%"></i></div>
+        <div class="krow" style="margin-top:12px"><span>Mano de obra</span><b>${RC_M(gt.labor)} · ${100 - matPct}%</b></div>
+        <div class="kbar"><i style="width:${100 - matPct}%;background:linear-gradient(90deg,var(--a3),var(--a2))"></i></div>
+        <div class="meta" style="margin-top:14px">Total gastado (finalizadas): <b>${RC_M(gt.total)}</b>.</div>
+        <div class="meta" style="margin-top:6px">% a tiempo: <b>${c.aTiempoPct}%</b> · % en presupuesto: <b>${c.enPresupPct}%</b></div>
+        <div class="meta" style="margin-top:6px">Estos agregados alimentan la calibración del Estimador (aprendizaje).</div>
+      </div>
+    </div>`;
+}
+
+// ─── C) Exportar reporte (CSV/Excel) ───
+function rcExportCSV() {
+  const c = rcCompute();
+  const rows = [['Casa', 'Lider', 'Estimado', 'Real', 'Desv $', 'Desv %', 'Dias atraso', 'Rentabilidad %']];
+  c.evr.forEach(x => rows.push([x.address, x.lider, x.est, x.real, x.devAbs, x.devPct, x.devDias == null ? '' : x.devDias, x.rent == null ? '' : x.rent]));
+  rows.push([], ['KPIs'], ['Ganancia historica', c.gananciaHist], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
+  const csv = rows.map(r => r.map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'remodelacion-estimado-vs-real.csv'; a.click(); URL.revokeObjectURL(url);
+  if (window.toast) toast('Reporte exportado (CSV / Excel)', 'success');
+}
+window.rcExportCSV = rcExportCSV;
