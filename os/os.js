@@ -28,6 +28,9 @@ const OS_EMPRESAS = {
     { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
     { k: 'dashboard', name: 'Dashboard de Obras', icon: '▤', fn: "osOpenApp('remodelacion','dashboard')" },
     { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('remodelacion','cronograma')" },
+    { k: 'clickup', name: 'ClickUp Análisis', icon: '📊', fn: "osOpenApp('remodelacion','clickup')" },
+    { k: 'airtable', name: 'Airtable Remodelación', icon: '🗂', ext: true, fn: "osOpenLink('Airtable Remodelacion')" },
+    { k: 'drive', name: 'Drive · Structure One', icon: '📁', ext: true, fn: "osOpenLink('Drive Compartida')" },
   ] },
   'educacion': { key: 'education', name: 'Educación', icon: '🎓', tag: 'Universidad de Real Estate', apps: [
     { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
@@ -611,7 +614,7 @@ function osAppView(comp) {
 // Apps que son SISTEMAS CLÁSICOS (viven en app.js, abren como modal/overlay) → tipo de sistema.
 const OS_APP_SYS = {
   'rentas/property-manager': 'pm-rental-mgmt', 'rentas/cronograma': 'cronograma',
-  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/dashboard': 'remodel-dashboard', 'remodelacion/cronograma': 'cronograma',
+  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/dashboard': 'remodel-dashboard', 'remodelacion/cronograma': 'cronograma', 'remodelacion/clickup': 'clickup-dashboard',
   'educacion/manager': 'edu-manager', 'educacion/reportes': 'edu-reports',
 };
 function osOpenApp(empresa, app, fromRoute) {
@@ -626,6 +629,18 @@ function osOpenApp(empresa, app, fromRoute) {
   if (sysType) return osOpenSystem(sysType, empresa);
 }
 window.osOpenApp = osOpenApp;
+
+// Links externos (Airtable / Drive): la URL vive en la config del sistema (tabla `systems`) → se lee de ahí, no se hardcodea.
+function osOpenExternal(url) { if (url) window.open(url, '_blank', 'noopener'); }
+function osOpenLink(nameLike) {
+  const sysMap = (typeof state !== 'undefined' && state && state.systems) || {};
+  for (const list of Object.values(sysMap)) {
+    const s = (list || []).find(x => x.type === 'link' && (x.name || '').toLowerCase().includes(String(nameLike).toLowerCase()) && x.config && x.config.url);
+    if (s) return osOpenExternal(s.config.url);
+  }
+  if (window.toast) toast('No encontré ese link en tu cuenta todavía.', 'error');
+}
+window.osOpenExternal = osOpenExternal; window.osOpenLink = osOpenLink;
 
 function osOpenSystem(sysType, empresaSlug) {
   // Busca el sistema por TIPO en TODAS las áreas (state.systems se indexa por id de área real, no por empresa).
