@@ -759,7 +759,7 @@ window.pmSetTab = pmSetTab;
 // ════════════════════════════════════════════════════════════════
 const PM_ES_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const PM_ES_MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-function pmMoney(v){ const n=Math.round(Number(v)||0); return (n<0?'-$':'$')+Math.abs(n).toLocaleString(); }
+function pmMoney(v){ return posMoney(v); } // #10: formato único compartido
 function pmInMonth(iso,y,m){ if(!iso) return false; return String(iso).slice(0,7) === `${y}-${String(m+1).padStart(2,'0')}`; }
 function pmPayrollForMonth(y,m){
   return (pmaState.payroll||[]).filter(p=>Number(p.year)===y && PM_ES_MONTHS.indexOf((p.month||'').toLowerCase())===m)

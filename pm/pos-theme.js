@@ -3,6 +3,23 @@
 // Lo usan los Command Center de Rentas (#cc-overlay) y Fix & Flip (#ff-overlay).
 // El CSS de cada uno define overrides con [data-theme="light"].
 // ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+// 💲 FORMATO DE NÚMEROS ÚNICO para TODA la app (#10). Fuente única, agnóstica al módulo.
+//   posMoney(n)  → exacto con separador de miles: $7,509,362 · -$1,650
+//   posMoneyK(n) → compacto: $7.51M / $146k / $17.4k / $850 (KPIs, headlines)
+//   Los helpers de cada módulo (pmMoney, FF_MONEY, OS_M, OS_K) delegan acá.
+// ════════════════════════════════════════════════════════════════
+window.posMoney = function (n) {
+  const x = Math.round(Number(n) || 0);
+  return (x < 0 ? '-$' : '$') + Math.abs(x).toLocaleString('en-US');
+};
+window.posMoneyK = function (n) {
+  const neg = Number(n) < 0 ? '-' : ''; const a = Math.abs(Number(n) || 0);
+  if (a >= 1e6) return neg + '$' + (a / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';   // $7.51M / $2M
+  if (a >= 1e5) return neg + '$' + Math.round(a / 1e3) + 'k';                          // $146k
+  if (a >= 1e3) return neg + '$' + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';     // $17.4k
+  return neg + '$' + Math.round(a).toLocaleString('en-US');                            // $850
+};
 window.posGetTheme = function () { try { return localStorage.getItem('pos-theme') || 'dark'; } catch (e) { return 'dark'; } };
 // Estado de tema UNIFICADO: <html data-osreskin data-theme> es la fuente única para
 // login + shell viejo + sistemas clásicos. Los overlays (OS/CC/FF) usan además su
