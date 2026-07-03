@@ -3539,7 +3539,7 @@ async function rmAutoGenPlanner(projectId, projectName) {
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = rmAddDays(activityStart, i);
       const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
-      inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', created_by: state.user.id });
+      inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', is_critical: !!(e.cpm && e.cpm.criticalPath && e.cpm.criticalPath.includes(code)), created_by: state.user.id });
     }
   });
   if (!inserts.length) return;
