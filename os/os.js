@@ -508,7 +508,15 @@ function osSlug(addr) { return String(addr || '').toLowerCase().trim().replace(/
 window.osSlug = osSlug;
 const OS_STAGE_LBL = { adquirida: 'Adquirida', en_rehab: 'En rehab', en_venta: 'En venta', rentada: 'Rentada', refinanciada: 'Refinanciada', vendida: 'Vendida' };
 function osOpenFicha(slug) {
-  try { document.getElementById('ff-overlay')?.remove(); document.getElementById('cc-overlay')?.remove(); FF && (FF.sys = null); } catch (e) {}
+  if (!slug) return;
+  // cerrar overlays (CC/FF) y el sistema clásico (PM/Remodel) si están abiertos como página
+  try { document.getElementById('ff-overlay')?.remove(); document.getElementById('cc-overlay')?.remove(); if (window.FF) FF.sys = null; } catch (e) {}
+  try {
+    OS._classicOpen = false;
+    document.getElementById('os-return-bar')?.remove();
+    const m = document.getElementById('modal'); if (m) { m.classList.remove('os-syspage'); if (!m.classList.contains('hidden')) m.classList.add('hidden'); }
+    const app = document.getElementById('app'); if (app) app.style.visibility = '';
+  } catch (e) {}
   const root = document.getElementById('os-root'); if (root) root.style.display = '';
   osNav('/casa/' + slug);
 }

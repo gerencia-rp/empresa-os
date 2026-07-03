@@ -1565,7 +1565,10 @@ function pmRenderPropertyDetail() {
 
   return `
     <div class="space-y-3 p-1">
-      <button onclick="pmaState.selectedPropertyId=null;pmRender()" class="text-xs text-slate-500 hover:text-slate-900">← Volver a propiedades</button>
+      <div class="flex items-center justify-between">
+        <button onclick="pmaState.selectedPropertyId=null;pmRender()" class="text-xs text-slate-500 hover:text-slate-900">← Volver a propiedades</button>
+        ${window.osOpenFicha ? `<button onclick="osOpenFicha('${window.osSlug ? osSlug(p.name) : ''}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">🏠 Ver ficha de casa (ciclo completo) →</button>` : ''}
+      </div>
 
       ${p.active === false ? `
         <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 text-amber-900 text-xs">

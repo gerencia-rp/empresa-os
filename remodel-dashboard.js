@@ -1650,7 +1650,10 @@ async function rdOpenObra(airtable_id) {
       <!-- Header -->
       <div class="bg-slate-900 text-white rounded-xl p-4">
         <div class="text-[10px] uppercase text-slate-400 font-bold">${p.proceso || 'Sin estado'}</div>
-        <div class="text-lg font-bold">${p.address}</div>
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="text-lg font-bold">${p.address}</div>
+          ${window.osOpenFicha ? `<button onclick="osOpenFicha('${window.osSlug ? osSlug(p.address) : ''}')" class="text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg px-3 py-1.5 whitespace-nowrap">🏠 Ver ficha de casa (ciclo completo) →</button>` : ''}
+        </div>
         <div class="text-xs text-slate-300 mt-1">Líder: ${p.lider || '—'} · Ciudad: ${p.city || '—'}</div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
           <div class="bg-slate-700/50 rounded p-2">
