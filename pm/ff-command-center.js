@@ -256,7 +256,7 @@ function ffCompute() {
     deficitAcum: confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
     marginPctAvg: activeConf.length ? activeConf.reduce((s, d) => s + d.marginPct, 0) / activeConf.length : 0,
     flips: deals.filter(d => d.isFlip).length, holds: deals.filter(d => d.strategy === 'hold').length,
-    investors: FF.investors.length,
+    investors: FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length, // sin la propia empresa (18)
     // Calidad de datos
     revisar: revisarList.length, sinDatos: deals.filter(d => d.dq.sinDatos).length,
     preliminar: deals.filter(d => d.dq.preliminar).length, confiablesN: confiables.length,
@@ -322,7 +322,7 @@ const FF_NAV = [
   ['deals', '▦', 'Deals & Pipeline', () => FF.deals.length],
   ['propiedades', '⌂', 'Propiedades', null],
   ['underwriting', '∑', 'Underwriting', null],
-  ['inversionistas', '◍', 'Inversionistas', () => FF.investors.length || null],
+  ['inversionistas', '◍', 'Inversionistas', () => FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length || null],
   ['finanzas', '$', 'Finanzas · QuickBooks', null],
   ['analitica', '▤', 'Analítica & KPIs', null],
   ['cerebro', '◆', 'Cerebro IA', null],

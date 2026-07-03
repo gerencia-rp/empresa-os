@@ -616,7 +616,7 @@ function pmRender() {
             ['properties','🏘️ Propiedades', pmaState.properties.length],
             ['calendar','📅 Calendario', ''],
             ['bookings','📋 Reservas', pmaState.bookings.length],
-            ['tenants','👥 Inquilinos', pmaState.tenants.length],
+            ['tenants','👥 Inquilinos', pmActiveBookings().length],
             ['payments','💵 Pagos', ''],
             ['expenses','📤 Gastos', ''],
             ['operations','🛠 Operación', ''],
