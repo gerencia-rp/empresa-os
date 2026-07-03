@@ -70,7 +70,7 @@ async function wpLoadAll() {
   const [
     resRes, actRes, projRes, catRes,
     // V2 — backlog, plantillas, recurrentes, all activities globales
-    blRes, ttRes, dtRes, rcRes, allActsRes, movRes, prRes
+    blRes, ttRes, dtRes, rcRes, allActsRes, movRes, prRes, wpPayRes
   ] = await Promise.all([
     sb.from('resources').select('*').eq('active', true).order('type').order('name'),
     sb.from('weekly_activities').select('*').gte('date', start).lte('date', end).order('date'),
@@ -82,10 +82,12 @@ async function wpLoadAll() {
     sb.from('wp_recurring').select('*').eq('active', true).then(r => r).catch(() => ({ data: [] })),
     sb.from('weekly_activities').select('*').then(r => r).catch(() => ({ data: [] })),
     sb.from('weekly_activity_moves').select('*').order('moved_at', { ascending: false }).limit(2000).then(r => r).catch(() => ({ data: [] })),
-    sb.from('remodel_project_resources').select('*').is('archived_at', null).then(r => r).catch(() => ({ data: [] }))
+    sb.from('remodel_project_resources').select('*').is('archived_at', null).then(r => r).catch(() => ({ data: [] })),
+    sb.from('remodel_worker_pay_summary').select('*').then(r => r).catch(() => ({ data: [] }))
   ]);
   wpState.moves = (movRes && movRes.data) || [];
   wpState.projectResources = (prRes && prRes.data) || [];
+  wpState.workerPay = (wpPayRes && wpPayRes.data) || [];
   wpState.resources = resRes.data || [];
   wpState.activities = allActsRes.data || actRes.data || [];  // usamos TODAS para soportar overdue global
   wpState.projects = projRes.data || [];
@@ -444,6 +446,7 @@ function wpRender() {
           ${conflicts.length ? `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold">⚠️ ${conflicts.length} conflictos</span>` : '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">✓ Sin conflictos</span>'}
           ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
           <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
+          <button onclick="wpOpenCrewPay()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Cuanto gana cada persona por propiedad — de Airtable">💵 Pago crew</button>
           <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
           <button onclick="wpToggleSidebar()" class="lg:hidden text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1.5 rounded font-bold" title="Mostrar/ocultar panel lateral">${wpState.sidebarHidden?'📂':'📁'}</button>
           <button onclick="wpOpenMonthView()" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-3 py-1.5 rounded font-bold" title="Vista mensual del calendario">📅 Mes</button>
@@ -5303,3 +5306,49 @@ function wpRenderDeviation() {
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-6xl'); }
 }
 window.wpRenderDeviation = wpRenderDeviation;
+
+// ─── BLOQUE 1.3: Pago por persona por propiedad (Crew × Hora — de Airtable Horas trabajadas/Cuadrillas) ───
+function wpOpenCrewPay(casaNorm) {
+  wpInjectTheme();
+  const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const money = n => '$' + Math.round(+n || 0).toLocaleString('en-US');
+  const pay = wpState.workerPay || [];
+  const casas = [...new Set(pay.map(p => p.casa_norm))].map(cn => ({ cn, name: (pay.find(p => p.casa_norm === cn) || {}).casa || cn })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  if (!pay.length) { openModal('💵 Pago crew', '<div id="wp-dev"><div class="dv-sec" style="text-align:center;color:var(--dmut);padding:30px">Sin datos de pago todavía. Corré el sync de trabajadores (Airtable → Supabase).</div></div>'); return; }
+  if (!casaNorm) {
+    const hf = wpState.houseFilter;
+    if (hf && hf !== 'all') {
+      const proj = (wpState.projects || []).find(p => p.id === hf);
+      const nm = proj ? proj.name : (hf.startsWith('name:') ? hf.slice(5) : '');
+      const n = String(nm).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const hit = casas.find(c => c.cn && (n.includes(c.cn) || c.cn.includes(n.slice(0, 6))));
+      casaNorm = hit && hit.cn;
+    }
+    casaNorm = casaNorm || (casas[0] && casas[0].cn);
+  }
+  const rows = pay.filter(p => p.casa_norm === casaNorm).sort((a, b) => (+b.pago || 0) - (+a.pago || 0));
+  const totalPago = rows.reduce((s, r) => s + (+r.pago || 0), 0);
+  const totalHoras = rows.reduce((s, r) => s + (+r.horas || 0), 0);
+  const avgH = totalHoras ? totalPago / totalHoras : 0;
+  const casaName = (casas.find(c => c.cn === casaNorm) || {}).name || '—';
+  const html = `<div id="wp-dev">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--dmut)">Cuánto gana cada persona en la obra (horas y total). Fuente: <b>Airtable — Horas trabajadas / Cuadrillas</b>.</div>
+      <select onchange="wpOpenCrewPay(this.value)" style="font-size:12px;padding:7px 10px;border-radius:9px;border:1px solid var(--dbord);background:var(--dglass);color:var(--dink)">${casas.map(c => `<option value="${esc(c.cn)}" ${c.cn === casaNorm ? 'selected' : ''}>🏠 ${esc(c.name)}</option>`).join('')}</select>
+    </div>
+    <div class="dv-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div class="dv-card"><div class="dv-lab">Pago total (obra)</div><div class="dv-big">${money(totalPago)}</div><div class="dv-meta">${rows.length} persona(s)</div></div>
+      <div class="dv-card"><div class="dv-lab">Horas totales</div><div class="dv-big">${Math.round(totalHoras).toLocaleString('en-US')}</div><div class="dv-meta">acumuladas</div></div>
+      <div class="dv-card"><div class="dv-lab">$/hora promedio</div><div class="dv-big">$${avgH.toFixed(1)}</div><div class="dv-meta">ponderado</div></div>
+    </div>
+    <div class="dv-sec"><h3>👷 Pago por persona — ${esc(casaName)}</h3>
+      <table><thead><tr><th>Persona</th><th>Semanas</th><th>Horas</th><th>$/hora</th><th>Pago total</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td><b>${esc(r.worker)}</b></td><td>${r.semanas || '—'}</td><td>${(+r.horas || 0).toFixed(1)}</td><td>$${(+r.x_hora || 0).toFixed(1)}</td><td><b>${money(r.pago)}</b></td></tr>`).join('')}
+      </tbody></table>
+    </div>
+    <div style="margin-top:12px"><button class="dv-back" onclick="wpBackToPlanner()">← Volver al Planner</button></div>
+  </div>`;
+  openModal(`💵 Pago crew — ${casaName}`, html);
+  const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
+}
+window.wpOpenCrewPay = wpOpenCrewPay;
