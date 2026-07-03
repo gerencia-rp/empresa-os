@@ -189,6 +189,7 @@ const RC_NAV = [
   ['evr', '⇄', 'Estimado vs Real'],
   ['obras', '▤', 'Obras'],
   ['lideres', '◈', 'Líderes'],
+  ['gestion', '◎', 'Gestión (EVM)'],
   ['cerebro', '✦', 'Cerebro de obra'],
 ];
 function rcRender() {
@@ -197,7 +198,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
@@ -355,3 +356,49 @@ function rcExportCSV() {
   if (window.toast) toast('Reporte exportado (CSV / Excel)', 'success');
 }
 window.rcExportCSV = rcExportCSV;
+
+// ─── F) Gestión (EVM): SPI/CPI por casa + agregados de calibración para el Estimador ───
+function rcEVM(o) {
+  const avance = +o.avance_pct || 0;
+  const cost = o.dq ? o.dq.gasto : ((+o.gasto_materiales || 0) + (+o.gasto_trabajadores || 0));
+  const presup = +o.presupuesto_interno || 0;
+  let timePct = null, spi = null, cpi = null;
+  if (o.fecha_inicio && o.fecha_estimada_fin) {
+    const total = (new Date(o.fecha_estimada_fin) - new Date(o.fecha_inicio)) / 86400000;
+    const elapsed = (Date.now() - new Date(o.fecha_inicio)) / 86400000;
+    if (total > 0) { timePct = Math.min(100, Math.max(0, elapsed / total * 100)); if (timePct > 0) spi = avance / timePct; }
+  }
+  if (presup > 0 && cost > 0 && avance > 0) cpi = (presup * avance / 100) / cost;
+  return { avance, timePct, spi, cpi };
+}
+function rcSecGestion(c) {
+  const rows = c.activas.map(o => ({ o, ...rcEVM(o) })).filter(x => x.spi != null || x.cpi != null);
+  const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+  const spiProm = avg(rows.map(r => r.spi).filter(v => v != null));
+  const cpiProm = avg(rows.map(r => r.cpi).filter(v => v != null));
+  const cal = c.fin.filter(o => (+o.sqft || 0) > 0 && ((+o.monto_real || o.dq.gasto) > 0) && (+o.presupuesto_interno || 0) > 0);
+  const realPsf = cal.length ? Math.round(avg(cal.map(o => (+o.monto_real || o.dq.gasto) / (+o.sqft)))) : 0;
+  const estPsf = cal.length ? Math.round(avg(cal.map(o => (+o.presupuesto_interno) / (+o.sqft)))) : 0;
+  return rcHeader('Gestión (EVM)', 'CPI/SPI por casa (obras en curso), avance físico vs planeado, y agregados de calibración listos para el Estimador.') + `
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">SPI promedio</div><div class="big ${(spiProm || 0) >= 1 ? 'up' : 'down'}">${spiProm != null ? spiProm.toFixed(2) : '—'}</div><div class="meta">cronograma (>1 adelantado)</div></div>
+      <div class="card kpi"><div class="lab">CPI promedio</div><div class="big ${(cpiProm || 0) >= 1 ? 'up' : 'down'}">${cpiProm != null ? cpiProm.toFixed(2) : '—'}</div><div class="meta">costo (>1 bajo presupuesto)</div></div>
+      <div class="card kpi"><div class="lab">% a tiempo</div><div class="big">${c.aTiempoPct}%</div><div class="meta">finalizadas</div></div>
+      <div class="card kpi"><div class="lab">% en presupuesto</div><div class="big">${c.enPresupPct}%</div><div class="meta">finalizadas</div></div>
+    </div>
+    <div class="grid row2">
+      <div class="card"><div class="chart-h"><div class="t">EVM por casa (en curso)</div><div class="k">${rows.length} obras</div></div>
+        <table class="ptable"><thead><tr><th>Casa</th><th>Físico %</th><th>Planeado %</th><th>SPI</th><th>CPI</th></tr></thead><tbody>
+        ${rows.length ? rows.map(x => `<tr><td><b>${RC_E(rcShort(x.o.address))}</b></td><td>${Math.round(x.avance)}%</td><td>${x.timePct != null ? Math.round(x.timePct) + '%' : '—'}</td><td class="${(x.spi || 0) >= 1 ? 'up' : 'down'}">${x.spi != null ? x.spi.toFixed(2) : '—'}</td><td class="${(x.cpi || 0) >= 1 ? 'up' : 'down'}">${x.cpi != null ? x.cpi.toFixed(2) : '—'}</td></tr>`).join('') : '<tr><td colspan="5" class="meta" style="padding:16px">Sin obras en curso con fechas y costo cargados.</td></tr>'}
+        </tbody></table></div>
+      <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Aprendizaje · calibración</b><span>DATO LISTO PARA EL ESTIMADOR</span></div></div>
+        <div class="krow"><span>$/sqft real (prom)</span><b>$${realPsf}</b></div>
+        <div class="krow"><span>$/sqft estimado (prom)</span><b>$${estPsf}</b></div>
+        <div class="krow"><span>Desviación de costo prom</span><b class="${c.desvCostoProm > 0 ? 'down' : 'up'}">${c.desvCostoProm > 0 ? '+' : ''}${c.desvCostoProm}%</b></div>
+        <div class="krow"><span>Desviación de días prom</span><b>${c.desvDiasProm > 0 ? '+' : ''}${c.desvDiasProm}d</b></div>
+        <div class="krow"><span>Ratio material histórico</span><b>${c.matPctHist}%</b></div>
+        <div class="meta" style="margin-top:12px">Agregados disponibles (vistas <b>remodel_obra_calibration</b> + <b>remodel_stage_deviation</b>) para calibrar el Estimador Pro (días/etapa, $/sqft). No se aplican automáticamente todavía.</div>
+      </div>
+    </div>`;
+}
+window.rcSecGestion = rcSecGestion;
