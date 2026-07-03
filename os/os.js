@@ -255,7 +255,7 @@ async function osLoad() {
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
-      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label'),
+      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label,sqft,retraso_dias,monto_por_gastar,rentabilidad,monto_real'),
       sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
     ]);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
@@ -521,7 +521,7 @@ const OS_STAGE_LBL = { adquirida: 'Adquirida', en_rehab: 'En rehab', en_venta: '
 function osOpenFicha(slug) {
   if (!slug) return;
   // cerrar overlays (CC/FF) y el sistema clásico (PM/Remodel) si están abiertos como página
-  try { document.getElementById('ff-overlay')?.remove(); document.getElementById('cc-overlay')?.remove(); if (window.FF) FF.sys = null; } catch (e) {}
+  try { document.getElementById('ff-overlay')?.remove(); document.getElementById('cc-overlay')?.remove(); document.getElementById('rc-overlay')?.remove(); if (window.FF) FF.sys = null; } catch (e) {}
   try {
     OS._classicOpen = false;
     document.getElementById('os-return-bar')?.remove();
@@ -576,6 +576,21 @@ function osCasa(comp) {
   const insights = osCasaInsights(m);
   const remoEnCurso = m.remodel && m.remodel.proceso !== 'Finalizado';
   const remoMat = m.remodel ? Number(m.remodel.gasto_materiales || 0) : 0, remoLab = m.remodel ? Number(m.remodel.gasto_trabajadores || 0) : 0;
+  const remoR = m.remodel || {};
+  const remoGasto = remoMat + remoLab;
+  const remoPresup = Number(remoR.presupuesto_interno || 0);
+  const remoReal = Number(remoR.monto_real || 0) || remoGasto;
+  const remoPctGast = remoPresup > 0 ? Math.round(remoReal / remoPresup * 100) : 0;
+  const remoRent = remoR.rentabilidad != null ? Number(remoR.rentabilidad) : null;
+  const remoRetraso = remoR.retraso_dias != null ? Number(remoR.retraso_dias) : null;
+  const remoDraws = Number(remoR.valor_cliente || 0);
+  const remoUtil = Number(remoR.ganancia || 0);
+  const _finR = (OS.remodel || []).filter(o => o.proceso === 'Finalizado');
+  const _tm = _finR.reduce((s, o) => s + Number(o.gasto_materiales || 0), 0), _tl = _finR.reduce((s, o) => s + Number(o.gasto_trabajadores || 0), 0);
+  const matRatio = (_tm + _tl) > 0 ? _tm / (_tm + _tl) : 0.47;
+  const estMat = remoPresup * matRatio, estLab = remoPresup * (1 - matRatio);
+  const devPct = (est, real) => est > 0 ? Math.round((real - est) / est * 100) : null;
+  const devBadge = (est, real) => { const d = devPct(est, real); return d == null ? '' : ` <span style="font-size:10px;color:${d > 5 ? 'var(--neg)' : d < -5 ? 'var(--pos)' : 'var(--mut)'}">(${d > 0 ? '+' : ''}${d}%)</span>`; };
   // etapas del ciclo (barra)
   const cycle = ['Adquirida', 'En rehab', 'Venta/Renta', 'Refi/Salida'];
   const cyIdx = m.ff ? ({ adquirida: 0, en_rehab: 1, en_venta: 2, rentada: 2, refinanciada: 3, vendida: 3 }[m.ff.stage] ?? 0) : (remoEnCurso ? 1 : (m.rentas ? 2 : 3));
@@ -591,8 +606,8 @@ function osCasa(comp) {
     <div class="grid k2" style="margin-top:12px">
       <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
         ${m.ff ? `${kv('Compra', OS_M(m.ff.purchase))}${kv('Remodelación (est/draws)', OS_M(m.ff.remComplete))}${kv('Holding', OS_M(m.ff.holding))}${kv('All-in', OS_M(m.ff.allIn), m.ff.dq.revisar ? 'down' : '')}${kv('ARV', OS_M(m.ff.arv))}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', OS_M(m.ff.arv * 0.75 - m.ff.remComplete - m.ff.holding))}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div>
-      <div class="card"><div class="chart-h"><div class="t">🔨 Remodelación</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
-        ${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · resultado preliminar</span></div>` : ''}${kv('Estado', OS_E(m.remodel.proceso || '—'))}${kv('Avance', Math.round(Number(m.remodel.avance_pct || 0)) + '%')}${kv('Líder', OS_E(m.remodel.lider || '—'))}${kv('Materiales', OS_M(remoMat))}${kv('Mano de obra', OS_M(remoLab))}${kv('Draws (mat+MO)', OS_M(remoMat + remoLab))}${kv('Inicio → fin est.', `${OS_E(m.remodel.fecha_inicio || 's/f')} → ${OS_E(m.remodel.fecha_estimada_fin || 's/f')}`)}${m.remodel.desviacion_label ? kv('Desvío', OS_E(m.remodel.desviacion_label), 'warn') : ''}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(Number(m.remodel.ganancia || 0)), remoEnCurso ? 'warn' : 'up')}` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div>
+      <div class="card"><div class="chart-h"><div class="t">🔨 Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
+        ${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E(remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
