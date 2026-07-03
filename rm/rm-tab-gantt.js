@@ -31,10 +31,13 @@ function rmRenderGantt(body) {
   body.innerHTML = `
     <div class="flex items-end justify-between mb-3 flex-wrap gap-2">
       <h2 class="text-lg font-bold">📅 Cronograma ${cpmOn?'CPM real':'lineal'} — ${rmState.editName || 'Proyecto'}</h2>
-      <!-- S3-G3 Toggle CPM -->
-      <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden text-xs">
-        <button onclick="rmState.cpmMode=false; rmRenderTab()" class="px-3 py-1.5 font-semibold ${!cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">📊 Lineal por fase</button>
-        <button onclick="rmState.cpmMode=true; rmRenderTab()" class="px-3 py-1.5 font-semibold ${cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">🔀 CPM avanzado</button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- S3-G3 Toggle CPM -->
+        <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden text-xs">
+          <button onclick="rmState.cpmMode=false; rmRenderTab()" class="px-3 py-1.5 font-semibold ${!cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">📊 Lineal por fase</button>
+          <button onclick="rmState.cpmMode=true; rmRenderTab()" class="px-3 py-1.5 font-semibold ${cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">🔀 CPM avanzado</button>
+        </div>
+        ${rmState.currentProject ? `<button onclick="rmSyncToPlanner()" class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Genera las actividades día a día en el Planner Semanal según estas etapas y días">📅 Enviar al Planner →</button>` : ''}
       </div>
     </div>
     ${cpmOn && cpmErr ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 mb-3">⚠️ ${cpmErr}. Revisá las dependencias en el tab Catálogo (probablemente hay un ciclo).</div>` : ''}
