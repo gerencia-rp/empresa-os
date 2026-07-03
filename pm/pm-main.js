@@ -484,6 +484,12 @@ function pmInjectTheme() {
   const D = 'html[data-osreskin="dark"] #pm-root';
   const st = document.createElement('style'); st.id = 'pm-theme-css';
   st.textContent = `
+  /* #13 sidebar (sub-nav vertical) — patrón unificado con Fix & Flip */
+  #pm-root .pm-nav{width:190px;position:sticky;top:0}
+  #pm-root .pm-navitem-active{background:rgba(16,185,129,.1);color:#0ea371 !important;box-shadow:inset 3px 0 0 #12b5a0}
+  html[data-osreskin="dark"] #pm-root .pm-navitem-active{background:rgba(69,227,198,.14);color:#45e3c6 !important;box-shadow:inset 3px 0 0 #45e3c6}
+  html[data-osreskin="dark"] #pm-root .pm-navitem:hover{background:rgba(255,255,255,.05) !important;color:#e7ecf5 !important}
+  @media (max-width:820px){#pm-root .pm-shell{flex-direction:column}#pm-root .pm-nav{width:100% !important;flex-direction:row !important;overflow-x:auto;position:static}}
   /* Solo lo específico de PM que el diseño compartido no cubre: clases propias + calendario inline */
   ${D} .pm-filter-select,${D} .pm-filter-select:hover{background:rgba(255,255,255,.05) !important;border-color:rgba(255,255,255,.14) !important;color:#e7ecf5 !important}
   ${D} .pm-filter-select.has-value{background:rgba(212,175,55,.16) !important;border-color:#d4af37 !important;color:#ecd28f !important}
@@ -608,9 +614,9 @@ function pmRender() {
     <div class="flex flex-col" style="min-height:60vh;">
       ${pmBreadcrumb()}
       ${pmRenderAlertsBar()}
-      <!-- Header con tabs -->
-      <div class="border-b border-slate-200 mb-3">
-        <div class="flex gap-1 -mb-px overflow-x-auto">
+      <!-- Layout: sidebar (sub-nav vertical) + contenido — patrón unificado con Fix & Flip (#13) -->
+      <div class="pm-shell flex gap-4 items-start">
+        <nav class="pm-nav shrink-0 flex flex-col gap-1">
           ${[
             ['dashboard','Resumen', ''],
             ['properties','🏘️ Propiedades', pmaState.properties.length],
@@ -622,14 +628,12 @@ function pmRender() {
             ['operations','🛠 Operación', ''],
             ['finance','💰 Finanzas', '']
           ].map(([k, label, count]) => `
-            <button onclick="pmSetTab('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${pmaState.tab===k?'border-emerald-500 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}">
-              ${label}${count!==''?` <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${count}</span>`:''}
+            <button onclick="pmSetTab('${k}')" class="pm-navitem text-left px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-between gap-2 whitespace-nowrap ${pmaState.tab===k?'pm-navitem-active':'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}">
+              <span>${label}</span>${count!==''?`<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${count}</span>`:''}
             </button>
           `).join('')}
-        </div>
-      </div>
-      <!-- Contenido del tab -->
-      <div class="flex-1 overflow-y-auto" style="max-height:75vh;">
+        </nav>
+        <div class="flex-1 min-w-0 overflow-y-auto" style="max-height:80vh;">
         ${pmaState.tab === 'dashboard'  ? pmRenderDashboard() : ''}
         ${pmaState.tab === 'properties' ? (pmaState.selectedPropertyId ? pmRenderPropertyDetail() : pmRenderPropertiesList()) : ''}
         ${pmaState.tab === 'calendar'   ? pmRenderCalendar() : ''}
@@ -639,6 +643,7 @@ function pmRender() {
         ${pmaState.tab === 'expenses'   ? pmRenderExpenses() : ''}
         ${pmaState.tab === 'operations' ? pmRenderOperations() : ''}
         ${pmaState.tab === 'finance'    ? pmRenderFinance() : ''}
+      </div>
       </div>
     </div>
     ${pmaState.ceoDetailKey ? pmRenderCeoDetailOverlay(pmaState.ceoDetailKey) : ''}

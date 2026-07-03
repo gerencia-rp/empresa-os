@@ -21,7 +21,7 @@ const FIELD_IDS = {
   interno: "fldsRWMQJ4Lv86GOU",
   presupuesto: "fldPMBhxLYr4TMje0",
   cliente: "fldAP3lI2FgXds14q",
-  ganancia: "fldjqSnHYrjkHtWRZ",
+  ganancia: "fldW26WBuAFPnWhi8",
   desviacion: "fldVgmxP8Z1xtdrmj",
   inicio: "fldG2SABUD5Ptcuj8",
   fin_estimado: "fldQtRD47N2jHaRyh",

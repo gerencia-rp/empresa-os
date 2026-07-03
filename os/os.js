@@ -330,12 +330,20 @@ function osCompute() {
     rentas: { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
     cobranza,
     holding: { capital: ffCapital, arv: ffArv, unidades: totalU + ff.length, ingresosMes: rentInc, deudaCobranza: cobranza.total },
-    remodel: {
-      obras: OS.remodel.length,
-      activas: OS.remodel.filter(o => !o.fecha_real_fin).length,
-      avance: (() => { const a = OS.remodel.map(o => Number(o.avance_pct || 0)).filter(x => x > 0); return a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : 0; })(),
-      ganancia: OS.remodel.reduce((s, o) => s + Number(o.ganancia || 0), 0),
-    },
+    remodel: (() => {
+      const fin = OS.remodel.filter(o => o.proceso === 'Finalizado');
+      const curso = OS.remodel.filter(o => o.proceso !== 'Finalizado');
+      const a = OS.remodel.map(o => Number(o.avance_pct || 0)).filter(x => x > 0);
+      return {
+        obras: OS.remodel.length,
+        activas: curso.length,
+        avance: a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : 0,
+        // DATA-GUARD (#2): la utilidad de obras en curso es PROYECTADA, no final → separada.
+        gananciaFinal: fin.reduce((s, o) => s + Number(o.ganancia || 0), 0),
+        gananciaEnCurso: curso.reduce((s, o) => s + Number(o.ganancia || 0), 0),
+        enCursoN: curso.length,
+      };
+    })(),
     educacion: OS.edu ? { activos: Number(OS.edu.activos || 0), conPlan: Number(OS.edu.con_plan_activo || 0), nuevos: Number(OS.edu.nuevos_30d || 0), antiguedad: Math.round(Number(OS.edu.antiguedad_promedio_dias || 0)) } : null,
   };
 }
@@ -438,7 +446,7 @@ function osEmpresa(comp) {
   const isFF = emp === 'fix-and-flip', isR = emp === 'rentas', isRemo = emp === 'remodelacion', isEdu = emp === 'educacion';
   const kpis = isFF ? [['Deals activos', comp.ff.activos, `de ${comp.ff.deals} totales`], ['Capital desplegado', OS_M(comp.ff.capital), 'all-in (compra+remod+holding)'], ['ARV portafolio', OS_M(comp.ff.arv), ''], ['Alertas', comp.ff.alertas || '—', 'mismo conteo que el Command Center']]
     : isR ? [['Ocupación', comp.rentas.occPct + '%', `${comp.rentas.ocupadas}/${comp.rentas.unidades}`], ['Ingresos/mes', OS_M(comp.rentas.ingresos), comp.mb.label], ['Casas', comp.rentas.casas, ''], ['Deuda cobranza', OS_M(comp.cobranza.total), 'contrato − real']]
-    : isRemo ? [['Obras activas', comp.remodel.activas, `de ${comp.remodel.obras} totales`], ['Avance promedio', comp.remodel.avance + '%', 'de las obras'], ['Ganancia proyectada', OS_M(comp.remodel.ganancia), 'valor − costos'], ['Obras totales', comp.remodel.obras, 'histórico']]
+    : isRemo ? [['Obras activas', comp.remodel.activas, `de ${comp.remodel.obras} totales`], ['Avance promedio', comp.remodel.avance + '%', 'de las obras'], ['Utilidad finalizadas', OS_M(comp.remodel.gananciaFinal), 'realizada (obras terminadas)'], ['En curso (proyectado)', OS_M(comp.remodel.gananciaEnCurso), `${comp.remodel.enCursoN} obras · NO final`]]
     : isEdu ? (comp.educacion ? [['Alumnos activos', comp.educacion.activos, `${comp.educacion.conPlan} con plan`], ['Nuevos (30d)', comp.educacion.nuevos, ''], ['Antigüedad prom.', comp.educacion.antiguedad + 'd', 'en el programa'], ['Con plan activo', comp.educacion.conPlan, `de ${comp.educacion.activos}`]] : [['Sin datos', '—', 'no hay snapshot de educación cargado']])
     : [['—', '—', 'datos próximamente']];
   return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag}</div>
