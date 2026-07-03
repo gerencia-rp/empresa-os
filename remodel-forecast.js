@@ -315,7 +315,7 @@ async function fcLoadConfig() {
     fcState.forecasts = fcs || [];
     // Diagnósticos guardados (Visita Previa reutilizable) — picker en el form
     try {
-      const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').order('updated_at', { ascending: false });
+      const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').is('archived_at', null).order('updated_at', { ascending: false });
       fcState.diagnoses = diags || [];
     } catch (e) {
       console.warn('diagnoses load skip:', e.message);
@@ -367,11 +367,15 @@ function fcRenderTab(body) {
           </div>
           ${(fcState.diagnoses || []).length > 0 ? `
             <div class="mb-2 bg-blue-50 border border-blue-200 rounded p-2">
-              <label class="block text-[10px] text-blue-700 font-bold uppercase mb-1">🔍 Cargar diagnóstico previo (${fcState.diagnoses.length} guardados)</label>
-              <select onchange="fcLoadDiagnosis(this.value)" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-                <option value="">— Seleccionar para auto-llenar —</option>
-                ${fcState.diagnoses.map(d => `<option value="${d.id}">${d.propiedad} · ${d.sqft||'?'}sqft · ${(d.source||'manual')} · ${new Date(d.updated_at).toLocaleDateString('es-MX')}</option>`).join('')}
-              </select>
+              ${(() => { const _n = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); const _dc = {}; fcState.diagnoses.forEach(d => { const k = _n(d.direccion || d.propiedad); _dc[k] = (_dc[k] || 0) + 1; }); const _dups = Object.values(_dc).filter(n => n > 1).reduce((a, b) => a + b, 0); window.__fcDc = _dc; window.__fcN = _n; return `
+              <div class="flex items-center justify-between mb-1"><label class="text-[10px] text-blue-700 font-bold uppercase">🔍 Diagnósticos guardados (${fcState.diagnoses.length}) — editar/borrar</label>${_dups ? `<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold" title="Diagnósticos con la misma dirección">⚠ ${_dups} duplicados por dirección</span>` : ''}</div>
+              <div class="flex gap-1">
+                <select id="fc-diag-sel" onchange="fcLoadDiagnosis(this.value)" class="flex-1 border border-slate-300 rounded px-2 py-1.5 text-sm">
+                  <option value="">— Cargar para editar —</option>
+                  ${fcState.diagnoses.map(d => `<option value="${d.id}">${(d.propiedad || '').replace(/</g, '&lt;')} · ${d.sqft || '?'}sqft · ${(d.source || 'manual')} · ${new Date(d.updated_at).toLocaleDateString('es-MX')}${_dc[_n(d.direccion || d.propiedad)] > 1 ? ' · ⚠dup' : ''}</option>`).join('')}
+                </select>
+                <button onclick="fcDeleteDiagnosis(document.getElementById('fc-diag-sel').value)" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-2.5 font-bold" title="Archivar (soft-delete) el diagnóstico seleccionado">🗑</button>
+              </div>`; })()}
             </div>
           ` : ''}
           <div class="grid grid-cols-3 gap-2 mb-2">
@@ -852,7 +856,7 @@ async function fcUploadTaskadeFile(file) {
     if (saveErr) throw new Error('Error guardando diagnóstico: ' + saveErr.message);
 
     // 5. Recargar lista de diagnoses
-    const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').order('updated_at', { ascending: false });
+    const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').is('archived_at', null).order('updated_at', { ascending: false });
     fcState.diagnoses = diags || [];
 
     if (statusEl) statusEl.innerHTML = `<span class="text-emerald-700">✓ ${file.name} cargado y guardado. Daño global: ${parsed.dano_global_pct.toFixed(1)}% (${parsed.veredicto || '—'}). Pasando a Editor detallado...</span>`;
@@ -941,7 +945,7 @@ async function fcSaveDiagnosis(source = 'manual', silent = false) {
     return;
   }
   // Recargar lista para reflejar en picker
-  const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').order('updated_at', { ascending: false });
+  const { data: diags } = await sb.from('remodel_forecast_diagnoses').select('*').is('archived_at', null).order('updated_at', { ascending: false });
   fcState.diagnoses = diags || [];
   if (!silent) {
     alert('✓ Diagnóstico guardado en el historial');
@@ -1857,3 +1861,15 @@ function fcSelfTest() {
   console.log('fcSelfTest', ok ? '✅ PASS' : '❌ FAIL', checks);
   return { ok, checks, resultado: r };
 }
+
+// Bloque 2.1 — soft-delete de diagnóstico
+async function fcDeleteDiagnosis(id) {
+  if (!id) return alert('Elegí un diagnóstico primero.');
+  if (!confirm('¿Archivar este diagnóstico? (reversible)')) return;
+  const { error } = await sb.from('remodel_forecast_diagnoses').update({ archived_at: new Date().toISOString() }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  const { data } = await sb.from('remodel_forecast_diagnoses').select('*').is('archived_at', null).order('updated_at', { ascending: false });
+  fcState.diagnoses = data || [];
+  const body = document.getElementById('rm-body'); if (body) fcRenderTab(body);
+}
+window.fcDeleteDiagnosis = fcDeleteDiagnosis;
