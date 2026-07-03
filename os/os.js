@@ -470,7 +470,7 @@ window.osDraftCobro = osDraftCobro;
 
 // ─── ÁREA · CONTABLE ───
 function osContable(comp) {
-  const capRows = OS.investors;
+  const capRows = OS.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')); // sin la propia empresa (18, no 19)
   return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
     <div class="grid k4">
       <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
