@@ -70,7 +70,7 @@ async function wpLoadAll() {
   const [
     resRes, actRes, projRes, catRes,
     // V2 — backlog, plantillas, recurrentes, all activities globales
-    blRes, ttRes, dtRes, rcRes, allActsRes, movRes
+    blRes, ttRes, dtRes, rcRes, allActsRes, movRes, prRes
   ] = await Promise.all([
     sb.from('resources').select('*').eq('active', true).order('type').order('name'),
     sb.from('weekly_activities').select('*').gte('date', start).lte('date', end).order('date'),
@@ -81,9 +81,11 @@ async function wpLoadAll() {
     sb.from('wp_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
     sb.from('wp_recurring').select('*').eq('active', true).then(r => r).catch(() => ({ data: [] })),
     sb.from('weekly_activities').select('*').then(r => r).catch(() => ({ data: [] })),
-    sb.from('weekly_activity_moves').select('*').order('moved_at', { ascending: false }).limit(2000).then(r => r).catch(() => ({ data: [] }))
+    sb.from('weekly_activity_moves').select('*').order('moved_at', { ascending: false }).limit(2000).then(r => r).catch(() => ({ data: [] })),
+    sb.from('remodel_project_resources').select('*').is('archived_at', null).then(r => r).catch(() => ({ data: [] }))
   ]);
   wpState.moves = (movRes && movRes.data) || [];
+  wpState.projectResources = (prRes && prRes.data) || [];
   wpState.resources = resRes.data || [];
   wpState.activities = allActsRes.data || actRes.data || [];  // usamos TODAS para soportar overdue global
   wpState.projects = projRes.data || [];
@@ -487,14 +489,7 @@ function wpRender() {
             <button onclick="wpSetSideTab('recurring')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='recurring'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">🔁 Recur <span class="bg-violet-600 text-white px-1 rounded">${(wpState.recurring||[]).length}</span></button>
           </div>
           <div class="flex-1 overflow-y-auto">
-            ${wpState.sidePanelTab === 'resources' ? `
-              <div class="p-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">Recursos · arrastra a un día</div>
-              ${wpRenderResourceGroup('crew', '👷 Equipos / Crews', 'border-blue-200 hover:border-blue-500')}
-              ${wpRenderResourceGroup('specialist', '👨‍🔧 Especialistas / Subs', 'border-purple-200 hover:border-purple-500')}
-              ${wpRenderResourceGroup('tool', '🔧 Herramientas / Equipos', 'border-amber-200 hover:border-amber-500')}
-              ${wpRenderResourceGroup('vehicle', '🚚 Vehículos', 'border-slate-200 hover:border-slate-500')}
-              ${wpRenderResourceGroup('other', '📦 Otros', 'border-slate-200 hover:border-slate-500')}
-            ` : ''}
+            ${wpState.sidePanelTab === 'resources' ? wpRenderTeamPanel(allHomes) : ''}
             ${wpState.sidePanelTab === 'backlog' ? wpRenderBacklogPanel() : ''}
             ${wpState.sidePanelTab === 'templates' ? wpRenderTaskTemplatesPanel() : ''}
             ${wpState.sidePanelTab === 'daytemplates' ? wpRenderDayTemplatesPanel() : ''}
@@ -663,6 +658,64 @@ function wpToggleSidebar() {
   wpState.sidebarHidden = !wpState.sidebarHidden;
   wpRender();
 }
+
+// ─── BLOQUE 1.1: Equipo FIJO por obra (crew/especialistas/herramientas/vehículos por casa, no por día) ───
+function wpTeamOf(houseId) {
+  const ids = (wpState.projectResources || []).filter(pr => pr.house_id === houseId).map(pr => pr.resource_id);
+  return (wpState.resources || []).filter(r => ids.includes(r.id));
+}
+function wpRenderTeamPanel(homes) {
+  const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return `
+    <div class="p-2 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">👷 Equipo de la obra</div>
+    <div class="p-2 space-y-2">
+      ${homes.length ? homes.map(h => {
+        const team = wpTeamOf(h.id);
+        return `<div class="wp-team border border-slate-200 rounded-lg p-2">
+          <div class="flex items-center justify-between gap-1">
+            <div class="font-bold text-[11px] truncate">${esc(h.name)}</div>
+            <button onclick="wpOpenEditTeam('${h.id.replace(/'/g, "\\'")}','${h.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-0.5 font-bold whitespace-nowrap">✏️ Editar equipo</button>
+          </div>
+          ${team.length ? `<div class="flex flex-wrap gap-1 mt-1.5">${team.map(r => `<span class="wp-res">${r.emoji || '•'} ${esc((r.name || '').replace('Crew ', ''))}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic mt-1">Sin equipo asignado.</div>'}
+        </div>`;
+      }).join('') : '<div class="text-[10px] text-slate-400 p-2">No hay casas visibles. Ajustá los filtros o agregá una casa.</div>'}
+    </div>`;
+}
+function wpOpenEditTeam(houseId, houseName) {
+  const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const assigned = new Set(wpTeamOf(houseId).map(r => r.id));
+  const groups = [['crew', '👷 Equipos / Crews'], ['specialist', '👨‍🔧 Especialistas'], ['tool', '🔧 Herramientas'], ['vehicle', '🚚 Vehículos'], ['other', '📦 Otros']];
+  const html = `<div id="wp-team-edit" class="space-y-3">
+    <div class="text-xs text-slate-500">Marcá los recursos asignados a <b>${esc(houseName)}</b> (equipo fijo de la obra, no por día). Reversible.</div>
+    ${groups.map(([type, label]) => {
+      const rs = (wpState.resources || []).filter(r => (r.type || 'other') === type && r.active !== false);
+      if (!rs.length) return '';
+      return `<div><div class="text-[10px] font-bold uppercase text-slate-500 mb-1">${label}</div>
+        <div class="flex flex-wrap gap-1.5">${rs.map(r => `<button onclick="wpToggleTeamResource('${houseId.replace(/'/g, "\\'")}','${r.id}', this)" data-on="${assigned.has(r.id) ? '1' : '0'}" class="wp-teamtog text-xs px-2.5 py-1 rounded-lg border ${assigned.has(r.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300'}">${r.emoji || '•'} ${esc(r.name)}</button>`).join('')}</div></div>`;
+    }).join('')}
+    ${!(wpState.resources || []).length ? '<div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">No hay recursos cargados todavía. Cerrá y usá "+ Recurso" para crearlos.</div>' : ''}
+    <div class="pt-2"><button onclick="wpBackToPlanner({reload:true})" class="bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-lg">✓ Listo</button></div>
+  </div>`;
+  openModal(`👷 Editar equipo — ${houseName}`, html);
+}
+window.wpOpenEditTeam = wpOpenEditTeam;
+async function wpToggleTeamResource(houseId, resourceId, btn) {
+  const on = btn.getAttribute('data-on') === '1';
+  try {
+    if (on) {
+      await sb.from('remodel_project_resources').update({ archived_at: new Date().toISOString() }).eq('house_id', houseId).eq('resource_id', resourceId).is('archived_at', null);
+      wpState.projectResources = (wpState.projectResources || []).filter(pr => !(pr.house_id === houseId && pr.resource_id === resourceId));
+      btn.setAttribute('data-on', '0'); btn.className = btn.className.replace('bg-blue-600 text-white border-blue-600', 'bg-white text-slate-600 border-slate-300');
+    } else {
+      const row = { house_id: houseId, resource_id: resourceId, created_by: (window.state && state.user && state.user.id) || null };
+      const { data, error } = await sb.from('remodel_project_resources').insert(row).select().single();
+      if (error) throw error;
+      wpState.projectResources = (wpState.projectResources || []).concat([data || row]);
+      btn.setAttribute('data-on', '1'); btn.className = btn.className.replace('bg-white text-slate-600 border-slate-300', 'bg-blue-600 text-white border-blue-600');
+    }
+  } catch (e) { if (window.toast) toast('No pude guardar: ' + e.message, 'error'); }
+}
+window.wpToggleTeamResource = wpToggleTeamResource;
 
 function wpRenderResourceGroup(type, label, borderClass) {
   const items = wpState.resources.filter(r => r.type === type);
@@ -1524,7 +1577,7 @@ function wpOpenCellView(homeId, homeName, dateStr) {
                   <div class="text-[11px] text-slate-500 mt-0.5">
                     ${a.stage ? `Etapa: <strong>${a.stage}</strong> · ` : ''}${a.start_hour||7}:00 - ${a.end_hour||17}:00 · Status: <strong>${a.status}</strong>
                   </div>
-                  ${aRes.length ? `<div class="flex flex-wrap gap-1 mt-2">${aRes.map(r => `<span class="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs">${r.emoji} ${r.name}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic mt-1">Sin recursos asignados — arrastra desde el sidebar</div>'}
+                  ${aRes.length ? `<div class="flex flex-wrap gap-1 mt-2">${aRes.map(r => `<span class="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs">${r.emoji} ${r.name}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic mt-1">Sin recursos asignados</div>'}
                   ${a.notes ? `<div class="text-[10px] text-slate-600 mt-2 italic">📝 ${a.notes}</div>` : ''}
                 </div>
                 <button onclick="wpEditActivity('${a.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">✏️ Editar</button>
