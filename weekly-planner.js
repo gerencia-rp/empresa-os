@@ -751,7 +751,7 @@ function wpRenderResourceGroup(type, label, borderClass) {
   if (items.length === 0) return '';
   const isOpen = wpState.openGroups?.[type] === true; // default cerrado
   return `
-    <details ${isOpen?'open':''} ontoggle="if(!window.wpState.openGroups)window.wpState.openGroups={}; wpState.openGroups['${type}']=this.open">
+    <details ${isOpen?'open':''} ontoggle="if(!wpState.openGroups)wpState.openGroups={}; wpState.openGroups['${type}']=this.open">
       <summary class="cursor-pointer px-2 py-2 bg-slate-100 border-b border-slate-200 text-xs font-bold uppercase text-slate-700 hover:bg-slate-200 flex justify-between items-center">
         <span>${label}</span><span class="text-[10px] bg-slate-900 text-white px-1.5 rounded">${items.length}</span>
       </summary>
@@ -2558,6 +2558,7 @@ async function wpApproveImport() {
           stage: it.stage,
           duration_days: it.duration_days,
           priority: it.is_critical ? 'critical' : 'normal',
+          is_critical: !!it.is_critical,
           status: 'planned',
           import_batch: importBatch,
           created_by: state.user.id
@@ -2572,6 +2573,8 @@ async function wpApproveImport() {
         activity_code: it.code,
         stage: it.stage,
         duration_days: it.duration_days,
+        priority: it.is_critical ? 'critical' : 'normal',
+        is_critical: !!it.is_critical,
         status: 'planned',
         import_batch: importBatch,
         created_by: state.user.id

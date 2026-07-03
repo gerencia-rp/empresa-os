@@ -399,7 +399,7 @@ async function rmSegImportExcel(file) {
   const wb = XLSX.read(buf, { type: 'array' });
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
   const norm = o => { const g = k => o[k] ?? o[k.toUpperCase()] ?? o[k[0].toUpperCase() + k.slice(1)]; return { activity_code: String(g('activity_code') || g('code') || g('codigo') || '').trim(), real_cost: +g('real_cost') || +g('costo') || 0, real_days: +g('real_days') || +g('dias') || 0, real_hours: +g('real_hours') || +g('horas') || 0 }; };
-  const ups = rows.map(norm).filter(r => r.activity_code).map(r => ({ project_id: rmState.currentProject.id, activity_code: r.activity_code, real_cost: r.real_cost, real_days: r.real_days, real_hours: r.real_hours, recorded_by: state.user.id }));
+  const ups = rows.map(norm).filter(r => r.activity_code).map(r => ({ project_id: rmState.currentProject.id, activity_code: r.activity_code, real_cost: r.real_cost, real_days: r.real_days, real_hours: r.real_hours, recorded_by: state.user?.id }));
   if (!ups.length) return alert('No encontré filas con activity_code. Columnas esperadas: activity_code, real_cost, real_days.');
   const { error } = await sb.from('remodel_actuals').upsert(ups, { onConflict: 'project_id,activity_code' });
   if (error) return alert('Error importando: ' + error.message);
