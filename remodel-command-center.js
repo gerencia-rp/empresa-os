@@ -26,7 +26,7 @@ function rcInjectCSS() {
   #rc-overlay .lidbar{height:6px;border-radius:6px;background:var(--glassb);overflow:hidden;margin-top:6px}#rc-overlay .lidbar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
   #rc-overlay .alertrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--glassb)}#rc-overlay .alertrow:last-child{border-bottom:none}
   #rc-overlay .adot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}#rc-overlay .adot.r{background:var(--neg)}#rc-overlay .adot.y{background:var(--amber)}
-  #rc-overlay .pullbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:8px 15px;border-radius:20px;cursor:pointer;font-size:11.5px}#rc-overlay .pullbtn:hover{filter:brightness(1.08)}#rc-overlay .pullbtn:disabled{opacity:.6;cursor:wait}`;
+  #rc-overlay .pullbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:8px 15px;border-radius:20px;cursor:pointer;font-size:11.5px}#rc-overlay .pullbtn:hover{filter:brightness(1.08)}#rc-overlay .pullbtn:disabled{opacity:.6;cursor:wait}#rc-overlay .rc-hide{display:none}#rc-overlay .ptable tr[onclick]:hover td{background:var(--glass)}`;
   document.head.appendChild(st);
 }
 
@@ -50,15 +50,17 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews] = await Promise.all([
+    const [p, a, l, names, crews, hrs] = await Promise.all([
       sb.from('remodel_at_properties').select('*').order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
       sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => []),
-      sb.from('remodel_crew_rates').select('airtable_id, nombre').then(r => r.data || []).catch(() => [])
+      sb.from('remodel_crew_rates').select('airtable_id, nombre').then(r => r.data || []).catch(() => []),
+      sb.from('remodel_worker_pay_summary').select('casa_norm, horas').then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
+    RC.casaHoras = {}; (hrs || []).forEach(x => { if (x.casa_norm) RC.casaHoras[x.casa_norm] = (RC.casaHoras[x.casa_norm] || 0) + (+x.horas || 0); });
     RC.obras = (p.data || []).map(o => ({ ...o, lider: rcResolveName(o.lider) }));
     RC.alerts = a.data || [];
     RC.syncLog = (l.data && l.data[0]) || null;
@@ -80,6 +82,12 @@ function rcDQ(o) {
   return { fin, enCurso: !fin && !sinDatos, sinDatos, sobrePresup, confiable: fin && gasto > 0, gasto, presup, mat, lab };
 }
 
+function rcObraHoras(o) {
+  const na = String(o.address || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ch = RC.casaHoras || {};
+  for (const cn in ch) { if (cn && cn.length >= 4 && na.includes(cn)) return ch[cn]; }
+  return 0;
+}
 function rcCompute() {
   const obras = RC.obras.map(o => ({ ...o, dq: rcDQ(o) }));
   const fin = obras.filter(o => o.dq.fin);
@@ -102,11 +110,15 @@ function rcCompute() {
   const lidMap = {};
   fin.forEach(o => {
     const k = (o.lider || '—').trim() || '—';
-    if (!lidMap[k]) lidMap[k] = { lider: k, n: 0, ganancia: 0, revenue: 0, avance: 0, sobre: 0 };
-    lidMap[k].n++; lidMap[k].ganancia += (+o.ganancia || 0); lidMap[k].revenue += (+o.valor_cliente || 0);
-    if (o.dq.sobrePresup) lidMap[k].sobre++;
+    if (!lidMap[k]) lidMap[k] = { lider: k, n: 0, ganancia: 0, revenue: 0, sobre: 0, sqft: 0, real: 0, presup: 0, diasSum: 0, diasN: 0, horas: 0, obras: [] };
+    const L = lidMap[k]; const real = (+o.monto_real || o.dq.gasto); const presup = (+o.presupuesto_interno || 0);
+    L.n++; L.ganancia += (+o.ganancia || 0); L.revenue += (+o.valor_cliente || 0);
+    if (o.dq.sobrePresup) L.sobre++;
+    L.sqft += (+o.sqft || 0); L.real += real; L.presup += presup; L.horas += rcObraHoras(o);
+    if (o.retraso_dias != null) { L.diasSum += +o.retraso_dias; L.diasN++; }
+    L.obras.push({ address: rcShort(o.address), devPct: presup > 0 ? Math.round((real - presup) / presup * 100) : null, dias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null });
   });
-  const lideres = Object.values(lidMap).map(l => ({ ...l, margen: l.revenue > 0 ? Math.round(l.ganancia / l.revenue * 100) : 0 }))
+  const lideres = Object.values(lidMap).map(l => ({ ...l, margen: l.revenue > 0 ? Math.round(l.ganancia / l.revenue * 100) : 0, devCosto: l.presup > 0 ? Math.round((l.real - l.presup) / l.presup * 100) : null, desvDias: l.diasN ? Math.round(l.diasSum / l.diasN) : null, psf: l.sqft > 0 ? Math.round(l.real / l.sqft) : null, horasSqft: (l.sqft > 0 && l.horas > 0) ? +(l.horas / l.sqft).toFixed(2) : null, sobrePct: l.n ? Math.round(l.sobre / l.n * 100) : 0 }))
     .sort((a, b) => b.ganancia - a.ganancia);
   // Alertas críticas computadas + de la tabla
   const compAlerts = [];
@@ -243,18 +255,26 @@ function rcObraCard(o) {
     <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${slug}')">🏠 Ver ficha de casa →</div>
   </div>`;
 }
+const RC_STAGES = ['Pre construcción', 'En construcción', 'Pre-entrega', 'Entrega', 'Finalizado'];
 function rcSecObras(c) {
-  const order = { 'En construcción': 0, 'Pre construcción': 1, 'Finalizado': 2 };
-  const cols = [['En curso', c.activas.filter(o => o.proceso === 'En construcción')], ['Pipeline', c.pipeline], ['Finalizadas', c.fin]];
-  return rcHeader('Obras', 'Cada obra con su gasto real, utilidad y ficha de casa. Las en curso van marcadas como proyectadas.') + `
-    <div class="kan">${cols.map(([t, list]) => `<div class="kcol"><div class="kcol-h">${t}<span class="cnt">${list.length}</span></div>${list.length ? list.map(rcObraCard).join('') : '<div class="meta" style="padding:14px 4px">—</div>'}</div>`).join('')}</div>`;
+  const cols = RC_STAGES.map(st => [st, c.obras.filter(o => o.proceso === st)]);
+  const sin = c.obras.filter(o => !RC_STAGES.includes(o.proceso));
+  if (sin.length) cols.push(['Sin estado', sin]);
+  return rcHeader('Pipeline de obras', 'Por etapa real de Procesos: Pre construcción → En construcción → Pre-entrega → Entrega → Finalizado. En curso = proyectado.') + `
+    <div class="kan">${cols.map(([t, list]) => `<div class="kcol"><div class="kcol-h">${RC_E(t)}<span class="cnt">${list.length}</span></div>${list.length ? list.map(rcObraCard).join('') : '<div class="meta" style="padding:14px 4px">—</div>'}</div>`).join('')}</div>`;
 }
 
 function rcSecLideres(c) {
-  const maxG = Math.max(1, ...c.lideres.map(l => l.ganancia));
-  return rcHeader('Performance por líder', 'Ranking por ganancia realizada (obras finalizadas). El margen objetivo es 20%.') + `
-    <div class="card"><table class="ptable"><thead><tr><th>Líder</th><th>Obras</th><th>Ganancia</th><th>Margen</th><th>Sobre presup.</th><th style="width:22%"></th></tr></thead><tbody>
-    ${c.lideres.length ? c.lideres.map(l => `<tr><td><b>${RC_E(l.lider)}</b></td><td>${l.n}</td><td class="${l.ganancia >= 0 ? 'up' : 'down'}">${RC_M(l.ganancia)}</td><td class="${l.margen >= 20 ? 'up' : l.margen >= 10 ? 'warn' : 'down'}">${l.margen}%</td><td>${l.sobre ? `<span class="warn">${l.sobre}</span>` : '0'}</td><td><div class="lidbar"><i style="width:${Math.round(Math.max(0, l.ganancia) / maxG * 100)}%"></i></div></td></tr>`).join('') : '<tr><td colspan="6" class="meta" style="padding:20px">Sin obras finalizadas todavía.</td></tr>'}
+  const dchip = (v, unit) => v == null ? '<span style="color:var(--mut2)">—</span>' : `<span class="${v > 0 ? 'down' : 'up'}">${v > 0 ? '+' : ''}${v}${unit}</span>`;
+  const detalle = l => l.obras.map(o => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:3px 0;border-top:1px solid var(--glassb)"><span>${RC_E(o.address)}</span><span style="color:var(--mut)">${o.devPct != null ? 'desv ' + (o.devPct > 0 ? '+' : '') + o.devPct + '%' : ''}${o.dias != null ? ' · ' + o.dias + 'd' : ''}${o.rent != null ? ' · rent ' + o.rent + '%' : ''}</span></div>`).join('');
+  const rows = c.lideres.map((l, i) => {
+    const main = `<tr style="cursor:pointer" onclick="document.getElementById('rc-lid-${i}').classList.toggle('rc-hide')"><td><b>${RC_E(l.lider)}</b> <span style="color:var(--mut2);font-size:9px">▸</span></td><td>${l.n}</td><td class="${l.ganancia >= 0 ? 'up' : 'down'}">${RC_M(l.ganancia)}</td><td>${dchip(l.devCosto, '%')}</td><td>${dchip(l.desvDias, 'd')}</td><td>${l.psf != null ? '$' + l.psf : '—'}</td><td>${l.horasSqft != null ? l.horasSqft : '—'}</td><td class="${l.sobrePct > 30 ? 'down' : ''}">${l.sobrePct}%</td></tr>`;
+    const det = `<tr id="rc-lid-${i}" class="rc-hide"><td colspan="8" style="padding:0"><div style="padding:9px 12px;background:var(--glass)"><div style="font-size:9px;letter-spacing:1px;color:var(--mut2);margin-bottom:6px">OBRAS DE ${RC_E((l.lider || '').toUpperCase())}</div>${detalle(l)}</div></td></tr>`;
+    return main + det;
+  }).join('');
+  return rcHeader('Performance por líder', 'Desviación de costo/días, $/sqft logrado, productividad (hrs/sqft) y % sobre presupuesto — finalizadas. Click para ver sus obras.') + `
+    <div class="card"><table class="ptable"><thead><tr><th>Líder</th><th>Obras</th><th>Ganancia</th><th>Desv costo</th><th>Desv días</th><th>$/sqft</th><th>hrs/sqft</th><th>% sobre pres.</th></tr></thead><tbody>
+    ${c.lideres.length ? rows : '<tr><td colspan="8" class="meta" style="padding:20px">Sin obras finalizadas.</td></tr>'}
     </tbody></table></div>`;
 }
 
