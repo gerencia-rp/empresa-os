@@ -78,10 +78,12 @@ function osInjectCSS() {
   #os-root .osbadge{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 9px;border-radius:20px;margin-top:7px;letter-spacing:.2px}
   #os-root .osbadge.warn{background:rgba(231,182,94,.16);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
   #os-root .osbadge.ok{background:rgba(72,214,156,.14);color:var(--pos);border:1px solid rgba(72,214,156,.3)}
+  #os-root .ff-dqx{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(240,104,122,.16);color:var(--neg);border:1px solid rgba(240,104,122,.35);white-space:nowrap}
   #os-root .up{color:var(--pos)}#os-root .down{color:var(--neg)}#os-root .warn{color:var(--amber)}
   #os-root .unit{cursor:pointer}#os-root .unit:hover{transform:translateY(-3px);border-color:var(--a2)}
   #os-root .unit .ico{font-size:26px}#os-root .unit .un{font-size:16px;font-weight:700;margin-top:9px}#os-root .unit .ut{font-size:11.5px;color:var(--mut2);margin-top:3px;min-height:30px}
   #os-root .unit .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-top:1px solid var(--glassb);margin-top:10px}#os-root .unit .kv b{color:var(--ink)}
+  #os-root .card:not(.unit) .kv{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--glassb)}#os-root .card:not(.unit) .kv:first-of-type{border-top:none}#os-root .card:not(.unit) .kv span{color:var(--mut)}#os-root .card:not(.unit) .kv b{color:var(--ink);text-align:right}
   #os-root .go{font-size:11px;color:var(--a2);margin-top:12px;font-weight:600}
   #os-root .brain{background:linear-gradient(180deg,rgba(30,28,58,.5),rgba(14,16,32,.5));border:1px solid rgba(138,123,255,.28)}
   #os-root[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,123,255,.1),rgba(79,141,255,.05))}
@@ -197,6 +199,7 @@ function osParse(path) {
   if (seg.length === 0) return { view: 'global' };
   if (seg[0] === 'operacion') return { view: 'operacion' };
   if (seg[0] === 'contable') return { view: 'contable' };
+  if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (OS_EMPRESAS[seg[0]]) {
     if (seg[1]) return { view: 'app', empresa: seg[0], app: seg[1], slug: seg[2] || null };
     return { view: 'empresa', empresa: seg[0] };
@@ -208,6 +211,7 @@ function osTitle(r) {
   if (r.view === 'global') return base;
   if (r.view === 'operacion') return 'Operación · ' + base;
   if (r.view === 'contable') return 'Contable · ' + base;
+  if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
   return 'No encontrado · ' + base;
 }
@@ -248,7 +252,7 @@ async function osLoad() {
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
-      sb.from('remodel_at_properties').select('proceso,avance_pct,ganancia,fecha_real_fin'),
+      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label'),
       sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
     ]);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
@@ -305,7 +309,8 @@ function osCompute() {
     const allIn = Number(d.purchase_price || 0) + remComplete + holding;
     const allInPct = arv ? allIn / arv : 0;
     const deficit = dr ? Number(dr.net_total || 0) : 0;
-    return { ...d, dr, arv, remComplete, holding, allIn, allInPct, deficit };
+    const dq = (typeof ffDataQuality === 'function') ? ffDataQuality({ allIn, arv, allInPct, stage: d.stage }) : { revisar: false, sinDatos: false, preliminar: false, confiable: true, flags: [] };
+    return { ...d, dr, arv, remComplete, holding, allIn, allInPct, deficit, dq };
   });
   const ffActive = ff.filter(d => d.stage !== 'vendida');
   const ffCapital = ffActive.reduce((s, d) => s + d.allIn, 0);
@@ -375,7 +380,7 @@ function osRender() {
   if (OS.loadErr) { root.innerHTML = osShell(`<div class="empty"><div style="font-size:40px">⚠️</div><div class="down" style="margin-top:10px">${OS_E(OS.loadErr)}</div></div>`); return; }
   if (!OS.loaded) { root.innerHTML = osShell('<div class="empty">⏳ Cargando datos del holding…</div>'); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, app: osAppView, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
@@ -494,6 +499,93 @@ function osContable(comp) {
 }
 
 // ─── NIVEL 3 · APP (abre el Command Center correspondiente) ───
+// ════════════════════════════════════════════════════════════════
+// 🏠 FICHA DE CASA — una vista por propiedad que une el ciclo de vida entre empresas (pilar #5).
+//   Unión por DIRECCIÓN NORMALIZADA (address_norm == address_normalized; remodel se normaliza igual).
+// ════════════════════════════════════════════════════════════════
+function osHouseKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function osSlug(addr) { return String(addr || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
+window.osSlug = osSlug;
+const OS_STAGE_LBL = { adquirida: 'Adquirida', en_rehab: 'En rehab', en_venta: 'En venta', rentada: 'Rentada', refinanciada: 'Refinanciada', vendida: 'Vendida' };
+function osOpenFicha(slug) {
+  try { document.getElementById('ff-overlay')?.remove(); document.getElementById('cc-overlay')?.remove(); FF && (FF.sys = null); } catch (e) {}
+  const root = document.getElementById('os-root'); if (root) root.style.display = '';
+  osNav('/casa/' + slug);
+}
+window.osOpenFicha = osOpenFicha;
+function osCasaMatch(slug, comp) {
+  const key = osHouseKey(slug);
+  const ff = (comp.ff.list || []).find(d => osHouseKey(d.address_norm || d.address) === key) || null;
+  const remodel = (OS.remodel || []).find(r => osHouseKey(r.address) === key) || null;
+  const prop = (OS.props || []).find(p => osHouseKey(p.address_normalized || p.name) === key) || null;
+  const addr = (ff && ff.address) || (remodel && remodel.address) || (prop && prop.name) || slug;
+  let rentas = null;
+  if (prop) {
+    const mb = comp.mb;
+    const us = OS.units.filter(u => u.property_id === prop.id);
+    const indep = us.filter(u => OS_INDEP.includes(u.unit_type));
+    const rooms = us.filter(u => u.unit_type === 'habitacion');
+    const hasR = rooms.length ? 1 : 0;
+    const totalU = indep.length + hasR;
+    const occU = indep.filter(u => osUnitState(u) === 'ocupada').length + (hasR && rooms.some(u => osUnitState(u) === 'ocupada') ? 1 : 0);
+    const occRent = us.filter(u => osUnitState(u) === 'ocupada').reduce((s, u) => s + Number(u.target_rent || 0), 0);
+    const cobrado = OS.pay.filter(x => x.property_id === prop.id && x.paid_at >= mb.from && x.paid_at <= mb.to).reduce((s, x) => s + Number(x.amount || 0), 0);
+    rentas = { prop, totalU, occU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, occRent: Math.round(occRent), cobrado: Math.round(cobrado), deuda: Math.round(Math.max(0, occRent - cobrado)) };
+  }
+  return { key, slug, addr, ff, remodel, prop, rentas };
+}
+function osCasaInsights(m) {
+  const ins = [];
+  if (m.ff && m.ff.dq && m.ff.dq.revisar) ins.push({ s: 'r', t: `Error de datos: all-in ${OS_M(m.ff.allIn)} = ${Math.round(m.ff.allInPct * 100)}% del ARV (imposible). Revisar la carga en Airtable (Draws).` });
+  if (m.ff && m.ff.dq && m.ff.dq.confiable && m.ff.deficit < -20000) ins.push({ s: 'r', t: `Déficit de ${OS_M(-m.ff.deficit)} (regla: OK si flujo+ y acumulado < $20k). Planear recuperación (refi/venta).` });
+  if (m.ff && Number(m.ff.appraisal) > 0 && m.ff.arv > 0 && Number(m.ff.appraisal) > m.ff.arv * 1.05) ins.push({ s: 'y', t: `Appraisal ${OS_M(m.ff.appraisal)} supera el ARV ${OS_M(m.ff.arv)} — revisar (afecta refi y equity).` });
+  if (m.remodel && m.remodel.proceso !== 'Finalizado') ins.push({ s: 'y', t: `Obra EN CURSO (${OS_E(m.remodel.proceso || 's/estado')}, ${Math.round(Number(m.remodel.avance_pct || 0))}% avance) — la utilidad de remodelación es preliminar, no final.` });
+  if (m.rentas && m.rentas.deuda > 200) ins.push({ s: 'r', t: `Deuda de cobranza ${OS_M(m.rentas.deuda)} este mes (esperado ${OS_M(m.rentas.occRent)}, cobrado ${OS_M(m.rentas.cobrado)}).` });
+  if (/childress/i.test(m.addr)) ins.push({ s: 'y', t: `Contrato/documentación pendiente de firma (dato del negocio). Verificar antes de avanzar.` });
+  return ins;
+}
+function osCasa(comp) {
+  const m = osCasaMatch(OS.route.slug, comp);
+  const kv = (l, v, cls) => `<div class="kv"><span>${l}</span><b class="${cls || ''}">${v}</b></div>`;
+  if (!m.ff && !m.remodel && !m.rentas) {
+    return `<div class="empty" style="padding:80px 40px"><div style="font-size:48px">🏚️</div><h1 style="margin-top:12px">Casa no encontrada</h1><div class="sub">No hay datos para <b>${OS_E(OS.route.slug)}</b> en Fix & Flip, Remodelación ni Rentas.</div><button class="cbtn" style="padding:10px 18px" data-osnav="/">← Volver al Panel Global</button></div>`;
+  }
+  const stageK = m.ff ? m.ff.stage : (m.remodel && m.remodel.proceso === 'Finalizado' ? 'refinanciada' : (m.remodel ? 'en_rehab' : (m.rentas ? 'rentada' : null)));
+  const stageLbl = m.ff ? (OS_STAGE_LBL[m.ff.stage] || m.ff.stage) : (m.remodel ? m.remodel.proceso : (m.rentas ? 'Rentada' : '—'));
+  const strat = m.ff ? (m.ff.strategy === 'flip' ? 'FLIP' : m.ff.strategy === 'hold' ? 'HOLD' : '') : '';
+  const dqBadge = (m.ff && m.ff.dq && m.ff.dq.revisar) ? `<span class="ff-dqx">⚠ dato a revisar</span>` : '';
+  const insights = osCasaInsights(m);
+  const remoEnCurso = m.remodel && m.remodel.proceso !== 'Finalizado';
+  const remoMat = m.remodel ? Number(m.remodel.gasto_materiales || 0) : 0, remoLab = m.remodel ? Number(m.remodel.gasto_trabajadores || 0) : 0;
+  // etapas del ciclo (barra)
+  const cycle = ['Adquirida', 'En rehab', 'Venta/Renta', 'Refi/Salida'];
+  const cyIdx = m.ff ? ({ adquirida: 0, en_rehab: 1, en_venta: 2, rentada: 2, refinanciada: 3, vendida: 3 }[m.ff.stage] ?? 0) : (remoEnCurso ? 1 : (m.rentas ? 2 : 3));
+  return `<h1>🏠 ${OS_E(ffShortAddr(m.addr))} <span>· Ficha de casa</span></h1>
+    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).</div>
+    <div class="grid k4">
+      <div class="card"><div class="lab">Etapa actual</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
+      <div class="card"><div class="lab">All-in</div><div class="big">${m.ff ? OS_M(m.ff.allIn) : '—'}</div><div class="meta">${m.ff ? Math.round(m.ff.allInPct * 100) + '% del ARV' : 'sin deal F&F'}</div></div>
+      <div class="card"><div class="lab">ARV</div><div class="big">${m.ff && m.ff.arv ? OS_M(m.ff.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
+      <div class="card"><div class="lab">${m.ff && m.ff.deficit < 0 ? 'Déficit' : 'Margen/Equity'}</div><div class="big ${m.ff && m.ff.deficit < 0 ? 'down' : 'up'}">${m.ff ? (m.ff.deficit < 0 ? OS_M(m.ff.deficit) : OS_M(m.ff.arv - m.ff.allIn)) : '—'}</div><div class="meta">${m.ff && m.ff.dq && !m.ff.dq.confiable ? 'no confiable' : m.ff ? 'ARV − all-in' : ''}</div></div>
+    </div>
+    <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
+    <div class="grid k2" style="margin-top:12px">
+      <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
+        ${m.ff ? `${kv('Compra', OS_M(m.ff.purchase))}${kv('Remodelación (est/draws)', OS_M(m.ff.remComplete))}${kv('Holding', OS_M(m.ff.holding))}${kv('All-in', OS_M(m.ff.allIn), m.ff.dq.revisar ? 'down' : '')}${kv('ARV', OS_M(m.ff.arv))}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', OS_M(m.ff.arv * 0.75 - m.ff.remComplete - m.ff.holding))}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div>
+      <div class="card"><div class="chart-h"><div class="t">🔨 Remodelación</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
+        ${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · resultado preliminar</span></div>` : ''}${kv('Estado', OS_E(m.remodel.proceso || '—'))}${kv('Avance', Math.round(Number(m.remodel.avance_pct || 0)) + '%')}${kv('Líder', OS_E(m.remodel.lider || '—'))}${kv('Materiales', OS_M(remoMat))}${kv('Mano de obra', OS_M(remoLab))}${kv('Draws (mat+MO)', OS_M(remoMat + remoLab))}${kv('Inicio → fin est.', `${OS_E(m.remodel.fecha_inicio || 's/f')} → ${OS_E(m.remodel.fecha_estimada_fin || 's/f')}`)}${m.remodel.desviacion_label ? kv('Desvío', OS_E(m.remodel.desviacion_label), 'warn') : ''}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(Number(m.remodel.ganancia || 0)), remoEnCurso ? 'warn' : 'up')}` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div>
+    </div>
+    <div class="grid k2" style="margin-top:16px">
+      <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
+        ${m.rentas ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`}</div>
+      <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
+        ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
+        ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
+      </div>
+    </div>
+    <div style="margin-top:18px"><button class="ibtn" data-osnav="/">← Panel Global</button></div>`;
+}
+function ffShortAddr(a) { return String(a || '').split(',')[0].replace(/\s+(austin|tx|texas)\b.*$/i, '').trim() || a; }
 function osAppView(comp) {
   const r = OS.route;
   // Renderiza el panel de empresa como fondo y abre la app encima.
