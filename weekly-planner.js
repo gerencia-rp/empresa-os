@@ -876,21 +876,70 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
   wpRender();
 }
 
-async function wpNewActivity(homeId, homeName, dateStr) {
-  const name = prompt('Nombre de la actividad (ej. "Poner concreto patio"):');
-  if (!name) return;
-  const stage = prompt('Etapa (opcional: demolicion, cimientos, drywall, etc.):') || null;
-  await sb.from('weekly_activities').insert({
-    project_id: homeId.startsWith('name:') ? null : homeId,
-    property_name: homeId.startsWith('name:') ? homeId.slice(5) : homeName,
-    date: dateStr,
-    activity_name: name,
-    stage,
-    created_by: state.user.id
-  });
-  await wpLoadAll();
-  wpRender();
+// BLOQUE 1.2 — Nueva actividad con opción MULTI-DÍA (un día / rango / varios) en UN paso.
+function wpNewActivity(homeId, homeName, dateStr) {
+  const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const stages = [...new Set((wpState.activities || []).map(a => a.stage).filter(Boolean))].sort();
+  const team = wpTeamOf(homeId).filter(r => r.type === 'crew' || r.type === 'specialist');
+  const crews = team.length ? team : (wpState.resources || []).filter(r => r.type === 'crew' || r.type === 'specialist');
+  const weekDays = Array.from({ length: 7 }, (_, i) => wpDateOnly(wpAddDays(wpState.weekStart || new Date(), i)));
+  const dl = d => new Date(d + 'T00:00:00').toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
+  const html = `<div id="wp-na" class="space-y-3" data-house="${esc(homeId)}" data-hname="${esc(homeName)}" data-date="${dateStr}">
+    <input id="wp-na-name" placeholder="Nombre de la actividad (ej. Drywall planta alta)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+    <div class="grid grid-cols-2 gap-2">
+      <input id="wp-na-stage" list="wp-na-stages" placeholder="Etapa" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+      <datalist id="wp-na-stages">${stages.map(s => `<option value="${esc(s)}"></option>`).join('')}</datalist>
+      <select id="wp-na-crew" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"><option value="">Crew (opcional)</option>${crews.map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
+    </div>
+    <div class="text-[11px] font-bold uppercase text-slate-500">Cuándo</div>
+    <div class="flex gap-3 flex-wrap text-xs">
+      <label class="flex items-center gap-1"><input type="radio" name="wp-na-mode" value="dia" checked onchange="wpNAMode('dia')" /> Un día</label>
+      <label class="flex items-center gap-1"><input type="radio" name="wp-na-mode" value="rango" onchange="wpNAMode('rango')" /> Rango de días</label>
+      <label class="flex items-center gap-1"><input type="radio" name="wp-na-mode" value="varios" onchange="wpNAMode('varios')" /> Varios días</label>
+    </div>
+    <div id="wp-na-dia" class="text-xs text-slate-600">📅 ${dl(dateStr)}</div>
+    <div id="wp-na-rango" class="grid-cols-2 gap-2 text-xs" style="display:none"><label class="block">Desde<input id="wp-na-from" type="date" value="${dateStr}" class="w-full border border-slate-300 rounded px-2 py-1" /></label><label class="block">Hasta<input id="wp-na-to" type="date" value="${dateStr}" class="w-full border border-slate-300 rounded px-2 py-1" /></label></div>
+    <div id="wp-na-varios" class="flex-wrap gap-1.5 text-xs" style="display:none">${weekDays.map(d => `<label class="flex items-center gap-1 border border-slate-300 rounded px-2 py-1"><input type="checkbox" class="wp-na-day" value="${d}" ${d === dateStr ? 'checked' : ''} /> ${dl(d)}</label>`).join('')}</div>
+    <div class="text-[10px] text-slate-400">Multi-día = una sola actividad enlazada (una entrada por día, con "día X/Y").</div>
+    <button onclick="wpCreateActivity()" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg">✓ Crear actividad</button>
+  </div>`;
+  openModal(`➕ Nueva actividad — ${homeName}`, html);
 }
+window.wpNewActivity = wpNewActivity;
+function wpNAMode(m) {
+  const map = { dia: 'block', rango: 'grid', varios: 'flex' };
+  ['dia', 'rango', 'varios'].forEach(x => { const el = document.getElementById('wp-na-' + x); if (el) el.style.display = x === m ? map[x] : 'none'; });
+}
+window.wpNAMode = wpNAMode;
+async function wpCreateActivity() {
+  const root = document.getElementById('wp-na'); if (!root) return;
+  const houseId = root.getAttribute('data-house'), houseName = root.getAttribute('data-hname'), dateStr = root.getAttribute('data-date');
+  const name = (document.getElementById('wp-na-name').value || '').trim(); if (!name) return alert('Ponele nombre a la actividad.');
+  const stage = (document.getElementById('wp-na-stage').value || '').trim() || null;
+  const crew = document.getElementById('wp-na-crew').value || '';
+  const mode = (document.querySelector('input[name="wp-na-mode"]:checked') || {}).value || 'dia';
+  let dates = [];
+  if (mode === 'dia') dates = [dateStr];
+  else if (mode === 'rango') {
+    const f = document.getElementById('wp-na-from').value, t = document.getElementById('wp-na-to').value;
+    if (!f || !t) return alert('Elegí el rango.');
+    let a = new Date(f + 'T00:00:00'), b = new Date(t + 'T00:00:00'); if (b < a) { const tmp = a; a = b; b = tmp; }
+    for (let x = new Date(a); x <= b; x.setDate(x.getDate() + 1)) dates.push(wpDateOnly(new Date(x)));
+  } else dates = [...document.querySelectorAll('.wp-na-day:checked')].map(c => c.value);
+  if (!dates.length) return alert('Elegí al menos un día.');
+  dates.sort();
+  const gid = dates.length > 1 && crypto.randomUUID ? crypto.randomUUID() : null;
+  const rows = dates.map((d, i) => ({
+    project_id: houseId.startsWith('name:') ? null : houseId,
+    property_name: houseId.startsWith('name:') ? houseId.slice(5) : houseName,
+    date: d, activity_name: dates.length > 1 ? `${name} (día ${i + 1}/${dates.length})` : name,
+    stage, group_id: gid, resource_ids: crew ? [crew] : [], created_by: (window.state && state.user && state.user.id) || null
+  }));
+  const { error } = await sb.from('weekly_activities').insert(rows);
+  if (error) return alert('Error: ' + error.message);
+  wpBackToPlanner({ reload: true });
+}
+window.wpCreateActivity = wpCreateActivity;
 
 function wpEditActivity(id) {
   const a = wpState.activities.find(x => x.id === id);
