@@ -167,7 +167,7 @@ async function rmRejectChangeOrder(coId) {
 
 function rmRenderVersions(body) {
   if (!rmState.currentProject) {
-    body.innerHTML = `<div class="text-center py-12 text-slate-500">
+    body.innerHTML = rmRenderCompare() + `<div class="text-center py-8 text-slate-500 text-sm">
       Cargá un proyecto desde <strong>📁 Proyectos</strong> para ver su historial de versiones y change orders.
     </div>`;
     return;
@@ -179,7 +179,7 @@ function rmRenderVersions(body) {
     (cosByStatus[co.status] || (cosByStatus.pending)).push(co);
   });
 
-  body.innerHTML = `
+  body.innerHTML = rmRenderCompare() + `
     <div class="flex justify-between items-end mb-3 flex-wrap gap-2">
       <div>
         <h2 class="text-lg font-bold">📜 Historial — ${rmState.currentProject.name}</h2>
@@ -277,3 +277,27 @@ function rmRenderVersions(body) {
     </div>
   `;
 }
+
+// Bloque 2.3 — comparar hasta 3 propiedades lado a lado (historial/portfolio)
+function rmRenderCompare() {
+  const projs = (rmState.projects || []).filter(p => !p.archived_at);
+  const ids = rmState.compareIds || [];
+  const money = n => '$' + Math.round(+n || 0).toLocaleString('en-US');
+  const psf = p => (+p.sqft > 0) ? '$' + Math.round((+p.budget_total || 0) / (+p.sqft)) : '—';
+  const sel = idx => `<select onchange="rmSetCompare(${idx}, this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs font-semibold">
+    <option value="">— Proyecto ${idx + 1} —</option>
+    ${projs.map(p => `<option value="${p.id}" ${ids[idx] === p.id ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}</option>`).join('')}</select>`;
+  const picked = ids.map(id => projs.find(p => p.id === id)).filter(Boolean);
+  const rows = [['Sqft', p => p.sqft || '—'], ['Presupuesto', p => money(p.budget_total)], ['Gasto real', p => p.real_total ? money(p.real_total) : '—'], ['$/sqft (est)', p => psf(p)], ['Estado', p => p.status || '—'], ['Actividades', p => (p.activities && (Array.isArray(p.activities) ? p.activities.length : Object.keys(p.activities).length)) || 0]];
+  return `<div class="mb-4 border border-slate-200 rounded-lg p-3">
+    <div class="text-sm font-bold mb-2">⚖️ Comparar hasta 3 propiedades</div>
+    <div class="flex gap-2 mb-3 flex-wrap">${[0, 1, 2].map(sel).join('')}</div>
+    ${picked.length ? `<table class="w-full text-xs"><thead><tr><th class="text-left p-1"></th>${picked.map(p => `<th class="text-left p-1 font-bold">${(p.name || '').replace(/</g, '&lt;')}</th>`).join('')}</tr></thead><tbody>${rows.map(([lab, fn]) => `<tr class="border-t border-slate-100"><td class="p-1 text-slate-500">${lab}</td>${picked.map(p => `<td class="p-1 font-semibold">${fn(p)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<div class="text-xs text-slate-400">Elegí proyectos para compararlos lado a lado.</div>'}
+  </div>`;
+}
+function rmSetCompare(idx, id) {
+  rmState.compareIds = rmState.compareIds || [];
+  rmState.compareIds[idx] = id || undefined;
+  rmRenderTab();
+}
+window.rmSetCompare = rmSetCompare;

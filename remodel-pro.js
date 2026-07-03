@@ -1275,7 +1275,8 @@ async function rmSaveProject() {
   await moSaveProjectMo(rmState.currentProject?.id);
   await rmLoadAll();
   rmRender();
-  alert('✓ Proyecto guardado');
+  await rmAutoGenPlanner(rmState.currentProject?.id, rmState.editName || rmState.currentProject?.name);
+  alert('✓ Estimación guardada. Cronograma (Planner) y seguimiento generados.');
 }
 
 async function rmLoadProject(p) {
@@ -3520,3 +3521,29 @@ function rmGetAllActivitiesIncludingCustom() {
   const customs = Object.values(rmState.customActivities || {});
   return [...base, ...customs];
 }
+
+// Bloque 2.2 — al guardar la estimación, auto-genera el cronograma en el Planner (baseline) la 1ª vez.
+async function rmAutoGenPlanner(projectId, projectName) {
+  if (!projectId || !rmState.selectedActivities || !Object.keys(rmState.selectedActivities).length) return;
+  const { count } = await sb.from('weekly_activities').select('id', { count: 'exact', head: true }).eq('project_id', projectId);
+  if (count && count > 0) return; // ya tiene cronograma → no pisar ediciones del Planner
+  const e = rmCalcProject();
+  const startDate = new Date(rmState.editStartDate);
+  const inserts = [];
+  Object.entries(rmState.selectedActivities).forEach(([code, cfg]) => {
+    const cat = rmGetCatalog().find(c => c.code === code); if (!cat) return;
+    const phaseSch = e.phaseSchedule[cat.phase];
+    let activityStart = phaseSch ? new Date(phaseSch.start) : startDate;
+    if (cfg.start_offset) activityStart = rmAddDays(activityStart, cfg.start_offset);
+    const days = cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)));
+    for (let i = 0; i < Math.min(days, 30); i++) {
+      const date = rmAddDays(activityStart, i);
+      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
+      inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', created_by: state.user.id });
+    }
+  });
+  if (!inserts.length) return;
+  for (let i = 0; i < inserts.length; i += 50) { const { error } = await sb.from('weekly_activities').insert(inserts.slice(i, i + 50)); if (error) { console.warn('autogen', error); break; } }
+  if (window.toast) toast(`Cronograma generado en el Planner (${inserts.length} actividades-día, con baseline).`, 'success');
+}
+window.rmAutoGenPlanner = rmAutoGenPlanner;
