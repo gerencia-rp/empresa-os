@@ -31,6 +31,10 @@ const wpState = {
   showChecklistFor: null,       // activityId si está abierto modal checklist
   printDate: null,              // si está set, se muestra vista print en lugar de grilla
   houseFilter: 'all',           // 'all' | projectId | 'name:Nombre' — filtra qué casa(s) ver en el calendario
+  liderFilter: 'all',           // A) filtro por crew/líder
+  stageFilter: 'all',           // A) filtro por etapa
+  onlyLate: false,              // A) solo atrasadas
+  hideEmpty: true,              // A) colapsar casas sin tareas esta semana
   openGroups: { crew:false, specialist:false, tool:false, vehicle:false, other:false }, // sidebar colapsado por default
   sidebarHidden: typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 1023px)').matches : false // oculto por default en mobile
 };
@@ -153,7 +157,21 @@ function wpInjectTheme() {
   #wp-root .bg-amber-50{background:rgba(192,125,22,.12) !important}
   #wp-root .bg-red-50{background:rgba(224,69,95,.09) !important}
   #wp-root .bg-red-600{background:var(--wneg) !important}#wp-root .bg-amber-600{background:var(--wamb) !important}#wp-root .bg-emerald-600{background:var(--wpos) !important}
+  /* A) tarjetas LIMPIAS: fondo neutro + estado por BORDE izquierdo (no bloques de color saturados) */
+  #wp-root td [draggable="true"].border-2{background:var(--wglass) !important;border-color:var(--wbord) !important;border-left-width:3px !important;box-shadow:0 1px 2px rgba(2,6,23,.05)}
+  #wp-root td [draggable="true"].bg-emerald-50{border-left-color:var(--wpos) !important}
+  #wp-root td [draggable="true"].bg-blue-50{border-left-color:var(--wa2) !important}
+  #wp-root td [draggable="true"].bg-rose-50,#wp-root td [draggable="true"].bg-red-50{border-left-color:var(--wneg) !important}
+  #wp-root td [draggable="true"].bg-amber-50{border-left-color:var(--wamb) !important}
+  #wp-root td [draggable="true"]:hover{border-color:var(--wa2) !important}
+  /* A) barra de filtros + meta de casa */
+  #wp-root .wp-filters{padding:2px 0}
+  #wp-root .wp-crew{font-weight:600}
+  #wp-root .wp-filters select,#wp-root .wp-fbtn{transition:.15s}
   /* ===== MODO OSCURO ===== */
+  html[data-osreskin="dark"] #wp-root td [draggable="true"].border-2{background:rgba(255,255,255,.04) !important;border-color:rgba(255,255,255,.09) !important;box-shadow:none}
+  html[data-osreskin="dark"] #wp-root .wp-crew{background:rgba(255,255,255,.08) !important;color:#c5cede !important}
+  html[data-osreskin="dark"] #wp-root .wp-filters .bg-white{background:rgba(255,255,255,.06) !important}
   html[data-osreskin="dark"] #modal:has(#wp-root) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;border-color:rgba(255,255,255,.08) !important;color:#e7ecf5}
   html[data-osreskin="dark"] #wp-root{--wink:#e7ecf5;--wmut:#8792a5;--wsurf:rgba(255,255,255,.05);--wglass:rgba(255,255,255,.04);--wbord:rgba(255,255,255,.09);color:#e7ecf5}
   html[data-osreskin="dark"] #wp-root .text-slate-900,html[data-osreskin="dark"] #wp-root .font-bold{color:#e7ecf5 !important}
@@ -297,10 +315,18 @@ function wpRender() {
 
   // Filtro por casa (si está activo, sólo muestra esa)
   const allHomes = homes.slice();
-  const filteredHomes = wpState.houseFilter === 'all' ? homes : homes.filter(h => h.id === wpState.houseFilter);
+  let filteredHomes = wpState.houseFilter === 'all' ? homes : homes.filter(h => h.id === wpState.houseFilter);
+  // A) Colapsar casas sin tareas visibles esta semana (con filtros aplicados)
+  const wpWeekSet = new Set(days.map(wpDateOnly));
+  const wpHomeWeekActs = h => wpState.activities.filter(a => (a.project_id === h.id || (!a.project_id && h.id.startsWith('name:') && a.property_name === h.id.slice(5))) && wpWeekSet.has(a.date) && wpActPassesFilters(a));
+  const wpAnyFilter = wpState.onlyLate || wpState.stageFilter !== 'all' || wpState.liderFilter !== 'all';
+  if (wpState.hideEmpty || wpAnyFilter) filteredHomes = filteredHomes.filter(h => wpHomeWeekActs(h).length > 0);
 
   // Detectar conflictos: misma resource en 2+ celdas el mismo día
   const conflicts = wpDetectConflicts();
+  // A) opciones de filtros (líder/etapa)
+  const wpAllStages = [...new Set(wpState.activities.map(a => a.stage).filter(Boolean))].sort();
+  const wpAllCrews = [...new Set((wpState.resources || []).filter(r => r.type === 'crew').map(r => r.name))].sort();
 
   // KPIs de avance esta semana (solo casas visibles, excluye terminadas)
   const totalThisWeek = visibleActs.length;
@@ -409,6 +435,22 @@ function wpRender() {
         </div>
       </div>
 
+      <!-- A) BARRA DE FILTROS -->
+      <div class="wp-filters flex items-center gap-2 flex-wrap mb-2">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Filtros</span>
+        <select onchange="wpSetLiderFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por crew/líder">
+          <option value="all">👷 Todos los crews</option>
+          ${wpAllCrews.map(c => `<option value="${(c || '').replace(/"/g, '&quot;')}" ${wpState.liderFilter === c ? 'selected' : ''}>${(c || '').replace(/</g, '&lt;')}</option>`).join('')}
+        </select>
+        <select onchange="wpSetStageFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por etapa">
+          <option value="all">🧱 Todas las etapas</option>
+          ${wpAllStages.map(s => `<option value="${(s || '').replace(/"/g, '&quot;')}" ${wpState.stageFilter === s ? 'selected' : ''}>${(s || '').replace(/</g, '&lt;')}</option>`).join('')}
+        </select>
+        <button onclick="wpToggleOnlyLate()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border ${wpState.onlyLate ? 'wp-fon bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">⏰ Solo atrasadas</button>
+        <button onclick="wpToggleHideEmpty()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border bg-white text-slate-600 border-slate-300 hover:bg-slate-50" title="Mostrar u ocultar casas sin tareas esta semana">${wpState.hideEmpty ? '📦 Ocultar vacías: ON' : '👁 Ocultar vacías: OFF'}</button>
+        ${(wpAnyFilter) ? `<button onclick="wpState.liderFilter='all';wpState.stageFilter='all';wpState.onlyLate=false;wpRender()" class="text-xs px-2 py-1 text-slate-400 hover:text-slate-700 underline">limpiar</button>` : ''}
+        <span class="text-[10px] text-slate-400 ml-auto">${filteredHomes.length} casa(s) visible(s)</span>
+      </div>
       <!-- BODY: Sidebar tabbed + Grid calendario -->
       <div class="flex gap-3 flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
         <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) -->
@@ -458,6 +500,13 @@ function wpRender() {
                 const homeActs = wpState.activities.filter(a => a.project_id === home.id || (!a.project_id && home.id.startsWith('name:') && a.property_name === home.id.slice(5)));
                 const homeDone = homeActs.filter(a => a.status === 'done').length;
                 const homePct = homeActs.length ? Math.round(homeDone/homeActs.length*100) : 0;
+                // A) líder(es) + días plan (baseline) vs real
+                const hB = homeActs.map(a => a.baseline_date).filter(Boolean).sort();
+                const hD = homeActs.map(a => a.date).filter(Boolean).sort();
+                const hPlanDays = hB.length ? wpDaysDiff(hB[0], hB[hB.length-1]) + 1 : 0;
+                const hRealDays = hD.length ? wpDaysDiff(hD[0], hD[hD.length-1]) + 1 : 0;
+                const hSlip = hRealDays - hPlanDays;
+                const hCrews = [...new Set(homeActs.flatMap(wpActCrews))];
                 return `
                 <tr>
                   <td class="py-2 px-2 border-b border-r border-slate-200 sticky left-0 bg-white z-10 align-top group">
@@ -465,6 +514,7 @@ function wpRender() {
                       <div class="font-bold text-xs">${home.name} <span class="text-[9px] text-slate-400">▤</span></div>
                       ${home.address ? `<div class="text-[10px] text-slate-500 truncate">${home.address}</div>` : ''}
                       ${homeActs.length ? `<div class="mt-1"><div class="bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${homePct}%"></div></div><div class="text-[9px] text-slate-500 mt-0.5">${homeDone}/${homeActs.length} (${homePct}%)</div></div>` : ''}
+                      ${homeActs.length ? `<div class="wp-hmeta text-[9px] mt-1 flex flex-wrap items-center gap-1">${hCrews.slice(0, 2).map(c => `<span class="wp-crew bg-slate-100 text-slate-600 px-1 rounded">👷 ${(c || '').replace('Crew ', '').replace(/</g, '&lt;')}</span>`).join('')}<span class="wp-days text-slate-500" title="Días plan (baseline) → real">📅 ${hPlanDays}→${hRealDays}d${hSlip > 0 ? ` <b class="text-rose-600">+${hSlip}</b>` : hSlip < 0 ? ` <b class="text-emerald-600">${hSlip}</b>` : ''}</span></div>` : ''}
                     </div>
                     <div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-100 opacity-50 group-hover:opacity-100 transition-opacity">
                       <button onclick="event.stopPropagation(); wpCompleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="flex-1 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="Marcar casa como terminada y enviar tiempos al Estimador Pro">✅ Terminar</button>
@@ -489,12 +539,27 @@ function wpRender() {
   `;
 }
 
+// A) crews (líder) de una actividad
+function wpActCrews(a) { return (a.resource_ids || []).map(rid => (wpState.resources || []).find(r => r.id === rid)).filter(r => r && r.type === 'crew').map(r => r.name); }
+// A) ¿la actividad pasa los filtros de líder/etapa/atrasadas?
+function wpActPassesFilters(a) {
+  if (wpState.stageFilter && wpState.stageFilter !== 'all' && (a.stage || '') !== wpState.stageFilter) return false;
+  if (wpState.liderFilter && wpState.liderFilter !== 'all' && !wpActCrews(a).includes(wpState.liderFilter)) return false;
+  if (wpState.onlyLate) { const late = a.status !== 'done' && a.status !== 'cancelled' && a.date < wpDateOnly(new Date()); if (!late) return false; }
+  return true;
+}
+function wpSetLiderFilter(v) { wpState.liderFilter = v || 'all'; wpRender(); }
+function wpSetStageFilter(v) { wpState.stageFilter = v || 'all'; wpRender(); }
+function wpToggleOnlyLate() { wpState.onlyLate = !wpState.onlyLate; wpRender(); }
+function wpToggleHideEmpty() { wpState.hideEmpty = !wpState.hideEmpty; wpRender(); }
+window.wpSetLiderFilter = wpSetLiderFilter; window.wpSetStageFilter = wpSetStageFilter; window.wpToggleOnlyLate = wpToggleOnlyLate; window.wpToggleHideEmpty = wpToggleHideEmpty;
+
 function wpRenderCell(home, date, conflicts) {
   const dateStr = wpDateOnly(date);
   const cellActs = wpState.activities.filter(a => {
     const matchProj = a.project_id === home.id;
     const matchName = !a.project_id && home.id.startsWith('name:') && a.property_name === home.id.slice(5);
-    return (matchProj || matchName) && a.date === dateStr;
+    return (matchProj || matchName) && a.date === dateStr && wpActPassesFilters(a);
   });
   const cellDone = cellActs.filter(a => a.status === 'done').length;
   const cellProgress = cellActs.length ? Math.round(cellDone/cellActs.length*100) : 0;
