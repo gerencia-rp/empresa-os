@@ -24,14 +24,13 @@ const OS_EMPRESAS = {
     { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenApp('rentas','property-manager')" },
     { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('rentas','cronograma')" },
   ] },
-  'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · SOW · cronogramas', apps: [
+  'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · estimación · pipeline', apps: [
     { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
-    { k: 'dashboard', name: 'Dashboard de Obras', icon: '▤', fn: "osOpenApp('remodelacion','dashboard')" },
+    { k: 'command-center', name: 'Command Center', icon: '◆', fn: "osOpenApp('remodelacion','command-center')" },
     { k: 'planner', name: 'Planner Semanal', icon: '🗓', fn: "osOpenApp('remodelacion','planner')" },
-    { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('remodelacion','cronograma')" },
-    { k: 'clickup', name: 'ClickUp Análisis', icon: '📊', fn: "osOpenApp('remodelacion','clickup')" },
     { k: 'airtable', name: 'Airtable Remodelación', icon: '🗂', ext: true, fn: "osOpenLink('Airtable Remodelacion')" },
     { k: 'drive', name: 'Drive · Structure One', icon: '📁', ext: true, fn: "osOpenLink('Drive Compartida')" },
+    // Fuera del panel (código intacto, se retoman después): Dashboard de Obras (→ Command Center), Cronograma (queda en Rentas), ClickUp Análisis.
   ] },
   'educacion': { key: 'education', name: 'Educación', icon: '🎓', tag: 'Universidad de Real Estate', apps: [
     { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
@@ -615,7 +614,7 @@ function osAppView(comp) {
 // Apps que son SISTEMAS CLÁSICOS (viven en app.js, abren como modal/overlay) → tipo de sistema.
 const OS_APP_SYS = {
   'rentas/property-manager': 'pm-rental-mgmt', 'rentas/cronograma': 'cronograma',
-  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/dashboard': 'remodel-dashboard', 'remodelacion/cronograma': 'cronograma', 'remodelacion/planner': 'weekly-planner', 'remodelacion/clickup': 'clickup-dashboard',
+  'remodelacion/remodel-pro': 'remodel-pro', 'remodelacion/planner': 'weekly-planner',
   'educacion/manager': 'edu-manager', 'educacion/reportes': 'edu-reports',
 };
 function osOpenApp(empresa, app, fromRoute) {
@@ -625,6 +624,8 @@ function osOpenApp(empresa, app, fromRoute) {
   if (empresa === 'fix-and-flip') { if (window.openFFCommandCenter) { openFFCommandCenter({ name: 'Fix & Flip' }); const sec = { deals: 'deals', underwriting: 'underwriting', inversionistas: 'inversionistas', finanzas: 'finanzas', analitica: 'analitica' }[app]; if (sec && sec !== 'command-center') setTimeout(() => window.ffGo && ffGo(sec), 450); } return; }
   // El "Command Center" de Rentas se removió (duplicaba a Property Manager) → redirigir.
   if (empresa === 'rentas' && app === 'command-center') { return osNav('/rentas/property-manager'); }
+  // Command Center de Remodelación: overlay propio (z>os-root), como el de FF → abre directo.
+  if (empresa === 'remodelacion' && app === 'command-center') { if (window.openRemodelCommandCenter) openRemodelCommandCenter({ name: 'Command Center · Remodelación' }); return; }
   // Sistemas clásicos → dispatch de app.js, con el OS oculto + barra Volver.
   const sysType = OS_APP_SYS[`${empresa}/${app}`];
   if (sysType) return osOpenSystem(sysType, empresa);
