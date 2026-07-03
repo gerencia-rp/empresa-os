@@ -70,7 +70,7 @@ async function wpLoadAll() {
   ] = await Promise.all([
     sb.from('resources').select('*').eq('active', true).order('type').order('name'),
     sb.from('weekly_activities').select('*').gte('date', start).lte('date', end).order('date'),
-    sb.from('remodel_projects').select('id,name,address,status,sqft,budget_total,activities,start_date,end_date_estimated,completed_at').order('created_at', { ascending: false }),
+    sb.from('remodel_projects').select('id,name,address,status,sqft,budget_total,activities,start_date,end_date_estimated,completed_at').is('archived_at', null).order('created_at', { ascending: false }),
     sb.from('remodel_catalog_items').select('code,description,depends_on').then(r => r.data || []).catch(() => []),
     sb.from('weekly_activities').select('*').is('date', null).order('priority', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
     sb.from('wp_task_templates').select('*').eq('active', true).order('category').order('name').then(r => r).catch(() => ({ data: [] })),
