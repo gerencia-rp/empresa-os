@@ -157,19 +157,42 @@ function wpInjectTheme() {
   #wp-root .bg-amber-50{background:rgba(192,125,22,.12) !important}
   #wp-root .bg-red-50{background:rgba(224,69,95,.09) !important}
   #wp-root .bg-red-600{background:var(--wneg) !important}#wp-root .bg-amber-600{background:var(--wamb) !important}#wp-root .bg-emerald-600{background:var(--wpos) !important}
-  /* A) tarjetas LIMPIAS: fondo neutro + estado por BORDE izquierdo (no bloques de color saturados) */
-  #wp-root td [draggable="true"].border-2{background:var(--wglass) !important;border-color:var(--wbord) !important;border-left-width:3px !important;box-shadow:0 1px 2px rgba(2,6,23,.05)}
-  #wp-root td [draggable="true"].bg-emerald-50{border-left-color:var(--wpos) !important}
-  #wp-root td [draggable="true"].bg-blue-50{border-left-color:var(--wa2) !important}
-  #wp-root td [draggable="true"].bg-rose-50,#wp-root td [draggable="true"].bg-red-50{border-left-color:var(--wneg) !important}
-  #wp-root td [draggable="true"].bg-amber-50{border-left-color:var(--wamb) !important}
-  #wp-root td [draggable="true"]:hover{border-color:var(--wa2) !important}
-  /* A) barra de filtros + meta de casa */
+  /* ===== TARJETA DE ACTIVIDAD PREMIUM (mismo lenguaje que la vista Desviación) ===== */
+  #wp-root td{padding:5px !important;vertical-align:top}
+  #wp-root .space-y-1{display:flex;flex-direction:column;gap:6px}
+  #wp-root .wp-acard{position:relative;background:var(--wglass);border:1px solid var(--wbord);border-left:3px solid var(--wmut);border-radius:10px;padding:8px 10px;transition:.16s;box-shadow:0 1px 2px rgba(2,6,23,.05)}
+  #wp-root .wp-acard:hover{border-color:var(--wa2);transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(2,6,23,.3)}
+  #wp-root .wp-acard[data-st="done"]{border-left-color:var(--wpos)}
+  #wp-root .wp-acard[data-st="late"],#wp-root .wp-acard[data-st="critical"],#wp-root .wp-acard[data-st="conflict"]{border-left-color:var(--wneg)}
+  #wp-root .wp-acard[data-st="postponed"],#wp-root .wp-acard[data-st="dep"]{border-left-color:var(--wamb)}
+  #wp-root .wp-acard[data-st="progress"]{border-left-color:var(--wa2)}
+  #wp-root .wp-acard[data-st="cancelled"]{opacity:.5}
+  #wp-root .wp-ac-top{display:flex;align-items:flex-start;gap:8px}
+  #wp-root .wp-ac-chk{margin-top:2px;cursor:pointer;flex-shrink:0;accent-color:var(--wpos)}
+  #wp-root .wp-ac-body{flex:1;min-width:0;cursor:pointer}
+  #wp-root .wp-ac-name{font-size:11.5px;font-weight:650;line-height:1.32;color:var(--wink);word-break:break-word}
+  #wp-root .wp-ac-name.wp-done{text-decoration:line-through;opacity:.5}
+  #wp-root .wp-ac-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
+  #wp-root .wp-ac-stage{font-size:9px;color:var(--wmut);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  #wp-root .wp-ac-day{font-size:8.5px;color:var(--wmut);background:rgba(100,116,139,.14);padding:1px 6px;border-radius:20px;font-weight:600;white-space:nowrap}
+  #wp-root .wp-ac-st{font-size:8.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  #wp-root .wp-acard[data-st="done"] .wp-ac-st{background:rgba(14,163,113,.13);color:var(--wpos)}
+  #wp-root .wp-acard[data-st="late"] .wp-ac-st,#wp-root .wp-acard[data-st="critical"] .wp-ac-st,#wp-root .wp-acard[data-st="conflict"] .wp-ac-st{background:rgba(224,69,95,.13);color:var(--wneg)}
+  #wp-root .wp-acard[data-st="postponed"] .wp-ac-st,#wp-root .wp-acard[data-st="dep"] .wp-ac-st{background:rgba(192,125,22,.15);color:var(--wamb)}
+  #wp-root .wp-acard[data-st="progress"] .wp-ac-st{background:rgba(47,110,240,.13);color:var(--wa2)}
+  #wp-root .wp-ac-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#wp-root .wp-ac-tags:empty{display:none}
+  #wp-root .wp-chip{font-size:8.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(100,116,139,.13);color:var(--wmut);border:none;cursor:pointer;line-height:1.4}
+  #wp-root .wp-chip.est{background:rgba(138,123,255,.15);color:#7b5bef}
+  #wp-root .wp-chip.ok{background:rgba(14,163,113,.13);color:var(--wpos)}
+  #wp-root .wp-res{font-size:8.5px;padding:2px 7px;border-radius:20px;background:rgba(47,110,240,.11);color:var(--wa2);font-weight:600;white-space:nowrap}
+  #wp-root .wp-ac-warn{font-size:9px;color:var(--wneg);font-weight:700;margin-top:5px}
+  #wp-root .wp-ac-sug{font-size:9px;color:var(--wamb);font-weight:600;margin-top:4px}
+  /* barra de filtros + meta de casa */
   #wp-root .wp-filters{padding:2px 0}
   #wp-root .wp-crew{font-weight:600}
   #wp-root .wp-filters select,#wp-root .wp-fbtn{transition:.15s}
   /* ===== MODO OSCURO ===== */
-  html[data-osreskin="dark"] #wp-root td [draggable="true"].border-2{background:rgba(255,255,255,.04) !important;border-color:rgba(255,255,255,.09) !important;box-shadow:none}
+  html[data-osreskin="dark"] #wp-root .wp-chip.est{background:rgba(138,123,255,.2);color:#b9aeff}
   html[data-osreskin="dark"] #wp-root .wp-crew{background:rgba(255,255,255,.08) !important;color:#c5cede !important}
   html[data-osreskin="dark"] #wp-root .wp-filters .bg-white{background:rgba(255,255,255,.06) !important}
   html[data-osreskin="dark"] #modal:has(#wp-root) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;border-color:rgba(255,255,255,.08) !important;color:#e7ecf5}
@@ -514,7 +537,7 @@ function wpRender() {
                       <div class="font-bold text-xs">${home.name} <span class="text-[9px] text-slate-400">▤</span></div>
                       ${home.address ? `<div class="text-[10px] text-slate-500 truncate">${home.address}</div>` : ''}
                       ${homeActs.length ? `<div class="mt-1"><div class="bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${homePct}%"></div></div><div class="text-[9px] text-slate-500 mt-0.5">${homeDone}/${homeActs.length} (${homePct}%)</div></div>` : ''}
-                      ${homeActs.length ? `<div class="wp-hmeta text-[9px] mt-1 flex flex-wrap items-center gap-1">${hCrews.slice(0, 2).map(c => `<span class="wp-crew bg-slate-100 text-slate-600 px-1 rounded">👷 ${(c || '').replace('Crew ', '').replace(/</g, '&lt;')}</span>`).join('')}<span class="wp-days text-slate-500" title="Días plan (baseline) → real">📅 ${hPlanDays}→${hRealDays}d${hSlip > 0 ? ` <b class="text-rose-600">+${hSlip}</b>` : hSlip < 0 ? ` <b class="text-emerald-600">${hSlip}</b>` : ''}</span></div>` : ''}
+                      ${homeActs.length ? `<div class="wp-hmeta text-[9px] mt-1 flex flex-wrap items-center gap-1">${hCrews.slice(0, 2).map(c => `<span class="wp-crew bg-slate-100 text-slate-600 px-1 rounded">👷 ${(c || '').replace('Crew ', '').replace(/</g, '&lt;')}</span>`).join('')}${Number.isFinite(hPlanDays) && Number.isFinite(hRealDays) ? `<span class="wp-days text-slate-500" title="Días plan (baseline) → real">📅 ${hPlanDays}→${hRealDays}d${hSlip > 0 ? ` <b class="text-rose-600">+${hSlip}</b>` : hSlip < 0 ? ` <b class="text-emerald-600">${hSlip}</b>` : ''}</span>` : ''}</div>` : ''}
                     </div>
                     <div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-100 opacity-50 group-hover:opacity-100 transition-opacity">
                       <button onclick="event.stopPropagation(); wpCompleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="flex-1 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="Marcar casa como terminada y enviar tiempos al Estimador Pro">✅ Terminar</button>
@@ -582,37 +605,36 @@ function wpRenderCell(home, date, conflicts) {
           const hasDepIssue = !depCheck.satisfied;
           const isCritical = a.priority === 'critical' || a.priority === 'urgent';
           const isPostponed = (a.notes || '').includes('[APLAZADA');
-          const statusColor = a.status === 'done' ? 'bg-emerald-50 border-emerald-300' :
-                              a.status === 'in_progress' ? 'bg-blue-50 border-blue-300' :
-                              a.status === 'cancelled' ? 'bg-slate-50 border-slate-200 opacity-60' :
-                              isCritical && a.status !== 'done' ? 'bg-rose-50 border-rose-500 border-l-4' :
-                              isPostponed ? 'bg-amber-50 border-amber-400 border-l-4' :
-                              hasConflict ? 'bg-red-50 border-red-300' :
-                              hasDepIssue ? 'bg-amber-50 border-amber-300' :
-                              'bg-white border-slate-200';
           const isLate = a.status !== 'done' && a.status !== 'cancelled' && new Date(a.date) < new Date(wpDateOnly(new Date()));
+          // A) estado primario → borde/punto sutil (mismo lenguaje que la vista Desviación)
+          const st = a.status === 'done' ? 'done' : a.status === 'cancelled' ? 'cancelled' : isLate ? 'late' : (isCritical ? 'critical' : (isPostponed ? 'postponed' : (hasConflict ? 'conflict' : (hasDepIssue ? 'dep' : (a.status === 'in_progress' ? 'progress' : 'normal')))));
+          const stLabel = { done: '✓ terminada', late: '⏰ atrasada', critical: '⚠ crítica', postponed: '⏸ aplazada', conflict: '⚠ conflicto', dep: `🔗 ${depCheck.blockers.length} dep`, progress: '● en curso', normal: '' }[st];
+          // extraer "(día X/Y)" del nombre para mostrarlo como chip limpio
+          const dayM = (a.activity_name || '').match(/\(d[ií]a\s*\d+\s*\/\s*\d+\)/i);
+          const cleanName = dayM ? a.activity_name.replace(dayM[0], '').trim() : a.activity_name;
+          const dayChip = dayM ? dayM[0].replace(/[()]/g, '').trim() : '';
           return `
-            <div class="${statusColor} border-2 rounded p-1.5 text-[11px] hover:border-slate-500"
+            <div class="wp-acard" data-st="${st}"
                  draggable="true"
                  ondragstart="wpActivityDragStart('${a.id}', event)"
                  ondragend="wpState.draggedActivityId=null">
-              <div class="flex items-start gap-1">
-                <input type="checkbox" ${a.status==='done'?'checked':''} onclick="event.stopPropagation(); wpQuickToggleDone('${a.id}', event)" class="mt-0.5 cursor-pointer" title="Marcar como done" />
-                <div class="flex-1 min-w-0 cursor-pointer" onclick="wpEditActivity('${a.id}')">
-                  <div class="font-bold text-slate-900 leading-tight ${a.status==='done'?'line-through opacity-60':''}">${a.activity_name}</div>
-                  <div class="flex items-center gap-1 flex-wrap">
-                    ${a.stage ? `<div class="text-[10px] text-slate-500">${a.stage}</div>` : ''}
-                    ${(a.notes||'').startsWith('[Estimador]') ? '<span class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded font-bold">📐 EST</span>' : ''}
-                    ${isLate ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded font-bold">⏰ ATRASADA</span>' : ''}
-                    ${isCritical && a.status !== 'done' ? '<span class="text-[9px] bg-rose-700 text-white px-1 rounded font-bold" title="Ruta crítica">⚠️ CRÍTICA</span>' : ''}
-                    ${isPostponed ? '<span class="text-[9px] bg-amber-600 text-white px-1 rounded font-bold" title="Tarea aplazada con motivo">🟡 APLAZADA</span>' : ''}
-                    ${hasDepIssue ? `<span class="text-[9px] bg-amber-600 text-white px-1 rounded font-bold" title="Dependencias no listas: ${depCheck.blockers.map(b => b.code).join(', ')}">🔗 ${depCheck.blockers.length} dep</span>` : ''}
-                    ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold hover:bg-emerald-200" title="Checklist + materiales">✅ ${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="text-[9px] text-slate-400 hover:text-slate-700" title="Agregar checklist + materiales">+ ✅</button>`}
-                    ${(a.materials||[]).length > 0 ? `<span class="text-[9px] bg-slate-100 text-slate-700 px-1 rounded" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
+              <div class="wp-ac-top">
+                <input type="checkbox" ${a.status==='done'?'checked':''} onclick="event.stopPropagation(); wpQuickToggleDone('${a.id}', event)" class="wp-ac-chk" title="Marcar como done" />
+                <div class="wp-ac-body" onclick="wpEditActivity('${a.id}')">
+                  <div class="wp-ac-name ${a.status==='done'?'wp-done':''}">${cleanName}</div>
+                  <div class="wp-ac-meta">
+                    ${a.stage ? `<span class="wp-ac-stage">${a.stage}</span>` : ''}
+                    ${dayChip ? `<span class="wp-ac-day">${dayChip}</span>` : ''}
+                    ${stLabel ? `<span class="wp-ac-st" title="${st==='critical'?'Ruta crítica':st==='postponed'?'Tarea aplazada':st==='dep'?'Dependencias no listas: '+depCheck.blockers.map(b=>b.code).join(', '):''}">${stLabel}</span>` : ''}
                   </div>
-                  ${acts.length ? `<div class="flex flex-wrap gap-0.5 mt-1">${acts.map(r => `<span class="text-[10px] bg-white border border-slate-300 px-1 rounded" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}</div>` : ''}
-                  ${hasConflict ? '<div class="text-[9px] text-red-600 font-bold mt-0.5">⚠️ Conflicto recurso</div>' : ''}
-                  ${hasDepIssue && depCheck.minDate ? `<div class="text-[9px] text-amber-700 font-semibold mt-0.5">📅 Sugerido: ${depCheck.minDate}</div>` : ''}
+                  <div class="wp-ac-tags">
+                    ${(a.notes||'').startsWith('[Estimador]') ? '<span class="wp-chip est" title="Viene del Estimador">📐 EST</span>' : ''}
+                    ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip ok" title="Checklist + materiales">✅ ${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip" title="Agregar checklist + materiales">+ ✅</button>`}
+                    ${(a.materials||[]).length > 0 ? `<span class="wp-chip" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
+                    ${acts.map(r => `<span class="wp-res" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}
+                  </div>
+                  ${hasConflict ? '<div class="wp-ac-warn">⚠️ Conflicto de recurso</div>' : ''}
+                  ${hasDepIssue && depCheck.minDate ? `<div class="wp-ac-sug">📅 Sugerido: ${depCheck.minDate}</div>` : ''}
                 </div>
               </div>
             </div>
