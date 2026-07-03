@@ -4,8 +4,8 @@
 function rmRenderSeguimiento(body) {
   const e = rmCalcProject();
   if (e.activities.length === 0) {
-    body.innerHTML = `<div class="text-center py-12 text-slate-500">
-      Cargá un proyecto desde <strong>📁 Proyectos</strong> o creá uno en el <strong>Editor</strong> para hacerle seguimiento.
+    body.innerHTML = rmSegSelector() + `<div class="text-center py-12 text-slate-500">
+      Elegí una propiedad arriba, o cargá/creá un proyecto para hacerle seguimiento.
     </div>`;
     return;
   }
@@ -13,7 +13,7 @@ function rmRenderSeguimiento(body) {
   const view = rmState.seguimientoView || 'fase';
   const isFase = view === 'fase';
 
-  body.innerHTML = `
+  body.innerHTML = rmSegSelector() + `
     <div class="flex items-end justify-between mb-3 flex-wrap gap-2">
       <div>
         <h2 class="text-lg font-bold">🔄 Seguimiento — ${rmState.editName || 'Proyecto'}</h2>
@@ -372,3 +372,39 @@ async function rmMarkProjectCompleted() {
   alert('✓ Proyecto marcado como completado. Sus actuales ya alimentan el modelo dinámico.');
   rmRenderTab();
 }
+
+// Bloque 2.3 — un seguimiento por propiedad + import Excel de avance
+function rmSegSelector() {
+  const projs = (rmState.projects || []).filter(p => !p.archived_at);
+  return `<div class="mb-2 flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200 rounded p-2">
+    <span class="text-[10px] font-bold uppercase text-slate-500">Seguimiento de:</span>
+    <select onchange="rmSelectProjectForTracking(this.value)" class="border border-slate-300 rounded px-2 py-1 text-sm font-semibold min-w-[220px]">
+      <option value="">— Elegí una propiedad —</option>
+      ${projs.map(p => `<option value="${p.id}" ${rmState.currentProject && rmState.currentProject.id === p.id ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.sqft ? ' · ' + p.sqft + 'sqft' : ''}</option>`).join('')}
+    </select>
+    <input type="file" id="rm-seg-xls" accept=".xlsx,.xls,.csv" style="display:none" onchange="rmSegImportExcel(this.files[0])">
+    <button onclick="document.getElementById('rm-seg-xls').click()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-2.5 py-1 rounded font-bold" title="Importar avance real: columnas activity_code, real_cost, real_days">📥 Importar Excel (avance)</button>
+  </div>`;
+}
+async function rmSelectProjectForTracking(id) {
+  if (!id) return;
+  const p = (rmState.projects || []).find(x => x.id === id);
+  if (p) { await rmLoadProject(p); rmState.tab = 'seguimiento'; rmRenderTab(); }
+}
+window.rmSelectProjectForTracking = rmSelectProjectForTracking;
+async function rmSegImportExcel(file) {
+  if (!file || !rmState.currentProject) return alert('Elegí primero una propiedad.');
+  if (typeof XLSX === 'undefined') return alert('Librería de Excel no cargada.');
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+  const norm = o => { const g = k => o[k] ?? o[k.toUpperCase()] ?? o[k[0].toUpperCase() + k.slice(1)]; return { activity_code: String(g('activity_code') || g('code') || g('codigo') || '').trim(), real_cost: +g('real_cost') || +g('costo') || 0, real_days: +g('real_days') || +g('dias') || 0, real_hours: +g('real_hours') || +g('horas') || 0 }; };
+  const ups = rows.map(norm).filter(r => r.activity_code).map(r => ({ project_id: rmState.currentProject.id, activity_code: r.activity_code, real_cost: r.real_cost, real_days: r.real_days, real_hours: r.real_hours, recorded_by: state.user.id }));
+  if (!ups.length) return alert('No encontré filas con activity_code. Columnas esperadas: activity_code, real_cost, real_days.');
+  const { error } = await sb.from('remodel_actuals').upsert(ups, { onConflict: 'project_id,activity_code' });
+  if (error) return alert('Error importando: ' + error.message);
+  if (typeof rmLoadActuals === 'function') await rmLoadActuals(rmState.currentProject.id);
+  rmRenderTab();
+  if (window.toast) toast(`Avance importado: ${ups.length} actividades.`, 'success'); else alert('Avance importado: ' + ups.length);
+}
+window.rmSegImportExcel = rmSegImportExcel;
