@@ -66,7 +66,7 @@ async function wpLoadAll() {
   const [
     resRes, actRes, projRes, catRes,
     // V2 — backlog, plantillas, recurrentes, all activities globales
-    blRes, ttRes, dtRes, rcRes, allActsRes
+    blRes, ttRes, dtRes, rcRes, allActsRes, movRes
   ] = await Promise.all([
     sb.from('resources').select('*').eq('active', true).order('type').order('name'),
     sb.from('weekly_activities').select('*').gte('date', start).lte('date', end).order('date'),
@@ -76,8 +76,10 @@ async function wpLoadAll() {
     sb.from('wp_task_templates').select('*').eq('active', true).order('category').order('name').then(r => r).catch(() => ({ data: [] })),
     sb.from('wp_day_templates').select('*').order('updated_at', { ascending: false }).then(r => r).catch(() => ({ data: [] })),
     sb.from('wp_recurring').select('*').eq('active', true).then(r => r).catch(() => ({ data: [] })),
-    sb.from('weekly_activities').select('*').then(r => r).catch(() => ({ data: [] }))
+    sb.from('weekly_activities').select('*').then(r => r).catch(() => ({ data: [] })),
+    sb.from('weekly_activity_moves').select('*').order('moved_at', { ascending: false }).limit(2000).then(r => r).catch(() => ({ data: [] }))
   ]);
+  wpState.moves = (movRes && movRes.data) || [];
   wpState.resources = resRes.data || [];
   wpState.activities = allActsRes.data || actRes.data || [];  // usamos TODAS para soportar overdue global
   wpState.projects = projRes.data || [];
@@ -172,7 +174,32 @@ function wpInjectTheme() {
   html[data-osreskin="dark"] #wp-root .bg-blue-50.border-blue-300,html[data-osreskin="dark"] #wp-root .text-blue-800,html[data-osreskin="dark"] #wp-root .text-blue-700{color:#8fb4ff !important}
   html[data-osreskin="dark"] #wp-root .bg-emerald-50.text-emerald-700,html[data-osreskin="dark"] #wp-root .text-emerald-700{color:#5fe0b8 !important}
   html[data-osreskin="dark"] #wp-root input,html[data-osreskin="dark"] #wp-root select{background:rgba(255,255,255,.06) !important;color:#e7ecf5 !important;border-color:rgba(255,255,255,.12) !important}
-  html[data-osreskin="dark"] #wp-root select option{background:#141b29;color:#e7ecf5}`;
+  html[data-osreskin="dark"] #wp-root select option{background:#141b29;color:#e7ecf5}
+  /* ===== Vista Desviación (Plan vs Real) — premium claro/oscuro ===== */
+  #wp-dev{--dink:#0f1c2e;--dmut:#64748b;--dbord:rgba(15,23,42,.09);--dglass:#fff;--dpos:#0ea371;--dneg:#e0455f;--damb:#c07d16;--dblue:#2f6ef0;color:var(--dink);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+  #wp-dev .dv-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+  #wp-dev .dv-card{background:var(--dglass);border:1px solid var(--dbord);border-radius:14px;padding:16px}
+  #wp-dev .dv-lab{font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--dmut);font-weight:700}
+  #wp-dev .dv-big{font-size:26px;font-weight:750;margin-top:6px;letter-spacing:-.5px}
+  #wp-dev .dv-meta{font-size:11px;color:var(--dmut);margin-top:5px}
+  #wp-dev .dv-pos{color:var(--dpos)}#wp-dev .dv-neg{color:var(--dneg)}#wp-dev .dv-amb{color:var(--damb)}
+  #wp-dev .dv-sec{background:var(--dglass);border:1px solid var(--dbord);border-radius:14px;padding:16px;margin-bottom:14px}
+  #wp-dev .dv-sec h3{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  #wp-dev table{width:100%;border-collapse:collapse;font-size:12.5px}
+  #wp-dev th{text-align:left;color:var(--dmut);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;padding:7px 8px;border-bottom:1px solid var(--dbord);font-weight:700}
+  #wp-dev td{padding:9px 8px;border-bottom:1px solid var(--dbord)}
+  #wp-dev .dv-track{position:relative;height:22px;background:rgba(100,116,139,.12);border-radius:6px;overflow:hidden}
+  #wp-dev .dv-bar{position:absolute;height:9px;border-radius:5px;top:2px}
+  #wp-dev .dv-bar.plan{background:rgba(47,110,240,.5);top:2px}#wp-dev .dv-bar.real{background:linear-gradient(90deg,var(--damb),var(--dneg));top:12px}
+  #wp-dev .dv-chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+  #wp-dev .dv-chip.ok{background:rgba(14,163,113,.12);color:var(--dpos)}#wp-dev .dv-chip.bad{background:rgba(224,69,95,.12);color:var(--dneg)}#wp-dev .dv-chip.warn{background:rgba(192,125,22,.14);color:var(--damb)}
+  #wp-dev .dv-brain{background:linear-gradient(180deg,rgba(138,123,255,.08),rgba(79,141,255,.04));border:1px solid rgba(138,123,255,.25)}
+  #wp-dev .dv-ins{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid var(--dbord);font-size:12.5px;line-height:1.5}#wp-dev .dv-ins:last-child{border:none}
+  #wp-dev .dv-back{background:none;border:1px solid var(--dbord);color:var(--dmut);border-radius:9px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer}#wp-dev .dv-back:hover{color:var(--dink)}
+  @media (max-width:820px){#wp-dev .dv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  html[data-osreskin="dark"] #wp-dev{--dink:#e7ecf5;--dmut:#8792a5;--dbord:rgba(255,255,255,.09);--dglass:rgba(255,255,255,.04)}
+  html[data-osreskin="dark"] #modal:has(#wp-dev) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-dev .dv-track{background:rgba(255,255,255,.06)}`;
   document.head.appendChild(st);
 }
 window.wpInjectTheme = wpInjectTheme;
@@ -372,6 +399,7 @@ function wpRender() {
           <button onclick="wpOpenIcsExport()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Exportar tareas a Google Calendar / iCloud (.ics)">📥 Calendario</button>
           <button onclick="wpOpenWorkerMobile()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Vista del día optimizada para celular del líder/obrero">📱 Vista obrero</button>
           <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
+          <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold" title="Plan inicial vs Real — desviacion por tarea/etapa/casa + Cerebro de planeacion">📉 Desviación</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
             <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
             ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
@@ -4992,3 +5020,97 @@ function wpDoIcsExport() {
   URL.revokeObjectURL(url);
   wpBackToPlanner();
 }
+
+// ════════════════════════════════════════════════════════════
+// 📉 PLAN INICIAL vs REAL (baseline) — desviación por tarea/etapa/casa/global + Cerebro de planeación.
+//    Lee baseline_date (día planeado original) vs date (real) de weekly_activities. NO escribe data.
+// ════════════════════════════════════════════════════════════
+const wpDevState = { house: 'all' };
+function wpDaysDiff(a, b) { if (!a || !b) return 0; return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000); }
+function wpHouseNameOf(a) { return a.property_name || ((wpState.projects || []).find(p => p.id === a.project_id) || {}).name || '—'; }
+
+function wpCalcDeviation(houseFilter) {
+  let acts = (wpState.activities || []).filter(a => a.baseline_date && a.date && a.status !== 'cancelled');
+  if (houseFilter && houseFilter !== 'all') acts = wpFilterActsByHouse(acts, houseFilter);
+  const withSlip = acts.map(a => ({ ...a, slip: wpDaysDiff(a.baseline_date, a.date) }));
+  const late = withSlip.filter(a => a.slip > 0), moved = withSlip.filter(a => a.slip !== 0);
+  const totalSlip = late.reduce((s, a) => s + a.slip, 0);
+  const avgSlip = withSlip.length ? withSlip.reduce((s, a) => s + a.slip, 0) / withSlip.length : 0;
+  const onTimePct = withSlip.length ? Math.round((withSlip.length - late.length) / withSlip.length * 100) : 100;
+  const nowMonth = wpDateOnly(new Date()).slice(0, 7);
+  const diasMesMas = (wpState.moves || []).filter(m => (m.moved_at || '').slice(0, 7) === nowMonth).reduce((s, m) => s + Math.max(0, +m.slip_days || 0), 0);
+  const grp = keyFn => { const g = {}; withSlip.forEach(a => { const k = keyFn(a) || '—'; (g[k] = g[k] || { key: k, n: 0, slipSum: 0, late: 0 }); g[k].n++; g[k].slipSum += a.slip; if (a.slip > 0) g[k].late++; }); return Object.values(g).map(x => ({ ...x, avg: x.n ? x.slipSum / x.n : 0, pct: x.n ? Math.round(x.late / x.n * 100) : 0 })).sort((a, b) => b.avg - a.avg); };
+  const byStage = grp(a => a.stage), byType = grp(a => (a.activity_name || '').replace(/\s*\(día.*/, '').trim() || a.activity_code);
+  const byCrew = (() => { const g = {}; withSlip.forEach(a => (a.resource_ids || []).forEach(rid => { const r = (wpState.resources || []).find(x => x.id === rid); if (r && r.type === 'crew') { (g[r.name] = g[r.name] || { key: r.name, n: 0, slipSum: 0, late: 0 }); g[r.name].n++; g[r.name].slipSum += a.slip; if (a.slip > 0) g[r.name].late++; } })); return Object.values(g).map(x => ({ ...x, avg: x.n ? x.slipSum / x.n : 0, pct: x.n ? Math.round(x.late / x.n * 100) : 0 })).sort((a, b) => b.avg - a.avg); })();
+  const H = {}; withSlip.forEach(a => { const h = wpHouseNameOf(a); const x = (H[h] = H[h] || { house: h, n: 0, slipSum: 0, late: 0, planMin: a.baseline_date, planMax: a.baseline_date, realMin: a.date, realMax: a.date }); x.n++; x.slipSum += a.slip; if (a.slip > 0) x.late++; if (a.baseline_date < x.planMin) x.planMin = a.baseline_date; if (a.baseline_date > x.planMax) x.planMax = a.baseline_date; if (a.date < x.realMin) x.realMin = a.date; if (a.date > x.realMax) x.realMax = a.date; });
+  const byHouse = Object.values(H).map(x => ({ ...x, avg: x.n ? x.slipSum / x.n : 0, pct: x.n ? Math.round(x.late / x.n * 100) : 0 })).sort((a, b) => b.avg - a.avg);
+  return { withSlip, moved, late, totalSlip, avgSlip, onTimePct, diasMesMas, tareasMovidas: moved.length, byStage, byType, byCrew, byHouse };
+}
+
+// C) APRENDIZAJE — agregados de desviación por etapa/tipo/crew, listos para que el Estimador calibre días/etapa.
+//    (No se aplican todavía; el dato queda disponible acá y en la vista SQL remodel_stage_deviation.)
+function wpDeviationAggregates() {
+  const c = wpCalcDeviation('all');
+  return { byStage: c.byStage.map(s => ({ stage: s.key, avgSlipDays: +s.avg.toFixed(2), pctLate: s.pct, n: s.n })), byTaskType: c.byType.slice(0, 40).map(t => ({ task: t.key, avgSlipDays: +t.avg.toFixed(2), n: t.n })), byCrew: c.byCrew.map(cr => ({ crew: cr.key, avgSlipDays: +cr.avg.toFixed(2), n: cr.n })), generatedAt: wpDateOnly(new Date()) };
+}
+window.wpDeviationAggregates = wpDeviationAggregates;
+
+function wpOpenDeviation() { wpDevState.house = wpState.houseFilter || 'all'; wpRenderDeviation(); }
+window.wpOpenDeviation = wpOpenDeviation;
+function wpDevSetHouse(v) { wpDevState.house = v; wpRenderDeviation(); }
+window.wpDevSetHouse = wpDevSetHouse;
+
+function wpRenderDeviation() {
+  wpInjectTheme();
+  const c = wpCalcDeviation(wpDevState.house);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' }) : '—';
+  const slipChip = v => v > 0 ? `<span class="dv-chip bad">+${v}d</span>` : v < 0 ? `<span class="dv-chip ok">${v}d</span>` : `<span class="dv-chip ok">a tiempo</span>`;
+  // opciones de casa
+  const activeProj = (wpState.projects || []).filter(p => p.status !== 'completed' && p.status !== 'cancelled');
+  const extra = new Set(); (wpState.activities || []).forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
+  const houseOpts = [`<option value="all">🏘️ Todas las casas</option>`, ...activeProj.map(p => `<option value="${esc(p.id)}" ${wpDevState.house === p.id ? 'selected' : ''}>🏠 ${esc(p.name)}</option>`), ...[...extra].map(n => `<option value="name:${esc(n)}" ${wpDevState.house === 'name:' + n ? 'selected' : ''}>🏠 ${esc(n)}</option>`)].join('');
+  // timeline global
+  const allD = c.byHouse.flatMap(h => [h.planMin, h.planMax, h.realMin, h.realMax]).filter(Boolean).sort();
+  const gMin = allD[0], gMax = allD[allD.length - 1];
+  const span = Math.max(1, wpDaysDiff(gMin, gMax));
+  const pos = d => Math.max(0, Math.min(100, wpDaysDiff(gMin, d) / span * 100));
+  // Cerebro de planeación
+  const insights = [];
+  if (c.byStage[0] && c.byStage[0].avg > 0.3) insights.push(`La etapa que más se atrasa es <b>${esc(c.byStage[0].key)}</b> — promedio +${c.byStage[0].avg.toFixed(1)} días (${c.byStage[0].pct}% de sus tareas se movieron).`);
+  if (c.byCrew[0] && c.byCrew[0].avg > 0.3) insights.push(`El crew con más atraso es <b>${esc(c.byCrew[0].key)}</b> — +${c.byCrew[0].avg.toFixed(1)} días promedio.`);
+  if (c.byType[0] && c.byType[0].avg > 0.5) insights.push(`Tipo de tarea más problemático: <b>${esc(c.byType[0].key)}</b> (+${c.byType[0].avg.toFixed(1)}d).`);
+  if (c.byHouse[0] && c.byHouse[0].pct > 0) insights.push(`Casa con mayor % de desviación: <b>${esc(c.byHouse[0].house)}</b> — ${c.byHouse[0].pct}% de tareas movidas.`);
+  if (!insights.length) insights.push('Todavía no hay desviación: las tareas están en su día planeado (baseline). A medida que se muevan, acá vas a ver qué etapas/crews/casas se atrasan más.');
+  insights.push('Estos agregados quedan disponibles para que el Estimador calibre sus días/etapa (aprendizaje).');
+
+  const tbl = (rows, label) => `<table><thead><tr><th>${label}</th><th>Tareas</th><th>Atraso prom.</th><th>% movidas</th></tr></thead><tbody>${rows.length ? rows.slice(0, 12).map(r => `<tr><td><b>${esc(r.key || r.house)}</b></td><td>${r.n}</td><td class="${r.avg > 0 ? 'dv-neg' : 'dv-pos'}">${r.avg > 0 ? '+' : ''}${r.avg.toFixed(1)}d</td><td>${r.pct}%</td></tr>`).join('') : '<tr><td colspan="4" style="color:var(--dmut);padding:14px">Sin datos</td></tr>'}</tbody></table>`;
+
+  const html = `<div id="wp-dev">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--dmut)">Plan inicial (baseline) vs Real — leído de <b>Airtable/Planner en vivo</b>.</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select onchange="wpDevSetHouse(this.value)" style="font-size:12px;padding:7px 10px;border-radius:9px;border:1px solid var(--dbord);background:var(--dglass);color:var(--dink)">${houseOpts}</select>
+        <button class="dv-back" onclick="wpBackToPlanner()">← Volver al Planner</button>
+      </div>
+    </div>
+    <div class="dv-kpis">
+      <div class="dv-card"><div class="dv-lab">Días de más (este mes)</div><div class="dv-big ${c.diasMesMas > 0 ? 'dv-neg' : 'dv-pos'}">${c.diasMesMas}</div><div class="dv-meta">suma de atrasos por reprogramación</div></div>
+      <div class="dv-card"><div class="dv-lab">Tareas movidas</div><div class="dv-big">${c.tareasMovidas}</div><div class="dv-meta">de ${c.withSlip.length} con baseline</div></div>
+      <div class="dv-card"><div class="dv-lab">Atraso promedio</div><div class="dv-big ${c.avgSlip > 0 ? 'dv-neg' : 'dv-pos'}">${c.avgSlip > 0 ? '+' : ''}${c.avgSlip.toFixed(1)}d</div><div class="dv-meta">plan → real por tarea</div></div>
+      <div class="dv-card"><div class="dv-lab">A tiempo</div><div class="dv-big ${c.onTimePct >= 80 ? 'dv-pos' : c.onTimePct >= 60 ? 'dv-amb' : 'dv-neg'}">${c.onTimePct}%</div><div class="dv-meta">tareas en su día planeado</div></div>
+    </div>
+    <div class="dv-sec"><h3>📊 Plan inicial vs Real — por casa</h3>
+      <div style="display:flex;gap:14px;font-size:10px;color:var(--dmut);margin-bottom:10px"><span><span style="display:inline-block;width:10px;height:8px;background:rgba(47,110,240,.5);border-radius:3px"></span> Plan</span><span><span style="display:inline-block;width:10px;height:8px;background:linear-gradient(90deg,#c07d16,#e0455f);border-radius:3px"></span> Real</span></div>
+      ${c.byHouse.length ? c.byHouse.map(h => `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><b>${esc(h.house)}</b><span>${slipChip(Math.round(h.avg))} · ${h.pct}% movidas · plan ${fmt(h.planMin)}–${fmt(h.planMax)} → real ${fmt(h.realMin)}–${fmt(h.realMax)}</span></div><div class="dv-track"><div class="dv-bar plan" style="left:${pos(h.planMin)}%;width:${Math.max(2, pos(h.planMax) - pos(h.planMin))}%"></div><div class="dv-bar real" style="left:${pos(h.realMin)}%;width:${Math.max(2, pos(h.realMax) - pos(h.realMin))}%"></div></div></div>`).join('') : '<div style="color:var(--dmut);padding:10px">Sin casas con baseline.</div>'}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="dv-sec"><h3>🧱 Desviación por etapa</h3>${tbl(c.byStage, 'Etapa')}</div>
+      <div class="dv-sec"><h3>🏠 Desviación por casa</h3>${tbl(c.byHouse.map(h => ({ ...h, key: h.house })), 'Casa')}</div>
+    </div>
+    <div class="dv-sec dv-brain"><h3>🧠 Cerebro de planeación</h3>${insights.map(i => `<div class="dv-ins"><span style="color:var(--dblue)">●</span><div>${i}</div></div>`).join('')}</div>
+  </div>`;
+  openModal('📉 Plan inicial vs Real — Desviación', html);
+  const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-6xl'); }
+}
+window.wpRenderDeviation = wpRenderDeviation;
