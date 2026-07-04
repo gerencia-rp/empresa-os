@@ -50,9 +50,10 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('remodel_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
       sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => []),
@@ -66,6 +67,7 @@ async function rcLoadAll() {
     RC.alerts = a.data || [];
     RC.syncLog = (l.data && l.data[0]) || null;
     RC.parity = parity || null;
+    RC.overhead = overhead || [];
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -107,6 +109,11 @@ function rcCompute() {
   const gananciaHist = fin.reduce((s, o) => s + (+o.ganancia || 0), 0);
   const revenueHist = fin.reduce((s, o) => s + (+o.valor_cliente || 0), 0);
   const margenHist = revenueHist > 0 ? Math.round(gananciaHist / revenueHist * 100) : 0;
+  // P1-4: overhead (Gastos Empresariales + Nómina Admin + Plataformas) → Utilidad NETA = ganancia BRUTA − overhead
+  const overheadRows = RC.overhead || [];
+  const overheadTotal = overheadRows.reduce((s, x) => s + (+x.monto || 0), 0);
+  const overheadBy = {}; overheadRows.forEach(x => { overheadBy[x.source] = (overheadBy[x.source] || 0) + (+x.monto || 0); });
+  const utilidadNeta = gananciaHist - overheadTotal;
   const matHist = fin.reduce((s, o) => s + (+o.gasto_materiales || 0), 0);
   const labHist = fin.reduce((s, o) => s + (+o.gasto_trabajadores || 0), 0);
   const matPctHist = (matHist + labHist) > 0 ? Math.round(matHist / (matHist + labHist) * 100) : 0;
@@ -167,7 +174,7 @@ function rcCompute() {
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
   const gastoTipo = { material: matHist, labor: labHist, total: matHist + labHist };
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, utilidadNeta, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -260,6 +267,14 @@ function rcSecCommand(c) {
       <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">mediana ${c.desvDiasMed>0?'+':''}${c.desvDiasMed}d · ${c.aTiempoPct}% a tiempo${c.desvDiasRevN?` · <span class="warn">${c.desvDiasRevN} a revisar</span>`:''}</div></div>
       <div class="card kpi"><div class="lab">Margen realizado</div><div class="big ${c.margenReal>=0?'up':'down'}">${RC_K(c.margenReal)}</div><div class="meta">ingreso − costo real (${c.fin.length} fin)</div></div>
       <div class="card kpi"><div class="lab">Alertas</div><div class="big ${c.compAlerts.length?'down':'up'}">${c.compAlerts.length}</div><div class="meta">sobre-presupuesto / atraso</div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="chart-h"><div class="t">Overhead / EBITDA de Remodelación</div><div class="k">Ganancia BRUTA − overhead</div></div>
+      <div class="grid kpis">
+        <div class="card kpi"><div class="lab">Ganancia BRUTA</div><div class="big up">${RC_K(c.gananciaHist)}</div><div class="meta">de obras, antes de overhead</div></div>
+        <div class="card kpi"><div class="lab">Overhead del período</div><div class="big down">${RC_K(c.overheadTotal)}</div><div class="meta">nómina admin ${RC_K(c.overheadBy.nomina_admin||0)} · gastos ${RC_K(c.overheadBy.gastos_empresariales||0)} · plataformas ${RC_K(c.overheadBy.plataformas||0)}</div></div>
+        <div class="card kpi"><div class="lab">Utilidad NETA</div><div class="big ${c.utilidadNeta>=0?'up glow':'down'}">${RC_K(c.utilidadNeta)}</div><div class="meta">EBITDA aprox = BRUTA − overhead</div></div>
+      </div>
     </div>
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Alertas críticas</div><div class="k">${c.compAlerts.length} activas</div></div>
