@@ -44,6 +44,7 @@ const BUNDLE_FILES = [
   "os/os.js",
   "remodel-dashboard.js",
   "remodel-command-center.js",
+  "remodel-reportes.js",
   "clickup-dashboard.js",
   "pm-dashboard.js",
   "education.js",

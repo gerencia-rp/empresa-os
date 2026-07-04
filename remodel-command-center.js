@@ -254,6 +254,7 @@ const RC_NAV = [
   ['obras', '▤', 'Obras'],
   ['lideres', '◈', 'Líderes'],
   ['gestion', '◎', 'Gestión (EVM)'],
+  ['reportes', '📑', 'Reportes CEO'],
   ['cerebro', '✦', 'Cerebro de obra'],
 ];
 function rcRender() {
@@ -262,7 +263,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
