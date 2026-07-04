@@ -52,13 +52,13 @@ async function rcLoadAll() {
   try {
     const [p, a, l, names, crews, hrs, parity, overhead] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
-      sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
-      sb.from('remodel_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
       sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => []),
       sb.from('remodel_crew_rates').select('airtable_id, nombre').then(r => r.data || []).catch(() => []),
-      sb.from('remodel_worker_pay_summary').select('casa_norm, horas').then(r => r.data || []).catch(() => [])
+      sb.from('remodel_worker_pay_summary').select('casa_norm, horas').then(r => r.data || []).catch(() => []),
+      sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('remodel_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
