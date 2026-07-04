@@ -534,6 +534,30 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Soft-delete de paridad: archivar obras NO vistas en este run (fantasmas borrados en Airtable).
+    // Seguro: se basa en last_synced_at (los vistos quedaron con last_synced_at ≈ ahora por el upsert).
+    const seenIds = projectedAll.map((p) => p.airtable_id).filter(Boolean);
+    const runStartIso = new Date(startMs).toISOString();
+    try {
+      await sb.from("remodel_at_properties")
+        .update({ active: false, archived_at: new Date().toISOString() })
+        .lt("last_synced_at", runStartIso).eq("active", true);
+      if (seenIds.length) {
+        await sb.from("remodel_at_properties")
+          .update({ active: true, archived_at: null }).in("airtable_id", seenIds);
+      }
+      const { count: mirrorCount } = await sb.from("remodel_at_properties")
+        .select("id", { count: "exact", head: true }).eq("active", true);
+      const airtableCount = seenIds.length;
+      await sb.from("remodel_sync_parity").upsert({
+        source: "remodel_at_properties",
+        airtable_count: airtableCount,
+        mirror_count: mirrorCount ?? airtableCount,
+        in_sync: (mirrorCount ?? airtableCount) === airtableCount,
+        checked_at: new Date().toISOString(),
+      }, { onConflict: "source" });
+    } catch (e) { console.warn("parity/softdelete skip:", String(e)); }
+
     // Refinamiento del pronosticador desde casas completas (no rompe el sync si falla)
     let refinement: any = null;
     try { refinement = await computeAndStoreRefinement(sb, projectedAll); }
