@@ -558,6 +558,39 @@ Deno.serve(async (req) => {
       }, { onConflict: "source" });
     } catch (e) { console.warn("parity/softdelete skip:", String(e)); }
 
+    // Overhead / EBITDA (P1-4): Gastos Empresariales + Nómina Admin + Plataformas → remodel_overhead
+    try {
+      const OVERHEAD_SOURCES = [
+        { table: "tblk1vS2PW6OP0OyY", source: "gastos_empresariales", monto: "fldDgzONzOg9v0tev", concepto: "fldIUMOsInhxxGs5Y", fecha: "fld12a5wWYFPSM5VH", categoria: "fldr8TNXyOx6fF9qR", mes: "fld9h5l9GOAeI3Czr", anio: "fldFDsokteNLzRGem" },
+        { table: "tblv77DAUX7mznOso", source: "nomina_admin", monto: "fldv0pTlmzh9Qxaoo", concepto: "fldPI1F8hqouEaXUL", mes: "fldy8UDu3y9OD9MLi" },
+        { table: "tblgd4wcFSa7Aq9R5", source: "plataformas", monto: "fldYnTphFfdhuDAm0", concepto: "fld3ELE48t7BtgUQo", mes: "fldZQqHQz1xCLXBWI" },
+      ] as any[];
+      const sel = (v: any) => (v && v.name) || (Array.isArray(v) ? (v[0]?.name || v[0]) : v) || null;
+      const ohRows: any[] = [];
+      for (const src of OVERHEAD_SOURCES) {
+        const recs = await fetchAirtableTableById(src.table);
+        for (const r of recs) {
+          const f = r.fields || {};
+          ohRows.push({
+            airtable_id: r.id, source: src.source,
+            concepto: f[src.concepto] != null ? String(f[src.concepto]) : null,
+            monto: typeof f[src.monto] === "number" ? f[src.monto] : null,
+            fecha: src.fecha ? (f[src.fecha] || null) : null,
+            categoria: src.categoria ? sel(f[src.categoria]) : null,
+            mes: src.mes ? sel(f[src.mes]) : null,
+            anio: src.anio ? sel(f[src.anio]) : null,
+            active: true, archived_at: null, last_synced_at: new Date().toISOString(),
+          });
+        }
+      }
+      if (ohRows.length) {
+        for (let i = 0; i < ohRows.length; i += 500) {
+          await sb.from("remodel_overhead").upsert(ohRows.slice(i, i + 500), { onConflict: "airtable_id" });
+        }
+        await sb.from("remodel_overhead").update({ active: false, archived_at: new Date().toISOString() }).lt("last_synced_at", runStartIso).eq("active", true);
+      }
+    } catch (e) { console.warn("overhead skip:", String(e)); }
+
     // Refinamiento del pronosticador desde casas completas (no rompe el sync si falla)
     let refinement: any = null;
     try { refinement = await computeAndStoreRefinement(sb, projectedAll); }
