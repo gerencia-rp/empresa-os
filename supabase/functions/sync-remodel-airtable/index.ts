@@ -591,6 +591,33 @@ Deno.serve(async (req) => {
       }
     } catch (e) { console.warn("overhead skip:", String(e)); }
 
+    // OKRs / Metas (Reportes CEO): tabla OKRs / Metas → remodel_okrs
+    try {
+      const OK = { table: "tblGUPnE4E5IrUGEt", metrica: "fldO1bR2kRbpkBMBk", clave: "fldmeai0JuTWSLvTs", objetivo: "fldXQbJB3I5o0q3zt", comparador: "fld0fngB6uZnV92CS", unidad: "fldRdSqlgqyQ10r9m", periodo: "fldTMwsdgQuAWVA4Q", descripcion: "fld3Q6boqaf1aGPUb" };
+      const selName = (v: any) => (v && v.name) || (Array.isArray(v) ? (v[0]?.name || v[0]) : v) || null;
+      const okRecs = await fetchAirtableTableById(OK.table);
+      const okRows = okRecs.map((r: any) => {
+        const f = r.fields || {};
+        return {
+          airtable_id: r.id,
+          metrica: f[OK.metrica] != null ? String(f[OK.metrica]) : null,
+          clave: f[OK.clave] != null ? String(f[OK.clave]) : null,
+          objetivo: typeof f[OK.objetivo] === "number" ? f[OK.objetivo] : null,
+          comparador: selName(f[OK.comparador]),
+          unidad: selName(f[OK.unidad]),
+          periodo: selName(f[OK.periodo]),
+          descripcion: f[OK.descripcion] != null ? String(f[OK.descripcion]) : null,
+          active: true, archived_at: null, last_synced_at: new Date().toISOString(),
+        };
+      });
+      if (okRows.length) {
+        for (let i = 0; i < okRows.length; i += 500) {
+          await sb.from("remodel_okrs").upsert(okRows.slice(i, i + 500), { onConflict: "airtable_id" });
+        }
+        await sb.from("remodel_okrs").update({ active: false, archived_at: new Date().toISOString() }).lt("last_synced_at", runStartIso).eq("active", true);
+      }
+    } catch (e) { console.warn("okrs skip:", String(e)); }
+
     // Refinamiento del pronosticador desde casas completas (no rompe el sync si falla)
     let refinement: any = null;
     try { refinement = await computeAndStoreRefinement(sb, projectedAll); }

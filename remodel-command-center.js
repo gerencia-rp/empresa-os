@@ -50,7 +50,7 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity, overhead] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead, okrs] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
@@ -58,7 +58,8 @@ async function rcLoadAll() {
       sb.from('remodel_crew_rates').select('airtable_id, nombre').then(r => r.data || []).catch(() => []),
       sb.from('remodel_worker_pay_summary').select('casa_norm, horas').then(r => r.data || []).catch(() => []),
       sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
-      sb.from('remodel_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => [])
+      sb.from('remodel_overhead').select('source, monto, categoria').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('remodel_okrs').select('*').eq('active', true).then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -68,6 +69,7 @@ async function rcLoadAll() {
     RC.syncLog = (l.data && l.data[0]) || null;
     RC.parity = parity || null;
     RC.overhead = overhead || [];
+    RC.okrs = okrs || [];
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -100,6 +102,21 @@ function rcFin(o) {
   const presupuesto = +o.presupuesto_interno || 0; // Presupuesto Remodelación
   return { mat, lab, ingreso, costoReal, presupuesto, margen: ingreso - costoReal, devCostoPct: presupuesto > 0 ? (costoReal - presupuesto) / presupuesto * 100 : null };
 }
+function rcObraDataset() {
+  return (RC.obras || []).map(o => {
+    const ff = rcFin(o); const sq = +o.sqft || 0; const dq = rcDQ(o);
+    return {
+      address: o.address, lider: o.lider || '—', estado: o.proceso || null, ciudad: o.city || null, sqft: sq,
+      ingreso: ff.ingreso, costo_real: ff.costoReal, presupuesto: ff.presupuesto, utilidad: +o.ganancia || 0,
+      margen: ff.ingreso > 0 ? Math.round((+o.ganancia || 0) / ff.ingreso * 100) : null,
+      retraso: o.retraso_dias != null ? +o.retraso_dias : null,
+      psf: sq > 0 ? Math.round(ff.costoReal / sq) : null,
+      rentabilidad: o.rentabilidad != null ? +o.rentabilidad : null,
+      fecha_inicio: o.fecha_inicio || null, fecha_real: o.fecha_real_fin || null,
+      fin: dq.fin, sinDatos: dq.sinDatos
+    };
+  });
+}
 function rcCompute() {
   const obras = RC.obras.map(o => ({ ...o, dq: rcDQ(o) }));
   const fin = obras.filter(o => o.dq.fin);
@@ -113,7 +130,13 @@ function rcCompute() {
   const overheadRows = RC.overhead || [];
   const overheadTotal = overheadRows.reduce((s, x) => s + (+x.monto || 0), 0);
   const overheadBy = {}; overheadRows.forEach(x => { overheadBy[x.source] = (overheadBy[x.source] || 0) + (+x.monto || 0); });
+  const CAPEX_RE = /veh[ií]culo|activo|compra de|maquinaria|equipo|mobiliario/i;
+  const overheadOpex = overheadRows.reduce((sum, x) => sum + ((x.source === 'gastos_empresariales' && CAPEX_RE.test(x.categoria || '')) ? 0 : (+x.monto || 0)), 0);
+  const overheadCapex = overheadTotal - overheadOpex;
+  const ingresoTotal = fin.reduce((sum, o) => sum + rcFin(o).ingreso, 0);
   const utilidadNeta = gananciaHist - overheadTotal;
+  const ebitda = gananciaHist - overheadOpex;
+  const ebitdaMargen = ingresoTotal > 0 ? Math.round(ebitda / ingresoTotal * 100) : 0;
   const matHist = fin.reduce((s, o) => s + (+o.gasto_materiales || 0), 0);
   const labHist = fin.reduce((s, o) => s + (+o.gasto_trabajadores || 0), 0);
   const matPctHist = (matHist + labHist) > 0 ? Math.round(matHist / (matHist + labHist) * 100) : 0;
@@ -174,7 +197,21 @@ function rcCompute() {
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
   const gastoTipo = { material: matHist, labor: labHist, total: matHist + labHist };
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, utilidadNeta, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  const OKR_DEFAULTS = [
+    { clave: 'margen_bruto', metrica: 'Margen bruto', objetivo: 20, comparador: '≥', unidad: '%' },
+    { clave: 'rentabilidad', metrica: 'Rentabilidad', objetivo: 15, comparador: '≥', unidad: '%' },
+    { clave: 'desv_costo', metrica: 'Desviación de costo', objetivo: 5, comparador: '≤', unidad: '%' },
+    { clave: 'desv_dias', metrica: 'Desviación de días', objetivo: 7, comparador: '≤', unidad: 'días' },
+    { clave: 'psf', metrica: 'Costo por sqft', objetivo: 50, comparador: '≤', unidad: 'usd' },
+    { clave: 'ebitda_margen', metrica: 'Margen EBITDA', objetivo: 10, comparador: '≥', unidad: '%' },
+    { clave: 'a_tiempo', metrica: '% Obras a tiempo', objetivo: 70, comparador: '≥', unidad: '%' },
+    { clave: 'en_presupuesto', metrica: '% Obras en presupuesto', objetivo: 70, comparador: '≥', unidad: '%' }
+  ];
+  const okrsConfigured = (RC.okrs || []).length > 0;
+  const okrsList = okrsConfigured ? RC.okrs : OKR_DEFAULTS;
+  const okrActual = { margen_bruto: margenHist, rentabilidad: rentProm, desv_costo: desvCostoProm, desv_dias: desvDiasProm, psf: psfProm, ebitda_margen: ebitdaMargen, a_tiempo: aTiempoPct, en_presupuesto: enPresupPct };
+  const okrRows = okrsList.map(o => { const actual = okrActual[o.clave]; const meta = +o.objetivo; const cumple = actual == null ? null : (o.comparador === '≤' ? actual <= meta : actual >= meta); return { clave: o.clave, metrica: o.metrica, objetivo: meta, comparador: o.comparador, unidad: o.unidad, actual, cumple }; });
+  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
