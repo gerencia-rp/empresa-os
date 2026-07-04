@@ -110,6 +110,10 @@ function rcCompute() {
   const matHist = fin.reduce((s, o) => s + (+o.gasto_materiales || 0), 0);
   const labHist = fin.reduce((s, o) => s + (+o.gasto_trabajadores || 0), 0);
   const matPctHist = (matHist + labHist) > 0 ? Math.round(matHist / (matHist + labHist) * 100) : 0;
+  const _psfArr = fin.filter(o => (+o.sqft || 0) > 0).map(o => { const ff = rcFin(o); return { psf: ff.costoReal / +o.sqft, mat: ff.mat / +o.sqft, lab: ff.lab / +o.sqft }; });
+  const psfProm = _psfArr.length ? Math.round(_psfArr.reduce((s, x) => s + x.psf, 0) / _psfArr.length) : 0;
+  const matPsfProm = _psfArr.length ? Math.round(_psfArr.reduce((s, x) => s + x.mat, 0) / _psfArr.length) : 0;
+  const labPsfProm = _psfArr.length ? Math.round(_psfArr.reduce((s, x) => s + x.lab, 0) / _psfArr.length) : 0;
   // Capital desplegado en obras activas
   const capitalActivo = activas.reduce((s, o) => s + o.dq.gasto, 0);
   const presupActivo = activas.reduce((s, o) => s + (+o.presupuesto_interno || 0), 0);
@@ -163,7 +167,7 @@ function rcCompute() {
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
   const gastoTipo = { material: matHist, labor: labHist, total: matHist + labHist };
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -266,15 +270,28 @@ function rcSecCommand(c) {
     </div>`;
 }
 
+function rcCompletitud(o) {
+  const num = v => (+v || 0) > 0;
+  const has = [num(o.presupuesto_interno), num(o.gasto_trabajadores), num(o.gasto_materiales), !!o.fecha_inicio, !!o.fecha_estimada_fin];
+  return { n: has.filter(Boolean).length, total: 5 };
+}
 function rcObraCard(o) {
   const dq = o.dq, av = Math.round(+o.avance_pct || 0);
   const badge = dq.sinDatos ? '<span class="ff-dq ff-dq-nd">sin datos</span>' : dq.sobrePresup ? '<span class="ff-dq ff-dq-rev">⚠ sobre presupuesto</span>' : (!dq.fin ? '<span class="ff-dq ff-dq-pre">en curso · proyectado</span>' : '');
   const util = dq.fin ? (+o.ganancia || 0) : ((+o.valor_cliente || 0) - dq.gasto);
   const slug = window.osSlug ? osSlug(o.address) : '';
+  const _ff = rcFin(o), _sq = +o.sqft || 0;
+  const _psf = _sq > 0 ? Math.round(_ff.costoReal / _sq) : null;
+  const _matPsf = _sq > 0 ? Math.round(_ff.mat / _sq) : null, _labPsf = _sq > 0 ? Math.round(_ff.lab / _sq) : null;
+  let _psfStr = '—';
+  if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
+  const _comp = rcCompletitud(o);
+  const _cc = _comp.n >= 5 ? '#34d399' : _comp.n >= 3 ? '#e7b65e' : '#f87171';
   return `<div class="kcard">
-    <div class="addr">${RC_E(rcShort(o.address))} ${badge}</div>
+    <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
     <div class="krow"><span>Gasto real</span><b>${RC_M(dq.gasto)}</b></div>
+    <div class="krow"><span>$/sqft (mat+MO)</span><b>${_psfStr}</b></div>
     <div class="krow"><span>Valor cliente</span><b>${RC_M(+o.valor_cliente || 0)}</b></div>
     <div class="krow"><span>${dq.fin ? 'Utilidad' : 'Utilidad (proy.)'}</span><b class="${util >= 0 ? 'up' : 'down'}">${RC_M(util)}</b></div>
     <div class="kbar"><i style="width:${Math.min(100, av)}%"></i></div>
@@ -348,8 +365,9 @@ function rcSecEvR(c) {
   return rcHeader('Estimado vs Real', 'Presupuesto (estimado) vs monto real por casa — desviación $ y %, y días estimados vs reales. Guard: solo finalizadas confiables.') + `
     <div class="grid kpis">
       <div class="card kpi"><div class="lab">Presupuesto (estimado)</div><div class="big">${RC_K(c.evrTot.est)}</div><div class="meta">${c.evr.length} obras</div></div>
-      <div class="card kpi"><div class="lab">Monto real</div><div class="big">${RC_K(c.evrTot.real)}</div><div class="meta">gastado real</div></div>
+      <div class="card kpi"><div class="lab">Costo real</div><div class="big">${RC_K(c.evrTot.real)}</div><div class="meta">(gasto trab+mat)×1.05</div></div>
       <div class="card kpi"><div class="lab">Desviación $</div><div class="big ${c.evrTot.devAbs > 0 ? 'down' : 'up'}">${c.evrTot.devAbs > 0 ? '+' : ''}${RC_K(c.evrTot.devAbs)}</div><div class="meta">real − estimado</div></div>
+      <div class="card kpi"><div class="lab">$/sqft prom</div><div class="big">${c.psfProm}</div><div class="meta">mat ${c.matPsfProm} · MO ${c.labPsfProm} (real/sqft)</div></div>
       <div class="card kpi"><div class="lab">Desviación %</div><div class="big ${c.evrTot.devPct > 0 ? 'down' : 'up'}">${c.evrTot.devPct > 0 ? '+' : ''}${c.evrTot.devPct}%</div><div class="meta">agregado</div></div>
     </div>
     <div class="grid row2">
