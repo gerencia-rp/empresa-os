@@ -50,8 +50,9 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs] = await Promise.all([
-      sb.from('remodel_at_properties').select('*').order('proceso').order('avance_pct', { ascending: true }),
+    const [p, a, l, names, crews, hrs, parity] = await Promise.all([
+      sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
+      sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
       sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => []),
@@ -64,6 +65,7 @@ async function rcLoadAll() {
     RC.obras = (p.data || []).map(o => ({ ...o, lider: rcResolveName(o.lider) }));
     RC.alerts = a.data || [];
     RC.syncLog = (l.data && l.data[0]) || null;
+    RC.parity = parity || null;
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -88,6 +90,14 @@ function rcObraHoras(o) {
   for (const cn in ch) { if (cn && cn.length >= 4 && na.includes(cn)) return ch[cn]; }
   return 0;
 }
+// Capa financiera (una sola definición): ingreso (draws) vs costo_real (Valor Remodelación) vs presupuesto.
+function rcFin(o) {
+  const mat = +o.gasto_materiales || 0, lab = +o.gasto_trabajadores || 0;
+  const ingreso = +o.monto_real || 0;              // Monto Real Remodelación (Draws − Intereses − Servicios − Muebles)
+  const costoReal = (mat + lab) * 1.05;            // Valor Remodelación = (Gasto trab + Gasto mat) × 1.05
+  const presupuesto = +o.presupuesto_interno || 0; // Presupuesto Remodelación
+  return { mat, lab, ingreso, costoReal, presupuesto, margen: ingreso - costoReal, devCostoPct: presupuesto > 0 ? (costoReal - presupuesto) / presupuesto * 100 : null };
+}
 function rcCompute() {
   const obras = RC.obras.map(o => ({ ...o, dq: rcDQ(o) }));
   const fin = obras.filter(o => o.dq.fin);
@@ -111,7 +121,7 @@ function rcCompute() {
   fin.forEach(o => {
     const k = (o.lider || '—').trim() || '—';
     if (!lidMap[k]) lidMap[k] = { lider: k, n: 0, ganancia: 0, revenue: 0, sobre: 0, sqft: 0, real: 0, presup: 0, diasSum: 0, diasN: 0, horas: 0, obras: [] };
-    const L = lidMap[k]; const real = (+o.monto_real || o.dq.gasto); const presup = (+o.presupuesto_interno || 0);
+    const L = lidMap[k]; const real = rcFin(o).costoReal; const presup = (+o.presupuesto_interno || 0);
     L.n++; L.ganancia += (+o.ganancia || 0); L.revenue += (+o.valor_cliente || 0);
     if (o.dq.sobrePresup) L.sobre++;
     L.sqft += (+o.sqft || 0); L.real += real; L.presup += presup; L.horas += rcObraHoras(o);
@@ -131,23 +141,29 @@ function rcCompute() {
     }
   });
   // C) ESTIMADO vs REAL por casa (finalizadas confiables): presupuesto (est) vs monto_real (real)
-  const evr = fin.filter(o => (+o.presupuesto_interno || 0) > 0 && ((+o.monto_real || o.dq.gasto) > 0)).map(o => {
-    const est = +o.presupuesto_interno || 0, real = +o.monto_real || o.dq.gasto;
+  const evr = fin.filter(o => (+o.presupuesto_interno || 0) > 0 && rcFin(o).costoReal > 0).map(o => {
+    const est = +o.presupuesto_interno || 0, real = rcFin(o).costoReal;
     return { address: rcShort(o.address), lider: (o.lider || '—'), est, real, devAbs: real - est, devPct: Math.round((real - est) / est * 100), devDias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null };
   });
   const evrTot = { est: evr.reduce((s, x) => s + x.est, 0), real: evr.reduce((s, x) => s + x.real, 0) };
   evrTot.devAbs = evrTot.real - evrTot.est; evrTot.devPct = evrTot.est > 0 ? Math.round(evrTot.devAbs / evrTot.est * 100) : 0;
   const topDesv = [...evr].sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct)).slice(0, 8);
   const desvCostoProm = evr.length ? Math.round(evr.reduce((s, x) => s + x.devPct, 0) / evr.length) : 0;
-  const _dias = fin.map(o => o.retraso_dias).filter(d => d != null).map(Number);
+  const margenReal = fin.reduce((s, o) => { const ff = rcFin(o); return s + ((ff.ingreso > 0 && ff.costoReal > 0) ? ff.margen : 0); }, 0);
+  const _diasAll = fin.map(o => o.retraso_dias).filter(d => d != null).map(Number);
+  const _diasRev = _diasAll.filter(d => Math.abs(d) > 180);   // outliers |>180d| = dato a revisar
+  const _dias = _diasAll.filter(d => Math.abs(d) <= 180);
   const desvDiasProm = _dias.length ? Math.round(_dias.reduce((s, x) => s + x, 0) / _dias.length) : 0;
+  const _sd = [..._dias].sort((a, b) => a - b);
+  const desvDiasMed = _sd.length ? (_sd.length % 2 ? _sd[(_sd.length - 1) / 2] : Math.round((_sd[_sd.length / 2 - 1] + _sd[_sd.length / 2]) / 2)) : 0;
+  const desvDiasRevN = _diasRev.length;
   const _rent = fin.map(o => o.rentabilidad).filter(r => r != null).map(Number);
   const rentProm = _rent.length ? +(_rent.reduce((s, x) => s + x, 0) / _rent.length).toFixed(1) : 0;
   const _conDias = fin.filter(o => o.retraso_dias != null);
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
   const gastoTipo = { material: matHist, labor: labHist, total: matHist + labHist };
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -219,17 +235,26 @@ function rcHeader(title, sub) {
 
 function rcSecCommand(c) {
   const ins = rcInsights(c);
+  const parN = RC.parity ? RC.parity.airtable_count : c.obras.length;
+  const paritySync = RC.parity ? (RC.parity.in_sync !== false && (RC.parity.airtable_count == null || RC.parity.airtable_count === c.obras.length)) : true;
+  const parityNote = paritySync
+    ? `Última verificación de paridad: <b style="color:#34d399">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
+    : `Última verificación de paridad: <b style="color:#f87171">ALERTA</b> · app ${c.obras.length} vs Airtable ${parN} — sync desincronizado`;
+  const parityBg = paritySync ? 'rgba(52,211,153,.1)' : 'rgba(248,113,113,.12)';
+  const parityBd = paritySync ? 'rgba(52,211,153,.25)' : 'rgba(248,113,113,.35)';
   return rcHeader('Command Center', `${c.obras.length} obras · ${c.fin.length} finalizadas · ${c.activas.length} en curso — capital, ganancia realizada y pipeline.`) + `
+    <div style="font-size:11px;padding:6px 12px;margin-bottom:10px;border-radius:8px;background:${parityBg};border:1px solid ${parityBd};color:var(--txt2)">${parityNote}</div>
     <div class="grid kpis">
-      <div class="card kpi"><div class="lab">Ganancia realizada</div><div class="big up glow">${RC_K(c.gananciaHist)}</div><div class="meta">${c.fin.length} obras finalizadas · margen ${c.margenHist}%</div></div>
-      <div class="card kpi"><div class="lab">Obras en curso</div><div class="big">${c.activas.length}</div><div class="meta">avance promedio ${c.avgAvance}%</div></div>
+      <div class="card kpi"><div class="lab">Ganancia realizada</div><div class="big up glow">${RC_K(c.gananciaHist)}</div><div class="meta">BRUTO · ${c.fin.length} finalizadas · margen ${c.margenHist}%</div></div>
+      <div class="card kpi"><div class="lab">Obras en curso</div>${paritySync ? `<div class="big">${c.activas.length}</div>` : `<div class="big down" style="font-size:15px;line-height:1.15" title="El conteo de la app no coincide con Airtable">⚠ sync<br>desincronizado</div>`}<div class="meta">avance promedio ${c.avgAvance}% · ${c.obras.length} obras</div></div>
       <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big">${RC_K(c.capitalActivo)}</div><div class="meta">en obras activas · presup. ${RC_K(c.presupActivo)}</div></div>
       <div class="card kpi"><div class="lab">Pipeline <span class="warn">proyectado</span></div><div class="big warn">${RC_K(c.pipelineProj)}</div><div class="meta">NO realizado · ${c.pipeline.length} en pre-construcción</div></div>
     </div>
     <div class="grid kpis" style="margin-top:14px">
       <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">histórico (${c.fin.length} finalizadas)</div></div>
       <div class="card kpi"><div class="lab">Desviación de costo prom</div><div class="big ${c.desvCostoProm>0?'down':'up'}">${c.desvCostoProm>0?'+':''}${c.desvCostoProm}%</div><div class="meta">real vs presupuesto · ${c.enPresupPct}% en presup.</div></div>
-      <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">${c.aTiempoPct}% a tiempo</div></div>
+      <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">mediana ${c.desvDiasMed>0?'+':''}${c.desvDiasMed}d · ${c.aTiempoPct}% a tiempo${c.desvDiasRevN?` · <span class="warn">${c.desvDiasRevN} a revisar</span>`:''}</div></div>
+      <div class="card kpi"><div class="lab">Margen realizado</div><div class="big ${c.margenReal>=0?'up':'down'}">${RC_K(c.margenReal)}</div><div class="meta">ingreso − costo real (${c.fin.length} fin)</div></div>
       <div class="card kpi"><div class="lab">Alertas</div><div class="big ${c.compAlerts.length?'down':'up'}">${c.compAlerts.length}</div><div class="meta">sobre-presupuesto / atraso</div></div>
     </div>
     <div class="grid row2">
