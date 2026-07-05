@@ -308,6 +308,7 @@ Deno.serve(async (req) => {
   const airtable_token = envToken || body.airtable_token;
   console.log("[pm-sync] token source:", envToken ? "env" : (body.airtable_token ? "body" : "none"));
   const base_id = body.base_id || Deno.env.get("AIRTABLE_BASE_ID") || "apptTKRYbx6gu701i";
+  const srcCounts: Record<string, number> = {}; // conteos de la FUENTE para el assert de paridad
   console.log("[pm-sync] base_id:", base_id);
   if (!airtable_token) return json({ ok: false, error: "Airtable token no configurado en el servidor (AIRTABLE_API_KEY)" }, 400);
 
@@ -373,6 +374,7 @@ Deno.serve(async (req) => {
     // 1) CASAS → pm_properties
     // ════════════════════════════════════════════════════════════
     const casas = await fetchAllRecords(base_id, TABLE_IDS.casas, airtable_token);
+    srcCounts.pm_properties = casas.length;
 
     // Existentes: mapa por recId de Casa y por address_normalized (conserva id / no duplica).
     const { data: existingProps0 } = await supabase.from("pm_properties").select("id, address, address_normalized, airtable_address_id");
@@ -449,10 +451,12 @@ Deno.serve(async (req) => {
     // 2) INQUILINOS → pm_tenants
     // ════════════════════════════════════════════════════════════
     const inquilinos = await fetchAllRecords(base_id, TABLE_IDS.inquilinos, airtable_token);
+    srcCounts.pm_tenants = inquilinos.filter((r: any) => r.fields?.[F.inq_nombre]).length; // solo filas válidas (las vacías se saltean y se reportan)
     const tenantMontoByRec: Record<string, number> = {};   // recId inquilino → Monto Renta (para bookings)
     const allTenants: any[] = [];
     for (const r of inquilinos) {
       const name = r.fields?.[F.inq_nombre];
+      if (!name) addWarn("inquilino_sin_nombre", "tenant", "tenant-" + r.id, null, { detalle: "Fila de Inquilinos sin Nombre en Airtable (probable fila vacía accidental): el sync la saltea. Completar o borrar en Airtable." });
       if (!name) continue;
       const monto = r.fields?.[F.inq_monto];
       if (typeof monto === "number") tenantMontoByRec[r.id] = monto;
@@ -489,11 +493,13 @@ Deno.serve(async (req) => {
     // 3) UNIDADES (tabla dedicada) → pm_units · RESERVAS → pm_bookings
     // ════════════════════════════════════════════════════════════
     const reservas = await fetchAllRecords(base_id, TABLE_IDS.reservas, airtable_token);
+    srcCounts.pm_bookings = reservas.length;
 
     // 3a) pm_units = 1 fila por registro de la tabla "Unidades" (tblItO7iMZT9QS87y).
     //     external_id = "unit-{recId}". Ocupación desde el campo Estado de la unidad
     //     (Ocupada/Disponible/Reservada) → pm_units.status, NO desde reservas.
     const unidades = await fetchAllRecords(base_id, TABLE_IDS.unidades, airtable_token);
+    srcCounts.pm_units = unidades.length;
     const mapUnitStatus = (s: string | null): string | null => {
       const v = (s || "").toLowerCase();
       if (/mantenim/.test(v))                 return "mantenimiento";
@@ -735,11 +741,17 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     try {
       const pagos = await fetchAllRecords(base_id, TABLE_IDS.pagos, airtable_token);
+      srcCounts.pm_payments = pagos.length;
       const paymentsIn: any[] = [];
       let paysLinked = 0, paysSkippedNoDate = 0, paysSinLink = 0;
       for (const r of pagos) {
         const fechaPago = r.fields?.[F.pag_fecha] || null;
-        if (!fechaPago) { paysSkippedNoDate++; continue; }
+        if (!fechaPago) {
+          paysSkippedNoDate++;
+          addWarn("pago_sin_fecha", "payment", "pay-" + r.id, null,
+            { pago: r.fields?.[F.pag_pago] || r.id, monto: r.fields?.[F.pag_monto] || null,
+              detalle: "Pago sin Fecha de Pago en Airtable: importado con status 'revisar' (NO cuenta en ingresos). Cargar la fecha en Airtable para activarlo." });
+        }
 
         const casaRec    = linkedId(r.fields?.[F.pag_casa]);
         const inqRec     = linkedId(r.fields?.[F.pag_inquilino]);
@@ -778,13 +790,13 @@ Deno.serve(async (req) => {
           category: "renta",
           concept: `${month || ""} ${year || ""}`.trim() || (r.fields?.[F.pag_pago] || ""),
           amount: r.fields?.[F.pag_monto] || 0,
-          paid_at: fechaPago,
+          paid_at: fechaPago || null,
           month, year: (year && !isNaN(year)) ? year : null,
           platform: getSel(r.fields?.[F.pag_plataforma]),
           casa_nickname: (casaRec && propNameByCasaRec[casaRec]) || null,
           payment_method: null,
           proof_url: getAttachUrl(r.fields?.[F.pag_comprob]),
-          status: "pagado",
+          status: fechaPago ? "pagado" : "revisar",
           notes: r.fields?.[F.pag_concil_ia] || null,
           ...mirrorFields()
         });
@@ -809,6 +821,7 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════
     try {
       const gastos = await fetchAllRecords(base_id, TABLE_IDS.gastos, airtable_token);
+      srcCounts.pm_expenses = gastos.length;
       const exp: any[] = [];
       let gastosSinCasa = 0;
       for (const r of gastos) {
@@ -933,9 +946,30 @@ Deno.serve(async (req) => {
         finished_at: new Date().toISOString()
       }).eq("id", log.id);
     }
+    // Assert de paridad fuente vs espejo (molde Remodelación/FF) — solo en runs reales
+    const parityOut: Record<string, any> = {};
+    if (!dry_run) {
+      try {
+        const mirrors: Array<[string, string, string]> = [
+          ["pm_properties", "pm_properties", "active"], ["pm_units", "pm_units", "is_active"],
+          ["pm_tenants", "pm_tenants", "active"], ["pm_bookings", "pm_bookings", "active"],
+          ["pm_payments", "pm_payments", "active"], ["pm_expenses", "pm_expenses", "active"],
+        ];
+        for (const [src, table, flag] of mirrors) {
+          if (srcCounts[src] == null) continue;
+          const { count } = await supabase.from(table).select("*", { count: "exact", head: true }).eq(flag, true);
+          const inSync = (count ?? 0) === srcCounts[src];
+          parityOut[src] = { airtable: srcCounts[src], mirror: count ?? 0, in_sync: inSync };
+          await supabase.from("remodel_sync_parity").upsert({
+            source: src, airtable_count: srcCounts[src], mirror_count: count ?? 0,
+            in_sync: inSync, checked_at: new Date().toISOString(),
+          }, { onConflict: "source" });
+        }
+      } catch (e) { errors.push("parity: " + (e as any)?.message); }
+    }
     return json({
       ok: true, dry_run, base_id, archive_enabled: ARCHIVE_ENABLED, mirror: MIRROR,
-      processedCount, archivedCount, archivedSamples,
+      processedCount, archivedCount, archivedSamples, parity: parityOut,
       stats, errors, duration_ms: Date.now() - startMs
     });
   } catch (e: any) {

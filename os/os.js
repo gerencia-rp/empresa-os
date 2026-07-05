@@ -245,7 +245,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units').eq('active', true),
@@ -259,7 +259,9 @@ async function osLoad() {
       sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
       sb.from('ff_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_payments').select('pago_hml').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('v_holding_pnl').select('*').then(r => r.data || []).catch(() => []),
     ]);
+    OS.pnl = pnl || [];
     OS.ffOverhead = (ffOh || []).reduce((t, x) => t + (+x.monto || 0), 0);
     OS.ffIntereses = (ffHml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
@@ -497,6 +499,19 @@ function osContable(comp) {
       <div class="card"><div class="lab">Overhead FF real</div><div class="big warn">${OS_M(OS.ffOverhead || 0)}</div><div class="meta">equipo + plataformas F&F (Airtable)</div></div>
       <div class="card"><div class="lab">Intereses HML reales</div><div class="big warn">${OS_M(OS.ffIntereses || 0)}</div><div class="meta">pagos fechados (Airtable)</div></div>
       <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(comp.cobranza.total)}</div><div class="meta">por cobrar (rentas)</div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">P&L del holding (v_holding_pnl)</div><div class="k">una definición por métrica · fuente: espejos verificados</div></div>
+      <table class="ptable"><thead><tr><th>Empresa</th><th>Ingreso</th><th>Costo real</th><th>Overhead</th><th>Utilidad bruta</th><th>EBITDA</th><th>FF realizado / inyectado</th></tr></thead><tbody>
+      ${(OS.pnl || []).map(r => {
+        const nm = { remodelacion: '🔨 Remodelación', fix_flip: '🏚 Fix & Flip', rentas: '🏠 Rentas', educacion: '🎓 Educación', consolidado: '🏛 CONSOLIDADO' }[r.empresa] || r.empresa;
+        const v = x => x == null ? '—' : OS_M(+x);
+        const cls = x => x == null ? '' : (+x >= 0 ? 'up' : 'down');
+        const ffx = (r.realizado == null && r.inyectado == null) ? '—' : (v(r.realizado) + ' / ' + v(r.inyectado));
+        const bold = r.empresa === 'consolidado' ? 'font-weight:800;border-top:1px solid var(--line, rgba(255,255,255,.2))' : '';
+        return `<tr style="${bold}"><td>${nm}</td><td>${v(r.ingreso)}</td><td>${v(r.costo_real)}</td><td class="down">${v(r.overhead)}</td><td class="${cls(r.utilidad_bruta)}">${v(r.utilidad_bruta)}</td><td class="${cls(r.ebitda)}">${v(r.ebitda)}</td><td>${ffx}</td></tr>`;
+      }).join('')}
+      </tbody></table>
+      <div class="meta" style="margin-top:8px">FF: "realizado" = casas con ciclo cerrado (vendida/refi/rentada); "inyectado" = cash en casas vivas (no es pérdida realizada). Educación: sin datos financieros en el sistema (ver auditoría). QuickBooks: parqueado esperando definición.</div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
