@@ -534,6 +534,9 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Backbone: asignar property_id (properties.id) a obras/proyectos/actividades nuevas (self-healing).
+    try { await sb.rpc("remodel_backfill_property_ids"); } catch (e) { console.warn("property_id backfill skip:", String(e)); }
+
     // Soft-delete de paridad: archivar obras NO vistas en este run (fantasmas borrados en Airtable).
     // Seguro: se basa en last_synced_at (los vistos quedaron con last_synced_at ≈ ahora por el upsert).
     const seenIds = projectedAll.map((p) => p.airtable_id).filter(Boolean);
