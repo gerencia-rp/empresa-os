@@ -211,13 +211,16 @@ window.ffToggleTheme = ffToggleTheme;
 async function ffLoadAll() {
   FF.loading = true; FF.loadError = null;
   try {
-    const [deals, draws, inv] = await Promise.all([
+    const [deals, draws, inv, oh, hml] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
+      sb.from('ff_overhead').select('source, concepto, monto, mes').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('ff_hml_payments').select('address_norm, fecha, pago_hml, fee, ref30').eq('active', true).then(r => r.data || []).catch(() => []),
     ]);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
+    FF.overhead = oh || []; FF.hml = hml || [];
   } catch (e) { FF.loadError = e.message || String(e); }
   finally { FF.loading = false; }
 }
@@ -304,10 +307,13 @@ function ffInsights(comp) {
     tx: `<b>${sinDraw.length} deal(s)</b> sin desglose de costos (Draws): ${sinDraw.slice(0, 3).map(d => FF_ESC(ffShort(d.address))).join(', ')}${sinDraw.length > 3 ? '…' : ''}. Sin all-in ni margen calculable.`,
     action: 'Completar el Desglose Draws de esos deals en Airtable' });
   // 6) Conocidos del negocio (info · se cargan en la memoria del Cerebro en Fase 2)
-  ins.push({ sev: 'info', impact: 146000, tag: 'OVERHEAD FUERA DE QB', sec: 'finanzas',
-    tx: `Hay ~<b>$146k</b> de overhead (equipo + plataformas Fix&Flip) que vive fuera de QuickBooks. Sumarlo para P&L real.`, action: 'Conciliar Gastos Equipo + Plataformas contra QuickBooks' });
-  ins.push({ sev: 'info', impact: 46000, tag: 'GAP DE INTERESES', sec: 'finanzas',
-    tx: `Gap estimado de <b>~$46k</b> de intereses HML no reflejado en libros. Revisar en la conciliación Airtable↔QuickBooks.`, action: 'Revisar intereses HML vs QuickBooks' });
+  // 6) Overhead + intereses REALES (espejo ff_overhead / ff_hml_payments — antes hardcodeados)
+  const ohReal = (FF.overhead || []).reduce((t, x) => t + (+x.monto || 0), 0);
+  const intReal = (FF.hml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
+  if (ohReal > 0) ins.push({ sev: 'info', impact: Math.round(ohReal), tag: 'OVERHEAD FF (REAL)', sec: 'finanzas',
+    tx: `Overhead Fix&Flip real: <b>${FF_MONEY(ohReal)}</b> (equipo + plataformas, desde Airtable). Restarlo para utilidad NETA.`, action: 'Ver P&L en Finanzas' });
+  if (intReal > 0) ins.push({ sev: 'info', impact: Math.round(intReal), tag: 'INTERESES HML (REAL)', sec: 'finanzas',
+    tx: `Intereses HML pagados (reales, fechados): <b>${FF_MONEY(intReal)}</b>. Costo de financiamiento vivo del portafolio.`, action: 'Ver Pagos HML en Finanzas' });
   ins.push({ sev: 'warning', impact: 0, tag: 'CONTRATO', sec: 'deals',
     tx: `<b>9909 Childress</b>: contrato/documentación pendiente de firma (dato del negocio). Verificar antes de avanzar.`, action: 'Confirmar firma de contrato de Childress' });
   const rank = { critical: 0, warning: 1, info: 3 };
@@ -359,7 +365,7 @@ function ffSidebar() {
       const badge = cnt === 'soon' ? '<span class="soon">pronto</span>' : (typeof cnt === 'function' && cnt() ? `<span class="b">${cnt()}</span>` : '');
       return `<a class="${FF.section === k ? 'on' : ''}" onclick="ffGo('${k}')"><span class="i">${i}</span> ${l}${badge}</a>`;
     }).join('')}</nav>
-    <div class="foot">Fuente de verdad · <b>Airtable</b> + QuickBooks<br>Solo lectura · sincronizado</div>`;
+    <div class="foot">Fuente de verdad · <b>Airtable</b> (sync + paridad)<br>Solo lectura · QuickBooks: Fase 2</div>`;
 }
 function ffHeader(title, accent, sub) {
   return `<div class="top"><div><h1>${title} · <span>${accent}</span></h1><div class="sub">${sub}</div></div>
@@ -504,6 +510,10 @@ function ffGastosPorTipo() {
 }
 function ffSecFinanzas(comp) {
   const gt = ffGastosPorTipo();
+  const ohReal = (FF.overhead || []).reduce((t, x) => t + (+x.monto || 0), 0);
+  const intReal = (FF.hml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
+  const rentDraws = (FF.draws || []).reduce((t, d) => t + (+d.net_total || 0), 0);
+  const ebitdaFF = rentDraws - ohReal;
   const invertido = comp.deals.reduce((s, d) => s + d.allIn, 0);
   // equity y déficit acumulado: SOLO deals confiables (el error $189k los distorsiona) → comp.kpi
   const equity = comp.kpi.equity;
@@ -519,16 +529,22 @@ function ffSecFinanzas(comp) {
       <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big down">${FF_MONEY(deficit)}</div><div class="meta">casas en rojo · deals confiables (error de datos excluido)</div></div>
       <div class="card kpi"><div class="lab">Intereses / gasto</div><div class="big warn">${gt.intPct}%</div><div class="meta">${FF_MONEY(gt.g['Intereses'])} de ${FF_MONEY(gt.total)}</div></div>
     </div>
+    <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px">
+      <div class="card kpi"><div class="lab">Rentabilidad draws</div><div class="big ${rentDraws>=0?'up':'down'}">${FF_MONEY(rentDraws)}</div><div class="meta">Σ neto por casa (fuente Airtable)</div></div>
+      <div class="card kpi"><div class="lab">Overhead FF real</div><div class="big down">${FF_MONEY(ohReal)}</div><div class="meta">equipo ${FF_MONEY((FF.overhead||[]).filter(x=>x.source==='equipo').reduce((t,x)=>t+(+x.monto||0),0))} · plataformas ${FF_MONEY((FF.overhead||[]).filter(x=>x.source==='plataformas').reduce((t,x)=>t+(+x.monto||0),0))}</div></div>
+      <div class="card kpi"><div class="lab">Intereses HML reales</div><div class="big warn">${FF_MONEY(intReal)}</div><div class="meta">${(FF.hml||[]).length} pagos fechados</div></div>
+      <div class="card kpi"><div class="lab">EBITDA FF (aprox)</div><div class="big ${ebitdaFF>=0?'up glow':'down'}">${FF_MONEY(ebitdaFF)}</div><div class="meta">rentabilidad draws − overhead</div></div>
+    </div>
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">del desglose de draws</div></div><canvas id="ff-fin-donut" height="230"></canvas></div>
       <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
         <table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th>Impacto</th></tr></thead><tbody>
-        <tr><td>Overhead de equipo + plataformas fuera de libros</td><td><span class="badge b-warn">Fuera de QB</span></td><td class="down">~$146k</td></tr>
-        <tr><td>Intereses HML no reflejados</td><td><span class="badge b-warn">Gap</span></td><td class="down">~$46k</td></tr>
+        <tr><td>Overhead FF (equipo + plataformas) — espejo Airtable</td><td><span class="badge b-ok">Real</span></td><td class="down">${FF_MONEY(ohReal)}</td></tr>
+        <tr><td>Intereses HML pagados (Pagos HML, fechados)</td><td><span class="badge b-ok">Real</span></td><td class="down">${FF_MONEY(intReal)}</td></tr>
         <tr><td>Obligación a inversionistas (pasivo)</td><td><span class="badge b-warn">Cap table</span></td><td>—</td></tr>
         <tr><td>Remodelación (draws)</td><td><span class="badge b-ok">Conciliado</span></td><td>${FF_MONEY(gt.g['Remodelación'])}</td></tr>
         </tbody></table>
-        <div class="meta" style="margin-top:10px">P&L / balance / cashflow completos de QuickBooks llegan con el conector QB. Hoy: gastos reales del Airtable + los gaps conocidos.</div></div>
+        <div class="meta" style="margin-top:10px">P&L / balance / cashflow completos de QuickBooks llegan con el conector QB (Fase 2). Hoy: overhead, intereses HML y gastos son REALES desde Airtable (espejo sincronizado con paridad).</div></div>
     </div>
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Mejores por margen</div><div class="k">rentabilidad por casa</div></div>

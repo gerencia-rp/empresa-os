@@ -245,7 +245,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units').eq('active', true),
@@ -257,7 +257,11 @@ async function osLoad() {
       sb.from('ff_investors').select('*').eq('active', true),
       sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label,sqft,retraso_dias,monto_por_gastar,rentabilidad,monto_real,avance_real'),
       sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
+      sb.from('ff_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('ff_hml_payments').select('pago_hml').eq('active', true).then(r => r.data || []).catch(() => []),
     ]);
+    OS.ffOverhead = (ffOh || []).reduce((t, x) => t + (+x.monto || 0), 0);
+    OS.ffIntereses = (ffHml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
     OS.book = book.data || []; OS.tenants = tenants.data || []; OS.tasks = tasks.data || []; OS.investors = inv.data || [];
     OS.remodel = (remodel.data || []).map(o => ({ ...o, avance_pct: (o.avance_real != null ? +o.avance_real : o.avance_pct) })); // avance del Planner si existe OS.edu = (edu.data && edu.data[0]) || null;
@@ -374,8 +378,8 @@ function osInsights(comp) {
   // Cobranza (holding): casas con deuda
   comp.cobranza.rows.slice(0, 3).forEach(r => ins.push({ sev: 'critical', impact: r.deuda, tag: 'COBRANZA · MORA', tx: `<b>${OS_E(r.casa)}</b>: deuda de <b>${OS_M(r.deuda)}</b> este mes (esperado ${OS_M(r.esperado)}, cobrado ${OS_M(r.cobrado)}). El Cerebro puede redactar el cobro.` }));
   // Conocidos del negocio (info)
-  ins.push({ sev: 'info', impact: 146000, tag: 'CONTABLE · OVERHEAD', tx: `~<b>$146k</b> de overhead fuera de QuickBooks (equipo + plataformas). Conciliar para P&L real.` });
-  ins.push({ sev: 'info', impact: 46000, tag: 'CONTABLE · INTERESES', tx: `Gap estimado de <b>~$46k</b> de intereses HML no reflejado en libros.` });
+  if (OS.ffOverhead > 0) ins.push({ sev: 'info', impact: Math.round(OS.ffOverhead), tag: 'CONTABLE · OVERHEAD FF', tx: `Overhead Fix&Flip real: <b>${OS_M(OS.ffOverhead)}</b> (equipo + plataformas, espejo Airtable). Restar para P&L neto.` });
+  if (OS.ffIntereses > 0) ins.push({ sev: 'info', impact: Math.round(OS.ffIntereses), tag: 'CONTABLE · INTERESES HML', tx: `Intereses HML pagados (reales): <b>${OS_M(OS.ffIntereses)}</b>.` });
   const rank = { critical: 0, warning: 1, info: 3 };
   ins.sort((a, b) => (rank[a.sev] - rank[b.sev]) || (b.impact - a.impact));
   return ins;
@@ -433,7 +437,7 @@ function osGlobal(comp) {
       </div>
       <div class="grid k2" style="margin-top:16px">
         <div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>
-        <div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead fuera QB</span><b class="warn">~$146k</b></div><div class="go">Abrir →</div></div>
+        <div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>
       </div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
         ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span></div></div>`).join('')}
@@ -490,15 +494,15 @@ function osContable(comp) {
   return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
     <div class="grid k4">
       <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
-      <div class="card"><div class="lab">Overhead fuera de QB</div><div class="big warn">~$146k</div><div class="meta">equipo + plataformas F&F</div></div>
-      <div class="card"><div class="lab">Gap de intereses</div><div class="big warn">~$46k</div><div class="meta">HML no reflejado en libros</div></div>
+      <div class="card"><div class="lab">Overhead FF real</div><div class="big warn">${OS_M(OS.ffOverhead || 0)}</div><div class="meta">equipo + plataformas F&F (Airtable)</div></div>
+      <div class="card"><div class="lab">Intereses HML reales</div><div class="big warn">${OS_M(OS.ffIntereses || 0)}</div><div class="meta">pagos fechados (Airtable)</div></div>
       <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(comp.cobranza.total)}</div><div class="meta">por cobrar (rentas)</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
         <table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th>Impacto</th></tr></thead><tbody>
-        <tr><td>Overhead de equipo + plataformas fuera de libros</td><td><span class="badge b-warn">Fuera de QB</span></td><td class="down">~$146k</td></tr>
-        <tr><td>Intereses HML no reflejados</td><td><span class="badge b-warn">Gap</span></td><td class="down">~$46k</td></tr>
+        <tr><td>Overhead FF (equipo + plataformas) — espejo Airtable</td><td><span class="badge b-ok">Real</span></td><td class="down">${OS_M(OS.ffOverhead || 0)}</td></tr>
+        <tr><td>Intereses HML pagados (reales, fechados)</td><td><span class="badge b-ok">Real</span></td><td class="down">${OS_M(OS.ffIntereses || 0)}</td></tr>
         <tr><td>Obligación a inversionistas (pasivo / cap table)</td><td><span class="badge b-warn">Pendiente</span></td><td>—</td></tr>
         <tr><td>Ingresos de rentas (plata real)</td><td><span class="badge b-ok">Conciliado</span></td><td class="up">${OS_M(comp.rentas.ingresos)}</td></tr>
         </tbody></table>
