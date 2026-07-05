@@ -255,12 +255,12 @@ async function osLoad() {
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
-      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label,sqft,retraso_dias,monto_por_gastar,rentabilidad,monto_real'),
+      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label,sqft,retraso_dias,monto_por_gastar,rentabilidad,monto_real,avance_real'),
       sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
     ]);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
     OS.book = book.data || []; OS.tenants = tenants.data || []; OS.tasks = tasks.data || []; OS.investors = inv.data || [];
-    OS.remodel = remodel.data || []; OS.edu = (edu.data && edu.data[0]) || null;
+    OS.remodel = (remodel.data || []).map(o => ({ ...o, avance_pct: (o.avance_real != null ? +o.avance_real : o.avance_pct) })); // avance del Planner si existe OS.edu = (edu.data && edu.data[0]) || null;
     OS.loaded = true;
   } catch (e) { OS.loadErr = e.message || String(e); }
 }

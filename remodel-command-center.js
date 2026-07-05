@@ -64,7 +64,7 @@ async function rcLoadAll() {
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
     RC.casaHoras = {}; (hrs || []).forEach(x => { if (x.casa_norm) RC.casaHoras[x.casa_norm] = (RC.casaHoras[x.casa_norm] || 0) + (+x.horas || 0); });
-    RC.obras = (p.data || []).map(o => ({ ...o, lider: rcResolveName(o.lider) }));
+    RC.obras = (p.data || []).map(o => ({ ...o, lider: rcResolveName(o.lider), avance_pct: (o.avance_real != null ? +o.avance_real : o.avance_pct) })); // avance del Planner (v_remodel_progress) si existe
     RC.alerts = a.data || [];
     RC.syncLog = (l.data && l.data[0]) || null;
     RC.parity = parity || null;
