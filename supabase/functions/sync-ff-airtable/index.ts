@@ -17,6 +17,7 @@ const T = {
   equipo: "tblE9UANWoYdlbEhX",     // Gastos Equipo Fix and Flip
   plataformas: "tblvULaFPu8YqDy1l",// Gasto Plataformas Fix And Flip
   hml: "tblV4wNA8hNs5Mmk8",        // Pagos HML
+  datosCasa: "tbluy4xlHJav9RtrZ", // Datos por casa (préstamo HML)
 };
 
 const F = {
@@ -26,6 +27,7 @@ const F = {
   eq: { name: "fldSsNBs1zQ6YZPxm", salario: "fldRIzVjmccCPyslQ", mes: "fldwdnqHKkr4Pvl9y", nombre: "fldckFo7H81jAMaBY" },
   pl: { plataforma: "fldZUdExLDg4nsjeY", mes: "fldMblARwfiZ2NVqq", valor: "fldaV7Mc21PaMYwg4" },
   hml: { prop: "fldDyPAYGHDBmBdvk", fecha: "fld7y5uQLeJlCHgno", pago: "fldDe1BDW4fP5s3WR", fee: "fldrSE3aeiMqkfpHE", ref30: "fldWACGPEKKhLp206", fechaRef: "fldlDpPWUnYhIsETm", check: "fldOOSgpzzdfw8ABA" },
+  dc: { prop: "fldgRmcy4oAfn9JYQ", cierre: "fld58rjMzZuoEwtDj", down: "fldxuB3kYq8cNQHIK", ctc: "fldzH5n6milc56KAU", monto: "fldZnz7Sq9iSuTtLe", tasa: "fld4Hv76aZCjXVhQ3", plazo: "fldbnPE1wT9Fm6D46", ini: "fldFI4BNG08elmnO1", venc: "flddtzbmaVXAPSSoC", rehabIni: "fldlhgKbDSkeXrXzi", rehabFin: "fldPul8pDQ3bHrirm", drAprob: "fld3UZOKmHMOw6VmS", drCobr: "fldlyv2c38vhBLHDd" },
 };
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -165,8 +167,30 @@ Deno.serve(async (req) => {
     });
     await upsert(sb, "ff_hml_payments", hmlRows);
 
+    // 5b) DATOS POR CASA (préstamo HML) → ff_hml_loans
+    const dcRecs = await fetchAll(T.datosCasa);
+    const dcRows = dcRecs.map((r) => {
+      const f = r.fields || {};
+      const linked = Array.isArray(f[F.dc.prop]) ? f[F.dc.prop][0] : null;
+      const linkId = typeof linked === "string" ? linked : linked?.id;
+      const addr = (linkId && addrById[linkId]) || null;
+      return {
+        airtable_id: r.id, address: addr, address_norm: norm(addr),
+        monto_hml: num(f[F.dc.monto]), tasa_pct: num(f[F.dc.tasa]), plazo_meses: f[F.dc.plazo] != null ? String(f[F.dc.plazo]) : null,
+        fecha_inicio: f[F.dc.ini] || null, fecha_vencimiento: f[F.dc.venc] || null,
+        gastos_cierre: num(f[F.dc.cierre]), down_payment: num(f[F.dc.down]), cash_to_close: num(f[F.dc.ctc]),
+        draws_aprobados: num(f[F.dc.drAprob]), draws_cobrados: num(f[F.dc.drCobr]),
+        fecha_inicio_rehab: f[F.dc.rehabIni] || null, fecha_fin_rehab: f[F.dc.rehabFin] || null,
+        active: true, archived_at: null, last_synced_at: now(),
+      };
+    }).filter((r) => r.address);
+    await upsert(sb, "ff_hml_loans", dcRows);
+
+    // 5c) property_id backbone FF (self-healing)
+    try { await sb.rpc("ff_backfill_property_ids"); } catch (e) { console.warn("ff pid skip:", String(e)); }
+
     // 6) Soft-delete: archivar lo no visto en este run
-    for (const t of ["ff_deals", "ff_draws", "ff_investors", "ff_overhead", "ff_hml_payments"]) {
+    for (const t of ["ff_deals", "ff_draws", "ff_investors", "ff_overhead", "ff_hml_payments", "ff_hml_loans"]) {
       await archiveUnseen(sb, t, runStartIso);
     }
 
@@ -174,9 +198,10 @@ Deno.serve(async (req) => {
     const p1 = await parity(sb, "ff_deals", dealRows.length, "ff_deals");
     const p2 = await parity(sb, "ff_draws", drawRows.length, "ff_draws");
     const p3 = await parity(sb, "ff_investors", invRows.length, "ff_investors");
+    const p4 = await parity(sb, "ff_hml_loans", dcRows.length, "ff_hml_loans");
 
     return new Response(JSON.stringify({
-      ok: true, deals: p1, draws: p2, investors: p3,
+      ok: true, deals: p1, draws: p2, investors: p3, hml_loans: p4,
       overhead: ohRows.length, hml_payments: hmlRows.length, duration_ms: Date.now() - startMs,
     }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (e) {

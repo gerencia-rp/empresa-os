@@ -14,9 +14,18 @@ const FF_K = n => { const a = Math.abs(n); return (n < 0 ? '-$' : '$') + (a >= 1
 const FF_ESC = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const FF_STAGES = [
   ['adquirida', 'Adquirida', 'st-adq'], ['en_rehab', 'En Rehab', 'st-reh'], ['en_venta', 'En Venta', 'st-ven'],
-  ['rentada', 'Rentada', 'st-ren'], ['refinanciada', 'Refinanciada', 'st-ref'], ['vendida', 'Vendida', 'st-vnd'],
+  ['rentada', 'Rentada', 'st-ren'], ['refinanciada', 'Refinanciada', 'st-ref'], ['rentada_y_refinanciada', 'Rentada y Refi', 'st-ref'], ['vendida', 'Vendida', 'st-vnd'],
 ];
 const FF_STAGE_LBL = Object.fromEntries(FF_STAGES.map(s => [s[0], s[1]]));
+// Blueprint FF: pipeline canónico Lead → Bajo contrato → Comprada → En remodelación → En renta/venta → Salida
+const FF_PIPELINE = [
+  ['lead', 'Lead', ['lead']],
+  ['bajo_contrato', 'Bajo contrato', ['bajo_contrato']],
+  ['comprada', 'Comprada', ['adquirida']],
+  ['remodelacion', 'En remodelación', ['en_rehab']],
+  ['renta_venta', 'En renta/venta', ['en_venta', 'rentada']],
+  ['salida', 'Salida', ['refinanciada', 'rentada_y_refinanciada', 'vendida']],
+];
 function ffShort(addr) { return String(addr || '').split(',')[0].trim(); }
 // ─── CALIDAD DE DATOS (no cambia la fuente; marca lo imposible/incompleto) ───
 const FF_FINISHED = ['vendida', 'refinanciada', 'rentada']; // resultado realizado (obra terminada + monetizada)
@@ -211,16 +220,20 @@ window.ffToggleTheme = ffToggleTheme;
 async function ffLoadAll() {
   FF.loading = true; FF.loadError = null;
   try {
-    const [deals, draws, inv, oh, hml] = await Promise.all([
+    const [deals, draws, inv, oh, hml, loans, cfg] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
       sb.from('ff_overhead').select('source, concepto, monto, mes').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_payments').select('address_norm, fecha, pago_hml, fee, ref30').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('ff_uw_config').select('key, value').then(r => r.data || []).catch(() => []),
     ]);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
+    FF.loans = loans || [];
+    FF.cfg = {}; (cfg || []).forEach(c => { FF.cfg[c.key] = +c.value; });
   } catch (e) { FF.loadError = e.message || String(e); }
   finally { FF.loading = false; }
 }
@@ -243,7 +256,14 @@ function ffCompute() {
     const deficit = dr ? Number(dr.net_total || 0) : 0; // <0 = déficit (cash inyectado)
     const equity = arv - allIn; // equity potencial
     const dq = ffDataQuality({ allIn, arv, allInPct, stage: d.stage });
-    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip' };
+    const loan = (FF.loans || []).find(l => l.address_norm === d.address_norm) || null;
+    const cerrada = ['vendida', 'refinanciada', 'rentada'].includes(d.stage);
+    const hmlDueDays = (loan && loan.fecha_vencimiento && !cerrada) ? Math.round((new Date(loan.fecha_vencimiento) - Date.now()) / 86400000) : null;
+    const budgetDevPct = (Number(d.remodel_est) > 0 && dr && Number(dr.remodel_complete) > 0) ? Math.round((Number(dr.remodel_complete) - Number(d.remodel_est)) / Number(d.remodel_est) * 100) : null;
+    const semAllin = arv > 0 && (allIn / arv) > (FF.cfg.all_in_max_pct || 0.75);
+    const semHml = hmlDueDays != null && hmlDueDays <= (FF.cfg.hml_warn_days || 45);
+    const semBudget = budgetDevPct != null && budgetDevPct > (FF.cfg.budget_warn_pct || 10);
+    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip', loan, hmlDueDays, budgetDevPct, semAllin, semHml, semBudget };
   });
   const active = deals.filter(d => d.stage !== 'vendida');
   // "confiables" = sin flags 'dato a revisar' / 'sin datos'. Los promedios/margen/déficit del
@@ -413,8 +433,11 @@ function ffDealTable(deals) {
 // ─── DEALS & PIPELINE (Kanban) ───
 function ffSecDeals(comp) {
   const { deals, kpi } = comp;
-  const cols = FF_STAGES.map(([k, lbl]) => ({ k, lbl, items: deals.filter(d => d.stage === k) }));
-  return `${ffHeader('Deals &amp; Pipeline', 'Kanban', `${kpi.total} deals · ${kpi.flips} flip / ${kpi.holds} hold · capital ${FF_MONEY(kpi.capital)}`)}
+  const cols = FF_PIPELINE.map(([k, lbl, stages]) => ({ k, lbl, items: deals.filter(d => stages.includes(d.stage)) }));
+  const sinStage = deals.filter(d => !FF_PIPELINE.some(([, , st]) => st.includes(d.stage)));
+  if (sinStage.length) cols.push({ k: 'otros', lbl: 'Sin etapa', items: sinStage });
+  const nAllin = deals.filter(d => d.semAllin).length, nHml = deals.filter(d => d.semHml).length, nBud = deals.filter(d => d.semBudget).length;
+  return `${ffHeader('Pipeline de casas', 'Blueprint FF', `${kpi.total} deals · semáforos: 🔴 all-in ${nAllin} · ⏰ HML ${nHml} · 📈 presupuesto ${nBud} (umbrales de ff_uw_config)`)}
     ${ffDQBar(comp)}
     <div class="kan">${cols.map(c => `<div class="kcol">
       <div class="kcol-h"><span>${c.lbl}</span><span class="cnt">${c.items.length}</span></div>
@@ -426,6 +449,7 @@ function ffKanCard(d) {
   return `<div class="kcard"${d.dq.revisar ? ' style="border-color:rgba(240,104,122,.4)"' : ''}>
     <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
     ${d.dq.flags.length ? `<div style="margin:5px 0 2px">${ffDQBadge(d.dq)}</div>` : ''}
+    ${(d.semAllin || d.semHml || d.semBudget) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px">${d.semAllin ? `<span class="ff-dq ff-dq-rev" title="all-in supera el máximo configurado del ARV">🔴 all-in ${Math.round(d.allInPct * 100)}%</span>` : ''}${d.semHml ? `<span class="ff-dq ff-dq-rev" title="vencimiento del préstamo HML">⏰ HML ${d.hmlDueDays < 0 ? 'VENCIDO ' + Math.abs(d.hmlDueDays) + 'd' : 'vence ' + d.hmlDueDays + 'd'}</span>` : ''}${d.semBudget ? `<span class="ff-dq ff-dq-pre" title="desvío del presupuesto de remodelación (real vs estimado)">📈 presup +${d.budgetDevPct}%</span>` : ''}</div>` : ''}
     <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.dr ? '' : ' · <span style="color:var(--amber)">sin draws</span>'}</div>
     <div class="krow"><span>All-in</span><b>${FF_MONEY(d.allIn)}</b></div>
     <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>

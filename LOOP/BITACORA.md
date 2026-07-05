@@ -18,3 +18,7 @@
 
 ## 5-jul · Fase 1 completada (6/6 empresas)
 Operación: ClickUp muerto 23d (P0-decisión), 26/94 tareas vencidas, 1 solo status en uso, 69/211 ops_day sin pid. Educación: espejo congelado 59 vs 45 (−24%), sin cron, KPIs contradictorios (97.8% activos + 100% inactivos), ingresos existen en fuente (1.Tbl Ventas) y no se espejan. Reportes en auditoria/.
+
+## 5-jul · Ciclo FF-M1 (en curso) — Dashboard casas + pipeline + semáforos
+**Plan**: espejo ff_hml_loans (Datos por casa) + property_id en ff_deals (RPC) + ff_uw_config (umbrales, no hardcode) + pipeline blueprint 6 etapas + 3 semáforos. **Verificación**: paridad ff_hml_loans=fuente; semáforos N verificables por SQL; 29/29 en pipeline; 0 pageerrors.
+**FF-M1 VERIFICADO** (5-jul): Pipeline blueprint 6 etapas (Lead 0 · Bajo contrato 0 · Comprada 6 · En remodelación 4 · En renta/venta 14 · Salida 5 = 29/29; 'Rentada y Refinanciada' mapeada a Salida). Semáforos UI = SQL exactos: 🔴 all-in>75% = 14 · ⏰ HML≤45d = 5 · 📈 presup>10% = 8, umbrales desde ff_uw_config (0 hardcode). Espejos nuevos: ff_hml_loans 20=20 (paridad, Datos por casa) · property_id 29/29 (RPC ff_backfill_property_ids en el sync). 0 pageerrors.
