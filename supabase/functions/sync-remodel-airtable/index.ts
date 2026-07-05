@@ -534,8 +534,27 @@ Deno.serve(async (req) => {
       }
     }
 
+    let wbStatus = "skip";
     // Backbone: asignar property_id (properties.id) a obras/proyectos/actividades nuevas (self-healing).
     try { await sb.rpc("remodel_backfill_property_ids"); } catch (e) { console.warn("property_id backfill skip:", String(e)); }
+
+    // Write-back del avance_real (Planner) → campo 'Avance Real (Planner)' en Airtable (Supabase es la fuente del avance).
+    // Requiere que el AIRTABLE_TOKEN tenga scope data.records:write en la base de Remodelación (si no → 403, se saltea).
+    try {
+      const { data: avRows } = await sb.from("remodel_at_properties")
+        .select("airtable_id, avance_real").eq("active", true).not("avance_real", "is", null);
+      const patches = (avRows || []).filter((r: any) => r.airtable_id && r.avance_real != null)
+        .map((r: any) => ({ id: r.airtable_id, fields: { "fld5nTFwW161Xu3sk": Math.round(Number(r.avance_real)) } }));
+      for (let i = 0; i < patches.length; i += 10) {
+        const wbRes = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ records: patches.slice(i, i + 10), typecast: false }),
+        });
+        wbStatus = wbRes.ok ? ("ok " + patches.length) : (wbRes.status + " " + (await wbRes.text()).slice(0, 80));
+        if (!wbRes.ok) break;
+      }
+    } catch (e) { wbStatus = "err"; console.warn("avance write-back skip:", String(e)); }
 
     // Soft-delete de paridad: archivar obras NO vistas en este run (fantasmas borrados en Airtable).
     // Seguro: se basa en last_synced_at (los vistos quedaron con last_synced_at ≈ ahora por el upsert).
@@ -642,6 +661,7 @@ Deno.serve(async (req) => {
       snapshots: snapshotCount,
       alerts: alertCount,
       refinement,
+      wb_status: wbStatus,
       duration_ms,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
