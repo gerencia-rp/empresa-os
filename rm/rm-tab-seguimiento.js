@@ -12,12 +12,14 @@ function rmRenderSeguimiento(body) {
 
   const view = rmState.seguimientoView || 'fase';
   const isFase = view === 'fase';
+  const _plannerAv = (rmState.currentProject && rmState.currentProject.progress_real != null) ? `<div class="mt-1 inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5" title="Avance único calculado desde el Planner (done/total) — misma fuente que Command Center y Ficha">📅 Avance real (Planner): ${Math.round(rmState.currentProject.progress_real)}%</div>` : '';
 
   body.innerHTML = rmSegSelector() + `
     <div class="flex items-end justify-between mb-3 flex-wrap gap-2">
       <div>
         <h2 class="text-lg font-bold">🔄 Seguimiento — ${rmState.editName || 'Proyecto'}</h2>
         <p class="text-xs text-slate-500">Registrá el avance real. ${isFase ? 'Vista por fase = rápido, agregado.' : 'Vista por actividad = granular, alimenta el modelo de aprendizaje.'}</p>
+        ${_plannerAv}
       </div>
       <!-- S1-G1 — Sub-tabs Por fase / Por actividad -->
       <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden text-xs">
