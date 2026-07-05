@@ -147,6 +147,7 @@ function ffInjectCSS() {
   #ff-overlay .cbub p{margin:0 0 6px}#ff-overlay .cbub p:last-child{margin:0}#ff-overlay .cbub ul,#ff-overlay .cbub ol{margin:4px 0 6px 18px}#ff-overlay .cbub li{margin:3px 0}
   @keyframes ffblink{0%,100%{opacity:.35}50%{opacity:1}}#ff-overlay .cbub.think::after{content:"▋";animation:ffblink 1s infinite}
   #ff-overlay .ff-zsel td{background:var(--glass)}
+#ff-um-modelos .pullbtn.on{background:linear-gradient(135deg,#4f8dff,#45e3c6);color:#fff;border-color:transparent}
 .uwbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   #ff-overlay .uwbar label{font-size:12px;color:var(--mut)}#ff-overlay .uwtag{font-size:11px;color:var(--a1)}
   #ff-overlay .uwrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -228,13 +229,13 @@ async function ffLoadAll() {
       sb.from('ff_overhead').select('source, concepto, monto, mes').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_payments').select('address_norm, fecha, pago_hml, fee, ref30').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
-      sb.from('ff_uw_config').select('key, value').then(r => r.data || []).catch(() => []),
+      sb.from('ff_uw_config').select('key, value, text_value').then(r => r.data || []).catch(() => []),
     ]);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
     FF.loans = loans || [];
-    FF.cfg = {}; (cfg || []).forEach(c => { FF.cfg[c.key] = +c.value; });
+    FF.cfg = {}; FF.cfgT = {}; (cfg || []).forEach(c => { if (c.value != null) FF.cfg[c.key] = +c.value; if (c.text_value) FF.cfgT[c.key] = c.text_value; });
   } catch (e) { FF.loadError = e.message || String(e); }
   finally { FF.loading = false; }
 }
@@ -702,7 +703,7 @@ function ffSecUnderwriting(comp) {
         <div class="meta" style="margin-top:8px">Las filas <b>⚠ dato a revisar</b> (all-in &gt; 100% del ARV) se excluyen del ROI y del semáforo — el margen/déficit está distorsionado por el error de carga.</div></div></div>`;
 }
 function ffUwIn(id, label, val) { return `<div class="uwrow"><label>${label}</label><input id="ff-${id}" value="${val === '' || val == null ? '' : val}" oninput="ffUwCalc()" inputmode="decimal"></div>`; }
-function ffUwPick(id) { FF.uw = FF.uw || {}; FF.uw.dealId = id || null; ffRender(); }
+function ffUwPick(id) { FF.uw = FF.uw || {}; FF.uw.dealId = id || null; const d = id ? FF.deals.find(x => x.id === id) : null; if (d && !FF.uw.modeloManual) FF.uw.modelo = d.strategy === 'flip' ? 'fixflip' : 'renta'; ffRender(); }
 window.ffUwPick = ffUwPick;
 function ffUwCalc() { ffMao(); ffEstim(); ffValRemod(); ffHml(); ffRefi(); ffUmCalc(); }
 window.ffUwCalc = ffUwCalc;
@@ -778,15 +779,21 @@ function ffUwModel(inp, cfgIn) {
 }
 function ffCalibZona() {
   const cerradas = ['rentada', 'rentada_y_refinanciada', 'vendida', 'refinanciada', 'en_venta'];
-  const map = {};
+  const zonasOk = ((FF.cfgT && FF.cfgT.calib_zonas) || '').split(',').map(z => z.trim().toLowerCase()).filter(Boolean);
+  const psfMin = (FF.cfg && FF.cfg.calib_psf_min) || 0;
+  const map = {}; const excl = [];
   (FF.deals || []).forEach(d => {
     if (!cerradas.includes(d.stage) || !(+d.sqft > 0)) return;
     const w = (FF.draws || []).find(x => x.address_norm === d.address_norm);
     if (!w || !(+w.remodel_complete > 0)) return;
     const zona = d.city || '(s/zona)';
+    if (zonasOk.length && !zonasOk.includes(zona.toLowerCase())) return; // solo zonas operativas (config)
+    const psf = +w.remodel_complete / +d.sqft;
+    if (psfMin && psf < psfMin) { excl.push({ casa: ffShort(d.address), psf: Math.round(psf) }); return; } // dato incompleto
     if (!map[zona]) map[zona] = [];
-    map[zona].push(+w.remodel_complete / +d.sqft);
+    map[zona].push(psf);
   });
+  ffCalibZona._excl = excl;
   const out = {};
   Object.entries(map).forEach(([z, arr]) => {
     arr.sort((a, b) => a - b);
@@ -840,6 +847,11 @@ function ffUmCalc() {
     return `<tr><td>${r > 0 ? '+' : ''}${Math.round(r * 100)}%</td>${cells}</tr>`;
   }).join('');
   parts.push(`<table class="ptable" style="font-size:10.5px"><thead><tr><th>rehab \\ ARV</th>${head}</tr></thead><tbody>${body}</tbody></table>`);
+  const modelo = (FF.uw && FF.uw.modelo) || 'fixflip';
+  const st = ffModelStrategy(m, modelo, cfg);
+  const lblMo = (FF_UW_MODELOS.find(x => x[0] === modelo) || [])[1] || modelo;
+  parts.push(`<div style="border-top:1px solid var(--glassb);margin:10px 0 6px;padding-top:8px;font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:.5px">Modelo: ${lblMo} — flujo y split</div>`);
+  st.rows.forEach(([l, v]) => { const isNum = typeof v === 'number'; parts.push(row(l, isNum ? FF_MONEY(v) : (v == null ? '—' : v), isNum ? (v >= 0 ? 'up' : 'down') : '')); });
   out.innerHTML = parts.join('');
 }
 window.ffUwModel = ffUwModel; window.ffUmCalc = ffUmCalc; window.ffUmUseCalib = ffUmUseCalib; window.ffCalibZona = ffCalibZona;
@@ -858,13 +870,46 @@ function ffUmCard(sel) {
       ${ffUwIn2('um-arv', 'ARV', dv.arv)}${ffUwIn2('um-rehab', 'Remodelación', dv.rehab)}
       <div class="uwrow"><label></label><button onclick="ffUmUseCalib()" class="pullbtn" style="font-size:10px;padding:4px 8px">usar el $/sqft calibrado de la zona</button></div>
       ${ffUwIn2('um-renta', 'Renta esperada /mes (opcional)', '')}
+      <div id="ff-um-modelos" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${FF_UW_MODELOS.map(([k, lbl]) => `<button data-mo="${k}" onclick="ffUmSetModelo('${k}')" class="pullbtn${(FF.uw && FF.uw.modelo) === k ? ' on' : ''}" style="font-size:10px;padding:4px 9px">${lbl}</button>`).join('')}</div>
       <div class="uwres" id="ff-um-out"></div>
       <div class="meta" style="margin-top:8px">Supuestos (de <b>ff_uw_config</b>, no hardcodeados): ${cfgChips}</div></div>
     <div class="card"><div class="chart-h"><div class="t">📐 Calibración $/sqft por zona</div><div class="k">histórico de casas con ciclo cerrado</div></div>
       <table class="ptable"><thead><tr><th>Zona</th><th style="text-align:right">n</th><th style="text-align:right">rango</th><th style="text-align:right">prom</th></tr></thead><tbody>${zrows}</tbody></table>
-      <div class="meta" style="margin-top:8px">La banda de la zona alimenta "usar $/sqft calibrado" y el validador. Fuente: ff_deals + ff_draws (remodel real = base Remodelación).</div></div>
+      <div class="meta" style="margin-top:8px">La banda de la zona alimenta "usar $/sqft calibrado" y el validador. Fuente: ff_deals + ff_draws (remodel real = base Remodelación). Zonas operativas: <b>${FF_ESC((FF.cfgT && FF.cfgT.calib_zonas) || 'todas')}</b> · piso ${(FF.cfg.calib_psf_min || 0)}/sqft.${(ffCalibZona._excl || []).length ? ` Excluidas por dato incompleto: ${ffCalibZona._excl.map(x => FF_ESC(x.casa) + ' (' + x.psf + ')').join(', ')}.` : ''}</div></div>
   </div>`;
 }
+
+
+// ─── M3 · Selector de modelo por casa (Blueprint FF §3) ───
+const FF_UW_MODELOS = [['fixflip', '🔨 Fix & Flip'], ['brrrr', '♻️ BRRRR'], ['renta', '🏠 Renta'], ['wholesale', '📄 Wholesale']];
+function ffModelStrategy(m, modelo, cfgIn) {
+  const cfg = cfgIn || FF.cfg || {};
+  const f = (k, d) => (cfg[k] != null ? +cfg[k] : d);
+  const split = f('split_investor_pct', 50) / 100;
+  if (modelo === 'fixflip') {
+    const venta = m.arv * f('selling_cost_pct', 6) / 100;
+    const ganancia = m.arv - m.allIn - venta;
+    const inv = ganancia > 0 ? ganancia * split : 0, nos = ganancia - inv;
+    return { modelo, rows: [['Venta al ARV', m.arv], ['− All-in', -m.allIn], ['− Costos de venta', -venta], ['= Ganancia neta', ganancia], ['Inversionista (' + Math.round(split * 100) + '%)', inv], ['Nosotros', nos], ['ROI inversionista', m.aporte > 0 ? Math.round(inv / m.aporte * 100) + '%' : '—']], ganancia, inv, nos };
+  }
+  if (modelo === 'brrrr') {
+    const buyout = m.aporte * (1 + f('investor_buyout_pct', 15) / 100);
+    const cashLeft = m.aporte - Math.max(0, m.cashOut);
+    const rentaNetaRefi = m.renta > 0 ? m.renta * (1 - f('vacancy_pct', 8) / 100) - m.renta * f('opex_pct', 35) / 100 - m.refiPago : null;
+    const reglaOk = m.refiPago <= m.pagoHml;
+    return { modelo, rows: [['Refi (' + Math.round(f('refi_ltv_pct', 75)) + '% LTV)', m.refiLoan], ['Cash-out (devuelve capital)', m.cashOut], ['Cash que queda adentro', cashLeft], ['Buy-out inversionista (capital +' + Math.round(f('investor_buyout_pct', 15)) + '%)', buyout], ['Renta neta post-refi /mes', rentaNetaRefi], ['Regla: pago refi ≤ pago HML', reglaOk ? '✓ cumple' : '⚠ NO cumple'], ['Equity retenido', m.arv - m.refiLoan]], buyout, cashLeft, rentaNetaRefi };
+  }
+  if (modelo === 'renta') {
+    const noiMes = m.renta > 0 ? m.renta * (1 - f('vacancy_pct', 8) / 100 - f('opex_pct', 35) / 100) : 0;
+    const capRate = m.allIn > 0 && noiMes ? (noiMes * 12) / m.allIn : null;
+    const dscr = m.pagoHml > 0 && noiMes ? noiMes / m.pagoHml : null;
+    return { modelo, rows: [['NOI /mes', noiMes], ['NOI /año', noiMes * 12], ['Cap rate sobre all-in', capRate != null ? (capRate * 100).toFixed(1) + '%' : '—'], ['DSCR (NOI/pago)', dscr != null ? dscr.toFixed(2) : '—'], ['Flujo neto /mes (con deuda)', m.rentaNeta]], noiMes, capRate, dscr };
+  }
+  const fee = m.arv * f('wholesale_fee_pct', 3) / 100;
+  return { modelo: 'wholesale', rows: [['Assignment fee (' + f('wholesale_fee_pct', 3) + '% ARV)', fee], ['Sin rehab ni holding', 'cero capital'], ['Nosotros (100%)', fee]], fee };
+}
+function ffUmSetModelo(mo) { FF.uw = FF.uw || {}; FF.uw.modelo = mo; ffUmCalc(); const bar = document.getElementById('ff-um-modelos'); if (bar) [...bar.querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.mo === mo)); }
+window.ffUmSetModelo = ffUmSetModelo; window.ffModelStrategy = ffModelStrategy;
 
 // ════════════════════════════════════════════════════════════════
 // CHARTS
