@@ -6,3 +6,4 @@
 
 ## Ciclo FF-2 (en curso)
 **Plan**: UI consume overhead/HML reales; borrar $146k/$46k de ff-command-center.js + os.js (5 spots); EBITDA FF real en Finanzas; footer honesto. **Verificación**: grep 0 hardcodes, UI muestra $127,875/$256,086, build+smoke OK.
+**FF-2 VERIFICADO** (5-jul): 0 hardcodes 146k/46k en el repo (grep). UI muestra overhead real $127,875, intereses reales $256,086, EBITDA FF aprox, conciliación con badges "Real", footer honesto. Smoke: 29 deals, ff_overhead 164, ff_hml 139, 0 pageerrors. Recurrencia: cron diario sync-airtable ahora también dispara sync-ff-airtable + sync-remodel-airtable (sin función Vercel nueva, límite 12 respetado). Commits en main, bundle 95c41b741a5f.

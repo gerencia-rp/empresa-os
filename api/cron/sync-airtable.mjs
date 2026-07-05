@@ -35,8 +35,29 @@ export default async function handler(req, res) {
       body: JSON.stringify({ dry_run: false, archive: false, triggered_by: "vercel-cron" }),
     });
     const text = await r.text();
-    res.status(r.status).setHeader("content-type", "application/json").send(text);
+    // Sync FF (deals/draws/investors/overhead/HML) + Remodelación en el mismo cron — best-effort, no rompen el PM sync.
+    let ffText = null, rmText = null;
+    try {
+      const rf = await fetch(`${base}/sync-ff-airtable`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ triggered_by: "vercel-cron" }),
+      });
+      ffText = await rf.text();
+    } catch (e) { ffText = "error: " + e.message; }
+    try {
+      const rr = await fetch(`${base}/sync-remodel-airtable`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ triggered_by: "vercel-cron" }),
+      });
+      rmText = await rr.text();
+    } catch (e) { rmText = "error: " + e.message; }
+    res.status(r.status).setHeader("content-type", "application/json")
+      .send(JSON.stringify({ pm: safeParse(text), ff: safeParse(ffText), remodel: safeParse(rmText) }));
   } catch (e) {
     res.status(502).json({ error: "Cron proxy error: " + e.message });
   }
 }
+
+function safeParse(t) { try { return JSON.parse(t); } catch { return t; } }

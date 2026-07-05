@@ -5,8 +5,8 @@ Estados: `pendiente` · `en curso` · `verificado` · `bloqueado (razón)`
 ## FIX & FLIP (autorizado por CEO 5-jul: SOLO P0)
 | # | P | Item | Estado |
 |---|---|---|---|
-| FF-1 | P0 | Sync FF recurrente (`sync-ff-airtable`): deals+draws+investors, upsert por airtable_id, archive-unseen (soft-delete), assert de paridad, badge UI + footer honesto | en curso |
-| FF-2 | P0 | Espejar overhead real FF (Gastos Equipo + Plataformas → `ff_overhead`; Pagos HML → `ff_hml_payments`) → EBITDA FF real; borrar hardcodes $146k/$46k (ff-cc + os.js) | pendiente |
+| FF-1 | P0 | Sync FF recurrente (sync-ff-airtable): deals+draws+investors, paridad, soft-delete, cron diario | verificado |
+| FF-2 | P0 | Overhead real FF + Pagos HML → EBITDA FF real; hardcodes eliminados | verificado |
 | FF-3 | P1 | property_id en ff_deals | **NO AUTORIZADO aún** (orden del CEO: no tocar) |
 | FF-4 | P1 | archived_at + alerta vencimientos HML | pendiente (post-P0) |
 
