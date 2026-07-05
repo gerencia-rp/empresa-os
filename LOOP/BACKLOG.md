@@ -17,6 +17,9 @@ Estados: `pendiente` · `en curso` · `verificado` · `bloqueado (razón)`
 | # | P | Item | Estado |
 |---|---|---|---|
 | RM-1 | P1 | Cobertura Planner 3/30 casas | pendiente de OK |
+| RN-1 | P0 | Rentas: paridad 6/6 con assert + pagos sin fecha importados como revisar + fantasma archivado + base PRODUCCIÓN verificada | verificado |
+| CT-1 | P0 | v_holding_pnl consolidado (realizado vs inyectado) + bloque /contable | verificado |
+| QB-1 | P0 | Conector QuickBooks | bloqueado (esperando input CEO: company+credenciales) |
 | RM-2 | P1 | Write-back avance (requiere scope token, acción CEO) | bloqueado (PAT read-only) |
 | RM-3 | P1 | Panel data-quality accionable | pendiente de OK |
 
