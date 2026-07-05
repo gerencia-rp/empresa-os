@@ -15,3 +15,6 @@
 ## Ciclo CT-1 (en curso) — v_holding_pnl
 **Plan**: vista consolidada (empresa: ingreso/costo/overhead/ebitda; FF separando realizado vs inyectado) + bloque en /contable. **Verificación**: remodel ebitda $130,275 en la vista; FF realizado vs inyectado suman Σ net_total; UI renderiza sin errores.
 **CT-1 VERIFICADO** (5-jul): v_holding_pnl creada — remodelacion EBITDA $130,275 (exacto vs auditoría), fix_flip realizado −$187,203 / inyectado −$232,243 (suman Σ net_total −$419,446 ✓), rentas EBITDA −$140,439, consolidado −$325,242. Bloque "P&L del holding" en /contable renderiza (5 filas, 0 pageerrors). QuickBooks parqueado esperando input del CEO.
+
+## 5-jul · Fase 1 completada (6/6 empresas)
+Operación: ClickUp muerto 23d (P0-decisión), 26/94 tareas vencidas, 1 solo status en uso, 69/211 ops_day sin pid. Educación: espejo congelado 59 vs 45 (−24%), sin cron, KPIs contradictorios (97.8% activos + 100% inactivos), ingresos existen en fuente (1.Tbl Ventas) y no se espejan. Reportes en auditoria/.
