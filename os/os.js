@@ -245,7 +245,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units,property_id,address_normalized,mortgage_monthly').eq('active', true),
@@ -260,8 +260,15 @@ async function osLoad() {
       sb.from('ff_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_payments').select('pago_hml').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('v_holding_pnl').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('qb_report_cache').select('empresa, report, label, value').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('qb_account_map').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('ff_hml_loans').select('monto_hml').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('ff_uw_config').select('value').eq('key', 'concil_warn_pct').maybeSingle().then(r => r.data).catch(() => null),
     ]);
     OS.pnl = pnl || [];
+    OS.qbCache = qbc || []; OS.qbMap = qbm || [];
+    OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
+    OS.concilWarn = cw ? +cw.value : 10;
     OS.ffOverhead = (ffOh || []).reduce((t, x) => t + (+x.monto || 0), 0);
     OS.ffIntereses = (ffHml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
@@ -380,6 +387,10 @@ function osInsights(comp) {
   // Cobranza (holding): casas con deuda
   comp.cobranza.rows.slice(0, 3).forEach(r => ins.push({ sev: 'critical', impact: r.deuda, tag: 'COBRANZA · MORA', tx: `<b>${OS_E(r.casa)}</b>: deuda de <b>${OS_M(r.deuda)}</b> este mes (esperado ${OS_M(r.esperado)}, cobrado ${OS_M(r.cobrado)}). El Cerebro puede redactar el cobro.` }));
   // Conocidos del negocio (info)
+  try { const cf = osConcilFF(); const warn = (OS.concilWarn != null ? OS.concilWarn : 10) / 100;
+    if (cf.aporteQB != null && Math.abs(cf.aporteOS - cf.aporteQB) / Math.max(cf.aporteQB, 1) > warn * 0.5) ins.push({ sev: 'warning', impact: Math.abs(cf.aporteOS - cf.aporteQB), tag: 'CONCILIACIÓN · APORTES', tx: `Aporte de inversionistas: OS <b>${OS_M(cf.aporteOS)}</b> vs QBO <b>${OS_M(cf.aporteQB)}</b> (Δ ${OS_M(cf.aporteOS - cf.aporteQB)}). Conciliar Investor Contributions.` });
+    if (cf.deudaQB != null && Math.abs(cf.deudaOS - cf.deudaQB) / Math.max(cf.deudaQB, 1) > warn * 0.5) ins.push({ sev: 'warning', impact: Math.abs(cf.deudaOS - cf.deudaQB), tag: 'CONCILIACIÓN · DEUDA HML', tx: `Deuda de préstamos: OS <b>${OS_M(cf.deudaOS)}</b> vs QBO <b>${OS_M(cf.deudaQB)}</b> (Δ ${OS_M(cf.deudaOS - cf.deudaQB)}).` });
+  } catch (e) {}
   if (OS.ffOverhead > 0) ins.push({ sev: 'info', impact: Math.round(OS.ffOverhead), tag: 'CONTABLE · OVERHEAD FF', tx: `Overhead Fix&Flip real: <b>${OS_M(OS.ffOverhead)}</b> (equipo + plataformas, espejo Airtable). Restar para P&L neto.` });
   if (OS.ffIntereses > 0) ins.push({ sev: 'info', impact: Math.round(OS.ffIntereses), tag: 'CONTABLE · INTERESES HML', tx: `Intereses HML pagados (reales): <b>${OS_M(OS.ffIntereses)}</b>.` });
   const rank = { critical: 0, warning: 1, info: 3 };
@@ -511,8 +522,9 @@ function osContable(comp) {
         return `<tr style="${bold}"><td>${nm}</td><td>${v(r.ingreso)}</td><td>${v(r.costo_real)}</td><td class="down">${v(r.overhead)}</td><td class="${cls(r.utilidad_bruta)}">${v(r.utilidad_bruta)}</td><td class="${cls(r.ebitda)}">${v(r.ebitda)}</td><td>${ffx}</td></tr>`;
       }).join('')}
       </tbody></table>
-      <div class="meta" style="margin-top:8px">FF: "realizado" = casas con ciclo cerrado (vendida/refi/rentada); "inyectado" = cash en casas vivas (no es pérdida realizada). Educación: sin datos financieros en el sistema (ver auditoría). QuickBooks: parqueado esperando definición.</div>
+      <div class="meta" style="margin-top:8px">FF: "realizado" = casas con ciclo cerrado (vendida/refi/rentada); "inyectado" = cash en casas vivas (no es pérdida realizada).</div>
     </div>
+    ${osConcilBlock(comp)}
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
         <table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th>Impacto</th></tr></thead><tbody>
@@ -769,3 +781,68 @@ window.osAsk = osAsk;
 
 // ─── Charts ───
 function osMountCharts(comp) { /* placeholder — los charts del holding se agregan con la Analítica */ }
+
+// ─── CT-2 · Conciliación OPERATIVO ↔ QuickBooks (libros reales) ───
+function osQbVal(emp, report, label) {
+  const r = (OS.qbCache || []).find(x => x.empresa === emp && x.report === report && x.label === label);
+  return r ? +r.value : null;
+}
+function osQbConcept(emp, concepto) {
+  const m = (OS.qbMap || []).find(x => x.concepto === concepto);
+  if (!m) return null;
+  const re = new RegExp(m.patron, 'i');
+  const rows = (OS.qbCache || []).filter(x => x.empresa === emp && x.report === 'balance' && re.test(x.label));
+  return rows.length ? rows.reduce((s, x) => s + (+x.value || 0), 0) : null;
+}
+function osQbTieneLibros(emp) { return (OS.qbCache || []).some(x => x.empresa === emp && +x.value); }
+function osConcilFF() {
+  const aporteOS = (OS.investors || []).reduce((s, i) => s + (+i.capital_aportado || 0), 0);
+  const aporteQB = osQbConcept('fix_flip', 'aporte_inversionistas');
+  const deudaOS = OS.hmlTotal || 0;
+  const deudaQB = osQbConcept('fix_flip', 'deuda_prestamos');
+  const capQB = osQbConcept('fix_flip', 'capitalizado_propiedades');
+  const realizadoOS = (OS.draws || []).reduce((s, d) => {
+    const deal = (OS.ff || []).find(x => x.address_norm === d.address_norm);
+    return s + ((deal && ['vendida', 'refinanciada', 'rentada'].includes(deal.stage)) ? (+d.net_total || 0) : 0);
+  }, 0);
+  const netQBall = osQbVal('fix_flip', 'pnl_all', 'Net Income');
+  const netQBytd = osQbVal('fix_flip', 'pnl_ytd', 'Net Income');
+  return { aporteOS, aporteQB, deudaOS, deudaQB, capQB, realizadoOS, netQBall, netQBytd };
+}
+function osConcilRow(lab, vOS, vQB, nota) {
+  const warn = (OS.concilWarn != null ? OS.concilWarn : 10) / 100;
+  const delta = (vOS != null && vQB != null) ? vOS - vQB : null;
+  const base = Math.max(Math.abs(vOS || 0), Math.abs(vQB || 0), 1);
+  const mal = delta != null && Math.abs(delta) / base > warn;
+  const chip = delta == null ? '' : (mal ? ' <span class="badge b-warn">⚠ descuadre</span>' : ' <span class="badge b-ok">✓</span>');
+  return `<tr><td>${lab}${nota ? `<div style="font-size:9px;opacity:.55">${nota}</div>` : ''}</td><td style="text-align:right">${vOS != null ? OS_M(vOS) : '—'}</td><td style="text-align:right">${vQB != null ? OS_M(vQB) : '—'}</td><td style="text-align:right" class="${delta > 0 ? 'warn' : delta < 0 ? 'down' : ''}">${delta != null ? OS_M(delta) : '—'}${chip}</td></tr>`;
+}
+function osConcilBlock(comp) {
+  const ff = osConcilFF();
+  const remOSIngreso = (OS.remodel || []).filter(o => o.proceso === 'Finalizado').reduce((s, o) => s + (+o.monto_real || 0), 0);
+  const remQBIncomeAll = osQbVal('remodelacion', 'pnl_all', 'Total Income');
+  const pnlRow = (emp, nombre) => {
+    const op = (OS.pnl || []).find(x => x.empresa === emp) || {};
+    const ytd = osQbVal(emp, 'pnl_ytd', 'Net Income');
+    const all = osQbVal(emp, 'pnl_all', 'Net Income');
+    const libros = osQbTieneLibros(emp);
+    return `<tr><td>${nombre}</td><td style="text-align:right">${op.ebitda != null ? OS_M(+op.ebitda) : '—'}</td><td style="text-align:right">${ytd != null ? OS_M(ytd) : (libros ? '—' : '<span style="opacity:.5">sin libros</span>')}</td><td style="text-align:right">${all != null ? OS_M(all) : (libros ? '—' : '<span style="opacity:.5">sin libros</span>')}</td></tr>`;
+  };
+  return `<div class="grid k2" style="margin-top:16px">
+    <div class="card"><div class="chart-h"><div class="t">Conciliación Fix & Flip ↔ QuickBooks</div><div class="k">libros reales (Flipping Rentals LLC)</div></div>
+      <table class="ptable"><thead><tr><th>Concepto</th><th style="text-align:right">OPERATIVO (OS)</th><th style="text-align:right">CONTABLE (QBO)</th><th style="text-align:right">Δ</th></tr></thead><tbody>
+      ${osConcilRow('Aporte de inversionistas', ff.aporteOS, ff.aporteQB, 'ff_investors vs cuenta Investor Contributions')}
+      ${osConcilRow('Deuda de préstamos (HML+refi)', ff.deudaOS, ff.deudaQB, 'ff_hml_loans vs Loan Payable')}
+      ${osConcilRow('Resultado realizado', ff.realizadoOS, ff.netQBall, 'ciclos cerrados (draws) vs Net Income histórico QBO')}
+      </tbody></table>
+      <div class="meta" style="margin-top:8px">🏦 <b>Capitalización (no mezclar con P&L):</b> QBO capitaliza las casas como ACTIVO — ${ff.capQB != null ? OS_M(ff.capQB) : '—'} en Fixed Assets + Inventory (cada casa = cuenta "Rental Property"). Por eso el neto contable (${ff.netQBall != null ? OS_M(ff.netQBall) : '—'}) difiere del operativo (${OS_M(ff.realizadoOS)}): el costo de las casas vivas está en el balance, no en el P&L. El Δ restante es la conciliación pendiente.</div></div>
+    <div class="card"><div class="chart-h"><div class="t">Capa contable del holding</div><div class="k">EBITDA operativo vs Net Income QBO · umbral ${OS.concilWarn != null ? OS.concilWarn : 10}%</div></div>
+      <table class="ptable"><thead><tr><th>Empresa</th><th style="text-align:right">EBITDA operativo</th><th style="text-align:right">QBO Net YTD</th><th style="text-align:right">QBO Net histórico</th></tr></thead><tbody>
+      ${pnlRow('fix_flip', '🏚 Fix & Flip')}${pnlRow('remodelacion', '🔨 Remodelación')}${pnlRow('rentas', '🏠 Rentas')}${pnlRow('educacion', '🎓 Educación')}
+      </tbody></table>
+      <table class="ptable" style="margin-top:10px"><thead><tr><th>Remodelación: ingreso</th><th style="text-align:right">OPERATIVO</th><th style="text-align:right">QBO</th><th style="text-align:right">Δ</th></tr></thead><tbody>
+      ${osConcilRow('Ingreso (draws vs libros)', remOSIngreso, remQBIncomeAll, 'monto_real finalizadas vs Total Income Structure One')}
+      </tbody></table>
+      <div class="meta" style="margin-top:8px">Rentas (EverHome, ⚠ configurada en COP) y Educación: libros sin movimientos — todo lo operativo está "fuera de libros" hasta que se carguen. Fuente: qb_report_cache (sync on-demand /qb-oauth/sync).</div></div>
+  </div>`;
+}
