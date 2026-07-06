@@ -19,7 +19,7 @@ Documento de trabajo por empresa. §1 Fix & Flip: ver `BLUEPRINT_FF.md` (**M1–
 
 **Reglas**: property_id + data real (remodel_projects, weekly_activities, remodel_worker_pay_summary, Pago de Materiales, Horas Trabajadas, remodel_at_properties, remodel_overhead) · aditivo · soft-delete · una definición por métrica · verificación al cierre de cada módulo.
 
-**ESTADO (5-jul-2026): RM-C1 ✅ RM-C2 ✅ RM-C3 ✅ RM-C4 ✅ — §2 COMPLETO.** Evidencia en LOOP/BITACORA.md.
+**ESTADO (6-jul-2026): RM-C1..C4 ✅ + RM-M1 (avance de obra EN VIVO: tareas vs plata + semáforos costo/tiempo, v_remodel_avance_vivo) ✅ + RM-M2 (recibo de pago quincenal por líder con firma canvas + registro remodel_payroll_receipts; write-back Airtable pendiente de scope) ✅.** Evidencia en LOOP/BITACORA.md.
 
 ## Definiciones únicas (nuevas)
 - `factor_dias(etapa)` = 1 + avg_slip_days(etapa) — cada actividad del Planner es 1 día-tarea; el slip promedio por tarea ES el sobrecosto de tiempo de la etapa. Guard: solo se aplica con `n_tasks ≥ n_threshold` (param existente = 3).
