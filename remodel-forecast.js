@@ -345,7 +345,22 @@ fcState.form = {
 const FC_STAGE_ICON = { 'Demolición':'⛏️','Cimentación':'🏗️','Externo':'🏠','Estructura':'🪵','Interno':'🛏️','Limpieza':'🧹' };
 
 // ─── RENDER PRINCIPAL DE LA TAB ───
+function fcApplyInspHandoff() {
+  let h = window.__inspHandoff;
+  if (!h) { try { h = JSON.parse(localStorage.getItem('rm_insp_handoff') || 'null'); } catch (e) {} }
+  if (!h || fcState._inspApplied === (h.property_id || h.nombre)) return null;
+  const af = h.afectacion_por_etapa || {};
+  const nueva = {};
+  FC_STAGES.forEach(et => { nueva[et] = (af[et] != null) ? Math.round(af[et]) : (et === 'Limpieza' ? 100 : 0); });
+  // Demolición/Estructura escalan con el daño; Limpieza siempre 100 (se limpia toda la casa)
+  fcState.form.afectacion = nueva;
+  if (h.nombre && !fcState.form.propiedad) fcState.form.propiedad = h.nombre;
+  if (h.direccion && !fcState.form.direccion) fcState.form.direccion = h.direccion;
+  fcState._inspApplied = h.property_id || h.nombre;
+  return h;
+}
 function fcRenderTab(body) {
+  const _insp = fcApplyInspHandoff();
   const f = fcState.form;
   const errores = fcValidarDiagnostico({ sqft: f.sqft, afectacion: f.afectacion });
   const otrosPct = f.otrosCostosPctOverride != null ? f.otrosCostosPctOverride : fcState.otrosCostosPct;
@@ -357,6 +372,7 @@ function fcRenderTab(body) {
   const duracionSugerida = fcDuracionEstimada(f.sqft);
 
   body.innerHTML = `
+    ${_insp ? `<div class="bg-teal-50 border border-teal-300 text-teal-800 rounded-lg px-3 py-2 mb-3 text-sm">🔍 <b>Pre-llenado desde la Inspección</b> de ${(_insp.nombre||'').replace(/</g,'&lt;')} (daño global ${_insp.dano_global||'—'}%): las afectaciones por etapa arrancan del diagnóstico, no de cero. Ajustá lo que haga falta.</div>` : ''}
     <div class="grid lg:grid-cols-12 gap-4">
       <!-- IZQUIERDA: Visita Previa -->
       <div class="lg:col-span-5 space-y-3">

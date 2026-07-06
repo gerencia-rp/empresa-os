@@ -82,6 +82,7 @@ async function inLoad() {
     IN.etapas = et.map(e => ({ ...e, divisiones: Array.isArray(e.divisiones) ? e.divisiones : JSON.parse(e.divisiones || '[]') }));
     IN.config = {}; cf.forEach(c => IN.config[c.key] = c.value);
     IN.inspecciones = ins; IN.props = pr;
+    await inLoadCalib();
   } catch (e) { console.warn('inLoad', e); }
 }
 
@@ -223,6 +224,7 @@ function inRenderWizard() {
       <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${(res.global || 0) >= 60 ? '#f87171' : '#34d399'}">${res.global != null ? res.global + '%' : '—'}</div><div style="opacity:.7">Daño Global Estimado</div></div>
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:8px 0 4px">Daño por etapa de renovación</div>
       <table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right"><b class="${(etapas[e.etapa] || 0) >= 50 ? 'down' : ''}">${etapas[e.etapa] != null ? etapas[e.etapa] + '%' : '—'}</b></td></tr>`).join('')}</tbody></table>
+      ${(() => { try { const rh = inRehabEstimado({ property_id: w.property_id, dano_etapas: res.etapas }); return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:12px 0 4px">💵 Rehab estimado (daño × $/sqft calibrado)</div><div style="padding:8px 10px;border-radius:8px;background:rgba(52,211,153,.08);margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px" class="up">${IN_M(rh.total)}</b><span style="font-size:10px;opacity:.7">${rh.sqft} sqft × ${rh.calibPsf}/sqft ${rh.n ? '<span style=\'background:rgba(18,181,160,.18);color:#12b5a0;padding:1px 6px;border-radius:8px;font-size:8px;font-weight:800\'>calibrado con ' + rh.n + ' obras</span>' : ''}</span></div></div><table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right">${IN_M(rh.porEtapa[e.etapa] || 0)}</td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:4px">Este total = candidato a \'Valor Remodelación\' → alimenta el MAO/underwriting de Fix & Flip por property_id.</div>`; } catch (e) { return ''; } })()}
       <div class="meta" style="margin-top:8px">Al guardar: se registra por property_id (Ficha de Casa) con TODAS las respuestas crudas + exportables JSON/XLS. Botón "→ Estimador" pre-llena el pronóstico con este daño por etapa.</div>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="repbtn" onclick="inSaveWizard()">💾 Guardar inspección</button></div></div>`;
   }
@@ -364,10 +366,44 @@ function inPrellenarEstimador(id) {
   const x = IN.inspecciones.find(i => i.id === id); if (!x) return;
   const afect = x.dano_etapas || {};
   // handoff: guardar en un slot que el Estimador lee al abrir para una casa
-  window.__inspHandoff = { property_id: x.property_id, nombre: x.nombre_ref, direccion: x.direccion, uso: x.uso, afectacion_por_etapa: afect, dano_global: x.dano_global_pct };
+  const rh = (() => { try { return inRehabEstimado(x); } catch (e) { return null; } })();
+  window.__inspHandoff = { property_id: x.property_id, nombre: x.nombre_ref, direccion: x.direccion, uso: x.uso, afectacion_por_etapa: afect, dano_global: x.dano_global_pct, rehab_estimado: rh ? rh.total : null };
   try { localStorage.setItem('rm_insp_handoff', JSON.stringify(window.__inspHandoff)); } catch (e) {}
   const resumen = IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `${e.emoji} ${e.etapa}: ${afect[e.etapa] != null ? afect[e.etapa] + '%' : '—'}`).join('\n');
   alert(`Handoff listo para el Estimador Pro (${x.nombre_ref}):\n\n${resumen}\n\nAbrí el Estimador → arranca el pronóstico con estas afectaciones por etapa (en vez de cero). El presupuesto que salga = candidato a "Valor Remodelación".`);
 }
 window.inPrellenarEstimador = inPrellenarEstimador;
 window.IN = IN; window.inLoad = inLoad; window.inRenderDB = inRenderDB;
+
+// ─── MEJORA daño→$: convertir % de daño en $ de rehab con calibración C1 ($/sqft por etapa) ───
+// $/sqft por etapa (semilla del catálogo del Estimador); calibrado al total real por la calibración C1.
+const IN_STAGE_PSF = { 'Demolición': 1.32, 'Cimentación': 0.00, 'Externo': 9.88, 'Estructura': 4.24, 'Interno': 28.01, 'Limpieza': 1.87 };
+async function inLoadCalib() {
+  try {
+    const [{ data: cc }, { data: pr }] = await Promise.all([
+      sb.from('v_remodel_calib_costos').select('*').eq('ventana', 'historico').maybeSingle(),
+      sb.from('remodel_forecast_params').select('key,value').eq('key', 'total_psf_real').maybeSingle(),
+    ]);
+    IN.calib = { psf_real: cc ? +cc.psf_real : (pr ? +pr.value : null), n: cc ? +cc.n : null };
+  } catch (e) { IN.calib = { psf_real: null, n: null }; }
+  return IN.calib;
+}
+function inRehabEstimado(insp) {
+  // sqft de la casa
+  const prop = (IN.props || []).find(p => p.property_id === insp.property_id);
+  const sqft = prop && +prop.sqft > 0 ? +prop.sqft : 1400;   // fallback promedio del portafolio
+  const seedTotal = Object.values(IN_STAGE_PSF).reduce((s, v) => s + v, 0);  // ~45.3
+  const calibPsf = IN.calib && IN.calib.psf_real ? IN.calib.psf_real : seedTotal;
+  const factor = seedTotal > 0 ? calibPsf / seedTotal : 1;    // reescala la semilla al $/sqft real calibrado
+  const et = insp.dano_etapas || {};
+  const porEtapa = {}; let total = 0;
+  IN.etapas.forEach(e => {
+    if (e.etapa === 'Limpieza') { const c = Math.round(IN_STAGE_PSF['Limpieza'] * factor * sqft); porEtapa[e.etapa] = c; total += c; return; }
+    const psf = (IN_STAGE_PSF[e.etapa] || 0) * factor;
+    const dano = (et[e.etapa] || 0) / 100;                    // el daño % escala el costo de esa etapa
+    const c = Math.round(psf * sqft * dano);
+    porEtapa[e.etapa] = c; total += c;
+  });
+  return { sqft, calibPsf: Math.round(calibPsf * 100) / 100, n: IN.calib ? IN.calib.n : null, porEtapa, total };
+}
+window.inRehabEstimado = inRehabEstimado; window.inLoadCalib = inLoadCalib;
