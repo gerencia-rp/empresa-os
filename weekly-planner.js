@@ -64,6 +64,8 @@ function wpMondayOf(d) {
 
 // ─── DB ───
 async function wpLoadAll() {
+  try { wpState.cleanView = localStorage.getItem('wp_clean') !== '0'; } catch (e) { wpState.cleanView = true; }
+  wpLoadVivoAtrasos();
   if (!wpState.weekStart) wpState.weekStart = wpMondayOf(new Date());
   const start = wpDateOnly(wpState.weekStart);
   const end = wpDateOnly(wpAddDays(wpState.weekStart, 6)); // domingo (7 días lun-dom)
@@ -180,6 +182,33 @@ function wpInjectTheme() {
   #wp-root .wp-ac-stage{font-size:9px;color:var(--wmut);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
   #wp-root .wp-ac-day{font-size:8.5px;color:var(--wmut);background:rgba(100,116,139,.14);padding:1px 6px;border-radius:20px;font-weight:600;white-space:nowrap}
   #wp-root .wp-ac-st{font-size:8.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  /* A3: color = ETAPA (no alarma); rojo solo atrasado/crítico real */
+  #wp-root .wp-acard[data-stage*="inter"]{border-left-color:#8b5cf6}
+  #wp-root .wp-acard[data-stage*="exter"]{border-left-color:#0ea5e9}
+  #wp-root .wp-acard[data-stage*="estruct"]{border-left-color:#f59e0b}
+  #wp-root .wp-acard[data-stage*="limpi"]{border-left-color:#10b981}
+  #wp-root .wp-acard[data-stage*="pintur"]{border-left-color:#ec4899}
+  #wp-root .wp-acard[data-stage*="demol"]{border-left-color:#78716c}
+  #wp-root .wp-acard[data-st="late"],#wp-root .wp-acard[data-st="critical"]{border-left-color:var(--wneg) !important}
+  #wp-root .wp-acard[data-st="done"]{border-left-color:var(--wpos) !important}
+  #wp-root .wp-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--wmut);margin-right:5px;flex-shrink:0;vertical-align:middle}
+  #wp-root .wp-acard[data-st="done"] .wp-dot{background:var(--wpos)}
+  #wp-root .wp-acard[data-st="late"] .wp-dot,#wp-root .wp-acard[data-st="critical"] .wp-dot{background:var(--wneg)}
+  #wp-root .wp-warn-ic{font-size:10px;cursor:help;opacity:.85}
+  /* A5: VISTA LIMPIA — tarjeta minimalista */
+  #wp-root.wp-clean .wp-ac-st,#wp-root.wp-clean .wp-ac-warn,#wp-root.wp-clean .wp-ac-sug{display:none}
+  #wp-root.wp-clean .wp-chip{display:none}
+  #wp-root.wp-clean .wp-chip.crit{display:inline-block;font-size:8px;padding:1px 5px}
+  #wp-root.wp-clean .wp-acard{padding:6px 8px;border-radius:8px}
+  #wp-root.wp-clean .wp-ac-meta{margin-top:2px}
+  #wp-root.wp-clean .wp-ac-tags{margin-top:2px}
+  /* A1: panel lateral de alertas */
+  #wp-alert-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:var(--wpanel,#fff);border-left:1px solid var(--wbord,#e2e8f0);box-shadow:-12px 0 40px -18px rgba(2,6,23,.35);z-index:9500;overflow:auto;padding:16px}
+  #wp-alert-drawer h3{font-size:13px;font-weight:800;margin:0 0 4px}
+  #wp-alert-drawer .wd-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;color:var(--wmut,#64748b)}
+  #wp-alert-drawer .wd-item{font-size:11.5px;padding:7px 9px;border:1px solid var(--wbord,#e2e8f0);border-radius:8px;margin-bottom:5px;line-height:1.4;cursor:pointer}
+  #wp-alert-drawer .wd-item:hover{border-color:#94a3b8}
+  #wp-alert-drawer .wd-item b{font-weight:700}
   #wp-root .wp-acard[data-st="done"] .wp-ac-st{background:rgba(14,163,113,.13);color:var(--wpos)}
   #wp-root .wp-acard[data-st="late"] .wp-ac-st,#wp-root .wp-acard[data-st="critical"] .wp-ac-st,#wp-root .wp-acard[data-st="conflict"] .wp-ac-st{background:rgba(224,69,95,.13);color:var(--wneg)}
   #wp-root .wp-acard[data-st="postponed"] .wp-ac-st,#wp-root .wp-acard[data-st="dep"] .wp-ac-st{background:rgba(192,125,22,.15);color:var(--wamb)}
@@ -335,6 +364,7 @@ function wpBackToPlanner(opts) {
 window.wpBackToPlanner = wpBackToPlanner;
 
 function wpRender() {
+  const _r = document.getElementById('wp-root'); if (_r) _r.classList.toggle('wp-clean', wpState.cleanView !== false);
   wpInjectTheme();
   const root = document.getElementById('wp-root');
   if (!root) return;
@@ -394,33 +424,7 @@ function wpRender() {
   const criticasAtrasadas = overdueAll.filter(a => a.priority === 'critical' || a.priority === 'urgent');
   const tomorrowIso = wpDateOnly(wpAddDays(new Date(), 1));
   const criticasBanner = criticasAtrasadas.length ? `
-    <div class="bg-gradient-to-r from-rose-600 to-rose-800 text-white border border-rose-700 rounded-lg px-3 py-2 mb-2 shadow-md">
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center gap-2">
-          <div class="text-2xl">⚠️</div>
-          <div>
-            <div class="text-sm font-bold uppercase tracking-wide">${criticasAtrasadas.length} actividad${criticasAtrasadas.length>1?'es':''} de ruta crítica atrasada${criticasAtrasadas.length>1?'s':''}</div>
-            <div class="text-[11px] opacity-90">Cada día perdido empuja la fecha de entrega final · ${[...new Set(criticasAtrasadas.map(a => a.property_name||a.project_id))].length} casa(s) afectada(s)</div>
-          </div>
-        </div>
-        <button onclick="wpToggleCriticasDetails()" class="text-[11px] bg-white text-rose-700 hover:bg-rose-50 font-bold px-3 py-1 rounded">${wpState.showCriticasDetails?'▴ Ocultar':'▾ Ver cuáles'}</button>
-      </div>
-      ${wpState.showCriticasDetails ? `
-        <div class="mt-2 space-y-1 max-h-40 overflow-y-auto bg-rose-900/30 rounded p-2">
-          ${criticasAtrasadas.map(t => {
-            const daysLate = Math.round((new Date(todayIso+'T00:00:00') - new Date(t.date+'T00:00:00'))/86400000);
-            return `<div class="flex items-center justify-between bg-white/95 border border-rose-300 rounded px-2 py-1 text-[11px] text-slate-900 cursor-pointer hover:bg-white" onclick="wpEditActivity('${t.id}')">
-              <div class="flex-1 min-w-0">
-                <div class="font-bold truncate text-rose-900">⚠️ ${(t.activity_name||'').replace(/</g,'&lt;')}</div>
-                <div class="text-[10px] text-slate-600">🏠 ${(t.property_name||'').replace(/</g,'&lt;')}${t.stage?` · ${t.stage}`:''}</div>
-              </div>
-              <span class="bg-rose-700 text-white text-[10px] font-bold px-2 py-0.5 rounded ml-2">⏰ ${daysLate}d</span>
-            </div>`;
-          }).join('')}
-        </div>
-      ` : ''}
-    </div>
-  ` : '';
+    <button onclick="wpToggleAlertPanel()" class="w-full text-left bg-rose-50 border border-rose-300 text-rose-800 rounded-lg px-3 py-1.5 mb-2 text-xs font-bold hover:bg-rose-100">⚠️ ${criticasAtrasadas.length} de ruta crítica atrasada${criticasAtrasadas.length>1?'s':''} · ${[...new Set(criticasAtrasadas.map(a => a.property_name||a.project_id))].length} casa(s) → abrir panel de alertas</button>` : '';
   const overdueBanner = overdueCount ? `
     <div class="bg-red-50 border border-red-300 rounded-lg px-3 py-2 mb-2 flex items-start gap-2">
       <div class="text-xl">⚠️</div>
@@ -455,7 +459,7 @@ function wpRender() {
 
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[80vh]">
-      ${criticasBanner}
+      ${criticasBanner}${wpAlertDrawerHtml(overdueAll, conflicts)}
       ${overdueBanner}
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
@@ -467,26 +471,32 @@ function wpRender() {
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs bg-slate-900 text-white px-2 py-1 rounded font-bold" title="Progreso de la semana">📊 ${doneThisWeek}/${totalThisWeek} (${progressPct}%)</span>
-          ${overdueCount ? `<span class="text-xs bg-red-600 text-white px-2 py-1 rounded font-bold">⏰ ${overdueCount} atrasadas</span>` : ''}
-          ${conflicts.length ? `<span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold">⚠️ ${conflicts.length} conflictos</span>` : '<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">✓ Sin conflictos</span>'}
-          ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Ver casas terminadas y su análisis">📁 ${completedCount} terminadas</button>` : ''}
-          <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold" title="Ver qué hace cada crew hora por hora hoy">👷 Hoy Crew × Hora</button>
-          <button onclick="wpOpenCrewPay()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Cuanto gana cada persona por propiedad — de Airtable">💵 Pago crew</button>
-          <button onclick="wpOpenImportExcel()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Subir Excel de cronograma (Estimador Pro) → llena este calendario">📥 Importar Excel</button>
-          <button onclick="wpToggleSidebar()" class="lg:hidden text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1.5 rounded font-bold" title="Mostrar/ocultar panel lateral">${wpState.sidebarHidden?'📂':'📁'}</button>
-          <button onclick="wpOpenMonthView()" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-3 py-1.5 rounded font-bold" title="Vista mensual del calendario">📅 Mes</button>
-          <button onclick="wpOpenIcsExport()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Exportar tareas a Google Calendar / iCloud (.ics)">📥 Calendario</button>
-          <button onclick="wpOpenWorkerMobile()" class="text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded font-bold" title="Vista del día optimizada para celular del líder/obrero">📱 Vista obrero</button>
-          <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
-          <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold" title="Plan inicial vs Real — desviacion por tarea/etapa/casa + Cerebro de planeacion">📉 Desviación</button>
-          <button onclick="wpOpenReport('semana')" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Reporte imprimible dia/semana/mes con estado por actividad">📄 PDF</button>
-          <button onclick="wpOpenBitacora()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Bitácora de obra auto-generada por casa">📔 Bitácora</button>
-          <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
-            <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
+          <button onclick="wpToggleAlertPanel()" class="text-xs ${overdueCount ? 'bg-red-600 text-white' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded font-bold" title="Abrir panel de alertas">${overdueCount ? '⏰ ' + overdueCount + ' atrasadas' : '✓ al día'}</button>
+          <button onclick="wpToggleAlertPanel()" class="text-xs ${conflicts.length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded font-bold" title="Abrir panel de alertas">${conflicts.length ? '⚠️ ' + conflicts.length + ' conflictos' : '✓ sin conflictos'}</button>
+          <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold">👷 Hoy</button>
+          <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold">📊 Reporte</button>
+          <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold">📉 Desviación</button>
+          <button onclick="wpOpenReport('semana')" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold">📄 PDF</button>
+          <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[180px]" title="Filtrar por casa">
+            <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas (${allHomes.length})</option>
             ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
           </select>
-          <button onclick="wpOpenPrintPicker()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Vista entregable imprimible del día">🖨️ Imprimir día</button>
-          <button onclick="wpToggleResourceForm()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">+ Recurso</button>
+          <button onclick="wpToggleClean()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold" title="Alternar tarjetas minimalistas / con todo el detalle">${wpState.cleanView === false ? '🔍 Detallada' : '✨ Limpia'}</button>
+          <details class="relative inline-block">
+            <summary class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold cursor-pointer list-none select-none">⋯ Más</summary>
+            <div class="absolute right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-[9000] p-1 w-52 flex flex-col">
+              ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📁 ${completedCount} terminadas</button>` : ''}
+              <button onclick="wpOpenCrewPay()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">💵 Pago crew</button>
+              <button onclick="wpOpenImportExcel()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📥 Importar Excel</button>
+              <button onclick="wpOpenMonthView()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📅 Vista mensual</button>
+              <button onclick="wpOpenIcsExport()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📥 Exportar calendario</button>
+              <button onclick="wpOpenWorkerMobile()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📱 Vista obrero</button>
+              <button onclick="wpOpenBitacora()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📔 Bitácora</button>
+              <button onclick="wpOpenPrintPicker()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">🖨️ Imprimir día</button>
+              <button onclick="wpToggleResourceForm()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">+ Recurso</button>
+              <button onclick="wpToggleSidebar()" class="lg:hidden text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${wpState.sidebarHidden?'📂 Mostrar panel':'📁 Ocultar panel'}</button>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -633,20 +643,20 @@ function wpRenderCell(home, date, conflicts) {
           const isLate = a.status !== 'done' && a.status !== 'cancelled' && new Date(a.date) < new Date(wpDateOnly(new Date()));
           // A) estado primario → borde/punto sutil (mismo lenguaje que la vista Desviación)
           const st = a.status === 'done' ? 'done' : a.status === 'cancelled' ? 'cancelled' : isLate ? 'late' : (isCritical ? 'critical' : (isPostponed ? 'postponed' : (hasConflict ? 'conflict' : (hasDepIssue ? 'dep' : (a.status === 'in_progress' ? 'progress' : 'normal')))));
-          const stLabel = { done: '✓ terminada', late: '⏰ atrasada', critical: '⚠ crítica', postponed: '⏸ aplazada', conflict: '⚠ conflicto', dep: `🔗 ${depCheck.blockers.length} dep`, progress: '● en curso', normal: '' }[st];
+          const stLabel = { done: '✓', late: '⏰ atrasada', critical: '⚠ crítica', postponed: '⏸ aplazada', conflict: '', dep: '', progress: '● en curso', normal: '' }[st];
           // extraer "(día X/Y)" del nombre para mostrarlo como chip limpio
           const dayM = (a.activity_name || '').match(/\(d[ií]a\s*\d+\s*\/\s*\d+\)/i);
           const cleanName = dayM ? a.activity_name.replace(dayM[0], '').trim() : a.activity_name;
           const dayChip = dayM ? dayM[0].replace(/[()]/g, '').trim() : '';
           return `
-            <div class="wp-acard" data-st="${st}"
+            <div class="wp-acard" data-st="${st}" data-stage="${String(a.stage || '').toLowerCase().replace(/"/g, '')}"
                  draggable="true"
                  ondragstart="wpActivityDragStart('${a.id}', event)"
                  ondragend="wpState.draggedActivityId=null">
               <div class="wp-ac-top">
                 <input type="checkbox" ${a.status==='done'?'checked':''} onclick="event.stopPropagation(); wpQuickToggleDone('${a.id}', event)" class="wp-ac-chk" title="Marcar como done" />
                 <div class="wp-ac-body" onclick="wpEditActivity('${a.id}')">
-                  <div class="wp-ac-name ${a.status==='done'?'wp-done':''}">${cleanName}</div>
+                  <div class="wp-ac-name ${a.status==='done'?'wp-done':''}"><span class="wp-dot"></span>${cleanName}${hasConflict ? ' <span class="wp-warn-ic" title="Conflicto de recurso: la misma persona está asignada en 2+ casas este día. Reasigná o mové la tarea.">⚠️</span>' : ''}${hasDepIssue ? ' <span class="wp-warn-ic" title="Dependencias no listas: ' + depCheck.blockers.map(b=>b.code).join(', ') + '">🔗</span>' : ''}</div>
                   <div class="wp-ac-meta">
                     ${a.stage ? `<span class="wp-ac-stage">${a.stage}</span>` : ''}
                     ${dayChip ? `<span class="wp-ac-day">${dayChip}</span>` : ''}
@@ -658,7 +668,6 @@ function wpRenderCell(home, date, conflicts) {
                     ${(a.materials||[]).length > 0 ? `<span class="wp-chip" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
                     ${acts.map(r => `<span class="wp-res" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}
                   </div>
-                  ${hasConflict ? '<div class="wp-ac-warn">⚠️ Conflicto de recurso</div>' : ''}
                   ${hasDepIssue && depCheck.minDate ? `<div class="wp-ac-sug">📅 Sugerido: ${depCheck.minDate}</div>` : ''}
                 </div>
               </div>
@@ -5516,3 +5525,39 @@ async function wpOpenBitacora(houseId) {
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-3xl', 'max-w-7xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
 }
 window.wpOpenBitacora = wpOpenBitacora;
+
+// ─── A1 · Panel lateral de Alertas (colapsable) + toggle vista limpia ───
+function wpToggleAlertPanel() { wpState.alertPanelOpen = !wpState.alertPanelOpen; wpRender(); }
+function wpToggleClean() {
+  wpState.cleanView = wpState.cleanView === false ? true : false;
+  try { localStorage.setItem('wp_clean', wpState.cleanView ? '1' : '0'); } catch (e) {}
+  wpRender();
+}
+window.wpToggleAlertPanel = wpToggleAlertPanel; window.wpToggleClean = wpToggleClean;
+function wpAlertDrawerHtml(overdueAll, conflicts) {
+  if (!wpState.alertPanelOpen) return '';
+  const E = x => String(x == null ? '' : x).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const hoy = wpDateOnly(new Date());
+  const dd = d => Math.round((new Date(hoy) - new Date(d)) / 86400000);
+  const casaDe = a => E((a.property_name || '').slice(0, 24));
+  // sin recurso/dueño (activas con fecha, sin resource)
+  const sinRec = wpState.activities.filter(a => a.status !== 'done' && a.status !== 'cancelled' && a.date && !(a.resource_ids || []).length);
+  const item = (a, extra) => `<div class="wd-item" onclick="wpEditActivity('${a.id}')"><b>${E((a.activity_name || '').replace(/\s*\(d[ií]a.*/, '').slice(0, 46))}</b><br><span style="opacity:.65">${casaDe(a)}${a.stage ? ' · ' + E(a.stage) : ''}${extra || ''}</span></div>`;
+  const atrasos = (wpState.vivoAtrasos || []);
+  return `<div id="wp-alert-drawer">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3>🔔 Alertas</h3><button onclick="wpToggleAlertPanel()" style="border:none;background:none;font-size:16px;cursor:pointer">✕</button></div>
+    ${atrasos.length ? `<div class="wd-sec">📉 Obras atrasadas vs cronograma (${atrasos.length})</div>` + atrasos.map(o => `<div class="wd-item" style="border-color:#fda4af"><b>${E(String(o.address || '').split(',')[0])}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado → <b>${o.atraso_pts} pts atrás</b>, ~${o.atraso_dias} día(s) de retraso</div>`).join('') : ''}
+    <div class="wd-sec">⏰ Atrasadas (${overdueAll.length})</div>
+    ${overdueAll.slice(0, 25).map(a => item(a, ` · <b style="color:#e11d48">${dd(a.date)}d tarde</b>${a.is_critical || a.priority === 'critical' || a.priority === 'urgent' ? ' · 🎯 crítica' : ''}`)).join('') || '<div class="wd-item">Ninguna ✓</div>'}
+    <div class="wd-sec">⚠️ Conflictos de recurso (${conflicts.length})</div>
+    ${conflicts.slice(0, 15).map(c => { const r = wpState.resources.find(x => x.id === c.resourceId); return `<div class="wd-item"><b>${E(r ? r.name : c.resourceId)}</b> asignado en ${c.count || 2}+ casas el ${c.date}</div>`; }).join('') || '<div class="wd-item">Ninguno ✓</div>'}
+    <div class="wd-sec">👤 Sin recurso asignado (${sinRec.length})</div>
+    ${sinRec.slice(0, 15).map(a => item(a, ' · sin dueño')).join('') || '<div class="wd-item">Ninguna ✓</div>'}
+  </div>`;
+}
+async function wpLoadVivoAtrasos() {
+  try {
+    const { data } = await sb.from('v_remodel_avance_vivo').select('address, pct_tareas, pct_esperado, atraso_pts, atraso_dias, atrasada_cronograma, proceso').eq('atrasada_cronograma', true);
+    wpState.vivoAtrasos = data || [];
+  } catch (e) { wpState.vivoAtrasos = []; }
+}

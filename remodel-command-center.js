@@ -297,6 +297,8 @@ function rcHeader(title, sub) {
 }
 
 function rcSecCommand(c) {
+  const atrasadas = (RC.avanceVivo || []).filter(x => x.atrasada_cronograma && x.proceso === 'En construcción');
+  const bannerAtraso = atrasadas.length ? `<div class="card" style="border:1px solid rgba(248,113,113,.5);margin-bottom:12px"><div class="lab" style="color:#f87171">📉 ${atrasadas.length} OBRA(S) ATRASADA(S) SEGÚN CRONOGRAMA</div>${atrasadas.map(o => `<div class="krow"><span><b>${RC_E(rcShort(o.address))}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado</span><b class="down">${o.atraso_pts} pts · ~${o.atraso_dias}d</b></div>`).join('')}</div>` : '';
   const ins = rcInsights(c);
   const parN = RC.parity ? RC.parity.airtable_count : c.obras.length;
   const paritySync = RC.parity ? (RC.parity.in_sync !== false && (RC.parity.airtable_count == null || RC.parity.airtable_count === c.obras.length)) : true;
@@ -354,7 +356,7 @@ function rcObraCard(o) {
   if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
   const _comp = rcCompletitud(o);
   const _cc = _comp.n >= 5 ? '#34d399' : _comp.n >= 3 ? '#e7b65e' : '#f87171';
-  return `<div class="kcard">
+  return `${bannerAtraso}<div class="kcard">
     <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
     <div class="krow"><span>Gasto real</span><b>${RC_M(dq.gasto)}</b></div>
@@ -535,7 +537,8 @@ function rcVivoCard() {
   const card = (o) => {
     const revisar = [];
     if ((+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15) revisar.push(`la plata (${o.pct_plata}%) corre ${Math.round(o.pct_plata - o.pct_tareas)}pts adelante de las tareas — posible sobrecosto`);
-    if (o.sem_tiempo === 'rojo') revisar.push(o.dias_pasados_fin > 0 ? `cronograma vencido hace ${o.dias_pasados_fin} días y va ${o.pct_tareas}%` : `vamos lentos: ${o.pct_tareas}% hecho con ${o.pct_dias}% del tiempo consumido`);
+    if (o.atrasada_cronograma) revisar.push(`ATRASADA según cronograma: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado → ${o.atraso_pts} pts atrás, ~${o.atraso_dias} día(s) de retraso`);
+    else if (o.sem_tiempo === 'rojo') revisar.push(o.dias_pasados_fin > 0 ? `cronograma vencido hace ${o.dias_pasados_fin} días y va ${o.pct_tareas}%` : `vamos lentos: ${o.pct_tareas}% hecho con ${o.pct_dias}% del tiempo consumido`);
     if (o.sem_costo === 'rojo') revisar.push(`gasto $${(+o.gasto_real).toLocaleString('en-US')} supera lo proyectado a hoy ($${(+o.costo_proyectado || 0).toLocaleString('en-US')})`);
     if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
     return `<div class="card" style="min-width:0">
