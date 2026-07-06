@@ -362,9 +362,16 @@ function inDownload(name, content, mime) {
 window.inExportJSON = inExportJSON; window.inExportXLS = inExportXLS; window.inExportTodo = inExportTodo;
 
 // ─── CONEXIÓN → ESTIMADOR PRO (pre-llenar con el daño por etapa) ───
+function inEtapasDesdeScores(x) {
+  // fuente única de la afectación por etapa: recalcular del scores (el dano_etapas guardado puede faltar)
+  const scores = x.scores || {};
+  if (scores && Object.keys(scores).length) { const res = inComputeDano(scores); if (res.etapas && Object.keys(res.etapas).length) return res.etapas; }
+  return x.dano_etapas || {};
+}
+window.inEtapasDesdeScores = inEtapasDesdeScores;
 function inPrellenarEstimador(id) {
   const x = IN.inspecciones.find(i => i.id === id); if (!x) return;
-  const afect = x.dano_etapas || {};
+  const afect = inEtapasDesdeScores(x);
   // handoff: guardar en un slot que el Estimador lee al abrir para una casa
   const rh = (() => { try { return inRehabEstimado(x); } catch (e) { return null; } })();
   window.__inspHandoff = { property_id: x.property_id, nombre: x.nombre_ref, direccion: x.direccion, uso: x.uso, afectacion_por_etapa: afect, dano_global: x.dano_global_pct, rehab_estimado: rh ? rh.total : null };
@@ -377,14 +384,20 @@ window.IN = IN; window.inLoad = inLoad; window.inRenderDB = inRenderDB;
 
 // ─── MEJORA daño→$: convertir % de daño en $ de rehab con calibración C1 ($/sqft por etapa) ───
 // $/sqft por etapa (semilla del catálogo del Estimador); calibrado al total real por la calibración C1.
-const IN_STAGE_PSF = { 'Demolición': 1.32, 'Cimentación': 0.00, 'Externo': 9.88, 'Estructura': 4.24, 'Interno': 28.01, 'Limpieza': 1.87 };
+// $/sqft por etapa: desde remodel_forecast_coef (config en tabla, NO hardcode). Se llena en inLoadCalib.
+IN.stagePsf = {};
 async function inLoadCalib() {
   try {
-    const [{ data: cc }, { data: pr }] = await Promise.all([
-      sb.from('v_remodel_calib_costos').select('*').eq('ventana', 'historico').maybeSingle(),
+    const [{ data: cc }, { data: pr }, coef] = await Promise.all([
       sb.from('remodel_forecast_params').select('key,value').eq('key', 'total_psf_real').maybeSingle(),
+      sb.from('v_remodel_calib_costos').select('n').eq('ventana', 'historico').maybeSingle(),
+      sb.from('remodel_forecast_coef').select('grupo, mo_sqft, mat_sqft').then(r => r.data || []),
     ]);
-    IN.calib = { psf_real: cc ? +cc.psf_real : (pr ? +pr.value : null), n: cc ? +cc.n : null };
+    // mapear nombres de grupo del coef → etapas de la inspección (Exterior→Externo)
+    const GMAP = { 'Exterior': 'Externo', 'Interior': 'Interno' };
+    IN.stagePsf = {}; (coef || []).forEach(c => { const et = GMAP[c.grupo] || c.grupo; IN.stagePsf[et] = (+c.mo_sqft || 0) + (+c.mat_sqft || 0); });
+    // FUENTE ÚNICA de $/sqft = total_psf_real (el mismo que usa la UI del Estimador). n de obras = calib histórico.
+    IN.calib = { psf_real: cc ? +cc.value : null, n: pr ? +pr.n : null };
   } catch (e) { IN.calib = { psf_real: null, n: null }; }
   return IN.calib;
 }
@@ -392,14 +405,16 @@ function inRehabEstimado(insp) {
   // sqft de la casa
   const prop = (IN.props || []).find(p => p.property_id === insp.property_id);
   const sqft = prop && +prop.sqft > 0 ? +prop.sqft : 1400;   // fallback promedio del portafolio
-  const seedTotal = Object.values(IN_STAGE_PSF).reduce((s, v) => s + v, 0);  // ~45.3
+  const psfTable = (IN.stagePsf && Object.keys(IN.stagePsf).length) ? IN.stagePsf : {};
+  const seedTotal = Object.values(psfTable).reduce((s, v) => s + v, 0) || 1;
   const calibPsf = IN.calib && IN.calib.psf_real ? IN.calib.psf_real : seedTotal;
   const factor = seedTotal > 0 ? calibPsf / seedTotal : 1;    // reescala la semilla al $/sqft real calibrado
-  const et = insp.dano_etapas || {};
+  const et = insp.scores ? inEtapasDesdeScores(insp) : (insp.dano_etapas || {});
+  const SP = psfTable;
   const porEtapa = {}; let total = 0;
   IN.etapas.forEach(e => {
-    if (e.etapa === 'Limpieza') { const c = Math.round(IN_STAGE_PSF['Limpieza'] * factor * sqft); porEtapa[e.etapa] = c; total += c; return; }
-    const psf = (IN_STAGE_PSF[e.etapa] || 0) * factor;
+    if (e.etapa === 'Limpieza') { const c = Math.round((SP['Limpieza'] || 0) * factor * sqft); porEtapa[e.etapa] = c; total += c; return; }
+    const psf = (SP[e.etapa] || 0) * factor;
     const dano = (et[e.etapa] || 0) / 100;                    // el daño % escala el costo de esa etapa
     const c = Math.round(psf * sqft * dano);
     porEtapa[e.etapa] = c; total += c;
