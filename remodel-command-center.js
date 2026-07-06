@@ -545,8 +545,8 @@ function rcVivoGanancia(o) {
   const bg = o.sem_ganancia === 'rojo' ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.08)';
   const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#e7b65e;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
   const modoSel = '<select onchange="rcSetCobro(&quot;' + o.property_id + '&quot;, this.value)" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:inherit;font-size:9px;padding:1px 4px" title="Cómo cobra Structure One esta obra">'
-    + '<option value="fijo"' + (o.modo_cobro !== 'costplus' ? ' selected' : '') + '>PRECIO FIJO</option>'
-    + '<option value="costplus"' + (o.modo_cobro === 'costplus' ? ' selected' : '') + '>COST-PLUS ×1.05</option></select>';
+    + '<option value="fijo"' + (o.modo_cobro !== 'costplus' ? ' selected' : '') + '>PRECIO FIJO (real)</option>'
+    + '<option value="costplus"' + (o.modo_cobro === 'costplus' ? ' selected' : '') + '>COST-PLUS ×1.05 (what-if)</option></select>';
   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
     + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + tentativo + '</span>' + modoSel
     + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'

@@ -95,3 +95,8 @@ v_remodel_progress v3: CADENA de métodos transparente (columna metodo): (1) pon
 **5 TRANSPARENCIA**: badge TENTATIVO en ganancia/ROI cuando metodo=conteo, con la regla visible ("el cronograma se sube DESDE el Estimador").
 **2 NÓMINA Y PAGOS**: sección propia en el CC (RC_NAV 💵): deuda por trabajador con drill-down por casa (C4), cobertura de tarifas, botón recibo quincenal, historial de recibos firmados con estado + flag ↗AT pendiente. Verificado con data real del espejo. 0 pageerrors.
 **3 WRITE-BACK**: sigue bloqueado por scope write del PAT (avisado — wb_status quedará confirmable al activarlo).
+
+## 6-jul · CIERRE REMODELACIÓN — write-back VERIFICADO + cobro FIJO confirmado
+**1 WRITE-BACK**: la API de Airtable NO convierte tipos de campo → creado campo percent "Porcentaje avance obra %" (fldjdSUiunUf2a8Xs, precision 0) vía conector; sync escribe DUAL (número legacy + percent). VERIFICADO leyendo Airtable: Starbright 7% · Wellington 34% · Denfield 80% (el singleSelect viejo decía 0/0/45% — retirarlo desde la UI cuando quieras; ninguna fórmula depende de él, revisado). ⚠ wb_status del sync = 403: el secret AIRTABLE_TOKEN de Supabase sigue sin write (el PAT nuevo no llegó al secret) — al actualizarlo, el sync mantiene el campo solo (escribí los 3 actuales vía conector). Denfield 96→80% legítimo: el equipo agregó 16 tareas (81→97).
+**2 COBRO**: PRECIO FIJO confirmado como default (ya era el default de la vista); cost-plus etiquetado "(what-if)". La pérdida de Starbright −$38,703 ES LA REAL.
+**3 SEGURIDAD**: verificada por el CEO con anon real (401/permission denied) — documentada acá y en migración 20260706110000.
