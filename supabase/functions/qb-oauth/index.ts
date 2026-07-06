@@ -130,6 +130,49 @@ Deno.serve(async (req) => {
       return json({ ok: true, empresa, reporte: isPnl ? "P&L YTD" : "Balance", company: rep?.Header?.ReportName ? undefined : undefined, header: rep?.Header, resumen: rows.slice(0, 25) });
     }
 
+    if (path.startsWith("/sync")) {
+      const db = sb();
+      const { data: conns } = await db.from("qb_connections").select("empresa").eq("active", true);
+      const y = new Date().getFullYear();
+      const hoy = new Date().toISOString().slice(0, 10);
+      const out: Record<string, any> = {};
+      const runStart = new Date().toISOString();
+      for (const c of (conns || [])) {
+        const emp = c.empresa;
+        const reports: Array<[string, string]> = [
+          ["pnl_ytd", `/reports/ProfitAndLoss?start_date=${y}-01-01&end_date=${hoy}`],
+          ["pnl_all", `/reports/ProfitAndLoss?start_date=2018-01-01&end_date=${hoy}`],
+          ["balance", `/reports/BalanceSheet?date_macro=Today`],
+        ];
+        out[emp] = {};
+        for (const [name, pathQ] of reports) {
+          try {
+            const rep = await qboGet(emp, pathQ);
+            const rows: Array<{ label: string; value: number }> = [];
+            const walk = (r: any) => { (r?.Row || []).forEach((row: any) => {
+              // totales/subtotales (Summary) + cuentas HOJA (Data rows con ColData directo)
+              const h = row.Summary?.ColData || row.Header?.ColData || row.ColData;
+              const cols = row.Summary?.ColData || row.ColData;
+              if (h && h[0]?.value != null && cols && cols[1]?.value !== undefined && cols[1]?.value !== "") {
+                const v = parseFloat(cols[1].value);
+                if (!isNaN(v)) rows.push({ label: String(h[0].value).slice(0, 120), value: v });
+              }
+              if (row.Rows) walk(row.Rows);
+            }); };
+            walk(rep?.Rows);
+            const seen = new Set<string>();
+            const uniq = rows.filter(r => { if (seen.has(r.label)) return false; seen.add(r.label); return true; });
+            for (let i = 0; i < uniq.length; i += 100) {
+              await db.from("qb_report_cache").upsert(uniq.slice(i, i + 100).map(r => ({ empresa: emp, report: name, label: r.label, value: r.value, fetched_at: runStart, active: true, archived_at: null })), { onConflict: "empresa,report,label" });
+            }
+            await db.from("qb_report_cache").update({ active: false, archived_at: new Date().toISOString() }).eq("empresa", emp).eq("report", name).lt("fetched_at", runStart).eq("active", true);
+            out[emp][name] = uniq.length;
+          } catch (e) { out[emp][name] = "err: " + String((e as any)?.message || e).slice(0, 100); }
+        }
+      }
+      return json({ ok: true, sync: out });
+    }
+
     return html(`<h2>QuickBooks · Rental Profits OS</h2><p>Rutas: /authorize?empresa=… · /callback · /status · /pnl?empresa=… · /balance?empresa=…</p>`);
   } catch (e) {
     return json({ ok: false, error: String((e as any)?.message || e) }, 500);
