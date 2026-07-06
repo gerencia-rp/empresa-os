@@ -50,7 +50,7 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct, ledger] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct, ledger, vivo] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
@@ -64,7 +64,8 @@ async function rcLoadAll() {
       sb.from('v_remodel_calib_etapas').select('*').then(r => r.data || []).catch(() => []),
       sb.from('v_remodel_presupuesto_casa').select('*').then(r => r.data || []).catch(() => []),
       sb.from('remodel_forecast_params').select('key, value').eq('key', 'alerta_sobrecosto_pct').maybeSingle().then(r => r.data).catch(() => null),
-      sb.from('v_remodel_nomina_ledger').select('*').then(r => r.data || []).catch(() => [])
+      sb.from('v_remodel_nomina_ledger').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('v_remodel_avance_vivo').select('*').then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -79,6 +80,7 @@ async function rcLoadAll() {
     RC.presupCasa = presup || [];
     RC.sobrecostoPct = scPct ? +scPct.value : 10;
     RC.ledger = ledger || [];
+    RC.avanceVivo = vivo || [];
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -496,6 +498,7 @@ function rcSecGestion(c) {
         <table class="ptable"><thead><tr><th>Casa</th><th>Físico %</th><th>Planeado %</th><th>SPI</th><th>CPI</th></tr></thead><tbody>
         ${rows.length ? rows.map(x => `<tr><td><b>${RC_E(rcShort(x.o.address))}</b></td><td>${Math.round(x.avance)}%</td><td>${x.timePct != null ? Math.round(x.timePct) + '%' : '—'}</td><td class="${(x.spi || 0) >= 1 ? 'up' : 'down'}">${x.spi != null ? x.spi.toFixed(2) : '—'}</td><td class="${(x.cpi || 0) >= 1 ? 'up' : 'down'}">${x.cpi != null ? x.cpi.toFixed(2) : '—'}</td></tr>`).join('') : '<tr><td colspan="5" class="meta" style="padding:16px">Sin obras en curso con fechas y costo cargados.</td></tr>'}
         </tbody></table></div>
+      ${rcVivoCard()}
       <div class="card"><div class="chart-h"><div class="t">Control de presupuesto por casa</div><div class="k">material (pagos) + MO (horas×rate) · alerta > presup +${RC.sobrecostoPct != null ? RC.sobrecostoPct : 10}%</div></div>
         <table class="ptable"><thead><tr><th>Casa</th><th class="r" style="text-align:right">Presup.</th><th style="text-align:right">Material</th><th style="text-align:right">MO (horas)</th><th style="text-align:right">Total real</th><th style="text-align:right">%</th></tr></thead><tbody>
         ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">⚠ SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
@@ -519,3 +522,29 @@ function rcSecGestion(c) {
     </div>`;
 }
 window.rcSecGestion = rcSecGestion;
+
+// ─── RM-M1 · Avance de obra EN VIVO (tareas vs plata + semáforos de costo y tiempo) ───
+function rcVivoCard() {
+  const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
+  const SEM = { verde: '🟢', amarillo: '🟡', rojo: '🔴', gris: '⚪' };
+  const bar = (pct, color) => `<div style="height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin:3px 0 7px"><i style="display:block;height:100%;width:${Math.min(100, +pct || 0)}%;background:${color}"></i></div>`;
+  const card = (o) => {
+    const revisar = [];
+    if ((+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15) revisar.push(`la plata (${o.pct_plata}%) corre ${Math.round(o.pct_plata - o.pct_tareas)}pts adelante de las tareas — posible sobrecosto`);
+    if (o.sem_tiempo === 'rojo') revisar.push(o.dias_pasados_fin > 0 ? `cronograma vencido hace ${o.dias_pasados_fin} días y va ${o.pct_tareas}%` : `vamos lentos: ${o.pct_tareas}% hecho con ${o.pct_dias}% del tiempo consumido`);
+    if (o.sem_costo === 'rojo') revisar.push(`gasto $${(+o.gasto_real).toLocaleString('en-US')} supera lo proyectado a hoy ($${(+o.costo_proyectado || 0).toLocaleString('en-US')})`);
+    if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
+    return `<div class="card" style="min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><b>${RC_E(rcShort(o.address))}</b><span style="font-size:11px;opacity:.7">${o.done || 0}/${o.total || 0} tareas</span></div>
+      <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE POR TAREAS · ${o.pct_tareas || 0}%</div>${bar(o.pct_tareas, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE POR PLATA · ${o.pct_plata != null ? o.pct_plata + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_plata, (+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15 ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
+      <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
+        <span>${SEM[o.sem_costo] || '⚪'} costo ${o.costo_proyectado ? `<span style="opacity:.6">(proy. a hoy $${(+o.costo_proyectado).toLocaleString('en-US')})</span>` : ''}</span>
+        <span>${SEM[o.sem_tiempo] || '⚪'} tiempo <span style="opacity:.6">(${o.pct_dias != null ? o.pct_dias + '% días' : 's/cronograma'})</span></span></div>
+      ${revisar.length ? `<div class="meta" style="margin-top:8px;color:var(--amber,#e7b65e)">🔍 Qué revisar: ${RC_E(revisar.join(' · '))}</div>` : '<div class="meta" style="margin-top:8px;color:#34d399">En plan ✓</div>'}
+    </div>`;
+  };
+  return `<div class="card"><div class="chart-h"><div class="t">Avance de obra EN VIVO</div><div class="k">tareas (Planner) vs plata (pagos+horas) · desviación contra cronograma · ${obras.length} en construcción</div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:10px">${obras.map(card).join('') || '<div class="meta">Sin obras en construcción.</div>'}</div>
+    <div class="meta" style="margin-top:10px">Definiciones: tareas = v_remodel_progress (cronograma del Planner cumplido) · plata = C2 (material_payments + horas×rate ÷ presupuesto) · proyección lineal sobre el cronograma · umbral = alerta_sobrecosto_pct. ⚠ Write-back del % a Airtable parqueado: falta scope write del token.</div></div>`;
+}
