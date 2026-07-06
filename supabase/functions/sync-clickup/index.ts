@@ -439,6 +439,18 @@ async function generateAgentProposals(sb: any, allProjected: any[], companiesMet
   venc.filter((t: any) => (Date.now() - new Date(t.due_date).getTime()) / 86400000 > 60).slice(0, 10)
     .forEach((t: any) => push("Auditor", "archivar_tarea", `Zombi +60d: ${t.name}`, `Vencía ${String(t.due_date).slice(0, 10)} en "${t.list_name}" (${empName(t.space_id)}), dueño ${t.primary_assignee || "nadie"}. Si ya no aplica, cerrarla.`, t, { status_cierre: "complete" }));
 
+  // COORDINADOR · LOOP DIARIO: (a) las NO-HECHAS de ayer pasan a hoy marcadas atrasadas
+  const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  act.filter((t: any) => t.due_date && String(t.due_date).slice(0, 10) === ayer && (t.primary_assignee || "").trim() && !GESTION.test(t.list_name || "") && !LONGTERM.test(t.list_name || "")).slice(0, 15)
+    .forEach((t: any) => push("Coordinador", "refechar_tarea", `No se hizo ayer → hoy: ${t.name}`, `De ${t.primary_assignee} en "${t.folder_name || t.list_name}". Planeada ayer (${ayer}), sigue abierta → pasa a HOY marcada atrasada (loop diario).`, t, { fecha_nueva: hoy, atrasada: true }));
+
+  // COORDINADOR: (b) plan del día por persona (informe)
+  const hoyTasks = act.filter((t: any) => t.due_date && String(t.due_date).slice(0, 10) === hoy);
+  const plan: Record<string, string[]> = {};
+  hoyTasks.forEach((t: any) => { const p2 = (t.primary_assignee || "(sin dueño)"); (plan[p2] = plan[p2] || []).push(t.name); });
+  const planTxt = Object.entries(plan).map(([p2, ts]) => `${p2}: ${ts.slice(0, 3).join(" · ")}${ts.length > 3 ? ` (+${ts.length - 3})` : ""}`).join(" | ") || "sin tareas fechadas para hoy";
+  push("Coordinador", "informe", `Plan de hoy ${hoy}: ${hoyTasks.length} tareas`, `HOY por persona — ${planTxt}`);
+
   // COORDINADOR: re-fechar vencidas recientes (≤14d) con dueño
   const prox = new Date(); prox.setDate(prox.getDate() + (prox.getDay() >= 5 ? 8 - prox.getDay() : 1));
   const proxIso = prox.toISOString().slice(0, 10);
