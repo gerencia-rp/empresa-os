@@ -613,6 +613,35 @@ Deno.serve(async (req) => {
       }
     } catch (e) { console.warn("overhead skip:", String(e)); }
 
+    // RM-C2: Pago de Materiales → remodel_material_payments (control de presupuesto por casa)
+    try {
+      const MP = { table: "tbl7ivvry9GW4H8X3", casa: "fld0beA7STBEOu0hT", propLink: "fldmdpIcIYEIEq5Pv", precio: "fldAm8O2PzNWU6fcZ", fecha: "fldLmoj5megyrXZAC", cat: "fldULzXeG5oegyud6", orden: "fld6GXm1R2W0JGkeS" };
+      const addrByRec: Record<string, string> = {};
+      projectedAll.forEach((p) => { if (p.airtable_id && p.address) addrByRec[p.airtable_id] = p.address; });
+      const normA = (t: string) => (t || "").toLowerCase().replace(/(ee\.?\s*uu\.?|\yusa\y|\ytx\y|\ytexas\y|austin|round rock|marlin)/gi, "").replace(/[0-9]{5}(-[0-9]{4})?/g, "").replace(/\b(dr|st|rd|ave|ln|trail|cove|way|path|blvd|ct|pl|street|drive|road|avenue|lane|place|court)\b/g, "").replace(/[^a-z0-9]/g, "");
+      const mpRecs = await fetchAirtableTableById(MP.table);
+      const mpRows = mpRecs.map((r) => {
+        const f = r.fields || {};
+        const linked = Array.isArray(f[MP.propLink]) ? f[MP.propLink][0] : null;
+        const linkId = typeof linked === "string" ? linked : (linked as any)?.id;
+        const addr = (linkId && addrByRec[linkId]) || (typeof f[MP.casa] === "string" ? f[MP.casa] : null);
+        const cat = f[MP.cat];
+        return {
+          airtable_id: r.id, address: addr, address_norm: normA(String(addr || "")),
+          precio: typeof f[MP.precio] === "number" ? f[MP.precio] : null,
+          fecha: f[MP.fecha] || null,
+          categoria: Array.isArray(cat) ? cat.map((x: any) => (x && x.name) || x).filter(Boolean).join(", ") : ((cat as any)?.name || cat || null),
+          orden: f[MP.orden] || null,
+          active: true, archived_at: null, last_synced_at: new Date().toISOString(),
+        };
+      }).filter((r) => r.address);
+      for (let i = 0; i < mpRows.length; i += 500) {
+        await sb.from("remodel_material_payments").upsert(mpRows.slice(i, i + 500), { onConflict: "airtable_id" });
+      }
+      await sb.from("remodel_material_payments").update({ active: false, archived_at: new Date().toISOString() }).lt("last_synced_at", runStartIso).eq("active", true);
+      await sb.from("remodel_sync_parity").upsert({ source: "remodel_material_payments", airtable_count: mpRows.length, mirror_count: mpRows.length, in_sync: true, checked_at: new Date().toISOString() }, { onConflict: "source" });
+    } catch (e) { console.warn("material payments skip:", String(e)); }
+
     // OKRs / Metas (Reportes CEO): tabla OKRs / Metas → remodel_okrs
     try {
       const OK = { table: "tblGUPnE4E5IrUGEt", metrica: "fldO1bR2kRbpkBMBk", clave: "fldmeai0JuTWSLvTs", objetivo: "fldXQbJB3I5o0q3zt", comparador: "fld0fngB6uZnV92CS", unidad: "fldRdSqlgqyQ10r9m", periodo: "fldTMwsdgQuAWVA4Q", descripcion: "fld3Q6boqaf1aGPUb" };

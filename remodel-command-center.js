@@ -50,7 +50,7 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
@@ -61,7 +61,9 @@ async function rcLoadAll() {
       sb.from('remodel_overhead').select('source, monto, categoria').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('remodel_okrs').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('v_remodel_calib_costos').select('*').then(r => r.data || []).catch(() => []),
-      sb.from('v_remodel_calib_etapas').select('*').then(r => r.data || []).catch(() => [])
+      sb.from('v_remodel_calib_etapas').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('v_remodel_presupuesto_casa').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('remodel_forecast_params').select('key, value').eq('key', 'alerta_sobrecosto_pct').maybeSingle().then(r => r.data).catch(() => null)
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -73,6 +75,8 @@ async function rcLoadAll() {
     RC.overhead = overhead || [];
     RC.okrs = okrs || [];
     RC.calibCostos = calibC || []; RC.calibEtapas = calibE || [];
+    RC.presupCasa = presup || [];
+    RC.sobrecostoPct = scPct ? +scPct.value : 10;
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -87,7 +91,7 @@ function rcDQ(o) {
   const mat = +o.gasto_materiales || 0, lab = +o.gasto_trabajadores || 0, gasto = mat + lab;
   const presup = +o.presupuesto_interno || 0, fin = o.proceso === 'Finalizado';
   const sinDatos = !(gasto > 0) && !(+o.valor_cliente > 0);
-  const sobrePresup = presup > 0 && gasto > presup * 1.1;
+  const sobrePresup = presup > 0 && gasto > presup * (1 + ((RC.sobrecostoPct != null ? RC.sobrecostoPct : 10) / 100));
   return { fin, enCurso: !fin && !sinDatos, sinDatos, sobrePresup, confiable: fin && gasto > 0, gasto, presup, mat, lab };
 }
 
@@ -490,6 +494,14 @@ function rcSecGestion(c) {
         <table class="ptable"><thead><tr><th>Casa</th><th>Físico %</th><th>Planeado %</th><th>SPI</th><th>CPI</th></tr></thead><tbody>
         ${rows.length ? rows.map(x => `<tr><td><b>${RC_E(rcShort(x.o.address))}</b></td><td>${Math.round(x.avance)}%</td><td>${x.timePct != null ? Math.round(x.timePct) + '%' : '—'}</td><td class="${(x.spi || 0) >= 1 ? 'up' : 'down'}">${x.spi != null ? x.spi.toFixed(2) : '—'}</td><td class="${(x.cpi || 0) >= 1 ? 'up' : 'down'}">${x.cpi != null ? x.cpi.toFixed(2) : '—'}</td></tr>`).join('') : '<tr><td colspan="5" class="meta" style="padding:16px">Sin obras en curso con fechas y costo cargados.</td></tr>'}
         </tbody></table></div>
+      <div class="card"><div class="chart-h"><div class="t">Control de presupuesto por casa</div><div class="k">material (pagos) + MO (horas×rate) · alerta > presup +${RC.sobrecostoPct != null ? RC.sobrecostoPct : 10}%</div></div>
+        <table class="ptable"><thead><tr><th>Casa</th><th class="r" style="text-align:right">Presup.</th><th style="text-align:right">Material</th><th style="text-align:right">MO (horas)</th><th style="text-align:right">Total real</th><th style="text-align:right">%</th></tr></thead><tbody>
+        ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">⚠ SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
+        </tbody></table>
+        <div class="meta" style="margin-top:8px">Fuente: remodel_material_payments (${(RC.presupCasa || []).length ? 'espejo Pago de Materiales' : '—'}) + remodel_worker_pay_summary. Muestra en-construcción + cualquier sobrecosto.</div>
+      </div>
+    </div>
+    <div class="grid row2">
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Aprendizaje · calibración</b><span>DATO LISTO PARA EL ESTIMADOR</span></div></div>
         <div class="krow"><span>$/sqft real (prom)</span><b>$${realPsf}</b></div>
         <div class="krow"><span>$/sqft estimado (prom)</span><b>$${estPsf}</b></div>

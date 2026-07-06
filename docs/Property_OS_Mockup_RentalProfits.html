@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rental Profits · Property OS — Command Center</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#06080d; --ink:#eef2f8; --mut:#93a0b6; --mut2:#5b6780;
+  --glass:rgba(255,255,255,.045); --glassb:rgba(255,255,255,.09);
+  --a1:#45e3c6; --a2:#4f8dff; --a3:#8a7bff;
+  --pos:#48d69c; --neg:#f0687a; --amber:#e7b65e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;letter-spacing:.1px}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:
+  radial-gradient(760px 520px at 8% -6%,rgba(69,227,198,.14),transparent 58%),
+  radial-gradient(820px 560px at 100% 4%,rgba(79,141,255,.15),transparent 56%),
+  radial-gradient(700px 620px at 70% 118%,rgba(138,123,255,.12),transparent 60%),
+  linear-gradient(180deg,#070a11,#05070c)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
+  background-size:44px 44px;mask:radial-gradient(circle at 50% 30%,#000,transparent 78%)}
+.app{display:grid;grid-template-columns:244px 1fr;min-height:100vh}
+/* Sidebar */
+.side{padding:22px 15px;position:sticky;top:0;height:100vh;
+  background:linear-gradient(180deg,rgba(12,16,26,.72),rgba(7,10,17,.72));border-right:1px solid rgba(255,255,255,.05);backdrop-filter:blur(16px)}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));
+  display:grid;place-items:center;color:#04121a;font-weight:900;font-size:16px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
+.brand b{font-size:15px;font-weight:750;letter-spacing:.2px}
+.brand span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.6px;margin-top:2px}
+.navlbl{font-size:9px;letter-spacing:1.8px;color:var(--mut2);text-transform:uppercase;padding:12px 12px 7px;font-weight:700}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:500;transition:.16s;position:relative}
+.nav a .i{width:16px;text-align:center;opacity:.85;font-size:13px}
+.nav a:hover{background:rgba(255,255,255,.04);color:var(--ink)}
+.nav a.on{color:#fff;background:linear-gradient(90deg,rgba(69,227,198,.16),rgba(79,141,255,.06));box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.nav a.on::before{content:"";position:absolute;left:-15px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--a1),var(--a2));box-shadow:0 0 10px var(--a1)}
+.nav a .b{margin-left:auto;font-size:10px;color:var(--mut2)}
+.side .foot{position:absolute;bottom:18px;left:15px;right:15px;font-size:10.5px;color:var(--mut2);line-height:1.7;
+  border-top:1px solid rgba(255,255,255,.05);padding-top:12px}
+.side .foot b{color:var(--a1)}
+/* Main */
+.main{padding:24px 32px 46px;max-width:1540px}
+.top{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
+.top h1{font-size:23px;font-weight:760;letter-spacing:-.3px}
+.top h1 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mut);font-size:12.5px;margin-top:5px}
+.pills{margin-left:auto;display:flex;gap:9px;align-items:center}
+.pill{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:8px 13px;border-radius:22px;backdrop-filter:blur(10px)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1)}
+.dot.live{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.pill.ai{background:linear-gradient(90deg,rgba(138,123,255,.22),rgba(79,141,255,.14));border-color:rgba(138,123,255,.4);color:#eaeaff}
+.shimmer{background:linear-gradient(90deg,#eaeaff 30%,#fff 50%,#eaeaff 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sh 3s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+/* Cards / glass */
+.grid{display:grid;gap:16px}.kpis{grid-template-columns:repeat(4,1fr)}
+.card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:16px;padding:19px;backdrop-filter:blur(18px);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 26px 60px -34px rgba(0,0,0,.9);transition:.2s;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent)}
+.card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.14)}
+.lab{font-size:10px;letter-spacing:1.5px;color:var(--mut2);text-transform:uppercase;font-weight:700}
+.kpi .big{font-size:33px;font-weight:780;margin-top:9px;letter-spacing:-.8px}
+.kpi .meta{font-size:11.5px;color:var(--mut);margin-top:7px;line-height:1.5}
+.glow{text-shadow:0 0 22px rgba(69,227,198,.4)}
+.up{color:var(--pos)}.down{color:var(--neg)}.warn{color:var(--amber)}
+.spark{position:absolute;right:14px;bottom:12px;width:94px;height:36px}
+.ring{--p:82;width:64px;height:64px;border-radius:50%;background:conic-gradient(from -90deg,var(--a1),var(--a2) calc(var(--p)*1%),rgba(255,255,255,.07) 0);display:grid;place-items:center;box-shadow:0 0 24px -4px rgba(69,227,198,.35)}
+.ring i{width:50px;height:50px;border-radius:50%;background:#0a0e16;display:grid;place-items:center;font-style:normal;font-weight:760;font-size:15px}
+.kpi.occ{display:flex;gap:15px;align-items:center}
+.row2{grid-template-columns:1.6fr 1fr;margin-top:16px}.row3{grid-template-columns:1fr 1fr 1fr;margin-top:16px}
+.chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.chart-h .t{font-size:13.5px;font-weight:640}.chart-h .k{font-size:11px;color:var(--mut2)}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--mut)}.legend b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+canvas{max-width:100%}
+/* AI Brain */
+.brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(138,123,255,.28);
+  box-shadow:0 26px 70px -34px rgba(90,70,230,.5),0 1px 0 rgba(255,255,255,.06) inset}
+.brain .bh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#a9f5e6,#45e3c6 30%,#4f8dff 70%,#2a2f66);box-shadow:0 0 22px rgba(79,141,255,.55)}
+.orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid transparent;
+  background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:spin 6s linear infinite;opacity:.7}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brain .bh b{font-size:14px}.brain .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.5px;margin-top:2px}
+.insight{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.insight:last-of-type{border-bottom:none}
+.insight .ic{font-size:8px;margin-top:6px}.ic.r{color:var(--neg)}.ic.y{color:var(--amber)}.ic.g{color:var(--pos)}
+.insight .tx{font-size:12px;line-height:1.5;color:#d6ddec}.insight .tx b{color:#fff;font-weight:650}
+.tag{display:inline-block;font-size:9px;letter-spacing:.7px;color:var(--mut2);margin-top:5px;font-weight:700}
+.ask{display:flex;gap:8px;margin-top:14px}
+.ask input{flex:1;background:rgba(6,9,16,.72);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
+.ask input::placeholder{color:var(--mut2)}
+.ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px;box-shadow:0 8px 20px -8px rgba(79,141,255,.7)}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.chip{font-size:11px;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}
+.chip:hover{color:#fff;border-color:rgba(138,123,255,.45)}
+.ptable{width:100%;border-collapse:collapse;font-size:12.5px}
+.ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.07);font-weight:700}
+.ptable td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
+.ptable tr:hover td{background:rgba(255,255,255,.025)}
+.badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}
+.b-ok{background:rgba(72,214,156,.13);color:var(--pos)}.b-red{background:rgba(240,104,122,.13);color:var(--neg)}.b-warn{background:rgba(231,182,94,.13);color:var(--amber)}
+.mini-bar{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;width:74px;display:inline-block;vertical-align:middle;margin-right:7px}
+.mini-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
+.op-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px}
+.op-time{color:var(--mut2);font-variant-numeric:tabular-nums;width:46px;font-size:11.5px}
+.op-zone{margin-left:auto;font-size:9.5px;padding:2px 9px;border-radius:20px;color:var(--mut)}
+.z-n{background:rgba(69,227,198,.12)}.z-s{background:rgba(255,255,255,.05)}
+.note{font-size:10.5px;color:var(--mut2);margin-top:24px;text-align:center}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">R</div><div><b>Property OS</b><span>RENTAL PROFITS</span></div></div>
+    <div class="navlbl">Rentas</div>
+    <nav class="nav">
+      <a class="on"><span class="i">◧</span> Command Center</a>
+      <a><span class="i">⌂</span> Propiedades <span class="b">19</span></a>
+      <a><span class="i">▦</span> Reservas &amp; Calendario <span class="b">60</span></a>
+      <a><span class="i">◔</span> Operación &amp; Cronogramas</a>
+      <a><span class="i">◍</span> Inquilinos <span class="b">83</span></a>
+      <a><span class="i">$</span> Finanzas</a>
+      <a><span class="i">▤</span> Analítica &amp; KPIs</a>
+      <a><span class="i">◆</span> Cerebro IA</a>
+    </nav>
+    <div class="foot">Fuente de verdad · <b>Airtable</b><br>Sync en vivo · hace 4 min</div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1>Command Center · <span>Rentas</span></h1>
+        <div class="sub">Todo el negocio de rentas en una sola vista — propiedades, reservas, operación y finanzas.</div>
+      </div>
+      <div class="pills">
+        <div class="pill"><span class="dot live"></span> Airtable en vivo</div>
+        <div class="pill ai">◆ <span class="shimmer">Cerebro analizando</span></div>
+      </div>
+    </div>
+
+    <div class="grid kpis">
+      <div class="card kpi occ">
+        <div><div class="lab">Ocupación</div>
+          <div class="meta" style="margin-top:10px">28 de 34 unidades<br><span class="up">▲ récord del trimestre</span></div></div>
+        <div class="ring" style="--p:82"><i>82%</i></div>
+      </div>
+      <div class="card kpi">
+        <div class="lab">Cashflow del mes</div>
+        <div class="big down">-$41,820</div>
+        <div class="meta">Ingresos $17.4k · Gastos $59.2k · <span class="warn">hipoteca cargada</span></div>
+        <canvas class="spark" id="sp1"></canvas>
+      </div>
+      <div class="card kpi">
+        <div class="lab">Renta potencial / mes</div>
+        <div class="big glow">$63,200</div>
+        <div class="meta">Captura 74% · <span class="warn">$3,400 sin cobrar (6 libres)</span></div>
+        <canvas class="spark" id="sp2"></canvas>
+      </div>
+      <div class="card kpi">
+        <div class="lab">Alertas del cerebro</div>
+        <div class="big">7</div>
+        <div class="meta"><span class="down">3 críticas</span> · 4 por revisar · accionables</div>
+        <canvas class="spark" id="sp3"></canvas>
+      </div>
+    </div>
+
+    <div class="grid row2">
+      <div class="card">
+        <div class="chart-h"><div class="t">Ingresos vs Gastos · 6 meses</div>
+          <div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div>
+        <canvas id="cfChart" height="132"></canvas>
+      </div>
+      <div class="card brain">
+        <div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>MEMORIA + ANÁLISIS EN VIVO</span></div></div>
+        <div class="insight"><div class="ic r">●</div><div class="tx"><b>514 Ramble</b> arrastra <b>-$5,065/mes</b> (en venta, sin cobrar). Acelerar la venta libera el mayor drenaje.<div class="tag">CRÍTICO · CASHFLOW</div></div></div>
+        <div class="insight"><div class="ic y">●</div><div class="tx"><b>6 unidades libres</b> = <b>$3,400/mes</b> en juego. 7105 Bethune (2 libres) es la prioridad de turnover.<div class="tag">OPORTUNIDAD</div></div></div>
+        <div class="insight"><div class="ic g">●</div><div class="tx">Aprendí: la <b>hipoteca ($45.7k/mes)</b> ya entra como gasto fijo por casa desde su fecha real. NOI por casa exacto.<div class="tag">MEMORIA ACTUALIZADA</div></div></div>
+        <div class="ask"><input placeholder="Preguntá a tu copiloto…"><button>Enviar</button></div>
+        <div class="chips"><span class="chip">¿Casas en rojo este mes?</span><span class="chip">Proyectá el cashflow a 3 meses</span></div>
+      </div>
+    </div>
+
+    <div class="grid row3">
+      <div class="card">
+        <div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div>
+        <canvas id="houseChart" height="220"></canvas>
+      </div>
+      <div class="card">
+        <div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">$59.2k</div></div>
+        <canvas id="donut" height="220"></canvas>
+      </div>
+      <div class="card">
+        <div class="chart-h"><div class="t">Operación de hoy</div><div class="k">Juan + Limpieza</div></div>
+        <div class="op-item"><span class="op-time">08:30</span> Turnover · 7105 Bethune <span class="op-zone z-n">Norte</span></div>
+        <div class="op-item"><span class="op-time">10:00</span> Cambio filtros A/C · Barkbridge <span class="op-zone z-s">Sur</span></div>
+        <div class="op-item"><span class="op-time">11:30</span> Limpieza profunda · 407 Capitol <span class="op-zone z-n">Norte</span></div>
+        <div class="op-item"><span class="op-time">14:00</span> Podar césped · 902 Virginia <span class="op-zone z-n">Norte</span></div>
+        <div class="op-item"><span class="op-time">15:30</span> Recepción check-in · Estudio 3 <span class="op-zone z-s">Sur</span></div>
+        <div style="margin-top:13px;font-size:11px;color:var(--mut)">◆ Ruta optimizada por zona · <span class="up">-42 min de traslados</span></div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:16px">
+      <div class="card">
+        <div class="chart-h"><div class="t">Propiedades · estado &amp; rentabilidad</div><div class="k">19 casas · 34 unidades</div></div>
+        <table class="ptable">
+          <thead><tr><th>Casa</th><th>Zona</th><th>Modelo</th><th>Ocupación</th><th>Renta/mes</th><th>Cashflow</th><th>Estado</th></tr></thead>
+          <tbody>
+            <tr><td>4916 Barkbridge Trail</td><td>Sur</td><td>Casa Completa</td><td><span class="mini-bar"><i style="width:100%"></i></span>100%</td><td>$2,600</td><td class="up">+$1,020</td><td><span class="badge b-ok">Sana</span></td></tr>
+            <tr><td>407 Capitol Dr</td><td>Norte</td><td>Mixta · 4 u</td><td><span class="mini-bar"><i style="width:100%"></i></span>100%</td><td>$9,896</td><td class="up">+$2,140</td><td><span class="badge b-ok">Sana</span></td></tr>
+            <tr><td>7105 Bethune Ave</td><td>Norte</td><td>Mixta · 4 u</td><td><span class="mini-bar"><i style="width:50%"></i></span>50%</td><td>$2,400</td><td class="down">-$1,941</td><td><span class="badge b-red">Baja ocup.</span></td></tr>
+            <tr><td>6203 Shadow Bend</td><td>Sur</td><td>Mixta · 3 u</td><td><span class="mini-bar"><i style="width:66%"></i></span>66%</td><td>$4,400</td><td class="down">-$1,536</td><td><span class="badge b-warn">Vigilar</span></td></tr>
+            <tr><td>514 Ramble Ln</td><td>Sur</td><td>Casa Completa</td><td><span class="mini-bar"><i style="width:100%"></i></span>100%</td><td>$3,000</td><td class="down">-$5,065</td><td><span class="badge b-red">En venta</span></td></tr>
+            <tr><td>902 Virginia Dr</td><td>Round Rock</td><td>Casa Completa</td><td><span class="mini-bar"><i style="width:100%"></i></span>100%</td><td>$3,400</td><td class="down">-$362</td><td><span class="badge b-warn">Vigilar</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="note">Prototipo de diseño — datos de muestra basados en tu operación real. Concepto: Property OS · Command Center + Cerebro IA.</div>
+  </main>
+</div>
+
+<script>
+Chart.defaults.font.family='-apple-system,Segoe UI,Roboto,sans-serif';
+const ax={grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#5b6780',font:{size:10}}};
+const gext={plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:'#5b6780',font:{size:10}}},y:ax}};
+function grad(ctx,c1,c2){const g=ctx.createLinearGradient(0,0,0,150);g.addColorStop(0,c1);g.addColorStop(1,c2);return g;}
+function spark(id,data,color){new Chart(document.getElementById(id),{type:'line',data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:color,borderWidth:1.8,tension:.4,pointRadius:0,fill:false}]},options:{plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{display:false},y:{display:false}}}});}
+spark('sp1',[-20,-28,-15,-30,-38,-42],'#f0687a');
+spark('sp2',[52,55,58,60,61,63],'#45e3c6');
+spark('sp3',[3,4,4,6,5,7],'#93a0b6');
+
+const cf=document.getElementById('cfChart').getContext('2d');
+new Chart(cf,{type:'line',data:{labels:['Ene','Feb','Mar','Abr','May','Jun'],
+  datasets:[
+   {label:'Ingresos',data:[31,34,33,33,52,26],borderColor:'#48d69c',backgroundColor:grad(cf,'rgba(72,214,156,.20)','rgba(72,214,156,0)'),fill:true,tension:.4,pointRadius:2.5,pointBackgroundColor:'#48d69c',borderWidth:2.2},
+   {label:'Gastos',data:[38,42,47,41,45,52],borderColor:'#f0687a',backgroundColor:grad(cf,'rgba(240,104,122,.14)','rgba(240,104,122,0)'),fill:true,tension:.4,pointRadius:2.5,pointBackgroundColor:'#f0687a',borderWidth:2.2}]},
+ options:gext});
+
+new Chart(document.getElementById('houseChart'),{type:'bar',
+ data:{labels:['Barkbridge','407 Capitol','1607 Picnic','902 Virginia','6203 Shadow','7105 Bethune','514 Ramble'],
+  datasets:[{data:[1020,2140,820,-362,-1536,-1941,-5065],borderRadius:5,
+   backgroundColor:['#48d69c','#48d69c','#48d69c','#f0687a','#f0687a','#f0687a','#f0687a']}]},
+ options:{...gext,indexAxis:'y',scales:{x:ax,y:{grid:{display:false},ticks:{color:'#93a0b6',font:{size:10}}}}}});
+
+new Chart(document.getElementById('donut'),{type:'doughnut',
+ data:{labels:['Hipoteca','Servicios','Mantenimiento','Nómina','Plataforma'],
+  datasets:[{data:[45719,6100,3200,2900,1300],backgroundColor:['#4f8dff','#45e3c6','#8a7bff','#3a6f74','#4a5568'],borderColor:'#0a0e16',borderWidth:3}]},
+ options:{maintainAspectRatio:false,cutout:'66%',plugins:{legend:{position:'bottom',labels:{color:'#93a0b6',font:{size:10},boxWidth:8,padding:9}}}}});
+</script>
+</body>
+</html>
