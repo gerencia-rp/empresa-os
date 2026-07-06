@@ -456,6 +456,7 @@ function fcRenderTab(body) {
 }
 
 function fcRenderResultado(r, crew, otrosPct) {
+  fcState.lastResult = r; // para edición de ⭐ importancia
   return `
     <!-- Header con indicador de sincronización del MO -->
     <div class="flex items-center justify-end">${typeof moSyncBadgeHtml === 'function' ? moSyncBadgeHtml() : ''}</div>
@@ -495,6 +496,7 @@ function fcRenderResultado(r, crew, otrosPct) {
             <th class="text-right p-2 text-slate-400" title="MO de referencia por coeficiente $/ft² (no es el cálculo activo si hay cuadrilla)">MO ref</th>
             <th class="text-right p-2">Material $</th>
             <th class="text-right p-2">Subtotal $</th>
+            <th class="text-right p-2" title="Peso de la etapa en el avance TÉCNICO de la obra. Default: participación en el costo (MO+material). Editable — debe sumar 100%.">⭐ Importancia</th>
             <th class="text-right p-2">% tiempo</th>
             <th class="text-right p-2">Días</th>
           </tr>
@@ -507,7 +509,8 @@ function fcRenderResultado(r, crew, otrosPct) {
               <td class="p-2 text-right ${r.moGlobalActivo?'font-semibold text-emerald-700':''}">$${Math.round(e.mo).toLocaleString()}</td>
               <td class="p-2 text-right text-slate-400">$${Math.round(e.moCoef).toLocaleString()}</td>
               <td class="p-2 text-right">$${Math.round(e.mat).toLocaleString()}</td>
-              <td class="p-2 text-right font-bold">$${Math.round(e.subtotal).toLocaleString()}</td>
+              <td class="p-2 text-right font-bold">${Math.round(e.subtotal).toLocaleString()}</td>
+              <td class="p-2 text-right"><input type="number" min="0" max="100" step="0.1" value="${(e.importancia != null ? e.importancia : (r.totalObra > 0 ? 100 * e.subtotal / r.totalObra : 0)).toFixed(1)}" onchange="fcSetImportancia(${r.etapas.indexOf(e)}, this.value)" class="w-16 text-right border border-slate-200 rounded px-1 py-0.5 text-xs font-bold text-amber-700" title="⭐ % de importancia en el avance técnico"></td>
               <td class="p-2 text-right text-slate-500">${e.pesoNormPct.toFixed(1)}%</td>
               <td class="p-2 text-right">${e.dias.toFixed(1)}</td>
             </tr>
@@ -972,6 +975,31 @@ function fcLoadJSON() {
 }
 
 // ─── GUARDAR PRONÓSTICO ───
+function fcSetImportancia(idx, val) {
+  const r = fcState.lastResult; if (!r || !r.etapas || !r.etapas[idx]) return;
+  r.etapas[idx].importancia = Math.max(0, Math.min(100, parseFloat(val) || 0));
+  const suma = r.etapas.reduce((s2, e) => s2 + (e.importancia != null ? e.importancia : (r.totalObra > 0 ? 100 * e.subtotal / r.totalObra : 0)), 0);
+  if (Math.abs(suma - 100) > 1) console.warn('⭐ Importancias suman ' + suma.toFixed(1) + '% (se renormalizan al guardar)');
+}
+window.fcSetImportancia = fcSetImportancia;
+
+// A: pesos de etapa → remodel_stage_weights (viajan al avance técnico por property_id)
+async function fcSaveStageWeights(propiedad, r) {
+  try {
+    const norm = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const key = norm(propiedad); if (key.length < 5) return 'nombre corto';
+    const { data: obras } = await sb.from('remodel_at_properties').select('property_id, address').eq('active', true);
+    const obra = (obras || []).find(o => o.property_id && (norm(o.address).includes(key) || key.includes(norm(String(o.address || '').split(',')[0]))));
+    if (!obra) return 'sin casa en espejo (se cargan cuando exista)';
+    const prev = (fcState.lastResult && fcState.lastResult.etapas) || [];
+    const pesos = r.etapas.map(e => { const ed = prev.find(p => p.etapa === e.etapa); const raw = ed && ed.importancia != null ? ed.importancia : (r.totalObra > 0 ? 100 * e.subtotal / r.totalObra : 0); return { etapa: e.etapa, raw }; });
+    const suma = pesos.reduce((s2, p) => s2 + p.raw, 0) || 1;
+    const clean = pesos.map(p => ({ property_id: obra.property_id, etapa: p.etapa, peso_pct: Math.round(10000 * p.raw / suma) / 100, fuente: 'estimador', address: obra.address, active: true, archived_at: null, updated_at: new Date().toISOString() }));
+    const { error } = await sb.from('remodel_stage_weights').upsert(clean, { onConflict: 'property_id,etapa' });
+    return error ? ('error: ' + error.message) : 'ok';
+  } catch (e) { return 'error: ' + e.message; }
+}
+
 async function fcSaveForecast() {
   const f = fcState.form;
   const errores = fcValidarDiagnostico({ sqft: f.sqft, afectacion: f.afectacion });
@@ -996,6 +1024,9 @@ async function fcSaveForecast() {
   }
   if (error) return alert('Error: ' + error.message + '\n\n(¿Corriste el SQL del Paso 2 con la tabla remodel_forecasts?)');
   if (typeof moSetSync === 'function') moSetSync('synced'); // reflejar en el indicador
+  // ⭐ pesos de importancia → avance técnico (Planner)
+  const wRes = await fcSaveStageWeights(f.propiedad, r);
+  if (wRes && wRes !== 'ok') console.warn('stage weights:', wRes);
   // Auto-guardar también como diagnóstico reutilizable para el picker
   await fcSaveDiagnosis('pronostico', true).catch(() => {});
   await fcLoadConfig();

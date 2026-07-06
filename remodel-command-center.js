@@ -50,12 +50,12 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct, ledger, vivo] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct, ledger, vivo, receipts] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
       sb.from('airtable_record_names').select('record_id, name').then(r => r.data || []).catch(() => []),
-      sb.from('remodel_crew_rates').select('airtable_id, nombre').then(r => r.data || []).catch(() => []),
+      sb.from('remodel_crew_rates').select('airtable_id, nombre, pago_x_hora').then(r => r.data || []).catch(() => []),
       sb.from('remodel_worker_pay_summary').select('casa_norm, horas').then(r => r.data || []).catch(() => []),
       sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
       sb.from('remodel_overhead').select('source, monto, categoria').eq('active', true).then(r => r.data || []).catch(() => []),
@@ -65,7 +65,8 @@ async function rcLoadAll() {
       sb.from('v_remodel_presupuesto_casa').select('*').then(r => r.data || []).catch(() => []),
       sb.from('remodel_forecast_params').select('key, value').eq('key', 'alerta_sobrecosto_pct').maybeSingle().then(r => r.data).catch(() => null),
       sb.from('v_remodel_nomina_ledger').select('*').then(r => r.data || []).catch(() => []),
-      sb.from('v_remodel_avance_vivo').select('*').then(r => r.data || []).catch(() => [])
+      sb.from('v_remodel_avance_vivo').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('remodel_payroll_receipts').select('id, fecha_pago, periodo_ini, periodo_fin, casa, lider, total, estado, airtable_writeback').eq('active', true).order('created_at', { ascending: false }).limit(20).then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -81,6 +82,8 @@ async function rcLoadAll() {
     RC.sobrecostoPct = scPct ? +scPct.value : 10;
     RC.ledger = ledger || [];
     RC.avanceVivo = vivo || [];
+    RC.crewRates = crews || [];
+    RC.receipts = receipts || [];
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -294,6 +297,8 @@ function rcHeader(title, sub) {
 }
 
 function rcSecCommand(c) {
+  const atrasadas = (RC.avanceVivo || []).filter(x => x.atrasada_cronograma && x.proceso === 'En construcción');
+  const bannerAtraso = atrasadas.length ? `<div class="card" style="border:1px solid rgba(248,113,113,.5);margin-bottom:12px"><div class="lab" style="color:#f87171">📉 ${atrasadas.length} OBRA(S) ATRASADA(S) SEGÚN CRONOGRAMA</div>${atrasadas.map(o => `<div class="krow"><span><b>${RC_E(rcShort(o.address))}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado</span><b class="down">${o.atraso_pts} pts · ~${o.atraso_dias}d</b></div>`).join('')}</div>` : '';
   const ins = rcInsights(c);
   const parN = RC.parity ? RC.parity.airtable_count : c.obras.length;
   const paritySync = RC.parity ? (RC.parity.in_sync !== false && (RC.parity.airtable_count == null || RC.parity.airtable_count === c.obras.length)) : true;
@@ -351,7 +356,7 @@ function rcObraCard(o) {
   if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
   const _comp = rcCompletitud(o);
   const _cc = _comp.n >= 5 ? '#34d399' : _comp.n >= 3 ? '#e7b65e' : '#f87171';
-  return `<div class="kcard">
+  return `${bannerAtraso}<div class="kcard">
     <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
     <div class="krow"><span>Gasto real</span><b>${RC_M(dq.gasto)}</b></div>
@@ -503,9 +508,10 @@ function rcSecGestion(c) {
         <table class="ptable"><thead><tr><th>Casa</th><th class="r" style="text-align:right">Presup.</th><th style="text-align:right">Material</th><th style="text-align:right">MO (horas)</th><th style="text-align:right">Total real</th><th style="text-align:right">%</th></tr></thead><tbody>
         ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">⚠ SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
         </tbody></table>
-        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos</div>
+        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rcPagoQuincenal()">💵 Generar pago quincenal</button></div>
         ${(() => { const tot = (RC.ledger || []).length; const sin = (RC.ledger || []).filter(x => x.rate_conocido === false).length; return sin ? `<div class="meta" style="margin-bottom:6px">⚠ Cobertura parcial: ${sin} de ${tot} filas del ledger sin rate conocido (nombre no matchea Personal en Campo) — su devengado no se computa. Corregir nombres en Airtable para cobertura total.</div>` : ''; })()}
         ${(() => { const map = {}; (RC.ledger || []).forEach(r => { if (!map[r.worker]) map[r.worker] = { w: r.worker, horas: 0, dev: 0, pag: 0, deuda: 0, casas: [] }; const m2 = map[r.worker]; m2.horas += +r.horas || 0; m2.dev += +r.devengado || 0; m2.pag += +r.pagado || 0; m2.deuda += +r.deuda || 0; if (+r.deuda > 100) m2.casas.push(rcShort(r.casa) + ' ' + RC_M(+r.deuda)); }); const tot = Object.values(map).filter(x => Math.abs(x.deuda) > 100).sort((x, y) => y.deuda - x.deuda); const deudaTotal = tot.reduce((s2, x) => s2 + Math.max(0, x.deuda), 0); return `<div class="krow"><span><b>DEUDA TOTAL</b></span><b class="down">${RC_M(deudaTotal)}</b></div>` + tot.slice(0, 8).map(x => `<div class="krow"><span>${RC_E(x.w)} <span style="opacity:.5;font-size:10px">(${Math.round(x.horas)}h · ${x.casas.slice(0, 2).join(', ')})</span></span><b class="${x.deuda > 0 ? 'down' : 'up'}">${RC_M(x.deuda)}</b></div>`).join(''); })()}
+        ${(RC.receipts || []).length ? `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Recibos quincenales registrados</div>` + (RC.receipts || []).slice(0, 6).map(rc2 => `<div class="krow"><span>${rc2.fecha_pago} · <b>${RC_E(rc2.lider || '—')}</b> · ${RC_E((rc2.casa || '').slice(0, 22))} <span style="opacity:.5;font-size:10px">(${rc2.periodo_ini}→${rc2.periodo_fin})</span></span><span><b>${RC_M(+rc2.total || 0)}</b> <span class="badge ${rc2.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:8px">${RC_E(rc2.estado)}</span>${rc2.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px">↗AT pend.</span>' : ''}</span></div>`).join('') : ''}
         <div class="meta" style="margin-top:8px">Fuente: remodel_material_payments (${(RC.presupCasa || []).length ? 'espejo Pago de Materiales' : '—'}) + remodel_worker_pay_summary. Muestra en-construcción + cualquier sobrecosto.</div>
       </div>
     </div>
@@ -524,20 +530,35 @@ function rcSecGestion(c) {
 window.rcSecGestion = rcSecGestion;
 
 // ─── RM-M1 · Avance de obra EN VIVO (tareas vs plata + semáforos de costo y tiempo) ───
+const DLR = String.fromCharCode(36);
+function rcVivoGanancia(o) {
+  const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
+  const neg = +o.ganancia_proyectada < 0;
+  const bg = o.sem_ganancia === 'rojo' ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.08)';
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
+    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + '</span>'
+    + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'
+    + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
+    + '<div class="meta" style="margin-top:3px;font-size:9px">cobra ' + M(o.valor_remodelacion) + ' · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
+}
 function rcVivoCard() {
   const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
   const SEM = { verde: '🟢', amarillo: '🟡', rojo: '🔴', gris: '⚪' };
   const bar = (pct, color) => `<div style="height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin:3px 0 7px"><i style="display:block;height:100%;width:${Math.min(100, +pct || 0)}%;background:${color}"></i></div>`;
   const card = (o) => {
     const revisar = [];
-    if ((+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15) revisar.push(`la plata (${o.pct_plata}%) corre ${Math.round(o.pct_plata - o.pct_tareas)}pts adelante de las tareas — posible sobrecosto`);
-    if (o.sem_tiempo === 'rojo') revisar.push(o.dias_pasados_fin > 0 ? `cronograma vencido hace ${o.dias_pasados_fin} días y va ${o.pct_tareas}%` : `vamos lentos: ${o.pct_tareas}% hecho con ${o.pct_dias}% del tiempo consumido`);
+    if (o.sobrecosto_vs_tecnico) revisar.push(`SOBRECOSTO: financiero ${o.pct_financiero}% vs técnico ${o.pct_tecnico}% (${Math.round(o.pct_financiero - o.pct_tecnico)}pts) — gastando más rápido de lo que avanza, rumbo a pérdida`);
+    if (o.sem_ganancia === 'rojo') revisar.push(`PÉRDIDA proyectada: costo @100% supera lo que cobra — renegociar o recortar`);
+    if (o.atrasada_cronograma) revisar.push(`ATRASADA según cronograma: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado → ${o.atraso_pts} pts atrás, ~${o.atraso_dias} día(s) de retraso`);
+    else if (o.sem_tiempo === 'rojo') revisar.push(o.dias_pasados_fin > 0 ? `cronograma vencido hace ${o.dias_pasados_fin} días y va ${o.pct_tareas}%` : `vamos lentos: ${o.pct_tareas}% hecho con ${o.pct_dias}% del tiempo consumido`);
     if (o.sem_costo === 'rojo') revisar.push(`gasto $${(+o.gasto_real).toLocaleString('en-US')} supera lo proyectado a hoy ($${(+o.costo_proyectado || 0).toLocaleString('en-US')})`);
     if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
     return `<div class="card" style="min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b>${RC_E(rcShort(o.address))}</b><span style="font-size:11px;opacity:.7">${o.done || 0}/${o.total || 0} tareas</span></div>
-      <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE POR TAREAS · ${o.pct_tareas || 0}%</div>${bar(o.pct_tareas, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
-      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE POR PLATA · ${o.pct_plata != null ? o.pct_plata + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_plata, (+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15 ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado' ? '⭐ ponderado' : '(conteo — sin pesos del Estimador)'} · ${o.pct_tecnico || 0}%</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE FINANCIERO · ${o.pct_plata != null ? o.pct_plata + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_plata, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#64748b,#94a3b8)')}
+      ${o.valor_remodelacion > 0 ? rcVivoGanancia(o) : ''}
       <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
         <span>${SEM[o.sem_costo] || '⚪'} costo ${o.costo_proyectado ? `<span style="opacity:.6">(proy. a hoy $${(+o.costo_proyectado).toLocaleString('en-US')})</span>` : ''}</span>
         <span>${SEM[o.sem_tiempo] || '⚪'} tiempo <span style="opacity:.6">(${o.pct_dias != null ? o.pct_dias + '% días' : 's/cronograma'})</span></span></div>
@@ -548,3 +569,152 @@ function rcVivoCard() {
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:10px">${obras.map(card).join('') || '<div class="meta">Sin obras en construcción.</div>'}</div>
     <div class="meta" style="margin-top:10px">Definiciones: tareas = v_remodel_progress (cronograma del Planner cumplido) · plata = C2 (material_payments + horas×rate ÷ presupuesto) · proyección lineal sobre el cronograma · umbral = alerta_sobrecosto_pct. ⚠ Write-back del % a Airtable parqueado: falta scope write del token.</div></div>`;
 }
+
+// ─── RM-M2 · Recibo de pago quincenal por LÍDER (regla Silvia: sin contrato individual; el líder recibe y reparte) ───
+function rcPagoQuincenal() {
+  const hoy = new Date(); const d = hoy.getDate();
+  const ini = d <= 15 ? new Date(hoy.getFullYear(), hoy.getMonth(), 1) : new Date(hoy.getFullYear(), hoy.getMonth(), 16);
+  const fin = d <= 15 ? new Date(hoy.getFullYear(), hoy.getMonth(), 15) : new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  const iso = x => x.toISOString().slice(0, 10);
+  const casas = (RC.obras || []).filter(o => o.active !== false).map(o => rcShort(o.address)).sort();
+  let lideres = (RC.crewRates || []).map(c => c.nombre).filter(Boolean).sort();
+  if (!lideres.length) lideres = [...new Set((RC.ledger || []).map(x => x.worker).filter(Boolean))].sort();
+  const el = document.createElement('div');
+  el.id = 'rc-pq-modal';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center';
+  el.innerHTML = `<div class="card" style="width:520px;max-width:94vw;background:#0d1420;border:1px solid rgba(255,255,255,.15)">
+    <div class="chart-h"><div class="t">💵 Pago de nómina quincenal</div><div class="k">recibo por LÍDER · horas del espejo</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0">
+      <label style="font-size:11px;color:#9fb0c9">Desde<br><input id="pq-ini" type="date" value="${iso(ini)}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit"></label>
+      <label style="font-size:11px;color:#9fb0c9">Hasta<br><input id="pq-fin" type="date" value="${iso(fin)}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit"></label>
+    </div>
+    <label style="font-size:11px;color:#9fb0c9">Casa<br><select id="pq-casa" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit;margin:4px 0 10px"><option value="">(todas las casas del período)</option>${casas.map(c => `<option>${RC_E(c)}</option>`).join('')}</select></label>
+    <label style="font-size:11px;color:#9fb0c9">Líder que recibe y firma<br><select id="pq-lider" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit;margin:4px 0 14px">${lideres.map(c => `<option>${RC_E(c)}</option>`).join('')}</select></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="repbtn ghost" onclick="document.getElementById('rc-pq-modal').remove()">Cancelar</button><button class="repbtn" onclick="rcPagoGenerar()">Ver desglose →</button></div></div>`;
+  document.body.appendChild(el);
+}
+async function rcPagoGenerar() {
+  const ini = document.getElementById('pq-ini').value, fin = document.getElementById('pq-fin').value;
+  const casa = document.getElementById('pq-casa').value, lider = document.getElementById('pq-lider').value;
+  if (!ini || !fin || !lider) { alert('Completá período y líder.'); return; }
+  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('worker, casa, casa_norm, fecha, horas, pago').gte('fecha', ini).lte('fecha', fin).limit(3000);
+  if (error) { alert('Error leyendo horas: ' + error.message); return; }
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const casaKey = norm(casa);
+  // MISMA definición que el ledger C4: match por casa_norm contenido en la casa normalizada (≥4 chars)
+  const rows = (hrs || []).filter(h => !casa || (h.casa_norm && h.casa_norm.length >= 4 && casaKey.includes(h.casa_norm)));
+  if (!rows.length) { alert('Sin horas registradas en ese período' + (casa ? ' para esa casa' : '') + '.'); return; }
+  const rates = {}; (RC.crewRates || []).forEach(c => rates[String(c.nombre || '').toLowerCase().trim()] = +c.pago_x_hora || 0);
+  const porW = {};
+  rows.forEach(h => {
+    const w = (h.worker || '?').trim(); if (!porW[w]) porW[w] = { w, horas: 0, pagoReg: 0, casas: new Set() };
+    porW[w].horas += +h.horas || 0; porW[w].pagoReg += +h.pago || 0; if (h.casa) porW[w].casas.add(String(h.casa).split(',')[0]);
+  });
+  const det = Object.values(porW).map(x => {
+    const rate = rates[x.w.toLowerCase()] || 0;
+    const devengado = rate ? Math.round(x.horas * rate * 100) / 100 : null;
+    return { ...x, rate, monto: devengado != null ? devengado : Math.round(x.pagoReg * 100) / 100, sinRate: !rate };
+  }).sort((a, b) => b.monto - a.monto);
+  const total = Math.round(det.reduce((s, x) => s + x.monto, 0) * 100) / 100;
+  document.getElementById('rc-pq-modal')?.remove();
+  rcReciboOverlay({ ini, fin, casa: casa || 'Todas las casas', lider, det, total, horasTot: Math.round(det.reduce((s, x) => s + x.horas, 0) * 10) / 10 });
+}
+function rcReciboRender(r) {
+  const M = n => '$' + (+n).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const filas = r.det.map(x => `<tr><td>${RC_E(x.w)}${x.sinRate ? ' <span style="color:#b45309;font-size:9px">(sin tarifa — se usa pago registrado)</span>' : ''}<div style="font-size:9px;color:#777">${RC_E([...x.casas].slice(0, 3).join(', '))}</div></td><td style="text-align:right">${x.horas.toFixed(1)}</td><td style="text-align:right">${x.rate ? M(x.rate) : '—'}</td><td style="text-align:right"><b>${M(x.monto)}</b></td></tr>`).join('');
+  const w = window.open('', '_blank', 'width=760,height=900');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Recibo nómina ${r.ini} a ${r.fin}</title><style>
+    body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;margin:0;padding:36px;max-width:700px}
+    .head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b45309;padding-bottom:14px}
+    .logo{font-size:22px;font-weight:800;color:#b45309}.logo span{display:block;font-size:10px;letter-spacing:2px;color:#666;font-weight:600}
+    h1{font-size:16px;margin:18px 0 2px}.sub{font-size:12px;color:#555;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#666;border-bottom:1px solid #ccc;padding:6px 4px}
+    th:nth-child(n+2),td:nth-child(n+2){text-align:right}td{padding:8px 4px;border-bottom:1px solid #eee}
+    .tot{font-size:17px;font-weight:800;text-align:right;margin:14px 0;padding:10px;background:#faf5ef;border-radius:8px}
+    .firma{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.firma div{border-top:1.5px solid #333;padding-top:6px;font-size:11px;color:#444}
+    .nota{font-size:10px;color:#777;margin-top:26px;line-height:1.5}
+    .btn{position:fixed;top:10px;right:10px;padding:8px 16px;background:#b45309;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
+    @media print{.btn{display:none}}</style></head><body>
+    <button class="btn" onclick="window.print()">🖨 Imprimir / PDF</button>
+    <div class="head"><div class="logo">STRUCTURE ONE <span>REMODELACIÓN · AUSTIN, TX</span></div><div style="font-size:11px;color:#666;text-align:right">Recibo de pago de nómina<br><b>${r.ini} → ${r.fin}</b></div></div>
+    <h1>Pago de nómina — ${RC_E(r.casa)}</h1>
+    <div class="sub">Período ${r.ini} a ${r.fin} · ${r.det.length} trabajador(es) · ${r.horasTot} horas · Recibe y distribuye: <b>${RC_E(r.lider)}</b></div>
+    <table><thead><tr><th>Trabajador</th><th>Horas</th><th>Valor/hora</th><th>Subtotal</th></tr></thead><tbody>${filas}</tbody></table>
+    <div class="tot">TOTAL A PAGAR: ${M(r.total)}</div>
+    <div class="firma"><div>Firma del líder (${RC_E(r.lider)})<br>Recibí conforme el total indicado para distribuir a mi equipo</div><div>Firma Structure One<br>Fecha: ____ / ____ / ______</div></div>
+    <div class="nota">El dinero se entrega al líder de cuadrilla, quien lo distribuye a su equipo. Desglose calculado de las horas registradas en el sistema (Horas Trabajadas por Semana × tarifa de Personal en Campo). Generado por Flipping Rentals OS · ${new Date().toLocaleString('es-MX')}</div>
+    </body></html>`);
+  w.document.close();
+}
+window.rcPagoQuincenal = rcPagoQuincenal; window.rcPagoGenerar = rcPagoGenerar;
+
+// ─── RM-M2 fase 2 · Recibo en overlay con FIRMA (canvas) + registro ───
+function rcReciboOverlay(r) {
+  RC._recibo = r;
+  const M = n => '$' + (+n).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const filas = r.det.map(x => `<tr><td>${RC_E(x.w)}${x.sinRate ? ' <span style="color:#b45309;font-size:9px">(sin tarifa — pago registrado)</span>' : ''}<div style="font-size:9px;color:#777">${RC_E([...x.casas].slice(0, 3).join(', '))}</div></td><td style="text-align:right">${x.horas.toFixed(1)}</td><td style="text-align:right">${x.rate ? M(x.rate) : '—'}</td><td style="text-align:right"><b>${M(x.monto)}</b></td></tr>`).join('');
+  const el = document.createElement('div');
+  el.id = 'rc-recibo-ov';
+  el.innerHTML = `<style>
+    #rc-recibo-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;overflow:auto;padding:20px}
+    #rc-recibo-doc{background:#fff;color:#111;max-width:700px;margin:0 auto;padding:34px;border-radius:12px;font-family:-apple-system,Segoe UI,sans-serif}
+    #rc-recibo-doc .rrh{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b45309;padding-bottom:12px}
+    #rc-recibo-doc .rrlogo{font-size:21px;font-weight:800;color:#b45309}#rc-recibo-doc .rrlogo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
+    #rc-recibo-doc table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+    #rc-recibo-doc th{text-align:left;font-size:10px;text-transform:uppercase;color:#666;border-bottom:1px solid #ccc;padding:6px 4px}
+    #rc-recibo-doc th:nth-child(n+2),#rc-recibo-doc td:nth-child(n+2){text-align:right}
+    #rc-recibo-doc td{padding:8px 4px;border-bottom:1px solid #eee}
+    #rc-recibo-doc .rrtot{font-size:17px;font-weight:800;text-align:right;margin:12px 0;padding:10px;background:#faf5ef;border-radius:8px}
+    #rc-firma-canvas{border:1.5px dashed #999;border-radius:8px;touch-action:none;background:#fcfcfc}
+    .rrbtns{display:flex;gap:8px;justify-content:flex-end;max-width:700px;margin:12px auto 40px}
+    .rrbtn{padding:9px 18px;border-radius:9px;border:none;font-weight:700;cursor:pointer;font-size:13px}
+    @media print{ body *{visibility:hidden !important} #rc-recibo-ov{position:absolute;inset:0;background:#fff;padding:0;overflow:visible} #rc-recibo-doc, #rc-recibo-doc *{visibility:visible !important} #rc-recibo-doc{border-radius:0;max-width:none} .rrbtns{display:none} }
+    </style>
+    <div id="rc-recibo-doc">
+      <div class="rrh"><div class="rrlogo">STRUCTURE ONE <span>REMODELACIÓN · AUSTIN, TX</span></div><div style="font-size:11px;color:#666;text-align:right">Recibo de pago de nómina<br><b>${r.ini} → ${r.fin}</b></div></div>
+      <h2 style="font-size:16px;margin:16px 0 2px">Pago de nómina — ${RC_E(r.casa)}</h2>
+      <div style="font-size:12px;color:#555">Período ${r.ini} a ${r.fin} · ${r.det.length} trabajador(es) · ${r.horasTot} horas · Recibe y distribuye: <b>${RC_E(r.lider)}</b></div>
+      <table><thead><tr><th>Trabajador</th><th>Horas</th><th>Valor/hora</th><th>Subtotal</th></tr></thead><tbody>${filas}</tbody></table>
+      <div class="rrtot">TOTAL A PAGAR: ${M(r.total)}</div>
+      <div style="margin-top:22px;font-size:11px;color:#444"><b>Firma del líder (${RC_E(r.lider)})</b> — Recibí conforme el total indicado para distribuir a mi equipo:</div>
+      <canvas id="rc-firma-canvas" width="620" height="130" style="width:100%;max-width:620px;margin-top:6px"></canvas>
+      <div style="display:flex;gap:10px;margin-top:4px"><button class="rrbtn" style="background:#eee;font-size:10px;padding:4px 10px" onclick="rcFirmaClear()">✕ borrar firma</button></div>
+      <div style="font-size:10px;color:#777;margin-top:18px;line-height:1.5">El dinero se entrega al líder de cuadrilla, quien lo distribuye a su equipo (regla operativa; sin contrato individual). Desglose = horas registradas × tarifa de Personal en Campo. Generado por Flipping Rentals OS · ${new Date().toLocaleString('es-MX')}</div>
+    </div>
+    <div class="rrbtns">
+      <button class="rrbtn" style="background:#e5e7eb" onclick="document.getElementById('rc-recibo-ov').remove()">Cerrar</button>
+      <button class="rrbtn" style="background:#374151;color:#fff" onclick="window.print()">🖨 Imprimir / PDF</button>
+      <button class="rrbtn" style="background:#b45309;color:#fff" onclick="rcReciboGuardar()">✍️ Firmar y registrar pago</button>
+    </div>`;
+  document.body.appendChild(el);
+  const cv = document.getElementById('rc-firma-canvas');
+  const ctx = cv.getContext('2d'); ctx.strokeStyle = '#1a1a5e'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  let draw = false, last = null; RC._firmaDirty = false;
+  const pos = e => { const rect = cv.getBoundingClientRect(); const p = e.touches ? e.touches[0] : e; return { x: (p.clientX - rect.left) * (cv.width / rect.width), y: (p.clientY - rect.top) * (cv.height / rect.height) }; };
+  const start = e => { draw = true; last = pos(e); e.preventDefault(); };
+  const move = e => { if (!draw) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; RC._firmaDirty = true; e.preventDefault(); };
+  const end = () => { draw = false; };
+  cv.addEventListener('mousedown', start); cv.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  cv.addEventListener('touchstart', start); cv.addEventListener('touchmove', move); cv.addEventListener('touchend', end);
+}
+function rcFirmaClear() { const cv = document.getElementById('rc-firma-canvas'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); RC._firmaDirty = false; }
+async function rcReciboGuardar() {
+  const r = RC._recibo; if (!r) return;
+  if (!RC._firmaDirty) { alert('Falta la firma del líder (dibujala en el recuadro).'); return; }
+  const cv = document.getElementById('rc-firma-canvas');
+  const firma = cv.toDataURL('image/png');
+  const { data: { session } } = await sb.auth.getSession();
+  const { error } = await sb.from('remodel_payroll_receipts').insert({
+    periodo_ini: r.ini, periodo_fin: r.fin, casa: r.casa, lider: r.lider,
+    total: r.total, horas: r.horasTot,
+    detalle: r.det.map(x => ({ worker: x.w, horas: x.horas, rate: x.rate, monto: x.monto, sinRate: !!x.sinRate })),
+    firma_png: firma, estado: 'realizado', airtable_writeback: 'pendiente',
+    created_by: (session && session.user && session.user.email) || 'panel'
+  });
+  if (error) { alert('No se pudo registrar (¿logueado?): ' + error.message); return; }
+  alert('✅ Pago registrado y firmado. Queda pendiente el write-back a Airtable (falta scope write del token).');
+  document.getElementById('rc-recibo-ov')?.remove();
+  try { const { data } = await sb.from('remodel_payroll_receipts').select('id, fecha_pago, periodo_ini, periodo_fin, casa, lider, total, estado, airtable_writeback').eq('active', true).order('created_at', { ascending: false }).limit(20); RC.receipts = data || []; } catch (e) {}
+  rcRender();
+}
+window.rcReciboOverlay = rcReciboOverlay; window.rcFirmaClear = rcFirmaClear; window.rcReciboGuardar = rcReciboGuardar;
