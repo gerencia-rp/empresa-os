@@ -872,6 +872,7 @@ function ffUmCard(sel) {
       ${ffUwIn2('um-renta', 'Renta esperada /mes (opcional)', '')}
       <div id="ff-um-modelos" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${FF_UW_MODELOS.map(([k, lbl]) => `<button data-mo="${k}" onclick="ffUmSetModelo('${k}')" class="pullbtn${(FF.uw && FF.uw.modelo) === k ? ' on' : ''}" style="font-size:10px;padding:4px 9px">${lbl}</button>`).join('')}</div>
       <div class="uwres" id="ff-um-out"></div>
+      <button onclick="ffDeckGenerate()" class="pullbtn" style="margin-top:10px;font-size:11px;padding:7px 12px">📽 Generar deck para inversionista (.pptx)</button>
       <div class="meta" style="margin-top:8px">Supuestos (de <b>ff_uw_config</b>, no hardcodeados): ${cfgChips}</div></div>
     <div class="card"><div class="chart-h"><div class="t">📐 Calibración $/sqft por zona</div><div class="k">histórico de casas con ciclo cerrado</div></div>
       <table class="ptable"><thead><tr><th>Zona</th><th style="text-align:right">n</th><th style="text-align:right">rango</th><th style="text-align:right">prom</th></tr></thead><tbody>${zrows}</tbody></table>
@@ -910,6 +911,101 @@ function ffModelStrategy(m, modelo, cfgIn) {
 }
 function ffUmSetModelo(mo) { FF.uw = FF.uw || {}; FF.uw.modelo = mo; ffUmCalc(); const bar = document.getElementById('ff-um-modelos'); if (bar) [...bar.querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.mo === mo)); }
 window.ffUmSetModelo = ffUmSetModelo; window.ffModelStrategy = ffModelStrategy;
+
+
+// ─── M5 · Deck para inversionista (Blueprint FF §5) — números 100% del espejo, 0 hardcode ───
+async function ffDeckGenerate(mode) {
+  if (typeof PptxGenJS === 'undefined') { alert('PptxGenJS no cargado.'); return null; }
+  const comp = ffCompute();
+  const cfg = FF.cfg || {};
+  const sel = FF.uw && FF.uw.dealId ? comp.deals.find(d => d.id === FF.uw.dealId) : null;
+  const inp = sel ? { arv: +sel.arv || 0, rehab: Math.round(sel.remComplete || 0), renta: ffNum('ff-um-renta') || 0 } : { arv: ffNum('ff-um-arv'), rehab: ffNum('ff-um-rehab'), renta: ffNum('ff-um-renta') };
+  if (!(inp.arv > 0)) { alert('Elegí un deal (o cargá un ARV) en Underwriting antes de generar el deck.'); return null; }
+  const m = ffUwModel(inp, cfg);
+  const modelo = (FF.uw && FF.uw.modelo) || 'fixflip';
+  const st = ffModelStrategy(m, modelo, cfg);
+  const lblMo = (FF_UW_MODELOS.find(x => x[0] === modelo) || [])[1] || modelo;
+  const dA = (+cfg.scen_arv_delta_pct || 10) / 100, dR = (+cfg.scen_rehab_delta_pct || 15) / 100;
+  const best = ffUwModel({ arv: inp.arv * (1 + dA), rehab: inp.rehab * (1 - dR), renta: inp.renta }, cfg);
+  const worst = ffUwModel({ arv: inp.arv * (1 - dA), rehab: inp.rehab * (1 + dR), renta: inp.renta }, cfg);
+  // Track record (espejo): cerradas, utilidad entregada, capital movido, banda de zona
+  const salida = ['vendida', 'refinanciada', 'rentada_y_refinanciada'];
+  const cerradas = comp.deals.filter(d => salida.includes(d.stage));
+  const utilEntregada = comp.deals.reduce((s, d) => s + (+d.utilidad_entregada || 0), 0);
+  const capitalMovido = comp.deals.reduce((s, d) => s + (+d.capital_inversionista || 0), 0);
+  const zonas = ffCalibZona();
+  const zonaKeys = Object.keys(zonas);
+  const topEntregadas = comp.deals.filter(d => +d.utilidad_entregada > 0).sort((a, b) => +b.utilidad_entregada - +a.utilidad_entregada).slice(0, 5);
+
+  const C = { bg: '0B1220', card: '141D2E', ac: '12B5A0', ac2: '4F8DFF', tx: 'E8EEFC', mut: '9FB0C9', pos: '34D399', neg: 'F0687A' };
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'W', width: 13.33, height: 7.5 });
+  pptx.layout = 'W';
+  const S = () => { const s = pptx.addSlide(); s.background = { color: C.bg }; return s; };
+  const T = (s, t, x, y, o) => s.addText(t, Object.assign({ x, y, w: 12.3, fontFace: 'Helvetica', color: C.tx, fontSize: 14 }, o || {}));
+
+  // 1 · Portada
+  let s1 = S();
+  T(s1, 'RENTAL PROFITS · FIX & FLIP', 0.7, 0.7, { fontSize: 13, color: C.ac, bold: true, charSpacing: 3 });
+  T(s1, 'Oportunidad de inversión', 0.7, 2.3, { fontSize: 44, bold: true });
+  T(s1, sel ? ffShort(sel.address) + ' · ' + (sel.city || '') : 'Análisis de underwriting', 0.7, 3.4, { fontSize: 22, color: C.mut });
+  T(s1, 'Modelo: ' + lblMo.replace(/^[^ ]+ /, '') + '  ·  ' + new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }), 0.7, 4.1, { fontSize: 14, color: C.mut });
+  T(s1, 'Números en vivo del sistema (Airtable · espejo verificado con paridad). Documento informativo — no constituye oferta de valores.', 0.7, 6.7, { fontSize: 9, color: C.mut });
+
+  // 2 · El deal (modelo unificado)
+  let s2 = S();
+  T(s2, 'EL DEAL — MODELO UNIFICADO', 0.7, 0.5, { fontSize: 13, color: C.ac, bold: true, charSpacing: 2 });
+  const rowsDeal = [
+    ['ARV', FF_MONEY(m.arv)], ['Remodelación (calibrada)', FF_MONEY(m.rehab)],
+    ['MAO — máxima oferta', FF_MONEY(m.mao)], ['All-in objetivo (' + Math.round(m.factor * 100) + '% ARV)', FF_MONEY(m.allIn)],
+    ['Préstamo HML (' + Math.round(+cfg.hml_ltc_pct || 90) + '% LTC, solo interés)', FF_MONEY(m.loan)],
+    ['Aporte del inversionista', FF_MONEY(m.aporte)], ['Pago HML mensual', FF_MONEY(m.pagoHml)],
+    ['Margen (equity)', FF_MONEY(m.margen)],
+  ];
+  s2.addTable(rowsDeal.map(r => [{ text: r[0], options: { color: C.mut, fontSize: 13 } }, { text: r[1], options: { color: C.tx, fontSize: 14, bold: true, align: 'right' } }]),
+    { x: 0.7, y: 1.1, w: 6.2, rowH: 0.52, fill: { color: C.card }, border: { type: 'solid', color: C.bg, pt: 1 } });
+  T(s2, 'Escenarios', 7.4, 1.1, { fontSize: 13, color: C.mut, bold: true, w: 5 });
+  s2.addTable([
+    [{ text: 'WORST', options: { color: C.neg, bold: true, fontSize: 12 } }, { text: 'BASE', options: { color: C.tx, bold: true, fontSize: 12 } }, { text: 'BEST', options: { color: C.pos, bold: true, fontSize: 12 } }],
+    [{ text: FF_MONEY(worst.mao), options: { color: C.tx, fontSize: 14, bold: true } }, { text: FF_MONEY(m.mao), options: { color: C.tx, fontSize: 14, bold: true } }, { text: FF_MONEY(best.mao), options: { color: C.tx, fontSize: 14, bold: true } }],
+    [{ text: 'margen ' + FF_MONEY(worst.margen), options: { color: C.mut, fontSize: 10 } }, { text: 'margen ' + FF_MONEY(m.margen), options: { color: C.mut, fontSize: 10 } }, { text: 'margen ' + FF_MONEY(best.margen), options: { color: C.mut, fontSize: 10 } }],
+  ], { x: 7.4, y: 1.5, w: 5.2, rowH: 0.5, fill: { color: C.card }, align: 'center', border: { type: 'solid', color: C.bg, pt: 1 } });
+  T(s2, 'Estructura (' + lblMo.replace(/^[^ ]+ /, '') + ')', 7.4, 3.6, { fontSize: 13, color: C.mut, bold: true, w: 5 });
+  s2.addTable(st.rows.slice(0, 6).map(r => [{ text: String(r[0]), options: { color: C.mut, fontSize: 11 } }, { text: typeof r[1] === 'number' ? FF_MONEY(r[1]) : String(r[1] == null ? '—' : r[1]), options: { color: C.tx, fontSize: 12, bold: true, align: 'right' } }]),
+    { x: 7.4, y: 4.0, w: 5.2, rowH: 0.45, fill: { color: C.card }, border: { type: 'solid', color: C.bg, pt: 1 } });
+  T(s2, 'Supuestos de ff_uw_config (editables, nada fijo): factor ' + (+cfg.arv_factor) + ' · cierre ' + (+cfg.closing_pct) + '% · lender ' + (+cfg.lender_fee_pct) + '% · contingencia ' + (+cfg.contingency_pct) + '% · HML ' + (+cfg.hml_rate_annual) + '% · holding ' + (+cfg.holding_months) + 'm', 0.7, 6.9, { fontSize: 9, color: C.mut });
+
+  // 3 · Track record
+  let s3 = S();
+  T(s3, 'TRACK RECORD — HISTÓRICO REAL', 0.7, 0.5, { fontSize: 13, color: C.ac, bold: true, charSpacing: 2 });
+  const kpiBox = (x, lab, val, sub) => { s3.addShape('rect', { x, y: 1.2, w: 2.9, h: 1.7, fill: { color: C.card }, rectRadius: 0.08 }); T(s3, lab, x + 0.2, 1.35, { fontSize: 10, color: C.mut, w: 2.6 }); T(s3, val, x + 0.2, 1.75, { fontSize: 26, bold: true, w: 2.6, color: C.ac }); T(s3, sub, x + 0.2, 2.45, { fontSize: 9, color: C.mut, w: 2.6 }); };
+  kpiBox(0.7, 'Casas gestionadas', String(comp.deals.length), comp.kpi.flips + ' flip · ' + comp.kpi.holds + ' hold');
+  kpiBox(3.8, 'Ciclos cerrados (venta/refi)', String(cerradas.length), 'de ' + comp.deals.length + ' casas');
+  kpiBox(6.9, 'Utilidad entregada a inversionistas', FF_MONEY(utilEntregada), 'pagada, histórica');
+  kpiBox(10.0, 'Capital de inversionistas', FF_MONEY(capitalMovido), String(comp.kpi.investors) + ' inversionistas');
+  if (zonaKeys.length) {
+    T(s3, 'Costo real de remodelación — banda calibrada (' + zonaKeys.join(', ') + ')', 0.7, 3.4, { fontSize: 13, color: C.mut, bold: true });
+    const z = zonas[zonaKeys[0]];
+    T(s3, `${z.min} – ${z.max} /sqft  ·  promedio ${z.prom}  ·  ${z.n} casas cerradas`, 0.7, 3.9, { fontSize: 18, bold: true });
+  }
+  if (topEntregadas.length) {
+    T(s3, 'Casas con utilidad entregada', 0.7, 4.8, { fontSize: 13, color: C.mut, bold: true });
+    s3.addTable(topEntregadas.map(d => [{ text: ffShort(d.address), options: { color: C.tx, fontSize: 12 } }, { text: FF_MONEY(+d.utilidad_entregada), options: { color: C.pos, fontSize: 12, bold: true, align: 'right' } }]),
+      { x: 0.7, y: 5.2, w: 7, rowH: 0.42, fill: { color: C.card }, border: { type: 'solid', color: C.bg, pt: 1 } });
+  }
+
+  // 4 · Contacto
+  let s4 = S();
+  T(s4, 'SIGUIENTE PASO', 0.7, 2.6, { fontSize: 13, color: C.ac, bold: true, charSpacing: 2 });
+  T(s4, 'Hablemos de esta oportunidad', 0.7, 3.1, { fontSize: 32, bold: true });
+  T(s4, 'gerencia@rentalprofitss.com  ·  rentalprofitss.com', 0.7, 4.1, { fontSize: 16, color: C.mut });
+
+  const fname = 'Deck_' + (sel ? ffShort(sel.address).replace(/[^A-Za-z0-9]+/g, '_') : 'Underwriting') + '.pptx';
+  if (mode === 'b64') return pptx.write('base64');
+  await pptx.writeFile({ fileName: fname });
+  return fname;
+}
+window.ffDeckGenerate = ffDeckGenerate;
 
 // ════════════════════════════════════════════════════════════════
 // CHARTS
