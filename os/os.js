@@ -245,7 +245,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw, ckT, ckS, agP] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units,property_id,address_normalized,mortgage_monthly').eq('active', true),
@@ -264,11 +264,19 @@ async function osLoad() {
       sb.from('qb_account_map').select('*').then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_loans').select('monto_hml').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_uw_config').select('value').eq('key', 'concil_warn_pct').maybeSingle().then(r => r.data).catch(() => null),
+      (async () => { // paginado: PostgREST capa a 1000 filas por request
+        const all = []; for (let pg = 0; pg < 8; pg++) {
+          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
+          all.push(...(data || [])); if (!data || data.length < 1000) break;
+        } return all; })().catch(() => []),
+      sb.from('clickup_snapshots').select('snapshot_date,total_open,total_overdue,total_closed_last_7d,company_id').order('snapshot_date').then(r => r.data || []).catch(() => []),
+      sb.from('agent_proposals').select('*').eq('active', true).order('created_at', { ascending: false }).limit(50).then(r => r.data || []).catch(() => []),
     ]);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
     OS.concilWarn = cw ? +cw.value : 10;
+    OS.ckTasks = ckT || []; OS.ckSnaps = ckS || []; OS.agProps = agP || [];
     OS.ffOverhead = (ffOh || []).reduce((t, x) => t + (+x.monto || 0), 0);
     OS.ffIntereses = (ffHml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
@@ -476,28 +484,7 @@ function osEmpresa(comp) {
 }
 
 // ─── ÁREA · OPERACIÓN ───
-function osOperacion(comp) {
-  const today = new Date().toISOString().slice(0, 10);
-  const open = OS.tasks.filter(t => t.status !== 'completado' && t.status !== 'cancelado');
-  const hoy = open.filter(t => t.scheduled_date === today).sort((a, b) => (a.start_at || '9').localeCompare(b.start_at || '9'));
-  const atras = open.filter(t => t.scheduled_date && t.scheduled_date < today);
-  const zlbl = z => ({ norte: 'Norte', sur: 'Sur', round_rock: 'Round Rock', marlin: 'Marlin' }[z] || z || '—');
-  return `<h1>⚙️ Operación <span>· Cronograma + Cobranza</span></h1><div class="sub">Cruza todas las empresas — el equipo (Juan + Limpieza) y la cobranza por inquilino. Deuda = contrato − plata real.</div>
-    <div class="grid k4">
-      <div class="card"><div class="lab">Tareas hoy</div><div class="big">${hoy.length}</div><div class="meta">${atras.length} atrasadas</div></div>
-      <div class="card"><div class="lab">Turnover (limpieza)</div><div class="big">${open.filter(t => t.task_type === 'cleaning').length}</div><div class="meta">desde check-outs</div></div>
-      <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(comp.cobranza.total)}</div><div class="meta">${comp.cobranza.rows.length} casas con saldo</div></div>
-      <div class="card"><div class="lab">Recepciones</div><div class="big">${open.filter(t => t.task_type === 'recepcion').length}</div><div class="meta">check-ins próximos</div></div>
-    </div>
-    <div class="grid k2" style="margin-top:16px">
-      <div class="card"><div class="chart-h"><div class="t">Cronograma de hoy</div><div class="k">Juan + Limpieza · por zona</div></div>
-        ${hoy.length ? hoy.slice(0, 12).map(t => `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${OS_E((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 34)}${t.assignee ? ` · <span style="color:var(--a2)">${OS_E(t.assignee)}</span>` : ''}</span><span class="zpill">${zlbl(t.zone)}</span></div>`).join('') : '<div class="meta" style="padding:14px 0">Sin tareas hoy.</div>'}</div>
-      <div class="card"><div class="chart-h"><div class="t">Cobranza · deuda por casa</div><div class="k">contrato − plata real</div></div>
-        <table class="ptable"><thead><tr><th>Casa</th><th>Esperado</th><th>Cobrado</th><th>Deuda</th><th></th></tr></thead><tbody>
-        ${comp.cobranza.rows.slice(0, 12).map(r => `<tr><td>${OS_E(r.casa)}</td><td>${OS_M(r.esperado)}</td><td>${OS_M(r.cobrado)}</td><td class="down">${OS_M(r.deuda)}</td><td><button class="cbtn" onclick="osDraftCobro('${OS_E(r.casa)}',${r.deuda})">✎ Cobro</button></td></tr>`).join('') || '<tr><td colspan="5" class="up">Sin deuda pendiente ✓</td></tr>'}</tbody></table>
-        <div class="meta" style="margin-top:10px">El Cerebro redacta el mensaje de cobro; un humano lo aprueba y envía. <b>Se registra la plata real, no el contrato.</b></div></div>
-    </div>`;
-}
+function osOperacion(comp) { return opsPanel(comp); }
 function osDraftCobro(casa, deuda) { osAsk(`Redactá un mensaje de cobro cordial pero firme para el inquilino de ${casa}, que debe ${OS_M(deuda)} este mes. Recordale el saldo, ofrecé un plan si hace falta, y pedí confirmación de pago. Español neutro.`); }
 window.osDraftCobro = osDraftCobro;
 
@@ -845,4 +832,139 @@ function osConcilBlock(comp) {
       </tbody></table>
       <div class="meta" style="margin-top:8px">Rentas (EverHome, ⚠ configurada en COP) y Educación: libros sin movimientos — todo lo operativo está "fuera de libros" hasta que se carguen. Fuente: qb_report_cache (sync on-demand /qb-oauth/sync).</div></div>
   </div>`;
+}
+
+// ═══ PANEL DE CONTROL DE OPERACIONES (espejo ClickUp, 3 empresas) ═══
+// UNA definición por métrica (= SQL de referencia): activa = status_type≠closed y sin date_closed/date_done.
+const OPS_EMP = { '90113866319': 'Fix & Flip', '90113866434': 'Remodelación', '90113866436': 'Rentas' };
+const OPS_URG = ['urgent', 'high', 'urgente', 'alta'];
+function opsHoy() { return new Date().toISOString().slice(0, 10); }
+function opsActiva(t) { return (t.status_type || '') !== 'closed' && !t.date_closed && !t.date_done; }
+function opsVencida(t) { return opsActiva(t) && t.due_date && String(t.due_date).slice(0, 10) < opsHoy(); }
+function opsCompute() {
+  const T = (OS.ckTasks || []);
+  const act = T.filter(opsActiva);
+  const venc = act.filter(opsVencida);
+  const sinD = act.filter(t => !(t.primary_assignee || '').trim());
+  const urg = act.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()));
+  const sinF = act.filter(t => !t.due_date);
+  const hoy = act.filter(t => t.due_date && String(t.due_date).slice(0, 10) === opsHoy());
+  const conDone = T.filter(t => t.date_done && t.due_date);
+  const aTiempo = conDone.filter(t => String(t.date_done).slice(0, 10) <= String(t.due_date).slice(0, 10));
+  const pctT = conDone.length ? Math.round(100 * aTiempo.length / conDone.length) : null;
+  // carga por persona
+  const P = {};
+  act.forEach(t => { const p = (t.primary_assignee || '').trim() || '(sin dueño)'; if (!P[p]) P[p] = { p, act: 0, venc: 0, urg: 0 }; P[p].act++; if (opsVencida(t)) P[p].venc++; if (OPS_URG.includes((t.priority || '').toLowerCase())) P[p].urg++; });
+  const personas = Object.values(P).sort((a, b) => b.act - a.act);
+  const cuellos = personas.filter(x => x.p !== '(sin dueño)' && (x.venc >= 10 || x.act >= 60));
+  // por empresa
+  const emp = Object.keys(OPS_EMP).map(sid => {
+    const a = act.filter(t => t.space_id === sid), v = a.filter(opsVencida);
+    const usd = a.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()) && !(t.primary_assignee || '').trim());
+    const ratio = a.length ? v.length / a.length : 0;
+    const sem = (ratio >= 0.10 || usd.length >= 15) ? 'rojo' : (ratio >= 0.04 || usd.length >= 5) ? 'amarillo' : 'verde';
+    return { sid, nombre: OPS_EMP[sid], act: a.length, venc: v.length, urgSinDueno: usd.length, ratio: Math.round(ratio * 100), sem };
+  });
+  // casas/listas estancadas: lista con ≥5 vencidas
+  const L = {};
+  venc.forEach(t => { const k = t.list_name || t.folder_name || '—'; L[k] = (L[k] || 0) + 1; });
+  const estancadas = Object.entries(L).map(([k, n]) => ({ lista: k, n })).filter(x => x.n >= 5).sort((a, b) => b.n - a.n);
+  // tendencia (snapshots sumados por fecha)
+  const S = {};
+  (OS.ckSnaps || []).forEach(s => { const d = s.snapshot_date; if (!S[d]) S[d] = { d, overdue: 0, open: 0, closed7: 0 }; S[d].overdue += +s.total_overdue || 0; S[d].open += +s.total_open || 0; S[d].closed7 += +s.total_closed_last_7d || 0; });
+  const tend = Object.values(S).sort((a, b) => a.d.localeCompare(b.d)).slice(-14);
+  const propuestas = (OS.agProps || []).filter(x => x.active !== false && x.estado === 'propuesta');
+  return { act, venc, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, cerradas7: tend.length ? tend[tend.length - 1].closed7 : 0 };
+}
+function opsGo(view, filtro) {
+  OS.opsView = view;
+  if (filtro !== undefined) OS.opsF = Object.assign({ emp: '', persona: '', tipo: '', q: '', sort: 'due', dir: 1 }, filtro || {});
+  osRender();
+}
+function opsSetF(k, v) { OS.opsF = OS.opsF || { emp: '', persona: '', tipo: '', q: '', sort: 'due', dir: 1 }; OS.opsF[k] = v; osRender(); }
+function opsSort(col) { const f = OS.opsF || {}; if (f.sort === col) f.dir = -f.dir; else { f.sort = col; f.dir = 1; } OS.opsF = f; osRender(); }
+window.opsGo = opsGo; window.opsSetF = opsSetF; window.opsSort = opsSort;
+
+function opsSemChip(sem) { return sem === 'rojo' ? '🔴' : sem === 'amarillo' ? '🟡' : '🟢'; }
+function opsCeoView(o) {
+  const empCards = o.emp.map(e => `<div class="card" style="cursor:pointer" onclick="opsGo('pm',{emp:'${e.sid}',tipo:'vencidas'})"><div class="lab">${opsSemChip(e.sem)} ${e.nombre}</div><div class="big">${e.act}</div><div class="meta">${e.venc} vencidas (${e.ratio}%) · ${e.urgSinDueno} urgentes sin dueño</div></div>`).join('');
+  // decisiones del día
+  const dec = [];
+  const top = o.personas.filter(x => x.p !== '(sin dueño)')[0];
+  const topV = [...o.personas].filter(x => x.p !== '(sin dueño)').sort((a, b) => b.venc - a.venc)[0];
+  if (topV && topV.venc >= 10) dec.push({ tx: `<b>${OS_E(topV.p)}</b> tiene <b>${topV.venc} tareas vencidas</b> (${topV.act} activas) — redistribuir o re-fechar.`, f: { persona: topV.p, tipo: 'vencidas' } });
+  const usdN = o.urg.filter(t => !(t.primary_assignee || '').trim()).length;
+  if (usdN) dec.push({ tx: `<b>${usdN} tareas urgentes SIN DUEÑO</b> — asignar hoy.`, f: { tipo: 'urgentes_sin_dueno' } });
+  o.estancadas.slice(0, 2).forEach(x => dec.push({ tx: `<b>${OS_E(x.lista)}</b> estancada: ${x.n} vencidas en la misma lista/casa.`, f: { q: x.lista, tipo: 'vencidas' } }));
+  if (o.tend.length >= 7 && o.tend[o.tend.length - 1].overdue > o.tend[Math.max(0, o.tend.length - 8)].overdue * 1.15) dec.push({ tx: `Las vencidas <b>subieron ${o.tend[o.tend.length - 1].overdue - o.tend[Math.max(0, o.tend.length - 8)].overdue}</b> en 7 días — la operación está empeorando.`, f: { tipo: 'vencidas' } });
+  if (o.propuestas.length) dec.push({ tx: `<b>${o.propuestas.length} propuesta(s) del Ops Brain</b> esperando tu aprobación.`, f: { tipo: 'propuestas' } });
+  const decHtml = dec.slice(0, 5).map((d, i) => `<div class="krow" style="cursor:pointer;padding:10px 0" onclick='opsGo("pm",${JSON.stringify(d.f)})'><span>${i + 1}. ${d.tx}</span><b style="opacity:.5">→</b></div>`).join('') || '<div class="meta" style="padding:10px 0">Nada crítico que decidir hoy ✓</div>';
+  // tendencia sparkline
+  const maxO = Math.max(...o.tend.map(x => x.overdue), 1);
+  const spark = o.tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(56 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
+  // carga por persona (top 8)
+  const maxA = Math.max(...o.personas.slice(0, 8).map(x => x.act), 1);
+  const carga = o.personas.slice(0, 8).map(x => `<div class="krow" style="cursor:pointer" onclick="opsGo('pm',{persona:'${OS_E(x.p)}'})"><span style="min-width:150px">${OS_E(x.p)}</span><span style="flex:1;margin:0 10px"><span style="display:block;height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><i style="display:block;height:100%;width:${Math.round(100 * x.act / maxA)}%;background:linear-gradient(90deg,#12b5a0,#2f6ef0)"></i></span></span><b>${x.act}</b><span class="${x.venc ? 'down' : ''}" style="min-width:74px;text-align:right;font-size:11px">${x.venc} venc.</span></div>`).join('');
+  return `<div class="grid k4">
+      <div class="card"><div class="lab">% a tiempo (histórico)</div><div class="big ${o.pctT >= 60 ? 'up' : 'down'}">${o.pctT != null ? o.pctT + '%' : '—'}</div><div class="meta">entregas con fecha cumplida</div></div>
+      <div class="card" style="cursor:pointer" onclick="opsGo('pm',{tipo:'vencidas'})"><div class="lab">Vencidas</div><div class="big down">${o.venc.length}</div><div class="meta">de ${o.act.length} activas</div></div>
+      <div class="card"><div class="lab">Cuellos de botella</div><div class="big ${o.cuellos.length ? 'warn' : 'up'}">${o.cuellos.length}</div><div class="meta">${o.cuellos.slice(0, 2).map(x => OS_E(x.p)).join(', ') || 'ninguno'}</div></div>
+      <div class="card"><div class="lab">Cerradas últimos 7d</div><div class="big up">${o.cerradas7}</div><div class="meta">eficiencia del equipo</div></div>
+    </div>
+    <div class="grid k3" style="margin-top:14px">${empCards}</div>
+    <div class="grid k2" style="margin-top:14px">
+      <div class="card"><div class="lab">🎯 Qué decidir hoy</div>${decHtml}</div>
+      <div class="card"><div class="lab">Tendencia de vencidas · ${o.tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin:12px 0 4px">${spark}</div><div class="meta">${o.tend.length ? o.tend[0].d + ' → ' + o.tend[o.tend.length - 1].d : 'sin snapshots'} · fuente: clickup_snapshots diarios</div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><div class="lab">Carga por persona (activas / vencidas)</div>${carga}</div>
+    <div class="meta" style="margin-top:10px">Semáforo empresa: 🔴 vencidas ≥10% de activas o ≥15 urgentes sin dueño · 🟡 ≥4% o ≥5 · 🟢 resto. Click en cualquier tarjeta/alerta baja a la Vista PM filtrada.</div>`;
+}
+function opsPmView(o) {
+  const f = OS.opsF = OS.opsF || { emp: '', persona: '', tipo: '', q: '', sort: 'due', dir: 1 };
+  let rows = o.act.slice();
+  if (f.tipo === 'vencidas') rows = rows.filter(opsVencida);
+  if (f.tipo === 'sin_dueno') rows = rows.filter(t => !(t.primary_assignee || '').trim());
+  if (f.tipo === 'sin_fecha') rows = rows.filter(t => !t.due_date);
+  if (f.tipo === 'urgentes') rows = rows.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()));
+  if (f.tipo === 'urgentes_sin_dueno') rows = rows.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()) && !(t.primary_assignee || '').trim());
+  if (f.tipo === 'hoy') rows = rows.filter(t => t.due_date && String(t.due_date).slice(0, 10) === opsHoy());
+  if (f.emp) rows = rows.filter(t => t.space_id === f.emp);
+  if (f.persona) rows = rows.filter(t => (t.primary_assignee || '').trim() === f.persona || (f.persona === '(sin dueño)' && !(t.primary_assignee || '').trim()));
+  if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(t => (t.name || '').toLowerCase().includes(q) || (t.list_name || '').toLowerCase().includes(q) || (t.folder_name || '').toLowerCase().includes(q)); }
+  const dir = f.dir || 1;
+  const sorters = { due: t => t.due_date || '9999', tarea: t => (t.name || '').toLowerCase(), emp: t => OPS_EMP[t.space_id] || '', dueno: t => (t.primary_assignee || 'zzz').toLowerCase(), prio: t => ({ urgent: 0, high: 1, normal: 2, low: 3 }[(t.priority || '').toLowerCase()] ?? 4), estado: t => (t.status || '').toLowerCase(), lista: t => (t.list_name || '').toLowerCase() };
+  const key = sorters[f.sort] || sorters.due;
+  rows.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+  const th = (col, lbl, al) => `<th style="cursor:pointer;${al ? 'text-align:' + al : ''}" onclick="opsSort('${col}')">${lbl}${f.sort === col ? (dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  const chip = (tipo, lbl, n) => `<button class="repbtn ${f.tipo === tipo ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="opsSetF('tipo','${f.tipo === tipo ? '' : tipo}')">${lbl} (${n})</button>`;
+  const personasSel = ['', '(sin dueño)', ...o.personas.filter(x => x.p !== '(sin dueño)').map(x => x.p)];
+  const fila = t => { const v = opsVencida(t); const urg = OPS_URG.includes((t.priority || '').toLowerCase()); return `<tr${v ? ' style="background:rgba(248,113,113,.06)"' : ''}><td><span class="badge ${v ? 'b-warn' : 'b-ok'}" style="font-size:9px">${OS_E(OPS_EMP[t.space_id] || '?')}</span></td><td><a href="${OS_E(t.url || '#')}" target="_blank" style="color:inherit;text-decoration:none"><b>${OS_E((t.name || '').slice(0, 60))}</b> ↗</a></td><td style="font-size:11px;opacity:.75">${OS_E((t.list_name || t.folder_name || '—').slice(0, 26))}</td><td>${OS_E(t.primary_assignee || '—')}</td><td class="${v ? 'down' : ''}">${t.due_date ? String(t.due_date).slice(0, 10) : '—'}</td><td>${urg ? '<b class="warn">' + OS_E(t.priority) + '</b>' : OS_E(t.priority || '—')}</td><td style="font-size:11px">${OS_E(t.status || '—')}</td></tr>`; };
+  const propBlock = f.tipo === 'propuestas' ? `<div class="card" style="margin-bottom:14px"><div class="lab">🤖 Propuestas del Ops Brain (${o.propuestas.length})</div>${o.propuestas.map(p => `<div class="krow"><span><b>${OS_E(p.agente || '?')}</b> · ${OS_E(p.tipo || '')} — ${OS_E(p.titulo || '')}${p.task_url ? ` <a href="${OS_E(p.task_url)}" target="_blank">↗</a>` : ''}</span><span style="opacity:.6;font-size:11px">${(p.created_at || '').slice(0, 10)}</span></div>`).join('') || '<div class="meta">Sin propuestas pendientes — los 4 agentes (Auditor/Coordinador/Analista/Líder) escriben acá.</div>'}</div>` : '';
+  return `<div class="grid k4">
+      <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','')"><div class="lab">Activas</div><div class="big">${o.act.length}</div><div class="meta">FF ${o.emp[0].act} · Rem ${o.emp[1].act} · Ren ${o.emp[2].act}</div></div>
+      <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','vencidas')"><div class="lab">Vencidas</div><div class="big down">${o.venc.length}</div><div class="meta">due &lt; hoy</div></div>
+      <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','sin_dueno')"><div class="lab">Sin dueño</div><div class="big warn">${o.sinD.length}</div><div class="meta">sin responsable</div></div>
+      <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','urgentes')"><div class="lab">Urgentes</div><div class="big warn">${o.urg.length}</div><div class="meta">% a tiempo hist.: ${o.pctT != null ? o.pctT + '%' : '—'}</div></div>
+    </div>
+    ${propBlock}
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('emp',this.value)">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas las empresas'}</option>`).join('')}</select>
+        <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('persona',this.value)">${personasSel.map(p => `<option value="${OS_E(p)}" ${f.persona === p ? 'selected' : ''}>${p || 'Todas las personas'}</option>`).join('')}</select>
+        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}
+        <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
+      </div>
+      <table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
+      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#48d69c">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table>
+      <div class="meta" style="margin-top:8px">Mostrando ${Math.min(150, rows.length)} de ${rows.length} · fuente: clickup_tasks_mirror (paridad 3/3 con ClickUp, sync diario). Acciones con aprobación (reasignar/re-fechar/archivar): fase siguiente.</div>
+    </div>`;
+}
+function opsPanel(comp) {
+  const o = opsCompute();
+  const v = OS.opsView || 'ceo';
+  const tog = (id, lbl) => `<button class="repbtn ${v === id ? '' : 'ghost'}" style="padding:6px 16px;font-weight:700" onclick="opsGo('${id}')">${lbl}</button>`;
+  const fresh = (OS.ckTasks || []).length ? String((OS.ckTasks.map(t => t.last_synced_at).sort().pop() || '')).slice(0, 16).replace('T', ' ') : '—';
+  return `<h1>⚙️ Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
+    <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
+    ${v === 'ceo' ? opsCeoView(o) : opsPmView(o)}`;
 }

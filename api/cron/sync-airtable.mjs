@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       });
       rmText = await rr.text();
     } catch (e) { rmText = "error: " + e.message; }
+    try { await fetch(`${base}/sync-clickup`, { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: "{}" }); } catch (e) { /* best effort */ }
     res.status(r.status).setHeader("content-type", "application/json")
       .send(JSON.stringify({ pm: safeParse(text), ff: safeParse(ffText), remodel: safeParse(rmText) }));
   } catch (e) {

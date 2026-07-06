@@ -326,8 +326,9 @@ Deno.serve(async (req) => {
 
     // Iterar cada empresa y syncear su space
     for (const co of companies) {
+      const runStartIso = new Date().toISOString();
       const tasks = await fetchAllTasksForSpace(co.clickup_space_id, co.clickup_team_id || TEAM_ID);
-      const projected = tasks.map((t: any) => ({ ...projectTask(t), company_id: co.id }));
+      const projected = tasks.map((t: any) => ({ ...projectTask(t), company_id: co.id, active: true, archived_at: null }));
 
       // Upsert tasks
       const BATCH = 100;
@@ -336,6 +337,16 @@ Deno.serve(async (req) => {
         const { error } = await sb.from("clickup_tasks_mirror").upsert(slice, { onConflict: "id" });
         if (error) console.warn(`upsert ${co.slug} batch error:`, error.message);
       }
+
+      // Soft-delete: archivar tareas del space no vistas en este run (borradas en ClickUp)
+      await sb.from("clickup_tasks_mirror").update({ active: false, archived_at: new Date().toISOString() })
+        .eq("space_id", String(co.clickup_space_id)).lt("last_synced_at", runStartIso).neq("active", false);
+      // Assert de paridad fuente vs espejo (molde)
+      try {
+        const { count: mirrorN } = await sb.from("clickup_tasks_mirror").select("id", { count: "exact", head: true })
+          .eq("space_id", String(co.clickup_space_id)).eq("active", true);
+        await sb.from("remodel_sync_parity").insert({ source: "clickup_" + co.slug, airtable_count: projected.length, mirror_count: mirrorN ?? -1, in_sync: (mirrorN ?? -1) === projected.length });
+      } catch (_e) { /* best effort */ }
 
       // KPIs + snapshot por empresa
       const kpis = computeKPIs(projected);
