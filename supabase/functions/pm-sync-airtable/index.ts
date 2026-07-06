@@ -92,6 +92,7 @@ const F = {
   inq_fecha_in:   "fldmK1GKgpS2Pm21c",
   inq_fecha_out:  "fld4fnXiwSYRYEWHy",
   inq_metodo:     "fldVz4dXzg8Pg8nn9",
+  inq_deposito:   "fldJ4tTS1NEtWTKKw",
   inq_casa:       "fldeTQFmUfpeZNpZk",  // link → Casas
   inq_obs_ia:     "fldjpVuBes0xpGN5c",
   // Reservas
@@ -469,6 +470,11 @@ Deno.serve(async (req) => {
         full_name: name,
         phone: r.fields?.[F.inq_telefono] || null,
         client_state: getSel(r.fields?.[F.inq_estado]) || null,
+        rent_amount: typeof monto === "number" ? monto : null,
+        rent_type: getSel(r.fields?.[F.inq_tipo_renta]) || null,
+        contract_start: r.fields?.[F.inq_fecha_in] || null,
+        contract_end: r.fields?.[F.inq_fecha_out] || null,
+        deposit: typeof r.fields?.[F.inq_deposito] === "number" ? r.fields[F.inq_deposito] : null,
         ai_summary: r.fields?.[F.inq_obs_ia] || null,
         notes: null,
         ...mirrorFields()
