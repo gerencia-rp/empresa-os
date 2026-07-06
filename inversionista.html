@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal del Inversionista · Rental Profits</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--bg:#06080d;--card:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--txt:#e8eefc;--mut:#9fb0c9;--mut2:#64748b;--a1:#12b5a0;--a2:#2f6ef0;--pos:#34d399;--neg:#f87171;--amber:#e7b65e}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 20px}
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+  .logo .ic{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--a1),var(--a2));display:flex;align-items:center;justify-content:center;font-size:20px}
+  .logo b{font-size:18px}.logo span{display:block;font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:1.5px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .login{max-width:420px;margin:8vh auto}
+  .login h1{font-size:20px;margin-bottom:8px}.login p{font-size:13px;color:var(--mut);margin-bottom:18px;line-height:1.5}
+  input{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--txt);font-size:14px;margin-bottom:12px}
+  button{width:100%;background:linear-gradient(135deg,var(--a1),var(--a2));border:none;border-radius:10px;padding:12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.5}
+  .msg{font-size:12.5px;margin-top:12px;color:var(--mut);line-height:1.5}
+  .msg.err{color:var(--neg)}.msg.ok{color:var(--pos)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+  .kpi .lab{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut2);font-weight:700;margin-bottom:6px}
+  .kpi .big{font-size:24px;font-weight:800}
+  .kpi .meta{font-size:11px;color:var(--mut2);margin-top:4px}
+  .up{color:var(--pos)}.down{color:var(--neg)}.warn{color:var(--amber)}
+  .proy{margin-top:10px}
+  .prow{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;gap:10px;padding:13px 14px;border-top:1px solid var(--line);font-size:13px;align-items:center}
+  .prow.head{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut2);font-weight:700;border-top:none}
+  .badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(18,181,160,.15);color:var(--a1)}
+  .bar{height:5px;border-radius:4px;background:rgba(255,255,255,.07);margin-top:5px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
+  .foot{margin-top:26px;font-size:11px;color:var(--mut2);text-align:center;line-height:1.6}
+  .out{background:none;border:1px solid var(--line);color:var(--mut);width:auto;padding:7px 14px;font-size:11px;font-weight:600;float:right}
+  @media(max-width:700px){.prow{grid-template-columns:1fr 1fr;row-gap:6px}.prow.head{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="login card"><h1>Cargando…</h1></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/config.public.js"></script>
+<script>
+const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const $ = (h) => { document.getElementById('app').innerHTML = h; };
+const M = (n) => n == null ? '—' : '$' + Math.round(+n).toLocaleString('en-US');
+const E = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const STAGE = { lead:'Lead', bajo_contrato:'Bajo contrato', adquirida:'Comprada', en_rehab:'En remodelación', en_venta:'En venta', rentada:'Rentada', refinanciada:'Refinanciada', rentada_y_refinanciada:'Rentada y refinanciada', vendida:'Vendida' };
+const LOGO = `<div class="logo"><div class="ic">🏛</div><div><b>Portal del Inversionista</b><span>Rental Profits · Fix &amp; Flip</span></div></div>`;
+
+function loginView(msg, cls) {
+  $(`${LOGO}<div class="login card">
+    <h1>Ingresá a tu portal</h1>
+    <p>Usá el email con el que estás registrado como inversionista. Te mandamos un link de acceso — sin contraseña.</p>
+    <input id="em" type="email" placeholder="tu@email.com" autocomplete="email">
+    <button id="go" onclick="sendLink()">Enviarme el link de acceso</button>
+    ${msg ? `<div class="msg ${cls || ''}">${msg}</div>` : ''}
+  </div><div class="foot">Solo lectura · Datos en vivo de tus proyectos · Rental Profits</div>`);
+}
+async function sendLink() {
+  const em = (document.getElementById('em') || {}).value || '';
+  if (!/@/.test(em)) { loginView('Ingresá un email válido.', 'err'); return; }
+  document.getElementById('go').disabled = true;
+  const { error } = await sb.auth.signInWithOtp({ email: em.trim(), options: { emailRedirectTo: location.origin + '/inversionista' } });
+  if (error) loginView('No se pudo enviar: ' + E(error.message), 'err');
+  else loginView('✓ Listo — revisá tu correo y abrí el link de acceso.', 'ok');
+}
+window.sendLink = sendLink;
+async function logout() { await sb.auth.signOut(); loginView(); }
+window.logout = logout;
+
+function portalView(d) {
+  const r = d.resumen || {};
+  const proys = d.proyectos || [];
+  const rows = proys.map(p => {
+    const avance = p.avance_obra != null ? +p.avance_obra : (p.avance_pct != null ? +p.avance_pct : null);
+    const flujo = (p.renta_mensual != null && p.gastos_mensuales != null) ? (+p.renta_mensual - +p.gastos_mensuales) : null;
+    return `<div class="prow">
+      <div><b>${E(p.address)}</b><div style="font-size:11px;color:var(--mut2)">${E(p.city || '')}</div>${avance != null ? `<div class="bar"><i style="width:${Math.min(100, avance)}%"></i></div><div style="font-size:10px;color:var(--mut2);margin-top:3px">obra ${Math.round(avance)}%${p.proceso_obra ? ' · ' + E(p.proceso_obra) : ''}</div>` : ''}</div>
+      <div><span class="badge">${E(STAGE[p.stage] || p.stage || '—')}</span></div>
+      <div>${M(p.capital)}<div style="font-size:10px;color:var(--mut2)">capital</div></div>
+      <div>${M(p.rentabilidad_prometida)}<div style="font-size:10px;color:var(--mut2)">retorno prometido</div></div>
+      <div class="${+p.utilidad_entregada > 0 ? 'up' : ''}">${M(p.utilidad_entregada)}<div style="font-size:10px;color:var(--mut2)">entregado</div>${flujo != null ? `<div style="font-size:10px;color:${flujo >= 0 ? 'var(--pos)' : 'var(--neg)'}">${M(flujo)}/mes flujo</div>` : ''}</div>
+    </div>`;
+  }).join('');
+  $(`${LOGO}
+    <div class="card">
+      <button class="out" onclick="logout()">Salir</button>
+      <h1 style="font-size:19px">Hola, ${E(d.nombre)}</h1>
+      <div style="font-size:12px;color:var(--mut2);margin-top:2px">${E(d.label || '')}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="lab">Capital aportado</div><div class="big">${M(r.capital_aportado)}</div><div class="meta">${r.n_proyectos} proyecto(s)</div></div>
+        <div class="kpi"><div class="lab">Distribuciones recibidas</div><div class="big up">${M(r.capital_pagado)}</div><div class="meta">pagos a la fecha</div></div>
+        <div class="kpi"><div class="lab">Capital en trabajo</div><div class="big ${+r.capital_pendiente > 0 ? 'warn' : 'up'}">${M(r.capital_pendiente)}</div><div class="meta">aportado − distribuido</div></div>
+      </div>
+      <div class="proy">
+        <div class="prow head"><div>Proyecto</div><div>Estado</div><div>Capital</div><div>Retorno prometido</div><div>Entregado</div></div>
+        ${rows || '<div class="prow">Sin proyectos asignados.</div>'}
+      </div>
+    </div>
+    <div class="foot">Waterfall: capital aportado → retorno prometido → distribuciones. Datos en vivo (Airtable, solo lectura).<br>¿Dudas? Escribinos a gerencia@rentalprofitss.com</div>`);
+}
+
+async function main() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { loginView(); return; }
+  const { data, error } = await sb.rpc('investor_portal');
+  if (error) { loginView('Error cargando el portal: ' + E(error.message), 'err'); return; }
+  if (!data || data.ok === false) {
+    loginView(`Tu email (<b>${E(session.user.email)}</b>) no figura como inversionista. Si creés que es un error, escribinos.`, 'err');
+    return;
+  }
+  portalView(data);
+}
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION' || ev === 'SIGNED_OUT') main(); });
+main();
+</script>
+</body>
+</html>

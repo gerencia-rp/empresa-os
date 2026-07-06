@@ -21,9 +21,9 @@ const T = {
 };
 
 const F = {
-  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c" },
+  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M" },
   draws: { dir: "fldEU8dXcmwovZP16", total: "fld208iuposxA20W0", meses: "fldEVC4tKVI5gnvrm", intHml: "fldf3D0KEwJv8CLZA", utilHml: "fldXsh3w2phWLiAmE", intRent: "fldH5ARDkRu1QL3Ny", utilRent: "fldpmyUxjat9b1s2d", muebles: "fldXwCW30iscTn3iL", appraisal: "fldSB6YjUmMZku28J", otros: "fld7D7gN3GuhTMzaU", rent: "fldOezTNcwnaWW7bD", refi: "fldEYY25oThUoOOIb", remodelRealLk: "fldr4DfeUx99NYC5R" },
-  inv: { nombre: "fldI09roeZswP65PK", etiqueta: "fldaSlCHNfi5dqKDi", email: "fldoixuufPLltt6ZF", tel: "fldZKnOD3pu8CP3WS", ciudad: "fldSvCPZsP5J1Mhf4", estado: "fldQukBRQ8bhCrffa", rangos: "fldnguKQ6cgTiBNBR", w9: "fldyLYGF9RuHQw2si", socio: "fldB0k2KTsR4rvZHJ", socioNombre: "fld5rdexk6h7iJ1UZ" },
+  inv: { nombre: "fldI09roeZswP65PK", etiqueta: "fldaSlCHNfi5dqKDi", email: "fldoixuufPLltt6ZF", tel: "fldZKnOD3pu8CP3WS", ciudad: "fldSvCPZsP5J1Mhf4", estado: "fldQukBRQ8bhCrffa", rangos: "fldnguKQ6cgTiBNBR", w9: "fldyLYGF9RuHQw2si", socio: "fldB0k2KTsR4rvZHJ", socioNombre: "fld5rdexk6h7iJ1UZ", propLink: "fldJZcAtnPeC8EN1c", capLookup: "fldXMQGQDauo5HnnV", capPagado: "fld0oPQaFZK8Drv3h" },
   eq: { name: "fldSsNBs1zQ6YZPxm", salario: "fldRIzVjmccCPyslQ", mes: "fldwdnqHKkr4Pvl9y", nombre: "fldckFo7H81jAMaBY" },
   pl: { plataforma: "fldZUdExLDg4nsjeY", mes: "fldMblARwfiZ2NVqq", valor: "fldaV7Mc21PaMYwg4" },
   hml: { prop: "fldDyPAYGHDBmBdvk", fecha: "fld7y5uQLeJlCHgno", pago: "fldDe1BDW4fP5s3WR", fee: "fldrSE3aeiMqkfpHE", ref30: "fldWACGPEKKhLp206", fechaRef: "fldlDpPWUnYhIsETm", check: "fldOOSgpzzdfw8ABA" },
@@ -34,6 +34,16 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 const norm = (s: any) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const num = (v: any) => (typeof v === "number" ? v : null);
 const sel = (v: any) => (v == null ? null : typeof v === "string" ? v : (v.name ?? (Array.isArray(v) ? v.map((x: any) => x?.name ?? x).filter(Boolean).join(", ") : null)));
+const lookupSum = (v: any): number | null => {
+  if (v == null) return null;
+  if (Array.isArray(v)) { const nums = v.map((x: any) => (typeof x === "number" ? x : null)).filter((x: any) => x != null); return nums.length ? nums.reduce((s: number, x: number) => s + x, 0) : null; }
+  if (typeof v === "object" && v.valuesByLinkedRecordId) { let t = 0, any = false; Object.values(v.valuesByLinkedRecordId).forEach((arr: any) => (arr || []).forEach((x: any) => { if (typeof x === "number") { t += x; any = true; } })); return any ? t : null; }
+  return typeof v === "number" ? v : null;
+};
+const linkIds = (v: any): string | null => {
+  if (!Array.isArray(v) || !v.length) return null;
+  return v.map((x: any) => (typeof x === "string" ? x : x?.id)).filter(Boolean).join(",");
+};
 const lookup1 = (v: any) => { // lookup de Airtable: array de valores o {valuesByLinkedRecordId}
   if (v == null) return null;
   if (Array.isArray(v)) return num(v[0]);
@@ -98,6 +108,11 @@ Deno.serve(async (req) => {
         purchase_price: num(f[F.deals.compra]), remodel_est: num(f[F.deals.remodelEst]), arv: num(f[F.deals.arv]),
         appraisal: num(f[F.deals.appraisal]), hml_payment: num(f[F.deals.hmlPago]), ref30_payment: num(f[F.deals.ref30]),
         sqft: num(f[F.deals.sqft]), cashout: num(f[F.deals.cashout]), close_date: f[F.deals.cierre] || null,
+        investor_rec_ids: linkIds(f[F.deals.invLink]),
+        capital_inversionista: num(f[F.deals.capInv]) ?? num(f[F.deals.capAportado]),
+        rentabilidad_prometida: num(f[F.deals.rentProm]), utilidad_entregada: num(f[F.deals.utilEntregada]),
+        deficit_total: num(f[F.deals.deficitTotal]), renta_mensual: num(f[F.deals.rentaMes]),
+        gastos_mensuales: num(f[F.deals.gastosMes]), ownership_pct: num(f[F.deals.ownership]),
         acquisition: sel(f[F.deals.adq]), active: true, archived_at: null, last_synced_at: now(),
       };
     }).filter((r) => r.address);
@@ -137,6 +152,8 @@ Deno.serve(async (req) => {
         email: f[F.inv.email] || null, phone: f[F.inv.tel] || null, city: f[F.inv.ciudad] || null,
         state: f[F.inv.estado] || null, ranges: sel(f[F.inv.rangos]), stage: sel(f[F.inv.w9]),
         has_partner: sel(f[F.inv.socio]), partner_name: f[F.inv.socioNombre] || null,
+        capital_aportado: lookupSum(f[F.inv.capLookup]), capital_pagado: num(f[F.inv.capPagado]),
+        deal_rec_ids: linkIds(f[F.inv.propLink]),
         active: true, archived_at: null, last_synced_at: now(),
       };
     }).filter((r) => r.name);

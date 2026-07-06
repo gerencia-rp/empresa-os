@@ -77,6 +77,7 @@ const STATIC_COPY = [
   "viral-data/opera-imperio-data-v2.json",
   "diag.html",
   "mi-plan.html",
+  "inversionista.html",
   "favicon.ico",
   "manifest.webmanifest",
   "sw.js",
