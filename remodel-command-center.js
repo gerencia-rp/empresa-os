@@ -84,6 +84,7 @@ async function rcLoadAll() {
     RC.avanceVivo = vivo || [];
     RC.crewRates = crews || [];
     RC.receipts = receipts || [];
+    if (window.inLoad) { try { await window.inLoad(); } catch (e) {} }
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -267,6 +268,7 @@ const RC_NAV = [
   ['evr', '⇄', 'Estimado vs Real'],
   ['obras', '▤', 'Obras'],
   ['lideres', '◈', 'Líderes'],
+  ['inspeccion', '🔍', 'Inspección'],
   ['nomina', '💵', 'Nómina y Pagos'],
   ['gestion', '◎', 'Gestión (EVM)'],
   ['reportes', '📑', 'Reportes CEO'],
@@ -278,7 +280,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => (window.inRenderDB ? `${rcHeader('Inspección de vivienda', 'Diagnóstico patológico', 'primera etapa: Inspección → Estimador → Planner')}${window.inRenderDB()}` : rcSecCommand(c)), reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
