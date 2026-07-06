@@ -950,6 +950,9 @@ Deno.serve(async (req) => {
         finished_at: new Date().toISOString()
       }).eq("id", log.id);
     }
+    // Backbone: property_id self-healing (molde FF/Remodel)
+    if (!dry_run) { try { await supabase.rpc("pm_backfill_property_ids"); } catch (e) { errors.push("pid backfill: " + (e as any)?.message); } }
+
     // Assert de paridad fuente vs espejo (molde Remodelación/FF) — solo en runs reales
     const parityOut: Record<string, any> = {};
     if (!dry_run) {
