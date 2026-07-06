@@ -50,7 +50,7 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE, presup, scPct, ledger] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
@@ -63,7 +63,8 @@ async function rcLoadAll() {
       sb.from('v_remodel_calib_costos').select('*').then(r => r.data || []).catch(() => []),
       sb.from('v_remodel_calib_etapas').select('*').then(r => r.data || []).catch(() => []),
       sb.from('v_remodel_presupuesto_casa').select('*').then(r => r.data || []).catch(() => []),
-      sb.from('remodel_forecast_params').select('key, value').eq('key', 'alerta_sobrecosto_pct').maybeSingle().then(r => r.data).catch(() => null)
+      sb.from('remodel_forecast_params').select('key, value').eq('key', 'alerta_sobrecosto_pct').maybeSingle().then(r => r.data).catch(() => null),
+      sb.from('v_remodel_nomina_ledger').select('*').then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -77,6 +78,7 @@ async function rcLoadAll() {
     RC.calibCostos = calibC || []; RC.calibEtapas = calibE || [];
     RC.presupCasa = presup || [];
     RC.sobrecostoPct = scPct ? +scPct.value : 10;
+    RC.ledger = ledger || [];
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -498,6 +500,8 @@ function rcSecGestion(c) {
         <table class="ptable"><thead><tr><th>Casa</th><th class="r" style="text-align:right">Presup.</th><th style="text-align:right">Material</th><th style="text-align:right">MO (horas)</th><th style="text-align:right">Total real</th><th style="text-align:right">%</th></tr></thead><tbody>
         ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">⚠ SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
         </tbody></table>
+        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos</div>
+        ${(() => { const map = {}; (RC.ledger || []).forEach(r => { if (!map[r.worker]) map[r.worker] = { w: r.worker, horas: 0, dev: 0, pag: 0, deuda: 0, casas: [] }; const m2 = map[r.worker]; m2.horas += +r.horas || 0; m2.dev += +r.devengado || 0; m2.pag += +r.pagado || 0; m2.deuda += +r.deuda || 0; if (+r.deuda > 100) m2.casas.push(rcShort(r.casa) + ' ' + RC_M(+r.deuda)); }); const tot = Object.values(map).filter(x => Math.abs(x.deuda) > 100).sort((x, y) => y.deuda - x.deuda); const deudaTotal = tot.reduce((s2, x) => s2 + Math.max(0, x.deuda), 0); return `<div class="krow"><span><b>DEUDA TOTAL</b></span><b class="down">${RC_M(deudaTotal)}</b></div>` + tot.slice(0, 8).map(x => `<div class="krow"><span>${RC_E(x.w)} <span style="opacity:.5;font-size:10px">(${Math.round(x.horas)}h · ${x.casas.slice(0, 2).join(', ')})</span></span><b class="${x.deuda > 0 ? 'down' : 'up'}">${RC_M(x.deuda)}</b></div>`).join(''); })()}
         <div class="meta" style="margin-top:8px">Fuente: remodel_material_payments (${(RC.presupCasa || []).length ? 'espejo Pago de Materiales' : '—'}) + remodel_worker_pay_summary. Muestra en-construcción + cualquier sobrecosto.</div>
       </div>
     </div>

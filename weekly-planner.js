@@ -480,6 +480,7 @@ function wpRender() {
           <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold" title="Análisis y reportes del planner — cumplimiento, atrasos, velocidad, etapas">📊 Reporte</button>
           <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold" title="Plan inicial vs Real — desviacion por tarea/etapa/casa + Cerebro de planeacion">📉 Desviación</button>
           <button onclick="wpOpenReport('semana')" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Reporte imprimible dia/semana/mes con estado por actividad">📄 PDF</button>
+          <button onclick="wpOpenBitacora()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold" title="Bitácora de obra auto-generada por casa">📔 Bitácora</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[200px]" title="Filtrar calendario por casa">
             <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas las casas (${allHomes.length})</option>
             ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
@@ -5473,3 +5474,45 @@ function wpCheckCriticalLate() {
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-7xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-2xl'); }
 }
 window.wpCheckCriticalLate = wpCheckCriticalLate;
+
+// ─── RM-C3 · Bitácora de avance auto-generada desde el Planner (por casa) ───
+async function wpOpenBitacora(houseId) {
+  const projs = (wpState.projects || []).filter(pr => !pr.archived_at);
+  const hid = houseId || (projs[0] && projs[0].id);
+  if (!hid) { alert('No hay casas activas.'); return; }
+  const casa = projs.find(pr => pr.id === hid) || { id: hid, name: hid };
+  const acts = (wpState.activities || []).filter(a => a.project_id === hid && a.status !== 'cancelled');
+  let moves = [];
+  try { const r = await sb.from('weekly_activity_moves').select('activity_name, from_date, to_date, slip_days, reason, moved_at').eq('project_id', hid).order('moved_at', { ascending: false }).limit(50); moves = r.data || []; } catch (e) {}
+  let avance = null;
+  try { const pid = (acts.find(a => a.property_id) || {}).property_id; if (pid) { const r = await sb.from('v_remodel_progress').select('avance_real, done, total').eq('property_id', pid).maybeSingle(); avance = r.data || null; } } catch (e) {}
+  const done = acts.filter(a => a.status === 'done' && a.date).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const byDate = {};
+  done.forEach(a => { (byDate[a.date] = byDate[a.date] || []).push(a); });
+  const esc = x => String(x == null ? '' : x).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fdate = d => new Date(d + 'T00:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  const dias = Object.keys(byDate).sort().reverse().map(d => {
+    const items = byDate[d].map(a => `<tr><td class="wr-d"></td><td>✔ ${esc((a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''))}${a.stage ? ` <span class="wr-st">· ${esc(a.stage)}</span>` : ''}${a.is_critical ? ' 🎯' : ''}</td><td class="wr-bd"><span class="wr-b wr-done">HECHA</span></td></tr>`).join('');
+    return `<div class="wr-home"><div class="wr-hh">${fdate(d)} <span class="wr-hc">${byDate[d].length} actividad(es)</span></div><table class="wr-t"><tbody>${items}</tbody></table></div>`;
+  }).join('') || '<div style="padding:16px;color:#888">Sin actividades completadas registradas todavía.</div>';
+  const movesHtml = moves.length ? `<div class="wr-home"><div class="wr-hh">Reprogramaciones <span class="wr-hc">${moves.length}</span></div><table class="wr-t"><tbody>${moves.map(mv => `<tr><td class="wr-d">${esc(mv.to_date)}</td><td>↷ ${esc((mv.activity_name || '').replace(/\s*\(d[ií]a.*/, ''))} · de ${esc(mv.from_date)} a ${esc(mv.to_date)}${mv.reason ? ` · <i>${esc(mv.reason)}</i>` : ''}</td><td class="wr-bd"><span class="wr-b ${mv.slip_days > 0 ? 'wr-late' : 'wr-done'}">${mv.slip_days > 0 ? '+' : ''}${mv.slip_days}d</span></td></tr>`).join('')}</tbody></table></div>` : '';
+  const sel = projs.map(pr => `<option value="${pr.id}" ${pr.id === hid ? 'selected' : ''}>${esc(pr.name)}</option>`).join('');
+  const html = `<div id="wp-report">
+    <div class="no-print" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <select onchange="wpOpenBitacora(this.value)" class="rp-sel" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--wbord,#ccc)">${sel}</select>
+      <button onclick="window.print()" class="wr-print" style="margin-left:auto">🖨️ Imprimir / PDF</button>
+    </div>
+    <div class="wr-doc">
+      <div class="wr-head"><div><div class="wr-title">Bitácora de obra — ${esc(casa.name)}</div><div class="wr-sub">Auto-generada del Planner · ${new Date().toLocaleDateString('es')}</div></div><div class="wr-brand">Ever Home · Remodelación</div></div>
+      <div class="wr-kpis">
+        <div class="wr-k"><div class="wr-kn">${done.length}</div><div class="wr-kl">Completadas</div></div>
+        <div class="wr-k"><div class="wr-kn">${acts.length}</div><div class="wr-kl">Totales</div></div>
+        <div class="wr-k"><div class="wr-kn">${avance && avance.avance_real != null ? Math.round(avance.avance_real) + '%' : '—'}</div><div class="wr-kl">Avance real</div></div>
+        <div class="wr-k"><div class="wr-kn">${moves.length}</div><div class="wr-kl">Reprogramaciones</div></div>
+      </div>
+      ${dias}${movesHtml}
+    </div></div>`;
+  openModal('📔 Bitácora de obra', html);
+  const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-3xl', 'max-w-7xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
+}
+window.wpOpenBitacora = wpOpenBitacora;
