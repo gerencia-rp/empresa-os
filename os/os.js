@@ -248,14 +248,14 @@ async function osLoad() {
     const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
-      sb.from('pm_properties').select('id,name,zone,rental_model,total_units').eq('active', true),
+      sb.from('pm_properties').select('id,name,zone,rental_model,total_units,property_id,address_normalized,mortgage_monthly').eq('active', true),
       sb.from('pm_units').select('id,property_id,status,target_rent,unit_type,is_active').eq('is_active', true),
       sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
       sb.from('pm_bookings').select('unit_id,property_id,tenant_id,start_date,end_date,status').eq('active', true),
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
-      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label,sqft,retraso_dias,monto_por_gastar,rentabilidad,monto_real,avance_real'),
+      sb.from('remodel_at_properties').select('address,city,lider,proceso,avance_pct,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,valor_cliente,ganancia,fecha_inicio,fecha_estimada_fin,fecha_real_fin,dias_transcurridos,desviacion_label,sqft,retraso_dias,monto_por_gastar,rentabilidad,monto_real,avance_real,property_id'),
       sb.from('edu_ceo_snapshot').select('activos,con_plan_activo,nuevos_30d,antiguedad_promedio_dias').eq('mentorship_id', 'flipping-rentals'),
       sb.from('ff_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_payments').select('pago_hml').eq('active', true).then(r => r.data || []).catch(() => []),
@@ -553,9 +553,13 @@ function osOpenFicha(slug) {
 window.osOpenFicha = osOpenFicha;
 function osCasaMatch(slug, comp) {
   const key = osHouseKey(slug);
-  const ff = (comp.ff.list || []).find(d => osHouseKey(d.address_norm || d.address) === key) || null;
-  const remodel = (OS.remodel || []).find(r => osHouseKey(r.address) === key) || null;
+  // Ancla: la casa de Rentas por slug; luego FF/Remodel por property_id (llave canónica), fallback dirección.
   const prop = (OS.props || []).find(p => osHouseKey(p.address_normalized || p.name) === key) || null;
+  const pid = prop && prop.property_id;
+  const ff = (pid && (comp.ff.list || []).find(d => d.property_id === pid))
+    || (comp.ff.list || []).find(d => osHouseKey(d.address_norm || d.address) === key) || null;
+  const remodel = (pid && (OS.remodel || []).find(r => r.property_id === pid))
+    || (OS.remodel || []).find(r => osHouseKey(r.address) === key) || null;
   const addr = (ff && ff.address) || (remodel && remodel.address) || (prop && prop.name) || slug;
   let rentas = null;
   if (prop) {
