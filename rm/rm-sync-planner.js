@@ -30,7 +30,9 @@ async function rmSyncToPlanner() {
     const phaseSch = e.phaseSchedule[cat.phase];
     let activityStart = phaseSch ? new Date(phaseSch.start) : startDate;
     if (cfg.start_offset) activityStart = rmAddDays(activityStart, cfg.start_offset);
-    const days = cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)));
+    const _sf = (typeof rmState !== 'undefined' && rmState._stageFactors) || {};
+    const _f = (typeof rmCalibFactor === 'function') ? rmCalibFactor(_sf, (RM_PHASES[cat.phase] || { name: cat.cat }).name) : 1;
+    const days = Math.max(1, Math.round((cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)))) * _f));
 
     // Crear 1 entry por día de duración (para verlo en cada día del Planner)
     for (let i = 0; i < Math.min(days, 30); i++) {

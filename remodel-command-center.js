@@ -50,7 +50,7 @@ window.rcToggleTheme = rcToggleTheme;
 
 async function rcLoadAll() {
   try {
-    const [p, a, l, names, crews, hrs, parity, overhead, okrs] = await Promise.all([
+    const [p, a, l, names, crews, hrs, parity, overhead, okrs, calibC, calibE] = await Promise.all([
       sb.from('remodel_at_properties').select('*').eq('active', true).order('proceso').order('avance_pct', { ascending: true }),
       sb.from('remodel_alerts').select('*').is('resolved_at', null).order('severity').then(r => r).catch(() => ({ data: [] })),
       sb.from('remodel_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).then(r => r).catch(() => ({ data: [] })),
@@ -59,7 +59,9 @@ async function rcLoadAll() {
       sb.from('remodel_worker_pay_summary').select('casa_norm, horas').then(r => r.data || []).catch(() => []),
       sb.from('remodel_sync_parity').select('*').eq('source', 'remodel_at_properties').maybeSingle().then(r => r.data).catch(() => null),
       sb.from('remodel_overhead').select('source, monto, categoria').eq('active', true).then(r => r.data || []).catch(() => []),
-      sb.from('remodel_okrs').select('*').eq('active', true).then(r => r.data || []).catch(() => [])
+      sb.from('remodel_okrs').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('v_remodel_calib_costos').select('*').then(r => r.data || []).catch(() => []),
+      sb.from('v_remodel_calib_etapas').select('*').then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -70,6 +72,7 @@ async function rcLoadAll() {
     RC.parity = parity || null;
     RC.overhead = overhead || [];
     RC.okrs = okrs || [];
+    RC.calibCostos = calibC || []; RC.calibEtapas = calibE || [];
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -493,7 +496,8 @@ function rcSecGestion(c) {
         <div class="krow"><span>Desviación de costo prom</span><b class="${c.desvCostoProm > 0 ? 'down' : 'up'}">${c.desvCostoProm > 0 ? '+' : ''}${c.desvCostoProm}%</b></div>
         <div class="krow"><span>Desviación de días prom</span><b>${c.desvDiasProm > 0 ? '+' : ''}${c.desvDiasProm}d</b></div>
         <div class="krow"><span>Ratio material histórico</span><b>${c.matPctHist}%</b></div>
-        <div class="meta" style="margin-top:12px">Agregados disponibles (vistas <b>remodel_obra_calibration</b> + <b>remodel_stage_deviation</b>) para calibrar el Estimador Pro (días/etapa, $/sqft). No se aplican automáticamente todavía.</div>
+        ${(() => { const h = (RC.calibCostos || []).find(x => x.ventana === 'historico') || {}; const u = (RC.calibCostos || []).find(x => x.ventana === 'ultimas_5') || {}; const et = (RC.calibEtapas || []).filter(x => x.aplicable); const converge = (u.desv_costo_pct != null && h.desv_costo_pct != null) ? (Math.abs(+u.desv_costo_pct) <= Math.abs(+h.desv_costo_pct)) : null; const etRows = et.map(x => `<div class="krow"><span>factor días · ${RC_E(x.etapa)} (n=${x.n_tareas})</span><b class="${+x.factor_dias > 1.05 ? 'down' : 'up'}">×${(+x.factor_dias).toFixed(3)}</b></div>`).join(''); return `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:10px 0 6px;padding-top:8px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Tendencia (se afina con cada obra cerrada)</div><div class="krow"><span>Desv. costo — histórico (${h.n || 0})</span><b>${h.desv_costo_pct > 0 ? '+' : ''}${h.desv_costo_pct}%</b></div><div class="krow"><span>Desv. costo — últimas 5</span><b class="${converge === false ? 'down' : 'up'}">${u.desv_costo_pct > 0 ? '+' : ''}${u.desv_costo_pct}%${converge === false ? ' ⚠ empeorando' : converge === true ? ' ✓ converge' : ''}</b></div><div class="krow"><span>$/sqft real — hist → últimas 5</span><b>${h.psf_real} → ${u.psf_real}</b></div>${etRows}`; })()}
+        <div class="meta" style="margin-top:12px"><b>LOOP ACTIVO</b>: los factores de días por etapa (real del Planner) y el $/sqft real YA se aplican a la generación del cronograma y al pronosticador (rmAutoGenPlanner · remodel_forecast_params). Se recalibra solo con cada obra cerrada.</div>
       </div>
     </div>`;
 }
