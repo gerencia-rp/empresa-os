@@ -255,7 +255,7 @@ async function ccLoadAll() {
     const [props, units, pay, exp, book, tenants, tasks, alerts] = await Promise.all([
       sb.from('pm_properties').select('id,name,address,zone,rental_model,total_units').eq('active', true).order('name'),
       sb.from('pm_units').select('id,name,property_id,status,target_rent,unit_type,is_active').eq('is_active', true),
-      sb.from('pm_payments').select('amount,type,status,property_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
+      sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,unit_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
       sb.from('pm_expenses').select('amount,category,subcategory,property_id,expense_date').eq('active', true),
       sb.from('pm_bookings').select('unit_id,property_id,tenant_id,start_date,end_date,status').eq('active', true),
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
@@ -787,6 +787,7 @@ function ccSecFinanzas(comp) {
       <div class="card kpi"><div class="lab">Gastos del mes</div><div class="big down">${CC_MONEY(kpi.expT)}</div></div>
       <div class="card kpi"><div class="lab">Cashflow neto</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div></div>
     </div>
+    ${ccCobranzaPanel()}
     <div class="grid row2"><div class="card"><div class="chart-h"><div class="t">Casas en pérdida (${rojo.length})</div><div class="k">peor primero</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Ingreso</th><th>Hipoteca</th><th>Gasto</th><th>Neto</th></tr></thead><tbody>
       ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#48d69c">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
@@ -963,4 +964,73 @@ function ccMountCharts(comp) {
     const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#f0687a', 'Servicios': '#4f8dff', 'Mantenim.': '#45e3c6', 'Nómina': '#8a7bff', 'Plataforma': '#e7b65e', 'Otros': '#4a5568' };
     mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#5b6780', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
   }
+}
+
+// ─── RN-M1 · Cobranza sistemática: aging por inquilino + renta perdida + draft de cobro ───
+// MISMA definición que el OS (deuda = renta objetivo ocupada − pagado del período, umbral $200).
+function ccCobranzaAging() {
+  const hoy = new Date();
+  const mes0 = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const meses = [0, 1, 2].map(k => {
+    const d = new Date(mes0.getFullYear(), mes0.getMonth() - k, 1);
+    const fin = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const iso = x => x.toISOString().slice(0, 10);
+    return { k, from: iso(d), to: iso(fin), label: d.toLocaleDateString('es', { month: 'short' }) };
+  });
+  const unitById = {}; (CC.units || []).forEach(u => unitById[u.id] = u);
+  const tenById = {}; (CC.tenants || []).forEach(t => tenById[t.id] = t);
+  const propById = {}; (CC.props || []).forEach(p => propById[p.id] = p);
+  const rows = [];
+  const activos = (CC.book || []).filter(b => b.tenant_id && b.unit_id && (!b.end_date || b.end_date >= meses[2].from) && (b.start_date || '') <= meses[0].to);
+  const porTenant = {};
+  activos.forEach(b => {
+    const u = unitById[b.unit_id]; if (!u || !(+u.target_rent > 0) || ccUnitState(u) !== 'ocupada') return;
+    if (!porTenant[b.tenant_id]) porTenant[b.tenant_id] = { tenant_id: b.tenant_id, rent: 0, casa: (propById[b.property_id] || {}).name || '', unidad: u.name || '', start: b.start_date };
+    porTenant[b.tenant_id].rent += +u.target_rent;
+    if (b.start_date && (!porTenant[b.tenant_id].start || b.start_date < porTenant[b.tenant_id].start)) porTenant[b.tenant_id].start = b.start_date;
+  });
+  Object.values(porTenant).forEach(pt => {
+    const t = tenById[pt.tenant_id] || {};
+    const buckets = meses.map(mm => {
+      if (pt.start && pt.start > mm.to) return null; // aún no vivía ese mes
+      const pagado = (CC.pay || []).filter(x => x.tenant_id === pt.tenant_id && x.paid_at >= mm.from && x.paid_at <= mm.to).reduce((s, x) => s + (+x.amount || 0), 0);
+      return Math.max(0, Math.round(pt.rent - pagado));
+    });
+    const total = buckets.reduce((s, x) => s + (x || 0), 0);
+    if (total > 200) rows.push({ nombre: t.full_name || pt.tenant_id, phone: t.phone || '', casa: (pt.casa || '').split(',')[0], unidad: pt.unidad, rent: Math.round(pt.rent), b0: buckets[0], b1: buckets[1], b2: buckets[2], total, tenant_id: pt.tenant_id });
+  });
+  rows.sort((a, b) => (b.b1 || 0) + (b.b2 || 0) - ((a.b1 || 0) + (a.b2 || 0)) || b.total - a.total);
+  const vencida = rows.reduce((s, r) => s + (r.b1 || 0) + (r.b2 || 0), 0);
+  const porCobrar = rows.reduce((s, r) => s + (r.b0 || 0), 0);
+  const rentaPerdida = (CC.units || []).filter(u => ccUnitState(u) === 'libre').reduce((s, u) => s + (+u.target_rent || 0), 0);
+  const unidadesLibres = (CC.units || []).filter(u => ccUnitState(u) === 'libre').length;
+  return { rows, total: rows.reduce((s, r) => s + r.total, 0), vencida, porCobrar, meses, rentaPerdida: Math.round(rentaPerdida), unidadesLibres };
+}
+function ccDraftCobro(tenantId) {
+  const ag = ccCobranzaAging();
+  const r = ag.rows.find(x => x.tenant_id === tenantId);
+  if (!r) return;
+  const partes = [];
+  if (r.b0) partes.push('mes en curso ' + CC_MONEY(r.b0));
+  if (r.b1) partes.push('mes anterior ' + CC_MONEY(r.b1));
+  if (r.b2) partes.push('hace 2 meses ' + CC_MONEY(r.b2));
+  const msg = 'Hola ' + (r.nombre || '').split(' ')[0] + ', te escribimos de Rental Profits. Registramos un saldo pendiente de ' + CC_MONEY(r.total) + ' por tu renta en ' + r.casa + (r.unidad ? ' (' + r.unidad + ')' : '') + ' — ' + partes.join(', ') + '. ¿Podés confirmarnos la fecha de pago o mandarnos el comprobante si ya lo hiciste? ¡Gracias!';
+  const doOpen = () => { if (r.phone) { const ph = String(r.phone).replace(/[^0-9]/g, ''); if (ph.length >= 10) window.open('https://wa.me/' + (ph.length === 10 ? '1' + ph : ph) + '?text=' + encodeURIComponent(msg), '_blank'); } };
+  if (navigator.clipboard) navigator.clipboard.writeText(msg).then(() => { alert('Draft copiado' + (r.phone ? ' — abriendo WhatsApp…' : ' (sin teléfono registrado)')); doOpen(); }, () => alert(msg));
+  else { alert(msg); doOpen(); }
+}
+window.ccCobranzaAging = ccCobranzaAging; window.ccDraftCobro = ccDraftCobro;
+function ccCobranzaPanel() {
+  const ag = ccCobranzaAging();
+  const fila = r => `<tr><td><b>${CC_ESC(r.nombre)}</b><div style="font-size:10px;opacity:.6">${CC_ESC(r.casa)}${r.unidad ? ' · ' + CC_ESC(r.unidad) : ''}</div></td><td style="text-align:right">${CC_MONEY(r.rent)}</td><td style="text-align:right">${r.b0 ? CC_MONEY(r.b0) : '—'}</td><td style="text-align:right" class="${r.b1 ? 'down' : ''}">${r.b1 == null ? 'n/a' : r.b1 ? CC_MONEY(r.b1) : '—'}</td><td style="text-align:right" class="${r.b2 ? 'down' : ''}">${r.b2 == null ? 'n/a' : r.b2 ? CC_MONEY(r.b2) : '—'}</td><td style="text-align:right"><b class="down">${CC_MONEY(r.total)}</b></td><td style="text-align:right"><button class="repbtn" style="padding:3px 8px;font-size:10px" onclick="ccDraftCobro('${r.tenant_id}')">📱 cobrar</button></td></tr>`;
+  return `<div class="grid kpis" style="grid-template-columns:repeat(4,1fr);margin-top:14px">
+      <div class="card kpi"><div class="lab">Deuda VENCIDA (meses previos)</div><div class="big down">${CC_MONEY(ag.vencida)}</div><div class="meta">${ag.rows.filter(r => (r.b1 || 0) + (r.b2 || 0) > 0).length} inquilino(s) en mora</div></div>
+      <div class="card kpi"><div class="lab">Por cobrar (mes en curso)</div><div class="big warn">${CC_MONEY(ag.porCobrar)}</div><div class="meta">aún no vencido — ${ag.meses[0].label}</div></div>
+      <div class="card kpi"><div class="lab">Renta potencial perdida</div><div class="big warn">${CC_MONEY(ag.rentaPerdida)}/mes</div><div class="meta">${ag.unidadesLibres} unidad(es) libres × renta objetivo</div></div>
+      <div class="card kpi"><div class="lab">Definición</div><div class="big" style="font-size:13px;line-height:1.4">renta objetivo ocupada − pagado</div><div class="meta">misma regla que el OS · umbral $200 · excluye pagos "revisar"</div></div>
+    </div>
+    <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">Cobranza · aging por inquilino</div><div class="k">últimos 3 meses · draft de cobro con un click</div></div>
+      <table class="ptable"><thead><tr><th>Inquilino</th><th style="text-align:right">Renta/mes</th><th style="text-align:right">${ag.meses[0].label}</th><th style="text-align:right">${ag.meses[1].label}</th><th style="text-align:right">${ag.meses[2].label}</th><th style="text-align:right">Deuda</th><th></th></tr></thead><tbody>
+      ${ag.rows.map(fila).join('') || '<tr><td colspan="7" style="color:#48d69c;padding:14px">Sin deuda de cobranza ✓</td></tr>'}</tbody></table>
+      <div class="meta" style="margin-top:8px">"n/a" = el inquilino aún no vivía ese mes. El draft se copia al portapapeles y abre WhatsApp si hay teléfono (no se envía solo — lo aprobás vos).</div></div></div>`;
 }
