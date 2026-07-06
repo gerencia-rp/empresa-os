@@ -253,7 +253,7 @@ async function ccLoadAll() {
   CC.loading = true; CC.loadError = null;
   try {
     const [props, units, pay, exp, book, tenants, tasks, alerts] = await Promise.all([
-      sb.from('pm_properties').select('id,name,address,zone,rental_model,total_units').eq('active', true).order('name'),
+      sb.from('pm_properties').select('id,name,address,zone,rental_model,total_units,mortgage_monthly,loan_type').eq('active', true).order('name'),
       sb.from('pm_units').select('id,name,property_id,status,target_rent,unit_type,is_active').eq('is_active', true),
       sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,unit_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
       sb.from('pm_expenses').select('amount,category,subcategory,property_id,expense_date').eq('active', true),
@@ -291,7 +291,7 @@ function ccCompute() {
   const mb = ccMonthBounds();
   const inMonth = d => d && d >= mb.from && d <= mb.to;
   const H = {};
-  CC.props.forEach(p => H[p.id] = { id: p.id, name: p.name, zone: p.zone, model: p.rental_model, inc: 0, exp: 0, hipo: 0, units: [], pot: 0 });
+  CC.props.forEach(p => H[p.id] = { id: p.id, name: p.name, zone: p.zone, model: p.rental_model, inc: 0, exp: 0, hipo: 0, hipoFija: Number(p.mortgage_monthly || 0), loanType: p.loan_type || '', units: [], pot: 0 });
   CC.units.forEach(u => { const h = H[u.property_id]; if (!h) return; h.units.push(u); h.pot += Number(u.target_rent || 0); });
   CC.pay.forEach(p => { if (inMonth(p.paid_at) && H[p.property_id]) H[p.property_id].inc += Number(p.amount || 0); });
   CC.exp.forEach(e => { if (inMonth(e.expense_date) && H[e.property_id]) { H[e.property_id].exp += Number(e.amount || 0); if (ccIsHipo(e)) H[e.property_id].hipo += Number(e.amount || 0); } });
@@ -299,7 +299,7 @@ function ccCompute() {
     const r = ccRentable(h.units);
     // Renta esperada de las unidades OCUPADAS (para detectar "ocupada sin ingresos").
     const occRent = h.units.filter(u => ccUnitState(u) === 'ocupada').reduce((s, u) => s + Number(u.target_rent || 0), 0);
-    return { ...h, net: h.inc - h.exp, total: r.total, occ: r.occ, res: r.res, free: r.free, mant: r.mant, pct: r.total ? Math.round(r.occ / r.total * 100) : 0, occRent };
+    return { ...h, net: h.inc - h.exp, flujoEstructural: occRent - h.hipoFija, total: r.total, occ: r.occ, res: r.res, free: r.free, mant: r.mant, pct: r.total ? Math.round(r.occ / r.total * 100) : 0, occRent };
   });
 
   // Global rentable (suma por casa, coherente con las fichas)
@@ -788,6 +788,7 @@ function ccSecFinanzas(comp) {
       <div class="card kpi"><div class="lab">Cashflow neto</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div></div>
     </div>
     ${ccCobranzaPanel()}
+    ${(() => { const hs = houses.filter(h => h.total > 0 || h.hipoFija > 0).sort((x, y) => x.flujoEstructural - y.flujoEstructural); const fila = h => `<tr><td>${CC_ESC((h.name || '').split(',')[0])}<div style="font-size:9px;opacity:.55">${CC_ESC(h.loanType || '')}</div></td><td style="text-align:right" class="up">${CC_MONEY(h.inc)}</td><td style="text-align:right">${CC_MONEY(h.exp)}</td><td style="text-align:right">${h.hipoFija ? CC_MONEY(h.hipoFija) : '—'}<div style="font-size:9px;opacity:.55">${h.hipo ? 'pagada ' + CC_MONEY(h.hipo) : 'sin pago reg.'}</div></td><td style="text-align:right" class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td style="text-align:right" class="${h.flujoEstructural >= 0 ? 'up' : 'down'}"><b>${CC_MONEY(h.flujoEstructural)}</b> ${h.flujoEstructural >= 0 ? '🟢' : '🔴'}</td></tr>`; const okN = hs.filter(h => h.flujoEstructural >= 0).length; return `<div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">P&L por casa — flujo estructural</div><div class="k">renta objetivo ocupada − hipoteca FIJA · regla del Cerebro: déficit OK si flujo+ · ${okN}/${hs.length} en verde</div></div><table class="ptable"><thead><tr><th>Casa</th><th style="text-align:right">Ingreso mes</th><th style="text-align:right">Gastos mes</th><th style="text-align:right">Hipoteca fija</th><th style="text-align:right">Flujo real</th><th style="text-align:right">Flujo estructural</th></tr></thead><tbody>${hs.map(fila).join('')}</tbody></table><div class="meta" style="margin-top:8px">Hipoteca FIJA = obligación mensual (espejo de Casas.Hipoteca mensual, 19 casas). "Flujo real" = ingreso − gastos del mes (depende de lo registrado); "flujo estructural" = capacidad de la casa a ocupación actual.</div></div></div>`; })()}
     <div class="grid row2"><div class="card"><div class="chart-h"><div class="t">Casas en pérdida (${rojo.length})</div><div class="k">peor primero</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Ingreso</th><th>Hipoteca</th><th>Gasto</th><th>Neto</th></tr></thead><tbody>
       ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#48d69c">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
