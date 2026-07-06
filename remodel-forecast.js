@@ -912,6 +912,14 @@ async function fcUploadTaskadeFile(file) {
 // ─── DIAGNÓSTICOS PERSISTIDOS (picker) ───
 
 // Carga un diagnóstico al form y guarda en historial
+const FC_AFECT_ALIAS = { 'Interior': 'Interno', 'Exterior': 'Externo', 'Interno': 'Interno', 'Externo': 'Externo' };
+function fcNormAfectacion(af) {
+  if (!af || typeof af !== 'object') return af;
+  const out = {};
+  Object.keys(af).forEach(k => { out[FC_AFECT_ALIAS[k] || k] = af[k]; });
+  return out;
+}
+window.fcNormAfectacion = fcNormAfectacion;
 function fcLoadDiagnosis(id) {
   if (!id) return;
   const d = fcState.diagnoses.find(x => x.id === id);
@@ -922,13 +930,15 @@ function fcLoadDiagnosis(id) {
   fcState.form.precioCompra = d.precio_compra || 0;
   fcState.form.fechaInicio = d.fecha_inicio || fcState.form.fechaInicio;
   fcState.form.duracionDias = d.duracion_dias || fcState.form.duracionDias;
+  // Normalizar llaves inglés→canónico (Interior→Interno, Exterior→Externo) — registros viejos las mezclan
+  const afNorm = fcNormAfectacion(d.afectacion);
   FC_STAGES.forEach(s => {
-    if (d.afectacion && d.afectacion[s] != null) fcState.form.afectacion[s] = +d.afectacion[s];
+    if (afNorm && afNorm[s] != null) fcState.form.afectacion[s] = +afNorm[s];
   });
   // Si el diagnóstico viene de Taskade, también restaurar el preview
   if (d.source === 'taskade' && d.detalle) {
     fcState.form._lastTaskade = {
-      propiedad: d.propiedad, direccion: d.direccion, afectacion: d.afectacion,
+      propiedad: d.propiedad, direccion: d.direccion, afectacion: fcNormAfectacion(d.afectacion),
       detalle: d.detalle, taskade_id: d.taskade_id, veredicto: d.veredicto,
       dano_global_pct: d.dano_global_pct, archivo_url: d.archivo_url, archivo_nombre: d.archivo_nombre
     };
