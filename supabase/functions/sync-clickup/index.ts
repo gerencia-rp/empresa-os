@@ -323,6 +323,7 @@ Deno.serve(async (req) => {
     let totalTasks = 0;
     let totalAlerts = 0;
     const perCompany: any[] = [];
+    const allProjected: any[] = [];
 
     // Iterar cada empresa y syncear su space
     for (const co of companies) {
@@ -338,6 +339,7 @@ Deno.serve(async (req) => {
         if (error) console.warn(`upsert ${co.slug} batch error:`, error.message);
       }
 
+      allProjected.push(...projected);
       // Soft-delete: archivar tareas del space no vistas en este run (borradas en ClickUp)
       await sb.from("clickup_tasks_mirror").update({ active: false, archived_at: new Date().toISOString() })
         .eq("space_id", String(co.clickup_space_id)).lt("last_synced_at", runStartIso).neq("active", false);
@@ -372,6 +374,10 @@ Deno.serve(async (req) => {
     // Mejor: borrar primero todas, después insertar. Lo cambiamos:
     // (ya no aplicamos delete general — las alertas se regeneran cada sync via overwrite manual)
 
+    // Ops Brain: 4 agentes generan propuestas (cola de aprobación)
+    let proposalsN = 0;
+    try { proposalsN = await generateAgentProposals(sb, allProjected, companies); } catch (e) { console.warn("agentes:", String(e).slice(0, 150)); }
+
     const duration_ms = Date.now() - startMs;
     await sb.from("clickup_sync_log").insert({
       tasks_synced: totalTasks,
@@ -383,6 +389,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       companies_synced: companies.length,
+      proposals: proposalsN,
       tasks_synced: totalTasks,
       alerts: totalAlerts,
       duration_ms,
@@ -399,3 +406,62 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// ─── OPS BRAIN · 4 agentes → agent_proposals (CONTRATO: agent_id/tipo_accion/evidencia/estado) ───
+async function generateAgentProposals(sb: any, allProjected: any[], companiesMeta: any[]) {
+  const { data: reg } = await sb.from("agent_registry").select("id, nombre").like("nombre", "Ops%").is("deleted_at", null);
+  const AG: Record<string, string> = {};
+  (reg || []).forEach((r: any) => { AG[r.nombre.replace("Ops · ", "")] = r.id; });
+  if (!AG["Auditor"]) return 0; // registry sin sembrar
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  const act = allProjected.filter((t: any) => (t.status_type || "") !== "closed" && !t.date_closed && !t.date_done);
+  const venc = act.filter((t: any) => t.due_date && String(t.due_date).slice(0, 10) < hoy);
+  const empName = (sid: string) => (companiesMeta.find((c: any) => String(c.clickup_space_id) === String(sid))?.name) || sid;
+  const P: any[] = [];
+  const push = (agente: string, tipo_accion: string, titulo: string, evidencia: string, t?: any, extra?: any) =>
+    P.push({ agent_id: AG[agente], tipo_accion, evidencia: evidencia.slice(0, 600), estado: "propuesta",
+      payload: { titulo: titulo.slice(0, 180), agente: "Ops · " + agente, empresa: t ? empName(t.space_id) : null, task_id: t?.id || null, task_url: t?.url || null, task_name: t?.name || null, ...(extra || {}) } });
+
+  // AUDITOR: duplicadas (mismo nombre normalizado + misma lista) → archivar copias
+  const seen: Record<string, any[]> = {};
+  act.forEach((t: any) => { const k = (t.list_id || "") + "|" + String(t.name || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 60); (seen[k] = seen[k] || []).push(t); });
+  Object.values(seen).filter((g) => g.length > 1).slice(0, 10).forEach((g) => {
+    g.sort((a: any, b: any) => String(b.date_created || "").localeCompare(String(a.date_created || "")));
+    g.slice(1, 3).forEach((t: any) => push("Auditor", "archivar_tarea", `Duplicada: ${t.name}`, `"${t.name}" repetida ${g.length}× en "${t.list_name}" (${empName(t.space_id)}). Cerrar esta copia; la más reciente queda viva.`, t, { status_cierre: "complete" }));
+  });
+  // AUDITOR: zombis (+60 días vencidas)
+  venc.filter((t: any) => (Date.now() - new Date(t.due_date).getTime()) / 86400000 > 60).slice(0, 10)
+    .forEach((t: any) => push("Auditor", "archivar_tarea", `Zombi +60d: ${t.name}`, `Vencía ${String(t.due_date).slice(0, 10)} en "${t.list_name}" (${empName(t.space_id)}), dueño ${t.primary_assignee || "nadie"}. Si ya no aplica, cerrarla.`, t, { status_cierre: "complete" }));
+
+  // COORDINADOR: re-fechar vencidas recientes (≤14d) con dueño
+  const prox = new Date(); prox.setDate(prox.getDate() + (prox.getDay() >= 5 ? 8 - prox.getDay() : 1));
+  const proxIso = prox.toISOString().slice(0, 10);
+  venc.filter((t: any) => (Date.now() - new Date(t.due_date).getTime()) / 86400000 <= 14 && (t.primary_assignee || "").trim()).slice(0, 10)
+    .forEach((t: any) => push("Coordinador", "refechar_tarea", `Re-fechar: ${t.name}`, `De ${t.primary_assignee}, vencía ${String(t.due_date).slice(0, 10)} (${empName(t.space_id)}). Mover a ${proxIso} para que no muera en el tablero.`, t, { fecha_nueva: proxIso }));
+
+  // ANALISTA DE CALIDAD: informe semanal de tiempos
+  const done7 = allProjected.filter((t: any) => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7);
+  const conDue = done7.filter((t: any) => t.due_date);
+  const aTiempo = conDue.filter((t: any) => String(t.date_done).slice(0, 10) <= String(t.due_date).slice(0, 10));
+  const tEnt = done7.filter((t: any) => t.date_created).map((t: any) => (new Date(t.date_done).getTime() - new Date(t.date_created).getTime()) / 86400000);
+  const tProm = tEnt.length ? Math.round(tEnt.reduce((s2: number, x: number) => s2 + x, 0) / tEnt.length) : null;
+  push("Analista de Calidad", "informe", `Calidad semanal: ${done7.length} cerradas`, `Últimos 7 días: ${done7.length} cerradas · ${conDue.length ? Math.round(100 * aTiempo.length / conDue.length) + "% a tiempo" : "sin fechas"} · entrega promedio ${tProm != null ? tProm + " días" : "—"} (creación→cierre). Vencidas hoy: ${venc.length}.`);
+
+  // LÍDER: matutino
+  const hoyT = act.filter((t: any) => t.due_date && String(t.due_date).slice(0, 10) === hoy);
+  const porP: Record<string, number> = {};
+  hoyT.forEach((t: any) => { const p = (t.primary_assignee || "(sin dueño)"); porP[p] = (porP[p] || 0) + 1; });
+  const matutino = Object.entries(porP).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([p, n]) => `${p}: ${n}`).join(" · ") || "sin tareas con fecha de hoy";
+  const usdN = act.filter((t: any) => ["urgent", "high"].includes((t.priority || "").toLowerCase()) && !(t.primary_assignee || "").trim()).length;
+  push("Líder", "informe", `Matutino ${hoy}: ${hoyT.length} para hoy`, `Plan del día — ${matutino}. Vencidas acumuladas: ${venc.length}. Urgentes sin dueño: ${usdN}.`);
+
+  // idempotencia por contrato: soft-delete pendientes previas de ESTOS agentes, sembrar frescas
+  await sb.from("agent_proposals").update({ deleted_at: new Date().toISOString() })
+    .in("agent_id", Object.values(AG)).eq("estado", "propuesta").is("deleted_at", null);
+  for (let i2 = 0; i2 < P.length; i2 += 50) {
+    const { error } = await sb.from("agent_proposals").insert(P.slice(i2, i2 + 50));
+    if (error) console.warn("proposals insert:", error.message);
+  }
+  return P.length;
+}

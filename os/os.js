@@ -266,11 +266,11 @@ async function osLoad() {
       sb.from('ff_uw_config').select('value').eq('key', 'concil_warn_pct').maybeSingle().then(r => r.data).catch(() => null),
       (async () => { // paginado: PostgREST capa a 1000 filas por request
         const all = []; for (let pg = 0; pg < 8; pg++) {
-          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
+          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at,is_recurring').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
           all.push(...(data || [])); if (!data || data.length < 1000) break;
         } return all; })().catch(() => []),
       sb.from('clickup_snapshots').select('snapshot_date,total_open,total_overdue,total_closed_last_7d,company_id').order('snapshot_date').then(r => r.data || []).catch(() => []),
-      sb.from('agent_proposals').select('*').eq('active', true).order('created_at', { ascending: false }).limit(50).then(r => r.data || []).catch(() => []),
+      sb.from('agent_proposals').select('*').is('deleted_at', null).eq('estado', 'propuesta').order('created_at', { ascending: false }).limit(60).then(r => r.data || []).catch(() => []),
     ]);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
@@ -873,8 +873,11 @@ function opsCompute() {
   const S = {};
   (OS.ckSnaps || []).forEach(s => { const d = s.snapshot_date; if (!S[d]) S[d] = { d, overdue: 0, open: 0, closed7: 0 }; S[d].overdue += +s.total_overdue || 0; S[d].open += +s.total_open || 0; S[d].closed7 += +s.total_closed_last_7d || 0; });
   const tend = Object.values(S).sort((a, b) => a.d.localeCompare(b.d)).slice(-14);
-  const propuestas = (OS.agProps || []).filter(x => x.active !== false && x.estado === 'propuesta');
-  return { act, venc, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, cerradas7: tend.length ? tend[tend.length - 1].closed7 : 0 };
+  const propuestas = (OS.agProps || []).filter(x => !x.deleted_at && x.estado === 'propuesta');
+  const dupIds = opsDuplicadas(act);
+  const ccKeys = opsCasasCerradasKeys();
+  const casaCerrada = act.filter(t => opsEnCasaCerrada(t, ccKeys));
+  return { act, venc, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, dupIds, casaCerrada, cerradas7: tend.length ? tend[tend.length - 1].closed7 : 0 };
 }
 function opsGo(view, filtro) {
   OS.opsView = view;
@@ -930,6 +933,8 @@ function opsPmView(o) {
   if (f.tipo === 'urgentes') rows = rows.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()));
   if (f.tipo === 'urgentes_sin_dueno') rows = rows.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()) && !(t.primary_assignee || '').trim());
   if (f.tipo === 'hoy') rows = rows.filter(t => t.due_date && String(t.due_date).slice(0, 10) === opsHoy());
+  if (f.tipo === 'duplicadas') rows = rows.filter(t => o.dupIds.has(t.id));
+  if (f.tipo === 'casa_cerrada') rows = rows.filter(t => o.casaCerrada.includes(t));
   if (f.emp) rows = rows.filter(t => t.space_id === f.emp);
   if (f.persona) rows = rows.filter(t => (t.primary_assignee || '').trim() === f.persona || (f.persona === '(sin dueño)' && !(t.primary_assignee || '').trim()));
   if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(t => (t.name || '').toLowerCase().includes(q) || (t.list_name || '').toLowerCase().includes(q) || (t.folder_name || '').toLowerCase().includes(q)); }
@@ -941,19 +946,20 @@ function opsPmView(o) {
   const chip = (tipo, lbl, n) => `<button class="repbtn ${f.tipo === tipo ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="opsSetF('tipo','${f.tipo === tipo ? '' : tipo}')">${lbl} (${n})</button>`;
   const personasSel = ['', '(sin dueño)', ...o.personas.filter(x => x.p !== '(sin dueño)').map(x => x.p)];
   const fila = t => { const v = opsVencida(t); const urg = OPS_URG.includes((t.priority || '').toLowerCase()); return `<tr${v ? ' style="background:rgba(248,113,113,.06)"' : ''}><td><span class="badge ${v ? 'b-warn' : 'b-ok'}" style="font-size:9px">${OS_E(OPS_EMP[t.space_id] || '?')}</span></td><td><a href="${OS_E(t.url || '#')}" target="_blank" style="color:inherit;text-decoration:none"><b>${OS_E((t.name || '').slice(0, 60))}</b> ↗</a></td><td style="font-size:11px;opacity:.75">${OS_E((t.list_name || t.folder_name || '—').slice(0, 26))}</td><td>${OS_E(t.primary_assignee || '—')}</td><td class="${v ? 'down' : ''}">${t.due_date ? String(t.due_date).slice(0, 10) : '—'}</td><td>${urg ? '<b class="warn">' + OS_E(t.priority) + '</b>' : OS_E(t.priority || '—')}</td><td style="font-size:11px">${OS_E(t.status || '—')}</td></tr>`; };
-  const propBlock = f.tipo === 'propuestas' ? `<div class="card" style="margin-bottom:14px"><div class="lab">🤖 Propuestas del Ops Brain (${o.propuestas.length})</div>${o.propuestas.map(p => `<div class="krow"><span><b>${OS_E(p.agente || '?')}</b> · ${OS_E(p.tipo || '')} — ${OS_E(p.titulo || '')}${p.task_url ? ` <a href="${OS_E(p.task_url)}" target="_blank">↗</a>` : ''}</span><span style="opacity:.6;font-size:11px">${(p.created_at || '').slice(0, 10)}</span></div>`).join('') || '<div class="meta">Sin propuestas pendientes — los 4 agentes (Auditor/Coordinador/Analista/Líder) escriben acá.</div>'}</div>` : '';
+  const propBlock = (f.tipo === 'propuestas' || o.propuestas.length) ? opsPropCard(o) : '';
+  const diarioBlock = f.tipo === 'hoy' ? opsDiarioCard(o) : '';
   return `<div class="grid k4">
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','')"><div class="lab">Activas</div><div class="big">${o.act.length}</div><div class="meta">FF ${o.emp[0].act} · Rem ${o.emp[1].act} · Ren ${o.emp[2].act}</div></div>
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','vencidas')"><div class="lab">Vencidas</div><div class="big down">${o.venc.length}</div><div class="meta">due &lt; hoy</div></div>
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','sin_dueno')"><div class="lab">Sin dueño</div><div class="big warn">${o.sinD.length}</div><div class="meta">sin responsable</div></div>
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','urgentes')"><div class="lab">Urgentes</div><div class="big warn">${o.urg.length}</div><div class="meta">% a tiempo hist.: ${o.pctT != null ? o.pctT + '%' : '—'}</div></div>
     </div>
-    ${propBlock}
+    ${propBlock}${diarioBlock}
     <div class="card" style="margin-top:14px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
         <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('emp',this.value)">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas las empresas'}</option>`).join('')}</select>
         <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('persona',this.value)">${personasSel.map(p => `<option value="${OS_E(p)}" ${f.persona === p ? 'selected' : ''}>${p || 'Todas las personas'}</option>`).join('')}</select>
-        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}
+        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}${chip('duplicadas', 'Posibles dup.', o.dupIds.size)}${chip('casa_cerrada', 'Casa cerrada', o.casaCerrada.length)}
         <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
       </div>
       <table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
@@ -969,4 +975,75 @@ function opsPanel(comp) {
   return `<h1>⚙️ Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
     <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
     ${v === 'ceo' ? opsCeoView(o) : opsPmView(o)}`;
+}
+
+// ─── Panel Ops fase 2: colas por revisar + seguimiento diario + aprobación de propuestas ───
+function opsNormName(x) { return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function opsDuplicadas(act) {
+  // posibles duplicadas: mismo nombre normalizado (≥12 chars) en la misma lista, excluyendo recurrentes
+  const g = {};
+  act.filter(t => !t.is_recurring && opsNormName(t.name).length >= 12).forEach(t => { const k = (t.list_name || '') + '|' + opsNormName(t.name).slice(0, 60); (g[k] = g[k] || []).push(t); });
+  const out = new Set();
+  Object.values(g).filter(x => x.length > 1).forEach(x => x.forEach(t => out.add(t.id)));
+  return out;
+}
+function opsCasasCerradasKeys() {
+  const keys = [];
+  (OS.remodel || []).filter(o => o.proceso === 'Finalizado').forEach(o => { const k = opsNormName(String(o.address || '').split(',')[0]); if (k.length > 5) keys.push(k); });
+  (OS.ff || []).filter(d => ['vendida', 'refinanciada'].includes(d.stage)).forEach(d => { const k = opsNormName(String(d.address || '').split(',')[0]); if (k.length > 5) keys.push(k); });
+  return [...new Set(keys)];
+}
+function opsEnCasaCerrada(t, keys) {
+  const ln = opsNormName(t.list_name), fn = opsNormName(t.folder_name);
+  return keys.some(k => (ln && ln.includes(k)) || (fn && fn.includes(k)));
+}
+async function opsDecide(id, decision) {
+  const btns = document.querySelectorAll(`[data-prop="${id}"] button`); btns.forEach(b => b.disabled = true);
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/clickup-writeback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session ? session.access_token : window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ proposal_id: id, decision, decidido_por: (session && session.user && session.user.email) || 'ceo' })
+    });
+    const j = await res.json();
+    if (!j.ok) { alert('No se pudo: ' + (j.error || res.status)); btns.forEach(b => b.disabled = false); return; }
+    OS.agProps = (OS.agProps || []).filter(p => p.id !== id);
+    osRender();
+  } catch (e) { alert('Error: ' + e.message); btns.forEach(b => b.disabled = false); }
+}
+window.opsDecide = opsDecide;
+function opsPropCard(o) {
+  const rows = o.propuestas.slice(0, 20).map(p => {
+    const pay = p.payload || {};
+    return `<div class="krow" data-prop="${p.id}" style="align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <span style="flex:1"><b>${OS_E(pay.agente || 'agente')}</b> · <span class="badge b-warn" style="font-size:9px">${OS_E(p.tipo_accion)}</span><br>
+      <b style="font-size:12.5px">${OS_E(pay.titulo || '')}</b>${pay.task_url ? ` <a href="${OS_E(pay.task_url)}" target="_blank" style="font-size:11px">↗</a>` : ''}
+      <div style="font-size:11px;opacity:.7;margin-top:3px">${OS_E(p.evidencia || '')}</div></span>
+      <span style="display:flex;gap:6px;margin-left:10px">
+        <button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="opsDecide('${p.id}','aprobar')">✓ Aprobar</button>
+        <button class="repbtn ghost" style="padding:4px 10px;font-size:11px" onclick="opsDecide('${p.id}','rechazar')">✗</button>
+      </span></div>`;
+  }).join('');
+  return `<div class="card" style="margin-top:14px"><div class="lab">🤖 Propuestas del Ops Brain — ${o.propuestas.length} esperando tu OK</div>
+    ${rows || '<div class="meta" style="padding:8px 0">Sin propuestas pendientes ✓ (los 4 agentes corren con cada sync)</div>'}
+    <div class="meta" style="margin-top:8px">Aprobar aplica la acción en ClickUp vía edge function (re-fechar/archivar=cerrar; nada se borra). Rechazar solo marca. Informes (Analista/Líder) se aprueban como leídos.</div></div>`;
+}
+function opsDiarioCard(o) {
+  const hoyIso = opsHoy();
+  const doneHoy = (OS.ckTasks || []).filter(t => t.date_done && String(t.date_done).slice(0, 10) === hoyIso);
+  const P = {};
+  o.hoy.forEach(t => { const p = (t.primary_assignee || '(sin dueño)'); (P[p] = P[p] || { p, plan: 0, hechas: 0 }).plan++; });
+  doneHoy.forEach(t => { const p = (t.primary_assignee || '(sin dueño)'); (P[p] = P[p] || { p, plan: 0, hechas: 0 }).hechas++; });
+  const done7 = (OS.ckTasks || []).filter(t => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7 && t.date_created);
+  const tProm = done7.length ? Math.round(done7.reduce((s, t) => s + (new Date(t.date_done) - new Date(t.date_created)) / 86400000, 0) / done7.length) : null;
+  const rows = Object.values(P).sort((a, b) => b.plan - a.plan).map(x => {
+    const sem = x.hechas >= x.plan && x.plan > 0 ? '🟢' : x.hechas > 0 ? '🟡' : x.plan > 0 ? '🔴' : '⚪';
+    return `<tr><td>${OS_E(x.p)}</td><td style="text-align:right">${x.plan}</td><td style="text-align:right" class="up">${x.hechas}</td><td style="text-align:right">${Math.max(0, x.plan - x.hechas)}</td><td style="text-align:right">${sem}</td></tr>`;
+  }).join('');
+  return `<div class="card" style="margin-top:14px"><div class="lab">📅 Seguimiento diario · ${hoyIso}</div>
+    <div class="grid k3" style="margin:10px 0"><div class="card kpi"><div class="lab">Plan de hoy</div><div class="big">${o.hoy.length}</div></div>
+    <div class="card kpi"><div class="lab">Cerradas hoy</div><div class="big up">${doneHoy.length}</div></div>
+    <div class="card kpi"><div class="lab">Entrega promedio (7d)</div><div class="big">${tProm != null ? tProm + 'd' : '—'}</div><div class="meta">creación→cierre · ${done7.length} cerradas</div></div></div>
+    <table class="ptable"><thead><tr><th>Persona</th><th style="text-align:right">Plan hoy</th><th style="text-align:right">Hechas</th><th style="text-align:right">Pendientes</th><th style="text-align:right">Salud</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;opacity:.6">Sin tareas con fecha de hoy — el Coordinador puede proponer el plan.</td></tr>'}</tbody></table></div>`;
 }
