@@ -247,7 +247,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw, ckT, ckS, agP] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw, ckT, ckS, agP, agReg] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units,property_id,address_normalized,mortgage_monthly').eq('active', true),
@@ -268,17 +268,19 @@ async function osLoad() {
       sb.from('ff_uw_config').select('value').eq('key', 'concil_warn_pct').maybeSingle().then(r => r.data).catch(() => null),
       (async () => { // paginado: PostgREST capa a 1000 filas por request
         const all = []; for (let pg = 0; pg < 8; pg++) {
-          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
+          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at,is_recurring,time_estimate,time_spent').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
           all.push(...(data || [])); if (!data || data.length < 1000) break;
         } return all; })().catch(() => []),
       sb.from('clickup_snapshots').select('snapshot_date,total_open,total_overdue,total_closed_last_7d,company_id').order('snapshot_date').then(r => r.data || []).catch(() => []),
-      sb.from('agent_proposals').select('*').eq('active', true).order('created_at', { ascending: false }).limit(50).then(r => r.data || []).catch(() => []),
+      sb.from('agent_proposals').select('*').is('deleted_at', null).eq('estado', 'propuesta').order('created_at', { ascending: false }).limit(60).then(r => r.data || []).catch(() => []),
+      sb.from('agent_registry').select('id, nombre').like('nombre', 'Ops%').is('deleted_at', null).then(r => r.data || []).catch(() => []),
     ]);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
     OS.concilWarn = cw ? +cw.value : 10;
     OS.ckTasks = ckT || []; OS.ckSnaps = ckS || []; OS.agProps = agP || [];
+    OS.agIds = {}; (agReg || []).forEach(r => OS.agIds[r.nombre] = r.id);
     OS.ffOverhead = (ffOh || []).reduce((t, x) => t + (+x.monto || 0), 0);
     OS.ffIntereses = (ffHml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
     OS.ff = ff.data || []; OS.draws = draws.data || []; OS.props = props.data || []; OS.units = units.data || []; OS.pay = pay.data || [];
@@ -874,13 +876,24 @@ function osConcilBlock(comp) {
 // UNA definición por métrica (= SQL de referencia): activa = status_type≠closed y sin date_closed/date_done.
 const OPS_EMP = { '90113866319': 'Fix & Flip', '90113866434': 'Remodelación', '90113866436': 'Rentas' };
 const OPS_URG = ['urgent', 'high', 'urgente', 'alta'];
+const OPS_RUIDO_RE = /plantilla|maestr|ejemplo|template/i;   // plantillas: fuera de TODO conteo
+const OPS_GESTION_RE = /cobros y pagos|check.?in|bienvenida|bitacor|gestion|gestión/i; // recurrentes por casa
+const OPS_LT_RE = /refinanc|estrategia de salida/i;          // procesos largos (meses): no son 'vencidas'
+function opsEsRuido(t) { return OPS_RUIDO_RE.test(t.name || '') || OPS_RUIDO_RE.test(t.list_name || '') || OPS_RUIDO_RE.test(t.folder_name || ''); }
+function opsEsGestion(t) { return OPS_GESTION_RE.test(t.list_name || ''); }
+function opsEsLongterm(t) { return OPS_LT_RE.test(t.list_name || ''); }
 function opsHoy() { return new Date().toISOString().slice(0, 10); }
 function opsActiva(t) { return (t.status_type || '') !== 'closed' && !t.date_closed && !t.date_done; }
 function opsVencida(t) { return opsActiva(t) && t.due_date && String(t.due_date).slice(0, 10) < opsHoy(); }
 function opsCompute() {
-  const T = (OS.ckTasks || []);
+  const T = (OS.ckTasks || []).filter(t => !opsEsRuido(t));
+  const ruidoN = (OS.ckTasks || []).length - T.length;
   const act = T.filter(opsActiva);
-  const venc = act.filter(opsVencida);
+  const gestion = act.filter(opsEsGestion);
+  const longterm = act.filter(t => opsEsLongterm(t) && !opsEsGestion(t));
+  const vencBrutas = act.filter(opsVencida);
+  const venc = vencBrutas.filter(t => !opsEsGestion(t) && !opsEsLongterm(t)); // VENCIDAS OPERATIVAS (regla reunión)
+  const porConfig = act.filter(t => !t.due_date || !(t.primary_assignee || '').trim());
   const sinD = act.filter(t => !(t.primary_assignee || '').trim());
   const urg = act.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()));
   const sinF = act.filter(t => !t.due_date);
@@ -909,8 +922,11 @@ function opsCompute() {
   const S = {};
   (OS.ckSnaps || []).forEach(s => { const d = s.snapshot_date; if (!S[d]) S[d] = { d, overdue: 0, open: 0, closed7: 0 }; S[d].overdue += +s.total_overdue || 0; S[d].open += +s.total_open || 0; S[d].closed7 += +s.total_closed_last_7d || 0; });
   const tend = Object.values(S).sort((a, b) => a.d.localeCompare(b.d)).slice(-14);
-  const propuestas = (OS.agProps || []).filter(x => x.active !== false && x.estado === 'propuesta');
-  return { act, venc, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, cerradas7: tend.length ? tend[tend.length - 1].closed7 : 0 };
+  const propuestas = (OS.agProps || []).filter(x => !x.deleted_at && x.estado === 'propuesta');
+  const dupIds = opsDuplicadas(act);
+  const ccKeys = opsCasasCerradasKeys();
+  const casaCerrada = act.filter(t => opsEnCasaCerrada(t, ccKeys));
+  return { act, venc, vencBrutas, gestion, longterm, porConfig, ruidoN, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, dupIds, casaCerrada, cerradas7: tend.length ? tend[tend.length - 1].closed7 : 0 };
 }
 function opsGo(view, filtro) {
   OS.opsView = view;
@@ -926,6 +942,7 @@ function opsCeoView(o) {
   const empCards = o.emp.map(e => `<div class="card" style="cursor:pointer" onclick="opsGo('pm',{emp:'${e.sid}',tipo:'vencidas'})"><div class="lab">${opsSemChip(e.sem)} ${e.nombre}</div><div class="big">${e.act}</div><div class="meta">${e.venc} vencidas (${e.ratio}%) · ${e.urgSinDueno} urgentes sin dueño</div></div>`).join('');
   // decisiones del día
   const dec = [];
+  if (o.porConfig.length > 50) dec.push({ tx: `<b>${o.porConfig.length} tareas POR CONFIGURAR</b> (sin fecha o dueño) — el agente diario no puede operar el tablero así. Meta: bajarlo a 0.`, f: { tipo: 'por_configurar' } });
   const top = o.personas.filter(x => x.p !== '(sin dueño)')[0];
   const topV = [...o.personas].filter(x => x.p !== '(sin dueño)').sort((a, b) => b.venc - a.venc)[0];
   if (topV && topV.venc >= 10) dec.push({ tx: `<b>${OS_E(topV.p)}</b> tiene <b>${topV.venc} tareas vencidas</b> (${topV.act} activas) — redistribuir o re-fechar.`, f: { persona: topV.p, tipo: 'vencidas' } });
@@ -945,10 +962,11 @@ function opsCeoView(o) {
   const carga = [...conDueno, ...(sinDuenoRow ? [sinDuenoRow] : [])].map(x => `<div class="krow" style="cursor:pointer" onclick="opsGo('pm',{persona:'${OS_E(x.p)}'})"><span style="min-width:150px">${OS_E(x.p)}</span><span style="flex:1;margin:0 10px"><span style="display:block;height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, Math.round(100 * x.act / maxA))}%;${x.p === '(sin dueño)' ? 'opacity:.35;' : ''}background:linear-gradient(90deg,#12b5a0,#2f6ef0)"></i></span></span><b style="min-width:44px;text-align:right">${x.act}</b><span class="${x.venc ? 'down' : ''}" style="min-width:84px;text-align:right;font-size:11px;margin-left:10px">${x.venc} venc.</span></div>`).join('');
   return `<div class="grid k4">
       <div class="card"><div class="lab">% a tiempo (histórico)</div><div class="big ${o.pctT >= 60 ? 'up' : 'down'}">${o.pctT != null ? o.pctT + '%' : '—'}</div><div class="meta">entregas con fecha cumplida</div></div>
-      <div class="card" style="cursor:pointer" onclick="opsGo('pm',{tipo:'vencidas'})"><div class="lab">Vencidas</div><div class="big down">${o.venc.length}</div><div class="meta">de ${o.act.length} activas</div></div>
+      <div class="card" style="cursor:pointer" onclick="opsGo('pm',{tipo:'vencidas'})"><div class="lab">Vencidas OPERATIVAS</div><div class="big down">${o.venc.length}</div><div class="meta">excluye ${o.vencBrutas.length - o.venc.length} de gestión/long-term</div></div>
       <div class="card"><div class="lab">Cuellos de botella</div><div class="big ${o.cuellos.length ? 'warn' : 'up'}">${o.cuellos.length}</div><div class="meta">${o.cuellos.slice(0, 2).map(x => OS_E(x.p)).join(', ') || 'ninguno'}</div></div>
       <div class="card"><div class="lab">Cerradas últimos 7d</div><div class="big up">${o.cerradas7}</div><div class="meta">eficiencia del equipo</div></div>
     </div>
+    <div class="card" style="margin-top:14px;border:1px solid rgba(231,182,94,.4);cursor:pointer" onclick="opsGo('pm',{tipo:'por_configurar'})"><div class="lab">⚡ POR CONFIGURAR — la prioridad (regla madre)</div><div style="display:flex;align-items:baseline;gap:14px;margin-top:6px"><div class="big warn">${o.porConfig.length}</div><div class="meta" style="flex:1">tareas sin fecha u dueño (${o.sinF.length} sin fecha · ${o.sinD.length} sin dueño). <b>El agente diario solo puede correr cuando toda tarea tenga fecha + dueño + dependencia.</b> Dependencias: aún no espejadas de ClickUp (P2). Click para trabajar la cola.</div></div></div>
     <div class="grid k3" style="margin-top:14px">${empCards}</div>
     <div class="grid k2" style="margin-top:14px">
       <div class="card"><div class="lab">🎯 Qué decidir hoy</div>${decHtml}</div>
@@ -966,6 +984,11 @@ function opsPmView(o) {
   if (f.tipo === 'urgentes') rows = rows.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()));
   if (f.tipo === 'urgentes_sin_dueno') rows = rows.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()) && !(t.primary_assignee || '').trim());
   if (f.tipo === 'hoy') rows = rows.filter(t => t.due_date && String(t.due_date).slice(0, 10) === opsHoy());
+  if (f.tipo === 'duplicadas') rows = rows.filter(t => o.dupIds.has(t.id));
+  if (f.tipo === 'por_configurar') rows = rows.filter(t => !t.due_date || !(t.primary_assignee || '').trim());
+  if (f.tipo === 'gestion') rows = rows.filter(opsEsGestion);
+  if (f.tipo === 'longterm') rows = rows.filter(t => opsEsLongterm(t) && !opsEsGestion(t));
+  if (f.tipo === 'casa_cerrada') rows = rows.filter(t => o.casaCerrada.includes(t));
   if (f.emp) rows = rows.filter(t => t.space_id === f.emp);
   if (f.persona) rows = rows.filter(t => (t.primary_assignee || '').trim() === f.persona || (f.persona === '(sin dueño)' && !(t.primary_assignee || '').trim()));
   if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(t => (t.name || '').toLowerCase().includes(q) || (t.list_name || '').toLowerCase().includes(q) || (t.folder_name || '').toLowerCase().includes(q)); }
@@ -976,24 +999,26 @@ function opsPmView(o) {
   const th = (col, lbl, al) => `<th style="cursor:pointer;${al ? 'text-align:' + al : ''}" onclick="opsSort('${col}')">${lbl}${f.sort === col ? (dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
   const chip = (tipo, lbl, n) => `<button class="repbtn ${f.tipo === tipo ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="opsSetF('tipo','${f.tipo === tipo ? '' : tipo}')">${lbl} (${n})</button>`;
   const personasSel = ['', '(sin dueño)', ...o.personas.filter(x => x.p !== '(sin dueño)').map(x => x.p)];
-  const fila = t => { const v = opsVencida(t); const urg = OPS_URG.includes((t.priority || '').toLowerCase()); return `<tr${v ? ' style="background:rgba(248,113,113,.06)"' : ''}><td><span class="badge ${v ? 'b-warn' : 'b-ok'}" style="font-size:9px">${OS_E(OPS_EMP[t.space_id] || '?')}</span></td><td><a href="${OS_E(t.url || '#')}" target="_blank" style="color:inherit;text-decoration:none"><b>${OS_E((t.name || '').slice(0, 60))}</b> ↗</a></td><td style="font-size:11px;opacity:.75">${OS_E((t.list_name || t.folder_name || '—').slice(0, 26))}</td><td>${OS_E(t.primary_assignee || '—')}</td><td class="${v ? 'down' : ''}">${t.due_date ? String(t.due_date).slice(0, 10) : '—'}</td><td>${urg ? '<b class="warn">' + OS_E(t.priority) + '</b>' : OS_E(t.priority || '—')}</td><td style="font-size:11px">${OS_E(t.status || '—')}</td></tr>`; };
-  const propBlock = f.tipo === 'propuestas' ? `<div class="card" style="margin-bottom:14px"><div class="lab">🤖 Propuestas del Ops Brain (${o.propuestas.length})</div>${o.propuestas.map(p => `<div class="krow"><span><b>${OS_E(p.agente || '?')}</b> · ${OS_E(p.tipo || '')} — ${OS_E(p.titulo || '')}${p.task_url ? ` <a href="${OS_E(p.task_url)}" target="_blank">↗</a>` : ''}</span><span style="opacity:.6;font-size:11px">${(p.created_at || '').slice(0, 10)}</span></div>`).join('') || '<div class="meta">Sin propuestas pendientes — los 4 agentes (Auditor/Coordinador/Analista/Líder) escriben acá.</div>'}</div>` : '';
+  const fila = t => { const v = opsVencida(t) && !opsEsGestion(t) && !opsEsLongterm(t); const urg = OPS_URG.includes((t.priority || '').toLowerCase()); const tags = (opsEsGestion(t) ? ` <span class="badge b-ok" style="font-size:8px">GESTIÓN — ${OS_E((t.folder_name || 'casa').slice(0, 18))}</span>` : '') + (opsEsLongterm(t) && !opsEsGestion(t) ? ' <span class="badge b-ok" style="font-size:8px">LONG-TERM</span>' : ''); return `<tr${v ? ' style="background:rgba(248,113,113,.06)"' : ''}><td><span class="badge ${v ? 'b-warn' : 'b-ok'}" style="font-size:9px">${OS_E(OPS_EMP[t.space_id] || '?')}</span></td><td><a href="${OS_E(t.url || '#')}" target="_blank" style="color:inherit;text-decoration:none"><b>${OS_E((t.name || '').slice(0, 60))}</b> ↗</a>${tags}</td><td style="font-size:11px;opacity:.75">${OS_E((t.list_name || t.folder_name || '—').slice(0, 26))}</td><td>${OS_E(t.primary_assignee || '—')}</td><td class="${v ? 'down' : ''}">${t.due_date ? String(t.due_date).slice(0, 10) : '—'}</td><td>${urg ? '<b class="warn">' + OS_E(t.priority) + '</b>' : OS_E(t.priority || '—')}</td><td style="font-size:11px">${OS_E(t.status || '—')}${f.tipo === 'por_configurar' ? `<div style="display:flex;gap:4px;margin-top:3px">${!t.due_date ? `<button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','fecha')">📅 fecha</button>` : ''}${!(t.primary_assignee || '').trim() ? `<button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','dueno')">👤 dueño</button>` : ''}</div>` : ''}${f.tipo === 'vencidas' ? `<div style="margin-top:3px"><button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','fecha')">📅 re-fechar</button></div>` : ''}${f.tipo === 'casa_cerrada' || f.tipo === 'duplicadas' ? `<div style="margin-top:3px"><button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','archivar')">📦 archivar</button></div>` : ''}</td></tr>`; };
+  const propBlock = (f.tipo === 'propuestas' || o.propuestas.length) ? opsPropCard(o) : '';
+  const diarioBlock = f.tipo === 'hoy' ? opsDiarioCard(o) + opsCierreCard(o) : '';
   return `<div class="grid k4">
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','')"><div class="lab">Activas</div><div class="big">${o.act.length}</div><div class="meta">FF ${o.emp[0].act} · Rem ${o.emp[1].act} · Ren ${o.emp[2].act}</div></div>
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','vencidas')"><div class="lab">Vencidas</div><div class="big down">${o.venc.length}</div><div class="meta">due &lt; hoy</div></div>
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','sin_dueno')"><div class="lab">Sin dueño</div><div class="big warn">${o.sinD.length}</div><div class="meta">sin responsable</div></div>
       <div class="card" style="cursor:pointer" onclick="opsSetF('tipo','urgentes')"><div class="lab">Urgentes</div><div class="big warn">${o.urg.length}</div><div class="meta">% a tiempo hist.: ${o.pctT != null ? o.pctT + '%' : '—'}</div></div>
     </div>
-    ${propBlock}
+    ${propBlock}${diarioBlock}
     <div class="card" style="margin-top:14px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
         <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('emp',this.value)">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas las empresas'}</option>`).join('')}</select>
         <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('persona',this.value)">${personasSel.map(p => `<option value="${OS_E(p)}" ${f.persona === p ? 'selected' : ''}>${p || 'Todas las personas'}</option>`).join('')}</select>
-        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}
+        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}${chip('por_configurar', '⚡ Por configurar', o.porConfig.length)}${chip('gestion', 'Gestión rec.', o.gestion.length)}${chip('longterm', 'Long-term', o.longterm.length)}${chip('duplicadas', 'Duplicadas', o.dupIds.size)}${chip('casa_cerrada', 'Casa cerrada', o.casaCerrada.length)}
+        <button class="repbtn ${OS.opsGroupCasa ? '' : 'ghost'}" style="padding:5px 10px;font-size:11px" onclick="OS.opsGroupCasa=!OS.opsGroupCasa;osRender()">🏠 Por casa</button>
         <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
       </div>
-      <table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
-      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#48d69c">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table>
+      ${OS.opsGroupCasa ? opsPorCasaView(o, rows, fila) : `<table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
+      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#48d69c">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table>`}
       <div class="meta" style="margin-top:8px">Mostrando ${Math.min(150, rows.length)} de ${rows.length} · fuente: clickup_tasks_mirror (paridad 3/3 con ClickUp, sync diario). Acciones con aprobación (reasignar/re-fechar/archivar): fase siguiente.</div>
     </div>`;
 }
@@ -1005,4 +1030,151 @@ function opsPanel(comp) {
   return `<h1>⚙️ Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
     <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
     ${v === 'ceo' ? opsCeoView(o) : opsPmView(o)}`;
+}
+
+// ─── Panel Ops fase 2: colas por revisar + seguimiento diario + aprobación de propuestas ───
+function opsNormName(x) { return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function opsDuplicadas(act) {
+  // posibles duplicadas: mismo nombre normalizado (≥12 chars) en la misma lista, excluyendo recurrentes
+  const g = {};
+  // duplicada REAL = mismo nombre + mismo proceso (lista) + MISMA casa (folder). Clones entre casas = proceso 1-11, NO duplicado.
+  act.filter(t => !t.is_recurring && opsNormName(t.name).length >= 12).forEach(t => { const k = (t.folder_name || '') + '|' + (t.list_name || '') + '|' + opsNormName(t.name).slice(0, 60); (g[k] = g[k] || []).push(t); });
+  const out = new Set();
+  Object.values(g).filter(x => x.length > 1).forEach(x => x.forEach(t => out.add(t.id)));
+  return out;
+}
+function opsCasasCerradasKeys() {
+  const keys = [];
+  (OS.remodel || []).filter(o => o.proceso === 'Finalizado').forEach(o => { const k = opsNormName(String(o.address || '').split(',')[0]); if (k.length > 5) keys.push(k); });
+  (OS.ff || []).filter(d => ['vendida', 'refinanciada'].includes(d.stage)).forEach(d => { const k = opsNormName(String(d.address || '').split(',')[0]); if (k.length > 5) keys.push(k); });
+  return [...new Set(keys)];
+}
+function opsEnCasaCerrada(t, keys) {
+  const ln = opsNormName(t.list_name), fn = opsNormName(t.folder_name);
+  return keys.some(k => (ln && ln.includes(k)) || (fn && fn.includes(k)));
+}
+async function opsDecide(id, decision) {
+  const btns = document.querySelectorAll(`[data-prop="${id}"] button`); btns.forEach(b => b.disabled = true);
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/clickup-writeback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session ? session.access_token : window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ proposal_id: id, decision, decidido_por: (session && session.user && session.user.email) || 'ceo' })
+    });
+    const j = await res.json();
+    if (!j.ok) { alert('No se pudo: ' + (j.error || res.status)); btns.forEach(b => b.disabled = false); return; }
+    OS.agProps = (OS.agProps || []).filter(p => p.id !== id);
+    osRender();
+  } catch (e) { alert('Error: ' + e.message); btns.forEach(b => b.disabled = false); }
+}
+window.opsDecide = opsDecide;
+function opsPropCard(o) {
+  const rows = o.propuestas.slice(0, 20).map(p => {
+    const pay = p.payload || {};
+    return `<div class="krow" data-prop="${p.id}" style="align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <span style="flex:1"><b>${OS_E(pay.agente || 'agente')}</b> · <span class="badge b-warn" style="font-size:9px">${OS_E(p.tipo_accion)}</span><br>
+      <b style="font-size:12.5px">${OS_E(pay.titulo || '')}</b>${pay.task_url ? ` <a href="${OS_E(pay.task_url)}" target="_blank" style="font-size:11px">↗</a>` : ''}
+      <div style="font-size:11px;opacity:.7;margin-top:3px">${OS_E(p.evidencia || '')}</div></span>
+      <span style="display:flex;gap:6px;margin-left:10px">
+        <button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="opsDecide('${p.id}','aprobar')">✓ Aprobar</button>
+        <button class="repbtn ghost" style="padding:4px 10px;font-size:11px" onclick="opsDecide('${p.id}','rechazar')">✗</button>
+      </span></div>`;
+  }).join('');
+  return `<div class="card" style="margin-top:14px"><div class="lab">🤖 Propuestas del Ops Brain — ${o.propuestas.length} esperando tu OK</div>
+    ${rows || '<div class="meta" style="padding:8px 0">Sin propuestas pendientes ✓ (los 4 agentes corren con cada sync)</div>'}
+    <div class="meta" style="margin-top:8px">Aprobar aplica la acción en ClickUp vía edge function (re-fechar/archivar=cerrar; nada se borra). Rechazar solo marca. Informes (Analista/Líder) se aprueban como leídos.</div></div>`;
+}
+function opsDiarioCard(o) {
+  const hoyIso = opsHoy();
+  const doneHoy = (OS.ckTasks || []).filter(t => t.date_done && String(t.date_done).slice(0, 10) === hoyIso);
+  const P = {};
+  o.hoy.forEach(t => { const p = (t.primary_assignee || '(sin dueño)'); (P[p] = P[p] || { p, plan: 0, hechas: 0 }).plan++; });
+  doneHoy.forEach(t => { const p = (t.primary_assignee || '(sin dueño)'); (P[p] = P[p] || { p, plan: 0, hechas: 0 }).hechas++; });
+  const done7 = (OS.ckTasks || []).filter(t => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7 && t.date_created);
+  const tProm = done7.length ? Math.round(done7.reduce((s, t) => s + (new Date(t.date_done) - new Date(t.date_created)) / 86400000, 0) / done7.length) : null;
+  const rows = Object.values(P).sort((a, b) => b.plan - a.plan).map(x => {
+    const sem = x.hechas >= x.plan && x.plan > 0 ? '🟢' : x.hechas > 0 ? '🟡' : x.plan > 0 ? '🔴' : '⚪';
+    return `<tr><td>${OS_E(x.p)}</td><td style="text-align:right">${x.plan}</td><td style="text-align:right" class="up">${x.hechas}</td><td style="text-align:right">${Math.max(0, x.plan - x.hechas)}</td><td style="text-align:right">${sem}</td></tr>`;
+  }).join('');
+  return `<div class="card" style="margin-top:14px"><div class="lab">📅 Seguimiento diario · ${hoyIso}</div>
+    <div class="grid k3" style="margin:10px 0"><div class="card kpi"><div class="lab">Plan de hoy</div><div class="big">${o.hoy.length}</div></div>
+    <div class="card kpi"><div class="lab">Cerradas hoy</div><div class="big up">${doneHoy.length}</div></div>
+    <div class="card kpi"><div class="lab">Entrega promedio (7d)</div><div class="big">${tProm != null ? tProm + 'd' : '—'}</div><div class="meta">creación→cierre · ${done7.length} cerradas</div></div></div>
+    <table class="ptable"><thead><tr><th>Persona</th><th style="text-align:right">Plan hoy</th><th style="text-align:right">Hechas</th><th style="text-align:right">Pendientes</th><th style="text-align:right">Salud</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;opacity:.6">Sin tareas con fecha de hoy — el Coordinador puede proponer el plan.</td></tr>'}</tbody></table></div>`;
+}
+
+// Acción rápida de la cola POR CONFIGURAR: crea una PROPUESTA (contrato) — se aplica recién con tu OK.
+async function opsProponer(taskId, que) {
+  const t = (OS.ckTasks || []).find(x => x.id === taskId); if (!t) return;
+  let tipo, payload, evidencia;
+  if (que === 'fecha') {
+    const fecha = prompt(`Fecha para "${(t.name || '').slice(0, 50)}" (YYYY-MM-DD):`, new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+    if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return;
+    tipo = 'refechar_tarea'; payload = { fecha_nueva: fecha };
+    evidencia = `Cola POR CONFIGURAR: sin fecha. Propuesta desde el panel: due ${fecha}.`;
+  } else if (que === 'archivar') {
+    if (!confirm(`¿Proponer archivar (cerrar en ClickUp) "${(t.name || '').slice(0, 50)}"? Nada se borra.`)) return;
+    tipo = 'archivar_tarea'; payload = { status_cierre: 'complete' };
+    evidencia = `Propuesta desde el panel: archivar (tarea en cola ${(OS.opsF || {}).tipo || ''}).`;
+  } else {
+    const nombres = [...new Set((OS.ckTasks || []).map(x => (x.primary_assignee || '').trim()).filter(Boolean))].sort();
+    const persona = prompt(`Dueño para "${(t.name || '').slice(0, 50)}":\n${nombres.slice(0, 12).join(' · ')}`, nombres[0] || '');
+    if (!persona) return;
+    tipo = 'reasignar_tarea'; payload = { assignee_name: persona.trim() };
+    evidencia = `Cola POR CONFIGURAR: sin dueño. Propuesta desde el panel: asignar a ${persona.trim()}.`;
+  }
+  const agId = (OS.agIds || {})['Ops · Coordinador'];
+  if (!agId) { alert('Registry de agentes no cargado.'); return; }
+  const { error } = await sb.from('agent_proposals').insert({
+    agent_id: agId, tipo_accion: tipo, estado: 'propuesta', evidencia,
+    payload: Object.assign({ titulo: `${que === 'fecha' ? 'Fechar' : 'Asignar'}: ${(t.name || '').slice(0, 80)}`, agente: 'Ops · Coordinador (vía panel)', empresa: OPS_EMP[t.space_id] || null, task_id: t.id, task_url: t.url || null, task_name: t.name || null, origen: 'panel' }, payload)
+  });
+  if (error) { alert('No se pudo proponer (¿logueado?): ' + error.message); return; }
+  const { data } = await sb.from('agent_proposals').select('*').is('deleted_at', null).eq('estado', 'propuesta').order('created_at', { ascending: false }).limit(60);
+  OS.agProps = data || OS.agProps; osRender();
+}
+window.opsProponer = opsProponer;
+
+// ─── Parte 4: tablero agrupado POR CASA (folder_name = casa, misma nomenclatura en las 3 empresas) ───
+function opsPorCasaView(o, rows, fila) {
+  const G = {};
+  rows.forEach(t => { const c = t.folder_name || '(sin casa)'; (G[c] = G[c] || []).push(t); });
+  const casas = Object.entries(G).sort((a, b) => b[1].length - a[1].length);
+  const abiertas = OS.opsCasasAbiertas = OS.opsCasasAbiertas || {};
+  return casas.slice(0, 40).map(([casa, ts]) => {
+    const venc = ts.filter(t => opsVencida(t) && !opsEsGestion(t) && !opsEsLongterm(t)).length;
+    const sinCfg = ts.filter(t => !t.due_date || !(t.primary_assignee || '').trim()).length;
+    const open = abiertas[casa];
+    const emp = OPS_EMP[ts[0].space_id] || '';
+    return `<div style="border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:8px;overflow:hidden">
+      <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer;background:rgba(255,255,255,.03)" onclick="opsToggleCasa('${OS_E(casa).replace(/'/g, '')}')">
+        <b style="flex:1">🏠 ${OS_E(casa)}</b><span class="badge b-ok" style="font-size:9px">${OS_E(emp)}</span>
+        <span style="font-size:11px;opacity:.75">${ts.length} tareas</span>
+        ${venc ? `<span class="badge b-warn" style="font-size:9px">${venc} venc.</span>` : ''}
+        ${sinCfg ? `<span style="font-size:10px;color:#e7b65e">⚡ ${sinCfg} por config.</span>` : ''}
+        <span style="opacity:.5">${open ? '▾' : '▸'}</span></div>
+      ${open ? `<table class="ptable" style="margin:0"><tbody>${ts.slice(0, 40).map(fila).join('')}</tbody></table>` : ''}</div>`;
+  }).join('') || '<div class="meta" style="padding:14px">Sin tareas con estos filtros.</div>';
+}
+function opsToggleCasa(c) { OS.opsCasasAbiertas = OS.opsCasasAbiertas || {}; OS.opsCasasAbiertas[c] = !OS.opsCasasAbiertas[c]; osRender(); }
+window.opsToggleCasa = opsToggleCasa;
+
+// ─── Parte 5+: cierre del día — planeado vs real por tarea cerrada hoy ───
+function opsCierreCard(o) {
+  const hoyIso = opsHoy();
+  const doneHoy = (OS.ckTasks || []).filter(t => !opsEsRuido(t) && t.date_done && String(t.date_done).slice(0, 10) === hoyIso);
+  const rows = doneHoy.slice(0, 30).map(t => {
+    const due = t.due_date ? String(t.due_date).slice(0, 10) : null;
+    const delta = due ? Math.round((new Date(hoyIso) - new Date(due)) / 86400000) : null;
+    const sem = delta == null ? '⚪ sin fecha' : delta <= 0 ? '🟢 a tiempo' : `🔴 +${delta}d tarde`;
+    const est = t.time_estimate ? Math.round(t.time_estimate / 3600000) : null;
+    const real = t.time_spent ? Math.round(t.time_spent / 3600000) : null;
+    return `<tr><td><b>${OS_E((t.name || '').slice(0, 50))}</b><div style="font-size:9px;opacity:.55">${OS_E(t.folder_name || '')}</div></td><td>${OS_E(t.primary_assignee || '—')}</td><td style="text-align:right">${due || '—'}</td><td style="text-align:right">${sem}</td><td style="text-align:right;font-size:11px">${est != null || real != null ? `${est != null ? est + 'h est' : '—'} / ${real != null ? real + 'h real' : '—'}` : '—'}</td></tr>`;
+  }).join('');
+  const conFecha = doneHoy.filter(t => t.due_date);
+  const aT = conFecha.filter(t => hoyIso <= String(t.due_date).slice(0, 10)).length;
+  return `<div class="card" style="margin-top:14px"><div class="lab">✅ Cierre del día — ${doneHoy.length} cerradas hoy ${conFecha.length ? `· ${aT}/${conFecha.length} a tiempo` : ''}</div>
+    <table class="ptable"><thead><tr><th>Tarea</th><th>Quién</th><th style="text-align:right">Planeada</th><th style="text-align:right">Entrega</th><th style="text-align:right">Est/Real</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;opacity:.6">Aún sin cierres hoy.</td></tr>'}</tbody></table>
+    <div class="meta" style="margin-top:8px">Calidad con evidencia (adjuntos/comentarios): no espejada de ClickUp todavía — P2 del sync. Las no-hechas de ayer: el Coordinador las propone re-fechadas a hoy (marcadas atrasadas) en cada sync.</div></div>`;
 }
