@@ -38,7 +38,7 @@ Todo sobre `property_id` y data real (`ff_deals`, `ff_draws`, `ff_investors`, `f
 | **M6** | Análisis + proyecciones | M2 | rentabilidad por zona/modelo/inversionista recalculable por SQL; proyección 5 años con supuestos de config |
 | **M7** | Informes/KPIs | M1–M6 | molde Reportes CEO Remodelación aplicado a FF |
 
-**Orden de ejecución (Fase 3, orden del CEO): M1 → M2 (parar tras M1) → resto según OK.**
+**ESTADO (5-jul-2026): M1 ✅ M2 ✅ M3 ✅ M4 ✅ M5 ✅ M6 ✅ M7 ✅ — BLUEPRINT COMPLETO.** Evidencia por módulo en LOOP/BITACORA.md.
 
 ## Definiciones únicas (extienden las existentes)
 - `all_in` = purchase + remodel_complete (real, = base Remodelación) + holding (draws) — YA en `ffCompute`.
