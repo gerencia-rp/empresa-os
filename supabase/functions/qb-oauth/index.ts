@@ -118,8 +118,10 @@ Deno.serve(async (req) => {
       const empresa = url.searchParams.get("empresa") || "";
       const isPnl = path.startsWith("/pnl");
       const y = new Date().getFullYear();
+      const from = url.searchParams.get("from") || `${y}-01-01`;
+      const to = url.searchParams.get("to") || new Date().toISOString().slice(0, 10);
       const rep = isPnl
-        ? await qboGet(empresa, `/reports/ProfitAndLoss?start_date=${y}-01-01&end_date=${new Date().toISOString().slice(0, 10)}`)
+        ? await qboGet(empresa, `/reports/ProfitAndLoss?start_date=${from}&end_date=${to}`)
         : await qboGet(empresa, `/reports/BalanceSheet?date_macro=Today`);
       // resumen compacto: filas de nivel 1 con totales
       const rows: Array<{ label: string; value: string }> = [];
