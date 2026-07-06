@@ -44,4 +44,4 @@ Documento de trabajo por empresa. §1 Fix & Flip: ver `BLUEPRINT_FF.md` (**M1–
 
 **Reglas**: property_id + data real (pm_payments/pm_expenses/pm_units/pm_tenants/pm_bookings + campos de Casas/Inquilinos sin espejar) · aditivo · soft-delete · una definición por métrica (deuda = contrato−pagado ya definida en OS; no duplicar) · verificación al cierre de cada módulo.
 
-**Orden Fase 3 propuesto: RN-M1 (plata) → RN-M2 → RN-M3 → RN-M4 → RN-M5.**
+**ESTADO (5-jul-2026): RN-M1 ✅ M2 ✅ M3 ✅ M4 ✅ M5 ✅ — §3 COMPLETO.** Evidencia en LOOP/BITACORA.md.

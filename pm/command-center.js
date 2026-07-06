@@ -258,7 +258,7 @@ async function ccLoadAll() {
       sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,unit_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
       sb.from('pm_expenses').select('amount,category,subcategory,property_id,expense_date').eq('active', true),
       sb.from('pm_bookings').select('unit_id,property_id,tenant_id,start_date,end_date,status').eq('active', true),
-      sb.from('pm_tenants').select('id,full_name,phone,client_state'),
+      sb.from('pm_tenants').select('id,full_name,phone,client_state,rent_amount,contract_start,contract_end,deposit'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,property_id,unit_id,zone,assignee,start_at,status').eq('active', true),
       sb.from('pm_alerts').select('severity,category,message,property_id').eq('resolved', false),
     ]);
@@ -832,11 +832,13 @@ function ccSecInquilinos(comp) {
   const active = CC.tenants.filter(t => (t.client_state || '').toLowerCase().includes('activ') || true);
   return `${ccHeader('Inquilinos', 'Rentas', `${CC.tenants.length} inquilinos`)}
     <div class="grid"><div class="card"><table class="ptable"><thead><tr><th>Inquilino</th><th>Teléfono</th><th>Estado</th></tr></thead><tbody>
-    ${CC.tenants.slice(0, 30).map(t => `<tr><td>${CC_ESC(t.full_name || '—')}</td><td>${CC_ESC(t.phone || '—')}</td><td><span class="badge b-ok">${CC_ESC(t.client_state || 'activo')}</span></td></tr>`).join('')}</tbody></table></div></div>`;
+    ${CC.tenants.slice(0, 30).map(t => `<tr><td>${CC_ESC(t.full_name || '—')}</td><td>${CC_ESC(t.phone || '—')}</td><td><span class="badge b-ok">${CC_ESC(t.client_state || 'activo')}</span></td></tr>`).join('')}</tbody></table></div></div>
+    ${ccContratosPanel()}`;
 }
 // ─── SECCIÓN: ANALÍTICA & KPIs ───
 function ccSecAnalitica(comp) {
   const { kpi, houses } = comp;
+  const tools = `<div class="reptools"><span class="reptitle">📊 Informes CEO</span><button class="repbtn" onclick="window.print()">🖨️ PDF</button><button class="repbtn" onclick="ccExportExcelRentas()">⬇ Excel</button><button class="repbtn ghost" onclick="ccCopyResumenRentas()">📋 Copiar resumen</button></div>`;
   const withData = houses.filter(h => h.inc > 0 || h.exp > 0);
   const best = [...withData].sort((a, b) => b.net - a.net)[0];
   const worst = [...withData].sort((a, b) => a.net - b.net)[0];
@@ -845,6 +847,7 @@ function ccSecAnalitica(comp) {
   const Z = {}; houses.forEach(h => { const z = ccZoneLabel(h.zone); (Z[z] = Z[z] || { o: 0, t: 0 }); Z[z].o += h.occ; Z[z].t += h.total; });
   const zoneRows = Object.entries(Z).filter(([, v]) => v.t).map(([z, v]) => ({ z, pct: Math.round(v.o / v.t * 100), o: v.o, t: v.t })).sort((a, b) => b.pct - a.pct);
   return `${ccHeader('Analítica', 'KPIs', `Tendencias e indicadores del portafolio · ${CC.props.length} casas · ${kpi.totalU} unidades (regla) · ${kpi.occPct}% ocupación`)}
+    ${tools}
     <div class="grid kpis">
       <div class="card kpi"><div class="lab">Cashflow del mes</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div><div class="meta">${comp.mb.label} · ing ${CC_K(kpi.inc)} / gas ${CC_K(kpi.expT)}</div></div>
       <div class="card kpi"><div class="lab">Mejor casa</div><div class="big up" style="font-size:20px">${best ? CC_ESC(best.name.split(',')[0]) : '—'}</div><div class="meta">${best ? CC_MONEY(best.net) + '/mes' : ''}</div></div>
@@ -1035,3 +1038,57 @@ function ccCobranzaPanel() {
       ${ag.rows.map(fila).join('') || '<tr><td colspan="7" style="color:#48d69c;padding:14px">Sin deuda de cobranza ✓</td></tr>'}</tbody></table>
       <div class="meta" style="margin-top:8px">"n/a" = el inquilino aún no vivía ese mes. El draft se copia al portapapeles y abre WhatsApp si hay teléfono (no se envía solo — lo aprobás vos).</div></div></div>`;
 }
+
+// ─── RN-M4 · Contratos + depósitos ───
+function ccContratosPanel() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const en = d => Math.round((new Date(d) - new Date(hoy)) / 86400000);
+  const activos = (CC.tenants || []).filter(t => (t.client_state || '') === 'Activo');
+  const porVencer = activos.filter(t => t.contract_end && en(t.contract_end) <= 60).sort((a, b) => (a.contract_end || '').localeCompare(b.contract_end || ''));
+  const depositos = (CC.tenants || []).filter(t => (t.client_state || '') === 'Activo' && +t.deposit > 0);
+  const depTotal = depositos.reduce((s, t) => s + (+t.deposit || 0), 0);
+  const fila = t => { const d = en(t.contract_end); const cls = d < 0 ? 'down' : d <= 30 ? 'warn' : ''; return `<tr><td><b>${CC_ESC(t.full_name)}</b></td><td>${t.contract_end}</td><td style="text-align:right" class="${cls}"><b>${d < 0 ? 'VENCIDO ' + Math.abs(d) + 'd' : d + ' días'}</b></td><td style="text-align:right">${t.rent_amount ? CC_MONEY(+t.rent_amount) : '—'}</td><td style="text-align:right">${t.deposit ? CC_MONEY(+t.deposit) : '—'}</td></tr>`; };
+  return `<div class="grid row2" style="margin-top:14px">
+    <div class="card"><div class="chart-h"><div class="t">Contratos por vencer (60 días)</div><div class="k">${porVencer.length} de ${activos.length} activos</div></div>
+      <table class="ptable"><thead><tr><th>Inquilino</th><th>Fin de contrato</th><th style="text-align:right">Vence en</th><th style="text-align:right">Renta</th><th style="text-align:right">Depósito</th></tr></thead><tbody>
+      ${porVencer.map(fila).join('') || '<tr><td colspan="5" style="color:#48d69c;padding:12px">Ningún contrato vence en 60 días ✓</td></tr>'}</tbody></table></div>
+    <div class="card"><div class="chart-h"><div class="t">Depósitos en custodia</div><div class="k">regla del Cerebro: los depósitos NO son renta</div></div>
+      <div class="grid kpis" style="grid-template-columns:1fr 1fr"><div class="card kpi"><div class="lab">Total en custodia</div><div class="big warn">${CC_MONEY(depTotal)}</div><div class="meta">${depositos.length} inquilino(s) activos con depósito</div></div>
+      <div class="card kpi"><div class="lab">Pasivo</div><div class="big" style="font-size:13px;line-height:1.4">devolver al salir (o aplicar a daños)</div><div class="meta">fuente: Inquilinos.Depósito</div></div></div>
+      <table class="ptable" style="margin-top:8px"><tbody>${depositos.sort((a, b) => +b.deposit - +a.deposit).slice(0, 8).map(t => `<tr><td>${CC_ESC(t.full_name)}</td><td style="text-align:right"><b>${CC_MONEY(+t.deposit)}</b></td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+}
+// ─── RN-M5 · Informes CEO Rentas (molde export trio) ───
+function ccExportExcelRentas() {
+  if (typeof XLSX === 'undefined') { alert('Librería Excel no disponible.'); return; }
+  const comp = ccCompute(); const ag = ccCobranzaAging();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comp.houses.map(h => ({ Casa: (h.name || '').split(',')[0], Zona: h.zone, Modelo: h.model, Unidades: h.total, Ocupadas: h.occ, IngresoMes: Math.round(h.inc), GastosMes: Math.round(h.exp), HipotecaFija: Math.round(h.hipoFija || 0), FlujoReal: Math.round(h.net), FlujoEstructural: Math.round(h.flujoEstructural || 0) }))), 'PnL_Casas');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ag.rows.map(r => ({ Inquilino: r.nombre, Casa: r.casa, Unidad: r.unidad, RentaMes: r.rent, MesActual: r.b0, Mes1: r.b1, Mes2: r.b2, DeudaTotal: r.total }))), 'Cobranza');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((CC.tenants || []).filter(t => t.client_state === 'Activo').map(t => ({ Inquilino: t.full_name, Estado: t.client_state, Renta: t.rent_amount, InicioContrato: t.contract_start, FinContrato: t.contract_end, Deposito: t.deposit }))), 'Contratos');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((CC.units || []).map(u => { const p = (CC.props || []).find(x => x.id === u.property_id) || {}; return { Casa: (p.name || '').split(',')[0], Unidad: u.name, Tipo: u.unit_type, Estado: u.status, RentaObjetivo: u.target_rent }; })), 'Unidades');
+  XLSX.writeFile(wb, 'Rentas_Informe.xlsx');
+}
+function ccCopyResumenRentas() {
+  const comp = ccCompute(); const ag = ccCobranzaAging();
+  const hoy = new Date().toISOString().slice(0, 10);
+  const en = d => Math.round((new Date(d) - new Date(hoy)) / 86400000);
+  const venc = (CC.tenants || []).filter(t => t.client_state === 'Activo' && t.contract_end && en(t.contract_end) <= 60);
+  const dep = (CC.tenants || []).filter(t => t.client_state === 'Activo' && +t.deposit > 0).reduce((s, t) => s + +t.deposit, 0);
+  const verdes = comp.houses.filter(h => (h.flujoEstructural || 0) >= 0 && (h.total > 0 || h.hipoFija > 0)).length;
+  const casasHipo = comp.houses.filter(h => h.total > 0 || h.hipoFija > 0).length;
+  const L = [];
+  L.push('RENTAS — RESUMEN EJECUTIVO · ' + new Date().toLocaleDateString('es-MX'));
+  L.push('');
+  L.push('Ocupación: ' + comp.kpi.occU + '/' + comp.kpi.totalU + ' (' + comp.kpi.occPct + '%) · Ingresos mes: ' + CC_MONEY(comp.kpi.inc) + ' · Cashflow: ' + CC_MONEY(comp.kpi.cashflow));
+  L.push('Flujo estructural: ' + verdes + '/' + casasHipo + ' casas en verde · Deuda VENCIDA: ' + CC_MONEY(ag.vencida) + ' · Por cobrar mes: ' + CC_MONEY(ag.porCobrar));
+  L.push('Renta perdida por vacancia: ' + CC_MONEY(ag.rentaPerdida) + '/mes · Depósitos en custodia: ' + CC_MONEY(dep));
+  L.push('');
+  L.push('3 DECISIONES:');
+  L.push('1. ' + (ag.vencida > 0 ? 'Cobrar la deuda VENCIDA (' + CC_MONEY(ag.vencida) + '): ' + ag.rows.filter(r => (r.b1 || 0) + (r.b2 || 0) > 0).slice(0, 3).map(r => r.nombre.split(' ')[0]).join(', ') + ' — drafts listos en Finanzas.' : 'Sin deuda vencida ✓.'));
+  L.push('2. ' + (ag.rentaPerdida > 0 ? 'Colocar ' + ag.unidadesLibres + ' unidad(es) libres: ' + CC_MONEY(ag.rentaPerdida) + '/mes en juego.' : 'Sin vacancia ✓.'));
+  L.push('3. ' + (venc.length ? venc.length + ' contrato(s) vencen en ≤60d (' + venc.slice(0, 3).map(t => (t.full_name || '').split(' ')[0]).join(', ') + '): renovar o programar salida.' : 'Sin vencimientos de contrato próximos ✓.'));
+  const txt = L.join('\n');
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => alert('Resumen copiado.'), () => alert(txt)); else alert(txt);
+}
+window.ccContratosPanel = ccContratosPanel; window.ccExportExcelRentas = ccExportExcelRentas; window.ccCopyResumenRentas = ccCopyResumenRentas;
