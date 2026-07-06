@@ -530,21 +530,35 @@ function rcSecGestion(c) {
 window.rcSecGestion = rcSecGestion;
 
 // ─── RM-M1 · Avance de obra EN VIVO (tareas vs plata + semáforos de costo y tiempo) ───
+const DLR = String.fromCharCode(36);
+function rcVivoGanancia(o) {
+  const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
+  const neg = +o.ganancia_proyectada < 0;
+  const bg = o.sem_ganancia === 'rojo' ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.08)';
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
+    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + '</span>'
+    + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'
+    + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
+    + '<div class="meta" style="margin-top:3px;font-size:9px">cobra ' + M(o.valor_remodelacion) + ' · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
+}
 function rcVivoCard() {
   const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
   const SEM = { verde: '🟢', amarillo: '🟡', rojo: '🔴', gris: '⚪' };
   const bar = (pct, color) => `<div style="height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin:3px 0 7px"><i style="display:block;height:100%;width:${Math.min(100, +pct || 0)}%;background:${color}"></i></div>`;
   const card = (o) => {
     const revisar = [];
-    if ((+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15) revisar.push(`la plata (${o.pct_plata}%) corre ${Math.round(o.pct_plata - o.pct_tareas)}pts adelante de las tareas — posible sobrecosto`);
+    if (o.sobrecosto_vs_tecnico) revisar.push(`SOBRECOSTO: financiero ${o.pct_financiero}% vs técnico ${o.pct_tecnico}% (${Math.round(o.pct_financiero - o.pct_tecnico)}pts) — gastando más rápido de lo que avanza, rumbo a pérdida`);
+    if (o.sem_ganancia === 'rojo') revisar.push(`PÉRDIDA proyectada: costo @100% supera lo que cobra — renegociar o recortar`);
     if (o.atrasada_cronograma) revisar.push(`ATRASADA según cronograma: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado → ${o.atraso_pts} pts atrás, ~${o.atraso_dias} día(s) de retraso`);
     else if (o.sem_tiempo === 'rojo') revisar.push(o.dias_pasados_fin > 0 ? `cronograma vencido hace ${o.dias_pasados_fin} días y va ${o.pct_tareas}%` : `vamos lentos: ${o.pct_tareas}% hecho con ${o.pct_dias}% del tiempo consumido`);
     if (o.sem_costo === 'rojo') revisar.push(`gasto $${(+o.gasto_real).toLocaleString('en-US')} supera lo proyectado a hoy ($${(+o.costo_proyectado || 0).toLocaleString('en-US')})`);
     if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
     return `<div class="card" style="min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b>${RC_E(rcShort(o.address))}</b><span style="font-size:11px;opacity:.7">${o.done || 0}/${o.total || 0} tareas</span></div>
-      <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE POR TAREAS · ${o.pct_tareas || 0}%</div>${bar(o.pct_tareas, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
-      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE POR PLATA · ${o.pct_plata != null ? o.pct_plata + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_plata, (+o.pct_plata || 0) > (+o.pct_tareas || 0) + 15 ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado' ? '⭐ ponderado' : '(conteo — sin pesos del Estimador)'} · ${o.pct_tecnico || 0}%</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE FINANCIERO · ${o.pct_plata != null ? o.pct_plata + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_plata, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
+      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#64748b,#94a3b8)')}
+      ${o.valor_remodelacion > 0 ? rcVivoGanancia(o) : ''}
       <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
         <span>${SEM[o.sem_costo] || '⚪'} costo ${o.costo_proyectado ? `<span style="opacity:.6">(proy. a hoy $${(+o.costo_proyectado).toLocaleString('en-US')})</span>` : ''}</span>
         <span>${SEM[o.sem_tiempo] || '⚪'} tiempo <span style="opacity:.6">(${o.pct_dias != null ? o.pct_dias + '% días' : 's/cronograma'})</span></span></div>
