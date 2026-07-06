@@ -223,7 +223,14 @@ async function onLogin(user) {
   window._appShown = true;
   state.user = user;
   showApp();  // ocultar login / mostrar la app YA — antes de cargar perfil/datos (así nunca queda pegado en login)
-  const { data: profile } = await sb.from('profiles').select('role,allowed_areas').eq('id', user.id).single();
+  const { data: profile } = await sb.from('profiles').select('role,allowed_areas,active').eq('id', user.id).single();
+  // Usuario desactivado (soft-delete del Panel de Admin) → no entra. Reversible: un admin lo reactiva.
+  if (profile && profile.active === false) {
+    window._appShown = false; state.user = null;
+    alert('Tu acceso está desactivado. Hablá con un administrador si creés que es un error.');
+    await sb.auth.signOut();
+    return;
+  }
   state.role = profile?.role || 'viewer';
   state.allowedAreas = profile?.allowed_areas || [];
   document.getElementById('user-email').textContent = user.email;
@@ -537,6 +544,9 @@ function selectArea(id) {
 // ════════════════════════════════════════════════════════════
 async function openTeamMgmt() {
   if (!isAdmin()) return alert('Solo admins');
+  // La gestión de equipo vive ahora en el Panel de Admin del OS (/admin): roles granulares,
+  // niveles por área y SOFT-DELETE (acá abajo quedaba un hard-delete — ya no se usa).
+  if (window.osNav) { closeModal?.(); osNav('/admin'); return; }
   const { data: profiles, error } = await sb.from('profiles')
     .select('id,email,role,allowed_areas,created_at')
     .order('created_at');

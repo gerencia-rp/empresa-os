@@ -202,6 +202,7 @@ function osParse(path) {
   if (seg.length === 0) return { view: 'global' };
   if (seg[0] === 'operacion') return { view: 'operacion' };
   if (seg[0] === 'contable') return { view: 'contable' };
+  if (seg[0] === 'admin') return { view: 'admin' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (OS_EMPRESAS[seg[0]]) {
     if (seg[1]) return { view: 'app', empresa: seg[0], app: seg[1], slug: seg[2] || null };
@@ -214,6 +215,7 @@ function osTitle(r) {
   if (r.view === 'global') return base;
   if (r.view === 'operacion') return 'Operación · ' + base;
   if (r.view === 'contable') return 'Contable · ' + base;
+  if (r.view === 'admin') return 'Admin · ' + base;
   if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
   return 'No encontrado · ' + base;
@@ -407,6 +409,31 @@ function osInsights(comp) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// ACCESO (gating por role + allowed_areas del profile — slugs canónicos:
+// fix-flip, remodelacion, rentas, operacion, contable, education).
+// El front esconde lo no permitido; el enforcement REAL es RLS en la DB.
+// ════════════════════════════════════════════════════════════════
+function osRole() { try { return (state && state.role) || 'viewer'; } catch (e) { return 'viewer'; } }
+function osAreasAllowed() { try { return (state && state.allowedAreas) || []; } catch (e) { return []; } }
+function osCanArea(k) { return osRole() === 'admin' || osAreasAllowed().includes(k); }
+window.osCanArea = osCanArea;
+// área requerida por ruta (empresa usa OS_EMPRESAS[].key; casa = cualquiera de las 3 de la casa)
+function osRouteGuard(r) {
+  if (r.view === 'admin') return osRole() === 'admin' ? null : 'admin';
+  let need = null;
+  if (r.view === 'operacion') need = ['operacion'];
+  else if (r.view === 'contable') need = ['contable'];
+  else if ((r.view === 'empresa' || r.view === 'app') && OS_EMPRESAS[r.empresa]) need = [OS_EMPRESAS[r.empresa].key];
+  else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
+  if (need && !need.some(osCanArea)) return need[0];
+  return null;
+}
+function osNoAccess(what) {
+  const lbl = what === 'admin' ? 'el Panel de Admin (solo administradores)' : 'esta sección';
+  return `<div class="empty"><div style="font-size:40px">🔒</div><div style="margin-top:10px">No tenés acceso a ${OS_E(lbl)}.</div><div class="meta" style="margin-top:6px">Pedile a un admin que te asigne el área en el Panel de Admin.</div><button class="cbtn" style="margin-top:14px" data-osnav="/">← Volver al inicio</button></div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
 // RENDER
 // ════════════════════════════════════════════════════════════════
 function osDestroyCharts() { OS._charts.forEach(c => { try { c.destroy(); } catch (e) {} }); OS._charts = []; }
@@ -415,8 +442,10 @@ function osRender() {
   posApplyTheme(root); osDestroyCharts();
   if (OS.loadErr) { root.innerHTML = osShell(`<div class="empty"><div style="font-size:40px">⚠️</div><div class="down" style="margin-top:10px">${OS_E(OS.loadErr)}</div></div>`); return; }
   if (!OS.loaded) { root.innerHTML = osShell('<div class="empty">⏳ Cargando datos del holding…</div>'); return; }
+  const guard = osRouteGuard(OS.route);
+  if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
@@ -425,6 +454,7 @@ function osCrumbs() {
   const r = OS.route; const parts = [`<a data-osnav="/">Global</a>`];
   if (r.view === 'operacion') parts.push('<span class="sep">/</span><b>⚙️ Operación</b>');
   else if (r.view === 'contable') parts.push('<span class="sep">/</span><b>📒 Contable</b>');
+  else if (r.view === 'admin') parts.push('<span class="sep">/</span><b>🛡 Admin</b>');
   else if (r.empresa) { const e = OS_EMPRESAS[r.empresa]; parts.push(`<span class="sep">/</span>${r.view === 'empresa' ? `<b>${e.icon} ${e.name}</b>` : `<a data-osnav="/${r.empresa}">${e.icon} ${e.name}</a>`}`); if (r.app) parts.push(`<span class="sep">/</span><b>${OS_E(r.app)}</b>`); }
   return parts.join(' ');
 }
@@ -432,7 +462,7 @@ function osShell(inner) {
   return `<div class="bgfx"></div><div class="wrap">
     <div class="bar"><div class="logo" data-osnav="/" style="cursor:pointer">FR</div><div class="brandt"><b>Flipping Rentals OS</b><span>RENTAL PROFITSS · HOLDING</span></div>
       <div class="crumbs">${osCrumbs()}</div>
-      <div class="barr"><button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
+      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">🛡 Admin</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
     </div>${inner}</div>`;
 }
 function osOpenAdmin() { const root = document.getElementById('os-root'); if (root) root.style.display = 'none'; if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 }); }
@@ -441,30 +471,36 @@ window.osOpenAdmin = osOpenAdmin;
 // ─── NIVEL 1 · GLOBAL (macro del holding) ───
 function osGlobal(comp) {
   const insights = osInsights(comp); const h = comp.holding;
-  const unitCard = (slug, e, extra) => `<div class="card unit" data-osnav="/${slug}"><div class="ico">${e.icon}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>`;
-  return `<h1>Panel <span>Global</span> · Rental Profitss</h1><div class="sub">Vista macro del holding — todas las empresas y áreas en un solo lugar. Los datos fluyen desde Airtable + QuickBooks (solo lectura).</div>
-    <div class="grid k4">
-      <div class="card"><div class="lab">Capital desplegado (F&F)</div><div class="big glow">${OS_M(h.capital)}</div><div class="meta">${comp.ff.activos} deals activos · ARV ${OS_K(comp.ff.arv)}</div></div>
-      <div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>
-      <div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada (rentas)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
-      <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>
-    </div>
-    <div class="grid k2" style="margin-top:16px">
+  const isAdm = osRole() === 'admin';
+  const unitCard = (slug, e, extra) => osCanArea(e.key) ? `<div class="card unit" data-osnav="/${slug}"><div class="ico">${e.icon}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>` : '';
+  // KPIs macro por área: cada tarjeta solo si el usuario tiene el área (admin ve todo)
+  const kpis = [
+    osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital desplegado (F&F)</div><div class="big glow">${OS_M(h.capital)}</div><div class="meta">${comp.ff.activos} deals activos · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
+    osCanArea('rentas') ? `<div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>` : '',
+    osCanArea('rentas') ? `<div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada (rentas)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>` : '',
+    (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>` : '',
+  ].join('');
+  const areaCards = [
+    osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
+    osCanArea('contable') ? `<div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>` : '',
+  ].join('');
+  // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
+  const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
+        ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span></div></div>`).join('')}
+        <div class="ask"><input id="os-ask" placeholder="Preguntá al Cerebro del holding…" onkeydown="if(event.key==='Enter')osAsk()"><button onclick="osAsk()">Enviar</button></div>
+        <div id="os-chat" class="cc-chat"></div>
+      </div>` : '';
+  return `<h1>Panel <span>Global</span> · Rental Profitss</h1><div class="sub">${isAdm ? 'Vista macro del holding — todas las empresas y áreas en un solo lugar.' : 'Tus áreas del holding.'} Los datos fluyen desde Airtable + QuickBooks (solo lectura).</div>
+    <div class="grid k4">${kpis}</div>
+    <div class="grid ${brain ? 'k2' : 'k2'}" style="margin-top:16px">
       <div><div class="grid k2 units">
         ${unitCard('fix-and-flip', OS_EMPRESAS['fix-and-flip'], `<div class="kv"><span>Capital</span><b>${OS_K(comp.ff.capital)}</b></div><div class="kv"><span>Deals</span><b>${comp.ff.deals}</b></div>`)}
         ${unitCard('rentas', OS_EMPRESAS['rentas'], `<div class="kv"><span>Ocupación</span><b>${comp.rentas.occPct}%</b></div><div class="kv"><span>Ingresos/mes</span><b>${OS_K(comp.rentas.ingresos)}</b></div>`)}
         ${unitCard('remodelacion', OS_EMPRESAS['remodelacion'], `<div class="kv"><span>Obras activas</span><b>${comp.remodel.activas}</b></div><div class="kv"><span>Avance prom.</span><b>${comp.remodel.avance}%</b></div>`)}
         ${unitCard('educacion', OS_EMPRESAS['educacion'], `<div class="kv"><span>Alumnos activos</span><b>${comp.educacion ? comp.educacion.activos : '—'}</b></div><div class="kv"><span>Nuevos (30d)</span><b>${comp.educacion ? comp.educacion.nuevos : '—'}</b></div>`)}
       </div>
-      <div class="grid k2" style="margin-top:16px">
-        <div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>
-        <div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>
-      </div></div>
-      <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
-        ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span></div></div>`).join('')}
-        <div class="ask"><input id="os-ask" placeholder="Preguntá al Cerebro del holding…" onkeydown="if(event.key==='Enter')osAsk()"><button onclick="osAsk()">Enviar</button></div>
-        <div id="os-chat" class="cc-chat"></div>
-      </div>
+      <div class="grid k2" style="margin-top:16px">${areaCards}</div></div>
+      ${brain}
     </div>`;
 }
 

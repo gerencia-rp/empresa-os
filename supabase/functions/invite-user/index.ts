@@ -24,8 +24,13 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch { return json({ ok: false, error: "JSON inválido" }, 400); }
   const email = (body.email || "").trim().toLowerCase();
-  const role = body.role === "admin" ? "admin" : "viewer";
-  const allowed_areas: string[] = Array.isArray(body.allowed_areas) ? body.allowed_areas : [];
+  // Roles granulares del Panel de Admin (mismo whitelist que profiles_role_check)
+  const ROLES = ["admin", "pm", "editor", "viewer"];
+  const role = ROLES.includes(body.role) ? body.role : "viewer";
+  // Slugs canónicos de las 6 secciones del OS ('pm' queda como legado del panel clásico)
+  const AREAS = ["fix-flip", "remodelacion", "rentas", "operacion", "contable", "education", "pm"];
+  const allowed_areas: string[] = (Array.isArray(body.allowed_areas) ? body.allowed_areas : [])
+    .filter((a: string) => AREAS.includes(a));
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ ok: false, error: "Email inválido" }, 400);
 
@@ -34,7 +39,8 @@ Deno.serve(async (req) => {
   // Si el email ya existe en profiles, solo actualizamos rol/áreas
   const { data: existing } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
   if (existing) {
-    await admin.from("profiles").update({ role, allowed_areas }).eq("id", existing.id);
+    // re-invitar a un email existente también lo REACTIVA (soft-delete reversible)
+    await admin.from("profiles").update({ role, allowed_areas, active: true, archived_at: null }).eq("id", existing.id);
     return json({ ok: true, user_id: existing.id, action: "updated", email });
   }
 
@@ -48,7 +54,7 @@ Deno.serve(async (req) => {
     // Ya existe en auth pero el profile fue eliminado. Re-crear profile + mandar magic link
     // de password recovery para que el usuario pueda volver a entrar.
     await admin.from("profiles").upsert(
-      { id: existingAuth.id, email, role, allowed_areas },
+      { id: existingAuth.id, email, role, allowed_areas, active: true, archived_at: null },
       { onConflict: "id" }
     );
     // Mandamos un magic link / recovery para que reset su password
@@ -75,7 +81,7 @@ Deno.serve(async (req) => {
   // El trigger handle_new_user ya creó el profile como viewer.
   // Actualizamos con el rol y áreas asignados por el admin.
   await admin.from("profiles").upsert(
-    { id: userId, email, role, allowed_areas },
+    { id: userId, email, role, allowed_areas, active: true, archived_at: null },
     { onConflict: "id" }
   );
 
