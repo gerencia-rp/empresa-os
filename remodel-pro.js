@@ -3527,11 +3527,27 @@ function rmGetAllActivitiesIncludingCustom() {
 }
 
 // Bloque 2.2 — al guardar la estimación, auto-genera el cronograma en el Planner (baseline) la 1ª vez.
+// RM-C1: factores de días por etapa desde el REAL del Planner (v_remodel_calib_etapas). Guard: solo aplicables (n≥umbral).
+async function rmLoadStageFactors() {
+  if (rmState._stageFactors) return rmState._stageFactors;
+  try {
+    const { data } = await sb.from('v_remodel_calib_etapas').select('etapa, factor_dias, aplicable, n_tareas');
+    const map = {}; (data || []).forEach(r => { if (r.aplicable && +r.factor_dias > 0) map[r.etapa] = +r.factor_dias; });
+    rmState._stageFactors = map;
+  } catch (e) { rmState._stageFactors = {}; }
+  return rmState._stageFactors;
+}
+function rmCalibFactor(map, stageName) {
+  const k = String(stageName || '').toLowerCase().trim().replace(/[.\s]+$/, '').replace(/_/g, ' ');
+  return map[k] || map[k.replace(/s$/, '')] || 1;
+}
+window.rmLoadStageFactors = rmLoadStageFactors; window.rmCalibFactor = rmCalibFactor;
 async function rmAutoGenPlanner(projectId, projectName) {
   if (!projectId || !rmState.selectedActivities || !Object.keys(rmState.selectedActivities).length) return;
   const { count } = await sb.from('weekly_activities').select('id', { count: 'exact', head: true }).eq('project_id', projectId);
   if (count && count > 0) return; // ya tiene cronograma → no pisar ediciones del Planner
   const e = rmCalcProject();
+  const stageFactors = await rmLoadStageFactors(); // loop de aprendizaje: días reales recalibran el plan
   const startDate = new Date(rmState.editStartDate);
   const inserts = [];
   Object.entries(rmState.selectedActivities).forEach(([code, cfg]) => {
@@ -3539,7 +3555,9 @@ async function rmAutoGenPlanner(projectId, projectName) {
     const phaseSch = e.phaseSchedule[cat.phase];
     let activityStart = phaseSch ? new Date(phaseSch.start) : startDate;
     if (cfg.start_offset) activityStart = rmAddDays(activityStart, cfg.start_offset);
-    const days = cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)));
+    const phaseNameCal = (RM_PHASES[cat.phase] || { name: cat.cat }).name;
+    const fCal = rmCalibFactor(stageFactors, phaseNameCal);
+    const days = Math.max(1, Math.round((cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)))) * fCal));
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = rmAddWorkDays(activityStart, i);
       const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
