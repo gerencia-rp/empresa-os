@@ -23,4 +23,12 @@ Estados: `pendiente` · `en curso` · `verificado` · `bloqueado (razón)`
 | RM-2 | P1 | Write-back avance (requiere scope token, acción CEO) | bloqueado (PAT read-only) |
 | RM-3 | P1 | Panel data-quality accionable | pendiente de OK |
 
-## Próximas auditorías Fase 1: Contable → Rentas → Operación → Educación
+## PRÓXIMOS
+| # | P | Item | Estado |
+|---|---|---|---|
+| EC-3 | — | Blueprint §3 RENTAS | siguiente (OK CEO al quedar verde) |
+| ED-1 | P0 | Educación: sync congelado 59 vs 45 + cron (molde FF listo) | pendiente de OK |
+| OP-1 | P0 | Decisión ClickUp (muerto 12-jun): revivir o retirar | esperando CEO |
+| QB-1 | P0 | Conector QuickBooks | bloqueado (input CEO) |
+| LD-1 | P1 | Nombres trabajadores ↔ Personal en Campo (cobertura ledger 74% sin rate) | pendiente |
+| PT-1 | P1 | Redirect URL portal en Supabase Auth + prueba real inversionista | acción CEO |
