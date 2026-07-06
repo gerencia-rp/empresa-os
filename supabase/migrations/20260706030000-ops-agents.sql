@@ -10,3 +10,7 @@ FROM (VALUES
   ('Ops · Líder',              'Arma el matutino diario (tareas de hoy por persona, vencidas, urgentes sin dueño)',               '["read","propose"]', 'P2')
 ) AS v(nombre, proceso, acciones, riesgo)
 WHERE NOT EXISTS (SELECT 1 FROM public.agent_registry r WHERE r.nombre = v.nombre AND r.deleted_at IS NULL);
+
+-- lectura del registry para el panel (metadata de agentes, sin secretos)
+DROP POLICY IF EXISTS agr_read ON public.agent_registry;
+CREATE POLICY agr_read ON public.agent_registry FOR SELECT TO anon, authenticated USING (true);

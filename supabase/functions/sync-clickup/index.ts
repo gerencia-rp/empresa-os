@@ -415,8 +415,13 @@ async function generateAgentProposals(sb: any, allProjected: any[], companiesMet
   if (!AG["Auditor"]) return 0; // registry sin sembrar
 
   const hoy = new Date().toISOString().slice(0, 10);
-  const act = allProjected.filter((t: any) => (t.status_type || "") !== "closed" && !t.date_closed && !t.date_done);
-  const venc = act.filter((t: any) => t.due_date && String(t.due_date).slice(0, 10) < hoy);
+  // Reglas de la reunión 6-jul: fuera plantillas; gestión recurrente y procesos largos NO son "vencidas"
+  const RUIDO = /plantilla|maestr|ejemplo|template/i;
+  const GESTION = /cobros y pagos|check.?in|bienvenida|bitacor|gestion|gestión/i;
+  const LONGTERM = /refinanc|estrategia de salida/i;
+  const base = allProjected.filter((t: any) => !RUIDO.test(t.name || "") && !RUIDO.test(t.list_name || "") && !RUIDO.test(t.folder_name || ""));
+  const act = base.filter((t: any) => (t.status_type || "") !== "closed" && !t.date_closed && !t.date_done);
+  const venc = act.filter((t: any) => t.due_date && String(t.due_date).slice(0, 10) < hoy && !GESTION.test(t.list_name || "") && !LONGTERM.test(t.list_name || ""));
   const empName = (sid: string) => (companiesMeta.find((c: any) => String(c.clickup_space_id) === String(sid))?.name) || sid;
   const P: any[] = [];
   const push = (agente: string, tipo_accion: string, titulo: string, evidencia: string, t?: any, extra?: any) =>
@@ -441,7 +446,7 @@ async function generateAgentProposals(sb: any, allProjected: any[], companiesMet
     .forEach((t: any) => push("Coordinador", "refechar_tarea", `Re-fechar: ${t.name}`, `De ${t.primary_assignee}, vencía ${String(t.due_date).slice(0, 10)} (${empName(t.space_id)}). Mover a ${proxIso} para que no muera en el tablero.`, t, { fecha_nueva: proxIso }));
 
   // ANALISTA DE CALIDAD: informe semanal de tiempos
-  const done7 = allProjected.filter((t: any) => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7);
+  const done7 = base.filter((t: any) => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7);
   const conDue = done7.filter((t: any) => t.due_date);
   const aTiempo = conDue.filter((t: any) => String(t.date_done).slice(0, 10) <= String(t.due_date).slice(0, 10));
   const tEnt = done7.filter((t: any) => t.date_created).map((t: any) => (new Date(t.date_done).getTime() - new Date(t.date_created).getTime()) / 86400000);

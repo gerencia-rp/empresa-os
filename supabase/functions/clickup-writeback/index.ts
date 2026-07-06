@@ -43,8 +43,19 @@ Deno.serve(async (req) => {
     const taskId = pay.task_id;
     if (p.tipo_accion === "refechar_tarea" && taskId && pay.fecha_nueva) {
       applied = await cu(`/task/${taskId}`, "PUT", { due_date: new Date(pay.fecha_nueva + "T17:00:00Z").getTime() });
-    } else if (p.tipo_accion === "reasignar_tarea" && taskId && pay.assignee_id) {
-      applied = await cu(`/task/${taskId}`, "PUT", { assignees: { add: [Number(pay.assignee_id)], rem: pay.remove_id ? [Number(pay.remove_id)] : [] } });
+    } else if (p.tipo_accion === "reasignar_tarea" && taskId && (pay.assignee_id || pay.assignee_name)) {
+      let aid = pay.assignee_id;
+      if (!aid && pay.assignee_name) {
+        // resolver nombre → member id (los espejos solo guardan nombres)
+        const teams = await cu("/team", "GET");
+        const buscado = String(pay.assignee_name).toLowerCase().trim();
+        for (const tm of (teams.teams || [])) {
+          const m = (tm.members || []).find((mm: any) => String(mm.user?.username || "").toLowerCase().trim() === buscado || String(mm.user?.email || "").toLowerCase() === buscado);
+          if (m) { aid = m.user.id; break; }
+        }
+        if (!aid) return json({ ok: false, error: `No encontré al miembro "${pay.assignee_name}" en ClickUp` }, 400);
+      }
+      applied = await cu(`/task/${taskId}`, "PUT", { assignees: { add: [Number(aid)], rem: pay.remove_id ? [Number(pay.remove_id)] : [] } });
     } else if (p.tipo_accion === "archivar_tarea" && taskId) {
       // archivar = cerrar la tarea en ClickUp (no se borra nada)
       applied = await cu(`/task/${taskId}`, "PUT", { status: pay.status_cierre || "complete" });
