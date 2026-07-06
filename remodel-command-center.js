@@ -543,15 +543,16 @@ function rcVivoGanancia(o) {
   const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
   const neg = +o.ganancia_proyectada < 0;
   const bg = o.sem_ganancia === 'rojo' ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.08)';
+  const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#f87171;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
   const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#e7b65e;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
   const modoSel = '<select onchange="rcSetCobro(&quot;' + o.property_id + '&quot;, this.value)" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:inherit;font-size:9px;padding:1px 4px" title="Cómo cobra Structure One esta obra">'
     + '<option value="fijo"' + (o.modo_cobro !== 'costplus' ? ' selected' : '') + '>PRECIO FIJO (real)</option>'
     + '<option value="costplus"' + (o.modo_cobro === 'costplus' ? ' selected' : '') + '>COST-PLUS ×1.05 (what-if)</option></select>';
   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
-    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + tentativo + '</span>' + modoSel
+    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + tentativo + precioTent + '</span>' + modoSel
     + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'
     + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
-    + '<div class="meta" style="margin-top:3px;font-size:9px">cobra proy. ' + M(o.valor_cobro_proyectado != null ? o.valor_cobro_proyectado : o.valor_remodelacion) + ' (' + (o.modo_cobro === 'costplus' ? 'cost-plus' : 'precio fijo') + ') · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
+    + '<div class="meta" style="margin-top:3px;font-size:9px">cobra proy. ' + M(o.valor_cobro_proyectado != null ? o.valor_cobro_proyectado : o.valor_remodelacion) + ' (' + (o.modo_cobro === 'costplus' ? 'what-if cost-plus' : 'Valor Remodelación') + ') · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
 }
 function rcVivoCard() {
   const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
