@@ -80,6 +80,8 @@ const F = {
   casa_wifi_clave:  "fldMlhg35OmZwJA5i",
   casa_drive:       "fldohaq4JEfOuYiCj",
   casa_habitaciones:"fldFsDu4p97kXAwh9",
+  casa_hipoteca:  "fldvyb3pip9EI8Tef",
+  casa_prestamo:  "fldn2af5YZi9Y12Hj",
   casa_acceso:      "fldKuVpYVzh7JzRP8",  // Código de acceso (keypad principal de la Casa)
   // Inquilinos
   inq_nombre:     "flddqJeRovK6Hoxx0",
@@ -404,6 +406,8 @@ Deno.serve(async (req) => {
         wifi_name: r.fields?.[F.casa_wifi_nombre] || null,
         wifi_pass: r.fields?.[F.casa_wifi_clave] || null,
         access_code: r.fields?.[F.casa_acceso] != null ? String(r.fields[F.casa_acceso]) : null,
+        mortgage_monthly: typeof r.fields?.[F.casa_hipoteca] === "number" ? r.fields[F.casa_hipoteca] : null,
+        loan_type: getSel(r.fields?.[F.casa_prestamo]),
         total_units: (() => { const v = parseInt(String(r.fields?.[F.casa_unidades] ?? "").replace(/[^0-9]/g, "")); return isNaN(v) ? null : v; })(),
         drive_url: r.fields?.[F.casa_drive] || null,
         status: isInactive ? "inactiva" : "activa",
