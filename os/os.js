@@ -895,7 +895,7 @@ function opsCeoView(o) {
   if (topV && topV.venc >= 10) dec.push({ tx: `<b>${OS_E(topV.p)}</b> tiene <b>${topV.venc} tareas vencidas</b> (${topV.act} activas) — redistribuir o re-fechar.`, f: { persona: topV.p, tipo: 'vencidas' } });
   const usdN = o.urg.filter(t => !(t.primary_assignee || '').trim()).length;
   if (usdN) dec.push({ tx: `<b>${usdN} tareas urgentes SIN DUEÑO</b> — asignar hoy.`, f: { tipo: 'urgentes_sin_dueno' } });
-  o.estancadas.slice(0, 2).forEach(x => dec.push({ tx: `<b>${OS_E(x.lista)}</b> estancada: ${x.n} vencidas en la misma lista/casa.`, f: { q: x.lista, tipo: 'vencidas' } }));
+  o.estancadas.slice(0, 2).forEach(x => dec.push({ tx: `<b>${OS_E(String(x.lista).replace(/^\d+[.)]\s*/, ''))}</b> estancada: ${x.n} vencidas en la misma lista/casa.`, f: { q: x.lista, tipo: 'vencidas' } }));
   if (o.tend.length >= 7 && o.tend[o.tend.length - 1].overdue > o.tend[Math.max(0, o.tend.length - 8)].overdue * 1.15) dec.push({ tx: `Las vencidas <b>subieron ${o.tend[o.tend.length - 1].overdue - o.tend[Math.max(0, o.tend.length - 8)].overdue}</b> en 7 días — la operación está empeorando.`, f: { tipo: 'vencidas' } });
   if (o.propuestas.length) dec.push({ tx: `<b>${o.propuestas.length} propuesta(s) del Ops Brain</b> esperando tu aprobación.`, f: { tipo: 'propuestas' } });
   const decHtml = dec.slice(0, 5).map((d, i) => `<div class="krow" style="cursor:pointer;padding:10px 0" onclick='opsGo("pm",${JSON.stringify(d.f)})'><span>${i + 1}. ${d.tx}</span><b style="opacity:.5">→</b></div>`).join('') || '<div class="meta" style="padding:10px 0">Nada crítico que decidir hoy ✓</div>';
@@ -903,8 +903,10 @@ function opsCeoView(o) {
   const maxO = Math.max(...o.tend.map(x => x.overdue), 1);
   const spark = o.tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(56 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
   // carga por persona (top 8)
-  const maxA = Math.max(...o.personas.slice(0, 8).map(x => x.act), 1);
-  const carga = o.personas.slice(0, 8).map(x => `<div class="krow" style="cursor:pointer" onclick="opsGo('pm',{persona:'${OS_E(x.p)}'})"><span style="min-width:150px">${OS_E(x.p)}</span><span style="flex:1;margin:0 10px"><span style="display:block;height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><i style="display:block;height:100%;width:${Math.round(100 * x.act / maxA)}%;background:linear-gradient(90deg,#12b5a0,#2f6ef0)"></i></span></span><b>${x.act}</b><span class="${x.venc ? 'down' : ''}" style="min-width:74px;text-align:right;font-size:11px">${x.venc} venc.</span></div>`).join('');
+  const conDueno = o.personas.filter(x => x.p !== '(sin dueño)').slice(0, 8);
+  const sinDuenoRow = o.personas.find(x => x.p === '(sin dueño)');
+  const maxA = Math.max(...conDueno.map(x => x.act), 1);
+  const carga = [...conDueno, ...(sinDuenoRow ? [sinDuenoRow] : [])].map(x => `<div class="krow" style="cursor:pointer" onclick="opsGo('pm',{persona:'${OS_E(x.p)}'})"><span style="min-width:150px">${OS_E(x.p)}</span><span style="flex:1;margin:0 10px"><span style="display:block;height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, Math.round(100 * x.act / maxA))}%;${x.p === '(sin dueño)' ? 'opacity:.35;' : ''}background:linear-gradient(90deg,#12b5a0,#2f6ef0)"></i></span></span><b style="min-width:44px;text-align:right">${x.act}</b><span class="${x.venc ? 'down' : ''}" style="min-width:84px;text-align:right;font-size:11px;margin-left:10px">${x.venc} venc.</span></div>`).join('');
   return `<div class="grid k4">
       <div class="card"><div class="lab">% a tiempo (histórico)</div><div class="big ${o.pctT >= 60 ? 'up' : 'down'}">${o.pctT != null ? o.pctT + '%' : '—'}</div><div class="meta">entregas con fecha cumplida</div></div>
       <div class="card" style="cursor:pointer" onclick="opsGo('pm',{tipo:'vencidas'})"><div class="lab">Vencidas</div><div class="big down">${o.venc.length}</div><div class="meta">de ${o.act.length} activas</div></div>
