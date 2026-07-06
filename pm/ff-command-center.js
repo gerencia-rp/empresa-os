@@ -369,7 +369,7 @@ function ffRender() {
     underwriting: () => ffSecUnderwriting(comp),
     inversionistas: () => ffSecInversionistas(comp),
     finanzas: () => ffSecFinanzas(comp),
-    analitica: () => ffSecFinanzas(comp),
+    analitica: () => ffSecAnalitica(comp),
     cerebro: () => ffSecCerebro(comp),
   }[FF.section] || (() => ffSecCommand(comp)))();
   requestAnimationFrame(() => ffMountCharts(comp));
@@ -1006,6 +1006,124 @@ async function ffDeckGenerate(mode) {
   return fname;
 }
 window.ffDeckGenerate = ffDeckGenerate;
+
+
+// ─── M6+M7 · Analítica, proyecciones e informes (Blueprint FF §6-7) ───
+function ffProyeccion(m, cfg) {
+  const f = (k, d) => (cfg[k] != null ? +cfg[k] : d);
+  const a = f('appreciation_pct_annual', 3) / 100, g = f('rent_growth_pct_annual', 3) / 100;
+  const sellNow = m.margen - m.arv * f('selling_cost_pct', 6) / 100;
+  const noiMes = m.renta > 0 ? m.renta * (1 - f('vacancy_pct', 8) / 100 - f('opex_pct', 35) / 100) : 0;
+  const anios = [1, 2, 3, 4, 5].map(y => {
+    const valor = m.arv * Math.pow(1 + a, y);
+    const rentaY = noiMes * 12 * Math.pow(1 + g, y - 1);
+    return { y, valor,
+      hold: { flujo: rentaY - m.pagoHml * 12, equity: valor - m.loan },
+      refi: { flujo: rentaY - m.refiPago * 12, equity: valor - m.refiLoan } };
+  });
+  const acum = (path) => { let fl = 0; return anios.map(r => { fl += r[path].flujo; return fl + r[path].equity; }); };
+  const holdAcum = acum('hold'), refiAcum = acum('refi');
+  const refi5 = refiAcum[4] + Math.max(0, m.cashOut);
+  const hold5 = holdAcum[4];
+  const caminos = [['VENDER hoy', sellNow], ['MANTENER 5 años', hold5], ['REFI + mantener', refi5]].sort((x, y) => y[1] - x[1]);
+  return { anios, holdAcum, refiAcum, sellNow, hold5, refi5, mejor: caminos[0] };
+}
+function ffAggBy(deals, keyFn) {
+  const map = {};
+  deals.forEach(d => {
+    const k = keyFn(d) || '—';
+    if (!map[k]) map[k] = { k, n: 0, capital: 0, margen: 0, entregada: 0, deficit: 0 };
+    const m = map[k];
+    m.n++; m.capital += d.allIn || 0; m.margen += (d.dq.confiable ? d.margin : 0);
+    m.entregada += +d.utilidad_entregada || 0; m.deficit += d.deficit < 0 ? d.deficit : 0;
+  });
+  return Object.values(map).sort((x, y) => y.capital - x.capital);
+}
+function ffInvestorAgg(comp) {
+  return (FF.investors || []).filter(i => +i.capital_aportado > 0 || i.deal_rec_ids).map(i => {
+    const nDeals = comp.deals.filter(d => d.investor_rec_ids && d.investor_rec_ids.indexOf(i.airtable_id) >= 0).length;
+    const entregada = comp.deals.filter(d => d.investor_rec_ids && d.investor_rec_ids.indexOf(i.airtable_id) >= 0).reduce((s, d) => s + (+d.utilidad_entregada || 0), 0);
+    return { name: i.name, capital: +i.capital_aportado || 0, pagado: +i.capital_pagado || 0, nDeals, entregada, pendiente: (+i.capital_aportado || 0) - (+i.capital_pagado || 0) };
+  }).sort((x, y) => y.capital - x.capital);
+}
+function ffSecAnalitica(comp) {
+  const { deals, kpi } = comp;
+  const cfg = FF.cfg || {};
+  const zonas = ffAggBy(deals, d => d.city);
+  const modelos = ffAggBy(deals, d => d.strategy === 'flip' ? 'Fix & Flip' : 'Hold / BRRRR');
+  const invs = ffInvestorAgg(comp).slice(0, 10);
+  const sel = FF.uw && FF.uw.dealId ? deals.find(d => d.id === FF.uw.dealId) : null;
+  const nAllin = deals.filter(d => d.semAllin).length, nHml = deals.filter(d => d.semHml).length, nBud = deals.filter(d => d.semBudget).length;
+  const cerradas = deals.filter(d => ['vendida', 'refinanciada', 'rentada_y_refinanciada'].includes(d.stage)).length;
+  const utilEnt = deals.reduce((s, d) => s + (+d.utilidad_entregada || 0), 0);
+  const zrow = z => `<tr><td>${FF_ESC(z.k)}</td><td style="text-align:right">${z.n}</td><td style="text-align:right">${FF_MONEY(z.capital)}</td><td style="text-align:right" class="${z.margen >= 0 ? 'up' : 'down'}">${FF_MONEY(z.margen)}</td><td style="text-align:right" class="down">${z.deficit ? FF_MONEY(z.deficit) : '—'}</td></tr>`;
+  const irow = i => `<tr><td>${FF_ESC(i.name)}</td><td style="text-align:right">${i.nDeals}</td><td style="text-align:right">${FF_MONEY(i.capital)}</td><td style="text-align:right" class="up">${FF_MONEY(i.pagado)}</td><td style="text-align:right" class="${i.entregada > 0 ? 'up' : ''}">${FF_MONEY(i.entregada)}</td><td style="text-align:right" class="${i.pendiente > 0 ? 'warn' : 'up'}">${FF_MONEY(i.pendiente)}</td></tr>`;
+  let proy = '<div class="meta">Elegí un deal en Underwriting (con ARV) y cargá renta esperada para proyectar 5 años.</div>';
+  if (sel && sel.arv > 0) {
+    const renta = (sel.renta_mensual != null && +sel.renta_mensual > 0) ? +sel.renta_mensual : Math.round(sel.arv * 0.008);
+    const m = ffUwModel({ arv: sel.arv, rehab: Math.round(sel.remComplete || 0), renta }, cfg);
+    const P = ffProyeccion(m, cfg);
+    const yrow = (r, i) => `<tr><td>Año ${r.y}</td><td style="text-align:right">${FF_MONEY(r.valor)}</td><td style="text-align:right" class="${r.hold.flujo >= 0 ? 'up' : 'down'}">${FF_MONEY(r.hold.flujo)}</td><td style="text-align:right">${FF_MONEY(P.holdAcum[i])}</td><td style="text-align:right" class="${r.refi.flujo >= 0 ? 'up' : 'down'}">${FF_MONEY(r.refi.flujo)}</td><td style="text-align:right">${FF_MONEY(P.refiAcum[i])}</td></tr>`;
+    proy = `<div class="meta" style="margin-bottom:8px">${FF_ESC(ffShort(sel.address))} · ARV ${FF_MONEY(sel.arv)} · renta ${FF_MONEY(renta)}/mes${sel.renta_mensual ? ' (real)' : ' (estimada 0.8% ARV)'} · apreciación ${+cfg.appreciation_pct_annual}%/año · crecimiento renta ${+cfg.rent_growth_pct_annual}%/año (config)</div>
+    <div class="grid kpis" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px">
+      <div class="card kpi"><div class="lab">VENDER hoy</div><div class="big ${P.sellNow >= 0 ? 'up' : 'down'}">${FF_MONEY(P.sellNow)}</div><div class="meta">margen neto tras costos de venta</div></div>
+      <div class="card kpi"><div class="lab">MANTENER 5 años</div><div class="big ${P.hold5 >= 0 ? 'up' : 'down'}">${FF_MONEY(P.hold5)}</div><div class="meta">flujos acumulados + equity año 5</div></div>
+      <div class="card kpi"><div class="lab">REFI + mantener</div><div class="big ${P.refi5 >= 0 ? 'up' : 'down'}">${FF_MONEY(P.refi5)}</div><div class="meta">+ cash-out inicial ${FF_MONEY(Math.max(0, m.cashOut))}</div></div>
+    </div>
+    <div class="meta" style="margin-bottom:8px">Mejor camino a 5 años: <b class="up">${P.mejor[0]} (${FF_MONEY(P.mejor[1])})</b></div>
+    <table class="ptable"><thead><tr><th>Año</th><th style="text-align:right">Valor</th><th style="text-align:right">Flujo HOLD</th><th style="text-align:right">Acum HOLD</th><th style="text-align:right">Flujo REFI</th><th style="text-align:right">Acum REFI</th></tr></thead><tbody>${P.anios.map(yrow).join('')}</tbody></table>`;
+  }
+  return `${ffHeader('Analítica & KPIs', 'Informes', 'Rentabilidad por zona/modelo/inversionista · proyección 5 años · export.')}
+    <div style="display:flex;gap:8px;margin-bottom:14px" class="no-print">
+      <button onclick="window.print()" class="pullbtn">🖨️ PDF</button>
+      <button onclick="ffExportExcelFF()" class="pullbtn">⬇ Excel</button>
+      <button onclick="ffCopyResumenFF()" class="pullbtn">📋 Copiar resumen</button>
+    </div>
+    <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big glow">${FF_MONEY(kpi.capital)}</div><div class="meta">${kpi.total} deals · ${cerradas} ciclos cerrados</div></div>
+      <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${FF_MONEY(kpi.equity)}</div><div class="meta">confiables</div></div>
+      <div class="card kpi"><div class="lab">Utilidad entregada</div><div class="big up">${FF_MONEY(utilEnt)}</div><div class="meta">a inversionistas, histórica</div></div>
+      <div class="card kpi"><div class="lab">Semáforos</div><div class="big ${nAllin + nHml + nBud ? 'down' : 'up'}">${nAllin + nHml + nBud}</div><div class="meta">🔴 ${nAllin} · ⏰ ${nHml} · 📈 ${nBud}</div></div>
+    </div>
+    <div class="grid row2" style="margin-top:14px">
+      <div class="card"><div class="chart-h"><div class="t">Rentabilidad por zona</div><div class="k">margen solo confiables</div></div>
+        <table class="ptable"><thead><tr><th>Zona</th><th style="text-align:right">Deals</th><th style="text-align:right">Capital</th><th style="text-align:right">Margen</th><th style="text-align:right">Déficit</th></tr></thead><tbody>${zonas.map(zrow).join('')}</tbody></table></div>
+      <div class="card"><div class="chart-h"><div class="t">Por modelo</div><div class="k">flip vs hold/BRRRR</div></div>
+        <table class="ptable"><thead><tr><th>Modelo</th><th style="text-align:right">Deals</th><th style="text-align:right">Capital</th><th style="text-align:right">Margen</th><th style="text-align:right">Déficit</th></tr></thead><tbody>${modelos.map(zrow).join('')}</tbody></table></div>
+    </div>
+    <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">Por inversionista</div><div class="k">capital account (top 10)</div></div>
+      <table class="ptable"><thead><tr><th>Inversionista</th><th style="text-align:right">Deals</th><th style="text-align:right">Capital</th><th style="text-align:right">Distribuido</th><th style="text-align:right">Utilidad entregada</th><th style="text-align:right">En trabajo</th></tr></thead><tbody>${invs.map(irow).join('')}</tbody></table></div></div>
+    <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">📈 Proyección 5 años — hold vs sell vs refi</div><div class="k">supuestos de config</div></div>${proy}</div></div>`;
+}
+function ffExportExcelFF() {
+  if (typeof XLSX === 'undefined') { alert('Librería Excel no disponible.'); return; }
+  const comp = ffCompute();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comp.deals.map(d => ({ Casa: ffShort(d.address), Zona: d.city, Etapa: FF_STAGE_LBL[d.stage] || d.stage, Modelo: d.strategy, Compra: d.purchase, Remodel: Math.round(d.remComplete), AllIn: Math.round(d.allIn), ARV: d.arv, MargenUSD: Math.round(d.margin), AllInPctARV: Math.round(d.allInPct * 100), Capital: d.capital_inversionista, UtilidadEntregada: d.utilidad_entregada, SemAllin: d.semAllin ? 'sí' : '', SemHML: d.semHml ? (d.hmlDueDays + 'd') : '', SemPresup: d.semBudget ? (d.budgetDevPct + '%') : '' }))), 'Deals');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ffInvestorAgg(comp).map(i => ({ Inversionista: i.name, Deals: i.nDeals, Capital: i.capital, Distribuido: i.pagado, UtilidadEntregada: i.entregada, EnTrabajo: i.pendiente }))), 'Inversionistas');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ffAggBy(comp.deals, d => d.city).map(z => ({ Zona: z.k, Deals: z.n, Capital: Math.round(z.capital), Margen: Math.round(z.margen), Deficit: Math.round(z.deficit) }))), 'Zonas');
+  XLSX.writeFile(wb, 'FF_Informe.xlsx');
+}
+function ffCopyResumenFF() {
+  const comp = ffCompute();
+  const { kpi, deals } = comp;
+  const nAllin = deals.filter(d => d.semAllin).length, nHml = deals.filter(d => d.semHml).length, nBud = deals.filter(d => d.semBudget).length;
+  const vencidos = deals.filter(d => d.semHml && d.hmlDueDays < 0).map(d => ffShort(d.address) + ' (' + Math.abs(d.hmlDueDays) + 'd vencido)');
+  const utilEnt = deals.reduce((s, d) => s + (+d.utilidad_entregada || 0), 0);
+  const L = [];
+  L.push('FIX & FLIP — RESUMEN EJECUTIVO · ' + new Date().toLocaleDateString('es-MX'));
+  L.push('');
+  L.push('Deals: ' + kpi.total + ' · Capital: ' + FF_MONEY(kpi.capital) + ' · Equity: ' + FF_MONEY(kpi.equity) + ' · Utilidad entregada: ' + FF_MONEY(utilEnt));
+  L.push('Semáforos: all-in>' + Math.round((FF.cfg.all_in_max_pct || 0.75) * 100) + '% = ' + nAllin + ' · HML = ' + nHml + ' · presupuesto = ' + nBud);
+  L.push('');
+  L.push('3 DECISIONES:');
+  L.push('1. ' + (vencidos.length ? 'HML VENCIDOS: ' + vencidos.join(', ') + ' — resolver extensión o refi YA.' : 'Sin HML vencidos — monitorear los próximos vencimientos.'));
+  L.push('2. ' + (nAllin ? nAllin + ' casas sobre el ' + Math.round((FF.cfg.all_in_max_pct || 0.75) * 100) + '% del ARV — revisar salida (venta/refi) antes de seguir inyectando.' : 'All-in bajo control.'));
+  L.push('3. ' + (nBud ? nBud + ' obras con desvío de presupuesto — cruzar con Remodelación (calibración) antes del próximo deal.' : 'Presupuestos de remodelación dentro de banda.'));
+  const txt = L.join('\n');
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => alert('Resumen copiado.'), () => alert(txt)); else alert(txt);
+}
+window.ffSecAnalitica = ffSecAnalitica; window.ffExportExcelFF = ffExportExcelFF; window.ffCopyResumenFF = ffCopyResumenFF; window.ffProyeccion = ffProyeccion;
 
 // ════════════════════════════════════════════════════════════════
 // CHARTS
