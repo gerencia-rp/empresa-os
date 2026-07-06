@@ -48,16 +48,18 @@ export async function sbREST(path, { method = 'GET', body, bearer, prefer } = {}
 
 // Recupera memorias relevantes para una pregunta.
 // Si hay embedding → RPC de similitud; si no → memorias activas recientes (fallback).
-export async function recallMemories(question, k = 6) {
+// bearer = JWT del usuario: con RLS por áreas (Etapa 2), pm_brain_memory ya no se
+// lee con anon — hay que consultar como el usuario logueado (área rentas o admin).
+export async function recallMemories(question, k = 6, bearer) {
   const vec = await embed(question);
   if (vec) {
     try {
-      const rows = await sbREST('rpc/match_brain_memory', { method: 'POST', body: { query_embedding: vecLiteral(vec), match_count: k } });
+      const rows = await sbREST('rpc/match_brain_memory', { method: 'POST', body: { query_embedding: vecLiteral(vec), match_count: k }, bearer });
       if (Array.isArray(rows) && rows.length) return { rows, mode: 'similarity' };
     } catch { /* fallthrough al fallback */ }
   }
   try {
-    const rows = await sbREST(`pm_brain_memory?select=id,tipo,texto,fuente,fecha&activo=eq.true&order=fecha.desc&limit=${k}`);
+    const rows = await sbREST(`pm_brain_memory?select=id,tipo,texto,fuente,fecha&activo=eq.true&order=fecha.desc&limit=${k}`, { bearer });
     return { rows: rows || [], mode: vec ? 'recent(sin-match)' : 'recent(sin-embedding)' };
   } catch {
     return { rows: [], mode: 'none' };

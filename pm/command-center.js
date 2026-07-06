@@ -617,8 +617,9 @@ async function ccSendChat(question) {
     .map(m => ({ role: m.role, content: m.content }));
   const snapshot = ccSnapshot(ccCompute());
   try {
+    const tok = await ccAuthToken(); // JWT del usuario: con RLS por áreas, la memoria RAG se lee como el usuario
     const r = await fetch('/api/brain-chat', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) },
       body: JSON.stringify({ question, snapshot, history }),
     });
     const data = await r.json().catch(() => ({}));
@@ -736,7 +737,8 @@ async function ccDailySummary(force) {
   try {
     const snapshot = ccSnapshot(ccCompute());
     const q = 'Generá el RESUMEN DEL DÍA en 2-3 frases cortas para el CEO: (1) estado general del portafolio con el número clave, (2) lo más urgente hoy, (3) UNA acción concreta sugerida. Directo, sin saludo, sin markdown de títulos.';
-    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: q, snapshot, history: [] }) });
+    const tok = await ccAuthToken();
+    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify({ question: q, snapshot, history: [] }) });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) { CC.daily.error = data.error || 'No se pudo generar el resumen.'; }
     else { CC.daily.text = data.answer || ''; }

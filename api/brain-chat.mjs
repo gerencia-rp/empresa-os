@@ -113,8 +113,9 @@ export default async function handler(req, res) {
   messages.push({ role: 'user', content: question });
 
   // RAG: recuperar memorias relevantes (similitud si hay embeddings; si no, recientes).
+  // Con RLS por áreas se lee con el JWT del usuario (anon ya no ve pm_brain_memory).
   let mem = { rows: [], mode: 'none' };
-  try { mem = await recallMemories(question, 6); } catch { /* memoria opcional */ }
+  try { mem = await recallMemories(question, 6, bearerOf(req)); } catch { /* memoria opcional */ }
 
   const payload = {
     model: MODEL,

@@ -796,7 +796,8 @@ async function osAsk(q) {
   OS.chatBusy = true; OS.chat.push({ role: 'user', content: question }); OS.chat.push({ role: 'assistant', content: '', thinking: true }); osRenderChat();
   const history = OS.chat.filter(m => !m.thinking && !m.error).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
   try {
-    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, snapshot: osSnapshot(osCompute()), history }) });
+    const tok = await (async () => { try { const s = await sb.auth.getSession(); return (s && s.data.session && s.data.session.access_token) || ''; } catch (e) { return ''; } })();
+    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify({ question, snapshot: osSnapshot(osCompute()), history }) });
     const data = await r.json().catch(() => ({})); OS.chat.pop();
     OS.chat.push(r.ok ? { role: 'assistant', content: data.answer || 'Sin respuesta.' } : { role: 'assistant', content: data.error || `Error (HTTP ${r.status}).`, error: true });
   } catch (e) { OS.chat.pop(); OS.chat.push({ role: 'assistant', content: 'No pude conectar: ' + (e.message || e), error: true }); }

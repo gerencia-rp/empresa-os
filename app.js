@@ -73,23 +73,65 @@ function showAuthError(msg) {
   el.classList.remove('hidden');
 }
 
-document.getElementById('auth-login-btn').addEventListener('click', async () => {
+// Errores de Supabase Auth en español entendible (el mensaje crudo viene en inglés)
+function authErrorES(error) {
+  const m = (error && error.message) || '';
+  if (/invalid login credentials/i.test(m)) return 'Email o contraseña incorrectos. Si no la recordás, usá "¿Olvidaste tu contraseña?" o el link mágico.';
+  if (/email not confirmed/i.test(m)) return 'Tu email todavía no está confirmado. Revisá tu casilla (y spam) o pedile a un admin que te reenvíe la invitación.';
+  if (/rate limit|too many/i.test(m)) return 'Demasiados intentos seguidos. Esperá unos minutos y probá de nuevo.';
+  if (/signups? not allowed|user not found/i.test(m)) return 'Ese email no tiene cuenta. Pedile a un admin que te invite desde el Panel de Admin.';
+  if (/network|fetch/i.test(m)) return 'No hay conexión. Revisá tu internet y reintentá.';
+  return m || 'No se pudo iniciar sesión. Probá de nuevo.';
+}
+
+async function doLogin() {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) return showAuthError(error.message);
-
-  // MFA challenge si el user tiene factor verificado.
-  // sb.auth.mfa.getAuthenticatorAssuranceLevel(): {currentLevel: 'aal1'|'aal2', nextLevel}
-  // Si currentLevel != nextLevel, el user necesita verificar TOTP antes de entrar.
+  if (!email) return showAuthError('Poné tu email.');
+  if (!password) return showAuthError('Poné tu contraseña (o usá el link mágico de abajo).');
+  const btn = document.getElementById('auth-login-btn');
+  btn.disabled = true; btn.textContent = '⏳ Entrando…';
   try {
-    const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
-      return await promptMfaChallenge(data.user);
-    }
-  } catch {}
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return showAuthError(authErrorES(error));
 
-  await onLogin(data.user);
+    // MFA challenge si el user tiene factor verificado.
+    // sb.auth.mfa.getAuthenticatorAssuranceLevel(): {currentLevel: 'aal1'|'aal2', nextLevel}
+    // Si currentLevel != nextLevel, el user necesita verificar TOTP antes de entrar.
+    try {
+      const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
+        return await promptMfaChallenge(data.user);
+      }
+    } catch {}
+
+    await onLogin(data.user);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Iniciar sesión';
+  }
+}
+document.getElementById('auth-login-btn').addEventListener('click', doLogin);
+// Enter en email/contraseña = entrar
+['auth-email', 'auth-password'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+});
+// 👁 mostrar/ocultar contraseña
+document.getElementById('auth-eye')?.addEventListener('click', () => {
+  const p = document.getElementById('auth-password');
+  p.type = p.type === 'password' ? 'text' : 'password';
+});
+// ✉️ Link mágico: entra sin contraseña (no crea cuentas — hay que estar invitado)
+document.getElementById('auth-magic-btn')?.addEventListener('click', async (ev) => {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showAuthError('Poné tu email arriba y tocá de nuevo.');
+  const btn = ev.target; btn.disabled = true; btn.textContent = '⏳ Enviando link…';
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin + '/' } });
+  btn.disabled = false; btn.textContent = '✉️ Entrar con link al email (sin contraseña)';
+  if (error) return showAuthError(authErrorES(error));
+  showAuthError('✓ Te mandamos un link a ' + email + '. Abrilo desde este dispositivo y entrás directo (puede tardar 1-2 min; mirá spam).');
+  const errEl = document.getElementById('auth-error');
+  if (errEl) errEl.className = 'text-sm text-emerald-700 bg-emerald-50 rounded-lg p-2';
 });
 
 // Reemplaza el formulario de auth por el de challenge MFA.
@@ -165,7 +207,9 @@ function passwordStrength(pwd) {
   return { ok: true };
 }
 
-document.getElementById('auth-signup-btn').addEventListener('click', async () => {
+// (El botón "Registrarse" se quitó del login: las cuentas se crean por invitación
+// desde el Panel de Admin. El handler queda por si se re-agrega el botón.)
+document.getElementById('auth-signup-btn')?.addEventListener('click', async () => {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showAuthError('Email inválido');
@@ -180,39 +224,75 @@ document.getElementById('auth-signup-btn').addEventListener('click', async () =>
 // "¿Olvidaste tu contraseña?" — manda un email de recovery
 document.getElementById('auth-forgot-btn').addEventListener('click', async () => {
   const email = document.getElementById('auth-email').value.trim();
-  if (!email) return showAuthError('Pon tu email arriba primero');
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showAuthError('Poné tu email arriba y tocá de nuevo.');
   const { error } = await sb.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + '/'
   });
-  if (error) return showAuthError(error.message);
-  showAuthError('✓ Te mandamos un email para resetear tu contraseña. Revisa tu inbox (puede tardar 1-2 min).');
+  if (error) return showAuthError(authErrorES(error));
+  showAuthError('✓ Te mandamos un email para restablecer tu contraseña. Abrí el link y elegí una nueva (puede tardar 1-2 min; mirá spam).');
   const errEl = document.getElementById('auth-error');
   if (errEl) errEl.className = 'text-sm text-emerald-700 bg-emerald-50 rounded-lg p-2';
 });
 
-// Detectar el flujo de recovery — si el URL tiene access_token + type=recovery, pedir nueva pwd
+// Detectar el flujo de recovery/invitación — SOLO si el hash trae type=recovery|invite
+// (un magic link también trae access_token pero NO debe pedir contraseña nueva).
 (async function checkPasswordRecovery() {
   const hash = window.location.hash || '';
-  if (hash.includes('type=recovery') || hash.includes('access_token')) {
+  const esRecovery = hash.includes('type=recovery') || hash.includes('type=invite');
+  const esMagic = hash.includes('type=magiclink');
+  if (esRecovery || esMagic || hash.includes('access_token')) {
     // SIEMPRE limpiar el hash primero — si el user cancela, navega, etc. el hash
-    // ya no debe re-ejecutar este flow. Antes quedaba pegado y volvía a pedir
-    // password en cada navegación SPA.
+    // ya no debe re-ejecutar este flow (quedaba pegado y re-pedía password).
     history.replaceState(null, '', window.location.pathname);
-
-    // Supabase ya restauró la sesión. Pedir nueva contraseña.
-    setTimeout(async () => {
-      const newPwd = prompt('Recibiste un link de recuperación. Ingresá tu nueva contraseña (8+ caracteres):');
-      if (!newPwd) return; // user canceló — no hacer nada (hash ya limpio)
-      if (newPwd.length < 8) {
-        alert('Contraseña debe tener 8+ caracteres. Refrescá el link del email y reintentá.');
-        return;
-      }
-      const { error } = await sb.auth.updateUser({ password: newPwd });
-      if (error) return alert('Error: ' + error.message);
-      alert('✓ Contraseña actualizada. Ya estás logueado.');
-    }, 500);
   }
+  if (!esRecovery) return; // magic link / otros: Supabase ya inicia sesión solo
+  // Supabase ya restauró la sesión → formulario de nueva contraseña (overlay propio).
+  setTimeout(() => showNewPasswordForm(), 500);
 })();
+
+// Formulario "creá tu nueva contraseña" (recovery e invitaciones) — reemplaza al prompt().
+function showNewPasswordForm() {
+  if (document.getElementById('pwd-reset-overlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'pwd-reset-overlay';
+  ov.className = 'fixed inset-0 bg-slate-900/80 flex items-center justify-center p-4 z-[100]';
+  ov.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div class="text-center mb-5">
+        <div class="text-4xl mb-2">🔑</div>
+        <h1 class="text-xl font-bold">Creá tu nueva contraseña</h1>
+        <p class="text-sm text-slate-500 mt-1">Mínimo 8 caracteres, con al menos 3 de: minúscula, mayúscula, número, símbolo.</p>
+      </div>
+      <div class="space-y-3">
+        <div class="relative">
+          <input id="pwd-new" type="password" placeholder="Nueva contraseña" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 pr-10 text-sm" />
+          <button id="pwd-eye" type="button" tabindex="-1" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">👁</button>
+        </div>
+        <input id="pwd-new2" type="password" placeholder="Repetila para confirmar" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm" />
+        <div id="pwd-err" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2"></div>
+        <button id="pwd-save" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg hover:bg-slate-700">Guardar y entrar</button>
+        <button id="pwd-skip" class="w-full text-xs text-slate-500 hover:text-slate-900">Ahora no (entrar igual)</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const err = m => { const e = ov.querySelector('#pwd-err'); e.textContent = m; e.classList.remove('hidden'); };
+  ov.querySelector('#pwd-eye').addEventListener('click', () => { const p = ov.querySelector('#pwd-new'); p.type = p.type === 'password' ? 'text' : 'password'; });
+  const save = async () => {
+    const p1 = ov.querySelector('#pwd-new').value, p2 = ov.querySelector('#pwd-new2').value;
+    const st = passwordStrength(p1);
+    if (!st.ok) return err(st.reason);
+    if (p1 !== p2) return err('Las contraseñas no coinciden.');
+    const btn = ov.querySelector('#pwd-save'); btn.disabled = true; btn.textContent = '⏳ Guardando…';
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    btn.disabled = false; btn.textContent = 'Guardar y entrar';
+    if (error) return err(error.message);
+    ov.remove();
+    if (window.toast) toast('✓ Contraseña actualizada. Ya estás adentro.', 'success');
+  };
+  ov.querySelector('#pwd-save').addEventListener('click', save);
+  ov.querySelector('#pwd-new2').addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+  ov.querySelector('#pwd-skip').addEventListener('click', () => ov.remove());
+}
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await sb.auth.signOut();
