@@ -80,6 +80,8 @@ const STATIC_COPY = [
   "diag.html",
   "mi-plan.html",
   "inversionista.html",
+  "diagnostico.html",
+  "diagnostico.js",
   "favicon.ico",
   "manifest.webmanifest",
   "sw.js",

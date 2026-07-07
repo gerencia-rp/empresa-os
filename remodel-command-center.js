@@ -280,7 +280,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => (window.inRenderDB ? `${rcHeader('Inspección de vivienda', 'Diagnóstico patológico', 'primera etapa: Inspección → Estimador → Planner')}${window.inRenderDB()}` : rcSecCommand(c)), reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">🏥</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">🔍 Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
