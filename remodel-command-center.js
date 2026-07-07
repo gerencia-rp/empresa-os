@@ -84,6 +84,7 @@ async function rcLoadAll() {
     RC.avanceVivo = vivo || [];
     RC.crewRates = crews || [];
     RC.receipts = receipts || [];
+    if (window.inLoad) { try { await window.inLoad(); } catch (e) {} }
   } catch (e) { RC.obras = RC.obras || []; }
 }
 function rcResolveName(v) {
@@ -267,6 +268,8 @@ const RC_NAV = [
   ['evr', '⇄', 'Estimado vs Real'],
   ['obras', '▤', 'Obras'],
   ['lideres', '◈', 'Líderes'],
+  ['inspeccion', '🔍', 'Inspección'],
+  ['nomina', '💵', 'Nómina y Pagos'],
   ['gestion', '◎', 'Gestión (EVM)'],
   ['reportes', '📑', 'Reportes CEO'],
   ['cerebro', '✦', 'Cerebro de obra'],
@@ -277,7 +280,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">🏥</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">🔍 Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
@@ -531,15 +534,27 @@ window.rcSecGestion = rcSecGestion;
 
 // ─── RM-M1 · Avance de obra EN VIVO (tareas vs plata + semáforos de costo y tiempo) ───
 const DLR = String.fromCharCode(36);
+async function rcSetCobro(pid, modo) {
+  const { error } = await sb.from('remodel_cobro_modo').upsert({ property_id: pid, modo, updated_at: new Date().toISOString() }, { onConflict: 'property_id' });
+  if (error) { alert('No se pudo: ' + error.message); return; }
+  const { data } = await sb.from('v_remodel_avance_vivo').select('*');
+  RC.avanceVivo = data || RC.avanceVivo; rcRender();
+}
+window.rcSetCobro = rcSetCobro;
 function rcVivoGanancia(o) {
   const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
   const neg = +o.ganancia_proyectada < 0;
   const bg = o.sem_ganancia === 'rojo' ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.08)';
-  return '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
-    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + '</span>'
+  const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#f87171;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
+  const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#e7b65e;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
+  const modoSel = '<select onchange="rcSetCobro(&quot;' + o.property_id + '&quot;, this.value)" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:inherit;font-size:9px;padding:1px 4px" title="Cómo cobra Structure One esta obra">'
+    + '<option value="fijo"' + (o.modo_cobro !== 'costplus' ? ' selected' : '') + '>PRECIO FIJO (real)</option>'
+    + '<option value="costplus"' + (o.modo_cobro === 'costplus' ? ' selected' : '') + '>COST-PLUS ×1.05 (what-if)</option></select>';
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
+    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + tentativo + precioTent + '</span>' + modoSel
     + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'
     + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
-    + '<div class="meta" style="margin-top:3px;font-size:9px">cobra ' + M(o.valor_remodelacion) + ' · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
+    + '<div class="meta" style="margin-top:3px;font-size:9px">cobra proy. ' + M(o.valor_cobro_proyectado != null ? o.valor_cobro_proyectado : o.valor_remodelacion) + ' (' + (o.modo_cobro === 'costplus' ? 'what-if cost-plus' : 'Valor Remodelación') + ') · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
 }
 function rcVivoCard() {
   const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
@@ -558,7 +573,7 @@ function rcVivoCard() {
       <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado_actividad' ? '⭐ $ por actividad' : o.metodo === 'ponderado_etapa' ? '⭐ por etapa' : '(conteo)'} · ${o.pct_tecnico || 0}%${o.tareas_sin_map > 0 && o.metodo === 'conteo' ? ` <span style="color:#e7b65e" title="Tareas del Planner que no cruzan con actividades del Estimador (planner manual o pronóstico sin guardar) — no ponderan hasta mapear">· ${o.tareas_sin_map} sin mapear</span>` : ''}</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
       <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE FINANCIERO${o.fuente_presupuesto === 'pronostico' ? ' (presup. del pronóstico)' : ''} · ${o.pct_financiero != null ? o.pct_financiero + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_financiero, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
       <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#64748b,#94a3b8)')}
-      ${o.valor_remodelacion > 0 ? rcVivoGanancia(o) : ''}
+      ${(o.valor_remodelacion > 0 || o.modo_cobro === 'costplus') ? rcVivoGanancia(o) : ''}
       <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
         <span>${SEM[o.sem_costo] || '⚪'} costo ${o.costo_proyectado ? `<span style="opacity:.6">(proy. a hoy $${(+o.costo_proyectado).toLocaleString('en-US')})</span>` : ''}</span>
         <span>${SEM[o.sem_tiempo] || '⚪'} tiempo <span style="opacity:.6">(${o.pct_dias != null ? o.pct_dias + '% días' : 's/cronograma'})</span></span></div>
@@ -718,3 +733,36 @@ async function rcReciboGuardar() {
   rcRender();
 }
 window.rcReciboOverlay = rcReciboOverlay; window.rcFirmaClear = rcFirmaClear; window.rcReciboGuardar = rcReciboGuardar;
+
+// ═══ MÓDULO INDEPENDIENTE · NÓMINA Y PAGOS (ledger + recibos + historial) — modular/vendible ═══
+function rcSecNomina(c) {
+  const led = RC.ledger || [];
+  const porW = {};
+  led.forEach(r => { if (!porW[r.worker]) porW[r.worker] = { w: r.worker, horas: 0, dev: 0, pag: 0, deuda: 0, casas: [] }; const m = porW[r.worker]; m.horas += +r.horas || 0; m.dev += +r.devengado || 0; m.pag += +r.pagado || 0; m.deuda += +r.deuda || 0; if (Math.abs(+r.deuda) > 50) m.casas.push({ casa: r.casa, deuda: +r.deuda, horas: +r.horas, ult: r.ultima_fecha }); });
+  const workers = Object.values(porW).sort((a, b) => b.deuda - a.deuda);
+  const deudaTotal = workers.reduce((s, x) => s + Math.max(0, x.deuda), 0);
+  const sinRate = led.filter(x => x.rate_conocido === false).length;
+  const abierto = RC._nomAbierto = RC._nomAbierto || {};
+  const filaW = x => {
+    const open = abierto[x.w];
+    const det = open ? `<tr><td colspan="5" style="padding:4px 12px 10px"><table class="ptable" style="margin:0">${x.casas.sort((a, b) => b.deuda - a.deuda).map(cs => `<tr><td style="font-size:11px;opacity:.8">${RC_E(cs.casa)}</td><td style="text-align:right;font-size:11px">${Math.round(cs.horas)}h</td><td style="text-align:right;font-size:11px">últ. ${cs.ult || '—'}</td><td style="text-align:right" class="${cs.deuda > 0 ? 'down' : 'up'}">${RC_M(cs.deuda)}</td></tr>`).join('')}</table></td></tr>` : '';
+    return `<tr style="cursor:pointer" onclick="RC._nomAbierto['${RC_E(x.w).replace(/'/g, '')}']=!RC._nomAbierto['${RC_E(x.w).replace(/'/g, '')}'];rcRender()"><td><b>${RC_E(x.w)}</b> <span style="opacity:.4">${open ? '▾' : '▸'}</span></td><td style="text-align:right">${Math.round(x.horas)}h</td><td style="text-align:right">${RC_M(x.dev)}</td><td style="text-align:right">${RC_M(x.pag)}</td><td style="text-align:right"><b class="${x.deuda > 0 ? 'down' : 'up'}">${RC_M(x.deuda)}</b></td></tr>${det}`;
+  };
+  const recibos = (RC.receipts || []).map(r => `<tr><td>${r.fecha_pago}</td><td><b>${RC_E(r.lider || '—')}</b></td><td style="font-size:11px">${RC_E((r.casa || '').slice(0, 26))}</td><td style="font-size:11px">${r.periodo_ini} → ${r.periodo_fin}</td><td style="text-align:right"><b>${RC_M(+r.total || 0)}</b></td><td style="text-align:right"><span class="badge ${r.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:9px">${RC_E(r.estado)}</span>${r.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px" title="Se empuja a Airtable cuando el token tenga scope write">↗AT</span>' : ''}</td></tr>`).join('');
+  return `${rcHeader('Nómina y Pagos', 'Structure One', `deuda neta ${RC_M(deudaTotal)} · ${workers.filter(x => x.deuda > 100).length} trabajador(es) con saldo`)}
+    <div class="grid kpis" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi"><div class="lab">Deuda NETA total</div><div class="big down">${RC_M(deudaTotal)}</div><div class="meta">devengado − pagado (C4)</div></div>
+      <div class="card kpi"><div class="lab">Recibos registrados</div><div class="big">${(RC.receipts || []).length}</div><div class="meta">quincenas firmadas</div></div>
+      <div class="card kpi"><div class="lab">Cobertura de tarifas</div><div class="big ${sinRate ? 'warn' : 'up'}">${led.length ? Math.round(100 * (led.length - sinRate) / led.length) : 0}%</div><div class="meta">${sinRate} filas sin rate (nombres ≠ Personal en Campo)</div></div>
+      <div class="card kpi" style="display:flex;flex-direction:column;justify-content:center"><button class="repbtn" style="font-size:13px;padding:10px" onclick="rcPagoQuincenal()">💵 Generar pago quincenal</button><div class="meta" style="margin-top:6px;text-align:center">recibo firmable por líder</div></div>
+    </div>
+    <div class="grid row2" style="margin-top:14px">
+      <div class="card"><div class="chart-h"><div class="t">Deuda por trabajador</div><div class="k">click para detalle por casa · grano: trabajador×casa×día</div></div>
+        <table class="ptable"><thead><tr><th>Trabajador</th><th style="text-align:right">Horas</th><th style="text-align:right">Devengado</th><th style="text-align:right">Pagado</th><th style="text-align:right">Deuda</th></tr></thead><tbody>
+        ${workers.filter(x => Math.abs(x.deuda) > 100).map(filaW).join('') || '<tr><td colspan="5" style="padding:12px;color:#48d69c">Sin deudas ✓</td></tr>'}</tbody></table></div>
+      <div class="card"><div class="chart-h"><div class="t">Historial de pagos quincenales</div><div class="k">recibos firmados (firma guardada en el registro)</div></div>
+        <table class="ptable"><thead><tr><th>Pago</th><th>Líder</th><th>Casa</th><th>Período</th><th style="text-align:right">Total</th><th style="text-align:right">Estado</th></tr></thead><tbody>
+        ${recibos || '<tr><td colspan="6" style="padding:12px;opacity:.6">Aún sin recibos — generá el primero con el botón 💵.</td></tr>'}</tbody></table>
+        <div class="meta" style="margin-top:8px">Al firmar un recibo queda registrado como REALIZADO con la firma del líder embebida. Write-back a "Nómina Trabajadores en Campo" (Airtable): pendiente del scope write del token.</div></div>
+    </div>`;
+}

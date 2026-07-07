@@ -544,7 +544,10 @@ Deno.serve(async (req) => {
       const { data: avRows } = await sb.from("remodel_at_properties")
         .select("airtable_id, avance_real").eq("active", true).not("avance_real", "is", null);
       const patches = (avRows || []).filter((r: any) => r.airtable_id && r.avance_real != null)
-        .map((r: any) => ({ id: r.airtable_id, fields: { "fld5nTFwW161Xu3sk": Math.round(Number(r.avance_real)) } }));
+        .map((r: any) => ({ id: r.airtable_id, fields: {
+          "fld5nTFwW161Xu3sk": Math.round(Number(r.avance_real)),            // número 0-100 (legacy)
+          "fldjdSUiunUf2a8Xs": Math.round(Number(r.avance_real)) / 100,      // percent (0-1): "Porcentaje avance obra %"
+        } }));
       for (let i = 0; i < patches.length; i += 10) {
         const wbRes = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`, {
           method: "PATCH",

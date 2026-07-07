@@ -345,7 +345,22 @@ fcState.form = {
 const FC_STAGE_ICON = { 'Demolición':'⛏️','Cimentación':'🏗️','Externo':'🏠','Estructura':'🪵','Interno':'🛏️','Limpieza':'🧹' };
 
 // ─── RENDER PRINCIPAL DE LA TAB ───
+function fcApplyInspHandoff() {
+  let h = window.__inspHandoff;
+  if (!h) { try { h = JSON.parse(localStorage.getItem('rm_insp_handoff') || 'null'); } catch (e) {} }
+  if (!h || fcState._inspApplied === (h.property_id || h.nombre)) return null;
+  const af = h.afectacion_por_etapa || {};
+  const nueva = {};
+  FC_STAGES.forEach(et => { nueva[et] = (af[et] != null) ? Math.round(af[et]) : (et === 'Limpieza' ? 100 : 0); });
+  // Demolición/Estructura escalan con el daño; Limpieza siempre 100 (se limpia toda la casa)
+  fcState.form.afectacion = nueva;
+  if (h.nombre && !fcState.form.propiedad) fcState.form.propiedad = h.nombre;
+  if (h.direccion && !fcState.form.direccion) fcState.form.direccion = h.direccion;
+  fcState._inspApplied = h.property_id || h.nombre;
+  return h;
+}
 function fcRenderTab(body) {
+  const _insp = fcApplyInspHandoff();
   const f = fcState.form;
   const errores = fcValidarDiagnostico({ sqft: f.sqft, afectacion: f.afectacion });
   const otrosPct = f.otrosCostosPctOverride != null ? f.otrosCostosPctOverride : fcState.otrosCostosPct;
@@ -357,6 +372,7 @@ function fcRenderTab(body) {
   const duracionSugerida = fcDuracionEstimada(f.sqft);
 
   body.innerHTML = `
+    ${_insp ? `<div class="bg-teal-50 border border-teal-300 text-teal-800 rounded-lg px-3 py-2 mb-3 text-sm">🔍 <b>Pre-llenado desde la Inspección</b> de ${(_insp.nombre||'').replace(/</g,'&lt;')} (daño global ${_insp.dano_global||'—'}%): las afectaciones por etapa arrancan del diagnóstico, no de cero. Ajustá lo que haga falta.</div>` : ''}
     <div class="grid lg:grid-cols-12 gap-4">
       <!-- IZQUIERDA: Visita Previa -->
       <div class="lg:col-span-5 space-y-3">
@@ -896,6 +912,14 @@ async function fcUploadTaskadeFile(file) {
 // ─── DIAGNÓSTICOS PERSISTIDOS (picker) ───
 
 // Carga un diagnóstico al form y guarda en historial
+const FC_AFECT_ALIAS = { 'Interior': 'Interno', 'Exterior': 'Externo', 'Interno': 'Interno', 'Externo': 'Externo' };
+function fcNormAfectacion(af) {
+  if (!af || typeof af !== 'object') return af;
+  const out = {};
+  Object.keys(af).forEach(k => { out[FC_AFECT_ALIAS[k] || k] = af[k]; });
+  return out;
+}
+window.fcNormAfectacion = fcNormAfectacion;
 function fcLoadDiagnosis(id) {
   if (!id) return;
   const d = fcState.diagnoses.find(x => x.id === id);
@@ -906,13 +930,15 @@ function fcLoadDiagnosis(id) {
   fcState.form.precioCompra = d.precio_compra || 0;
   fcState.form.fechaInicio = d.fecha_inicio || fcState.form.fechaInicio;
   fcState.form.duracionDias = d.duracion_dias || fcState.form.duracionDias;
+  // Normalizar llaves inglés→canónico (Interior→Interno, Exterior→Externo) — registros viejos las mezclan
+  const afNorm = fcNormAfectacion(d.afectacion);
   FC_STAGES.forEach(s => {
-    if (d.afectacion && d.afectacion[s] != null) fcState.form.afectacion[s] = +d.afectacion[s];
+    if (afNorm && afNorm[s] != null) fcState.form.afectacion[s] = +afNorm[s];
   });
   // Si el diagnóstico viene de Taskade, también restaurar el preview
   if (d.source === 'taskade' && d.detalle) {
     fcState.form._lastTaskade = {
-      propiedad: d.propiedad, direccion: d.direccion, afectacion: d.afectacion,
+      propiedad: d.propiedad, direccion: d.direccion, afectacion: fcNormAfectacion(d.afectacion),
       detalle: d.detalle, taskade_id: d.taskade_id, veredicto: d.veredicto,
       dano_global_pct: d.dano_global_pct, archivo_url: d.archivo_url, archivo_nombre: d.archivo_nombre
     };
