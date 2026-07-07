@@ -377,6 +377,8 @@ Deno.serve(async (req) => {
     // Ops Brain: 4 agentes generan propuestas (cola de aprobación)
     let proposalsN = 0;
     try { proposalsN = await generateAgentProposals(sb, allProjected, companies); } catch (e) { console.warn("agentes:", String(e).slice(0, 150)); }
+    let sabueso: any = null;
+    try { sabueso = await runSabueso(sb, allProjected, companies); } catch (e) { console.warn("sabueso:", String(e).slice(0, 150)); }
 
     const duration_ms = Date.now() - startMs;
     await sb.from("clickup_sync_log").insert({
@@ -390,6 +392,7 @@ Deno.serve(async (req) => {
       ok: true,
       companies_synced: companies.length,
       proposals: proposalsN,
+      sabueso,
       tasks_synced: totalTasks,
       alerts: totalAlerts,
       duration_ms,
@@ -481,4 +484,64 @@ async function generateAgentProposals(sb: any, allProjected: any[], companiesMet
     if (error) console.warn("proposals insert:", error.message);
   }
   return P.length;
+}
+
+// ─── SABUESO: scrum-master automático — catálogo de checks sobre el tablero operativo ───
+async function runSabueso(sb: any, allProjected: any[], companiesMeta: any[]) {
+  const { data: cfgRows } = await sb.from("sabueso_config").select("*").eq("activo", true);
+  const CFG: Record<string, number> = {};
+  (cfgRows || []).forEach((c: any) => CFG[c.check_key] = +c.umbral);
+  const u = (k: string, def: number) => CFG[k] != null ? CFG[k] : def;
+  const empName = (sid: string) => (companiesMeta.find((c: any) => String(c.clickup_space_id) === String(sid))?.name) || sid;
+  const now = Date.now(); const DAY = 86400000;
+  // filtro de ruido + operativas activas (misma definición del panel)
+  const RUIDO = /plantilla|maestr|ejemplo|template/i, GEST = /cobros y pagos|check.?in|bienvenida|bitacor|gestion|gestión/i, LT = /refinanc|estrategia de salida/i;
+  const op = allProjected.filter((t: any) =>
+    !RUIDO.test(t.name || "") && !RUIDO.test(t.list_name || "") && !RUIDO.test(t.folder_name || "") &&
+    !GEST.test(t.list_name || "") && !LT.test(t.list_name || "") &&
+    (t.status_type || "") !== "closed" && !t.date_closed && !t.date_done);
+  const F: any[] = [];
+  const add = (t: any, key: string, cat: string, sev: string, accion: string, detalle: string, dueno?: string) =>
+    F.push({ check_key: key, categoria: cat, severidad: sev, task_id: t?.id || null, task_name: (t?.name || "").slice(0, 160), task_url: t?.url || null, empresa: t ? empName(t.space_id) : null, lista: t?.list_name || null, dueno_sugerido: dueno || null, accion, detalle: detalle.slice(0, 300), estado: "abierto", active: true, archived_at: null });
+  // HIGIENE
+  op.filter((t: any) => !t.due_date).forEach((t: any) => add(t, "H1", "higiene", "media", "poner_fecha", `Sin fecha límite en "${t.list_name || t.folder_name}".`));
+  op.filter((t: any) => !(t.primary_assignee || "").trim()).forEach((t: any) => add(t, "H2", "higiene", "media", "asignar_dueno", `Sin dueño en "${t.list_name || t.folder_name}".`));
+  // FLUJO · congelada por prioridad
+  op.forEach((t: any) => {
+    if (!t.date_updated) return;
+    const dias = (now - new Date(t.date_updated).getTime()) / DAY;
+    const pr = (t.priority || "").toLowerCase();
+    const umb = pr === "urgent" ? u("F1_urgente", 3) : pr === "high" ? u("F1_alta", 7) : u("F1_normal", 14);
+    if (dias > umb) add(t, "F1", "flujo", pr === "urgent" ? "alta" : "media", "refechar", `Congelada ${Math.round(dias)}d (umbral ${umb}d, prioridad ${pr || "normal"}) en "${t.list_name}".`, t.primary_assignee);
+  });
+  // FLUJO · WIP por persona
+  const wip: Record<string, number> = {};
+  op.forEach((t: any) => { const p = (t.primary_assignee || "").trim(); if (p) wip[p] = (wip[p] || 0) + 1; });
+  const wipU = u("F2_wip", 40);
+  Object.entries(wip).filter(([, n]) => (n as number) > wipU).forEach(([p, n]) => { F.push({ check_key: "F2", categoria: "flujo", severidad: "alta", task_id: null, task_name: null, task_url: null, empresa: null, lista: null, dueno_sugerido: p, accion: "redistribuir", detalle: `${p} tiene ${n} activas (umbral ${wipU}) — sobrecargado.`, estado: "abierto", active: true, archived_at: null }); });
+  // FLUJO · urgente sin dueño
+  op.filter((t: any) => ["urgent", "high"].includes((t.priority || "").toLowerCase()) && !(t.primary_assignee || "").trim()).forEach((t: any) => add(t, "U1", "flujo", "alta", "asignar_dueno", `Urgente (${t.priority}) SIN dueño en "${t.list_name}".`));
+  // PROCESO · estado terminal abierto
+  op.filter((t: any) => /vendida|finaliz|cerrada|entregada/i.test(t.list_name || "")).forEach((t: any) => add(t, "P1", "proceso", "critica", "archivar", `Tarea abierta en lista terminal "${t.list_name}" — la casa figura cerrada.`));
+  // PROCESO · huérfana
+  op.filter((t: any) => !(t.list_name || "").trim() && !(t.folder_name || "").trim()).forEach((t: any) => add(t, "P3", "proceso", "media", "asignar_lista", "Tarea sin lista ni casa (huérfana)."));
+  // PROCESO · duplicados (mismo nombre + lista + casa)
+  const seen: Record<string, any[]> = {};
+  op.filter((t: any) => (t.name || "").replace(/[^a-z0-9]/gi, "").length >= 12).forEach((t: any) => { const k = (t.folder_name || "") + "|" + (t.list_name || "") + "|" + (t.name || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 60); (seen[k] = seen[k] || []).push(t); });
+  Object.values(seen).filter((g) => g.length > 1).forEach((g) => { g.slice(1).forEach((t: any) => add(t, "P2", "proceso", "media", "archivar", `Duplicado (${g.length}×) de "${t.name}" en "${t.list_name}".`)); });
+  // SLA · plata/inversionista congelada/vencida > N días
+  const slaU = u("S1_sla_plata", 5);
+  op.filter((t: any) => /pago|cobro|inversion|draw|refinanc|renta|dinero|factura|nomina|nómina/i.test((t.list_name || "") + " " + (t.name || ""))).forEach((t: any) => {
+    const venc = t.due_date && String(t.due_date).slice(0, 10) < new Date().toISOString().slice(0, 10);
+    const congel = t.date_updated && (now - new Date(t.date_updated).getTime()) / DAY > slaU;
+    if (venc || congel) add(t, "S1", "sla", "critica", "escalar", `Toca plata/inversionista y está ${venc ? "vencida" : "congelada"} — escalar.`, t.primary_assignee);
+  });
+  // persistir: soft-delete de los findings del run anterior + insertar frescos
+  const runIso = new Date().toISOString();
+  await sb.from("sabueso_findings").update({ active: false, archived_at: runIso }).eq("active", true);
+  for (let i = 0; i < F.length; i += 200) {
+    const { error } = await sb.from("sabueso_findings").insert(F.slice(i, i + 200).map((x) => ({ ...x, run_at: runIso })));
+    if (error) console.warn("sabueso insert:", error.message);
+  }
+  return { total: F.length, porSeveridad: F.reduce((a: any, x: any) => { a[x.severidad] = (a[x.severidad] || 0) + 1; return a; }, {}) };
 }

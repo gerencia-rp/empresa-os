@@ -248,7 +248,7 @@ window.osToggleTheme = osToggleTheme;
 async function osLoad() {
   OS.loaded = false; OS.loadErr = null;
   try {
-    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw, ckT, ckS, agP, agReg] = await Promise.all([
+    const [ff, draws, props, units, pay, book, tenants, tasks, inv, remodel, edu, ffOh, ffHml, pnl, qbc, qbm, hmlL, cw, ckT, ckS, agP, agReg, sab, sabCfg] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units,property_id,address_normalized,mortgage_monthly').eq('active', true),
@@ -275,12 +275,15 @@ async function osLoad() {
       sb.from('clickup_snapshots').select('snapshot_date,total_open,total_overdue,total_closed_last_7d,company_id').order('snapshot_date').then(r => r.data || []).catch(() => []),
       sb.from('agent_proposals').select('*').is('deleted_at', null).eq('estado', 'propuesta').order('created_at', { ascending: false }).limit(60).then(r => r.data || []).catch(() => []),
       sb.from('agent_registry').select('id, nombre').like('nombre', 'Ops%').is('deleted_at', null).then(r => r.data || []).catch(() => []),
+      (async () => { const all = []; for (let pg = 0; pg < 5; pg++) { const { data } = await sb.from('sabueso_findings').select('*').eq('active', true).order('id').range(pg * 1000, pg * 1000 + 999); all.push(...(data || [])); if (!data || data.length < 1000) break; } return all; })().catch(() => []),
+      sb.from('sabueso_config').select('*').eq('activo', true).then(r => r.data || []).catch(() => []),
     ]);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
     OS.concilWarn = cw ? +cw.value : 10;
     OS.ckTasks = ckT || []; OS.ckSnaps = ckS || []; OS.agProps = agP || [];
+    OS.sabueso = sab || []; OS.sabCfg = {}; (sabCfg || []).forEach(c => OS.sabCfg[c.check_key] = c);
     OS.agIds = {}; (agReg || []).forEach(r => OS.agIds[r.nombre] = r.id);
     OS.ffOverhead = (ffOh || []).reduce((t, x) => t + (+x.monto || 0), 0);
     OS.ffIntereses = (ffHml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
@@ -890,6 +893,8 @@ function opsEsLongterm(t) { return OPS_LT_RE.test(t.list_name || ''); }
 function opsHoy() { return new Date().toISOString().slice(0, 10); }
 function opsActiva(t) { return (t.status_type || '') !== 'closed' && !t.date_closed && !t.date_done; }
 function opsVencida(t) { return opsActiva(t) && t.due_date && String(t.due_date).slice(0, 10) < opsHoy(); }
+function opsCongelada(t) { const u = t.date_updated; if (!u) return false; return (Date.now() - new Date(u).getTime()) / 86400000 > 14; }
+function opsMovido7d(t) { const u = t.date_updated; if (!u) return false; return (Date.now() - new Date(u).getTime()) / 86400000 <= 7; }
 function opsCompute() {
   const T = (OS.ckTasks || []).filter(t => !opsEsRuido(t));
   const ruidoN = (OS.ckTasks || []).length - T.length;
@@ -908,16 +913,22 @@ function opsCompute() {
   const pctT = conDone.length ? Math.round(100 * aTiempo.length / conDone.length) : null;
   // carga por persona
   const P = {};
-  act.forEach(t => { const p = (t.primary_assignee || '').trim() || '(sin dueño)'; if (!P[p]) P[p] = { p, act: 0, venc: 0, urg: 0 }; P[p].act++; if (opsVencida(t)) P[p].venc++; if (OPS_URG.includes((t.priority || '').toLowerCase())) P[p].urg++; });
+  act.forEach(t => { const p = (t.primary_assignee || '').trim() || '(sin dueño)'; if (!P[p]) P[p] = { p, act: 0, venc: 0, urg: 0, cong: 0 }; P[p].act++; if (opsVencida(t)) P[p].venc++; if (OPS_URG.includes((t.priority || '').toLowerCase())) P[p].urg++; if (opsCongelada(t)) P[p].cong++; });
   const personas = Object.values(P).sort((a, b) => b.act - a.act);
-  const cuellos = personas.filter(x => x.p !== '(sin dueño)' && (x.venc >= 10 || x.act >= 60));
+  const cuellos = personas.filter(x => x.p !== '(sin dueño)' && x.act > (OS.sabCfg && OS.sabCfg.F2_wip ? +OS.sabCfg.F2_wip.umbral : 40));
   // por empresa
   const emp = Object.keys(OPS_EMP).map(sid => {
-    const a = act.filter(t => t.space_id === sid), v = a.filter(opsVencida);
-    const usd = a.filter(t => OPS_URG.includes((t.priority || '').toLowerCase()) && !(t.primary_assignee || '').trim());
-    const ratio = a.length ? v.length / a.length : 0;
-    const sem = (ratio >= 0.10 || usd.length >= 15) ? 'rojo' : (ratio >= 0.04 || usd.length >= 5) ? 'amarillo' : 'verde';
-    return { sid, nombre: OPS_EMP[sid], act: a.length, venc: v.length, urgSinDueno: usd.length, ratio: Math.round(ratio * 100), sem };
+    const a = act.filter(t => t.space_id === sid);
+    const hig = a.length ? a.filter(t => t.due_date && (t.primary_assignee || '').trim()).length / a.length : 1;
+    const cong = a.length ? a.filter(opsCongelada).length / a.length : 0;
+    const sinDue = a.length ? a.filter(t => !(t.primary_assignee || '').trim()).length / a.length : 0;
+    const v = a.filter(opsVencida);
+    // composite de FLUJO (0 malo → 1 sano): higiene alta, congelado bajo, sin-dueño bajo
+    const score = 0.4 * hig + 0.35 * (1 - cong) + 0.25 * (1 - sinDue);
+    const sem = score < 0.35 ? 'rojo' : score < 0.6 ? 'amarillo' : 'verde';
+    // número-problema: el peor de los tres
+    const probs = [{ k: 'sin fecha', v: a.filter(t => !t.due_date).length, pct: Math.round(100 * (a.filter(t => !t.due_date).length) / (a.length || 1)) }, { k: 'sin dueño', v: a.filter(t => !(t.primary_assignee || '').trim()).length, pct: Math.round(sinDue * 100) }, { k: 'congeladas', v: a.filter(opsCongelada).length, pct: Math.round(cong * 100) }].sort((x, y) => y.pct - x.pct);
+    return { sid, nombre: OPS_EMP[sid], act: a.length, venc: v.length, higienePct: Math.round(hig * 100), congelPct: Math.round(cong * 100), sinDuenoN: a.filter(t => !(t.primary_assignee || '').trim()).length, problema: probs[0], score: Math.round(score * 100), sem };
   });
   // casas/listas estancadas: lista con ≥5 vencidas
   const L = {};
@@ -927,11 +938,22 @@ function opsCompute() {
   const S = {};
   (OS.ckSnaps || []).forEach(s => { const d = s.snapshot_date; if (!S[d]) S[d] = { d, overdue: 0, open: 0, closed7: 0 }; S[d].overdue += +s.total_overdue || 0; S[d].open += +s.total_open || 0; S[d].closed7 += +s.total_closed_last_7d || 0; });
   const tend = Object.values(S).sort((a, b) => a.d.localeCompare(b.d)).slice(-14);
+  // MÉTRICAS DE SALUD (flujo + higiene)
+  const conFyD = act.filter(t => t.due_date && (t.primary_assignee || '').trim());  // higiene
+  const higienePct = act.length ? Math.round(100 * conFyD.length / act.length) : 0;
+  const movidos = act.filter(opsMovido7d);
+  const movidoPct = act.length ? Math.round(100 * movidos.length / act.length) : 0;
+  const congeladas = act.filter(opsCongelada);
+  const congelPct = act.length ? Math.round(100 * congeladas.length / act.length) : 0;
+  // cycle time (creación→cierre) de cerradas últimos 90d
+  const cerr90 = T.filter(t => t.date_done && t.date_created && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 90);
+  const cycleTime = cerr90.length ? Math.round(cerr90.reduce((s2, t) => s2 + (new Date(t.date_done) - new Date(t.date_created)) / 86400000, 0) / cerr90.length) : null;
+  const throughput = T.filter(t => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7).length;
   const propuestas = (OS.agProps || []).filter(x => !x.deleted_at && x.estado === 'propuesta');
   const dupIds = opsDuplicadas(act);
   const ccKeys = opsCasasCerradasKeys();
   const casaCerrada = act.filter(t => opsEnCasaCerrada(t, ccKeys));
-  return { act, venc, vencBrutas, gestion, longterm, porConfig, ruidoN, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, dupIds, casaCerrada, cerradas7: tend.length ? tend[tend.length - 1].closed7 : 0 };
+  return { act, venc, vencBrutas, gestion, longterm, porConfig, ruidoN, sinD, urg, sinF, hoy, pctT, personas, cuellos, emp, estancadas, tend, propuestas, dupIds, casaCerrada, higienePct, movidoPct, congelPct, congeladas, cycleTime, throughput, cerradas7: throughput, totalBruto: (OS.ckTasks || []).length };
 }
 function opsGo(view, filtro) {
   OS.opsView = view;
@@ -944,41 +966,38 @@ window.opsGo = opsGo; window.opsSetF = opsSetF; window.opsSort = opsSort;
 
 function opsSemChip(sem) { return sem === 'rojo' ? '🔴' : sem === 'amarillo' ? '🟡' : '🟢'; }
 function opsCeoView(o) {
-  const empCards = o.emp.map(e => `<div class="card" style="cursor:pointer" onclick="opsGo('pm',{emp:'${e.sid}',tipo:'vencidas'})"><div class="lab">${opsSemChip(e.sem)} ${e.nombre}</div><div class="big">${e.act}</div><div class="meta">${e.venc} vencidas (${e.ratio}%) · ${e.urgSinDueno} urgentes sin dueño</div></div>`).join('');
-  // decisiones del día
+  const kpi = (lab, val, meta, sub, good) => `<div class="card"><div class="lab">${lab}</div><div class="big ${good == null ? '' : good ? 'up' : 'down'}">${val}</div><div class="meta">${meta}${sub ? ' · ' + sub : ''}</div></div>`;
+  const kpis = `<div class="grid k4">
+    ${kpi('Higiene (fecha+dueño)', o.higienePct + '%', 'meta 100%', 'tablero configurado', o.higienePct >= 60)}
+    ${kpi('Flujo (movido 7d)', o.movidoPct + '%', 'congelado ' + o.congelPct + '%', 'antídoto del estancamiento', o.movidoPct >= 40)}
+    ${kpi('Tiempo de ciclo', (o.cycleTime != null ? o.cycleTime + 'd' : '—'), 'meta ≤30d', 'creación→cierre', o.cycleTime != null && o.cycleTime <= 30)}
+    ${kpi('Throughput', o.throughput + '/sem', 'cerradas 7d', '', null)}
+  </div>`;
+  const empCards = o.emp.map(e => `<div class="card" style="cursor:pointer" onclick="opsGo('pm',{emp:'${e.sid}'})"><div class="lab">${opsSemChip(e.sem)} ${e.nombre} <span style="opacity:.5;font-weight:400">· salud ${e.score}</span></div><div style="display:flex;align-items:baseline;gap:8px;margin:4px 0"><div class="big">${e.act}</div><div class="down" style="font-size:13px;font-weight:700">${e.problema.v} ${e.problema.k} (${e.problema.pct}%)</div></div><div class="meta">higiene ${e.higienePct}% · congeladas ${e.congelPct}% · sin dueño ${e.sinDuenoN}</div></div>`).join('');
+  // 3 DECISIONES por impacto ($/inversionista primero)
   const dec = [];
-  if (o.porConfig.length > 50) dec.push({ tx: `<b>${o.porConfig.length} tareas POR CONFIGURAR</b> (sin fecha o dueño) — el agente diario no puede operar el tablero así. Meta: bajarlo a 0.`, f: { tipo: 'por_configurar' } });
-  const top = o.personas.filter(x => x.p !== '(sin dueño)')[0];
-  const topV = [...o.personas].filter(x => x.p !== '(sin dueño)').sort((a, b) => b.venc - a.venc)[0];
-  if (topV && topV.venc >= 10) dec.push({ tx: `<b>${OS_E(topV.p)}</b> tiene <b>${topV.venc} tareas vencidas</b> (${topV.act} activas) — redistribuir o re-fechar.`, f: { persona: topV.p, tipo: 'vencidas' } });
-  const usdN = o.urg.filter(t => !(t.primary_assignee || '').trim()).length;
-  if (usdN) dec.push({ tx: `<b>${usdN} tareas urgentes SIN DUEÑO</b> — asignar hoy.`, f: { tipo: 'urgentes_sin_dueno' } });
-  o.estancadas.slice(0, 2).forEach(x => dec.push({ tx: `<b>${OS_E(String(x.lista).replace(/^\d+[.)]\s*/, ''))}</b> estancada: ${x.n} vencidas en la misma lista/casa.`, f: { q: x.lista, tipo: 'vencidas' } }));
-  if (o.tend.length >= 7 && o.tend[o.tend.length - 1].overdue > o.tend[Math.max(0, o.tend.length - 8)].overdue * 1.15) dec.push({ tx: `Las vencidas <b>subieron ${o.tend[o.tend.length - 1].overdue - o.tend[Math.max(0, o.tend.length - 8)].overdue}</b> en 7 días — la operación está empeorando.`, f: { tipo: 'vencidas' } });
-  if (o.propuestas.length) dec.push({ tx: `<b>${o.propuestas.length} propuesta(s) del Ops Brain</b> esperando tu aprobación.`, f: { tipo: 'propuestas' } });
-  const decHtml = dec.slice(0, 5).map((d, i) => `<div class="krow" style="cursor:pointer;padding:10px 0" onclick='opsGo("pm",${JSON.stringify(d.f)})'><span>${i + 1}. ${d.tx}</span><b style="opacity:.5">→</b></div>`).join('') || '<div class="meta" style="padding:10px 0">Nada crítico que decidir hoy ✓</div>';
-  // tendencia sparkline
-  const maxO = Math.max(...o.tend.map(x => x.overdue), 1);
-  const spark = o.tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(56 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
-  // carga por persona (top 8)
-  const conDueno = o.personas.filter(x => x.p !== '(sin dueño)').slice(0, 8);
-  const sinDuenoRow = o.personas.find(x => x.p === '(sin dueño)');
-  const maxA = Math.max(...conDueno.map(x => x.act), 1);
-  const carga = [...conDueno, ...(sinDuenoRow ? [sinDuenoRow] : [])].map(x => `<div class="krow" style="cursor:pointer" onclick="opsGo('pm',{persona:'${OS_E(x.p)}'})"><span style="min-width:150px">${OS_E(x.p)}</span><span style="flex:1;margin:0 10px"><span style="display:block;height:9px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, Math.round(100 * x.act / maxA))}%;${x.p === '(sin dueño)' ? 'opacity:.35;' : ''}background:linear-gradient(90deg,#12b5a0,#2f6ef0)"></i></span></span><b style="min-width:44px;text-align:right">${x.act}</b><span class="${x.venc ? 'down' : ''}" style="min-width:84px;text-align:right;font-size:11px;margin-left:10px">${x.venc} venc.</span></div>`).join('');
-  return `<div class="grid k4">
-      <div class="card"><div class="lab">% a tiempo (histórico)</div><div class="big ${o.pctT >= 60 ? 'up' : 'down'}">${o.pctT != null ? o.pctT + '%' : '—'}</div><div class="meta">entregas con fecha cumplida</div></div>
-      <div class="card" style="cursor:pointer" onclick="opsGo('pm',{tipo:'vencidas'})"><div class="lab">Vencidas OPERATIVAS</div><div class="big down">${o.venc.length}</div><div class="meta">excluye ${o.vencBrutas.length - o.venc.length} de gestión/long-term</div></div>
-      <div class="card"><div class="lab">Cuellos de botella</div><div class="big ${o.cuellos.length ? 'warn' : 'up'}">${o.cuellos.length}</div><div class="meta">${o.cuellos.slice(0, 2).map(x => OS_E(x.p)).join(', ') || 'ninguno'}</div></div>
-      <div class="card"><div class="lab">Cerradas últimos 7d</div><div class="big up">${o.cerradas7}</div><div class="meta">eficiencia del equipo</div></div>
-    </div>
-    <div class="card" style="margin-top:14px;border:1px solid rgba(231,182,94,.4);cursor:pointer" onclick="opsGo('pm',{tipo:'por_configurar'})"><div class="lab">⚡ POR CONFIGURAR — la prioridad (regla madre)</div><div style="display:flex;align-items:baseline;gap:14px;margin-top:6px"><div class="big warn">${o.porConfig.length}</div><div class="meta" style="flex:1">tareas sin fecha u dueño (${o.sinF.length} sin fecha · ${o.sinD.length} sin dueño). <b>El agente diario solo puede correr cuando toda tarea tenga fecha + dueño + dependencia.</b> Dependencias: aún no espejadas de ClickUp (P2). Click para trabajar la cola.</div></div></div>
+  const slaPlata = (OS.sabueso || []).filter(x => x.categoria === 'sla' && x.active !== false);
+  if (slaPlata.length) dec.push({ imp: 3, tx: `<b>${slaPlata.length} tareas que TOCAN PLATA/inversionista</b> vencidas o congeladas — escalar hoy (mayor impacto $).`, f: { tab: 'sabueso', cat: 'sla' } });
+  const peorEmp = [...o.emp].sort((a, b) => a.score - b.score)[0];
+  if (peorEmp && peorEmp.sem === 'rojo') dec.push({ imp: 2, tx: `<b>${peorEmp.nombre}</b> en rojo: ${peorEmp.problema.v} ${peorEmp.problema.k} (${peorEmp.problema.pct}%) y ${peorEmp.congelPct}% congelado — sesión de higiene del tablero.`, f: { emp: peorEmp.sid } });
+  const topWip = o.personas.filter(x => x.p !== '(sin dueño)').sort((a, b) => b.act - a.act)[0];
+  if (topWip && topWip.act > 60) dec.push({ imp: 2, tx: `<b>${OS_E(topWip.p)}</b> sobrecargado: ${topWip.act} activas (${topWip.cong} congeladas) — redistribuir.`, f: { persona: topWip.p } });
+  const critN = (OS.sabueso || []).filter(x => x.severidad === 'critica').length;
+  if (critN) dec.push({ imp: 1, tx: `<b>${critN} anomalías CRÍTICAS</b> del Sabueso (estado terminal abierto, SLA) — revisar.`, f: { tab: 'sabueso' } });
+  if (o.propuestas.length) dec.push({ imp: 1, tx: `<b>${o.propuestas.length} propuestas</b> del Ops Brain esperando aprobación (en 3 lotes).`, f: { tab: 'pm', tipo: 'propuestas' } });
+  dec.sort((a, b) => b.imp - a.imp);
+  const decHtml = dec.slice(0, 3).map((d, i) => `<div class="krow" style="cursor:pointer;padding:10px 0" onclick='${d.f.tab === 'sabueso' ? `opsGo("sabueso",${JSON.stringify(d.f)})` : `opsGo("pm",${JSON.stringify(d.f)})`}'><span>${i + 1}. ${d.tx}</span><b style="opacity:.5">→</b></div>`).join('') || '<div class="meta" style="padding:10px 0">Nada crítico esta semana ✓</div>';
+  // mini-tendencia congeladas/vencidas (snapshots)
+  const tend = o.tend.slice(-10);
+  const maxO = Math.max(...tend.map(x => x.overdue), 1);
+  const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
+  return `${kpis}
     <div class="grid k3" style="margin-top:14px">${empCards}</div>
     <div class="grid k2" style="margin-top:14px">
-      <div class="card"><div class="lab">🎯 Qué decidir hoy</div>${decHtml}</div>
-      <div class="card"><div class="lab">Tendencia de vencidas · ${o.tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin:12px 0 4px">${spark}</div><div class="meta">${o.tend.length ? o.tend[0].d + ' → ' + o.tend[o.tend.length - 1].d : 'sin snapshots'} · fuente: clickup_snapshots diarios</div></div>
+      <div class="card"><div class="lab">🎯 Las 3 decisiones de la semana</div><div class="meta" style="margin-bottom:4px">rankeadas por impacto ($/inversionista primero)</div>${decHtml}</div>
+      <div class="card"><div class="lab">Tendencia de vencidas · ${tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:54px;margin:12px 0 4px">${spark || '<span class="meta">sin snapshots</span>'}</div><div class="meta">${tend.length ? tend[0].d + ' → ' + tend[tend.length - 1].d : ''}</div><div class="krow" style="cursor:pointer;margin-top:8px" onclick="opsGo('sabueso')"><span>🐕 <b>${(OS.sabueso || []).length} anomalías</b> del Sabueso</span><b style="opacity:.5">ver →</b></div></div>
     </div>
-    <div class="card" style="margin-top:14px"><div class="lab">Carga por persona (activas / vencidas)</div>${carga}</div>
-    <div class="meta" style="margin-top:10px">Semáforo empresa: 🔴 vencidas ≥10% de activas o ≥15 urgentes sin dueño · 🟡 ≥4% o ≥5 · 🟢 resto. Click en cualquier tarjeta/alerta baja a la Vista PM filtrada.</div>`;
+    <div class="meta" style="margin-top:10px">Salud por FLUJO+HIGIENE (no %vencidas — engaña con tablero sin fechas). Filtro de ruido: plantillas/recurrentes/refis fuera. Bruto: ${o.totalBruto} tareas → ${o.act.length} operativas. ⚠ dependencies no está en el espejo (P2) → higiene mide fecha+dueño.</div>`;
 }
 function opsPmView(o) {
   const f = OS.opsF = OS.opsF || { emp: '', persona: '', tipo: '', q: '', sort: 'due', dir: 1 };
@@ -1027,14 +1046,60 @@ function opsPmView(o) {
       <div class="meta" style="margin-top:8px">Mostrando ${Math.min(150, rows.length)} de ${rows.length} · fuente: clickup_tasks_mirror (paridad 3/3 con ClickUp, sync diario). Acciones con aprobación (reasignar/re-fechar/archivar): fase siguiente.</div>
     </div>`;
 }
+
+// ─── VISTA SABUESO (scrum-master automático) ───
+const SAB_SEV = { critica: { e: '🔴', o: 3, l: 'Crítica' }, alta: { e: '🟠', o: 2, l: 'Alta' }, media: { e: '🟡', o: 1, l: 'Media' }, baja: { e: '⚪', o: 0, l: 'Baja' } };
+const SAB_CAT = { higiene: '🧼 Higiene', flujo: '🌊 Flujo', proceso: '⚙️ Proceso', sla: '💰 SLA plata', datos: '🗃 Datos' };
+function opsSabuesoView(o) {
+  const all = (OS.sabueso || []).filter(x => x.active !== false);
+  const f = OS.sabF = OS.sabF || { cat: '', emp: '', persona: '' };
+  let rows = all.slice();
+  if (f.cat) rows = rows.filter(x => x.categoria === f.cat);
+  if (f.emp) rows = rows.filter(x => x.empresa === OPS_EMP[f.emp]);
+  if (f.persona) rows = rows.filter(x => x.dueno_sugerido === f.persona);
+  rows.sort((a, b) => (SAB_SEV[b.severidad]?.o || 0) - (SAB_SEV[a.severidad]?.o || 0));
+  const bySev = all.reduce((a, x) => { a[x.severidad] = (a[x.severidad] || 0) + 1; return a; }, {});
+  const byCat = all.reduce((a, x) => { a[x.categoria] = (a[x.categoria] || 0) + 1; return a; }, {});
+  // health por proceso/lista
+  const byLista = {};
+  (o.act || []).forEach(t => { const k = (t.list_name || t.folder_name || '—'); if (!byLista[k]) byLista[k] = { lista: k, n: 0, mal: 0 }; byLista[k].n++; if (!t.due_date || !(t.primary_assignee || '').trim() || opsCongelada(t)) byLista[k].mal++; });
+  const procesos = Object.values(byLista).filter(x => x.n >= 4).map(x => ({ ...x, salud: Math.round(100 * (1 - x.mal / x.n)) })).sort((a, b) => a.salud - b.salud).slice(0, 10);
+  const catChip = (k, l, n) => `<button class="repbtn ${f.cat === k ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="OS.sabF=Object.assign(OS.sabF||{},{cat:'${f.cat === k ? '' : k}'});osRender()">${l} (${n})</button>`;
+  const fila = x => `<tr><td>${SAB_SEV[x.severidad]?.e || '⚪'}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: '📅 fecha', asignar_dueno: '👤 dueño', refechar: '📅 re-fechar', archivar: '📦 archivar', escalar: '⚠ escalar', asignar_lista: '🗂 lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
+  return `<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
+      <div class="lab">🐕 El Sabueso olfateó</div>
+      <div style="font-size:52px;font-weight:800;color:${all.length ? '#f87171' : '#34d399'}">${all.length}</div>
+      <div class="meta">anomalías activas · ${bySev.critica || 0} críticas · ${bySev.alta || 0} altas · ${bySev.media || 0} medias · <b>norte: 0 = todo perfecto</b></div></div>
+    <div style="display:flex;gap:5px;margin:12px 0;flex-wrap:wrap">${Object.entries(SAB_CAT).map(([k, l]) => byCat[k] ? catChip(k, l, byCat[k]) : '').join('')}
+      <select class="repbtn ghost" style="padding:4px 8px" onchange="OS.sabF=Object.assign(OS.sabF||{},{emp:this.value});osRender()">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas'}</option>`).join('')}</select></div>
+    <div class="grid k2">
+      <div class="card"><div class="lab">Anomalías (por severidad)</div><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#48d69c">Nada que olfatear ✓</td></tr>'}</tbody></table><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
+      <div class="card"><div class="lab">Health score por proceso/lista</div><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 30))}</td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:6px">Salud = 1 − (sin fecha/dueño o congeladas)/total. Peores primero.</div></div>
+    </div>`;
+}
+async function opsSabAccion(id, accion) {
+  const finding = (OS.sabueso || []).find(x => x.id === id); if (!finding) return;
+  const agId = (OS.agIds || {})['Ops · Auditor'] || (OS.agIds || {})['Ops · Coordinador'];
+  if (!agId) { alert('Registry de agentes no cargado (necesitás sesión).'); return; }
+  const map = { poner_fecha: 'refechar_tarea', refechar: 'refechar_tarea', asignar_dueno: 'reasignar_tarea', archivar: 'archivar_tarea', escalar: 'archivar_tarea', asignar_lista: 'archivar_tarea', redistribuir: 'reasignar_tarea' };
+  const tipo = map[accion] || 'archivar_tarea';
+  const payload = { titulo: `Sabueso: ${finding.check_key} — ${(finding.task_name || '').slice(0, 60)}`, agente: 'Ops · Sabueso', empresa: finding.empresa, task_id: finding.task_id, task_url: finding.task_url, task_name: finding.task_name, origen: 'sabueso' };
+  if (tipo === 'refechar_tarea') payload.fecha_nueva = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  if (tipo === 'archivar_tarea') payload.status_cierre = 'complete';
+  const { error } = await sb.from('agent_proposals').insert({ agent_id: agId, tipo_accion: tipo, estado: 'propuesta', evidencia: finding.detalle, payload });
+  if (error) { alert('No se pudo proponer: ' + error.message); return; }
+  alert('✅ Propuesta creada (dry-run) — aprobala en la Vista PM → propuestas.');
+}
+window.opsSabAccion = opsSabAccion;
+
 function opsPanel(comp) {
   const o = opsCompute();
   const v = OS.opsView || 'ceo';
   const tog = (id, lbl) => `<button class="repbtn ${v === id ? '' : 'ghost'}" style="padding:6px 16px;font-weight:700" onclick="opsGo('${id}')">${lbl}</button>`;
   const fresh = (OS.ckTasks || []).length ? String((OS.ckTasks.map(t => t.last_synced_at).sort().pop() || '')).slice(0, 16).replace('T', ' ') : '—';
   return `<h1>⚙️ Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
-    <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
-    ${v === 'ceo' ? opsCeoView(o) : opsPmView(o)}`;
+    <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}${tog('sabueso', '🐕 Sabueso' + ((OS.sabueso||[]).length ? ' · '+(OS.sabueso||[]).length : ''))}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
+    ${v === 'ceo' ? opsCeoView(o) : v === 'sabueso' ? opsSabuesoView(o) : opsPmView(o)}`;
 }
 
 // ─── Panel Ops fase 2: colas por revisar + seguimiento diario + aprobación de propuestas ───
@@ -1075,21 +1140,42 @@ async function opsDecide(id, decision) {
 }
 window.opsDecide = opsDecide;
 function opsPropCard(o) {
-  const rows = o.propuestas.slice(0, 20).map(p => {
-    const pay = p.payload || {};
-    return `<div class="krow" data-prop="${p.id}" style="align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-      <span style="flex:1"><b>${OS_E(pay.agente || 'agente')}</b> · <span class="badge b-warn" style="font-size:9px">${OS_E(p.tipo_accion)}</span><br>
-      <b style="font-size:12.5px">${OS_E(pay.titulo || '')}</b>${pay.task_url ? ` <a href="${OS_E(pay.task_url)}" target="_blank" style="font-size:11px">↗</a>` : ''}
-      <div style="font-size:11px;opacity:.7;margin-top:3px">${OS_E(p.evidencia || '')}</div></span>
-      <span style="display:flex;gap:6px;margin-left:10px">
-        <button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="opsDecide('${p.id}','aprobar')">✓ Aprobar</button>
-        <button class="repbtn ghost" style="padding:4px 10px;font-size:11px" onclick="opsDecide('${p.id}','rechazar')">✗</button>
-      </span></div>`;
-  }).join('');
-  return `<div class="card" style="margin-top:14px"><div class="lab">🤖 Propuestas del Ops Brain — ${o.propuestas.length} esperando tu OK</div>
-    ${rows || '<div class="meta" style="padding:8px 0">Sin propuestas pendientes ✓ (los 4 agentes corren con cada sync)</div>'}
-    <div class="meta" style="margin-top:8px">Aprobar aplica la acción en ClickUp vía edge function (re-fechar/archivar=cerrar; nada se borra). Rechazar solo marca. Informes (Analista/Líder) se aprueban como leídos.</div></div>`;
+  // agrupar en 3 lotes por tipo con aprobar-en-lote (no 43 tarjetas sueltas)
+  const grupos = {};
+  o.propuestas.forEach(p => { const t = p.tipo_accion || 'otro'; (grupos[t] = grupos[t] || []).push(p); });
+  const LOTE = { refechar_tarea: { e: '📅', l: 'Re-fechar' }, archivar_tarea: { e: '📦', l: 'Archivar' }, reasignar_tarea: { e: '👤', l: 'Reasignar' }, informe: { e: '📋', l: 'Informes' } };
+  const open = OS._propOpen || {};
+  const bloque = (tipo, arr) => {
+    const info = LOTE[tipo] || { e: '•', l: tipo };
+    const detalle = open[tipo] ? `<div style="margin-top:6px">${arr.slice(0, 30).map(p => `<div class="krow" data-prop="${p.id}" style="padding:6px 0;font-size:11px;border-top:1px solid rgba(255,255,255,.05)"><span style="flex:1">${OS_E((p.payload || {}).titulo || p.evidencia || '')}${(p.payload || {}).task_url ? ` <a href="${OS_E(p.payload.task_url)}" target="_blank">↗</a>` : ''}</span><span style="display:flex;gap:5px"><button class="repbtn" style="padding:2px 8px;font-size:10px" onclick="opsDecide('${p.id}','aprobar')">✓</button><button class="repbtn ghost" style="padding:2px 7px;font-size:10px" onclick="opsDecide('${p.id}','rechazar')">✗</button></span></div>`).join('')}</div>` : '';
+    return `<div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">${info.e}</span><div style="flex:1"><b>${info.l}</b> <span style="opacity:.6">· ${arr.length} propuesta(s) del Ops Brain</span></div>
+        <button class="repbtn ghost" style="padding:4px 9px;font-size:11px" onclick="OS._propOpen=Object.assign(OS._propOpen||{},{'${tipo}':!(OS._propOpen||{})['${tipo}']});osRender()">${open[tipo] ? 'ocultar' : 'ver'}</button>
+        <button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="opsAprobarLote('${tipo}')">✓ Aprobar los ${arr.length}</button></div>${detalle}</div>`;
+  };
+  const bloques = Object.entries(grupos).map(([t, arr]) => bloque(t, arr)).join('');
+  return `<div class="card" style="margin-top:14px"><div class="lab">🤖 Ops Brain — ${o.propuestas.length} propuestas en ${Object.keys(grupos).length} lote(s)</div>
+    <div class="meta" style="margin-bottom:8px">Aprobá por lote (no de a una). Cada acción se aplica en ClickUp vía edge function; nada se borra.</div>
+    ${bloques || '<div class="meta" style="padding:8px 0">Sin propuestas pendientes ✓</div>'}</div>`;
 }
+async function opsAprobarLote(tipo) {
+  const arr = o_propByTipo(tipo);
+  if (!arr.length) return;
+  if (!confirm(`¿Aprobar y aplicar las ${arr.length} propuestas de "${tipo}"? Se ejecutan en ClickUp (nada se borra).`)) return;
+  let ok = 0;
+  for (const p of arr) { const r = await opsDecideRaw(p.id, 'aprobar'); if (r) ok++; }
+  alert(`✅ ${ok}/${arr.length} aplicadas.`);
+  const { data } = await sb.from('agent_proposals').select('*').is('deleted_at', null).eq('estado', 'propuesta').order('created_at', { ascending: false }).limit(60);
+  OS.agProps = data || OS.agProps; osRender();
+}
+function o_propByTipo(tipo) { return (OS.agProps || []).filter(x => !x.deleted_at && x.estado === 'propuesta' && (x.tipo_accion || 'otro') === tipo); }
+async function opsDecideRaw(id, decision) {
+  try { const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/clickup-writeback`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session ? session.access_token : window.SUPABASE_ANON_KEY}` }, body: JSON.stringify({ proposal_id: id, decision, decidido_por: (session && session.user && session.user.email) || 'ceo' }) });
+    const j = await res.json(); return j.ok;
+  } catch (e) { return false; }
+}
+window.opsAprobarLote = opsAprobarLote;
 function opsDiarioCard(o) {
   const hoyIso = opsHoy();
   const doneHoy = (OS.ckTasks || []).filter(t => t.date_done && String(t.date_done).slice(0, 10) === hoyIso);
