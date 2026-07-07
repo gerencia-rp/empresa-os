@@ -269,7 +269,7 @@ async function osLoad() {
       sb.from('ff_uw_config').select('value').eq('key', 'concil_warn_pct').maybeSingle().then(r => r.data).catch(() => null),
       (async () => { // paginado: PostgREST capa a 1000 filas por request
         const all = []; for (let pg = 0; pg < 8; pg++) {
-          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at,is_recurring,time_estimate,time_spent').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
+          const { data } = await sb.from('clickup_tasks_mirror').select('id,name,status,status_type,priority,primary_assignee,due_date,date_created,date_updated,date_done,date_closed,list_name,folder_name,space_id,url,last_synced_at,is_recurring,time_estimate,time_spent').eq('active', true).in('space_id', ['90113866319', '90113866434', '90113866436']).order('id').range(pg * 1000, pg * 1000 + 999);
           all.push(...(data || [])); if (!data || data.length < 1000) break;
         } return all; })().catch(() => []),
       sb.from('clickup_snapshots').select('snapshot_date,total_open,total_overdue,total_closed_last_7d,company_id').order('snapshot_date').then(r => r.data || []).catch(() => []),
@@ -925,7 +925,7 @@ function opsCompute() {
     const v = a.filter(opsVencida);
     // composite de FLUJO (0 malo → 1 sano): higiene alta, congelado bajo, sin-dueño bajo
     const score = 0.4 * hig + 0.35 * (1 - cong) + 0.25 * (1 - sinDue);
-    const sem = score < 0.35 ? 'rojo' : score < 0.6 ? 'amarillo' : 'verde';
+    const sem = score < 0.5 ? 'rojo' : score < 0.7 ? 'amarillo' : 'verde';
     // número-problema: el peor de los tres
     const probs = [{ k: 'sin fecha', v: a.filter(t => !t.due_date).length, pct: Math.round(100 * (a.filter(t => !t.due_date).length) / (a.length || 1)) }, { k: 'sin dueño', v: a.filter(t => !(t.primary_assignee || '').trim()).length, pct: Math.round(sinDue * 100) }, { k: 'congeladas', v: a.filter(opsCongelada).length, pct: Math.round(cong * 100) }].sort((x, y) => y.pct - x.pct);
     return { sid, nombre: OPS_EMP[sid], act: a.length, venc: v.length, higienePct: Math.round(hig * 100), congelPct: Math.round(cong * 100), sinDuenoN: a.filter(t => !(t.primary_assignee || '').trim()).length, problema: probs[0], score: Math.round(score * 100), sem };
@@ -946,8 +946,9 @@ function opsCompute() {
   const congeladas = act.filter(opsCongelada);
   const congelPct = act.length ? Math.round(100 * congeladas.length / act.length) : 0;
   // cycle time (creación→cierre) de cerradas últimos 90d
-  const cerr90 = T.filter(t => t.date_done && t.date_created && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 90);
-  const cycleTime = cerr90.length ? Math.round(cerr90.reduce((s2, t) => s2 + (new Date(t.date_done) - new Date(t.date_created)) / 86400000, 0) / cerr90.length) : null;
+  const cerr90 = T.filter(t => { const cierre = t.date_closed || t.date_done; return cierre && t.date_created && (Date.now() - new Date(cierre).getTime()) / 86400000 <= 90; });
+  const leadDays = cerr90.map(t => ((new Date(t.date_closed || t.date_done) - new Date(t.date_created)) / 86400000)).filter(d => d >= 0).sort((a, b) => a - b);
+  const cycleTime = leadDays.length ? Math.round(leadDays[Math.floor(leadDays.length / 2)]) : null;  // mediana
   const throughput = T.filter(t => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7).length;
   const propuestas = (OS.agProps || []).filter(x => !x.deleted_at && x.estado === 'propuesta');
   const dupIds = opsDuplicadas(act);
@@ -1062,8 +1063,9 @@ function opsSabuesoView(o) {
   const byCat = all.reduce((a, x) => { a[x.categoria] = (a[x.categoria] || 0) + 1; return a; }, {});
   // health por proceso/lista
   const byLista = {};
-  (o.act || []).forEach(t => { const k = (t.list_name || t.folder_name || '—'); if (!byLista[k]) byLista[k] = { lista: k, n: 0, mal: 0 }; byLista[k].n++; if (!t.due_date || !(t.primary_assignee || '').trim() || opsCongelada(t)) byLista[k].mal++; });
-  const procesos = Object.values(byLista).filter(x => x.n >= 4).map(x => ({ ...x, salud: Math.round(100 * (1 - x.mal / x.n)) })).sort((a, b) => a.salud - b.salud).slice(0, 10);
+  (o.act || []).forEach(t => { const k = (t.list_name || t.folder_name || '—'); if (!byLista[k]) byLista[k] = { lista: k, n: 0, conFyD: 0, movido: 0 }; byLista[k].n++; if (t.due_date && (t.primary_assignee || '').trim()) byLista[k].conFyD++; if (opsMovido7d(t)) byLista[k].movido++; });
+  // salud graduada: 50% higiene (fecha+dueño) + 50% flujo (movido 7d) — así los procesos se distinguen entre sí
+  const procesos = Object.values(byLista).filter(x => x.n >= 4).map(x => ({ ...x, higiene: Math.round(100 * x.conFyD / x.n), flujo: Math.round(100 * x.movido / x.n), salud: Math.round(100 * (0.5 * x.conFyD / x.n + 0.5 * x.movido / x.n)) })).sort((a, b) => a.salud - b.salud).slice(0, 12);
   const catChip = (k, l, n) => `<button class="repbtn ${f.cat === k ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="OS.sabF=Object.assign(OS.sabF||{},{cat:'${f.cat === k ? '' : k}'});osRender()">${l} (${n})</button>`;
   const fila = x => `<tr><td>${SAB_SEV[x.severidad]?.e || '⚪'}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: '📅 fecha', asignar_dueno: '👤 dueño', refechar: '📅 re-fechar', archivar: '📦 archivar', escalar: '⚠ escalar', asignar_lista: '🗂 lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
   return `<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
@@ -1074,7 +1076,7 @@ function opsSabuesoView(o) {
       <select class="repbtn ghost" style="padding:4px 8px" onchange="OS.sabF=Object.assign(OS.sabF||{},{emp:this.value});osRender()">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas'}</option>`).join('')}</select></div>
     <div class="grid k2">
       <div class="card"><div class="lab">Anomalías (por severidad)</div><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#48d69c">Nada que olfatear ✓</td></tr>'}</tbody></table><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
-      <div class="card"><div class="lab">Health score por proceso/lista</div><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 30))}</td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:6px">Salud = 1 − (sin fecha/dueño o congeladas)/total. Peores primero.</div></div>
+      <div class="card"><div class="lab">Health score por proceso/lista</div><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 28))}<div style="font-size:9px;opacity:.5">higiene ${p.higiene}% · movido ${p.flujo}%</div></td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:6px">Salud = 50% higiene (fecha+dueño) + 50% flujo (movido 7d). Peores primero.</div></div>
     </div>`;
 }
 async function opsSabAccion(id, accion) {
