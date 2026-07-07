@@ -255,8 +255,8 @@ async function ccLoadAll() {
     const [props, units, pay, exp, book, tenants, tasks, alerts] = await Promise.all([
       sb.from('pm_properties').select('id,name,address,zone,rental_model,total_units,mortgage_monthly,loan_type').eq('active', true).order('name'),
       sb.from('pm_units').select('id,name,property_id,status,target_rent,unit_type,is_active').eq('is_active', true),
-      sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,unit_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
-      sb.from('pm_expenses').select('amount,category,subcategory,property_id,expense_date').eq('active', true),
+      sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,unit_id,paid_at,billing_ym').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
+      sb.from('pm_expenses').select('amount,category,subcategory,property_id,expense_date,billing_ym,scope').eq('active', true),
       sb.from('pm_bookings').select('unit_id,property_id,tenant_id,start_date,end_date,status').eq('active', true),
       sb.from('pm_tenants').select('id,full_name,phone,client_state,rent_amount,contract_start,contract_end,deposit'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,property_id,unit_id,zone,assignee,start_at,status').eq('active', true),
@@ -290,11 +290,15 @@ function ccRentable(units) {
 function ccCompute() {
   const mb = ccMonthBounds();
   const inMonth = d => d && d >= mb.from && d <= mb.to;
+  // MES DE RENTA (tag Mes/Año de Airtable → billing_ym) — la definición oficial para
+  // ingresos y gastos del mes. Sin tag, cae a la fecha (igual que antes para esas filas).
+  const ymOf = x => x.billing_ym || (x.paid_at || x.expense_date || '').slice(0, 7);
+  const inBillMonth = x => ymOf(x) === mb.from.slice(0, 7);
   const H = {};
   CC.props.forEach(p => H[p.id] = { id: p.id, name: p.name, zone: p.zone, model: p.rental_model, inc: 0, exp: 0, hipo: 0, hipoFija: Number(p.mortgage_monthly || 0), loanType: p.loan_type || '', units: [], pot: 0 });
   CC.units.forEach(u => { const h = H[u.property_id]; if (!h) return; h.units.push(u); h.pot += Number(u.target_rent || 0); });
-  CC.pay.forEach(p => { if (inMonth(p.paid_at) && H[p.property_id]) H[p.property_id].inc += Number(p.amount || 0); });
-  CC.exp.forEach(e => { if (inMonth(e.expense_date) && H[e.property_id]) { H[e.property_id].exp += Number(e.amount || 0); if (ccIsHipo(e)) H[e.property_id].hipo += Number(e.amount || 0); } });
+  CC.pay.forEach(p => { if (inBillMonth(p) && H[p.property_id]) H[p.property_id].inc += Number(p.amount || 0); });
+  CC.exp.forEach(e => { if (inBillMonth(e) && H[e.property_id]) { H[e.property_id].exp += Number(e.amount || 0); if (ccIsHipo(e)) H[e.property_id].hipo += Number(e.amount || 0); } });
   const houses = Object.values(H).map(h => {
     const r = ccRentable(h.units);
     // Renta esperada de las unidades OCUPADAS (para detectar "ocupada sin ingresos").
@@ -307,13 +311,14 @@ function ccCompute() {
   const occU = houses.reduce((s, h) => s + h.occ, 0);
   const resU = houses.reduce((s, h) => s + h.res, 0);
   const freeU = houses.reduce((s, h) => s + h.free, 0);
-  const inc = CC.pay.filter(p => inMonth(p.paid_at)).reduce((s, p) => s + Number(p.amount || 0), 0);
-  const expT = CC.exp.filter(e => inMonth(e.expense_date)).reduce((s, e) => s + Number(e.amount || 0), 0);
+  const inc = CC.pay.filter(inBillMonth).reduce((s, p) => s + Number(p.amount || 0), 0);
+  const incCash = CC.pay.filter(p => inMonth(p.paid_at)).reduce((s, p) => s + Number(p.amount || 0), 0); // cobrado en el mes (caja)
+  const expT = CC.exp.filter(inBillMonth).reduce((s, e) => s + Number(e.amount || 0), 0);
   const potTotal = CC.units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const potFree = CC.units.filter(u => ccUnitState(u) === 'libre').reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const capture = potTotal ? Math.round((potTotal - potFree) / potTotal * 100) : 0;
 
-  return { mb, houses, kpi: { totalU, occU, resU, freeU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, inc, expT, cashflow: inc - expT, potTotal, potFree, capture } };
+  return { mb, houses, kpi: { totalU, occU, resU, freeU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, inc, incCash, expT, cashflow: inc - expT, potTotal, potFree, capture } };
 }
 
 // ─── INSIGHTS (reglas rankeadas por $ de impacto) ───
@@ -785,7 +790,7 @@ function ccSecFinanzas(comp) {
       <span class="rephint">Números unificados (regla ${kpi.totalU}u). Se genera con "Guardar como PDF".</span>
     </div>
     <div class="grid kpis" style="grid-template-columns:repeat(3,1fr)">
-      <div class="card kpi"><div class="lab">Ingresos del mes</div><div class="big up">${CC_MONEY(kpi.inc)}</div></div>
+      <div class="card kpi"><div class="lab">Ingresos del mes (renta del mes)</div><div class="big up">${CC_MONEY(kpi.inc)}</div><div class="meta">por tag Mes/Año · cobrado en el mes (caja): ${CC_MONEY(kpi.incCash)}</div></div>
       <div class="card kpi"><div class="lab">Gastos del mes</div><div class="big down">${CC_MONEY(kpi.expT)}</div></div>
       <div class="card kpi"><div class="lab">Cashflow neto</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div></div>
     </div>
@@ -999,7 +1004,10 @@ function ccCobranzaAging() {
     const t = tenById[pt.tenant_id] || {};
     const buckets = meses.map(mm => {
       if (pt.start && pt.start > mm.to) return null; // aún no vivía ese mes
-      const pagado = (CC.pay || []).filter(x => x.tenant_id === pt.tenant_id && x.paid_at >= mm.from && x.paid_at <= mm.to).reduce((s, x) => s + (+x.amount || 0), 0);
+      // Pagado de ESE mes = pagos con tag Mes/Año de ese mes (una renta de junio cobrada
+      // en mayo cuenta como junio pagado). Sin tag, cae a la fecha de cobro.
+      const ymm = mm.from.slice(0, 7);
+      const pagado = (CC.pay || []).filter(x => x.tenant_id === pt.tenant_id && (x.billing_ym || (x.paid_at || '').slice(0, 7)) === ymm).reduce((s, x) => s + (+x.amount || 0), 0);
       return Math.max(0, Math.round(pt.rent - pagado));
     });
     const total = buckets.reduce((s, x) => s + (x || 0), 0);

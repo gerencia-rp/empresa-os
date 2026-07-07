@@ -165,8 +165,11 @@ async function pmLoadAll() {
     { name: 'units',      optional: false, q: () => sb.from('pm_units').select('*').order('code') },
     { name: 'bookings',   optional: false, q: () => sb.from('pm_bookings').select('*').order('start_date', { ascending: false }).limit(2000) },
     { name: 'tenants',    optional: false, q: () => sb.from('pm_tenants').select('*').order('full_name').limit(500) },
-    { name: 'payments',   optional: false, q: () => sb.from('pm_payments').select('*').order('paid_at', { ascending: false, nullsFirst: false }).limit(1000) },
-    { name: 'expenses',   optional: true,  q: () => sb.from('pm_expenses').select('*').order('expense_date', { ascending: false, nullsFirst: false }).limit(2000) },
+    // SOLO filas activas del espejo (los inactivos son residuo soft-deleted del sync viejo y
+    // NO entran en ningún cálculo). Antes: select sin filtro + limit(1000) sobre 1228 filas
+    // cortaba pagos con paid_at null (los "revisar" del mes) — bug real.
+    { name: 'payments',   optional: false, q: () => sb.from('pm_payments').select('*').eq('active', true).order('paid_at', { ascending: false, nullsFirst: false }).limit(2000) },
+    { name: 'expenses',   optional: true,  q: () => sb.from('pm_expenses').select('*').eq('active', true).order('expense_date', { ascending: false, nullsFirst: false }).limit(2000) },
     { name: 'payroll',    optional: true,  q: () => sb.from('pm_payroll').select('*').limit(1000) },
     { name: 'credentials',optional: true,  q: () => sb.from('pm_credentials').select('*').limit(1000) },
     { name: 'wifi',       optional: true,  q: () => sb.from('pm_wifi_credentials').select('*').limit(500) },
@@ -397,12 +400,18 @@ function pmTileState(tile) {
   if (tile._roomIds.some(id => pmaState.bookings.some(b => b.unit_id === id && b.status === 'confirmado' && (b.start_date || '') > today))) return 'reservada';
   return 'libre';
 }
+// ═══ UNA definición de "mes" para dinero (regla dura): el MES DE RENTA es el tag
+// Mes/Año de Airtable (pm_payments/pm_expenses.billing_ym, columna generada en la DB).
+// Si la fila no tiene tag, cae explícitamente a la fecha (paid_at/expense_date).
+// paid_at queda SOLO para la vista de flujo de caja ("cobrado en el mes").
+function pmBillYm(x) { return (x && (x.billing_ym || (x.paid_at || x.expense_date || '').slice(0, 7))) || ''; }
+
 function pmFinanceOf(propertyId, monthDate = null) {
-  // monthDate: Date|null. null = all-time, else solo el mes específico
+  // monthDate: Date|null. null = all-time, else solo el mes específico (mes de renta)
   let pays = pmaState.payments.filter(p => p.property_id === propertyId && p.status === 'pagado');
   if (monthDate) {
     const ym = monthDate.toISOString().slice(0,7);
-    pays = pays.filter(p => (p.paid_at || '').startsWith(ym));
+    pays = pays.filter(p => pmBillYm(p) === ym);
   }
   const ingresos = pays.filter(p => p.type === 'ingreso').reduce((s,p) => s + Number(p.amount||0), 0);
   const gastos = pays.filter(p => p.type === 'gasto').reduce((s,p) => s + Number(p.amount||0), 0);
@@ -766,6 +775,8 @@ const PM_ES_MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','
 const PM_ES_MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function pmMoney(v){ return posMoney(v); } // #10: formato único compartido
 function pmInMonth(iso,y,m){ if(!iso) return false; return String(iso).slice(0,7) === `${y}-${String(m+1).padStart(2,'0')}`; }
+// mes de renta (billing) del row x == año/mes dado — misma firma que pmInMonth pero por tag
+function pmBillInMonth(x,y,m){ return pmBillYm(x) === `${y}-${String(m+1).padStart(2,'0')}`; }
 function pmPayrollForMonth(y,m){
   return (pmaState.payroll||[]).filter(p=>Number(p.year)===y && PM_ES_MONTHS.indexOf((p.month||'').toLowerCase())===m)
     .reduce((s,p)=>s+Number(p.salary||0),0);
@@ -782,8 +793,8 @@ function pmOccupancyAt(date){
 }
 function pmCashflowOf(y,m){
   const pays = pmaState.payments.filter(p=>p.status==='pagado');
-  const income = pays.filter(p=>p.type==='ingreso' && pmInMonth(p.paid_at,y,m)).reduce((s,p)=>s+Number(p.amount||0),0);
-  const gExp   = pays.filter(p=>p.type==='gasto'   && pmInMonth(p.paid_at,y,m)).reduce((s,p)=>s+Number(p.amount||0),0);
+  const income = pays.filter(p=>p.type==='ingreso' && pmBillInMonth(p,y,m)).reduce((s,p)=>s+Number(p.amount||0),0);
+  const gExp   = pays.filter(p=>p.type==='gasto'   && pmBillInMonth(p,y,m)).reduce((s,p)=>s+Number(p.amount||0),0);
   const payroll = pmPayrollForMonth(y,m);
   return { income, gastos: gExp+payroll, net: income-gExp-payroll };
 }
@@ -1324,7 +1335,9 @@ function pmRenderPropertyCardInline(p) {
   // → conservar UNA, prefiriendo la OCUPADA (luego reservada/activa). Same code + renta DISTINTA
   // = unidades reales distintas (se conservan ambas).
   const _uByKey = {};
-  for (const u of pmUnitsOf(p.id)) {
+  // SOLO unidades activas del espejo (las inactivas son legacy del sync viejo — soft-deleted,
+  // nunca se muestran acá aunque showArchived esté prendido). El set activo = base Modelo Nuevo.
+  for (const u of pmUnitsOf(p.id).filter(x => x.is_active !== false)) {
     const k = `${(u.code||u.id)}|${u.target_rent||0}`;
     const score = x => (pmActiveBookingOf(x.id)?4:0) + (pmaState.bookings.some(b=>b.unit_id===x.id&&b.status==='confirmado')?2:0) + (x.is_active!==false?1:0);
     if (!_uByKey[k] || score(u) > score(_uByKey[k])) _uByKey[k] = u;
@@ -1462,6 +1475,8 @@ function pmRenderUnitRow(u, p) {
   const unitBookings = pmBookingsOf(u.id)
     .filter(b => b.status !== 'cancelado' && (!b.end_date || b.end_date >= today))
     .sort((a,b) => (a.start_date||'').localeCompare(b.start_date||''));
+  // Reserva vigente HOY (antes se leía un global `active` inexistente → ReferenceError latente)
+  const active = unitBookings.find(b => b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado'].includes(b.status)) || null;
   const bookingChip = (b) => {
     const isActive = b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado'].includes(b.status);
     const isUpcoming = b.start_date && b.start_date > today;
@@ -1487,6 +1502,7 @@ function pmRenderUnitRow(u, p) {
             ${active ? `<span>· 👤 ${pmTenantName(active.tenant_id)}</span>` : ''}
             ${active && active.end_date ? `<span>· vence ${active.end_date}</span>` : ''}
           </div>
+          ${u.access_codes ? `<div class="text-[11px] text-slate-600 mt-0.5 whitespace-pre-line" title="Accesos y códigos (🚪 Unidades en Airtable)">🔑 ${String(u.access_codes).replace(/</g,'&lt;').slice(0,140)}</div>` : ''}
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <div class="text-right">
@@ -1496,6 +1512,7 @@ function pmRenderUnitRow(u, p) {
           <button onclick="pmToggleUnitActive('${u.id}', ${!isOn})" class="relative inline-flex h-5 w-9 rounded-full transition ${isOn?'bg-emerald-500':'bg-slate-300'}" title="${isOn?'Desactivar':'Activar'}">
             <span class="absolute ${isOn?'right-0.5':'left-0.5'} top-0.5 h-4 w-4 rounded-full bg-white shadow transition"></span>
           </button>
+          <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}','${u.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1 rounded" title="Guía de Bienvenida / Check-in de ESTA unidad (usa su código de acceso)">📄 Check-in</button>
           <button onclick="pmEditBooking(null,'${u.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold px-2 py-1 rounded" title="Nueva reserva">+ Reserva</button>
           <button onclick="pmEditUnit('${u.id}','${p.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
         </div>
@@ -3949,7 +3966,8 @@ function pmYmLabelC(ym) { return pmYmLabel(ym) + (pmYmIsCurrent(ym) ? ' · en cu
 // Un mes con muchos menos pagos que el histórico se lee como "carga en progreso", no como mal mes.
 // (Pilar #1: no se maquilla el dato — se muestra el real + el contexto de completitud.)
 function pmMonthLoadInfo(ym) {
-  const cnt = (yy) => pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at || '').startsWith(yy)).length;
+  // Completitud de carga por MES DE RENTA (tag Mes/Año) — misma dimensión que los ingresos.
+  const cnt = (yy) => pmaState.payments.filter(p => p.type === 'ingreso' && pmBillYm(p) === yy).length;
   const n = cnt(ym);
   const priors = []; for (let i = 1; i <= 3; i++) { const c = cnt(pmYmShift(ym, -i)); if (c > 0) priors.push(c); }
   const avg = priors.length ? priors.reduce((s, x) => s + x, 0) / priors.length : 0;
@@ -4067,7 +4085,8 @@ function pmPeriodMatch(dateStr, period) {
 }
 function pmPaymentsFiltered() {
   const period = pmaState.payPeriod || 'month';
-  let pays = pmaState.payments.filter(p => p.type === 'ingreso' && pmPeriodMatch(p.paid_at, period));
+  // El período filtra por MES DE RENTA (tag Mes/Año), no por fecha de cobro.
+  let pays = pmaState.payments.filter(p => p.type === 'ingreso' && pmPeriodMatch(pmBillYm(p), period));
   if (pmaState.payFilterProperty) pays = pays.filter(p => p.property_id === pmaState.payFilterProperty);
   if (pmaState.payFilterPlatform) pays = pays.filter(p => p.platform === pmaState.payFilterPlatform);
   if (pmaState.payRecurrenceFilter) pays = pays.filter(p => { const b = pmPaymentBooking(p); return b && pmRecurrenceOf(b.payment_day).kind === pmaState.payRecurrenceFilter; });
@@ -4082,7 +4101,8 @@ function pmPaymentsTableHtml() {
     <table class="w-full text-xs">
       <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
         <tr>
-          <th class="px-3 py-2 text-left">Fecha</th><th class="px-3 py-2 text-left">Inquilino</th>
+          <th class="px-3 py-2 text-left" title="Mes de renta (tag Mes/Año de Airtable)">Mes renta</th>
+          <th class="px-3 py-2 text-left" title="Fecha en que se cobró (flujo de caja)">Cobrado</th><th class="px-3 py-2 text-left">Inquilino</th>
           <th class="px-3 py-2 text-left">Casa</th><th class="px-3 py-2 text-left">Unit</th>
           <th class="px-3 py-2 text-right">Monto</th><th class="px-3 py-2 text-left">Plataforma</th>
           <th class="px-3 py-2 text-left">Recurrencia</th><th class="px-3 py-2 text-left">Estatus</th>
@@ -4100,7 +4120,8 @@ function pmPaymentsTableHtml() {
           const orphan = !p.property_id;
           const atLink = (p._src === 'expense') ? null : pmAirtableLink(p.external_id, 'tbl5p63dUEhrzgHVJ');
           return `<tr class="border-t border-slate-100 ${orphan ? 'bg-red-50' : 'hover:bg-slate-50'}">
-            <td class="px-3 py-2 whitespace-nowrap text-slate-700">${p.paid_at||'—'}</td>
+            <td class="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">${p.month ? `${p.month} ${p.year||''}` : '<span class="text-amber-600" title="Sin tag Mes/Año en Airtable">sin mes</span>'}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-slate-500">${p.paid_at||'<span class="text-amber-600">—</span>'}</td>
             <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,24)}</td>
             <td class="px-3 py-2 ${orphan?'text-amber-700':'text-slate-600'}">${orphan ? `<span class="inline-flex items-center gap-1"><span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="Este pago no tiene casa asignada. ¿Vincular manualmente o archivar?">⚠️ Sin vincular</span>${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-[10px] text-blue-700 hover:underline font-bold">Vincular a casa…</button> <button onclick="pmArchivePaymentLegacy('${p.id}')" class="text-[10px] text-slate-500 hover:underline">Archivar</button>`}</span>` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
             <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
@@ -4111,7 +4132,7 @@ function pmPaymentsTableHtml() {
             <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
             <td class="px-3 py-2 text-center whitespace-nowrap">${p._src==='expense'?'':`${bk?`<button onclick="pmMarkPayment('${bk.id}')" title="Marcar pago" class="text-amber-600 hover:text-amber-800 mr-1">💵</button>`:''}<button onclick="pmEditPayment('${p.id}')" title="Editar" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
           </tr>`;
-        }).join('') : `<tr><td colspan="10" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos con estos filtros.</td></tr>`}
+        }).join('') : `<tr><td colspan="11" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos con estos filtros.</td></tr>`}
       </tbody>
     </table>`;
 }
@@ -4138,9 +4159,12 @@ function pmRenderPayments() {
   const now = new Date();
   const propFilter = pmaState.payFilterProperty;
 
-  // Cards del mes actual (snapshot)
-  const monthPays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym) && (!propFilter || p.property_id === propFilter));
+  // Cards del mes (snapshot) — RENTA DEL MES = tag Mes/Año (billing), no fecha de cobro.
+  const monthPays = pmaState.payments.filter(p => p.type === 'ingreso' && pmBillYm(p) === ym && (!propFilter || p.property_id === propFilter));
   const cobrado = monthPays.reduce((s,p) => s + Number(p.amount||0), 0);
+  // Flujo de caja: lo efectivamente COBRADO dentro del mes calendario (por paid_at)
+  const cashPays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym) && (!propFilter || p.property_id === propFilter));
+  const cobradoCash = cashPays.reduce((s,p) => s + Number(p.amount||0), 0);
   const activeBs = pmActiveBookings().filter(b => !propFilter || b.property_id === propFilter);
   const atrasados = activeBs.filter(b => pmTenantPayStatus(b).key === 'atrasado');
 
@@ -4149,7 +4173,7 @@ function pmRenderPayments() {
     const due = pmNextDueDate(b); if (!due) return false;
     const diff = Math.floor((due - now) / 86400000);
     if (!(diff >= -3 && diff <= 7)) return false;   // incluye recién vencidos (3d gracia) + próximos 7d
-    const paid = pmaState.payments.some(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym) && (p.booking_id===b.id || (b.tenant_id && p.tenant_id===b.tenant_id)));
+    const paid = pmaState.payments.some(p => p.type==='ingreso' && pmBillYm(p) === ym && (p.booking_id===b.id || (b.tenant_id && p.tenant_id===b.tenant_id)));
     return !paid;
   }).sort((a,b) => pmNextDueDate(a) - pmNextDueDate(b));
 
@@ -4199,10 +4223,11 @@ function pmRenderPayments() {
         </div>
       </div>` : ''}
 
-    <!-- 4 cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-      ${card('Ingresos cobrados', pmMoney(cobrado), pmYmLabelC(ym), 'text-emerald-700')}<div class="mt-2">${pmMonthBadge(ym)}</div>
-      ${card('Pagos registrados', monthPays.length, 'este mes')}
+    <!-- cards del mes -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">
+      ${card('Renta del mes', pmMoney(cobrado), pmYmLabelC(ym) + ' · por tag Mes/Año', 'text-emerald-700')}<div class="mt-2">${pmMonthBadge(ym)}</div>
+      ${card('Cobrado en el mes', pmMoney(cobradoCash), 'flujo de caja (por fecha de pago)', 'text-slate-700')}
+      ${card('Pagos del mes', monthPays.length, 'con tag ' + pmYmLabelC(ym))}
       ${card('Pagos atrasados', atrasados.length, 'inquilinos', atrasados.length?'text-red-600':'text-slate-900')}
       ${card('Próximos 7 días', proximosList.length, 'por cobrar', proximosList.length?'text-amber-600':'text-slate-900')}
     </div>
@@ -4839,23 +4864,31 @@ function pmFinAgg(r) {
   if (modelF) scopeProps = scopeProps.filter(p => (p.rental_model || 'casa_completa') === modelF);
   const scopeIds = new Set(scopeProps.map(p => p.id));
   const scoped = (propF || modelF);
-  const inc = pmaState.payments.filter(p => p.type==='ingreso' && pmInRange(p.paid_at, r)
+  // MES DE RENTA (tag Mes/Año → billing_ym) para ingresos Y gastos — una sola definición.
+  // Si la fila no tiene tag, pmBillYm cae a la fecha (paid_at/expense_date).
+  const inYms = (x) => r.ymList.includes(pmBillYm(x));
+  const inc = pmaState.payments.filter(p => p.type==='ingreso' && inYms(p)
     && (!scoped || scopeIds.has(p.property_id))
     && (!platF || (pmPaymentBooking(p)?.booking_type === platF)));
-  const exp = pmaState.expenses.filter(e => pmInRange(e.expense_date, r) && (!scoped || scopeIds.has(e.property_id)));
+  const exp = pmaState.expenses.filter(e => inYms(e) && (!scoped || scopeIds.has(e.property_id) || (!e.property_id && e.scope === 'empresa' && !propF)));
   const sum = (arr, f) => arr.reduce((s,x) => s + Number((f?f(x):x.amount)||0), 0);
   const income = sum(inc);
-  // Buckets de categoría (6) — FIX3
+  // Flujo de caja del período (por fecha real de cobro) — solo informativo
+  const incomeCash = sum(pmaState.payments.filter(p => p.type==='ingreso' && pmInRange(p.paid_at, r)
+    && (!scoped || scopeIds.has(p.property_id))));
+  // Buckets de categoría — FIX3 (+ Gastos x Empresa separados, vienen de la tabla "Gastos x Empresa")
   const isMaint = (e) => /mantenim|maintenance|repair|arreglo|reparac|plomer|electric/i.test(e.subcategory||'');
   const isHipo  = (e) => /hipotec|mortgage/i.test(e.subcategory||'');
-  const hipoE  = exp.filter(e => isHipo(e));                                   // 🏦 hipoteca = gasto fijo por casa
-  const aseoE  = exp.filter(e => !isHipo(e) && pmIsAseo(e));
-  const maintE = exp.filter(e => !isHipo(e) && !pmIsAseo(e) && isMaint(e));
-  const operE  = exp.filter(e => !isHipo(e) && ['operational','platform'].includes(e.category));
-  const houseE = exp.filter(e => e.category==='house' && !isHipo(e) && !pmIsAseo(e) && !isMaint(e));
+  const empresaE = exp.filter(e => e.scope === 'empresa');
+  const expC = exp.filter(e => e.scope !== 'empresa');
+  const hipoE  = expC.filter(e => isHipo(e));                                   // 🏦 hipoteca = gasto fijo por casa
+  const aseoE  = expC.filter(e => !isHipo(e) && pmIsAseo(e));
+  const maintE = expC.filter(e => !isHipo(e) && !pmIsAseo(e) && isMaint(e));
+  const operE  = expC.filter(e => !isHipo(e) && ['operational','platform'].includes(e.category));
+  const houseE = expC.filter(e => e.category==='house' && !isHipo(e) && !pmIsAseo(e) && !isMaint(e));
   const acc = new Set([...hipoE, ...aseoE, ...maintE, ...operE, ...houseE].map(e => e.id));
-  const otrosE = exp.filter(e => !acc.has(e.id));
-  const house = sum(houseE), cleaning = sum(aseoE), operational = sum(operE), maintenance = sum(maintE), hipoteca = sum(hipoE), otros = sum(otrosE);
+  const otrosE = expC.filter(e => !acc.has(e.id));
+  const house = sum(houseE), cleaning = sum(aseoE), operational = sum(operE), maintenance = sum(maintE), hipoteca = sum(hipoE), otros = sum(otrosE), empresa = sum(empresaE);
   const payroll = pmPayrollInRange(r);
   // Gastos directos = TODOS los pm_expenses (incl. hipoteca).
   // NOI (Net Operating Income) = ingresos − gastos OPERATIVOS, EXCLUYE la deuda (hipoteca).
@@ -4883,6 +4916,7 @@ function pmFinAgg(r) {
   expenseByCategory['⚙️ Operativos/Plataforma'] = operational;
   expenseByCategory['🔧 Mantenimiento'] = maintenance;
   expenseByCategory['👥 Nómina'] = payroll;
+  expenseByCategory['🏢 Gastos de empresa'] = empresa;
   expenseByCategory['📦 Otros'] = otros;
 
   const activeProps = scopeProps;   // ya filtrado por casa/modelo
@@ -4900,7 +4934,7 @@ function pmFinAgg(r) {
     const margin = pIncome > 0 ? pNoi / pIncome : 0;
     return { property: p, occ, rentable, income: pIncome, hipoteca: pHipoteca, house: pHouse, cleaning: pClean, payrollPro: payrollPerProp, operativosPro: operativosPerProp, net: pNet, noi: pNoi, margin };
   });
-  return { income, house, cleaning, operational, maintenance, hipoteca, otros, payroll, directos, gastosTotal, noi, net, margin,
+  return { income, incomeCash, house, cleaning, operational, maintenance, hipoteca, otros, empresa, payroll, directos, gastosTotal, noi, net, margin,
     incomeByPlatform, incomeByModel, expenseByCategory, props, activePropsCount: activeProps.length };
 }
 // Normaliza plataforma de pago a un booking_type (FIX9)
@@ -5112,7 +5146,7 @@ function pmRenderFinance() {
 
     <!-- SECCIÓN 1 · KPIs con delta MoM -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-      ${kpi('Ingresos cobrados (plata real)', pmMoney(agg.income), arrowD(delta(agg.income, prevAgg.income))+' MoM · '+r.label+(r.months===1?' '+pmMonthBadge(r.ymList[0]):''), 'text-emerald-700')}
+      ${kpi('Renta del período (por Mes/Año)', pmMoney(agg.income), arrowD(delta(agg.income, prevAgg.income))+' MoM · '+r.label+' · cobrado en el período (caja): '+pmMoney(agg.incomeCash)+(r.months===1?' '+pmMonthBadge(r.ymList[0]):''), 'text-emerald-700')}
       ${kpi('Gastos totales', pmMoney(agg.gastosTotal), arrowD(delta(agg.gastosTotal, prevAgg.gastosTotal))+' MoM', 'text-red-600')}
       ${kpi('NOI (operativo, antes de deuda)', pmMoney(agg.noi), arrowD(delta(agg.noi, prevAgg.noi))+' MoM · ingresos − opex', agg.noi>=0?'text-emerald-700':'text-red-600')}
       ${kpi('Cash flow neto (después de deuda)', pmMoney(agg.net), arrowD(delta(agg.net, prevAgg.net))+' MoM · NOI − hipoteca − nómina', agg.net>=0?'text-emerald-700':'text-red-600')}
@@ -6216,7 +6250,12 @@ function pmUtilityStatus(u) {
 function pmRenderUtilities() {
   const utils = pmaState.utilities || [];
   const pF = pmaState.opsFilterProperty;
-  let rows = pF ? utils.filter(u => u.property_id === pF) : utils;
+  // Un utility "configurado" tiene monto, cuenta o algún pago registrado. Los placeholders
+  // vacíos (seed sin fuente en Airtable) NO se listan como filas fantasma: van a un aviso.
+  const isConfigured = u => Number(u.monthly_amount||0) > 0 || (u.account_number||'').trim() || u.last_paid_date;
+  const pending = utils.filter(u => !isConfigured(u));
+  let rows = utils.filter(isConfigured);
+  if (pF) rows = rows.filter(u => u.property_id === pF);
   rows = [...rows].sort((a,b) => (pmPropertyName(a.property_id)).localeCompare(pmPropertyName(b.property_id)) || (a.service_name||'').localeCompare(b.service_name||''));
   const props = pmaState.properties.filter(p => utils.some(u => u.property_id === p.id));
   const totalMonth = rows.reduce((s,u) => s + Number(u.monthly_amount||0), 0);
@@ -6225,7 +6264,7 @@ function pmRenderUtilities() {
   <div class="space-y-3">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div>
-        <div class="text-sm font-bold text-slate-900">Utilities · ${rows.length} servicios</div>
+        <div class="text-sm font-bold text-slate-900">Utilities · ${rows.length} configurados</div>
         <div class="text-xs text-slate-500">${pmMoney(totalMonth)}/mes estimado${overdue?` · <span class="text-red-600 font-bold">${overdue} vencidos</span>`:''}</div>
       </div>
       <div class="flex items-center gap-2">
@@ -6251,7 +6290,13 @@ function pmRenderUtilities() {
           <td class="px-3 py-2 text-center whitespace-nowrap"><button onclick="pmMarkUtilityPaid('${u.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">Marcar pagado</button> <button onclick="pmEditUtility('${u.id}')" class="text-slate-400 hover:text-slate-700">✏️</button></td>
         </tr>`; }).join('')}</tbody>
       </table>
-    </div>` : '<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Sin servicios. Corré pm-operacion-utilities.sql para sembrarlos o agregá uno.</div>'}
+    </div>` : '<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Todavía no hay utilities configurados (monto + cuenta). Agregá uno con "+ Servicio" o esperá la tabla de utilities en Airtable.</div>'}
+    ${pending.length ? `<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+      ⚠️ <b>${pending.length} servicios pendientes de configurar</b> (sin monto ni número de cuenta — hoy NO existe tabla de utilities en la base Modelo Nuevo, son placeholders del seed).
+      Para activarlos: completalos acá con ✏️ (monto mensual + cuenta + día de corte) o definí la fuente en Airtable (tabla de utilities nueva, o 🔑 Accesos con Categoría=servicio) y se sincronizan.
+      <button onclick="pmaState._showPendingUtils=!pmaState._showPendingUtils;pmRender()" class="ml-2 text-amber-900 underline font-bold">${pmaState._showPendingUtils?'Ocultar':'Ver lista'}</button>
+      ${pmaState._showPendingUtils ? `<div class="mt-2 flex flex-wrap gap-1.5">${pending.map(u => `<button onclick="pmEditUtility('${u.id}')" class="bg-white border border-amber-200 rounded px-2 py-0.5 text-[10px] hover:bg-amber-100" title="Configurar">${pmPropertyName(u.property_id).replace(/</g,'&lt;').slice(0,14)} · ${(u.service_name||'').replace(/</g,'&lt;')}</button>`).join('')}</div>` : ''}
+    </div>` : ''}
   </div>`;
 }
 async function pmMarkUtilityPaid(id) {
@@ -6428,7 +6473,11 @@ function pmRenderServices() {
             </div>`;
           }).join('')}
         </div>
-      </div>`).join('') : '<div class="text-xs text-slate-400 italic px-3 py-8 text-center bg-slate-50 rounded-lg">Sin servicios cargados. Agregá uno o marcá credenciales con categoría «servicio».</div>'}
+      </div>`).join('') : `<div class="text-xs text-slate-500 px-3 py-8 text-center bg-slate-50 rounded-lg">
+        <div class="font-bold text-slate-700 mb-1">Sin servicios automáticos todavía</div>
+        Esta vista lee la tabla <b>🔑 Accesos</b> de Airtable filtrando <b>Categoría = «servicio»</b> — hoy ningún acceso está marcado así.<br/>
+        Para que aparezcan: en Airtable → 🔑 Accesos, poné Categoría «servicio» a los accesos de luz/agua/internet/etc. (el sync los trae solo), o agregá uno acá con «+ Servicio».
+      </div>`}
   </div>`;
 }
 

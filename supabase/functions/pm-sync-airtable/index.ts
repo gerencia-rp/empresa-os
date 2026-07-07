@@ -63,6 +63,7 @@ const TABLE_IDS = {
   reservas:   "tblzz3fokkBprEpIm",
   pagos:      "tbl5p63dUEhrzgHVJ",
   gastos:     "tblGBQ5xn9Zp6YrTN",
+  gastos_emp: "tbl9dJXwI9Vn3kjKy",  // "Gastos x Empresa" → pm_expenses scope='empresa'
   accesos:    "tblfb63Yhn0NIMDNw",
   // tareas: ELIMINADA de Airtable (2026-06-30) — pm_tasks ahora es 100% app-generada
   unidades:   "tblItO7iMZT9QS87y"
@@ -140,6 +141,16 @@ const F = {
   gst_factura:    "fldFGenqtv8piockd",
   gst_casa:       "fld3NuV9K8Wxg86bL",  // link → Casas
   gst_ambito:     "fldhHLYaoS8VhfuTZ",  // Ámbito (Casa/Plataforma/Equipo)
+  gst_año:        "fldtoc3jPdOZ5A2M3",  // Año (singleSelect) — alimenta billing_ym
+  // Gastos x Empresa (overhead sin Casa) → pm_expenses scope='empresa'
+  ge_concepto:    "fldTkGSK4rwO4VeBM",
+  ge_tipo:        "fldS8m6mtZpiT1Lfb",
+  ge_valor:       "fldOXIxBa41E7dqev",
+  ge_fecha:       "fldI3Zjvp7OiGwbB9",
+  ge_mes:         "fld9gH2SlnD13fjzy",
+  ge_año:         "fldcW0W0sA5Iv70SJ",
+  ge_factura:     "fld8YOKPID9G3gRdI",  // url (no attachment)
+  ge_ambito:      "fld66QLuEkhXtJ4M1",
   // Accesos (🔑)
   acc_servicio:   "fldiAGNHPO8ieYrcF",
   acc_categoria:  "fldCmDi12qdwmFD9c",
@@ -846,16 +857,44 @@ Deno.serve(async (req) => {
           addWarn("gasto_sin_casa", "expense", "exp-" + r.id, null,
             { concepto: r.fields?.[F.gst_concepto] || null, tipo, ambito, monto: r.fields?.[F.gst_valor] || null });
         }
+        const gYearRaw = getSel(r.fields?.[F.gst_año]);
         exp.push({
           external_id: "exp-" + r.id,
           category: inferExpenseCategory(ambito || tipo),
           subcategory: tipo || ambito || null,
           property_id: propId,
+          scope: "casa",
           amount: r.fields?.[F.gst_valor] || 0,
           expense_date: expenseDate(r.fields?.[F.gst_fecha], r.fields?.[F.gst_mes], r.createdTime),
           month: getSel(r.fields?.[F.gst_mes])?.toLowerCase() || null,
+          year: gYearRaw ? parseInt(gYearRaw) : null,   // alimenta billing_ym (mes de renta)
           description: r.fields?.[F.gst_concepto] || tipo || "Gasto",
           invoice_url: getAttachUrl(r.fields?.[F.gst_factura]),
+          paid: true,
+          notes: null,
+          ...mirrorFields()
+        });
+      }
+      // ── "Gastos x Empresa" (overhead SIN casa) → mismas filas con scope='empresa'.
+      //    Se upsertean JUNTO a los de casa (un solo mirrorArchive para pm_expenses).
+      const gastosEmp = await fetchAllRecords(base_id, TABLE_IDS.gastos_emp, airtable_token);
+      srcCounts.pm_expenses += gastosEmp.length;
+      for (const r of gastosEmp) {
+        const tipo = getSel(r.fields?.[F.ge_tipo]);
+        const ambito = getSel(r.fields?.[F.ge_ambito]);
+        const yRaw = getSel(r.fields?.[F.ge_año]);
+        exp.push({
+          external_id: "gastoemp-" + r.id,
+          category: inferExpenseCategory(ambito || tipo) === "house" ? "operational" : inferExpenseCategory(ambito || tipo),
+          subcategory: tipo || ambito || null,
+          property_id: null,
+          scope: "empresa",
+          amount: r.fields?.[F.ge_valor] || 0,
+          expense_date: expenseDate(r.fields?.[F.ge_fecha], r.fields?.[F.ge_mes], r.createdTime),
+          month: getSel(r.fields?.[F.ge_mes])?.toLowerCase() || null,
+          year: yRaw ? parseInt(yRaw) : null,
+          description: r.fields?.[F.ge_concepto] || tipo || "Gasto empresa",
+          invoice_url: (typeof r.fields?.[F.ge_factura] === "string" ? r.fields[F.ge_factura] : null),
           paid: true,
           notes: null,
           ...mirrorFields()

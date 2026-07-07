@@ -252,7 +252,7 @@ async function osLoad() {
       sb.from('ff_draws').select('*'),
       sb.from('pm_properties').select('id,name,zone,rental_model,total_units,property_id,address_normalized,mortgage_monthly').eq('active', true),
       sb.from('pm_units').select('id,property_id,status,target_rent,unit_type,is_active').eq('is_active', true),
-      sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,paid_at').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
+      sb.from('pm_payments').select('amount,type,status,property_id,tenant_id,paid_at,billing_ym').eq('active', true).eq('type', 'ingreso').eq('status', 'pagado'),
       sb.from('pm_bookings').select('unit_id,property_id,tenant_id,start_date,end_date,status').eq('active', true),
       sb.from('pm_tenants').select('id,full_name,phone,client_state'),
       sb.from('pm_tasks').select('title,task_type,scheduled_date,zone,assignee,start_at,status,property_id').eq('active', true),
@@ -299,8 +299,10 @@ function osMonthBounds() { const d = new Date(); const y = d.getUTCFullYear(), m
 // Indicador de COMPLETITUD DE CARGA del mes (mismo criterio que PM): nº de pagos cargados vs
 // promedio de meses previos → un número bajo se lee como carga incompleta, no como mal mes.
 function osYmShift(ym, delta) { const y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + delta; const dt = new Date(y, m, 1); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`; }
+// MES DE RENTA (tag Mes/Año de Airtable → billing_ym); sin tag cae a la fecha de cobro.
+function osBillYm(p) { return p.billing_ym || (p.paid_at || '').slice(0, 7); }
 function osMonthLoadInfo(ym) {
-  const cnt = yy => OS.pay.filter(p => (p.paid_at || '').startsWith(yy)).length;
+  const cnt = yy => OS.pay.filter(p => osBillYm(p) === yy).length;
   const n = cnt(ym); const priors = []; for (let i = 1; i <= 3; i++) { const c = cnt(osYmShift(ym, -i)); if (c > 0) priors.push(c); }
   const avg = priors.length ? priors.reduce((s, x) => s + x, 0) / priors.length : 0;
   const nowd = new Date(); const curYm = `${nowd.getFullYear()}-${String(nowd.getMonth() + 1).padStart(2, '0')}`;
@@ -348,7 +350,8 @@ function osCompute() {
   const mb = osMonthBounds(); const inM = x => x && x >= mb.from && x <= mb.to;
   let totalU = 0, occU = 0;
   OS.props.forEach(p => { const us = OS.units.filter(u => u.property_id === p.id); const indep = us.filter(u => OS_INDEP.includes(u.unit_type)); const rooms = us.filter(u => u.unit_type === 'habitacion'); const hasR = rooms.length ? 1 : 0; totalU += indep.length + hasR; occU += indep.filter(u => osUnitState(u) === 'ocupada').length + (hasR && rooms.some(u => osUnitState(u) === 'ocupada') ? 1 : 0); });
-  const rentInc = OS.pay.filter(p => inM(p.paid_at)).reduce((s, p) => s + Number(p.amount || 0), 0);
+  // Ingresos del mes = RENTA DEL MES (tag Mes/Año), no fecha de cobro.
+  const rentInc = OS.pay.filter(p => osBillYm(p) === mb.from.slice(0, 7)).reduce((s, p) => s + Number(p.amount || 0), 0);
   const occPct = totalU ? Math.round(occU / totalU * 100) : 0;
   // Cobranza (deuda contrato − plata real): por casa ocupada, renta esperada vs cobrada en el mes.
   const cobranza = osCobranza(mb);
@@ -383,7 +386,7 @@ function osCobranza(mb) {
     const us = OS.units.filter(u => u.property_id === p.id);
     const occRent = us.filter(u => osUnitState(u) === 'ocupada').reduce((s, u) => s + Number(u.target_rent || 0), 0);
     if (occRent <= 0) return;
-    const cobrado = OS.pay.filter(x => x.property_id === p.id && x.paid_at >= mb.from && x.paid_at <= mb.to).reduce((s, x) => s + Number(x.amount || 0), 0);
+    const cobrado = OS.pay.filter(x => x.property_id === p.id && osBillYm(x) === mb.from.slice(0, 7)).reduce((s, x) => s + Number(x.amount || 0), 0);
     const deuda = occRent - cobrado;
     if (deuda > 200) rows.push({ casa: pName(p.id), esperado: Math.round(occRent), cobrado: Math.round(cobrado), deuda: Math.round(deuda) });
   });
@@ -479,7 +482,7 @@ function osGlobal(comp) {
   const kpis = [
     osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital desplegado (F&F)</div><div class="big glow">${OS_M(h.capital)}</div><div class="meta">${comp.ff.activos} deals activos · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>` : '',
-    osCanArea('rentas') ? `<div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada (rentas)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>` : '',
+    osCanArea('rentas') ? `<div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>` : '',
     (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>` : '',
   ].join('');
   const areaCards = [
@@ -531,7 +534,7 @@ function osContable(comp) {
   const capRows = OS.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')); // sin la propia empresa (18, no 19)
   return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
     <div class="grid k4">
-      <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">plata real cobrada · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
+      <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año) · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
       <div class="card"><div class="lab">Overhead FF real</div><div class="big warn">${OS_M(OS.ffOverhead || 0)}</div><div class="meta">equipo + plataformas F&F (Airtable)</div></div>
       <div class="card"><div class="lab">Intereses HML reales</div><div class="big warn">${OS_M(OS.ffIntereses || 0)}</div><div class="meta">pagos fechados (Airtable)</div></div>
       <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(comp.cobranza.total)}</div><div class="meta">por cobrar (rentas)</div></div>
