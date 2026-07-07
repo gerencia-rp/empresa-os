@@ -263,7 +263,7 @@ async function osLoad() {
       sb.from('ff_overhead').select('source, monto').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_payments').select('pago_hml').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('v_holding_pnl').select('*').then(r => r.data || []).catch(() => []),
-      sb.from('qb_report_cache').select('empresa, report, label, value').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('qb_report_cache').select('empresa, report, label, value, fetched_at').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('qb_account_map').select('*').then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_loans').select('monto_hml').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_uw_config').select('value').eq('key', 'concil_warn_pct').maybeSingle().then(r => r.data).catch(() => null),
@@ -534,6 +534,7 @@ window.osDraftCobro = osDraftCobro;
 function osContable(comp) {
   const capRows = OS.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')); // sin la propia empresa (18, no 19)
   return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
+    ${window.ctSabuesoBlock ? ctSabuesoBlock(comp) : ''}
     <div class="grid k4">
       <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año) · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
       <div class="card"><div class="lab">Overhead FF real</div><div class="big warn">${OS_M(OS.ffOverhead || 0)}</div><div class="meta">equipo + plataformas F&F (Airtable)</div></div>

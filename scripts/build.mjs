@@ -44,6 +44,7 @@ const BUNDLE_FILES = [
   "pm/ff-command-center.js",
   "os/os.js",
   "os/os-admin.js",
+  "os/os-ct-sabueso.js",
   "remodel-dashboard.js",
   "remodel-command-center.js",
   "remodel-reportes.js",
