@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (7 Jul 2026 — 🐕 Sabueso Contable en /contable) · EN VIVO
+
+- 🐕 **Sabueso Contable** (`os/os-ct-sabueso.js`, sección de `/contable`): microscopio de conciliación con norte **"$0 = todo cuadra"** (arrancó en ~$6.75M sin conciliar / 43 descuadres). Catálogo **C1–C8**: C1 conciliación OS↔QBO (inversionistas en **3 conceptos**: comprometido $947k [OS aportado] / pagado $194k [OS] / contabilizado $728k [QBO] — comprometido−QBO va como *diferencia de definición*, no error; préstamos espejando el chart of accounts: HML vivo [OS, deals sin refi/venta] vs `Loan Payable–HML`, y `HML-Refin` $1.22M **sin espejo OS** → falta campo "Monto Refi" en Airtable FF; Rental Property por casa; préstamo activo en casa vendida) · C2 salud RAG (rojo margen bruto<0; FF realizado SEPARADO de inyectado) · C3 libros al día (EBITDA op vs Net QBO >10%) · C4 cobranza aging por casa (billing_ym) · C5 caja (D/E [QBO] con umbral `de_max`, cash por empresa; runway pendiente P&L mensual — no se inventa burn) · C7 anomalías por casa (draws >2× estimado = posible cash-out disfrazado, obras con pérdida, casas en rojo) · C8 higiene (Rentas sin QBO, Educación sin P&L → "sin datos" NUNCA $0, pagos revisar, gastos sin Año).
+- ⚙️ **Infra**: `ct_config` (umbrales, cero hardcode) + `ct_findings` (persistente con soft-delete; **auto-resuelve** lo que deja de disparar → el cierre semanal trackea abierto→resuelto) — migr `20260707120000`. Acciones = `agent_proposals` `estado='propuesta'` con `agent_id` del **agente registrado en `agent_registry`** ("Sabueso Contable", P1/asistido, uuid `7eb3ab03…`) — **siempre aprueba un humano**. Policies de proposals/registry ampliadas a `operacion|contable`.
+- 🧭 **Honestidad**: cada cifra declara fuente [OS/QBO/Airtable]; header muestra "libros QBO al {fetched_at}" (osLoad ahora trae `fetched_at` de `qb_report_cache`); botón "📋 Cierre p/ contadora" copia la lista ordenada por $ + resueltos de la semana.
+
+---
+
 ## 🎯 Estado (7 Jul 2026 — Rentas: MES DE RENTA único + unidades/check-in + espejo limpio) · EN VIVO
 
 - 💵 **REGLA DURA — "mes" de dinero en Rentas = MES DE RENTA (tag Mes/Año de Airtable), NUNCA la fecha de cobro.** Implementado como columna GENERADA **`billing_ym`** ('YYYY-MM') en `pm_payments` y `pm_expenses` (migrs `20260707100000`+`110000`; si falta el tag Año usa el año de la fecha). TODAS las superficies agrupan por `billing_ym`: PM Finanzas (`pmFinAgg`/`pmBillYm`), tab Pagos (columna "Mes renta"), cashflow, Rentas CC (`ccCompute`, aging de cobranza) y OS (`osBillYm`, cobranza). `paid_at` queda SOLO para "cobrado en el mes" (flujo de caja) — métrica separada y rotulada. Junio-2026 verificado contra Airtable directo: 52 pagos / $48,248.55 exacto.
