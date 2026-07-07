@@ -4,6 +4,17 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (7 Jul 2026 — Rentas: MES DE RENTA único + unidades/check-in + espejo limpio) · EN VIVO
+
+- 💵 **REGLA DURA — "mes" de dinero en Rentas = MES DE RENTA (tag Mes/Año de Airtable), NUNCA la fecha de cobro.** Implementado como columna GENERADA **`billing_ym`** ('YYYY-MM') en `pm_payments` y `pm_expenses` (migrs `20260707100000`+`110000`; si falta el tag Año usa el año de la fecha). TODAS las superficies agrupan por `billing_ym`: PM Finanzas (`pmFinAgg`/`pmBillYm`), tab Pagos (columna "Mes renta"), cashflow, Rentas CC (`ccCompute`, aging de cobranza) y OS (`osBillYm`, cobranza). `paid_at` queda SOLO para "cobrado en el mes" (flujo de caja) — métrica separada y rotulada. Junio-2026 verificado contra Airtable directo: 52 pagos / $48,248.55 exacto.
+- 🚪 **Propiedades despliega las unidades ACTIVAS del espejo** (tipo, estado, 🔑 código de acceso, renta) con **📄 Check-in POR unidad** (`pmGenerateWelcomeGuide(propId, unitId)` — la guía usa el código de ESA unidad). Bramble = 5 unidades, no 16: las inactivas legacy (external_id viejo `unit-{casa}-{slug}`) NUNCA se muestran; el set activo = 🚪 Unidades del Modelo Nuevo (keyed `unit-{recId}`).
+- 🐛 **Fixes reales encontrados**: (1) pm-main cargaba `pm_payments` SIN filtro `active` con `limit(1000)` sobre 1,228 filas → los pagos sin fecha (status `revisar`) quedaban cortados; ahora `eq('active',true)` — los 902 pagos y 258 gastos inactivos legacy no entran en NINGÚN cálculo. (2) `pmRenderUnitRow` usaba un global `active` inexistente (ReferenceError latente).
+- 💸 **Gastos**: el sync ahora trae **"Gastos x Empresa"** (`tbl9dJXwI9Vn3kjKy`) → `pm_expenses.scope='empresa'` (`gastoemp-{recId}`), y mapea el **Año** de Gastos X Casa. Finanzas agrupa por `billing_ym` y muestra "🏢 Gastos de empresa" como categoría propia. ⚠️ Data quality conocida: 7 gastos con Mes sin Año y 6 gastos de empresa (mayo) sin Año — caen al año de la fecha; ideal taguear Año en Airtable.
+- 💡 **Utilities**: NO hay tabla fuente en el Modelo Nuevo — los 72 placeholders del seed se muestran colapsados como "pendiente de configurar" (no filas fantasma). "Servicios automáticos" se llena marcando 🔑 Accesos con Categoría=«servicio».
+- 🔁 Sync 100% idempotente por `external_id` = recId (`casa-/tenant-/unit-/booking-/pay-/exp-/gastoemp-/cred-`), paridad Airtable=espejo con assert por tabla.
+
+---
+
 ## 🎯 Estado (6 Jul 2026 — Panel de Admin + RLS por áreas + Login fácil) · EN VIVO
 
 - 🛡 **Panel de Admin en el OS (`/admin`, solo role=admin)** — módulo `os/os-admin.js`: listar usuarios (con último acceso vía RPC `admin_users_overview()` SECURITY DEFINER), invitar (edge function `invite-user`, ahora roles `admin/pm/editor/viewer` + reactiva al re-invitar), editar rol/áreas/nivel (👁 ve / ✏️ edita → `profiles.area_levels`, hoy informativo), **desactivar = soft-delete** (`profiles.active/archived_at`, reversible — NUNCA hard-delete; el panel viejo con 🗑 redirige acá). Usuario inactivo no puede loguearse. Migración `20260706100000`.
