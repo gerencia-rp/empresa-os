@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Propuesta de Inversión · Flipping Rentals</title>
+<meta name="robots" content="noindex" />
+<style>
+  :root{--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.05);--glassb:rgba(255,255,255,.1);--a1:#45e3c6;--a2:#4f8dff;--pos:#48d69c;--amber:#e7b65e}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(760px 520px at 8% -6%,rgba(69,227,198,.15),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(79,141,255,.16),transparent 56%),linear-gradient(180deg,#070a11,#05070c);color:var(--ink);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}
+  .logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#04121a;font-weight:900;font-size:17px;margin-bottom:14px}
+  h1{font-size:26px;font-weight:780;letter-spacing:-.4px}h1 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--mut);font-size:13px;margin:6px 0 22px}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .card{background:var(--glass);border:1px solid var(--glassb);border-radius:15px;padding:18px;backdrop-filter:blur(14px)}
+  .lab{font-size:9.5px;letter-spacing:1.4px;color:var(--mut2);text-transform:uppercase;font-weight:700}
+  .big{font-size:26px;font-weight:780;margin-top:7px;font-variant-numeric:tabular-nums}
+  .meta{font-size:11.5px;color:var(--mut);margin-top:5px;line-height:1.5}
+  .up{color:var(--pos)}.warn{color:var(--amber)}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-top:1px solid var(--glassb)}
+  .kv:first-of-type{border-top:none}.kv span{color:var(--mut)}
+  .empty{padding:60px;text-align:center;color:var(--mut2)}
+  .cta{display:inline-block;background:linear-gradient(135deg,var(--a1),var(--a2));color:#04121a;font-weight:750;padding:13px 22px;border-radius:12px;text-decoration:none;font-size:14px;margin-top:20px}
+  @media(max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"><div class="empty">⏳ Cargando propuesta…</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/config.public.js"></script>
+<script>
+const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const $ = v => '$' + Math.round(+v || 0).toLocaleString('en-US');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const MODELOS = { fixflip: '🏚 Fix & Flip', fixhold: '🏠 Fix & Hold', brrrr: '♻️ BRRRR (compra→remodela→renta→refinancia)' };
+(async function(){
+  const link = new URLSearchParams(location.search).get('link');
+  const app = document.getElementById('app');
+  if (!link) { app.innerHTML = '<div class="empty">Falta el link de la propuesta.</div>'; return; }
+  const { data: d, error } = await sb.rpc('inv_proposal_public', { link });
+  if (error || !d || !d.ok) { app.innerHTML = '<div class="empty">Propuesta no encontrada o vencida.</div>'; return; }
+  const ret = d.retornos || {};
+  const est = d.estructura || {};
+  const escenarios = Array.isArray(d.escenarios) ? d.escenarios : [];
+  app.innerHTML = ''
+    + '<div class="logo">FR</div>'
+    + '<h1>Propuesta de inversión <span>· ' + esc((d.direccion || 'Propiedad').split(',')[0]) + '</span></h1>'
+    + '<div class="sub">' + esc(d.direccion || '') + ' · modelo: <b>' + (MODELOS[d.modelo] || esc(d.modelo)) + '</b> · Flipping Rentals · Austin, TX</div>'
+    + '<div class="grid">'
+    + '<div class="card"><div class="lab">Inversión total</div><div class="big">' + $(d.precio_total) + '</div><div class="meta">precio llave en mano para el inversionista</div></div>'
+    + '<div class="card"><div class="lab">Valor estimado (ARV)</div><div class="big up">' + $(d.arv) + '</div><div class="meta">after repair value — avalúo objetivo</div></div>'
+    + '<div class="card"><div class="lab">Renta proyectada</div><div class="big">' + $(d.renta_proyectada) + '/mes</div><div class="meta">modelo de renta por habitación</div></div>'
+    + '</div>'
+    + '<div class="grid" style="margin-top:14px">'
+    + (ret.tir31 != null ? '<div class="card"><div class="lab">TIR proyectada (31 años)</div><div class="big up">' + (ret.tir31 * 100).toFixed(1) + '%</div><div class="meta">retorno anual del hold completo</div></div>' : '')
+    + (ret.vpn31 != null ? '<div class="card"><div class="lab">VPN (31 años)</div><div class="big up">' + $(ret.vpn31) + '</div><div class="meta">valor presente neto al retorno esperado</div></div>' : '')
+    + (est.inversionista_pct != null ? '<div class="card"><div class="lab">Tu participación</div><div class="big">' + est.inversionista_pct + '%</div><div class="meta">de la utilidad y el patrimonio</div></div>' : '')
+    + '</div>'
+    + (escenarios.length ? '<div class="card" style="margin-top:14px"><div class="lab" style="margin-bottom:8px">Escenarios de valor (sensibilidad del avalúo)</div>'
+      + '<div class="grid">' + escenarios.map((e, i) => '<div class="card" style="background:rgba(255,255,255,.03)"><div class="lab">' + (i === 0 ? 'Conservador −10%' : i === 1 ? 'Base' : 'Optimista +10%') + '</div><div class="big">' + $(e.arv) + '</div></div>').join('') + '</div></div>' : '')
+    + '<div class="meta" style="margin-top:18px;line-height:1.7">Proyecciones del modelo financiero de Flipping Rentals — no constituyen garantía de retorno. Los retornos se materializan a largo plazo (amortización + renta + valorización). Detalle completo, flujo mes a mes y documentos en una llamada.</div>'
+    + '<a class="cta" href="mailto:gerencia@rentalprofitss.com?subject=' + encodeURIComponent('Propuesta ' + (d.direccion || '')) + '">Hablemos de esta inversión →</a>';
+})();
+</script>
+</body>
+</html>

@@ -69,6 +69,7 @@ const BUNDLE_FILES = [
 
 // Archivos que se copian tal cual (no van al bundle)
 const STATIC_COPY = [
+  "propuesta.html",
   "inversionista.html",
   "os/inv-engine.js",
   "os/inv-portal.js",
