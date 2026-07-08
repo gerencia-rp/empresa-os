@@ -185,15 +185,53 @@
     const vpn31 = fclConTerminal[0] + NPV(tasaDesc, fclConTerminal.slice(1));  // NPV(retorno esperado) + año 0, CON terminal
     // ── BASE OFICIAL "POST-REFI" (como el Excel): año 0 = cash atrapado tras el refi
     // (si hay dato REAL — ff_draws.net_total — manda; si no, el acumulado del ciclo del motor).
+    // Los años 1..31 son la OPERACIÓN post-refi (uodi − cuota − seguro, con inflación y
+    // cuota fija) — el ciclo completo ya quedó resumido en el año 0 (nada se cuenta dos veces).
     // TIR = IRR(FCL post-refi, sin venta) · VPN = NPV(retorno esperado) + año 0, con venta.
     const mesRefiIdx = refiMes != null ? Math.min(refiMes, M) : M;
     const cicloAcum = meses.slice(0, mesRefiIdx + 1).reduce((s, x) => s + x.fclNegocio, 0);
     const anio0PostRefi = p.cashAtrapadoReal != null ? -Math.abs(p.cashAtrapadoReal) : cicloAcum;
-    const fclPostRefi = [anio0PostRefi];
-    for (let a = 1; a <= ANIOS; a++) fclPostRefi.push(anios[a].fclNegocio);
+    const opsAnual = (a) => {   // año operativo a precios del año a (misma fórmula del bloque anual 2..31)
+      const g = Math.pow(1 + inf, a - 1);
+      const ingA = (p.ocupacionEstable != null ? p.ocupacionEstable : 1) * arriendoPleno * 12 * g;
+      const opFijo = ((p.mantenimientoMes || 0) + (p.serviciosMes || 0)) * (p.ocupacionEstable || 1) * 12 * g + (p.hoaMes || 0) * 12 * g;
+      const opPct = ingA * ((p.padsplitPct || 0) + (p.comisionPct || 0));
+      const impProp = p.arv * Math.pow(1 + valz, a - 1) * (p.impPropiedadPct || 0);
+      const uOp = ingA - opFijo - opPct;
+      const impR = uOp - impProp > 0 ? (uOp - impProp) * (p.impRentaPct || 0) : 0;
+      let cuotaA = 0;
+      for (let k = 0; k < 12; k++) { const f = banco.tabla[(a - 1) * 12 + k]; if (f) cuotaA += f.cuota; }
+      return (uOp - impProp - impR) - cuotaA - (p.seguroMes || 0) * 12 * g;
+    };
+    // Perfil de proyección post-refi: 'motor' (uodi−cuota−seguro con inflación, cuota fija)
+    // o 'plano' (utilidad anual constante = como proyecta el Excel; se calibra con
+    // util_anual_postrefi + anio0_postrefi para reproducir la TIR/VPN de la hoja).
+    const perfilPlano = p.postRefiPerfil === 'plano' && p.utilAnualPostRefi != null;
+    const anio0Oficial = p.anio0PostRefi != null ? -Math.abs(p.anio0PostRefi) : anio0PostRefi;
+    const fclPostRefi = [anio0Oficial];
+    for (let a = 1; a <= ANIOS; a++) fclPostRefi.push(perfilPlano ? p.utilAnualPostRefi : opsAnual(a));
     const tir31PostRefi = IRR(fclPostRefi);
     const fclPostRefiVenta = fclPostRefi.slice(); fclPostRefiVenta[ANIOS] += terminal;
     const vpn31PostRefi = fclPostRefiVenta[0] + NPV(tasaDesc, fclPostRefiVenta.slice(1));
+    // ── ANÁLISIS DE 3 FASES (por casa y para el inversionista) ──
+    // Fase 0: déficit inicial del ciclo (mes y monto del punto más profundo del FCL acumulado)
+    // Fase 1: cuándo la operación cubre el déficit post-refi (Σ utilidades ≥ |año 0|)
+    // Fase 2: recuperación TOTAL del capital del inversionista (su parte de utilidades ≥ su aporte)
+    let acumC = 0, defMax = 0, defMes = 0;
+    meses.forEach(x => { acumC += x.fclNegocio; if (acumC < defMax) { defMax = acumC; defMes = x.m; } });
+    let f1 = null, acc = 0;
+    for (let a = 1; a <= ANIOS; a++) { acc += fclPostRefi[a]; if (acc >= Math.abs(anio0Oficial)) { f1 = a; break; } }
+    const invPct = p.repartoInv != null ? p.repartoInv : 0.5;
+    let f2 = null;
+    if (p.inversionAportada > 0) {
+      let accInv = 0;
+      for (let a = 1; a <= ANIOS; a++) { accInv += Math.max(0, fclPostRefi[a]) * invPct; if (accInv >= p.inversionAportada) { f2 = a; break; } }
+    }
+    const fases = {
+      fase0: { mes: defMes, deficitMax: defMax },
+      fase1: { anio: f1, cubre: Math.abs(anio0Oficial) },
+      fase2: { anio: f2, capital: p.inversionAportada || null, nota: f2 == null && p.inversionAportada > 0 ? 'solo con utilidades no se recupera en 31 años — el capital se recupera vía patrimonio/venta o distribuciones del refi' : null },
+    };
     // año estabilizado (2) para CAP/DSCR/equilibrio
     const est = anios[2] || anios[1];
     const noi = est.uodi + est.impuestos - (est.impuestos - 0) + est.uodi * 0; // NOI = ingreso − operativos (sin impuestos ni deuda)
@@ -216,7 +254,8 @@
         arriendoPleno, noiAnual, capValor, capCosto, dscr, puntoEquilibrio,
         vpnMensual, tirCiclo: tirMensualPeriodo != null ? Math.pow(1 + tirMensualPeriodo, 12) - 1 : null,
         tir31, tir31ConVenta, vpn31, terminal, profit: porParte(profit), roi,
-        anio0PostRefi, tir31PostRefi, vpn31PostRefi,   // ← base OFICIAL (Excel)
+        anio0PostRefi: anio0Oficial, tir31PostRefi, vpn31PostRefi,   // ← base OFICIAL (Excel)
+        fases,
         cashInvertido, utilidadAnualEstable: porParte(est.uodi - est.cuota - (p.seguroMes || 0) * 12),
         vpn31Parte: porParte(vpn31),
       },

@@ -123,7 +123,9 @@ function iaEngineParamsFromRows(rows, holdingPct) {
     mantenimientoMes: g('mantenimiento_mes', 0), serviciosMes: g('servicios_mes', 0), hoaMes: g('hoa_mes', 0),
     padsplitPct: g('padsplit_pct', 0), comisionPct: g('comision_pct', 0), impPropiedadPct: g('imp_propiedad_pct', 0), impRentaPct: g('imp_renta_pct', 0),
     seguroMes: g('seguro_mes', 0), cicloMeses: g('ciclo_meses', 12), anios: g('anios', 31),
-    repartoInv: holdingPct != null ? holdingPct : g('reparto_inv', 0.5), cashAtrapadoReal: g('cash_atrapado_real', null) };
+    repartoInv: holdingPct != null ? holdingPct : g('reparto_inv', 0.5), cashAtrapadoReal: g('cash_atrapado_real', null),
+    postRefiPerfil: P.postrefi_perfil ? P.postrefi_perfil.value : null,
+    utilAnualPostRefi: g('util_anual_postrefi', null), anio0PostRefi: g('anio0_postrefi', null) };
 }
 
 // ─── F2: escenarios + simulador ───

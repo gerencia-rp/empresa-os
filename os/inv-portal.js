@@ -91,6 +91,11 @@ function ipEngineParams(pid) {
     cicloMeses: num(P, 'ciclo_meses', 12), anios: num(P, 'anios', 31),
     repartoInv: holding.reparto_pct != null ? +holding.reparto_pct : num(P, 'reparto_inv', 0.5),
     cashAtrapadoReal: num(P, 'cash_atrapado_real', null),
+    // calibración Excel: perfil post-refi plano (TIR/VPN oficiales de la hoja)
+    postRefiPerfil: P.postrefi_perfil ? P.postrefi_perfil.value : null,
+    utilAnualPostRefi: num(P, 'util_anual_postrefi', null),
+    anio0PostRefi: num(P, 'anio0_postrefi', null),
+    inversionAportada: +holding.inversion_aportada || null,
   };
 }
 function srcChip(P, k) {
