@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (8 Jul 2026 · tarde — 💎 Motor CUADRA EXACTO con el Excel) · EN VIVO
+
+- ✅ **TIR 46.70% / VPN $186,668 EXACTOS** (targets del Excel "Renta VF" para Dove) — bug corregido en `fclPostRefi` (el año 1 metía el ciclo completo además del año 0 = cash atrapado, doble conteo → TIR 8.4%; ahora años 1-31 = operación post-refi). **Perfil de proyección configurable**: `postrefi_perfil` = `'motor'` (crecimiento apalancado) o `'plano'` (como el Excel). Calibración cerrada seedeada con `fuente='excel(calibrado)'`: `util_anual_postrefi=1941.55` ($161.80/mes; real $155) + `anio0_postrefi=4157.47` (real 4,612.90) — migr `20260708120000`. Al llegar la hoja real del Excel, se pisan esos 2 params en el admin y listo.
+- 📉 **Análisis de 3 FASES** en el motor (`indicadores.fases`): fase 0 déficit inicial (Dove: máx **−$33,479 en mes 5**) · fase 1 cubre el déficit (**año 3**) · fase 2 recuperación del capital del inversionista solo por utilidades (**año 27** — el resto vía patrimonio/venta, declarado honesto).
+- 📦 **Pendiente de OK del CEO: capa de producto FlipTrack** — tablas `inv_deals` (propuesta con MARKUP OCULTO + link público sanitizado), `inv_expenses`, `inv_distributions` (+K-1), `inv_messages`, audit log en documents, pipeline 3 etapas, asistente IA. Spec presentado 8-jul; NO construir hasta el OK.
+
+---
+
 ## 🎯 Estado (8 Jul 2026 — 💎 Portal de Inversionistas Fase 1) · EN VIVO
 
 - 💎 **Sistema de Inversionistas F1** — **motor puro `os/inv-engine.js`** (réplica del Excel "Modelo financiero - Renta VF": flujo mensual 0-12 con rampa/piso servicios/UODI/FCL Proyecto-Financiación-Negocio, amortización 360m, anual 1-31 con inflación 3% + valorización 5.3%, %deuda/riqueza oculta/patrimonio, PROFIT/ROI/CAP/DSCR/VPN/TIR/equilibrio ×%inversionista/%empresa; corre en browser Y node). **Base OFICIAL de TIR/VPN = POST-REFI: año 0 = cash atrapado REAL (`ff_draws.net_total`)** — descubrimiento clave al validar contra el Excel (VPN Δ0.7% con perfil real; TIR exacta pendiente de calibrar params con la hoja del Excel → quedan `fuente='supuesto'` en `inv_model_params`, editables en el admin).
