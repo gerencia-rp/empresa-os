@@ -350,8 +350,7 @@ const FF_NAV = [
   ['command', '◧', 'Command Center', null],
   ['deals', '▦', 'Deals & Pipeline', () => FF.deals.length],
   ['propiedades', '⌂', 'Propiedades', null],
-  ['underwriting', '∑', 'Underwriting', null],
-  ['uwsuite', '🧮', 'Suite Underwriting', null],
+  ['uwsuite', '🧮', 'Underwriting', null],
   ['inversionistas', '◍', 'Inversionistas', () => FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length || null],
   ['finanzas', '$', 'Finanzas · QuickBooks', null],
   ['analitica', '▤', 'Analítica & KPIs', null],
@@ -367,7 +366,7 @@ function ffRender() {
   ffDestroyCharts();
   main.innerHTML = ({
     command: () => ffSecCommand(comp), deals: () => ffSecDeals(comp), propiedades: () => ffSecPropiedades(comp),
-    underwriting: () => ffSecUnderwriting(comp),
+    underwriting: () => { FF.section='uwsuite'; setTimeout(()=>{ if(window.ffUwLoad) ffUwLoad().then(()=>ffUwRender()); },30); return `<div class="sec-head"><h2>🧮 Underwriting</h2><p>6 calculadoras calibradas · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando…</div></div>`; },
     uwsuite: () => { setTimeout(() => { if (window.ffUwLoad) ffUwLoad().then(() => ffUwRender()); }, 30); return `<div class="sec-head"><h2>🧮 Suite de Underwriting</h2><p>6 calculadoras calibradas con el histórico · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando calibración…</div></div>`; },
     inversionistas: () => ffSecInversionistas(comp),
     finanzas: () => ffSecFinanzas(comp),
@@ -379,7 +378,7 @@ function ffRender() {
 window.ffRender = ffRender;
 async function ffReload() { await ffLoadAll(); ffRender(); }
 window.ffReload = ffReload;
-function ffGo(s) { FF.section = s; ffRender(); document.getElementById('ff-overlay')?.scrollTo(0, 0); }
+function ffGo(s) { if (s === 'underwriting') s = 'uwsuite'; FF.section = s; ffRender(); document.getElementById('ff-overlay')?.scrollTo(0, 0); }
 window.ffGo = ffGo;
 
 function ffSidebar() {

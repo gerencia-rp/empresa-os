@@ -25,15 +25,17 @@ const UW_NAV = [
 
 async function ffUwLoad() {
   try {
-    const [cfg, deals, hml, an] = await Promise.all([
+    const [cfg, deals, hml, an, draws] = await Promise.all([
       sb.from('ff_uw_config').select('key, value').then(r => r.data || []),
       sb.from('ff_deals').select('*').eq('active', true).order('address').then(r => r.data || []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []),
       sb.from('ff_underwriting_analyses').select('*').eq('active', true).order('updated_at', { ascending: false }).limit(50).then(r => r.data || []),
+      sb.from('ff_draws').select('address_norm, remodel_complete').eq('active', true).then(r => r.data || []),
     ]);
     UW.cfg = {}; cfg.forEach(c => UW.cfg[c.key] = c.value);
     UW.deals = deals; UW.analyses = an;
     UW.hml = {}; hml.forEach(h => { if (h.address_norm) UW.hml[h.address_norm] = h; });
+    UW.draws = {}; (draws || []).forEach(dr => { if (dr.address_norm) UW.draws[dr.address_norm] = dr; });
   } catch (e) { console.warn('ffUwLoad', e); }
 }
 
@@ -63,9 +65,12 @@ function ffUwCargarCasa(dealId) {
   const d = UW.deals.find(x => x.id === dealId); if (!d) return;
   const h = UW.hml[d.address_norm] || {};
   const inp = ffUwDefaults();
-  inp.remod_directo = +d.remodel_est || 0;
+  const dr = (UW.draws || {})[d.address_norm] || {};
+  inp.remod_directo = +dr.remodel_complete || 0;   // Costo Remod REAL (cobrado por Remodelación). Si null (obra no terminada) → 0 editable + estimador.
+  inp.usar_estimador = !(+dr.remodel_complete > 0);
   inp.est_sqft = +d.sqft || 1400;
   inp.purchase = +d.purchase_price || 0;
+  inp.arv_airtable = +d.arv || 0;                  // FIX 3b: ARV de Airtable = fuente única
   inp.arv = +d.arv || 0; inp.appraisal = +d.appraisal || 0;
   inp.cashout_en_draw = 0;
   inp.closing_costs = +h.gastos_cierre || UWc('ctc_closing_default', 16052);
@@ -122,18 +127,17 @@ function ffUwCalcNegocio(inp) {
 function ffUwCalcArv(inp) {
   const psfZona = UWc('arv_psf_zona', 295);
   const sqft = +inp.est_sqft || 0;
-  const arvComps = Math.round(psfZona * sqft);                 // por comparables ($/sqft zona × sqft)
+  const arvComps = Math.round(psfZona * sqft);                 // SOLO referencia (no alimenta MAO/cash-out)
   const appraisal = +inp.appraisal || 0;                        // ancla real
-  const arvManual = +inp.arv || 0;                              // input directo si lo tiene
-  // rango: conservador / probable / optimista
-  const anclas = [arvComps, appraisal, arvManual].filter(x => x > 0);
-  const probable = anclas.length ? Math.round(anclas.reduce((s, x) => s + x, 0) / anclas.length) : arvComps;
+  const arvAirtable = +inp.arv_airtable || +inp.arv || 0;       // FIX 3b: fuente de verdad = Propiedades.ARV
+  // el ARV núcleo (probable) = Airtable si existe; si no (hipotética), comps
+  const probable = arvAirtable > 0 ? arvAirtable : arvComps;
   const conservador = Math.round(probable * 0.92);
   const optimista = Math.round(probable * 1.08);
   // confianza: alta si appraisal presente y comps cerca
-  const spread = anclas.length > 1 ? Math.max(...anclas) / Math.min(...anclas) - 1 : null;
-  const confianza = appraisal > 0 && spread != null && spread < 0.1 ? 'alta' : (appraisal > 0 || anclas.length > 1) ? 'media' : 'baja';
-  return { arvComps, appraisal, probable, conservador, optimista, confianza, psfZona, sqft, mercadoVivo: false };
+  const esAirtable = arvAirtable > 0;
+  const confianza = esAirtable ? 'alta (Airtable)' : appraisal > 0 ? 'media' : 'baja';
+  return { arvComps, appraisal, arvAirtable, esAirtable, probable, conservador, optimista, confianza, psfZona, sqft, mercadoVivo: false };
 }
 // ═══ CALCULADORA 3 · CASH-OUT ═══
 function ffUwCalcCashout(inp, arv) {
