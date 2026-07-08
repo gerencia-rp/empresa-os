@@ -351,6 +351,7 @@ const FF_NAV = [
   ['deals', '▦', 'Deals & Pipeline', () => FF.deals.length],
   ['propiedades', '⌂', 'Propiedades', null],
   ['underwriting', '∑', 'Underwriting', null],
+  ['uwsuite', '🧮', 'Suite Underwriting', null],
   ['inversionistas', '◍', 'Inversionistas', () => FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length || null],
   ['finanzas', '$', 'Finanzas · QuickBooks', null],
   ['analitica', '▤', 'Analítica & KPIs', null],
@@ -367,6 +368,7 @@ function ffRender() {
   main.innerHTML = ({
     command: () => ffSecCommand(comp), deals: () => ffSecDeals(comp), propiedades: () => ffSecPropiedades(comp),
     underwriting: () => ffSecUnderwriting(comp),
+    uwsuite: () => { setTimeout(() => { if (window.ffUwLoad) ffUwLoad().then(() => ffUwRender()); }, 30); return `<div class="sec-head"><h2>🧮 Suite de Underwriting</h2><p>6 calculadoras calibradas con el histórico · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando calibración…</div></div>`; },
     inversionistas: () => ffSecInversionistas(comp),
     finanzas: () => ffSecFinanzas(comp),
     analitica: () => ffSecAnalitica(comp),
