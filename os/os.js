@@ -18,6 +18,7 @@ const OS_EMPRESAS = {
     { k: 'deals', name: 'Deals & Pipeline', icon: '▦', fn: "osOpenApp('fix-and-flip','deals')" },
     { k: 'underwriting', name: 'Underwriting', icon: '∑', fn: "osOpenApp('fix-and-flip','underwriting')" },
     { k: 'inversionistas', name: 'Inversionistas', icon: '◍', fn: "osOpenApp('fix-and-flip','inversionistas')" },
+    { k: 'portal-inv', name: 'Portal Inversionistas', icon: '💎', fn: "osNav('/inversionistas')" },
     { k: 'finanzas', name: 'Finanzas · QuickBooks', icon: '$', fn: "osOpenApp('fix-and-flip','finanzas')" },
   ] },
   'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
@@ -204,6 +205,7 @@ function osParse(path) {
   if (seg[0] === 'operacion') return { view: 'operacion' };
   if (seg[0] === 'contable') return { view: 'contable' };
   if (seg[0] === 'admin') return { view: 'admin' };
+  if (seg[0] === 'inversionistas') return { view: 'invadmin' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (OS_EMPRESAS[seg[0]]) {
     if (seg[1]) return { view: 'app', empresa: seg[0], app: seg[1], slug: seg[2] || null };
@@ -217,6 +219,7 @@ function osTitle(r) {
   if (r.view === 'operacion') return 'Operación · ' + base;
   if (r.view === 'contable') return 'Contable · ' + base;
   if (r.view === 'admin') return 'Admin · ' + base;
+  if (r.view === 'invadmin') return 'Inversionistas · ' + base;
   if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
   return 'No encontrado · ' + base;
@@ -430,7 +433,8 @@ window.osCanArea = osCanArea;
 function osRouteGuard(r) {
   if (r.view === 'admin') return osRole() === 'admin' ? null : 'admin';
   let need = null;
-  if (r.view === 'operacion') need = ['operacion'];
+  if (r.view === 'invadmin') need = ['fix-flip'];
+  else if (r.view === 'operacion') need = ['operacion'];
   else if (r.view === 'contable') need = ['contable'];
   else if ((r.view === 'empresa' || r.view === 'app') && OS_EMPRESAS[r.empresa]) need = [OS_EMPRESAS[r.empresa].key];
   else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
@@ -454,7 +458,7 @@ function osRender() {
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }

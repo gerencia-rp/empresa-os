@@ -45,6 +45,8 @@ const BUNDLE_FILES = [
   "os/os.js",
   "os/os-admin.js",
   "os/os-ct-sabueso.js",
+  "os/inv-engine.js",
+  "os/inv-admin.js",
   "remodel-dashboard.js",
   "remodel-command-center.js",
   "remodel-reportes.js",
@@ -66,6 +68,9 @@ const BUNDLE_FILES = [
 
 // Archivos que se copian tal cual (no van al bundle)
 const STATIC_COPY = [
+  "inversionista.html",
+  "os/inv-engine.js",
+  "os/inv-portal.js",
   "config.public.js",
   "viral.html",
   "viral-memory.js",
