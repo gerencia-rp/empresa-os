@@ -5,7 +5,7 @@
 // Todo soft-delete; escrituras protegidas por RLS (has_area fix-flip).
 // ════════════════════════════════════════════════════════════════
 
-const IA = { loaded: false, loading: false, err: null, access: [], holdings: [], investors: [], deals: [], params: [], cashflow: [], casa: null, tab: 'accesos' };
+const IA = { loaded: false, loading: false, err: null, access: [], holdings: [], investors: [], deals: [], params: [], cashflow: [], casa: null, tab: 'accesos', sim: {} };
 window.IA = IA;
 
 function iaMoney(v) { return '$' + Math.round(+v || 0).toLocaleString('en-US'); }
@@ -126,11 +126,88 @@ function iaEngineParamsFromRows(rows, holdingPct) {
     repartoInv: holdingPct != null ? holdingPct : g('reparto_inv', 0.5), cashAtrapadoReal: g('cash_atrapado_real', null) };
 }
 
+// ─── F2: escenarios + simulador ───
+function iaBaseParams() {
+  const h = IA.holdings.find(x => x.property_id === IA.casa);
+  return iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null);
+}
+function iaEstOpts() {
+  const P = {}; IA.params.forEach(r => P[r.key] = r);
+  const g = k => { const r = P[k]; const v = r ? parseFloat(r.value) : NaN; return isNaN(v) ? null : v; };
+  return { remodelTotal: g('est_remodel_total'), arv: g('est_arv'), cierrePct: g('est_cierre_pct') };
+}
+function iaFechaCierre() { const r = IA.params.find(x => x.key === 'fecha_cierre'); return r ? r.value : null; }
+function iaRunEscenario(tipo) {
+  const base = iaBaseParams();
+  const p = invEngine.escenario(base, tipo, {
+    est: iaEstOpts(),
+    movsPorMes: tipo === 'realizado' ? invEngine.movsPorMes(IA.cashflow, iaFechaCierre()) : null,
+    sim: IA.sim,
+  });
+  return { p, r: invEngine.run(p) };
+}
+function iaSimSet(k, v) { const n = parseFloat(v); if (isNaN(n)) delete IA.sim[k]; else IA.sim[k] = n; osRender(); }
+window.iaSimSet = iaSimSet;
+function iaSimReset() { IA.sim = {}; osRender(); }
+window.iaSimReset = iaSimReset;
+async function iaGuardarCache() {
+  const tipos = ['estimado', 'proyectado', 'realizado', 'simulado'];
+  for (const t of tipos) {
+    const { r } = iaRunEscenario(t);
+    const data = {
+      indicadores: r.indicadores,
+      anios: r.anios.map(a => ({ a: a.a, fclNegocio: Math.round(a.fclNegocio), valor: Math.round(a.valor), saldo: Math.round(a.saldo), patrimonioInv: Math.round(a.patrimonioInv), abono: Math.round(a.abono) })),
+      sim: t === 'simulado' ? IA.sim : undefined,
+    };
+    const { error } = await sb.from('inv_projection').upsert({ property_id: IA.casa, escenario: t, data, params_hash: String(JSON.stringify(iaBaseParams()).length), computed_at: new Date().toISOString(), active: true, archived_at: null }, { onConflict: 'property_id,escenario' });
+    if (error) return alert('Error guardando ' + t + ': ' + error.message);
+  }
+  if (window.toast) toast('💾 Proyección cacheada (4 escenarios) en inv_projection', 'success');
+}
+window.iaGuardarCache = iaGuardarCache;
+
+function iaTabEscenarios() {
+  const casas = [...new Set(IA.holdings.map(h => h.property_id))];
+  const casaSel = '<select class="osa-in" onchange="iaSetCasa(this.value)">' + casas.map(c => '<option value="' + c + '" ' + (c === IA.casa ? 'selected' : '') + '>' + OS_E(iaCasaName(c)) + '</option>').join('') + '</select>';
+  if (!IA.params.length) return '<div class="empty">Esta casa no tiene parámetros del modelo.</div>';
+  const tipos = [['estimado', '📋 Estimado', 'underwriting original'], ['proyectado', '🎯 Proyectado', 'premisas confirmadas + supuestos'], ['realizado', '✅ Realizado', IA.cashflow.length + ' movimientos reales'], ['simulado', '🧪 Simulado', 'sensibilidad del simulador']];
+  const runs = {}; tipos.forEach(t => { try { runs[t[0]] = iaRunEscenario(t[0]); } catch (e) { runs[t[0]] = null; } });
+  const base = iaBaseParams();
+  const fila = (lab, fn, fmt) => '<tr><td>' + lab + '</td>' + tipos.map(t => { const x = runs[t[0]]; return '<td style="text-align:right">' + (x ? (fmt || (v => v))(fn(x)) : '—') + '</td>'; }).join('') + '</tr>';
+  const pct1 = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
+  const inv = base.repartoInv;
+  const comp = '<div class="card overx" style="margin-bottom:14px"><div class="chart-h"><div class="t">Comparativa de escenarios · ' + OS_E(iaCasaName(IA.casa)) + '</div><div class="k">mismo motor, distintos inputs · reparto inversionista ' + Math.round(inv * 100) + '%</div></div>'
+    + '<table class="ptable"><thead><tr><th>Indicador</th>' + tipos.map(t => '<th style="text-align:right" title="' + t[2] + '">' + t[1] + '</th>').join('') + '</tr></thead><tbody>'
+    + fila('TIR 31 años (post-refi)', x => x.r.indicadores.tir31PostRefi, pct1)
+    + fila('VPN 31 años · casa', x => x.r.indicadores.vpn31PostRefi, iaMoney)
+    + fila('VPN 31 años · inversionista', x => x.r.indicadores.vpn31PostRefi * inv, iaMoney)
+    + fila('CAP rate (valor)', x => x.r.indicadores.capValor, pct1)
+    + fila('DSCR', x => x.r.indicadores.dscr, v => v.toFixed(2))
+    + fila('Punto de equilibrio', x => x.r.indicadores.puntoEquilibrio, pct1)
+    + fila('Cash del ciclo (FCL negativos)', x => -x.r.indicadores.cashInvertido, iaMoney)
+    + fila('Utilidad año 2 (casa)', x => x.r.anios[2] ? x.r.anios[2].fclNegocio : null, iaMoney)
+    + fila('Patrimonio inversionista año 10', x => x.r.anios[10] ? x.r.anios[10].patrimonioInv : null, iaMoney)
+    + '</tbody></table>'
+    + '<div class="meta" style="margin-top:8px">Realizado usa el SUMIF de los movimientos reales por mes (reemplazan la línea calculada); sin movimientos = proyectado. Estimado reconstruye el underwriting (remodelación ' + iaMoney(iaEstOpts().remodelTotal || 0) + ' estimada, originación ' + pct1(iaEstOpts().cierrePct) + ').</div></div>';
+
+  const simDef = [['arv', 'ARV / avalúo', base.arv], ['compra', 'Precio de compra', base.compra], ['arriendoHab', 'Arriendo por habitación', base.arriendoHab], ['ocupacionEstable', 'Ocupación estable (0-1)', base.ocupacionEstable], ['refiTasa', 'Tasa refi (0-1)', base.refiTasa], ['valorizacion', 'Valorización anual (0-1)', base.valorizacion]];
+  const simRun = runs.simulado, proyRun = runs.proyectado;
+  const dTir = simRun && proyRun && simRun.r.indicadores.tir31PostRefi != null && proyRun.r.indicadores.tir31PostRefi != null ? (simRun.r.indicadores.tir31PostRefi - proyRun.r.indicadores.tir31PostRefi) : null;
+  const dVpn = simRun && proyRun ? simRun.r.indicadores.vpn31PostRefi - proyRun.r.indicadores.vpn31PostRefi : null;
+  const sim = '<div class="card"><div class="chart-h"><div class="t">🧪 Simulador — sensibilidad ARV / ocupación / compra / arriendo / tasa</div><div class="k"><button class="ct-btn" onclick="iaSimReset()">↺ Reset</button> <button class="ct-btn" onclick="iaGuardarCache()">💾 Guardar proyección (4 escenarios)</button></div></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+    + simDef.map(([k, lab, cur]) => '<div><div class="lab" style="margin-bottom:4px">' + lab + '</div><input class="osa-in" style="width:100%" type="number" step="any" value="' + (IA.sim[k] != null ? IA.sim[k] : (cur != null ? cur : '')) + '" onchange="iaSimSet(\'' + k + '\', this.value)"></div>').join('')
+    + '</div>'
+    + (dTir != null ? '<div class="meta" style="margin-top:12px;font-size:13px">Simulado vs Proyectado: <b class="' + (dTir >= 0 ? 'up' : 'down') + '">Δ TIR ' + (dTir >= 0 ? '+' : '') + (dTir * 100).toFixed(1) + ' pts</b> · <b class="' + (dVpn >= 0 ? 'up' : 'down') + '">Δ VPN ' + (dVpn >= 0 ? '+' : '') + iaMoney(dVpn) + '</b></div>' : '')
+    + '</div>';
+  return '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">' + casaSel + '</div>' + comp + sim;
+}
+
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos']];
+  const tabs = [['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IA.tab=\'' + t[0] + '\';osRender()">' + t[1] + '</button>').join(' ');
   let body = '';
 
@@ -208,6 +285,8 @@ function invAdminView() {
       + IA.cashflow.map(m => '<div class="kv"><span>' + OS_E(m.fecha) + ' · ' + OS_E(m.item || m.linea) + (m.id_factura ? ' · #' + OS_E(m.id_factura) : '') + '</span><b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + iaMoney(m.tipo === 'ingreso' ? m.valor : -m.valor) + ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" onclick="iaDelMov(\'' + m.id + '\')">🗑</button></b></div>').join('')
       + '</div></div></div>';
   }
+
+  if (IA.tab === 'escenarios') body = iaTabEscenarios();
 
   return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'

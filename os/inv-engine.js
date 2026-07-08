@@ -73,27 +73,35 @@
     const banco = amortizacion(p.refiMonto, p.refiTasa, p.refiPlazoM);
 
     // ── 1) flujo mensual del ciclo ──
+    // p.realesPorMes = { m: {ingreso, operativos, impuestos, inversion, financiero} } — escenario
+    // REALIZADO: el SUMIF de la hoja "Datos reales" por mes reemplaza la línea calculada.
+    const RM = p.realesPorMes || {};
     const meses = [];
     let saldoHM = 0;
     for (let m = 0; m <= M; m++) {
       const o = occ(m), e = escala(m);
-      const ingreso = o * arriendoPleno;
+      const rp = RM[m] || null;
+      let ingreso = o * arriendoPleno;
       // operativos: fijos que escalan (mantenimiento + servicios + HOA) y % del ingreso (PadSplit + comisión)
       const mant = (p.mantenimientoMes || 0) * e;
       const servicios = (p.serviciosMes || 0) * e;               // Σ de los 8 ítems (parametrizados como total o ítems)
       const hoa = p.hoaMes || 0;
       const padsplit = ingreso * (p.padsplitPct || 0);
       const comision = ingreso * (p.comisionPct || 0);
-      const operativos = mant + servicios + hoa + padsplit + comision;
+      let operativos = mant + servicios + hoa + padsplit + comision;
+      if (rp && rp.ingreso != null) ingreso = rp.ingreso;        // REAL manda
+      if (rp && rp.operativos != null) operativos = rp.operativos;
       const utilOperativa = ingreso - operativos;
       // impuestos: propiedad (ARV × tasa /12, corre siempre) + renta condicional (solo si utilidad > 0)
-      const impPropiedad = p.arv * (p.impPropiedadPct || 0) / 12;
-      const impRenta = utilOperativa > 0 ? utilOperativa * (p.impRentaPct || 0) : 0;
+      let impPropiedad = p.arv * (p.impPropiedadPct || 0) / 12;
+      let impRenta = utilOperativa > 0 ? utilOperativa * (p.impRentaPct || 0) : 0;
+      if (rp && rp.impuestos != null) { impPropiedad = rp.impuestos; impRenta = 0; }
       const uodi = utilOperativa - impPropiedad - impRenta;
       // FC inversión
       const compraMes = m === 0 ? -(p.compra + (p.cierreCompra || 0)) : 0;
       const drawMes = -(drawsMes[m] || 0);
-      const otrosInv = -((p.otrosInversionMes || {})[m] || 0);   // muebles, setup, etc. por mes
+      let otrosInv = -((p.otrosInversionMes || {})[m] || 0);     // muebles, setup, etc. por mes
+      if (rp && rp.inversion != null) otrosInv = -rp.inversion;  // inversión REAL del mes reemplaza el supuesto
       const fcInv = compraMes + drawMes + otrosInv;
       const fclProyecto = fcInv + uodi;
       // financiación
@@ -111,6 +119,7 @@
         const fila = banco.tabla[m - refiMes - 1];
         if (fila) detFin.bancoCuota = -fila.cuota;
       }
+      if (rp && rp.financiero != null) detFin.seguro = -rp.financiero;  // financieros reales del mes (fuera de HM/banco calculados)
       fin = detFin.hmDesembolso + detFin.hmInteres + detFin.hmPago + detFin.bancoPrestamo + detFin.bancoCuota + detFin.seguro + detFin.cashout;
       const fclNegocio = fclProyecto + fin;
       meses.push({ m, ocupacion: o, ingreso, mant, servicios, hoa, padsplit, comision, operativos, utilOperativa, impPropiedad, impRenta, uodi, fcInv, fclProyecto, fin, detFin, fclNegocio, saldoHM });
@@ -221,5 +230,50 @@
     };
   }
 
-  return { run, PMT, NPV, IRR, amortizacion };
+  // ══ 5) ESCENARIOS — devuelve los params ajustados; el motor es el mismo (una definición) ══
+  //  estimado   = underwriting original (remodel/ARV estimados, cierre por originación, sin datos reales)
+  //  proyectado = premisas confirmadas + supuestos actuales (params tal cual)
+  //  realizado  = proyectado + SUMIF de movimientos reales por mes (reemplazan la línea calculada)
+  //  simulado   = proyectado + overrides del simulador (ARV/ocupación/compra/arriendo/tasa)
+  function escenario(base, tipo, opts) {
+    opts = opts || {};
+    if (tipo === 'estimado') {
+      const est = opts.est || {};
+      const remodel = est.remodelTotal != null ? est.remodelTotal : Object.values(base.draws || {}).reduce((s, v) => s + v, 0);
+      const arv = est.arv != null ? est.arv : base.arv;
+      const cierre = est.cierrePct != null ? (base.compra + remodel) * est.cierrePct : base.cierreCompra;
+      return { ...base, arv, cierreCompra: cierre, draws: { 1: remodel / 2, 2: remodel / 2 }, otrosInversionMes: {},
+        hmInicial: base.compra, refiMonto: 0.75 * arv, cashAtrapadoReal: null, realesPorMes: null };
+    }
+    if (tipo === 'realizado') return { ...base, realesPorMes: opts.movsPorMes || {} };
+    if (tipo === 'simulado') {
+      const s = { ...base, ...(opts.sim || {}), realesPorMes: null };
+      if (opts.sim && opts.sim.arv != null && opts.sim.refiMonto == null) s.refiMonto = 0.75 * opts.sim.arv;
+      if (opts.sim && (opts.sim.arv != null || opts.sim.compra != null || opts.sim.refiTasa != null)) s.cashAtrapadoReal = null; // el cash atrapado real ya no aplica al simular el ciclo
+      return s;
+    }
+    return { ...base }; // proyectado
+  }
+
+  // SUMIF de la hoja "Datos reales": agrupa movimientos por mes (desde el cierre) y categoría.
+  function movsPorMes(movimientos, fechaCierre) {
+    const out = {};
+    const c = new Date(String(fechaCierre) + 'T00:00:00');
+    (movimientos || []).forEach(mv => {
+      if (!mv || !mv.fecha) return;
+      const d = new Date(String(mv.fecha) + 'T00:00:00');
+      const m = Math.max(0, Math.round((d - c) / (30.44 * 86400000)));
+      const o = out[m] = out[m] || { ingreso: null, operativos: null, impuestos: null, inversion: null, financiero: null };
+      const v = Math.abs(+mv.valor || 0);
+      const add = k => { o[k] = (o[k] || 0) + v; };
+      if (mv.tipo === 'ingreso' || mv.categoria === 'ingreso') add('ingreso');
+      else if (mv.categoria === 'tax') add('impuestos');
+      else if (mv.categoria === 'inversion') add('inversion');
+      else if (mv.categoria === 'financiero') add('financiero');
+      else add('operativos');
+    });
+    return out;
+  }
+
+  return { run, PMT, NPV, IRR, amortizacion, escenario, movsPorMes };
 });

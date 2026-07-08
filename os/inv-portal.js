@@ -106,7 +106,13 @@ function render() {
   const P = IP.params[pid] || {};
   const holding = IP.holdings.find(h => h.property_id === pid) || {};
   const p = ipEngineParams(pid);
-  const r = window.invEngine.run(p);
+  // Escenario automático: con movimientos reales cargados corre REALIZADO (SUMIF por mes);
+  // sin movimientos, PROYECTADO (premisas). Mismo motor, una definición.
+  const movsCasa = IP.cashflow[pid] || [];
+  const fechaC = (IP.params[pid] || {}).fecha_cierre ? IP.params[pid].fecha_cierre.value : null;
+  const escenario = (movsCasa.length && fechaC) ? 'realizado' : 'proyectado';
+  const pRun = escenario === 'realizado' ? invEngine.escenario(p, 'realizado', { movsPorMes: invEngine.movsPorMes(movsCasa, fechaC) }) : p;
+  const r = window.invEngine.run(pRun);
   const i = r.indicadores;
   const inv = p.repartoInv;
   const dir = P.direccion ? P.direccion.value : 'Casa';
@@ -136,7 +142,7 @@ function render() {
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector + '<span class="meta">' + esc(IP.email) + '</span><button class="ibtn" onclick="ipLogout()">Salir</button></div></div>'
     + '<h1>' + esc(dir.split(',')[0]) + ' <span>· tu inversión</span></h1>'
-    + '<div class="sub">' + esc(dir) + ' · estado: <b>' + esc(estado) + '</b> · cierre: ' + esc(cierre) + ' · Los números marcados <span class="src">real</span> salen de datos reales; <span class="src sup">supuesto</span> son premisas del modelo en calibración.</div>'
+    + '<div class="sub">' + esc(dir) + ' · estado: <b>' + esc(estado) + '</b> · cierre: ' + esc(cierre) + ' · escenario: <b>' + (escenario === 'realizado' ? '✅ Realizado (' + movsCasa.length + ' movimientos reales) + proyección' : '🎯 Proyectado (premisas)') + '</b> · <span class="src">real</span> = dato real; <span class="src sup">supuesto</span> = premisa en calibración.</div>'
 
     + '<div class="grid k4">'
     + kpi('Tu inversión', $money(holding.inversion_aportada), 'aportada el ' + esc(holding.fecha_entrada || cierre))
