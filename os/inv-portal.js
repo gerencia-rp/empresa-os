@@ -185,12 +185,12 @@ function render() {
     + '</div></div>'
 
     + '<div class="grid k2" style="margin-top:14px">'
-    + '<div class="card"><div class="chart-h"><div class="t">1 · Construcción de riqueza anual</div><div class="k">amortización + rentabilidad + valorización</div></div><div style="position:relative;height:300px;width:100%"><canvas id="ch1"></canvas></div></div>'
-    + '<div class="card"><div class="chart-h"><div class="t">2 · Evolución del patrimonio</div><div class="k">valor vs deuda (desapalancamiento)</div></div><div style="position:relative;height:300px;width:100%"><canvas id="ch2"></canvas></div></div>'
-    + '<div class="card"><div class="chart-h"><div class="t">3 · Ingresos vs deuda fija</div><div class="k">la inflación trabaja para vos (DSCR crece)</div></div><div style="position:relative;height:300px;width:100%"><canvas id="ch3"></canvas></div></div>'
-    + '<div class="card"><div class="chart-h"><div class="t">4 · Utilidad acumulada</div><div class="k">negativa al inicio, compuesta después</div></div><div style="position:relative;height:300px;width:100%"><canvas id="ch4"></canvas></div></div>'
+    + '<div class="card"><div class="chart-h"><div class="t">1 · Construcción de riqueza anual</div><div class="k">amortización + rentabilidad + valorización</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="ch1"></canvas></div></div>'
+    + '<div class="card"><div class="chart-h"><div class="t">2 · Evolución del patrimonio</div><div class="k">valor vs deuda (desapalancamiento)</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="ch2"></canvas></div></div>'
+    + '<div class="card"><div class="chart-h"><div class="t">3 · Ingresos vs deuda fija</div><div class="k">la inflación trabaja para vos (DSCR crece)</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="ch3"></canvas></div></div>'
+    + '<div class="card"><div class="chart-h"><div class="t">4 · Utilidad acumulada</div><div class="k">negativa al inicio, compuesta después</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="ch4"></canvas></div></div>'
     + '</div>'
-    + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">5 · Gastos: operativos · impuestos · financieros</div><div class="k">transparencia total</div></div><div style="position:relative;height:260px;width:100%"><canvas id="ch5"></canvas></div></div>'
+    + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">5 · Gastos: operativos · impuestos · financieros</div><div class="k">transparencia total</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="ch5"></canvas></div></div>'
 
     + '<div class="card overx" style="margin-top:14px"><div class="chart-h"><div class="t">Flujo operativo del ciclo (mes 0–' + p.cicloMeses + ')</div><div class="k">' + (cf.length ? 'con movimientos reales cargados' : 'proyección desde parámetros — los movimientos reales se cargan desde administración') + '</div></div>'
     + '<table><thead><tr><th>Mes</th><th>Ocup.</th><th>Ingreso</th><th>Operativos</th><th>UODI</th><th>Financiación</th><th>FCL del mes</th><th>Acumulado</th></tr></thead><tbody>'
@@ -324,7 +324,7 @@ async function ipReloadProducto() {
 function drawCharts(r, inv) {
   const A = r.anios.filter(x => x.a >= 1);
   const labels = A.map(x => 'a' + x.a);
-  const C = (id, cfg) => { const el = document.getElementById(id); if (el && window.Chart) IP.charts.push(new Chart(el, cfg)); };
+  const C = (id, cfg) => { const el = document.getElementById(id); if (!el || !window.Chart) return; cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); IP.charts.push(new Chart(el, cfg)); };
   const gopt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#93a0b6', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: '#5b6780', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } }, y: { ticks: { color: '#5b6780', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } } } };
   C('ch1', { type: 'bar', data: { labels, datasets: [
     { label: 'Amortización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.amortizacion * inv), backgroundColor: '#4f8dff' },

@@ -123,7 +123,7 @@ function rpInjectCSS() {
   #rc-overlay .rp-okrbar{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
   #rc-overlay .rp-okr{font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;border:1px solid}
   #rc-overlay .rp-dec{font-size:12.5px;line-height:1.5;padding:8px 4px;border-bottom:1px solid var(--line,rgba(255,255,255,.06));color:var(--txt,#e8eefc)}
-  #rc-overlay .rp-canvas{height:230px;position:relative;padding:6px}
+  #rc-overlay .rp-canvas{height:230px;position:relative;padding:6px;overflow:hidden}
   #rc-overlay table.rp-t{width:100%;border-collapse:collapse;font-size:12px}
   #rc-overlay table.rp-t th{text-align:left;padding:6px 8px;color:var(--txt3,#64748b);font-size:10px;text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line,rgba(255,255,255,.1))}
   #rc-overlay table.rp-t td{padding:6px 8px;border-bottom:1px solid var(--line,rgba(255,255,255,.05));color:var(--txt,#e8eefc)}
@@ -340,7 +340,7 @@ function rpDrawCharts() {
   const tick = theme ? '#475569' : '#9fb0c9';
   const ds = rpFilter(rcObraDataset());
   const m = rpMetrics(ds);
-  const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; cfg.options = cfg.options || {}; cfg.options.responsive = true; cfg.options.maintainAspectRatio = false; cfg.options.plugins = Object.assign({ legend: { display: false } }, cfg.options.plugins || {}); cfg.options.scales = cfg.options.scales || {}; ['x', 'y', 'r'].forEach(ax => { if (cfg.options.scales[ax]) { cfg.options.scales[ax].grid = { color: grid }; cfg.options.scales[ax].ticks = Object.assign({ color: tick }, cfg.options.scales[ax].ticks || {}); if (cfg.options.scales[ax].pointLabels) cfg.options.scales[ax].pointLabels.color = tick; } }); try { RP.charts.push(new Chart(el, cfg)); } catch (e) {} };
+  const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; cfg.options = cfg.options || {}; cfg.options.responsive = true; cfg.options.maintainAspectRatio = false; cfg.options.resizeDelay = 200; cfg.options.plugins = Object.assign({ legend: { display: false } }, cfg.options.plugins || {}); cfg.options.scales = cfg.options.scales || {}; ['x', 'y', 'r'].forEach(ax => { if (cfg.options.scales[ax]) { cfg.options.scales[ax].grid = { color: grid }; cfg.options.scales[ax].ticks = Object.assign({ color: tick }, cfg.options.scales[ax].ticks || {}); if (cfg.options.scales[ax].pointLabels) cfg.options.scales[ax].pointLabels.color = tick; } }); try { RP.charts.push(new Chart(el, cfg)); } catch (e) {} };
   const teal = '#12b5a0', blue = '#2f6ef0', red = '#f87171', amber = '#e7b65e';
   if (RP.tipo === 'r1') {
     const top = [...m.fin].sort((a, b) => b.utilidad - a.utilidad).slice(0, 8);

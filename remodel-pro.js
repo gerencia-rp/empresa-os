@@ -2153,6 +2153,7 @@ function rmRenderCharts(e) {
     },
     options: {
       responsive: true,
+      resizeDelay: 200,
       plugins: {
         legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10, padding: 6 } },
         tooltip: { callbacks: { label: (c) => `${c.label}: ${rmFmt(c.raw)} (${(c.raw/e.totals.total*100).toFixed(0)}%)` } }
@@ -2172,6 +2173,7 @@ function rmRenderCharts(e) {
     },
     options: {
       responsive: true,
+      resizeDelay: 200,
       scales: { x: { stacked: true, ticks: { font: { size: 8 } } }, y: { stacked: true, ticks: { font: { size: 8 }, callback: (v) => '$' + (v/1000) + 'k' } } },
       plugins: {
         legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10, padding: 6 } },

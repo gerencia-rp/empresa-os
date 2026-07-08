@@ -100,7 +100,7 @@ function ccInjectCSS() {
   @keyframes ccsh{to{background-position:-200% 0}}
   #cc-overlay .ccclose{position:fixed;top:16px;right:20px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
   #cc-overlay .ccclose:hover{color:#fff;border-color:rgba(255,255,255,.2)}
-  #cc-overlay .grid{display:grid;gap:16px}#cc-overlay .kpis{grid-template-columns:repeat(4,1fr)}
+  #cc-overlay .grid{display:grid;gap:16px;align-items:start}#cc-overlay .kpis{grid-template-columns:repeat(4,1fr)}
   #cc-overlay .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:16px;padding:19px;backdrop-filter:blur(18px);box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 26px 60px -34px rgba(0,0,0,.9);transition:.2s;overflow:hidden}
   #cc-overlay .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent)}
   #cc-overlay .card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.14)}
@@ -526,15 +526,15 @@ function ccSecCommand(comp) {
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Ingresos vs Gastos · 6 meses</div>
         <div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div>
-        <div style="position:relative;height:160px;width:100%"><canvas id="cc-cf"></canvas></div></div>
+        <div style="position:relative;overflow:hidden;height:160px;width:100%"><canvas id="cc-cf"></canvas></div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>ANÁLISIS EN VIVO · REGLAS</span></div></div>
         ${insights.slice(0, 3).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : i.sev === 'opportunity' ? 'g' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${CC_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}</div></div></div>`).join('')}
         <div class="ask"><input id="cc-ask" placeholder="Preguntá a tu copiloto…" onkeydown="if(event.key==='Enter')ccAsk()"><button onclick="ccAsk()">Enviar</button></div>
         <div class="chips"><span class="chip" onclick="ccGo('cerebro')">Ver todos los insights</span><span class="chip" onclick="ccGo('finanzas')">¿Casas en rojo?</span></div></div>
     </div>
     <div class="grid row3">
-      <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;height:280px;width:100%"><canvas id="cc-house"></canvas></div></div>
-      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;overflow:hidden;height:280px;width:100%"><canvas id="cc-house"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Operación de hoy</div><div class="k">cronograma real · ${todayTasks.length} tareas</div></div>
         ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#5b6780;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
         <div style="margin-top:13px;font-size:11px;color:var(--mut)"><span class="chip" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</span></div></div>
@@ -799,7 +799,7 @@ function ccSecFinanzas(comp) {
     <div class="grid row2"><div class="card"><div class="chart-h"><div class="t">Casas en pérdida (${rojo.length})</div><div class="k">peor primero</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Ingreso</th><th>Hipoteca</th><th>Gasto</th><th>Neto</th></tr></thead><tbody>
       ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#48d69c">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
-      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div></div>`;
+      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div></div>`;
 }
 // ─── SECCIÓN: RESERVAS ───
 function ccSecReservas(comp) {
@@ -862,19 +862,19 @@ function ccSecAnalitica(comp) {
       <div class="card kpi"><div class="lab">Captura de renta</div><div class="big glow">${kpi.capture}%</div><div class="meta">${CC_MONEY(kpi.potTotal - kpi.potFree)} de ${CC_MONEY(kpi.potTotal)} potencial · <span class="warn">${CC_MONEY(kpi.potFree)} sin cobrar</span></div></div>
     </div>
     <div class="grid row2" style="margin-top:16px">
-      <div class="card"><div class="chart-h"><div class="t">Ingresos vs Gastos · 12 meses</div><div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div><div style="position:relative;height:300px;width:100%"><canvas id="cc-an-ie"></canvas></div></div>
-      <div class="card"><div class="chart-h"><div class="t">Cashflow mensual · 12 meses</div><div class="k">rojo = pérdida</div></div><div style="position:relative;height:300px;width:100%"><canvas id="cc-an-cf"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Ingresos vs Gastos · 12 meses</div><div class="legend"><span><b style="background:var(--pos)"></b>Ingresos</span><span><b style="background:var(--neg)"></b>Gastos</span></div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="cc-an-ie"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Cashflow mensual · 12 meses</div><div class="k">rojo = pérdida</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="cc-an-cf"></canvas></div></div>
     </div>
     <div class="grid row2" style="margin-top:16px">
-      <div class="card"><div class="chart-h"><div class="t">Ocupación mensual · 12 meses</div><div class="k">estimada por reservas · regla</div></div><div style="position:relative;height:300px;width:100%"><canvas id="cc-an-occ"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Ocupación mensual · 12 meses</div><div class="k">estimada por reservas · regla</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="cc-an-occ"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Ocupación por zona</div><div class="k">${kpi.occPct}% global</div></div>
         ${zoneRows.map(z => `<div class="op-item"><span style="width:110px">${CC_ESC(z.z)}</span><span class="mini-bar" style="width:140px"><i style="width:${z.pct}%"></i></span><span style="margin-left:auto">${z.pct}% · ${z.o}/${z.t}</span></div>`).join('')}</div>
     </div>
     <div class="grid row2" style="margin-top:16px">
-      <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;height:320px;width:100%"><canvas id="cc-an-noibar"></canvas></div></div>
-      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · ${comp.mb.label}</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;height:300px;width:100%"><canvas id="cc-an-donut"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;overflow:hidden;height:320px;width:100%"><canvas id="cc-an-noibar"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · ${comp.mb.label}</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="cc-an-donut"></canvas></div></div>
     </div>
-    <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">Evolución de gastos por tipo · 6 meses</div><div class="k">miles US$</div></div><div style="position:relative;height:300px;width:100%"><canvas id="cc-an-exptrend"></canvas></div></div></div>
+    <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">Evolución de gastos por tipo · 6 meses</div><div class="k">miles US$</div></div><div style="position:relative;overflow:hidden;height:300px;width:100%"><canvas id="cc-an-exptrend"></canvas></div></div></div>
     <div class="grid" style="margin-top:16px"><div class="card">
       <div class="chart-h"><div class="t">NOI y cashflow por casa</div><div class="k">NOI = ingreso − gastos operativos (sin hipoteca)</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Zona</th><th>Ocup.</th><th>Ingreso</th><th>Gastos op.</th><th>Hipoteca</th><th>NOI</th><th>Cashflow</th></tr></thead><tbody>
@@ -941,7 +941,7 @@ function ccMountCharts(comp) {
   if (!window.Chart) return;
   const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#5b6780', font: { size: 10 } } };
   const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#5b6780', font: { size: 10 } } }, y: ax } };
-  const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} CC._charts.push(new Chart(el, cfg)); };
+  const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); CC._charts.push(new Chart(el, cfg)); };
   const grad = (ctx, c1, c2) => { const g = ctx.createLinearGradient(0, 0, 0, 150); g.addColorStop(0, c1); g.addColorStop(1, c2); return g; };
   // sparklines
   const spark = (id, data, color) => mk(id, { type: 'line', data: { labels: data.map((_, i) => i), datasets: [{ data, borderColor: color, borderWidth: 1.8, tension: .4, pointRadius: 0, fill: false }] }, options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false } } } });

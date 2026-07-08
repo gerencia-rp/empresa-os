@@ -978,7 +978,7 @@ async function rdRenderTendencias() {
       <!-- Gráfico 1: Revenue y Neto mensual -->
       <div class="bg-white border border-slate-200 rounded-xl p-3 mb-3">
         <div class="text-xs font-bold uppercase text-slate-600 mb-2">📈 Revenue y Neto mensual (12m)</div>
-        <div style="position:relative; height: 240px;">
+        <div style="position:relative; height: 240px; overflow:hidden;">
           <canvas id="trend-revenue"></canvas>
         </div>
       </div>
@@ -987,13 +987,13 @@ async function rdRenderTendencias() {
       <div class="grid md:grid-cols-2 gap-3 mb-3">
         <div class="bg-white border border-slate-200 rounded-xl p-3">
           <div class="text-xs font-bold uppercase text-slate-600 mb-2">🏁 Obras finalizadas por mes</div>
-          <div style="position:relative; height: 200px;">
+          <div style="position:relative; height: 200px; overflow:hidden;">
             <canvas id="trend-obras"></canvas>
           </div>
         </div>
         <div class="bg-white border border-slate-200 rounded-xl p-3">
           <div class="text-xs font-bold uppercase text-slate-600 mb-2">✅ % Cumplimiento planner (6m)</div>
-          <div style="position:relative; height: 200px;">
+          <div style="position:relative; height: 200px; overflow:hidden;">
             <canvas id="trend-cumplimiento"></canvas>
           </div>
         </div>
@@ -1002,7 +1002,7 @@ async function rdRenderTendencias() {
       <!-- Gráfico 3: Críticas vs Aplazadas (operación) -->
       <div class="bg-white border border-slate-200 rounded-xl p-3 mb-3">
         <div class="text-xs font-bold uppercase text-slate-600 mb-2">⚠️ Salud operativa mensual (6m)</div>
-        <div style="position:relative; height: 220px;">
+        <div style="position:relative; height: 220px; overflow:hidden;">
           <canvas id="trend-ops"></canvas>
         </div>
       </div>
@@ -1069,7 +1069,7 @@ async function rdRenderTendencias() {
         ]
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false, resizeDelay: 200,
         plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
         scales: {
           y: { ticks: { callback: v => '$' + (v/1000) + 'k', font: { size: 10 } } },
@@ -1087,7 +1087,7 @@ async function rdRenderTendencias() {
         datasets: [{ label: 'Obras', data: last12Months.map(m => byMonth[m]?.count || 0), backgroundColor: 'rgba(139,92,246,0.7)', borderRadius: 6 }]
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false, resizeDelay: 200,
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 } }, x: { ticks: { font: { size: 9 } } } }
       }
@@ -1112,7 +1112,7 @@ async function rdRenderTendencias() {
         }]
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false, resizeDelay: 200,
         plugins: { legend: { display: false } },
         scales: { y: { min: 0, max: 100, ticks: { callback: v => v+'%', font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
       }
@@ -1131,7 +1131,7 @@ async function rdRenderTendencias() {
         ]
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false, resizeDelay: 200,
         plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
         scales: { y: { beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 } }, x: { ticks: { font: { size: 10 } } } }
       }
