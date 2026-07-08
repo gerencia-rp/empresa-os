@@ -219,36 +219,45 @@ function ffUwShell() {
 function ffUwSubBody() {
   return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, unificada: ffUwViewUnificada }[UW.sub] || ffUwViewNegocio)();
 }
-const UW_IN = (lab, k, val, hint) => `<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--txt3,#9fb0c9);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">${lab}${hint ? ` <span style="opacity:.5;text-transform:none">${hint}</span>` : ''}</div><input value="${val}" onchange="ffUwSet('${k}',this.value)" style="width:100%;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:7px 10px;color:inherit;font-size:13px"></div>`;
+// ─── helpers de diseño (premium, legible para no-expertos) ───
+const UW_DLR = '\u0024';
+const UW_FMT = (val, tipo) => { const n = +val || 0; if (tipo === 'money') return n === 0 ? '' : Math.round(n).toLocaleString('en-US'); if (tipo === 'pct') return n === 0 ? '' : n; return val === 0 ? '' : val; };
+function UW_IN(lab, k, val, opts) {
+  opts = opts || {}; const tipo = opts.tipo || (/pct|_pct$/.test(k) ? 'pct' : (/sqft|meses|hold/.test(k) ? 'num' : 'money'));
+  const pre = tipo === 'money' ? UW_DLR : '', suf = tipo === 'pct' ? '%' : '';
+  const ph = opts.ph != null ? opts.ph : '0';
+  const shown = UW_FMT(val, tipo);
+  return '<div style="margin-bottom:10px"><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);font-weight:600;margin-bottom:3px">' + lab + (opts.help ? '<span title="' + UW_E(opts.help) + '" style="opacity:.45;margin-left:5px;cursor:help;font-size:11px">&#9432;</span>' : '') + '</div><div style="display:flex;align-items:center;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:0 10px">' + (pre ? '<span style="opacity:.5;font-size:13px">' + pre + '</span>' : '') + '<input value="' + shown + '" placeholder="' + ph + '" onchange="ffUwSet(&quot;' + k + '&quot;,this.value.replace(/[,%\\s' + UW_DLR + ']/g,&quot;&quot;))" style="flex:1;background:none;border:none;padding:8px 6px;color:inherit;font-size:14px;font-weight:600;outline:none">' + (suf ? '<span style="opacity:.5;font-size:13px">' + suf + '</span>' : '') + '</div>' + (opts.hint ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:2px">' + opts.hint + '</div>' : '') + '</div>';
+}
+function UW_HERO(titulo, valor, sub, color) {
+  const c = color || 'var(--a1,#12b5a0)';
+  return '<div style="background:linear-gradient(135deg,' + c + '22,transparent);border:1px solid ' + c + '55;border-radius:14px;padding:18px 22px;margin-bottom:16px"><div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + titulo + '</div><div style="font-size:40px;font-weight:800;color:' + c + ';line-height:1.1;margin:4px 0">' + valor + '</div>' + (sub ? '<div style="font-size:12px;color:var(--txt3,#9fb0c9)">' + sub + '</div>' : '') + '</div>';
+}
+function UW_BLOCK(subtitulo, inner) {
+  return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--a1,#12b5a0);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--line,rgba(255,255,255,.08))">' + subtitulo + '</div>' + inner + '</div>';
+}
+function UW_ROW(l, v, cls) {
+  return '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px' + (cls === 'tot' ? ';font-weight:700;border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:8px' : '') + '"><span style="color:var(--txt2,#c9d5ea)">' + l + '</span><b class="' + (cls && cls !== 'tot' ? cls : '') + '">' + UW_M(v) + '</b></div>';
+}
+function UW_CARD(titulo, proposito, inner) {
+  return '<div class="card" style="padding:20px"><div style="margin-bottom:14px"><div style="font-size:17px;font-weight:700">' + titulo + '</div><div style="font-size:12px;color:var(--txt3,#9fb0c9);margin-top:2px">' + proposito + '</div></div>' + inner + '</div>';
+}
 function ffUwViewNegocio() {
   const inp = UW.a.inputs, r = ffUwCalcNegocio(inp);
-  const row = (l, v, cls) => `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px${cls ? ';font-weight:700' : ''}"><span>${l}</span><b class="${cls || ''}">${UW_M(v)}</b></div>`;
-  const estToggle = `<div style="display:flex;gap:6px;margin:6px 0 10px"><button class="repbtn ${inp.usar_estimador ? 'ghost' : ''}" style="padding:4px 10px;font-size:11px" onclick="ffUwSet('usar_estimador',false)">Costo directo (Remodelación)</button><button class="repbtn ${inp.usar_estimador ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="ffUwSet('usar_estimador',true)">Estimador rápido $/sqft</button></div>`;
+  const estToggle = '<div style="display:flex;gap:6px;margin-bottom:10px"><button class="repbtn ' + (inp.usar_estimador ? 'ghost' : '') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'usar_estimador\',false)">Costo real (Remodelación)</button><button class="repbtn ' + (inp.usar_estimador ? '' : 'ghost') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'usar_estimador\',true)">Estimador rápido $/sqft</button></div>';
   const estBox = inp.usar_estimador
-    ? `<div style="background:rgba(18,181,160,.06);border-radius:8px;padding:10px;margin-bottom:8px">${UW_IN('Sqft', 'est_sqft', inp.est_sqft)}<div style="font-size:10px;color:var(--txt3,#9fb0c9);text-transform:uppercase;margin-bottom:3px">Tipo de remod</div><div style="display:flex;gap:5px;margin-bottom:6px">${['suave', 'media', 'pesada'].map(t => `<button class="repbtn ${inp.est_tipo === t ? '' : 'ghost'}" style="flex:1;padding:5px;font-size:11px" onclick="ffUwSet('est_tipo','${t}')">${t} $${ffUwPsf(t)}</button>`).join('')}</div><div class="meta">Estimado: ${(+inp.est_sqft || 0)} sqft × $${ffUwPsf(inp.est_tipo)}/sqft = <b>${UW_M(r.remod)}</b> · mercado externo $${UWc('psf_mercado_externo', 110)}/sqft = ${UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0))} (adentro ahorra ${UW_M((UWc('psf_mercado_externo', 110) - ffUwPsf(inp.est_tipo)) * (+inp.est_sqft || 0))})</div></div>`
-    : UW_IN('Costo Remodelación (directo)', 'remod_directo', inp.remod_directo, '· lo pasa Remodelación');
-  const alerta = r.deficitRiesgo ? `<div style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px;color:#f87171">⚠️ RIESGO DE DÉFICIT: el remod del draw es $${r.psfDraw}/sqft, por debajo del calibrado ($${r.psfAlerta}/sqft de las casas de Remodelación). El draw puede no cubrir la obra real.</div>` : '';
-  return `<div class="grid k2" style="gap:14px">
-    <div class="card"><div class="chart-h"><div class="t">1A · Draw al Harmony</div><div class="k">desglose calibrado</div></div>
-      ${estToggle}${estBox}
-      ${UW_IN('Meses de hold', 'meses_hold', inp.meses_hold)}
-      ${UW_IN('Compra (para interés/CTC)', 'purchase', inp.purchase)}
-      ${UW_IN('% que financia el Harmony', 'hml_finance_pct', inp.hml_finance_pct, '· varía por deal')}
-      <div class="grid k2" style="gap:8px">${UW_IN('Utilities/mes', 'utilities_mes', inp.utilities_mes)}${UW_IN('Muebles/staging', 'muebles', inp.muebles)}</div>
-      <div class="grid k2" style="gap:8px">${UW_IN('Appraisal', 'appraisal_cost', inp.appraisal_cost)}${UW_IN('Cash-out en draw', 'cashout_en_draw', inp.cashout_en_draw)}</div>
-      <div class="grid k2" style="gap:8px">${UW_IN('Permisos', 'permisos', inp.permisos)}${UW_IN('Dumpster', 'dumpster', inp.dumpster)}</div>
-      <div class="grid k2" style="gap:8px">${UW_IN('AC/HVAC', 'ac', inp.ac)}${UW_IN('Contingencia %', 'contingencia_pct', inp.contingencia_pct)}</div>
-    </div>
-    <div>
-      <div class="card"><div class="chart-h"><div class="t">Draw total</div></div>
-        ${row('Remodelación', r.remod)}${row('Intereses (' + inp.meses_hold + 'm × ' + UWc('harmony_int_mensual_pct', 1) + '%)', r.intereses)}${row('Utilities', r.utilities)}${row('Muebles', +inp.muebles)}${row('Appraisal', +inp.appraisal_cost)}${(+inp.cashout_en_draw > 0) ? row('Cash-out incluido', +inp.cashout_en_draw) : ''}${row('Permisos + dumpster + AC', (+inp.permisos) + (+inp.dumpster) + (+inp.ac))}${row('Contingencia (' + inp.contingencia_pct + '%)', r.contingencia)}
-        <div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:6px">${row('DRAW AL HARMONY', r.draw, 'up')}</div>${alerta}</div>
-      <div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">1B · Cash to Close</div><div class="k">lo que pone el inversionista</div></div>
-        ${row('Compra', +inp.purchase)}${row('− Financia el Harmony (' + inp.hml_finance_pct + '%)', -r.financia)}${row('= Down payment', r.downPayment)}${row('+ Closing costs (Gastos cierre HML)', r.closing)}${row('+ Earnest money', r.earnest)}
-        <div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:6px">${row('EL INVERSIONISTA PONE', r.cashToClose, 'down')}</div>
-        ${r.ctcReal ? `<div class="meta" style="margin-top:6px">Cash to close real en Airtable: ${UW_M(r.ctcReal)} · Δ ${UW_M(r.cashToClose - r.ctcReal)} (calibración)</div>` : ''}</div>
-    </div>
-  </div>`;
+    ? '<div style="background:rgba(18,181,160,.06);border-radius:10px;padding:12px;margin-bottom:8px">' + UW_IN('Superficie (sqft)', 'est_sqft', inp.est_sqft, { tipo: 'num', help: 'Pies cuadrados a remodelar' }) + '<div style="font-size:11.5px;color:var(--txt2,#c9d5ea);font-weight:600;margin-bottom:5px">Tipo de remodelación</div><div style="display:flex;gap:5px;margin-bottom:6px">' + ['suave', 'media', 'pesada'].map(t => '<button class="repbtn ' + (inp.est_tipo === t ? '' : 'ghost') + '" style="flex:1;padding:6px;font-size:11px;text-transform:capitalize" onclick="ffUwSet(\'est_tipo\',\'' + t + '\')">' + t + ' $' + ffUwPsf(t) + '</button>').join('') + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (+inp.est_sqft || 0) + ' sqft &times; $' + ffUwPsf(inp.est_tipo) + '/sqft = <b>' + UW_M(r.remod) + '</b> &middot; contratista externo $' + UWc('psf_mercado_externo', 110) + '/sqft = ' + UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0)) + ' (adentro ahorra ' + UW_M((UWc('psf_mercado_externo', 110) - ffUwPsf(inp.est_tipo)) * (+inp.est_sqft || 0)) + ')</div></div>'
+    : UW_IN('Costo de remodelación (real)', 'remod_directo', inp.remod_directo, { help: 'Costo Real que cobra la empresa de Remodelación (Airtable). Si la obra no terminó, queda en 0 y podés usar el estimador.', hint: r.remod === 0 ? '⚠ sin costo real cargado — usá el estimador rápido' : 'del histórico de Remodelación' });
+  const alerta = r.deficitRiesgo ? '<div style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);border-radius:9px;padding:9px 11px;margin-top:8px;font-size:11.5px;color:#f87171">&#9888; Riesgo de déficit: el remod del draw es $' + r.psfDraw + '/sqft, por debajo del calibrado ($' + r.psfAlerta + '/sqft). El draw puede no cubrir la obra real.</div>' : '';
+  const izq = UW_CARD('1A &middot; Draw al Harmony', 'Lo que el Harmony te desembolsa para hacer la obra.',
+    UW_BLOCK('Remodelación', estToggle + estBox) +
+    UW_BLOCK('Holding e intereses', UW_IN('Meses de hold', 'meses_hold', inp.meses_hold, { tipo: 'num', help: 'Cuántos meses vas a tener el préstamo antes del refi/venta' }) + UW_IN('Precio de compra', 'purchase', inp.purchase, { help: 'Para calcular intereses y cash to close' }) + UW_IN('% que financia el Harmony', 'hml_finance_pct', inp.hml_finance_pct, { help: 'Porcentaje de la compra que pone el prestamista. Varía por deal.' }) + UW_IN('Utilities por mes', 'utilities_mes', inp.utilities_mes)) +
+    UW_BLOCK('Muebles y otros', '<div class="grid k2" style="gap:8px">' + UW_IN('Muebles / staging', 'muebles', inp.muebles) + UW_IN('Appraisal', 'appraisal_cost', inp.appraisal_cost) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Cash-out en el draw', 'cashout_en_draw', inp.cashout_en_draw) + UW_IN('Permisos', 'permisos', inp.permisos) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Dumpster', 'dumpster', inp.dumpster) + UW_IN('AC / HVAC', 'ac', inp.ac) + '</div>' + UW_IN('Contingencia', 'contingencia_pct', inp.contingencia_pct, { help: 'Colchón sobre el subtotal por imprevistos' })));
+  const der = UW_HERO('Draw al Harmony', UW_M(r.draw), 'lo que el prestamista desembolsa', 'var(--a1,#12b5a0)') +
+    '<div class="card" style="padding:16px">' + UW_ROW('Remodelación', r.remod) + UW_ROW('Intereses (' + inp.meses_hold + 'm)', r.intereses) + UW_ROW('Utilities', r.utilities) + UW_ROW('Muebles', +inp.muebles) + UW_ROW('Appraisal', +inp.appraisal_cost) + (+inp.cashout_en_draw > 0 ? UW_ROW('Cash-out incluido', +inp.cashout_en_draw) : '') + UW_ROW('Permisos + dumpster + AC', (+inp.permisos) + (+inp.dumpster) + (+inp.ac)) + UW_ROW('Contingencia (' + inp.contingencia_pct + '%)', r.contingencia) + UW_ROW('Draw total', r.draw, 'tot') + alerta + '</div>' +
+    UW_HERO('El inversionista pone', UW_M(r.cashToClose), 'cash to close (1B)', 'var(--a2,#2f6ef0)') +
+    '<div class="card" style="padding:16px">' + UW_ROW('Compra', +inp.purchase) + UW_ROW('&minus; Financia el Harmony (' + inp.hml_finance_pct + '%)', -r.financia) + UW_ROW('= Down payment', r.downPayment) + UW_ROW('+ Closing costs', r.closing) + UW_ROW('+ Earnest money', r.earnest) + UW_ROW('El inversionista pone', r.cashToClose, 'tot') + (r.ctcReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Cash to close real (Airtable): ' + UW_M(r.ctcReal) + ' &middot; &Delta; ' + UW_M(r.cashToClose - r.ctcReal) + '</div>' : '') + '</div>';
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwRender() {
   const el = document.getElementById('ff-uw-body');
@@ -258,81 +267,49 @@ function ffUwRender() {
 // ═══ VISTAS de las calculadoras 2-6 ═══
 function ffUwViewArv() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), a = o.arv;
-  const conf = { alta: 'up', media: 'warn', baja: 'down' }[a.confianza] || '';
-  return `<div class="grid k2" style="gap:14px">
-    <div class="card"><div class="chart-h"><div class="t">2 · ARV</div><div class="k">comparables + appraisals reales</div></div>
-      ${UW_IN('Sqft', 'est_sqft', inp.est_sqft)}
-      ${UW_IN('$/sqft de la zona (comparables)', 'arv_psf_override', inp.arv_psf_override != null ? inp.arv_psf_override : UWc('arv_psf_zona', 295), '· calibrado del histórico')}
-      ${UW_IN('ARV manual (opcional)', 'arv', inp.arv)}
-      ${UW_IN('Appraisal real (ancla)', 'appraisal', inp.appraisal)}
-      <div class="meta" style="margin-top:6px">🔌 Mercado en vivo (PropStream/HAR): <b>pendiente de enganche</b> — hoy ARV = comparables ($/sqft zona) + tu appraisal real como ancla.</div></div>
-    <div class="card"><div class="chart-h"><div class="t">ARV en rango</div><div class="k">confianza <span class="${conf}">${a.confianza}</span></div></div>
-      <div style="text-align:center;padding:14px 0"><div style="font-size:36px;font-weight:800;color:var(--a1,#12b5a0)">${UW_M(a.probable)}</div><div class="meta">valor probable</div></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line,rgba(255,255,255,.12))"><span>🔻 Conservador</span><b>${UW_M(a.conservador)}</b></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 0"><span>🎯 Probable</span><b>${UW_M(a.probable)}</b></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 0"><span>🔺 Optimista</span><b>${UW_M(a.optimista)}</b></div>
-      <div class="meta" style="margin-top:6px">Comps: ${UW_M(a.arvComps)} (${a.sqft} sqft × ${a.psfZona}) · Appraisal: ${a.appraisal ? UW_M(a.appraisal) : '—'}${a.appraisal > 0 && a.arvComps > 0 ? ` · appraisal es ${Math.round(100 * a.appraisal / a.arvComps)}% de comps` : ''}</div></div>
-  </div>`;
+  const hero = UW_HERO('ARV (valor de reventa)', UW_M(a.probable), a.esAirtable ? 'de Airtable (fuente de verdad) &middot; confianza ' + a.confianza : 'estimado por comps &middot; confianza ' + a.confianza, a.esAirtable ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
+  const izq = UW_CARD('2 &middot; ARV', 'El valor de la casa remodelada. La fuente de verdad es el ARV de Airtable.',
+    UW_BLOCK('Fuente de verdad', UW_IN('ARV de Airtable', 'arv', inp.arv, { help: 'Propiedades.ARV — alimenta MAO, cash-out y margen en toda la app' }) + UW_IN('Appraisal real (ancla)', 'appraisal', inp.appraisal, { help: 'Valor de tasación cuando exista' })) +
+    UW_BLOCK('Referencia por comparables', UW_IN('Superficie (sqft)', 'est_sqft', inp.est_sqft, { tipo: 'num' }) + '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">$/sqft de la zona: $' + a.psfZona + ' &rarr; comps = ' + UW_M(a.arvComps) + ' <b>(referencia, NO alimenta cálculos)</b></div>') +
+    '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">&#128268; Mercado en vivo (PropStream/HAR): pendiente de enganche.</div>');
+  const der = hero + '<div class="card" style="padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:8px">Rango de valor</div>' + UW_ROW('&#128317; Conservador', a.conservador) + UW_ROW('&#127919; Probable', a.probable, 'tot') + UW_ROW('&#128316; Optimista', a.optimista) + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:8px">Comps (referencia): ' + UW_M(a.arvComps) + (a.appraisal > 0 ? ' &middot; appraisal: ' + UW_M(a.appraisal) : '') + '</div></div>';
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwViewCashout() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), c = o.cashout;
-  const row = (l, v, cls) => `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px${cls ? ';font-weight:700' : ''}"><span>${l}</span><b class="${cls || ''}">${UW_M(v)}</b></div>`;
-  return `<div class="grid k2" style="gap:14px">
-    <div class="card"><div class="chart-h"><div class="t">3 · Cash-Out (refi)</div><div class="k">min(ARV, appraisal) × LTV − payoff</div></div>
-      ${UW_IN('LTV del refi (%)', 'ltv_pct', inp.ltv_pct, '· ' + UWc('cashout_ltv_pct', 75) + '–' + UWc('cashout_ltv_max', 80) + '% por prestamista')}
-      ${UW_IN('Payoff (saldo Harmony)', 'payoff', inp.payoff)}
-      <div class="meta" style="margin-top:6px">Base = min(ARV probable ${UW_M(o.arv.probable)}, appraisal ${UW_M(inp.appraisal)}) = ${UW_M(c.base)}</div></div>
-    <div class="card"><div class="chart-h"><div class="t">Cash-out + recuperación</div></div>
-      ${row('Base (min ARV/appraisal)', c.base)}${row('× LTV (' + c.ltv + '%)', c.prestamoRefi)}${row('− Payoff Harmony', -c.payoff)}
-      <div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:6px">${row('CASH-OUT', c.cashOut, c.cashOut >= 0 ? 'up' : 'down')}</div>
-      <div style="text-align:center;padding:12px 0;margin-top:8px;background:rgba(18,181,160,.06);border-radius:8px"><div style="font-size:28px;font-weight:800;color:${c.recuperaPct >= 100 ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)'}">${c.recuperaPct != null ? c.recuperaPct + '%' : '—'}</div><div class="meta">capital recuperado (cash-out ÷ cash to close ${UW_M(c.ctc)})</div></div></div>
-  </div>`;
+  const hero = UW_HERO('Cash-out del refi', UW_M(c.cashOut), c.recuperaPct != null ? 'recupera ' + c.recuperaPct + '% del cash to close' : '', c.cashOut >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
+  const izq = UW_CARD('3 &middot; Cash-Out (refinanciación)', 'Cuánto capital recuperás al refinanciar. min(ARV, appraisal) &times; LTV &minus; payoff.',
+    UW_BLOCK('Parámetros del refi', UW_IN('LTV del refi', 'ltv_pct', inp.ltv_pct, { help: 'Loan-to-value que da el prestamista del refi (' + UWc('cashout_ltv_pct', 75) + '–' + UWc('cashout_ltv_max', 80) + '%)' }) + UW_IN('Payoff (saldo Harmony)', 'payoff', inp.payoff, { help: 'Lo que se le debe al Harmony y hay que pagar con el refi' })) +
+    '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Base = min(ARV ' + UW_M(o.arv.probable) + ', appraisal ' + UW_M(inp.appraisal) + ') = <b>' + UW_M(c.base) + '</b></div>');
+  const der = hero + '<div class="card" style="padding:16px">' + UW_ROW('Base (min ARV/appraisal)', c.base) + UW_ROW('&times; LTV (' + c.ltv + '%)', c.prestamoRefi) + UW_ROW('&minus; Payoff Harmony', -c.payoff) + UW_ROW('Cash-out', c.cashOut, c.cashOut >= 0 ? 'up' : 'down') + '</div>' + UW_HERO('Capital recuperado', c.recuperaPct != null ? c.recuperaPct + '%' : '—', 'cash-out &divide; cash to close ' + UW_M(c.ctc), c.recuperaPct >= 100 ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwViewIntereses() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), i = o.intereses;
-  return `<div class="grid k2" style="gap:14px">
-    <div class="card"><div class="chart-h"><div class="t">4 · Intereses</div><div class="k">Harmony interest-only + DSCR</div></div>
-      ${UW_IN('Compra', 'purchase', inp.purchase)}
-      ${UW_IN('% que financia el Harmony', 'hml_finance_pct', inp.hml_finance_pct)}
-      <div class="meta" style="margin-top:6px">Tasa Harmony ${i.tasaHarmony}%/año (interest-only) · DSCR ${i.tasaDscr}%/año a ${UWc('dscr_plazo_anos', 30)} años. Editables en config.</div></div>
-    <div class="card"><div class="chart-h"><div class="t">Pagos mensuales</div></div>
-      <div style="text-align:center;padding:14px 0"><div style="font-size:30px;font-weight:800;color:var(--amber,#e7b65e)">${UW_M(i.intMensualHarmony)}</div><div class="meta">interés mensual Harmony (durante el hold) · sobre ${UW_M(i.financia)} financiados</div></div>
-      <div style="border-top:1px solid var(--line,rgba(255,255,255,.12));padding-top:12px;text-align:center"><div style="font-size:30px;font-weight:800;color:var(--a2,#2f6ef0)">${UW_M(i.pagoDscr)}</div><div class="meta">pago mensual DSCR post-refi · sobre ${UW_M(i.dscrPrincipal)} a 30 años</div></div></div>
-  </div>`;
+  const izq = UW_CARD('4 &middot; Intereses', 'El pago mensual durante la obra (Harmony) y después del refi (DSCR).',
+    UW_BLOCK('Base del préstamo', UW_IN('Precio de compra', 'purchase', inp.purchase) + UW_IN('% que financia el Harmony', 'hml_finance_pct', inp.hml_finance_pct)) +
+    '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Tasa Harmony ' + i.tasaHarmony + '%/año (interest-only) &middot; DSCR ' + i.tasaDscr + '%/año a ' + UWc('dscr_plazo_anos', 30) + ' años. Editables en config.</div>');
+  const der = UW_HERO('Interés mensual (Harmony)', UW_M(i.intMensualHarmony), 'durante el hold &middot; sobre ' + UW_M(i.financia) + ' financiados', 'var(--amber,#e7b65e)') + UW_HERO('Pago mensual (DSCR post-refi)', UW_M(i.pagoDscr), 'sobre ' + UW_M(i.dscrPrincipal) + ' a 30 años', 'var(--a2,#2f6ef0)');
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwViewIngreso() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), g = o.ingreso;
-  const row = (l, v, neg) => `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px"><span>${l}</span><b class="${neg ? 'down' : ''}">${neg ? '-' : ''}${UW_M(Math.abs(v))}</b></div>`;
-  return `<div class="grid k2" style="gap:14px">
-    <div class="card"><div class="chart-h"><div class="t">5 · Ingreso Mensual</div><div class="k">renta por modelo − gastos</div></div>
-      ${UW_IN('Renta mensual proyectada', 'renta_mensual', inp.renta_mensual, '· de Rentas real por modelo')}
-      <div class="meta" style="margin-top:6px">Gastos calibrados (config, % de renta): PM ${UWc('pm_fee_pct', 8)}% · vacancy ${UWc('vacancy_pct', 5)}% · mantenimiento ${UWc('mantenimiento_pct', 5)}% · impuestos ${UWc('impuestos_pct_arv', 2.2)}% ARV/año · seguro ${UW_M(UWc('seguro_mensual', 120))}/mes.</div></div>
-    <div class="card"><div class="chart-h"><div class="t">Flujo</div></div>
-      ${row('Renta', g.renta)}${row('Pago DSCR', g.pagoDscr, true)}${row('Impuestos', g.impuestos, true)}${row('Seguro', g.seguro, true)}${row('PM fee', g.pmFee, true)}${row('Vacancy', g.vacancy, true)}${row('Mantenimiento', g.mantenimiento, true)}
-      <div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:10px;text-align:center"><div style="font-size:30px;font-weight:800;color:${g.flujo >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)'}">${UW_M(g.flujo)}/mes</div><div class="meta">flujo mensual · cash-on-cash ${g.cashOnCash != null ? g.cashOnCash + '%' : '—'} (sobre ${UW_M(g.cashLeft)} left in)</div></div></div>
-  </div>`;
+  const hero = UW_HERO('Flujo mensual', UW_M(g.flujo) + '/mes', g.cashOnCash != null ? 'cash-on-cash ' + g.cashOnCash + '% sobre ' + UW_M(g.cashLeft) + ' invertidos' : '', g.flujo >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
+  const izq = UW_CARD('5 &middot; Ingreso Mensual', 'El flujo que deja la casa rentada, después de todos los gastos.',
+    UW_BLOCK('Ingreso', UW_IN('Renta mensual proyectada', 'renta_mensual', inp.renta_mensual, { help: 'De Rentas real por modelo (casa completa / habitaciones / mixta)' })) +
+    '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Gastos calibrados (% de renta): PM ' + UWc('pm_fee_pct', 8) + '% &middot; vacancy ' + UWc('vacancy_pct', 5) + '% &middot; mantenimiento ' + UWc('mantenimiento_pct', 5) + '% &middot; impuestos ' + UWc('impuestos_pct_arv', 2.2) + '% ARV/año &middot; seguro ' + UW_M(UWc('seguro_mensual', 120)) + '/mes.</div>');
+  const der = hero + '<div class="card" style="padding:16px">' + UW_ROW('Renta', g.renta) + UW_ROW('&minus; Pago DSCR', -g.pagoDscr, 'down') + UW_ROW('&minus; Impuestos', -g.impuestos, 'down') + UW_ROW('&minus; Seguro', -g.seguro, 'down') + UW_ROW('&minus; PM fee', -g.pmFee, 'down') + UW_ROW('&minus; Vacancy', -g.vacancy, 'down') + UW_ROW('&minus; Mantenimiento', -g.mantenimiento, 'down') + UW_ROW('Flujo mensual', g.flujo, 'tot') + '</div>';
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwViewUnificada() {
   const o = ffUwComputeAll(), u = o.unificada;
-  const chip = (ok, l) => `<span class="badge ${ok ? 'b-ok' : 'b-warn'}" style="font-size:10px">${ok ? '✓' : '⚠'} ${l}</span>`;
+  const chip = (ok, l) => '<span class="badge ' + (ok ? 'b-ok' : 'b-warn') + '" style="font-size:10px">' + (ok ? '&#10003;' : '&#9888;') + ' ' + l + '</span>';
   const verColor = u.veredicto === 'GO' ? 'var(--pos,#34d399)' : u.veredicto === 'NO-GO' ? 'var(--neg,#f87171)' : 'var(--amber,#e7b65e)';
-  const kpi = (l, v, sub) => `<div class="card kpi"><div class="lab">${l}</div><div class="big">${v}</div>${sub ? `<div class="meta">${sub}</div>` : ''}</div>`;
-  return `<div class="card" style="text-align:center;padding:20px;border:2px solid ${verColor}">
-      <div class="lab">Veredicto del deal</div><div style="font-size:44px;font-weight:800;color:${verColor}">${u.veredicto}</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap">${chip(u.gAllIn, 'all-in ≤' + u.allInMax + '% ARV')}${chip(u.gDeficit, 'sin riesgo déficit')}${chip(u.gFlujo, 'flujo +')}</div>
-      <button class="repbtn" style="margin-top:14px" onclick="ffUwPresentacion()">📄 Generar presentación de negocio</button></div>
-    <div class="grid k4" style="margin-top:14px">
-      ${kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '')}
-      ${kpi('MAO (max offer)', UW_M(u.mao), 'compra máxima al guardrail')}
-      ${kpi('Cash to close', UW_M(u.cashToClose), 'lo que pone el inversionista')}
-      ${kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? u.recuperaPct + '% recuperado' : '')}
-    </div>
-    <div class="grid k3" style="margin-top:14px">
-      ${kpi('Cash left in', UW_M(u.cashLeftIn), 'capital que queda invertido')}
-      ${kpi('Flujo mensual', UW_M(u.flujo) + '/mes', '')}
-      ${kpi('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—', 'flujo anual ÷ cash left in')}
-    </div>
-    <div class="card" style="margin-top:14px"><div class="lab">Cadena del deal</div><div class="meta" style="margin-top:6px">comparables → ARV ${UW_M(o.arv.probable)} → remod ${UW_M(o.negocio.remod)} + draw ${UW_M(o.negocio.draw)} → cash to close ${UW_M(o.negocio.cashToClose)} → cash-out ${UW_M(o.cashout.cashOut)} → intereses Harmony ${UW_M(o.intereses.intMensualHarmony)}/DSCR ${UW_M(o.intereses.pagoDscr)} → flujo ${UW_M(o.ingreso.flujo)}/mes. Guardrails: all-in ≤${u.allInMax}% ARV, regla de déficit. ${u.veredicto === 'GO' ? '✅ pasa.' : u.veredicto === 'NO-GO' ? '❌ no pasa.' : '⚠ revisar.'}</div></div>`;
+  const kpi = (l, v, sub) => '<div class="card kpi" style="padding:16px"><div class="lab">' + l + '</div><div class="big">' + v + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
+  return '<div class="card" style="text-align:center;padding:24px;border:2px solid ' + verColor + '"><div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Veredicto del deal</div><div style="font-size:46px;font-weight:800;color:' + verColor + '">' + u.veredicto + '</div><div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">' + chip(u.gAllIn, 'all-in &le;' + u.allInMax + '% ARV') + chip(u.gDeficit, 'sin riesgo déficit') + chip(u.gFlujo, 'flujo +') + '</div><button class="repbtn" style="margin-top:16px" onclick="ffUwPresentacion()">&#128196; Generar presentación de negocio</button></div>' +
+    '<div class="grid k4" style="margin-top:16px">' + kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '') + kpi('MAO (oferta máxima)', UW_M(u.mao), 'compra máxima al guardrail') + kpi('Cash to close', UW_M(u.cashToClose), 'lo que pone el inversionista') + kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? u.recuperaPct + '% recuperado' : '') + '</div>' +
+    '<div class="grid k3" style="margin-top:14px">' + kpi('Cash left in', UW_M(u.cashLeftIn), 'capital que queda invertido') + kpi('Flujo mensual', UW_M(u.flujo) + '/mes', '') + kpi('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—', 'flujo anual &divide; cash left in') + '</div>' +
+    '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; cash to close ' + UW_M(o.negocio.cashToClose) + ' &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
 }
 function ffUwPresentacion() {
   const o = ffUwComputeAll(), u = o.unificada, a = UW.a;
