@@ -82,7 +82,7 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ## 📈 REGLA DURA — Gráficas Chart.js (8-jul, tras el bug del FF CC)
 
-**Todo `<canvas>` de Chart.js va SIEMPRE envuelto en `<div style="position:relative;height:Npx;width:100%">`** (altura FIJA en el wrapper) + `responsive:true, maintainAspectRatio:false` + `destroy()` de la instancia previa antes de re-crear. **NUNCA** poner `height` (atributo o CSS) en el canvas ni dejar que un padre dependa del alto del canvas → loop de reflow infinito (pasó en "Capital por etapa del pipeline" del FF CC). Alturas vigentes: FF CC 320/320/260/260 · Rentas CC 160-320 · portal inversionista 300×4+260 · remodel-reportes `.rp-canvas` 230 · remodel-dashboard wrappers propios. Fix commit `3de788a`, QA 6/6 en prod (estabilidad tras 6s + recarga).
+**Todo `<canvas>` de Chart.js va SIEMPRE envuelto en `<div style="position:relative;height:Npx;width:100%;overflow:hidden">`** — la altura FIJA + **`overflow:hidden` (el candado real: sin él, el resize del HOVER sigue empujando el contenedor)** + `responsive:true, maintainAspectRatio:false, resizeDelay:200` + `destroy()` previo (una instancia por canvas). **NUNCA** `height` (attr/CSS) en el canvas, y las filas de gráficas con **`align-items:start`** (una gráfica no debe estirar a la vecina — así colapsaba la dona). Barras horizontales: altura = n_barras×28+90. Alturas vigentes: FF CC 320 / n×28+90 / 320 / 300 · Rentas CC 160-320 · portal 300×4+260 · remodel `.rp-canvas` 230. Fix commits `3de788a`+`6829b90`; QA con HOVER INTENSIVO en prod (3 pasadas × 13 puntos: alturas idénticas, tooltip normal, 0 pageerrors).
 
 ---
 
