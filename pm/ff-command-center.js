@@ -411,15 +411,15 @@ function ffSecCommand(comp) {
       <div class="card kpi"><div class="lab">Alertas del Cerebro</div><div class="big">${insights.length}</div><div class="meta"><span class="down">${crit} críticas</span> · déficit acum. <span class="down">${FF_MONEY(kpi.deficitAcum)}</span></div></div>
     </div>
     <div class="grid row2">
-      <div class="card"><div class="chart-h"><div class="t">Capital por etapa del pipeline</div><div class="k">all-in US$</div></div><canvas id="ff-stage" height="150"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Capital por etapa del pipeline</div><div class="k">all-in US$</div></div><div style="position:relative;height:320px;width:100%"><canvas id="ff-stage"></canvas></div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>ANÁLISIS EN VIVO · REGLAS</span></div></div>
         ${insights.slice(0, 3).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${FF_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}</div></div></div>`).join('')}
         <div class="ask"><input id="ff-ask" placeholder="Preguntá al Cerebro de Fix &amp; Flip…" onkeydown="if(event.key==='Enter')ffAsk()"><button onclick="ffAsk()">Enviar</button></div>
         <div style="margin-top:11px"><span class="chip" onclick="ffGo('cerebro')">Ver todos los insights</span></div></div>
     </div>
     <div class="grid row2">
-      <div class="card"><div class="chart-h"><div class="t">Margen / déficit por deal</div><div class="k">verde = margen · rojo = déficit</div></div><canvas id="ff-margin" height="240"></canvas></div>
-      <div class="card"><div class="chart-h"><div class="t">Deals por etapa</div><div class="k">${kpi.total} total</div></div><canvas id="ff-donut" height="240"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Margen / déficit por deal</div><div class="k">verde = margen · rojo = déficit</div></div><div style="position:relative;height:320px;width:100%"><canvas id="ff-margin"></canvas></div></div>
+      <div class="card"><div class="chart-h"><div class="t">Deals por etapa</div><div class="k">${kpi.total} total</div></div><div style="position:relative;height:260px;width:100%"><canvas id="ff-donut"></canvas></div></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card">
       <div class="chart-h"><div class="t">Pipeline resumido</div><div class="k">${kpi.activos} activos · abrí Deals para el Kanban</div></div>
@@ -563,7 +563,7 @@ function ffSecFinanzas(comp) {
       <div class="card kpi"><div class="lab">EBITDA FF (aprox)</div><div class="big ${ebitdaFF>=0?'up glow':'down'}">${FF_MONEY(ebitdaFF)}</div><div class="meta">rentabilidad draws − overhead</div></div>
     </div>
     <div class="grid row2">
-      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">del desglose de draws</div></div><canvas id="ff-fin-donut" height="230"></canvas></div>
+      <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">del desglose de draws</div></div><div style="position:relative;height:260px;width:100%"><canvas id="ff-fin-donut"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
         <table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th>Impacto</th></tr></thead><tbody>
         <tr><td>Overhead FF (equipo + plataformas) — espejo Airtable</td><td><span class="badge b-ok">Real</span></td><td class="down">${FF_MONEY(ohReal)}</td></tr>
