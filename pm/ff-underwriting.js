@@ -270,7 +270,7 @@ function ffUwViewArv() {
   const hero = UW_HERO('ARV (valor de reventa)', UW_M(a.probable), a.esAirtable ? 'de Airtable (fuente de verdad) &middot; confianza ' + a.confianza : 'estimado por comps &middot; confianza ' + a.confianza, a.esAirtable ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
   const izq = UW_CARD('2 &middot; ARV', 'El valor de la casa remodelada. La fuente de verdad es el ARV de Airtable.',
     UW_BLOCK('Fuente de verdad', UW_IN('ARV de Airtable', 'arv', inp.arv, { help: 'Propiedades.ARV — alimenta MAO, cash-out y margen en toda la app' }) + UW_IN('Appraisal real (ancla)', 'appraisal', inp.appraisal, { help: 'Valor de tasación cuando exista' })) +
-    UW_BLOCK('Referencia por comparables', UW_IN('Superficie (sqft)', 'est_sqft', inp.est_sqft, { tipo: 'num' }) + '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">$/sqft de la zona: $' + a.psfZona + ' &rarr; comps = ' + UW_M(a.arvComps) + ' <b>(referencia, NO alimenta cálculos)</b></div>') +
+    UW_BLOCK('Referencia por comparables', UW_IN('Superficie (sqft)', 'est_sqft', inp.est_sqft, { tipo: 'num' }) + '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">$/sqft de la zona: $' + a.psfZona + ' &rarr; comps = ' + UW_M(a.arvComps) + ' <b>(referencia)</b></div>' + ffUwRcCompsBox()) +
     '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">&#128268; Mercado en vivo (PropStream/HAR): pendiente de enganche.</div>');
   const der = hero + '<div class="card" style="padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:8px">Rango de valor</div>' + UW_ROW('&#128317; Conservador', a.conservador) + UW_ROW('&#127919; Probable', a.probable, 'tot') + UW_ROW('&#128316; Optimista', a.optimista) + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:8px">Comps (referencia): ' + UW_M(a.arvComps) + (a.appraisal > 0 ? ' &middot; appraisal: ' + UW_M(a.appraisal) : '') + '</div></div>';
   return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
@@ -296,7 +296,7 @@ function ffUwViewIngreso() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), g = o.ingreso;
   const hero = UW_HERO('Flujo mensual', UW_M(g.flujo) + '/mes', g.cashOnCash != null ? 'cash-on-cash ' + g.cashOnCash + '% sobre ' + UW_M(g.cashLeft) + ' invertidos' : '', g.flujo >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
   const izq = UW_CARD('5 &middot; Ingreso Mensual', 'El flujo que deja la casa rentada, después de todos los gastos.',
-    UW_BLOCK('Ingreso', UW_IN('Renta mensual proyectada', 'renta_mensual', inp.renta_mensual, { help: 'De Rentas real por modelo (casa completa / habitaciones / mixta)' })) +
+    UW_BLOCK('Ingreso', UW_IN('Renta mensual proyectada', 'renta_mensual', inp.renta_mensual, { help: 'De Rentas real por modelo' }) + ffUwRcRentBox()) +
     '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Gastos calibrados (% de renta): PM ' + UWc('pm_fee_pct', 8) + '% &middot; vacancy ' + UWc('vacancy_pct', 5) + '% &middot; mantenimiento ' + UWc('mantenimiento_pct', 5) + '% &middot; impuestos ' + UWc('impuestos_pct_arv', 2.2) + '% ARV/año &middot; seguro ' + UW_M(UWc('seguro_mensual', 120)) + '/mes.</div>');
   const der = hero + '<div class="card" style="padding:16px">' + UW_ROW('Renta', g.renta) + UW_ROW('&minus; Pago DSCR', -g.pagoDscr, 'down') + UW_ROW('&minus; Impuestos', -g.impuestos, 'down') + UW_ROW('&minus; Seguro', -g.seguro, 'down') + UW_ROW('&minus; PM fee', -g.pmFee, 'down') + UW_ROW('&minus; Vacancy', -g.vacancy, 'down') + UW_ROW('&minus; Mantenimiento', -g.mantenimiento, 'down') + UW_ROW('Flujo mensual', g.flujo, 'tot') + '</div>';
   return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
@@ -344,5 +344,59 @@ function ffUwPresentacion() {
   w.document.close();
 }
 window.ffUwPresentacion = ffUwPresentacion;
+
+
+// ─── RentCast (mercado en vivo) — vía proxy backend, la key nunca llega acá ───
+UW.rentcast = {};   // { address_norm: { value, rent, comps, fecha, cached, disponible } }
+async function ffUwRentcast(endpoint, refresh) {
+  const a = UW.a; if (!a) return null;
+  const addr = a.direccion || a.nombre; if (!addr) return null;
+  const key = String(addr).toLowerCase().replace(/[^a-z0-9]/g, '');
+  UW.rentcast[key] = UW.rentcast[key] || {};
+  const slot = UW.rentcast[key];
+  if (!refresh && slot[endpoint] !== undefined) return slot[endpoint];
+  slot[endpoint] = 'loading'; ffUwRender();
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/rentcast`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session ? session.access_token : window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ address: addr, endpoint, refresh: !!refresh })
+    });
+    const j = await res.json();
+    slot[endpoint] = j.ok ? { value: j.value, payload: j.payload, cached: j.cached, fetched_at: j.fetched_at, llamadas: j.llamadas } : { disponible: false, error: j.error };
+    slot.llamadas = j.llamadas;
+  } catch (e) { slot[endpoint] = { disponible: false, error: e.message }; }
+  ffUwRender(); return slot[endpoint];
+}
+function ffUwRcSlot(endpoint) {
+  const a = UW.a; if (!a) return null;
+  const key = String(a.direccion || a.nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return (UW.rentcast[key] || {})[endpoint];
+}
+window.ffUwRentcast = ffUwRentcast;
+// referencia de comps de RentCast (pestaña ARV)
+function ffUwRcCompsBox() {
+  const s = ffUwRcSlot('value');
+  if (s === 'loading') return '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">⏳ consultando mercado en vivo…</div>';
+  if (!s) return '<button class="repbtn ghost" style="padding:5px 11px;font-size:11px" onclick="ffUwRentcast(\'value\')">🔌 Traer mercado en vivo (RentCast)</button>';
+  if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#e7b65e)">⚠ Mercado en vivo no disponible' + (s.error ? ' (' + UW_E(String(s.error).slice(0, 60)) + ')' : '') + ' — se usa el $/sqft por zona.</div>';
+  const comps = (s.payload && s.payload.comparables) || [];
+  const fecha = s.fetched_at ? String(s.fetched_at).slice(0, 10) : '';
+  return '<div style="background:rgba(47,110,240,.06);border-radius:9px;padding:10px;margin-top:6px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--a2,#2f6ef0)">Mercado en vivo (RentCast) · referencia, NO alimenta cálculos ' + (s.cached ? '· cache' : '') + '</div>'
+    + '<div style="font-size:20px;font-weight:800;margin:4px 0">' + UW_M(s.value) + ' <span style="font-size:11px;font-weight:400;opacity:.6">valor estimado RentCast</span></div>'
+    + '<div style="font-size:10px;color:var(--txt3,#9fb0c9)">' + comps.length + ' comparables' + (fecha ? ' · ' + fecha : '') + '</div>'
+    + (comps.length ? '<div style="margin-top:6px;max-height:120px;overflow:auto">' + comps.slice(0, 5).map(c => '<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-top:1px solid var(--line,rgba(255,255,255,.06))"><span style="opacity:.75">' + UW_E((c.formattedAddress || c.address || '').slice(0, 32)) + '</span><b>' + UW_M(c.price) + (c.squareFootage ? ' · ' + Math.round((c.price || 0) / c.squareFootage) + '/sqft' : '') + '</b></div>').join('') + '</div>' : '')
+    + '<button class="repbtn ghost" style="padding:3px 9px;font-size:10px;margin-top:6px" onclick="ffUwRentcast(\'value\',true)">↻ Actualizar mercado</button>'
+    + (s.llamadas != null ? '<span style="font-size:9px;opacity:.5;margin-left:8px">' + s.llamadas + '/50 llamadas usadas</span>' : '') + '</div>';
+}
+// sugerencia de renta de RentCast (pestaña Ingreso)
+function ffUwRcRentBox() {
+  const s = ffUwRcSlot('rent');
+  if (s === 'loading') return '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">⏳ consultando renta de mercado…</div>';
+  if (!s) return '<button class="repbtn ghost" style="padding:5px 11px;font-size:11px" onclick="ffUwRentcast(\'rent\')">🔌 Sugerir renta (RentCast)</button>';
+  if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#e7b65e)">⚠ Renta de mercado no disponible — usá tu proyección.</div>';
+  return '<div style="background:rgba(52,211,153,.06);border-radius:9px;padding:10px;margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--pos,#34d399)">Renta de mercado (RentCast) · sugerencia</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><div style="font-size:22px;font-weight:800">' + UW_M(s.value) + '/mes</div><button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="ffUwSet(\'renta_mensual\',' + (+s.value || 0) + ')">Usar esta renta</button></div>' + ((s.payload && s.payload.comparables) ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:4px">' + s.payload.comparables.length + ' comparables de renta</div>' : '') + '<button class="repbtn ghost" style="padding:3px 9px;font-size:10px;margin-top:6px" onclick="ffUwRentcast(\'rent\',true)">↻ Actualizar</button></div>';
+}
 
 window.UW = UW; window.ffUwLoad = ffUwLoad; window.ffUwShell = ffUwShell; window.ffUwRender = ffUwRender; window.ffUwComputeAll = ffUwComputeAll;
