@@ -87,6 +87,24 @@ SNAPSHOT DE DATOS REALES (fuente: Airtable → pm_*):
 ${snap}${buildMemoryBlock(memory)}`;
 }
 
+// 🤖 Investor Assistant — asistente del PORTAL DE INVERSIONISTAS.
+// El snapshot llega del portal, que solo puede leer los datos DEL inversionista (RLS).
+function buildSystemInvestor(snapshot) {
+  const snap = JSON.stringify(snapshot ?? {}, null, 0).slice(0, 30000);
+  return `Sos el "Investor Assistant" del portal de inversionistas de Flipping Rentals (Austin, TX). Hablás con UN inversionista sobre SU inversión inmobiliaria (modelo: compra con Hard Money → remodelación → renta por habitación → refinanciación 30 años → hold con valorización).
+
+REGLAS:
+- Respondé SIEMPRE en el idioma en que te pregunta el usuario.
+- SOLO tenés los datos de ESTE inversionista (snapshot de abajo). Si te preguntan por otras propiedades, otros inversionistas o datos internos de la empresa, decí que solo podés hablar de su inversión.
+- NÚMEROS CONCRETOS del snapshot: inversión, % de participación, TIR/VPN a 31 años, CAP, DSCR, riqueza hoy, patrimonio a 5/10/31, distribuciones. NO inventes cifras.
+- HONESTO SOBRE RIESGOS: la utilidad mensual temprana puede ser baja o negativa (fase 0/1); el retorno fuerte es a LARGO PLAZO (amortización + valorización). El punto de equilibrio y el DSCR dicen qué tan justa está la operación. Nada es garantía de retorno.
+- Las 3 FASES (en snapshot.fases): fase 0 = déficit inicial del ciclo; fase 1 = la operación cubre el déficit; fase 2 = recuperación del capital solo por utilidades (el resto se recupera vía patrimonio/venta o distribuciones).
+- Conciso, cálido y claro — el inversionista no es financiero. Explicá los términos la primera vez.
+
+SNAPSHOT DE SU INVERSIÓN (datos reales + proyección del modelo):
+${snap}`;
+}
+
 export default async function handler(req, res) {
   // Routing: ?resource=memory → CRUD de memoria; si no → chat.
   if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);
@@ -112,15 +130,20 @@ export default async function handler(req, res) {
   // El historial debe alternar y empezar en user; si el último ya es user, lo dejamos igual.
   messages.push({ role: 'user', content: question });
 
-  // RAG: recuperar memorias relevantes (similitud si hay embeddings; si no, recientes).
-  // Con RLS por áreas se lee con el JWT del usuario (anon ya no ve pm_brain_memory).
+  // Modo INVERSIONISTA: system propio, sin memoria del Cerebro (su snapshot ya viene
+  // filtrado por RLS desde el portal — solo SU data).
+  const esInvestor = body.mode === 'investor';
   let mem = { rows: [], mode: 'none' };
-  try { mem = await recallMemories(question, 6, bearerOf(req)); } catch { /* memoria opcional */ }
+  if (!esInvestor) {
+    // RAG: recuperar memorias relevantes (similitud si hay embeddings; si no, recientes).
+    // Con RLS por áreas se lee con el JWT del usuario (anon ya no ve pm_brain_memory).
+    try { mem = await recallMemories(question, 6, bearerOf(req)); } catch { /* memoria opcional */ }
+  }
 
   const payload = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    system: buildSystem(body.snapshot, mem.rows),
+    system: esInvestor ? buildSystemInvestor(body.snapshot) : buildSystem(body.snapshot, mem.rows),
     messages,
   };
 

@@ -7,7 +7,7 @@
 // ════════════════════════════════════════════════════════════════
 
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '' };
+const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'props', myIds: [], dists: [], msgs: [], chat: [] };
 window.IP = IP;
 
 const $money = v => '$' + Math.round(+v || 0).toLocaleString('en-US');
@@ -51,14 +51,19 @@ async function ipLoad() {
     return;
   }
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
-  const [prm, cf, dc] = await Promise.all([
+  const [prm, cf, dc, acc, dist, msg] = await Promise.all([
     sb.from('inv_model_params').select('*').in('property_id', props).eq('active', true),
     sb.from('inv_cashflow_real').select('*').in('property_id', props).eq('active', true).order('fecha'),
     sb.from('inv_documents').select('*').in('property_id', props).eq('active', true),
+    sb.from('inv_access').select('investor_airtable_id').eq('active', true),
+    sb.from('inv_distributions').select('*').eq('active', true),
+    sb.from('inv_messages').select('*').eq('active', true),
   ]);
   IP.params = {}; (prm.data || []).forEach(r => { (IP.params[r.property_id] = IP.params[r.property_id] || {})[r.key] = r; });
   IP.cashflow = {}; (cf.data || []).forEach(r => { (IP.cashflow[r.property_id] = IP.cashflow[r.property_id] || []).push(r); });
   IP.docs = {}; (dc.data || []).forEach(r => { (IP.docs[r.property_id] = IP.docs[r.property_id] || []).push(r); });
+  IP.myIds = [...new Set((acc.data || []).map(a => a.investor_airtable_id))];
+  IP.dists = dist.data || []; IP.msgs = msg.data || [];
   IP.casa = IP.casa || props[0];
   render();
 }
@@ -143,12 +148,21 @@ function render() {
   const kpi = (lab, val, meta, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
   const acumRows = (() => { let acc = 0; return r.meses.map(x => { acc += x.fclNegocio; return acc; }); })();
 
-  app().innerHTML = ''
+  const noLeidos = (IP.msgs || []).filter(m => !(m.read_by || []).includes(IP.email.toLowerCase())).length;
+  const TABS = [['props', '🏠 Propiedades'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['docs', '📄 Documentos'], ['ia', '🤖 Asistente']];
+  const head = ''
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector + '<span class="meta">' + esc(IP.email) + '</span><button class="ibtn" onclick="ipLogout()">Salir</button></div></div>'
     + '<h1>' + esc(dir.split(',')[0]) + ' <span>· tu inversión</span></h1>'
     + '<div class="sub">' + esc(dir) + ' · estado: <b>' + esc(estado) + '</b> · cierre: ' + esc(cierre) + ' · escenario: <b>' + (escenario === 'realizado' ? '✅ Realizado (' + movsCasa.length + ' movimientos reales) + proyección' : '🎯 Proyectado (premisas)') + '</b> · <span class="src">real</span> = dato real; <span class="src sup">supuesto</span> = premisa en calibración.</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' + TABS.map(t => '<button class="ibtn" style="' + (IP.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IP.tab=\'' + t[0] + '\';render()">' + t[1] + '</button>').join('') + '</div>';
 
+  let body = '';
+  if (IP.tab === 'dist') body = renderDist(pid, inv);
+  else if (IP.tab === 'msgs') body = renderMsgs(pid);
+  else if (IP.tab === 'docs') body = renderDocs(docs);
+  else if (IP.tab === 'ia') body = renderIA();
+  else body = ''
     + '<div class="grid k4">'
     + kpi('Tu inversión', $money(holding.inversion_aportada), 'aportada el ' + esc(holding.fecha_entrada || cierre))
     + kpi('Tu participación', $pct(inv), 'de la utilidad y el patrimonio de esta casa')
@@ -195,7 +209,116 @@ function render() {
 
     + '<div class="meta" style="margin-top:16px;opacity:.7">Proyección del modelo financiero (valorización ' + $pct(p.valorizacion) + '/año · inflación ' + $pct(p.inflacion) + ' · descuento ' + $pct(p.retornoEsperado) + ') — no constituye garantía de retorno. Cifras "real" desde registros de la operación; "supuesto" en calibración contra el modelo maestro.</div>';
 
-  drawCharts(r, inv);
+  app().innerHTML = head + body;
+  if (IP.tab === 'props' || !IP.tab) drawCharts(r, inv);
+  IP.lastSnapshot = { casa: dir, escenario, inversion: +holding.inversion_aportada || 0, reparto: inv, tir31: i.tir31PostRefi, vpn31: i.vpn31PostRefi, vpn31_inv: i.vpn31PostRefi * inv, cap: i.capValor, dscr: i.dscr, equilibrio: i.puntoEquilibrio, riqueza_hoy: riquezaHoy, utilidad_mensual: Math.round((r.anios[2] ? r.anios[2].fclNegocio : 0) / 12), fases: i.fases, patrimonio_a5: r.anios[5].patrimonioInv, patrimonio_a10: r.anios[10].patrimonioInv, patrimonio_a31: r.anios[Math.min(31, r.anios.length - 1)].patrimonioInv, distribuciones: (IP.dists || []).filter(d => d.property_id === pid).map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
+}
+
+// ─── 💸 Distribuciones ───
+function renderDist(pid, inv) {
+  const rows = (IP.dists || []).slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const pagadas = rows.filter(d => d.estado === 'pagada');
+  const total = pagadas.reduce((s, d) => s + (+d.monto || 0), 0);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const prox = rows.filter(d => d.estado === 'programada' && d.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+  const dias = prox ? Math.ceil((new Date(prox.fecha) - Date.now()) / 86400000) : null;
+  const kpi = (lab, val, meta, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
+  return '<div class="grid k3">'
+    + kpi('Total recibido', $money(total), pagadas.length + ' distribuciones pagadas', 'up')
+    + kpi('Próxima distribución', prox ? $money(prox.monto) : '—', prox ? esc(prox.fecha) + ' · faltan ' + dias + ' días' + (dias <= 14 ? ' <b class="warn">⏰ en menos de 14 días</b>' : '') : 'sin programadas', prox && dias <= 14 ? 'warn' : '')
+    + kpi('K-1 disponibles', rows.filter(d => d.k1_url).length, 'documentos fiscales de tus distribuciones')
+    + '</div>'
+    + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Historial</div><div class="k"><button class="ibtn" onclick="ipDistCSV()">⬇ CSV</button></div></div>'
+    + (rows.length ? '<div class="overx"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>K-1</th></tr></thead><tbody>'
+      + rows.map(d => '<tr><td>' + esc(d.fecha) + '</td><td>' + esc(d.tipo) + '</td><td class="up">' + $money(d.monto) + '</td><td>' + (d.estado === 'pagada' ? '<span class="up">✓ pagada</span>' : '<span class="warn">programada</span>') + '</td><td>' + (d.k1_url ? '<a href="' + esc(d.k1_url) + '" target="_blank" style="color:var(--a2)">K-1 ↗</a>' : '—') + '</td></tr>').join('')
+      + '</tbody></table></div>' : '<div class="empty">Todavía no hay distribuciones registradas.</div>')
+    + '</div>';
+}
+function ipDistCSV() {
+  const rows = (IP.dists || []);
+  const csv = 'fecha,tipo,monto,estado,k1\n' + rows.map(d => [d.fecha, d.tipo, d.monto, d.estado, d.k1_url || ''].join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'distribuciones.csv'; a.click();
+}
+window.ipDistCSV = ipDistCSV;
+
+// ─── 💬 Mensajes ───
+function renderMsgs(pid) {
+  const rows = (IP.msgs || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">Escribinos</div><div class="k">te respondemos en el portal</div></div>'
+    + '<input id="ip-msg-asunto" class="login-input" placeholder="Asunto" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;margin-bottom:8px">'
+    + '<textarea id="ip-msg-cuerpo" rows="3" placeholder="Tu mensaje…" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px"></textarea>'
+    + '<button class="cbtn" style="margin-top:8px" onclick="ipEnviarMsg()">Enviar</button></div>'
+    + (rows.length ? rows.map(m => {
+      const leido = (m.read_by || []).includes(IP.email.toLowerCase());
+      return '<div class="card" style="margin-bottom:8px;' + (!leido && m.de === 'admin' ? 'border-color:rgba(79,141,255,.45)' : '') + '" ' + (!leido ? 'onclick="ipMarcarLeido(\'' + m.id + '\')"' : '') + '>'
+        + '<div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 Flipping Rentals' : '👤 Vos') + ' · ' + esc((m.created_at || '').slice(0, 10)) + (!leido && m.de === 'admin' ? ' · <b style="color:var(--a2)">nuevo</b>' : '') + '</span></div>'
+        + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:4px 0">' + esc(m.asunto) + '</div>' : '')
+        + '<div style="font-size:12.5px;color:var(--mut);white-space:pre-wrap">' + esc(m.cuerpo) + '</div></div>';
+    }).join('') : '<div class="empty">Sin mensajes todavía.</div>');
+}
+async function ipEnviarMsg() {
+  const asunto = (document.getElementById('ip-msg-asunto').value || '').trim();
+  const cuerpo = (document.getElementById('ip-msg-cuerpo').value || '').trim();
+  if (!cuerpo) return;
+  const { error } = await sb.from('inv_messages').insert({ investor_airtable_id: IP.myIds[0], de: 'inversionista', asunto, cuerpo });
+  if (error) return alert('Error: ' + error.message);
+  await ipReloadProducto(); render();
+}
+window.ipEnviarMsg = ipEnviarMsg;
+async function ipMarcarLeido(id) { await sb.rpc('inv_msg_marcar_leido', { msg: id }); await ipReloadProducto(); render(); }
+window.ipMarcarLeido = ipMarcarLeido;
+
+// ─── 📄 Documentos (con audit log) ───
+function renderDocs(docs) {
+  return '<div class="card"><div class="chart-h"><div class="t">Documentos de tu inversión</div><div class="k">cada vista queda registrada</div></div>'
+    + (docs.length ? docs.map(d => '<div class="kv"><span>' + esc(d.tipo) + '</span><b><a href="#" onclick="ipVerDoc(\'' + d.id + '\',\'' + esc(d.url) + '\');return false" style="color:var(--a2)">' + esc(d.nombre) + ' ↗</a></b></div>').join('') : '<div class="empty" style="padding:20px">Todavía no hay documentos cargados.</div>')
+    + '</div>';
+}
+async function ipVerDoc(id, url) { try { await sb.rpc('inv_doc_log', { doc: id, accion: 'ver' }); } catch (e) {} window.open(url, '_blank'); }
+window.ipVerDoc = ipVerDoc;
+
+// ─── 🤖 Asistente IA ───
+function renderIA() {
+  const sugeridos = ['¿Cómo va mi inversión?', '¿Cómo viene mi flujo de efectivo?', '¿Cuál es mi ROI y qué significa?', '¿Cuándo recupero mi capital?'];
+  return '<div class="card"><div class="chart-h"><div class="t">🤖 Investor Assistant</div><div class="k">responde SOLO con los datos de TU inversión · números concretos · honesto sobre riesgos</div></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + sugeridos.map(s => '<button class="ibtn" onclick="ipAsk(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</button>').join('') + '</div>'
+    + '<div id="ip-chat" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;margin-bottom:10px">'
+    + (IP.chat || []).map(m => '<div style="max-width:85%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;' + (m.role === 'user' ? 'align-self:flex-end;background:rgba(79,141,255,.16);border:1px solid rgba(79,141,255,.3)' : 'align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)') + '">' + esc(m.content) + '</div>').join('')
+    + '</div>'
+    + '<div style="display:flex;gap:8px"><input id="ip-ia-q" placeholder="Preguntá sobre tu inversión…" onkeydown="if(event.key===\'Enter\')ipAsk()" style="flex:1;background:var(--glass);border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:13px;outline:none"><button class="cbtn" onclick="ipAsk()">Enviar</button></div>'
+    + '</div>';
+}
+async function ipAsk(q) {
+  const input = document.getElementById('ip-ia-q');
+  const question = (q || (input ? input.value : '') || '').trim();
+  if (!question) return;
+  IP.chat = IP.chat || [];
+  IP.chat.push({ role: 'user', content: question });
+  IP.chat.push({ role: 'assistant', content: '…pensando' });
+  render();
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const tok = session ? session.access_token : '';
+    const res = await fetch('/api/brain-chat', {
+      method: 'POST', headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) },
+      body: JSON.stringify({ mode: 'investor', question, snapshot: IP.lastSnapshot || {}, history: IP.chat.filter(m => m.content !== '…pensando').slice(0, -1) }),
+    });
+    const d = await res.json();
+    IP.chat.pop();
+    IP.chat.push({ role: 'assistant', content: res.ok ? (d.answer || 'Sin respuesta.') : ('Error: ' + (d.error || res.status)) });
+  } catch (e) { IP.chat.pop(); IP.chat.push({ role: 'assistant', content: 'No pude conectar: ' + e.message }); }
+  render();
+}
+window.ipAsk = ipAsk;
+
+async function ipReloadProducto() {
+  const props = [...new Set(IP.holdings.map(h => h.property_id))];
+  const [dc, ms] = await Promise.all([
+    sb.from('inv_distributions').select('*').eq('active', true),
+    sb.from('inv_messages').select('*').eq('active', true),
+  ]);
+  IP.dists = dc.data || []; IP.msgs = ms.data || [];
 }
 
 function drawCharts(r, inv) {

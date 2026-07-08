@@ -205,11 +205,89 @@ function iaTabEscenarios() {
   return '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">' + casaSel + '</div>' + comp + sim;
 }
 
+// ─── F1 producto: distribuciones + mensajes (admin) ───
+async function iaLoadProducto() {
+  const [d, m] = await Promise.all([
+    sb.from('inv_distributions').select('*').eq('active', true).order('fecha', { ascending: false }),
+    sb.from('inv_messages').select('*').eq('active', true).order('created_at', { ascending: false }).limit(100),
+  ]);
+  IA.dists = d.data || []; IA.msgs = m.data || [];
+}
+async function iaCrearDist() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const row = { investor_airtable_id: g('ia-d-inv'), property_id: g('ia-d-casa'), fecha: g('ia-d-fecha'), tipo: g('ia-d-tipo') || 'utilidad', monto: parseFloat(g('ia-d-monto')) || 0, estado: g('ia-d-estado') || 'programada', k1_url: g('ia-d-k1') || null };
+  if (!row.investor_airtable_id || !row.property_id || !row.fecha || !row.monto) return alert('Inversionista, casa, fecha y monto son obligatorios');
+  const { error } = await sb.from('inv_distributions').insert(row);
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('✓ Distribución creada', 'success');
+  await iaLoadProducto(); osRender();
+}
+window.iaCrearDist = iaCrearDist;
+async function iaDistEstado(id, estado) {
+  const { error } = await sb.from('inv_distributions').update({ estado }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  await iaLoadProducto(); osRender();
+}
+window.iaDistEstado = iaDistEstado;
+async function iaDelDist(id) {
+  const { error } = await sb.from('inv_distributions').update({ active: false, archived_at: new Date().toISOString() }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  await iaLoadProducto(); osRender();
+}
+window.iaDelDist = iaDelDist;
+async function iaEnviarMsgAdmin() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const dest = g('ia-mm-dest');
+  const row = { de: 'admin', asunto: g('ia-mm-asunto'), cuerpo: g('ia-mm-cuerpo') };
+  if (!row.cuerpo) return alert('Escribí el mensaje');
+  if (dest.startsWith('casa:')) row.property_id = dest.slice(5);          // fan-out: todos los holders de la casa
+  else row.investor_airtable_id = dest;
+  const { error } = await sb.from('inv_messages').insert(row);
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('✉️ Mensaje enviado', 'success');
+  await iaLoadProducto(); osRender();
+}
+window.iaEnviarMsgAdmin = iaEnviarMsgAdmin;
+
+function iaTabDist() {
+  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Nueva distribución</div><div class="k">utilidad / refi / venta / devolución de capital · con K-1</div></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+    + '<select id="ia-d-inv" class="osa-in">' + invOpts + '</select>'
+    + '<select id="ia-d-casa" class="osa-in">' + casaOpts + '</select>'
+    + '<input id="ia-d-fecha" type="date" class="osa-in">'
+    + '<input id="ia-d-monto" type="number" class="osa-in" placeholder="monto $">'
+    + '<select id="ia-d-tipo" class="osa-in"><option>utilidad</option><option>refi</option><option>venta</option><option>devolucion_capital</option></select>'
+    + '<select id="ia-d-estado" class="osa-in"><option>programada</option><option>pagada</option></select>'
+    + '<input id="ia-d-k1" class="osa-in" placeholder="URL del K-1 (opcional)" style="grid-column:span 2">'
+    + '</div><button class="cbtn" style="margin-top:10px" onclick="iaCrearDist()">Crear</button></div>'
+    + '<div class="card"><div class="chart-h"><div class="t">Distribuciones (' + (IA.dists || []).length + ')</div></div>'
+    + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Casa</th><th>Fecha</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th><th style="text-align:right"></th></tr></thead><tbody>'
+    + ((IA.dists || []).map(d => '<tr><td>' + OS_E(iaInvName(d.investor_airtable_id)) + '</td><td>' + OS_E(iaCasaName(d.property_id)) + '</td><td>' + OS_E(d.fecha) + '</td><td>' + OS_E(d.tipo) + (d.k1_url ? ' 📄' : '') + '</td>'
+      + '<td style="text-align:right">' + iaMoney(d.monto) + '</td>'
+      + '<td>' + (d.estado === 'pagada' ? '<span class="badge b-ok">pagada</span>' : '<span class="badge b-warn">programada</span> <button class="ct-btn" style="padding:2px 7px;font-size:9px" onclick="iaDistEstado(\'' + d.id + '\',\'pagada\')">✓ pagar</button>') + '</td>'
+      + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDist(\'' + d.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="7" class="empty">Sin distribuciones.</td></tr>')
+    + '</tbody></table></div>';
+}
+function iaTabMsgs() {
+  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">👤 ' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="casa:' + c + '">🏠 Todos los de ' + OS_E(iaCasaName(c)) + '</option>').join('');
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">✉️ Enviar mensaje</div><div class="k">a un inversionista o fan-out a todos los holders de una casa</div></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><select id="ia-mm-dest" class="osa-in">' + casaOpts + invOpts + '</select>'
+    + '<input id="ia-mm-asunto" class="osa-in" style="flex:1;min-width:220px" placeholder="Asunto"></div>'
+    + '<textarea id="ia-mm-cuerpo" rows="3" class="osa-in" style="width:100%" placeholder="Mensaje…"></textarea>'
+    + '<button class="cbtn" style="margin-top:8px" onclick="iaEnviarMsgAdmin()">Enviar</button></div>'
+    + ((IA.msgs || []).map(m => '<div class="card" style="margin-bottom:8px"><div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 → ' + (m.investor_airtable_id ? OS_E(iaInvName(m.investor_airtable_id)) : '🏠 ' + OS_E(iaCasaName(m.property_id))) : '👤 ' + OS_E(iaInvName(m.investor_airtable_id))) + ' · ' + OS_E((m.created_at || '').slice(0, 10)) + '</span><b class="meta">leído por: ' + ((m.read_by || []).length ? OS_E((m.read_by || []).join(', ')) : '—') + '</b></div>'
+      + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:3px 0">' + OS_E(m.asunto) + '</div>' : '')
+      + '<div class="meta" style="white-space:pre-wrap">' + OS_E(m.cuerpo) + '</div></div>').join('') || '<div class="empty">Sin mensajes.</div>');
+}
+
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador']];
+  const tabs = [['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IA.tab=\'' + t[0] + '\';osRender()">' + t[1] + '</button>').join(' ');
   let body = '';
 
@@ -289,6 +367,8 @@ function invAdminView() {
   }
 
   if (IA.tab === 'escenarios') body = iaTabEscenarios();
+  if (IA.tab === 'dist') { if (!IA.dists) { iaLoadProducto().then(osRender); body = '<div class="empty">⏳</div>'; } else body = iaTabDist(); }
+  if (IA.tab === 'msgs') { if (!IA.msgs) { iaLoadProducto().then(osRender); body = '<div class="empty">⏳</div>'; } else body = iaTabMsgs(); }
 
   return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'
