@@ -10,7 +10,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const HOURS_TABLE = "tblyCieXLFdZM60El"; // Horas trabajadas semana
 const CREW_TABLE = "tblQzJoPvakTbz4gt";  // Cuadrillas
-const F = { fecha: "fldkFHa9K5pRlO29V", worker: "fldpIYjB33HK0tdEk", casa: "fldN20CWfhDsgwQNS", horas: "fldRWftVP66WRcbYD", pago: "fldP8mv5lJdehwvKx" };
+const F = { fecha: "fldkFHa9K5pRlO29V", worker: "fldpIYjB33HK0tdEk", casa: "fldN20CWfhDsgwQNS", horas: "fldRWftVP66WRcbYD", pago: "fldP8mv5lJdehwvKx", pagoTotalDia: "fldKgQ5Eyv5esHpSQ" };
 const C = { nombre: "fldnSityxRqbpwDEF", experiencia: "fld4PEcliEXZ4kTgY", rate: "fld4bAKu6waby0jrR" };
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -60,6 +60,8 @@ Deno.serve(async (req) => {
         fecha: f[F.fecha] || null,
         horas: f[F.horas] ?? null,
         pago: f[F.pago] ?? null,
+        // "Pago Total Dia" (formula horas×rate) — fuente ÚNICA del pago diario para el desglose quincenal (NO recalcular en el front).
+        pago_total_dia: f[F.pagoTotalDia] ?? null,
         last_synced_at: now,
       };
     });

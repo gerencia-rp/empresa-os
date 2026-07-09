@@ -26,7 +26,9 @@ function rcInjectCSS() {
   #rc-overlay .lidbar{height:6px;border-radius:6px;background:var(--glassb);overflow:hidden;margin-top:6px}#rc-overlay .lidbar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
   #rc-overlay .alertrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--glassb)}#rc-overlay .alertrow:last-child{border-bottom:none}
   #rc-overlay .adot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}#rc-overlay .adot.r{background:var(--neg)}#rc-overlay .adot.y{background:var(--amber)}
-  #rc-overlay .pullbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:8px 15px;border-radius:20px;cursor:pointer;font-size:11.5px}#rc-overlay .pullbtn:hover{filter:brightness(1.08)}#rc-overlay .pullbtn:disabled{opacity:.6;cursor:wait}#rc-overlay .rc-hide{display:none}#rc-overlay .ptable tr[onclick]:hover td{background:var(--glass)}`;
+  #rc-overlay .pullbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:8px 15px;border-radius:20px;cursor:pointer;font-size:11.5px}#rc-overlay .pullbtn:hover{filter:brightness(1.08)}#rc-overlay .pullbtn:disabled{opacity:.6;cursor:wait}#rc-overlay .rc-hide{display:none}#rc-overlay .ptable tr[onclick]:hover td{background:var(--glass)}
+  #rc-overlay .repbtn.ghost{background:var(--glass);border:1px solid var(--glassb);color:var(--ink);filter:none}#rc-overlay .repbtn.ghost:hover{border-color:var(--a2);filter:none}
+  #rc-overlay .ptable tfoot td{border-top:1px solid var(--glassb);font-size:11.5px}`;
   document.head.appendChild(st);
 }
 
@@ -66,7 +68,7 @@ async function rcLoadAll() {
       sb.from('remodel_forecast_params').select('key, value').eq('key', 'alerta_sobrecosto_pct').maybeSingle().then(r => r.data).catch(() => null),
       sb.from('v_remodel_nomina_ledger').select('*').then(r => r.data || []).catch(() => []),
       sb.from('v_remodel_avance_vivo').select('*').then(r => r.data || []).catch(() => []),
-      sb.from('remodel_payroll_receipts').select('id, fecha_pago, periodo_ini, periodo_fin, casa, lider, total, estado, airtable_writeback').eq('active', true).order('created_at', { ascending: false }).limit(20).then(r => r.data || []).catch(() => [])
+      sb.from('remodel_payroll_receipts').select('id, fecha_pago, periodo_ini, periodo_fin, casa, lider, total, estado, airtable_writeback, airtable_record_id').eq('active', true).order('created_at', { ascending: false }).limit(20).then(r => r.data || []).catch(() => [])
     ]);
     RC.names = {}; (names || []).forEach(n => { RC.names[n.record_id] = n.name; });
     (crews || []).forEach(c => { if (c.airtable_id && c.nombre) RC.names[c.airtable_id] = c.nombre; });
@@ -585,94 +587,136 @@ function rcVivoCard() {
     <div class="meta" style="margin-top:10px">Definiciones: tareas = v_remodel_progress (cronograma del Planner cumplido) · plata = C2 (material_payments + horas×rate ÷ presupuesto) · proyección lineal sobre el cronograma · umbral = alerta_sobrecosto_pct. ⚠ Write-back del % a Airtable parqueado: falta scope write del token.</div></div>`;
 }
 
-// ─── RM-M2 · Recibo de pago quincenal por LÍDER (regla Silvia: sin contrato individual; el líder recibe y reparte) ───
+// ─── RM-M2 · Desglose de nómina QUINCENAL por CASA (Lun–Dom; la Fecha de Pago cubre las 2 semanas que cierran antes) ───
+// Regla de quincena (NO hardcode): semanas Lun–Dom; la Fecha de Pago cubre las DOS semanas Lun–Dom
+// cuyo domingo cierra ANTES de esa fecha. Todo se deriva de la fecha elegida.
+function rcQuincena(fechaPagoStr) {
+  const p = String(fechaPagoStr || '').split('-').map(Number);
+  const pd = new Date(p[0], (p[1] || 1) - 1, p[2] || 1);
+  const dow = pd.getDay();                      // 0=Dom … 6=Sáb
+  const back = dow === 0 ? 7 : dow;             // último domingo ESTRICTAMENTE antes de la fecha
+  const s2fin = new Date(pd); s2fin.setDate(pd.getDate() - back);
+  const s2ini = new Date(s2fin); s2ini.setDate(s2fin.getDate() - 6);
+  const s1fin = new Date(s2fin); s1fin.setDate(s2fin.getDate() - 7);
+  const s1ini = new Date(s2fin); s1ini.setDate(s2fin.getDate() - 13);
+  const iso = x => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  return { s1ini: iso(s1ini), s1fin: iso(s1fin), s2ini: iso(s2ini), s2fin: iso(s2fin) };
+}
+function rcFmtDMY(iso) { const a = String(iso || '').split('-'); return a.length === 3 ? (a[2] + '/' + a[1]) : (iso || '—'); }
+
 function rcPagoQuincenal() {
-  const hoy = new Date(); const d = hoy.getDate();
-  const ini = d <= 15 ? new Date(hoy.getFullYear(), hoy.getMonth(), 1) : new Date(hoy.getFullYear(), hoy.getMonth(), 16);
-  const fin = d <= 15 ? new Date(hoy.getFullYear(), hoy.getMonth(), 15) : new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-  const iso = x => x.toISOString().slice(0, 10);
-  const casas = (RC.obras || []).filter(o => o.active !== false).map(o => rcShort(o.address)).sort();
-  let lideres = (RC.crewRates || []).map(c => c.nombre).filter(Boolean).sort();
-  if (!lideres.length) lideres = [...new Set((RC.ledger || []).map(x => x.worker).filter(Boolean))].sort();
+  const hoy = new Date();
+  const isoHoy = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
+  const casas = (RC.obras || []).filter(o => o.active !== false).map(o => rcShort(o.address)).filter(Boolean).sort();
+  const ov = document.getElementById('rc-overlay') || document.body;
   const el = document.createElement('div');
   el.id = 'rc-pq-modal';
-  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center';
-  el.innerHTML = `<div class="card" style="width:520px;max-width:94vw;background:#0d1420;border:1px solid rgba(255,255,255,.15)">
-    <div class="chart-h"><div class="t">💵 Pago de nómina quincenal</div><div class="k">recibo por LÍDER · horas del espejo</div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0">
-      <label style="font-size:11px;color:#9fb0c9">Desde<br><input id="pq-ini" type="date" value="${iso(ini)}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit"></label>
-      <label style="font-size:11px;color:#9fb0c9">Hasta<br><input id="pq-fin" type="date" value="${iso(fin)}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit"></label>
-    </div>
-    <label style="font-size:11px;color:#9fb0c9">Casa<br><select id="pq-casa" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit;margin:4px 0 10px"><option value="">(todas las casas del período)</option>${casas.map(c => `<option>${RC_E(c)}</option>`).join('')}</select></label>
-    <label style="font-size:11px;color:#9fb0c9">Líder que recibe y firma<br><select id="pq-lider" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit;margin:4px 0 14px">${lideres.map(c => `<option>${RC_E(c)}</option>`).join('')}</select></label>
-    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="repbtn ghost" onclick="document.getElementById('rc-pq-modal').remove()">Cancelar</button><button class="repbtn" onclick="rcPagoGenerar()">Ver desglose →</button></div></div>`;
-  document.body.appendChild(el);
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:99999;display:flex;align-items:center;justify-content:center;color:var(--ink)';
+  el.innerHTML = '<div class="card" style="width:480px;max-width:94vw;background:var(--bg);border:1px solid var(--glassb);color:var(--ink);color-scheme:dark light">'
+    + '<div class="chart-h"><div class="t">💵 Desglose de nómina quincenal</div><div class="k">por casa · horas del espejo</div></div>'
+    + '<div style="margin:12px 0"><label style="font-size:11px;color:var(--mut)">Casa<br>'
+    + '<select id="pq-casa" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:9px;color:var(--ink);margin:4px 0 12px">'
+    + '<option value="">(todas las casas del período)</option>' + casas.map(c => '<option>' + RC_E(c) + '</option>').join('') + '</select></label>'
+    + '<label style="font-size:11px;color:var(--mut)">Fecha de pago<br>'
+    + '<input id="pq-fecha" type="date" value="' + isoHoy + '" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:9px;color:var(--ink)"></label></div>'
+    + '<div class="meta" style="margin:0 0 12px">Cubre las 2 semanas Lun–Dom que cierran antes de esa fecha.</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="repbtn ghost" onclick="document.getElementById(\'rc-pq-modal\').remove()">Cancelar</button>'
+    + '<button class="repbtn" onclick="rcPagoGenerar()">Ver desglose →</button></div></div>';
+  ov.appendChild(el);
 }
 async function rcPagoGenerar() {
-  const ini = document.getElementById('pq-ini').value, fin = document.getElementById('pq-fin').value;
-  const casa = document.getElementById('pq-casa').value, lider = document.getElementById('pq-lider').value;
-  if (!ini || !fin || !lider) { alert('Completá período y líder.'); return; }
-  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('worker, casa, casa_norm, fecha, horas, pago').gte('fecha', ini).lte('fecha', fin).limit(3000);
+  const casa = document.getElementById('pq-casa').value;
+  const fechaPago = document.getElementById('pq-fecha').value;
+  if (!fechaPago) { alert('Elegí la fecha de pago.'); return; }
+  const q = rcQuincena(fechaPago);
+  // '*' (no columnas explícitas) para degradar sin error si 'pago_total_dia' aún no existe (pre-migración).
+  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('*').gte('fecha', q.s1ini).lte('fecha', q.s2fin).limit(5000);
   if (error) { alert('Error leyendo horas: ' + error.message); return; }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const casaKey = norm(casa);
+  const obras = (RC.obras || []).filter(o => o.active !== false);
   // MISMA definición que el ledger C4: match por casa_norm contenido en la casa normalizada (≥4 chars)
+  const obraFor = h => {
+    if (!h.casa_norm || h.casa_norm.length < 4) return null;
+    return obras.find(o => norm(rcShort(o.address)).includes(h.casa_norm)) || null;
+  };
+  const casaKey = norm(casa);
   const rows = (hrs || []).filter(h => !casa || (h.casa_norm && h.casa_norm.length >= 4 && casaKey.includes(h.casa_norm)));
-  if (!rows.length) { alert('Sin horas registradas en ese período' + (casa ? ' para esa casa' : '') + '.'); return; }
-  const rates = {}; (RC.crewRates || []).forEach(c => rates[String(c.nombre || '').toLowerCase().trim()] = +c.pago_x_hora || 0);
-  const porW = {};
+  let faltaPTD = false;
+  const byCasa = {};
   rows.forEach(h => {
-    const w = (h.worker || '?').trim(); if (!porW[w]) porW[w] = { w, horas: 0, pagoReg: 0, casas: new Set() };
-    porW[w].horas += +h.horas || 0; porW[w].pagoReg += +h.pago || 0; if (h.casa) porW[w].casas.add(String(h.casa).split(',')[0]);
+    const wk = (h.fecha >= q.s1ini && h.fecha <= q.s1fin) ? 'sem1' : (h.fecha >= q.s2ini && h.fecha <= q.s2fin) ? 'sem2' : null;
+    if (!wk) return;
+    const o = obraFor(h);
+    const label = o ? rcShort(o.address) : (rcShort(h.casa) || 'Sin casa asignada');
+    if (!byCasa[label]) byCasa[label] = { label, recId: o ? (o.airtable_id || null) : null, lider: o ? (o.lider || '—') : '—', workers: {}, sem1: { horas: 0, pago: 0 }, sem2: { horas: 0, pago: 0 } };
+    const g = byCasa[label];
+    const w = (h.worker || '?').trim();
+    if (!g.workers[w]) g.workers[w] = { w, sem1: { horas: 0, pago: 0 }, sem2: { horas: 0, pago: 0 } };
+    // Fuente ÚNICA del pago diario = "Pago Total Dia" (Airtable), NO recalcular.
+    const ptd = Number(h.pago_total_dia);
+    if (h.pago_total_dia == null) faltaPTD = true;
+    const val = Number.isFinite(ptd) ? ptd : 0;
+    g.workers[w][wk].horas += +h.horas || 0; g.workers[w][wk].pago += val;
+    g[wk].horas += +h.horas || 0; g[wk].pago += val;
   });
-  const det = Object.values(porW).map(x => {
-    const rate = rates[x.w.toLowerCase()] || 0;
-    const devengado = rate ? Math.round(x.horas * rate * 100) / 100 : null;
-    return { ...x, rate, monto: devengado != null ? devengado : Math.round(x.pagoReg * 100) / 100, sinRate: !rate };
-  }).sort((a, b) => b.monto - a.monto);
-  const total = Math.round(det.reduce((s, x) => s + x.monto, 0) * 100) / 100;
+  const casas = Object.values(byCasa).map(c => ({
+    label: c.label, recId: c.recId, lider: c.lider, sem1: c.sem1, sem2: c.sem2,
+    total: c.sem1.pago + c.sem2.pago, horasTot: c.sem1.horas + c.sem2.horas,
+    workers: Object.values(c.workers).map(w => ({ w: w.w, sem1: w.sem1, sem2: w.sem2, total: w.sem1.pago + w.sem2.pago, horas: w.sem1.horas + w.sem2.horas })).sort((a, b) => b.total - a.total),
+  })).sort((a, b) => b.total - a.total);
+  if (!casas.length) { alert('Sin horas registradas en ese período' + (casa ? ' para esa casa' : '') + '.'); return; }
   document.getElementById('rc-pq-modal')?.remove();
-  rcReciboOverlay({ ini, fin, casa: casa || 'Todas las casas', lider, det, total, horasTot: Math.round(det.reduce((s, x) => s + x.horas, 0) * 10) / 10 });
+  RC._desglose = { fechaPago, q, casaSel: casa || 'Todas las casas', casas, total: casas.reduce((s, c) => s + c.total, 0), faltaPTD };
+  rcDesgloseOverlay();
 }
-function rcReciboRender(r) {
-  const M = n => '$' + (+n).toLocaleString('en-US', { minimumFractionDigits: 2 });
-  const filas = r.det.map(x => `<tr><td>${RC_E(x.w)}${x.sinRate ? ' <span style="color:#b45309;font-size:9px">(sin tarifa — se usa pago registrado)</span>' : ''}<div style="font-size:9px;color:#777">${RC_E([...x.casas].slice(0, 3).join(', '))}</div></td><td style="text-align:right">${x.horas.toFixed(1)}</td><td style="text-align:right">${x.rate ? M(x.rate) : '—'}</td><td style="text-align:right"><b>${M(x.monto)}</b></td></tr>`).join('');
-  const w = window.open('', '_blank', 'width=760,height=900');
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Recibo nómina ${r.ini} a ${r.fin}</title><style>
-    body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;margin:0;padding:36px;max-width:700px}
-    .head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b45309;padding-bottom:14px}
-    .logo{font-size:22px;font-weight:800;color:#b45309}.logo span{display:block;font-size:10px;letter-spacing:2px;color:#666;font-weight:600}
-    h1{font-size:16px;margin:18px 0 2px}.sub{font-size:12px;color:#555;margin-bottom:16px}
-    table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#666;border-bottom:1px solid #ccc;padding:6px 4px}
-    th:nth-child(n+2),td:nth-child(n+2){text-align:right}td{padding:8px 4px;border-bottom:1px solid #eee}
-    .tot{font-size:17px;font-weight:800;text-align:right;margin:14px 0;padding:10px;background:#faf5ef;border-radius:8px}
-    .firma{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.firma div{border-top:1.5px solid #333;padding-top:6px;font-size:11px;color:#444}
-    .nota{font-size:10px;color:#777;margin-top:26px;line-height:1.5}
-    .btn{position:fixed;top:10px;right:10px;padding:8px 16px;background:#b45309;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
-    @media print{.btn{display:none}}</style></head><body>
-    <button class="btn" onclick="window.print()">🖨 Imprimir / PDF</button>
-    <div class="head"><div class="logo">STRUCTURE ONE <span>REMODELACIÓN · AUSTIN, TX</span></div><div style="font-size:11px;color:#666;text-align:right">Recibo de pago de nómina<br><b>${r.ini} → ${r.fin}</b></div></div>
-    <h1>Pago de nómina — ${RC_E(r.casa)}</h1>
-    <div class="sub">Período ${r.ini} a ${r.fin} · ${r.det.length} trabajador(es) · ${r.horasTot} horas · Recibe y distribuye: <b>${RC_E(r.lider)}</b></div>
-    <table><thead><tr><th>Trabajador</th><th>Horas</th><th>Valor/hora</th><th>Subtotal</th></tr></thead><tbody>${filas}</tbody></table>
-    <div class="tot">TOTAL A PAGAR: ${M(r.total)}</div>
-    <div class="firma"><div>Firma del líder (${RC_E(r.lider)})<br>Recibí conforme el total indicado para distribuir a mi equipo</div><div>Firma Structure One<br>Fecha: ____ / ____ / ______</div></div>
-    <div class="nota">El dinero se entrega al líder de cuadrilla, quien lo distribuye a su equipo. Desglose calculado de las horas registradas en el sistema (Horas Trabajadas por Semana × tarifa de Personal en Campo). Generado por Flipping Rentals OS · ${new Date().toLocaleString('es-MX')}</div>
-    </body></html>`);
-  w.document.close();
+function rcDesgloseOverlay() {
+  const d = RC._desglose; if (!d) return;
+  const M = n => RC_M(n);
+  const per = 'Sem 1 ' + rcFmtDMY(d.q.s1ini) + '–' + rcFmtDMY(d.q.s1fin) + ' · Sem 2 ' + rcFmtDMY(d.q.s2ini) + '–' + rcFmtDMY(d.q.s2fin) + ' (Lun–Dom)';
+  const casaCard = (c, idx) => {
+    const filas = c.workers.map(w => '<tr><td>' + RC_E(w.w) + '</td>'
+      + '<td style="text-align:right">' + w.sem1.horas.toFixed(1) + '</td><td style="text-align:right">' + M(w.sem1.pago) + '</td>'
+      + '<td style="text-align:right">' + w.sem2.horas.toFixed(1) + '</td><td style="text-align:right">' + M(w.sem2.pago) + '</td>'
+      + '<td style="text-align:right"><b>' + M(w.total) + '</b></td></tr>').join('');
+    const noRec = c.recId ? '' : ' <span class="badge b-warn" style="font-size:8px" title="La casa no cruza con una obra del espejo — sin Propiedad para el write-back">sin casa en espejo</span>';
+    return '<div class="card" style="margin-top:12px;background:var(--glass)">'
+      + '<div class="chart-h"><div class="t">' + RC_E(c.label) + noRec + '</div><div class="k">Líder: ' + RC_E(c.lider) + ' · ' + c.workers.length + ' trab. · ' + c.horasTot.toFixed(1) + ' h</div></div>'
+      + '<table class="ptable"><thead><tr><th>Trabajador</th><th style="text-align:right">Sem 1 h</th><th style="text-align:right">Sem 1 $</th><th style="text-align:right">Sem 2 h</th><th style="text-align:right">Sem 2 $</th><th style="text-align:right">Subtotal</th></tr></thead>'
+      + '<tbody>' + filas + '</tbody>'
+      + '<tfoot><tr><td style="font-weight:700">Subtotal casa</td><td style="text-align:right">' + c.sem1.horas.toFixed(1) + '</td><td style="text-align:right">' + M(c.sem1.pago) + '</td><td style="text-align:right">' + c.sem2.horas.toFixed(1) + '</td><td style="text-align:right">' + M(c.sem2.pago) + '</td><td style="text-align:right"><b>' + M(c.total) + '</b></td></tr></tfoot></table>'
+      + '<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="repbtn" onclick="rcReciboFor(' + idx + ')">✍️ Firmar y registrar recibo →</button></div></div>';
+  };
+  const ov = document.getElementById('rc-overlay') || document.body;
+  const el = document.createElement('div');
+  el.id = 'rc-desglose-ov';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:99999;overflow:auto;padding:24px;color:var(--ink)';
+  el.innerHTML = '<div class="card" style="max-width:920px;margin:0 auto;background:var(--bg);border:1px solid var(--glassb);color:var(--ink)">'
+    + '<div class="chart-h"><div class="t">💵 Desglose quincenal · ' + RC_E(d.casaSel) + '</div><div class="k">pago ' + RC_E(d.fechaPago) + '</div></div>'
+    + '<div class="meta">' + per + '</div>'
+    + (d.faltaPTD ? '<div class="meta" style="color:var(--amber);margin-top:6px">⚠ Hay filas sin “Pago Total Dia” (falta re-correr el sync de workers tras la migración) — se computan como $0.</div>' : '')
+    + d.casas.map(casaCard).join('')
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:12px;border-radius:10px;background:var(--glass)"><b>TOTAL QUINCENA</b><b style="font-size:17px">' + M(d.total) + '</b></div>'
+    + '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="repbtn ghost" onclick="document.getElementById(\'rc-desglose-ov\').remove()">Cerrar</button></div></div>';
+  ov.appendChild(el);
 }
-window.rcPagoQuincenal = rcPagoQuincenal; window.rcPagoGenerar = rcPagoGenerar;
+function rcReciboFor(idx) {
+  const d = RC._desglose; if (!d || !d.casas[idx]) return;
+  const c = d.casas[idx];
+  rcReciboOverlay({ fechaPago: d.fechaPago, q: d.q, casa: c.label, casaRec: c.recId, lider: c.lider, det: c.workers, total: c.total, horasTot: c.horasTot });
+}
+window.rcPagoQuincenal = rcPagoQuincenal; window.rcPagoGenerar = rcPagoGenerar; window.rcDesgloseOverlay = rcDesgloseOverlay; window.rcReciboFor = rcReciboFor;
 
 // ─── RM-M2 fase 2 · Recibo en overlay con FIRMA (canvas) + registro ───
 function rcReciboOverlay(r) {
   RC._recibo = r;
   const M = n => '$' + (+n).toLocaleString('en-US', { minimumFractionDigits: 2 });
-  const filas = r.det.map(x => `<tr><td>${RC_E(x.w)}${x.sinRate ? ' <span style="color:#b45309;font-size:9px">(sin tarifa — pago registrado)</span>' : ''}<div style="font-size:9px;color:#777">${RC_E([...x.casas].slice(0, 3).join(', '))}</div></td><td style="text-align:right">${x.horas.toFixed(1)}</td><td style="text-align:right">${x.rate ? M(x.rate) : '—'}</td><td style="text-align:right"><b>${M(x.monto)}</b></td></tr>`).join('');
+  const filas = r.det.map(x => `<tr><td>${RC_E(x.w)}</td><td style="text-align:right">${x.sem1.horas.toFixed(1)}</td><td style="text-align:right">${M(x.sem1.pago)}</td><td style="text-align:right">${x.sem2.horas.toFixed(1)}</td><td style="text-align:right">${M(x.sem2.pago)}</td><td style="text-align:right"><b>${M(x.total)}</b></td></tr>`).join('');
+  const per1 = `${r.q.s1ini} → ${r.q.s1fin}`, per2 = `${r.q.s2ini} → ${r.q.s2fin}`;
   const el = document.createElement('div');
   el.id = 'rc-recibo-ov';
   el.innerHTML = `<style>
     #rc-recibo-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;overflow:auto;padding:20px}
-    #rc-recibo-doc{background:#fff;color:#111;max-width:700px;margin:0 auto;padding:34px;border-radius:12px;font-family:-apple-system,Segoe UI,sans-serif}
+    #rc-recibo-doc{background:#fff;color:#111;max-width:720px;margin:0 auto;padding:34px;border-radius:12px;font-family:-apple-system,Segoe UI,sans-serif}
     #rc-recibo-doc .rrh{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b45309;padding-bottom:12px}
     #rc-recibo-doc .rrlogo{font-size:21px;font-weight:800;color:#b45309}#rc-recibo-doc .rrlogo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
     #rc-recibo-doc table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
@@ -681,27 +725,27 @@ function rcReciboOverlay(r) {
     #rc-recibo-doc td{padding:8px 4px;border-bottom:1px solid #eee}
     #rc-recibo-doc .rrtot{font-size:17px;font-weight:800;text-align:right;margin:12px 0;padding:10px;background:#faf5ef;border-radius:8px}
     #rc-firma-canvas{border:1.5px dashed #999;border-radius:8px;touch-action:none;background:#fcfcfc}
-    .rrbtns{display:flex;gap:8px;justify-content:flex-end;max-width:700px;margin:12px auto 40px}
+    .rrbtns{display:flex;gap:8px;justify-content:flex-end;max-width:720px;margin:12px auto 40px}
     .rrbtn{padding:9px 18px;border-radius:9px;border:none;font-weight:700;cursor:pointer;font-size:13px}
     @media print{ body *{visibility:hidden !important} #rc-recibo-ov{position:absolute;inset:0;background:#fff;padding:0;overflow:visible} #rc-recibo-doc, #rc-recibo-doc *{visibility:visible !important} #rc-recibo-doc{border-radius:0;max-width:none} .rrbtns{display:none} }
     </style>
     <div id="rc-recibo-doc">
-      <div class="rrh"><div class="rrlogo">STRUCTURE ONE <span>REMODELACIÓN · AUSTIN, TX</span></div><div style="font-size:11px;color:#666;text-align:right">Recibo de pago de nómina<br><b>${r.ini} → ${r.fin}</b></div></div>
+      <div class="rrh"><div class="rrlogo">STRUCTURE ONE <span>REMODELACIÓN · AUSTIN, TX</span></div><div style="font-size:11px;color:#666;text-align:right">Recibo de pago de nómina<br><b>Pago ${r.fechaPago}</b></div></div>
       <h2 style="font-size:16px;margin:16px 0 2px">Pago de nómina — ${RC_E(r.casa)}</h2>
-      <div style="font-size:12px;color:#555">Período ${r.ini} a ${r.fin} · ${r.det.length} trabajador(es) · ${r.horasTot} horas · Recibe y distribuye: <b>${RC_E(r.lider)}</b></div>
-      <table><thead><tr><th>Trabajador</th><th>Horas</th><th>Valor/hora</th><th>Subtotal</th></tr></thead><tbody>${filas}</tbody></table>
+      <div style="font-size:12px;color:#555">Quincena: Semana 1 ${per1} · Semana 2 ${per2} · ${r.det.length} trabajador(es) · ${r.horasTot.toFixed(1)} horas · Recibe y firma: <b>${RC_E(r.lider)}</b></div>
+      <table><thead><tr><th>Trabajador</th><th>Sem 1 h</th><th>Sem 1 $</th><th>Sem 2 h</th><th>Sem 2 $</th><th>Subtotal</th></tr></thead><tbody>${filas}</tbody></table>
       <div class="rrtot">TOTAL A PAGAR: ${M(r.total)}</div>
       <div style="margin-top:22px;font-size:11px;color:#444"><b>Firma del líder (${RC_E(r.lider)})</b> — Recibí conforme el total indicado para distribuir a mi equipo:</div>
-      <canvas id="rc-firma-canvas" width="620" height="130" style="width:100%;max-width:620px;margin-top:6px"></canvas>
+      <canvas id="rc-firma-canvas" width="640" height="130" style="width:100%;max-width:640px;margin-top:6px"></canvas>
       <div style="display:flex;gap:10px;margin-top:4px"><button class="rrbtn" style="background:#eee;font-size:10px;padding:4px 10px" onclick="rcFirmaClear()">✕ borrar firma</button></div>
-      <div style="font-size:10px;color:#777;margin-top:18px;line-height:1.5">El dinero se entrega al líder de cuadrilla, quien lo distribuye a su equipo (regla operativa; sin contrato individual). Desglose = horas registradas × tarifa de Personal en Campo. Generado por Flipping Rentals OS · ${new Date().toLocaleString('es-MX')}</div>
+      <div style="font-size:10px;color:#777;margin-top:18px;line-height:1.5">El dinero se entrega al líder de cuadrilla, quien lo distribuye a su equipo (regla operativa; sin contrato individual). Desglose = “Pago Total Dia” registrado por día (Airtable), NO recalculado. Generado por Flipping Rentals OS.</div>
     </div>
     <div class="rrbtns">
       <button class="rrbtn" style="background:#e5e7eb" onclick="document.getElementById('rc-recibo-ov').remove()">Cerrar</button>
       <button class="rrbtn" style="background:#374151;color:#fff" onclick="window.print()">🖨 Imprimir / PDF</button>
       <button class="rrbtn" style="background:#b45309;color:#fff" onclick="rcReciboGuardar()">✍️ Firmar y registrar pago</button>
     </div>`;
-  document.body.appendChild(el);
+  (document.getElementById('rc-overlay') || document.body).appendChild(el);
   const cv = document.getElementById('rc-firma-canvas');
   const ctx = cv.getContext('2d'); ctx.strokeStyle = '#1a1a5e'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   let draw = false, last = null; RC._firmaDirty = false;
@@ -719,20 +763,65 @@ async function rcReciboGuardar() {
   const cv = document.getElementById('rc-firma-canvas');
   const firma = cv.toDataURL('image/png');
   const { data: { session } } = await sb.auth.getSession();
-  const { error } = await sb.from('remodel_payroll_receipts').insert({
-    periodo_ini: r.ini, periodo_fin: r.fin, casa: r.casa, lider: r.lider,
-    total: r.total, horas: r.horasTot,
-    detalle: r.det.map(x => ({ worker: x.w, horas: x.horas, rate: x.rate, monto: x.monto, sinRate: !!x.sinRate })),
-    firma_png: firma, estado: 'realizado', airtable_writeback: 'pendiente',
+  const detalle = { casa_rec: r.casaRec || null, sem1: { ini: r.q.s1ini, fin: r.q.s1fin }, sem2: { ini: r.q.s2ini, fin: r.q.s2fin }, workers: r.det };
+  const { data: ins, error } = await sb.from('remodel_payroll_receipts').insert({
+    periodo_ini: r.q.s1ini, periodo_fin: r.q.s2fin, fecha_pago: r.fechaPago,
+    casa: r.casa, lider: r.lider, total: r.total, horas: r.horasTot,
+    detalle, firma_png: firma, estado: 'realizado', airtable_writeback: 'pendiente',
     created_by: (session && session.user && session.user.email) || 'panel'
-  });
+  }).select('id').single();
   if (error) { alert('No se pudo registrar (¿logueado?): ' + error.message); return; }
-  alert('✅ Pago registrado y firmado. Queda pendiente el write-back a Airtable (falta scope write del token).');
   document.getElementById('rc-recibo-ov')?.remove();
-  try { const { data } = await sb.from('remodel_payroll_receipts').select('id, fecha_pago, periodo_ini, periodo_fin, casa, lider, total, estado, airtable_writeback').eq('active', true).order('created_at', { ascending: false }).limit(20); RC.receipts = data || []; } catch (e) {}
+  await rcReloadRecibos();
+  rcRender();
+  // El write-back (movimiento de plata a Airtable) va en DRY-RUN: mostramos EXACTAMENTE qué se escribiría y esperamos aprobación.
+  rcWritebackPreview(ins.id);
+}
+async function rcReloadRecibos() {
+  try { const { data } = await sb.from('remodel_payroll_receipts').select('id, fecha_pago, periodo_ini, periodo_fin, casa, lider, total, estado, airtable_writeback, airtable_record_id').eq('active', true).order('created_at', { ascending: false }).limit(20); RC.receipts = data || []; } catch (e) {}
+}
+async function rcNominaWriteback(receiptId, dryRun) {
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/remodel-nomina-writeback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` },
+      body: JSON.stringify({ receipt_id: receiptId, dry_run: !!dryRun })
+    });
+    return await res.json().catch(() => ({ ok: false, error: 'respuesta no-JSON' }));
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+async function rcWritebackPreview(receiptId) {
+  const r = await rcNominaWriteback(receiptId, true);
+  const ov = document.getElementById('rc-overlay') || document.body;
+  const el = document.createElement('div');
+  el.id = 'rc-wb-modal';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:99999;display:flex;align-items:center;justify-content:center;color:var(--ink)';
+  const okDry = !!(r && r.ok);
+  const body = okDry
+    ? '<div class="meta" style="margin:8px 0">Se escribiría este registro en Airtable «Nomina Trabajadores en Campo» (tabla tblsmtrvcJbwwLjch):</div>'
+      + '<pre style="background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:320px;color:var(--ink);white-space:pre-wrap">' + RC_E(JSON.stringify({ preview: r.preview, resuelto: r.resolved }, null, 2)) + '</pre>'
+      + ((r.warnings && r.warnings.length) ? '<div class="meta" style="color:var(--amber)">⚠ ' + RC_E(r.warnings.join(' · ')) + '</div>' : '')
+    : '<div class="meta" style="color:var(--neg);margin:8px 0">No se pudo preparar el write-back: ' + RC_E((r && r.error) || 'error') + '</div>';
+  const canWrite = okDry && !r.blocking;
+  el.innerHTML = '<div class="card" style="width:620px;max-width:95vw;background:var(--bg);border:1px solid var(--glassb);color:var(--ink);max-height:88vh;overflow:auto">'
+    + '<div class="chart-h"><div class="t">↗ Write-back a Airtable · DRY-RUN</div><div class="k">movimiento de plata · requiere tu OK</div></div>'
+    + body
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="repbtn ghost" onclick="document.getElementById(\'rc-wb-modal\').remove()">Cerrar</button>'
+    + (canWrite ? '<button class="repbtn" onclick="rcWritebackConfirm(\'' + receiptId + '\',this)">Escribir en Airtable →</button>' : '')
+    + '</div></div>';
+  ov.appendChild(el);
+}
+async function rcWritebackConfirm(receiptId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Escribiendo…'; }
+  const r = await rcNominaWriteback(receiptId, false);
+  document.getElementById('rc-wb-modal')?.remove();
+  if (r && r.ok) alert('✅ Escrito en Airtable. recId: ' + (r.record_id || '—'));
+  else alert('❌ No se pudo escribir: ' + ((r && r.error) || 'error'));
+  await rcReloadRecibos();
   rcRender();
 }
 window.rcReciboOverlay = rcReciboOverlay; window.rcFirmaClear = rcFirmaClear; window.rcReciboGuardar = rcReciboGuardar;
+window.rcNominaWriteback = rcNominaWriteback; window.rcWritebackPreview = rcWritebackPreview; window.rcWritebackConfirm = rcWritebackConfirm;
 
 // ═══ MÓDULO INDEPENDIENTE · NÓMINA Y PAGOS (ledger + recibos + historial) — modular/vendible ═══
 function rcSecNomina(c) {
@@ -748,13 +837,13 @@ function rcSecNomina(c) {
     const det = open ? `<tr><td colspan="5" style="padding:4px 12px 10px"><table class="ptable" style="margin:0">${x.casas.sort((a, b) => b.deuda - a.deuda).map(cs => `<tr><td style="font-size:11px;opacity:.8">${RC_E(cs.casa)}</td><td style="text-align:right;font-size:11px">${Math.round(cs.horas)}h</td><td style="text-align:right;font-size:11px">últ. ${cs.ult || '—'}</td><td style="text-align:right" class="${cs.deuda > 0 ? 'down' : 'up'}">${RC_M(cs.deuda)}</td></tr>`).join('')}</table></td></tr>` : '';
     return `<tr style="cursor:pointer" onclick="RC._nomAbierto['${RC_E(x.w).replace(/'/g, '')}']=!RC._nomAbierto['${RC_E(x.w).replace(/'/g, '')}'];rcRender()"><td><b>${RC_E(x.w)}</b> <span style="opacity:.4">${open ? '▾' : '▸'}</span></td><td style="text-align:right">${Math.round(x.horas)}h</td><td style="text-align:right">${RC_M(x.dev)}</td><td style="text-align:right">${RC_M(x.pag)}</td><td style="text-align:right"><b class="${x.deuda > 0 ? 'down' : 'up'}">${RC_M(x.deuda)}</b></td></tr>${det}`;
   };
-  const recibos = (RC.receipts || []).map(r => `<tr><td>${r.fecha_pago}</td><td><b>${RC_E(r.lider || '—')}</b></td><td style="font-size:11px">${RC_E((r.casa || '').slice(0, 26))}</td><td style="font-size:11px">${r.periodo_ini} → ${r.periodo_fin}</td><td style="text-align:right"><b>${RC_M(+r.total || 0)}</b></td><td style="text-align:right"><span class="badge ${r.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:9px">${RC_E(r.estado)}</span>${r.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px" title="Se empuja a Airtable cuando el token tenga scope write">↗AT</span>' : ''}</td></tr>`).join('');
+  const recibos = (RC.receipts || []).map(r => `<tr><td>${r.fecha_pago}</td><td><b>${RC_E(r.lider || '—')}</b></td><td style="font-size:11px">${RC_E((r.casa || '').slice(0, 26))}</td><td style="font-size:11px">${r.periodo_ini} → ${r.periodo_fin}</td><td style="text-align:right"><b>${RC_M(+r.total || 0)}</b></td><td style="text-align:right"><span class="badge ${r.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:9px">${RC_E(r.estado)}</span>${r.airtable_writeback === 'ok' ? ' <span class="badge b-ok" style="font-size:8px" title="Escrito en Airtable Nómina">✓AT</span>' : ' <span style="opacity:.5;font-size:9px" title="Write-back pendiente (dry-run/aprobación)">↗AT</span>'}</td></tr>`).join('');
   return `${rcHeader('Nómina y Pagos', 'Structure One', `deuda neta ${RC_M(deudaTotal)} · ${workers.filter(x => x.deuda > 100).length} trabajador(es) con saldo`)}
     <div class="grid kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="card kpi"><div class="lab">Deuda NETA total</div><div class="big down">${RC_M(deudaTotal)}</div><div class="meta">devengado − pagado (C4)</div></div>
       <div class="card kpi"><div class="lab">Recibos registrados</div><div class="big">${(RC.receipts || []).length}</div><div class="meta">quincenas firmadas</div></div>
       <div class="card kpi"><div class="lab">Cobertura de tarifas</div><div class="big ${sinRate ? 'warn' : 'up'}">${led.length ? Math.round(100 * (led.length - sinRate) / led.length) : 0}%</div><div class="meta">${sinRate} filas sin rate (nombres ≠ Personal en Campo)</div></div>
-      <div class="card kpi" style="display:flex;flex-direction:column;justify-content:center"><button class="repbtn" style="font-size:13px;padding:10px" onclick="rcPagoQuincenal()">💵 Generar pago quincenal</button><div class="meta" style="margin-top:6px;text-align:center">recibo firmable por líder</div></div>
+      <div class="card kpi" style="display:flex;flex-direction:column;justify-content:center"><button class="repbtn" style="font-size:13px;padding:10px" onclick="rcPagoQuincenal()">💵 Generar pago quincenal</button><div class="meta" style="margin-top:6px;text-align:center">desglose por casa · recibo firmable</div></div>
     </div>
     <div class="grid row2" style="margin-top:14px">
       <div class="card"><div class="chart-h"><div class="t">Deuda por trabajador</div><div class="k">click para detalle por casa · grano: trabajador×casa×día</div></div>
@@ -763,6 +852,6 @@ function rcSecNomina(c) {
       <div class="card"><div class="chart-h"><div class="t">Historial de pagos quincenales</div><div class="k">recibos firmados (firma guardada en el registro)</div></div>
         <table class="ptable"><thead><tr><th>Pago</th><th>Líder</th><th>Casa</th><th>Período</th><th style="text-align:right">Total</th><th style="text-align:right">Estado</th></tr></thead><tbody>
         ${recibos || '<tr><td colspan="6" style="padding:12px;opacity:.6">Aún sin recibos — generá el primero con el botón 💵.</td></tr>'}</tbody></table>
-        <div class="meta" style="margin-top:8px">Al firmar un recibo queda registrado como REALIZADO con la firma del líder embebida. Write-back a "Nómina Trabajadores en Campo" (Airtable): pendiente del scope write del token.</div></div>
+        <div class="meta" style="margin-top:8px">Al firmar un recibo queda registrado como REALIZADO con la firma embebida. El write-back a "Nomina Trabajadores en Campo" (Airtable) se genera UN recibo por casa, en DRY-RUN: se muestra qué se va a escribir y se aprueba a mano (✓AT = escrito). Requiere PAT con scope write.</div></div>
     </div>`;
 }
