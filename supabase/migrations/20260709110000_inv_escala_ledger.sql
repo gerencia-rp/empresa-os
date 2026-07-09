@@ -168,6 +168,8 @@ create or replace function public.inv_ledger(pid uuid) returns table (
     from ok, pm_properties pp
     join pm_expenses e on e.property_id = pp.id and e.active
     where pp.property_id = pid and pp.active and coalesce(e.amount,0) > 0
+      -- la hipoteca/cuota del banco YA entra desde ff_hml_payments (fecha real) — acá se excluye para no duplicar
+      and coalesce(e.description,'') !~* 'hipoteca' and coalesce(e.category,'') !~* 'hipoteca' and coalesce(e.subcategory,'') !~* 'hipoteca'
   -- DISTRIBUCIONES pagadas al inversionista
   union all
   select dt.fecha, 'Distribución al inversionista (' || dt.tipo || ')', 'gasto', 'distribucion', dt.monto, 'OS:inv_distributions', dt.k1_url

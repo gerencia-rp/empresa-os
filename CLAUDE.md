@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (9 Jul 2026 — 💎 Inversionistas ESCALADO a todas las casas + Ledger) · EN VIVO
+
+- 🏘 **AUTO-POBLADO a TODAS las casas** (migr `20260709110000`, idempotente — Dove/manual NO se pisa): **23 casas · 23 holdings · 17 inversionistas · $955,846** desde `ff_deals` (capital_inversionista, ownership_pct como reparto, N:N por investor_rec_ids) + ~40 `inv_model_params`/casa mapeados de ff_deals/ff_hml_loans/ff_draws/ff_hml_payments con fuente declarada (refi_mes desde la 1ª cuota ref30; hm_inicial = monto_hml − draws; 75% LTV modelo). **Base oficial post-refi con utilidad REAL** ((renta−gastos)×12 + año0 = net_total) en las 17 casas con datos; el resto queda 'supuesto/en calibración' (5 casas ownership 0/sin capital quedan FUERA, sin romper). `inv_projection` con 92 proyecciones (23×4) — script `inv-proj.cjs` (motor en node + service key). Dove intacta (46.70%/$186,668).
+- 💰 **LEDGER "movimiento del dinero"** — RPC `inv_ledger(pid)` SECURITY DEFINER (guard `inv_my_props()` o fix-flip; una definición para portal y admin): línea de tiempo unificada por property_id → compra+cierre+draws [FF] · desembolso/pagos/fees HML + cuotas banco + cash-out [ff_hml_*] · **renta cobrada + gastos por ítem [Rentas, via `pm_properties.property_id` — ya backfilleado 21/21]** · distribuciones pagadas [OS] · manuales [inv_cashflow_real]. Cada fila: fecha/concepto/tipo/categoría/monto/FUENTE/comprobante 📎. **⚠ dedup clave: la "Hipoteca" de pm_expenses se EXCLUYE (la cuota real viene de ff_hml_payments)** — eran $257,751 duplicados en el portafolio. Dove validada: 94 movimientos reales (34 rentas $40,281 + gastos + 10 cuotas + 3 pagos HML + compra/draws/cashout).
+- 🖥 Portal: tab **💰 Movimiento del dinero** (resumen ingresos/gastos/distribuido/utilidad × su %, filtros tipo/mes, saldo acumulado, chip de fuente). Admin: tab **💰 Ledger** (selector casa, subtotales por categoría, fuentes). RLS verificado: ledger cruzado entre inversionistas = 0 · sin acceso = 0. QA 13/13 en prod.
+
+---
+
 ## 🎯 Estado (8 Jul 2026 · tarde — 💎 Motor CUADRA EXACTO con el Excel) · EN VIVO
 
 - ✅ **TIR 46.70% / VPN $186,668 EXACTOS** (targets del Excel "Renta VF" para Dove) — bug corregido en `fclPostRefi` (el año 1 metía el ciclo completo además del año 0 = cash atrapado, doble conteo → TIR 8.4%; ahora años 1-31 = operación post-refi). **Perfil de proyección configurable**: `postrefi_perfil` = `'motor'` (crecimiento apalancado) o `'plano'` (como el Excel). Calibración cerrada seedeada con `fuente='excel(calibrado)'`: `util_anual_postrefi=1941.55` ($161.80/mes; real $155) + `anio0_postrefi=4157.47` (real 4,612.90) — migr `20260708120000`. Al llegar la hoja real del Excel, se pisan esos 2 params en el admin y listo.
