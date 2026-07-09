@@ -402,7 +402,7 @@ function iaTabGlobal() {
   const kpi = (lab, val, meta) => '<div class="card"><div class="lab">' + lab + '</div><div class="big">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
   return '<div class="grid k4">'
     + kpi('Capital total invertido', iaMoney(capTotal), Object.keys(caps).length + ' inversionistas · ' + Object.keys(porCasa).length + ' casas [inv_holdings]')
-    + kpi('TIR promedio proyectada', tirs.length ? (tirs.reduce((s, x) => s + x, 0) / tirs.length * 100).toFixed(1) + '%' : 'sin datos', tirs.length + ' casas con proyección cacheada')
+    + kpi('TIR promedio proyectada', tirs.length ? (tirs.reduce((s, x) => s + x, 0) / tirs.length * 100).toFixed(1) + '%' : 'sin datos', tirs.length + ' de ' + projs.length + ' casas con proyección (resto en calibración)')
     + kpi('VPN agregado (31a)', vpns.length ? iaMoney(vpns.reduce((s, x) => s + x, 0)) : 'sin datos', 'suma de proyecciones [inv_projection]')
     + kpi('Alertas', alertas.length, alertas.length ? 'ver abajo' : 'todo al día')
     + '</div>'
@@ -418,11 +418,42 @@ function iaTabGlobal() {
     + '</div></div>';
 }
 
+// ─── 💰 Ledger "movimiento del dinero" (misma RPC que el portal — una definición) ───
+IA.ledgerCache = IA.ledgerCache || {};
+async function iaLoadLedger(pid) {
+  const { data, error } = await sb.rpc("inv_ledger", { pid });
+  IA.ledgerCache[pid] = error ? { err: error.message } : (data || []);
+  osRender();
+}
+function iaTabLedger() {
+  const casas = [...new Set(IA.holdings.map(h => h.property_id))];
+  if (!casas.includes(IA.casa)) IA.casa = casas[0];
+  const casaSel = "<select class=\"osa-in\" onchange=\"iaSetCasa(this.value)\">" + casas.map(c => "<option value=\"" + c + "\" " + (c === IA.casa ? "selected" : "") + ">" + OS_E(iaCasaName(c)) + "</option>").join("") + "</select>";
+  const led = IA.ledgerCache[IA.casa];
+  if (led === undefined) { iaLoadLedger(IA.casa); return casaSel + "<div class=\"empty\">⏳ Armando el ledger…</div>"; }
+  if (led.err) return casaSel + "<div class=\"empty down\">" + OS_E(led.err) + "</div>";
+  if (!led.length) return casaSel + "<div class=\"empty\">Sin movimientos para esta casa.</div>";
+  let acum = 0;
+  const full = led.map(m => { acum += (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0); return { ...m, acum }; });
+  const cats = {};
+  led.forEach(m => { const k = m.tipo + ":" + m.categoria; cats[k] = (cats[k] || 0) + +m.monto; });
+  const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span>" + OS_E(k.replace(":", " · ")) + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
+  return "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px\">" + casaSel + "<span class=\"meta\">" + led.length + " movimientos · saldo final <b style=\"color:" + (acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(acum) + "</b></span></div>"
+    + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div></div>" + subt + "</div>"
+    + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
+    + Object.entries(led.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
+    + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th>Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\">Saldo</th><th>Fuente</th></tr></thead><tbody>"
+    + full.slice().reverse().map(m => "<tr><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
+      + "<td style=\"text-align:right\" class=\"" + (m.tipo === "ingreso" ? "up" : "down") + "\">" + (m.tipo === "ingreso" ? "+" : "−") + iaMoney(m.monto) + "</td>"
+      + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>").join("")
+    + "</tbody></table></div>";
+}
+
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes']];
+  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IA.tab=\'' + t[0] + '\';osRender()">' + t[1] + '</button>').join(' ');
   let body = '';
 
@@ -508,6 +539,7 @@ function invAdminView() {
   else if (IA.tab === 'msgs') body = iaTabMsgs();
   else if (IA.tab === 'pipeline') body = iaTabPipeline();
   else if (IA.tab === 'global') body = iaTabGlobal();
+  else if (IA.tab === 'ledger') body = iaTabLedger();
 
   return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'

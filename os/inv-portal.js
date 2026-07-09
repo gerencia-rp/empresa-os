@@ -7,7 +7,7 @@
 // ════════════════════════════════════════════════════════════════
 
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'props', myIds: [], dists: [], msgs: [], chat: [] };
+const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'props', myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' } };
 window.IP = IP;
 
 const $money = v => '$' + Math.round(+v || 0).toLocaleString('en-US');
@@ -149,7 +149,7 @@ function render() {
   const acumRows = (() => { let acc = 0; return r.meses.map(x => { acc += x.fclNegocio; return acc; }); })();
 
   const noLeidos = (IP.msgs || []).filter(m => !(m.read_by || []).includes(IP.email.toLowerCase())).length;
-  const TABS = [['props', '🏠 Propiedades'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['docs', '📄 Documentos'], ['ia', '🤖 Asistente']];
+  const TABS = [['props', '🏠 Propiedades'], ['money', '💰 Movimiento del dinero'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['docs', '📄 Documentos'], ['ia', '🤖 Asistente']];
   const head = ''
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector + '<span class="meta">' + esc(IP.email) + '</span><button class="ibtn" onclick="ipLogout()">Salir</button></div></div>'
@@ -158,7 +158,8 @@ function render() {
     + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' + TABS.map(t => '<button class="ibtn" style="' + (IP.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IP.tab=\'' + t[0] + '\';render()">' + t[1] + '</button>').join('') + '</div>';
 
   let body = '';
-  if (IP.tab === 'dist') body = renderDist(pid, inv);
+  if (IP.tab === 'money') body = renderMoney(pid, inv);
+  else if (IP.tab === 'dist') body = renderDist(pid, inv);
   else if (IP.tab === 'msgs') body = renderMsgs(pid);
   else if (IP.tab === 'docs') body = renderDocs(docs);
   else if (IP.tab === 'ia') body = renderIA();
@@ -212,6 +213,55 @@ function render() {
   app().innerHTML = head + body;
   if (IP.tab === 'props' || !IP.tab) drawCharts(r, inv);
   IP.lastSnapshot = { casa: dir, escenario, inversion: +holding.inversion_aportada || 0, reparto: inv, tir31: i.tir31PostRefi, vpn31: i.vpn31PostRefi, vpn31_inv: i.vpn31PostRefi * inv, cap: i.capValor, dscr: i.dscr, equilibrio: i.puntoEquilibrio, riqueza_hoy: riquezaHoy, utilidad_mensual: Math.round((r.anios[2] ? r.anios[2].fclNegocio : 0) / 12), fases: i.fases, patrimonio_a5: r.anios[5].patrimonioInv, patrimonio_a10: r.anios[10].patrimonioInv, patrimonio_a31: r.anios[Math.min(31, r.anios.length - 1)].patrimonioInv, distribuciones: (IP.dists || []).filter(d => d.property_id === pid).map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
+}
+
+// ─── 💰 Movimiento del dinero — ledger unificado (RPC inv_ledger, RLS: solo SUS casas) ───
+async function ipLoadLedger(pid) {
+  const { data, error } = await sb.rpc('inv_ledger', { pid });
+  IP.ledger[pid] = error ? { err: error.message } : (data || []);
+  render();
+}
+function ipLedgerF(k, v) { IP.ledgerF[k] = v; render(); }
+window.ipLedgerF = ipLedgerF;
+function renderMoney(pid, inv) {
+  const led = IP.ledger[pid];
+  if (led === undefined) { ipLoadLedger(pid); return '<div class="empty">⏳ Armando el movimiento del dinero…</div>'; }
+  if (led.err) return '<div class="empty">Error: ' + esc(led.err) + '</div>';
+  if (!led.length) return '<div class="empty">Sin movimientos registrados todavía para esta casa.</div>';
+  // saldo acumulado sobre la línea de tiempo COMPLETA (los filtros no lo alteran)
+  let acum = 0;
+  const full = led.map(m => { acum += (m.tipo === 'ingreso' ? 1 : -1) * (+m.monto || 0); return { ...m, acum }; });
+  const tIng = led.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + +m.monto, 0);
+  const tGas = led.filter(m => m.tipo === 'gasto' && m.categoria !== 'distribucion').reduce((s, m) => s + +m.monto, 0);
+  const tDist = led.filter(m => m.categoria === 'distribucion').reduce((s, m) => s + +m.monto, 0);
+  const tRenta = led.filter(m => m.categoria === 'renta').reduce((s, m) => s + +m.monto, 0);
+  const tOper = led.filter(m => m.categoria === 'operativo').reduce((s, m) => s + +m.monto, 0);
+  const meses = [...new Set(led.map(m => String(m.fecha || '').slice(0, 7)))].sort().reverse();
+  const F = IP.ledgerF;
+  const rows = full.filter(m => (F.tipo === 'todos' || m.tipo === F.tipo) && (F.mes === 'todos' || String(m.fecha || '').startsWith(F.mes)));
+  const kpi = (lab, val, meta, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
+  const srcTag = f => '<span class="src' + (/manual/.test(f) ? ' sup' : '') + '" title="' + esc(f) + '">' + esc(String(f).split(':')[0]) + '</span>';
+  const sel = (campo, opts, cur) => '<select class="ibtn" style="padding:7px 10px" onchange="ipLedgerF(\'' + campo + '\', this.value)">' + opts.map(o => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+  return '<div class="grid k4">'
+    + kpi('Ingresos totales', $money(tIng), 'renta cobrada ' + $money(tRenta) + ' + financiación/cash-out', 'up')
+    + kpi('Gastos totales', $money(tGas), 'operativos ' + $money(tOper) + ' + inversión + financieros', 'down')
+    + kpi('Distribuido a vos', $money(tDist), 'distribuciones pagadas (100% tuyas)', 'up')
+    + kpi('Utilidad operativa · tu ' + $pct(inv), $money((tRenta - tOper) * inv), 'renta − gastos operativos de la casa × tu %; el resto de tu riqueza es equity + valorización (ver 🏠)', (tRenta - tOper) >= 0 ? 'up' : 'warn')
+    + '</div>'
+    + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Línea de tiempo · ' + led.length + ' movimientos</div><div class="k" style="display:flex;gap:6px">'
+    + sel('tipo', [['todos', 'Todos'], ['ingreso', '↑ Ingresos'], ['gasto', '↓ Gastos']], F.tipo)
+    + sel('mes', [['todos', 'Todos los meses']].concat(meses.map(m => [m, m])), F.mes)
+    + '</div></div>'
+    + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right">Saldo acum.</th><th>Fuente</th></tr></thead><tbody>'
+    + rows.slice().reverse().map(m => '<tr><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
+      + '<td>' + esc(m.concepto) + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">📎</a>' : '') + '</td>'
+      + '<td>' + esc(m.categoria) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '">' + $money(m.acum) + '</td>'
+      + '<td>' + srcTag(m.fuente) + '</td></tr>').join('')
+    + '</tbody></table></div>'
+    + '<div class="meta" style="margin-top:10px">Transparencia total de la casa: cada movimiento declara su fuente (FF = Fix & Flip · Rentas = property management · OS = registro del holding). Las distribuciones son 100% tuyas; la utilidad y el patrimonio se reparten a tu ' + $pct(inv) + '. El detalle operativo es de la casa completa. Los draws de remodelación vienen agregados (la fuente no fecha draw por draw).</div>'
+    + '</div>';
 }
 
 // ─── 💸 Distribuciones ───
