@@ -386,6 +386,34 @@ function rmRenderEditor(body) {
           </div>
         </div>
 
+        <!-- REGLA DEL DRAW (reunión 9-jul): del draw también salen intereses/servicios/muebles.
+             Capitol cobró $85k con solo $63,750 disponibles → déficit $36k. Esto lo evita. -->
+        ${(() => {
+          if (!window.CierreEngine) return '';
+          rmState.draw = rmState.draw || { total: 0, int: 0, serv: 0, mueb: 0 };
+          const dw = rmState.draw;
+          const p = CierreEngine.precioCobrar({ gastoInternoEsperado: e.pricing.internalCost, rentabilidadObjetivo: e.pricing.markup, drawsIngresados: dw.total, interesesDraw: dw.int, serviciosDraw: dw.serv, mueblesDraw: dw.mueb });
+          const brecha = p.brecha.valor;
+          const inp = (k, lbl) => '<div><label class="block text-[10px] text-slate-500">' + lbl + '</label><input type="number" step="100" value="' + (dw[k] || 0) + '" onchange="rmState.draw.' + k + '=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>';
+          return `
+            <div class="bg-white rounded-xl border-2 ${dw.total > 0 && brecha > 0 ? 'border-red-400' : 'border-slate-200'} p-4">
+              <h3 class="text-xs font-bold text-slate-700 uppercase mb-1">💰 Regla del draw — no cobrar de menos</h3>
+              <p class="text-[10px] text-slate-500 mb-2">Valor a cobrar = gasto interno esperado + rentabilidad objetivo + lo que sale del mismo draw (intereses + servicios + muebles).</p>
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                ${inp('total', 'Draws ingresados $')}${inp('int', 'Intereses del draw $')}${inp('serv', 'Servicios del draw $')}${inp('mueb', 'Muebles del draw $')}
+              </div>
+              <table class="w-full text-xs">
+                <tbody>
+                  <tr class="border-b border-slate-100"><td class="py-1 text-slate-500">Valor a COBRAR</td><td class="py-1 text-right font-bold">${rmFmt(p.valorACobrar.valor)}</td></tr>
+                  <tr class="border-b border-slate-100"><td class="py-1 text-slate-500">Monto real disponible del draw</td><td class="py-1 text-right font-bold">${dw.total > 0 ? rmFmt(p.montoRealDisponible.valor) : '—'}</td></tr>
+                  ${dw.total > 0 ? '<tr><td class="py-1 ' + (brecha > 0 ? 'text-red-600 font-bold' : 'text-emerald-600') + '">' + (brecha > 0 ? '⚠️ Brecha (el draw NO alcanza)' : '✓ El draw cubre lo cobrado') + '</td><td class="py-1 text-right font-bold ' + (brecha > 0 ? 'text-red-600' : 'text-emerald-600') + '">' + rmFmt(Math.abs(brecha)) + '</td></tr>' : ''}
+                </tbody>
+              </table>
+              ${dw.total > 0 && brecha > 0 ? '<div class="mt-2 text-[10px] text-red-700 font-semibold">Cobrar ' + rmFmt(p.valorACobrar.valor) + ' con solo ' + rmFmt(p.montoRealDisponible.valor) + ' disponibles = déficit que sale de la caja de F&F (caso Capitol: $36k). Pedí draw mayor o ajustá el precio.</div>' : ''}
+            </div>
+          `;
+        })()}
+
         <!-- CONTROLES PRICING -->
         <details class="bg-white rounded-xl border border-slate-200">
           <summary class="cursor-pointer p-3 text-xs font-bold uppercase text-slate-700 hover:bg-slate-50">⚙️ Ajustes de pricing</summary>
