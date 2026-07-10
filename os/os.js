@@ -38,6 +38,13 @@ const OS_EMPRESAS = {
     { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
     { k: 'reportes', name: 'Informes Ejecutivos', icon: '▤', fn: "osOpenApp('educacion','reportes')" },
   ] },
+  // Departamento IA: Pedir/Galería abiertos a todo usuario logueado; Bandeja gateada
+  // adentro del módulo (os/os-ia.js) por has_area('ia')/admin. Datos en Supabase (ia_*).
+  'ia': { key: 'ia', name: 'IA', icon: '🤖', tag: 'Pedidos · automatizaciones · galería', apps: [
+    { k: 'pedir', name: 'Pedir a la IA', icon: '📝', fn: "osiaGo('pedir')" },
+    { k: 'bandeja', name: 'Bandeja', icon: '📥', fn: "osiaGo('bandeja')" },
+    { k: 'galeria', name: 'Galería', icon: '🖼', fn: "osiaGo('galeria')" },
+  ] },
 };
 const OS_AREAS = {
   operacion: { name: 'Operación', icon: '⚙️', tag: 'Cronograma + cobranza · cruza todas las empresas' },
@@ -207,6 +214,7 @@ function osParse(path) {
   if (seg[0] === 'admin') return { view: 'admin' };
   if (seg[0] === 'inversionistas') return { view: 'invadmin' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
+  if (seg[0] === 'ia') { if (window.OSIA && seg[1]) OSIA.tab = seg[1]; return { view: 'empresa', empresa: 'ia' }; } // /ia/pedir|bandeja|galeria = tab del módulo
   if (OS_EMPRESAS[seg[0]]) {
     if (seg[1]) return { view: 'app', empresa: seg[0], app: seg[1], slug: seg[2] || null };
     return { view: 'empresa', empresa: seg[0] };
@@ -436,6 +444,7 @@ function osRouteGuard(r) {
   if (r.view === 'invadmin') need = ['fix-flip'];
   else if (r.view === 'operacion') need = ['operacion'];
   else if (r.view === 'contable') need = ['contable'];
+  else if (r.empresa === 'ia') need = null; // IA abierta a todo usuario logueado (Bandeja se gatea en el módulo)
   else if ((r.view === 'empresa' || r.view === 'app') && OS_EMPRESAS[r.empresa]) need = [OS_EMPRESAS[r.empresa].key];
   else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
   if (need && !need.some(osCanArea)) return need[0];
@@ -511,6 +520,7 @@ function osGlobal(comp) {
         ${unitCard('rentas', OS_EMPRESAS['rentas'], `<div class="kv"><span>Ocupación</span><b>${comp.rentas.occPct}%</b></div><div class="kv"><span>Ingresos/mes</span><b>${OS_K(comp.rentas.ingresos)}</b></div>`)}
         ${unitCard('remodelacion', OS_EMPRESAS['remodelacion'], `<div class="kv"><span>Obras activas</span><b>${comp.remodel.activas}</b></div><div class="kv"><span>Avance prom.</span><b>${comp.remodel.avance}%</b></div>`)}
         ${unitCard('educacion', OS_EMPRESAS['educacion'], `<div class="kv"><span>Alumnos activos</span><b>${comp.educacion ? comp.educacion.activos : '—'}</b></div><div class="kv"><span>Nuevos (30d)</span><b>${comp.educacion ? comp.educacion.nuevos : '—'}</b></div>`)}
+        <div class="card unit" data-osnav="/ia"><div class="ico">🤖</div><div class="un">IA</div><div class="ut">Pedidos · automatizaciones · galería</div><div class="kv"><span>Pedí algo a la IA</span><b>2 min</b></div><div class="kv"><span>Artefactos publicados</span><b>Galería</b></div><div class="go">Abrir IA →</div></div>
       </div>
       <div class="grid k2" style="margin-top:16px">${areaCards}</div></div>
       ${brain}
@@ -520,6 +530,7 @@ function osGlobal(comp) {
 // ─── NIVEL 2 · EMPRESA ───
 function osEmpresa(comp) {
   const e = OS_EMPRESAS[OS.route.empresa]; const emp = OS.route.empresa;
+  if (emp === 'ia') return window.osiaView ? osiaView() : `<div class="empty">Módulo IA no cargado (os/os-ia.js)</div>`;
   const isFF = emp === 'fix-and-flip', isR = emp === 'rentas', isRemo = emp === 'remodelacion', isEdu = emp === 'educacion';
   const kpis = isFF ? [['Deals activos', comp.ff.activos, `de ${comp.ff.deals} totales`], ['Capital desplegado', OS_M(comp.ff.capital), 'all-in (compra+remod+holding)'], ['ARV portafolio', OS_M(comp.ff.arv), ''], ['Alertas', comp.ff.alertas || '—', 'mismo conteo que el Command Center']]
     : isR ? [['Ocupación', comp.rentas.occPct + '%', `${comp.rentas.ocupadas}/${comp.rentas.unidades}`], ['Ingresos/mes', OS_M(comp.rentas.ingresos), comp.mb.label], ['Casas', comp.rentas.casas, ''], ['Deuda cobranza', OS_M(comp.cobranza.total), 'contrato − real']]

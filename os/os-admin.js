@@ -20,6 +20,7 @@ const OSA_AREAS = [
   { k: 'operacion', name: 'Operación', icon: '⚙️' },
   { k: 'contable', name: 'Contable', icon: '📒' },
   { k: 'education', name: 'Educación', icon: '🎓' },
+  { k: 'ia', name: 'IA (gestor de bandeja)', icon: '🤖' }, // Pedir/Galería son para todos; esta área da la Bandeja a no-admins
 ];
 const OSA_ROLES = [
   { k: 'admin', name: 'admin', desc: 've todo + gestiona usuarios' },

@@ -48,6 +48,7 @@ const BUNDLE_FILES = [
   "os/os-ct-sabueso.js",
   "os/inv-engine.js",
   "os/inv-admin.js",
+  "os/os-ia.js",
   "remodel-dashboard.js",
   "remodel-command-center.js",
   "remodel-reportes.js",

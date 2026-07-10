@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (9 Jul 2026 — 🤖 Departamento IA en /ia) · EN VIVO
+
+- 🤖 **Departamento IA** (ruta `/ia`, mismo nivel que Remodelación) — módulo `os/os-ia.js`, datos 100% Supabase (NO Airtable): `ia_requests` + `ia_artifacts` (migr `20260709120000`, soft-delete `activo`, sin DELETE policies). 3 vistas: **📝 Pedir** (form con nombre/área/descripción con dictado por voz Web Speech API 🎤/frecuencia/resultado deseado/ejemplo → insert; abajo "Pedidos" con estado), **📥 Bandeja** (gestores: estado nueva/en_revision/en_construccion/publicada/descartada + tipo prompt/dashboard/agente/automatizacion + impacto + nota, editable por fila, 🗑 soft-delete), **🖼 Galería** (artefactos publicados, buscador + filtro por área, gestores publican).
+- 🔐 **Acceso**: Pedir + Galería = todo usuario logueado (excepción explícita en `osRouteGuard`); Bandeja = `has_area('ia')` (admins pasan por el bypass; área `ia` asignable en el Panel de Admin → "IA (gestor de bandeja)"). RLS: insert `user_id=auth.uid()`, select propio o gestor; artifacts select `activo=true`, escrituras solo gestor.
+- ⚠️ **NAMESPACE**: el módulo usa `OSIA`/`osia*` — el prefijo `IA`/`ia*` ya lo ocupa `os/inv-admin.js`. Registrado en `OS_EMPRESAS['ia']`, card fija en el panel Global, `index.html` + `BUNDLE_FILES`. `/ia/<tab>` deep-linkea la vista.
+
+---
+
 ## 🎯 Estado (8 Jul 2026 · tarde — 💎 Motor CUADRA EXACTO con el Excel) · EN VIVO
 
 - ✅ **TIR 46.70% / VPN $186,668 EXACTOS** (targets del Excel "Renta VF" para Dove) — bug corregido en `fclPostRefi` (el año 1 metía el ciclo completo además del año 0 = cash atrapado, doble conteo → TIR 8.4%; ahora años 1-31 = operación post-refi). **Perfil de proyección configurable**: `postrefi_perfil` = `'motor'` (crecimiento apalancado) o `'plano'` (como el Excel). Calibración cerrada seedeada con `fuente='excel(calibrado)'`: `util_anual_postrefi=1941.55` ($161.80/mes; real $155) + `anio0_postrefi=4157.47` (real 4,612.90) — migr `20260708120000`. Al llegar la hoja real del Excel, se pisan esos 2 params en el admin y listo.
