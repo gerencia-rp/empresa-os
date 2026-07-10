@@ -38,12 +38,13 @@ const OS_EMPRESAS = {
     { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
     { k: 'reportes', name: 'Informes Ejecutivos', icon: '▤', fn: "osOpenApp('educacion','reportes')" },
   ] },
-  // Departamento IA: Pedir/Galería abiertos a todo usuario logueado; Bandeja gateada
-  // adentro del módulo (os/os-ia.js) por has_area('ia')/admin. Datos en Supabase (ia_*).
-  'ia': { key: 'ia', name: 'IA', icon: '🤖', tag: 'Pedidos · automatizaciones · galería', apps: [
-    { k: 'pedir', name: 'Pedir a la IA', icon: '📝', fn: "osiaGo('pedir')" },
-    { k: 'bandeja', name: 'Bandeja', icon: '📥', fn: "osiaGo('bandeja')" },
+  // Departamento IA v2 (fábrica): Crear/Galería abiertos a todo usuario logueado;
+  // Pendientes gateado adentro del módulo (os/os-ia.js) por has_area('ia')/admin.
+  // Edge function ia-builder (Claude) + Supabase ia_sessions/ia_artifacts/ia_specs.
+  'ia': { key: 'ia', name: 'IA', icon: '🏭', tag: 'Fábrica de herramientas · IA en vivo', apps: [
+    { k: 'crear', name: 'Crear herramienta', icon: '🏭', fn: "osiaGo('crear')" },
     { k: 'galeria', name: 'Galería', icon: '🖼', fn: "osiaGo('galeria')" },
+    { k: 'pendientes', name: 'Pendientes de OK', icon: '📥', fn: "osiaGo('pendientes')" },
   ] },
 };
 const OS_AREAS = {
@@ -520,7 +521,7 @@ function osGlobal(comp) {
         ${unitCard('rentas', OS_EMPRESAS['rentas'], `<div class="kv"><span>Ocupación</span><b>${comp.rentas.occPct}%</b></div><div class="kv"><span>Ingresos/mes</span><b>${OS_K(comp.rentas.ingresos)}</b></div>`)}
         ${unitCard('remodelacion', OS_EMPRESAS['remodelacion'], `<div class="kv"><span>Obras activas</span><b>${comp.remodel.activas}</b></div><div class="kv"><span>Avance prom.</span><b>${comp.remodel.avance}%</b></div>`)}
         ${unitCard('educacion', OS_EMPRESAS['educacion'], `<div class="kv"><span>Alumnos activos</span><b>${comp.educacion ? comp.educacion.activos : '—'}</b></div><div class="kv"><span>Nuevos (30d)</span><b>${comp.educacion ? comp.educacion.nuevos : '—'}</b></div>`)}
-        <div class="card unit" data-osnav="/ia"><div class="ico">🤖</div><div class="un">IA</div><div class="ut">Pedidos · automatizaciones · galería</div><div class="kv"><span>Pedí algo a la IA</span><b>2 min</b></div><div class="kv"><span>Artefactos publicados</span><b>Galería</b></div><div class="go">Abrir IA →</div></div>
+        <div class="card unit" data-osnav="/ia"><div class="ico">🏭</div><div class="un">IA</div><div class="ut">Fábrica de herramientas · IA en vivo</div><div class="kv"><span>Contá una tarea</span><b>y sale una herramienta</b></div><div class="kv"><span>Publicadas</span><b>Galería</b></div><div class="go">Abrir IA →</div></div>
       </div>
       <div class="grid k2" style="margin-top:16px">${areaCards}</div></div>
       ${brain}
