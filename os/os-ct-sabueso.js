@@ -284,7 +284,9 @@ function ctDueno(f) {
 // ─── Persistencia: upsert + auto-resolver lo que dejó de disparar ───
 async function ctPersist(run) {
   const nowISO = new Date().toISOString();
-  const rows = run.map(f => ({ check_id: f.check_id, empresa: f.empresa, clave: f.clave, titulo: f.titulo, detalle: f.detalle, fuente: f.fuente, impacto_usd: f.impacto_usd, severidad: f.severidad, last_seen: nowISO, active: true }));
+  const seen = new Set(); // dos findings con la misma (check,clave) rompen el upsert ("cannot affect row a second time")
+  const rows = run.filter(f => { const k = f.check_id + '|' + f.clave; if (seen.has(k)) return false; seen.add(k); return true; })
+    .map(f => ({ check_id: f.check_id, empresa: f.empresa, clave: f.clave, titulo: f.titulo, detalle: f.detalle, fuente: f.fuente, impacto_usd: f.impacto_usd, severidad: f.severidad, last_seen: nowISO, active: true }));
   for (let i = 0; i < rows.length; i += 50) {
     const { error } = await sb.from('ct_findings').upsert(rows.slice(i, i + 50), { onConflict: 'check_id,clave' });
     if (error) { CT.err = 'persist: ' + error.message; return; }
