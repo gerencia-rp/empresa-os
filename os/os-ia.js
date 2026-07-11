@@ -1,25 +1,30 @@
 // ════════════════════════════════════════════════════════════════
-// 🏭 DEPARTAMENTO IA v2 — FÁBRICA DE HERRAMIENTAS (ruta /ia del OS).
-// Chat con la edge function `ia-builder` (Claude en vivo): entrevista al
-// empleado y resuelve por 2 carriles — LIBRE publica un HTML autocontenido
-// al instante en la Galería; CON OK guarda un spec pendiente (ia_specs) que
-// construye un humano después. NUNCA auto-toca producción.
-// Seguridad de render: <iframe sandbox="allow-scripts"> SIN allow-same-origin
-// (origen opaco: sin localStorage/cookies/sesión, sin DOM del padre).
+// 🏭 DEPARTAMENTO IA v3 — FÁBRICA DE ARTEFACTOS guiada (Guía Maestra).
+// Wizard conversacional (una pregunta por vez, texto o voz) que llena la
+// FICHA DEL ARTEFACTO (10 campos, barra de progreso) → PROPUESTA con diagrama
+// (el empleado confirma) → BUILD con tests (caso de oro + borde, verificador
+// independiente) → DEMO en vivo (Probar) → PUBLICAR explícito a la Galería.
+// Carril CON OK (datos reales/plata/terceros): spec pendiente, nunca ejecuta.
+// Render seguro: <iframe sandbox="allow-scripts"> SIN allow-same-origin.
 // ⚠ NAMESPACE: OSIA/osia* — el prefijo IA/ia* lo ocupa os/inv-admin.js.
 // ════════════════════════════════════════════════════════════════
-const OSIA = { loaded: false, loading: false, err: null, arts: [], specs: [], tab: 'crear', q: '', fArea: '', me: '', chat: [], sessionId: null, busy: false, _rec: null };
+const OSIA = { loaded: false, loading: false, err: null, arts: [], specs: [], tab: 'crear', q: '', fArea: '', me: '', chat: [], sessionId: null, busy: false, busyMsg: '', stage: 'chat', ficha: {}, progreso: 0, propuesta: null, paquete: null, _rec: null };
 window.OSIA = OSIA;
 
-const OSIA_TIPO_LBL = { prompt: '💬 Prompt', dashboard: '📊 Calculadora', agente: '🤖 Asistente', automatizacion: '⚡ Automatización' };
+const OSIA_TIPO_LBL = { prompt: '💬 Generador', dashboard: '📊 Calculadora', agente: '🤖 Asistente', automatizacion: '⚡ Checklist/Flujo' };
 const OSIA_SPEC_ESTADOS = ['pendiente', 'aprobado', 'construido', 'descartado'];
 const OSIA_SPEC_CLS = { pendiente: 'b-warn', aprobado: 'b-ok', construido: 'b-ok', descartado: 'b-red' };
+const OSIA_FICHA = [
+  ['nombre', 'Nombre'], ['trabajo', 'El trabajo'], ['quien_cuando', 'Quién y cuándo'], ['inputs', 'Qué datos entran'],
+  ['reglas', 'Reglas'], ['resultado', 'Qué decide'], ['entregable', 'Cómo lo entrega'], ['ejemplos_oro', 'Ejemplos de oro'],
+  ['casos_borde', 'Casos borde'], ['no_debe', 'Qué NO hace'],
+];
 
 function osiaE(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function osiaCanManage() { return window.osCanArea ? osCanArea('ia') : false; }
 function osiaFecha(ts) { try { return new Date(ts).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }); } catch (e) { return ''; } }
 
-// ─── CSS propio ───
+// ─── CSS ───
 function osiaCSS() {
   if (document.getElementById('osia-styles')) return;
   const st = document.createElement('style'); st.id = 'osia-styles';
@@ -28,8 +33,11 @@ function osiaCSS() {
   #os-root .osia-tab{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);padding:8px 16px;border-radius:11px;cursor:pointer;font-size:12.5px;font-weight:600}
   #os-root .osia-tab:hover{color:var(--ink);border-color:var(--a2)}
   #os-root .osia-tab.on{color:var(--ink);border-color:var(--a2);background:linear-gradient(135deg,rgba(69,227,198,.12),rgba(79,141,255,.1))}
-  #os-root .osia-chat{display:flex;flex-direction:column;gap:10px;max-height:52vh;overflow-y:auto;padding:4px 2px}
-  #os-root .osia-b{max-width:86%;padding:11px 14px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  #os-root .osia-prog{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+  #os-root .osia-step{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--mut2);background:var(--glass);border:1px solid var(--glassb);border-radius:14px;padding:3px 9px}
+  #os-root .osia-step.ok{color:var(--pos);border-color:rgba(72,214,156,.4)}
+  #os-root .osia-chat{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow-y:auto;padding:4px 2px}
+  #os-root .osia-b{max-width:88%;padding:11px 14px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
   #os-root .osia-b.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3)}
   #os-root .osia-b.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)}
   #os-root .osia-b.think{color:var(--mut2);font-style:italic;align-self:flex-start}
@@ -40,12 +48,20 @@ function osiaCSS() {
   #os-root .osia-mic{background:var(--glass);border:1px solid var(--glassb);border-radius:10px;cursor:pointer;font-size:15px;padding:0 12px;color:var(--ink)}
   #os-root .osia-mic.rec{border-color:var(--neg);animation:osiapulse 1s infinite}
   @keyframes osiapulse{50%{opacity:.5}}
+  #os-root .osia-flow{display:flex;flex-direction:column;gap:0;margin:10px 0}
+  #os-root .osia-fbox{background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 13px;font-size:12px;line-height:1.4}
+  #os-root .osia-farr{text-align:center;color:var(--a2);font-size:13px;line-height:1.6}
+  #os-root .osia-bigbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:800;padding:12px 22px;border-radius:12px;cursor:pointer;font-size:13.5px}
+  #os-root .osia-ghostbtn{background:var(--glass);border:1px solid var(--glassb);color:var(--ink);font-weight:600;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:12.5px}
+  #os-root .osia-ghostbtn:hover{border-color:var(--a2)}
+  #os-root .osia-demo-fr{width:100%;height:380px;border:1px solid var(--glassb);border-radius:12px;background:#fff}
   #os-root .osia-in{background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:6px 9px;color:var(--ink);font-size:11.5px;outline:none;font-family:inherit;max-width:100%}
   #os-root .osia-frame-wrap{position:fixed;inset:0;z-index:1200;background:rgba(4,6,10,.72);display:flex;align-items:center;justify-content:center;padding:26px}
   #os-root .osia-frame-box{background:#fff;border-radius:14px;width:min(1080px,96vw);height:min(760px,92vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 40px 90px -30px rgba(0,0,0,.8)}
   #os-root .osia-frame-hd{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#f1f5fb;border-bottom:1px solid #dfe6f0;color:#0f1c2e;font-size:13px;font-weight:700}
   #os-root .osia-frame-hd .x{margin-left:auto;cursor:pointer;border:none;background:#e3e9f3;border-radius:8px;padding:5px 12px;font-size:12px;color:#0f1c2e}
   #os-root .osia-frame-box iframe{flex:1;border:none;width:100%;background:#fff}
+  #os-root .osia-frame-box .osia-doc{flex:1;overflow-y:auto;padding:22px 26px;color:#0f1c2e;font-size:13.5px;line-height:1.65;white-space:pre-wrap}
   #os-root .osia-spec-pre{background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;max-height:220px;overflow-y:auto;color:var(--mut)}`;
   document.head.appendChild(st);
 }
@@ -68,6 +84,13 @@ async function osiaLoad(force) {
   osRender();
 }
 window.osiaLoad = osiaLoad;
+async function osiaReloadData() {
+  const [ar, sp] = await Promise.all([
+    sb.from('ia_artifacts').select('id,titulo,area,tipo,descripcion,ruta,carril,solicitante,creado_at,activo').eq('activo', true).order('creado_at', { ascending: false }),
+    sb.from('ia_specs').select('*').eq('activo', true).order('creado_at', { ascending: false }),
+  ]);
+  OSIA.arts = ar.data || OSIA.arts; OSIA.specs = sp.data || OSIA.specs;
+}
 
 function osiaGo(tab) {
   OSIA.tab = tab;
@@ -76,10 +99,10 @@ function osiaGo(tab) {
 }
 window.osiaGo = osiaGo;
 
-// ─── VISTA (la despacha osEmpresa de os.js) ───
+// ─── VISTA raíz ───
 function osiaView() {
   osiaCSS();
-  if (OSIA.tab === 'pedir' || OSIA.tab === 'bandeja') OSIA.tab = OSIA.tab === 'bandeja' ? 'pendientes' : 'crear'; // rutas v1
+  if (OSIA.tab === 'pedir' || OSIA.tab === 'bandeja') OSIA.tab = OSIA.tab === 'bandeja' ? 'pendientes' : 'crear'; // rutas viejas
   const tab = OSIA.tab;
   if (!OSIA.loaded && !OSIA.loading && !OSIA.err) osiaLoad();
   const mgr = osiaCanManage();
@@ -87,9 +110,10 @@ function osiaView() {
   const tabBtn = (k, lbl) => '<button class="osia-tab ' + (tab === k ? 'on' : '') + '" onclick="osiaGo(\'' + k + '\')">' + lbl + '</button>';
   let body;
   if (OSIA.err) body = '<div class="empty"><div style="font-size:34px">⚠️</div><div class="down" style="margin-top:8px">' + osiaE(OSIA.err) + '</div></div>';
-  else if (!OSIA.loaded) body = '<div class="empty">⏳ Cargando la fábrica de herramientas…</div>';
+  else if (!OSIA.loaded) body = '<div class="empty">⏳ Cargando la fábrica…</div>';
   else body = tab === 'galeria' ? osiaGaleria() : tab === 'pendientes' ? (mgr ? osiaPendientes() : osiaNoAccess()) : osiaCrear();
-  return '<h1>🏭 IA <span>· Fábrica de herramientas</span></h1><div class="sub">Contale a la IA qué tarea querés resolver: te entrevista y construye la herramienta al instante — o la deja lista para aprobación si toca datos reales.</div>' +
+  if (tab === 'crear' && OSIA.stage === 'demo' && OSIA.paquete) requestAnimationFrame(osiaMountDemo);
+  return '<h1>🏭 IA <span>· Fábrica de artefactos</span></h1><div class="sub">Contale a la IA una tarea y salí con una herramienta probada: te entrevista, te muestra el plan, la construye y la probás antes de publicar.</div>' +
     '<div class="osia-tabs">' + tabBtn('crear', '🏭 Crear') + tabBtn('galeria', '🖼 Galería (' + OSIA.arts.length + ')') + (mgr ? tabBtn('pendientes', '📥 Pendientes de OK' + (nPend ? ' (' + nPend + ')' : '')) : '') + '</div>' + body;
 }
 window.osiaView = osiaView;
@@ -98,23 +122,79 @@ function osiaNoAccess() {
   return '<div class="empty"><div style="font-size:34px">🔒</div><div style="margin-top:8px">Los pendientes de OK son para gestores del área IA (o admins).</div></div>';
 }
 
-// ═══ 1) CREAR — chat con ia-builder ═══
+// ═══ 1) CREAR — wizard ═══
+function osiaProgressHTML() {
+  const f = OSIA.ficha || {};
+  return '<div class="osia-prog">' + OSIA_FICHA.map(p => {
+    const done = f[p[0]] && String(f[p[0]]).trim();
+    return '<span class="osia-step ' + (done ? 'ok' : '') + '">' + (done ? '✓' : '·') + ' ' + p[1] + '</span>';
+  }).join('') + '</div>';
+}
+
 function osiaCrear() {
   const hasVoice = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   const micBtn = hasVoice ? '<button type="button" class="osia-mic" id="osia-mic" onclick="osiaVoice()" title="Dictar por voz">🎤</button>' : '';
-  const hello = '<div class="osia-b a">¡Hola! Soy el builder del equipo. Contame qué tarea hacés (o querés dejar de hacer) y te armo una herramienta.\n\nEj: "cada semana calculo a mano cuánto le toca a cada trabajador" · "necesito un checklist de inspección de obra" · "quiero un generador de mensajes de cobro".</div>';
-  const nueva = OSIA.chat.length ? '<button class="ibtn" style="margin-left:auto" onclick="osiaNueva()">＋ Nueva conversación</button>' : '';
-  return '<div class="grid k2" style="align-items:start;grid-template-columns:1.6fr 1fr">' +
-    '<div class="card"><div class="chart-h"><div class="t">🏭 Construí tu herramienta</div>' + nueva + '</div>' +
+  const hello = '<div class="osia-b a">¡Hola! Contame una tarea que hagas seguido (o que te gustaría no hacer más) y la convertimos en una herramienta.\n\nEj: "calculo a mano cuánto cobrar cuando un inquilino entra a mitad de mes" · "necesito un checklist de inspección" · "armo mensajes de cobro uno por uno".</div>';
+  const nueva = OSIA.chat.length ? '<button class="ibtn" style="margin-left:auto" onclick="osiaNueva()">＋ Nueva</button>' : '';
+  const started = OSIA.chat.length > 0;
+  const propuestaCard = (OSIA.stage === 'propose' && OSIA.propuesta) ? osiaPropuestaHTML() : '';
+  const demoCard = (OSIA.stage === 'demo' && OSIA.paquete) ? osiaDemoHTML() : '';
+  const lateral = started ? osiaFichaCard() : osiaComoFunciona(hasVoice);
+  return '<div class="grid k2" style="align-items:start;grid-template-columns:1.65fr 1fr">' +
+    '<div><div class="card"><div class="chart-h"><div class="t">🏭 Construí tu artefacto</div>' + nueva + '</div>' +
+    (started ? osiaProgressHTML() : '') +
     '<div class="osia-chat" id="osia-chat">' + hello + osiaChatHTML() + '</div>' +
-    '<div class="osia-ask"><textarea id="osia-inp" placeholder="Describí la tarea… (Enter envía, Shift+Enter salto de línea)" onkeydown="osiaKey(event)"></textarea>' + micBtn + '<button class="cbtn" style="padding:0 18px" onclick="osiaSend()">Enviar</button></div></div>' +
-    '<div class="card"><div class="chart-h"><div class="t">Cómo funciona</div></div>' +
-    '<div class="kv"><span>1 · Contás la tarea</span><b>con tus palabras' + (hasVoice ? ' o por voz 🎤' : '') + '</b></div>' +
-    '<div class="kv"><span>2 · La IA te entrevista</span><b>4-5 preguntas cortas</b></div>' +
-    '<div class="kv"><span>3a · Herramienta libre</span><b>se publica al instante 🖼</b></div>' +
-    '<div class="kv"><span>3b · Toca datos reales</span><b>🔒 queda para OK del admin</b></div>' +
-    '<div class="meta" style="margin-top:12px">Carril libre = calculadoras, generadores de documentos, checklists, plantillas (los datos los ingresás vos). Todo lo que toque plata, Airtable, pagos o mensajes a terceros NUNCA se auto-construye: queda como spec pendiente de aprobación.</div></div></div>';
+    '<div class="osia-ask"><textarea id="osia-inp" placeholder="Contá tu tarea… (Enter envía, Shift+Enter salto de línea)" onkeydown="osiaKey(event)"></textarea>' + micBtn + '<button class="cbtn" style="padding:0 18px" onclick="osiaSend()">Enviar</button></div></div>' +
+    propuestaCard + demoCard + '</div>' + lateral + '</div>';
 }
+
+function osiaComoFunciona(hasVoice) {
+  return '<div class="card"><div class="chart-h"><div class="t">Cómo funciona</div></div>' +
+    '<div class="kv"><span>1 · Contás la tarea</span><b>con tus palabras' + (hasVoice ? ' o por voz 🎤' : '') + '</b></div>' +
+    '<div class="kv"><span>2 · Te entrevista</span><b>una pregunta por vez</b></div>' +
+    '<div class="kv"><span>3 · Te muestra el plan</span><b>y confirmás</b></div>' +
+    '<div class="kv"><span>4 · Lo construye y prueba</span><b>caso de oro + caso borde 🧪</b></div>' +
+    '<div class="kv"><span>5 · Lo probás vos</span><b>demo en vivo</b></div>' +
+    '<div class="kv"><span>6 · Publicar</span><b>queda en la Galería 🖼</b></div>' +
+    '<div class="meta" style="margin-top:12px">Si la herramienta necesita datos reales de la empresa (pagos, Airtable, mensajes a inquilinos…), no se construye sola: queda como pedido pendiente del OK de un admin. 🔒</div></div>';
+}
+
+function osiaFichaCard() {
+  const f = OSIA.ficha || {};
+  return '<div class="card"><div class="chart-h"><div class="t">📋 Ficha del artefacto</div><div class="k">' + (OSIA.progreso || 0) + '/10</div></div>' +
+    OSIA_FICHA.map(p => {
+      const v = f[p[0]] ? String(f[p[0]]) : '';
+      return '<div class="kv"><span>' + p[1] + '</span><b style="max-width:60%;font-weight:' + (v ? '600' : '400') + ';color:' + (v ? 'var(--ink)' : 'var(--mut2)') + '">' + (v ? osiaE(v.slice(0, 90)) + (v.length > 90 ? '…' : '') : '…') + '</b></div>';
+    }).join('') + '</div>';
+}
+
+function osiaPropuestaHTML() {
+  const p = OSIA.propuesta;
+  const flow = (p.pasos || []).map((s, i) => '<div class="osia-fbox"><b>' + (i + 1) + '.</b> ' + osiaE(s) + '</div>').join('<div class="osia-farr">↓</div>');
+  const carril = p.carril === 'ok'
+    ? '<span class="badge b-warn">🔒 necesita OK de un admin (usa datos reales)</span>'
+    : '<span class="badge b-ok">⚡ se construye y publica al instante</span>';
+  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">📐 Así lo voy a hacer</div>' + carril + '</div>' +
+    '<div class="meta" style="margin-bottom:6px">' + osiaE(p.resumen || '') + '</div>' +
+    '<div class="osia-flow">' + flow + '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+    '<button class="osia-bigbtn" onclick="osiaConfirm()">✅ Dale, construilo</button>' +
+    '<button class="osia-ghostbtn" onclick="osiaChange()">✏️ Quiero cambiar algo</button></div></div>';
+}
+
+function osiaDemoHTML() {
+  const p = OSIA.paquete;
+  const oro = p.caso_oro ? '<div class="kv"><span>🧪 Probalo con</span><b>' + osiaE(p.caso_oro.entrada || '') + '</b></div><div class="kv"><span>Debería dar</span><b>' + osiaE(p.caso_oro.salida_esperada || '') + '</b></div>' : '';
+  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">🎉 ' + osiaE(p.titulo || 'Tu artefacto') + '</div><span class="badge b-ok">pasó las 2 pruebas 🧪</span></div>' +
+    '<div class="meta" style="margin-bottom:8px">' + osiaE(p.resumen || '') + ' Jugá con el demo — cuando te convenza, publicalo. Si querés cambiar algo, escribilo en el chat de arriba.</div>' +
+    oro +
+    '<iframe class="osia-demo-fr" id="osia-demo-frame" sandbox="allow-scripts" style="margin-top:10px"></iframe>' +
+    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+    '<button class="osia-bigbtn" onclick="osiaPublicar()">🚀 Publicar en la Galería</button>' +
+    '<button class="osia-ghostbtn" onclick="osiaProbar()">▶ Probar en grande</button>' +
+    '<button class="osia-ghostbtn" onclick="osiaChange()">✏️ Pedir un cambio</button></div></div>';
+}
+function osiaMountDemo() { const fr = document.getElementById('osia-demo-frame'); if (fr && OSIA.paquete && !fr.srcdoc) fr.srcdoc = OSIA.paquete.html || ''; }
 
 function osiaChatHTML() {
   return OSIA.chat.map(m => {
@@ -124,22 +204,33 @@ function osiaChatHTML() {
     if (m.artifact) extra = '<div style="margin-top:9px"><button class="cbtn" style="padding:7px 14px" onclick="osiaAbrir(\'' + m.artifact.id + '\')">▶ Abrir "' + osiaE(m.artifact.titulo) + '"</button> <button class="ibtn" style="height:30px;padding:0 12px" onclick="osiaGo(\'galeria\')">Ver en Galería →</button></div>';
     if (m.spec) extra = '<div style="margin-top:8px"><span class="badge b-warn">🔒 pendiente de OK del admin</span></div>';
     return '<div class="osia-b a">' + osiaE(m.content) + extra + '</div>';
-  }).join('') + (OSIA.busy ? '<div class="osia-b think" id="osia-think">⏳ pensando / construyendo…</div>' : '');
+  }).join('') + (OSIA.busy ? '<div class="osia-b think" id="osia-think">' + osiaE(OSIA.busyMsg || '⏳ pensando…') + '</div>' : '');
 }
 function osiaPaintChat() { const el = document.getElementById('osia-chat'); if (el) { el.innerHTML = el.children[0].outerHTML + osiaChatHTML(); el.scrollTop = el.scrollHeight; } }
 
 function osiaKey(ev) { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); osiaSend(); } }
 window.osiaKey = osiaKey;
-function osiaNueva() { OSIA.chat = []; OSIA.sessionId = null; OSIA.busy = false; osRender(); }
+function osiaNueva() { OSIA.chat = []; OSIA.sessionId = null; OSIA.busy = false; OSIA.stage = 'chat'; OSIA.ficha = {}; OSIA.progreso = 0; OSIA.propuesta = null; OSIA.paquete = null; osRender(); }
 window.osiaNueva = osiaNueva;
+function osiaConfirm() { osiaSendMsg('✅ Confirmo, construilo así.', '🏗 Construyendo y probando tu artefacto… (puede tardar ~1 minuto)'); }
+window.osiaConfirm = osiaConfirm;
+function osiaChange() { const el = document.getElementById('osia-inp'); if (el) { el.placeholder = 'Contá qué querés cambiar…'; el.focus(); } }
+window.osiaChange = osiaChange;
 
 async function osiaSend() {
   const inp = document.getElementById('osia-inp');
   const msg = inp ? inp.value.trim() : '';
   if (!msg || OSIA.busy) return;
   inp.value = '';
+  const esperaBuild = OSIA.stage === 'propose' || OSIA.stage === 'demo';
+  await osiaSendMsg(msg, esperaBuild ? '🏗 Trabajando en tu artefacto… (puede tardar ~1 minuto)' : '⏳ pensando…');
+}
+window.osiaSend = osiaSend;
+
+async function osiaSendMsg(msg, busyMsg) {
+  if (OSIA.busy) return;
   OSIA.chat.push({ role: 'user', content: msg });
-  OSIA.busy = true; osiaPaintChat();
+  OSIA.busy = true; OSIA.busyMsg = busyMsg || '⏳ pensando…'; osiaPaintChat();
   try {
     const { data: sess } = await sb.auth.getSession();
     const token = sess && sess.session && sess.session.access_token;
@@ -152,35 +243,67 @@ async function osiaSend() {
     const j = await res.json().catch(() => ({}));
     if (!res.ok || !j.ok) throw new Error(j.error || ('Error ' + res.status));
     OSIA.sessionId = j.session_id || OSIA.sessionId;
-    if (j.action === 'published') {
-      OSIA.chat.push({ role: 'assistant', content: j.texto, artifact: j.artifact });
-      OSIA.sessionId = null; // sesión cerrada
-      await osiaReloadData();
-      if (j.artifact && j.artifact.html) { OSIA._lastHtml = { id: j.artifact.id, titulo: j.artifact.titulo, html: j.artifact.html }; }
-    } else if (j.action === 'spec') {
-      OSIA.chat.push({ role: 'assistant', content: j.texto, spec: true });
-      OSIA.sessionId = null;
-      await osiaReloadData();
-    } else {
+    OSIA.busy = false;
+    if (j.action === 'ask') {
+      OSIA.ficha = j.ficha || OSIA.ficha; OSIA.progreso = j.progreso ?? OSIA.progreso; OSIA.stage = 'chat'; OSIA.propuesta = null; OSIA.paquete = null;
       OSIA.chat.push({ role: 'assistant', content: j.texto });
-    }
+      osRender();
+    } else if (j.action === 'propose') {
+      OSIA.ficha = j.ficha || OSIA.ficha; OSIA.progreso = j.progreso ?? 10; OSIA.stage = 'propose';
+      OSIA.propuesta = { pasos: j.pasos || [], carril: j.carril, resumen: j.resumen }; OSIA.paquete = null;
+      OSIA.chat.push({ role: 'assistant', content: '📐 Te dejé la propuesta acá abajo — revisala y confirmame.' });
+      osRender();
+    } else if (j.action === 'demo') {
+      OSIA.stage = 'demo'; OSIA.paquete = j.paquete; OSIA.propuesta = null;
+      OSIA.chat.push({ role: 'assistant', content: j.texto });
+      osRender();
+    } else if (j.action === 'spec') {
+      OSIA.stage = 'chat'; OSIA.propuesta = null; OSIA.paquete = null; OSIA.sessionId = null;
+      OSIA.chat.push({ role: 'assistant', content: j.texto, spec: true });
+      await osiaReloadData(); osRender();
+    } else if (j.action === 'published') {
+      OSIA.stage = 'chat'; OSIA.sessionId = null;
+      OSIA.chat.push({ role: 'assistant', content: j.texto || '✅ Publicado.', artifact: j.artifact });
+      await osiaReloadData(); osRender();
+    } else { osRender(); }
   } catch (e) {
+    OSIA.busy = false;
     OSIA.chat.push({ role: 'err', content: '⚠️ ' + (e.message || String(e)) });
+    osiaPaintChat();
   }
-  OSIA.busy = false; osiaPaintChat();
   const el = document.getElementById('osia-inp'); if (el) el.focus();
 }
-window.osiaSend = osiaSend;
 
-async function osiaReloadData() {
-  const [ar, sp] = await Promise.all([
-    sb.from('ia_artifacts').select('id,titulo,area,tipo,descripcion,ruta,carril,solicitante,creado_at,activo').eq('activo', true).order('creado_at', { ascending: false }),
-    sb.from('ia_specs').select('*').eq('activo', true).order('creado_at', { ascending: false }),
-  ]);
-  OSIA.arts = ar.data || OSIA.arts; OSIA.specs = sp.data || OSIA.specs;
+async function osiaPublicar() {
+  if (OSIA.busy || !OSIA.sessionId) return;
+  OSIA.busy = true; OSIA.busyMsg = '🚀 Publicando…'; osiaPaintChat();
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess && sess.session && sess.session.access_token;
+    const res = await fetch(window.SUPABASE_URL + '/functions/v1/ia-builder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'publicar', session_id: OSIA.sessionId }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) throw new Error(j.error || ('Error ' + res.status));
+    OSIA.busy = false; OSIA.stage = 'chat';
+    OSIA._lastHtml = OSIA.paquete ? { id: j.artifact.id, titulo: j.artifact.titulo, html: OSIA.paquete.html } : null;
+    OSIA.paquete = null; OSIA.sessionId = null;
+    OSIA.chat.push({ role: 'assistant', content: '🚀 ¡Publicado! Ya está en la Galería para todo el equipo.', artifact: j.artifact });
+    await osiaReloadData(); osRender();
+  } catch (e) {
+    OSIA.busy = false;
+    OSIA.chat.push({ role: 'err', content: '⚠️ ' + (e.message || String(e)) });
+    osiaPaintChat();
+  }
 }
+window.osiaPublicar = osiaPublicar;
 
-// Dictado por voz (Web Speech API)
+function osiaProbar() { if (OSIA.paquete) osiaModalHtml(OSIA.paquete.titulo || 'Demo', OSIA.paquete.html || ''); }
+window.osiaProbar = osiaProbar;
+
+// Dictado por voz
 function osiaVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
@@ -199,7 +322,7 @@ window.osiaVoice = osiaVoice;
 function osiaGaleria() {
   const areas = ['', ...new Set(OSIA.arts.map(a => a.area).filter(Boolean))];
   const filtro = '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">' +
-    '<input class="osia-in" style="flex:1;min-width:200px;padding:9px 12px" placeholder="🔎 Buscar herramienta…" value="' + osiaE(OSIA.q) + '" oninput="osiaSetQ(this.value)">' +
+    '<input class="osia-in" style="flex:1;min-width:200px;padding:9px 12px" placeholder="🔎 Buscar artefacto…" value="' + osiaE(OSIA.q) + '" oninput="osiaSetQ(this.value)">' +
     '<select class="osia-in" style="padding:9px 12px" onchange="osiaSetArea(this.value)">' + areas.map(a => '<option value="' + osiaE(a) + '" ' + (OSIA.fArea === a ? 'selected' : '') + '>' + (a ? osiaE(a) : 'Todas las áreas') + '</option>').join('') + '</select></div>';
   return filtro + '<div id="osia-gal-list">' + osiaGalList() + '</div>';
 }
@@ -209,15 +332,16 @@ function osiaGalList() {
   const list = OSIA.arts
     .filter(a => !OSIA.fArea || a.area === OSIA.fArea)
     .filter(a => !q || ((a.titulo || '') + ' ' + (a.descripcion || '')).toLowerCase().includes(q));
-  if (!list.length) return '<div class="empty"><div style="font-size:34px">🖼</div><div style="margin-top:8px">Todavía no hay herramientas' + (q || OSIA.fArea ? ' con ese filtro' : '') + '. Creá la primera en 🏭 Crear.</div></div>';
+  if (!list.length) return '<div class="empty"><div style="font-size:34px">🖼</div><div style="margin-top:8px">Todavía no hay artefactos' + (q || OSIA.fArea ? ' con ese filtro' : '') + '. Creá el primero en 🏭 Crear.</div></div>';
   const card = a => '<div class="card"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
     (a.tipo ? '<span class="badge b-ok">' + (OSIA_TIPO_LBL[a.tipo] || a.tipo) + '</span>' : '') +
     (a.area ? '<span class="badge b-warn">' + osiaE(a.area) + '</span>' : '') +
     '<span class="meta" style="margin-left:auto">' + osiaFecha(a.creado_at) + '</span></div>' +
     '<div style="font-size:15px;font-weight:700;margin-top:10px">' + osiaE(a.titulo) + '</div>' +
     (a.descripcion ? '<div class="meta" style="margin-top:6px">' + osiaE(a.descripcion) + '</div>' : '') +
-    (a.solicitante ? '<div class="meta" style="margin-top:4px">pedida por ' + osiaE(a.solicitante) + '</div>' : '') +
-    '<div class="go" style="cursor:pointer" onclick="osiaAbrir(\'' + a.id + '\')">▶ Abrir herramienta</div>';
+    (a.solicitante ? '<div class="meta" style="margin-top:4px">pedido por ' + osiaE(a.solicitante) + '</div>' : '') +
+    '<div style="display:flex;gap:12px;margin-top:12px"><span class="go" style="cursor:pointer;margin-top:0" onclick="osiaAbrir(\'' + a.id + '\')">▶ Abrir</span>' +
+    '<span class="go" style="cursor:pointer;margin-top:0" onclick="osiaInstructivo(\'' + a.id + '\')">📖 Instructivo</span></div>';
   return '<div class="grid k3" style="align-items:start">' + list.map(a => card(a) + '</div>').join('') + '</div>';
 }
 function osiaSetQ(v) { OSIA.q = v; const el = document.getElementById('osia-gal-list'); if (el) el.innerHTML = osiaGalList(); }
@@ -225,8 +349,24 @@ window.osiaSetQ = osiaSetQ;
 function osiaSetArea(v) { OSIA.fArea = v; const el = document.getElementById('osia-gal-list'); if (el) el.innerHTML = osiaGalList(); }
 window.osiaSetArea = osiaSetArea;
 
-// Abrir artefacto: html → iframe SANDBOX (allow-scripts, SIN allow-same-origin);
-// legacy con `ruta` → navegar/abrir link.
+// Modal genérico (iframe sandbox o documento de texto)
+function osiaModalHtml(titulo, html, docText) {
+  osiaCSS(); osiaCerrar();
+  const wrap = document.createElement('div'); wrap.className = 'osia-frame-wrap'; wrap.id = 'osia-frame-wrap';
+  wrap.addEventListener('click', ev => { if (ev.target === wrap) osiaCerrar(); });
+  const box = document.createElement('div'); box.className = 'osia-frame-box';
+  const hd = document.createElement('div'); hd.className = 'osia-frame-hd';
+  hd.innerHTML = '<span>🏭 ' + osiaE(titulo) + '</span>' + (docText ? '' : '<span class="meta" style="font-weight:400">sandbox aislado</span>');
+  const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕ Cerrar'; x.onclick = osiaCerrar;
+  hd.appendChild(x); box.appendChild(hd);
+  if (docText) { const d = document.createElement('div'); d.className = 'osia-doc'; d.textContent = docText; box.appendChild(d); }
+  else { const fr = document.createElement('iframe'); fr.setAttribute('sandbox', 'allow-scripts'); fr.srcdoc = html; box.appendChild(fr); }
+  wrap.appendChild(box);
+  const root = document.getElementById('os-root') || document.body; root.appendChild(wrap);
+}
+function osiaCerrar() { const w = document.getElementById('osia-frame-wrap'); if (w) w.remove(); }
+window.osiaCerrar = osiaCerrar;
+
 async function osiaAbrir(id) {
   const meta = OSIA.arts.find(a => a.id === id) || {};
   let html = (OSIA._lastHtml && OSIA._lastHtml.id === id) ? OSIA._lastHtml.html : null;
@@ -236,23 +376,17 @@ async function osiaAbrir(id) {
     else if (data && data.ruta) { if (/^https?:/i.test(data.ruta)) window.open(data.ruta, '_blank'); else osNav(data.ruta); return; }
   }
   if (!html) { if (window.toast) toast('Este artefacto no tiene contenido para abrir', 'error'); return; }
-  osiaCSS();
-  const wrap = document.createElement('div'); wrap.className = 'osia-frame-wrap'; wrap.id = 'osia-frame-wrap';
-  wrap.addEventListener('click', ev => { if (ev.target === wrap) osiaCerrar(); });
-  const box = document.createElement('div'); box.className = 'osia-frame-box';
-  const hd = document.createElement('div'); hd.className = 'osia-frame-hd';
-  hd.innerHTML = '<span>🏭 ' + osiaE(meta.titulo || 'Herramienta') + '</span><span class="meta" style="font-weight:400">sandbox aislado</span>';
-  const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕ Cerrar'; x.onclick = osiaCerrar;
-  hd.appendChild(x);
-  const fr = document.createElement('iframe');
-  fr.setAttribute('sandbox', 'allow-scripts'); // SIN allow-same-origin: origen opaco, sin storage/cookies/sesión, sin DOM padre
-  fr.srcdoc = html;
-  box.appendChild(hd); box.appendChild(fr); wrap.appendChild(box);
-  const root = document.getElementById('os-root') || document.body; root.appendChild(wrap);
+  osiaModalHtml(meta.titulo || 'Artefacto', html);
 }
 window.osiaAbrir = osiaAbrir;
-function osiaCerrar() { const w = document.getElementById('osia-frame-wrap'); if (w) w.remove(); }
-window.osiaCerrar = osiaCerrar;
+
+async function osiaInstructivo(id) {
+  const meta = OSIA.arts.find(a => a.id === id) || {};
+  const { data } = await sb.from('ia_artifacts').select('instructivo,descripcion').eq('id', id).maybeSingle();
+  const txt = (data && data.instructivo) || (data && data.descripcion) || 'Este artefacto no tiene instructivo cargado.';
+  osiaModalHtml('Instructivo · ' + (meta.titulo || ''), '', txt);
+}
+window.osiaInstructivo = osiaInstructivo;
 
 // ═══ 3) PENDIENTES DE OK (gestores) ═══
 function osiaPendientes() {
@@ -271,7 +405,7 @@ function osiaPendientes() {
     '<div class="osia-spec-pre" style="margin-top:9px">' + osiaE(s.prompt_completo || '') + '</div>' +
     '<input class="osia-in" id="osia-sn-' + s.id + '" value="' + osiaE(s.nota || '') + '" placeholder="Nota (qué se decidió / dónde quedó construido)" style="margin-top:9px;width:100%">' +
     '</div>';
-  return '<div class="meta" style="margin-bottom:12px">Cada spec es el prompt COMPLETO para construir la herramienta (copiable → Claude Code). Nada de esto se ejecuta solo: siempre lo construye y aprueba un humano.</div>' + rows.map(row).join('');
+  return '<div class="meta" style="margin-bottom:12px">Cada spec es el prompt COMPLETO para construir el artefacto (copiable → Claude Code). Nada se ejecuta solo: siempre lo construye y aprueba un humano.</div>' + rows.map(row).join('');
 }
 
 async function osiaSpecSave(id) {

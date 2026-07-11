@@ -4,6 +4,13 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (11 Jul 2026 — 🏭 IA v3: FÁBRICA DE ARTEFACTOS guiada, Guía Maestra) · EN VIVO
+
+- 🧙 **Wizard sobre la v2**: `ia-builder` ahora sigue la Guía Maestra — entrevista UNA pregunta por vez que llena la **FICHA DEL ARTEFACTO (10 campos)** (tool `preguntar` devuelve la ficha cada turno → **barra de progreso 10 pasos real** en el front) → **`proponer`** (pasos del flujo + carril; el front dibuja el diagrama con cajas CSS y el empleado CONFIRMA antes de construir) → **`entregar_libre`** exige caso de oro + caso borde con `tests_pasan` + **verificador independiente** (Sonnet `claude-sonnet-4-6`, tool `veredicto`: lógica vs los 2 casos + caza hardcode; 1 auto-corrección con feedback `[VERIFICADOR]` dentro del mismo request) → estado **`demo`** (paquete en `ia_sessions.paquete_json`, iframe sandbox inline + "Probalo con: caso de oro") → **publicar es `{action:'publicar'}` explícito** (ya no auto-publica). Reglas duras del cerebro: un solo trabajo por artefacto, PROHIBIDO hardcode (datos = inputs), resultado LÓGICO (decisión, no volcado de datos), paquete = artefacto+diagrama+**instructivo** (botón 📖 en la Galería).
+- 🗄 Migr `20260711100000`: `ia_sessions` += `ficha_json`/`paquete_json` + estados `propuesta`/`demo`; `ia_artifacts` += `ficha_json`/`instructivo`. Rate limit subido a 30 msg/10min (el wizard usa ~8-12 turnos). E2E v3 en prod (`qa-ia-v3.mjs`): Prorrateo de Renta publicado (la IA detectó un error de matemática del usuario en el ejemplo de oro 💪) + WhatsApp/Airtable → propuesta carril OK → spec. Latencias: pregunta 4-15s · build+verificación ~56s.
+
+---
+
 ## 🎯 Estado (10 Jul 2026 — 🏭 IA v2: FÁBRICA DE HERRAMIENTAS con Claude en vivo) · EN VIVO
 
 - 🏭 **`/ia` es una fábrica, no un buzón**: chat → edge function **`ia-builder`** (Claude `claude-opus-4-8` vía `_shared/anthropic.ts`, tools forzadas `preguntar/publicar_libre/derivar_ok`) que ENTREVISTA al empleado (tarea/frecuencia/inputs/resultado/ejemplo, máx ~8 repreguntas) y clasifica en **2 carriles**: **LIBRE** (self-contained: calculadora/generador/checklist, cero datos reales/red/secretos) → genera HTML autocontenido y lo **publica al instante** en la Galería; **CON OK** (datos reales/plata/terceros) → NUNCA ejecuta: guarda el spec+prompt completo en `ia_specs` estado `pendiente` (lo construye un humano/Claude Code tras aprobar). E2E verificado en prod: conversor publicado en 30s · pedido WhatsApp+Airtable derivado a spec.
