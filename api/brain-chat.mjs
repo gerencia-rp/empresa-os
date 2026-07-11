@@ -5,7 +5,10 @@
 //   Se fusionó acá para no pasar el límite de 12 Serverless Functions del plan Hobby.
 //
 // La API key vive SOLO en el servidor. El navegador nunca la ve.
+// Parser (?resource=parse-doc): Capa 0 anti-tecleo — statements HML / facturas → JSON estructurado.
+//   Fusionado acá por el límite de 12 Serverless Functions. Requiere JWT válido (verifyAuth).
 import { recallMemories, embed, sbREST, vecLiteral } from './_brain.mjs';
+import { verifyAuth } from './_pm-auth.mjs';
 
 // ─── MEMORIA (pm_brain_memory) ───
 const MEM_TIPOS = ['hecho', 'decisión', 'aprendizaje', 'nota'];
@@ -105,9 +108,48 @@ SNAPSHOT DE SU INVERSIÓN (datos reales + proyección del modelo):
 ${snap}`;
 }
 
+// ─── PARSER DE DOCUMENTOS (Capa 0) — statement HML / factura → JSON. Nada se guarda acá:
+// el front lo mete en ct_doc_extracts como PROPUESTA y un humano aprueba. ───
+async function parseDocHandler(req, res) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+  const auth = await verifyAuth(req);
+  if (!auth.ok) { res.status(401).json({ error: 'Sesión requerida: ' + (auth.reason || '') }); return; }
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) { res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY en el servidor.' }); return; }
+  const b = jsonSafe(req.body, {}) || {};
+  const tipo = b.tipo === 'factura' ? 'factura' : 'hml_statement';
+  const data = String(b.data_base64 || '');
+  if (!data) { res.status(400).json({ error: 'Falta el documento (data_base64).' }); return; }
+  const mt = String(b.media_type || 'application/pdf');
+  const bloque = mt === 'application/pdf'
+    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
+    : { type: 'image', source: { type: 'base64', media_type: mt, data } };
+  const instr = tipo === 'hml_statement'
+    ? 'Extraé del statement del préstamo HML un JSON con EXACTAMENTE esta forma: {"casa": "dirección si aparece o null", "fecha_statement": "YYYY-MM-DD|null", "pago_mensual": número, "interes": número|null, "escrow_impound": número|null, "fees": [{"concepto": "...", "monto": número}], "extension": {"monto": número, "meses": número, "fecha": "YYYY-MM-DD"} | null, "notas": "..."}. REGLAS: el pago mensual es el que efectivamente se paga — si el statement trae "trust account reserve impound" (escrow), va INCLUIDO en pago_mensual y desglosado en escrow_impound. Si hay cargo de extensión/prórroga (extension fee, loan extension), va en extension. NO inventes números: lo que no esté, null.'
+    : 'Extraé de la factura/recibo un JSON con EXACTAMENTE esta forma: {"vendor": "...", "fecha": "YYYY-MM-DD|null", "total": número, "casa_sugerida": "dirección si aparece o null", "items": [{"descripcion": "...", "monto": número, "categoria": "material"|"mueble"|"herramienta"}], "mixta": true|false, "notas": "..."}. REGLAS: la categorización material/mueble/herramienta es OBLIGATORIA por ítem. Si la factura mezcla categorías (mixta=true), los ítems ya quedan partidos por categoría para cargarse como filas separadas con el mismo comprobante. NO inventes montos.';
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: MODEL, max_tokens: 2000,
+        system: 'Sos un extractor de datos financieros. Respondés ÚNICAMENTE el JSON pedido, sin markdown ni texto extra. Números como number (sin $ ni comas). Lo que no está en el documento es null — jamás inventar.',
+        messages: [{ role: 'user', content: [bloque, { type: 'text', text: instr }] }],
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { res.status(r.status).json({ error: d?.error?.message || ('Claude HTTP ' + r.status) }); return; }
+    const txt = (d.content || []).filter(x => x.type === 'text').map(x => x.text).join('').trim();
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) { res.status(422).json({ error: 'El parser no devolvió JSON.', raw: txt.slice(0, 500) }); return; }
+    res.status(200).json({ extract: JSON.parse(m[0]), tipo, usage: d.usage || null });
+  } catch (e) { res.status(502).json({ error: 'Parser: ' + (e.message || String(e)) }); }
+}
+
 export default async function handler(req, res) {
-  // Routing: ?resource=memory → CRUD de memoria; si no → chat.
+  // Routing: ?resource=memory → CRUD de memoria; ?resource=parse-doc → parser Capa 0; si no → chat.
   if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);
+  if ((req.query && req.query.resource) === 'parse-doc') return parseDocHandler(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {

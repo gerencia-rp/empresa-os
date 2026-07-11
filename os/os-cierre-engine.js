@@ -128,7 +128,7 @@
     const add = (check, empresa, clave, titulo, impacto, sev, fuente, detalle) =>
       F.push({ check_id: check, empresa, clave, titulo, impacto_usd: Math.round(Math.abs(impacto || 0)), severidad: sev, fuente, detalle: detalle || {} });
     const casa = a => (a || '').split(',')[0].trim();
-    const slug = a => (a || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 22);
+    const slug = a => (a || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 48); // 48: claves cortas colisionaban (upsert ON CONFLICT ×2)
     // matcher casa↔obra: el Personal en Campo usa solo la calle ("RAMBLE"), Remodel la dirección completa
     const letras = a => (a || '').toLowerCase().replace(/[^a-z]/g, '');
     const matchObra = (casaNombre, obras) => {

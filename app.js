@@ -1358,12 +1358,40 @@ function openInternalSystem(sys) {
   if (sys.type === 'clickup-dashboard') return openClickupDashboard(sys);
   if (sys.type === 'pm-dashboard') return openPMDashboard(sys);
   if (sys.type === 'pm-rental-mgmt') return openPmSystem();
-  // Educación — 4 sistemas (Mentorías Manager, Presentaciones IA, Informes, Metodología FlipMentoría)
-  if (sys.type === 'edu-manager' || sys.type === 'mentorship-mgr') return openEduManager(sys);
-  if (sys.type === 'edu-presentations') return openEduPresentationsSystem(sys);
-  if (sys.type === 'edu-reports') return openEduReportsSystem(sys);
-  if (sys.type === 'edu-methodology') return openEduMethodologySystem(sys);
-  if (sys.type === 'edu-whatsapp') return openEduWhatsappSystem(sys);
+  // Educación — DESACTIVADO (2026-07): el cockpit se movió a Fliptrack (/admin/educacion).
+  // El portal del alumno (/diag + /mi-plan) sigue vivo acá — es autónomo
+  // (edge fn edu-generate-plan-from-invite genera el plan al completar el diagnóstico).
+  const EDU_TYPES = ['edu-manager', 'mentorship-mgr', 'edu-presentations', 'edu-reports', 'edu-methodology', 'edu-whatsapp'];
+  if (EDU_TYPES.includes(sys.type)) return openEduMovedNotice(sys);
+}
+
+// Aviso de migración Educación → Fliptrack, con acceso legacy de emergencia.
+function openEduMovedNotice(sys) {
+  window._eduLegacySys = sys; // sys real de la card, para el acceso legacy
+  const FLIPTRACK_URL = 'https://fliptrack-two.vercel.app/admin/educacion';
+  openModal('🎓 Educación se movió a Fliptrack', `
+    <div class="space-y-4 text-sm">
+      <p class="text-base">El cockpit de la mentoría (Manager, Reportes, Metodología, WhatsApp) ahora vive en <b>Fliptrack</b>. Este sistema quedó desactivado.</p>
+      <a href="${FLIPTRACK_URL}" target="_blank" rel="noopener"
+         class="block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl px-4 py-3">
+        Abrir Fliptrack → /admin/educacion
+      </a>
+      <p class="text-slate-400">Los links de diagnóstico ya enviados (<code>/diag</code>) y los planes de los alumnos (<code>/mi-plan</code>) <b>siguen funcionando</b> — no dependen de este panel.</p>
+      <button onclick="closeModal(); _openEduLegacy('${sys.type}')"
+              class="text-xs text-slate-500 hover:text-slate-300 underline">
+        Abrir versión legacy por única vez (solo emergencias)
+      </button>
+    </div>
+  `, { size: 'md' });
+}
+
+function _openEduLegacy(type) {
+  const sys = (window._eduLegacySys && window._eduLegacySys.type === type) ? window._eduLegacySys : { type };
+  if (type === 'edu-manager' || type === 'mentorship-mgr') return openEduManager(sys);
+  if (type === 'edu-presentations') return openEduPresentationsSystem(sys);
+  if (type === 'edu-reports') return openEduReportsSystem(sys);
+  if (type === 'edu-methodology') return openEduMethodologySystem(sys);
+  if (type === 'edu-whatsapp') return openEduWhatsappSystem(sys);
 }
 
 // ============================================================

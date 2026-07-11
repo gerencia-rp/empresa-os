@@ -45,6 +45,7 @@ const BUNDLE_FILES = [
   "pm/ff-underwriting.js",
   "os/os.js",
   "os/os-admin.js",
+  "os/os-cierre-engine.js",
   "os/os-ct-sabueso.js",
   "os/inv-engine.js",
   "os/inv-admin.js",
