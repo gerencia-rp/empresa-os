@@ -54,8 +54,18 @@ function ffUwDefaults() {
     remod_directo: 0, usar_estimador: false, est_sqft: 1400, est_tipo: 'media',
     meses_hold: 6, utilities_mes: 250, muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
     contingencia_pct: UWc('draw_contingencia_pct', 10), permisos: 1500, dumpster: 800, ac: 0,
-    // cash to close
-    purchase: 0, hml_finance_pct: 90, closing_costs: UWc('ctc_closing_default', 16052), earnest: 5000,
+    // 1B · El inversionista pone (HUD-1, defaults calibrados con el HUD de Bethune)
+    purchase: 0, hml_finance_pct: 90,
+    //   fees prestamista
+    cc_origination_pct: UWc('cc_origination_pct', 1.5), cc_documentation: UWc('cc_documentation', 1495),
+    cc_draw_fee: UWc('cc_draw_fee', 500), cc_underwriting: UWc('cc_underwriting', 995), cc_prepaid_interest: UWc('cc_prepaid_interest', 2042.40),
+    //   título / escrow / registro (~$3,400 típico)
+    cc_title: UWc('cc_title', 2050), cc_escrow: UWc('cc_escrow', 550), cc_recording: UWc('cc_recording', 250),
+    cc_ucc: UWc('cc_ucc', 150), cc_courier: UWc('cc_courier', 100), cc_guaranty: UWc('cc_guaranty', 300),
+    //   wholesale (opcional)
+    wholesale: false, cc_assignment: 0,
+    //   créditos — se ACREDITAN al cierre (earnest/option ya pagados + proración de impuestos)
+    earnest: 5000, option_fee: 0, prorata_impuestos: 0,
     // otras calc (se llenan en 2-6)
     arv: 0, appraisal: 0, ltv_pct: 75, payoff: 0,
     renta_mensual: 0, gastos_mensuales: 0,
@@ -73,7 +83,7 @@ function ffUwCargarCasa(dealId) {
   inp.arv_airtable = +d.arv || 0;                  // FIX 3b: ARV de Airtable = fuente única
   inp.arv = +d.arv || 0; inp.appraisal = +d.appraisal || 0;
   inp.cashout_en_draw = 0;
-  inp.closing_costs = +h.gastos_cierre || UWc('ctc_closing_default', 16052);
+  inp._closing_real = +h.gastos_cierre || null;   // ancla real del HUD (Airtable) p/ comparar con las líneas
   inp.renta_mensual = +d.renta_mensual || 0; inp.gastos_mensuales = +d.gastos_mensuales || 0;
   inp.payoff = +h.monto_hml || 0;
   if (h.cash_to_close) inp._ctc_real = +h.cash_to_close;   // ancla real para calibrar
@@ -117,11 +127,26 @@ function ffUwCalcNegocio(inp) {
   const psfDraw = (+inp.est_sqft > 0) ? remod / +inp.est_sqft : null;
   const psfAlerta = UWc('deficit_alert_psf', 60);
   const deficitRiesgo = psfDraw != null && psfDraw < psfAlerta;
-  // 1B · Cash to close = (compra − financia Harmony) + closing + earnest
-  const financia = Math.round((+inp.purchase || 0) * ((+inp.hml_finance_pct || 90) / 100));
-  const downPayment = (+inp.purchase || 0) - financia;
-  const cashToClose = downPayment + (+inp.closing_costs || 0) + (+inp.earnest || 0);
-  return { remod, intereses, utilities, contingencia, draw, psfDraw: psfDraw ? Math.round(psfDraw) : null, psfAlerta, deficitRiesgo, financia, downPayment, closing: +inp.closing_costs || 0, earnest: +inp.earnest || 0, cashToClose, ctcReal: inp._ctc_real || null };
+  // 1B · EL INVERSIONISTA PONE (HUD-1, calibrado con Bethune):
+  //   Base = compra + rehab draw · Préstamo = Base × %financia (90% Harmony típico, 100% permitido)
+  //   Inversionista pone = Down + gastos de cierre − créditos (earnest + option + proración: se ACREDITAN, no se suman)
+  const R2 = n => Math.round(n * 100) / 100;
+  const pctFin = Math.min(100, Math.max(0, +inp.hml_finance_pct || 90)) / 100;
+  const financia = Math.round((+inp.purchase || 0) * pctFin);   // legado: base de intereses (calc 4)
+  const baseHud = (+inp.purchase || 0) + remod;                 // rehab holdback = la obra (Bethune: 240k+170k=410k); intereses/utilities NO van en el loan amount
+  const prestamo = R2(baseHud * pctFin);
+  const downPayment = R2(baseHud - prestamo);
+  const origination = R2(prestamo * ((+inp.cc_origination_pct || 0) / 100));
+  const feesPrestamista = R2(origination + (+inp.cc_documentation || 0) + (+inp.cc_draw_fee || 0) + (+inp.cc_underwriting || 0) + (+inp.cc_prepaid_interest || 0));
+  const feesTitulo = R2((+inp.cc_title || 0) + (+inp.cc_escrow || 0) + (+inp.cc_recording || 0) + (+inp.cc_ucc || 0) + (+inp.cc_courier || 0) + (+inp.cc_guaranty || 0));
+  const assignment = inp.wholesale ? (+inp.cc_assignment || 0) : 0;
+  const closing = R2(feesPrestamista + feesTitulo + assignment);
+  const creditos = R2((+inp.earnest || 0) + (+inp.option_fee || 0) + (+inp.prorata_impuestos || 0));
+  const cashToClose = R2(downPayment + closing - creditos);
+  const yaPagado = R2((+inp.earnest || 0) + (+inp.option_fee || 0));
+  return { remod, intereses, utilities, contingencia, draw, psfDraw: psfDraw ? Math.round(psfDraw) : null, psfAlerta, deficitRiesgo,
+    financia, baseHud, prestamo, downPayment, origination, feesPrestamista, feesTitulo, assignment, closing, creditos, yaPagado, cashToClose,
+    earnest: +inp.earnest || 0, ctcReal: inp._ctc_real || null, closingReal: inp._closing_real || null };
 }
 // ═══ CALCULADORA 2 · ARV ═══
 function ffUwCalcArv(inp) {
@@ -221,7 +246,9 @@ function ffUwSubBody() {
 }
 // ─── helpers de diseño (premium, legible para no-expertos) ───
 const UW_DLR = '\u0024';
-const UW_FMT = (val, tipo) => { const n = +val || 0; if (tipo === 'money') return n === 0 ? '' : Math.round(n).toLocaleString('en-US'); if (tipo === 'pct') return n === 0 ? '' : n; return val === 0 ? '' : val; };
+const UW_FMT = (val, tipo) => { const n = +val || 0; if (tipo === 'money') return n === 0 ? '' : (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }); if (tipo === 'pct') return n === 0 ? '' : n; return val === 0 ? '' : val; };
+// formato con centavos (fidelidad HUD) — solo cuando los hay
+const UW_M2 = n => { if (n == null || isNaN(n)) return '—'; const r = Math.round(n * 100) / 100; const c = Math.abs(r - Math.round(r)) >= 0.005; return (r < 0 ? '-$' : '$') + Math.abs(r).toLocaleString('en-US', { minimumFractionDigits: c ? 2 : 0, maximumFractionDigits: c ? 2 : 0 }); };
 function UW_IN(lab, k, val, opts) {
   opts = opts || {}; const tipo = opts.tipo || (/pct|_pct$/.test(k) ? 'pct' : (/sqft|meses|hold/.test(k) ? 'num' : 'money'));
   const pre = tipo === 'money' ? UW_DLR : '', suf = tipo === 'pct' ? '%' : '';
@@ -253,11 +280,32 @@ function ffUwViewNegocio() {
     UW_BLOCK('Remodelación', estToggle + estBox) +
     UW_BLOCK('Holding e intereses', UW_IN('Meses de hold', 'meses_hold', inp.meses_hold, { tipo: 'num', help: 'Cuántos meses vas a tener el préstamo antes del refi/venta' }) + UW_IN('Precio de compra', 'purchase', inp.purchase, { help: 'Para calcular intereses y cash to close' }) + UW_IN('% que financia el Harmony', 'hml_finance_pct', inp.hml_finance_pct, { help: 'Porcentaje de la compra que pone el prestamista. Varía por deal.' }) + UW_IN('Utilities por mes', 'utilities_mes', inp.utilities_mes)) +
     UW_BLOCK('Muebles y otros', '<div class="grid k2" style="gap:8px">' + UW_IN('Muebles / staging', 'muebles', inp.muebles) + UW_IN('Appraisal', 'appraisal_cost', inp.appraisal_cost) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Cash-out en el draw', 'cashout_en_draw', inp.cashout_en_draw) + UW_IN('Permisos', 'permisos', inp.permisos) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Dumpster', 'dumpster', inp.dumpster) + UW_IN('AC / HVAC', 'ac', inp.ac) + '</div>' + UW_IN('Contingencia', 'contingencia_pct', inp.contingencia_pct, { help: 'Colchón sobre el subtotal por imprevistos' })));
+  // 1B · inputs HUD (fórmula calibrada con el HUD-1 de Bethune)
+  const whToggle = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><button class="repbtn ' + (inp.wholesale ? '' : 'ghost') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'wholesale\',' + (inp.wholesale ? 'false' : 'true') + ')">' + (inp.wholesale ? '☑' : '☐') + ' Deal por wholesaler</button><span style="font-size:10px;color:var(--txt3,#9fb0c9)">assignment fee al cierre (Bethune: $40,000)</span></div>';
+  const izqHud = UW_CARD('1B &middot; El inversionista pone (HUD)', 'Base = compra + rehab draw &middot; préstamo = base &times; %financia &middot; pone = down + gastos de cierre &minus; créditos.',
+    UW_BLOCK('Financiación', UW_IN('% que financia el prestamista', 'hml_finance_pct', inp.hml_finance_pct, { help: 'Sobre la BASE (compra + rehab draw). Default 90% Harmony; se permite 100% (Bethune).' })) +
+    UW_BLOCK('Fees prestamista', UW_IN('Origination (% del préstamo)', 'cc_origination_pct', inp.cc_origination_pct, { hint: UW_M2(r.origination) + ' sobre préstamo ' + UW_M(r.prestamo) }) + '<div class="grid k2" style="gap:8px">' + UW_IN('Documentation', 'cc_documentation', inp.cc_documentation) + UW_IN('Draw fee', 'cc_draw_fee', inp.cc_draw_fee) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Underwriting', 'cc_underwriting', inp.cc_underwriting) + UW_IN('Prepaid interest', 'cc_prepaid_interest', inp.cc_prepaid_interest) + '</div>') +
+    UW_BLOCK('Título / escrow / registro', '<div class="grid k2" style="gap:8px">' + UW_IN('Title insurance', 'cc_title', inp.cc_title) + UW_IN('Escrow fee', 'cc_escrow', inp.cc_escrow) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Recording', 'cc_recording', inp.cc_recording) + UW_IN('UCC', 'cc_ucc', inp.cc_ucc) + '</div><div class="grid k2" style="gap:8px">' + UW_IN('Courier', 'cc_courier', inp.cc_courier) + UW_IN('Guaranty', 'cc_guaranty', inp.cc_guaranty) + '</div><div style="font-size:10px;color:var(--txt3,#9fb0c9)">grupo típico ~$3,400 (HUD Bethune)</div>') +
+    UW_BLOCK('Wholesale (opcional)', whToggle + (inp.wholesale ? UW_IN('Assignment fee', 'cc_assignment', inp.cc_assignment) : '')) +
+    UW_BLOCK('Créditos al cierre', '<div class="grid k2" style="gap:8px">' + UW_IN('Earnest money', 'earnest', inp.earnest, { help: 'Se paga al inicio y se ACREDITA al cierre — no suma al total, ya lo pusiste antes.' }) + UW_IN('Option fee', 'option_fee', inp.option_fee, { help: 'Igual que el earnest: pagado al inicio, acreditado al cierre.' }) + '</div>' + UW_IN('Proración de impuestos', 'prorata_impuestos', inp.prorata_impuestos, { help: 'Crédito del vendedor por impuestos del año en curso (HUD línea de prorations).' })));
   const der = UW_HERO('Draw al Harmony', UW_M(r.draw), 'lo que el prestamista desembolsa', 'var(--a1,#12b5a0)') +
     '<div class="card" style="padding:16px">' + UW_ROW('Remodelación', r.remod) + UW_ROW('Intereses (' + inp.meses_hold + 'm)', r.intereses) + UW_ROW('Utilities', r.utilities) + UW_ROW('Muebles', +inp.muebles) + UW_ROW('Appraisal', +inp.appraisal_cost) + (+inp.cashout_en_draw > 0 ? UW_ROW('Cash-out incluido', +inp.cashout_en_draw) : '') + UW_ROW('Permisos + dumpster + AC', (+inp.permisos) + (+inp.dumpster) + (+inp.ac)) + UW_ROW('Contingencia (' + inp.contingencia_pct + '%)', r.contingencia) + UW_ROW('Draw total', r.draw, 'tot') + alerta + '</div>' +
-    UW_HERO('El inversionista pone', UW_M(r.cashToClose), 'cash to close (1B)', 'var(--a2,#2f6ef0)') +
-    '<div class="card" style="padding:16px">' + UW_ROW('Compra', +inp.purchase) + UW_ROW('&minus; Financia el Harmony (' + inp.hml_finance_pct + '%)', -r.financia) + UW_ROW('= Down payment', r.downPayment) + UW_ROW('+ Closing costs', r.closing) + UW_ROW('+ Earnest money', r.earnest) + UW_ROW('El inversionista pone', r.cashToClose, 'tot') + (r.ctcReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Cash to close real (Airtable): ' + UW_M(r.ctcReal) + ' &middot; &Delta; ' + UW_M(r.cashToClose - r.ctcReal) + '</div>' : '') + '</div>';
-  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
+    UW_HERO('El inversionista pone', UW_M2(r.cashToClose), 'down + gastos de cierre &minus; créditos (HUD)', 'var(--a2,#2f6ef0)') +
+    '<div class="card" style="padding:16px">'
+    + UW_ROW('Base (compra ' + UW_M(+inp.purchase) + ' + rehab ' + UW_M(r.remod) + ')', r.baseHud)
+    + UW_ROW('&minus; Préstamo (' + inp.hml_finance_pct + '% de la base)', -r.prestamo)
+    + UW_ROW('= Down payment', r.downPayment, 'tot')
+    + '<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin:10px 0 2px">+ Gastos de cierre</div>'
+    + UW_ROW('&nbsp;&nbsp;Fees prestamista (orig ' + UW_M2(r.origination) + ' + doc + draw + uw + prepaid)', r.feesPrestamista)
+    + UW_ROW('&nbsp;&nbsp;Título / escrow / registro', r.feesTitulo)
+    + (inp.wholesale ? UW_ROW('&nbsp;&nbsp;Assignment fee (wholesaler)', r.assignment) : '')
+    + UW_ROW('&nbsp;&nbsp;Subtotal gastos de cierre', r.closing, 'tot')
+    + UW_ROW('&minus; Créditos (earnest + option + proración)', -r.creditos, 'down')
+    + UW_ROW('EL INVERSIONISTA PONE', r.cashToClose, 'tot')
+    + '<div style="font-size:11px;color:var(--txt2,#c9d5ea);margin-top:8px;background:rgba(47,110,240,.08);border-radius:8px;padding:8px 10px">Ya pagado como earnest/option: <b>' + UW_M2(r.yaPagado) + '</b> (acreditado) &middot; falta al cierre: <b>' + UW_M2(r.cashToClose) + '</b></div>'
+    + (r.ctcReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Cash to close real (Airtable): ' + UW_M(r.ctcReal) + ' &middot; &Delta; ' + UW_M(r.cashToClose - r.ctcReal) + '</div>' : '')
+    + (r.closingReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:2px">Gastos de cierre reales (Airtable): ' + UW_M(r.closingReal) + ' &middot; &Delta; ' + UW_M(r.closing - r.closingReal) + '</div>' : '') + '</div>';
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + izqHud + '</div><div>' + der + '</div></div>';
 }
 function ffUwRender() {
   const el = document.getElementById('ff-uw-body');
@@ -277,11 +325,11 @@ function ffUwViewArv() {
 }
 function ffUwViewCashout() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), c = o.cashout;
-  const hero = UW_HERO('Cash-out del refi', UW_M(c.cashOut), c.recuperaPct != null ? 'recupera ' + c.recuperaPct + '% del cash to close' : '', c.cashOut >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
+  const hero = UW_HERO('Cash-out del refi', UW_M(c.cashOut), c.recuperaPct != null ? 'recupera ' + c.recuperaPct + '% de lo que puso el inversionista (HUD)' : '', c.cashOut >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
   const izq = UW_CARD('3 &middot; Cash-Out (refinanciación)', 'Cuánto capital recuperás al refinanciar. min(ARV, appraisal) &times; LTV &minus; payoff.',
     UW_BLOCK('Parámetros del refi', UW_IN('LTV del refi', 'ltv_pct', inp.ltv_pct, { help: 'Loan-to-value que da el prestamista del refi (' + UWc('cashout_ltv_pct', 75) + '–' + UWc('cashout_ltv_max', 80) + '%)' }) + UW_IN('Payoff (saldo Harmony)', 'payoff', inp.payoff, { help: 'Lo que se le debe al Harmony y hay que pagar con el refi' })) +
     '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Base = min(ARV ' + UW_M(o.arv.probable) + ', appraisal ' + UW_M(inp.appraisal) + ') = <b>' + UW_M(c.base) + '</b></div>');
-  const der = hero + '<div class="card" style="padding:16px">' + UW_ROW('Base (min ARV/appraisal)', c.base) + UW_ROW('&times; LTV (' + c.ltv + '%)', c.prestamoRefi) + UW_ROW('&minus; Payoff Harmony', -c.payoff) + UW_ROW('Cash-out', c.cashOut, c.cashOut >= 0 ? 'up' : 'down') + '</div>' + UW_HERO('Capital recuperado', c.recuperaPct != null ? c.recuperaPct + '%' : '—', 'cash-out &divide; cash to close ' + UW_M(c.ctc), c.recuperaPct >= 100 ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
+  const der = hero + '<div class="card" style="padding:16px">' + UW_ROW('Base (min ARV/appraisal)', c.base) + UW_ROW('&times; LTV (' + c.ltv + '%)', c.prestamoRefi) + UW_ROW('&minus; Payoff Harmony', -c.payoff) + UW_ROW('Cash-out', c.cashOut, c.cashOut >= 0 ? 'up' : 'down') + '</div>' + UW_HERO('Capital recuperado', c.recuperaPct != null ? c.recuperaPct + '%' : '—', 'cash-out &divide; lo que puso el inversionista ' + UW_M2(c.ctc) + ' (HUD)', c.recuperaPct >= 100 ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
   return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwViewIntereses() {
@@ -307,9 +355,9 @@ function ffUwViewUnificada() {
   const verColor = u.veredicto === 'GO' ? 'var(--pos,#34d399)' : u.veredicto === 'NO-GO' ? 'var(--neg,#f87171)' : 'var(--amber,#e7b65e)';
   const kpi = (l, v, sub) => '<div class="card kpi" style="padding:16px"><div class="lab">' + l + '</div><div class="big">' + v + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
   return '<div class="card" style="text-align:center;padding:24px;border:2px solid ' + verColor + '"><div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Veredicto del deal</div><div style="font-size:46px;font-weight:800;color:' + verColor + '">' + u.veredicto + '</div><div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">' + chip(u.gAllIn, 'all-in &le;' + u.allInMax + '% ARV') + chip(u.gDeficit, 'sin riesgo déficit') + chip(u.gFlujo, 'flujo +') + '</div><button class="repbtn" style="margin-top:16px" onclick="ffUwPresentacion()">&#128196; Generar presentación de negocio</button></div>' +
-    '<div class="grid k4" style="margin-top:16px">' + kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '') + kpi('MAO (oferta máxima)', UW_M(u.mao), 'compra máxima al guardrail') + kpi('Cash to close', UW_M(u.cashToClose), 'lo que pone el inversionista') + kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? u.recuperaPct + '% recuperado' : '') + '</div>' +
+    '<div class="grid k4" style="margin-top:16px">' + kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '') + kpi('MAO (oferta máxima)', UW_M(u.mao), 'compra máxima al guardrail') + kpi('El inversionista pone', UW_M2(u.cashToClose), 'HUD: down + cierre &minus; créditos') + kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? u.recuperaPct + '% recuperado' : '') + '</div>' +
     '<div class="grid k3" style="margin-top:14px">' + kpi('Cash left in', UW_M(u.cashLeftIn), 'capital que queda invertido') + kpi('Flujo mensual', UW_M(u.flujo) + '/mes', '') + kpi('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—', 'flujo anual &divide; cash left in') + '</div>' +
-    '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; cash to close ' + UW_M(o.negocio.cashToClose) + ' &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
+    '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; el inversionista pone ' + UW_M2(o.negocio.cashToClose) + ' (HUD) &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
 }
 function ffUwPresentacion() {
   const o = ffUwComputeAll(), u = o.unificada, a = UW.a;
@@ -331,7 +379,7 @@ function ffUwPresentacion() {
     <div class="grid">
       <div class="kpi"><div class="l">ARV</div><div class="v">${M(o.arv.probable)}</div></div>
       <div class="kpi"><div class="l">All-in (${u.allInPct}% ARV)</div><div class="v">${M(u.allIn)}</div></div>
-      <div class="kpi"><div class="l">Cash to close (inversionista)</div><div class="v">${M(u.cashToClose)}</div></div>
+      <div class="kpi"><div class="l">El inversionista pone (HUD)</div><div class="v">${M(u.cashToClose)}</div></div>
       <div class="kpi"><div class="l">Cash-out (recupera ${u.recuperaPct || 0}%)</div><div class="v">${M(u.cashOut)}</div></div>
       <div class="kpi"><div class="l">Cash left in</div><div class="v">${M(u.cashLeftIn)}</div></div>
       <div class="kpi"><div class="l">Flujo mensual</div><div class="v">${M(u.flujo)}</div></div>
