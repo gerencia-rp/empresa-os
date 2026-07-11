@@ -4,12 +4,12 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
-<<<<<<< HEAD
 ## 🎯 Estado (11 Jul 2026 — 🏭 IA v3: FÁBRICA DE ARTEFACTOS guiada, Guía Maestra) · EN VIVO
 
 - 🧙 **Wizard sobre la v2**: `ia-builder` ahora sigue la Guía Maestra — entrevista UNA pregunta por vez que llena la **FICHA DEL ARTEFACTO (10 campos)** (tool `preguntar` devuelve la ficha cada turno → **barra de progreso 10 pasos real** en el front) → **`proponer`** (pasos del flujo + carril; el front dibuja el diagrama con cajas CSS y el empleado CONFIRMA antes de construir) → **`entregar_libre`** exige caso de oro + caso borde con `tests_pasan` + **verificador independiente** (Sonnet `claude-sonnet-4-6`, tool `veredicto`: lógica vs los 2 casos + caza hardcode; 1 auto-corrección con feedback `[VERIFICADOR]` dentro del mismo request) → estado **`demo`** (paquete en `ia_sessions.paquete_json`, iframe sandbox inline + "Probalo con: caso de oro") → **publicar es `{action:'publicar'}` explícito** (ya no auto-publica). Reglas duras del cerebro: un solo trabajo por artefacto, PROHIBIDO hardcode (datos = inputs), resultado LÓGICO (decisión, no volcado de datos), paquete = artefacto+diagrama+**instructivo** (botón 📖 en la Galería).
 - 🗄 Migr `20260711100000`: `ia_sessions` += `ficha_json`/`paquete_json` + estados `propuesta`/`demo`; `ia_artifacts` += `ficha_json`/`instructivo`. Rate limit subido a 30 msg/10min (el wizard usa ~8-12 turnos). E2E v3 en prod (`qa-ia-v3.mjs`): Prorrateo de Renta publicado (la IA detectó un error de matemática del usuario en el ejemplo de oro 💪) + WhatsApp/Airtable → propuesta carril OK → spec. Latencias: pregunta 4-15s · build+verificación ~56s.
-=======
+---
+
 ## 🎯 Estado (10 Jul 2026 — 📐 CIERRE ANTI-RECAÍDA: definiciones 9-jul + 10 checks + Capa 0) · EN VIVO
 
 - 📐 **Motor de cierre `os/os-cierre-engine.js`** (UMD puro node+browser, en `index.html` + `BUNDLE_FILES`): las definiciones de la reunión 9-jul codificadas en el OS, NO en fórmulas de Airtable. `remodelCasa()` (monto real = draws − intereses − servicios − muebles − extensión · gasto interno real = trab+mat+5% margen · utilidad/rentabilidad · **drift vs la fórmula espejada de Airtable** — descubierto: la fórmula de Airtable NI SIQUIERA es consistente entre casas: Virginia Δ$21,912, Idlewood Δ$8,120, Michelle Δ$2,080) · `ffCasa()` (meses cubiertos vs hueco=DÉFICIT, jamás sumar ambos como el mismo periodo; pago mensual CON escrow; extensión suma al déficit) · `precioCobrar()` (= gasto interno esperado + rentabilidad objetivo + lo que sale del draw). Cada output declara valor+fórmula+fuente. Umbrales SOLO en `ct_config` (`CFG_DEF` como fallback).
@@ -17,7 +17,6 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 - 🗓 **Vista "Cierre del mes"** (toggle en el Sabueso): SOLO excepciones (sin info), agrupadas por **dueño único por dato** (`ct_config` `cierre_dueno_*`: Juan draws/HML · Michell facturas · Alejandra obra · Carlos rentas · Silvia comprobantes; fallback por empresa) + 📋 copiar. Objetivo 30–60 min.
 - 📄 **Capa 0 anti-tecleo**: `?resource=parse-doc` en `api/brain-chat.mjs` (fusionado, límite 12 fns; auth `verifyAuth`, máx 3MB body Vercel) — statement HML → {pago_mensual CON escrow desglosado, interés, fees, **extension{monto,meses,fecha}**} · factura → items categorizados material/mueble/herramienta (mixta=partir filas, mismo comprobante). **Nada se ejecuta solo**: modal 📄 en el Sabueso → `ct_doc_extracts` estado `propuesta` → humano aprueba → statement con extensión inserta `ff_extension_payments` (🆕 tabla OS, migr `20260710100000_cierre_anti_recaida`, el campo no existe en Airtable) · factura → `agent_proposals` p/ cargar en Airtable. Probado E2E en prod con PDF sintético: escrow+extensión extraídos exactos.
 - 💰 **Regla del draw en el Estimador Pro** (`rm/rm-tab-editor.js`, card tras el desglose): inputs draws/intereses/servicios/muebles del draw → valor a COBRAR vs **monto real disponible** + brecha en rojo (caso Capitol: cobraron $85k con $63,750 → déficit $36k). QA 13/13 en prod + parser funcional.
->>>>>>> origin/main
 
 ---
 
