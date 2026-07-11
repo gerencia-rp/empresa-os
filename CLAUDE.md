@@ -4,7 +4,15 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
-## 🎯 Estado (11 Jul 2026 — 🏭 IA v3: FÁBRICA DE ARTEFACTOS guiada, Guía Maestra) · EN VIVO
+## 🎯 Estado (11 Jul 2026 · tarde — 🏭 IA v3.1: modo ECONÓMICO, Haiku + Prompt Poderoso) · DEPLOYADO (⚠ sin créditos API)
+
+- 💸 **Optimización de costo sobre v3**: la entrevista corre ENTERA en **Haiku** (`claude-haiku-4-5-20251001`, ~$0.01-0.03/wizard vs ~$1 con Opus) y **se QUITÓ el auto-build por API** (sin build Opus 16k, sin verificador Sonnet, sin action `publicar`). Tools quedan 2: `preguntar` (ficha en cada turno, igual) + **`finalizar`** → el **PROMPT PODEROSO lo arma el SERVIDOR** (plantilla maestra Guía v2 fija: 10 campos + requisitos técnicos anti-hardcode/anti-red + instrucción de entrega con insert a `ia_artifacts`) — determinista, costo cero.
+- 📋 Al finalizar: spec en `ia_specs` con **ficha_json + carril + tipo** (migr `20260711110000`) — carril **libre → estado 'aprobado'** (el empleado ve el prompt + botón "📋 Copiar prompt · Pegá esto en Claude Code para construir tu artefacto") · carril **ok → 'pendiente'** (el empleado NO recibe el prompt, queda para el OK del admin, con advertencia "NO CONSTRUIR SIN APROBACIÓN" dentro del prompt). Upsert por session_id (re-finalizar pisa el mismo spec). El artefacto se construye en Claude Code y se publica a `ia_artifacts` (write = has_area('ia')/admin) → Galería intacta.
+- ⚠️ **BLOQUEADOR 11-jul**: la cuenta Anthropic de `ANTHROPIC_API_KEY` (Supabase Secrets) quedó **SIN CRÉDITOS** ("credit balance too low") → ia-builder (y fm-ai-coach/remodel-ai/etc.) devuelven 502 con el error claro. Recargar en console.anthropic.com → Plans & Billing y correr `qa-ia-v31.mjs` (scratchpad) para el E2E pendiente.
+
+---
+
+## 🎯 Estado (11 Jul 2026 — 🏭 IA v3: FÁBRICA DE ARTEFACTOS guiada, Guía Maestra) · superseded por v3.1
 
 - 🧙 **Wizard sobre la v2**: `ia-builder` ahora sigue la Guía Maestra — entrevista UNA pregunta por vez que llena la **FICHA DEL ARTEFACTO (10 campos)** (tool `preguntar` devuelve la ficha cada turno → **barra de progreso 10 pasos real** en el front) → **`proponer`** (pasos del flujo + carril; el front dibuja el diagrama con cajas CSS y el empleado CONFIRMA antes de construir) → **`entregar_libre`** exige caso de oro + caso borde con `tests_pasan` + **verificador independiente** (Sonnet `claude-sonnet-4-6`, tool `veredicto`: lógica vs los 2 casos + caza hardcode; 1 auto-corrección con feedback `[VERIFICADOR]` dentro del mismo request) → estado **`demo`** (paquete en `ia_sessions.paquete_json`, iframe sandbox inline + "Probalo con: caso de oro") → **publicar es `{action:'publicar'}` explícito** (ya no auto-publica). Reglas duras del cerebro: un solo trabajo por artefacto, PROHIBIDO hardcode (datos = inputs), resultado LÓGICO (decisión, no volcado de datos), paquete = artefacto+diagrama+**instructivo** (botón 📖 en la Galería).
 - 🗄 Migr `20260711100000`: `ia_sessions` += `ficha_json`/`paquete_json` + estados `propuesta`/`demo`; `ia_artifacts` += `ficha_json`/`instructivo`. Rate limit subido a 30 msg/10min (el wizard usa ~8-12 turnos). E2E v3 en prod (`qa-ia-v3.mjs`): Prorrateo de Renta publicado (la IA detectó un error de matemática del usuario en el ejemplo de oro 💪) + WhatsApp/Airtable → propuesta carril OK → spec. Latencias: pregunta 4-15s · build+verificación ~56s.

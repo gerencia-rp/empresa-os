@@ -1,14 +1,14 @@
 // ════════════════════════════════════════════════════════════════
-// 🏭 DEPARTAMENTO IA v3 — FÁBRICA DE ARTEFACTOS guiada (Guía Maestra).
-// Wizard conversacional (una pregunta por vez, texto o voz) que llena la
-// FICHA DEL ARTEFACTO (10 campos, barra de progreso) → PROPUESTA con diagrama
-// (el empleado confirma) → BUILD con tests (caso de oro + borde, verificador
-// independiente) → DEMO en vivo (Probar) → PUBLICAR explícito a la Galería.
-// Carril CON OK (datos reales/plata/terceros): spec pendiente, nunca ejecuta.
-// Render seguro: <iframe sandbox="allow-scripts"> SIN allow-same-origin.
+// 🏭 DEPARTAMENTO IA v3.1 — FÁBRICA DE ARTEFACTOS "modo económico".
+// Wizard conversacional (Haiku, una pregunta por vez, texto o voz) que llena
+// la FICHA DEL ARTEFACTO (10 campos, barra de progreso). Al completar, el
+// server genera el PROMPT PODEROSO (plantilla Guía Maestra v2) → botón
+// "Copiar prompt" → se construye en Claude Code (SIN auto-build por API).
+// El spec (ficha+prompt) queda en ia_specs: libre='aprobado', ok='pendiente'.
+// Galería intacta; render seguro <iframe sandbox> sin allow-same-origin.
 // ⚠ NAMESPACE: OSIA/osia* — el prefijo IA/ia* lo ocupa os/inv-admin.js.
 // ════════════════════════════════════════════════════════════════
-const OSIA = { loaded: false, loading: false, err: null, arts: [], specs: [], tab: 'crear', q: '', fArea: '', me: '', chat: [], sessionId: null, busy: false, busyMsg: '', stage: 'chat', ficha: {}, progreso: 0, propuesta: null, paquete: null, _rec: null };
+const OSIA = { loaded: false, loading: false, err: null, arts: [], specs: [], tab: 'crear', q: '', fArea: '', me: '', chat: [], sessionId: null, busy: false, busyMsg: '', stage: 'chat', ficha: {}, progreso: 0, promptPack: null, _rec: null };
 window.OSIA = OSIA;
 
 const OSIA_TIPO_LBL = { prompt: '💬 Generador', dashboard: '📊 Calculadora', agente: '🤖 Asistente', automatizacion: '⚡ Checklist/Flujo' };
@@ -112,8 +112,7 @@ function osiaView() {
   if (OSIA.err) body = '<div class="empty"><div style="font-size:34px">⚠️</div><div class="down" style="margin-top:8px">' + osiaE(OSIA.err) + '</div></div>';
   else if (!OSIA.loaded) body = '<div class="empty">⏳ Cargando la fábrica…</div>';
   else body = tab === 'galeria' ? osiaGaleria() : tab === 'pendientes' ? (mgr ? osiaPendientes() : osiaNoAccess()) : osiaCrear();
-  if (tab === 'crear' && OSIA.stage === 'demo' && OSIA.paquete) requestAnimationFrame(osiaMountDemo);
-  return '<h1>🏭 IA <span>· Fábrica de artefactos</span></h1><div class="sub">Contale a la IA una tarea y salí con una herramienta probada: te entrevista, te muestra el plan, la construye y la probás antes de publicar.</div>' +
+  return '<h1>🏭 IA <span>· Fábrica de artefactos</span></h1><div class="sub">Contale a la IA una tarea: te entrevista a fondo y te entrega el prompt listo para construir tu artefacto en Claude Code.</div>' +
     '<div class="osia-tabs">' + tabBtn('crear', '🏭 Crear') + tabBtn('galeria', '🖼 Galería (' + OSIA.arts.length + ')') + (mgr ? tabBtn('pendientes', '📥 Pendientes de OK' + (nPend ? ' (' + nPend + ')' : '')) : '') + '</div>' + body;
 }
 window.osiaView = osiaView;
@@ -137,26 +136,24 @@ function osiaCrear() {
   const hello = '<div class="osia-b a">¡Hola! Contame una tarea que hagas seguido (o que te gustaría no hacer más) y la convertimos en una herramienta.\n\nEj: "calculo a mano cuánto cobrar cuando un inquilino entra a mitad de mes" · "necesito un checklist de inspección" · "armo mensajes de cobro uno por uno".</div>';
   const nueva = OSIA.chat.length ? '<button class="ibtn" style="margin-left:auto" onclick="osiaNueva()">＋ Nueva</button>' : '';
   const started = OSIA.chat.length > 0;
-  const propuestaCard = (OSIA.stage === 'propose' && OSIA.propuesta) ? osiaPropuestaHTML() : '';
-  const demoCard = (OSIA.stage === 'demo' && OSIA.paquete) ? osiaDemoHTML() : '';
+  const promptCard = (OSIA.stage === 'prompt' && OSIA.promptPack) ? osiaPromptHTML() : '';
   const lateral = started ? osiaFichaCard() : osiaComoFunciona(hasVoice);
   return '<div class="grid k2" style="align-items:start;grid-template-columns:1.65fr 1fr">' +
     '<div><div class="card"><div class="chart-h"><div class="t">🏭 Construí tu artefacto</div>' + nueva + '</div>' +
     (started ? osiaProgressHTML() : '') +
     '<div class="osia-chat" id="osia-chat">' + hello + osiaChatHTML() + '</div>' +
     '<div class="osia-ask"><textarea id="osia-inp" placeholder="Contá tu tarea… (Enter envía, Shift+Enter salto de línea)" onkeydown="osiaKey(event)"></textarea>' + micBtn + '<button class="cbtn" style="padding:0 18px" onclick="osiaSend()">Enviar</button></div></div>' +
-    propuestaCard + demoCard + '</div>' + lateral + '</div>';
+    promptCard + '</div>' + lateral + '</div>';
 }
 
 function osiaComoFunciona(hasVoice) {
   return '<div class="card"><div class="chart-h"><div class="t">Cómo funciona</div></div>' +
     '<div class="kv"><span>1 · Contás la tarea</span><b>con tus palabras' + (hasVoice ? ' o por voz 🎤' : '') + '</b></div>' +
-    '<div class="kv"><span>2 · Te entrevista</span><b>una pregunta por vez</b></div>' +
-    '<div class="kv"><span>3 · Te muestra el plan</span><b>y confirmás</b></div>' +
-    '<div class="kv"><span>4 · Lo construye y prueba</span><b>caso de oro + caso borde 🧪</b></div>' +
-    '<div class="kv"><span>5 · Lo probás vos</span><b>demo en vivo</b></div>' +
-    '<div class="kv"><span>6 · Publicar</span><b>queda en la Galería 🖼</b></div>' +
-    '<div class="meta" style="margin-top:12px">Si la herramienta necesita datos reales de la empresa (pagos, Airtable, mensajes a inquilinos…), no se construye sola: queda como pedido pendiente del OK de un admin. 🔒</div></div>';
+    '<div class="kv"><span>2 · Te entrevista a fondo</span><b>una pregunta por vez</b></div>' +
+    '<div class="kv"><span>3 · Ficha completa (10 pasos)</span><b>sale tu PROMPT PODEROSO 📋</b></div>' +
+    '<div class="kv"><span>4 · Lo pegás en Claude Code</span><b>ahí se construye</b></div>' +
+    '<div class="kv"><span>5 · Publicado</span><b>aparece en la Galería 🖼</b></div>' +
+    '<div class="meta" style="margin-top:12px">Si el artefacto necesita datos reales de la empresa (pagos, Airtable, mensajes a inquilinos…), el brief queda pendiente del OK de un admin antes de construirse. 🔒</div></div>';
 }
 
 function osiaFichaCard() {
@@ -168,33 +165,31 @@ function osiaFichaCard() {
     }).join('') + '</div>';
 }
 
-function osiaPropuestaHTML() {
-  const p = OSIA.propuesta;
+function osiaPromptHTML() {
+  const p = OSIA.promptPack;
   const flow = (p.pasos || []).map((s, i) => '<div class="osia-fbox"><b>' + (i + 1) + '.</b> ' + osiaE(s) + '</div>').join('<div class="osia-farr">↓</div>');
-  const carril = p.carril === 'ok'
-    ? '<span class="badge b-warn">🔒 necesita OK de un admin (usa datos reales)</span>'
-    : '<span class="badge b-ok">⚡ se construye y publica al instante</span>';
-  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">📐 Así lo voy a hacer</div>' + carril + '</div>' +
+  const esOk = p.carril === 'ok';
+  const carril = esOk
+    ? '<span class="badge b-warn">🔒 pendiente del OK de un admin (usa datos reales)</span>'
+    : '<span class="badge b-ok">✅ listo para construir</span>';
+  const cta = esOk
+    ? '<div class="meta" style="margin-top:12px">El brief completo quedó guardado. Cuando un admin lo apruebe, se construye y te avisan — no hace falta que hagas nada más.</div>'
+    : '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">' +
+      '<button class="osia-bigbtn" onclick="osiaCopyPrompt()">📋 Copiar prompt</button>' +
+      '<span class="meta">Pegá esto en <b>Claude Code</b> para construir tu artefacto.</span></div>';
+  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">📋 ' + osiaE(p.titulo || 'Tu prompt') + '</div>' + carril + '</div>' +
     '<div class="meta" style="margin-bottom:6px">' + osiaE(p.resumen || '') + '</div>' +
-    '<div class="osia-flow">' + flow + '</div>' +
-    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
-    '<button class="osia-bigbtn" onclick="osiaConfirm()">✅ Dale, construilo</button>' +
-    '<button class="osia-ghostbtn" onclick="osiaChange()">✏️ Quiero cambiar algo</button></div></div>';
+    (flow ? '<div class="osia-flow">' + flow + '</div>' : '') +
+    (esOk ? '' : '<div class="osia-spec-pre" style="margin-top:10px;max-height:300px">' + osiaE(p.prompt || '') + '</div>') +
+    cta + '</div>';
 }
 
-function osiaDemoHTML() {
-  const p = OSIA.paquete;
-  const oro = p.caso_oro ? '<div class="kv"><span>🧪 Probalo con</span><b>' + osiaE(p.caso_oro.entrada || '') + '</b></div><div class="kv"><span>Debería dar</span><b>' + osiaE(p.caso_oro.salida_esperada || '') + '</b></div>' : '';
-  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">🎉 ' + osiaE(p.titulo || 'Tu artefacto') + '</div><span class="badge b-ok">pasó las 2 pruebas 🧪</span></div>' +
-    '<div class="meta" style="margin-bottom:8px">' + osiaE(p.resumen || '') + ' Jugá con el demo — cuando te convenza, publicalo. Si querés cambiar algo, escribilo en el chat de arriba.</div>' +
-    oro +
-    '<iframe class="osia-demo-fr" id="osia-demo-frame" sandbox="allow-scripts" style="margin-top:10px"></iframe>' +
-    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
-    '<button class="osia-bigbtn" onclick="osiaPublicar()">🚀 Publicar en la Galería</button>' +
-    '<button class="osia-ghostbtn" onclick="osiaProbar()">▶ Probar en grande</button>' +
-    '<button class="osia-ghostbtn" onclick="osiaChange()">✏️ Pedir un cambio</button></div></div>';
+async function osiaCopyPrompt() {
+  const p = OSIA.promptPack; if (!p || !p.prompt) return;
+  try { await navigator.clipboard.writeText(p.prompt); if (window.toast) toast('Prompt copiado 📋 — pegalo en Claude Code', 'success'); }
+  catch (e) { prompt('Copiá el prompt:', p.prompt); }
 }
-function osiaMountDemo() { const fr = document.getElementById('osia-demo-frame'); if (fr && OSIA.paquete && !fr.srcdoc) fr.srcdoc = OSIA.paquete.html || ''; }
+window.osiaCopyPrompt = osiaCopyPrompt;
 
 function osiaChatHTML() {
   return OSIA.chat.map(m => {
@@ -210,20 +205,15 @@ function osiaPaintChat() { const el = document.getElementById('osia-chat'); if (
 
 function osiaKey(ev) { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); osiaSend(); } }
 window.osiaKey = osiaKey;
-function osiaNueva() { OSIA.chat = []; OSIA.sessionId = null; OSIA.busy = false; OSIA.stage = 'chat'; OSIA.ficha = {}; OSIA.progreso = 0; OSIA.propuesta = null; OSIA.paquete = null; osRender(); }
+function osiaNueva() { OSIA.chat = []; OSIA.sessionId = null; OSIA.busy = false; OSIA.stage = 'chat'; OSIA.ficha = {}; OSIA.progreso = 0; OSIA.promptPack = null; osRender(); }
 window.osiaNueva = osiaNueva;
-function osiaConfirm() { osiaSendMsg('✅ Confirmo, construilo así.', '🏗 Construyendo y probando tu artefacto… (puede tardar ~1 minuto)'); }
-window.osiaConfirm = osiaConfirm;
-function osiaChange() { const el = document.getElementById('osia-inp'); if (el) { el.placeholder = 'Contá qué querés cambiar…'; el.focus(); } }
-window.osiaChange = osiaChange;
 
 async function osiaSend() {
   const inp = document.getElementById('osia-inp');
   const msg = inp ? inp.value.trim() : '';
   if (!msg || OSIA.busy) return;
   inp.value = '';
-  const esperaBuild = OSIA.stage === 'propose' || OSIA.stage === 'demo';
-  await osiaSendMsg(msg, esperaBuild ? '🏗 Trabajando en tu artefacto… (puede tardar ~1 minuto)' : '⏳ pensando…');
+  await osiaSendMsg(msg, '⏳ pensando…');
 }
 window.osiaSend = osiaSend;
 
@@ -245,25 +235,17 @@ async function osiaSendMsg(msg, busyMsg) {
     OSIA.sessionId = j.session_id || OSIA.sessionId;
     OSIA.busy = false;
     if (j.action === 'ask') {
-      OSIA.ficha = j.ficha || OSIA.ficha; OSIA.progreso = j.progreso ?? OSIA.progreso; OSIA.stage = 'chat'; OSIA.propuesta = null; OSIA.paquete = null;
+      OSIA.ficha = j.ficha || OSIA.ficha; OSIA.progreso = j.progreso ?? OSIA.progreso; OSIA.stage = 'chat'; OSIA.promptPack = null;
       OSIA.chat.push({ role: 'assistant', content: j.texto });
       osRender();
-    } else if (j.action === 'propose') {
-      OSIA.ficha = j.ficha || OSIA.ficha; OSIA.progreso = j.progreso ?? 10; OSIA.stage = 'propose';
-      OSIA.propuesta = { pasos: j.pasos || [], carril: j.carril, resumen: j.resumen }; OSIA.paquete = null;
-      OSIA.chat.push({ role: 'assistant', content: '📐 Te dejé la propuesta acá abajo — revisala y confirmame.' });
-      osRender();
-    } else if (j.action === 'demo') {
-      OSIA.stage = 'demo'; OSIA.paquete = j.paquete; OSIA.propuesta = null;
-      OSIA.chat.push({ role: 'assistant', content: j.texto });
-      osRender();
-    } else if (j.action === 'spec') {
-      OSIA.stage = 'chat'; OSIA.propuesta = null; OSIA.paquete = null; OSIA.sessionId = null;
-      OSIA.chat.push({ role: 'assistant', content: j.texto, spec: true });
+    } else if (j.action === 'prompt') {
+      OSIA.ficha = j.ficha || OSIA.ficha; OSIA.progreso = j.progreso ?? 10; OSIA.stage = 'prompt';
+      OSIA.promptPack = { titulo: j.titulo, carril: j.carril, pasos: j.pasos || [], resumen: j.resumen, prompt: j.prompt };
+      OSIA.chat.push({ role: 'assistant', content: j.texto, spec: j.carril === 'ok' });
       await osiaReloadData(); osRender();
-    } else if (j.action === 'published') {
-      OSIA.stage = 'chat'; OSIA.sessionId = null;
-      OSIA.chat.push({ role: 'assistant', content: j.texto || '✅ Publicado.', artifact: j.artifact });
+    } else if (j.action === 'spec') { // compat
+      OSIA.stage = 'chat'; OSIA.promptPack = null; OSIA.sessionId = null;
+      OSIA.chat.push({ role: 'assistant', content: j.texto, spec: true });
       await osiaReloadData(); osRender();
     } else { osRender(); }
   } catch (e) {
@@ -273,35 +255,6 @@ async function osiaSendMsg(msg, busyMsg) {
   }
   const el = document.getElementById('osia-inp'); if (el) el.focus();
 }
-
-async function osiaPublicar() {
-  if (OSIA.busy || !OSIA.sessionId) return;
-  OSIA.busy = true; OSIA.busyMsg = '🚀 Publicando…'; osiaPaintChat();
-  try {
-    const { data: sess } = await sb.auth.getSession();
-    const token = sess && sess.session && sess.session.access_token;
-    const res = await fetch(window.SUPABASE_URL + '/functions/v1/ia-builder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ action: 'publicar', session_id: OSIA.sessionId }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.ok) throw new Error(j.error || ('Error ' + res.status));
-    OSIA.busy = false; OSIA.stage = 'chat';
-    OSIA._lastHtml = OSIA.paquete ? { id: j.artifact.id, titulo: j.artifact.titulo, html: OSIA.paquete.html } : null;
-    OSIA.paquete = null; OSIA.sessionId = null;
-    OSIA.chat.push({ role: 'assistant', content: '🚀 ¡Publicado! Ya está en la Galería para todo el equipo.', artifact: j.artifact });
-    await osiaReloadData(); osRender();
-  } catch (e) {
-    OSIA.busy = false;
-    OSIA.chat.push({ role: 'err', content: '⚠️ ' + (e.message || String(e)) });
-    osiaPaintChat();
-  }
-}
-window.osiaPublicar = osiaPublicar;
-
-function osiaProbar() { if (OSIA.paquete) osiaModalHtml(OSIA.paquete.titulo || 'Demo', OSIA.paquete.html || ''); }
-window.osiaProbar = osiaProbar;
 
 // Dictado por voz
 function osiaVoice() {
