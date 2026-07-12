@@ -270,11 +270,12 @@ function apCSS() {
 let AP_MAP = null;
 function apLeaflet(cb) {
   if (window.L) return cb();
+  // jsdelivr: es el único CDN de scripts permitido por el CSP de vercel.json (unpkg está bloqueado)
   if (!document.getElementById('ap-leaflet-css')) {
-    const l = document.createElement('link'); l.id = 'ap-leaflet-css'; l.rel = 'stylesheet'; l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(l);
+    const l = document.createElement('link'); l.id = 'ap-leaflet-css'; l.rel = 'stylesheet'; l.href = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(l);
   }
   if (document.getElementById('ap-leaflet-js')) { const t = setInterval(() => { if (window.L) { clearInterval(t); cb(); } }, 120); setTimeout(() => clearInterval(t), 8000); return; }
-  const s = document.createElement('script'); s.id = 'ap-leaflet-js'; s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload = cb; document.head.appendChild(s);
+  const s = document.createElement('script'); s.id = 'ap-leaflet-js'; s.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'; s.onload = cb; document.head.appendChild(s);
 }
 function apCompCssId(id) { return 'ap-comp-' + String(id).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40); }
 function apPinClick(cssId) {
