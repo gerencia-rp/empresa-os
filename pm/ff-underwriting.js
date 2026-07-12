@@ -21,19 +21,23 @@ const UW_NAV = [
   ['arv', '🏷️', 'ARV', 'comparables + appraisals'],
   ['cashout', '💰', 'Cash-Out', 'refi capital recuperado'],
   ['intereses', '📉', 'Intereses', 'Harmony + DSCR'],
-  ['ingreso', '🏠', 'Ingreso Mensual', 'flujo + cash-on-cash'],
+  ['ingreso', '🏠', 'Ingreso Mensual', 'renta por modelo de negocio'],
   ['unificada', '🎯', 'Vista Unificada', 'one-pager GO/NO-GO'],
 ];
 
 async function ffUwLoad() {
   try {
-    const [cfg, deals, hml, an, draws] = await Promise.all([
+    const [cfg, deals, hml, an, draws, pmProps, pmUnits] = await Promise.all([
       sb.from('ff_uw_config').select('key, value, text_value').then(r => r.data || []),
       sb.from('ff_deals').select('*').eq('active', true).order('address').then(r => r.data || []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []),
       sb.from('ff_underwriting_analyses').select('*').eq('active', true).order('updated_at', { ascending: false }).limit(50).then(r => r.data || []),
       sb.from('ff_draws').select('address_norm, remodel_complete').eq('active', true).then(r => r.data || []),
+      // mezcla real de unidades (Rentas) para la Calc 5 — bajo RLS sin área rentas devuelve []
+      sb.from('pm_properties').select('id,property_id,name').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('pm_units').select('property_id,unit_type,name,target_rent').eq('active', true).then(r => r.data || []).catch(() => []),
     ]);
+    UW.pmProps = pmProps; UW.pmUnits = pmUnits;
     UW.cfg = {}; UW.cfgTxt = {}; cfg.forEach(c => { UW.cfg[c.key] = c.value; if (c.text_value != null) UW.cfgTxt[c.key] = c.text_value; });
     UW.deals = deals; UW.analyses = an;
     UW.hml = {}; hml.forEach(h => { if (h.address_norm) UW.hml[h.address_norm] = h; });
@@ -543,6 +547,9 @@ function ffUwViewIntereses() {
 }
 // ─── Calc 5 · UI patrón Cash-Out (ola 1): hero flujo + 1 input + desglose. Lógica intacta. ───
 function ffUwViewIngreso() {
+  // Calc 5 = INGRESO POR MODELO (pm/ff-ingreso-modelos.js): casa/habitaciones/unidades/mixta con tarifas
+  // calibradas de Rentas real, comparadas lado a lado. renta_mensual sigue siendo la fuente guardada.
+  if (window.ffIngresoView) return ffIngresoView();
   const inp = UW.a.inputs, o = ffUwComputeAll(), g = o.ingreso;
   const pos = g.flujo >= 0;
   const hero = kitHero('Flujo mensual', UW_M(g.flujo) + '/mes',
