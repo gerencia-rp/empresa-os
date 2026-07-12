@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (12 Jul 2026 — 💰 UW Calc 3 Cash-Out itemizada, refis reales EXACTOS) · EN VIVO
+
+- 💰 **Calc 3 Cash-Out reescrita** (`ffUwCalcCashout`, rama `feat/ff-cashout-refi`) con ingeniería inversa de los refis REALES de Champions Funding (DSCR 30a): **estado de cierre itemizado** — valor tasado → ×LTV **y tope DSCR** (renta÷DSCR_obj − T/12 − S/12 despejado a principal; con renta baja manda el DSCR, caso Echo) → préstamo → −payoff → **−costos itemizados** (a fees Champions uw $1,495+proc $695+orig %; b título $2,100+escala; c interés prepagado préstamo×tasa/365×días; d seguro prima+impound; e **impuestos = valor×tasa condado×(1+M/12)** — computado, no plano) → **CASH-OUT** + box **escrows = plata propia guardada** + capital recuperado neto + recupera % (**♾️ retorno infinito** si ≥100, propagado a Unificada y deck). FIX del bug: antes era ARV×75%−payoff sin costos (inflado).
+- 🔎 **Descubrimientos de la ingeniería inversa**: (1) el campo Airtable **"Monto Pagado al HML con la Refi" = payoff puro + costos de refi** (todo menos el cash-out) → identidad `préstamo − pagado = cash-out` EXACTA en Michelle/Echo/Childress/Meadow (⚠ **Dove Δ$3,133.80** — revisar en Airtable); el payoff puro se deriva `pagado − costos itemizados`. (2) **La base del préstamo es la TASACIÓN del refi (appraisal), no min(ARV, appraisal)** — Childress lo prueba: 75%×appraisal 380k = 285k con ARV 355k. (3) Tasa DSCR reverseada **7.125%** → `dscr_tasa_anual` actualizada (era 7.5 supuesto); PITI modelo vs reales Δ≤$165.
+- 🗄 Migr `20260712100000`: `ff_hml_loans` += `monto_prestamo_refi/monto_pagado_hml_refi/fecha_refi/pct_banco_refi` (sync `sync-ff-airtable` v12 los mapea de "Datos por casa"; el LTV se precarga del % real del banco) + 11 seeds `refi_*` en `ff_uw_config`. **Golden tests `scripts/test-uw-cashout.mjs` (corren el código real): Michelle $23,093.29 · Echo $10,951.14 · Childress $50,968.24 · Meadow $138.63 EXACTOS** + camino HUD manual (payoff $272,116.57 + itemización orig 1.5% = costos $25,790.14 ✓).
+
+---
+
 ## 🎯 Estado (11 Jul 2026 · tarde — 🏭 IA v3.1: modo ECONÓMICO, Haiku + Prompt Poderoso) · DEPLOYADO (⚠ sin créditos API)
 
 - 💸 **Optimización de costo sobre v3**: la entrevista corre ENTERA en **Haiku** (`claude-haiku-4-5-20251001`, ~$0.01-0.03/wizard vs ~$1 con Opus) y **se QUITÓ el auto-build por API** (sin build Opus 16k, sin verificador Sonnet, sin action `publicar`). Tools quedan 2: `preguntar` (ficha en cada turno, igual) + **`finalizar`** → el **PROMPT PODEROSO lo arma el SERVIDOR** (plantilla maestra Guía v2 fija: 10 campos + requisitos técnicos anti-hardcode/anti-red + instrucción de entrega con insert a `ia_artifacts`) — determinista, costo cero.
