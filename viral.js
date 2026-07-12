@@ -998,6 +998,44 @@ function setupTabs() {
   });
 }
 
+// ---------- Onboarding del Studio (CTA del estado inicial en viral.html) ----------
+// El onboarding estático de #tab-studio vive en el HTML y renderStudio() (viral-opera.js)
+// lo reemplaza cuando la marca termina de cargar. Este helper solo navega/enfoca:
+// NO toca la lógica de generación.
+function viralStudioStart(tries) {
+  tries = tries || 0;
+  const tabBtn = document.querySelector('[data-tab="studio"]');
+  const panel = document.getElementById('tab-studio');
+  if (tabBtn && panel && panel.classList.contains('hidden')) tabBtn.click();
+  const gen = document.getElementById('st-generate');
+  if (!gen) {
+    // El Studio todavía se está armando (carga async de la marca): reintenta el render y espera.
+    if (window.OPERA_RENDERERS && typeof window.OPERA_RENDERERS.studio === 'function') window.OPERA_RENDERERS.studio();
+    if (tries < 10) setTimeout(() => viralStudioStart(tries + 1), 400);
+    return;
+  }
+  const visible = (el) => !!(el && el.offsetParent !== null);
+  const dolor = document.getElementById('st-dolor');
+  const tema = document.getElementById('st-tema');
+  const idea = document.getElementById('st-idea');
+  const haySeleccion = (visible(dolor) && dolor.value) ||
+    (visible(tema) && tema.value.trim()) ||
+    (visible(idea) && idea.value.trim());
+  if (haySeleccion) {
+    // Ya hay dolor/tema elegido: dispara el flujo de generación existente.
+    gen.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    gen.click();
+    return;
+  }
+  // Sin selección: lleva al usuario al primer control del paso 1/2.
+  const target = visible(dolor) ? dolor : (visible(idea) ? idea : document.querySelector('#tab-studio select, #tab-studio textarea'));
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try { target.focus({ preventScroll: true }); } catch (e) { target.focus(); }
+  }
+}
+window.viralStudioStart = viralStudioStart;
+
 // ---------- Init ----------
 document.addEventListener('DOMContentLoaded', () => {
   refreshKeyStatus();

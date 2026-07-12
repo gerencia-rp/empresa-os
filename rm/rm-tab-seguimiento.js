@@ -130,12 +130,65 @@ function rmRenderSeguimientoFase(e) {
 }
 
 // S1-G1 — Vista granular por actividad (alimenta remodel_actuals)
+// Estado local de filtro/paginación de la tabla por actividad (expuesto para los onclick)
+window.RM_SEG = window.RM_SEG || { etapa: '', page: 0, per: 50 };
+
 function rmRenderSeguimientoActividad(e) {
+  const seg = window.RM_SEG;
+  const allActs = e.activities;
+
+  // Filtro por etapa (las etapas presentes en los datos, mismas que agrupa la tabla)
+  const fActs = seg.etapa ? allActs.filter(a => String(a.phase) === String(seg.etapa)) : allActs;
+
+  // Paginación 25/50/100 (default 50)
+  const per = [25, 50, 100].includes(+seg.per) ? +seg.per : 50;
+  const totalN = fActs.length;
+  const maxPage = Math.max(0, Math.ceil(totalN / per) - 1);
+  if (seg.page > maxPage) seg.page = maxPage;
+  if (seg.page < 0) seg.page = 0;
+  const from = seg.page * per;
+  const pageActs = fActs.slice(from, from + per);
+
+  // La tabla renderiza SOLO la página actual, agrupada por etapa igual que antes
   const actsByPhase = {};
-  e.activities.forEach(a => {
+  pageActs.forEach(a => {
     if (!actsByPhase[a.phase]) actsByPhase[a.phase] = [];
     actsByPhase[a.phase].push(a);
   });
+
+  // Toolbar (filtro + paginador) — armada con concatenación, sin templates anidados
+  const phasesPresent = Array.from(new Set(allActs.map(a => String(a.phase)))).sort();
+  let etapaOpts = '<option value="">Todas las etapas</option>';
+  phasesPresent.forEach(p => {
+    const inf = RM_PHASES[p] || { icon: '', name: 'Etapa ' + p };
+    etapaOpts += '<option value="' + p + '"' + (String(seg.etapa) === p ? ' selected' : '') + '>' +
+      inf.icon + ' ' + p + '. ' + inf.name + '</option>';
+  });
+  let perOpts = '';
+  [25, 50, 100].forEach(n => {
+    perOpts += '<option value="' + n + '"' + (per === n ? ' selected' : '') + '>' + n + ' / pág</option>';
+  });
+  const shownFrom = totalN === 0 ? 0 : from + 1;
+  const shownTo = from + pageActs.length;
+  const segToolbar =
+    '<div class="mb-2 flex items-center gap-2 flex-wrap">' +
+      '<select onchange="rmSegSetEtapa(this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs font-semibold" title="Filtrar la tabla por etapa">' + etapaOpts + '</select>' +
+      '<select onchange="rmSegSetPer(this.value)" class="border border-slate-300 rounded px-2 py-1 text-xs" title="Actividades por página">' + perOpts + '</select>' +
+      '<div class="flex items-center gap-1 ml-auto text-xs">' +
+        '<button class="repbtn ghost" onclick="rmSegGoPage(-1)"' + (seg.page <= 0 ? ' disabled' : '') + '>‹ Anterior</button>' +
+        '<span class="text-slate-500 px-1">' + shownFrom + '–' + shownTo + ' de ' + totalN + '</span>' +
+        '<button class="repbtn ghost" onclick="rmSegGoPage(1)"' + (seg.page >= maxPage ? ' disabled' : '') + '>Siguiente ›</button>' +
+      '</div>' +
+    '</div>';
+
+  // Estado vacío del filtro (los KPIs de arriba siguen siendo del proyecto completo)
+  const segEmptyRow = totalN === 0
+    ? '<tr><td colspan="8" class="p-4">' +
+        (typeof kitEmpty === 'function'
+          ? kitEmpty('🔍', 'Sin actividades en esta etapa.')
+          : '<div class="text-center text-slate-500 py-6">Sin actividades en esta etapa.</div>') +
+      '</td></tr>'
+    : '';
 
   // Totales granulares
   let totalEst = 0, totalReal = 0, withRealCount = 0, totalActs = 0;
@@ -178,6 +231,9 @@ function rmRenderSeguimientoActividad(e) {
       </div>
     </div>
 
+    <!-- Filtro por etapa + paginación -->
+    ${segToolbar}
+
     <!-- Tabla granular -->
     <div class="border border-slate-200 rounded-xl overflow-x-auto mb-4">
       <table class="w-full text-[11px]">
@@ -194,6 +250,7 @@ function rmRenderSeguimientoActividad(e) {
           </tr>
         </thead>
         <tbody>
+          ${segEmptyRow}
           ${Object.entries(actsByPhase).map(([p, acts]) => {
             const info = RM_PHASES[p];
             return `
@@ -262,6 +319,25 @@ function rmRenderSeguimientoActividad(e) {
     ${!rmState.currentProject ? '<p class="text-[10px] text-amber-600 text-center mt-2">⚠️ Guardá el proyecto primero (Editor) para persistir actuales.</p>' : ''}
   `;
 }
+
+// Handlers del filtro/paginador de la vista por actividad (solo UI, cero lógica de datos)
+function rmSegSetEtapa(v) {
+  window.RM_SEG.etapa = v || '';
+  window.RM_SEG.page = 0; // el filtro resetea a página 0
+  rmRenderTab();
+}
+function rmSegSetPer(v) {
+  window.RM_SEG.per = +v || 50;
+  window.RM_SEG.page = 0;
+  rmRenderTab();
+}
+function rmSegGoPage(delta) {
+  window.RM_SEG.page = Math.max(0, (window.RM_SEG.page || 0) + delta);
+  rmRenderTab(); // el render clampa contra la última página
+}
+window.rmSegSetEtapa = rmSegSetEtapa;
+window.rmSegSetPer = rmSegSetPer;
+window.rmSegGoPage = rmSegGoPage;
 
 function rmSetTracking(phase, field, value) {
   if (!rmState.tracking[phase]) rmState.tracking[phase] = {};

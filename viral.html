@@ -76,7 +76,34 @@
 <main class="max-w-6xl mx-auto px-5 py-6">
 
   <!-- ===== STUDIO (v3 — tab por defecto) ===== -->
-  <section id="tab-studio" class="tab-panel"></section>
+  <!-- Onboarding inicial: se ve apenas abre la app (mientras carga la marca) y si la carga falla.
+       renderStudio() (viral-opera.js) lo reemplaza con el formulario completo — NO tocar su lógica. -->
+  <section id="tab-studio" class="tab-panel">
+    <div id="studio-onboarding" class="max-w-3xl mx-auto text-center py-10 px-2">
+      <div class="text-5xl mb-4">🎯</div>
+      <h2 class="font-display font-extrabold text-3xl sm:text-4xl text-accent mb-3">¿Qué contenido hacemos hoy?</h2>
+      <p class="text-sm text-zinc-400 mb-8 max-w-xl mx-auto">Este es tu Studio: acá salen reels, carruseles, historias y más, con toda tu marca inyectada automáticamente. Son 3 pasos:</p>
+      <div class="grid sm:grid-cols-3 gap-3 text-left mb-8">
+        <div class="bg-primary/40 border border-accent/15 rounded-xl p-4">
+          <div class="font-display font-extrabold text-2xl text-accent mb-1">1</div>
+          <p class="text-sm font-semibold text-zinc-100">Elegí la categoría</p>
+          <p class="text-xs text-zinc-400 mt-1.5 leading-relaxed">El área del problema de tu cliente: dinero, miedo, tiempo, conocimiento…</p>
+        </div>
+        <div class="bg-primary/40 border border-accent/15 rounded-xl p-4">
+          <div class="font-display font-extrabold text-2xl text-accent mb-1">2</div>
+          <p class="text-sm font-semibold text-zinc-100">Elegí el dolor del cliente</p>
+          <p class="text-xs text-zinc-400 mt-1.5 leading-relaxed">El problema concreto que este contenido va a atacar. Si dudás, el dado 🎲 elige uno por vos.</p>
+        </div>
+        <div class="bg-primary/40 border border-accent/15 rounded-xl p-4">
+          <div class="font-display font-extrabold text-2xl text-accent mb-1">3</div>
+          <p class="text-sm font-semibold text-zinc-100">Generá</p>
+          <p class="text-xs text-zinc-400 mt-1.5 leading-relaxed">La IA arma el contenido con tu avatar, tu enemigo y tu fórmula de marca.</p>
+        </div>
+      </div>
+      <button onclick="viralStudioStart()" class="bg-accent text-primary hover:opacity-90 font-semibold px-8 py-3.5 rounded-lg glow text-base">🚀 Empezar a crear</button>
+      <p class="text-[11px] text-zinc-600 mt-3">Tu marca y el banco de dolores se cargan solos — no hay nada que configurar.</p>
+    </div>
+  </section>
 
   <!-- ===== MARCA (acordeón — engine + consulta) ===== -->
   <section id="tab-marca" class="tab-panel hidden"></section>
@@ -107,22 +134,23 @@
       <div class="space-y-4">
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
           <div>
-            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <label class="text-xs font-semibold text-zinc-400">📂 Categoría — el área del problema de tu cliente (dinero, miedo, tiempo…)</label>
             <select id="r-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Todas las categorías —</option>
             </select>
+            <label class="mt-2 block text-xs font-semibold text-zinc-400">🎯 Dolor — el problema concreto del cliente que ataca este contenido</label>
             <select id="r-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Elige un dolor específico (opcional) —</option>
             </select>
             <p id="r-dolor-hint" class="text-[11px] text-emerald-400/80 mt-1 hidden"></p>
           </div>
           <div>
-            <label class="text-xs font-semibold text-zinc-400">Tema / ángulo libre (opcional si elegiste dolor)</label>
+            <label class="text-xs font-semibold text-zinc-400">✍️ Tema — de qué hablás, con tus palabras (opcional si ya elegiste un dolor)</label>
             <textarea id="r-tema" rows="2" placeholder="Ej: por qué el criterio importa más que el capital" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="text-xs font-semibold text-zinc-400">Formato</label>
+              <label class="text-xs font-semibold text-zinc-400">🎬 Formato — la estructura del reel (dejá Automático si dudás)</label>
               <select id="r-formato" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
                 <option value="auto">Automático (mejor)</option>
                 <option>Manita</option>
@@ -179,22 +207,23 @@
       <div class="space-y-4">
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
           <div>
-            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <label class="text-xs font-semibold text-zinc-400">📂 Categoría — el área del problema de tu cliente (dinero, miedo, tiempo…)</label>
             <select id="c-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Todas las categorías —</option>
             </select>
+            <label class="mt-2 block text-xs font-semibold text-zinc-400">🎯 Dolor — el problema concreto del cliente que ataca este contenido</label>
             <select id="c-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Elige un dolor específico (opcional) —</option>
             </select>
             <p id="c-dolor-hint" class="text-[11px] text-emerald-400/80 mt-1 hidden"></p>
           </div>
           <div>
-            <label class="text-xs font-semibold text-zinc-400">Tema / ángulo libre (opcional si elegiste dolor)</label>
+            <label class="text-xs font-semibold text-zinc-400">✍️ Tema — de qué hablás, con tus palabras (opcional si ya elegiste un dolor)</label>
             <textarea id="c-tema" rows="2" placeholder="Ej: cómo construir patrimonio con tu primer flip" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="text-xs font-semibold text-zinc-400">Plantilla</label>
+              <label class="text-xs font-semibold text-zinc-400">🖼️ Plantilla — la estructura del carrusel (dejá Automático si dudás)</label>
               <select id="c-plantilla" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
                 <option value="auto">Automático (mejor)</option>
                 <option>Referente famoso</option>
@@ -247,10 +276,11 @@
       <div class="space-y-4">
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
           <div>
-            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <label class="text-xs font-semibold text-zinc-400">📂 Categoría — el área del problema de tu cliente (dinero, miedo, tiempo…)</label>
             <select id="h-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Todas las categorías —</option>
             </select>
+            <label class="mt-2 block text-xs font-semibold text-zinc-400">🎯 Dolor — el problema concreto del cliente que ataca este contenido</label>
             <select id="h-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Elige un dolor específico (opcional) —</option>
             </select>
@@ -275,7 +305,7 @@
             </div>
           </div>
           <div>
-            <label class="text-xs font-semibold text-zinc-400">Tema (propiedad / lección / oferta / resultado)</label>
+            <label class="text-xs font-semibold text-zinc-400">✍️ Tema — qué mostrás hoy: una propiedad, una lección, una oferta o un resultado</label>
             <textarea id="h-tema" rows="2" placeholder="Ej: habitación amueblada disponible en zona X / cómo calculé el MAO de esta casa / lancé mi clase de los 4 números" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-2">
@@ -336,17 +366,18 @@
       <div class="space-y-4">
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
           <div>
-            <label class="text-xs font-semibold text-zinc-400">🎯 Dolor del avatar (banco de conocimiento)</label>
+            <label class="text-xs font-semibold text-zinc-400">📂 Categoría — el área del problema de tu cliente (dinero, miedo, tiempo…)</label>
             <select id="y-categoria" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Todas las categorías —</option>
             </select>
+            <label class="mt-2 block text-xs font-semibold text-zinc-400">🎯 Dolor — el problema concreto del cliente que ataca este contenido</label>
             <select id="y-dolor" class="mt-2 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-fuchsia-500 outline-none">
               <option value="">— Elige un dolor específico (opcional) —</option>
             </select>
             <p id="y-dolor-hint" class="text-[11px] text-emerald-400/80 mt-1 hidden"></p>
           </div>
           <div>
-            <label class="text-xs font-semibold text-zinc-400">Tema / ángulo libre (opcional si elegiste dolor)</label>
+            <label class="text-xs font-semibold text-zinc-400">✍️ Tema — de qué hablás, con tus palabras (opcional si ya elegiste un dolor)</label>
             <textarea id="y-tema" rows="2" placeholder="Ej: cómo analizar tu primera propiedad sin perder dinero" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm resize-none focus:border-fuchsia-500 outline-none"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-2">

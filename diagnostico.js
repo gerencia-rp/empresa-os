@@ -89,6 +89,7 @@ function dStartWizard(inspId) {
   const base = inspId ? D.inspecciones.find(x => x.id === inspId) : null;
   D.wizard = { id: base ? base.id : null, nombre_ref: base ? base.nombre_ref : '', direccion: base ? base.direccion : '', uso: base ? base.uso : 'compra', property_id: base ? base.property_id : null, numero_pisos: base ? (base.numero_pisos || 1) : 1, scores: base ? JSON.parse(JSON.stringify(base.scores || {})) : {}, raw: base ? JSON.parse(JSON.stringify(base.raw_answers || {})) : {}, limpieza: base ? (base.limpieza_items || []) : [], subScores: {}, idx: 0, avisos: [] };
   D.wizard.steps = dBuildSteps(D.wizard);
+  D.wizard.maxIdx = base ? D.wizard.steps.length - 1 : 0; // editar una existente = todos los pasos ya recorridos (minimapa clickeable)
   D.tab = 'evaluar'; dRender();
 }
 window.dStartWizard = dStartWizard;
@@ -112,8 +113,17 @@ function dTabEvaluar() {
   const av = (w.avisos || []).length ? `<div class="card" style="border-color:var(--amber);margin-bottom:10px"><div style="color:var(--amber);font-size:11px;font-weight:700">⚠ Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin-top:3px">• ${E(a)}</div>`).join('')}</div>` : '';
   const body = dStepBody(step, w, res);
   const nav = `<div style="display:flex;justify-content:space-between;margin-top:12px"><button class="btn ghost" ${w.idx === 0 ? 'disabled' : ''} onclick="dNav(-1)">← Atrás</button><span style="font-size:11px;color:var(--mut2);align-self:center">Paso ${w.idx + 1} de ${total} · ${step.seccion} · ${pct}%</span>${w.idx < total - 1 ? `<button class="btn" onclick="dNav(1)">Siguiente →</button>` : '<span></span>'}</div>`;
-  const chips = [...new Set(w.steps.map(s => s.seccion))].map(sec => `<span class="chip" style="${step.seccion === sec ? '' : 'opacity:.4'}">${sec}</span>`).join(' ');
-  return `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">${chips}</div>
+  // Minimapa del wizard: un chip por paso — actual resaltado, recorridos con ✓ (clickeables via dGoStep), futuros apagados
+  const maxIdx = Math.min(Math.max(w.maxIdx || 0, w.idx), total - 1);
+  const chips = w.steps.map((s, i) => {
+    const cur = i === w.idx, done = !cur && i <= maxIdx;
+    const label = (s.emoji ? s.emoji + ' ' : '') + E(s.titulo);
+    const base = 'flex:0 0 auto;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid var(--line);white-space:nowrap;';
+    if (cur) return `<span class="chip" style="${base}background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;border-color:transparent" title="Paso actual · ${E(s.seccion)}">${label}</span>`;
+    if (done) return `<span class="chip" style="${base}background:rgba(52,211,153,.12);color:var(--pos);cursor:pointer" title="Completado · volver a este paso" onclick="dGoStep(${i})">✓ ${label}</span>`;
+    return `<span class="chip" style="${base}background:transparent;color:var(--mut2);opacity:.5" title="Pendiente · ${E(s.seccion)}">${label}</span>`;
+  }).join('');
+  return `<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:4px;-webkit-overflow-scrolling:touch">${chips}</div>
     <div class="bar" style="margin-bottom:12px"><i style="width:${pct}%;background:linear-gradient(90deg,var(--a1),var(--a2))"></i></div>
     <div class="grid" style="grid-template-columns:1fr 300px">${`<div>${av}${body}${nav}</div>`}${panel}</div>`;
 }
@@ -142,20 +152,43 @@ function dReporte(w, res) {
     <table><tbody>${D.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${E(e.etapa)}</td><td style="text-align:right"><b class="${(res.etapas[e.etapa] || 0) >= 50 ? 'down' : ''}">${res.etapas[e.etapa] != null ? res.etapas[e.etapa] + '%' : '—'}</b></td></tr>`).join('')}</tbody></table>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="dSaveWizard()">💾 Guardar</button><button class="btn ghost" onclick="dPrellenar()">→ Estimador</button></div></div>`;
 }
-function dNav(dir) { const w = D.wizard; if (dir > 0 && w.idx === 0) { w.nombre_ref = (document.getElementById('d-nom') || {}).value || w.nombre_ref; w.direccion = (document.getElementById('d-dir') || {}).value || ''; w.property_id = (document.getElementById('d-pid') || {}).value || null; if (!w.nombre_ref.trim()) { alert('El Nombre / Referencia es obligatorio.'); return; } } w.idx = Math.max(0, Math.min(w.steps.length - 1, w.idx + dir)); dRender(); }
+function dNav(dir) { const w = D.wizard; if (dir > 0 && w.idx === 0) { w.nombre_ref = (document.getElementById('d-nom') || {}).value || w.nombre_ref; w.direccion = (document.getElementById('d-dir') || {}).value || ''; w.property_id = (document.getElementById('d-pid') || {}).value || null; if (!w.nombre_ref.trim()) { alert('El Nombre / Referencia es obligatorio.'); return; } } w.idx = Math.max(0, Math.min(w.steps.length - 1, w.idx + dir)); w.maxIdx = Math.max(w.maxIdx || 0, w.idx); dRender(); }
+function dGoStep(i) { // salto directo desde el minimapa — SOLO a pasos ya recorridos
+  const w = D.wizard; if (!w) return;
+  i = Math.max(0, Math.min(w.steps.length - 1, +i || 0));
+  if (i > Math.max(w.maxIdx || 0, w.idx)) return; // futuros: no clickeables
+  if (w.idx === 0 && i > 0) { // mismo guard de Datos básicos que dNav
+    w.nombre_ref = (document.getElementById('d-nom') || {}).value || w.nombre_ref;
+    w.direccion = (document.getElementById('d-dir') || {}).value || '';
+    w.property_id = (document.getElementById('d-pid') || {}).value || null;
+    if (!w.nombre_ref.trim()) { alert('El Nombre / Referencia es obligatorio.'); return; }
+  }
+  w.idx = i; w.maxIdx = Math.max(w.maxIdx || 0, w.idx); dRender();
+}
 function dSetPisos(n) { D.wizard.numero_pisos = n; D.wizard.steps = dBuildSteps(D.wizard); dNav(1); }
 function dSetScore(k, p, s, isSub) { const w = D.wizard; if (isSub) { w.subScores[k] = w.subScores[k] || {}; w.subScores[k][p] = s; } else { w.scores[k] = w.scores[k] || {}; w.scores[k][p] = s; } dRender(); }
 function dSetRed(red, val) { const w = D.wizard; w.raw.redes = w.raw.redes || {}; w.raw.redes[red] = val; const noF = ['plomeria', 'gas', 'electricidad'].filter(r => w.raw.redes[r] === 'no_funciona').length; const pct = noF * (Dcfg('red_peso_pct', 33.33) / 100); const score = pct <= 0 ? 1 : Math.min(5, 1 + Math.round(pct * 4)); w.scores.redes = {}; D.patologias.forEach(p => w.scores.redes[p.key] = score); if (val === 'no_funciona') { const a = `Necesitás tramitar permisos para restablecer el servicio de: ${red}`; if (!w.avisos.includes(a)) w.avisos.push(a); } dRender(); }
 function dSetCarp(c, v) { const w = D.wizard; w.raw.carpinteria = w.raw.carpinteria || {}; w.raw.carpinteria[c] = +v || 0; const r = w.raw.carpinteria; const mal = (r.ventanas_mal || 0) + (r.puertas_int_mal || 0) + (r.gabinetes_mal || 0); const tot = (r.ventanas_tot || 0) + (r.puertas_int_tot || 0) + (r.gabinetes_tot || 0); const ratio = tot > 0 ? mal / tot : 0; const score = ratio <= 0 ? 1 : Math.min(5, 1 + Math.round(ratio * 4)); w.scores.carpinteria = {}; D.patologias.forEach(p => w.scores.carpinteria[p.key] = score); dRender(); }
 function dToggleLimpieza(it) { const w = D.wizard; w.limpieza = w.limpieza || []; const i = w.limpieza.indexOf(it); if (i >= 0) w.limpieza.splice(i, 1); else w.limpieza.push(it); dRender(); }
-window.dNav = dNav; window.dSetPisos = dSetPisos; window.dSetScore = dSetScore; window.dSetRed = dSetRed; window.dSetCarp = dSetCarp; window.dToggleLimpieza = dToggleLimpieza;
+window.dNav = dNav; window.dGoStep = dGoStep; window.dSetPisos = dSetPisos; window.dSetScore = dSetScore; window.dSetRed = dSetRed; window.dSetCarp = dSetCarp; window.dToggleLimpieza = dToggleLimpieza;
+function dToast(msg, ms) { // feedback breve no bloqueante (usa window.toast si existe)
+  if (typeof window.toast === 'function') { window.toast(msg); return; }
+  let t = document.getElementById('d-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'd-toast'; t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .25s;max-width:90vw;text-align:center'; document.body.appendChild(t); }
+  t.textContent = msg; clearTimeout(t._h1); clearTimeout(t._h2);
+  requestAnimationFrame(() => { t.style.opacity = '1'; });
+  t._h1 = setTimeout(() => { t.style.opacity = '0'; }, ms || 2400);
+  t._h2 = setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, (ms || 2400) + 400);
+}
+window.dToast = dToast;
 async function dSaveWizard() {
   const w = D.wizard, res = dWizardCompute();
+  dToast('💾 Guardando…', 6000);
   const row = { property_id: w.property_id || null, nombre_ref: w.nombre_ref, direccion: w.direccion || null, uso: w.uso || null, numero_pisos: w.numero_pisos || 1, scores: w.scores, raw_answers: w.raw, limpieza_items: w.limpieza || [], dano_global_pct: res.global, dano_divisiones: res.divisiones, dano_patologias: res.patologias, dano_etapas: res.etapas, veredicto: dVeredicto(res.global), estado: 'completa', updated_at: new Date().toISOString() };
   const { data: { session } } = await sb.auth.getSession(); row.created_by = (session && session.user && session.user.email) || 'diagnostico';
   let error; if (w.id) ({ error } = await sb.from('remodel_inspecciones').update(row).eq('id', w.id)); else ({ error } = await sb.from('remodel_inspecciones').insert(row));
   if (error) { alert('No se pudo guardar: ' + error.message); return; }
-  alert('✅ Inspección guardada' + (res.global != null ? ` — daño global ${res.global}%` : ''));
+  dToast('✅ Inspección guardada' + (res.global != null ? ' — daño global ' + res.global + '%' : ''));
   D.wizard = null; await dLoad(); D.tab = 'db'; dRender();
 }
 function dPrellenar() { const w = D.wizard, res = dWizardCompute(); try { localStorage.setItem('rm_insp_handoff', JSON.stringify({ property_id: w.property_id, nombre: w.nombre_ref, direccion: w.direccion, uso: w.uso, afectacion_por_etapa: res.etapas, dano_global: res.global })); } catch (e) {} alert(`Handoff listo para el Estimador Pro (${w.nombre_ref}).\nAbrí Remodelación → Estimador: arranca con estas afectaciones por etapa.`); }
