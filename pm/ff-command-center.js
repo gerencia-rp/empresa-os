@@ -50,6 +50,7 @@ function ffDQBadge(dq) {
 function ffDQBar(comp) {
   const k = comp.kpi; const flagged = k.revisar + k.sinDatos;
   if (!flagged && !k.preliminar) return `<div class="ff-dqbar clean"><div><div class="t">✓ Datos consistentes</div><div class="d">${k.confiablesN}/${k.total} deals confiables · sin valores imposibles</div></div></div>`;
+  if (!flagged) return `<div class="ff-dqbar clean"><div><div class="t">✓ Datos consistentes · ${k.preliminar} en obra</div><div class="d">${k.confiablesN}/${k.total} deals confiables · los ${k.preliminar} preliminares (obra en curso) no entran en promedios hasta terminar 🏗</div></div></div>`;
   const revNames = k.revisarList.map(d => `${FF_ESC(ffShort(d.address))} (${Math.round(d.allInPct * 100)}%)`).join(', ');
   return `<div class="ff-dqbar"><div><div class="t">⚠ ${flagged} deal(s) con datos a revisar</div><div class="d">${k.revisar} imposibles (all-in > 100% ARV) · ${k.sinDatos} sin datos · ${k.preliminar} preliminares (obra en curso). <b>Excluidos de promedios/márgenes.</b></div></div>${revNames ? `<div class="lst">${revNames}</div>` : ''}</div>`;
 }
@@ -415,7 +416,7 @@ function ffSecCommand(comp) {
   const critTop = insights.find(i => i.sev === 'critical');
   const flaggedDQ = kpi.revisar + kpi.sinDatos;
   const verdict = crit > 0
-    ? kitVerdict('revisar', crit + (crit === 1 ? ' alerta crítica' : ' alertas críticas') + ' en el portafolio', (critTop ? critTop.tx + (critTop.action ? ' — 👉 ' + FF_ESC(critTop.action) : '') : '') + ' · <span class="chip" style="cursor:pointer" onclick="ffGo(\'cerebro\')">ver el detalle en el Cerebro →</span>')
+    ? kitVerdict('revisar', crit + (crit === 1 ? ' alerta crítica' : ' alertas críticas') + ' en el portafolio — <a style="cursor:pointer;text-decoration:underline" onclick="ffGo(\'cerebro\')">ver en el Cerebro</a>', (critTop ? critTop.tx + (critTop.action ? ' — 👉 ' + FF_ESC(critTop.action) : '') : ''))
     : flaggedDQ > 0
       ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. 🧹')
       : kitVerdict('go', 'Portafolio sano — sin alertas críticas 🎉', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
