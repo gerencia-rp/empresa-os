@@ -13,6 +13,8 @@ const UW = {
 const UW_M = n => (n == null || isNaN(n)) ? '—' : (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
 const UW_E = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function UWc(k, def) { const v = UW.cfg[k]; return v != null ? +v : def; }
+function UWct(k, def) { const v = (UW.cfgTxt || {})[k]; return v != null && v !== '' ? String(v) : def; }
+window.UWct = UWct;
 
 const UW_NAV = [
   ['negocio', '💵', 'Del Negocio', 'Draw + Cash to Close'],
@@ -26,13 +28,13 @@ const UW_NAV = [
 async function ffUwLoad() {
   try {
     const [cfg, deals, hml, an, draws] = await Promise.all([
-      sb.from('ff_uw_config').select('key, value').then(r => r.data || []),
+      sb.from('ff_uw_config').select('key, value, text_value').then(r => r.data || []),
       sb.from('ff_deals').select('*').eq('active', true).order('address').then(r => r.data || []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []),
       sb.from('ff_underwriting_analyses').select('*').eq('active', true).order('updated_at', { ascending: false }).limit(50).then(r => r.data || []),
       sb.from('ff_draws').select('address_norm, remodel_complete').eq('active', true).then(r => r.data || []),
     ]);
-    UW.cfg = {}; cfg.forEach(c => UW.cfg[c.key] = c.value);
+    UW.cfg = {}; UW.cfgTxt = {}; cfg.forEach(c => { UW.cfg[c.key] = c.value; if (c.text_value != null) UW.cfgTxt[c.key] = c.text_value; });
     UW.deals = deals; UW.analyses = an;
     UW.hml = {}; hml.forEach(h => { if (h.address_norm) UW.hml[h.address_norm] = h; });
     UW.draws = {}; (draws || []).forEach(dr => { if (dr.address_norm) UW.draws[dr.address_norm] = dr; });
@@ -314,6 +316,9 @@ function ffUwRender() {
 
 // ═══ VISTAS de las calculadoras 2-6 ═══
 function ffUwViewArv() {
+  // Calc 2 = ARV PROFESIONAL (pm/ff-arv-pro.js): tasador con comps RentCast ajustados estilo 1004.
+  // El ARV de Airtable sigue siendo la fuente de verdad de MAO/cash-out; el motor produce el estimado profesional.
+  if (window.ffArvProView) return ffArvProView();
   const inp = UW.a.inputs, o = ffUwComputeAll(), a = o.arv;
   const hero = UW_HERO('ARV (valor de reventa)', UW_M(a.probable), a.esAirtable ? 'de Airtable (fuente de verdad) &middot; confianza ' + a.confianza : 'estimado por comps &middot; confianza ' + a.confianza, a.esAirtable ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
   const izq = UW_CARD('2 &middot; ARV', 'El valor de la casa remodelada. La fuente de verdad es el ARV de Airtable.',
@@ -421,7 +426,7 @@ function ffUwRcSlot(endpoint) {
   const key = String(a.direccion || a.nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   return (UW.rentcast[key] || {})[endpoint];
 }
-window.ffUwRentcast = ffUwRentcast;
+window.ffUwRentcast = ffUwRentcast; window.ffUwRcSlot = ffUwRcSlot;
 // referencia de comps de RentCast (pestaña ARV)
 function ffUwRcCompsBox() {
   const s = ffUwRcSlot('value');

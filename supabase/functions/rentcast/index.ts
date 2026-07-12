@@ -1,6 +1,8 @@
 // RentCast proxy — la API key vive SOLO en el backend (RENTCAST_API_KEY secret).
 // El front nunca la ve; toda llamada pasa por acá con el header X-Api-Key.
-// GET/POST ?address=...&endpoint=value|rent&refresh=true
+// GET/POST ?address=...&endpoint=value|rent|property&refresh=true
+//   value    → /avm/value con compCount=20 (comps de venta para el ARV profesional)
+//   property → /properties (ficha del subject: sqft, camas, baños, año, lote, features)
 // Cache 30 días en rentcast_cache; cuenta llamadas en rentcast_usage (límite 50 gratis).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -29,7 +31,7 @@ Deno.serve(async (req) => {
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY);
     const key = norm(address);
-    const ep = endpoint === "rent" ? "avm_rent" : "avm_value";
+    const ep = endpoint === "rent" ? "avm_rent" : endpoint === "property" ? "property" : "avm_value";
 
     // cache
     if (!refresh) {
@@ -42,7 +44,9 @@ Deno.serve(async (req) => {
     // llamar RentCast
     const path = endpoint === "rent"
       ? `/avm/rent/long-term?address=${encodeURIComponent(address)}`
-      : `/avm/value?address=${encodeURIComponent(address)}`;
+      : endpoint === "property"
+        ? `/properties?address=${encodeURIComponent(address)}`
+        : `/avm/value?address=${encodeURIComponent(address)}&compCount=20`;
     const res = await fetch(`https://api.rentcast.io/v1${path}`, { headers: { "X-Api-Key": KEY, Accept: "application/json" } });
     // contar la llamada (aunque falle, consume cuota si llegó al server)
     const { data: u } = await db.from("rentcast_usage").select("llamadas").eq("id", 1).maybeSingle();
@@ -52,8 +56,11 @@ Deno.serve(async (req) => {
       const txt = await res.text();
       return json({ ok: false, disponible: false, status: res.status, error: `RentCast ${res.status}: ${txt.slice(0, 160)}`, llamadas: (u?.llamadas || 0) + 1 }, 200);
     }
-    const data = await res.json();
-    const value = endpoint === "rent" ? (data.rent ?? data.rentEstimate ?? null) : (data.price ?? data.value ?? null);
+    let data = await res.json();
+    if (endpoint === "property" && Array.isArray(data)) data = data[0] || null;   // /properties devuelve array
+    const value = endpoint === "rent" ? (data?.rent ?? data?.rentEstimate ?? null)
+      : endpoint === "property" ? (data?.squareFootage ?? null)
+      : (data?.price ?? data?.value ?? null);
 
     await db.from("rentcast_cache").upsert({ address_norm: key, endpoint: ep, address, payload: data, value, fetched_at: new Date().toISOString(), active: true, archived_at: null }, { onConflict: "address_norm,endpoint" });
 

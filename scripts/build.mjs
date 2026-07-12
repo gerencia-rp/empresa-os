@@ -43,6 +43,7 @@ const BUNDLE_FILES = [
   "pm/command-center.js",
   "pm/ff-command-center.js",
   "pm/ff-underwriting.js",
+  "pm/ff-arv-pro.js",
   "os/os.js",
   "os/os-admin.js",
   "os/os-cierre-engine.js",

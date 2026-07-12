@@ -21,7 +21,7 @@ const T = {
 };
 
 const F = {
-  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M" },
+  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M", apprLink: "fldOg97WmkVIQ0k0o" },
   draws: { dir: "fldEU8dXcmwovZP16", total: "fld208iuposxA20W0", meses: "fldEVC4tKVI5gnvrm", intHml: "fldf3D0KEwJv8CLZA", utilHml: "fldXsh3w2phWLiAmE", intRent: "fldH5ARDkRu1QL3Ny", utilRent: "fldpmyUxjat9b1s2d", muebles: "fldXwCW30iscTn3iL", appraisal: "fldSB6YjUmMZku28J", otros: "fld7D7gN3GuhTMzaU", rent: "fldOezTNcwnaWW7bD", refi: "fldEYY25oThUoOOIb", remodelRealLk: "fldr4DfeUx99NYC5R" },
   inv: { nombre: "fldI09roeZswP65PK", etiqueta: "fldaSlCHNfi5dqKDi", email: "fldoixuufPLltt6ZF", tel: "fldZKnOD3pu8CP3WS", ciudad: "fldSvCPZsP5J1Mhf4", estado: "fldQukBRQ8bhCrffa", rangos: "fldnguKQ6cgTiBNBR", w9: "fldyLYGF9RuHQw2si", socio: "fldB0k2KTsR4rvZHJ", socioNombre: "fld5rdexk6h7iJ1UZ", propLink: "fldJZcAtnPeC8EN1c", capLookup: "fldXMQGQDauo5HnnV", capPagado: "fld0oPQaFZK8Drv3h" },
   eq: { name: "fldSsNBs1zQ6YZPxm", salario: "fldRIzVjmccCPyslQ", mes: "fldwdnqHKkr4Pvl9y", nombre: "fldckFo7H81jAMaBY" },
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
         airtable_id: r.id, address: addr, address_norm: norm(addr), city: f[F.deals.ciudad] || null,
         stage: stageNorm(f[F.deals.estado]), strategy: (() => { const s = (sel(f[F.deals.estrategia]) || "").toLowerCase(); return s.includes("flip") ? "flip" : s ? "hold" : null; })(),
         purchase_price: num(f[F.deals.compra]), remodel_est: num(f[F.deals.remodelEst]), arv: num(f[F.deals.arv]),
-        appraisal: num(f[F.deals.appraisal]), hml_payment: num(f[F.deals.hmlPago]), ref30_payment: num(f[F.deals.ref30]),
+        appraisal: num(f[F.deals.appraisal]), appraisal_link: f[F.deals.apprLink] || null, hml_payment: num(f[F.deals.hmlPago]), ref30_payment: num(f[F.deals.ref30]),
         sqft: num(f[F.deals.sqft]), cashout: num(f[F.deals.cashout]), close_date: f[F.deals.cierre] || null,
         investor_rec_ids: linkIds(f[F.deals.invLink]),
         capital_inversionista: num(f[F.deals.capInv]) ?? num(f[F.deals.capAportado]),
