@@ -1,0 +1,110 @@
+/* ════════════════════════════════════════════════════════════════
+   🎨 EMPRESA OS · TOKENS CANÓNICOS (Fase 0 del sistema de diseño)
+   Fuente de verdad de la paleta. El shell (os/os.js osInjectCSS) mantiene
+   un ESPEJO de estas variables scoped a #os-root — si cambiás acá, sincronizá allá.
+   Dos familias unificadas por alias:
+     shell:  --bg --ink --mut --mut2 --glass --glassb --a1 --a2 --a3 --pos --neg --amber
+     FF/UW:  --card --line --txt2 --txt3  (alias — NO definir de nuevo en módulos)
+   REGLAS (gobernanza): toda superficie nueva importa este archivo + ui/kit.js.
+   Prohibido: Tailwind nuevo, :root propios por módulo, hex/rgba de paleta inline.
+   Contraste: ningún texto legible por debajo de --mut2.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── DARK (default del OS) ── */
+  --bg: #06080d;
+  --ink: #eef2f8;
+  --mut: #93a0b6;
+  --mut2: #5b6780;
+  --glass: rgba(255, 255, 255, .045);
+  --glassb: rgba(255, 255, 255, .09);
+  --a1: #45e3c6;
+  --a2: #4f8dff;
+  --a3: #8a7bff;
+  --pos: #48d69c;
+  --neg: #f0687a;
+  --amber: #e7b65e;
+  --bggrad: linear-gradient(180deg, #070a11, #05070c);
+  /* alias familia FF/UW */
+  --card: rgba(255, 255, 255, .045);
+  --line: rgba(255, 255, 255, .12);
+  --txt2: #c9d5ea;
+  --txt3: #9fb0c9;
+  /* superficies */
+  --radius: 18px;
+  --shadow: 0 26px 60px -34px rgba(0, 0, 0, .9);
+  --amber-bg: rgba(231, 182, 94, .14);
+}
+
+/* ── LIGHT (canon CEO 12-jul: tinte suave de fondo + tarjetas blancas con sombra) ── */
+[data-theme="light"] {
+  --bg: #eef1f7;              /* NO blanco puro: las tarjetas resaltan */
+  --ink: #0f172a;
+  --mut: #475569;             /* secundario más oscuro que antes */
+  --mut2: #64748b;            /* caption — MÍNIMO permitido de contraste */
+  --glass: #ffffff;           /* tarjetas blancas */
+  --glassb: #e2e8f0;
+  --a1: #2563eb;
+  --a2: #1d4ed8;
+  --a3: #6b5bef;
+  --pos: #0f9d6b;
+  --neg: #dc2626;
+  --amber: #b45309;           /* texto sólido, nunca rgba tenue */
+  --bggrad: linear-gradient(180deg, #f3f5fa, #e9edf5);
+  --card: #ffffff;
+  --line: #e2e8f0;
+  --txt2: #334155;
+  --txt3: #64748b;
+  --shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 6px 16px rgba(15, 23, 42, .06);
+  --amber-bg: #fef3c7;
+}
+
+/* ════════ COMPONENTES BASE (baja especificidad: los módulos pueden refinar) ════════ */
+
+.ui-card, .card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Botones canónicos (.btn absorbe .cbtn; .btn-ghost absorbe .ibtn/.repbtn.ghost) */
+.btn {
+  background: linear-gradient(135deg, var(--a1), var(--a2));
+  border: none; color: #fff; font-weight: 700;
+  padding: 9px 16px; border-radius: 11px; cursor: pointer; font-size: 12.5px;
+}
+[data-theme="light"] .btn { color: #fff; }
+:root:not([data-theme="light"]) .btn { color: #04121a; }
+.btn-ghost {
+  background: var(--card); border: 1px solid var(--line); color: var(--ink);
+  font-weight: 600; padding: 9px 14px; border-radius: 11px; cursor: pointer; font-size: 12.5px;
+}
+.btn-ghost:hover { border-color: var(--a2); }
+/* .repbtn vivía indefinido en el shell (bug de la auditoría) — se define acá */
+.repbtn { background: linear-gradient(135deg, var(--a1), var(--a2)); border: none; color: #fff; font-weight: 700; padding: 7px 13px; border-radius: 10px; cursor: pointer; font-size: 12px; }
+.repbtn.ghost { background: var(--card); border: 1px solid var(--line); color: var(--ink); font-weight: 600; }
+.repbtn.ghost:hover { border-color: var(--a2); }
+
+/* Badges con contraste garantizado en ambos temas */
+.badge { font-size: 10px; padding: 3px 9px; border-radius: 7px; font-weight: 600; }
+.b-ok   { background: rgba(72, 214, 156, .14); color: var(--pos); }
+.b-red  { background: rgba(240, 104, 122, .14); color: var(--neg); }
+.b-warn { background: var(--amber-bg); color: var(--amber); }
+
+/* Estados */
+.ui-empty { padding: 44px; text-align: center; color: var(--mut2); font-size: 13px; }
+.ui-error { background: rgba(220, 38, 38, .1); border: 1px solid rgba(220, 38, 38, .35); color: var(--neg); border-radius: 10px; padding: 10px 13px; font-size: 12.5px; }
+
+/* ════════ QUICK WINS GLOBALES ════════ */
+
+/* Tablas densas: scroll propio, nunca desbordar la página */
+.overx { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+#os-root .card:has(table) { overflow-x: auto; }
+
+/* Responsive: grids del OS a 1 columna en celular */
+@media (max-width: 768px) {
+  #os-root .k4, #os-root .k3, #os-root .k2,
+  .grid.k4, .grid.k3, .grid.k2 { grid-template-columns: 1fr !important; }
+  #os-root .wrap { padding: 14px 12px 40px; }
+}

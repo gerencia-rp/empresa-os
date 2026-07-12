@@ -64,9 +64,10 @@ function osInjectCSS() {
     --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
     --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#070a11,#05070c);
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  #os-root[data-theme="light"]{--bg:#eef2f8;--ink:#0f1c2e;--mut:#48566e;--mut2:#8595ac;--glass:rgba(255,255,255,.82);--glassb:rgba(15,23,42,.09);
-    --a1:#12b5a0;--a2:#2f6ef0;--a3:#6b5bef;--pos:#0ea371;--neg:#e0455f;--amber:#c98a1e;
-    --mesh1:rgba(18,181,160,.1);--mesh2:rgba(47,110,240,.1);--mesh3:rgba(107,91,239,.08);--bggrad:linear-gradient(180deg,#f6f8fc,#eaf0f8)}
+  /* LIGHT canon CEO 12-jul — ESPEJO de ui/tokens.css (mantener sincronizado) */
+  #os-root[data-theme="light"]{--bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
+    --a1:#2563eb;--a2:#1d4ed8;--a3:#6b5bef;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309;
+    --mesh1:rgba(37,99,235,.06);--mesh2:rgba(29,78,216,.05);--mesh3:rgba(107,91,239,.05);--bggrad:linear-gradient(180deg,#f3f5fa,#e9edf5)}
   #os-root *{box-sizing:border-box;margin:0;padding:0}
   #os-root .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(760px 520px at 8% -6%,var(--mesh1),transparent 58%),radial-gradient(820px 560px at 100% 4%,var(--mesh2),transparent 56%),radial-gradient(700px 620px at 70% 118%,var(--mesh3),transparent 60%),var(--bggrad)}
   #os-root .wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:22px 30px 60px}
@@ -82,7 +83,8 @@ function osInjectCSS() {
   #os-root .sub{color:var(--mut);font-size:13px;margin:5px 0 20px}
   #os-root .grid{display:grid;gap:16px}#os-root .k4{grid-template-columns:repeat(4,minmax(0,1fr))}#os-root .k3{grid-template-columns:repeat(3,minmax(0,1fr))}#os-root .k2{grid-template-columns:repeat(2,minmax(0,1fr))}
   #os-root .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:16px;padding:19px;backdrop-filter:blur(18px);box-shadow:0 26px 60px -34px rgba(0,0,0,.9);transition:.2s;overflow:hidden}
-  #os-root[data-theme="light"] .card{box-shadow:0 10px 30px -18px rgba(15,23,42,.22)}
+  #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
+  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#fef3c7;color:#b45309;border-color:#fcd34d}
   #os-root .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
   #os-root[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(15,23,42,.1),transparent)}
   #os-root .lab{font-size:10px;letter-spacing:1.4px;color:var(--mut2);text-transform:uppercase;font-weight:700}

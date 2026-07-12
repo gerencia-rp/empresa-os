@@ -4,6 +4,16 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎨 REGLA DURA — SISTEMA DE DISEÑO (12-jul, Fase 0 aprobada por el CEO)
+
+- **Toda superficie nueva importa `ui/tokens.css` + usa `ui/kit.js`** (kitMoney/kitMoney2/kitHero/kitCard/kitRow/kitInput/kitInputSm/kitBadge/kitEmpty/kitLoading/kitError — globales del bundle). **PROHIBIDO**: Tailwind nuevo, `:root`/paleta propia por módulo, hex/rgba de paleta inline. Familia canónica = la del shell (`--bg/--ink/--mut/--mut2/--glass/--glassb/--a1/--a2/--pos/--neg/--amber`); la familia FF (`--card/--line/--txt2/--txt3`) vive como ALIAS en tokens.css — no redefinirla.
+- **Regla "sin dato ≠ $0"**: todo KPI usa `kitMoney(n)` (null→'—'), jamás un $0 mudo. **Contraste**: ningún texto legible por debajo de `--mut2`; badges amber en light = texto sólido `#b45309` sobre `#fef3c7`.
+- **LIGHT canon** (CEO): `--bg:#eef1f7` (tinte, no blanco) · tarjetas `#ffffff` + borde `#e2e8f0` + sombra `0 1px 2px rgba(15,23,42,.05), 0 6px 16px rgba(15,23,42,.06)` + radio 16-20 · `--ink:#0f172a/--mut:#475569/--mut2:#64748b` · `--a1:#2563eb/--pos:#0f9d6b/--neg:#dc2626/--amber:#b45309`. ⚠ `osInjectCSS` (os/os.js) mantiene un ESPEJO scoped a #os-root — sincronizar si cambian los tokens.
+- Quick wins globales en tokens.css: media query ≤768px (grids k2/k3/k4 → 1 col), `.overx` + `#os-root .card:has(table){overflow-x:auto}`, `.repbtn` por fin definido (el shell lo usaba sin definirlo).
+- 🪦 **Zombies borrados (12-jul)**: `cleaning-planner.js`, `ops-planner.js` (ya redirigían a Cronograma) y `remodel-dashboard.js` (reemplazado por el RC CC; `app.js` redirige el type legacy) — bundle −467 KB. **Auditoría completa de las 37 superficies (semáforos + problemas) en la conversación del 12-jul**; olas pendientes: replicar patrón Cash-Out en Intereses/Ingreso/Negocio · modernizar clásicos (PM/Cronograma/Estimador) · unificar standalone — revisar UNA POR UNA con el CEO antes de aplicar.
+
+---
+
 ## 🎯 Estado (12 Jul 2026 — 🏷️ ARV PROFESIONAL: Calc 2 = tasador con comps RentCast) · EN VIVO
 
 - 🏷️ **Calc 2 rehecha como TASADOR 1004** (rama `feat/ff-arv-profesional`, módulo `pm/ff-arv-pro.js` en index+BUNDLE): dirección → **RentCast** (edge fn `rentcast` v5: endpoint nuevo `property` = subject sqft/camas/baños/año/lote/features + `value` con `compCount=20`; cache 30d, cuota 50 — 7 usadas) → **filtros del tasador** (dist 0.8mi / 12m / sqft ±25% / camas / baños / año, checkbox por comp, 3–8) → **motor de ajustes por comp** (GLA $/sqft con override por zip `arv_adj_gla_psf_<zip>`, cuarto/baño $15k, año %/año, lote $/sqft, tendencia %/mes + manuales: condición/ubicación/concesiones/otros[piscina-garaje-fireplace]; RentCast NO trae features del comp → 🟡 manual) → valor ajustado + **Net/Gross Adj %** (warn >25%) → **reconciliación ponderada 1/(gross+2)** → ARV + rango ±6% + confianza (n/gross prom/dispersión). **NUNCA $/sqft promedio × sqft.** Estado en `UW.a.inputs.arvpro` (persiste con el análisis). ARV Airtable sigue de fuente de verdad; botón explícito "usar como ARV".

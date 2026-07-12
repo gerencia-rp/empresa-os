@@ -18,6 +18,7 @@ const DIST = path.join(ROOT, "dist");
 //             deal-rules antes que loan-calculator y property-analyzer.
 const BUNDLE_FILES = [
   "ui-toolkit.js",
+  "ui/kit.js",           // 🎨 UI kit del sistema de diseño (kitMoney/kitHero/… — Fase 0)
   "lib/deal-rules.js",
   "app.js",
   "estimator.js",
@@ -36,8 +37,6 @@ const BUNDLE_FILES = [
   "remodel-forecast.js",
   "remodel-inspeccion.js",
   "weekly-planner.js",
-  "ops-planner.js",
-  "cleaning-planner.js",
   "pm/cronograma.js",
   "pm/pos-theme.js",
   "pm/command-center.js",
@@ -51,7 +50,6 @@ const BUNDLE_FILES = [
   "os/inv-engine.js",
   "os/inv-admin.js",
   "os/os-ia.js",
-  "remodel-dashboard.js",
   "remodel-command-center.js",
   "remodel-reportes.js",
   "clickup-dashboard.js",
@@ -72,6 +70,7 @@ const BUNDLE_FILES = [
 
 // Archivos que se copian tal cual (no van al bundle)
 const STATIC_COPY = [
+  "ui/tokens.css",       // 🎨 tokens canónicos (index.html los linkea)
   "propuesta.html",
   "inversionista.html",
   "os/inv-engine.js",
