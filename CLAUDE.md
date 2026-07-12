@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (12 Jul 2026 — 🏷️ ARV PROFESIONAL: Calc 2 = tasador con comps RentCast) · EN VIVO
+
+- 🏷️ **Calc 2 rehecha como TASADOR 1004** (rama `feat/ff-arv-profesional`, módulo `pm/ff-arv-pro.js` en index+BUNDLE): dirección → **RentCast** (edge fn `rentcast` v5: endpoint nuevo `property` = subject sqft/camas/baños/año/lote/features + `value` con `compCount=20`; cache 30d, cuota 50 — 7 usadas) → **filtros del tasador** (dist 0.8mi / 12m / sqft ±25% / camas / baños / año, checkbox por comp, 3–8) → **motor de ajustes por comp** (GLA $/sqft con override por zip `arv_adj_gla_psf_<zip>`, cuarto/baño $15k, año %/año, lote $/sqft, tendencia %/mes + manuales: condición/ubicación/concesiones/otros[piscina-garaje-fireplace]; RentCast NO trae features del comp → 🟡 manual) → valor ajustado + **Net/Gross Adj %** (warn >25%) → **reconciliación ponderada 1/(gross+2)** → ARV + rango ±6% + confianza (n/gross prom/dispersión). **NUNCA $/sqft promedio × sqft.** Estado en `UW.a.inputs.arvpro` (persiste con el análisis). ARV Airtable sigue de fuente de verdad; botón explícito "usar como ARV".
+- 📏 **Calibración/aprendizaje**: `ff_deals.appraisal_link` espejado (Link Appraisal `fldOg97WmkVIQ0k0o`, sync deployado por `npx supabase@latest functions deploy --use-api` — el npx FUNCIONA aunque el CLI local esté roto) — 28/28 con PDF 📄. Tabla de 15 casas ARV vs appraisal (12 usadas + 3 excluidas de `arv_calib_excluir`: Capitol/Stonleigh/Barkbridge[/Slaughter]): |error| prom 9.0%, sesgo +4.2%, **sugerencia de bias que aplica un humano** (`arv_bias_pct` + por zip n≥3). 25 keys `arv_*` en `ff_uw_config`, TODAS editables desde la UI (`apCfgSet`). Meta <5% con semáforo.
+- ✅ Demo real Shadow Bend: subject 1744sf/2bñ/1977 (camas 🟡 manual), 20 comps → 12 pasan filtros → 8 reconciliados → **ARV $467,526** (rango 439–496k) vs Airtable $460k (Δ+7.5k) vs appraisal $535k (−12.6% — ni los comps llegan al appraisal: señal honesta). QA prod 10/10 (0 pageerrors, excluir comp recalcula, 15 PDFs).
+
+---
+
 ## 🎯 Estado (11 Jul 2026 · tarde — 🏭 IA v3.1: modo ECONÓMICO, Haiku + Prompt Poderoso) · DEPLOYADO (⚠ sin créditos API)
 
 - 💸 **Optimización de costo sobre v3**: la entrevista corre ENTERA en **Haiku** (`claude-haiku-4-5-20251001`, ~$0.01-0.03/wizard vs ~$1 con Opus) y **se QUITÓ el auto-build por API** (sin build Opus 16k, sin verificador Sonnet, sin action `publicar`). Tools quedan 2: `preguntar` (ficha en cada turno, igual) + **`finalizar`** → el **PROMPT PODEROSO lo arma el SERVIDOR** (plantilla maestra Guía v2 fija: 10 campos + requisitos técnicos anti-hardcode/anti-red + instrucción de entrega con insert a `ia_artifacts`) — determinista, costo cero.
