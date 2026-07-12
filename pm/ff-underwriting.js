@@ -32,7 +32,7 @@ async function ffUwLoad() {
       sb.from('ff_deals').select('*').eq('active', true).order('address').then(r => r.data || []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []),
       sb.from('ff_underwriting_analyses').select('*').eq('active', true).order('updated_at', { ascending: false }).limit(50).then(r => r.data || []),
-      sb.from('ff_draws').select('address_norm, remodel_complete').eq('active', true).then(r => r.data || []),
+      sb.from('ff_draws').select('address_norm, remodel_complete, hml_months, interest_hml, interest_until_rent').eq('active', true).then(r => r.data || []),
       // mezcla real de unidades (Rentas) para la Calc 5 — bajo RLS sin área rentas devuelve []
       sb.from('pm_properties').select('id,property_id,name').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('pm_units').select('property_id,unit_type,name,target_rent').eq('active', true).then(r => r.data || []).catch(() => []),
