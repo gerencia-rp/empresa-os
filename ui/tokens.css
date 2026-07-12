@@ -124,6 +124,18 @@
    de módulo (0-1-0). Todo CSS inyectado por un módulo que viva dentro de un
    overlay con reset DEBE scopear sus selectores con el ID del contenedor. */
 
+/* ── SUPERVIVENCIA DE LOS COMPONENTES DEL KIT dentro de los 4 overlays con reset
+   (#os-root, #ff-overlay, #cc-overlay, #rc-overlay). Sin esto, los paddings de
+   las clases bare de este archivo mueren ahí adentro. Overlay nuevo con reset → sumarlo acá. */
+#os-root .btn, #ff-overlay .btn, #cc-overlay .btn, #rc-overlay .btn { padding: 9px 16px; }
+#os-root .btn-ghost, #ff-overlay .btn-ghost, #cc-overlay .btn-ghost, #rc-overlay .btn-ghost { padding: 9px 14px; }
+#os-root .repbtn, #ff-overlay .repbtn, #cc-overlay .repbtn, #rc-overlay .repbtn { padding: 7px 13px; }
+#os-root .badge, #ff-overlay .badge, #cc-overlay .badge, #rc-overlay .badge { padding: 3px 9px; }
+#os-root .tag-grad, #ff-overlay .tag-grad, #cc-overlay .tag-grad, #rc-overlay .tag-grad { padding: 3px 10px; }
+#os-root .ui-empty, #ff-overlay .ui-empty, #cc-overlay .ui-empty, #rc-overlay .ui-empty { padding: 44px; }
+#os-root .ui-error, #ff-overlay .ui-error, #cc-overlay .ui-error, #rc-overlay .ui-error { padding: 10px 13px; }
+#os-root .ui-row, #ff-overlay .ui-row, #cc-overlay .ui-row, #rc-overlay .ui-row { gap: 12px; }
+
 /* Tablas densas: scroll propio, nunca desbordar la página */
 .overx { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
 #os-root .card:has(table) { overflow-x: auto; }
