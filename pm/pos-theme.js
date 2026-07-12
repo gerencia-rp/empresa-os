@@ -78,7 +78,7 @@ window.posInjectGlobalCSS = function () {
   #auth-screen input{background:rgba(6,9,16,.5) !important;border:1px solid rgba(255,255,255,.13) !important;color:#eef2f8 !important;border-radius:12px !important;padding:11px 13px !important}
   html[data-osreskin="light"] #auth-screen input{background:#fff !important;border-color:rgba(15,23,42,.14) !important;color:#0f1c2e !important}
   #auth-screen input:focus{border-color:#4f8dff !important;outline:none;box-shadow:0 0 0 3px rgba(79,141,255,.18) !important}
-  #auth-screen #auth-login-btn{background:linear-gradient(135deg,#45e3c6,#4f8dff) !important;color:#04121a !important;border-radius:12px !important;font-weight:750;box-shadow:0 10px 26px -10px rgba(79,141,255,.6) !important}
+  #auth-screen #auth-login-btn{background:linear-gradient(135deg,#45e3c6,#4f8dff) !important;color:#fff !important;border-radius:12px !important;font-weight:750;box-shadow:0 10px 26px -10px rgba(79,141,255,.6) !important}
   #auth-screen #auth-login-btn:hover{filter:brightness(1.06)}
   #auth-screen #auth-signup-btn{background:rgba(255,255,255,.07) !important;color:#eef2f8 !important;border:1px solid rgba(255,255,255,.13) !important;border-radius:12px !important;font-weight:600}
   html[data-osreskin="light"] #auth-screen #auth-signup-btn{background:rgba(15,23,42,.05) !important;color:#0f1c2e !important;border-color:rgba(15,23,42,.12) !important}
@@ -168,10 +168,10 @@ window.posInjectDesignSystem = function () {
   html[data-osreskin] #modal .text-amber-900,html[data-osreskin] #modal .text-amber-800,html[data-osreskin] #modal .text-amber-700,html[data-osreskin] #modal .text-amber-600,html[data-osreskin] #modal .text-yellow-700,html[data-osreskin] #modal .text-orange-700{color:var(--amber) !important}
   html[data-osreskin] #modal .text-red-900,html[data-osreskin] #modal .text-red-800,html[data-osreskin] #modal .text-red-700,html[data-osreskin] #modal .text-red-600,html[data-osreskin] #modal .text-rose-700{color:var(--neg) !important}
   html[data-osreskin] #modal .text-blue-900,html[data-osreskin] #modal .text-blue-800,html[data-osreskin] #modal .text-blue-700,html[data-osreskin] #modal .text-blue-600,html[data-osreskin] #modal .text-sky-700,html[data-osreskin] #modal .text-indigo-700{color:var(--a2) !important}
-  ${D} .bg-emerald-500,${D} .bg-emerald-600,${D} .bg-emerald-700{background:#0ea371 !important;color:#04121a !important}
+  ${D} .bg-emerald-500,${D} .bg-emerald-600,${D} .bg-emerald-700{background:#0ea371 !important;color:#fff !important}
   ${D} .bg-red-500,${D} .bg-red-600,${D} .bg-red-700{background:#dc4b63 !important;color:#fff !important}
   ${D} .bg-blue-500,${D} .bg-blue-600{background:#3b7fe0 !important;color:#fff !important}
-  ${D} .bg-amber-500,${D} .bg-amber-600{background:#c98a1e !important;color:#04121a !important}
+  ${D} .bg-amber-500,${D} .bg-amber-600{background:#c98a1e !important;color:#fff !important}
   /* ── estados vacío / carga ── */
   html[data-osreskin] #modal .animate-pulse{opacity:.5}
   `;
