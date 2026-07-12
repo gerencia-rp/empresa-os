@@ -220,24 +220,24 @@ function apCSS() {
   st.textContent = [
     '.ap-grad{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0))}',
     '.ap-card{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:16px;padding:18px}',
-    '.ap-lab{color:var(--txt3,#9fb0c9);font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:700}',
+    '.ap-lab{color:var(--mut,#9fb0c9);font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:700}',
     '.ap-searchbar{display:flex;gap:10px;align-items:center;background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:14px;padding:10px 14px;margin-bottom:16px}',
     '.ap-searchbar input{flex:1;background:transparent;border:none;color:inherit;font-size:15px;outline:none;min-width:180px}',
     '.ap-btn{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#04121b;font-weight:700;border:none;border-radius:10px;padding:9px 16px;font-size:13px;cursor:pointer;white-space:nowrap}',
     '.ap-btn.ghost{background:var(--card,rgba(255,255,255,.06));color:inherit;border:1px solid var(--line,rgba(255,255,255,.12));font-weight:600}',
     '.ap-stat{background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.1));border-radius:10px;padding:7px 12px;min-width:72px}',
-    '.ap-stat .n{font-size:16px;font-weight:700}.ap-stat .t{color:var(--txt3,#9fb0c9);font-size:10.5px}',
+    '.ap-stat .n{font-size:16px;font-weight:700}.ap-stat .t{color:var(--mut,#9fb0c9);font-size:10.5px}',
     '.ap-stat input{width:64px;background:transparent;border:none;border-bottom:1px dashed var(--line,rgba(255,255,255,.25));color:inherit;font-size:16px;font-weight:700;outline:none}',
     '.ap-big{font-size:44px;font-weight:800;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.05;margin:6px 0 2px}',
     '.ap-conf{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid}',
     '.ap-rline{height:8px;border-radius:6px;background:var(--line,rgba(255,255,255,.12));position:relative;margin:10px 0 6px}',
     '.ap-rline .fill{position:absolute;left:16%;right:16%;top:0;bottom:0;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));border-radius:6px;opacity:.45}',
     '.ap-rline .dot{position:absolute;left:50%;top:50%;width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid var(--a2,#2f6ef0);transform:translate(-50%,-50%)}',
-    '.ap-rvals{display:flex;justify-content:space-between;color:var(--txt3,#9fb0c9);font-size:11.5px}.ap-rvals b{color:var(--ink,inherit)}',
-    '.ap-fchip{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:20px;padding:6px 13px;font-size:12px;color:var(--txt3,#9fb0c9);display:inline-flex;align-items:center;gap:5px}',
+    '.ap-rvals{display:flex;justify-content:space-between;color:var(--mut,#9fb0c9);font-size:11.5px}.ap-rvals b{color:var(--ink,#eaf0ff)}',
+    '.ap-fchip{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:20px;padding:6px 13px;font-size:12px;color:var(--mut,#9fb0c9);display:inline-flex;align-items:center;gap:5px}',
     '.ap-fchip input{width:44px;background:transparent;border:none;border-bottom:1px dashed var(--line,rgba(255,255,255,.3));color:inherit;font-weight:700;font-size:12px;outline:none;text-align:center}',
     '.ap-kv{display:flex;justify-content:space-between;gap:8px;padding:3.5px 0;font-size:12px;border-bottom:1px dashed var(--line,rgba(255,255,255,.06))}',
-    '.ap-kv span{color:var(--txt3,#9fb0c9)}.ap-kv b{text-align:right}',
+    '.ap-kv span{color:var(--mut,#9fb0c9)}.ap-kv b{text-align:right}',
     '#ap-map{height:400px;border-radius:16px;border:1px solid var(--line,rgba(255,255,255,.12));overflow:hidden;z-index:1}',
     '.ap-pin{background:var(--card,#1b2540);border:1px solid var(--line,#26314e);border-radius:8px;padding:3px 7px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.35);color:var(--ink,#eaf0ff);cursor:pointer}',
     '.ap-pin.s{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#04121b}',
@@ -249,39 +249,40 @@ function apCSS() {
     '.ap-photo{height:86px;background:linear-gradient(135deg,rgba(18,181,160,.18),rgba(47,110,240,.18));display:flex;align-items:center;justify-content:center;font-size:30px;position:relative}',
     '.ap-status{position:absolute;right:8px;top:8px;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(0,0,0,.35);color:#fff;text-transform:uppercase;letter-spacing:.5px}',
     '.ap-wt{display:inline-block;font-size:11px;font-weight:800;color:#04121b;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));padding:2px 9px;border-radius:20px}',
-    '.ap-pill{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));color:var(--txt3,#9fb0c9)}',
+    '.ap-pill{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));color:var(--mut,#9fb0c9)}',
     '.ap-adj{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}',
-    '.ap-adj span{color:var(--txt3,#9fb0c9)}',
+    '.ap-adj span{color:var(--mut,#9fb0c9)}',
     '.ap-pos{color:var(--pos,#34d399);font-weight:700}.ap-neg{color:var(--neg,#f87171);font-weight:700}',
     '.ap-grid table{border-collapse:collapse;width:100%;min-width:820px;font-size:12.5px}',
     '.ap-grid th,.ap-grid td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line,rgba(255,255,255,.08))}',
-    '.ap-grid th:first-child,.ap-grid td:first-child{text-align:left;position:sticky;left:0;background:var(--bg2,var(--card,#151d31));color:var(--txt3,#9fb0c9);font-weight:600;font-size:11.5px;z-index:2}',
+    '.ap-grid th:first-child,.ap-grid td:first-child{text-align:left;position:sticky;left:0;background:var(--bg2,var(--card,#151d31));color:var(--mut,#9fb0c9);font-weight:600;font-size:11.5px;z-index:2}',
     '.ap-grid thead th{background:var(--glass,rgba(255,255,255,.05));vertical-align:bottom;font-size:11.5px}',
     '.ap-grid .subjcol{color:var(--a2,#2f6ef0)!important;font-weight:700}',
-    '.ap-grid .sec td{background:var(--glass,rgba(255,255,255,.04));color:var(--txt3,#9fb0c9);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;text-align:left}',
+    '.ap-grid .sec td{background:var(--glass,rgba(255,255,255,.04));color:var(--mut,#9fb0c9);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;text-align:left}',
     '.ap-grid .best td{box-shadow:inset 0 2px 0 var(--a1,#12b5a0)}',
     '.ap-cbx{accent-color:var(--a1,#12b5a0);width:15px;height:15px;cursor:pointer}',
     '.ap-man input{width:64px;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:6px;padding:3px 6px;color:inherit;font-size:10.5px;text-align:right}',
     // ── modo SIMPLE (mockup claro 12-jul) — tarjetas suaves con sombra, legible en claro Y oscuro ──
     '.ap-card,.ap-comp{box-shadow:0 6px 22px rgba(23,43,77,.08)}',
+    '.ap-card,.ap-comp,.ap-searchbar,.ap-seg,.ap-grid,.ap-expnote,.ap-strip{color:var(--ink,#eaf0ff)}',
     '.ap-seg{display:inline-flex;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;padding:4px;gap:2px}',
-    '.ap-seg button{border:none;background:transparent;color:var(--txt3,#9fb0c9);font-weight:700;font-size:12.5px;padding:7px 15px;border-radius:9px;cursor:pointer}',
+    '.ap-seg button{border:none;background:transparent;color:var(--mut,#9fb0c9);font-weight:700;font-size:12.5px;padding:7px 15px;border-radius:9px;cursor:pointer}',
     '.ap-seg button.on{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#fff;box-shadow:0 3px 10px rgba(23,43,77,.2)}',
     '.ap-strip{display:flex;align-items:center;gap:16px;flex-wrap:wrap}',
     '.ap-ph{width:92px;height:70px;border-radius:12px;background:linear-gradient(135deg,rgba(47,110,240,.18),rgba(18,181,160,.18));display:grid;place-items:center;font-size:28px;flex-shrink:0}',
     '.ap-verify{font-size:12px;font-weight:700;color:var(--a1,#12b5a0);background:rgba(18,181,160,.1);border:1px solid rgba(18,181,160,.35);padding:6px 12px;border-radius:20px;white-space:nowrap;cursor:pointer}',
     '.ap-bigsimple{font-size:50px;font-weight:800;line-height:1.05;letter-spacing:-1px;margin:8px 0 6px;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));-webkit-background-clip:text;background-clip:text;color:transparent}',
-    '.ap-plain{color:var(--txt3,#9fb0c9);font-size:13.5px}',
+    '.ap-plain{color:var(--mut,#9fb0c9);font-size:13.5px}',
     '.ap-light{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:var(--glass,rgba(255,255,255,.07));border:1px solid var(--line,rgba(255,255,255,.1))}',
     '.ap-vword{font-size:19px;font-weight:800}',
     '.ap-moffer{font-size:32px;font-weight:800;margin:10px 0 4px}',
-    '.ap-mrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt3,#9fb0c9);padding:7px 0;border-top:1px solid var(--line,rgba(255,255,255,.1))}',
+    '.ap-mrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut,#9fb0c9);padding:7px 0;border-top:1px solid var(--line,rgba(255,255,255,.1))}',
     '.ap-mrow b{color:inherit;font-variant-numeric:tabular-nums}',
     '.ap-sectitle{font-size:15px;font-weight:800;margin:16px 2px 10px}',
     '.ap-comp2 .img{height:100px;background:linear-gradient(135deg,rgba(47,110,240,.16),rgba(18,181,160,.16));display:grid;place-items:center;font-size:28px;position:relative}',
     '.ap-tag{position:absolute;top:8px;left:8px;background:var(--card,rgba(20,28,44,.9));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;box-shadow:0 3px 10px rgba(23,43,77,.15)}',
     '.ap-tag.best{background:var(--pos,#12b76a);color:#fff;border:none}',
-    '.ap-expnote{margin-top:16px;text-align:center;color:var(--txt3,#9fb0c9);font-size:13px;background:var(--card,rgba(255,255,255,.03));border:1px dashed var(--line,rgba(255,255,255,.18));border-radius:14px;padding:13px;cursor:pointer}',
+    '.ap-expnote{margin-top:16px;text-align:center;color:var(--mut,#9fb0c9);font-size:13px;background:var(--card,rgba(255,255,255,.03));border:1px dashed var(--line,rgba(255,255,255,.18));border-radius:14px;padding:13px;cursor:pointer}',
   ].join('\n');
   document.head.appendChild(st);
 }
@@ -306,7 +307,7 @@ function apPinClick(cssId) {
 window.apPinClick = apPinClick;
 function apMapMount() {
   const el = document.getElementById('ap-map'); if (!el) return;
-  const s = apSubject(); if (!s || s.lat == null || s.lng == null) { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--txt3,#9fb0c9);font-size:12px">🗺 El mapa aparece al buscar el subject (lat/long de RentCast)</div>'; return; }
+  const s = apSubject(); if (!s || s.lat == null || s.lng == null) { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--mut,#9fb0c9);font-size:12px">🗺 El mapa aparece al buscar el subject (lat/long de RentCast)</div>'; return; }
   apLeaflet(() => {
     if (!document.getElementById('ap-map')) return;   // cambió la vista mientras cargaba
     if (AP_MAP) { try { AP_MAP.remove(); } catch (e) {} AP_MAP = null; }
@@ -373,7 +374,7 @@ function apSubjStrip(s) {
   const esLaCasa = s.rcOk && fi.dirRc && s.dir && fi.dirRc.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) === s.dir.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10);
   return '<div class="ap-card ap-strip" style="padding:16px 18px;margin-bottom:14px">'
     + '<div class="ap-ph">🏠</div>'
-    + '<div style="flex:1;min-width:220px"><div style="font-size:17px;font-weight:800">' + AP_E((fi.dirRc || s.dir || '—').split(',')[0]) + ' <span style="font-weight:500;color:var(--txt3,#9fb0c9);font-size:13px">' + AP_E((fi.subdivision ? fi.subdivision + ', ' : '') + (s.zip || '')) + '</span></div>'
+    + '<div style="flex:1;min-width:220px"><div style="font-size:17px;font-weight:800">' + AP_E((fi.dirRc || s.dir || '—').split(',')[0]) + ' <span style="font-weight:500;color:var(--mut,#9fb0c9);font-size:13px">' + AP_E((fi.subdivision ? fi.subdivision + ', ' : '') + (s.zip || '')) + '</span></div>'
     + '<div class="ap-plain" style="margin-top:3px;font-size:12.5px">' + AP_E(facts || 'buscá la dirección para traer los datos') + '</div></div>'
     + (esLaCasa ? '<span class="ap-verify">✓ Esta es tu casa</span>' : '<span class="ap-verify" style="color:var(--amber,#e7b65e);background:rgba(231,182,94,.1);border-color:rgba(231,182,94,.35)" onclick="document.getElementById(\'ap-dir\').focus();document.getElementById(\'ap-dir\').select()">¿No es esta? corregila</span>')
     + '</div>';
@@ -396,7 +397,7 @@ function apHeroSimple(rec, inp) {
   const compra = +inp.purchase || 0;
   const tol = apCfg('arv_semaforo_tol_pct', 5) / 100;
   let sem;
-  if (!oferta) sem = { ico: '⚪', word: 'Esperando el valor', color: 'var(--txt3,#9fb0c9)', txt: 'buscá el subject para calcular la oferta máxima' };
+  if (!oferta) sem = { ico: '⚪', word: 'Esperando el valor', color: 'var(--mut,#9fb0c9)', txt: 'buscá el subject para calcular la oferta máxima' };
   else if (!compra) sem = { ico: '🟡', word: 'Falta el precio de compra', color: 'var(--amber,#e7b65e)', txt: 'cargalo en 💵 Del Negocio para el veredicto' };
   else if (compra <= oferta) sem = { ico: '🟢', word: 'Buen deal', color: 'var(--pos,#34d399)', txt: 'comprás ' + AP_M(oferta - compra) + ' por debajo del máximo' };
   else if (compra <= oferta * (1 + tol)) sem = { ico: '🟡', word: 'Justo al límite', color: 'var(--amber,#e7b65e)', txt: 'estás ' + AP_M(compra - oferta) + ' arriba del máximo — negociá' };
@@ -416,7 +417,7 @@ function apHeroSimple(rec, inp) {
   return '<div class="grid k2" style="gap:14px;align-items:stretch;margin-bottom:6px">' + izq + der + '</div>';
 }
 function apCompsSimple(s, comps, rec, f) {
-  if (!comps.length) return '<div class="ap-card" style="padding:26px;text-align:center;color:var(--txt3,#9fb0c9)">Sin comps todavía — buscá la dirección arriba.</div>';
+  if (!comps.length) return '<div class="ap-card" style="padding:26px;text-align:center;color:var(--mut,#9fb0c9)">Sin comps todavía — buscá la dirección arriba.</div>';
   const st = apState();
   const us = (rec && rec.usables) || [];
   const bestId = us.length ? us[0].c.id : null;
@@ -426,13 +427,13 @@ function apCompsSimple(s, comps, rec, f) {
     const excl = !!st.excl[c.id];
     return '<div class="ap-comp ap-comp2" id="' + apCompCssId(c.id) + '">'
       + '<div class="img">🏡<span class="ap-tag' + (c.id === bestId ? ' best' : '') + '">' + (c.id === bestId ? '★ La más parecida' : (c.dist != null ? 'a ' + c.dist.toFixed(2) + ' mi' : '')) + '</span>'
-      + '<span style="position:absolute;right:8px;bottom:6px;font-size:9px;color:var(--txt3,#9fb0c9)">foto no disponible (RentCast)</span></div>'
+      + '<span style="position:absolute;right:8px;bottom:6px;font-size:9px;color:var(--mut,#9fb0c9)">foto no disponible (RentCast)</span></div>'
       + '<div style="padding:12px 14px">'
       + '<div style="font-size:19px;font-weight:800">' + AP_M(c.price) + '</div>'
       + '<div style="font-size:13px;font-weight:600;margin-top:1px">' + AP_E(c.dir.split(',')[0]) + '</div>'
       + '<div class="ap-plain" style="font-size:12px;margin-top:4px">' + (c.sqft ? c.sqft.toLocaleString() + ' sqft' : 'sqft 🟡') + ' · ' + (c.beds != null ? c.beds : '?') + '/' + (c.baths != null ? c.baths : '?') + (c.year ? ' · ' + c.year : '') + ' · vendida ' + AP_D(c.fecha) + (c.dist != null ? ' · a ' + c.dist.toFixed(2) + ' mi' : '') + '</div>'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--line,rgba(255,255,255,.08));font-size:12px">'
-      + '<label style="display:flex;align-items:center;gap:6px;color:var(--txt3,#9fb0c9);cursor:pointer"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> usar</label>'
+      + '<label style="display:flex;align-items:center;gap:6px;color:var(--mut,#9fb0c9);cursor:pointer"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> usar</label>'
       + '<span class="ap-plain" style="font-size:12px">ajustada a <b style="color:inherit;font-weight:800">' + AP_M(x.adj.valorAjustado) + '</b></span>'
       + '</div></div></div>';
   }).join('');
@@ -470,7 +471,7 @@ function apVistaFicha(s) {
 }
 
 function apVistaHero(rec, inp) {
-  if (!rec || !rec.arv) return '<div class="ap-card"><div class="ap-lab">ARV estimado (comps ajustados)</div><div style="color:var(--txt3,#9fb0c9);padding:26px 0;text-align:center">Buscá el subject para reconciliar comps.</div></div>';
+  if (!rec || !rec.arv) return '<div class="ap-card"><div class="ap-lab">ARV estimado (comps ajustados)</div><div style="color:var(--mut,#9fb0c9);padding:26px 0;text-align:center">Buscá el subject para reconciliar comps.</div></div>';
   const cc = apConfColor(rec.confianza.nivel);
   const arvAt = +inp.arv_airtable || +inp.arv || 0;
   const appr = +inp.appraisal || 0;
@@ -526,31 +527,31 @@ function apCardComp(x, esRec) {
   const mIn = (k, ph) => '<input value="' + (man[k] || '') + '" placeholder="' + ph + '" onchange="apManSet(\'' + c.id + '\',\'' + k + '\',this.value)">';
   const adjRows = adj.rows.map(r => '<div class="ap-adj"><span>' + AP_E(r.concepto) + '</span><b class="' + (r.monto >= 0 ? 'ap-pos' : 'ap-neg') + '">' + (r.monto >= 0 ? '+' : '−') + AP_M(Math.abs(r.monto)).slice(1 - 1) + '</b></div>').join('') || '<div class="ap-adj"><span>sin ajustes — gemelo del subject</span><b>$0</b></div>';
   return '<div class="ap-comp' + (excl || !x.filtro.pasa ? ' off' : '') + '" id="' + cssId + '">'
-    + '<div class="ap-photo">🏠' + (c.status ? '<span class="ap-status">' + AP_E(c.status) + '</span>' : '') + '<span style="position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--txt3,#9fb0c9)">foto: no disponible en RentCast</span></div>'
+    + '<div class="ap-photo">🏠' + (c.status ? '<span class="ap-status">' + AP_E(c.status) + '</span>' : '') + '<span style="position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--mut,#9fb0c9)">foto: no disponible en RentCast</span></div>'
     + '<div style="padding:13px 15px">'
     + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div style="font-weight:700;font-size:13px">' + AP_E(c.dir.split(',')[0]) + '</div>'
-    + '<label style="display:flex;gap:5px;align-items:center;font-size:10px;color:var(--txt3,#9fb0c9);white-space:nowrap"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> incluir</label></div>'
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin:1px 0 7px">' + (c.dist != null ? c.dist.toFixed(2) + ' mi' : '') + ' · ' + AP_D(c.fecha) + (c.dom ? ' · DOM ' + c.dom : '') + (x.filtro.pasa ? '' : ' · <span style="color:var(--amber,#e7b65e)">filtrado: ' + AP_E(x.filtro.razones.join('; ')) + '</span>') + '</div>'
-    + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:22px;font-weight:800">' + AP_M(c.price) + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (c.sqft && c.price ? '$' + Math.round(c.price / c.sqft) + '/sqft' : '') + '</div></div>'
-    + '<div style="font-size:11.5px;color:var(--txt3,#9fb0c9);margin:4px 0 9px">' + (c.sqft ? c.sqft.toLocaleString() + ' sqft' : 'sqft 🟡') + ' · ' + (c.beds != null ? c.beds : '🟡') + ' cm / ' + (c.baths != null ? c.baths : '🟡') + ' bñ · ' + (c.year || '🟡') + ' · lote ' + (c.lot ? c.lot.toLocaleString() : '🟡') + ' · piscina 🟡</div>'
+    + '<label style="display:flex;gap:5px;align-items:center;font-size:10px;color:var(--mut,#9fb0c9);white-space:nowrap"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> incluir</label></div>'
+    + '<div style="font-size:10.5px;color:var(--mut,#9fb0c9);margin:1px 0 7px">' + (c.dist != null ? c.dist.toFixed(2) + ' mi' : '') + ' · ' + AP_D(c.fecha) + (c.dom ? ' · DOM ' + c.dom : '') + (x.filtro.pasa ? '' : ' · <span style="color:var(--amber,#e7b65e)">filtrado: ' + AP_E(x.filtro.razones.join('; ')) + '</span>') + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:22px;font-weight:800">' + AP_M(c.price) + '</div><div style="font-size:11px;color:var(--mut,#9fb0c9)">' + (c.sqft && c.price ? '$' + Math.round(c.price / c.sqft) + '/sqft' : '') + '</div></div>'
+    + '<div style="font-size:11.5px;color:var(--mut,#9fb0c9);margin:4px 0 9px">' + (c.sqft ? c.sqft.toLocaleString() + ' sqft' : 'sqft 🟡') + ' · ' + (c.beds != null ? c.beds : '🟡') + ' cm / ' + (c.baths != null ? c.baths : '🟡') + ' bñ · ' + (c.year || '🟡') + ' · lote ' + (c.lot ? c.lot.toLocaleString() : '🟡') + ' · piscina 🟡</div>'
     + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.08));padding-top:7px">' + adjRows + '</div>'
-    + '<details class="ap-man" style="margin:6px 0"><summary style="cursor:pointer;font-size:10.5px;color:var(--txt3,#9fb0c9)">± ajustes manuales (condición · ubicación · concesiones · pool/garaje/otros)</summary>'
+    + '<details class="ap-man" style="margin:6px 0"><summary style="cursor:pointer;font-size:10.5px;color:var(--mut,#9fb0c9)">± ajustes manuales (condición · ubicación · concesiones · pool/garaje/otros)</summary>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' + mIn('cond', 'condición') + mIn('ubic', 'ubicación') + mIn('conces', 'concesiones') + mIn('otros', 'otros') + '</div></details>'
     + '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line,rgba(255,255,255,.08));padding-top:8px">'
-    + '<div><div style="font-size:10px;color:var(--txt3,#9fb0c9)">valor ajustado · net ' + adj.netPct.toFixed(1) + '% · gross ' + adj.grossPct.toFixed(1) + '%' + (adj.grossPct > apCfg('arv_gross_adj_warn_pct', 25) ? ' ⚠' : '') + '</div><div style="font-size:17px;font-weight:800">' + AP_M(adj.valorAjustado) + '</div></div>'
+    + '<div><div style="font-size:10px;color:var(--mut,#9fb0c9)">valor ajustado · net ' + adj.netPct.toFixed(1) + '% · gross ' + adj.grossPct.toFixed(1) + '%' + (adj.grossPct > apCfg('arv_gross_adj_warn_pct', 25) ? ' ⚠' : '') + '</div><div style="font-size:17px;font-weight:800">' + AP_M(adj.valorAjustado) + '</div></div>'
     + (esRec && x.pesoPct != null ? '<span class="ap-wt">peso ' + x.pesoPct + '%</span>' : '<span class="ap-pill">fuera del cálculo</span>')
     + '</div></div></div>';
 }
 
 function apVistaGrilla(s, rec) {
-  if (!rec || !rec.usables || !rec.usables.length) return '<div class="ap-card" style="text-align:center;color:var(--txt3,#9fb0c9)">Sin comps reconciliados.</div>';
+  if (!rec || !rec.usables || !rec.usables.length) return '<div class="ap-card" style="text-align:center;color:var(--mut,#9fb0c9)">Sin comps reconciliados.</div>';
   const us = rec.usables;
   const st = apState();
   const catSum = (x, cat) => x.adj.rows.filter(r => r.cat === cat).reduce((a, r) => a + r.monto, 0);
   const fmtAdj = v => v === 0 ? '$0' : '<b class="' + (v > 0 ? 'ap-pos' : 'ap-neg') + '">' + (v > 0 ? '+' : '−') + AP_M(Math.abs(v)).slice(0) + '</b>';
   const minGross = Math.min(...us.map(x => x.adj.grossPct));
-  const head = '<tr><th>Comparable →</th><th class="subjcol">SUBJECT<div style="font-weight:500;font-size:10px;color:var(--txt3,#9fb0c9)">' + AP_E((s.dir || '').split(',')[0]) + '</div></th>'
-    + us.map(x => '<th><div style="font-weight:700">' + AP_E(x.c.dir.split(',')[0]) + '</div><div style="font-weight:500;font-size:10px;color:var(--txt3,#9fb0c9)">' + (x.c.dist != null ? x.c.dist.toFixed(2) + ' mi · ' : '') + AP_D(x.c.fecha) + '</div></th>').join('') + '</tr>';
+  const head = '<tr><th>Comparable →</th><th class="subjcol">SUBJECT<div style="font-weight:500;font-size:10px;color:var(--mut,#9fb0c9)">' + AP_E((s.dir || '').split(',')[0]) + '</div></th>'
+    + us.map(x => '<th><div style="font-weight:700">' + AP_E(x.c.dir.split(',')[0]) + '</div><div style="font-weight:500;font-size:10px;color:var(--mut,#9fb0c9)">' + (x.c.dist != null ? x.c.dist.toFixed(2) + ' mi · ' : '') + AP_D(x.c.fecha) + '</div></th>').join('') + '</tr>';
   const row = (lbl, sv, fn) => '<tr><td>' + lbl + '</td><td class="subjcol">' + sv + '</td>' + us.map(x => '<td>' + fn(x) + '</td>').join('') + '</tr>';
   const sec = lbl => '<tr class="sec"><td colspan="' + (us.length + 2) + '">' + lbl + '</td></tr>';
   return '<div class="ap-card ap-grid" style="padding:0;overflow-x:auto"><table><thead>' + head + '</thead><tbody>'
@@ -601,7 +602,7 @@ function ffArvProView() {
   if (modo === 'simple') {
     const mapaS = '<div class="ap-sectitle">📍 Dónde están las casas comparables</div>'
       + '<div style="position:relative"><div id="ap-map" style="height:300px"></div>'
-      + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--txt3,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">TU CASA + comps · click en un pin resalta la tarjeta</div></div>';
+      + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--mut,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">TU CASA + comps · click en un pin resalta la tarjeta</div></div>';
     setTimeout(apMapMount, 40);
     return head + apSubjStrip(s) + apHeroSimple(rec, inp) + mapaS
       + '<div class="ap-sectitle">🏘️ Las casas parecidas que se vendieron cerca</div>' + apCompsSimple(s, comps, rec, f)
@@ -613,7 +614,7 @@ function ffArvProView() {
 
   // mapa
   const mapa = '<div style="position:relative;margin-bottom:4px"><div id="ap-map"></div>'
-    + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--txt3,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">📍 Subject + ' + comps.length + ' comparables · click en un pin resalta el comp</div></div>';
+    + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--mut,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">📍 Subject + ' + comps.length + ' comparables · click en un pin resalta el comp</div></div>';
 
   // criterio + resumen
   const criterio = apVistaCriterio(f, comps, rec);
@@ -625,7 +626,7 @@ function ffArvProView() {
     + '<div style="display:flex;gap:6px"><button class="ap-btn ' + (vista === 'cards' ? '' : 'ghost') + '" style="padding:5px 12px;font-size:11px" onclick="apSet(\'vista\',\'cards\')">🃏 Tarjetas</button>'
     + '<button class="ap-btn ' + (vista === 'grid' ? '' : 'ghost') + '" style="padding:5px 12px;font-size:11px" onclick="apSet(\'vista\',\'grid\')">📋 Grilla 1004</button></div></div>';
   let compsHtml;
-  if (!comps.length) compsHtml = '<div class="ap-card" style="text-align:center;padding:30px;color:var(--txt3,#9fb0c9)">Sin comps todavía — buscá el subject arriba.</div>';
+  if (!comps.length) compsHtml = '<div class="ap-card" style="text-align:center;padding:30px;color:var(--mut,#9fb0c9)">Sin comps todavía — buscá el subject arriba.</div>';
   else if (vista === 'grid') compsHtml = apVistaGrilla(s, rec);
   else {
     const st2 = apState();
@@ -638,16 +639,16 @@ function ffArvProView() {
 
   // foot + calibración/factores (misma lógica de siempre)
   const foot = rec && rec.arv ? '<div style="display:flex;gap:12px;align-items:center;margin:14px 0;flex-wrap:wrap"><button class="ap-btn" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>'
-    + '<span style="font-size:11.5px;color:var(--txt3,#9fb0c9)">' + (rec.usables[0] ? 'El más parecido: ' + AP_E(rec.usables[0].c.dir.split(',')[0]) + ' (gross ' + rec.usables[0].adj.grossPct.toFixed(1) + '% → peso ' + rec.usables[0].pesoPct + '%).' : '') + ' El ARV de Airtable sigue siendo la fuente de verdad guardada.</span></div>' : '';
+    + '<span style="font-size:11.5px;color:var(--mut,#9fb0c9)">' + (rec.usables[0] ? 'El más parecido: ' + AP_E(rec.usables[0].c.dir.split(',')[0]) + ' (gross ' + rec.usables[0].adj.grossPct.toFixed(1) + '% → peso ' + rec.usables[0].pesoPct + '%).' : '') + ' El ARV de Airtable sigue siendo la fuente de verdad guardada.</span></div>' : '';
 
-  const fEd = (k, l, def) => '<div style="margin-bottom:8px"><div style="font-size:10.5px;color:var(--txt2,#c9d5ea);font-weight:600;margin-bottom:2px">' + l + '</div><input value="' + apCfg(k, def) + '" onchange="apCfgSet(\'' + k + '\',this.value)" style="width:100%;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:6px 9px;color:inherit;font-size:12.5px;font-weight:600;outline:none"></div>';
+  const fEd = (k, l, def) => '<div style="margin-bottom:8px"><div style="font-size:10.5px;color:var(--mut,#c9d5ea);font-weight:600;margin-bottom:2px">' + l + '</div><input value="' + apCfg(k, def) + '" onchange="apCfgSet(\'' + k + '\',this.value)" style="width:100%;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:6px 9px;color:inherit;font-size:12.5px;font-weight:600;outline:none"></div>';
   const factores = '<details class="ap-card" style="padding:14px;margin-bottom:14px"><summary style="cursor:pointer" class="ap-lab">⚙️ Factores de ajuste (calibrados, editables — ff_uw_config)</summary>'
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px">'
     + fEd('arv_adj_gla_psf', 'GLA $/sqft' + (s.zip ? ' (zip ' + s.zip + ' usa arv_adj_gla_psf_' + s.zip + ' si existe)' : ''), 90)
     + fEd('arv_adj_cuarto', 'Cuarto $', 15000) + fEd('arv_adj_bano', 'Baño $', 15000) + fEd('arv_adj_piscina', 'Piscina $ (guía p/ manual)', 25000)
     + fEd('arv_adj_garaje', 'Garaje $ (guía p/ manual)', 20000) + fEd('arv_adj_fireplace', 'Fireplace $ (guía)', 1500) + fEd('arv_adj_lote_psf', 'Lote $/sqft', 2) + fEd('arv_adj_ano_pct', 'Año %/año', 0.5)
     + fEd('arv_mercado_pct_mes', 'Tendencia mercado %/mes', 0) + fEd('arv_rango_pct', 'Rango ±%', 6) + fEd('arv_gross_adj_warn_pct', 'Warn gross adj %', 25) + fEd('arv_bias_pct', 'Sesgo aplicado %', 0)
-    + '</div><div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:4px">Guías de piscina/garaje/fireplace: RentCast no dice si el COMP los tiene → usá el campo manual "otros" del comp con estos montos.</div></details>';
+    + '</div><div style="font-size:10px;color:var(--mut,#9fb0c9);margin-top:4px">Guías de piscina/garaje/fireplace: RentCast no dice si el COMP los tiene → usá el campo manual "otros" del comp con estos montos.</div></details>';
 
   const metaOk = cal.errorAbs != null && cal.errorAbs <= cal.meta;
   const filasCal = cal.filas.map(x =>
@@ -663,7 +664,7 @@ function ffArvProView() {
       + cal.zips.map(z => 'zip ' + z.zip + ': ' + (-z.prom).toFixed(1) + '% (n=' + z.n + ')').join(' · ')
       + ' <button class="ap-btn" style="padding:3px 10px;font-size:10.5px;margin-left:8px" onclick="apAplicarBias(' + cal.sugerenciaBias.toFixed(2) + ')">Aplicar (humano aprueba)</button></div>' : '')
     + '<div style="overflow-x:auto"><table style="min-width:560px"><thead><tr><th style="text-align:left">Casa</th><th>ARV nuestro</th><th>Appraisal</th><th>Desviación</th><th style="text-align:center">PDF</th></tr></thead><tbody>' + filasCal + '</tbody></table></div>'
-    + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Excluidas de la calibración (atípicos/datos sucios, editable en arv_calib_excluir): ' + AP_E(window.UWct ? UWct('arv_calib_excluir', '—') : '—') + '</div></div>';
+    + '<div style="font-size:10px;color:var(--mut,#9fb0c9);margin-top:6px">Excluidas de la calibración (atípicos/datos sucios, editable en arv_calib_excluir): ' + AP_E(window.UWct ? UWct('arv_calib_excluir', '—') : '—') + '</div></div>';
 
   setTimeout(apMapMount, 40);
   return head + top + mapa + criterio + resumen + toggle + compsHtml + foot + factores + calHtml;
