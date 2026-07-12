@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════
-// 🏷️ ARV PROFESIONAL (Calc 2 de la Suite UW) — tasador estilo formulario 1004.
+// 🏷️ ARV PROFESIONAL (Calc 2 de la Suite UW) — tasador estilo formulario 1004, UX PropStream.
 // Subject + comps de RentCast (proxy backend, key jamás en el front) → filtros del tasador →
 // motor de ajustes por comp (GLA/cuarto/baño/año/lote/fecha + manuales) → reconciliación
 // ponderada por MENOR gross adj % → ARV + rango + confianza → desviación vs appraisal real
@@ -7,15 +7,20 @@
 // Cero hardcode: factores/filtros en ff_uw_config (editables acá mismo). Fuente de verdad
 // guardada sigue siendo el ARV de Airtable; esto produce el "ARV estimado profesional".
 // Estado por análisis en UW.a.inputs.arvpro (persiste con ff_underwriting_analyses).
+// UI: mockup PropStream del CEO (12-jul) — ficha subject completa (APN/dueño/assessed/última
+// venta), mapa Leaflet con pins de precio, criterio visible, resumen bajo/prom/alto,
+// comps como TARJETAS + toggle GRILLA 1004 lado a lado. Fotos: RentCast no las da → placeholder.
 // ════════════════════════════════════════════════════════════════
 
 const AP_E = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const AP_M = n => (n == null || isNaN(n)) ? '—' : (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const AP_K = n => (n == null || isNaN(n)) ? '—' : '$' + (Math.abs(n) >= 1000 ? Math.round(n / 1000) + 'k' : Math.round(n));
 const AP_N = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
+const AP_D = f => { if (!f) return '—'; const s = String(f).slice(0, 10); return s.slice(5, 7) + '/' + s.slice(0, 4); };
 
 function apState() {
   if (!UW.a) return null;
-  if (!UW.a.inputs.arvpro) UW.a.inputs.arvpro = { subj: {}, man: {}, excl: {}, filtros: {}, dir: '' };
+  if (!UW.a.inputs.arvpro) UW.a.inputs.arvpro = { subj: {}, man: {}, excl: {}, filtros: {}, dir: '', vista: 'cards' };
   return UW.a.inputs.arvpro;
 }
 function apCfg(k, def) { return UWc(k, def); }
@@ -24,6 +29,7 @@ function apGlaPsf(zip) { return zip != null && UW.cfg['arv_adj_gla_psf_' + zip] 
 function apMesesDesde(fecha) { if (!fecha) return null; const t = new Date(fecha).getTime(); return isNaN(t) ? null : (Date.now() - t) / (30.44 * 86400000); }
 
 // ─── SUBJECT: RentCast /properties + overrides manuales (faltantes marcados) ───
+function apRcPayload(ep) { const rc = (window.ffUwRcSlot && ffUwRcSlot(ep)) || null; return (rc && rc !== 'loading' && rc.payload) || null; }
 function apSubject() {
   const st = apState(); if (!st) return null;
   const rc = (window.ffUwRcSlot && ffUwRcSlot('property')) || null;
@@ -39,7 +45,30 @@ function apSubject() {
     pool: st.subj.pool != null ? !!st.subj.pool : !!feat.pool,
     garage: st.subj.garage != null ? !!st.subj.garage : !!(feat.garage || feat.garageSpaces),
     fireplace: st.subj.fireplace != null ? !!st.subj.fireplace : !!feat.fireplace,
+    lat: AP_N(p.latitude), lng: AP_N(p.longitude),
     rcOk: !!(rc && rc !== 'loading' && rc.payload), rcLoading: rc === 'loading',
+  };
+}
+// ficha extendida (APN, condado, dueño, assessed, última venta) — solo lectura, para confirmar LA casa
+function apSubjectFicha() {
+  const p = apRcPayload('property') || {};
+  const feat = p.features || {};
+  const tax = p.taxAssessments || {};
+  const yrs = Object.keys(tax).sort();
+  const assessed = yrs.length ? tax[yrs[yrs.length - 1]] : null;
+  let ventaFecha = p.lastSaleDate || null, ventaPrecio = p.lastSalePrice || null;
+  const hist = p.history || {};
+  Object.values(hist).forEach(h => { if (h && h.event === 'Sale' && (!ventaFecha || h.date > ventaFecha)) { ventaFecha = h.date; if (h.price) ventaPrecio = h.price; } });
+  return {
+    dirRc: p.formattedAddress || null, apn: p.assessorID || null, condado: p.county || null,
+    subdivision: p.subdivision || null, tipo: p.propertyType || null,
+    dueno: p.owner && p.owner.names ? p.owner.names.join(', ') : null,
+    ownerOcc: p.ownerOccupied, loteAcres: p.lotSize ? p.lotSize / 43560 : null,
+    parking: feat.garageSpaces != null ? feat.garageSpaces + ' garaje' : feat.garage ? 'garaje' : null,
+    hvac: [feat.coolingType ? 'AC ' + feat.coolingType : (feat.cooling ? 'AC' : null), feat.heatingType ? 'Heat ' + feat.heatingType : (feat.heating ? 'Heat' : null)].filter(Boolean).join(' · ') || null,
+    pisos: feat.floorCount || null, techo: feat.roofType || null,
+    assessed: assessed ? { anio: assessed.year, total: assessed.value, land: assessed.land, imp: assessed.improvements } : null,
+    ventaFecha, ventaPrecio,
   };
 }
 
@@ -52,7 +81,8 @@ function apComps() {
     price: AP_N(c.price), sqft: AP_N(c.squareFootage), beds: AP_N(c.bedrooms), baths: AP_N(c.bathrooms),
     year: AP_N(c.yearBuilt), lot: AP_N(c.lotSize), dist: AP_N(c.distance),
     fecha: c.removedDate || c.lastSeenDate || c.listedDate || null, dom: AP_N(c.daysOnMarket),
-    corr: AP_N(c.correlation),
+    corr: AP_N(c.correlation), lat: AP_N(c.latitude), lng: AP_N(c.longitude),
+    status: c.status || null, listingType: c.listingType || null,
   })).filter(c => c.price > 0);
 }
 
@@ -81,22 +111,23 @@ function apPasaFiltro(s, c, f) {
 }
 
 // ─── MOTOR DE AJUSTES estilo 1004 (ajusto el COMP hacia el subject; + = el subject vale más) ───
+// (cat = etiqueta de presentación para la grilla; la matemática no cambia)
 function apAjustes(s, c) {
   const st = apState(); const man = st.man[c.id] || {};
   const rows = [];
-  const add = (concepto, monto, fuente) => { if (monto) rows.push({ concepto, monto: Math.round(monto), fuente }); };
-  if (s.sqft && c.sqft) add('GLA ' + (s.sqft - c.sqft > 0 ? '+' : '') + Math.round(s.sqft - c.sqft) + ' sqft × $' + apGlaPsf(s.zip), (s.sqft - c.sqft) * apGlaPsf(s.zip), 'auto');
-  if (s.beds != null && c.beds != null && s.beds !== c.beds) add('Cuartos Δ' + (s.beds - c.beds), (s.beds - c.beds) * apCfg('arv_adj_cuarto', 15000), 'auto');
-  if (s.baths != null && c.baths != null && s.baths !== c.baths) add('Baños Δ' + (s.baths - c.baths), (s.baths - c.baths) * apCfg('arv_adj_bano', 15000), 'auto');
-  if (s.year && c.year && s.year !== c.year) add('Año Δ' + (s.year - c.year), (s.year - c.year) * (apCfg('arv_adj_ano_pct', 0.5) / 100) * c.price, 'auto');
-  if (s.lot && c.lot && Math.abs(s.lot - c.lot) > 500) add('Lote Δ' + Math.round(s.lot - c.lot) + ' sqft', (s.lot - c.lot) * apCfg('arv_adj_lote_psf', 2), 'auto');
+  const add = (cat, concepto, monto, fuente) => { if (monto) rows.push({ cat, concepto, monto: Math.round(monto), fuente }); };
+  if (s.sqft && c.sqft) add('gla', 'GLA ' + (s.sqft - c.sqft > 0 ? '+' : '') + Math.round(s.sqft - c.sqft) + ' sqft × $' + apGlaPsf(s.zip), (s.sqft - c.sqft) * apGlaPsf(s.zip), 'auto');
+  if (s.beds != null && c.beds != null && s.beds !== c.beds) add('cuartos', 'Cuartos Δ' + (s.beds - c.beds), (s.beds - c.beds) * apCfg('arv_adj_cuarto', 15000), 'auto');
+  if (s.baths != null && c.baths != null && s.baths !== c.baths) add('banos', 'Baños Δ' + (s.baths - c.baths), (s.baths - c.baths) * apCfg('arv_adj_bano', 15000), 'auto');
+  if (s.year && c.year && s.year !== c.year) add('ano', 'Año Δ' + (s.year - c.year), (s.year - c.year) * (apCfg('arv_adj_ano_pct', 0.5) / 100) * c.price, 'auto');
+  if (s.lot && c.lot && Math.abs(s.lot - c.lot) > 500) add('lote', 'Lote Δ' + Math.round(s.lot - c.lot) + ' sqft', (s.lot - c.lot) * apCfg('arv_adj_lote_psf', 2), 'auto');
   const m = apMesesDesde(c.fecha);
   const tend = apCfg('arv_mercado_pct_mes', 0);
-  if (m != null && tend) add('Tendencia mercado ' + Math.round(m) + 'm × ' + tend + '%/m', m * (tend / 100) * c.price, 'auto');
-  add('Condición/reno (manual)', AP_N(man.cond) || 0, 'manual');
-  add('Ubicación/submercado (manual)', AP_N(man.ubic) || 0, 'manual');
-  add('Concesiones vendedor (manual)', -(AP_N(man.conces) || 0), 'manual');
-  add('Piscina/garaje/fireplace/otros (manual)', AP_N(man.otros) || 0, 'manual');
+  if (m != null && tend) add('tend', 'Tendencia mercado ' + Math.round(m) + 'm × ' + tend + '%/m', m * (tend / 100) * c.price, 'auto');
+  add('man', 'Condición/reno (manual)', AP_N(man.cond) || 0, 'manual');
+  add('man', 'Ubicación/submercado (manual)', AP_N(man.ubic) || 0, 'manual');
+  add('man', 'Concesiones vendedor (manual)', -(AP_N(man.conces) || 0), 'manual');
+  add('man', 'Piscina/garaje/fireplace/otros (manual)', AP_N(man.otros) || 0, 'manual');
   const neto = rows.reduce((x, r) => x + r.monto, 0);
   const bruto = rows.reduce((x, r) => x + Math.abs(r.monto), 0);
   return { rows, neto, bruto, valorAjustado: Math.round(c.price + neto), netPct: c.price ? neto / c.price * 100 : 0, grossPct: c.price ? bruto / c.price * 100 : 0 };
@@ -171,7 +202,7 @@ function apUsarArv(v) { if (!UW.a || !(v > 0)) return; UW.a.inputs.arv = v; UW.a
 window.apUsarArv = apUsarArv;
 async function apCfgSet(key, v) {
   const num = AP_N(v); if (num == null) return;
-  const { error } = await sb.from('ff_uw_config').upsert({ key, value: num, label: (UW.cfgTxt && UW.cfgTxt['label_' + key]) || undefined, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  const { error } = await sb.from('ff_uw_config').upsert({ key, value: num, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return alert('Config: ' + error.message);
   UW.cfg[key] = num; ffUwRender();
 }
@@ -182,18 +213,256 @@ async function apAplicarBias(v) {
 }
 window.apAplicarBias = apAplicarBias;
 
-// ─── UI ───
-function apInput(lab, val, onchange, opts) {
-  opts = opts || {};
-  return '<div style="margin-bottom:8px"><div style="font-size:10.5px;color:var(--txt2,#c9d5ea);font-weight:600;margin-bottom:2px">' + lab + (opts.falta ? ' <span style="color:var(--amber,#e7b65e)" title="RentCast no lo cubre — entrada manual">🟡 faltante</span>' : '') + '</div>'
-    + '<input value="' + (val == null || val === '' ? '' : AP_E(val)) + '" placeholder="' + (opts.ph || '—') + '" onchange="' + onchange + '" style="width:100%;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:6px 9px;color:inherit;font-size:12.5px;font-weight:600;outline:none">' + '</div>';
+// ════════════════════════════════════ UI (mockup PropStream 12-jul) ════════════════════════════════════
+function apCSS() {
+  if (document.getElementById('ap-css')) return;
+  const st = document.createElement('style'); st.id = 'ap-css';
+  st.textContent = [
+    '.ap-grad{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0))}',
+    '.ap-card{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:16px;padding:18px}',
+    '.ap-lab{color:var(--txt3,#9fb0c9);font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:700}',
+    '.ap-searchbar{display:flex;gap:10px;align-items:center;background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:14px;padding:10px 14px;margin-bottom:16px}',
+    '.ap-searchbar input{flex:1;background:transparent;border:none;color:inherit;font-size:15px;outline:none;min-width:180px}',
+    '.ap-btn{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#04121b;font-weight:700;border:none;border-radius:10px;padding:9px 16px;font-size:13px;cursor:pointer;white-space:nowrap}',
+    '.ap-btn.ghost{background:var(--card,rgba(255,255,255,.06));color:inherit;border:1px solid var(--line,rgba(255,255,255,.12));font-weight:600}',
+    '.ap-stat{background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.1));border-radius:10px;padding:7px 12px;min-width:72px}',
+    '.ap-stat .n{font-size:16px;font-weight:700}.ap-stat .t{color:var(--txt3,#9fb0c9);font-size:10.5px}',
+    '.ap-stat input{width:64px;background:transparent;border:none;border-bottom:1px dashed var(--line,rgba(255,255,255,.25));color:inherit;font-size:16px;font-weight:700;outline:none}',
+    '.ap-big{font-size:44px;font-weight:800;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.05;margin:6px 0 2px}',
+    '.ap-conf{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid}',
+    '.ap-rline{height:8px;border-radius:6px;background:var(--line,rgba(255,255,255,.12));position:relative;margin:10px 0 6px}',
+    '.ap-rline .fill{position:absolute;left:16%;right:16%;top:0;bottom:0;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));border-radius:6px;opacity:.45}',
+    '.ap-rline .dot{position:absolute;left:50%;top:50%;width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid var(--a2,#2f6ef0);transform:translate(-50%,-50%)}',
+    '.ap-rvals{display:flex;justify-content:space-between;color:var(--txt3,#9fb0c9);font-size:11.5px}.ap-rvals b{color:var(--ink,inherit)}',
+    '.ap-fchip{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:20px;padding:6px 13px;font-size:12px;color:var(--txt3,#9fb0c9);display:inline-flex;align-items:center;gap:5px}',
+    '.ap-fchip input{width:44px;background:transparent;border:none;border-bottom:1px dashed var(--line,rgba(255,255,255,.3));color:inherit;font-weight:700;font-size:12px;outline:none;text-align:center}',
+    '.ap-kv{display:flex;justify-content:space-between;gap:8px;padding:3.5px 0;font-size:12px;border-bottom:1px dashed var(--line,rgba(255,255,255,.06))}',
+    '.ap-kv span{color:var(--txt3,#9fb0c9)}.ap-kv b{text-align:right}',
+    '#ap-map{height:400px;border-radius:16px;border:1px solid var(--line,rgba(255,255,255,.12));overflow:hidden;z-index:1}',
+    '.ap-pin{background:var(--card,#1b2540);border:1px solid var(--line,#26314e);border-radius:8px;padding:3px 7px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.35);color:var(--ink,#eaf0ff);cursor:pointer}',
+    '.ap-pin.s{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#04121b}',
+    '.ap-pin.dim{opacity:.45;font-weight:500}',
+    '.ap-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;align-items:start}',
+    '.ap-comp{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:16px;overflow:hidden;transition:box-shadow .25s,border-color .25s}',
+    '.ap-comp.hl{border-color:var(--a1,#12b5a0);box-shadow:0 0 0 2px var(--a1,#12b5a0)}',
+    '.ap-comp.off{opacity:.45}',
+    '.ap-photo{height:86px;background:linear-gradient(135deg,rgba(18,181,160,.18),rgba(47,110,240,.18));display:flex;align-items:center;justify-content:center;font-size:30px;position:relative}',
+    '.ap-status{position:absolute;right:8px;top:8px;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(0,0,0,.35);color:#fff;text-transform:uppercase;letter-spacing:.5px}',
+    '.ap-wt{display:inline-block;font-size:11px;font-weight:800;color:#04121b;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));padding:2px 9px;border-radius:20px}',
+    '.ap-pill{font-size:11px;padding:2px 9px;border-radius:20px;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));color:var(--txt3,#9fb0c9)}',
+    '.ap-adj{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}',
+    '.ap-adj span{color:var(--txt3,#9fb0c9)}',
+    '.ap-pos{color:var(--pos,#34d399);font-weight:700}.ap-neg{color:var(--neg,#f87171);font-weight:700}',
+    '.ap-grid table{border-collapse:collapse;width:100%;min-width:820px;font-size:12.5px}',
+    '.ap-grid th,.ap-grid td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line,rgba(255,255,255,.08))}',
+    '.ap-grid th:first-child,.ap-grid td:first-child{text-align:left;position:sticky;left:0;background:var(--bg2,var(--card,#151d31));color:var(--txt3,#9fb0c9);font-weight:600;font-size:11.5px;z-index:2}',
+    '.ap-grid thead th{background:var(--glass,rgba(255,255,255,.05));vertical-align:bottom;font-size:11.5px}',
+    '.ap-grid .subjcol{color:var(--a2,#2f6ef0)!important;font-weight:700}',
+    '.ap-grid .sec td{background:var(--glass,rgba(255,255,255,.04));color:var(--txt3,#9fb0c9);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;text-align:left}',
+    '.ap-grid .best td{box-shadow:inset 0 2px 0 var(--a1,#12b5a0)}',
+    '.ap-cbx{accent-color:var(--a1,#12b5a0);width:15px;height:15px;cursor:pointer}',
+    '.ap-man input{width:64px;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:6px;padding:3px 6px;color:inherit;font-size:10.5px;text-align:right}',
+  ].join('\n');
+  document.head.appendChild(st);
 }
-function apChipConf(nivel) {
-  const c = nivel === 'alta' ? 'var(--pos,#34d399)' : nivel === 'media' ? 'var(--amber,#e7b65e)' : 'var(--neg,#f87171)';
-  return '<span style="border:1px solid ' + c + ';color:' + c + ';border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">confianza ' + nivel + '</span>';
+
+// ─── mapa (Leaflet lazy, OSM tiles) ───
+let AP_MAP = null;
+function apLeaflet(cb) {
+  if (window.L) return cb();
+  if (!document.getElementById('ap-leaflet-css')) {
+    const l = document.createElement('link'); l.id = 'ap-leaflet-css'; l.rel = 'stylesheet'; l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(l);
+  }
+  if (document.getElementById('ap-leaflet-js')) { const t = setInterval(() => { if (window.L) { clearInterval(t); cb(); } }, 120); setTimeout(() => clearInterval(t), 8000); return; }
+  const s = document.createElement('script'); s.id = 'ap-leaflet-js'; s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload = cb; document.head.appendChild(s);
+}
+function apCompCssId(id) { return 'ap-comp-' + String(id).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40); }
+function apPinClick(cssId) {
+  const el = document.getElementById(cssId); if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('hl'); setTimeout(() => el.classList.remove('hl'), 2400);
+}
+window.apPinClick = apPinClick;
+function apMapMount() {
+  const el = document.getElementById('ap-map'); if (!el) return;
+  const s = apSubject(); if (!s || s.lat == null || s.lng == null) { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--txt3,#9fb0c9);font-size:12px">🗺 El mapa aparece al buscar el subject (lat/long de RentCast)</div>'; return; }
+  apLeaflet(() => {
+    if (!document.getElementById('ap-map')) return;   // cambió la vista mientras cargaba
+    if (AP_MAP) { try { AP_MAP.remove(); } catch (e) {} AP_MAP = null; }
+    const map = L.map('ap-map', { scrollWheelZoom: false }).setView([s.lat, s.lng], 14);
+    AP_MAP = map;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+    const stx = apState(); const f = apFiltros();
+    const rec = apReconciliar(s, apComps());
+    const enRec = new Set(rec.usables ? rec.usables.map(u => u.c.id) : []);
+    L.marker([s.lat, s.lng], { icon: L.divIcon({ className: '', html: '<div class="ap-pin s">SUBJECT</div>', iconAnchor: [34, 12] }) }).addTo(map)
+      .bindPopup('<b>SUBJECT</b><br>' + AP_E(s.dir));
+    const pts = [[s.lat, s.lng]];
+    apComps().forEach(c => {
+      if (c.lat == null || c.lng == null) return;
+      pts.push([c.lat, c.lng]);
+      const dim = !enRec.has(c.id);
+      const lbl = AP_K(c.price) + (c.dist != null ? ' · ' + c.dist.toFixed(2) + 'mi' : '');
+      const mk = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: '', html: '<div class="ap-pin' + (dim ? ' dim' : '') + '">' + lbl + '</div>', iconAnchor: [30, 12] }) }).addTo(map);
+      mk.on('click', () => apPinClick(apCompCssId(c.id)));
+      mk.bindTooltip(AP_E(c.dir.split(',')[0]));
+    });
+    if (pts.length > 1) map.fitBounds(pts, { padding: [34, 34] });
+  });
+}
+
+// ─── piezas de UI ───
+function apConfColor(nivel) { return nivel === 'alta' ? 'var(--pos,#34d399)' : nivel === 'media' ? 'var(--amber,#e7b65e)' : 'var(--neg,#f87171)'; }
+function apStat(lbl, val, key, opts) {
+  opts = opts || {};
+  const inner = key
+    ? '<input value="' + (val == null || val === '' ? '' : AP_E(val)) + '" placeholder="—" onchange="apSet(\'' + key + '\',this.value)">'
+    : '<div class="n">' + (val == null || val === '' ? '—' : AP_E(val)) + '</div>';
+  return '<div class="ap-stat">' + inner + '<div class="t">' + lbl + (opts.falta ? ' <span title="RentCast no lo trajo — cargalo" style="color:var(--amber,#e7b65e)">🟡</span>' : '') + '</div></div>';
+}
+function apRangeBar(rec) {
+  return '<div style="margin-top:14px"><div class="ap-rline"><div class="fill"></div><div class="dot"></div></div>'
+    + '<div class="ap-rvals"><span>conservador <b>' + AP_M(rec.conservador) + '</b></span><span>probable <b>' + AP_M(rec.arv) + '</b></span><span>optimista <b>' + AP_M(rec.optimista) + '</b></span></div></div>';
+}
+
+function apVistaFicha(s) {
+  const fi = apSubjectFicha();
+  const kv = (k, v) => v ? '<div class="ap-kv"><span>' + k + '</span><b>' + AP_E(v) + '</b></div>' : '';
+  const toggles = ['pool:Piscina', 'garage:Garaje', 'fireplace:Fireplace'].map(x => {
+    const [k, l] = x.split(':');
+    return '<button class="ap-btn ghost" style="padding:4px 10px;font-size:11px" onclick="apSet(\'subj.' + k + '\',' + (s[k] ? 'false' : 'true') + ')">' + (s[k] ? '☑' : '☐') + ' ' + l + '</button>';
+  }).join(' ');
+  return '<div class="ap-card">'
+    + '<div class="ap-lab">Propiedad (subject) · ' + (s.rcLoading ? '⏳ RentCast…' : s.rcOk ? '✓ RentCast' : '<span style="color:var(--amber,#e7b65e)">sin RentCast — datos a mano</span>') + (s.zip ? ' · zip ' + s.zip : '') + '</div>'
+    + '<div style="font-size:20px;font-weight:700;margin:6px 0 4px">' + AP_E((fi.dirRc || s.dir || '').split(',')[0] || '—') + '</div>'
+    + (fi.dirRc && s.dir && fi.dirRc.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) !== s.dir.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) ? '<div style="font-size:11px;color:var(--neg,#f87171);margin-bottom:6px">⚠ RentCast devolvió otra dirección — verificá</div>' : '')
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px">'
+    + apStat('sqft', s.sqft, 'subj.sqft', { falta: s.rcOk && s.sqft == null })
+    + apStat('camas', s.beds, 'subj.beds', { falta: s.rcOk && s.beds == null })
+    + apStat('baños', s.baths, 'subj.baths', { falta: s.rcOk && s.baths == null })
+    + apStat('año', s.year, 'subj.year', { falta: s.rcOk && s.year == null })
+    + apStat('lote sqft', s.lot, 'subj.lot', { falta: s.rcOk && s.lot == null })
+    + (fi.loteAcres ? apStat('acres', fi.loteAcres.toFixed(2)) : '')
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + toggles + '</div>'
+    + kv('APN', fi.apn) + kv('Condado', fi.condado) + kv('Subdivisión', fi.subdivision) + kv('Tipo', fi.tipo)
+    + kv('Dueño', fi.dueno ? fi.dueno + (fi.ownerOcc === false ? ' · absentee' : fi.ownerOcc ? ' · owner-occupied' : '') : null)
+    + kv('Parking', fi.parking) + kv('HVAC', fi.hvac) + kv('Pisos / techo', [fi.pisos, fi.techo].filter(Boolean).join(' · ') || null)
+    + (fi.assessed ? kv('Valor tasado ' + fi.assessed.anio, AP_M(fi.assessed.total) + ' (land ' + AP_M(fi.assessed.land) + ' + imp ' + AP_M(fi.assessed.imp) + ')') : '')
+    + kv('Última venta', fi.ventaFecha ? AP_D(fi.ventaFecha) + (fi.ventaPrecio ? ' · ' + AP_M(fi.ventaPrecio) : '') : null)
+    + '<div style="margin-top:10px"><button class="ap-btn ghost" style="font-size:11px" onclick="document.getElementById(\'ap-dir\').focus();document.getElementById(\'ap-dir\').select()">¿No es esta? corregir dirección</button></div>'
+    + '</div>';
+}
+
+function apVistaHero(rec, inp) {
+  if (!rec || !rec.arv) return '<div class="ap-card"><div class="ap-lab">ARV estimado (comps ajustados)</div><div style="color:var(--txt3,#9fb0c9);padding:26px 0;text-align:center">Buscá el subject para reconciliar comps.</div></div>';
+  const cc = apConfColor(rec.confianza.nivel);
+  const arvAt = +inp.arv_airtable || +inp.arv || 0;
+  const appr = +inp.appraisal || 0;
+  return '<div class="ap-card">'
+    + '<div class="ap-lab">ARV estimado (comps ajustados)</div>'
+    + '<div class="ap-big">' + AP_M(rec.arv) + '</div>'
+    + '<span class="ap-conf" style="color:' + cc + ';border-color:' + cc + ';background:transparent">● confianza ' + rec.confianza.nivel + ' · ' + rec.usables.length + ' comps · dispersión ' + rec.dispersion.toFixed(0) + '%</span>'
+    + apRangeBar(rec)
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:11.5px">'
+    + (arvAt ? '<span class="ap-pill">ARV Airtable ' + AP_M(arvAt) + ' · Δ <b class="' + (rec.arv - arvAt >= 0 ? 'ap-pos' : 'ap-neg') + '">' + AP_M(rec.arv - arvAt) + '</b></span>' : '')
+    + (appr ? '<span class="ap-pill">Appraisal ' + AP_M(appr) + ' · Δ <b class="' + (Math.abs(rec.arv - appr) / appr <= 0.05 ? 'ap-pos' : 'ap-neg') + '">' + ((rec.arv - appr) / appr * 100).toFixed(1) + '%</b></span>' : '')
+    + '</div>'
+    + '<button class="ap-btn" style="margin-top:12px" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>'
+    + '</div>';
+}
+
+function apVistaCriterio(f, comps, rec) {
+  const chip = (pre, key, val, suf) => '<span class="ap-fchip">' + pre + ' <input value="' + val + '" onchange="apSet(\'filtros.' + key + '\',this.value)">' + (suf || '') + '</span>';
+  return '<div style="margin:14px 0 12px"><div class="ap-lab" style="margin-bottom:7px">Criterio de búsqueda · data set: ventas/listings RentCast · status: vendidas y activas · ' + comps.length + ' encontradas → ' + (rec && rec.usables ? rec.usables.length : 0) + ' reconciliadas</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + chip('Distancia <', 'dist', f.dist, ' mi') + chip('Vendidas <', 'meses', f.meses, ' meses') + chip('Sqft ±', 'sqftPct', f.sqftPct, '%')
+    + chip('Camas ±', 'camas', f.camas, '') + chip('Baños ±', 'banos', f.banos, '') + chip('Año ±', 'ano', f.ano, '')
+    + '</div></div>';
+}
+
+function apVistaResumen(s, rec) {
+  if (!rec || !rec.usables || !rec.usables.length) return '';
+  const cs = rec.usables.map(u => u.c);
+  const col = (fn) => { const v = cs.map(fn).filter(x => x != null && !isNaN(x)); return v.length ? { lo: Math.min(...v), hi: Math.max(...v), avg: v.reduce((a, b) => a + b, 0) / v.length } : null; };
+  const rows = [
+    ['Precio venta', s2 => null, c => c.price, AP_M],
+    ['SqFt', () => s.sqft, c => c.sqft, v => Math.round(v).toLocaleString()],
+    ['$/SqFt', () => null, c => c.sqft ? c.price / c.sqft : null, v => '$' + Math.round(v)],
+    ['Camas', () => s.beds, c => c.beds, v => (Math.round(v * 10) / 10)],
+    ['Baños', () => s.baths, c => c.baths, v => (Math.round(v * 10) / 10)],
+    ['Lote sqft', () => s.lot, c => c.lot, v => Math.round(v).toLocaleString()],
+    ['Año', () => s.year, c => c.year, v => Math.round(v)],
+    ['Distancia mi', () => null, c => c.dist, v => v.toFixed(2)],
+  ];
+  const tr = rows.map(([lbl, sf, cf, fmt]) => {
+    const st = col(cf); const sv = sf();
+    return '<tr><td>' + lbl + '</td><td class="subjcol">' + (sv != null ? fmt(sv) : '—') + '</td>'
+      + (st ? '<td>' + fmt(st.lo) + '</td><td>' + fmt(st.avg) + '</td><td>' + fmt(st.hi) + '</td>' : '<td>—</td><td>—</td><td>—</td>') + '</tr>';
+  }).join('');
+  return '<div class="ap-card ap-grid" style="padding:0;overflow-x:auto;margin-bottom:14px"><table><thead><tr><th>Resumen</th><th class="subjcol">SUBJECT</th><th>BAJO</th><th>PROMEDIO</th><th>ALTO</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
+}
+
+function apCardComp(x, esRec) {
+  const c = x.c, adj = x.adj, st = apState();
+  const man = st.man[c.id] || {};
+  const cssId = apCompCssId(c.id);
+  const excl = !!st.excl[c.id];
+  const mIn = (k, ph) => '<input value="' + (man[k] || '') + '" placeholder="' + ph + '" onchange="apManSet(\'' + c.id + '\',\'' + k + '\',this.value)">';
+  const adjRows = adj.rows.map(r => '<div class="ap-adj"><span>' + AP_E(r.concepto) + '</span><b class="' + (r.monto >= 0 ? 'ap-pos' : 'ap-neg') + '">' + (r.monto >= 0 ? '+' : '−') + AP_M(Math.abs(r.monto)).slice(1 - 1) + '</b></div>').join('') || '<div class="ap-adj"><span>sin ajustes — gemelo del subject</span><b>$0</b></div>';
+  return '<div class="ap-comp' + (excl || !x.filtro.pasa ? ' off' : '') + '" id="' + cssId + '">'
+    + '<div class="ap-photo">🏠' + (c.status ? '<span class="ap-status">' + AP_E(c.status) + '</span>' : '') + '<span style="position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--txt3,#9fb0c9)">foto: no disponible en RentCast</span></div>'
+    + '<div style="padding:13px 15px">'
+    + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div style="font-weight:700;font-size:13px">' + AP_E(c.dir.split(',')[0]) + '</div>'
+    + '<label style="display:flex;gap:5px;align-items:center;font-size:10px;color:var(--txt3,#9fb0c9);white-space:nowrap"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> incluir</label></div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin:1px 0 7px">' + (c.dist != null ? c.dist.toFixed(2) + ' mi' : '') + ' · ' + AP_D(c.fecha) + (c.dom ? ' · DOM ' + c.dom : '') + (x.filtro.pasa ? '' : ' · <span style="color:var(--amber,#e7b65e)">filtrado: ' + AP_E(x.filtro.razones.join('; ')) + '</span>') + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:22px;font-weight:800">' + AP_M(c.price) + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (c.sqft && c.price ? '$' + Math.round(c.price / c.sqft) + '/sqft' : '') + '</div></div>'
+    + '<div style="font-size:11.5px;color:var(--txt3,#9fb0c9);margin:4px 0 9px">' + (c.sqft ? c.sqft.toLocaleString() + ' sqft' : 'sqft 🟡') + ' · ' + (c.beds != null ? c.beds : '🟡') + ' cm / ' + (c.baths != null ? c.baths : '🟡') + ' bñ · ' + (c.year || '🟡') + ' · lote ' + (c.lot ? c.lot.toLocaleString() : '🟡') + ' · piscina 🟡</div>'
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.08));padding-top:7px">' + adjRows + '</div>'
+    + '<details class="ap-man" style="margin:6px 0"><summary style="cursor:pointer;font-size:10.5px;color:var(--txt3,#9fb0c9)">± ajustes manuales (condición · ubicación · concesiones · pool/garaje/otros)</summary>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' + mIn('cond', 'condición') + mIn('ubic', 'ubicación') + mIn('conces', 'concesiones') + mIn('otros', 'otros') + '</div></details>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line,rgba(255,255,255,.08));padding-top:8px">'
+    + '<div><div style="font-size:10px;color:var(--txt3,#9fb0c9)">valor ajustado · net ' + adj.netPct.toFixed(1) + '% · gross ' + adj.grossPct.toFixed(1) + '%' + (adj.grossPct > apCfg('arv_gross_adj_warn_pct', 25) ? ' ⚠' : '') + '</div><div style="font-size:17px;font-weight:800">' + AP_M(adj.valorAjustado) + '</div></div>'
+    + (esRec && x.pesoPct != null ? '<span class="ap-wt">peso ' + x.pesoPct + '%</span>' : '<span class="ap-pill">fuera del cálculo</span>')
+    + '</div></div></div>';
+}
+
+function apVistaGrilla(s, rec) {
+  if (!rec || !rec.usables || !rec.usables.length) return '<div class="ap-card" style="text-align:center;color:var(--txt3,#9fb0c9)">Sin comps reconciliados.</div>';
+  const us = rec.usables;
+  const st = apState();
+  const catSum = (x, cat) => x.adj.rows.filter(r => r.cat === cat).reduce((a, r) => a + r.monto, 0);
+  const fmtAdj = v => v === 0 ? '$0' : '<b class="' + (v > 0 ? 'ap-pos' : 'ap-neg') + '">' + (v > 0 ? '+' : '−') + AP_M(Math.abs(v)).slice(0) + '</b>';
+  const minGross = Math.min(...us.map(x => x.adj.grossPct));
+  const head = '<tr><th>Comparable →</th><th class="subjcol">SUBJECT<div style="font-weight:500;font-size:10px;color:var(--txt3,#9fb0c9)">' + AP_E((s.dir || '').split(',')[0]) + '</div></th>'
+    + us.map(x => '<th><div style="font-weight:700">' + AP_E(x.c.dir.split(',')[0]) + '</div><div style="font-weight:500;font-size:10px;color:var(--txt3,#9fb0c9)">' + (x.c.dist != null ? x.c.dist.toFixed(2) + ' mi · ' : '') + AP_D(x.c.fecha) + '</div></th>').join('') + '</tr>';
+  const row = (lbl, sv, fn) => '<tr><td>' + lbl + '</td><td class="subjcol">' + sv + '</td>' + us.map(x => '<td>' + fn(x) + '</td>').join('') + '</tr>';
+  const sec = lbl => '<tr class="sec"><td colspan="' + (us.length + 2) + '">' + lbl + '</td></tr>';
+  return '<div class="ap-card ap-grid" style="padding:0;overflow-x:auto"><table><thead>' + head + '</thead><tbody>'
+    + row('Precio de venta', '—', x => AP_M(x.c.price))
+    + row('$/sqft', '—', x => x.c.sqft ? '$' + Math.round(x.c.price / x.c.sqft) : '—')
+    + row('Sqft (GLA)', s.sqft ? s.sqft.toLocaleString() : '—', x => x.c.sqft ? x.c.sqft.toLocaleString() : '🟡')
+    + row('Camas / Baños', (s.beds != null ? s.beds : '—') + ' / ' + (s.baths != null ? s.baths : '—'), x => (x.c.beds != null ? x.c.beds : '🟡') + ' / ' + (x.c.baths != null ? x.c.baths : '🟡'))
+    + row('Año', s.year || '—', x => x.c.year || '🟡')
+    + row('Lote sqft', s.lot ? s.lot.toLocaleString() : '—', x => x.c.lot ? x.c.lot.toLocaleString() : '—')
+    + sec('Ajustes al subject')
+    + row('Tamaño (GLA) · $' + apGlaPsf(s.zip) + '/sqft', '—', x => fmtAdj(catSum(x, 'gla')))
+    + row('Cuartos', '—', x => fmtAdj(catSum(x, 'cuartos')))
+    + row('Baños', '—', x => fmtAdj(catSum(x, 'banos')))
+    + row('Año / condición', '—', x => fmtAdj(catSum(x, 'ano') + (AP_N((st.man[x.c.id] || {}).cond) || 0)))
+    + row('Lote', '—', x => fmtAdj(catSum(x, 'lote')))
+    + row('Manuales (ubic/conces/otros)', '—', x => fmtAdj(catSum(x, 'man') - (AP_N((st.man[x.c.id] || {}).cond) || 0)))
+    + sec('Resultado')
+    + row('Ajuste neto', '—', x => '<b class="' + (x.adj.netPct >= 0 ? 'ap-pos' : 'ap-neg') + '">' + (x.adj.netPct >= 0 ? '+' : '') + x.adj.netPct.toFixed(1) + '%</b>')
+    + row('Ajuste bruto (similitud)', '—', x => x.adj.grossPct.toFixed(1) + '%' + (x.adj.grossPct === minGross ? ' ✅' : ''))
+    + '<tr class="best"><td>Valor ajustado</td><td class="subjcol">—</td>' + us.map(x => '<td style="font-weight:800">' + AP_M(x.adj.valorAjustado) + '</td>').join('') + '</tr>'
+    + row('Peso en el ARV', '—', x => '<span class="' + (x.adj.grossPct === minGross ? 'ap-wt' : 'ap-pill') + '">' + x.pesoPct + '%</span>')
+    + row('Incluir en el cálculo', '—', x => '<input type="checkbox" class="ap-cbx" checked onchange="apExclToggle(\'' + x.c.id + '\')">')
+    + '</tbody></table></div>';
 }
 
 function ffArvProView() {
+  apCSS();
   const inp = UW.a.inputs;
   const st = apState();
   if (!st.dir) st.dir = UW.a.direccion || '';
@@ -202,112 +471,71 @@ function ffArvProView() {
   const f = apFiltros();
   const rec = comps.length ? apReconciliar(s, comps) : null;
   const cal = apCalibracion();
-  const grossWarn = apCfg('arv_gross_adj_warn_pct', 25);
-  const netWarn = apCfg('arv_net_adj_warn_pct', 15);
 
-  // ── header: buscar subject
-  const buscar = '<div class="card" style="padding:16px;margin-bottom:14px"><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">'
-    + '<div style="flex:1;min-width:260px">' + apInput('Dirección del subject', st.dir, "apSet('dir',this.value)", { ph: 'ej. 6203 Shadow Bend, Austin, TX 78745' }) + '</div>'
-    + '<button class="repbtn" style="margin-bottom:8px" onclick="apBuscar(false)">🔎 Buscar subject + comps</button>'
-    + '<button class="repbtn ghost" style="margin-bottom:8px" onclick="apBuscar(true)">↻ Refrescar (gasta cuota)</button>'
-    + '</div><div style="font-size:10px;color:var(--txt3,#9fb0c9)">RentCast vía backend (key en secret) · cache 30 días · comps = ventas/listings reales de la zona</div></div>';
+  // header + searchbar
+  const head = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:2px"><b style="font-size:18px">🏷️ ARV Profesional</b><span class="ap-pill">calibrado con tus appraisals</span></div>'
+    + '<div style="color:var(--txt3,#9fb0c9);font-size:12.5px;margin-bottom:14px">La decisión más importante del negocio. Comps reales del mercado, ajustados como un tasador — nunca $/sqft promedio × sqft.</div>'
+    + '<div class="ap-searchbar">🔎 <input id="ap-dir" value="' + AP_E(st.dir) + '" placeholder="Dirección del subject — ej. 6203 Shadow Bend, Austin, TX 78745" onchange="apSet(\'dir\',this.value)">'
+    + '<button class="ap-btn ghost" onclick="apBuscar(true)">↺ Refrescar</button><button class="ap-btn" onclick="apBuscar(false)">Buscar comps</button></div>';
 
-  // ── subject card
-  const rcTag = s.rcLoading ? '⏳ consultando…' : s.rcOk ? '<span class="up">✓ RentCast</span>' : '<span style="color:var(--amber,#e7b65e)">sin datos RentCast — cargá a mano</span>';
-  const subjCard = '<div class="card" style="padding:16px;margin-bottom:14px"><div style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--a1,#12b5a0);margin-bottom:8px">Subject · ' + rcTag + (s.zip ? ' · zip ' + s.zip + ' (GLA $' + apGlaPsf(s.zip) + '/sqft)' : '') + '</div>'
-    + '<div class="grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
-    + apInput('Sqft (GLA)', s.sqft, "apSet('subj.sqft',this.value)", { falta: s.rcOk && s.sqft == null })
-    + apInput('Camas', s.beds, "apSet('subj.beds',this.value)", { falta: s.rcOk && s.beds == null })
-    + apInput('Baños', s.baths, "apSet('subj.baths',this.value)", { falta: s.rcOk && s.baths == null })
-    + apInput('Año', s.year, "apSet('subj.year',this.value)", { falta: s.rcOk && s.year == null })
-    + apInput('Lote sqft', s.lot, "apSet('subj.lot',this.value)", { falta: s.rcOk && s.lot == null })
-    + '</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">'
-    + ['pool:Piscina', 'garage:Garaje', 'fireplace:Fireplace'].map(x => { const [k, l] = x.split(':'); return '<button class="repbtn ' + (s[k] ? '' : 'ghost') + '" style="padding:4px 10px;font-size:11px" onclick="apSet(\'subj.' + k + '\',' + (s[k] ? 'false' : 'true') + ')">' + (s[k] ? '☑' : '☐') + ' ' + l + '</button>'; }).join('')
-    + '</div></div>';
+  // grid: ficha | hero
+  const top = '<div class="grid k2" style="gap:14px;align-items:start;margin-bottom:14px">' + apVistaFicha(s) + apVistaHero(rec, inp) + '</div>';
 
-  // ── filtros
-  const filtros = '<div class="card" style="padding:14px;margin-bottom:14px"><div style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--a1,#12b5a0);margin-bottom:8px">Filtros de comparables (como tu equipo)</div>'
-    + '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">'
-    + apInput('Distancia máx (mi)', f.dist, "apSet('filtros.dist',this.value)")
-    + apInput('Venta hace máx (meses)', f.meses, "apSet('filtros.meses',this.value)")
-    + apInput('Sqft ±%', f.sqftPct, "apSet('filtros.sqftPct',this.value)")
-    + apInput('Camas ±', f.camas, "apSet('filtros.camas',this.value)")
-    + apInput('Baños ±', f.banos, "apSet('filtros.banos',this.value)")
-    + apInput('Año ±', f.ano, "apSet('filtros.ano',this.value)")
-    + '</div></div>';
+  // mapa
+  const mapa = '<div style="position:relative;margin-bottom:4px"><div id="ap-map"></div>'
+    + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--txt3,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">📍 Subject + ' + comps.length + ' comparables · click en un pin resalta el comp</div></div>';
 
-  // ── tabla de comps
-  let compsHtml = '';
-  if (!comps.length) compsHtml = '<div class="card" style="padding:24px;text-align:center;color:var(--txt3,#9fb0c9);margin-bottom:14px">Sin comps todavía — dale a 🔎 Buscar.</div>';
+  // criterio + resumen
+  const criterio = apVistaCriterio(f, comps, rec);
+  const resumen = apVistaResumen(s, rec);
+
+  // comps: toggle tarjetas / grilla
+  const vista = st.vista || 'cards';
+  const toggle = '<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px;flex-wrap:wrap;gap:8px"><div class="ap-lab">Comparables — el más parecido (menor ajuste bruto) pesa más</div>'
+    + '<div style="display:flex;gap:6px"><button class="ap-btn ' + (vista === 'cards' ? '' : 'ghost') + '" style="padding:5px 12px;font-size:11px" onclick="apSet(\'vista\',\'cards\')">🃏 Tarjetas</button>'
+    + '<button class="ap-btn ' + (vista === 'grid' ? '' : 'ghost') + '" style="padding:5px 12px;font-size:11px" onclick="apSet(\'vista\',\'grid\')">📋 Grilla 1004</button></div></div>';
+  let compsHtml;
+  if (!comps.length) compsHtml = '<div class="ap-card" style="text-align:center;padding:30px;color:var(--txt3,#9fb0c9)">Sin comps todavía — buscá el subject arriba.</div>';
+  else if (vista === 'grid') compsHtml = apVistaGrilla(s, rec);
   else {
-    const filas = comps.map(c => {
-      const fl = apPasaFiltro(s, c, f);
-      const adj = apAjustes(s, c);
-      const inclUse = rec && rec.usables.some(u => u.c.id === c.id);
-      const u = rec && rec.usables.find(u => u.c.id === c.id);
-      const man = st.man[c.id] || {};
-      const warn = adj.grossPct > grossWarn ? ' <span title="gross adj > ' + grossWarn + '% — comp poco comparable (estándar 1004)" style="color:var(--neg,#f87171)">⚠</span>' : '';
-      const mIn = (k, ph) => '<input value="' + (man[k] || '') + '" placeholder="' + ph + '" onchange="apManSet(\'' + c.id + '\',\'' + k + '\',this.value)" style="width:74px;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:6px;padding:3px 6px;color:inherit;font-size:10.5px;text-align:right">';
-      return '<tr style="' + (st.excl[c.id] ? 'opacity:.35;' : !fl.pasa ? 'opacity:.45;' : '') + (inclUse ? 'background:rgba(18,181,160,.05)' : '') + '">'
-        + '<td><input type="checkbox" ' + (!st.excl[c.id] ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')" title="incluir/excluir"></td>'
-        + '<td style="max-width:190px"><div style="font-weight:600;font-size:11.5px">' + AP_E(c.dir.split(',')[0]) + '</div><div style="font-size:9.5px;opacity:.55">' + (c.dist != null ? c.dist.toFixed(2) + ' mi · ' : '') + (c.fecha ? String(c.fecha).slice(0, 10) : 's/fecha') + (c.dom ? ' · DOM ' + c.dom : '') + (fl.pasa ? '' : ' · <span style="color:var(--amber,#e7b65e)">filtrado: ' + AP_E(fl.razones.join('; ')) + '</span>') + '</div></td>'
-        + '<td style="text-align:right;font-weight:700">' + AP_M(c.price) + '</td>'
-        + '<td style="text-align:right;font-size:11px">' + (c.sqft || '—') + '<div style="font-size:9px;opacity:.5">' + (c.sqft && c.price ? '$' + Math.round(c.price / c.sqft) + '/sf' : '') + '</div></td>'
-        + '<td style="text-align:center;font-size:11px">' + (c.beds != null ? c.beds : '🟡') + '/' + (c.baths != null ? c.baths : '🟡') + '<div style="font-size:9px;opacity:.5">' + (c.year || '🟡') + '</div></td>'
-        + '<td style="font-size:10px;max-width:170px">' + adj.rows.map(r => '<div style="display:flex;justify-content:space-between;gap:6px"><span style="opacity:.65">' + AP_E(r.concepto) + '</span><b>' + AP_M(r.monto) + '</b></div>').join('') + '</td>'
-        + '<td style="text-align:right;white-space:nowrap">' + mIn('cond', 'cond') + '<br>' + mIn('ubic', 'ubic') + '<br>' + mIn('conces', 'conces') + '<br>' + mIn('otros', 'otros') + '</td>'
-        + '<td style="text-align:right;font-weight:800">' + AP_M(adj.valorAjustado) + '<div style="font-size:9px;opacity:.6;font-weight:400">net ' + adj.netPct.toFixed(1) + '% · gross ' + adj.grossPct.toFixed(1) + '%' + warn + (Math.abs(adj.netPct) > netWarn ? ' ⚠net' : '') + '</div>' + (u ? '<div style="font-size:9px;color:var(--a1,#12b5a0)">peso ' + u.pesoPct + '%</div>' : '') + '</td></tr>';
-    }).join('');
-    compsHtml = '<div class="card" style="padding:14px;margin-bottom:14px"><div style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--a1,#12b5a0);margin-bottom:8px">Comparables (' + comps.length + ' de RentCast · reconcilio ' + (rec ? rec.usables.length : 0) + ')</div>'
-      + '<div style="overflow-x:auto"><table class="ptable" style="width:100%;font-size:12px"><thead><tr><th></th><th>Comp</th><th style="text-align:right">Precio</th><th style="text-align:right">Sqft</th><th style="text-align:center">Cm/Bñ·Año</th><th>Ajustes (auto)</th><th style="text-align:right">Manuales $</th><th style="text-align:right">Ajustado</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
-      + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">🟡 = dato que RentCast no cubre (cargalo a mano en "Manuales": condición C1–C6/reno, ubicación, concesiones −, piscina/garaje/fireplace en "otros"). NUNCA se usa $/sqft promedio × sqft — solo comps ajustados.</div></div>';
+    const st2 = apState();
+    const todos = comps.map(c => ({ c, filtro: apPasaFiltro(s, c, f), adj: apAjustes(s, c) }));
+    const enRec = new Map((rec && rec.usables || []).map(u => [u.c.id, u]));
+    todos.forEach(x => { const u = enRec.get(x.c.id); if (u) x.pesoPct = u.pesoPct; });
+    const orden = todos.sort((a, b) => (enRec.has(b.c.id) ? 1 : 0) - (enRec.has(a.c.id) ? 1 : 0) || a.adj.grossPct - b.adj.grossPct);
+    compsHtml = '<div class="ap-cards">' + orden.map(x => apCardComp(x, enRec.has(x.c.id))).join('') + '</div>';
   }
 
-  // ── reconciliación / hero
-  let hero = '';
-  if (rec && rec.arv) {
-    const arvAt = +inp.arv_airtable || +inp.arv || 0;
-    const appr = +inp.appraisal || 0;
-    hero = '<div style="background:linear-gradient(135deg,var(--a1,#12b5a0)22,transparent);border:1px solid var(--a1,#12b5a0)55;border-radius:14px;padding:18px 22px;margin-bottom:14px">'
-      + '<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:10px"><div>'
-      + '<div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">ARV estimado profesional (comps ajustados)</div>'
-      + '<div style="font-size:40px;font-weight:800;color:var(--a1,#12b5a0);line-height:1.1;margin:4px 0">' + AP_M(rec.arv) + '</div>'
-      + '<div style="font-size:12px;color:var(--txt3,#9fb0c9)">🔻 ' + AP_M(rec.conservador) + ' · 🎯 ' + AP_M(rec.arv) + ' · 🔺 ' + AP_M(rec.optimista) + ' &nbsp; ' + apChipConf(rec.confianza.nivel) + '</div>'
-      + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:4px">' + rec.confianza.razones.map(AP_E).join(' · ') + '</div></div>'
-      + '<div style="text-align:right;font-size:12px">'
-      + (arvAt ? '<div>ARV Airtable (fuente de verdad): <b>' + AP_M(arvAt) + '</b> · Δ <b class="' + (rec.arv - arvAt >= 0 ? 'up' : 'down') + '">' + AP_M(rec.arv - arvAt) + '</b></div>' : '')
-      + (appr ? '<div>Appraisal real: <b>' + AP_M(appr) + '</b> · Δ <b class="' + (Math.abs(rec.arv - appr) / appr <= 0.05 ? 'up' : 'down') + '">' + AP_M(rec.arv - appr) + ' (' + ((rec.arv - appr) / appr * 100).toFixed(1) + '%)</b></div>' : '')
-      + '<button class="repbtn" style="margin-top:8px" onclick="apUsarArv(' + rec.arv + ')">→ Usar como ARV del análisis</button>'
-      + '</div></div></div>';
-  }
+  // foot + calibración/factores (misma lógica de siempre)
+  const foot = rec && rec.arv ? '<div style="display:flex;gap:12px;align-items:center;margin:14px 0;flex-wrap:wrap"><button class="ap-btn" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>'
+    + '<span style="font-size:11.5px;color:var(--txt3,#9fb0c9)">' + (rec.usables[0] ? 'El más parecido: ' + AP_E(rec.usables[0].c.dir.split(',')[0]) + ' (gross ' + rec.usables[0].adj.grossPct.toFixed(1) + '% → peso ' + rec.usables[0].pesoPct + '%).' : '') + ' El ARV de Airtable sigue siendo la fuente de verdad guardada.</span></div>' : '';
 
-  // ── factores editables
-  const fEd = (k, l, def) => apInput(l, apCfg(k, def), "apCfgSet('" + k + "',this.value)");
-  const factores = '<details class="card" style="padding:14px;margin-bottom:14px"><summary style="cursor:pointer;font-size:12px;font-weight:800;text-transform:uppercase;color:var(--a1,#12b5a0)">⚙️ Factores de ajuste (calibrados, editables — ff_uw_config)</summary>'
+  const fEd = (k, l, def) => '<div style="margin-bottom:8px"><div style="font-size:10.5px;color:var(--txt2,#c9d5ea);font-weight:600;margin-bottom:2px">' + l + '</div><input value="' + apCfg(k, def) + '" onchange="apCfgSet(\'' + k + '\',this.value)" style="width:100%;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:6px 9px;color:inherit;font-size:12.5px;font-weight:600;outline:none"></div>';
+  const factores = '<details class="ap-card" style="padding:14px;margin-bottom:14px"><summary style="cursor:pointer" class="ap-lab">⚙️ Factores de ajuste (calibrados, editables — ff_uw_config)</summary>'
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px">'
-    + fEd('arv_adj_gla_psf', 'GLA $/sqft' + (s.zip ? ' (global; zip ' + s.zip + ' usa arv_adj_gla_psf_' + s.zip + ' si existe)' : ''), 90)
+    + fEd('arv_adj_gla_psf', 'GLA $/sqft' + (s.zip ? ' (zip ' + s.zip + ' usa arv_adj_gla_psf_' + s.zip + ' si existe)' : ''), 90)
     + fEd('arv_adj_cuarto', 'Cuarto $', 15000) + fEd('arv_adj_bano', 'Baño $', 15000) + fEd('arv_adj_piscina', 'Piscina $ (guía p/ manual)', 25000)
     + fEd('arv_adj_garaje', 'Garaje $ (guía p/ manual)', 20000) + fEd('arv_adj_fireplace', 'Fireplace $ (guía)', 1500) + fEd('arv_adj_lote_psf', 'Lote $/sqft', 2) + fEd('arv_adj_ano_pct', 'Año %/año', 0.5)
     + fEd('arv_mercado_pct_mes', 'Tendencia mercado %/mes', 0) + fEd('arv_rango_pct', 'Rango ±%', 6) + fEd('arv_gross_adj_warn_pct', 'Warn gross adj %', 25) + fEd('arv_bias_pct', 'Sesgo aplicado %', 0)
     + '</div><div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:4px">Guías de piscina/garaje/fireplace: RentCast no dice si el COMP los tiene → usá el campo manual "otros" del comp con estos montos.</div></details>';
 
-  // ── calibración / desviación
   const metaOk = cal.errorAbs != null && cal.errorAbs <= cal.meta;
   const filasCal = cal.filas.map(x =>
-    '<tr style="' + (x.excluida ? 'opacity:.4' : '') + '"><td style="font-size:11.5px">' + AP_E(x.casa) + (x.excluida ? ' <span class="osbadge" style="font-size:8.5px">excluida</span>' : '') + '</td>'
-    + '<td style="text-align:right">' + AP_M(x.arv) + '</td><td style="text-align:right">' + AP_M(x.appr) + '</td>'
-    + '<td style="text-align:right;font-weight:700" class="' + (Math.abs(x.devPct) <= 5 ? 'up' : 'down') + '">' + AP_M(x.dev) + ' (' + x.devPct.toFixed(1) + '%)</td>'
+    '<tr style="' + (x.excluida ? 'opacity:.4' : '') + '"><td style="font-size:11.5px;text-align:left">' + AP_E(x.casa) + (x.excluida ? ' <span class="ap-pill" style="font-size:9px">excluida</span>' : '') + '</td>'
+    + '<td>' + AP_M(x.arv) + '</td><td>' + AP_M(x.appr) + '</td>'
+    + '<td style="font-weight:700" class="' + (Math.abs(x.devPct) <= 5 ? 'ap-pos' : 'ap-neg') + '">' + AP_M(x.dev) + ' (' + x.devPct.toFixed(1) + '%)</td>'
     + '<td style="text-align:center">' + (x.link ? '<a href="' + AP_E(x.link) + '" target="_blank" title="abrir appraisal PDF">📄</a>' : '—') + '</td></tr>').join('');
-  const calHtml = '<div class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
-    + '<div style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--a1,#12b5a0)">📏 Calibración — ARV nuestro vs appraisal real (' + cal.usadas.length + ' casas' + (cal.filas.length - cal.usadas.length ? ' + ' + (cal.filas.length - cal.usadas.length) + ' excluidas' : '') + ')</div>'
-    + '<div style="font-size:12px">' + (cal.errorAbs != null ? '|error| prom <b class="' + (metaOk ? 'up' : 'down') + '">' + cal.errorAbs.toFixed(1) + '%</b> (meta ≤' + cal.meta + '%) · sesgo <b>' + (cal.errorProm >= 0 ? '+' : '') + cal.errorProm.toFixed(1) + '%</b> ' + (cal.errorProm > 1 ? '(pasados — estimamos de más)' : cal.errorProm < -1 ? '(conservadores)' : '(neutro)') : 'sin datos') + '</div></div>'
+  const calHtml = '<div class="ap-card ap-grid" style="padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+    + '<div class="ap-lab">📏 Calibración — ARV nuestro vs appraisal real (' + cal.usadas.length + ' casas' + (cal.filas.length - cal.usadas.length ? ' + ' + (cal.filas.length - cal.usadas.length) + ' excluidas' : '') + ')</div>'
+    + '<div style="font-size:12px">' + (cal.errorAbs != null ? '|error| prom <b class="' + (metaOk ? 'ap-pos' : 'ap-neg') + '">' + cal.errorAbs.toFixed(1) + '%</b> (meta ≤' + cal.meta + '%) · sesgo <b>' + (cal.errorProm >= 0 ? '+' : '') + cal.errorProm.toFixed(1) + '%</b> ' + (cal.errorProm > 1 ? '(pasados — estimamos de más)' : cal.errorProm < -1 ? '(conservadores)' : '(neutro)') : 'sin datos') + '</div></div>'
     + (cal.sugerenciaBias != null && Math.abs(cal.sugerenciaBias) > 0.5 && Math.abs(apCfg('arv_bias_pct', 0) - cal.sugerenciaBias) > 0.5
       ? '<div style="background:rgba(231,182,94,.08);border:1px solid rgba(231,182,94,.3);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:11.5px">💡 Sugerencia de recalibración: aplicar sesgo <b>' + cal.sugerenciaBias.toFixed(2) + '%</b> al reconciliado (hoy ' + apCfg('arv_bias_pct', 0) + '%). '
       + cal.zips.map(z => 'zip ' + z.zip + ': ' + (-z.prom).toFixed(1) + '% (n=' + z.n + ')').join(' · ')
-      + ' <button class="repbtn" style="padding:3px 10px;font-size:10.5px;margin-left:8px" onclick="apAplicarBias(' + cal.sugerenciaBias.toFixed(2) + ')">Aplicar (humano aprueba)</button></div>' : '')
-    + '<div style="overflow-x:auto"><table class="ptable" style="width:100%;font-size:12px"><thead><tr><th>Casa</th><th style="text-align:right">ARV nuestro</th><th style="text-align:right">Appraisal</th><th style="text-align:right">Desviación</th><th style="text-align:center">PDF</th></tr></thead><tbody>' + filasCal + '</tbody></table></div>'
-    + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Excluidas de la calibración (atípicos/datos sucios, editable en arv_calib_excluir): ' + AP_E(UWct ? UWct('arv_calib_excluir', '—') : '—') + '</div></div>';
+      + ' <button class="ap-btn" style="padding:3px 10px;font-size:10.5px;margin-left:8px" onclick="apAplicarBias(' + cal.sugerenciaBias.toFixed(2) + ')">Aplicar (humano aprueba)</button></div>' : '')
+    + '<div style="overflow-x:auto"><table style="min-width:560px"><thead><tr><th style="text-align:left">Casa</th><th>ARV nuestro</th><th>Appraisal</th><th>Desviación</th><th style="text-align:center">PDF</th></tr></thead><tbody>' + filasCal + '</tbody></table></div>'
+    + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Excluidas de la calibración (atípicos/datos sucios, editable en arv_calib_excluir): ' + AP_E(window.UWct ? UWct('arv_calib_excluir', '—') : '—') + '</div></div>';
 
-  return buscar + subjCard + hero + filtros + compsHtml + factores + calHtml;
+  setTimeout(apMapMount, 40);
+  return head + top + mapa + criterio + resumen + toggle + compsHtml + foot + factores + calHtml;
 }
 window.ffArvProView = ffArvProView;
