@@ -27,6 +27,12 @@ function kitMoney2(n, opts) {  // con centavos cuando los hay (fidelidad HUD)
 }
 function kitPct(n, dec) { return (n == null || isNaN(n)) ? '—' : (Math.round(n * Math.pow(10, dec || 0)) / Math.pow(10, dec || 0)) + '%'; }
 function kitNum(n) { return (n == null || isNaN(n)) ? '—' : (+n).toLocaleString('en-US'); }
+// Valores NO monetarios: null/''/NaN → '— sin dato' (NUNCA un emoji o color como valor)
+function kitValue(v, opts) {
+  opts = opts || {};
+  if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return '<span style="color:var(--mut2)" title="' + (opts.motivo || 'sin dato en la fuente') + '">—' + (opts.corto ? '' : ' sin dato') + '</span>';
+  return kitEsc(v) + (opts.unidad ? ' ' + opts.unidad : '');
+}
 
 // ─── HERO: el número protagonista (patrón Cash-Out). Sin color → número en DEGRADÉ de marca (ADN ARV Pro). ───
 function kitHero(titulo, valor, sub, color) {
@@ -140,4 +146,4 @@ window.kitMoney = kitMoney; window.kitMoney2 = kitMoney2; window.kitPct = kitPct
 window.kitHero = kitHero; window.kitCard = kitCard; window.kitRow = kitRow;
 window.kitInput = kitInput; window.kitInputSm = kitInputSm;
 window.kitBadge = kitBadge; window.kitEmpty = kitEmpty; window.kitLoading = kitLoading; window.kitError = kitError; window.kitEsc = kitEsc;
-window.kitVerdict = kitVerdict; window.kitConfidence = kitConfidence; window.kitRange = kitRange; window.kitToggle = kitToggle;
+window.kitVerdict = kitVerdict; window.kitConfidence = kitConfidence; window.kitRange = kitRange; window.kitToggle = kitToggle; window.kitValue = kitValue;

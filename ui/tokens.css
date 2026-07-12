@@ -13,7 +13,7 @@
 :root {
   /* ── DARK (default del OS) ── */
   --bg: #06080d;
-  --ink: #eef2f8;
+  --ink: #e6ebf5;   /* canon CEO 12-jul: texto claro en oscuro */
   --mut: #93a0b6;
   --mut2: #5b6780;
   --glass: rgba(255, 255, 255, .045);
@@ -112,6 +112,17 @@
 .ui-error { background: rgba(220, 38, 38, .1); border: 1px solid rgba(220, 38, 38, .35); color: var(--neg); border-radius: 10px; padding: 10px 13px; font-size: 12.5px; }
 
 /* ════════ QUICK WINS GLOBALES ════════ */
+
+/* Fila de controles (header con título+pill+toggle, searchbar con input+botones):
+   SIEMPRE envuelve, gap ≥12px, nada flush contra el borde. Regla D del canon. */
+.ui-row { display: flex; flex-wrap: wrap; gap: 12px; row-gap: 10px; align-items: center; min-width: 0; }
+.ui-row > * { flex-shrink: 0; }
+.ui-row > input, .ui-row > .ui-grow { flex: 1 1 160px; min-width: 0; }
+
+/* ⚠ REGLA ANTI-RESET (aprendida en ARV 12-jul): los overlays con reset
+   `#contenedor *{margin:0;padding:0}` (especificidad 1-0-1) PISAN las clases
+   de módulo (0-1-0). Todo CSS inyectado por un módulo que viva dentro de un
+   overlay con reset DEBE scopear sus selectores con el ID del contenedor. */
 
 /* Tablas densas: scroll propio, nunca desbordar la página */
 .overx { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }

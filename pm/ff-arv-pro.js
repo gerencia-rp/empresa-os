@@ -221,9 +221,9 @@ function apCSS() {
     '.ap-grad{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0))}',
     '.ap-card{background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:16px;padding:18px}',
     '.ap-lab{color:var(--mut,#9fb0c9);font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:700}',
-    '.ap-searchbar{display:flex;gap:10px;align-items:center;background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:14px;padding:10px 14px;margin-bottom:16px}',
+    '.ap-searchbar{display:flex;flex-wrap:wrap;gap:12px;row-gap:8px;align-items:center;background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:14px;padding:10px 14px;margin-bottom:16px}',
     '.ap-searchbar input{flex:1;background:transparent;border:none;color:inherit;font-size:15px;outline:none;min-width:180px}',
-    '.ap-btn{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#04121b;font-weight:700;border:none;border-radius:10px;padding:9px 16px;font-size:13px;cursor:pointer;white-space:nowrap}',
+    '.ap-btn{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#fff;font-weight:700;border:none;border-radius:10px;padding:9px 16px;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0}',
     '.ap-btn.ghost{background:var(--card,rgba(255,255,255,.06));color:inherit;border:1px solid var(--line,rgba(255,255,255,.12));font-weight:600}',
     '.ap-stat{background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.1));border-radius:10px;padding:7px 12px;min-width:72px}',
     '.ap-stat .n{font-size:16px;font-weight:700}.ap-stat .t{color:var(--mut,#9fb0c9);font-size:10.5px}',
@@ -283,7 +283,12 @@ function apCSS() {
     '.ap-tag{position:absolute;top:8px;left:8px;background:var(--card,rgba(20,28,44,.9));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;box-shadow:0 3px 10px rgba(23,43,77,.15)}',
     '.ap-tag.best{background:var(--pos,#12b76a);color:#fff;border:none}',
     '.ap-expnote{margin-top:16px;text-align:center;color:var(--mut,#9fb0c9);font-size:13px;background:var(--card,rgba(255,255,255,.03));border:1px dashed var(--line,rgba(255,255,255,.18));border-radius:14px;padding:13px;cursor:pointer}',
-  ].join('\n');
+  ].join('\n')
+    // ⚠ REGLA GLOBAL (12-jul): el reset `#ff-overlay *{margin:0;padding:0}` (ID+universal, 1-0-1)
+    // le GANA a las clases sueltas (0-1-0) y mataba todos los paddings/margins de .ap-*
+    // (botones cortados por la esquina redondeada, todo amontonado). Se scopea cada
+    // selector con el ID del contenedor para recuperar la especificidad.
+    .replace(/(^|\n|,)(\s*\.)/g, '$1#ff-overlay $2');
   document.head.appendChild(st);
 }
 
@@ -341,7 +346,7 @@ function apStat(lbl, val, key, opts) {
   const inner = key
     ? '<input value="' + (val == null || val === '' ? '' : AP_E(val)) + '" placeholder="—" onchange="apSet(\'' + key + '\',this.value)">'
     : '<div class="n">' + (val == null || val === '' ? '—' : AP_E(val)) + '</div>';
-  return '<div class="ap-stat">' + inner + '<div class="t">' + lbl + (opts.falta ? ' <span title="RentCast no lo trajo — cargalo" style="color:var(--amber,#e7b65e)">🟡</span>' : '') + '</div></div>';
+  return '<div class="ap-stat">' + inner + '<div class="t">' + lbl + (opts.falta ? ' <span title="RentCast no lo trajo — cargalo" style="color:var(--amber,#e7b65e);font-weight:700">· falta</span>' : '') + '</div></div>';
 }
 function apRangeBar(rec, lbls) {
   const L = lbls || ['conservador', 'probable', 'optimista'];
@@ -363,7 +368,7 @@ function apSubjStrip(s) {
   const fi = apSubjectFicha();
   const facts = [
     s.sqft ? s.sqft.toLocaleString() + ' sqft' : null,
-    s.beds != null ? s.beds + ' camas' : 'camas 🟡',
+    s.beds != null ? s.beds + ' camas' : 'camas: — sin dato',
     s.baths != null ? s.baths + ' baños' : null,
     s.year || null,
     fi.loteAcres ? 'lote ' + fi.loteAcres.toFixed(2) + ' ac' : null,
@@ -592,9 +597,12 @@ function ffArvProView() {
 
   // header con toggle Simple/Experto + searchbar
   const modo = st.modo || 'simple';
-  const seg = '<div class="ap-seg"><button class="' + (modo === 'simple' ? 'on' : '') + '" onclick="apSet(\'modo\',\'simple\')">● Simple</button><button class="' + (modo === 'experto' ? 'on' : '') + '" onclick="apSet(\'modo\',\'experto\')">Experto (tasador)</button></div>';
-  const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
-    + '<div style="display:flex;align-items:center;gap:10px"><b style="font-size:18px">🏷️ ARV · Valor de reventa</b><span class="ap-pill">calibrado con tus tasaciones</span></div>' + seg + '</div>'
+  // toggle canónico del sistema de diseño (kitToggle) con fallback al seg viejo
+  const seg = (typeof kitToggle === 'function')
+    ? kitToggle('✨ Simple', '🔬 Experto (tasador)', modo === 'experto', "apSet('modo','" + (modo === 'experto' ? 'simple' : 'experto') + "')")
+    : '<div class="ap-seg"><button class="' + (modo === 'simple' ? 'on' : '') + '" onclick="apSet(\'modo\',\'simple\')">● Simple</button><button class="' + (modo === 'experto' ? 'on' : '') + '" onclick="apSet(\'modo\',\'experto\')">Experto (tasador)</button></div>';
+  const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;row-gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0"><b style="font-size:18px">🏷️ ARV · Valor de reventa</b><span class="ap-pill">calibrado con tus tasaciones</span></div>' + seg + '</div>'
     + '<div class="ap-searchbar">🔎 <input id="ap-dir" value="' + AP_E(st.dir) + '" placeholder="Dirección de la casa — ej. 6203 Shadow Bend, Austin, TX 78745" onchange="apSet(\'dir\',this.value)">'
     + '<button class="ap-btn ghost" onclick="apBuscar(true)">↺ Refrescar</button><button class="ap-btn" onclick="apBuscar(false)">Buscar</button></div>';
 
