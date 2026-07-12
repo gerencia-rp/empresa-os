@@ -197,6 +197,6 @@ function ffIngresoView() {
 
   const nota = inp.renta_mensual ? '<div style="font-size:11px;color:var(--mut,#9fb0c9);margin-top:10px">Renta del análisis (alimenta la Vista Unificada): <b style="color:var(--ink,#eaf0ff)">' + IG_M(inp.renta_mensual) + '/mes</b>' + (st.modelo ? ' · modelo ' + lblM[st.modelo] : ' · del deal real (Airtable)') + '</div>' : '';
 
-  return head + '<div class="grid k4" style="gap:14px;align-items:stretch;margin-top:4px">' + cards + '</div>' + mejorTxt + config + flujoCard + tarifas + nota;
+  return head + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;align-items:stretch;margin-top:4px">' + cards + '</div>' + mejorTxt + config + flujoCard + tarifas + nota;
 }
 window.ffIngresoView = ffIngresoView;
