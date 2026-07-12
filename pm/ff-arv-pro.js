@@ -310,7 +310,8 @@ function apMapMount() {
   apLeaflet(() => {
     if (!document.getElementById('ap-map')) return;   // cambió la vista mientras cargaba
     if (AP_MAP) { try { AP_MAP.remove(); } catch (e) {} AP_MAP = null; }
-    const map = L.map('ap-map', { scrollWheelZoom: false }).setView([s.lat, s.lng], 14);
+    // animaciones OFF: al re-renderizar (innerHTML) el contenedor viejo muere y una animación pendiente tira "_leaflet_pos" undefined
+    const map = L.map('ap-map', { scrollWheelZoom: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([s.lat, s.lng], 14);
     AP_MAP = map;
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
     const stx = apState(); const f = apFiltros();
@@ -328,7 +329,7 @@ function apMapMount() {
       mk.on('click', () => apPinClick(apCompCssId(c.id)));
       mk.bindTooltip(AP_E(c.dir.split(',')[0]));
     });
-    if (pts.length > 1) map.fitBounds(pts, { padding: [34, 34] });
+    if (pts.length > 1) map.fitBounds(pts, { padding: [34, 34], animate: false });
   });
 }
 
@@ -577,6 +578,8 @@ function apVistaGrilla(s, rec) {
 
 function ffArvProView() {
   apCSS();
+  // matar el mapa ANTES de que el re-render deje su contenedor huérfano (evita "_leaflet_pos")
+  if (AP_MAP) { try { AP_MAP.remove(); } catch (e) {} AP_MAP = null; }
   const inp = UW.a.inputs;
   const st = apState();
   if (!st.dir) st.dir = UW.a.direccion || '';
