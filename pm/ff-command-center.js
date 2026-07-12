@@ -85,7 +85,7 @@ function ffInjectCSS() {
   #ff-overlay .side{padding:22px 15px;position:sticky;top:0;height:100vh;background:linear-gradient(180deg,rgba(12,16,26,.72),rgba(7,10,17,.72));border-right:1px solid var(--glassb);backdrop-filter:blur(16px);display:flex;flex-direction:column}
   #ff-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
   #ff-overlay .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
-  #ff-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#04121a;font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
+  #ff-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
   #ff-overlay .brand b{font-size:15px;font-weight:750}#ff-overlay .brand span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.4px;margin-top:2px}
   #ff-overlay .navlbl{font-size:9px;letter-spacing:1.8px;color:var(--mut2);text-transform:uppercase;padding:12px 12px 7px;font-weight:700}
   #ff-overlay .nav{display:flex;flex-direction:column;gap:2px}
@@ -141,7 +141,7 @@ function ffInjectCSS() {
   #ff-overlay .chip{font-size:11px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}#ff-overlay .chip:hover{color:var(--ink);border-color:var(--a2)}
   #ff-overlay .ask{display:flex;gap:8px;margin-top:14px}
   #ff-overlay .ask input{flex:1;background:var(--glass);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
-  #ff-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
+  #ff-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   #ff-overlay .cc-chat{display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto}#ff-overlay .cc-chat:empty{display:none}
   #ff-overlay .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
   #ff-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3);color:var(--ink)}
@@ -160,7 +160,7 @@ function ffInjectCSS() {
   #ff-overlay .uwrow input:focus,#ff-overlay .uwrow select:focus,#ff-overlay .uwbar select:focus{border-color:var(--a2)}
   #ff-overlay .uwres{margin-top:10px;padding-top:10px;border-top:1px solid var(--glassb)}
   #ff-overlay .uwbig{font-size:22px;font-weight:760;letter-spacing:-.4px}#ff-overlay .uwsub{font-size:10.5px;color:var(--mut2);margin-top:3px;line-height:1.5}
-  #ff-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}#ff-overlay .repbtn:hover{filter:brightness(1.08)}
+  #ff-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}#ff-overlay .repbtn:hover{filter:brightness(1.08)}
   /* KANBAN */
   #ff-overlay .kan{display:flex;gap:13px;overflow-x:auto;padding-bottom:8px}
   #ff-overlay .kcol{flex:1;min-width:210px}

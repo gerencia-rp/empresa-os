@@ -26,7 +26,7 @@ function rcInjectCSS() {
   #rc-overlay .lidbar{height:6px;border-radius:6px;background:var(--glassb);overflow:hidden;margin-top:6px}#rc-overlay .lidbar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
   #rc-overlay .alertrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--glassb)}#rc-overlay .alertrow:last-child{border-bottom:none}
   #rc-overlay .adot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}#rc-overlay .adot.r{background:var(--neg)}#rc-overlay .adot.y{background:var(--amber)}
-  #rc-overlay .pullbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:8px 15px;border-radius:20px;cursor:pointer;font-size:11.5px}#rc-overlay .pullbtn:hover{filter:brightness(1.08)}#rc-overlay .pullbtn:disabled{opacity:.6;cursor:wait}#rc-overlay .rc-hide{display:none}#rc-overlay .ptable tr[onclick]:hover td{background:var(--glass)}
+  #rc-overlay .pullbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:8px 15px;border-radius:20px;cursor:pointer;font-size:11.5px}#rc-overlay .pullbtn:hover{filter:brightness(1.08)}#rc-overlay .pullbtn:disabled{opacity:.6;cursor:wait}#rc-overlay .rc-hide{display:none}#rc-overlay .ptable tr[onclick]:hover td{background:var(--glass)}
   #rc-overlay .repbtn.ghost{background:var(--glass);border:1px solid var(--glassb);color:var(--ink);filter:none}#rc-overlay .repbtn.ghost:hover{border-color:var(--a2);filter:none}
   #rc-overlay .ptable tfoot td{border-top:1px solid var(--glassb);font-size:11.5px}`;
   document.head.appendChild(st);
@@ -361,7 +361,7 @@ function rcObraCard(o) {
   if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
   const _comp = rcCompletitud(o);
   const _cc = _comp.n >= 5 ? 'var(--pos,#34d399)' : _comp.n >= 3 ? 'var(--amber,#e7b65e)' : 'var(--neg,#f87171)';
-  return `${bannerAtraso}<div class="kcard">
+  return `<div class="kcard"><!-- fix 12-jul: ${'$'}{bannerAtraso} era fuera de scope (vive en rcSecCommand) → crasheaba la sección Obras -->
     <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
     <div class="krow"><span>Gasto real</span><b>${RC_M(dq.gasto)}</b></div>

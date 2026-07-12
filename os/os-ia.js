@@ -52,7 +52,7 @@ function osiaCSS() {
   #os-root .osia-flow{display:flex;flex-direction:column;gap:0;margin:10px 0}
   #os-root .osia-fbox{background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 13px;font-size:12px;line-height:1.4}
   #os-root .osia-farr{text-align:center;color:var(--a2);font-size:13px;line-height:1.6}
-  #os-root .osia-bigbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:800;padding:12px 22px;border-radius:12px;cursor:pointer;font-size:13.5px}
+  #os-root .osia-bigbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:800;padding:12px 22px;border-radius:12px;cursor:pointer;font-size:13.5px}
   #os-root .osia-ghostbtn{background:var(--glass);border:1px solid var(--glassb);color:var(--ink);font-weight:600;padding:12px 18px;border-radius:12px;cursor:pointer;font-size:12.5px}
   #os-root .osia-ghostbtn:hover{border-color:var(--a2)}
   #os-root .osia-demo-fr{width:100%;height:380px;border:1px solid var(--glassb);border-radius:12px;background:#fff}

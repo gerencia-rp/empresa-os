@@ -76,7 +76,7 @@ function ccInjectCSS() {
   #cc-overlay .app{position:relative;z-index:1;display:grid;grid-template-columns:244px 1fr;min-height:100vh}
   #cc-overlay .side{padding:22px 15px;position:sticky;top:0;height:100vh;background:linear-gradient(180deg,rgba(12,16,26,.72),rgba(7,10,17,.72));border-right:1px solid rgba(255,255,255,.05);backdrop-filter:blur(16px);display:flex;flex-direction:column}
   #cc-overlay .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
-  #cc-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#04121a;font-weight:900;font-size:16px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
+  #cc-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:16px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
   #cc-overlay .brand b{font-size:15px;font-weight:750}#cc-overlay .brand span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.6px;margin-top:2px}
   #cc-overlay .navlbl{font-size:9px;letter-spacing:1.8px;color:var(--mut2);text-transform:uppercase;padding:12px 12px 7px;font-weight:700}
   #cc-overlay .nav{display:flex;flex-direction:column;gap:2px}
@@ -141,7 +141,7 @@ function ccInjectCSS() {
   #cc-overlay .ask{display:flex;gap:8px;margin-top:14px}
   #cc-overlay .ask input{flex:1;background:rgba(6,9,16,.72);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
   #cc-overlay .ask input::placeholder{color:var(--mut2)}
-  #cc-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px;box-shadow:0 8px 20px -8px rgba(79,141,255,.7)}
+  #cc-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px;box-shadow:0 8px 20px -8px rgba(79,141,255,.7)}
   #cc-overlay .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
   #cc-overlay .chip{font-size:11px;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}
   #cc-overlay .chip:hover{color:#fff;border-color:rgba(138,123,255,.45)}
@@ -163,7 +163,7 @@ function ccInjectCSS() {
   #cc-overlay .memadd select{background:rgba(6,9,16,.72);border:1px solid var(--glassb);border-radius:10px;color:var(--ink);font-size:12px;padding:9px 10px;outline:none}
   #cc-overlay .memadd input{flex:1;min-width:220px;background:rgba(6,9,16,.72);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:12px;outline:none}
   #cc-overlay .memadd input::placeholder{color:var(--mut2)}
-  #cc-overlay .memadd button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:750;padding:0 15px;border-radius:10px;cursor:pointer;font-size:12px}
+  #cc-overlay .memadd button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 15px;border-radius:10px;cursor:pointer;font-size:12px}
   #cc-overlay .memrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
   #cc-overlay .memrow.off{opacity:.42}
   #cc-overlay .memtipo{flex-shrink:0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.05);color:var(--mut);white-space:nowrap;margin-top:1px}
@@ -191,7 +191,7 @@ function ccInjectCSS() {
   #cc-overlay .tbtn:hover{color:#fff;border-color:rgba(69,227,198,.5)}
   #cc-overlay .reptools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glassb)}
   #cc-overlay .reptitle{font-size:12px;font-weight:650;color:#e6ebf5}
-  #cc-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#04121a;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}
+  #cc-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}
   #cc-overlay .repbtn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--ink)}
   #cc-overlay .repbtn:hover{filter:brightness(1.08)}#cc-overlay .rephint{font-size:10.5px;color:var(--mut2);margin-left:auto}
   #cc-overlay .rtask{font-size:9.5px;padding:2px 8px;border-radius:12px;background:rgba(69,227,198,.12);color:var(--a1)}
