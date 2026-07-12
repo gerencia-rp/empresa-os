@@ -69,8 +69,17 @@ function ffUwDefaults() {
     //   créditos — se ACREDITAN al cierre (earnest/option ya pagados + proración de impuestos)
     earnest: 5000, option_fee: 0, prorata_impuestos: 0,
     // otras calc (se llenan en 2-6)
-    arv: 0, appraisal: 0, ltv_pct: 75, payoff: 0,
+    arv: 0, appraisal: 0, ltv_pct: UWc('refi_ltv_pct', 75), payoff: 0,
     renta_mensual: 0, gastos_mensuales: 0,
+    // 3 · Cash-Out refi DSCR (Champions) — itemizado, calibrado con los HUD de Michelle/Echo
+    refi_prestamo_real: 0,                                              // override: préstamo real del refi (Airtable) — 0 = calculado
+    refi_dscr_obj: UWc('refi_dscr_objetivo', 1.0),
+    refi_orig_pct: UWc('refi_originacion_pct', 0), refi_uw_fee: UWc('refi_fee_underwriting', 1495), refi_proc_fee: UWc('refi_fee_processing', 695),
+    refi_titulo: UWc('refi_titulo_base', 2100), refi_titulo_pct: UWc('refi_titulo_pct', 0),
+    refi_dias_prepagado: UWc('refi_dias_prepagado', 17),
+    refi_seguro_anual: UWc('refi_seguro_anual', 1900), refi_imp_seguro_m: UWc('refi_impound_seguro_meses', 3),
+    refi_imp_imp_m: UWc('refi_impound_imp_meses', 3), refi_tax_pct: UWc('refi_tax_pct', 2.1),
+    refi_otros: 0,                                                      // ajuste vs HUD (línea "otros" del cierre)
   };
 }
 function ffUwCargarCasa(dealId) {
@@ -87,7 +96,14 @@ function ffUwCargarCasa(dealId) {
   inp.cashout_en_draw = 0;
   inp._closing_real = +h.gastos_cierre || null;   // ancla real del HUD (Airtable) p/ comparar con las líneas
   inp.renta_mensual = +d.renta_mensual || 0; inp.gastos_mensuales = +d.gastos_mensuales || 0;
-  inp.payoff = +h.monto_hml || 0;
+  // refi (Calc 3): seeds desde el espejo de "Datos por casa" + anclas reales
+  inp.refi_prestamo_real = +h.monto_prestamo_refi || 0;
+  inp._refi_pagado_real = +h.monto_pagado_hml_refi || 0;   // Airtable: payoff + costos de refi (todo menos el cash-out)
+  if (+h.pct_banco_refi > 0) inp.ltv_pct = Math.round(h.pct_banco_refi * 10000) / 100;
+  inp._cashout_real = +d.cashout || null;                  // ancla: Balance to Borrower real
+  inp._ref30_real = +d.ref30_payment || null;              // ancla: PITI DSCR real
+  // payoff: con dato real del refi se DERIVA (pagado − costos itemizados); sin refi aún → saldo HML como arranque
+  inp.payoff = inp._refi_pagado_real > 0 ? 0 : (+h.monto_hml || 0);
   if (h.cash_to_close) inp._ctc_real = +h.cash_to_close;   // ancla real para calibrar
   UW.a = { id: null, nombre: (d.address || '').split(',')[0], property_id: d.property_id, ff_deal_id: d.id, es_hipotetica: false, direccion: d.address, ciudad: d.city || 'Austin', inputs: inp, outputs: {}, veredicto: null };
   UW.sub = 'negocio'; ffUwRender();
@@ -166,17 +182,65 @@ function ffUwCalcArv(inp) {
   const confianza = esAirtable ? 'alta (Airtable)' : appraisal > 0 ? 'media' : 'baja';
   return { arvComps, appraisal, arvAirtable, esAirtable, probable, conservador, optimista, confianza, psfZona, sqft, mercadoVivo: false };
 }
-// ═══ CALCULADORA 3 · CASH-OUT ═══
+// ═══ CALCULADORA 3 · CASH-OUT (refi DSCR itemizado — ingeniería inversa de Michelle/Echo, Champions Funding) ═══
+// Valor tasado (appraisal si existe, si no ARV — Childress probó que la tasación del refi manda, incluso > ARV)
+// → préstamo = min(valor × LTV, tope DSCR) → − payoff − costos ITEMIZADOS = cash-out (Balance to Borrower).
+// El campo Airtable "Monto Pagado al HML con la Refi" = payoff + costos (todo menos el cash-out) → ancla exacta.
 function ffUwCalcCashout(inp, arv) {
-  const base = Math.min(arv.probable || 0, (+inp.appraisal || arv.probable || 0));  // min(ARV, appraisal)
-  const ltv = (+inp.ltv_pct || UWc('cashout_ltv_pct', 75)) / 100;
-  const ltvMax = UWc('cashout_ltv_max', 80);
-  const prestamoRefi = Math.round(base * ltv);
-  const payoff = +inp.payoff || 0;                              // saldo Harmony a pagar
-  const cashOut = prestamoRefi - payoff;
-  const ctc = (inp._ctcCalc != null ? inp._ctcCalc : 0);        // cash to close del inversionista
+  const R2 = n => Math.round(n * 100) / 100;
+  // 1) valor
+  const arvA = arv.arvAirtable || arv.probable || 0;
+  const appraisal = +inp.appraisal || 0;
+  const valorTasado = appraisal > 0 ? appraisal : arvA;     // base del préstamo y de los impuestos
+  const usaAppraisal = appraisal > 0;
+  // 2) préstamo = min(LTV, tope DSCR)
+  const ltvPct = +inp.ltv_pct || UWc('refi_ltv_pct', 75);
+  const tasaAnual = UWc('dscr_tasa_anual', 7.125) / 100;
+  const r = tasaAnual / 12, nM = UWc('dscr_plazo_anos', 30) * 12;
+  const factorPI = r > 0 ? r * Math.pow(1 + r, nM) / (Math.pow(1 + r, nM) - 1) : 0;  // pago P&I por $1
+  const taxPct = (+inp.refi_tax_pct || 0) / 100;
+  const taxMes = valorTasado * taxPct / 12;
+  const segMes = (+inp.refi_seguro_anual || 0) / 12;
+  const dscrObj = +inp.refi_dscr_obj || 1;
+  const renta = +inp.renta_mensual || 0;
+  const piMax = renta > 0 ? renta / dscrObj - taxMes - segMes : null;                // P&I máximo que la renta banca
+  const topeDscr = (piMax != null && piMax > 0 && factorPI > 0) ? Math.round(piMax / factorPI) : null;
+  const prestamoLtv = Math.round(valorTasado * ltvPct / 100);
+  const prestamoCalc = topeDscr != null ? Math.min(prestamoLtv, topeDscr) : prestamoLtv;
+  const limitante = (topeDscr != null && topeDscr < prestamoLtv) ? 'dscr' : 'ltv';
+  const prestamoReal = +inp.refi_prestamo_real || 0;
+  const prestamo = prestamoReal > 0 ? prestamoReal : prestamoCalc;                   // real de Airtable manda si existe
+  // 4) costos de refi — itemizados y COMPUTADOS (no un fee plano)
+  const origination = R2(prestamo * ((+inp.refi_orig_pct || 0) / 100));
+  const feesLender = R2(origination + (+inp.refi_uw_fee || 0) + (+inp.refi_proc_fee || 0));
+  const titulo = R2((+inp.refi_titulo || 0) + prestamo * ((+inp.refi_titulo_pct || 0) / 100));
+  const prepagado = R2(prestamo * tasaAnual / 365 * (+inp.refi_dias_prepagado || 0));
+  const seguroAnual = +inp.refi_seguro_anual || 0;
+  const seguro = R2(seguroAnual + (seguroAnual / 12) * (+inp.refi_imp_seguro_m || 0));  // prima + impound
+  const taxAnual = R2(valorTasado * taxPct);
+  const impuestos = R2(taxAnual * (1 + (+inp.refi_imp_imp_m || 0) / 12));               // 1 año + impound M meses
+  const otros = +inp.refi_otros || 0;
+  const costos = R2(feesLender + titulo + prepagado + seguro + impuestos + otros);
+  // 3) payoff: input manual (HUD) → derivado del ancla Airtable (pagado − costos) → saldo HML
+  const pagadoReal = +inp._refi_pagado_real || 0;
+  let payoff, payoffFuente;
+  if (+inp.payoff > 0) { payoff = +inp.payoff; payoffFuente = 'input (HUD)'; }
+  else if (pagadoReal > 0) { payoff = R2(pagadoReal - costos); payoffFuente = 'derivado: pagado Airtable − costos'; }
+  else { payoff = 0; payoffFuente = 'sin dato — cargalo del HUD o del saldo HML'; }
+  // 5) cash-out (Balance to Borrower)
+  const cashOut = R2(prestamo - payoff - costos);
+  // 6) escrows = tu propia plata guardada (impuestos + seguro prepagados/impound)
+  const escrows = R2(impuestos + seguro);
+  const recuperadoNeto = R2(cashOut + escrows);
+  const ctc = (inp._ctcCalc != null ? inp._ctcCalc : 0);
   const recuperaPct = ctc > 0 ? Math.round(100 * cashOut / ctc) : null;
-  return { base, ltv: +inp.ltv_pct || UWc('cashout_ltv_pct', 75), ltvMax, prestamoRefi, payoff, cashOut, recuperaPct, ctc };
+  const cashoutReal = inp._cashout_real != null ? +inp._cashout_real : null;         // ancla Airtable
+  return { valorTasado, usaAppraisal, arvA, appraisal, ltv: ltvPct, prestamoLtv, topeDscr, limitante, prestamoCalc, prestamoReal, prestamo,
+    origination, feesLender, titulo, prepagado, seguro, seguroAnual, taxAnual, impuestos, otros, costos,
+    payoff, payoffFuente, pagadoReal, cashOut, escrows, recuperadoNeto, recuperaPct, ctc, cashoutReal,
+    tasaAnual: UWc('dscr_tasa_anual', 7.125), dscrObj, renta,
+    // compat con calc 4/6 (nombre legado)
+    prestamoRefi: prestamo, base: valorTasado };
 }
 // ═══ CALCULADORA 4 · INTERESES ═══
 function ffUwCalcIntereses(inp, cashout) {
@@ -330,19 +394,54 @@ function ffUwViewArv() {
 }
 function ffUwViewCashout() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), c = o.cashout;
-  const hero = UW_HERO('Cash-out del refi', UW_M(c.cashOut), c.recuperaPct != null ? 'recupera ' + c.recuperaPct + '% de lo que puso el inversionista (HUD)' : '', c.cashOut >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
-  const izq = UW_CARD('3 &middot; Cash-Out (refinanciación)', 'Cuánto capital recuperás al refinanciar. min(ARV, appraisal) &times; LTV &minus; payoff.',
-    UW_BLOCK('Parámetros del refi', UW_IN('LTV del refi', 'ltv_pct', inp.ltv_pct, { help: 'Loan-to-value que da el prestamista del refi (' + UWc('cashout_ltv_pct', 75) + '–' + UWc('cashout_ltv_max', 80) + '%)' }) + UW_IN('Payoff (saldo Harmony)', 'payoff', inp.payoff, { help: 'Lo que se le debe al Harmony y hay que pagar con el refi' })) +
-    '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Base = min(ARV ' + UW_M(o.arv.probable) + ', appraisal ' + UW_M(inp.appraisal) + ') = <b>' + UW_M(c.base) + '</b></div>');
-  const der = hero + '<div class="card" style="padding:16px">' + UW_ROW('Base (min ARV/appraisal)', c.base) + UW_ROW('&times; LTV (' + c.ltv + '%)', c.prestamoRefi) + UW_ROW('&minus; Payoff Harmony', -c.payoff) + UW_ROW('Cash-out', c.cashOut, c.cashOut >= 0 ? 'up' : 'down') + '</div>' + UW_HERO('Capital recuperado', c.recuperaPct != null ? c.recuperaPct + '%' : '—', 'cash-out &divide; lo que puso el inversionista ' + UW_M2(c.ctc) + ' (HUD)', c.recuperaPct >= 100 ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
-  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
+  const infinito = c.recuperaPct != null && c.recuperaPct >= 100;
+  const hero = UW_HERO('Cash-out del refi (Balance to Borrower)', UW_M2(c.cashOut), 'préstamo &minus; payoff &minus; costos de refi itemizados', c.cashOut >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
+  // ── izquierda: parámetros editables (cero hardcode: defaults de ff_uw_config) ──
+  const izq = UW_CARD('3 &middot; Cash-Out (refi DSCR &middot; Champions)', 'Ingeniería inversa de los refis reales (Michelle/Echo). Todo editable; los costos se COMPUTAN del valor y el préstamo.',
+    UW_BLOCK('Préstamo del refi', UW_IN('LTV del refi', 'ltv_pct', inp.ltv_pct, { help: 'Observado 72–76%. Se precarga con el % real del banco (Airtable) si existe.' })
+      + UW_IN('DSCR objetivo', 'refi_dscr_obj', inp.refi_dscr_obj, { tipo: 'num', help: 'Renta ÷ PITI mínimo que exige el prestamista (1.0–1.25). Si la renta es baja, ESTE tope manda.' })
+      + UW_IN('Renta mensual (p/ tope DSCR)', 'renta_mensual', inp.renta_mensual, { help: 'La misma de la Calc 5. Con renta baja el préstamo lo limita el DSCR, no el LTV (caso Echo).' })
+      + UW_IN('Préstamo real (override)', 'refi_prestamo_real', inp.refi_prestamo_real, { help: 'Monto préstamo Refi de Airtable. Si está, manda sobre el calculado.', hint: c.prestamoReal > 0 ? 'usando el real de Airtable' : 'calculado: ' + UW_M(c.prestamoCalc) })) +
+    UW_BLOCK('Payoff del hard money', UW_IN('Payoff (saldo HML al refi)', 'payoff', inp.payoff, { help: 'Del HUD del refi. Si queda en 0 y hay dato de Airtable, se deriva solo: pagado al HML − costos.', hint: 'fuente: ' + c.payoffFuente })) +
+    UW_BLOCK('Costos del refi &middot; a) fees prestamista', UW_IN('Originación (% del préstamo)', 'refi_orig_pct', inp.refi_orig_pct, { hint: UW_M2(c.origination) + ' (Michelle 1.5% = $4,815 · Echo 0)' }) + '<div class="grid k2" style="gap:8px">' + UW_IN('Underwriting', 'refi_uw_fee', inp.refi_uw_fee, { help: 'Constante Champions: $1,495' }) + UW_IN('Processing', 'refi_proc_fee', inp.refi_proc_fee, { help: 'Constante Champions: $695' }) + '</div>') +
+    UW_BLOCK('b) título / registro', '<div class="grid k2" style="gap:8px">' + UW_IN('Base título/registro', 'refi_titulo', inp.refi_titulo, { help: 'Semi-fijo ~$2,100' }) + UW_IN('Escala (% del préstamo)', 'refi_titulo_pct', inp.refi_titulo_pct, { help: 'El lender title insurance escala un poco con el préstamo' }) + '</div>') +
+    UW_BLOCK('c) interés prepagado', UW_IN('Días hasta el 1er pago', 'refi_dias_prepagado', inp.refi_dias_prepagado, { tipo: 'num', hint: 'préstamo × ' + c.tasaAnual + '%/365 × días = ' + UW_M2(c.prepagado) })) +
+    UW_BLOCK('d) seguro', '<div class="grid k2" style="gap:8px">' + UW_IN('Prima anual', 'refi_seguro_anual', inp.refi_seguro_anual) + UW_IN('Impound (meses)', 'refi_imp_seguro_m', inp.refi_imp_seguro_m, { tipo: 'num' }) + '</div>') +
+    UW_BLOCK('e) impuestos (el rubro más grande)', '<div class="grid k2" style="gap:8px">' + UW_IN('Tasa condado (%/año)', 'refi_tax_pct', inp.refi_tax_pct, { help: 'Travis 2.1%. Se calcula sobre el VALOR TASADO, no plano.' }) + UW_IN('Impound (meses)', 'refi_imp_imp_m', inp.refi_imp_imp_m, { tipo: 'num', help: 'Se cobra 1 año + M meses de colchón al escrow' }) + '</div><div style="font-size:10px;color:var(--txt3,#9fb0c9)">' + UW_M(c.valorTasado) + ' × ' + inp.refi_tax_pct + '% = ' + UW_M2(c.taxAnual) + '/año → al cierre ' + UW_M2(c.impuestos) + '</div>') +
+    UW_BLOCK('Ajuste', UW_IN('Otros costos (ajuste vs HUD)', 'refi_otros', inp.refi_otros, { help: 'Línea "otros" del estado de cierre para cuadrar con el HUD real.' })));
+  // ── derecha: estado de cierre ──
+  const limChip = c.topeDscr != null
+    ? '<div style="font-size:10.5px;margin:4px 0 8px;color:' + (c.limitante === 'dscr' ? 'var(--amber,#e7b65e)' : 'var(--txt3,#9fb0c9)') + '">tope LTV ' + UW_M(c.prestamoLtv) + ' · tope DSCR (' + c.dscrObj + 'x, renta ' + UW_M(c.renta) + ') ' + UW_M(c.topeDscr) + ' → manda el <b>' + (c.limitante === 'dscr' ? 'DSCR (renta baja)' : 'LTV') + '</b></div>'
+    : '<div style="font-size:10.5px;margin:4px 0 8px;color:var(--txt3,#9fb0c9)">sin renta cargada → tope DSCR no evaluado (solo LTV)</div>';
+  const anclas = (c.cashoutReal != null ? '<div style="font-size:10.5px;margin-top:8px;padding:8px 10px;background:rgba(52,211,153,.07);border-radius:8px">🎯 Cash-out REAL (Airtable): <b>' + UW_M2(c.cashoutReal) + '</b> · Δ modelo ' + UW_M2(c.cashOut - c.cashoutReal) + '</div>' : '')
+    + (c.pagadoReal > 0 ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:4px">Pagado al HML con la refi (Airtable, incluye costos): ' + UW_M2(c.pagadoReal) + ' · modelo payoff+costos: ' + UW_M2(c.payoff + c.costos) + '</div>' : '');
+  const cierre = '<div class="card" style="padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Estado de cierre del refi</div>'
+    + UW_ROW('Valor tasado (' + (c.usaAppraisal ? 'appraisal' : 'ARV Airtable') + ')', c.valorTasado)
+    + UW_ROW('&times; LTV ' + c.ltv + '%' + (c.prestamoReal > 0 ? ' → préstamo REAL' : ''), c.prestamo)
+    + limChip
+    + UW_ROW('&minus; Payoff hard money', -c.payoff, 'down')
+    + '<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin:10px 0 2px">&minus; Costos de refi (itemizados)</div>'
+    + UW_ROW('&nbsp;&nbsp;a) Fees prestamista (uw + proc + orig ' + UW_M2(c.origination) + ')', -c.feesLender, 'down')
+    + UW_ROW('&nbsp;&nbsp;b) Título / registro', -c.titulo, 'down')
+    + UW_ROW('&nbsp;&nbsp;c) Interés prepagado (' + inp.refi_dias_prepagado + 'd @ ' + c.tasaAnual + '%)', -c.prepagado, 'down')
+    + UW_ROW('&nbsp;&nbsp;d) Seguro (prima + ' + inp.refi_imp_seguro_m + 'm impound)', -c.seguro, 'down')
+    + UW_ROW('&nbsp;&nbsp;e) Impuestos (1 año + ' + inp.refi_imp_imp_m + 'm escrow)', -c.impuestos, 'down')
+    + (c.otros ? UW_ROW('&nbsp;&nbsp;Otros (ajuste HUD)', -c.otros, 'down') : '')
+    + UW_ROW('&nbsp;&nbsp;Subtotal costos de refi', -c.costos, 'tot')
+    + UW_ROW('CASH-OUT (Balance to Borrower)', c.cashOut, 'tot')
+    + anclas + '</div>';
+  const escrowBox = '<div class="card" style="padding:16px;margin-top:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--a2,#2f6ef0);margin-bottom:6px">💡 De los costos, ' + UW_M2(c.escrows) + ' son ESCROWS</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.55">Impuestos (' + UW_M2(c.impuestos) + ') + seguro (' + UW_M2(c.seguro) + ') prepagados = <b>tu propia plata guardada</b> en la cuenta de escrow, no un gasto perdido.</div>'
+    + UW_ROW('Capital recuperado NETO (cash-out + escrows)', c.recuperadoNeto, 'up') + '</div>';
+  const heroRec = UW_HERO('Capital recuperado', infinito ? '♾️ ' + c.recuperaPct + '%' : (c.recuperaPct != null ? c.recuperaPct + '%' : '—'), (infinito ? 'RETORNO INFINITO — recuperó todo lo que puso · ' : '') + 'cash-out ' + UW_M2(c.cashOut) + ' &divide; puso ' + UW_M2(c.ctc) + ' (Calc 1 HUD)', infinito ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
+  return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + hero + cierre + escrowBox + heroRec + '</div></div>';
 }
 function ffUwViewIntereses() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), i = o.intereses;
   const izq = UW_CARD('4 &middot; Intereses', 'El pago mensual durante la obra (Harmony) y después del refi (DSCR).',
     UW_BLOCK('Base del préstamo', UW_IN('Precio de compra', 'purchase', inp.purchase) + UW_IN('% que financia el Harmony', 'hml_finance_pct', inp.hml_finance_pct)) +
     '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">Tasa Harmony ' + i.tasaHarmony + '%/año (interest-only) &middot; DSCR ' + i.tasaDscr + '%/año a ' + UWc('dscr_plazo_anos', 30) + ' años. Editables en config.</div>');
-  const der = UW_HERO('Interés mensual (Harmony)', UW_M(i.intMensualHarmony), 'durante el hold &middot; sobre ' + UW_M(i.financia) + ' financiados', 'var(--amber,#e7b65e)') + UW_HERO('Pago mensual (DSCR post-refi)', UW_M(i.pagoDscr), 'sobre ' + UW_M(i.dscrPrincipal) + ' a 30 años', 'var(--a2,#2f6ef0)');
+  const refReal = UW.a.inputs._ref30_real;
+  const der = UW_HERO('Interés mensual (Harmony)', UW_M(i.intMensualHarmony), 'durante el hold &middot; sobre ' + UW_M(i.financia) + ' financiados', 'var(--amber,#e7b65e)') + UW_HERO('Pago mensual (DSCR post-refi)', UW_M(i.pagoDscr), 'P&amp;I sobre ' + UW_M(i.dscrPrincipal) + ' a 30 años @ ' + i.tasaDscr + '%' + (refReal ? ' &middot; PITI real (Airtable): ' + UW_M2(refReal) : ''), 'var(--a2,#2f6ef0)');
   return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 function ffUwViewIngreso() {
@@ -360,7 +459,7 @@ function ffUwViewUnificada() {
   const verColor = u.veredicto === 'GO' ? 'var(--pos,#34d399)' : u.veredicto === 'NO-GO' ? 'var(--neg,#f87171)' : 'var(--amber,#e7b65e)';
   const kpi = (l, v, sub) => '<div class="card kpi" style="padding:16px"><div class="lab">' + l + '</div><div class="big">' + v + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
   return '<div class="card" style="text-align:center;padding:24px;border:2px solid ' + verColor + '"><div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Veredicto del deal</div><div style="font-size:46px;font-weight:800;color:' + verColor + '">' + u.veredicto + '</div><div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">' + chip(u.gAllIn, 'all-in &le;' + u.allInMax + '% ARV') + chip(u.gDeficit, 'sin riesgo déficit') + chip(u.gFlujo, 'flujo +') + '</div><button class="repbtn" style="margin-top:16px" onclick="ffUwPresentacion()">&#128196; Generar presentación de negocio</button></div>' +
-    '<div class="grid k4" style="margin-top:16px">' + kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '') + kpi('MAO (oferta máxima)', UW_M(u.mao), 'compra máxima al guardrail') + kpi('El inversionista pone', UW_M2(u.cashToClose), 'HUD: down + cierre &minus; créditos') + kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? u.recuperaPct + '% recuperado' : '') + '</div>' +
+    '<div class="grid k4" style="margin-top:16px">' + kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '') + kpi('MAO (oferta máxima)', UW_M(u.mao), 'compra máxima al guardrail') + kpi('El inversionista pone', UW_M2(u.cashToClose), 'HUD: down + cierre &minus; créditos') + kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? (u.recuperaPct >= 100 ? '♾️ retorno infinito (' + u.recuperaPct + '%)' : u.recuperaPct + '% recuperado') + ' · escrows ' + UW_M(o.cashout.escrows) : '') + '</div>' +
     '<div class="grid k3" style="margin-top:14px">' + kpi('Cash left in', UW_M(u.cashLeftIn), 'capital que queda invertido') + kpi('Flujo mensual', UW_M(u.flujo) + '/mes', '') + kpi('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—', 'flujo anual &divide; cash left in') + '</div>' +
     '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; el inversionista pone ' + UW_M2(o.negocio.cashToClose) + ' (HUD) &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
 }
@@ -385,7 +484,7 @@ function ffUwPresentacion() {
       <div class="kpi"><div class="l">ARV</div><div class="v">${M(o.arv.probable)}</div></div>
       <div class="kpi"><div class="l">All-in (${u.allInPct}% ARV)</div><div class="v">${M(u.allIn)}</div></div>
       <div class="kpi"><div class="l">El inversionista pone (HUD)</div><div class="v">${M(u.cashToClose)}</div></div>
-      <div class="kpi"><div class="l">Cash-out (recupera ${u.recuperaPct || 0}%)</div><div class="v">${M(u.cashOut)}</div></div>
+      <div class="kpi"><div class="l">Cash-out (${u.recuperaPct >= 100 ? '♾️ retorno infinito' : 'recupera ' + (u.recuperaPct || 0) + '%'})</div><div class="v">${M(u.cashOut)}</div></div>
       <div class="kpi"><div class="l">Cash left in</div><div class="v">${M(u.cashLeftIn)}</div></div>
       <div class="kpi"><div class="l">Flujo mensual</div><div class="v">${M(u.flujo)}</div></div>
       <div class="kpi"><div class="l">ROI cash-on-cash</div><div class="v">${u.roi || 0}%</div></div>
