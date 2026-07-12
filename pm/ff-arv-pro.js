@@ -335,7 +335,7 @@ function apVistaFicha(s) {
   return '<div class="ap-card">'
     + '<div class="ap-lab">Propiedad (subject) · ' + (s.rcLoading ? '⏳ RentCast…' : s.rcOk ? '✓ RentCast' : '<span style="color:var(--amber,#e7b65e)">sin RentCast — datos a mano</span>') + (s.zip ? ' · zip ' + s.zip : '') + '</div>'
     + '<div style="font-size:20px;font-weight:700;margin:6px 0 4px">' + AP_E((fi.dirRc || s.dir || '').split(',')[0] || '—') + '</div>'
-    + (fi.dirRc && s.dir && fi.dirRc.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) !== s.dir.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 14) ? '<div style="font-size:11px;color:var(--neg,#f87171);margin-bottom:6px">⚠ RentCast devolvió otra dirección — verificá</div>' : '')
+    + (fi.dirRc && s.dir && fi.dirRc.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) !== s.dir.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) ? '<div style="font-size:11px;color:var(--neg,#f87171);margin-bottom:6px">⚠ RentCast devolvió otra dirección — verificá</div>' : '')
     + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px">'
     + apStat('sqft', s.sqft, 'subj.sqft', { falta: s.rcOk && s.sqft == null })
     + apStat('camas', s.beds, 'subj.beds', { falta: s.rcOk && s.beds == null })
