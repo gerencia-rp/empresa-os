@@ -466,7 +466,7 @@ function ffUwViewCashout() {
     : 'plata que sale del refi, después de pagar el HML y los costos';
   const heroReal = c.cashoutReal != null ? '<div style="font-size:12px;margin-top:8px;opacity:.85;color:' + heroCol + '">🎯 real (Airtable): <b>' + UW_M2(c.cashoutReal) + '</b> · Δ modelo ' + UW_M2(c.cashOut - c.cashoutReal) + '</div>' : '';
   const recupera = c.recuperaPct != null ? '<div style="font-size:12px;margin-top:4px;opacity:.85;color:' + heroCol + '">' + (infinito ? '♾️ <b>retorno infinito</b> — recuperás el ' + c.recuperaPct + '% de lo que pusiste (' + UW_M2(c.ctc) + ')' : 'recuperás el <b>' + c.recuperaPct + '%</b> de lo que pusiste (' + UW_M2(c.ctc) + ')') + '</div>' : '';
-  const hero = '<div style="background:' + (pos ? 'rgba(52,211,153,.1)' : 'rgba(248,113,113,.1)') + ';border:1px solid ' + (pos ? 'rgba(52,211,153,.35)' : 'rgba(248,113,113,.35)') + ';border-radius:20px;padding:22px 24px;margin-bottom:18px">'
+  const hero = '<div style="background:color-mix(in srgb, ' + heroCol + ' 10%, transparent);border:1px solid color-mix(in srgb, ' + heroCol + ' 35%, transparent);border-radius:20px;padding:22px 24px;margin-bottom:18px">'
     + '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:' + heroCol + ';font-weight:700">Cash-out estimado</div>'
     + '<div style="font-size:42px;font-weight:800;color:' + heroCol + ';margin-top:4px;letter-spacing:-1px">' + UW_M2(c.cashOut) + '</div>'
     + '<div style="font-size:12px;color:' + heroCol + ';margin-top:4px;opacity:.9">' + heroNote + '</div>' + heroReal + recupera + '</div>';
@@ -582,13 +582,13 @@ function ffUwPresentacion() {
   const w = window.open('', '_blank', 'width=800,height=1000');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Análisis ${UW_E(a.nombre)}</title><style>
     body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;margin:0;padding:36px;max-width:720px}
-    .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #12b5a0;padding-bottom:14px}
-    .logo{font-size:22px;font-weight:800;color:#12b5a0}.logo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
+    .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #2563eb;padding-bottom:14px}
+    .logo{font-size:22px;font-weight:800;color:#2563eb}.logo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
     .ver{font-size:34px;font-weight:800;color:${u.veredicto === 'GO' ? '#16a34a' : u.veredicto === 'NO-GO' ? '#dc2626' : '#d97706'}}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
     .kpi{border:1px solid #e5e7eb;border-radius:8px;padding:10px}.kpi .l{font-size:10px;text-transform:uppercase;color:#666}.kpi .v{font-size:20px;font-weight:800}
     .chain{font-size:12px;color:#444;line-height:1.6;margin-top:16px;background:#f8fafc;padding:12px;border-radius:8px}
-    .btn{position:fixed;top:10px;right:10px;padding:8px 16px;background:#12b5a0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
+    .btn{position:fixed;top:10px;right:10px;padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
     @media print{.btn{display:none}}</style></head><body>
     <button class="btn" onclick="window.print()">🖨 PDF</button>
     <div class="h"><div class="logo">FLIPPING RENTALS <span>ANÁLISIS DE INVERSIÓN</span></div><div style="text-align:right"><div class="ver">${u.veredicto}</div><div style="font-size:11px;color:#666">${UW_E(a.direccion || a.nombre)}</div></div></div>
@@ -646,7 +646,7 @@ function ffUwRcCompsBox() {
   if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#e7b65e)">⚠ Mercado en vivo no disponible' + (s.error ? ' (' + UW_E(String(s.error).slice(0, 60)) + ')' : '') + ' — se usa el $/sqft por zona.</div>';
   const comps = (s.payload && s.payload.comparables) || [];
   const fecha = s.fetched_at ? String(s.fetched_at).slice(0, 10) : '';
-  return '<div style="background:rgba(47,110,240,.06);border-radius:9px;padding:10px;margin-top:6px">'
+  return '<div style="background:color-mix(in srgb, var(--a2,#2563eb) 7%, transparent);border-radius:9px;padding:10px;margin-top:6px">'
     + '<div style="font-size:11px;font-weight:700;color:var(--a2,#2f6ef0)">Mercado en vivo (RentCast) · referencia, NO alimenta cálculos ' + (s.cached ? '· cache' : '') + '</div>'
     + '<div style="font-size:20px;font-weight:800;margin:4px 0">' + UW_M(s.value) + ' <span style="font-size:11px;font-weight:400;opacity:.6">valor estimado RentCast</span></div>'
     + '<div style="font-size:10px;color:var(--txt3,#9fb0c9)">' + comps.length + ' comparables' + (fecha ? ' · ' + fecha : '') + '</div>'
