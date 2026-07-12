@@ -573,6 +573,8 @@ function ffUwViewIngreso() {
     + hero + inputs + desglose + '</div>';
 }
 function ffUwViewUnificada() {
+  // Calc 6 = VISTA UNIFICADA PRO (pm/ff-unificada-pro.js): resumen de un vistazo + one-pager inversionista.
+  if (window.ffUnificadaView) return ffUnificadaView();
   const o = ffUwComputeAll(), u = o.unificada;
   const chip = (ok, l) => '<span class="badge ' + (ok ? 'b-ok' : 'b-warn') + '" style="font-size:10px">' + (ok ? '&#10003;' : '&#9888;') + ' ' + l + '</span>';
   const verColor = u.veredicto === 'GO' ? 'var(--pos,#34d399)' : u.veredicto === 'NO-GO' ? 'var(--neg,#f87171)' : 'var(--amber,#e7b65e)';
@@ -583,6 +585,7 @@ function ffUwViewUnificada() {
     '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; el inversionista pone ' + UW_M2(o.negocio.cashToClose) + ' (HUD) &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
 }
 function ffUwPresentacion() {
+  if (window.ffUnificadaOnePager) return ffUnificadaOnePager();   // one-pager pro (fallback: el viejo)
   const o = ffUwComputeAll(), u = o.unificada, a = UW.a;
   const DLR = String.fromCharCode(36);
   const M = n => DLR + Math.round(n || 0).toLocaleString('en-US');

@@ -44,6 +44,7 @@ const BUNDLE_FILES = [
   "pm/ff-underwriting.js",
   "pm/ff-arv-pro.js",
   "pm/ff-ingreso-modelos.js",
+  "pm/ff-unificada-pro.js",
   "os/os.js",
   "os/os-admin.js",
   "os/os-cierre-engine.js",
