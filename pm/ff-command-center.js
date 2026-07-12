@@ -197,6 +197,11 @@ function ffInjectCSS() {
     #ff-overlay .nav{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:5px}#ff-overlay .nav a{white-space:nowrap;flex-shrink:0}#ff-overlay .nav a.on::before{display:none}
     #ff-overlay .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#ff-overlay .row2,#ff-overlay .row3{grid-template-columns:minmax(0,1fr)}
     #ff-overlay .top{flex-direction:column;padding-right:104px}#ff-overlay .pills{margin-left:0;flex-wrap:wrap}
+  }
+  @media (max-width:600px){
+    #ff-overlay .kpis{grid-template-columns:minmax(0,1fr)}
+    #ff-overlay .kanban{grid-template-columns:minmax(0,1fr)}
+    #ff-overlay .wrap{padding:14px 12px 40px}
   }`;
   document.head.appendChild(st);
 }
@@ -400,21 +405,33 @@ function ffHeader(title, accent, sub) {
 function ffStratBadge(d) { return d.strategy === 'flip' ? '<span class="kstrat flip">FLIP</span>' : (d.strategy === 'hold' ? '<span class="kstrat hold">HOLD</span>' : ''); }
 
 // ─── COMMAND CENTER ───
+// ─── COMMAND (rediseño ADN premium 12-jul: veredicto + hero degradé + confianza + Simple/Experto) ───
 function ffSecCommand(comp) {
   const { kpi, deals } = comp; const insights = ffInsights(comp);
   const crit = insights.filter(i => i.sev === 'critical').length;
   const rehab = deals.filter(d => d.stage === 'en_rehab').length, venta = deals.filter(d => d.stage === 'en_venta').length;
-  return `${ffHeader('Command Center', 'Fix &amp; Flip', 'Todo el negocio de Fix &amp; Flip en una vista — pipeline, capital, márgenes, inversionistas y Cerebro.')}
-    ${ffDQBar(comp)}
-    <div class="grid kpis">
+  const exp = !!FF.exp; // toggle Simple / Experto (default Simple: decisión + números + pipeline)
+  // banda de decisión: derivada de los insights que YA calcula el Cerebro (sin lógica nueva)
+  const critTop = insights.find(i => i.sev === 'critical');
+  const flaggedDQ = kpi.revisar + kpi.sinDatos;
+  const verdict = crit > 0
+    ? kitVerdict('revisar', crit + (crit === 1 ? ' alerta crítica' : ' alertas críticas') + ' en el portafolio', (critTop ? critTop.tx + (critTop.action ? ' — 👉 ' + FF_ESC(critTop.action) : '') : '') + ' · <span class="chip" style="cursor:pointer" onclick="ffGo(\'cerebro\')">ver el detalle en el Cerebro →</span>')
+    : flaggedDQ > 0
+      ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. 🧹')
+      : kitVerdict('go', 'Portafolio sano — sin alertas críticas 🎉', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
+  const conf = kitConfidence(flaggedDQ === 0 ? 'alta' : flaggedDQ <= 2 ? 'media' : 'baja', kpi.confiablesN + '/' + kpi.total + ' deals confiables');
+  const hero = kitHero('Capital desplegado 💼', kitMoney(kpi.capital),
+    'all-in de los deals activos (compra + remod + holding) · ARV del portafolio <b>' + kitMoney(kpi.arvTotal) + '</b> · equity potencial <b style="color:var(--pos)">' + kitMoney(kpi.equity) + '</b> &nbsp; ' + conf);
+  const kpis = `<div class="grid kpis">
       <div class="card kpi"><div class="lab">Deals activos</div><div class="big">${kpi.activos}</div><div class="meta">${kpi.flips} flip · ${kpi.holds} hold · ${rehab} en rehab · ${venta} en venta</div></div>
-      <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big glow">${FF_MONEY(kpi.capital)}</div><div class="meta">all-in de deals activos (compra + remod + holding)</div></div>
-      <div class="card kpi"><div class="lab">ARV del portafolio</div><div class="big">${FF_MONEY(kpi.arvTotal)}</div><div class="meta">equity potencial <span class="up">${FF_MONEY(kpi.equity)}</span></div></div>
-      <div class="card kpi"><div class="lab">Alertas del Cerebro</div><div class="big">${insights.length}</div><div class="meta"><span class="down">${crit} críticas</span> · déficit acum. <span class="down">${FF_MONEY(kpi.deficitAcum)}</span></div></div>
-    </div>
+      <div class="card kpi"><div class="lab">Equity potencial</div><div class="big ${kpi.equity > 0 ? 'up' : ''}">${kitMoney(kpi.equity)}</div><div class="meta">ARV − all-in de los activos</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">hoyo operativo declarado por casa</div></div>
+      <div class="card kpi"><div class="lab">Insights del Cerebro</div><div class="big">${insights.length || '—'}</div><div class="meta"><span class="${crit ? 'down' : ''}">${crit} críticas</span> · <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></div></div>
+    </div>`;
+  const experto = !exp ? '' : `
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Capital por etapa del pipeline</div><div class="k">all-in US$</div></div><div style="position:relative;height:320px;width:100%;overflow:hidden"><canvas id="ff-stage"></canvas></div></div>
-      <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>ANÁLISIS EN VIVO · REGLAS</span></div></div>
+      <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro IA</b><span>INSIGHTS · REGLAS</span></div></div>
         ${insights.slice(0, 3).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}${i.action ? `<div class="iaction">➜ ${FF_ESC(i.action)}</div>` : ''}<div class="tag">${i.tag}</div></div></div>`).join('')}
         <div class="ask"><input id="ff-ask" placeholder="Preguntá al Cerebro de Fix &amp; Flip…" onkeydown="if(event.key==='Enter')ffAsk()"><button onclick="ffAsk()">Enviar</button></div>
         <div style="margin-top:11px"><span class="chip" onclick="ffGo('cerebro')">Ver todos los insights</span></div></div>
@@ -422,10 +439,17 @@ function ffSecCommand(comp) {
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Margen / déficit por deal</div><div class="k">verde = margen · rojo = déficit</div></div><div style="position:relative;height:${Math.min(14, comp.deals.filter(d => d.arv > 0).length) * 28 + 90}px;width:100%;overflow:hidden"><canvas id="ff-margin"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Deals por etapa</div><div class="k">${kpi.total} total</div></div><div style="position:relative;height:320px;width:100%;overflow:hidden"><canvas id="ff-donut"></canvas></div></div>
-    </div>
+    </div>`;
+  return `${ffHeader('Command Center', 'Fix &amp; Flip', 'Todo el negocio de Fix &amp; Flip en una vista — pipeline, capital, márgenes, inversionistas y Cerebro.')}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">${kitToggle('✨ Simple', '🔬 Experto', exp, "FF.exp=!FF.exp;ffRender()")}</div>
+    ${verdict}
+    ${ffDQBar(comp)}
+    ${hero}
+    ${kpis}
+    ${experto}
     <div class="grid" style="margin-top:16px"><div class="card">
       <div class="chart-h"><div class="t">Pipeline resumido</div><div class="k">${kpi.activos} activos · abrí Deals para el Kanban</div></div>
-      ${ffDealTable(deals.filter(d => d.stage !== 'vendida').sort((a, b) => a.deficit - b.deficit).slice(0, 10))}
+      <div class="overx">${ffDealTable(deals.filter(d => d.stage !== 'vendida').sort((a, b) => a.deficit - b.deficit).slice(0, 10))}</div>
     </div></div>`;
 }
 function ffDealTable(deals) {

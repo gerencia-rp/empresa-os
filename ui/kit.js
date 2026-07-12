@@ -28,13 +28,58 @@ function kitMoney2(n, opts) {  // con centavos cuando los hay (fidelidad HUD)
 function kitPct(n, dec) { return (n == null || isNaN(n)) ? '—' : (Math.round(n * Math.pow(10, dec || 0)) / Math.pow(10, dec || 0)) + '%'; }
 function kitNum(n) { return (n == null || isNaN(n)) ? '—' : (+n).toLocaleString('en-US'); }
 
-// ─── HERO: el número protagonista (patrón Cash-Out) ───
+// ─── HERO: el número protagonista (patrón Cash-Out). Sin color → número en DEGRADÉ de marca (ADN ARV Pro). ───
 function kitHero(titulo, valor, sub, color) {
+  const grad = !color;                       // sin color explícito = look premium con --grad
   const c = color || 'var(--a1)';
-  return '<div style="background:color-mix(in srgb, ' + c + ' 12%, transparent);border:1px solid color-mix(in srgb, ' + c + ' 40%, transparent);border-radius:20px;padding:20px 24px;margin-bottom:16px">'
-    + '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:' + c + ';font-weight:700">' + titulo + '</div>'
-    + '<div style="font-size:40px;font-weight:800;color:' + c + ';line-height:1.1;margin-top:4px;letter-spacing:-1px">' + valor + '</div>'
-    + (sub ? '<div style="font-size:12px;color:' + c + ';margin-top:4px;opacity:.9">' + sub + '</div>' : '') + '</div>';
+  const numStyle = grad ? 'class="hero-num" style="font-size:40px;line-height:1.1;margin-top:4px"'
+    : 'style="font-size:40px;font-weight:800;color:' + c + ';line-height:1.1;margin-top:4px;letter-spacing:-1px"';
+  return '<div class="card" style="background:' + (grad ? 'var(--card)' : 'color-mix(in srgb, ' + c + ' 12%, transparent)') + ';border:1px solid ' + (grad ? 'var(--line)' : 'color-mix(in srgb, ' + c + ' 40%, transparent)') + ';border-radius:20px;padding:20px 24px;margin-bottom:16px">'
+    + '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:' + (grad ? 'var(--mut2)' : c) + ';font-weight:700">' + titulo + '</div>'
+    + '<div ' + numStyle + '>' + valor + '</div>'
+    + (sub ? '<div style="font-size:12px;color:' + (grad ? 'var(--mut)' : c) + ';margin-top:4px;opacity:.92">' + sub + '</div>' : '') + '</div>';
+}
+
+// ─── VERDICT: banda de decisión (semáforo + acción) — ADN ARV Pro ───
+// nivel: 'go' | 'revisar' | 'nogo' · titulo: la decisión en humano · accion: qué hacer ahora
+function kitVerdict(nivel, titulo, accion) {
+  const map = { go: ['var(--pos)', '✅'], revisar: ['var(--amber)', '⚠️'], nogo: ['var(--neg)', '⛔'] };
+  const [c, ico] = map[nivel] || map.revisar;
+  return '<div style="display:flex;align-items:center;gap:14px;background:color-mix(in srgb, ' + c + ' 10%, transparent);border:1px solid color-mix(in srgb, ' + c + ' 35%, transparent);border-radius:16px;padding:14px 18px;margin-bottom:16px;flex-wrap:wrap">'
+    + '<span style="font-size:22px">' + ico + '</span>'
+    + '<div style="flex:1;min-width:200px"><div style="font-size:14.5px;font-weight:800;color:' + c + '">' + titulo + '</div>'
+    + (accion ? '<div style="font-size:12px;color:var(--txt2);margin-top:2px">' + accion + '</div>' : '') + '</div></div>';
+}
+
+// ─── CONFIDENCE: badge de confianza del dato — ADN ARV Pro ───
+// nivel: 'alta' | 'media' | 'baja' · detalle opcional ("12 comps · Airtable")
+function kitConfidence(nivel, detalle) {
+  const map = { alta: ['var(--pos)', '●●●'], media: ['var(--amber)', '●●○'], baja: ['var(--neg)', '●○○'] };
+  const [c, dots] = map[nivel] || map.media;
+  return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:20px;background:color-mix(in srgb, ' + c + ' 12%, transparent);color:' + c + ';border:1px solid color-mix(in srgb, ' + c + ' 30%, transparent)">'
+    + '<span style="letter-spacing:1px">' + dots + '</span> confianza ' + nivel + (detalle ? ' <span style="font-weight:400;opacity:.8">· ' + detalle + '</span>' : '') + '</span>';
+}
+
+// ─── RANGE: barra flojo / probable / bien — ADN ARV Pro ───
+// vals = {bajo, probable, alto} · labels opcionales · fmt opcional (default kitMoney)
+function kitRange(vals, labels, fmt) {
+  const f = fmt || kitMoney; const L = labels || ['flojo', 'probable', 'bien'];
+  return '<div style="margin:10px 0">'
+    + '<div style="position:relative;height:8px;border-radius:6px;background:linear-gradient(90deg, color-mix(in srgb, var(--neg) 55%, transparent), color-mix(in srgb, var(--amber) 55%, transparent), color-mix(in srgb, var(--pos) 55%, transparent))">'
+    + '<span style="position:absolute;left:50%;top:-3px;width:3px;height:14px;background:var(--ink);border-radius:2px;transform:translateX(-50%)"></span></div>'
+    + '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--mut)">'
+    + '<span>' + L[0] + '<br><b style="color:var(--ink)">' + f(vals.bajo) + '</b></span>'
+    + '<span style="text-align:center">' + L[1] + '<br><b class="hero-num" style="font-size:15px">' + f(vals.probable) + '</b></span>'
+    + '<span style="text-align:right">' + L[2] + '<br><b style="color:var(--ink)">' + f(vals.alto) + '</b></span>'
+    + '</div></div>';
+}
+
+// ─── TOGGLE Simple / Experto — ADN ARV Pro ───
+// activo: true=segundo modo (experto) · onclickExpr: expresión que alterna y re-renderiza
+function kitToggle(labelSimple, labelExperto, activo, onclickExpr) {
+  const pill = (txt, on) => '<span style="padding:6px 14px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;' + (on ? 'background:var(--grad);color:#fff' : 'color:var(--mut)') + '">' + txt + '</span>';
+  return '<span onclick="' + onclickExpr + '" style="display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:3px;cursor:pointer;user-select:none">'
+    + pill(labelSimple, !activo) + pill(labelExperto, !!activo) + '</span>';
 }
 
 // ─── CARD con título/propósito ───
@@ -95,3 +140,4 @@ window.kitMoney = kitMoney; window.kitMoney2 = kitMoney2; window.kitPct = kitPct
 window.kitHero = kitHero; window.kitCard = kitCard; window.kitRow = kitRow;
 window.kitInput = kitInput; window.kitInputSm = kitInputSm;
 window.kitBadge = kitBadge; window.kitEmpty = kitEmpty; window.kitLoading = kitLoading; window.kitError = kitError; window.kitEsc = kitEsc;
+window.kitVerdict = kitVerdict; window.kitConfidence = kitConfidence; window.kitRange = kitRange; window.kitToggle = kitToggle;
