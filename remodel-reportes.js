@@ -16,6 +16,7 @@ const RP_PERIODS = [['mes', 'Mes'], ['trimestre', 'Trimestre'], ['ytd', 'YTD'], 
 
 function rpUnit(u, v) {
   if (v == null) return '—';
+  if (typeof v === 'number' && !isFinite(v)) return '—';   // sin dato ≠ NaN mudo
   if (u === '%') return v + '%';
   if (u === 'usd' || u === '$') return RC_M(v);
   if (u === 'días') return (v > 0 ? '+' : '') + v + 'd';
@@ -27,6 +28,8 @@ function rpMedian(arr) {
   return a.length % 2 ? a[(a.length - 1) / 2] : Math.round((a[a.length / 2 - 1] + a[a.length / 2]) / 2);
 }
 function rpSem(ok) { return ok == null ? '#94a3b8' : ok ? '#34d399' : '#f87171'; }
+// Formateador defensivo para celdas: null/NaN/Infinity → '—' (regla "sin dato ≠ $0")
+function rpM(v) { return (v == null || !isFinite(v)) ? '—' : RC_M(v); }
 
 // Filtro por período (sobre fecha_real, o fecha_inicio si no finalizó) + líder/estado/ciudad
 function rpFilter(ds) {
@@ -114,6 +117,11 @@ function rpInjectCSS() {
   #rc-overlay .rp-x{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;border:1px solid var(--line,rgba(255,255,255,.1));background:var(--glass,rgba(255,255,255,.04));color:var(--txt,#e8eefc);cursor:pointer}
   #rc-overlay .rp-x:hover{border-color:#12b5a0}
   #rc-overlay .rp-filters{background:var(--glass,rgba(255,255,255,.03));border:1px solid var(--line,rgba(255,255,255,.08));border-radius:12px;padding:10px 12px;margin-bottom:14px}
+  #rc-overlay details.rp-filters > summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2,#9fb0c9);user-select:none;list-style:none}
+  #rc-overlay details.rp-filters > summary::-webkit-details-marker{display:none}
+  #rc-overlay details.rp-filters > summary::after{content:'▸';margin-left:6px;opacity:.6;display:inline-block;transition:transform .15s}
+  #rc-overlay details.rp-filters[open] > summary::after{transform:rotate(90deg)}
+  #rc-overlay details.rp-filters[open] > summary{margin-bottom:8px}
   #rc-overlay .rp-frow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
   #rc-overlay .rp-flab{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#64748b);font-weight:700}
   #rc-overlay .rp-chip{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--line,rgba(255,255,255,.1));background:transparent;color:var(--txt2,#9fb0c9);cursor:pointer}
@@ -161,7 +169,8 @@ function rcSecReportes(c) {
         <button onclick="rpCopyResumen()" class="rp-x" title="Copiar resumen ejecutivo">📋 Copiar</button>
       </div>
     </div>
-    <div class="rp-filters no-print">
+    <details class="rp-filters no-print"${window.innerWidth > 768 ? ' open' : ''}>
+      <summary>🔍 Filtros <span style="font-weight:400;opacity:.75">· ${obras.length} obras · ${RP.period}</span></summary>
       <div class="rp-frow"><span class="rp-flab">Período</span>${periodBtns}${custom}</div>
       <div class="rp-frow">
         <span class="rp-flab">Líder</span><select onchange="rpSet('lider',this.value)" class="rp-sel">${opt(lideres, RP.lider)}</select>
@@ -175,7 +184,7 @@ function rcSecReportes(c) {
         </select>
       </div>
       <div class="rp-note">${obras.length} obras en el filtro · período <b>${RP.period}</b>${!c.okrsConfigured ? ' · <span style="color:#e7b65e">⚠ metas no configuradas (usando defaults) — cargalas en la tabla “OKRs / Metas” de Airtable</span>' : ''}</div>
-    </div>
+    </details>
     <div id="rp-report">${body(c, obras)}</div>`;
 }
 
@@ -196,9 +205,15 @@ function rpR1(c, obras) {
   const lideres = rpLiderAgg(m.fin);
   const decisiones = rpDecisiones(c, m, okr, lideres);
   const okrChips = okr.map(o => `<span class="rp-okr" style="border-color:${rpSem(o.cumple)}44;background:${rpSem(o.cumple)}18;color:${rpSem(o.cumple)}">${RC_E(o.metrica)}: ${rpUnit(o.unidad, o.actual)} / ${o.comparador}${rpUnit(o.unidad, o.objetivo)}</span>`).join('');
-  const topRows = top.map(o => `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td class="r">${RC_M(o.utilidad)}</td><td class="r ${o.margen >= 20 ? 'up' : 'down'}">${o.margen != null ? o.margen + '%' : '—'}</td><td class="r">${o.psf != null ? RC_M(o.psf) : '—'}</td></tr>`).join('');
-  const bottomRows = bottom.map(o => `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td class="r ${o.utilidad >= 0 ? 'up' : 'down'}">${RC_M(o.utilidad)}</td><td class="r">${o.retraso != null ? (o.retraso > 0 ? '+' : '') + o.retraso + 'd' : '—'}</td></tr>`).join('');
-  return `
+  const topRows = top.map(o => `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td class="r">${rpM(o.utilidad)}</td><td class="r ${o.margen >= 20 ? 'up' : 'down'}">${(o.margen != null && isFinite(o.margen)) ? o.margen + '%' : '—'}</td><td class="r">${rpM(o.psf)}</td></tr>`).join('');
+  const bottomRows = bottom.map(o => `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td class="r ${o.utilidad >= 0 ? 'up' : 'down'}">${rpM(o.utilidad)}</td><td class="r">${(o.retraso != null && isFinite(o.retraso)) ? (o.retraso > 0 ? '+' : '') + o.retraso + 'd' : '—'}</td></tr>`).join('');
+  // El número protagonista arriba (ADN premium): ganancia bruta del período en degradé. Sin obras finalizadas → '—' (sin dato ≠ $0).
+  const hero = (typeof kitHero === 'function')
+    ? kitHero('Ganancia bruta del período 🏗',
+      (typeof kitMoney === 'function' ? kitMoney(m.nFin ? m.ganancia : null) : rpM(m.nFin ? m.ganancia : null)),
+      m.nFin + ' obras finalizadas · margen <b>' + (isFinite(m.margen) ? m.margen + '%' : '—') + '</b> · EBITDA <b>' + rpM(ebitda) + '</b> (opex ' + rpM(oh.opex) + ')')
+    : '';
+  return hero + `
     <div class="grid kpis">
       ${rpKpiCard('Ganancia BRUTA', RC_K(m.ganancia), m.nFin + ' finalizadas · margen ' + m.margen + '%', 'up glow')}
       ${rpKpiCard('EBITDA', RC_K(ebitda), 'margen ' + ebitdaMargen + '% · opex ' + RC_K(oh.opex), ebitda >= 0 ? 'up' : 'down')}
@@ -258,8 +273,8 @@ function rpR2(c, obras) {
 function rpR3(c, obras) {
   const m = rpMetrics(obras);
   const lideres = rpLiderAgg(m.fin);
-  const lidRows = lideres.map(l => `<tr><td><b>${RC_E(l.lider)}</b>${l.shared ? ' <span class="rp-sh" title="Tiene obras compartidas — regla aplicada">⚖</span>' : ''}</td><td class="r">${l.nR}</td><td class="r">${RC_M(l.ganancia)}</td><td class="r ${l.margen >= 20 ? 'up' : 'down'}">${l.margen}%</td><td class="r">${l.psf != null ? RC_M(l.psf) : '—'}</td><td class="r ${(l.desvDias || 0) > 7 ? 'down' : 'up'}">${l.desvDias != null ? (l.desvDias > 0 ? '+' : '') + l.desvDias + 'd' : '—'}</td></tr>`).join('');
-  const obraRows = [...m.fin].sort((a, b) => b.utilidad - a.utilidad).map(o => `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td>${RC_E(o.ciudad || '—')}</td><td class="r ${o.utilidad >= 0 ? 'up' : 'down'}">${RC_M(o.utilidad)}</td><td class="r ${o.margen >= 20 ? 'up' : 'down'}">${o.margen != null ? o.margen + '%' : '—'}</td><td class="r">${o.retraso != null ? (o.retraso > 0 ? '+' : '') + o.retraso + 'd' : '—'}</td></tr>`).join('');
+  const lidRows = lideres.map(l => `<tr><td><b>${RC_E(l.lider)}</b>${l.shared ? ' <span class="rp-sh" title="Tiene obras compartidas — regla aplicada">⚖</span>' : ''}</td><td class="r">${isFinite(l.nR) ? l.nR : '—'}</td><td class="r">${rpM(l.ganancia)}</td><td class="r ${l.margen >= 20 ? 'up' : 'down'}">${isFinite(l.margen) ? l.margen + '%' : '—'}</td><td class="r">${rpM(l.psf)}</td><td class="r ${(l.desvDias || 0) > 7 ? 'down' : 'up'}">${(l.desvDias != null && isFinite(l.desvDias)) ? (l.desvDias > 0 ? '+' : '') + l.desvDias + 'd' : '—'}</td></tr>`).join('');
+  const obraRows = [...m.fin].sort((a, b) => b.utilidad - a.utilidad).map(o => `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td>${RC_E(o.ciudad || '—')}</td><td class="r ${o.utilidad >= 0 ? 'up' : 'down'}">${rpM(o.utilidad)}</td><td class="r ${o.margen >= 20 ? 'up' : 'down'}">${(o.margen != null && isFinite(o.margen)) ? o.margen + '%' : '—'}</td><td class="r">${(o.retraso != null && isFinite(o.retraso)) ? (o.retraso > 0 ? '+' : '') + o.retraso + 'd' : '—'}</td></tr>`).join('');
   return `
     <div class="rp-modenote">Regla de líder compartido: <b>${RP.liderMode === 'split' ? 'Split 50-50' : RP.liderMode === 'primero' ? 'Primer líder' : 'Ambos (100%)'}</b> — obras con 2 líderes (ej. Bethune) se atribuyen según esta regla. ⚖ = líder con obras compartidas.</div>
     <div class="grid row2">
@@ -298,11 +313,11 @@ function rpR5(c, obras) {
   const matProm = withSq.length ? Math.round(withSq.reduce((s, o) => s + (o.costo_real * 0.476) / o.sqft, 0) / withSq.length) : 0;
   const rows = [...withSq].sort((a, b) => (b.costo_real / b.sqft) - (a.costo_real / a.sqft)).map(o => {
     const psf = Math.round(o.costo_real / o.sqft);
-    return `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td class="r">${o.sqft}</td><td class="r"><b>${RC_M(psf)}</b></td><td class="r ${psf <= 50 ? 'up' : 'down'}">${psf <= 50 ? '✓' : '⚠'}</td></tr>`;
+    return `<tr><td>${RC_E(rcShort(o.address))}</td><td>${RC_E(o.lider)}</td><td class="r">${isFinite(o.sqft) ? o.sqft : '—'}</td><td class="r"><b>${rpM(psf)}</b></td><td class="r ${psf <= 50 ? 'up' : 'down'}">${!isFinite(psf) ? '—' : psf <= 50 ? '✓' : '⚠'}</td></tr>`;
   }).join('');
   const byCity = {};
   withSq.forEach(o => { const k = o.ciudad || '—'; if (!byCity[k]) byCity[k] = { c: 0, s: 0 }; byCity[k].c += o.costo_real; byCity[k].s += o.sqft; });
-  const cityRows = Object.entries(byCity).map(([k, v]) => `<tr><td>${RC_E(k)}</td><td class="r">${RC_M(Math.round(v.c / v.s))}</td></tr>`).join('');
+  const cityRows = Object.entries(byCity).map(([k, v]) => `<tr><td>${RC_E(k)}</td><td class="r">${rpM(Math.round(v.c / v.s))}</td></tr>`).join('');
   return `
     <div class="grid kpis">
       ${rpKpiCard('$/sqft prom', RC_M(m.psf), withSq.length + ' obras con sqft')}

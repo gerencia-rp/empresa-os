@@ -457,9 +457,15 @@ function wpRender() {
     </div>
   ` : '';
 
+  // Mini-header protagonista (ADN premium): obras activas + avance de la semana, con datos que la vista ya computa.
+  const wpHero = (typeof kitHero === 'function')
+    ? kitHero('Planner semanal · ' + weekLabel + ' 🏗',
+      allHomes.length + ' obra' + (allHomes.length === 1 ? '' : 's'),
+      doneThisWeek + '/' + totalThisWeek + ' actividades hechas esta semana (' + progressPct + '%)' + (overdueCount ? ' · <b>⏰ ' + overdueCount + ' atrasada(s)</b>' : ' · ✓ al día'))
+    : '';
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[80vh]">
-      ${criticasBanner}${wpAlertDrawerHtml(overdueAll, conflicts)}
+      ${wpHero}${criticasBanner}${wpAlertDrawerHtml(overdueAll, conflicts)}
       ${overdueBanner}
       <!-- HEADER -->
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
@@ -882,6 +888,7 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
     if (error) return alert('Error moviendo: ' + error.message);
     await wpLoadAll();
     wpRender();
+    if (window.toast) toast('✅ Actividad reprogramada', 'success');
     return;
   }
 
@@ -1302,6 +1309,7 @@ async function wpConfirmPostpone(id) {
   if (error) return alert('Error: ' + error.message);
   await wpLoadAll();
   wpBackToPlanner();
+  if (window.toast) toast('✅ Actividad reprogramada', 'success');
 }
 
 // Reprograma una actividad a nuevo día
@@ -1314,6 +1322,7 @@ async function wpReprogramTask(id, newDate) {
   }).eq('id', id);
   await wpLoadAll();
   wpRender();
+  if (window.toast) toast('✅ Actividad reprogramada', 'success');
   if (prev && prev.is_critical && oldDate) { const delta = Math.round((new Date(newDate) - new Date(oldDate)) / 86400000); if (delta) await wpCascadeReschedule(prev, delta); }
 }
 // Bloque 4.1 — cascada: al mover una actividad crítica, recorre sus sucesores dependientes (depends_on del catálogo).
@@ -1351,6 +1360,7 @@ async function wpReprogramAllOverdue(newDate) {
   }).in('id', ids);
   await wpLoadAll();
   wpRender();
+  if (window.toast) toast('✅ ' + ids.length + ' actividad(es) reprogramada(s)', 'success');
 }
 
 function wpToggleCriticasDetails() {
@@ -1372,6 +1382,7 @@ async function wpReprogramListToDate(ids, newDate) {
   if (error) return alert('Error reprogramando: ' + error.message);
   await wpLoadAll();
   wpBackToPlanner();
+  if (window.toast) toast('✅ ' + ids.length + ' tarea(s) reprogramada(s)', 'success');
 }
 
 function wpNavWeek(delta) {

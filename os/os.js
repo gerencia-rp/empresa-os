@@ -551,9 +551,9 @@ function osEmpresa(comp) {
     : isEdu ? (comp.educacion ? [['Alumnos activos', comp.educacion.activos, `${comp.educacion.conPlan} con plan`], ['Nuevos (30d)', comp.educacion.nuevos, ''], ['Antigüedad prom.', comp.educacion.antiguedad + 'd', 'en el programa'], ['Con plan activo', comp.educacion.conPlan, `de ${comp.educacion.activos}`]] : [['Sin datos', '—', 'no hay snapshot de educación cargado']])
     : [['—', '—', 'datos próximamente']];
   return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag}</div>
-    <div class="grid k4">${kpis.map(k => `<div class="card"><div class="lab">${k[0]}</div><div class="big">${k[1]}</div><div class="meta">${k[2]}</div></div>`).join('')}</div>
+    <div class="grid k4">${kpis.map(k => `<div class="card" title="${k[0]}"><div class="lab">${k[0]}</div><div class="big">${k[1]}</div><div class="meta">${k[2]}</div></div>`).join('')}</div>
     <div class="chart-h" style="margin:24px 4px 12px"><div class="t">Apps de ${e.name}</div><div class="k">clic para abrir</div></div>
-    <div class="grid k3">${e.apps.map(a => `<div class="card app-card" ${a.soon ? '' : `onclick="${a.fn}"`}><div class="ai">${a.icon}</div><div style="flex:1"><div class="an">${a.name}</div><div class="at">${a.soon ? 'Fase 2' : 'Abrir app'}</div></div>${a.soon ? '<span class="soon">pronto</span>' : ''}</div>`).join('')}</div>`;
+    <div class="grid k3">${e.apps.map(a => `<div class="card app-card" ${a.soon ? '' : `onclick="${a.fn}"`}><div class="ai">${a.icon}</div><div style="flex:1;min-width:0"><div class="an" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</div><div class="at">${a.soon ? 'Fase 2' : 'Abrir app'}</div></div>${a.soon ? '<span class="soon">pronto</span>' : ''}</div>`).join('')}</div>`;
 }
 
 // ─── ÁREA · OPERACIÓN ───
@@ -564,7 +564,18 @@ window.osDraftCobro = osDraftCobro;
 // ─── ÁREA · CONTABLE ───
 function osContable(comp) {
   const capRows = OS.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')); // sin la propia empresa (18, no 19)
+  // Veredicto arriba de todo, derivado del Sabueso: si el Contable (CT) ya corrió usa sus descuadres abiertos (con $ de impacto); si no, los findings activos críticos/altos del Sabueso general.
+  let veredicto = '';
+  if (window.kitVerdict) {
+    const ctAb = (window.CT && CT.loaded) ? (CT.db || []).filter(f => ['abierto', 'marcado_contadora', 'ajuste_propuesto'].includes(f.estado) && f.severidad !== 'info') : null;
+    const ab = ctAb != null ? ctAb : (OS.sabueso || []).filter(x => x.active !== false && (x.severidad === 'critica' || x.severidad === 'alta'));
+    const monto = ctAb != null ? ctAb.reduce((s, f) => s + (+f.impacto_usd || 0), 0) : 0;
+    veredicto = ab.length
+      ? kitVerdict('revisar', ab.length + (ab.length === 1 ? ' descuadre abierto' : ' descuadres abiertos') + (monto ? ' · ' + kitMoney(monto) + ' sin conciliar' : ''), 'Revisá el Sabueso Contable (abajo), ordenado por impacto en plata — el norte es cero.')
+      : kitVerdict('go', 'Libros cuadrando', 'Sin descuadres abiertos del Sabueso — norte de cero sostenido.');
+  }
   return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
+    ${veredicto}
     ${window.ctSabuesoBlock ? ctSabuesoBlock(comp) : ''}
     <div class="grid k4">
       <div class="card"><div class="lab">Ingresos rentas (mes)</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año) · ${comp.mb.label}</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>
@@ -573,27 +584,28 @@ function osContable(comp) {
       <div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(comp.cobranza.total)}</div><div class="meta">por cobrar (rentas)</div></div>
     </div>
     <div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">P&L del holding (v_holding_pnl)</div><div class="k">una definición por métrica · fuente: espejos verificados</div></div>
-      <table class="ptable"><thead><tr><th>Empresa</th><th>Ingreso</th><th>Costo real</th><th>Overhead</th><th>Utilidad bruta</th><th>EBITDA</th><th>FF realizado / inyectado</th></tr></thead><tbody>
+      <div class="overx"><table class="ptable"><thead><tr><th>Empresa</th><th style="text-align:right">Ingreso</th><th style="text-align:right">Costo real</th><th style="text-align:right">Overhead</th><th style="text-align:right">Utilidad bruta</th><th style="text-align:right">EBITDA</th><th style="text-align:right">FF realizado / inyectado</th></tr></thead><tbody>
       ${(OS.pnl || []).map(r => {
         const nm = { remodelacion: '🔨 Remodelación', fix_flip: '🏚 Fix & Flip', rentas: '🏠 Rentas', educacion: '🎓 Educación', consolidado: '🏛 CONSOLIDADO' }[r.empresa] || r.empresa;
         const v = x => x == null ? '—' : OS_M(+x);
         const cls = x => x == null ? '' : (+x >= 0 ? 'up' : 'down');
         const ffx = (r.realizado == null && r.inyectado == null) ? '—' : (v(r.realizado) + ' / ' + v(r.inyectado));
-        const bold = r.empresa === 'consolidado' ? 'font-weight:800;border-top:1px solid var(--line, rgba(255,255,255,.2))' : '';
-        return `<tr style="${bold}"><td>${nm}</td><td>${v(r.ingreso)}</td><td>${v(r.costo_real)}</td><td class="down">${v(r.overhead)}</td><td class="${cls(r.utilidad_bruta)}">${v(r.utilidad_bruta)}</td><td class="${cls(r.ebitda)}">${v(r.ebitda)}</td><td>${ffx}</td></tr>`;
+        const bold = r.empresa === 'consolidado' ? 'font-weight:800;border-top:2px solid var(--line);background:color-mix(in srgb, var(--a2) 5%, transparent)' : '';
+        const num = 'text-align:right';
+        return `<tr style="${bold}"><td>${nm}</td><td style="${num}">${v(r.ingreso)}</td><td style="${num}">${v(r.costo_real)}</td><td class="down" style="${num}">${v(r.overhead)}</td><td class="${cls(r.utilidad_bruta)}" style="${num}">${v(r.utilidad_bruta)}</td><td class="${cls(r.ebitda)}" style="${num}">${v(r.ebitda)}</td><td style="${num}">${ffx}</td></tr>`;
       }).join('')}
-      </tbody></table>
+      </tbody></table></div>
       <div class="meta" style="margin-top:8px">FF: "realizado" = casas con ciclo cerrado (vendida/refi/rentada); "inyectado" = cash en casas vivas (no es pérdida realizada).</div>
     </div>
     ${osConcilBlock(comp)}
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">Conciliación Airtable ↔ QuickBooks</div><div class="k">SOLO LECTURA</div></div>
-        <table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th>Impacto</th></tr></thead><tbody>
-        <tr><td>Overhead FF (equipo + plataformas) — espejo Airtable</td><td><span class="badge b-ok">Real</span></td><td class="down">${OS_M(OS.ffOverhead || 0)}</td></tr>
-        <tr><td>Intereses HML pagados (reales, fechados)</td><td><span class="badge b-ok">Real</span></td><td class="down">${OS_M(OS.ffIntereses || 0)}</td></tr>
-        <tr><td>Obligación a inversionistas (pasivo / cap table)</td><td><span class="badge b-warn">Pendiente</span></td><td>—</td></tr>
-        <tr><td>Ingresos de rentas (plata real)</td><td><span class="badge b-ok">Conciliado</span></td><td class="up">${OS_M(comp.rentas.ingresos)}</td></tr>
-        </tbody></table>
+        <div class="overx"><table class="ptable"><thead><tr><th>Concepto</th><th>Estado</th><th style="text-align:right">Impacto</th></tr></thead><tbody>
+        <tr><td>Overhead FF (equipo + plataformas) — espejo Airtable</td><td><span class="badge b-ok">Real</span></td><td class="down" style="text-align:right">${OS_M(OS.ffOverhead || 0)}</td></tr>
+        <tr><td>Intereses HML pagados (reales, fechados)</td><td><span class="badge b-ok">Real</span></td><td class="down" style="text-align:right">${OS_M(OS.ffIntereses || 0)}</td></tr>
+        <tr><td>Obligación a inversionistas (pasivo / cap table)</td><td><span class="badge b-warn">Pendiente</span></td><td style="text-align:right">—</td></tr>
+        <tr><td>Ingresos de rentas (plata real)</td><td><span class="badge b-ok">Conciliado</span></td><td class="up" style="text-align:right">${OS_M(comp.rentas.ingresos)}</td></tr>
+        </tbody></table></div>
         <div class="meta" style="margin-top:10px">P&L / balance / cashflow de QuickBooks completos llegan en la Fase 2 (conector QB). Hoy: conciliación de los gaps conocidos.</div></div>
       <div class="card"><div class="chart-h"><div class="t">Cap table de inversionistas</div><div class="k">${capRows.length} inversionistas</div></div>
         ${capRows.length ? `<table class="ptable"><thead><tr><th>Inversionista</th><th>Etiqueta</th><th>Ciudad</th></tr></thead><tbody>${capRows.slice(0, 14).map(x => `<tr><td>${OS_E(x.name || '—')}</td><td>${OS_E(x.label || '—')}</td><td>${OS_E(x.city || '—')}</td></tr>`).join('')}</tbody></table>`
@@ -701,13 +713,13 @@ function osCasa(comp) {
     <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
     <div class="grid k2" style="margin-top:12px">
       <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
-        ${m.ff ? `${kv('Compra', OS_M(m.ff.purchase))}${kv('Remodelación (est/draws)', OS_M(m.ff.remComplete))}${kv('Holding', OS_M(m.ff.holding))}${kv('All-in', OS_M(m.ff.allIn), m.ff.dq.revisar ? 'down' : '')}${kv('ARV', OS_M(m.ff.arv))}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', OS_M(m.ff.arv * 0.75 - m.ff.remComplete - m.ff.holding))}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div>
+        <div class="overx">${m.ff ? `${kv('Compra', OS_M(m.ff.purchase))}${kv('Remodelación (est/draws)', OS_M(m.ff.remComplete))}${kv('Holding', OS_M(m.ff.holding))}${kv('All-in', OS_M(m.ff.allIn), m.ff.dq.revisar ? 'down' : '')}${kv('ARV', OS_M(m.ff.arv))}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', OS_M(m.ff.arv * 0.75 - m.ff.remComplete - m.ff.holding))}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
       <div class="card"><div class="chart-h"><div class="t">🔨 Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
-        ${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E(remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div>
+        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E(remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
-        ${m.rentas ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`}</div>
+        <div class="overx">${m.rentas ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
         ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
         ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
@@ -1071,8 +1083,8 @@ function opsPmView(o) {
         <button class="repbtn ${OS.opsGroupCasa ? '' : 'ghost'}" style="padding:5px 10px;font-size:11px" onclick="OS.opsGroupCasa=!OS.opsGroupCasa;osRender()">🏠 Por casa</button>
         <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
       </div>
-      ${OS.opsGroupCasa ? opsPorCasaView(o, rows, fila) : `<table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
-      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#48d69c">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table>`}
+      ${OS.opsGroupCasa ? opsPorCasaView(o, rows, fila) : `<div class="overx"><table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
+      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#48d69c">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table></div>`}
       <div class="meta" style="margin-top:8px">Mostrando ${Math.min(150, rows.length)} de ${rows.length} · fuente: clickup_tasks_mirror (paridad 3/3 con ClickUp, sync diario). Acciones con aprobación (reasignar/re-fechar/archivar): fase siguiente.</div>
     </div>`;
 }
@@ -1104,8 +1116,8 @@ function opsSabuesoView(o) {
     <div style="display:flex;gap:5px;margin:12px 0;flex-wrap:wrap">${Object.entries(SAB_CAT).map(([k, l]) => byCat[k] ? catChip(k, l, byCat[k]) : '').join('')}
       <select class="repbtn ghost" style="padding:4px 8px" onchange="OS.sabF=Object.assign(OS.sabF||{},{emp:this.value});osRender()">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas'}</option>`).join('')}</select></div>
     <div class="grid k2">
-      <div class="card"><div class="lab">Anomalías (por severidad)</div><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#48d69c">Nada que olfatear ✓</td></tr>'}</tbody></table><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
-      <div class="card"><div class="lab">Health score por proceso/lista</div><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 28))}<div style="font-size:9px;opacity:.5">higiene ${p.higiene}% · movido ${p.flujo}%</div></td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:6px">Salud = 50% higiene (fecha+dueño) + 50% flujo (movido 7d). Peores primero.</div></div>
+      <div class="card"><div class="lab">Anomalías (por severidad)</div><div class="overx"><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#48d69c">Nada que olfatear ✓</td></tr>'}</tbody></table></div><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
+      <div class="card"><div class="lab">Health score por proceso/lista</div><div class="overx"><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 28))}<div style="font-size:9px;opacity:.5">higiene ${p.higiene}% · movido ${p.flujo}%</div></td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table></div><div class="meta" style="margin-top:6px">Salud = 50% higiene (fecha+dueño) + 50% flujo (movido 7d). Peores primero.</div></div>
     </div>`;
 }
 async function opsSabAccion(id, accion) {
@@ -1128,8 +1140,10 @@ function opsPanel(comp) {
   const v = OS.opsView || 'ceo';
   const tog = (id, lbl) => `<button class="repbtn ${v === id ? '' : 'ghost'}" style="padding:6px 16px;font-weight:700" onclick="opsGo('${id}')">${lbl}</button>`;
   const fresh = (OS.ckTasks || []).length ? String((OS.ckTasks.map(t => t.last_synced_at).sort().pop() || '')).slice(0, 16).replace('T', ' ') : '—';
+  const hero = window.kitHero ? kitHero('Deuda de cobranza del holding', kitMoney(comp.holding.deudaCobranza), 'contrato − plata real · ' + comp.cobranza.rows.length + ' casas con deuda este mes') : '';
   return `<h1>⚙️ Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
     <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}${tog('sabueso', '🐕 Sabueso' + ((OS.sabueso||[]).length ? ' · '+(OS.sabueso||[]).length : ''))}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
+    ${hero}
     ${v === 'ceo' ? opsCeoView(o) : v === 'sabueso' ? opsSabuesoView(o) : opsPmView(o)}`;
 }
 
@@ -1223,7 +1237,7 @@ function opsDiarioCard(o) {
     <div class="grid k3" style="margin:10px 0"><div class="card kpi"><div class="lab">Plan de hoy</div><div class="big">${o.hoy.length}</div></div>
     <div class="card kpi"><div class="lab">Cerradas hoy</div><div class="big up">${doneHoy.length}</div></div>
     <div class="card kpi"><div class="lab">Entrega promedio (7d)</div><div class="big">${tProm != null ? tProm + 'd' : '—'}</div><div class="meta">creación→cierre · ${done7.length} cerradas</div></div></div>
-    <table class="ptable"><thead><tr><th>Persona</th><th style="text-align:right">Plan hoy</th><th style="text-align:right">Hechas</th><th style="text-align:right">Pendientes</th><th style="text-align:right">Salud</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;opacity:.6">Sin tareas con fecha de hoy — el Coordinador puede proponer el plan.</td></tr>'}</tbody></table></div>`;
+    <div class="overx"><table class="ptable"><thead><tr><th>Persona</th><th style="text-align:right">Plan hoy</th><th style="text-align:right">Hechas</th><th style="text-align:right">Pendientes</th><th style="text-align:right">Salud</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;opacity:.6">Sin tareas con fecha de hoy — el Coordinador puede proponer el plan.</td></tr>'}</tbody></table></div></div>`;
 }
 
 // Acción rápida de la cola POR CONFIGURAR: crea una PROPUESTA (contrato) — se aplica recién con tu OK.

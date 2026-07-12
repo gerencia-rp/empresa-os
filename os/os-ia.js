@@ -40,6 +40,7 @@ function osiaCSS() {
   #os-root .osia-b{max-width:88%;padding:11px 14px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
   #os-root .osia-b.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3)}
   #os-root .osia-b.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)}
+  #os-root .osia-blbl{font-size:10px;color:var(--mut2);font-weight:700;letter-spacing:.4px;margin-bottom:4px}
   #os-root .osia-b.think{color:var(--mut2);font-style:italic;align-self:flex-start}
   #os-root .osia-b.err{align-self:flex-start;border:1px solid rgba(240,104,122,.4);color:var(--neg);background:var(--glass)}
   #os-root .osia-ask{display:flex;gap:8px;margin-top:12px}
@@ -112,8 +113,11 @@ function osiaView() {
   if (OSIA.err) body = '<div class="empty"><div style="font-size:34px">⚠️</div><div class="down" style="margin-top:8px">' + osiaE(OSIA.err) + '</div></div>';
   else if (!OSIA.loaded) body = '<div class="empty">⏳ Cargando la fábrica…</div>';
   else body = tab === 'galeria' ? osiaGaleria() : tab === 'pendientes' ? (mgr ? osiaPendientes() : osiaNoAccess()) : osiaCrear();
+  const pendBand = (mgr && nPend > 0 && window.kitVerdict)
+    ? kitVerdict('revisar', nPend + (nPend === 1 ? ' spec esperando' : ' specs esperando') + ' tu OK', 'Revisalas en 📥 Pendientes')
+    : '';
   return '<h1>🏭 IA <span>· Fábrica de artefactos</span></h1><div class="sub">Contale a la IA una tarea: te entrevista a fondo y te entrega el prompt listo para construir tu artefacto en Claude Code.</div>' +
-    '<div class="osia-tabs">' + tabBtn('crear', '🏭 Crear') + tabBtn('galeria', '🖼 Galería (' + OSIA.arts.length + ')') + (mgr ? tabBtn('pendientes', '📥 Pendientes de OK' + (nPend ? ' (' + nPend + ')' : '')) : '') + '</div>' + body;
+    '<div class="osia-tabs">' + tabBtn('crear', '🏭 Crear') + tabBtn('galeria', '🖼 Galería (' + OSIA.arts.length + ')') + (mgr ? tabBtn('pendientes', '📥 Pendientes de OK' + (nPend ? ' (' + nPend + ')' : '')) : '') + '</div>' + pendBand + body;
 }
 window.osiaView = osiaView;
 
@@ -133,7 +137,7 @@ function osiaProgressHTML() {
 function osiaCrear() {
   const hasVoice = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   const micBtn = hasVoice ? '<button type="button" class="osia-mic" id="osia-mic" onclick="osiaVoice()" title="Dictar por voz">🎤</button>' : '';
-  const hello = '<div class="osia-b a">¡Hola! Contame una tarea que hagas seguido (o que te gustaría no hacer más) y la convertimos en una herramienta.\n\nEj: "calculo a mano cuánto cobrar cuando un inquilino entra a mitad de mes" · "necesito un checklist de inspección" · "armo mensajes de cobro uno por uno".</div>';
+  const hello = '<div class="osia-b a"><div class="osia-blbl">🏭 Builder</div>¡Hola! Contame una tarea que hagas seguido (o que te gustaría no hacer más) y la convertimos en una herramienta.\n\nEj: "calculo a mano cuánto cobrar cuando un inquilino entra a mitad de mes" · "necesito un checklist de inspección" · "armo mensajes de cobro uno por uno".</div>';
   const nueva = OSIA.chat.length ? '<button class="ibtn" style="margin-left:auto" onclick="osiaNueva()">＋ Nueva</button>' : '';
   const started = OSIA.chat.length > 0;
   const promptCard = (OSIA.stage === 'prompt' && OSIA.promptPack) ? osiaPromptHTML() : '';
@@ -198,7 +202,7 @@ function osiaChatHTML() {
     let extra = '';
     if (m.artifact) extra = '<div style="margin-top:9px"><button class="cbtn" style="padding:7px 14px" onclick="osiaAbrir(\'' + m.artifact.id + '\')">▶ Abrir "' + osiaE(m.artifact.titulo) + '"</button> <button class="ibtn" style="height:30px;padding:0 12px" onclick="osiaGo(\'galeria\')">Ver en Galería →</button></div>';
     if (m.spec) extra = '<div style="margin-top:8px"><span class="badge b-warn">🔒 pendiente de OK del admin</span></div>';
-    return '<div class="osia-b a">' + osiaE(m.content) + extra + '</div>';
+    return '<div class="osia-b a"><div class="osia-blbl">🏭 Builder</div>' + osiaE(m.content) + extra + '</div>';
   }).join('') + (OSIA.busy ? '<div class="osia-b think" id="osia-think">' + osiaE(OSIA.busyMsg || '⏳ pensando…') + '</div>' : '');
 }
 function osiaPaintChat() { const el = document.getElementById('osia-chat'); if (el) { el.innerHTML = el.children[0].outerHTML + osiaChatHTML(); el.scrollTop = el.scrollHeight; } }

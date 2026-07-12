@@ -185,7 +185,7 @@ function eduIsStageOverdue(s) {
 function eduRender() {
   const root = document.getElementById('edu-root');
   if (!root) return;
-  if (eduState.loading) { root.innerHTML = '<div class="text-center py-12 text-slate-400">⏳ Cargando...</div>'; return; }
+  if (eduState.loading) { root.innerHTML = (typeof kitLoading === 'function') ? kitLoading('Cargando mentorías…') : '<div class="text-center py-12 text-slate-400">⏳ Cargando...</div>'; return; }
   if (eduState.mentorships.length === 0) {
     root.innerHTML = `
       <div class="text-center py-12">
@@ -200,8 +200,17 @@ function eduRender() {
   const myStudents = eduMyStudents();
   const myAlerts = eduMyAlerts();
 
+  // Número protagonista arriba (ADN premium): estudiantes activos de la mentoría actual — mismo criterio del tab Estudiantes.
+  const eduActivosN = myStudents.filter(s => s.status === 'active').length;
+  const eduHero = (typeof kitHero === 'function')
+    ? kitHero((cur ? cur.icon + ' ' + cur.name : 'Mentorías') + ' · Estudiantes activos',
+      eduActivosN + ' activo' + (eduActivosN === 1 ? '' : 's'),
+      myStudents.length + ' estudiante(s) en total · ' + (myAlerts.length ? '<b>⚠️ ' + myAlerts.length + ' alerta(s) abierta(s)</b>' : '✓ sin alertas abiertas'))
+    : '';
+
   root.innerHTML = `
     <div class="flex flex-col h-full max-h-[84vh]">
+      ${eduHero}
       <!-- Selector de mentoría -->
       <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-200 flex-wrap">
         <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Mentoría:</span>
@@ -600,7 +609,7 @@ function eduRenderStudents() {
       </div>
 
       <!-- Lista CRM simplificada: Nombre / Etapa / Fecha mod etapa / Fecha entrada / Activo / Pago -->
-      ${filtered.length === 0 ? `<div class="text-center py-12 text-slate-400 text-xs">Sin estudiantes con esos filtros.</div>` : `
+      ${filtered.length === 0 ? ((typeof kitEmpty === 'function') ? kitEmpty('🎓', 'Sin alumnos con este filtro') : `<div class="text-center py-12 text-slate-400 text-xs">Sin estudiantes con esos filtros.</div>`) : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50">
@@ -5981,7 +5990,7 @@ ${JSON.stringify(summary, null, 2)}`;
 // ════════════════════════════════════════════════════════════
 function eduRenderCohorts() {
   const students = eduMyStudents();
-  if (!students.length) return '<div class="p-8 text-center text-slate-400 text-sm">Sin estudiantes para comparar.</div>';
+  if (!students.length) return (typeof kitEmpty === 'function') ? kitEmpty('🎓', 'Sin alumnos para comparar cohortes') : '<div class="p-8 text-center text-slate-400 text-sm">Sin estudiantes para comparar.</div>';
 
   const now = Date.now();
   const dayMs = 86400000;
