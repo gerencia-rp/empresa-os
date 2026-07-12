@@ -296,7 +296,7 @@ function apMapMount() {
     const stx = apState(); const f = apFiltros();
     const rec = apReconciliar(s, apComps());
     const enRec = new Set(rec.usables ? rec.usables.map(u => u.c.id) : []);
-    L.marker([s.lat, s.lng], { icon: L.divIcon({ className: '', html: '<div class="ap-pin s">SUBJECT</div>', iconAnchor: [34, 12] }) }).addTo(map)
+    L.marker([s.lat, s.lng], { icon: L.divIcon({ className: '', html: '<div class="ap-pin s">SUBJECT</div>', iconSize: null, iconAnchor: [34, 12] }) }).addTo(map)
       .bindPopup('<b>SUBJECT</b><br>' + AP_E(s.dir));
     const pts = [[s.lat, s.lng]];
     apComps().forEach(c => {
@@ -304,7 +304,7 @@ function apMapMount() {
       pts.push([c.lat, c.lng]);
       const dim = !enRec.has(c.id);
       const lbl = AP_K(c.price) + (c.dist != null ? ' · ' + c.dist.toFixed(2) + 'mi' : '');
-      const mk = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: '', html: '<div class="ap-pin' + (dim ? ' dim' : '') + '">' + lbl + '</div>', iconAnchor: [30, 12] }) }).addTo(map);
+      const mk = L.marker([c.lat, c.lng], { icon: L.divIcon({ className: '', html: '<div class="ap-pin' + (dim ? ' dim' : '') + '">' + lbl + '</div>', iconSize: null, iconAnchor: [30, 12] }) }).addTo(map);
       mk.on('click', () => apPinClick(apCompCssId(c.id)));
       mk.bindTooltip(AP_E(c.dir.split(',')[0]));
     });
