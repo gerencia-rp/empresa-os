@@ -669,4 +669,4 @@ function ffArvProView() {
   setTimeout(apMapMount, 40);
   return head + top + mapa + criterio + resumen + toggle + compsHtml + foot + factores + calHtml;
 }
-window.ffArvProView = ffArvProView;
+window.ffArvProView = ffArvProView; window.apCSS = apCSS;
