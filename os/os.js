@@ -152,9 +152,9 @@ function osInjectCSS() {
     radial-gradient(700px 620px at 74% 120%,rgba(138,123,255,.1),transparent 60%),
     linear-gradient(180deg,#070a11,#05070c) !important}
   html[data-osreskin="light"] #modal.os-syspage{background:
-    radial-gradient(760px 520px at 6% -6%,rgba(18,181,160,.1),transparent 58%),
-    radial-gradient(820px 560px at 100% 2%,rgba(47,110,240,.1),transparent 56%),
-    linear-gradient(180deg,#f6f8fc,#eaf0f8) !important}
+    radial-gradient(760px 520px at 6% -6%,rgba(37,99,235,.06),transparent 58%),
+    radial-gradient(820px 560px at 100% 2%,rgba(29,78,216,.05),transparent 56%),
+    linear-gradient(180deg,#f3f5fa,#e9edf5) !important}
   #modal.os-syspage > div.bg-white{max-width:1520px !important;width:calc(100% - 40px) !important;margin:72px auto 28px !important;min-height:calc(100vh - 100px);max-height:none !important;height:auto !important;background:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;backdrop-filter:none !important;overflow:visible !important}
   #modal.os-syspage #modal-body{max-height:none !important;overflow:visible !important;padding:0 !important}
   /* ocultar el header propio del modal (título+×): el topbar del OS ya da contexto y "Volver" */
@@ -196,6 +196,16 @@ function osInjectReskin() {
   /* bg-slate-900 lo maneja el sistema de diseño compartido (superficie oscura elevada, no gradiente,
      para no romper las cards de acento con sublabels muted). */
   /* Property Manager tiene su tema COMPLETO propio (pmInjectTheme en pm-main.js). */
+  /* ───────── OLA 3 (12-jul): red de seguridad para ESTILOS INLINE de los clásicos en dark ───────── */
+  ${D} #modal [style*="background:#fff"],${D} #modal [style*="background: #fff"],${D} #modal [style*="background:white"],${D} #modal [style*="background-color:#fff"]{background-color:#151d28 !important}
+  ${D} #modal [style*="background:#fafafa"],${D} #modal [style*="background:#f8fafc"],${D} #modal [style*="background:#f9fafb"],${D} #modal [style*="background:#f1f5f9"]{background-color:#131a24 !important}
+  ${D} #modal [style*="color:#000"],${D} #modal [style*="color: #000"],${D} #modal [style*="color:black"],${D} #modal [style*="color:#111"],${D} #modal [style*="color:#1e293b"],${D} #modal [style*="color:#0f172a"]{color:#e7ecf5 !important}
+  /* ───────── OLA 3: pulido LIGHT canon (tarjetas con sombra + contraste mínimo --mut2) ───────── */
+  ${L} #modal .bg-white.rounded-xl,${L} #modal .bg-white.rounded-lg,${L} #modal .bg-white.rounded-2xl{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06) !important;border-color:#e2e8f0 !important}
+  ${L} #modal .text-slate-500,${L} #modal .text-gray-500{color:#475569 !important}
+  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#64748b !important}
+  /* ───────── OLA 3: tablas de los clásicos scrollean en celular (no rompen la página) ───────── */
+  @media (max-width:768px){ html[data-osreskin] #modal-body table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch} }
   `;
   document.head.appendChild(st);
 }

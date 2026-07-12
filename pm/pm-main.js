@@ -495,7 +495,7 @@ function pmInjectTheme() {
   st.textContent = `
   /* #13 sidebar (sub-nav vertical) — patrón unificado con Fix & Flip */
   #pm-root .pm-nav{width:190px;position:sticky;top:0}
-  #pm-root .pm-navitem-active{background:rgba(16,185,129,.1);color:#0ea371 !important;box-shadow:inset 3px 0 0 #12b5a0}
+  #pm-root .pm-navitem-active{background:rgba(37,99,235,.1);color:#2563eb !important;box-shadow:inset 3px 0 0 #2563eb} /* light canon 12-jul */
   html[data-osreskin="dark"] #pm-root .pm-navitem-active{background:rgba(69,227,198,.14);color:#45e3c6 !important;box-shadow:inset 3px 0 0 #45e3c6}
   html[data-osreskin="dark"] #pm-root .pm-navitem:hover{background:rgba(255,255,255,.05) !important;color:#e7ecf5 !important}
   @media (max-width:820px){#pm-root .pm-shell{flex-direction:column}#pm-root .pm-nav{width:100% !important;flex-direction:row !important;overflow-x:auto;position:static}}
@@ -513,6 +513,8 @@ function pmInjectTheme() {
   ${D} [style*="solid #e2e8f0"],${D} [style*="solid #cbd5e1"]{border-color:rgba(255,255,255,.1) !important}
   ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#e7ecf5 !important}
   ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#93a0b6 !important}
+  ${D} [style*="color:#000"],${D} [style*="color: #000"],${D} [style*="color:black"],${D} [style*="color:#111"],${D} [style*="color:#020617"]{color:#e7ecf5 !important} /* ola 3: texto negro sobre vidrio */
+  ${D} [style*="background:white"],${D} [style*="background-color:#fff"],${D} [style*="background-color: #fff"]{background:rgba(255,255,255,.045) !important}
   /* barras de reserva (gradientes por tipo) y marcador HOY se conservan tal cual */
   html[data-osreskin="light"] #pm-root .pm-filter-select.has-value{background:#fdf8e7 !important}
   `;
