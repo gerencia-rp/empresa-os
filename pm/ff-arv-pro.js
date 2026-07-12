@@ -20,7 +20,7 @@ const AP_D = f => { if (!f) return '—'; const s = String(f).slice(0, 10); retu
 
 function apState() {
   if (!UW.a) return null;
-  if (!UW.a.inputs.arvpro) UW.a.inputs.arvpro = { subj: {}, man: {}, excl: {}, filtros: {}, dir: '', vista: 'cards' };
+  if (!UW.a.inputs.arvpro) UW.a.inputs.arvpro = { subj: {}, man: {}, excl: {}, filtros: {}, dir: '', modo: 'simple' };
   return UW.a.inputs.arvpro;
 }
 function apCfg(k, def) { return UWc(k, def); }
@@ -262,6 +262,26 @@ function apCSS() {
     '.ap-grid .best td{box-shadow:inset 0 2px 0 var(--a1,#12b5a0)}',
     '.ap-cbx{accent-color:var(--a1,#12b5a0);width:15px;height:15px;cursor:pointer}',
     '.ap-man input{width:64px;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:6px;padding:3px 6px;color:inherit;font-size:10.5px;text-align:right}',
+    // ── modo SIMPLE (mockup claro 12-jul) — tarjetas suaves con sombra, legible en claro Y oscuro ──
+    '.ap-card,.ap-comp{box-shadow:0 6px 22px rgba(23,43,77,.08)}',
+    '.ap-seg{display:inline-flex;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;padding:4px;gap:2px}',
+    '.ap-seg button{border:none;background:transparent;color:var(--txt3,#9fb0c9);font-weight:700;font-size:12.5px;padding:7px 15px;border-radius:9px;cursor:pointer}',
+    '.ap-seg button.on{background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));color:#fff;box-shadow:0 3px 10px rgba(23,43,77,.2)}',
+    '.ap-strip{display:flex;align-items:center;gap:16px;flex-wrap:wrap}',
+    '.ap-ph{width:92px;height:70px;border-radius:12px;background:linear-gradient(135deg,rgba(47,110,240,.18),rgba(18,181,160,.18));display:grid;place-items:center;font-size:28px;flex-shrink:0}',
+    '.ap-verify{font-size:12px;font-weight:700;color:var(--a1,#12b5a0);background:rgba(18,181,160,.1);border:1px solid rgba(18,181,160,.35);padding:6px 12px;border-radius:20px;white-space:nowrap;cursor:pointer}',
+    '.ap-bigsimple{font-size:50px;font-weight:800;line-height:1.05;letter-spacing:-1px;margin:8px 0 6px;background:linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));-webkit-background-clip:text;background-clip:text;color:transparent}',
+    '.ap-plain{color:var(--txt3,#9fb0c9);font-size:13.5px}',
+    '.ap-light{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:var(--glass,rgba(255,255,255,.07));border:1px solid var(--line,rgba(255,255,255,.1))}',
+    '.ap-vword{font-size:19px;font-weight:800}',
+    '.ap-moffer{font-size:32px;font-weight:800;margin:10px 0 4px}',
+    '.ap-mrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--txt3,#9fb0c9);padding:7px 0;border-top:1px solid var(--line,rgba(255,255,255,.1))}',
+    '.ap-mrow b{color:inherit;font-variant-numeric:tabular-nums}',
+    '.ap-sectitle{font-size:15px;font-weight:800;margin:16px 2px 10px}',
+    '.ap-comp2 .img{height:100px;background:linear-gradient(135deg,rgba(47,110,240,.16),rgba(18,181,160,.16));display:grid;place-items:center;font-size:28px;position:relative}',
+    '.ap-tag{position:absolute;top:8px;left:8px;background:var(--card,rgba(20,28,44,.9));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:3px 9px;font-size:11px;font-weight:800;box-shadow:0 3px 10px rgba(23,43,77,.15)}',
+    '.ap-tag.best{background:var(--pos,#12b76a);color:#fff;border:none}',
+    '.ap-expnote{margin-top:16px;text-align:center;color:var(--txt3,#9fb0c9);font-size:13px;background:var(--card,rgba(255,255,255,.03));border:1px dashed var(--line,rgba(255,255,255,.18));border-radius:14px;padding:13px;cursor:pointer}',
   ].join('\n');
   document.head.appendChild(st);
 }
@@ -321,9 +341,102 @@ function apStat(lbl, val, key, opts) {
     : '<div class="n">' + (val == null || val === '' ? '—' : AP_E(val)) + '</div>';
   return '<div class="ap-stat">' + inner + '<div class="t">' + lbl + (opts.falta ? ' <span title="RentCast no lo trajo — cargalo" style="color:var(--amber,#e7b65e)">🟡</span>' : '') + '</div></div>';
 }
-function apRangeBar(rec) {
+function apRangeBar(rec, lbls) {
+  const L = lbls || ['conservador', 'probable', 'optimista'];
   return '<div style="margin-top:14px"><div class="ap-rline"><div class="fill"></div><div class="dot"></div></div>'
-    + '<div class="ap-rvals"><span>conservador <b>' + AP_M(rec.conservador) + '</b></span><span>probable <b>' + AP_M(rec.arv) + '</b></span><span>optimista <b>' + AP_M(rec.optimista) + '</b></span></div></div>';
+    + '<div class="ap-rvals"><span>' + L[0] + '<b>' + AP_M(rec.conservador) + '</b></span><span style="text-align:center">' + L[1] + '<b>' + AP_M(rec.arv) + '</b></span><span style="text-align:right">' + L[2] + '<b>' + AP_M(rec.optimista) + '</b></span></div></div>';
+}
+// confianza EN PALABRAS (modo simple — para alguien nuevo del equipo de captación)
+function apConfPalabras(rec) {
+  if (!rec || !rec.arv) return null;
+  const why = rec.dispersion > 15 ? 'las ventas varían bastante en la zona'
+    : rec.usables.length < 4 ? 'hay pocas ventas comparables cerca'
+    : rec.grossProm > 15 ? 'las casas cercanas necesitan ajustes grandes'
+    : 'las ventas cercanas son consistentes';
+  return { nivel: rec.confianza.nivel, why };
+}
+
+// ─── MODO SIMPLE (mockup claro del CEO, 12-jul) ───
+function apSubjStrip(s) {
+  const fi = apSubjectFicha();
+  const facts = [
+    s.sqft ? s.sqft.toLocaleString() + ' sqft' : null,
+    s.beds != null ? s.beds + ' camas' : 'camas 🟡',
+    s.baths != null ? s.baths + ' baños' : null,
+    s.year || null,
+    fi.loteAcres ? 'lote ' + fi.loteAcres.toFixed(2) + ' ac' : null,
+    s.pool ? 'con piscina' : 'sin piscina',
+    fi.dueno ? 'dueño: ' + fi.dueno.split(',')[0] : null,
+    fi.assessed ? 'tasado ' + fi.assessed.anio + ': ' + AP_M(fi.assessed.total) : null,
+  ].filter(Boolean).join(' · ');
+  const esLaCasa = s.rcOk && fi.dirRc && s.dir && fi.dirRc.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) === s.dir.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10);
+  return '<div class="ap-card ap-strip" style="padding:16px 18px;margin-bottom:14px">'
+    + '<div class="ap-ph">🏠</div>'
+    + '<div style="flex:1;min-width:220px"><div style="font-size:17px;font-weight:800">' + AP_E((fi.dirRc || s.dir || '—').split(',')[0]) + ' <span style="font-weight:500;color:var(--txt3,#9fb0c9);font-size:13px">' + AP_E((fi.subdivision ? fi.subdivision + ', ' : '') + (s.zip || '')) + '</span></div>'
+    + '<div class="ap-plain" style="margin-top:3px;font-size:12.5px">' + AP_E(facts || 'buscá la dirección para traer los datos') + '</div></div>'
+    + (esLaCasa ? '<span class="ap-verify">✓ Esta es tu casa</span>' : '<span class="ap-verify" style="color:var(--amber,#e7b65e);background:rgba(231,182,94,.1);border-color:rgba(231,182,94,.35)" onclick="document.getElementById(\'ap-dir\').focus();document.getElementById(\'ap-dir\').select()">¿No es esta? corregila</span>')
+    + '</div>';
+}
+function apHeroSimple(rec, inp) {
+  const cp = apConfPalabras(rec);
+  const izq = '<div class="ap-card" style="padding:20px 22px">'
+    + '<div class="ap-lab">Valor de reventa estimado (ya remodelada)</div>'
+    + (rec && rec.arv
+      ? '<div class="ap-bigsimple">' + AP_M(rec.arv) + '</div>'
+      + '<div class="ap-plain">Basado en <b>' + rec.usables.length + ' casas parecidas</b> vendidas cerca en los últimos meses.</div>'
+      + '<span class="ap-conf" style="margin-top:12px;color:' + apConfColor(cp.nivel) + ';border-color:' + apConfColor(cp.nivel) + '">● Confianza ' + cp.nivel + ' · ' + cp.why + '</span>'
+      + apRangeBar(rec, ['Si sale flojo', 'Lo más probable', 'Si sale bien'])
+      : '<div class="ap-plain" style="padding:28px 0;text-align:center">Poné la dirección arriba y dale <b>Buscar</b> — el sistema trae las ventas de la zona.</div>')
+    + '</div>';
+  // ¿Conviene? — semáforo + oferta máxima con la cuenta simple visible (remod real de la Calc 1)
+  const negocio = (typeof ffUwCalcNegocio === 'function') ? ffUwCalcNegocio(inp) : { remod: 0 };
+  const pct = apCfg('allin_max_pct', 75);
+  const oferta = rec && rec.arv ? Math.round(rec.arv * pct / 100 - (negocio.remod || 0)) : null;
+  const compra = +inp.purchase || 0;
+  const tol = apCfg('arv_semaforo_tol_pct', 5) / 100;
+  let sem;
+  if (!oferta) sem = { ico: '⚪', word: 'Esperando el valor', color: 'var(--txt3,#9fb0c9)', txt: 'buscá el subject para calcular la oferta máxima' };
+  else if (!compra) sem = { ico: '🟡', word: 'Falta el precio de compra', color: 'var(--amber,#e7b65e)', txt: 'cargalo en 💵 Del Negocio para el veredicto' };
+  else if (compra <= oferta) sem = { ico: '🟢', word: 'Buen deal', color: 'var(--pos,#34d399)', txt: 'comprás ' + AP_M(oferta - compra) + ' por debajo del máximo' };
+  else if (compra <= oferta * (1 + tol)) sem = { ico: '🟡', word: 'Justo al límite', color: 'var(--amber,#e7b65e)', txt: 'estás ' + AP_M(compra - oferta) + ' arriba del máximo — negociá' };
+  else sem = { ico: '🔴', word: 'Caro para ganar', color: 'var(--neg,#f87171)', txt: 'pagás ' + AP_M(compra - oferta) + ' más que el máximo para ganar' };
+  const der = '<div class="ap-card" style="padding:20px 22px">'
+    + '<div class="ap-lab">¿Conviene? · Oferta máxima</div>'
+    + '<div style="display:flex;align-items:center;gap:11px;margin-top:10px"><div class="ap-light">' + sem.ico + '</div><div><div class="ap-vword" style="color:' + sem.color + '">' + sem.word + '</div><div class="ap-plain" style="font-size:12px">' + sem.txt + '</div></div></div>'
+    + (oferta != null
+      ? '<div class="ap-lab" style="margin-top:16px">Oferta máxima (para ganar)</div><div class="ap-moffer">' + AP_M(oferta) + '</div>'
+      + '<div class="ap-mrow"><span>' + pct + '% del valor de reventa</span><b>' + AP_M(rec.arv * pct / 100) + '</b></div>'
+      + '<div class="ap-mrow"><span>− remodelación estimada (Calc 1)</span><b>−' + AP_M(negocio.remod || 0) + '</b></div>'
+      + '<div class="ap-mrow" style="border-bottom:1px solid var(--line,rgba(255,255,255,.1))"><span>= máximo a ofrecer</span><b>' + AP_M(oferta) + '</b></div>'
+      + (compra ? '<div class="ap-mrow" style="border-top:none;padding-top:9px"><span>Precio de compra actual</span><b>' + AP_M(compra) + '</b></div>' : '')
+      + (rec && rec.arv ? '<button class="ap-btn ghost" style="margin-top:10px;font-size:11.5px" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>' : '')
+      : '')
+    + '</div>';
+  return '<div class="grid k2" style="gap:14px;align-items:stretch;margin-bottom:6px">' + izq + der + '</div>';
+}
+function apCompsSimple(s, comps, rec, f) {
+  if (!comps.length) return '<div class="ap-card" style="padding:26px;text-align:center;color:var(--txt3,#9fb0c9)">Sin comps todavía — buscá la dirección arriba.</div>';
+  const st = apState();
+  const us = (rec && rec.usables) || [];
+  const bestId = us.length ? us[0].c.id : null;
+  const ocultas = comps.length - us.length;
+  const cards = us.map(x => {
+    const c = x.c;
+    const excl = !!st.excl[c.id];
+    return '<div class="ap-comp ap-comp2" id="' + apCompCssId(c.id) + '">'
+      + '<div class="img">🏡<span class="ap-tag' + (c.id === bestId ? ' best' : '') + '">' + (c.id === bestId ? '★ La más parecida' : (c.dist != null ? 'a ' + c.dist.toFixed(2) + ' mi' : '')) + '</span>'
+      + '<span style="position:absolute;right:8px;bottom:6px;font-size:9px;color:var(--txt3,#9fb0c9)">foto no disponible (RentCast)</span></div>'
+      + '<div style="padding:12px 14px">'
+      + '<div style="font-size:19px;font-weight:800">' + AP_M(c.price) + '</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-top:1px">' + AP_E(c.dir.split(',')[0]) + '</div>'
+      + '<div class="ap-plain" style="font-size:12px;margin-top:4px">' + (c.sqft ? c.sqft.toLocaleString() + ' sqft' : 'sqft 🟡') + ' · ' + (c.beds != null ? c.beds : '?') + '/' + (c.baths != null ? c.baths : '?') + (c.year ? ' · ' + c.year : '') + ' · vendida ' + AP_D(c.fecha) + (c.dist != null ? ' · a ' + c.dist.toFixed(2) + ' mi' : '') + '</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--line,rgba(255,255,255,.08));font-size:12px">'
+      + '<label style="display:flex;align-items:center;gap:6px;color:var(--txt3,#9fb0c9);cursor:pointer"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> usar</label>'
+      + '<span class="ap-plain" style="font-size:12px">ajustada a <b style="color:inherit;font-weight:800">' + AP_M(x.adj.valorAjustado) + '</b></span>'
+      + '</div></div></div>';
+  }).join('');
+  return '<div class="ap-cards" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">' + cards + '</div>'
+    + (ocultas > 0 ? '<div class="ap-plain" style="font-size:11.5px;margin-top:8px;text-align:center">' + ocultas + ' casas más no entraron al cálculo (muy lejos, muy viejas o muy distintas) — velas en Experto.</div>' : '');
 }
 
 function apVistaFicha(s) {
@@ -473,11 +586,24 @@ function ffArvProView() {
   const rec = comps.length ? apReconciliar(s, comps) : null;
   const cal = apCalibracion();
 
-  // header + searchbar
-  const head = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:2px"><b style="font-size:18px">🏷️ ARV Profesional</b><span class="ap-pill">calibrado con tus appraisals</span></div>'
-    + '<div style="color:var(--txt3,#9fb0c9);font-size:12.5px;margin-bottom:14px">La decisión más importante del negocio. Comps reales del mercado, ajustados como un tasador — nunca $/sqft promedio × sqft.</div>'
-    + '<div class="ap-searchbar">🔎 <input id="ap-dir" value="' + AP_E(st.dir) + '" placeholder="Dirección del subject — ej. 6203 Shadow Bend, Austin, TX 78745" onchange="apSet(\'dir\',this.value)">'
-    + '<button class="ap-btn ghost" onclick="apBuscar(true)">↺ Refrescar</button><button class="ap-btn" onclick="apBuscar(false)">Buscar comps</button></div>';
+  // header con toggle Simple/Experto + searchbar
+  const modo = st.modo || 'simple';
+  const seg = '<div class="ap-seg"><button class="' + (modo === 'simple' ? 'on' : '') + '" onclick="apSet(\'modo\',\'simple\')">● Simple</button><button class="' + (modo === 'experto' ? 'on' : '') + '" onclick="apSet(\'modo\',\'experto\')">Experto (tasador)</button></div>';
+  const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<div style="display:flex;align-items:center;gap:10px"><b style="font-size:18px">🏷️ ARV · Valor de reventa</b><span class="ap-pill">calibrado con tus tasaciones</span></div>' + seg + '</div>'
+    + '<div class="ap-searchbar">🔎 <input id="ap-dir" value="' + AP_E(st.dir) + '" placeholder="Dirección de la casa — ej. 6203 Shadow Bend, Austin, TX 78745" onchange="apSet(\'dir\',this.value)">'
+    + '<button class="ap-btn ghost" onclick="apBuscar(true)">↺ Refrescar</button><button class="ap-btn" onclick="apBuscar(false)">Buscar</button></div>';
+
+  // ══ MODO SIMPLE (default): decidir en 10 segundos, todo en lenguaje humano ══
+  if (modo === 'simple') {
+    const mapaS = '<div class="ap-sectitle">📍 Dónde están las casas comparables</div>'
+      + '<div style="position:relative"><div id="ap-map" style="height:300px"></div>'
+      + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--txt3,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">TU CASA + comps · click en un pin resalta la tarjeta</div></div>';
+    setTimeout(apMapMount, 40);
+    return head + apSubjStrip(s) + apHeroSimple(rec, inp) + mapaS
+      + '<div class="ap-sectitle">🏘️ Las casas parecidas que se vendieron cerca</div>' + apCompsSimple(s, comps, rec, f)
+      + '<div class="ap-expnote" onclick="apSet(\'modo\',\'experto\')">👁️ ¿Querés ver cómo el sistema ajustó cada casa (tamaño, baños, año, lote…)? Pasate a <b>Experto (tasador)</b> para ver la grilla completa estilo appraisal.</div>';
+  }
 
   // grid: ficha | hero
   const top = '<div class="grid k2" style="gap:14px;align-items:start;margin-bottom:14px">' + apVistaFicha(s) + apVistaHero(rec, inp) + '</div>';
@@ -490,8 +616,8 @@ function ffArvProView() {
   const criterio = apVistaCriterio(f, comps, rec);
   const resumen = apVistaResumen(s, rec);
 
-  // comps: toggle tarjetas / grilla
-  const vista = st.vista || 'cards';
+  // comps: toggle tarjetas / grilla (experto abre en la grilla 1004)
+  const vista = st.vista || 'grid';
   const toggle = '<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px;flex-wrap:wrap;gap:8px"><div class="ap-lab">Comparables — el más parecido (menor ajuste bruto) pesa más</div>'
     + '<div style="display:flex;gap:6px"><button class="ap-btn ' + (vista === 'cards' ? '' : 'ghost') + '" style="padding:5px 12px;font-size:11px" onclick="apSet(\'vista\',\'cards\')">🃏 Tarjetas</button>'
     + '<button class="ap-btn ' + (vista === 'grid' ? '' : 'ghost') + '" style="padding:5px 12px;font-size:11px" onclick="apSet(\'vista\',\'grid\')">📋 Grilla 1004</button></div></div>';
