@@ -308,10 +308,10 @@ function rcSecCommand(c) {
   const parN = RC.parity ? RC.parity.airtable_count : c.obras.length;
   const paritySync = RC.parity ? (RC.parity.in_sync !== false && (RC.parity.airtable_count == null || RC.parity.airtable_count === c.obras.length)) : true;
   const parityNote = paritySync
-    ? `Última verificación de paridad: <b style="color:#34d399">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
+    ? `Última verificación de paridad: <b style="color:var(--pos,#34d399)">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
     : `Última verificación de paridad: <b style="color:#f87171">ALERTA</b> · app ${c.obras.length} vs Airtable ${parN} — sync desincronizado`;
-  const parityBg = paritySync ? 'rgba(52,211,153,.1)' : 'rgba(248,113,113,.12)';
-  const parityBd = paritySync ? 'rgba(52,211,153,.25)' : 'rgba(248,113,113,.35)';
+  const parityBg = paritySync ? 'color-mix(in srgb, var(--pos,#34d399) 10%, transparent)' : 'color-mix(in srgb, var(--neg,#f87171) 12%, transparent)';
+  const parityBd = paritySync ? 'color-mix(in srgb, var(--pos,#34d399) 25%, transparent)' : 'color-mix(in srgb, var(--neg,#f87171) 35%, transparent)';
   return rcHeader('Command Center', `${c.obras.length} obras · ${c.fin.length} finalizadas · ${c.activas.length} en curso — capital, ganancia realizada y pipeline.`) + `
     <div style="font-size:11px;padding:6px 12px;margin-bottom:10px;border-radius:8px;background:${parityBg};border:1px solid ${parityBd};color:var(--txt2)">${parityNote}</div>
     <div class="grid kpis">
@@ -360,7 +360,7 @@ function rcObraCard(o) {
   let _psfStr = '—';
   if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
   const _comp = rcCompletitud(o);
-  const _cc = _comp.n >= 5 ? '#34d399' : _comp.n >= 3 ? '#e7b65e' : '#f87171';
+  const _cc = _comp.n >= 5 ? 'var(--pos,#34d399)' : _comp.n >= 3 ? 'var(--amber,#e7b65e)' : 'var(--neg,#f87171)';
   return `${bannerAtraso}<div class="kcard">
     <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
@@ -546,7 +546,7 @@ window.rcSetCobro = rcSetCobro;
 function rcVivoGanancia(o) {
   const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
   const neg = +o.ganancia_proyectada < 0;
-  const bg = o.sem_ganancia === 'rojo' ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.08)';
+  const bg = o.sem_ganancia === 'rojo' ? 'color-mix(in srgb, var(--neg,#f87171) 10%, transparent)' : 'color-mix(in srgb, var(--pos,#34d399) 8%, transparent)';
   const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#f87171;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
   const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#e7b65e;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
   const modoSel = '<select onchange="rcSetCobro(&quot;' + o.property_id + '&quot;, this.value)" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:inherit;font-size:9px;padding:1px 4px" title="Cómo cobra Structure One esta obra">'

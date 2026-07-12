@@ -66,10 +66,12 @@ function ffInjectCSS() {
     --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
     --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#070a11,#05070c);
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
+  /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
   #ff-overlay[data-theme="light"]{
-    --bg:#eef2f8;--ink:#0f1c2e;--mut:#48566e;--mut2:#8595ac;--glass:rgba(255,255,255,.82);--glassb:rgba(15,23,42,.09);
-    --a1:#12b5a0;--a2:#2f6ef0;--a3:#6b5bef;--pos:#0ea371;--neg:#e0455f;--amber:#c98a1e;
-    --mesh1:rgba(18,181,160,.10);--mesh2:rgba(47,110,240,.10);--mesh3:rgba(107,91,239,.08);--bggrad:linear-gradient(180deg,#f6f8fc,#eaf0f8)}
+    --bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
+    --a1:#2563eb;--a2:#1d4ed8;--a3:#6b5bef;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309;
+    --mesh1:rgba(37,99,235,.06);--mesh2:rgba(29,78,216,.05);--mesh3:rgba(107,91,239,.05);--bggrad:linear-gradient(180deg,#f3f5fa,#e9edf5)}
+  #ff-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
   #ff-overlay *{box-sizing:border-box;margin:0;padding:0}
   #ff-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
     radial-gradient(760px 520px at 8% -6%,var(--mesh1),transparent 58%),

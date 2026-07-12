@@ -39,10 +39,12 @@ function ccInjectCSS() {
     --bg:#06080d;--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
     --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
+  /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
   #cc-overlay[data-theme="light"]{
-    --bg:#eef2f8;--ink:#0f1c2e;--mut:#48566e;--mut2:#8595ac;--glass:rgba(255,255,255,.82);--glassb:rgba(15,23,42,.09);
-    --a1:#12b5a0;--a2:#2f6ef0;--a3:#6b5bef;--pos:#0ea371;--neg:#e0455f;--amber:#c98a1e}
-  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(18,181,160,.1),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(47,110,240,.1),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.08),transparent 60%),linear-gradient(180deg,#f6f8fc,#eaf0f8)}
+    --bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
+    --a1:#2563eb;--a2:#1d4ed8;--a3:#6b5bef;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309}
+  #cc-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
+  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(37,99,235,.06),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(29,78,216,.05),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.05),transparent 60%),linear-gradient(180deg,#f3f5fa,#e9edf5)}
   #cc-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
   #cc-overlay[data-theme="light"] .card{box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
   #cc-overlay[data-theme="light"] .glow{text-shadow:none}#cc-overlay[data-theme="light"] .ring i{background:#f6f8fc}

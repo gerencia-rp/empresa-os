@@ -57,13 +57,13 @@ function kitRow(l, v, opts) {
 // ─── INPUT grande protagonista (patrón Cash-Out: label + hint, número a la derecha) ───
 // onchangeExpr: expresión JS con `this.value` limpio disponible como VAL, ej: "miSet('arv',VAL)"
 function kitInput(lab, hint, val, onchangeExpr, opts) {
-  opts = opts || {}; const pct = !!opts.pct;
-  const shown = (val == null || val === 0) ? '' : (pct ? val : (Math.round(val * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }));
+  opts = opts || {}; const pct = !!opts.pct, plain = !!opts.plain;
+  const shown = (val == null || val === 0) ? '' : ((pct || plain) ? val : (Math.round(val * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }));
   const handler = onchangeExpr.replace(/VAL/g, 'this.value.replace(/[,%\\s' + KIT_DLR + ']/g,&quot;&quot;)');
   return '<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)">' + lab
     + (hint ? ' <span style="color:var(--mut2);font-weight:400;font-size:12px">— ' + hint + '</span>' : '') + '</div>'
     + '<div style="display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:0 12px;background:var(--card)">'
-    + (pct ? '' : '<span style="color:var(--mut2);font-size:15px">' + KIT_DLR + '</span>')
+    + ((pct || plain) ? '' : '<span style="color:var(--mut2);font-size:15px">' + KIT_DLR + '</span>')
     + '<input value="' + shown + '" placeholder="0" inputmode="decimal" onchange="' + handler + '" style="border:0;outline:0;width:100%;padding:12px 8px;font-size:17px;font-weight:600;color:var(--ink);background:transparent;text-align:right">'
     + (pct ? '<span style="color:var(--mut2);font-size:15px">%</span>' : '') + '</div>'
     + (opts.foot ? '<div style="font-size:11px;color:var(--mut2);margin-top:4px">' + opts.foot + '</div>' : '') + '</div>';
