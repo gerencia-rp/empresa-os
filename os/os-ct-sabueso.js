@@ -570,7 +570,15 @@ function ctSabuesoBlock(comp) {
   if (!CT.loaded && !CT.err) { ctLoad(); return '<div class="card" style="margin-top:16px"><div class="empty">🐕 Sabueso Contable corriendo los checks…</div></div>'; }
   if (CT.err) return '<div class="card" style="margin-top:16px"><div class="empty down">Sabueso: ' + OS_E(CT.err) + ' <button class="cbtn" onclick="ctLoad(true)">Reintentar</button></div></div>';
   const ab = ctAbiertos();
-  const total = ab.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
+  // B2 (auditoría 13-jul): "sin conciliar" = SOLO checks de CONCILIACIÓN OS↔QBO (C1–C3), neteado por
+  // concepto — no la suma de |todo| (así nació el "$8.3M > Total Assets" imposible). El resto de los
+  // checks es "$ señalado a revisar" (higiene/anomalías), otra cosa.
+  const abConcil = ab.filter(f => ['C1', 'C2', 'C3'].includes(f.check_id));
+  const total = abConcil.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
+  const senalado = ab.reduce((s, f) => s + (+f.impacto_usd || 0), 0) - total;
+  // guard-rail duro: Σ descuadres jamás puede superar el activo total del holding (QBO)
+  const assetsHolding = (OS.qbCache || []).filter(x => x.report === 'balance' && x.label === 'Total Assets').reduce((s, x) => s + (+x.value || 0), 0);
+  const motorErr = assetsHolding > 0 && total > assetsHolding;
   let list = ab;
   if (CT.fEmp) list = list.filter(f => f.empresa === CT.fEmp);
   if (CT.fSev) list = list.filter(f => f.severidad === CT.fSev);
@@ -590,7 +598,9 @@ function ctSabuesoBlock(comp) {
   return '<div class="card" style="margin-top:16px;border-color:rgba(231,182,94,.3)">'
     + hdr + ctDocxBlock()
     + '<div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;margin:2px 0 12px">'
-    + '<div><span style="font-size:30px;font-weight:800" class="' + (total ? 'down' : 'up') + '">' + OS_M(total) + '</span> <span class="lab">sin conciliar</span></div>'
+    + (motorErr ? '<div style="flex-basis:100%">' + (typeof reconcileLE === 'function' ? reconcileLE(total, assetsHolding, 'Σ descuadres vs Total Assets del holding').html : '<div class="down">⛔ motor en error: Σ descuadres supera el balance</div>') + '</div>' : '')
+    + '<div><span style="font-size:30px;font-weight:800" class="' + (motorErr ? 'warn' : total ? 'down' : 'up') + '">' + (motorErr ? '⛔ motor en error' : OS_M(total)) + '</span> <span class="lab">sin conciliar (OS↔QBO, C1–C3)</span></div>'
+    + '<div><span style="font-size:22px;font-weight:760" class="warn">' + OS_M(senalado) + '</span> <span class="lab">$ señalado a revisar (higiene/anomalías)</span></div>'
     + '<div><span style="font-size:22px;font-weight:760" class="' + (ab.length ? 'warn' : 'up') + '">' + ab.length + '</span> <span class="lab">descuadres abiertos</span></div>'
     + '<div class="meta">el norte: <b class="up">$0 = todo cuadra</b> · cada cifra declara su fuente [OS / QBO / Airtable]</div></div>'
 
