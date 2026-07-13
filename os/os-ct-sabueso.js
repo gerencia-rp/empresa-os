@@ -40,7 +40,7 @@ async function ctLoad(force) {
     ]);
     // datasets para los checks C9–C18 del motor de cierre (reunión 9-jul) — bajo RLS, áreas ajenas devuelven []
     const g = (q) => q.then(r => r.data || []).catch(() => []);
-    const [hmlPays, ext, remodelC, matPays, wh, pmPayC, pmExpC, docx] = await Promise.all([
+    const [hmlPays, ext, remodelC, matPays, wh, pmPayC, pmExpC, docx, diverg] = await Promise.all([
       g(sb.from('ff_hml_payments').select('address_norm,fecha,fee,pago_hml').eq('active', true)),
       g(sb.from('ff_extension_payments').select('*').eq('active', true)),
       g(sb.from('remodel_at_properties').select('address,property_id,proceso,avance_pct,avance_real,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,monto_real,monto_por_gastar,fecha_inicio,fecha_real_fin').eq('active', true)),
@@ -49,8 +49,10 @@ async function ctLoad(force) {
       g(sb.from('pm_payments').select('property_id,amount,billing_ym,proof_url,attachment_url,status,concept').eq('active', true).eq('type', 'ingreso').in('status', ['pagado', 'paid', 'completado']).limit(3000)),
       g(sb.from('pm_expenses').select('property_id,amount,billing_ym,category,subcategory,description,invoice_url').eq('active', true).limit(3000)),
       g(sb.from('ct_doc_extracts').select('*').eq('active', true).eq('estado', 'propuesta').order('created_at', { ascending: false })),
+      g(sb.from('v_divergencias_legacy').select('*')),
     ]);
     CT.eng = { hmlPays, extensiones: ext, remodel: remodelC, matPays, workerHours: wh, pmPay: pmPayC, pmExp: pmExpC };
+    CT.diverg = diverg;
     CT.docx = docx;
     CT.agentId = ag ? ag.id : null;
     if (cfg.error) throw cfg.error;
@@ -270,6 +272,14 @@ function ctRunChecks() {
       }, CT.cfg));
     } catch (e) { add('C9', 'holding', 'engine-error', 'Motor de cierre falló: ' + (e.message || e), 0, 'info', 'OS', {}); }
   }
+
+  // ══ C19 · DIVERGENCIA LEGACY vs DERIVADO (O8/P2 auditoría 13-jul) — el campo manual no pasa en silencio ══
+  (CT.diverg || []).forEach(dv => add('C19', dv.tipo === 'unidades_casa' ? 'rentas' : 'remodelacion',
+    'diverg-' + dv.tipo + '-' + String(dv.casa || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20),
+    (dv.casa || '') + ': ' + (dv.tipo === 'avance_obra'
+      ? 'avance legacy ' + dv.valor_legacy + '% ≠ Planner ' + dv.valor_derivado + '% — la app lee el Planner; corregir o retirar el singleSelect en Airtable (retiro = acción humana en la UI)'
+      : 'campo "Unidades" manual = ' + dv.valor_legacy + ' ≠ conteo real ' + dv.valor_derivado + ' — corregir el manual en Airtable (la app usa el conteo real)'),
+    0, 'media', 'Airtable', dv));
 
   return F;
 }
