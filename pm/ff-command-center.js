@@ -247,6 +247,10 @@ async function ffLoadAll() {
     ]);
     // #2: capital desplegado ÚNICO desde la capa de KPIs (equity ≠ deuda) — v_capital_deployed (O1)
     FF.capital = await sb.from('v_capital_deployed').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // N1: P&L por casa con interés HML visible — v_pnl_casa (O1)
+    FF.pnlCasa = await sb.from('v_pnl_casa').select('*').then(r => r.data || []).catch(() => []);
+    // N3: utilidad realizada de obras (Airtable) para el waterfall — v_obras_kpi (O1)
+    FF.obrasKpi = await sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
@@ -634,9 +638,43 @@ function ffSecFinanzas(comp) {
     ? `<div class="overx"><table class="ptable"><thead><tr><th>Casa</th><th>All-in</th><th>ARV</th><th>Margen</th></tr></thead><tbody>
         ${rows.map(d => `<tr><td>${FF_ESC(ffShort(d.address))} ${d.dq.preliminar ? ffDQBadge(d.dq) : ''}</td><td>${kitMoney(d.allIn)}</td><td>${kitMoney(d.arv)}</td><td class="${cls}">${kitMoney(d.margin)}</td></tr>`).join('')}</tbody></table></div>`
     : kitEmpty('📭', 'Sin deals con datos confiables para rankear');
+  // N4 (auditoría 13-jul): el costo #1 del negocio AL TOPE con semáforo — interés/ingreso e ICR
+  const anioIni = new Date().getFullYear() + '-01-01';
+  const intYtd = (FF.hml || []).filter(x => x.fecha && x.fecha >= anioIni).reduce((t, x) => t + (+x.pago_hml || 0), 0);
+  const ingYtd = qbVal('pnl_ytd', 'Total Income');
+  const gasYtd = qbVal('pnl_ytd', 'Total Expenses');
+  const intPctIng = ingYtd > 0 ? Math.round(100 * intYtd / ingYtd) : null;
+  const icr = intYtd > 0 && ingYtd != null && gasYtd != null ? Math.round(100 * (ingYtd - gasYtd) / intYtd) / 100 : null;
+  const topeN4 = `<div class="grid kpis" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px">
+      ${typeof kitKpi === 'function' ? kitKpi({ label: 'Interés HML / Ingreso', term: 'hml', valor: intPctIng != null ? intPctIng + '%' : '—', sub: kitMoney(intYtd) + ' de interés YTD sobre ' + kitMoney(ingYtd) + ' de ingreso [QBO]', estado: intPctIng != null && intPctIng > 40 ? 'neg' : 'warn', fuente: 'OS↔QBO', next: { porque: 'El interés se come ' + intPctIng + '% del ingreso — es el costo #1 del negocio.', accion: 'acelerar refis de las casas rentadas (cada refi corta el HML caro)', quien: 'Juan' } }) : ''}
+      ${typeof kitKpi === 'function' ? kitKpi({ label: 'ICR — cobertura del interés', term: 'icr', valor: icr != null ? icr + '×' : '—', sub: '(ingreso − gastos) ÷ interés YTD · <1× = la operación no cubre su propio interés', estado: icr != null && icr < 1 ? 'neg' : 'ok', fuente: 'QBO', next: { porque: 'La operación cubre solo ' + (icr != null ? icr : '—') + '× de su interés: el hold quema caja.', accion: 'priorizar rentar/refinanciar las casas con HML vencido', quien: 'Juan' } }) : ''}
+    </div>`;
+  // N3: waterfall ÚNICO que reconcilia las 3 "ganancias" (Airtable obras → interés → overhead → QBO)
+  const utilObras = FF.obrasKpi ? +FF.obrasKpi.utilidad_realizada : null;
+  const netQbYtd = qbVal('pnl_ytd', 'Net Income');
+  const esperado = utilObras != null ? utilObras - intYtd - ohReal : null;
+  const residuo = esperado != null && netQbYtd != null ? netQbYtd - esperado : null;
+  const waterfall = `<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">Puente de la ganancia — UNA sola cadena</div><div class="k">reconcilia Airtable → QBO (antes diferían 30×)</div></div>
+      ${typeof kitRow === 'function' ? kitRow('Utilidad de obras finalizadas', null, { txt: kitMoney(utilObras) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>' })
+        + kitRow('− Interés HML pagado YTD', null, { txt: '−' + kitMoney(intYtd) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>', neg: true })
+        + kitRow('− Overhead F&F (equipo + plataformas)', null, { txt: '−' + kitMoney(ohReal) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>', neg: true })
+        + kitRow('= Esperado por la cadena', null, { txt: kitMoney(esperado), big: true })
+        + kitRow('Net Income QBO (YTD)', null, { txt: kitMoney(netQbYtd) + ' <span class="badge b-warn" style="font-size:8px">QBO</span>', big: true })
+        + kitRow('Residuo (alcances/periodos distintos — revisar con contadora)', null, { txt: kitMoney(residuo), last: true, color: residuo != null && Math.abs(residuo) > 50000 ? 'var(--neg)' : 'var(--mut)' }) : ''}
+    </div>`;
+  // N1: P&L por casa con el interés VISIBLE (v_pnl_casa) — peores primero
+  const pnlRows = (FF.pnlCasa || []).filter(p => +p.interes_hml_real > 0 || +p.ingresos_renta > 0)
+    .sort((a, b) => (+a.utilidad_neta_post_interes) - (+b.utilidad_neta_post_interes)).slice(0, 10);
+  const pnlCasaCard = pnlRows.length ? `<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">P&L por casa — con el interés HML visible</div><div class="k">v_pnl_casa · neta post-interés (el ROI real)</div></div>
+      <div class="overx"><table class="ptable"><thead><tr><th>Casa</th><th>Rentas</th><th>Gastos</th><th>Interés HML</th><th>Neta post-interés</th></tr></thead><tbody>
+      ${pnlRows.map(p => `<tr><td>${FF_ESC(p.casa)}</td><td>${kitMoney(+p.ingresos_renta, { ceroEs: 'sin renta aún' })}</td><td>${kitMoney(+p.gastos_operativos, { ceroEs: '—' })}</td><td class="warn">${kitMoney(+p.interes_hml_real, { ceroEs: '—' })}</td><td class="${+p.utilidad_neta_post_interes >= 0 ? 'up' : 'down'}">${kitMoney(+p.utilidad_neta_post_interes)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="meta" style="margin-top:8px">El interés que antes era invisible ahora está en la línea de cada casa. Prorrateo teórico (días×tasa) disponible en la vista para casas sin pagos fechados.</div></div>` : '';
   return `${ffHeader('Finanzas', 'QuickBooks + Cockpit', `Invertido ${kitMoney(invertido)} · equity ${kitMoney(equity)} · déficit ${kitMoney(deficit)} · interés ${gt.intPct}% del gasto`)}
     ${ffDQBar(comp)}
+    ${topeN4}
     ${hero}
+    ${waterfall}
+    ${pnlCasaCard}
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       <div class="card kpi"><div class="lab">All-in del portafolio</div><div class="big glow">${kitMoney(invertido)}</div><div class="meta">compra + remod (COSTO — no es el capital aportado)</div></div>
       <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${kitMoney(equity)}</div><div class="meta">ARV − all-in (positivo)</div></div>
