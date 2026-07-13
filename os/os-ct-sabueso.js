@@ -40,7 +40,7 @@ async function ctLoad(force) {
     ]);
     // datasets para los checks C9–C18 del motor de cierre (reunión 9-jul) — bajo RLS, áreas ajenas devuelven []
     const g = (q) => q.then(r => r.data || []).catch(() => []);
-    const [hmlPays, ext, remodelC, matPays, wh, pmPayC, pmExpC, docx, diverg] = await Promise.all([
+    const [hmlPays, ext, remodelC, matPays, wh, pmPayC, pmExpC, docx, diverg, obrasKpi] = await Promise.all([
       g(sb.from('ff_hml_payments').select('address_norm,fecha,fee,pago_hml').eq('active', true)),
       g(sb.from('ff_extension_payments').select('*').eq('active', true)),
       g(sb.from('remodel_at_properties').select('address,property_id,proceso,avance_pct,avance_real,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,monto_real,monto_por_gastar,fecha_inicio,fecha_real_fin').eq('active', true)),
@@ -50,9 +50,11 @@ async function ctLoad(force) {
       g(sb.from('pm_expenses').select('property_id,amount,billing_ym,category,subcategory,description,invoice_url').eq('active', true).limit(3000)),
       g(sb.from('ct_doc_extracts').select('*').eq('active', true).eq('estado', 'propuesta').order('created_at', { ascending: false })),
       g(sb.from('v_divergencias_legacy').select('*')),
+      sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null),
     ]);
     CT.eng = { hmlPays, extensiones: ext, remodel: remodelC, matPays, workerHours: wh, pmPay: pmPayC, pmExp: pmExpC };
     CT.diverg = diverg;
+    CT.obrasKpi = obrasKpi;
     CT.docx = docx;
     CT.agentId = ag ? ag.id : null;
     if (cfg.error) throw cfg.error;
@@ -518,6 +520,36 @@ function ctCardEmpresa(emp) {
   return '<div class="card"><div class="lab">' + (CT_EMP_LBL[emp] || emp) + ' ' + s.ico + ' <span style="letter-spacing:0;text-transform:none;font-weight:600">' + s.lbl + '</span></div>' + filas.join('') + '</div>';
 }
 
+// ─── O5 (auditoría 13-jul): RECONCILIADOR 3 columnas [OS | QBO | Airtable] con Δ y alerta >5% ───
+function ctReconciliador() {
+  const warnPct = ctNum('o5_delta_warn_pct', 5);
+  const inv = ctInversionistas(); const pre = ctPrestamos();
+  const ingQb = ctQb('fix_flip', 'pnl_ytd', 'Total Income');
+  const netQb = ctQb('fix_flip', 'pnl_ytd', 'Net Income');
+  const utilObras = CT.obrasKpi ? +CT.obrasKpi.utilidad_realizada : null;
+  const airHmlTotal = (CT.hml || []).reduce((s, l) => s + (+l.monto_hml || 0), 0);
+  const filas = [
+    { c: 'Préstamos HML (vivo)', os: pre.osVivo, qbo: pre.qboHml, air: airHmlTotal, nota: 'OS = deals sin refi/venta · Airtable = Σ préstamos activos (incluye refinanciadas)' },
+    { c: 'Refi (principal)', os: null, qbo: pre.qboRefin, air: null, nota: 'sin espejo OS — falta campo "Monto Refi" en Airtable (conocido)' },
+    { c: 'Aportes de inversionistas', os: inv.pagado || null, qbo: inv.qbo, air: inv.comprometido, nota: 'Airtable = comprometido · QBO = contabilizado' },
+    { c: 'Ingresos del año (F&F)', os: null, qbo: ingQb, air: null, nota: 'ingreso operativo YTD [QBO P&L]' },
+    { c: 'Ganancia', os: null, qbo: netQb, air: utilObras, nota: 'Airtable = utilidad obras finalizadas (histórica) · QBO = Net Income YTD — alcances distintos, ver waterfall en F&F' },
+  ];
+  const cell = v => v == null ? '<span style="color:var(--mut)">—</span>' : OS_M(v);
+  const rows = filas.map(f => {
+    const base = f.qbo != null ? f.qbo : (f.os != null ? f.os : f.air);
+    const comp = f.os != null && f.qbo != null ? f.os : (f.air != null && f.qbo != null ? f.air : null);
+    const delta = comp != null && f.qbo != null ? comp - f.qbo : null;
+    const rojo = delta != null && Math.abs(delta) / Math.max(Math.abs(f.qbo || 0), 1) * 100 > warnPct;
+    return '<tr' + (rojo ? ' style="background:rgba(240,104,122,.07)"' : '') + '><td>' + f.c + '<div style="font-size:9px;opacity:.5">' + f.nota + '</div></td>'
+      + '<td style="text-align:right">' + cell(f.os) + '</td><td style="text-align:right;font-weight:700">' + cell(f.qbo) + '</td><td style="text-align:right">' + cell(f.air) + '</td>'
+      + '<td style="text-align:right" class="' + (rojo ? 'down' : 'up') + '">' + (delta != null ? OS_M(delta) + (rojo ? ' ⚠' : ' ✓') : '—') + '</td></tr>';
+  }).join('');
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">🔗 Reconciliador OS ↔ QBO ↔ Airtable</div><div class="k">Δ vs QBO · alerta si |Δ| &gt; ' + warnPct + '% · libros al ' + ctFmtD(ctQbFecha()) + '</div></div>'
+    + '<div style="overflow-x:auto"><table class="ptable"><thead><tr><th>Concepto</th><th style="text-align:right">OS</th><th style="text-align:right">QBO</th><th style="text-align:right">Airtable</th><th style="text-align:right">Δ</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<div class="meta" style="margin-top:8px">Cada línea debe coincidir con QBO vivo o pintarse roja (test B10). El espejo QBO se refresca con qb-oauth/sync y estampa as_of.</div></div>';
+}
+
 function ctFindingRow(f) {
   const sev = CT_SEV[f.severidad] || CT_SEV.media;
   const est = { abierto: '', marcado_contadora: '<span class="osbadge warn">📌 p/ contadora</span>', ajuste_propuesto: '<span class="osbadge warn">📝 ajuste propuesto</span>', aceptado: '<span class="osbadge ok">aceptado</span>' }[f.estado] || '';
@@ -566,6 +598,7 @@ function ctSabuesoBlock(comp) {
     + ctCardEmpresa('fix_flip') + ctCardEmpresa('rentas') + ctCardEmpresa('remodelacion') + ctCardEmpresa('educacion')
     + '</div>'
 
+    + ctReconciliador()
     + '<div class="grid k3" style="margin-bottom:14px">'
     + '<div class="card"><div class="lab">Inversionistas — 3 conceptos, no un número</div>'
     + kv('Comprometido <span style="opacity:.5">[OS aportado]</span>', OS_M(inv.comprometido))
