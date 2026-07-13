@@ -401,7 +401,9 @@ function osCompute() {
     remodel: (() => {
       const fin = OS.remodel.filter(o => o.proceso === 'Finalizado');
       const curso = OS.remodel.filter(o => o.proceso !== 'Finalizado');
-      const a = OS.remodel.map(o => Number(o.avance_pct || 0)).filter(x => x > 0);
+      // B7 (auditoría 13-jul): el avance promedio SOLO cuenta obras con % del Planner (avance_real);
+      // promediar el singleSelect legacy daba el 91% fantasma.
+      const a = OS.remodel.filter(o => o.avance_real != null).map(o => Number(o.avance_real)).filter(x => x > 0);
       return {
         obras: OS.remodel.length,
         activas: curso.length,

@@ -208,8 +208,11 @@ function rcCompute() {
   const _sd = [..._dias].sort((a, b) => a - b);
   const desvDiasMed = _sd.length ? (_sd.length % 2 ? _sd[(_sd.length - 1) / 2] : Math.round((_sd[_sd.length / 2 - 1] + _sd[_sd.length / 2]) / 2)) : 0;
   const desvDiasRevN = _diasRev.length;
-  const _rent = fin.map(o => o.rentabilidad).filter(r => r != null).map(Number);
-  const rentProm = _rent.length ? +(_rent.reduce((s, x) => s + x, 0) / _rent.length).toFixed(1) : 0;
+  // B9 (auditoría 13-jul): rentabilidad = margen PONDERADO Σutilidad/Σingreso (valor_interno),
+  // excluyendo denominadores ≤0 (Stonleigh neg/neg daba 322%). JAMÁS promediar la columna %
+  // (llega como fracción de Airtable → mostraba "0.2%"). Debe dar 170,682/1,466,360 = 11.6%.
+  const _rentOK = fin.filter(o => (+o.valor_interno || 0) > 0);
+  const rentProm = _rentOK.length ? +((100 * _rentOK.reduce((s, o) => s + (+o.ganancia || 0), 0)) / _rentOK.reduce((s, o) => s + (+o.valor_interno || 0), 0)).toFixed(1) : 0;
   const _conDias = fin.filter(o => o.retraso_dias != null);
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
