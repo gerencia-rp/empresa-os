@@ -715,8 +715,9 @@ function osCasa(comp) {
   // etapas del ciclo (barra)
   const cycle = ['Adquirida', 'En rehab', 'Venta/Renta', 'Refi/Salida'];
   const cyIdx = m.ff ? ({ adquirida: 0, en_rehab: 1, en_venta: 2, rentada: 2, refinanciada: 3, vendida: 3 }[m.ff.stage] ?? 0) : (remoEnCurso ? 1 : (m.rentas ? 2 : 3));
+  const fichaPid = (m.p360 && m.p360.property_id) || (m.prop && m.prop.property_id) || (m.ff && m.ff.property_id) || null;
   return `<h1>🏠 ${OS_E(ffShortAddr(m.addr))} <span>· Ficha de casa</span></h1>
-    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).</div>
+    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).${fichaPid && window.reportCasa ? ` <button class="cbtn" style="margin-left:8px" onclick="reportCasa('${fichaPid}')">📄 Reporte PDF de la casa</button>` : ''}</div>
     <div class="grid k4">
       <div class="card"><div class="lab">Etapa actual</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
       <div class="card"><div class="lab">All-in (compra + rehab real)</div><div class="big">${m.p360 && m.p360.all_in != null ? OS_M(+m.p360.all_in) : (m.ff ? OS_M(m.ff.allIn) : '—')}</div><div class="meta">${m.p360 && m.p360.compra != null ? `compra ${OS_M(+m.p360.compra)} + rehab ${m.p360.rehab_real != null ? OS_M(+m.p360.rehab_real) : '— sin dato'}` : (m.ff ? Math.round(m.ff.allInPct * 100) + '% del ARV' : 'sin deal F&F')}</div></div>
