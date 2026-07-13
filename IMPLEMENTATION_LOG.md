@@ -55,6 +55,9 @@ Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota)
 
 Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK carril in (libre,ok) → extendido a 'datos'; RPC nueva = 404 hasta "notify pgrst, 'reload schema'".
 
+### Deploy Scope B (13-jul)
+- Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
+
 ## RE-AUDITORÍA 28 DIMENSIONES (13-jul, medida contra data viva)
 | # | Dimensión | ANTES (auditoría) | DESPUÉS (medido hoy) | ✓ |
 |---|---|---|---|---|
