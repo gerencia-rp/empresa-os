@@ -90,7 +90,7 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 | 27 | Supuestos | $28/sqft · 12m soñados | $53/sqft real (19 obras) · obra 1.8m · holding 4.6m, aplicables 1-clic | ✅ |
 | 28 | Gobernanza IA | viewer publicó cross-área, sin audit | área⊆allowed_areas + created_by + versionado + audit inmutable + **N8 carril datos FUNCIONAL** (whitelist 6 vistas · gate admin en DB · RLS del usuario · audit vivo) | ✅ |
 
-**Score ronda 1: 26 ✅ · 2 🟡.** Verificación adicional: smoke prod 17/17 · gate CI 12/12 · rent-roll vivo (Bethune gap $4,400/mes) · fantasmas Arcadia/Cervin detectadas solas.
+**Score ronda 1: 26 ✅ · 2 🟡.** (rondas 2-3 abajo) Verificación adicional: smoke prod 17/17 · gate CI 12/12 · rent-roll vivo (Bethune gap $4,400/mes) · fantasmas Arcadia/Cervin detectadas solas.
 
 
 ### RE-AUDITORÍA ronda 2 (13-jul, post-Scope B — medida contra data viva)
@@ -99,6 +99,13 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - **#28 → ✅**: ia_audit_log pasó de 0 a 6 eventos reales (publicado/actualizado/aprobado/datos_leidos×2), whitelist 6 vistas activa, check de carril incluye 'datos', gate de admin probado E2E en prod.
 - Capacidades nuevas medidas: v_portal_inversor + RPC en prod (RLS: inversionista=1 casa, viewer=0, anon=401) · uw_base_modo='draw' en config · gate CI 12/12.
 - Dato honesto: inv_distributions tiene 3 filas pero 0 activas (demo soft-deleted) — el portal muestra 'sin distribuciones programadas', correcto; se llena cuando se registre la primera real.
+
+
+### Cierre #26 · plantilla N7 llenada (13-jul — Score final: 28 ✅ · 0 🟡)
+- clickup_scheduler_plantilla: **30 reglas** — dueño por lista = ASIGNADO REAL más frecuente en ClickUp (Juan Manuel Sanchez fix-flip/HML/venta · Michell Yanes etapas/documentación · Carlos Vasquez rentas/cobros/check-in · Daniel Lara contratos · CEO plan del OS) + días por criticidad (cobranza/check-in/refi/cierre 3-5d · resto 7d · plan interno 14d). Editable en DB (RLS operacion).
+- **Cobertura: 1,404/1,411 huérfanas (99.5%)** con dueño+vencimiento sugeridos; único resto honesto: 'List' (7 tareas, lista sin nombre real — corregir en ClickUp). Fix de bug latente: patrones solapados ('Entrega' ⊂ 'Pre-Entrega') duplicaban filas → v_tareas_huerfanas ahora elige el patrón MÁS LARGO (lateral, fan-out verificado = 0).
+- v_huerfanas_resumen + card en /operacion (junto al índice de disciplina): total, % cubierto, top listas con dueño → días, y lo sin-cubrir declarado. Verificada EN PROD (bundle ea35344cb178): '1,411 huérfanas · dueños sugeridos visibles · List sin plantilla'.
+- Aplicación = flujo existente propuesta → OK humano → clickup-execute (nada se asigna solo); el nacer-con-fecha vía webhook sigue como mejora futura, pero la CURA DE ORIGEN (quién y cuándo por default) quedó definida y operativa.
 
 ## ANTES → DESPUÉS (verificado contra fuente)
 - Capital: "$7.83M/$8.37M desplegado" → equity $963,598 [Airtable] / $763,361 [QBO] + deuda separada.
