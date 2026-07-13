@@ -36,6 +36,11 @@ Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota)
 ## Cierre
 - ✅ **Cierre · Gate de CI** — scripts/ci-gate.mjs (npm run ci:gate): (a) capa KPIs responde y es coherente (ocupación suma, margen 0–100), (b) property_id 100% + 20 aliases QBO, (c) guard-rails anti-$0 presentes, (d) espejo QBO fresco ≤30d + assets $7.67M + equity ≤ assets. **CORRIDO: 12/12 ✓**. ⚠ el re-sync QBO cambió "Total Assets"→"TOTAL ASSETS" (guard B2 y gate actualizados case-insensitive).
 
+## MERGE A MAIN + DEPLOY (13-jul)
+- Mergeado a main (bundle 35507bd74851) y verificado EN PROD con smoke headless: Global (capital/ocupación/cobranza operativa) + /contable (reconciliador, B2, C20, C21, espejo Refin $1,459,200) + FF Finanzas (ICR, déficit en hold, waterfall, equity panel, P&L por casa) — **17/17 · 0 pageerrors**.
+- Fix post-deploy: v_pnl_casa reescrita con CTEs (migr 20260713200000) — la versión con 6 subqueries correlacionadas se iba a timeout bajo RLS con select * (el front recibía []).
+- Gotcha de QA documentado: innerHTML serializa & → &amp; ("P&L" no matchea en el DOM; buscar por innerText).
+
 ## ANTES → DESPUÉS (verificado contra fuente)
 - Capital: "$7.83M/$8.37M desplegado" → equity $963,598 [Airtable] / $763,361 [QBO] + deuda separada.
 - Ganancia: 3 números con 30× de gap → Net Income QBO YTD único + waterfall con residuo declarado.
