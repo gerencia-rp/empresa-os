@@ -127,7 +127,27 @@ function kitSkeleton(n, alto) {
   document.head.appendChild(st);
 })();
 
+// ─── GUARD-RAILS DE SANITY (B17/P3) — reusables en cualquier tile ───
+// noZeroAsReal: si el valor FUENTE es null/vacío → "sin dato" (nunca $0 con ✅).
+function noZeroAsReal(v, fmt, motivo) {
+  if (v == null || v === '' || (typeof v === 'number' && isNaN(v)))
+    return '<span style="color:var(--mut)" title="' + kitEsc(motivo || 'la fuente no tiene este dato') + '">— sin dato</span>';
+  return (fmt || kitMoney)(+v);
+}
+// reconcileLE: la parte no puede superar el total (ej. Σdescuadres ≤ Total Assets).
+// Si se viola → {ok:false} + banda "motor en error" (B2): jamás mostrar la cifra imposible como real.
+function reconcileLE(parte, total, etiqueta) {
+  const ok = parte == null || total == null || +parte <= +total;
+  return {
+    ok,
+    html: ok ? '' : '<div style="background:color-mix(in srgb, var(--neg) 10%, transparent);border:1px solid color-mix(in srgb, var(--neg) 35%, transparent);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--neg);font-weight:700">⛔ Motor en error: ' + kitEsc(etiqueta || '') + ' — la cifra calculada (' + kitMoney(parte) + ') supera el total posible (' + kitMoney(total) + '). No se muestra como dato real.</div>',
+  };
+}
+// emptyState: estado vacío estándar (alias semántico del kitEmpty del design system)
+function emptyState(icon, msg, cta) { return kitEmpty(icon, msg, cta); }
+
 // exposición global
 window.KIT_GLOSARIO = KIT_GLOSARIO;
 window.kitTerm = kitTerm; window.kitDrill = kitDrill; window.kitNext = kitNext;
 window.kitKpi = kitKpi; window.kitSkeleton = kitSkeleton;
+window.noZeroAsReal = noZeroAsReal; window.reconcileLE = reconcileLE; window.emptyState = emptyState;
