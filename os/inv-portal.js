@@ -51,14 +51,17 @@ async function ipLoad() {
     return;
   }
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
-  const [prm, cf, dc, acc, dist, msg] = await Promise.all([
+  const [prm, cf, dc, acc, dist, msg, res] = await Promise.all([
     sb.from('inv_model_params').select('*').in('property_id', props).eq('active', true),
     sb.from('inv_cashflow_real').select('*').in('property_id', props).eq('active', true).order('fecha'),
     sb.from('inv_documents').select('*').in('property_id', props).eq('active', true),
     sb.from('inv_access').select('investor_airtable_id').eq('active', true),
     sb.from('inv_distributions').select('*').eq('active', true),
     sb.from('inv_messages').select('*').eq('active', true),
+    // obs #16: resumen por casa (v_portal_inversor → RPC SECURITY DEFINER filtrada por inv_my_props)
+    sb.from('v_portal_inversor').select('*').then(r => r.data || []).catch(() => []),
   ]);
+  IP.resumen = res || [];
   IP.params = {}; (prm.data || []).forEach(r => { (IP.params[r.property_id] = IP.params[r.property_id] || {})[r.key] = r; });
   IP.cashflow = {}; (cf.data || []).forEach(r => { (IP.cashflow[r.property_id] = IP.cashflow[r.property_id] || []).push(r); });
   IP.docs = {}; (dc.data || []).forEach(r => { (IP.docs[r.property_id] = IP.docs[r.property_id] || []).push(r); });
@@ -157,13 +160,42 @@ function render() {
     + '<div class="sub">' + esc(dir) + ' · estado: <b>' + esc(estado) + '</b> · cierre: ' + esc(cierre) + ' · escenario: <b>' + (escenario === 'realizado' ? '✅ Realizado (' + movsCasa.length + ' movimientos reales) + proyección' : '🎯 Proyectado (premisas)') + '</b> · <span class="src">real</span> = dato real; <span class="src sup">supuesto</span> = premisa en calibración.</div>'
     + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' + TABS.map(t => '<button class="ibtn" style="' + (IP.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IP.tab=\'' + t[0] + '\';render()">' + t[1] + '</button>').join('') + '</div>';
 
+  // obs #16 · tus casas de un vistazo (una tarjeta por casa: invertido, etapa/avance, líder, flujo, déficit, próxima distribución)
+  const resumenCards = (IP.resumen || []).length ? ''
+    + '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">Tus casas de un vistazo</div><div class="k">tocá una tarjeta para ver el detalle completo</div></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;align-items:start">'
+    + IP.resumen.map(rc => {
+      const activa = rc.property_id === pid;
+      const meses = rc.meses_invertido != null ? (rc.meses_invertido >= 12 ? Math.floor(rc.meses_invertido / 12) + ' a ' + (rc.meses_invertido % 12) + ' m' : rc.meses_invertido + ' meses') : null;
+      const flujo = rc.flujo_ult_mes != null
+        ? '<span style="color:' + (rc.flujo_ult_mes >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)') + ';font-weight:700">' + $money(rc.flujo_ult_mes) + '</span> <span class="meta">(' + esc(rc.flujo_ult_mes_ym || '') + ')</span>'
+        : '<span class="meta">sin rentas todavía</span>';
+      const desg = rc.deficit_desglose || {};
+      const deficit = +rc.deficit > 0
+        ? '<div style="margin-top:6px;font-size:12px;color:var(--neg,#f87171)">Déficit acumulado: <b>' + $money(rc.deficit) + '</b>'
+          + '<div class="meta" style="font-size:11px">renta ' + $money(desg.ingresos_renta || 0) + ' − gastos ' + $money(desg.gastos_operativos || 0) + ' − interés HML ' + $money(desg.interes_hml || 0) + '</div>'
+          + '<div class="meta" style="font-size:11px">se cubre con el refi/venta' + (rc.fecha_estimada_pago ? ' · fecha estimada: <b>' + esc(rc.fecha_estimada_pago) + '</b>' : '') + (rc.fecha_pago_fuente ? ' <span class="src' + (/estimada/.test(rc.fecha_pago_fuente) ? ' sup' : '') + '" title="' + esc(rc.fecha_pago_fuente) + '">' + (/estimada/.test(rc.fecha_pago_fuente) ? 'estimado' : 'real') + '</span>' : '') + '</div></div>'
+        : '';
+      const dist = rc.proxima_dist_fecha
+        ? '<div style="margin-top:6px;font-size:12px">💸 Próxima distribución: <b>' + esc(rc.proxima_dist_fecha) + '</b>' + (rc.proxima_dist_monto != null ? ' · ' + $money(rc.proxima_dist_monto) : '') + '</div>'
+        : (rc.ultima_dist_fecha ? '<div class="meta" style="margin-top:6px;font-size:11px">última distribución pagada: ' + esc(rc.ultima_dist_fecha) + (rc.ultima_dist_monto != null ? ' (' + $money(rc.ultima_dist_monto) + ')' : '') + '</div>'
+          : '<div class="meta" style="margin-top:6px;font-size:11px">sin distribuciones programadas</div>');
+      return '<div class="card" onclick="IP.casa=\'' + rc.property_id + '\';render()" style="cursor:pointer;margin:0' + (activa ? ';border-color:var(--a2)' : '') + '">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>' + esc(rc.casa || '—') + '</b><span class="src">' + esc((rc.etapa || '—').replace(/_/g, ' ')) + '</span></div>'
+        + '<div class="meta" style="margin-top:4px">' + (rc.avance_planner != null ? '🏗 obra ' + Math.round(rc.avance_planner) + '% · ' : '') + (rc.lider ? '👷 ' + esc(String(rc.lider).split(',')[0]) : '👷 —') + '</div>'
+        + '<div style="margin-top:8px;font-size:13px">Invertiste <b>' + $money(rc.invertido) + '</b>' + (meses ? ' <span class="meta">hace ' + meses + (rc.fecha_entrada ? ' (' + esc(rc.fecha_entrada) + ')' : '') + '</span>' : '') + '</div>'
+        + '<div style="margin-top:4px;font-size:12px">Flujo del último mes: ' + flujo + '</div>'
+        + deficit + dist + '</div>';
+    }).join('')
+    + '</div></div>' : '';
+
   let body = '';
   if (IP.tab === 'money') body = renderMoney(pid, inv);
   else if (IP.tab === 'dist') body = renderDist(pid, inv);
   else if (IP.tab === 'msgs') body = renderMsgs(pid);
   else if (IP.tab === 'docs') body = renderDocs(docs);
   else if (IP.tab === 'ia') body = renderIA();
-  else body = ''
+  else body = resumenCards
     + '<div class="grid k4">'
     + kpi('Tu inversión', $money(holding.inversion_aportada), 'aportada el ' + esc(holding.fecha_entrada || cierre))
     + kpi('Tu participación', $pct(inv), 'de la utilidad y el patrimonio de esta casa')
