@@ -42,6 +42,19 @@ Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota)
 - Gotcha de QA documentado: innerHTML serializa & → &amp; ("P&L" no matchea en el DOM; buscar por innerText).
 
 
+
+## SCOPE B · OBSERVACIONES DEL CEO (13-jul, cerradas — commits por ítem en rebuild/os-audit-2026-07)
+| Obs | ANTES | DESPUÉS (verificado contra fuente) |
+|---|---|---|
+| #8-#11 UW | Base = compra + rehab (Bethune legacy) · interés 6m fijo · tasa DSCR 7.5 en Calc 4 vs 7.125 en Calc 3 · payoff se re-pedía | **Base = compra + DRAW TOTAL** ($200,000+$135,080=$335,080 · 90% = **$301,572 exacto**, corrido contra el código real; modo legacy en ff_uw_config uw_base_modo) · interés del draw sobre **duración REAL calibrada (1.8m** de v_supuestos_calibrados, editable) · **una sola tasa HML (12%) y DSCR (7.125%/30a) para las 5 calcs**, visibles y editables inline con rótulos "HML · solo interés · durante obra" / "DSCR · 30a · amortizado" · payoff ⛓ fluye del deal (saldo HML Airtable, con chip de fuente) · goldens cash-out Michelle/Echo/Childress/Meadow intactos |
+| #16 Portal inversor | portal sin resumen por casa; sin fecha de pago del déficit | **v_portal_inversor** (security_invoker sobre RPC inv_portal_resumen SECURITY DEFINER + inv_my_props) — por casa: invertido + hace cuánto · etapa/avance Planner · líder · flujo del último mes (billing_ym) · déficit desglosado (renta−gastos−interés HML, v_pnl_casa) + fecha estimada de pago (refi hecha ∣ inicio HML + holding calibrado) · próxima/última distribución (inv_distributions **ya existía** — 3 filas, verificado). **RLS probado en prod: inversionista QA = solo Dove ($25,400·13m·déficit $10,358.13 exacto) · viewer = 0 filas · anon = 401** |
+| #20 Planner | tablero apretado bajo KPIs, tarjetas 8.5-11px | board **full-viewport**, KPIs/filtros **colapsables** (wp_kpis_open), columnas 220px con scroll propio, tarjetas 13.5px con líder visible; ruta crítica/alertas siempre visibles; cero lógica tocada |
+| #19 Estimador | 17 tabs planos + 2 ocultos | nav **3 pasos Proyecto→Estimar→SOW** (19 tabs mapeados; Editor/Pronóstico/3-Estimaciones contiguos; Crew NO estaba vacío → sub-tab del grupo 3) + **proyecto activo compartido** (RM_ACTIVE + localStorage, restaurado al abrir) |
+| #12+#14 CRM/rol | CRM sin onboarding; líderes solo productividad | guía colapsable "🧭 ¿qué hago acá?" (4 pasos, flujo CRM→propuesta→deal→portal) + **scorecard por líder**: cumple presupuesto/tiempo (rcFin/retraso_dias, sin dato = '—'), margen ponderado, 🔍 Qué revisar (peor obra + acción + dueño, patrón kitNext) |
+| #24 IA N8 | spec en papel; ia_audit_log 0 filas | **carril datos-lectura FUNCIONAL**: ia_data_whitelist (6 vistas KPI) · edge fn ia-data (JWT del usuario → su RLS; solo select ≤500) · gate de admin EN DB (aprobado_por via RPC ia_aprobar_artifact) · front inyecta __IA_DATA__ al sandbox (el iframe jamás ve un token) · audit cableado: publicado/actualizado/aprobado/spec_*/datos_leidos. **E2E prod 9/9**: 403 sin OK → viewer no aprueba → admin aprueba → lee v_ocupacion 48/45 → fuera de whitelist 403 → RLS del usuario (viewer sin fix-flip ve nulls) |
+
+Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK carril in (libre,ok) → extendido a 'datos'; RPC nueva = 404 hasta "notify pgrst, 'reload schema'".
+
 ## RE-AUDITORÍA 28 DIMENSIONES (13-jul, medida contra data viva)
 | # | Dimensión | ANTES (auditoría) | DESPUÉS (medido hoy) | ✓ |
 |---|---|---|---|---|
