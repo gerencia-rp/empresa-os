@@ -1049,11 +1049,20 @@ function opsCeoView(o) {
   const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
   // N12 (auditoría 13-jul): índice de disciplina por persona (fecha+dueño 50% · al día 30% · movimiento 20%)
   if (OS.disciplina === undefined) { OS.disciplina = null; sb.from('v_disciplina_clickup').select('*').order('disciplina', { ascending: false }).then(r => { OS.disciplina = r.data || []; osRender(); }).catch(() => { OS.disciplina = []; }); }
+  // N7 (plantilla llenada 13-jul): huérfanas con dueño/fecha SUGERIDOS por lista — cura de origen del ruido
+  if (OS.huerfanas === undefined) { OS.huerfanas = null; sb.from('v_huerfanas_resumen').select('*').order('huerfanas', { ascending: false }).then(r => { OS.huerfanas = r.data || []; osRender(); }).catch(() => { OS.huerfanas = []; }); }
+  const hTot = (OS.huerfanas || []).reduce((s, x) => s + (+x.huerfanas || 0), 0);
+  const hCub = (OS.huerfanas || []).reduce((s, x) => s + (x.dueno_sugerido ? +x.huerfanas : 0), 0);
+  const huerfCard = (OS.huerfanas && OS.huerfanas.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧹 Tareas huérfanas (sin fecha/dueño) · plantilla N7 activa</div>
+    <div class="meta" style="margin-bottom:4px"><b>${hTot.toLocaleString()}</b> huérfanas · <b>${hTot ? Math.round(100 * hCub / hTot) : 0}%</b> ya tienen dueño y vencimiento SUGERIDOS por la plantilla (asignado real más frecuente por lista) — se aplican por el flujo propuesta → OK humano → ClickUp</div>
+    ${OS.huerfanas.slice(0, 8).map(x => `<div class="krow" style="padding:5px 0"><span>${OS_E(x.list_name)} <span style="opacity:.5">· ${x.huerfanas}</span></span><b>${x.dueno_sugerido ? '→ ' + OS_E(x.dueno_sugerido) + ' · ' + x.dias_para_vencer + 'd' : '<span class="warn">sin plantilla</span>'}</b></div>`).join('')}
+    ${(OS.huerfanas.some(x => !x.dueno_sugerido)) ? `<div class="meta" style="margin-top:6px">Sin cubrir: ${OS.huerfanas.filter(x => !x.dueno_sugerido).map(x => OS_E(x.list_name) + ' (' + x.huerfanas + ')').join(' · ')} — lista sin nombre real, corregir en ClickUp</div>` : ''}</div>` : '';
   const discCard = (OS.disciplina && OS.disciplina.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧭 Índice de disciplina por persona (ClickUp)</div><div class="meta" style="margin-bottom:4px">higiene (fecha+dueño) 50% · al día 30% · movimiento 7d 20% — accountability, no castigo</div>
     ${OS.disciplina.slice(0, 8).map(p => `<div class="krow" style="padding:5px 0"><span>${OS_E(p.persona)} <span style="opacity:.5">· ${p.tareas} tareas</span></span><b class="${p.disciplina >= 60 ? 'up' : p.disciplina >= 30 ? 'warn' : 'down'}">${p.disciplina}</b></div>`).join('')}</div>` : '';
   return `${kpis}
     <div class="grid k3" style="margin-top:14px">${empCards}</div>
     ${discCard}
+    ${huerfCard}
     <div class="grid k2" style="margin-top:14px">
       <div class="card"><div class="lab">🎯 Las 3 decisiones de la semana</div><div class="meta" style="margin-bottom:4px">rankeadas por impacto ($/inversionista primero)</div>${decHtml}</div>
       <div class="card"><div class="lab">Tendencia de vencidas · ${tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:54px;margin:12px 0 4px">${spark || '<span class="meta">sin snapshots</span>'}</div><div class="meta">${tend.length ? tend[0].d + ' → ' + tend[tend.length - 1].d : ''}</div><div class="krow" style="cursor:pointer;margin-top:8px" onclick="opsGo('sabueso')"><span>🐕 <b>${(OS.sabueso || []).length} anomalías</b> del Sabueso</span><b style="opacity:.5">ver →</b></div></div>
