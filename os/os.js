@@ -437,9 +437,9 @@ function osCobranza(mb) {
 function osInsights(comp) {
   const ins = [];
   // Fix & Flip: error de datos, appraisal>ARV, all-in>75% (leídos de ff_deals; el detalle fino vive en el CC de FF)
-  comp.ff.list.filter(d => d.appraisal > 0 && d.arv > 0 && d.appraisal > d.arv * 1.05).forEach(d => ins.push({ sev: 'warning', impact: d.appraisal - d.arv, tag: 'FIX&FLIP · APPRAISAL>ARV', tx: `<b>${OS_E((d.address || '').split(',')[0])}</b>: appraisal ${OS_M(d.appraisal)} > ARV ${OS_M(d.arv)}.` }));
+  comp.ff.list.filter(d => d.appraisal > 0 && d.arv > 0 && d.appraisal > d.arv * 1.05).forEach(d => ins.push({ sev: 'warning', impact: d.appraisal - d.arv, tag: 'FIX&FLIP · APPRAISAL>ARV', tx: `<b>${OS_E((d.address || '').split(',')[0])}</b>: appraisal ${OS_M(d.appraisal)} > ARV ${OS_M(d.arv)}.`, accion: 'actualizar el ARV en Airtable con el appraisal real', quien: 'Juan' }));
   // Cobranza (holding): casas con deuda
-  comp.cobranza.rows.slice(0, 3).forEach(r => ins.push({ sev: 'critical', impact: r.deuda, tag: 'COBRANZA · MORA', tx: `<b>${OS_E(r.casa)}</b>: deuda de <b>${OS_M(r.deuda)}</b> este mes (esperado ${OS_M(r.esperado)}, cobrado ${OS_M(r.cobrado)}). El Cerebro puede redactar el cobro.` }));
+  comp.cobranza.rows.slice(0, 3).forEach(r => ins.push({ sev: 'critical', impact: r.deuda, tag: 'COBRANZA · MORA', tx: `<b>${OS_E(r.casa)}</b>: deuda de <b>${OS_M(r.deuda)}</b> este mes (esperado ${OS_M(r.esperado)}, cobrado ${OS_M(r.cobrado)}). El Cerebro puede redactar el cobro.`, accion: 'contactar al inquilino y registrar el pago o el acuerdo', quien: 'Carlos' }));
   // Conocidos del negocio (info)
   try { const cf = osConcilFF(); const warn = (OS.concilWarn != null ? OS.concilWarn : 10) / 100;
     if (cf.aporteQB != null && Math.abs(cf.aporteOS - cf.aporteQB) / Math.max(cf.aporteQB, 1) > warn * 0.5) ins.push({ sev: 'warning', impact: Math.abs(cf.aporteOS - cf.aporteQB), tag: 'CONCILIACIÓN · APORTES', tx: `Aporte de inversionistas: OS <b>${OS_M(cf.aporteOS)}</b> vs QBO <b>${OS_M(cf.aporteQB)}</b> (Δ ${OS_M(cf.aporteOS - cf.aporteQB)}). Conciliar Investor Contributions.` });
@@ -532,7 +532,7 @@ function osGlobal(comp) {
   ].join('');
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
   const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
-        ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span></div></div>`).join('')}
+        ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span>${i.sev === 'critical' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('')}
         <div class="ask"><input id="os-ask" placeholder="Preguntá al Cerebro del holding…" onkeydown="if(event.key==='Enter')osAsk()"><button onclick="osAsk()">Enviar</button></div>
         <div id="os-chat" class="cc-chat"></div>
       </div>` : '';
@@ -677,10 +677,10 @@ function osCasaMatch(slug, comp) {
 function osCasaInsights(m) {
   const ins = [];
   if (m.ff && m.ff.dq && m.ff.dq.revisar) ins.push({ s: 'r', t: `Error de datos: all-in ${OS_M(m.ff.allIn)} = ${Math.round(m.ff.allInPct * 100)}% del ARV (imposible). Revisar la carga en Airtable (Draws).` });
-  if (m.ff && m.ff.dq && m.ff.dq.confiable && m.ff.deficit < -20000) ins.push({ s: 'r', t: `Déficit de ${OS_M(-m.ff.deficit)} (regla: OK si flujo+ y acumulado < $20k). Planear recuperación (refi/venta).` });
+  if (m.ff && m.ff.dq && m.ff.dq.confiable && m.ff.deficit < -20000) ins.push({ s: 'r', t: `Déficit de ${OS_M(-m.ff.deficit)} (regla: OK si flujo+ y acumulado < $20k). Planear recuperación (refi/venta).`, accion: 'armar plan de refi o venta', quien: 'Juan' });
   if (m.ff && Number(m.ff.appraisal) > 0 && m.ff.arv > 0 && Number(m.ff.appraisal) > m.ff.arv * 1.05) ins.push({ s: 'y', t: `Appraisal ${OS_M(m.ff.appraisal)} supera el ARV ${OS_M(m.ff.arv)} — revisar (afecta refi y equity).` });
   if (m.remodel && m.remodel.proceso !== 'Finalizado') ins.push({ s: 'y', t: `Obra EN CURSO (${OS_E(m.remodel.proceso || 's/estado')}, ${Math.round(Number(m.remodel.avance_pct || 0))}% avance) — la utilidad de remodelación es preliminar, no final.` });
-  if (m.rentas && m.rentas.deuda > 200) ins.push({ s: 'r', t: `Deuda de cobranza ${OS_M(m.rentas.deuda)} este mes (esperado ${OS_M(m.rentas.occRent)}, cobrado ${OS_M(m.rentas.cobrado)}).` });
+  if (m.rentas && m.rentas.deuda > 200) ins.push({ s: 'r', t: `Deuda de cobranza ${OS_M(m.rentas.deuda)} este mes (esperado ${OS_M(m.rentas.occRent)}, cobrado ${OS_M(m.rentas.cobrado)}).`, accion: 'gestionar cobro con el inquilino y registrar el pago', quien: 'Carlos' });
   if (/childress/i.test(m.addr)) ins.push({ s: 'y', t: `Contrato/documentación pendiente de firma (dato del negocio). Verificar antes de avanzar.` });
   return ins;
 }
@@ -735,7 +735,7 @@ function osCasa(comp) {
       <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
         <div class="overx">${m.rentas ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
-        ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
+        ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}${i.s === 'r' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
         ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
       </div>
     </div>
