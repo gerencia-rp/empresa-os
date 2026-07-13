@@ -245,6 +245,8 @@ async function ffLoadAll() {
       // B1: la GANANCIA real viene del P&L de QBO (espejo qb_report_cache) — una sola definición
       sb.from('qb_report_cache').select('report,label,value,fetched_at').eq('empresa', 'fix_flip').in('label', ['Net Income', 'Total Income', 'Total Expenses', 'Net Other Income']).then(r => r.data || []).catch(() => []),
     ]);
+    // #2: capital desplegado ÚNICO desde la capa de KPIs (equity ≠ deuda) — v_capital_deployed (O1)
+    FF.capital = await sb.from('v_capital_deployed').select('*').maybeSingle().then(r => r.data).catch(() => null);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
@@ -428,8 +430,7 @@ function ffSecCommand(comp) {
       ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. 🧹')
       : kitVerdict('go', 'Portafolio sano — sin alertas críticas 🎉', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
   const conf = kitConfidence(flaggedDQ === 0 ? 'alta' : flaggedDQ <= 2 ? 'media' : 'baja', kpi.confiablesN + '/' + kpi.total + ' deals confiables');
-  const hero = kitHero('Capital desplegado 💼', kitMoney(kpi.capital),
-    'all-in de los deals activos (compra + remod + holding) · ARV del portafolio <b>' + kitMoney(kpi.arvTotal) + '</b> · equity potencial <b style="color:var(--pos)">' + kitMoney(kpi.equity) + '</b> &nbsp; ' + conf);
+  const hero = ffCapitalHero('all-in de los deals activos (costo, no capital) <b>' + kitMoney(kpi.capital) + '</b> · ARV <b>' + kitMoney(kpi.arvTotal) + '</b> · equity potencial <b style="color:var(--pos)">' + kitMoney(kpi.equity) + '</b> &nbsp; ' + conf);
   const kpis = `<div class="grid kpis">
       <div class="card kpi"><div class="lab">Deals activos</div><div class="big">${kpi.activos}</div><div class="meta">${kpi.flips} flip · ${kpi.holds} hold · ${rehab} en rehab · ${venta} en venta</div></div>
       <div class="card kpi"><div class="lab">Equity potencial</div><div class="big ${kpi.equity > 0 ? 'up' : ''}">${kitMoney(kpi.equity)}</div><div class="meta">ARV − all-in de los activos</div></div>
@@ -533,8 +534,7 @@ function ffSecInversionistas(comp) {
   const conSocio = crm.filter(x => (x.has_partner || '').toUpperCase() === 'SI').length;
   const invertido = comp.deals.reduce((s, d) => s + d.allIn, 0);
   const aporteBase = Math.round((invertido / (comp.deals.length || 1)) / 1000) * 1000;
-  const hero = kitHero('Capital desplegado en deals 💼', kitMoney(invertido),
-    crm.length + ' inversionistas en el CRM · aporte base típico <b>' + kitMoney(aporteBase) + '</b> por deal · los aportes reales por inversionista se vinculan al deal en Airtable');
+  const hero = ffCapitalHero(crm.length + ' inversionistas en el CRM · all-in de los deals (costo) <b>' + kitMoney(invertido) + '</b> · aporte base típico <b>' + kitMoney(aporteBase) + '</b>');
   return `${ffHeader('Inversionistas', 'CRM + Modelos', `${crm.length} inversionistas (sin la propia empresa) · ${crm.filter(isLLC).length} LLCs · ${conSocio} con socio`)}
     ${hero}
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
@@ -589,6 +589,24 @@ function ffGastosPorTipo() {
   const total = Object.values(g).reduce((s, v) => s + v, 0);
   return { g, total, intPct: total ? Math.round(g['Intereses'] / total * 100) : 0 };
 }
+// ─── #2 (auditoría 13-jul): capital desplegado ÚNICO — equity separado de deuda, desde v_capital_deployed ───
+function ffCapitalHero(sub) {
+  const c = FF.capital;
+  if (!c) return kitHero('Capital del holding 💼', '<span style="font-size:18px;color:var(--mut)">sin datos — v_capital_deployed</span>', sub || '');
+  const asOf = c.qbo_as_of ? new Date(c.qbo_as_of).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—';
+  const drill = typeof kitDrill === 'function'
+    ? kitDrill('<b>' + kitMoney(c.equity_comprometido_airtable) + '</b>', 'Capital del holding — desglose', (typeof kitRow === 'function'
+      ? kitRow('Equity comprometido (aportes firmados)', null, { txt: kitMoney(c.equity_comprometido_airtable) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>' })
+      + kitRow('Equity contabilizado (Investor Contributions)', null, { txt: kitMoney(c.equity_qbo) + ' <span class="badge b-warn" style="font-size:8px">QBO al ' + asOf + '</span>' })
+      + kitRow('Deuda HML activa (espejo)', null, { txt: kitMoney(c.deuda_hml_os_activa) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>' })
+      + kitRow('Deuda Loan Payable–HML', null, { txt: kitMoney(c.deuda_hml_qbo) + ' <span class="badge b-warn" style="font-size:8px">QBO</span>' })
+      + kitRow('Deuda refi (HML-Refin)', null, { txt: kitMoney(c.deuda_refi_qbo) + ' <span class="badge b-warn" style="font-size:8px">QBO</span>', last: true })
+      + '<div style="font-size:11px;color:var(--mut);margin-top:10px">La deuda NUNCA se presenta como "capital desplegado": es apalancamiento. El capital del inversor es el equity.</div>' : ''), 'OS↔QBO')
+    : kitMoney(c.equity_comprometido_airtable);
+  return kitHero('Capital del holding 💼',
+    'EQUITY ' + drill + ' <span style="font-size:17px;font-weight:600;color:var(--mut)">+ deuda HML ' + kitMoney(c.deuda_hml_qbo != null ? c.deuda_hml_qbo : c.deuda_hml_os_activa) + '</span>',
+    'aportado real [Airtable] · en libros ' + kitMoney(c.equity_qbo) + ' [QBO al ' + asOf + '] · la deuda no es capital — clic en el número para el desglose' + (sub ? ' · ' + sub : ''));
+}
 function ffSecFinanzas(comp) {
   const gt = ffGastosPorTipo();
   const ohReal = (FF.overhead || []).reduce((t, x) => t + (+x.monto || 0), 0);
@@ -620,7 +638,7 @@ function ffSecFinanzas(comp) {
     ${ffDQBar(comp)}
     ${hero}
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-      <div class="card kpi"><div class="lab">Capital invertido</div><div class="big glow">${kitMoney(invertido)}</div><div class="meta">all-in del portafolio</div></div>
+      <div class="card kpi"><div class="lab">All-in del portafolio</div><div class="big glow">${kitMoney(invertido)}</div><div class="meta">compra + remod (COSTO — no es el capital aportado)</div></div>
       <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${kitMoney(equity)}</div><div class="meta">ARV − all-in (positivo)</div></div>
       <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big down">${kitMoney(deficit)}</div><div class="meta">casas en rojo · deals confiables (error de datos excluido)</div></div>
       <div class="card kpi"><div class="lab">Intereses / gasto</div><div class="big warn">${kitPct(gt.intPct)}</div><div class="meta">${kitMoney(gt.g['Intereses'], { ceroEs: 'sin datos' })} de ${kitMoney(gt.total, { ceroEs: 'sin datos' })}</div></div>
@@ -1152,7 +1170,7 @@ function ffSecAnalitica(comp) {
       <button onclick="ffCopyResumenFF()" class="pullbtn">📋 Copiar resumen</button>
     </div>
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-      <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big glow">${FF_MONEY(kpi.capital)}</div><div class="meta">${kpi.total} deals · ${cerradas} ciclos cerrados</div></div>
+      <div class="card kpi"><div class="lab">Equity aportado · deuda HML</div><div class="big glow">${FF.capital ? FF_MONEY(FF.capital.equity_comprometido_airtable) : 'sin datos'}<span style="font-size:13px;color:var(--mut)"> + ${FF.capital ? FF_MONEY(FF.capital.deuda_hml_qbo != null ? FF.capital.deuda_hml_qbo : FF.capital.deuda_hml_os_activa) : '—'}</span></div><div class="meta">v_capital_deployed · all-in (costo) ${FF_MONEY(kpi.capital)} · ${kpi.total} deals · ${cerradas} cerrados</div></div>
       <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${FF_MONEY(kpi.equity)}</div><div class="meta">confiables</div></div>
       <div class="card kpi"><div class="lab">Utilidad entregada</div><div class="big up">${FF_MONEY(utilEnt)}</div><div class="meta">a inversionistas, histórica</div></div>
       <div class="card kpi"><div class="lab">Semáforos</div><div class="big ${nAllin + nHml + nBud ? 'down' : 'up'}">${nAllin + nHml + nBud}</div><div class="meta">🔴 ${nAllin} · ⏰ ${nHml} · 📈 ${nBud}</div></div>

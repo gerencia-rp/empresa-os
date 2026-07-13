@@ -302,6 +302,8 @@ async function osLoad() {
       (async () => { const all = []; for (let pg = 0; pg < 5; pg++) { const { data } = await sb.from('sabueso_findings').select('*').eq('active', true).order('id').range(pg * 1000, pg * 1000 + 999); all.push(...(data || [])); if (!data || data.length < 1000) break; } return all; })().catch(() => []),
       sb.from('sabueso_config').select('*').eq('activo', true).then(r => r.data || []).catch(() => []),
     ]);
+    // #2 (auditoría 13-jul): capital único desde la capa de KPIs — equity ≠ deuda
+    OS.capital = await sb.from('v_capital_deployed').select('*').maybeSingle().then(r => r.data).catch(() => null);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
@@ -510,7 +512,7 @@ function osGlobal(comp) {
   const unitCard = (slug, e, extra) => osCanArea(e.key) ? `<div class="card unit" data-osnav="/${slug}"><div class="ico">${e.icon}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>` : '';
   // KPIs macro por área: cada tarjeta solo si el usuario tiene el área (admin ve todo)
   const kpis = [
-    osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital desplegado (F&F)</div><div class="big glow">${OS_M(h.capital)}</div><div class="meta">${comp.ff.activos} deals activos · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
+    osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital del holding (F&F)</div><div class="big glow">${OS.capital ? OS_M(+OS.capital.equity_comprometido_airtable) : OS_M(h.capital)}</div><div class="meta">${OS.capital ? `equity aportado [Airtable] + deuda HML ${OS_K(+(OS.capital.deuda_hml_qbo != null ? OS.capital.deuda_hml_qbo : OS.capital.deuda_hml_os_activa))} [QBO] — la deuda no es capital` : 'v_capital_deployed sin datos'} · ${comp.ff.activos} deals · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>` : '',
     (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>` : '',
