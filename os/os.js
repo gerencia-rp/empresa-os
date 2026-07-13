@@ -306,6 +306,8 @@ async function osLoad() {
     OS.capital = await sb.from('v_capital_deployed').select('*').maybeSingle().then(r => r.data).catch(() => null);
     // B5: la ficha de casa lee equity/all-in/líder de la capa de KPIs (v_property_360)
     OS.p360 = await sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []);
+    // B4: ocupación ÚNICA desde v_ocupacion (48/45/3/0 = 93.75%) — mata el snapshot congelado
+    OS.ocup = await sb.from('v_ocupacion').select('*').maybeSingle().then(r => r.data).catch(() => null);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
@@ -390,7 +392,10 @@ function osCompute() {
   return {
     mb,
     ff: { deals: ff.length, activos: ffActive.length, capital: ffCapital, arv: ffArv, alertas: ffAlertas, list: ff },
-    rentas: { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
+    // B4 (auditoría 13-jul): la ocupación oficial viene de v_ocupacion (capa de KPIs) — misma cifra en todas las pantallas
+    rentas: OS.ocup
+      ? { casas: OS.props.length, unidades: +OS.ocup.unidades_rentables, ocupadas: +OS.ocup.ocupadas, occPct: Math.round(+OS.ocup.ocupacion_pct), mantenimiento: +OS.ocup.mantenimiento, disponibles: +OS.ocup.disponibles, ingresos: rentInc }
+      : { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
     cobranza,
     holding: { capital: ffCapital, arv: ffArv, unidades: totalU + ff.length, ingresosMes: rentInc, deudaCobranza: cobranza.total },
     remodel: (() => {

@@ -265,6 +265,8 @@ async function ccLoadAll() {
       sb.from('pm_alerts').select('severity,category,message,property_id').eq('resolved', false),
     ]);
     if (props.error) throw props.error;
+    // B4 (auditoría 13-jul): ocupación ÚNICA — v_ocupacion (capa de KPIs)
+    CC.ocup = await sb.from('v_ocupacion').select('*').maybeSingle().then(r => r.data).catch(() => null);
     CC.props = props.data || []; CC.units = units.data || []; CC.pay = pay.data || [];
     CC.exp = exp.data || []; CC.book = book.data || []; CC.tenants = tenants.data || [];
     CC.tasks = tasks.data || []; CC.alerts = alerts.data || [];
@@ -320,7 +322,13 @@ function ccCompute() {
   const potFree = CC.units.filter(u => ccUnitState(u) === 'libre').reduce((s, u) => s + Number(u.target_rent || 0), 0);
   const capture = potTotal ? Math.round((potTotal - potFree) / potTotal * 100) : 0;
 
-  return { mb, houses, kpi: { totalU, occU, resU, freeU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, inc, incCash, expT, cashflow: inc - expT, potTotal, potFree, capture } };
+  // B4+B13 (auditoría 13-jul): los KPIs de ocupación salen de v_ocupacion (misma cifra en TODAS las
+  // pantallas); "libres" = disponibles (JAMÁS incluye mantenimiento). Fallback local si la vista falta.
+  const oc = CC.ocup;
+  const kpiOcc = oc
+    ? { totalU: +oc.unidades_rentables, occU: +oc.ocupadas, resU: +oc.reservadas, freeU: +oc.disponibles, mantU: +oc.mantenimiento, occPct: Math.round(+oc.ocupacion_pct) }
+    : { totalU, occU, resU, freeU, mantU: null, occPct: totalU ? Math.round(occU / totalU * 100) : 0 };
+  return { mb, houses, kpi: { ...kpiOcc, inc, incCash, expT, cashflow: inc - expT, potTotal, potFree, capture } };
 }
 
 // ─── INSIGHTS (reglas rankeadas por $ de impacto) ───
