@@ -19,6 +19,7 @@ const DIST = path.join(ROOT, "dist");
 const BUNDLE_FILES = [
   "ui-toolkit.js",
   "ui/kit.js",           // 🎨 UI kit del sistema de diseño (kitMoney/kitHero/… — Fase 0)
+  "ui/kit-decision.js",  // 🧭 O4: TermTooltip + DrillDown + NextAction + Tarjeta-KPI (auditoría 13-jul)
   "lib/deal-rules.js",
   "app.js",
   "estimator.js",
