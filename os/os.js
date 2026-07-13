@@ -1047,8 +1047,13 @@ function opsCeoView(o) {
   const tend = o.tend.slice(-10);
   const maxO = Math.max(...tend.map(x => x.overdue), 1);
   const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
+  // N12 (auditoría 13-jul): índice de disciplina por persona (fecha+dueño 50% · al día 30% · movimiento 20%)
+  if (OS.disciplina === undefined) { OS.disciplina = null; sb.from('v_disciplina_clickup').select('*').order('disciplina', { ascending: false }).then(r => { OS.disciplina = r.data || []; osRender(); }).catch(() => { OS.disciplina = []; }); }
+  const discCard = (OS.disciplina && OS.disciplina.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧭 Índice de disciplina por persona (ClickUp)</div><div class="meta" style="margin-bottom:4px">higiene (fecha+dueño) 50% · al día 30% · movimiento 7d 20% — accountability, no castigo</div>
+    ${OS.disciplina.slice(0, 8).map(p => `<div class="krow" style="padding:5px 0"><span>${OS_E(p.persona)} <span style="opacity:.5">· ${p.tareas} tareas</span></span><b class="${p.disciplina >= 60 ? 'up' : p.disciplina >= 30 ? 'warn' : 'down'}">${p.disciplina}</b></div>`).join('')}</div>` : '';
   return `${kpis}
     <div class="grid k3" style="margin-top:14px">${empCards}</div>
+    ${discCard}
     <div class="grid k2" style="margin-top:14px">
       <div class="card"><div class="lab">🎯 Las 3 decisiones de la semana</div><div class="meta" style="margin-bottom:4px">rankeadas por impacto ($/inversionista primero)</div>${decHtml}</div>
       <div class="card"><div class="lab">Tendencia de vencidas · ${tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:54px;margin:12px 0 4px">${spark || '<span class="meta">sin snapshots</span>'}</div><div class="meta">${tend.length ? tend[0].d + ' → ' + tend[tend.length - 1].d : ''}</div><div class="krow" style="cursor:pointer;margin-top:8px" onclick="opsGo('sabueso')"><span>🐕 <b>${(OS.sabueso || []).length} anomalías</b> del Sabueso</span><b style="opacity:.5">ver →</b></div></div>

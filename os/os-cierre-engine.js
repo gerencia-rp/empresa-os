@@ -228,7 +228,7 @@
     });
 
     // ══ C14 · PAGO SIN COMPROBANTE (regla de Silvia: sin soporte NO se da por bueno) ══
-    const maxList = cfgNum(cfg, 'c14_max_listar');
+    const maxList = Math.max(20, cfgNum(cfg, 'c14_max_listar'));  // N11: top-20 = ~60% del riesgo
     const sinSoporte = [];
     pmPay.forEach(x => { if (['pagado', 'paid', 'completado'].includes(x.status) && !((x.proof_url || '').trim() || (x.attachment_url || '').trim()) && N(x.amount) > 0) sinSoporte.push({ tipo: 'renta', casa: (pmPropById[x.property_id] || {}).name, monto: N(x.amount), ref: x.concept || x.billing_ym }); });
     pmExp.forEach(e => { if (!((e.invoice_url || '').trim()) && N(e.amount) > 0) sinSoporte.push({ tipo: 'gasto', casa: (pmPropById[e.property_id] || {}).name, monto: N(e.amount), ref: e.description || e.subcategory }); });

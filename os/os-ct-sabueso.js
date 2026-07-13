@@ -40,7 +40,7 @@ async function ctLoad(force) {
     ]);
     // datasets para los checks C9–C18 del motor de cierre (reunión 9-jul) — bajo RLS, áreas ajenas devuelven []
     const g = (q) => q.then(r => r.data || []).catch(() => []);
-    const [hmlPays, ext, remodelC, matPays, wh, pmPayC, pmExpC, docx, diverg, obrasKpi] = await Promise.all([
+    const [hmlPays, ext, remodelC, matPays, wh, pmPayC, pmExpC, docx, diverg, obrasKpi, fantasmas] = await Promise.all([
       g(sb.from('ff_hml_payments').select('address_norm,fecha,fee,pago_hml').eq('active', true)),
       g(sb.from('ff_extension_payments').select('*').eq('active', true)),
       g(sb.from('remodel_at_properties').select('address,property_id,proceso,avance_pct,avance_real,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,monto_real,monto_por_gastar,fecha_inicio,fecha_real_fin').eq('active', true)),
@@ -51,10 +51,12 @@ async function ctLoad(force) {
       g(sb.from('ct_doc_extracts').select('*').eq('active', true).eq('estado', 'propuesta').order('created_at', { ascending: false })),
       g(sb.from('v_divergencias_legacy').select('*')),
       sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null),
+      g(sb.from('v_casas_fantasma').select('*')),
     ]);
     CT.eng = { hmlPays, extensiones: ext, remodel: remodelC, matPays, workerHours: wh, pmPay: pmPayC, pmExp: pmExpC };
     CT.diverg = diverg;
     CT.obrasKpi = obrasKpi;
+    CT.fantasmas = fantasmas;
     CT.docx = docx;
     CT.agentId = ag ? ag.id : null;
     if (cfg.error) throw cfg.error;
@@ -274,6 +276,11 @@ function ctRunChecks() {
       }, CT.cfg));
     } catch (e) { add('C9', 'holding', 'engine-error', 'Motor de cierre falló: ' + (e.message || e), 0, 'info', 'OS', {}); }
   }
+
+  // ══ C21 · CASA FANTASMA (N10 auditoría 13-jul): activa con 0 unidades rentables o sin modelo ══
+  (CT.fantasmas || []).forEach(cf => add('C21', 'rentas', 'fantasma-' + String(cf.casa || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20),
+    'Casa fantasma · ' + cf.casa + ': ' + cf.motivo + ' — no debe contar en vacancia ni inventar "1 unid · 1 disp"; configurar unidades/modelo en Airtable o archivarla',
+    0, 'media', 'Airtable', cf));
 
   // ══ C20 · INTERÉS NEGATIVO en el P&L (B11 auditoría 13-jul): reversas mal clasificadas contaminan los libros ══
   (OS.qbCache || []).filter(x => x.report && x.report.startsWith('pnl') && /inter/i.test(x.label || '') && +x.value < 0)
