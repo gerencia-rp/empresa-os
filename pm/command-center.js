@@ -856,6 +856,24 @@ function ccSecInquilinos(comp) {
 function ccSecAnalitica(comp) {
   const { kpi, houses } = comp;
   const tools = `<div class="reptools"><span class="reptitle">📊 Informes CEO</span><button class="repbtn" onclick="window.print()">🖨️ PDF</button><button class="repbtn" onclick="ccExportExcelRentas()">⬇ Excel</button><button class="repbtn ghost" onclick="ccCopyResumenRentas()">📋 Copiar resumen</button></div>`;
+  // N5 (auditoría 13-jul): RENT-ROLL VIVO — potencial vs realizada, gap en $ por casa (v_rent_roll)
+  if (CC.rentRoll === undefined) { CC.rentRoll = null; sb.from('v_rent_roll').select('*').order('gap', { ascending: false }).then(r => { CC.rentRoll = r.data || []; ccRender(); }).catch(() => { CC.rentRoll = []; }); }
+  const rrRows = (CC.rentRoll || []).slice(0, 12);
+  const rentRoll = rrRows.length ? `<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">💵 Rent-roll vivo — potencial vs realizada (${rrRows[0].mes_renta})</div><div class="k">v_rent_roll · el gap es vacancia o cobranza, en plata</div></div>
+    <div class="overx"><table class="ptable"><thead><tr><th>Casa</th><th>Modelo</th><th>Unid (ocup)</th><th>Potencial</th><th>Realizada</th><th>Gap</th></tr></thead><tbody>
+    ${rrRows.map(r => `<tr><td>${CC_ESC(r.casa)}</td><td>${CC_ESC(r.modelo || '—')}</td><td>${r.unidades} (${r.ocupadas})</td><td>${CC_MONEY(+r.potencial)}</td><td>${CC_MONEY(+r.realizada)}</td><td class="${+r.gap > 500 ? 'down' : 'up'}">${CC_MONEY(+r.gap)}</td></tr>`).join('')}</tbody></table></div></div>` : '';
+  // N6: analítica por MODELO de negocio × mes de renta (billing_ym) — no solo agregados por zona
+  const porModeloMes = (() => {
+    const propModelo = {}; (CC.props || []).forEach(p => propModelo[p.id] = p.rental_model || '(sin modelo)');
+    const meses = [...new Set((CC.pay || []).map(p => p.billing_ym).filter(Boolean))].sort().slice(-4);
+    const agg = {};
+    (CC.pay || []).forEach(p => { if (!p.billing_ym || !meses.includes(p.billing_ym)) return; const m = propModelo[p.property_id] || '(sin modelo)'; agg[m] = agg[m] || {}; agg[m][p.billing_ym] = (agg[m][p.billing_ym] || 0) + (+p.amount || 0); });
+    const modelos = Object.keys(agg).sort();
+    if (!modelos.length) return '';
+    return `<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">📐 Ingreso por MODELO de negocio × mes de renta</div><div class="k">qué modelo repetir y cuál frenar</div></div>
+      <div class="overx"><table class="ptable"><thead><tr><th>Modelo</th>${meses.map(m => `<th>${m}</th>`).join('')}</tr></thead><tbody>
+      ${modelos.map(mo => `<tr><td><b>${CC_ESC(mo)}</b></td>${meses.map(m => `<td>${agg[mo][m] ? CC_MONEY(Math.round(agg[mo][m])) : '<span style="opacity:.4">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  })();
   const withData = houses.filter(h => h.inc > 0 || h.exp > 0);
   const best = [...withData].sort((a, b) => b.net - a.net)[0];
   const worst = [...withData].sort((a, b) => a.net - b.net)[0];
@@ -863,7 +881,9 @@ function ccSecAnalitica(comp) {
   // Ocupación por zona (regla)
   const Z = {}; houses.forEach(h => { const z = ccZoneLabel(h.zone); (Z[z] = Z[z] || { o: 0, t: 0 }); Z[z].o += h.occ; Z[z].t += h.total; });
   const zoneRows = Object.entries(Z).filter(([, v]) => v.t).map(([z, v]) => ({ z, pct: Math.round(v.o / v.t * 100), o: v.o, t: v.t })).sort((a, b) => b.pct - a.pct);
-  return `${ccHeader('Analítica', 'KPIs', `Tendencias e indicadores del portafolio · ${CC.props.length} casas · ${kpi.totalU} unidades (regla) · ${kpi.occPct}% ocupación`)}
+  return `${ccHeader('Analítica', 'KPIs', `Tendencias e indicadores del portafolio · ${CC.props.length} casas · ${kpi.totalU} unidades · ${kpi.occPct}% ocupación`)}
+    ${rentRoll}
+    ${porModeloMes}
     ${tools}
     <div class="grid kpis">
       <div class="card kpi"><div class="lab">Cashflow del mes</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div><div class="meta">${comp.mb.label} · ing ${CC_K(kpi.inc)} / gas ${CC_K(kpi.expT)}</div></div>
