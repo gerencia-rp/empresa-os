@@ -234,7 +234,7 @@ window.ffToggleTheme = ffToggleTheme;
 async function ffLoadAll() {
   FF.loading = true; FF.loadError = null;
   try {
-    const [deals, draws, inv, oh, hml, loans, cfg] = await Promise.all([
+    const [deals, draws, inv, oh, hml, loans, cfg, qb] = await Promise.all([
       sb.from('ff_deals').select('*').eq('active', true),
       sb.from('ff_draws').select('*').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
@@ -242,11 +242,14 @@ async function ffLoadAll() {
       sb.from('ff_hml_payments').select('address_norm, fecha, pago_hml, fee, ref30').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_uw_config').select('key, value, text_value').then(r => r.data || []).catch(() => []),
+      // B1: la GANANCIA real viene del P&L de QBO (espejo qb_report_cache) — una sola definición
+      sb.from('qb_report_cache').select('report,label,value,fetched_at').eq('empresa', 'fix_flip').in('label', ['Net Income', 'Total Income', 'Total Expenses', 'Net Other Income']).then(r => r.data || []).catch(() => []),
     ]);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
     FF.loans = loans || [];
+    FF.qb = qb || [];
     FF.cfg = {}; FF.cfgT = {}; (cfg || []).forEach(c => { if (c.value != null) FF.cfg[c.key] = +c.value; if (c.text_value) FF.cfgT[c.key] = c.text_value; });
   } catch (e) { FF.loadError = e.message || String(e); }
   finally { FF.loading = false; }
@@ -590,8 +593,14 @@ function ffSecFinanzas(comp) {
   const gt = ffGastosPorTipo();
   const ohReal = (FF.overhead || []).reduce((t, x) => t + (+x.monto || 0), 0);
   const intReal = (FF.hml || []).reduce((t, x) => t + (+x.pago_hml || 0), 0);
-  const rentDraws = (FF.draws || []).reduce((t, d) => t + (+d.net_total || 0), 0);
-  const ebitdaFF = rentDraws - ohReal;
+  // B1 (auditoría 13-jul): Σ(draws − gastos op) NO es EBITDA ni "rentabilidad" — es DÉFICIT DE
+  // CAPITAL EN HOLD (cash inyectado a recuperar vía refi/venta). La ganancia real = P&L de QBO.
+  const deficitHold = (FF.draws || []).reduce((t, d) => t + (+d.net_total || 0), 0);
+  const qbVal = (rep, lbl) => { const r = (FF.qb || []).find(x => x.report === rep && x.label === lbl); return r ? +r.value : null; };
+  const netYtd = qbVal('pnl_ytd', 'Net Income');
+  const netAll = qbVal('pnl_all', 'Net Income');
+  const qbAsOf = (FF.qb || []).reduce((m, x) => (!m || x.fetched_at > m) ? x.fetched_at : m, null);
+  const qbAsOfLbl = qbAsOf ? new Date(qbAsOf).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : null;
   const invertido = comp.deals.reduce((s, d) => s + d.allIn, 0);
   // equity y déficit acumulado: SOLO deals confiables (el error $189k los distorsiona) → comp.kpi
   const equity = comp.kpi.equity;
@@ -617,10 +626,10 @@ function ffSecFinanzas(comp) {
       <div class="card kpi"><div class="lab">Intereses / gasto</div><div class="big warn">${kitPct(gt.intPct)}</div><div class="meta">${kitMoney(gt.g['Intereses'], { ceroEs: 'sin datos' })} de ${kitMoney(gt.total, { ceroEs: 'sin datos' })}</div></div>
     </div>
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px">
-      <div class="card kpi"><div class="lab">Rentabilidad draws</div><div class="big ${rentDraws>=0?'up':'down'}">${kitMoney(rentDraws, { ceroEs: 'sin datos' })}</div><div class="meta">Σ neto por casa (fuente Airtable)</div></div>
+      <div class="card kpi"><div class="lab">${typeof kitTerm === 'function' ? kitTerm('deficit', 'Déficit de capital en hold') : 'Déficit de capital en hold'}</div><div class="big ${deficitHold>=0?'up':'warn'}">${kitMoney(deficitHold, { ceroEs: 'sin datos' })}</div><div class="meta">a recuperar vía refi/venta · Σ neto draws [Airtable] — NO es pérdida ni EBITDA</div></div>
       <div class="card kpi"><div class="lab">Overhead FF real</div><div class="big down">${kitMoney(ohReal, { ceroEs: 'sin datos' })}</div><div class="meta">equipo ${kitMoney((FF.overhead||[]).filter(x=>x.source==='equipo').reduce((t,x)=>t+(+x.monto||0),0), { ceroEs: 'sin datos' })} · plataformas ${kitMoney((FF.overhead||[]).filter(x=>x.source==='plataformas').reduce((t,x)=>t+(+x.monto||0),0), { ceroEs: 'sin datos' })}</div></div>
       <div class="card kpi"><div class="lab">Intereses HML reales</div><div class="big warn">${kitMoney(intReal, { ceroEs: 'sin datos' })}</div><div class="meta">${(FF.hml||[]).length} pagos fechados</div></div>
-      <div class="card kpi"><div class="lab">EBITDA FF (aprox)</div><div class="big ${ebitdaFF>=0?'up glow':'down'}">${kitMoney(ebitdaFF)}</div><div class="meta">rentabilidad draws − overhead</div></div>
+      <div class="card kpi"><div class="lab">Ganancia real (Net Income)</div><div class="big ${netYtd != null ? (netYtd>=0?'up glow':'down') : ''}">${netYtd != null ? kitMoney(netYtd) : '<span style="font-size:16px;color:var(--mut)">sin libros QBO</span>'}</div><div class="meta">P&L QuickBooks YTD${qbAsOfLbl ? ' · al ' + qbAsOfLbl : ''}${netAll != null ? ' · histórico ' + kitMoney(netAll) : ''} — la ÚNICA definición de ganancia</div></div>
     </div>
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">del desglose de draws</div></div><div style="position:relative;height:300px;width:100%;overflow:hidden"><canvas id="ff-fin-donut"></canvas></div></div>
