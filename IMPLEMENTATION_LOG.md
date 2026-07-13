@@ -86,7 +86,7 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 | 23 | Legacy en silencio | manual ≠ rollup sin alertar | 4 divergencias ALERTADAS (C19) | ✅ |
 | 24 | $0 sobre vacío | ✅ sobre vacío en varias pantallas | guard-rails (kitMoney null='—', noZeroAsReal) + gate (c) | ✅ |
 | 25 | Dato→decisión | EVM aislado en 1/50 pantallas | glosario 24 términos + Term/Drill/NextAction replicado | ✅ |
-| 26 | Ruido de anomalías | 2,927 crudas sin priorizar | colapso semántico en grupos por $ (crudas siguen ~2,934: la cura de ORIGEN espera la plantilla N7) | 🟡 |
+| 26 | Ruido de anomalías | 2,927 crudas sin priorizar | grupos por $ + **plantilla N7 LLENADA (13-jul)**: 30 reglas data-driven (dueño = asignado real más frecuente por lista) → 1,404/1,411 huérfanas (99.5%) con dueño+vencimiento sugeridos, card en /operacion; se aplican vía propuesta→OK humano→ClickUp | ✅ |
 | 27 | Supuestos | $28/sqft · 12m soñados | $53/sqft real (19 obras) · obra 1.8m · holding 4.6m, aplicables 1-clic | ✅ |
 | 28 | Gobernanza IA | viewer publicó cross-área, sin audit | área⊆allowed_areas + created_by + versionado + audit inmutable + **N8 carril datos FUNCIONAL** (whitelist 6 vistas · gate admin en DB · RLS del usuario · audit vivo) | ✅ |
 
