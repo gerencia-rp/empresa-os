@@ -251,6 +251,8 @@ async function ffLoadAll() {
     FF.pnlCasa = await sb.from('v_pnl_casa').select('*').then(r => r.data || []).catch(() => []);
     // N3: utilidad realizada de obras (Airtable) para el waterfall — v_obras_kpi (O1)
     FF.obrasKpi = await sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // N2: equity incorporado por casa — v_property_360 (O1)
+    FF.p360 = await sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
@@ -669,10 +671,29 @@ function ffSecFinanzas(comp) {
       <div class="overx"><table class="ptable"><thead><tr><th>Casa</th><th>Rentas</th><th>Gastos</th><th>Interés HML</th><th>Neta post-interés</th></tr></thead><tbody>
       ${pnlRows.map(p => `<tr><td>${FF_ESC(p.casa)}</td><td>${kitMoney(+p.ingresos_renta, { ceroEs: 'sin renta aún' })}</td><td>${kitMoney(+p.gastos_operativos, { ceroEs: '—' })}</td><td class="warn">${kitMoney(+p.interes_hml_real, { ceroEs: '—' })}</td><td class="${+p.utilidad_neta_post_interes >= 0 ? 'up' : 'down'}">${kitMoney(+p.utilidad_neta_post_interes)}</td></tr>`).join('')}</tbody></table></div>
       <div class="meta" style="margin-top:8px">El interés que antes era invisible ahora está en la línea de cada casa. Prorrateo teórico (días×tasa) disponible en la vista para casas sin pagos fechados.</div></div>` : '';
+  // N2: EQUITY INCORPORADO del holding — la señal BUENA, casa por casa (v_property_360; solo deals
+  // con obra real: rehab_real presente; el pipeline sin rehab inflaría con ARV−compra)
+  const eqCasas = (FF.p360 || []).filter(p => p.etapa !== 'vendida' && p.equity != null && p.rehab_real != null)
+    .sort((a, b) => (+b.equity) - (+a.equity));
+  const eqTotal = eqCasas.reduce((s, p) => s + (+p.equity), 0);
+  const eqMax = eqCasas.length ? Math.max(...eqCasas.map(p => Math.abs(+p.equity))) : 1;
+  const eqBar = p => {
+    const v = +p.equity, w = Math.max(3, Math.round(100 * Math.abs(v) / eqMax));
+    const drillHtml = typeof kitRow === 'function' ? kitRow('ARV', +p.arv) + kitRow('− Compra', null, { txt: '−' + kitMoney(+p.compra), neg: true }) + kitRow('− Rehab real', null, { txt: '−' + kitMoney(+p.rehab_real), neg: true }) + kitRow('= Equity incorporado', +p.equity, { big: true, last: true, color: v >= 0 ? 'var(--pos)' : 'var(--neg)' }) : '';
+    const val = typeof kitDrill === 'function' ? kitDrill('<b style="color:' + (v >= 0 ? 'var(--pos)' : 'var(--neg)') + '">' + kitMoney(v) + '</b>', p.casa + ' — equity', drillHtml, 'Airtable') : kitMoney(v);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:4px 0"><span style="width:150px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${FF_ESC(p.casa)}</span>
+      <div style="flex:1;height:9px;border-radius:6px;background:var(--glass)"><div style="height:100%;width:${w}%;border-radius:6px;background:${v >= 0 ? 'var(--pos)' : 'var(--neg)'}"></div></div>
+      <span style="width:90px;text-align:right;font-size:12.5px">${val}</span></div>`;
+  };
+  const equityPanel = eqCasas.length ? `<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">💎 Equity incorporado del holding</div><div class="k">Σ(ARV − all-in) por casa con obra · el verdadero pitch al inversor</div></div>
+      <div style="font-size:30px;font-weight:800;color:var(--pos);margin:2px 0 10px">${kitMoney(eqTotal)}</div>
+      ${eqCasas.slice(0, 12).map(eqBar).join('')}
+      ${eqCasas.length > 12 ? `<div class="meta" style="margin-top:6px">+ ${eqCasas.length - 12} casas más</div>` : ''}</div>` : '';
   return `${ffHeader('Finanzas', 'QuickBooks + Cockpit', `Invertido ${kitMoney(invertido)} · equity ${kitMoney(equity)} · déficit ${kitMoney(deficit)} · interés ${gt.intPct}% del gasto`)}
     ${ffDQBar(comp)}
     ${topeN4}
     ${hero}
+    ${equityPanel}
     ${waterfall}
     ${pnlCasaCard}
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
