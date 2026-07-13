@@ -20,11 +20,11 @@ Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota)
 - ✅ **1.7 · B5+B6+B8** — B5: ficha muestra Equity incorporado SIEMPRE (v_property_360: Wellington +$200,000; déficit en hold pasa a secundario "a recuperar, no es pérdida"; all-in desglosado compra+rehab; líder resuelto) · B6: verificado YA cubierto por trabajo previo (badge "en curso · proyectado", utilidad proyectada = valor_cliente − gasto = fórmula de la auditoría, Denfield +$63K; avance Planner-first de 0.4) · B8: sync-remodel-workers mapea el LINK Personal en Campo + lookup tarifa + link propiedad (deployado + corrido: 3,433/3,436 filas con recId), v_remodel_nomina_ledger v2 joinea por recId (texto libre solo fallback legacy) — **0 sin tarifa (antes 177) · 0 deudas negativas (antes 172)** · sobrepago $133,902 visible aparte · deuda neta $39,026. NOTA: si falta tarifa de alguien nuevo se carga EN AIRTABLE (Personal en Campo), no acá.
 
 ## FASE 2 — Consistencia
-- ⬜ 2.1 · B4+B13+B14 ocupación única
-- ⬜ 2.2 · B7+B9 roll-ups + rentabilidad
-- ⬜ 2.3 · O6 motor de reportes PDF
-- ⬜ 2.4 · P7 NextAction en toda la app
-- ⬜ 2.5 · O9+B11+B15 cerebro por $ + limpiezas contables
+- ✅ **2.1 · B4+B13+B14** — v_ocupacion (48/45/3/0=93.75%) en Global + Rentas CC (todas sus secciones vía kpi override); libres=disponibles sin mantenimiento; snapshot 30/34 muerto. B14: el calendario clásico no muestra % (no reproducible — anotado). pm-main clásico conserva la regla del dueño internamente (alimenta cobranza), el headline del OS es la vista.
+- ✅ **2.2 · B7+B9** — avance prom solo Planner (mata el 91%); rentabilidad = margen ponderado Σutilidad/Σvalor_interno = **11.6% ✓** (excl. denominador ≤0, mata 0.2% y Stonleigh 322%); obras ya venían del espejo (26).
+- ✅ **2.3 · O6** — ui/report-engine.js (reportOpen genérico: marca, KPI cards, tablas badges, filas, conclusión, print CSS, sin-dato≠$0) + reportCasa() de las vistas O1, botón 📄 en la ficha.
+- ✅ **2.4 · P7** — kitNext en Global (cobranza→Carlos, appraisal>ARV→Juan) + Ficha (déficit→refi/venta); Rentas CC ya traía action, Sabueso tiene proponer/contadora, FF Finanzas desde 1.3.
+- ✅ **2.5 · O9+B11+B15** — colapso semántico 2,927→grupos priorizados (sla/críticas/volumen) en /operacion con filtro 1-clic · C20 interés negativo (Refin −$15,747.56 ✓ detectado; reclasificación = contadora, QBO read-only) · "Cobranza operativa" + A/R QBO al lado.
 
 ## FASE 3 — Datos / proceso / inteligencia
 - ⬜ 3.1 · O7 supuestos calibrados
