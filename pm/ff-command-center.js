@@ -533,6 +533,22 @@ function ffInvRowsHTML(crm) {
 }
 function ffInvSearch(v) { FF.invQ = v; const tb = document.getElementById('ff-crm-tbody'); if (tb) tb.innerHTML = ffInvRowsHTML(ffInvCrm()); }
 window.ffInvSearch = ffInvSearch;
+// ─── Guía "¿qué hago acá?" del CRM (obs #12 CEO) — colapsable, estado persistido en localStorage ───
+function ffCrmGuiaToggle(open) { try { localStorage.setItem('ff_crm_guia', open ? 'abierta' : 'cerrada'); } catch (e) { /* storage bloqueado: no persiste, no rompe */ } }
+window.ffCrmGuiaToggle = ffCrmGuiaToggle;
+function ffCrmGuia() {
+  let abierta = true; try { abierta = localStorage.getItem('ff_crm_guia') !== 'cerrada'; } catch (e) { }
+  const paso = (n, t, d) => '<div style="display:flex;gap:10px;align-items:flex-start;margin-top:9px">'
+    + '<span style="flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--glass);border:1px solid var(--glassb);display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;color:var(--ink)">' + n + '</span>'
+    + '<div style="font-size:12px;line-height:1.55;color:var(--mut)"><b style="color:var(--ink)">' + t + '</b> — ' + d + '</div></div>';
+  return '<details class="card" style="margin-bottom:14px;padding:12px 16px"' + (abierta ? ' open' : '') + ' ontoggle="ffCrmGuiaToggle(this.open)">'
+    + '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink)">🧭 ¿Qué hago acá?<span style="font-weight:500;color:var(--mut2);font-size:11px">guía rápida del CRM · clic para abrir/cerrar</span></summary>'
+    + paso(1, 'Qué es esta pantalla', 'el CRM de inversionistas activos: quiénes son, qué capital mueven (comprometido vs aportado) y con qué modelo/contrato trabajan. Todo viene de Airtable — acá se mira y se decide, no se edita.')
+    + paso(2, 'Mirá primero', 'los KPIs de arriba: contratos sin firmar (cuando el dato exista en Airtable), sociedades a documentar y el capital del holding (comprometido vs aportado). Un contrato sin firma o un socio sin documentar va primero.')
+    + paso(3, 'Tomá acción', 'contactá al inversionista, generá una propuesta con los 4 modelos (botón ✎ Generar propuesta) o calculá el buy-out (capital + 15%) en la cap table. Lo que acuerdes se registra en Airtable — esta pantalla es SOLO LECTURA.')
+    + paso(4, 'Dónde sigue el flujo', 'la propuesta se convierte en deal (Pipeline / Underwriting), el deal se fondea y el inversionista sigue su plata en el Portal de Inversionistas (/inversionista). El ciclo completo: CRM → propuesta → deal → portal.')
+    + '</details>';
+}
 function ffSecInversionistas(comp) {
   const crm = ffInvCrm();
   const isLLC = ffInvIsLLC;
@@ -542,6 +558,7 @@ function ffSecInversionistas(comp) {
   const aporteBase = Math.round((invertido / (comp.deals.length || 1)) / 1000) * 1000;
   const hero = ffCapitalHero(crm.length + ' inversionistas en el CRM · all-in de los deals (costo) <b>' + kitMoney(invertido) + '</b> · aporte base típico <b>' + kitMoney(aporteBase) + '</b>');
   return `${ffHeader('Inversionistas', 'CRM + Modelos', `${crm.length} inversionistas (sin la propia empresa) · ${crm.filter(isLLC).length} LLCs · ${conSocio} con socio`)}
+    ${ffCrmGuia()}
     ${hero}
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       <div class="card kpi"><div class="lab">Inversionistas</div><div class="big">${crm.length}</div><div class="meta">CRM depurado (sin Flipping Rentals LLC)</div></div>
