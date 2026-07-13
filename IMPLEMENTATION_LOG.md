@@ -41,6 +41,41 @@ Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota)
 - Fix post-deploy: v_pnl_casa reescrita con CTEs (migr 20260713200000) — la versión con 6 subqueries correlacionadas se iba a timeout bajo RLS con select * (el front recibía []).
 - Gotcha de QA documentado: innerHTML serializa & → &amp; ("P&L" no matchea en el DOM; buscar por innerText).
 
+
+## RE-AUDITORÍA 28 DIMENSIONES (13-jul, medida contra data viva)
+| # | Dimensión | ANTES (auditoría) | DESPUÉS (medido hoy) | ✓ |
+|---|---|---|---|---|
+| 1 | Capital desplegado | $7.83M/$8.37M (deuda como capital) | equity $963,597.63 + deuda $4,515,214 separadas | ✅ |
+| 2 | Equity en libros | espejo stale $728,361 | $763,361 = QBO vivo | ✅ |
+| 3 | Ganancia | "EBITDA −$453,456" falso | Net Income QBO YTD $46,102.99 (exacto al vivo) | ✅ |
+| 4 | Net Income fantasma | $1,067,530 inexistente | eliminado; no reproducible | ✅ |
+| 5 | Déficit mal rotulado | "Rentabilidad draws −$320,230" | "Déficit de capital en hold (a recuperar)" | ✅ |
+| 6 | Motor conciliación | $8.3M sin conciliar > assets | C1–C3 neteado + guard ≤ $7,669,529 (motor en error si viola) | ✅ |
+| 7 | Espejo HML-Refin | Δ −$238,500 | $1,459,200 = QBO vivo · as_of 13-jul | ✅ |
+| 8 | Ocupación | 4 valores distintos, 30/34 congelado | 48/45/3/0 = 93.75% única (= PDF equipo) | ✅ |
+| 9 | Estados canónicos | libres incluía mantenimiento | disponibles=0 sin mantenimiento | ✅ |
+| 10 | Conteo de obras | 31 (Estimador+dupes) · avance 91% legacy | 26/7 · avance solo Planner | ✅ |
+| 11 | Utilidad realizada | inconsistente | $170,682 exacto en capa KPIs | ✅ |
+| 12 | Rentabilidad | "0.2%" y Stonleigh 322% | 11.6% ponderado (excl. denominador ≤0) | ✅ |
+| 13 | Ficha (Wellington) | "déficit −$130k" | equity +$200,000 (déficit hold secundario) | ✅ |
+| 14 | Reporte de obra | "$0 🔴 PÉRDIDA" en curso | proyectada = valor−gasto + badge en curso | ✅ |
+| 15 | Identidad nómina | re-match texto libre | por LINK: 3,433/3,436 filas · 149/149 grupos | ✅ |
+| 16 | Tarifas nómina | 177 sin rate | 0 (lookup del link) | ✅ |
+| 17 | Deudas nómina | 172 negativas | 0 · sobrepago $133,902 visible aparte | ✅ |
+| 18 | Interés HML | invisible en P&L | $141,907 YTD = 66% ingreso · ICR 0.28× al tope + por casa | ✅ |
+| 19 | Puente de ganancias | 3 números, 30× gap | waterfall único con residuo declarado | ✅ |
+| 20 | Equity incorporado | tapado por cifras infladas | panel $2,852,652 (casas con obra) + ranking/drill | ✅ |
+| 21 | Llave property_id | strings sucios entre 4 fuentes | 175 aliases · QBO 20/20 · joins por id | ✅ |
+| 22 | Ghosts | rec vacío + 6 units + dupes | 0 · 0 · 0 | ✅ |
+| 23 | Legacy en silencio | manual ≠ rollup sin alertar | 4 divergencias ALERTADAS (C19) | ✅ |
+| 24 | $0 sobre vacío | ✅ sobre vacío en varias pantallas | guard-rails (kitMoney null='—', noZeroAsReal) + gate (c) | ✅ |
+| 25 | Dato→decisión | EVM aislado en 1/50 pantallas | glosario 24 términos + Term/Drill/NextAction replicado | ✅ |
+| 26 | Ruido de anomalías | 2,927 crudas sin priorizar | colapso semántico en grupos por $ (crudas siguen ~2,934: la cura de ORIGEN espera la plantilla N7) | 🟡 |
+| 27 | Supuestos | $28/sqft · 12m soñados | $53/sqft real (19 obras) · obra 1.8m · holding 4.6m, aplicables 1-clic | ✅ |
+| 28 | Gobernanza IA | viewer publicó cross-área, sin audit | área⊆allowed_areas + created_by + versionado + audit inmutable (N8 carril datos: spec) | 🟡 |
+
+**Score: 26 ✅ · 2 🟡 (dependen de config humana: plantilla N7 / carril N8).** Verificación adicional: smoke prod 17/17 · gate CI 12/12 · rent-roll vivo (Bethune gap $4,400/mes) · fantasmas Arcadia/Cervin detectadas solas.
+
 ## ANTES → DESPUÉS (verificado contra fuente)
 - Capital: "$7.83M/$8.37M desplegado" → equity $963,598 [Airtable] / $763,361 [QBO] + deuda separada.
 - Ganancia: 3 números con 30× de gap → Net Income QBO YTD único + waterfall con residuo declarado.
