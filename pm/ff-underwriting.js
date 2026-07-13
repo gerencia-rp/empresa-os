@@ -42,6 +42,8 @@ async function ffUwLoad() {
     UW.deals = deals; UW.analyses = an;
     UW.hml = {}; hml.forEach(h => { if (h.address_norm) UW.hml[h.address_norm] = h; });
     UW.draws = {}; (draws || []).forEach(dr => { if (dr.address_norm) UW.draws[dr.address_norm] = dr; });
+    // O7 (auditoría 13-jul): supuestos calibrados desde la HISTORIA real — visibles y aplicables
+    UW.calib = await sb.from('v_supuestos_calibrados').select('*').maybeSingle().then(r => r.data).catch(() => null);
   } catch (e) { console.warn('ffUwLoad', e); }
 }
 
@@ -58,7 +60,7 @@ function ffUwDefaults() {
   return {
     // negocio
     remod_directo: 0, usar_estimador: false, est_sqft: 1400, est_tipo: 'media',
-    meses_hold: 6, utilities_mes: 250, muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
+    meses_hold: UWc('default_meses_hold', 6), utilities_mes: 250, muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
     contingencia_pct: UWc('draw_contingencia_pct', 10), permisos: 1500, dumpster: 800, ac: 0,
     // 1B · El inversionista pone (HUD-1, defaults calibrados con el HUD de Bethune)
     purchase: 0, hml_finance_pct: 90,
@@ -347,6 +349,13 @@ function ffUwViewNegocio() {
     ? '<div style="background:color-mix(in srgb, var(--a1) 7%, transparent);border-radius:10px;padding:12px;margin-bottom:16px">' + kitInput('Superficie (sqft)', 'pies cuadrados a remodelar', inp.est_sqft, "ffUwSet('est_sqft',VAL)", { plain: true }) + '<div style="display:flex;gap:5px;margin-bottom:6px">' + ['suave', 'media', 'pesada'].map(t => '<button class="repbtn ' + (inp.est_tipo === t ? '' : 'ghost') + '" style="flex:1;padding:6px;font-size:11px;text-transform:capitalize" onclick="ffUwSet(\'est_tipo\',\'' + t + '\')">' + t + ' $' + ffUwPsf(t) + '</button>').join('') + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (+inp.est_sqft || 0) + ' sqft &times; $' + ffUwPsf(inp.est_tipo) + '/sqft = <b>' + UW_M(r.remod) + '</b> &middot; afuera costaría ' + UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0)) + '</div></div>'
     : kitInput('Costo de remodelación', 'real de la empresa de Remodelación', inp.remod_directo, "ffUwSet('remod_directo',VAL)", { foot: r.remod === 0 ? '⚠ sin costo real cargado — usá el estimador rápido' : 'del histórico de Remodelación' });
   const alerta = r.deficitRiesgo ? '<div class="ui-error" style="margin-top:8px">&#9888; Riesgo de déficit: el remod del draw es $' + r.psfDraw + '/sqft, por debajo del calibrado ($' + r.psfAlerta + '/sqft). El draw puede no cubrir la obra real.</div>' : '';
+  // O7 (auditoría 13-jul): supuestos desde la HISTORIA real — visibles, aplicación a 1 clic (humano)
+  const cal = UW.calib;
+  const supuestosO7 = cal ? '<div style="background:rgba(18,181,160,.07);border:1px solid rgba(18,181,160,.28);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:11.5px">'
+    + '⚙️ <b>Historia real</b>: obra <b>$' + (cal.psf_real || '—') + '/sqft</b> (' + cal.psf_n + ' finalizadas) · duración <b>' + (cal.obra_meses_prom || '—') + ' m</b> · holding hasta rentar <b>' + (cal.holding_meses_prom || '—') + ' m</b>. Defaults hoy: $/sqft media <b>$' + ffUwPsf('media') + '</b> · hold <b>' + UWc('default_meses_hold', 6) + ' m</b>.'
+    + (cal.psf_real && Math.abs(cal.psf_real - ffUwPsf('media')) > 3 && window.apCfgSet ? ' <button class="repbtn" style="padding:3px 10px;font-size:10.5px" onclick="apCfgSet(\'psf_media\',' + cal.psf_real + ')">aplicar $' + cal.psf_real + '/sqft</button>' : '')
+    + (cal.holding_meses_prom && Math.abs(Math.round(cal.holding_meses_prom) - UWc('default_meses_hold', 6)) >= 1 && window.apCfgSet ? ' <button class="repbtn ghost" style="padding:3px 10px;font-size:10.5px" onclick="apCfgSet(\'default_meses_hold\',' + Math.round(cal.holding_meses_prom) + ')">aplicar hold ' + Math.round(cal.holding_meses_prom) + ' m</button>' : '')
+    + '</div>' : '';
   // hero protagonista: lo que pone el inversionista (+ draw como dato hermano)
   const hero = kitHero('El inversionista pone', UW_M2(r.cashToClose),
     'down + gastos de cierre &minus; créditos (HUD) · Draw al Harmony: <b>' + UW_M(r.draw) + '</b>' + (r.ctcReal ? ' · 🎯 real Airtable ' + UW_M(r.ctcReal) + ' (Δ ' + UW_M(r.cashToClose - r.ctcReal) + ')' : ''), 'var(--a2,#2f6ef0)');
@@ -399,7 +408,7 @@ function ffUwViewNegocio() {
     + kitRow('Muebles + appraisal + permisos + dumpster + AC', (+inp.muebles) + (+inp.appraisal_cost) + (+inp.permisos) + (+inp.dumpster) + (+inp.ac))
     + (+inp.cashout_en_draw > 0 ? kitRow('Cash-out incluido', +inp.cashout_en_draw) : '')
     + kitRow('Contingencia (' + inp.contingencia_pct + '%)', r.contingencia)
-    + kitRow('<b>= Draw total</b>', r.draw, { big: true, color: 'var(--a1,#12b5a0)' }) + alerta
+    + kitRow('<b>= Draw total</b>', r.draw, { big: true, color: 'var(--a1,#12b5a0)' }) + alerta + supuestosO7
     + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">El inversionista pone (HUD)</div>'
     + kitRow('Base (compra ' + UW_M(+inp.purchase) + ' + rehab ' + UW_M(r.remod) + ')', r.baseHud)
     + kitRow('&minus; Préstamo (' + inp.hml_finance_pct + '% de la base)', r.prestamo, { neg: true })
