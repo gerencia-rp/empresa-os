@@ -524,7 +524,7 @@ function osGlobal(comp) {
     osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital del holding (F&F)</div><div class="big glow">${OS.capital ? OS_M(+OS.capital.equity_comprometido_airtable) : OS_M(h.capital)}</div><div class="meta">${OS.capital ? `equity aportado [Airtable] + deuda HML ${OS_K(+(OS.capital.deuda_hml_qbo != null ? OS.capital.deuda_hml_qbo : OS.capital.deuda_hml_os_activa))} [QBO] — la deuda no es capital` : 'v_capital_deployed sin datos'} · ${comp.ff.activos} deals · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>` : '',
-    (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>` : '',
+    (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Cobranza operativa</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas · A/R contable [QBO]: ${(() => { const ar = (OS.qbCache || []).find(x => x.report === 'balance' && x.label === 'Total Accounts Receivable'); return ar ? OS_M(+ar.value) : 'sin libros'; })()}</div></div>` : '',
   ].join('');
   const areaCards = [
     osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
@@ -1109,6 +1109,19 @@ const SAB_CAT = { higiene: '🧼 Higiene', flujo: '🌊 Flujo', proceso: '⚙️
 function opsSabuesoView(o) {
   const all = (OS.sabueso || []).filter(x => x.active !== false);
   const f = OS.sabF = OS.sabF || { cat: '', emp: '', persona: '' };
+  // O9 (auditoría 13-jul): COLAPSO SEMÁNTICO — 2,927 anomalías crudas → ~grupos accionables,
+  // priorizados por severidad (las de plata/inversionista primero). El grano fino sigue abajo.
+  const grupos = {};
+  all.forEach(x => {
+    const k = (x.check_key || '?') + '|' + (x.categoria || '') + '|' + (x.empresa || '');
+    if (!grupos[k]) grupos[k] = { check: x.check_key, cat: x.categoria, emp: x.empresa, n: 0, crit: 0, dueno: x.dueno_sugerido, accion: x.accion, ej: x.task_name };
+    grupos[k].n++; if (x.severidad === 'critica') grupos[k].crit++;
+  });
+  const gList = Object.values(grupos).sort((a, b) => (b.cat === 'sla' ? 1 : 0) - (a.cat === 'sla' ? 1 : 0) || b.crit - a.crit || b.n - a.n);
+  const colapso = `<div class="card" style="margin-bottom:12px"><div class="lab">🧠 Colapso semántico — ${all.length.toLocaleString()} anomalías → ${gList.length} grupos accionables</div>
+    <div class="meta" style="margin-bottom:6px">un problema = una fila (no 3,000); prioridad: $/inversionista (sla) → críticas → volumen. La causa raíz del ruido se cura en origen (auto-scheduler N7).</div>
+    ${gList.slice(0, 12).map(g => `<div class="krow" style="cursor:pointer;padding:7px 0" onclick='OS.sabF={cat:${JSON.stringify(g.cat || '')},emp:"",persona:""};osRender()'><span><b>${OS_E(g.check + (g.cat ? ' · ' + g.cat : ''))}</b> ${g.emp ? '· ' + OS_E(g.emp) : ''} — ${g.n.toLocaleString()} caso(s)${g.crit ? ` · <b class="down">${g.crit} críticas</b>` : ''}${g.accion ? `<div class="meta">→ ${OS_E(g.accion)}${g.dueno ? ' · ' + OS_E(g.dueno) : ''}</div>` : ''}</span><b style="opacity:.5">filtrar →</b></div>`).join('')}
+  </div>`;
   let rows = all.slice();
   if (f.cat) rows = rows.filter(x => x.categoria === f.cat);
   if (f.emp) rows = rows.filter(x => x.empresa === OPS_EMP[f.emp]);
@@ -1123,7 +1136,7 @@ function opsSabuesoView(o) {
   const procesos = Object.values(byLista).filter(x => x.n >= 4).map(x => ({ ...x, higiene: Math.round(100 * x.conFyD / x.n), flujo: Math.round(100 * x.movido / x.n), salud: Math.round(100 * (0.5 * x.conFyD / x.n + 0.5 * x.movido / x.n)) })).sort((a, b) => a.salud - b.salud).slice(0, 12);
   const catChip = (k, l, n) => `<button class="repbtn ${f.cat === k ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="OS.sabF=Object.assign(OS.sabF||{},{cat:'${f.cat === k ? '' : k}'});osRender()">${l} (${n})</button>`;
   const fila = x => `<tr><td>${SAB_SEV[x.severidad]?.e || '⚪'}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: '📅 fecha', asignar_dueno: '👤 dueño', refechar: '📅 re-fechar', archivar: '📦 archivar', escalar: '⚠ escalar', asignar_lista: '🗂 lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
-  return `<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
+  return `${colapso}<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
       <div class="lab">🐕 El Sabueso olfateó</div>
       <div style="font-size:52px;font-weight:800;color:${all.length ? '#f87171' : '#34d399'}">${all.length}</div>
       <div class="meta">anomalías activas · ${bySev.critica || 0} críticas · ${bySev.alta || 0} altas · ${bySev.media || 0} medias · <b>norte: 0 = todo perfecto</b></div></div>

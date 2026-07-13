@@ -275,6 +275,12 @@ function ctRunChecks() {
     } catch (e) { add('C9', 'holding', 'engine-error', 'Motor de cierre falló: ' + (e.message || e), 0, 'info', 'OS', {}); }
   }
 
+  // ══ C20 · INTERÉS NEGATIVO en el P&L (B11 auditoría 13-jul): reversas mal clasificadas contaminan los libros ══
+  (OS.qbCache || []).filter(x => x.report && x.report.startsWith('pnl') && /inter/i.test(x.label || '') && +x.value < 0)
+    .forEach(x => add('C20', 'fix_flip', 'int-neg-' + (x.report || '') + '-' + (x.label || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24),
+      'Interés NEGATIVO en el P&L [QBO ' + x.report + ']: "' + x.label + '" = ' + OS_M(+x.value) + ' — una reversa/ajuste está clasificada como interés; pedir a la contadora reclasificarla (QBO es solo lectura desde acá)',
+      Math.abs(+x.value), 'media', 'QBO', { label: x.label, report: x.report, valor: +x.value }));
+
   // ══ C19 · DIVERGENCIA LEGACY vs DERIVADO (O8/P2 auditoría 13-jul) — el campo manual no pasa en silencio ══
   (CT.diverg || []).forEach(dv => add('C19', dv.tipo === 'unidades_casa' ? 'rentas' : 'remodelacion',
     'diverg-' + dv.tipo + '-' + String(dv.casa || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20),
