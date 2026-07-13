@@ -27,11 +27,23 @@ Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota)
 - ✅ **2.5 · O9+B11+B15** — colapso semántico 2,927→grupos priorizados (sla/críticas/volumen) en /operacion con filtro 1-clic · C20 interés negativo (Refin −$15,747.56 ✓ detectado; reclasificación = contadora, QBO read-only) · "Cobranza operativa" + A/R QBO al lado.
 
 ## FASE 3 — Datos / proceso / inteligencia
-- ⬜ 3.1 · O7 supuestos calibrados
-- ⬜ 3.2 · N7 auto-scheduler ClickUp
-- ⬜ 3.3 · N5+N6+N9 rent-roll + analítica + ranking
-- ⬜ 3.4 · N8+B16+O12+O13 fábrica IA robusta
-- ⬜ 3.5 · N10+N11+N12 detectores y disciplina
+- ✅ **3.1 · O7** — v_supuestos_calibrados: obra $53/sqft REAL (19 finalizadas) vs $28 soñado · duración 1.8m vs 12m · holding financiero 4.6m. Visible en Del Negocio con aplicar-a-1-clic (psf_media / default_meses_hold → ff_uw_config). Mata el déficit fantasma del timeline.
+- 🟡 **3.2 · N7 PARCIAL** — infraestructura lista: tabla clickup_scheduler_plantilla (dueño por rol + offset por lista) + v_tareas_huerfanas (alimenta el flujo propuesta→aprobación→clickup-execute existente). ⛔ NOTA (regla 7b): la PLANTILLA es config de negocio (qué dueño para qué lista) que debe llenar el CEO/operación — al llenarla, el flujo de propuestas la aplica en lote; el nacer-con-fecha requiere además un webhook de ClickUp (siguiente iteración).
+- ✅ **3.3 · N5+N6+N9** — v_rent_roll (potencial vs realizada, gap $: Bethune $4,400/mes, Echo $3,600…; Garden Path ya no es el top — data fresca) + tabla en Analítica CC · ingreso por MODELO × mes de renta · ranking real por casa = P&L post-interés (FF) + NOI rank (CC).
+- ✅ **3.4 · B16+O12+O13 (N8 especificado)** — insert de artefactos exige created_by=auth.uid() + área ⊆ allowed_areas del creador (ia_area_ok) · delete bloqueado · versionado (version+parent_id) · ia_audit_log INMUTABLE (solo insert) con trigger. 🟡 N8 (carril datos-lectura con conectores read-only whitelisted + artefactos con Design System): especificado como siguiente iteración — requiere diseño de producto del carril (gate de admin ya existe).
+- ✅ **3.5 · N10+N11+N12** — C21 casa fantasma (encontró **Arcadia y Cervin** ✓, los casos exactos) · C14 top-20 con % del riesgo (comprobante requerido en form = config Airtable, acción humana) · v_disciplina_clickup + card en /operacion (higiene 50/al día 30/movimiento 20; peor: sin-dueño 911 tareas score 0).
 
 ## Cierre
-- ⬜ Gate de CI (4 checks) + re-auditoría 28 dimensiones
+- ✅ **Cierre · Gate de CI** — scripts/ci-gate.mjs (npm run ci:gate): (a) capa KPIs responde y es coherente (ocupación suma, margen 0–100), (b) property_id 100% + 20 aliases QBO, (c) guard-rails anti-$0 presentes, (d) espejo QBO fresco ≤30d + assets $7.67M + equity ≤ assets. **CORRIDO: 12/12 ✓**. ⚠ el re-sync QBO cambió "Total Assets"→"TOTAL ASSETS" (guard B2 y gate actualizados case-insensitive).
+
+## ANTES → DESPUÉS (verificado contra fuente)
+- Capital: "$7.83M/$8.37M desplegado" → equity $963,598 [Airtable] / $763,361 [QBO] + deuda separada.
+- Ganancia: 3 números con 30× de gap → Net Income QBO YTD único + waterfall con residuo declarado.
+- Espejo QBO: Investor Contributions y HML-Refin stale → = QBO vivo, as_of 13-jul.
+- Ocupación: 4 valores distintos → 48/45/3/0 = 93.75% en todas las pantallas (= PDF del equipo).
+- Obras: 91%/31 fantasma → 26/7, utilidad $170,682, margen 11.6% ponderado.
+- Wellington: "déficit −$130k" → equity +$200,000 (déficit en hold como secundario honesto).
+- Nómina: texto libre, 177 sin tarifa, 172 deudas negativas → por LINK (3,433/3,436), 0 y 0.
+- Interés HML: invisible → 68% del ingreso · ICR 0.35× al tope en rojo + por casa en el P&L.
+- Anomalías: 2,927 crudas → grupos accionables priorizados por $.
+- Fantasmas: Arcadia/Cervin detectadas solas (C21); ghost F&F y units vacías fuera de conteos.

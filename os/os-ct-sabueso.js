@@ -590,7 +590,7 @@ function ctSabuesoBlock(comp) {
   const total = abConcil.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
   const senalado = ab.reduce((s, f) => s + (+f.impacto_usd || 0), 0) - total;
   // guard-rail duro: Σ descuadres jamás puede superar el activo total del holding (QBO)
-  const assetsHolding = (OS.qbCache || []).filter(x => x.report === 'balance' && x.label === 'Total Assets').reduce((s, x) => s + (+x.value || 0), 0);
+  const assetsHolding = (OS.qbCache || []).filter(x => x.report === 'balance' && (x.label || '').toUpperCase() === 'TOTAL ASSETS').reduce((s, x) => s + (+x.value || 0), 0);
   const motorErr = assetsHolding > 0 && total > assetsHolding;
   let list = ab;
   if (CT.fEmp) list = list.filter(f => f.empresa === CT.fEmp);
