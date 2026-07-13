@@ -88,9 +88,17 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 | 25 | Dato→decisión | EVM aislado en 1/50 pantallas | glosario 24 términos + Term/Drill/NextAction replicado | ✅ |
 | 26 | Ruido de anomalías | 2,927 crudas sin priorizar | colapso semántico en grupos por $ (crudas siguen ~2,934: la cura de ORIGEN espera la plantilla N7) | 🟡 |
 | 27 | Supuestos | $28/sqft · 12m soñados | $53/sqft real (19 obras) · obra 1.8m · holding 4.6m, aplicables 1-clic | ✅ |
-| 28 | Gobernanza IA | viewer publicó cross-área, sin audit | área⊆allowed_areas + created_by + versionado + audit inmutable (N8 carril datos: spec) | 🟡 |
+| 28 | Gobernanza IA | viewer publicó cross-área, sin audit | área⊆allowed_areas + created_by + versionado + audit inmutable + **N8 carril datos FUNCIONAL** (whitelist 6 vistas · gate admin en DB · RLS del usuario · audit vivo) | ✅ |
 
-**Score: 26 ✅ · 2 🟡 (dependen de config humana: plantilla N7 / carril N8).** Verificación adicional: smoke prod 17/17 · gate CI 12/12 · rent-roll vivo (Bethune gap $4,400/mes) · fantasmas Arcadia/Cervin detectadas solas.
+**Score ronda 1: 26 ✅ · 2 🟡.** Verificación adicional: smoke prod 17/17 · gate CI 12/12 · rent-roll vivo (Bethune gap $4,400/mes) · fantasmas Arcadia/Cervin detectadas solas.
+
+
+### RE-AUDITORÍA ronda 2 (13-jul, post-Scope B — medida contra data viva)
+**Score: 27 ✅ · 1 🟡** (solo queda #26: las ~2,934 anomalías crudas esperan la plantilla N7 — acción humana).
+- Núcleo INTACTO tras Scope B (ningún KPI se movió): equity $963,597.63 · deuda $4,515,214 · Net Income YTD $46,102.99 · assets $7,669,529 · Refin $1,459,200 as_of 13-jul · ocupación 48/45/3/0 = 93.75% · obras 26/7 · utilidad $170,682 · margen 11.6% · Wellington +$200,000 · nómina 0 sin rate / 0 deudas neg · interés YTD $141,907 (66% del ingreso) · equity incorporado $2,852,652 · 175 aliases (QBO 20) · ghosts 0/0/0 · divergencias 4 · fantasmas Arcadia/Cervin · supuestos $53/sqft·1.8m·4.6m.
+- **#28 → ✅**: ia_audit_log pasó de 0 a 6 eventos reales (publicado/actualizado/aprobado/datos_leidos×2), whitelist 6 vistas activa, check de carril incluye 'datos', gate de admin probado E2E en prod.
+- Capacidades nuevas medidas: v_portal_inversor + RPC en prod (RLS: inversionista=1 casa, viewer=0, anon=401) · uw_base_modo='draw' en config · gate CI 12/12.
+- Dato honesto: inv_distributions tiene 3 filas pero 0 activas (demo soft-deleted) — el portal muestra 'sin distribuciones programadas', correcto; se llena cuando se registre la primera real.
 
 ## ANTES → DESPUÉS (verificado contra fuente)
 - Capital: "$7.83M/$8.37M desplegado" → equity $963,598 [Airtable] / $763,361 [QBO] + deuda separada.
