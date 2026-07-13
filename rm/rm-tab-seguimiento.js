@@ -467,7 +467,7 @@ function rmSegSelector() {
 async function rmSelectProjectForTracking(id) {
   if (!id) return;
   const p = (rmState.projects || []).find(x => x.id === id);
-  if (p) { await rmLoadProject(p); rmState.tab = 'seguimiento'; rmRenderTab(); }
+  if (p) { await rmLoadProject(p); rmState.tab = 'seguimiento'; rmRender(); } // rmRender (no rmRenderTab): re-pinta también la barra de pasos/sub-tabs
 }
 window.rmSelectProjectForTracking = rmSelectProjectForTracking;
 async function rmSegImportExcel(file) {

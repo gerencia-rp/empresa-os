@@ -1324,11 +1324,18 @@ async function rmLoadProject(p) {
       moSync.status = 'idle';
     }
   }
+  // Proyecto activo COMPARTIDO (obs #19): persiste para que todos los pasos/tabs
+  // (y la próxima apertura del Estimador) abran con esta misma casa.
+  try {
+    window.RM_ACTIVE = { projectId: p.id, address: p.address || p.name || '' };
+    localStorage.setItem('rm_active_project', JSON.stringify(window.RM_ACTIVE));
+  } catch (e) { /* storage bloqueado: no rompe */ }
   rmState.tab = 'editor';
   rmRender();
 }
 
 function rmNewProject() {
+  try { window.RM_ACTIVE = null; localStorage.removeItem('rm_active_project'); } catch (e) {}
   rmState.currentProject = null;
   rmState.actualsByCode = {};
   rmState.versions = [];
@@ -1382,40 +1389,128 @@ async function openRemodelPro(sys) {
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   rmRender();
+  rmRestoreActiveProject(); // async: si había proyecto activo guardado, lo re-carga sin cambiar de tab
+}
+
+// Restaura el proyecto activo guardado (localStorage `rm_active_project`) al abrir el Estimador.
+// Mantiene la tab actual (rmLoadProject fuerza 'editor' → la devolvemos).
+async function rmRestoreActiveProject() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('rm_active_project') || 'null'); } catch (e) { return; }
+  if (!saved || !saved.projectId || rmState.currentProject) return;
+  const p = (rmState.projects || []).find(function (x) { return x.id === saved.projectId; });
+  if (!p) return;
+  const keepTab = rmState.tab;
+  try {
+    await rmLoadProject(p);
+    rmState.tab = keepTab;
+    rmRender();
+  } catch (e) { /* si falla la carga, el Estimador queda como estaba */ }
+}
+
+// ─── FLUJO EN 3 FASES (obs #19 CEO): 1️⃣ Proyecto → 2️⃣ Estimar → 3️⃣ SOW/Obra ───
+// Los 17 tabs viejos NO se borran: se reagrupan como sub-tabs dentro de 3 pasos.
+// El grupo activo se DERIVA de rmState.tab (mapa tab→grupo) → cualquier rmSetTab /
+// deep-link viejo desde otros módulos sigue funcionando sin cambios.
+const RM_GROUPS = [
+  { id: 'proyecto', num: '1', name: 'Proyecto',   tabs: ['projects', 'seguimiento', 'versions'] },
+  { id: 'estimar',  num: '2', name: 'Estimar',    tabs: ['editor', 'forecast', 'compare', 'rates', 'catalog', 'learning', 'calibration', 'agent'] },
+  { id: 'obra',     num: '3', name: 'SOW / Obra', tabs: ['sow', 'obrapro', 'gantt', 'purchases', 'field', 'crew'] }
+];
+// Tabs "ocultas" (sin botón propio, alcanzables por código) también mapeadas.
+const RM_TAB_GROUP = (function () {
+  const m = { quick: 'estimar', suppliers_sub: 'obra' };
+  RM_GROUPS.forEach(function (g) { g.tabs.forEach(function (t) { m[t] = g.id; }); });
+  return m;
+})();
+const RM_LAST_TAB_BY_GROUP = {}; // última sub-tab visitada por grupo (volver donde estabas)
+
+function rmNavEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function rmTabLabels() {
+  const samplesCount = (Object.values(rmDynamicBenchmarks || {}).reduce(function (s, d) { return s + (d.samples || 0); }, 0)) + 5;
+  return {
+    projects: '📁 Proyectos (' + rmState.projects.length + ')',
+    compare: '🎯 3 Estimaciones',
+    rates: '📊 Tasas $/ft²',
+    editor: rmState.currentProject ? ('✏️ ' + rmNavEsc(rmState.currentProject.name)) : '➕ Editor detallado',
+    forecast: '🔮 Pronóstico',
+    seguimiento: '🔄 Seguimiento',
+    gantt: '📅 Cronograma',
+    sow: '📋 SOW (Lender)',
+    obrapro: '🏗 Obra Pro',
+    versions: rmState.currentProject ? ('📜 Historial (' + rmState.versions.length + 'v · ' + rmState.changeOrders.length + 'CO)') : '📜 Historial',
+    crew: '👷 Crew (' + rmState.crew.length + ')',
+    purchases: '🛒 Lista compra',
+    field: '📱 Vista campo',
+    agent: '🤖 IA Agente',
+    catalog: '🛠 Catálogo (' + rmGetCatalog().length + ')',
+    learning: '📈 Precisión (' + samplesCount + ')',
+    calibration: '🎯 Calibración'
+  };
+}
+
+function rmActiveGroupId() { return RM_TAB_GROUP[rmState.tab] || 'proyecto'; }
+
+// Barra de navegación: pasos 1→2→3 + chip de proyecto activo + sub-tabs del grupo.
+// Estilos con tokens del tema (var(--ink)/var(--mut)/var(--glass)) → legible claro/oscuro.
+function rmNavHtml() {
+  const labels = rmTabLabels();
+  const activeGroup = rmActiveGroupId();
+  const grp = RM_GROUPS.find(function (g) { return g.id === activeGroup; }) || RM_GROUPS[0];
+  let steps = '';
+  RM_GROUPS.forEach(function (g, i) {
+    const on = g.id === activeGroup;
+    if (i) steps += '<span style="color:var(--mut,#94a3b8);font-size:13px;flex:none">→</span>';
+    steps += '<button onclick="rmSetGroup(\'' + g.id + '\')" style="flex:none;display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;'
+      + (on
+        ? 'border:1px solid var(--a1,#2563eb);background:var(--a1,#2563eb);color:#fff'
+        : 'border:1px solid var(--glassb,#e2e8f0);background:var(--glass,rgba(148,163,184,.08));color:var(--ink,#0f172a)')
+      + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;'
+      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#e2e8f0);color:var(--mut,#64748b)')
+      + '">' + g.num + '</span>' + g.name + '</button>';
+  });
+  // Chip del proyecto activo (compartido entre todos los pasos)
+  let chip = '';
+  if (rmState.currentProject) {
+    chip = '<span style="flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--glassb,#e2e8f0);background:var(--glass,rgba(148,163,184,.08));color:var(--mut,#475569)" title="Proyecto activo: todos los pasos abren con esta casa">📌 '
+      + rmNavEsc(rmState.currentProject.address || rmState.currentProject.name || '')
+      + ' <a onclick="rmSetTab(\'projects\')" style="cursor:pointer;text-decoration:underline;color:var(--a1,#2563eb)">cambiar</a></span>';
+  }
+  let subs = '';
+  grp.tabs.forEach(function (t) {
+    const on = rmState.tab === t;
+    subs += '<button onclick="rmSetTab(\'' + t + '\')" style="flex:none;padding:8px 12px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;background:none;border:none;border-bottom:2px solid '
+      + (on ? 'var(--a1,#2563eb);color:var(--ink,#0f172a)' : 'transparent;color:var(--mut,#64748b)')
+      + '">' + (labels[t] || t) + '</button>';
+  });
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">' + steps + chip + '</div>'
+    + '<div style="display:flex;gap:2px;margin:0 -24px 16px;padding:0 24px;overflow-x:auto;border-bottom:1px solid var(--glassb,#e2e8f0)">' + subs + '</div>';
 }
 
 function rmRender() {
   const root = document.getElementById('rm-root');
-  const samplesCount = (Object.values(rmDynamicBenchmarks || {}).reduce((s,d) => s + (d.samples||0), 0)) + 5;
-  const tabs = [
-    { id: 'projects', label: `📁 Proyectos (${rmState.projects.length})` },
-    { id: 'compare', label: '🎯 3 Estimaciones' },
-    { id: 'rates', label: '📊 Tasas $/ft²' },
-    { id: 'editor', label: rmState.currentProject ? `✏️ ${rmState.currentProject.name}` : '➕ Editor detallado' },
-    { id: 'forecast', label: '🔮 Pronóstico' },
-    { id: 'seguimiento', label: '🔄 Seguimiento' },
-    { id: 'gantt', label: '📅 Cronograma' },
-    { id: 'sow', label: '📋 SOW (Lender)' },
-    { id: 'obrapro', label: '🏗 Obra Pro' },
-    { id: 'versions', label: rmState.currentProject ? `📜 Historial (${rmState.versions.length}v · ${rmState.changeOrders.length}CO)` : '📜 Historial' },
-    { id: 'crew', label: `👷 Crew (${rmState.crew.length})` },
-    { id: 'purchases', label: '🛒 Lista compra' },
-    { id: 'field', label: '📱 Vista campo' },
-    { id: 'agent', label: '🤖 IA Agente' },
-    { id: 'catalog', label: `🛠 Catálogo (${rmGetCatalog().length})` },
-    { id: 'learning', label: `📈 Precisión (${samplesCount})` },
-    { id: 'calibration', label: `🎯 Calibración` }
-  ];
-  root.innerHTML = `
-    <div class="flex gap-1 mb-4 border-b border-slate-200 -mx-6 px-6 overflow-x-auto">
-      ${tabs.map(t => `<button onclick="rmSetTab('${t.id}')" class="px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${rmState.tab===t.id?'border-slate-900 text-slate-900':'border-transparent text-slate-500 hover:text-slate-900'}">${t.label}</button>`).join('')}
-    </div>
-    <div id="rm-body"></div>
-  `;
+  if (!root) return;
+  // Recordar la última sub-tab del grupo (aunque el tab se haya seteado directo, sin rmSetTab)
+  const g = RM_TAB_GROUP[rmState.tab];
+  if (g) {
+    const def = RM_GROUPS.find(function (x) { return x.id === g; });
+    if (def && def.tabs.indexOf(rmState.tab) >= 0) RM_LAST_TAB_BY_GROUP[g] = rmState.tab;
+  }
+  root.innerHTML = rmNavHtml() + '<div id="rm-body"></div>';
   rmRenderTab();
 }
 
 function rmSetTab(t) { rmState.tab = t; rmRender(); }
+
+function rmSetGroup(gid) {
+  const grp = RM_GROUPS.find(function (x) { return x.id === gid; });
+  if (!grp) return;
+  const last = RM_LAST_TAB_BY_GROUP[gid];
+  rmSetTab(last && grp.tabs.indexOf(last) >= 0 ? last : grp.tabs[0]);
+}
 
 // ─── PRESERVAR FOCO al re-render (fix UX crítico) ───
 // Wrap todo render que se llama desde oninput
