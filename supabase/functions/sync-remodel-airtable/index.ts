@@ -554,6 +554,10 @@ Deno.serve(async (req) => {
     // Backbone: asignar property_id (properties.id) a obras/proyectos/actividades nuevas (self-healing).
     try { await sb.rpc("remodel_backfill_property_ids"); } catch (e) { console.warn("property_id backfill skip:", String(e)); }
 
+    // Regla ÚNICA de avance (remodel_avance_regla): Finalizado/todas-done → 100, Pre construcción → 0,
+    // resto hechas/total del Planner — cubre casas SIN tareas, así el write-back de abajo llega a las 26.
+    try { await sb.rpc("remodel_recompute_avance_all"); } catch (e) { console.warn("avance recompute skip:", String(e)); }
+
     // Write-back del avance_real (Planner) → campo 'Avance Real (Planner)' en Airtable (Supabase es la fuente del avance).
     // Requiere que el AIRTABLE_TOKEN tenga scope data.records:write en la base de Remodelación (si no → 403, se saltea).
     try {
