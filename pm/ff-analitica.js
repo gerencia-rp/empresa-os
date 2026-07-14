@@ -142,14 +142,18 @@
       return { d, casa: casaCorta(d.address), arv: d.arv, saldo, tope, gap, lista: gap != null && gap >= 0 };
     }).sort((a, b) => (b.gap ?? -1e15) - (a.gap ?? -1e15));
 
-    // S7.2 — concentración por inversionista (co-inversión = sin la empresa propia)
-    const coInvs = (FF.investors || []).filter(i => (+i.capital_aportado || 0) > 0 && !/flipping\s*rentals/i.test(i.name || ''));
-    const coTotal = coInvs.reduce((s, i) => s + (+i.capital_aportado || 0), 0);
+    // S7.2 — concentración por inversionista: MISMA definición que la sección Inversionistas
+    // (v_inversionistas = co-inversión ACTIVA, participación viva; fallback: capital_aportado del espejo)
     const umbralConc = +cfg.an_conc_max_pct || 25;
-    const conc = coInvs.map(i => ({
-      name: i.name, capital: +i.capital_aportado || 0, nDeals: String(i.deal_rec_ids || '').split(',').filter(Boolean).length,
-      share: coTotal ? (+i.capital_aportado || 0) / coTotal * 100 : 0,
-    })).sort((a, b) => b.capital - a.capital);
+    let conc, coTotal;
+    if ((FF.invRank || []).length) {
+      coTotal = FF.invRank.reduce((s, i) => s + (+i.capital_desplegado || 0), 0);
+      conc = FF.invRank.map(i => ({ name: i.inversionista, capital: +i.capital_desplegado || 0, nDeals: i.casas_vivas, share: coTotal ? (+i.capital_desplegado || 0) / coTotal * 100 : 0 })).sort((a, b) => b.capital - a.capital);
+    } else {
+      const coInvs = (FF.investors || []).filter(i => (+i.capital_aportado || 0) > 0 && !/flipping\s*rentals/i.test(i.name || ''));
+      coTotal = coInvs.reduce((s, i) => s + (+i.capital_aportado || 0), 0);
+      conc = coInvs.map(i => ({ name: i.name, capital: +i.capital_aportado || 0, nDeals: String(i.deal_rec_ids || '').split(',').filter(Boolean).length, share: coTotal ? (+i.capital_aportado || 0) / coTotal * 100 : 0 })).sort((a, b) => b.capital - a.capital);
+    }
 
     // S7.3 — salud de cartera (flujo mensual POST-deuda por casa; déficit corregido, NUNCA desde draws)
     const salud = { sanas: [], deficit: [], sinDatos: [], noAplica: [] };
@@ -253,7 +257,8 @@
       <tr><td>Deuda HML (QBO · Loan Payable–HML)</td><td class="r">${M(m.deudaHmlQbo)}</td></tr>
       <tr><td>Deuda refi/DSCR (QBO · HML-Refin)</td><td class="r">${M(m.deudaRefiQbo)}</td></tr>
       <tr><td><b>Total QBO</b> <span class="an-mut">· libros al ${m.qboAsOf ? String(m.qboAsOf).slice(0, 10) : '—'}</span></td><td class="r"><b>${M(m.deudaQbo)}</b></td></tr>
-      <tr><td class="an-mut">Espejo OS (Airtable): HML activo ${M(m.deudaOsHml)} + refi ${M(m.deudaOsRefi)}</td><td class="r an-mut">${M(m.deudaOsHml + m.deudaOsRefi)}</td></tr></table>
+      <tr><td class="an-mut">Espejo OS (Airtable): HML activo ${M(m.deudaOsHml)} + refi ${M(m.deudaOsRefi)}</td><td class="r an-mut">${M(m.deudaOsHml + m.deudaOsRefi)}</td></tr>
+      ${FF.portKpi && FF.portKpi.deuda_portafolio != null ? `<tr><td class="an-mut">Por casa, solo propias (v_ff_portafolio: HML si no refi, refi si refi)</td><td class="r an-mut">${M(FF.portKpi.deuda_portafolio)}</td></tr>` : ''}</table>
       <div class="an-note">Manda QBO (los libros). La diferencia OS↔QBO la audita el Sabueso (C1).</div>`;
     return sec('4 · Patrimonio', 'Lo que vale el portafolio, lo que se debe, y cuánto equity generó cada dólar de capital.', `
       ${typeof kitHero === 'function' ? kitHero('Multiplicador de capital 🏆', m.mult != null ? m.mult.toFixed(1) + '×' : '—', `cada $1 de capital desplegado (${M(m.capital)}) generó ${m.mult != null ? '$' + m.mult.toFixed(2) : '—'} de equity`) : ''}
