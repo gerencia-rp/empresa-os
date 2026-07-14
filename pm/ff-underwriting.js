@@ -93,6 +93,7 @@ function ffUwDefaults() {
     contingencia_fija: 0,                                        // valor fijo opcional de contingencia (pisa el %)
     hml_tasa_anual: 0, dscr_tasa_anual: 0, dscr_plazo_anos: 0,   // 0 = usar config; editable inline en Intereses
     hml_capitaliza: 0,                                           // interés/fees que el term sheet CAPITALIZA al payoff
+    intereses_override: 0,                                       // monto MANUAL de intereses del draw (0 = calculado)
     contingencia_pct: UWc('draw_contingencia_pct', 10), permisos: 1500, dumpster: 800, ac: 0,
     // 1B · El inversionista pone (HUD-1, defaults calibrados con el HUD de Bethune)
     purchase: 0, hml_finance_pct: 90,
@@ -232,12 +233,16 @@ function ffUwCalcNegocio(inp) {
   const pctRemo0 = ffUwPctRemo(inp) / 100;
   const baseModo0 = UWct('uw_base_modo', 'draw');
   const contingenciaFija = +inp.contingencia_fija || 0;                  // valor fijo opcional (pisa el %)
-  let intereses = 0, subtotal = 0, contingencia = 0, draw = 0, prestamoIter = 0;
+  // intereses AJUSTABLES (CEO 14-jul): override manual del monto — si está, pisa el punto fijo
+  const interesesOverride = +inp.intereses_override || 0;
+  let intereses = interesesOverride > 0 ? Math.round(interesesOverride) : 0;
+  let subtotal = 0, contingencia = 0, draw = 0, prestamoIter = 0;
   for (let i = 0; i < 6; i++) {
     subtotal = remod + intereses + utilities + insurance + extras;
     contingencia = contingenciaFija > 0 ? Math.round(contingenciaFija) : Math.round(subtotal * ((+inp.contingencia_pct || 0) / 100));
     draw = subtotal + contingencia;
     prestamoIter = (+inp.purchase || 0) * pctCompra0 + (baseModo0 === 'rehab' ? remod : draw) * pctRemo0;
+    if (interesesOverride > 0) break;                                    // monto manual: no iterar
     const nuevo = Math.round(prestamoIter * intMensual * mesesHold);
     if (nuevo === intereses) break;
     intereses = nuevo;
@@ -467,7 +472,8 @@ function ffUwViewNegocio() {
   const inp = UW.a.inputs, r = ffUwCalcNegocio(inp);
   const estToggle = '<div style="display:flex;gap:6px;margin-bottom:10px"><button class="repbtn ' + (inp.usar_estimador ? 'ghost' : '') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'usar_estimador\',false)">Costo real (Remodelación)</button><button class="repbtn ' + (inp.usar_estimador ? '' : 'ghost') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'usar_estimador\',true)">Estimador rápido $/sqft</button></div>';
   const estBox = inp.usar_estimador
-    ? '<div style="background:color-mix(in srgb, var(--a1) 7%, transparent);border-radius:10px;padding:12px;margin-bottom:16px">' + kitInput('Superficie (sqft)', 'pies cuadrados a remodelar', inp.est_sqft, "ffUwSet('est_sqft',VAL)", { plain: true }) + '<div style="display:flex;gap:5px;margin-bottom:6px">' + ['suave', 'media', 'pesada'].map(t => '<button class="repbtn ' + (inp.est_tipo === t ? '' : 'ghost') + '" style="flex:1;padding:6px;font-size:11px;text-transform:capitalize" onclick="ffUwSet(\'est_tipo\',\'' + t + '\')">' + t + ' $' + ffUwPsf(t) + '</button>').join('') + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (+inp.est_sqft || 0) + ' sqft &times; $' + ffUwPsf(inp.est_tipo) + '/sqft = <b>' + UW_M(r.remod) + '</b> &middot; afuera costaría ' + UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0)) + '</div></div>'
+    ? '<div style="background:color-mix(in srgb, var(--a1) 7%, transparent);border-radius:10px;padding:12px;margin-bottom:16px">' + kitInput('Superficie (sqft)', 'pies cuadrados a remodelar', inp.est_sqft, "ffUwSet('est_sqft',VAL)", { plain: true }) + '<div style="display:flex;gap:5px;margin-bottom:6px">' + ['suave', 'media', 'pesada'].map(t => '<button class="repbtn ' + (inp.est_tipo === t ? '' : 'ghost') + '" style="flex:1;padding:6px;font-size:11px;text-transform:capitalize" onclick="ffUwSet(\'est_tipo\',\'' + t + '\')">' + t + ' $' + ffUwPsf(t) + '</button>').join('') + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (+inp.est_sqft || 0) + ' sqft &times; $' + ffUwPsf(inp.est_tipo) + '/sqft = <b>' + UW_M(r.remod) + '</b> &middot; afuera costaría ' + UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0))
+      + (() => { const afuera = UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0); const sug = Math.round((r.remod + afuera) / 2); return (r.remod > 0 && afuera > 0) ? ' &middot; <b style="color:var(--a1,#12b5a0)">sugerido (media): ' + UW_M(sug) + '</b> <button class="repbtn ghost" style="padding:2px 8px;font-size:10px" onclick="ffUwSet(\'remod_directo\',' + sug + ');ffUwSet(\'usar_estimador\',false)">→ usar</button>' : ''; })() + '</div></div>'
     : kitInput('Costo de remodelación', 'real de la empresa de Remodelación', inp.remod_directo, "ffUwSet('remod_directo',VAL)", { foot: r.remod === 0 ? '⚠ sin costo real cargado — usá el estimador rápido' : 'del histórico de Remodelación' });
   const alerta = r.deficitRiesgo ? '<div class="ui-error" style="margin-top:8px">&#9888; Riesgo de déficit: el remod del draw es $' + r.psfDraw + '/sqft, por debajo del calibrado ($' + r.psfAlerta + '/sqft). El draw puede no cubrir la obra real.</div>' : '';
   // O7 (auditoría 13-jul): supuestos desde la HISTORIA real — visibles, aplicación a 1 clic (humano)
@@ -501,6 +507,8 @@ function ffUwViewNegocio() {
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + kitInputSm('Utilities / mes', inp.utilities_mes, "ffUwSet('utilities_mes',VAL)")
     + kitInputSm('Insurance de la casa / mes', inp.insurance_mes, "ffUwSet('insurance_mes',VAL)")
+    + kitInputSm('Tasa HML (%/año)', ffUwTasaHml(inp), "ffUwSet('hml_tasa_anual',VAL)", { pct: true })
+    + kitInputSm('Intereses del draw — MANUAL (0 = calculado)', inp.intereses_override, "ffUwSet('intereses_override',VAL)")
     + kitInputSm('Muebles / staging', inp.muebles, "ffUwSet('muebles',VAL)")
     + kitInputSm('Appraisal', inp.appraisal_cost, "ffUwSet('appraisal_cost',VAL)")
     + kitInputSm('Cash-out en el draw', inp.cashout_en_draw, "ffUwSet('cashout_en_draw',VAL)")
@@ -536,7 +544,7 @@ function ffUwViewNegocio() {
     + '</div></details>';
   const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
     + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">Draw al Harmony</div>'
-    + kitRow('Remodelación', r.remod) + kitRow('Intereses HML (' + r.mesesHold + 'm de HOLDING @ ' + r.tasaHml + '%/año · solo interés · sobre el préstamo bruto)', r.intereses) + kitRow('Utilities (' + r.mesesHold + 'm de holding)', r.utilities)
+    + kitRow('Remodelación', r.remod) + kitRow(+inp.intereses_override > 0 ? 'Intereses HML (MANUAL — <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'intereses_override\',0)">↩ volver al calculado</a>)' : 'Intereses HML (' + r.mesesHold + 'm de HOLDING @ ' + r.tasaHml + '%/año · solo interés · sobre el préstamo bruto)', r.intereses) + kitRow('Utilities (' + r.mesesHold + 'm de holding)', r.utilities)
     + (r.insurance > 0 ? kitRow('Insurance de la casa (' + r.mesesHold + 'm)', r.insurance) : '')
     + kitRow('Muebles + appraisal + permisos + dumpster + AC', (+inp.muebles) + (+inp.appraisal_cost) + (+inp.permisos) + (+inp.dumpster) + (+inp.ac))
     + (+inp.cashout_en_draw > 0 ? kitRow('Cash-out incluido', +inp.cashout_en_draw) : '')
