@@ -88,17 +88,37 @@
     return { rows, neto, bruto, valorAjustado: Math.round(c.price + neto), netPct: c.price ? neto / c.price * 100 : 0, grossPct: c.price ? bruto / c.price * 100 : 0 };
   }
 
+  // ─── saneo del subject: dato de UNA fuente implausible = DUDOSO (null + flag), jamás usado en silencio ───
+  // (caso Cervin/Dove/Childress: el condado dice 1-3 camas en casas convertidas → mata los comps)
+  function saneaSubject(s) {
+    const out = Object.assign({}, s), dudosos = [];
+    if (out.beds != null && out.beds <= 1 && out.sqft >= 1000) { dudosos.push({ attr: 'beds', lbl: 'camas', v: out.beds, motivo: out.beds + ' cama(s) con ' + out.sqft + ' sqft — dato del condado dudoso' }); out.beds = null; }
+    if (out.baths != null && out.baths < 1) { dudosos.push({ attr: 'baths', lbl: 'baños', v: out.baths, motivo: 'menos de 1 baño — dato dudoso' }); out.baths = null; }
+    if (out.sqft != null && out.sqft < 400) { dudosos.push({ attr: 'sqft', lbl: 'sqft', v: out.sqft, motivo: 'sqft irreal' }); out.sqft = null; }
+    return { s: out, dudosos };
+  }
+
   // ─── reconciliación: MEDIANA PONDERADA de comps ajustados · outliers MAD fuera · confianza medida ───
   // opts: { man: {compId:{...}}, excl: {compId:true}, filtrosOver, hoy (ISO p/ backtest) }
+  // Si <minN comps: EXPANSIÓN ADAPTATIVA del tasador (6→9→12 meses · +0.5 mi) declarada y con confianza capada.
   function reconciliar(s, comps, cfg, opts) {
     opts = opts || {};
-    const f = filtros(cfg, opts.filtrosOver);
+    const f0 = filtros(cfg, opts.filtrosOver);
     const maxN = cfgN(cfg, 'arv_comps_max', 8), minN = cfgN(cfg, 'arv_comps_min', 3);
     const grossWarn = cfgN(cfg, 'arv_gross_adj_warn_pct', 25);
-    let usables = comps.map(c => ({ c, filtro: pasaFiltro(s, c, f, opts.hoy), adj: ajustes(s, c, cfg, (opts.man || {})[c.id], opts.hoy) }))
-      .filter(x => x.filtro.pasa && !(opts.excl || {})[x.c.id])
-      .sort((a, b) => a.adj.grossPct - b.adj.grossPct)
-      .slice(0, maxN);
+    const escalones = [f0,
+      Object.assign({}, f0, { meses: f0.meses * 1.5 }),
+      Object.assign({}, f0, { meses: f0.meses * 2, dist: f0.dist + 0.5 }),
+      Object.assign({}, f0, { meses: f0.meses * 2, dist: f0.dist + 0.5, sqftPct: f0.sqftPct + 10 })];
+    let f = f0, relajado = 0, usables = [];
+    for (let e = 0; e < escalones.length; e++) {
+      f = escalones[e]; relajado = e;
+      usables = comps.map(c => ({ c, filtro: pasaFiltro(s, c, f, opts.hoy), adj: ajustes(s, c, cfg, (opts.man || {})[c.id], opts.hoy) }))
+        .filter(x => x.filtro.pasa && !(opts.excl || {})[x.c.id])
+        .sort((a, b) => a.adj.grossPct - b.adj.grossPct)
+        .slice(0, maxN);
+      if (usables.length >= minN) break;
+    }
     // outliers estadísticos: valor ajustado a > k×MAD de la mediana → fuera (con razón visible)
     const outliers = [];
     if (usables.length >= 4) {
@@ -111,7 +131,7 @@
         return true;
       });
     }
-    if (!usables.length) return { usables, outliers, arv: null, provisional: false, confianza: { nivel: 'sin comps', score: 0, razones: ['ningún comp pasa filtros'] } };
+    if (!usables.length) return { usables, outliers, arv: null, provisional: false, relajado, confianza: { nivel: 'sin comps', score: 0, razones: ['ningún comp pasa filtros (ni con búsqueda expandida)'] } };
     // pesos: similitud (menor gross adj) × recencia × cercanía
     usables.forEach(x => {
       const wSim = 1 / (x.adj.grossPct + 2);
@@ -123,7 +143,9 @@
     const sw = usables.reduce((x, u) => x + u.peso, 0);
     usables.forEach(x => x.pesoPct = Math.round(100 * x.peso / sw));
     const items = usables.map(x => ({ v: x.adj.valorAjustado, w: x.peso }));
-    const bias = cfgN(cfg, 'arv_bias_pct', 0);
+    // sesgo calibrado: global + submercado (arv_bias_pct_<zip>, calibrado con n≥2 tasaciones reales del zip)
+    const zipBias = (s.zip != null && cfg && cfg['arv_bias_pct_' + s.zip] != null && !isNaN(+cfg['arv_bias_pct_' + s.zip])) ? +cfg['arv_bias_pct_' + s.zip] : 0;
+    const bias = cfgN(cfg, 'arv_bias_pct', 0) + zipBias;
     const arv = Math.round(cuantilPond(items, 0.5) * (1 + bias / 100));
     const p25 = Math.round(cuantilPond(items, 0.25) * (1 + bias / 100));
     const p75 = Math.round(cuantilPond(items, 0.75) * (1 + bias / 100));
@@ -143,13 +165,16 @@
     score -= Math.min(15, dProm * 10);                              // lejos
     score -= Math.min(15, Math.max(0, grossProm - 15));             // muy ajustados
     score = Math.max(0, Math.round(score));
-    const nivel = (cv > cvAlto || usables.length < minN) ? 'baja' : (cv > cvWarn || usables.length < minN + 1 || grossProm > grossWarn) ? 'media' : 'alta';
+    if (relajado) score = Math.max(0, score - relajado * 8);        // búsqueda expandida = menos confianza
+    let nivel = (cv > cvAlto || usables.length < minN) ? 'baja' : (cv > cvWarn || usables.length < minN + 1 || grossProm > grossWarn) ? 'media' : 'alta';
+    if (relajado >= 2 && nivel === 'alta') nivel = 'media';
     const razones = [usables.length + ' comps reconciliados (mediana ponderada)', 'CV ' + cv.toFixed(1) + '%', 'gross adj prom ' + grossProm.toFixed(1) + '%',
       'venta media hace ' + mProm.toFixed(1) + 'm', 'a ' + dProm.toFixed(2) + ' mi prom'];
+    if (relajado) razones.push('🔎 búsqueda expandida (escalón ' + relajado + ': ' + Math.round(f.meses) + 'm / ' + f.dist + ' mi) por pocos comps');
     if (outliers.length) razones.push(outliers.length + ' outlier(s) estadístico(s) excluido(s)');
-    if (bias) razones.push('sesgo calibrado ' + bias + '%');
+    if (bias) razones.push('sesgo calibrado ' + (Math.round(bias * 100) / 100) + '%' + (zipBias ? ' (incluye submercado ' + s.zip + ': ' + zipBias + '%)' : ''));
     if (usables.length < minN) razones.push('⚠ menos de ' + minN + ' comps válidos');
-    return { usables, outliers, arv, p25, p75, cv, score, grossProm, dispersion: cv, distProm: dProm, mesesProm: mProm, bias,
+    return { usables, outliers, arv, p25, p75, cv, score, grossProm, dispersion: cv, distProm: dProm, mesesProm: mProm, bias, relajado, filtrosUsados: f,
       conservador: p25, optimista: p75, confianza: { nivel, score, razones } };
   }
 
@@ -241,13 +266,34 @@
         }
       }
     }
-    // cierre de sesgo: bias = −sesgo mediano remanente (corrección global, acotada)
-    const sinBias = backtest(casas, mejor);
-    const bias = sinBias.sesgoMediano != null ? Math.max(-8, Math.min(8, -sinBias.sesgoMediano)) : 0;
-    mejor.arv_bias_pct = Math.round(bias * 100) / 100;
+    // 2) sesgo por SUBMERCADO (zip con ≥ minZipN tasaciones reales): bias_zip = −mediana del error del zip
+    const minZipN = (opts.zipMinN != null ? opts.zipMinN : 2);
+    const btZip = backtest(casas, mejor);
+    const porZip = {};
+    btZip.porCasa.forEach((x, i) => { const z = casas[i].subject && casas[i].subject.zip; if (z && x.errPct != null) (porZip[z] = porZip[z] || []).push(x.errPct); });
+    const zipsCal = [];
+    Object.entries(porZip).forEach(([z, errs]) => {
+      if (errs.length >= minZipN) {
+        const b = Math.max(-12, Math.min(12, -mediana(errs)));
+        if (Math.abs(b) >= 1) { mejor['arv_bias_pct_' + z] = Math.round(b * 100) / 100; zipsCal.push({ zip: z, n: errs.length, bias: mejor['arv_bias_pct_' + z] }); }
+      }
+    });
+    // 3) sesgo GLOBAL: grid fino que minimiza MdAPE SUJETO a |sesgo medio| ≤ metaSesgo (si es alcanzable)
+    const metaSesgo = (opts.metaSesgo != null ? opts.metaSesgo : 2) - 0.2;   // margen
+    let mejorBias = 0, mejorFin = null;
+    for (let b = -6; b <= 6.001; b += 0.25) {
+      const cand = Object.assign({}, mejor); cand.arv_bias_pct = Math.round(b * 100) / 100;
+      const r = backtest(casas, cand);
+      if (r.mdape == null) continue;
+      const cumple = Math.abs(r.sesgo) <= metaSesgo;
+      const mejorCumple = mejorFin && Math.abs(mejorFin.sesgo) <= metaSesgo;
+      const gana = !mejorFin || (cumple && !mejorCumple) || (cumple === mejorCumple && (cumple ? r.mdape < mejorFin.mdape : Math.abs(r.sesgo) < Math.abs(mejorFin.sesgo)));
+      if (gana) { mejorBias = cand.arv_bias_pct; mejorFin = r; }
+    }
+    mejor.arv_bias_pct = mejorBias;
     const final = backtest(casas, mejor);
-    return { params: mejor, antes: backtest(casas, cfgBase), despues: final, probados };
+    return { params: mejor, antes: backtest(casas, cfgBase), despues: final, probados, zipsCal };
   }
 
-  return { filtros, pasaFiltro, ajustes, reconciliar, conflictos, triangular, backtest, calibrar, _mediana: mediana, _cuantilPond: cuantilPond, mesesDesde };
+  return { filtros, pasaFiltro, ajustes, reconciliar, saneaSubject, conflictos, triangular, backtest, calibrar, _mediana: mediana, _cuantilPond: cuantilPond, mesesDesde };
 });
