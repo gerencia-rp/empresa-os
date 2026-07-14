@@ -59,6 +59,8 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## CALC 4 · PITI de la refi (14-jul): el pago mensual es el TOTAL PAYMENT — P&I + property tax mensual (2.1%/año del valor tasado, calibrado con los HUDs de Champions) + insurance/impound mensual (prima/12), desglosado con tax% y prima editables inline + Δ vs PITI real de Airtable. Verificado Michelle: 2,163 + 749 + 158.33 = **$3,070.33** vs real $3,032.26 (la misma calibración de los goldens). Smoke prod 6/6.
+
 ## CALC 1 · insurance + holding real + contingencia fija + FIX guardado (14-jul, pedido del CEO)
 - **Estimador rápido: SUGERIDO (media)** entre el costo interno ($/sqft calibrado) y el de afuera ($110/sqft) + botón "→ usar" que lo pasa a costo real (1400 sqft media: 88,200 / 154,000 → sugerido **$121,100** ✓ prod). **Intereses SIEMPRE ajustables**: tasa HML editable también en Ajustes de Calc 1 (misma key que Calc 4) + monto MANUAL de intereses del draw (pisa el punto fijo, rotulado "MANUAL" con ↩ volver al calculado; draw/préstamo/payoff se recalculan con el manual). Smoke prod 6/6.
 - **Insurance de la casa**: input mensual en Ajustes → insurance × meses de holding entra al draw (y por el punto fijo, al préstamo/interés/payoff). Config default `uw_insurance_mes`.
