@@ -59,6 +59,11 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## % DEL HML SEPARADO: compra vs remodelación (14-jul, pedido del CEO)
+- ANTES: un solo "% que financia" aplicado a toda la base → no modelaba la realidad (Harmony presta 90% de la compra y 100% de la remo). DESPUÉS: dos inputs en Calc 1 (`hml_pct_compra` 90 / `hml_pct_remo` 100 default) → **préstamo bruto = %compra×compra + %remo×draw** (punto fijo intacto).
+- PROPAGACIÓN por la cadena (verificado en prod 6/6): interés del draw, payoff → Calc 3, base → Calc 4, Unificada — ejemplo 200k/100k/3m/2m: préstamo $309,168 · **down = solo 10% de la compra ($20,000)** · payoff/base4 = mismo número; editar % en vivo recalcula todo (100% compra → down $0, caso Bethune).
+- Retro-compatibilidad AL CENTAVO: análisis guardados sin los campos nuevos usan hml_finance_pct legacy en ambos (guard en ffUwAbrir, mismo resultado que antes: $295,856.10 exacto). Goldens cash-out intactos.
+
 ## FICHA DE CASA · "Compra $0" con dato existente (14-jul)
 | Qué | ANTES | DESPUÉS |
 |---|---|---|
