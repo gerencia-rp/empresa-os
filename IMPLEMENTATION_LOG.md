@@ -173,3 +173,23 @@ Un solo motor (\`pm/ff-arv-engine.js\` UMD) para Simple, Experto y back-test (\`
 | Capital | `capital_inversionista` coalesced ("Capital del inversionista" ?? aportado) — Stonleigh daba 45,000 | **`capital_aportado` PURO** (fldrePoqg3C3caiZ5, sync v14 + col nueva) — Stonleigh **35,000** ✔ |
 | Ranking (data viva) | — | **Jefferson $188,000/4 · MEK $112,870.14/2 · Ivy $77,000/1+1 salida · Michael $43,000 · Jessica $35,968 · Ronald/Johanna/Cesar/Héctor $35,000 · Kysbel $34,708 · Daniel $23,200 — TOTAL $654,746.14 · 11 inversionistas · 16 casas EXACTO** al esperado del CEO |
 | Rentabilidad | no existía | honesta desde `v_inversionistas` (security_invoker): rentada = participación × (renta − gastos) × 12 ÷ capital · vendida = utilidad entregada ÷ capital · sin renta/gastos = **"pendiente de dato"** (MEK: 2 casas s/dato), jamás $0. Detalle por casa: capital · % participación (1 − ownership) · etapa · flujo anual de su parte |
+
+---
+
+## 14-jul · Calc 4 Intereses = DOS MODELITOS SEPARADOS (obs del CEO, rama feat/calcs-encadenadas)
+
+**Pedido:** la calc de Intereses en dos modelitos distintos, en dos lugares distintos — (1) Harmony/HML y (2) Refinanciación/DSCR — cada uno con SU pago mensual, sin re-teclear datos que ya viven en otras calcs.
+
+### ANTES → DESPUÉS
+- **UI**: una sola vista con hero del DSCR + tarjeta de inputs que RE-PEDÍA compra y % financia + un desglose que mezclaba HML y REFI en la misma tarjeta → **dos modelitos separados**: tarjeta 1 "🔨 Pago mensual al Harmony" (hero ámbar, etiqueta *HML · solo interés · durante la obra/hold*) y tarjeta 2 "🏦 Pago mensual de la refi" (hero azul, etiqueta *DSCR · refinanciación · amortizado*), cada una con su base, sus inputs y su nota de propagación + cierre "por qué son dos" (dos préstamos, dos bases, dos fórmulas).
+- **Pago mensual HML**: redondeado a dólares ($2,959) → **con centavos** = préstamo × tasa/12 exacto (**$295,856 @12% → $2,958.56/mes**, verificado con el código real en node). El pago NO depende de los meses (probado: con 5 o 10 meses da idéntico); los meses (editables, estimado) solo mueven el **interés total del hold** ($2,958.56 × 5 = $14,792.80 exacto).
+- **Inputs**: compra y % financia re-tecleados en Calc 4 → **eliminados de la vista** (viven en Calc 1; la base llega ⛓ por `negocio.prestamo`). Quedan editables inline solo lo propio del modelito: tasa HML + meses (M1) · tasa DSCR + plazo + préstamo override (M2, mismo `refi_prestamo_real` que ya mandaba en Cash-Out).
+- **Base del refi**: rótulo fijo "75% × ARV" → **declara la fuente real ⛓ Cash-Out**: LTV% × (tasación del refi | ARV) o "tope DSCR — la renta manda" u override; verificado en cadena: ARV 449,297 → Cash-Out préstamo 336,973 → Calc 4 lee el MISMO número → **$2,270/mes @7.125%/30a** exacto.
+- **Propagación nueva**: el pago HML no llegaba al Ingreso → **Calc 5 (modelos + fallback) muestra "⏳ Durante el hold"**: mismo flujo pero pagando el HML ⛓ en vez de la cuota DSCR (antes del refi la casa paga el hard money). Las demás cadenas ya existían y quedan intactas: interés total → reserva del draw (Calc 1)/déficit · cuota DSCR → flujo post-refi (Calc 5) · préstamo refi → cash-out (Calc 3) · Analítica del portafolio usa pagos REALES (hml_payment + ref30_payment del CC FF).
+
+### Verificación
+- `scratchpad/verify-intereses.mjs` (corre el código REAL): 6/6 ✅ — 2,958.56 · 14,792.80 · invariancia a meses · 2,270 · cadena ARV→Cash-Out→Intereses sin re-cálculo.
+- Goldens `scripts/test-uw-cashout.mjs`: Michelle/Echo/Childress/Meadow **exactos** (sin cambios).
+- `npm run ci:gate`: **12/12 ✓** · `node --check` OK en los 2 archivos tocados.
+
+Commits: `04dde2c` (Calc 4 dos modelitos) · siguiente (propagación hold en Calc 5).
