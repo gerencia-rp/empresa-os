@@ -239,7 +239,7 @@ async function ffLoadAll() {
       sb.from('ff_draws').select('*').eq('active', true),
       sb.from('ff_investors').select('*').eq('active', true),
       sb.from('ff_overhead').select('source, concepto, monto, mes').eq('active', true).then(r => r.data || []).catch(() => []),
-      sb.from('ff_hml_payments').select('address_norm, fecha, pago_hml, fee, ref30').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('ff_hml_payments').select('address_norm, fecha, pago_hml, fee, ref30, fecha_ref30').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('ff_uw_config').select('key, value, text_value').then(r => r.data || []).catch(() => []),
       // B1: la GANANCIA real viene del P&L de QBO (espejo qb_report_cache) — una sola definición
@@ -1213,6 +1213,7 @@ function ffInvestorAgg(comp) {
   }).sort((x, y) => y.capital - x.capital);
 }
 function ffSecAnalitica(comp) {
+  if (window.ffAnaliticaView) return ffAnaliticaView(comp); // rediseño 13-jul (pm/ff-analitica.js) — métricas que sí sirven; fallback = vista vieja
   const { deals, kpi } = comp;
   const cfg = FF.cfg || {};
   const zonas = ffAggBy(deals, d => d.city);
