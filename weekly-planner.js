@@ -36,7 +36,9 @@ const wpState = {
   onlyLate: false,              // A) solo atrasadas
   hideEmpty: true,              // A) colapsar casas sin tareas esta semana
   openGroups: { crew:false, specialist:false, tool:false, vehicle:false, other:false }, // sidebar colapsado por default
-  sidebarHidden: typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 1023px)').matches : false // oculto por default en mobile
+  sidebarHidden: (typeof localStorage !== 'undefined' && localStorage.getItem('wp_sidebar_hidden') !== null)
+    ? localStorage.getItem('wp_sidebar_hidden') === '1'
+    : (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 1023px)').matches : false) // sin preferencia guardada: oculto por default en mobile
 };
 
 function wpFmtDate(d) {
@@ -220,6 +222,11 @@ function wpInjectTheme() {
   #wp-root .wp-res{font-size:8.5px;padding:2px 7px;border-radius:20px;background:rgba(47,110,240,.11);color:var(--wa2);font-weight:600;white-space:nowrap}
   #wp-root .wp-ac-warn{font-size:9px;color:var(--wneg);font-weight:700;margin-top:5px}
   #wp-root .wp-ac-sug{font-size:9px;color:var(--wamb);font-weight:600;margin-top:4px}
+  /* pestaña para reabrir el panel de actividades (colapsado) */
+  #wp-root .wp-sbtab{border:1px solid var(--wbord);background:var(--wglass);color:var(--wmut);border-radius:10px;font-size:11px;font-weight:700;padding:10px 12px;cursor:pointer;transition:.15s;white-space:nowrap;box-shadow:0 1px 2px rgba(2,6,23,.05)}
+  #wp-root .wp-sbtab:hover{color:var(--wink);border-color:var(--wa2);background:rgba(47,110,240,.06)}
+  @media(min-width:1024px){#wp-root .wp-sbtab{writing-mode:vertical-rl;text-orientation:mixed;padding:14px 7px;letter-spacing:.5px;align-self:stretch;max-height:280px}}
+  #wp-root .wp-sbclose{flex:0 0 auto;font-size:11px;line-height:1;transition:.15s}
   /* barra de filtros + meta de casa */
   #wp-root .wp-filters{padding:2px 0}
   #wp-root .wp-crew{font-weight:600}
@@ -500,7 +507,7 @@ function wpRender() {
               <button onclick="wpOpenBitacora()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📔 Bitácora</button>
               <button onclick="wpOpenPrintPicker()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">🖨️ Imprimir día</button>
               <button onclick="wpToggleResourceForm()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">+ Recurso</button>
-              <button onclick="wpToggleSidebar()" class="lg:hidden text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${wpState.sidebarHidden?'📂 Mostrar panel':'📁 Ocultar panel'}</button>
+              <button onclick="wpToggleSidebar()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${wpState.sidebarHidden?'📂 Mostrar actividades':'📁 Ocultar actividades'}</button>
             </div>
           </details>
         </div>
@@ -524,8 +531,9 @@ function wpRender() {
       </div>
       <!-- BODY: Sidebar tabbed + Grid calendario -->
       <div class="flex gap-3 flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
-        <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) -->
-        <div class="${wpState.sidebarHidden?'hidden lg:flex':'flex'} w-full lg:w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden lg:flex-col max-h-[40vh] lg:max-h-none">
+        <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) — colapsable con ✕ / pestaña Actividades -->
+        ${wpState.sidebarHidden ? `<button onclick="wpToggleSidebar()" class="wp-sbtab flex-shrink-0" title="Abrir el panel de actividades (recursos, backlog, tareas)">📥 Actividades</button>` : ''}
+        <div class="${wpState.sidebarHidden?'hidden':'flex'} w-full lg:w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden lg:flex-col max-h-[40vh] lg:max-h-none">
           <!-- Tabs -->
           <div class="flex border-b border-slate-200 bg-slate-50 text-[10px] font-bold">
             <button onclick="wpSetSideTab('resources')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='resources'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">👷 Recursos</button>
@@ -533,6 +541,7 @@ function wpRender() {
             <button onclick="wpSetSideTab('templates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">📚 Tareas</button>
             <button onclick="wpSetSideTab('daytemplates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='daytemplates'?'bg-white border-b-2 border-blue-600':'text-slate-500 hover:bg-slate-100'}">🗂️ Días <span class="bg-blue-600 text-white px-1 rounded">${(wpState.dayTemplates||[]).length}</span></button>
             <button onclick="wpSetSideTab('recurring')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='recurring'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">🔁 Recur <span class="bg-violet-600 text-white px-1 rounded">${(wpState.recurring||[]).length}</span></button>
+            <button onclick="wpToggleSidebar()" class="wp-sbclose px-2 py-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Cerrar el panel de actividades">✕</button>
           </div>
           <div class="flex-1 overflow-y-auto">
             ${wpState.sidePanelTab === 'resources' ? wpRenderTeamPanel(allHomes) : ''}
@@ -582,6 +591,7 @@ function wpRender() {
                     </div>
                     <div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-100 opacity-50 group-hover:opacity-100 transition-opacity">
                       <button onclick="event.stopPropagation(); wpCompleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="flex-1 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="Marcar casa como terminada y enviar tiempos al Estimador Pro">✅ Terminar</button>
+                      <button onclick="event.stopPropagation(); wpOpenReschedule('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold" title="Reprogramar obra: mover TODO el calendario N días hábiles (preview + deshacer)">📆</button>
                       <button onclick="event.stopPropagation(); wpDeleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 py-0.5 rounded" title="Eliminar casa y todas sus actividades (no recuperable)">🗑️</button>
                     </div>
                   </td>
@@ -701,6 +711,7 @@ function wpSetHouseFilter(value) {
 
 function wpToggleSidebar() {
   wpState.sidebarHidden = !wpState.sidebarHidden;
+  try { localStorage.setItem('wp_sidebar_hidden', wpState.sidebarHidden ? '1' : '0'); } catch (e) {}
   wpRender();
 }
 
@@ -4999,6 +5010,254 @@ if (typeof window !== 'undefined') {
 // Cada día es una celda con número de tareas, color por estado.
 // Click en un día abre la vista detallada de ese día.
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 📆 REPROGRAMAR OBRA — mover TODO el calendario de una obra N días hábiles
+//    (Lun–Sáb laborables; nunca inicia/termina en domingo). Solo cambian fechas:
+//    duración, orden/depends_on, etapa, responsables y demás campos quedan intactos.
+//    Flujo seguro: PREVIEW (no escribe) → Confirmar → Deshacer (corrimiento inverso).
+//    Historial en remodel_reschedules (si la tabla no está, queda deshacer en sesión).
+// ════════════════════════════════════════════════════════════
+const wpReschedState = { homeId: null, homeName: '', acts: [], skipped: 0, prevStart: null, preview: null, last: null, sessionLast: {} };
+
+// ±N días hábiles: el domingo no cuenta como día y jamás se cae en él (si el origen es domingo, normaliza al lunes)
+function wpAddWorkDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  let left = Math.abs(n); const step = n < 0 ? -1 : 1;
+  while (left > 0) { d.setDate(d.getDate() + step); if (d.getDay() !== 0) left--; }
+  if (d.getDay() === 0) d.setDate(d.getDate() + step); // paranoia: nunca terminar en domingo
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+function wpReschedFmt(iso) { return new Date(iso + 'T00:00:00').toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }); }
+
+async function wpOpenReschedule(homeId, homeName) {
+  // TODAS las actividades de la obra desde la DB (wpState.activities es solo la semana visible)
+  let q = sb.from('weekly_activities').select('id,date,baseline_date,status,stage,activity_name').order('date');
+  q = homeId.startsWith('name:') ? q.eq('property_name', homeId.slice(5)) : q.eq('project_id', homeId);
+  const { data, error } = await q;
+  if (error) { if (window.toast) toast('No pude cargar las actividades: ' + error.message, 'error'); return; }
+  const all = (data || []).filter(a => a.date);
+  const movibles = all.filter(a => a.status !== 'done' && a.status !== 'cancelled');
+  if (!movibles.length) { if (window.toast) toast('Esta obra no tiene actividades pendientes para mover.', 'error'); return; }
+  const proj = homeId.startsWith('name:') ? null : (wpState.projects || []).find(p => p.id === homeId);
+  wpReschedState.homeId = homeId; wpReschedState.homeName = homeName;
+  wpReschedState.acts = movibles; wpReschedState.skipped = all.length - movibles.length;
+  wpReschedState.prevStart = (proj && proj.start_date) || movibles[0].date;
+  wpReschedState.preview = null;
+  // último corrimiento sin deshacer (historial DB; si la tabla no existe, memoria de la sesión)
+  wpReschedState.last = null;
+  try {
+    const { data: hist, error: he } = await sb.from('remodel_reschedules').select('*').eq('project_id', homeId).is('undone_at', null).order('created_at', { ascending: false }).limit(1);
+    if (!he && hist && hist.length) wpReschedState.last = hist[0];
+  } catch (e) { /* tabla aún no migrada */ }
+  if (!wpReschedState.last && wpReschedState.sessionLast[homeId]) wpReschedState.last = wpReschedState.sessionLast[homeId];
+  wpReschedRenderModal();
+}
+
+function wpReschedRenderModal() {
+  const S = wpReschedState;
+  const rango = `${wpReschedFmt(S.acts[0].date)} → ${wpReschedFmt(S.acts[S.acts.length - 1].date)}`;
+  const html = `
+    <div class="space-y-3" id="wp-resched">
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
+        <span>🏠 <b class="text-slate-900">${(S.homeName || '').replace(/</g, '&lt;')}</b></span>
+        <span>📋 <b>${S.acts.length}</b> actividades pendientes (${rango})</span>
+        <span>🚩 inicio actual: <b>${wpReschedFmt(S.prevStart)}</b></span>
+        ${S.skipped ? `<span class="text-amber-700">✋ ${S.skipped} hechas/canceladas NO se mueven (historial)</span>` : ''}
+      </div>
+
+      <!-- Forma de mover -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+        <div class="text-[10px] font-bold uppercase tracking-wide text-slate-500">¿Cómo lo movemos?</div>
+        <label class="flex items-center gap-2 text-sm cursor-pointer flex-wrap">
+          <input type="radio" name="wp-rs-mode" value="days" checked onchange="wpReschedClearPrev()" />
+          Correr
+          <input id="wp-rs-n" type="number" min="1" max="120" value="4" onfocus="document.querySelector('input[name=wp-rs-mode][value=days]').checked=true" oninput="wpReschedClearPrev()" class="w-16 border border-slate-300 rounded px-2 py-1.5 text-sm text-right" />
+          días hábiles hacia
+          <select id="wp-rs-dir" onfocus="document.querySelector('input[name=wp-rs-mode][value=days]').checked=true" onchange="wpReschedClearPrev()" class="border border-slate-300 rounded px-2 py-1.5 text-sm bg-white">
+            <option value="1">adelante →</option>
+            <option value="-1">← atrás</option>
+          </select>
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer flex-wrap">
+          <input type="radio" name="wp-rs-mode" value="date" onchange="wpReschedClearPrev()" />
+          Nueva fecha de inicio:
+          <input id="wp-rs-date" type="date" value="${S.prevStart}" onfocus="document.querySelector('input[name=wp-rs-mode][value=date]').checked=true" onchange="wpReschedClearPrev()" class="border border-slate-300 rounded px-2 py-1.5 text-sm" />
+          <span class="text-[10px] text-slate-400">(si cae domingo, pasa al lunes)</span>
+        </label>
+      </div>
+
+      <!-- Re-plan vs atraso -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+        <div class="text-[10px] font-bold uppercase tracking-wide text-slate-500">¿Re-plan o atraso de ejecución?</div>
+        <label class="flex items-start gap-2 text-xs cursor-pointer">
+          <input type="radio" name="wp-rs-rebase" value="1" checked onchange="wpReschedClearPrev()" class="mt-0.5" />
+          <span><b>Re-plan (re-basar)</b> — el plan original (baseline) se mueve junto con las fechas. La vista Desviación arranca en cero. Para obras que aún no empezaron.</span>
+        </label>
+        <label class="flex items-start gap-2 text-xs cursor-pointer">
+          <input type="radio" name="wp-rs-rebase" value="0" onchange="wpReschedClearPrev()" class="mt-0.5" />
+          <span><b>Atraso de ejecución</b> — el baseline queda donde está y el corrimiento queda registrado como atraso de cada actividad en la vista Desviación.</span>
+        </label>
+      </div>
+
+      <div id="wp-rs-prev"></div>
+
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="wpReschedPreview()" class="flex-1 bg-slate-900 text-white text-sm font-bold py-2.5 px-4 rounded-lg hover:opacity-90">👁 Ver preview (no escribe nada)</button>
+        <button id="wp-rs-apply" onclick="wpReschedApply()" disabled class="flex-1 bg-emerald-600 text-white text-sm font-bold py-2.5 px-4 rounded-lg disabled:opacity-40 hover:bg-emerald-700">✅ Confirmar y aplicar</button>
+      </div>
+
+      ${S.last ? `
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-center justify-between gap-2 flex-wrap">
+        <span>↩︎ Último corrimiento: <b>${S.last.shift_wd > 0 ? '+' : ''}${S.last.shift_wd} días hábiles</b> el ${new Date(S.last.created_at).toLocaleDateString('es', { day: 'numeric', month: 'short' })} (inicio ${S.last.prev_start ? wpReschedFmt(S.last.prev_start) : '—'} → ${S.last.new_start ? wpReschedFmt(S.last.new_start) : '—'})${S.last._session ? ' · <i>solo esta sesión</i>' : ''}</span>
+        <button onclick="wpReschedUndo()" class="bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-700">Deshacer</button>
+      </div>` : ''}
+    </div>`;
+  openModal(`📆 Reprogramar obra · ${S.homeName}`, html);
+}
+function wpReschedClearPrev() { wpReschedState.preview = null; const p = document.getElementById('wp-rs-prev'); if (p) p.innerHTML = ''; const b = document.getElementById('wp-rs-apply'); if (b) b.disabled = true; }
+
+// n firmado en días hábiles según el modo elegido
+function wpReschedCalcShift() {
+  const mode = (document.querySelector('input[name="wp-rs-mode"]:checked') || {}).value || 'days';
+  if (mode === 'days') {
+    const n = Math.round(+((document.getElementById('wp-rs-n') || {}).value || 0));
+    const dir = +((document.getElementById('wp-rs-dir') || {}).value || 1);
+    if (!n || n < 1) return { error: 'Poné cuántos días hábiles (1 o más).' };
+    return { n: n * dir };
+  }
+  let target = (document.getElementById('wp-rs-date') || {}).value;
+  if (!target) return { error: 'Elegí la nueva fecha de inicio.' };
+  let note = '';
+  if (new Date(target + 'T00:00:00').getDay() === 0) { target = wpAddWorkDays(target, 0); note = 'La fecha elegida era domingo → se usa el lunes ' + wpReschedFmt(target) + '.'; }
+  const n = wpDaysDiff(wpReschedState.prevStart, target);
+  if (!n) return { error: 'La fecha elegida es el inicio actual — no hay nada que mover.' };
+  return { n, note };
+}
+
+function wpReschedPreview() {
+  const S = wpReschedState;
+  const shift = wpReschedCalcShift();
+  const box = document.getElementById('wp-rs-prev');
+  if (shift.error) { if (box) box.innerHTML = `<div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700">${shift.error}</div>`; return; }
+  const n = shift.n;
+  const rebase = ((document.querySelector('input[name="wp-rs-rebase"]:checked') || {}).value || '1') === '1';
+  const rows = S.acts.map(a => ({ id: a.id, old: a.date, nue: wpAddWorkDays(a.date, n) }));
+  const stages = {};
+  S.acts.forEach((a, i) => {
+    const s = a.stage || '—'; const g = stages[s] = stages[s] || { n: 0, min: null, max: null, nmin: null, nmax: null };
+    g.n++; const o = a.date, v = rows[i].nue;
+    if (!g.min || o < g.min) g.min = o; if (!g.max || o > g.max) g.max = o;
+    if (!g.nmin || v < g.nmin) g.nmin = v; if (!g.nmax || v > g.nmax) g.nmax = v;
+  });
+  const oldEnd = rows.reduce((m, r) => r.old > m ? r.old : m, '');
+  const newEnd = rows.reduce((m, r) => r.nue > m ? r.nue : m, '');
+  const newStart = wpAddWorkDays(S.prevStart, n);
+  S.preview = { n, rebase, rows, newStart, newEnd };
+  if (box) box.innerHTML = `
+    <div class="bg-white border border-slate-200 rounded-xl p-3">
+      <div class="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-2">Preview — ${n > 0 ? '+' : ''}${n} días hábiles · ${rebase ? 're-plan (baseline se mueve)' : 'atraso (baseline queda)'} · nada escrito aún</div>
+      ${shift.note ? `<div class="text-[11px] text-amber-700 mb-2">⚠ ${shift.note}</div>` : ''}
+      <div class="overx" style="overflow-x:auto">
+      <table class="w-full text-[11px]">
+        <thead><tr class="text-left text-slate-500"><th class="py-1 pr-2">Etapa</th><th class="py-1 pr-2 text-right">Act</th><th class="py-1 pr-2">Antes</th><th class="py-1">Después</th></tr></thead>
+        <tbody>
+          ${Object.entries(stages).map(([s, g]) => `
+            <tr class="border-t border-slate-100">
+              <td class="py-1.5 pr-2 font-semibold">${s.replace(/</g, '&lt;')}</td>
+              <td class="py-1.5 pr-2 text-right">${g.n}</td>
+              <td class="py-1.5 pr-2 text-slate-500 whitespace-nowrap">${wpReschedFmt(g.min)} → ${wpReschedFmt(g.max)}</td>
+              <td class="py-1.5 font-semibold whitespace-nowrap">${wpReschedFmt(g.nmin)} → ${wpReschedFmt(g.nmax)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+      <div class="mt-2 pt-2 border-t border-slate-200 text-xs flex flex-wrap gap-x-4 gap-y-1">
+        <span>🚩 Inicio: <b>${wpReschedFmt(S.prevStart)} → ${wpReschedFmt(newStart)}</b></span>
+        <span>📦 Entrega: <b>${wpReschedFmt(oldEnd)} → ${wpReschedFmt(newEnd)}</b></span>
+        <span class="text-emerald-700">✓ 0 en domingo · duración/orden/etapas intactas</span>
+      </div>
+    </div>`;
+  const b = document.getElementById('wp-rs-apply'); if (b) b.disabled = false;
+}
+
+async function wpReschedApply() {
+  const S = wpReschedState;
+  if (!S.preview) { if (window.toast) toast('Primero mirá el preview.', 'error'); return; }
+  const { n, rebase, rows, newStart } = S.preview;
+  const btn = document.getElementById('wp-rs-apply'); if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  // agrupar por fecha vieja (misma vieja → misma nueva) y actualizar POR IDS (sin colisiones)
+  const byOld = {};
+  rows.forEach(r => { (byOld[r.old] = byOld[r.old] || []).push(r); });
+  const ts = new Date().toISOString();
+  let moved = 0;
+  for (const old of Object.keys(byOld)) {
+    const grp = byOld[old];
+    const payload = { date: grp[0].nue, updated_at: ts };
+    if (rebase) payload.baseline_date = grp[0].nue;
+    const { data, error } = await sb.from('weekly_activities').update(payload).in('id', grp.map(r => r.id)).select('id');
+    if (error) { if (window.toast) toast(`⚠ Corrimiento PARCIAL (${moved}/${rows.length}): ${error.message}. Reabrí y revisá antes de reintentar.`, 'error'); return; }
+    moved += (data || []).length;
+  }
+  // ancla del proyecto (si es proyecto real)
+  if (!S.homeId.startsWith('name:')) {
+    const { error: pe } = await sb.from('remodel_projects').update({ start_date: newStart }).eq('id', S.homeId);
+    if (pe && window.toast) toast('Actividades movidas, pero no pude actualizar start_date del proyecto: ' + pe.message, 'error');
+  }
+  // historial para deshacer
+  const rec = { project_id: S.homeId, project_name: S.homeName, shift_wd: n, prev_start: S.prevStart, new_start: newStart, rebase, acts_count: moved, created_at: ts };
+  try {
+    const u = await sb.auth.getUser(); rec.created_by = u?.data?.user?.email || null;
+    const { data: ins, error: ie } = await sb.from('remodel_reschedules').insert(rec).select();
+    if (ie) throw ie;
+    S.sessionLast[S.homeId] = null; S.last = ins[0];
+  } catch (e) {
+    rec._session = true; S.sessionLast[S.homeId] = rec; S.last = rec;
+    if (window.toast) toast('Historial no disponible (migración pendiente) — el Deshacer queda para esta sesión.', 'info');
+  }
+  if (window.toast) toast(`✅ ${S.homeName}: ${moved} actividades corridas ${n > 0 ? '+' : ''}${n} días hábiles. Entrega: ${wpReschedFmt(S.preview.newEnd)}.`, 'success');
+  await wpLoadAll(); wpRender();
+  S.preview = null;
+  wpOpenReschedule(S.homeId, S.homeName); // re-consulta y reabre con el estado real + Deshacer
+}
+
+async function wpReschedUndo() {
+  const S = wpReschedState;
+  const rec = S.last;
+  if (!rec) return;
+  if (!confirm(`Deshacer el corrimiento de ${rec.shift_wd > 0 ? '+' : ''}${rec.shift_wd} días hábiles de "${S.homeName}"?\n\nSe aplica el corrimiento inverso (${-rec.shift_wd} días hábiles) a las actividades pendientes y el inicio vuelve a ${rec.prev_start || 'la fecha previa'}.`)) return;
+  // recargar actividades actuales y aplicar inverso con la MISMA lógica
+  let q = sb.from('weekly_activities').select('id,date,status').order('date');
+  q = S.homeId.startsWith('name:') ? q.eq('property_name', S.homeId.slice(5)) : q.eq('project_id', S.homeId);
+  const { data, error } = await q;
+  if (error) { if (window.toast) toast('No pude cargar: ' + error.message, 'error'); return; }
+  const movibles = (data || []).filter(a => a.date && a.status !== 'done' && a.status !== 'cancelled');
+  const byOld = {};
+  movibles.forEach(a => { (byOld[a.date] = byOld[a.date] || []).push(a.id); });
+  const ts = new Date().toISOString();
+  let moved = 0;
+  for (const old of Object.keys(byOld)) {
+    const nue = wpAddWorkDays(old, -rec.shift_wd);
+    const payload = { date: nue, updated_at: ts };
+    if (rec.rebase) payload.baseline_date = nue;
+    const { data: d2, error: e2 } = await sb.from('weekly_activities').update(payload).in('id', byOld[old]).select('id');
+    if (e2) { if (window.toast) toast(`⚠ Deshacer PARCIAL (${moved}): ${e2.message}`, 'error'); return; }
+    moved += (d2 || []).length;
+  }
+  if (!S.homeId.startsWith('name:') && rec.prev_start) {
+    await sb.from('remodel_projects').update({ start_date: rec.prev_start }).eq('id', S.homeId);
+  }
+  if (rec.id) { try { await sb.from('remodel_reschedules').update({ undone_at: ts }).eq('id', rec.id); } catch (e) {} }
+  S.sessionLast[S.homeId] = null;
+  if (window.toast) toast(`↩︎ Deshecho: ${moved} actividades volvieron ${-rec.shift_wd > 0 ? '+' : ''}${-rec.shift_wd} días hábiles.`, 'success');
+  await wpLoadAll(); wpRender();
+  wpOpenReschedule(S.homeId, S.homeName); // refresca el modal con el estado real
+}
+
+window.wpOpenReschedule = wpOpenReschedule; window.wpReschedPreview = wpReschedPreview;
+window.wpReschedApply = wpReschedApply; window.wpReschedUndo = wpReschedUndo; window.wpReschedClearPrev = wpReschedClearPrev;
+
 const wpMonthState = { monthStart: null };
 
 function wpOpenMonthView() {
@@ -5038,6 +5297,8 @@ function wpRenderMonthView() {
   const toIso = wpDateOnly(lastDay);
   let acts = (wpState.activities||[]).filter(a => a.date && a.date >= fromIso && a.date <= toIso);
   acts = wpFilterActsByHouse(acts, houseFilter);
+  // Domingos: la grilla no los muestra (día no laboral), pero si hay tareas cargadas en domingo se avisa
+  const sundayActs = acts.filter(a => new Date(a.date + 'T00:00:00').getDay() === 0);
 
   // Agrupar por día
   const byDay = {};
@@ -5100,20 +5361,21 @@ function wpRenderMonthView() {
         </div>
       </div>
 
-      <!-- Grilla calendario -->
+      <!-- Grilla calendario (lun-sáb: el domingo es día no laboral y no se muestra; los datos no se tocan) -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="grid grid-cols-7 bg-slate-100 text-[10px] font-bold uppercase text-slate-600">
-          ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => `<div class="p-2 text-center border-r border-slate-200 last:border-r-0">${d}</div>`).join('')}
+        <div class="grid grid-cols-6 bg-slate-100 text-[10px] font-bold uppercase text-slate-600">
+          ${['Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => `<div class="p-2 text-center border-r border-slate-200 last:border-r-0">${d}</div>`).join('')}
         </div>
-        <div class="grid grid-cols-7">
+        <div class="grid grid-cols-6">
           ${cells.map((c, i) => {
+            if (i % 7 === 6) return ''; // columna domingo oculta (solo vista)
             if (!c) return `<div class="border-t border-r border-slate-100 last:border-r-0 bg-slate-50 min-h-[80px]"></div>`;
             const info = c.info;
             let bg = 'bg-white hover:bg-slate-50';
             if (c.isToday) bg = 'bg-amber-50 hover:bg-amber-100';
             if (info?.atrasadas > 0) bg = 'bg-red-50 hover:bg-red-100';
             else if (info?.criticas > 0 && info.done < info.criticas) bg = 'bg-rose-50 hover:bg-rose-100';
-            const isWeekend = (i % 7) >= 5;
+            const isWeekend = (i % 7) === 5;
             return `
               <button onclick="wpOpenDayView('${c.iso}', '${houseFilter}')" class="border-t border-r border-slate-100 last:border-r-0 ${bg} ${isWeekend?'opacity-70':''} text-left p-1.5 min-h-[80px] flex flex-col">
                 <div class="flex items-center justify-between">
@@ -5140,6 +5402,7 @@ function wpRenderMonthView() {
         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-rose-50 border border-rose-300 rounded"></span> Críticas pendientes</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-50 border border-red-300 rounded"></span> Atrasadas</span>
         <span class="flex items-center gap-1">⚠️ Críticas del día · 🟡 Aplazadas · ⏰ Atrasadas</span>
+        ${sundayActs.length ? `<span class="flex items-center gap-1 text-amber-700 font-semibold">🛌 ${sundayActs.length} actividad(es) caen en domingo (no laboral, no se muestra la columna) — ${[...new Set(sundayActs.map(a => a.date))].sort().map(d => `<button onclick="wpOpenDayView('${d}', '${houseFilter}')" class="underline hover:text-amber-900">${new Date(d + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' })}</button>`).join(' · ')}</span>` : ''}
       </div>
 
       <div class="flex gap-2">
