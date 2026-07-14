@@ -45,7 +45,7 @@ async function ctLoad(force) {
       g(sb.from('ff_extension_payments').select('*').eq('active', true)),
       g(sb.from('remodel_at_properties').select('address,property_id,proceso,avance_pct,avance_real,gasto_materiales,gasto_trabajadores,presupuesto_interno,valor_interno,monto_real,monto_por_gastar,fecha_inicio,fecha_real_fin').eq('active', true)),
       g(sb.from('remodel_material_payments').select('address,address_norm,property_id,precio,fecha,categoria,orden').eq('active', true).limit(3000)),
-      g(sb.from('remodel_worker_hours').select('worker,casa,casa_norm,fecha,horas,pago,pago_total_dia').limit(6000)),
+      g(sb.from('remodel_worker_hours').select('worker,casa,casa_norm,fecha,horas,pago,pago_total_dia').is('archived_at', null).limit(6000)),
       g(sb.from('pm_payments').select('property_id,amount,billing_ym,proof_url,attachment_url,status,concept').eq('active', true).eq('type', 'ingreso').in('status', ['pagado', 'paid', 'completado']).limit(3000)),
       g(sb.from('pm_expenses').select('property_id,amount,billing_ym,category,subcategory,description,invoice_url').eq('active', true).limit(3000)),
       g(sb.from('ct_doc_extracts').select('*').eq('active', true).eq('estado', 'propuesta').order('created_at', { ascending: false })),

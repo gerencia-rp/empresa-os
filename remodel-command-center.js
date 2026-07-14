@@ -731,7 +731,7 @@ async function rcPagoGenerar() {
   if (!fechaPago) { alert('Elegí la fecha de pago.'); return; }
   const q = rcQuincena(fechaPago);
   // '*' (no columnas explícitas) para degradar sin error si 'pago_total_dia' aún no existe (pre-migración).
-  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('*').gte('fecha', q.s1ini).lte('fecha', q.s2fin).limit(5000);
+  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('*').is('archived_at', null).gte('fecha', q.s1ini).lte('fecha', q.s2fin).limit(5000);
   if (error) { alert('Error leyendo horas: ' + error.message); return; }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const obras = (RC.obras || []).filter(o => o.active !== false);
