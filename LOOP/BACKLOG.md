@@ -32,3 +32,4 @@ Estados: `pendiente` · `en curso` · `verificado` · `bloqueado (razón)`
 | QB-1 | P0 | Conector QuickBooks | bloqueado (input CEO) |
 | LD-1 | P1 | Nombres trabajadores ↔ Personal en Campo (cobertura ledger 74% sin rate) | pendiente |
 | PT-1 | P1 | Redirect URL portal en Supabase Auth + prueba real inversionista | acción CEO |
+| INV-1 | P1 | Inversionistas: generador de propuesta con MODELO real (fuera del Cerebro — el botón "✎ Generar propuesta"→ffAsk se quitó del módulo el 14-jul) | pendiente |

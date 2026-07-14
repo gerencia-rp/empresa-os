@@ -164,3 +164,12 @@ Un solo motor (\`pm/ff-arv-engine.js\` UMD) para Simple, Experto y back-test (\`
 - Interés HML: invisible → 68% del ingreso · ICR 0.35× al tope en rojo + por casa en el P&L.
 - Anomalías: 2,927 crudas → grupos accionables priorizados por $.
 - Fantasmas: Arcadia/Cervin detectadas solas (C21); ghost F&F y units vacías fuera de conteos.
+
+## MÓDULO INVERSIONISTAS REHECHO (14-jul — ranking por capital desplegado, obs CEO "el módulo actual no sirve")
+| Qué | ANTES | DESPUÉS (verificado contra Airtable vivo) |
+|---|---|---|
+| Contenido del módulo | CRM plano (21 filas con rangos VIP/Blanco/Azul/Amarillo), "Capital del holding", KPI "Con socio"/"Contratos sin firmar" (—), 4 modelos con "✎ Generar propuesta" que mandaba al Cerebro, cap table paramétrica con aporte "típico" inventado (all-in/deals) | **LISTA de co-inversionistas ACTIVOS** rankeada de mayor a menor (capital desplegado, desempate nº casas) — todo lo demás se quitó; el generador de propuesta va al BACKLOG (INV-1) como modelo real fuera del Cerebro |
+| Quién entra | todos los del CRM (incluía comprados, operadores y la propia empresa) | **participación viva**: 0 < ownership nuestro < 100% (Porcentaje de Owner Ship flddh8bS7oP34ak1M). Ownership 100% = les compramos su parte → fuera (Valeria, Caldas×2, Yeisson, Yeison, Diego, Flipping Rentals). Ownership 0 = operador → fuera, va en su módulo (Hitalo, Mirna, MEK/Charles, Jefferson/Harvest, Camilo). Vendidas con sociedad = **salida realizada** (se listan, no suman): Ivy · 1109 Arcadia |
+| Capital | `capital_inversionista` coalesced ("Capital del inversionista" ?? aportado) — Stonleigh daba 45,000 | **`capital_aportado` PURO** (fldrePoqg3C3caiZ5, sync v14 + col nueva) — Stonleigh **35,000** ✔ |
+| Ranking (data viva) | — | **Jefferson $188,000/4 · MEK $112,870.14/2 · Ivy $77,000/1+1 salida · Michael $43,000 · Jessica $35,968 · Ronald/Johanna/Cesar/Héctor $35,000 · Kysbel $34,708 · Daniel $23,200 — TOTAL $654,746.14 · 11 inversionistas · 16 casas EXACTO** al esperado del CEO |
+| Rentabilidad | no existía | honesta desde `v_inversionistas` (security_invoker): rentada = participación × (renta − gastos) × 12 ÷ capital · vendida = utilidad entregada ÷ capital · sin renta/gastos = **"pendiente de dato"** (MEK: 2 casas s/dato), jamás $0. Detalle por casa: capital · % participación (1 − ownership) · etapa · flujo anual de su parte |
