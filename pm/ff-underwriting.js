@@ -51,12 +51,22 @@ async function ffUwLoad() {
 
 // ─── calibración: $/sqft del histórico ───
 function ffUwPsf(tipo) { return UWc(tipo === 'suave' ? 'psf_suave' : tipo === 'pesada' ? 'psf_pesada' : 'psf_media', 63); }
-// meses de hold: input del deal → duración REAL calibrada (v_supuestos_calibrados, obs #9 CEO) → config
-function ffUwMesesHold(inp) {
-  const m = +inp.meses_hold; if (m > 0) return m;
+// ─── TIEMPOS separados (obs #11): obra ≠ renta; hold = obra + renta (derivado, NO input suelto) ───
+// El interés del HML corre SOLO sobre meses_OBRA. Legacy: análisis viejos con meses_hold → obra=hold, renta=0.
+function ffUwMesesObra(inp) {
+  const m = +inp.meses_obra; if (m > 0) return m;
+  const h = +inp.meses_hold; if (h > 0) return h;                    // legacy (análisis guardados pre-cambio)
   const cal = (UW.calib && +UW.calib.obra_meses_prom) || 0;
   return cal > 0 ? cal : UWc('default_meses_hold', 6);
 }
+function ffUwMesesRenta(inp) {
+  if (inp.meses_renta != null && inp.meses_renta !== '' && +inp.meses_renta >= 0) return +inp.meses_renta;
+  if (+inp.meses_hold > 0 && !(+inp.meses_obra > 0)) return 0;       // legacy: el hold viejo ya era el total
+  const cal = UW.calib;
+  return (cal && +cal.holding_meses_prom > 0 && +cal.obra_meses_prom > 0)
+    ? Math.max(0, Math.round((cal.holding_meses_prom - cal.obra_meses_prom) * 10) / 10) : 0;
+}
+function ffUwMesesHold(inp) { return Math.round((ffUwMesesObra(inp) + ffUwMesesRenta(inp)) * 10) / 10; }
 // tasas por deal (override) con fallback a config — UNA sola fuente para las 5 calcs
 function ffUwTasaHml(inp) { return +inp.hml_tasa_anual > 0 ? +inp.hml_tasa_anual : UWc('harmony_tasa_anual', 12); }
 function ffUwTasaDscr(inp) { return +inp.dscr_tasa_anual > 0 ? +inp.dscr_tasa_anual : UWc('dscr_tasa_anual', 7.125); }
@@ -72,8 +82,12 @@ function ffUwDefaults() {
   return {
     // negocio
     remod_directo: 0, usar_estimador: false, est_sqft: 1400, est_tipo: 'media',
-    meses_hold: (UW.calib && +UW.calib.obra_meses_prom) || UWc('default_meses_hold', 6), utilities_mes: 250, muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
+    meses_obra: (UW.calib && +UW.calib.obra_meses_prom) || UWc('default_meses_hold', 6),   // tiempo de REMODELACIÓN (calibrado, editable)
+    meses_renta: (UW.calib && +UW.calib.holding_meses_prom > 0 && +UW.calib.obra_meses_prom > 0) ? Math.max(0, Math.round((UW.calib.holding_meses_prom - UW.calib.obra_meses_prom) * 10) / 10) : 0,  // rentando hasta el refi
+    meses_hold: 0,                                               // DERIVADO = obra + renta (no se edita suelto)
+    utilities_mes: 250, muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
     hml_tasa_anual: 0, dscr_tasa_anual: 0, dscr_plazo_anos: 0,   // 0 = usar config; editable inline en Intereses
+    hml_capitaliza: 0,                                           // interés/fees que el term sheet CAPITALIZA al payoff
     contingencia_pct: UWc('draw_contingencia_pct', 10), permisos: 1500, dumpster: 800, ac: 0,
     // 1B · El inversionista pone (HUD-1, defaults calibrados con el HUD de Bethune)
     purchase: 0, hml_finance_pct: 90,
@@ -128,7 +142,13 @@ function ffUwCargarCasa(dealId) {
   inp._hml_saldo = +h.monto_hml || 0;                      // saldo HML → fallback de payoff en Calc 3
   inp._draw_real = +dr.total_draws || 0;                   // draw real de Airtable → comparador en Calc 1
   if (+h.tasa_pct > 0) inp.hml_tasa_anual = Math.round((h.tasa_pct > 1 ? +h.tasa_pct : +h.tasa_pct * 100) * 100) / 100;  // tasa HML real del préstamo
-  if (+dr.hml_months > 0) inp.meses_hold = +dr.hml_months; // duración real del deal (si existe) pisa el calibrado
+  // tiempos reales del deal (obs #11): obra = meses de interés pagados; renta = hueco hasta rentar (ff_draws)
+  if (+dr.hml_months > 0) {
+    inp.meses_obra = +dr.hml_months;
+    const mensualInt = +dr.interest_hml > 0 ? +dr.interest_hml / +dr.hml_months : 0;
+    inp.meses_renta = mensualInt > 0 ? Math.round(((+dr.interest_until_rent || 0) / mensualInt) * 10) / 10 : 0;
+    inp.meses_hold = 0;                                    // derivado
+  }
   UW.a = { id: null, nombre: (d.address || '').split(',')[0], property_id: d.property_id, ff_deal_id: d.id, es_hipotetica: false, direccion: d.address, ciudad: d.city || 'Austin', inputs: inp, outputs: {}, veredicto: null };
   UW.sub = 'negocio'; ffUwRender();
 }
@@ -157,17 +177,29 @@ window.ffUwSet = ffUwSet; window.ffUwSub = ffUwSub;
 function ffUwCalcNegocio(inp) {
   // 1A · Draw al Harmony
   const remod = inp.usar_estimador ? Math.round(ffUwPsf(inp.est_tipo) * (+inp.est_sqft || 0)) : (+inp.remod_directo || 0);
-  // tasa HML del deal (o config 12%/año = 1%/mes) — la MISMA que ve Calc 4
+  // tasa HML del deal (o config 12%/año = 1%/mes) — la MISMA que ven las 5 calcs
   const intMensual = ffUwTasaHml(inp) / 12 / 100;
-  // meses: duración REAL calibrada por default (obs #9 — v_supuestos_calibrados obra 1.8m, no 6m fijos)
-  const mesesHold = ffUwMesesHold(inp);
-  // el interés se calcula sobre lo que financia el Harmony (compra × %) + remod (lo pone Harmony via draws)
-  const baseInteres = (+inp.purchase || 0) * ((+inp.hml_finance_pct || 90) / 100) + remod;
-  const intereses = Math.round(baseInteres * intMensual * mesesHold);
+  // TIEMPOS separados (obs #11): el interés del HML corre SOLO durante la OBRA; utilities todo el hold
+  const mesesObra = ffUwMesesObra(inp);
+  const mesesRenta = ffUwMesesRenta(inp);
+  const mesesHold = Math.round((mesesObra + mesesRenta) * 10) / 10;
   const utilities = Math.round((+inp.utilities_mes || 0) * mesesHold);
-  const subtotal = remod + intereses + utilities + (+inp.muebles || 0) + (+inp.appraisal_cost || 0) + (+inp.cashout_en_draw || 0) + (+inp.permisos || 0) + (+inp.dumpster || 0) + (+inp.ac || 0);
-  const contingencia = Math.round(subtotal * ((+inp.contingencia_pct || 0) / 100));
-  const draw = subtotal + contingencia;
+  const extras = (+inp.muebles || 0) + (+inp.appraisal_cost || 0) + (+inp.cashout_en_draw || 0) + (+inp.permisos || 0) + (+inp.dumpster || 0) + (+inp.ac || 0);
+  // ═ UNA SOLA BASE DEL HML (punto 0): préstamo bruto = %financia × (compra + DRAW TOTAL) ═
+  // El interés (línea del draw) corre sobre ESE préstamo × meses_OBRA → punto fijo (converge en 2-3 vueltas;
+  // antes Calc 1 usaba compra+draw y Calc 4 compra×90%+remod: $291,780 ≠ $280,000 para el mismo deal).
+  const pctFin0 = Math.min(100, Math.max(0, +inp.hml_finance_pct || 90)) / 100;
+  const baseModo0 = UWct('uw_base_modo', 'draw');
+  let intereses = 0, subtotal = 0, contingencia = 0, draw = 0, prestamoIter = 0;
+  for (let i = 0; i < 6; i++) {
+    subtotal = remod + intereses + utilities + extras;
+    contingencia = Math.round(subtotal * ((+inp.contingencia_pct || 0) / 100));
+    draw = subtotal + contingencia;
+    prestamoIter = (+inp.purchase || 0) * pctFin0 + (baseModo0 === 'rehab' ? remod : draw) * pctFin0;
+    const nuevo = Math.round(prestamoIter * intMensual * mesesObra);
+    if (nuevo === intereses) break;
+    intereses = nuevo;
+  }
   // alerta déficit: remod del draw vs costo real calibrado
   const psfDraw = (+inp.est_sqft > 0) ? remod / +inp.est_sqft : null;
   const psfAlerta = UWc('deficit_alert_psf', 60);
@@ -177,11 +209,11 @@ function ffUwCalcNegocio(inp) {
   //   modo 'rehab' (legacy, calibración Bethune compra+rehab) disponible via ff_uw_config uw_base_modo
   //   Inversionista pone = Down + gastos de cierre − créditos (earnest + option + proración: se ACREDITAN, no se suman)
   const R2 = n => Math.round(n * 100) / 100;
-  const pctFin = Math.min(100, Math.max(0, +inp.hml_finance_pct || 90)) / 100;
+  const pctFin = pctFin0;
   const financia = Math.round((+inp.purchase || 0) * pctFin);   // legado: base de intereses (calc 4)
-  const baseModo = UWct('uw_base_modo', 'draw');
+  const baseModo = baseModo0;
   const baseHud = (+inp.purchase || 0) + (baseModo === 'rehab' ? remod : draw);
-  const prestamo = R2(baseHud * pctFin);
+  const prestamo = R2(baseHud * pctFin);                        // = LA base única del HML (misma del punto fijo)
   const downPayment = R2(baseHud - prestamo);
   const origination = R2(prestamo * ((+inp.cc_origination_pct || 0) / 100));
   const feesPrestamista = R2(origination + (+inp.cc_documentation || 0) + (+inp.cc_draw_fee || 0) + (+inp.cc_underwriting || 0) + (+inp.cc_prepaid_interest || 0));
@@ -191,9 +223,15 @@ function ffUwCalcNegocio(inp) {
   const creditos = R2((+inp.earnest || 0) + (+inp.option_fee || 0) + (+inp.prorata_impuestos || 0));
   const cashToClose = R2(downPayment + closing - creditos);
   const yaPagado = R2((+inp.earnest || 0) + (+inp.option_fee || 0));
+  // 1C · EL HARD MONEY TE PRESTA (desembolso neto) vs PAYOFF al refinanciar — dos números DISTINTOS
+  const feesLenderCierre = R2((+inp.cc_documentation || 0) + (+inp.cc_draw_fee || 0) + (+inp.cc_underwriting || 0));
+  const desembolsoNeto = R2(prestamo - origination - feesLenderCierre);
+  const capitaliza = +inp.hml_capitaliza || 0;                  // interés/reserva que el term sheet suma al principal
+  const payoffHml = R2(prestamo + capitaliza);                  // → alimenta la Calc 3 (Cash-Out) solo
   return { remod, intereses, utilities, contingencia, draw, psfDraw: psfDraw ? Math.round(psfDraw) : null, psfAlerta, deficitRiesgo,
-    mesesHold, tasaHml: ffUwTasaHml(inp), baseModo,
+    mesesObra, mesesRenta, mesesHold, tasaHml: ffUwTasaHml(inp), baseModo,
     financia, baseHud, prestamo, downPayment, origination, feesPrestamista, feesTitulo, assignment, closing, creditos, yaPagado, cashToClose,
+    feesLenderCierre, desembolsoNeto, capitaliza, payoffHml,
     earnest: +inp.earnest || 0, ctcReal: inp._ctc_real || null, closingReal: inp._closing_real || null };
 }
 // ═══ CALCULADORA 2 · ARV ═══
@@ -251,13 +289,17 @@ function ffUwCalcCashout(inp, arv) {
   const impuestos = R2(taxAnual * (1 + (+inp.refi_imp_imp_m || 0) / 12));               // 1 año + impound M meses
   const otros = +inp.refi_otros || 0;
   const costos = R2(feesLender + titulo + prepagado + seguro + impuestos + otros);
-  // 3) payoff: input manual (HUD) → derivado del ancla Airtable (pagado − costos) → saldo HML
+  // 3) payoff — CADENA (punto 2): override manual → real del refi (Airtable) → ⛓ CALCULADO en Del Negocio → saldo HML
   const pagadoReal = +inp._refi_pagado_real || 0;
-  let payoff, payoffFuente;
-  if (+inp.payoff > 0) { payoff = +inp.payoff; payoffFuente = 'input (HUD)'; }
+  let payoff, payoffFuente, payoffOverride = false;
+  if (+inp.payoff > 0) {
+    payoff = +inp.payoff; payoffOverride = true;
+    payoffFuente = (+inp._hml_saldo > 0 && +inp.payoff === +inp._hml_saldo) ? 'real: saldo HML del deal (Airtable)' : 'override manual';
+  }
   else if (pagadoReal > 0) { payoff = R2(pagadoReal - costos); payoffFuente = 'derivado: pagado Airtable − costos'; }
+  else if (+inp._payoffCalc > 0) { payoff = +inp._payoffCalc; payoffFuente = '⛓ calculado en Del Negocio (principal HML + capitalizado)'; }
   else if (+inp._hml_saldo > 0) { payoff = +inp._hml_saldo; payoffFuente = '⛓ del deal: saldo HML (Airtable)'; }
-  else { payoff = 0; payoffFuente = 'sin dato — cargalo del HUD o del saldo HML'; }
+  else { payoff = 0; payoffFuente = 'sin dato — cargalo del HUD o corré Del Negocio'; }
   // 5) cash-out (Balance to Borrower)
   const cashOut = R2(prestamo - payoff - costos);
   // 6) escrows = tu propia plata guardada (impuestos + seguro prepagados/impound)
@@ -268,22 +310,27 @@ function ffUwCalcCashout(inp, arv) {
   const cashoutReal = inp._cashout_real != null ? +inp._cashout_real : null;         // ancla Airtable
   return { valorTasado, usaAppraisal, arvA, appraisal, ltv: ltvPct, prestamoLtv, topeDscr, limitante, prestamoCalc, prestamoReal, prestamo,
     origination, feesLender, titulo, prepagado, seguro, seguroAnual, taxAnual, impuestos, otros, costos,
-    payoff, payoffFuente, pagadoReal, cashOut, escrows, recuperadoNeto, recuperaPct, ctc, cashoutReal,
+    payoff, payoffFuente, payoffOverride, payoffCalc: +inp._payoffCalc || null, pagadoReal, cashOut, escrows, recuperadoNeto, recuperaPct, ctc, cashoutReal,
     tasaAnual: ffUwTasaDscr(inp), dscrObj, renta,
     // compat con calc 4/6 (nombre legado)
     prestamoRefi: prestamo, base: valorTasado };
 }
 // ═══ CALCULADORA 4 · INTERESES ═══
-function ffUwCalcIntereses(inp, cashout) {
-  // ⛓ tasas por deal con fallback config — las MISMAS de Calc 1 (HML) y Calc 3 (DSCR); editables inline
-  const financia = Math.round((+inp.purchase || 0) * ((+inp.hml_finance_pct || 90) / 100)) + (inp._remodCalc || 0);
+function ffUwCalcIntereses(inp, cashout, negocio) {
+  // ⛓ UNA base del HML (punto 0): el préstamo bruto de Del Negocio — se acabó el $291,780 vs $280,000
+  const prestamoBruto = negocio && negocio.prestamo > 0 ? Math.round(negocio.prestamo)
+    : Math.round((+inp.purchase || 0) * ((+inp.hml_finance_pct || 90) / 100)) + (inp._remodCalc || 0);  // fallback legacy
   const tasaHarmony = ffUwTasaHml(inp) / 100;
-  const intMensualHarmony = Math.round(financia * tasaHarmony / 12);   // interest-only
+  const mesesObra = negocio ? negocio.mesesObra : ffUwMesesObra(inp);
+  const intMensualHarmony = Math.round(prestamoBruto * tasaHarmony / 12);              // interest-only
+  const interesTotalObra = Math.round(prestamoBruto * tasaHarmony / 12 * mesesObra);   // el CARRY real (solo obra)
   const dscrPrincipal = cashout.prestamoRefi || 0;
   const tasaDscr = ffUwTasaDscr(inp) / 100 / 12;
   const nDscr = ffUwPlazoDscr(inp) * 12;
   const pagoDscr = dscrPrincipal > 0 && tasaDscr > 0 ? Math.round(dscrPrincipal * tasaDscr * Math.pow(1 + tasaDscr, nDscr) / (Math.pow(1 + tasaDscr, nDscr) - 1)) : 0;
-  return { financia, intMensualHarmony, dscrPrincipal, pagoDscr, tasaHarmony: ffUwTasaHml(inp), tasaDscr: ffUwTasaDscr(inp), plazoDscr: ffUwPlazoDscr(inp), mesesHold: ffUwMesesHold(inp) };
+  return { financia: prestamoBruto, prestamoBruto, intMensualHarmony, interesTotalObra, dscrPrincipal, pagoDscr,
+    tasaHarmony: ffUwTasaHml(inp), tasaDscr: ffUwTasaDscr(inp), plazoDscr: ffUwPlazoDscr(inp),
+    mesesObra, mesesRenta: negocio ? negocio.mesesRenta : ffUwMesesRenta(inp), mesesHold: negocio ? negocio.mesesHold : ffUwMesesHold(inp) };
 }
 // ═══ CALCULADORA 5 · INGRESO MENSUAL ═══
 function ffUwCalcIngreso(inp, arv, intereses) {
@@ -304,9 +351,10 @@ function ffUwComputeAll() {
   const inp = UW.a.inputs;
   const negocio = ffUwCalcNegocio(inp);
   inp._remodCalc = negocio.remod; inp._ctcCalc = negocio.cashToClose;
+  inp._payoffCalc = negocio.payoffHml;                 // ⛓ el payoff fluye SOLO a la Calc 3 (punto 2)
   const arv = ffUwCalcArv(inp);
   const cashout = ffUwCalcCashout(inp, arv);
-  const intereses = ffUwCalcIntereses(inp, cashout);
+  const intereses = ffUwCalcIntereses(inp, cashout, negocio);
   // cash left in = cash to close − cash-out recuperado
   inp._cashLeftIn = Math.max(0, negocio.cashToClose - Math.max(0, cashout.cashOut));
   const ingreso = ffUwCalcIngreso(inp, arv, intereses);
