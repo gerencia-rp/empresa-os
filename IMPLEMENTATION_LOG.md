@@ -58,6 +58,23 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 ### Deploy Scope B (13-jul)
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
+
+## ARV CERTERO (13-jul, rama feat/arv-certero — directiva: error MEDIBLE contra tasaciones reales)
+Disparador: Cervin dio \$415,773 con 3 camas (RentCast/condado) cuando tiene 4 — Zillow \$471,900, assessed \$486,691.
+
+| Qué | ANTES | DESPUÉS (medido) |
+|---|---|---|
+| **Back-test motor vs tasaciones reales** | el motor NUNCA se había corrido contra la historia (la 'calibración' comparaba ARV Airtable vs appraisal, no el motor); corrido: **MdAPE 9.0% · sesgo −7.6%** | **MdAPE 4.9% · sesgo −1.6%** sobre las 12 casas con 'Valuación por el Appraisal' (excl. las 4 del CEO) — **META ≤6%/±2% ✅**, con Dove (−20%) y Childress (−12.9%) ADENTRO como outliers honestos (tasaciones DSCR income-infladas que ni el AVM alcanza: −18/−22%) |
+| Subject | 1 fuente (RentCast) usada en silencio — Dove/Childress figuran con 1 CAMA en el condado y el filtro mataba 14/20 comps | saneo automático (dato implausible = DUDOSO, null) + conflictos multi-fuente (RentCast vs Airtable vs manual) + **gate PROVISIONAL**: el ARV se muestra atenuado con chips '⚠ camas: 3 (RentCast) — ✓ usar 3 / ✓ usar 4 / otro' hasta que el humano confirma |
+| Selección de comps | 0.8mi/12m/±25% · si nada pasaba → 0 comps y silencio | filtros de tasador **1mi/6m/±15%/±1cama/mismo tipo** + outliers MAD fuera (declarados) + **expansión adaptativa** (6→9→12m) con confianza capada y aviso |
+| ARV | promedio ponderado 1/(gross+2) | **mediana ponderada** (similitud × recencia × cercanía) — jamás promedio crudo |
+| Confianza | adjetivo por reglas | **medida**: score 0-100 (CV/n/recencia/distancia/gross) + rango **P25–P75 real** de los comps ajustados |
+| Triangulación | no existía | panel Comps · AVM RentCast · **assessed × 1.235 (factor calibrado, n=12)** · tasación previa · ARV Airtable — divergencia >8% = ⚠ con la razón probable (ej. 'camas en conflicto') |
+| Calibración | bias global manual sugerido | \`calibrar()\` por coordenadas (GLA \$/sqft, cuarto, baño, año, tendencia, MAD-k) + **sesgo por SUBMERCADO** (78745 +4.4% n=3 · 78664 +12% n=2 · Marlin −1.6% n=2) + bias global con restricción de sesgo. Corrida persistida en \`arv_calibracion\` + \`v_arv_calibracion\` → la UI muestra '🎯 precisión ±4.9% sobre 12 casas' + botón ♻ recalibrar (auto-nudge al cerrar casa nueva) |
+| **Cervin (disparador)** | \$415,773 (3 camas, comps flojos) | con 4 camas confirmadas: **\$457,541 (P25–P75 457–487k)** — dentro de la evidencia ~460–480k SIN forzar; con 3 camas ya da 449k por la mejor reconciliación; el gate marca 'camas: una sola fuente — confirmá' |
+
+Un solo motor (\`pm/ff-arv-engine.js\` UMD) para Simple, Experto y back-test (\`scripts/arv-backtest.mjs\`). Params calibrados: GLA \$70/sqft · cuarto \$8k · baño \$12.5k · año 0.35%/a · lote \$3/sqft · MAD-k 3 · bias +3% + submercados. Cuota RentCast: 30/50 usadas (cache 30d). ⚠ Caveats declarados: n=12 (riesgo de sobreajuste, mitigado con MdAPE robusto + submercados solo n≥2); comps actuales vs tasaciones pasadas (sin fecha de appraisal espejada); assessed factor calibrado sobre refis DSCR.
+
 ## RE-AUDITORÍA 28 DIMENSIONES (13-jul, medida contra data viva)
 | # | Dimensión | ANTES (auditoría) | DESPUÉS (medido hoy) | ✓ |
 |---|---|---|---|---|
