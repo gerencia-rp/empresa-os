@@ -4,6 +4,13 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (14 Jul 2026 — RC: métricas LIMPIAS de Remodelación) · EN VIVO
+
+- 💰 **El CC de Remodelación muestra utilidad/rentabilidad LIMPIAS** (separan la plata de Remodelación de la del flip): 3 campos fórmula nuevos en Airtable → columnas aditivas `utilidad_remodelacion` (fldQ3vhMvBuCDUJVR) / `rentabilidad_remodelacion` (fldywMYaieK1bQ9MP) / `deficit_ff` (fldXxmdccFiGk1zPI, Draws − Valor cliente) en `remodel_at_properties` (migr `remodel_at_properties_add_metricas_limpias`), mapeadas en `sync-remodel-airtable` v49. Solo Finalizado tiene utilidad/rent limpia (la fórmula lo exige).
+- 📐 **Una definición**: `rcUtil()`/`rcRentPct()` en `remodel-command-center.js` — Utilidad, rentabilidad (ponderada Σutilidad/Σvalor_cliente, criterio B9), líderes, EVR, OKRs, ficha y EBITDA leen de ahí; Reportes CEO heredan vía `rcObraDataset()`. Déficit/Exceso F&F = tarjeta KPI + fila por obra. Las columnas viejas (`ganancia`/`rentabilidad`, con Draws) NO se borraron: visibles como "con Draws" (tarjeta, adaptador `utilidad_con_draws`, CSV).
+
+---
+
 ## 🎨 REGLA DURA — SISTEMA DE DISEÑO (12-jul, Fase 0 aprobada por el CEO)
 
 - **Toda superficie nueva importa `ui/tokens.css` + usa `ui/kit.js`** (kitMoney/kitMoney2/kitHero/kitCard/kitRow/kitInput/kitInputSm/kitBadge/kitEmpty/kitLoading/kitError — globales del bundle). **PROHIBIDO**: Tailwind nuevo, `:root`/paleta propia por módulo, hex/rgba de paleta inline. Familia canónica = la del shell (`--bg/--ink/--mut/--mut2/--glass/--glassb/--a1/--a2/--pos/--neg/--amber`); la familia FF (`--card/--line/--txt2/--txt3`) vive como ALIAS en tokens.css — no redefinirla.
