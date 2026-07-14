@@ -60,6 +60,7 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 
 
 ## CALC 1 · insurance + holding real + contingencia fija + FIX guardado (14-jul, pedido del CEO)
+- **Estimador rápido: SUGERIDO (media)** entre el costo interno ($/sqft calibrado) y el de afuera ($110/sqft) + botón "→ usar" que lo pasa a costo real (1400 sqft media: 88,200 / 154,000 → sugerido **$121,100** ✓ prod). **Intereses SIEMPRE ajustables**: tasa HML editable también en Ajustes de Calc 1 (misma key que Calc 4) + monto MANUAL de intereses del draw (pisa el punto fijo, rotulado "MANUAL" con ↩ volver al calculado; draw/préstamo/payoff se recalculan con el manual). Smoke prod 6/6.
 - **Insurance de la casa**: input mensual en Ajustes → insurance × meses de holding entra al draw (y por el punto fijo, al préstamo/interés/payoff). Config default `uw_insurance_mes`.
 - **Meses HASTA RENTAR O VENDER** (antes "rentando hasta el refi"): obra + hasta rentar/vender = HOLDING, y el interés/utilities/insurance corren sobre ESA suma (el CEO: "esa suma es lo real que voy a pagar de intereses y tener de los draws") — ejemplo 3+2: interés = préstamo × 1% × 5 = $15,876 (antes solo obra ×3). Calc 4 muestra "Interés total del holding (5 m = obra 3 + hasta rentar/vender 2)" con ambos meses editables.
 - **Contingencia FIJA** opcional (pisa el %): input en Ajustes; desglose rotula "Contingencia (FIJA)".
