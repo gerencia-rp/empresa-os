@@ -437,7 +437,11 @@ function ffUwViewNegocio() {
     + kitInput('Precio de compra', 'lo que se paga por la casa', inp.purchase, "ffUwSet('purchase',VAL)")
     + estToggle + estBox
     + kitInput('% que financia el prestamista', r.baseModo === 'rehab' ? 'sobre compra + rehab (modo legacy)' : 'sobre la base = compra + DRAW TOTAL (90 típico, 100 permitido)', inp.hml_finance_pct, "ffUwSet('hml_finance_pct',VAL)", { pct: true })
-    + kitInput('Meses de hold', 'default = duración REAL calibrada (' + ((UW.calib && UW.calib.obra_meses_prom) || '—') + ' m de obra, historia real) — editable', inp.meses_hold, "ffUwSet('meses_hold',VAL)", { plain: true })
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    + kitInputSm('Meses de OBRA (remodelación)', r.mesesObra, "ffUwSet('meses_obra',VAL)")
+    + kitInputSm('Meses RENTANDO hasta el refi', r.mesesRenta, "ffUwSet('meses_renta',VAL)")
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--txt3,#9fb0c9);margin:-4px 0 10px">⏱ obra ' + r.mesesObra + ' m + renta ' + r.mesesRenta + ' m = hold <b>' + r.mesesHold + ' m</b> · el interés del HML corre SOLO durante la obra (calibrado: ' + ((UW.calib && UW.calib.obra_meses_prom) || '—') + ' m)</div>'
     + '</div>';
   const adv = '<details ' + (UW.negAdv ? 'open' : '') + ' ontoggle="UW.negAdv=this.open" style="background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:18px;padding:4px 22px;margin-bottom:16px">'
     + '<summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--txt3,#9fb0c9);padding:14px 0;list-style:none">⚙︎ Ajustes (opcional) — draw y cierre HUD, ya calibrados</summary>'
@@ -452,6 +456,7 @@ function ffUwViewNegocio() {
     + kitInputSm('Dumpster', inp.dumpster, "ffUwSet('dumpster',VAL)")
     + kitInputSm('AC / HVAC', inp.ac, "ffUwSet('ac',VAL)")
     + kitInputSm('Contingencia (%)', inp.contingencia_pct, "ffUwSet('contingencia_pct',VAL)", { pct: true })
+    + kitInputSm('Interés/fees capitalizados al payoff', inp.hml_capitaliza, "ffUwSet('hml_capitaliza',VAL)")
     + '</div>'
     + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--a2,#2f6ef0);margin:16px 0 8px">Cierre HUD · fees prestamista</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
@@ -478,7 +483,7 @@ function ffUwViewNegocio() {
     + '</div></details>';
   const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
     + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">Draw al Harmony</div>'
-    + kitRow('Remodelación', r.remod) + kitRow('Intereses HML (' + r.mesesHold + 'm @ ' + r.tasaHml + '%/año · solo interés · durante obra)', r.intereses) + kitRow('Utilities', r.utilities)
+    + kitRow('Remodelación', r.remod) + kitRow('Intereses HML (' + r.mesesObra + 'm de OBRA @ ' + r.tasaHml + '%/año · solo interés · sobre el préstamo bruto)', r.intereses) + kitRow('Utilities (' + r.mesesHold + 'm de hold)', r.utilities)
     + kitRow('Muebles + appraisal + permisos + dumpster + AC', (+inp.muebles) + (+inp.appraisal_cost) + (+inp.permisos) + (+inp.dumpster) + (+inp.ac))
     + (+inp.cashout_en_draw > 0 ? kitRow('Cash-out incluido', +inp.cashout_en_draw) : '')
     + kitRow('Contingencia (' + inp.contingencia_pct + '%)', r.contingencia)
@@ -496,6 +501,17 @@ function ffUwViewNegocio() {
     + kitRow('<b>= EL INVERSIONISTA PONE</b>', null, { big: true, txt: UW_M2(r.cashToClose), color: 'var(--a2,#2f6ef0)', last: true })
     + '<div style="font-size:11px;color:var(--txt2,#c9d5ea);margin-top:8px;background:color-mix(in srgb, var(--a2) 8%, transparent);border-radius:8px;padding:8px 10px">Ya pagado como earnest/option: <b>' + UW_M2(r.yaPagado) + '</b> (acreditado) &middot; falta al cierre: <b>' + UW_M2(r.cashToClose) + '</b></div>'
     + (r.closingReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Gastos de cierre reales (Airtable): ' + UW_M(r.closingReal) + ' &middot; &Delta; ' + UW_M(r.closing - r.closingReal) + '</div>' : '')
+    // 1C · lo que RECIBE el negocio vs lo que DEBE al refinanciar — dos números distintos (punto 1)
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">El hard money te presta (desembolso neto)</div>'
+    + kitRow('Préstamo bruto (' + inp.hml_finance_pct + '% × base)', r.prestamo)
+    + kitRow('&minus; Puntos/originación (' + (+inp.cc_origination_pct || 0) + '%)', r.origination, { neg: true })
+    + kitRow('&minus; Fees de cierre del lender (doc + draw + uw)', r.feesLenderCierre, { neg: true })
+    + kitRow('<b>= Desembolso neto al negocio</b>', null, { big: true, txt: UW_M2(r.desembolsoNeto), color: 'var(--pos,#34d399)' })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Payoff del HML al refinanciar</div>'
+    + kitRow('Principal del HML', r.prestamo)
+    + kitRow('+ Interés/fees que se capitalizan (term sheet)', r.capitaliza || 0)
+    + kitRow('<b>= Lo que le pagás al refinanciar</b>', null, { big: true, txt: UW_M2(r.payoffHml), color: 'var(--amber,#e7b65e)', last: true })
+    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:6px">⛓ Este payoff alimenta SOLO la Calc 3 (Cash-Out) — no lo re-tecleás. Recibís ' + UW_M2(r.desembolsoNeto) + ' pero debés ' + UW_M2(r.payoffHml) + ': no son lo mismo.</div>'
     + '</div>';
   return '<div style="max-width:560px;margin:0 auto">'
     + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Del Negocio</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Compra + obra: cuánto desembolsa el prestamista y cuánto pone el inversionista.</div></div>'
