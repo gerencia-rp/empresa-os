@@ -380,7 +380,16 @@ function ffUwCalcIntereses(inp, cashout, negocio) {
   const tasaDscr = ffUwTasaDscr(inp) / 100 / 12;
   const nDscr = ffUwPlazoDscr(inp) * 12;
   const pagoDscr = dscrPrincipal > 0 && tasaDscr > 0 ? Math.round(dscrPrincipal * tasaDscr * Math.pow(1 + tasaDscr, nDscr) / (Math.pow(1 + tasaDscr, nDscr) - 1)) : 0;
+  // PITI (CEO 14-jul): total payment = P&I + property tax mensual + insurance/impound mensual.
+  // Tax = % del VALOR TASADO de la casa (refi_tax_pct, 2.1%/año Travis calibrado con HUDs reales);
+  // seguro = prima anual /12 (refi_seguro_anual) — mismos inputs de la Calc 3, una sola fuente.
+  const valorTasadoI = cashout.valorTasado || 0;
+  const taxPctI = +inp.refi_tax_pct > 0 ? +inp.refi_tax_pct : UWc('refi_tax_pct', 2.1);
+  const taxMes = R2i(valorTasadoI * (taxPctI / 100) / 12);
+  const seguroMes = R2i(((+inp.refi_seguro_anual > 0 ? +inp.refi_seguro_anual : UWc('refi_seguro_anual', 1900))) / 12);
+  const pitiTotal = pagoDscr > 0 ? R2i(pagoDscr + taxMes + seguroMes) : 0;
   return { financia: prestamoBruto, prestamoBruto, intMensualHarmony, interesTotalObra, dscrPrincipal, pagoDscr,
+    taxMes, seguroMes, pitiTotal, taxPct: taxPctI, valorTasado: valorTasadoI,
     tasaHarmony: ffUwTasaHml(inp), tasaDscr: ffUwTasaDscr(inp), plazoDscr: ffUwPlazoDscr(inp),
     mesesObra, mesesRenta: negocio ? negocio.mesesRenta : ffUwMesesRenta(inp), mesesHold: negocio ? negocio.mesesHold : ffUwMesesHold(inp) };
 }
@@ -712,16 +721,22 @@ function ffUwViewIntereses() {
     + '</div>';
   // ═ MODELITO 2 · REFI (DSCR) — AMORTIZADO, después del refi ═
   const baseTxt = co.prestamoReal > 0 ? 'préstamo real del refi (Airtable/override)' : (co.limitante === 'dscr' ? 'tope DSCR — la renta manda' : co.ltv + '% × ' + (co.usaAppraisal ? 'tasación del refi' : 'ARV'));
-  const heroRefi = kitHero('🏦 Pago mensual de la refi', UW_M(i.pagoDscr) + '/mes',
-    'DSCR · refinanciación · amortizado — P&amp;I sobre ' + UW_M(i.dscrPrincipal) + ' (' + baseTxt + ') a ' + i.plazoDscr + ' años @ ' + i.tasaDscr + '%', azul);
+  const heroRefi = kitHero('🏦 Pago mensual TOTAL de la refi (PITI)', UW_M2(i.pitiTotal) + '/mes',
+    'P&amp;I ' + UW_M(i.pagoDscr) + ' + property tax ' + UW_M2(i.taxMes) + ' + insurance ' + UW_M2(i.seguroMes) + ' — sobre ' + UW_M(i.dscrPrincipal) + ' (' + baseTxt + ') a ' + i.plazoDscr + ' años @ ' + i.tasaDscr + '%'
+    + (refReal ? ' · 🎯 real Airtable ' + UW_M2(refReal) + ' (Δ ' + UW_M2(i.pitiTotal - refReal) + ')' : ''), azul);
   const cardRefi = '<div class="card" style="padding:18px 22px;border-radius:18px;margin-bottom:16px">'
     + kitRow('Préstamo del refi (⛓ Cash-Out: ' + baseTxt + ')', i.dscrPrincipal)
-    + kitRow('<b>Cuota amortizada P&amp;I (' + (i.plazoDscr * 12) + ' cuotas @ ' + i.tasaDscr + '%/año)</b>', i.pagoDscr, { big: true, color: azul, last: !refReal })
-    + (refReal ? kitRow('🎯 PITI real de referencia (Airtable, incluye imp+seguro)', null, { txt: UW_M2(refReal), last: true }) : '')
+    + kitRow('Cuota amortizada P&amp;I (' + (i.plazoDscr * 12) + ' cuotas @ ' + i.tasaDscr + '%/año)', i.pagoDscr)
+    + kitRow('+ Property tax mensual (' + i.taxPct + '%/año del valor tasado ' + UW_M(i.valorTasado) + ' ÷ 12)', i.taxMes, { money2: true })
+    + kitRow('+ Insurance / impound mensual (prima anual ÷ 12)', i.seguroMes, { money2: true })
+    + kitRow('<b>= TOTAL PAYMENT (PITI)</b>', i.pitiTotal, { money2: true, big: true, color: azul, last: !refReal })
+    + (refReal ? kitRow('🎯 PITI real (Airtable) · Δ modelo ' + UW_M2(i.pitiTotal - refReal), null, { txt: UW_M2(refReal), last: true }) : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">'
     + kitInputSm('Tasa DSCR (%/año)', i.tasaDscr, "ffUwSet('dscr_tasa_anual',VAL)", { pct: true })
     + kitInputSm('Plazo (años)', i.plazoDscr, "ffUwSet('dscr_plazo_anos',VAL)")
     + kitInputSm('Préstamo (override)', inp.refi_prestamo_real, "ffUwSet('refi_prestamo_real',VAL)")
+    + kitInputSm('Property tax (%/año del valor)', i.taxPct, "ffUwSet('refi_tax_pct',VAL)", { pct: true })
+    + kitInputSm('Insurance (prima anual)', inp.refi_seguro_anual, "ffUwSet('refi_seguro_anual',VAL)")
     + '</div>'
     + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">La base NO tiene nada que ver con la compra ni con el HML: nace en el Cash-Out (LTV × valor tasado, con tope DSCR). Override vacío = ⛓ calculado. ⛓ Propaga: la cuota al flujo después del refi (Calc 5) y a Analítica; el préstamo al cash-out (Calc 3: refi − payoff − costos).</div>'
     + '</div>';
