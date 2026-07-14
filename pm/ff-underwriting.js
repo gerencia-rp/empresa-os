@@ -580,7 +580,10 @@ function ffUwViewCashout() {
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
     + IN3('Valor de refi / ARV', 'tasación esperada', 'appraisal', valorMostrado, { foot: c.usaAppraisal ? 'usando la tasación (appraisal)' : 'usando el ARV de Airtable — al escribir acá pasás a tasación' })
     + IN3('Renta mensual', 'para el tope DSCR', 'renta_mensual', inp.renta_mensual, { foot: c.topeDscr != null ? 'tope DSCR (' + c.dscrObj + 'x): ' + UW_M(c.topeDscr) + ' · tope LTV: ' + UW_M(c.prestamoLtv) : 'sin renta, el tope DSCR no se evalúa (solo LTV)' })
-    + IN3('Payoff del HML', 'saldo a pagar al refinanciar', 'payoff', inp.payoff, { foot: 'fuente: ' + c.payoffFuente })
+    + IN3('Payoff del HML', 'saldo a pagar al refinanciar — ⛓ se llena solo desde Del Negocio', 'payoff', c.payoffOverride ? inp.payoff : c.payoff, {
+      foot: 'fuente: ' + c.payoffFuente
+        + (c.payoffOverride && c.payoffCalc > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'payoff\',0)">↩ volver al calculado (' + UW_M2(c.payoffCalc) + ')</a>' : '')
+        + (!c.payoffOverride ? ' · escribí un valor para override manual' : '') })
     + '</div>';
   // ── AJUSTES colapsados (defaults calibrados de ff_uw_config) ──
   const adv = '<details ' + (UW.cashoutAdv ? 'open' : '') + ' ontoggle="UW.cashoutAdv=this.open" style="background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:18px;padding:4px 22px;margin-bottom:16px">'
@@ -632,19 +635,21 @@ function ffUwViewIntereses() {
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
     + kitInput('Precio de compra', 'base del préstamo del hard money', inp.purchase, "ffUwSet('purchase',VAL)")
     + kitInput('% que financia el hard money', 'porcentaje de la compra que pone el prestamista', inp.hml_finance_pct, "ffUwSet('hml_finance_pct',VAL)", { pct: true })
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">'
     + kitInputSm('Tasa HML (%/año)', i.tasaHarmony, "ffUwSet('hml_tasa_anual',VAL)", { pct: true })
+    + kitInputSm('Meses de OBRA', i.mesesObra, "ffUwSet('meses_obra',VAL)")
     + kitInputSm('Tasa DSCR (%/año)', i.tasaDscr, "ffUwSet('dscr_tasa_anual',VAL)", { pct: true })
     + kitInputSm('Plazo DSCR (años)', i.plazoDscr, "ffUwSet('dscr_plazo_anos',VAL)")
     + '</div>'
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9)">⛓ una sola fuente: la tasa HML alimenta el interés del draw (Calc 1) y la DSCR el tope y pago del refi (Calc 3). Defaults de config; acá las pisás por deal.</div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9)">⛓ una sola fuente: tasa HML + meses de obra alimentan el interés del draw (Calc 1); la DSCR, el tope y pago del refi (Calc 3). Lo que cambies acá se refleja en TODAS las calcs.</div>'
     + '</div>';
   const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
-    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">🔨 HML — ' + i.tasaHarmony + '%/año · SOLO INTERÉS · durante la obra (' + i.mesesHold + ' m)</div>'
-    + kitRow('Base financiada (compra × ' + inp.hml_finance_pct + '% + remod)', i.financia)
-    + kitRow('<b>Interés mensual</b>', i.intMensualHarmony, { big: true, color: 'var(--amber,#e7b65e)' })
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">🏦 DSCR — ' + i.tasaDscr + '%/año · ' + i.plazoDscr + ' AÑOS · AMORTIZADO (después del refi)</div>'
-    + kitRow('Préstamo del refi (⛓ Calc 3)', i.dscrPrincipal)
+    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">🔨 HML — ' + i.tasaHarmony + '%/año · SOLO INTERÉS · durante la OBRA (' + i.mesesObra + ' m, no el hold de ' + i.mesesHold + ' m)</div>'
+    + kitRow('Préstamo bruto del HML (⛓ Del Negocio: ' + inp.hml_finance_pct + '% × compra + draw)', i.prestamoBruto)
+    + kitRow('Interés mensual', i.intMensualHarmony)
+    + kitRow('<b>Interés TOTAL de la obra (' + i.mesesObra + ' m) — el carry real</b>', i.interesTotalObra, { big: true, color: 'var(--amber,#e7b65e)' })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">🏦 REFI / DSCR — ' + i.tasaDscr + '%/año · ' + i.plazoDscr + ' AÑOS · AMORTIZADO (después del refi)</div>'
+    + kitRow('Préstamo del refi (⛓ Calc 3: ' + (+inp.ltv_pct || 75) + '% × ARV)', i.dscrPrincipal)
     + kitRow('<b>Pago mensual P&amp;I</b>', i.pagoDscr, { big: true, color: 'var(--a2,#2f6ef0)', last: !refReal })
     + (refReal ? kitRow('PITI real de referencia (Airtable, incluye imp+seguro)', null, { txt: UW_M2(refReal), last: true }) : '')
     + '</div>';

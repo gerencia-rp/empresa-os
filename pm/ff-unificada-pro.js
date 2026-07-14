@@ -17,15 +17,14 @@ const UN_MODELO_LBL = { casa: '🏠 Casa Completa', hab: '🚪 Por Habitaciones'
 function unCtx() {
   const inp = UW.a.inputs;
   const o = ffUwComputeAll();
-  // tiempo hasta rentar: casa real = meses cubiertos + hueco (ff_draws); hipotética = meses de hold
-  let mesesObra = +inp.meses_hold || null, mesesHastaRenta = null, fuenteTiempo = 'meses de hold (Calc 1)';
+  // tiempos: obra ≠ renta (obs #11) — la MISMA fuente de Calc 1 (deal real ya seteó obra/renta al cargar)
+  let mesesObra = o.negocio.mesesObra || null;
+  let mesesRenta = o.negocio.mesesRenta || 0;
+  let mesesHastaRenta = o.negocio.mesesHold || null;
+  let fuenteTiempo = 'obra + renta (Calc 1)';
   const deal = UW.a.ff_deal_id ? (UW.deals || []).find(d => d.id === UW.a.ff_deal_id) : null;
   const dr = deal ? (UW.draws || {})[deal.address_norm] : null;
-  if (dr && +dr.hml_months > 0) {
-    const mensual = +dr.interest_hml > 0 ? +dr.interest_hml / +dr.hml_months : (+deal.hml_payment || 0);
-    const hueco = mensual > 0 ? Math.round((+dr.interest_until_rent || 0) / mensual) : 0;
-    mesesObra = +dr.hml_months; mesesHastaRenta = +dr.hml_months + hueco; fuenteTiempo = 'real: meses cubiertos + hueco (ff_draws)';
-  } else if (mesesObra) mesesHastaRenta = mesesObra;
+  if (dr && +dr.hml_months > 0) fuenteTiempo = 'real: meses cubiertos + hueco (ff_draws)';
   // confianza del ARV: tasador profesional si corrió; si no, la fuente de la Calc 2
   let arvConf = o.arv.confianza, arvProfesional = null;
   try {
@@ -35,7 +34,7 @@ function unCtx() {
     }
   } catch (e) { /* el tasador es opcional acá */ }
   const modeloRenta = (inp.ing && inp.ing.modelo) ? UN_MODELO_LBL[inp.ing.modelo] : null;
-  return { inp, o, mesesObra, mesesHastaRenta, fuenteTiempo, arvConf, arvProfesional, modeloRenta };
+  return { inp, o, mesesObra, mesesRenta, mesesHastaRenta, fuenteTiempo, arvConf, arvProfesional, modeloRenta };
 }
 
 // tarjeta con manejo de FALTANTES (nunca $0 fingido)
@@ -95,7 +94,7 @@ function ffUnificadaView() {
     tieneRemod ? unKpi('Remodelación', UN_M(o.negocio.remod), inp.usar_estimador ? 'estimador $/sqft' : 'costo real Remodelación') : unKpi('Remodelación', '', '', { falta: 'cargá la remo en Del Negocio', tab: 'negocio' }),
     unKpi('Draw al Harmony', UN_M(o.negocio.draw), 'obra + intereses + utilities'),
     c.mesesObra ? unKpi('Meses de obra', c.mesesObra + ' m', c.fuenteTiempo.startsWith('real') ? 'real (ff_draws)' : 'estimado') : unKpi('Meses de obra', '', '', { falta: 'meses de hold en Del Negocio', tab: 'negocio' }),
-    c.mesesHastaRenta ? unKpi('Hasta rentar', c.mesesHastaRenta + ' m', c.fuenteTiempo) : unKpi('Hasta rentar', '', '', { falta: 'meses de hold en Del Negocio', tab: 'negocio' }),
+    c.mesesHastaRenta ? unKpi('Hasta rentar', c.mesesHastaRenta + ' m', 'obra ' + (c.mesesObra || 0) + ' m + renta ' + (c.mesesRenta || 0) + ' m') : unKpi('Hasta rentar', '', '', { falta: 'meses de hold en Del Negocio', tab: 'negocio' }),
   ]);
 
   const inversion = unSec('La inversión', [
