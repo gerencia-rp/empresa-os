@@ -68,6 +68,8 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 | Déficit por casa | dr.net_total (campo equivocado) → Wellington −$130k FALSO, Charles −$110k FALSO | **[Total Draws − Déficit Total] − Down Payment** (la fórmula del CEO): Capitol = −30,463.76 − 7,500 = **−$37,963.76 exacto** · GUARDRAIL: draws=0 con obra → "⚠ faltan draws" (Wellington/Charles/Slaughter/Harvest + 3 más = 7 casas), EXCLUIDAS del acumulado (**−$289,188** corregido) |
 | Pipeline + Propiedades | "HOLD" recortado · all-in compra+rehab+holding · vendidas mezcladas | estrategia PALABRA COMPLETA ("Fix and hold") · **all-in = compra + Total Draws** (fallback compra+rehab ROTULADO *rehab) · badges Operador/Vendida atenuadas (siguen visibles, NO cuentan en totales) |
 
+**Deploy verificado EN PROD** (smoke 13/13 · 0 pageerrors): los 4 KPIs con los números exactos del CEO + conteos + déficit corregido −$289,188 + estrategia completa + ⚠ faltan draws + badges Operador/Vendida. Gotcha QA: /fix-and-flip es la página de EMPRESA (cards) — el CC se abre por ruta de app (/fix-and-flip/underwriting) + ffGo(seccion).
+
 ## CALCS ENCADENADAS (14-jul, rama feat/calcs-encadenadas — "cuánto presta el HML → payoff → refi")
 | Qué | ANTES | DESPUÉS (verificado corriendo el código real: compra $200,000 · remod $100,000 · obra 3 m · renta 2 m) |
 |---|---|---|
