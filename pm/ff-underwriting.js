@@ -326,8 +326,10 @@ function ffUwCalcIntereses(inp, cashout, negocio) {
     : Math.round((+inp.purchase || 0) * ((+inp.hml_finance_pct || 90) / 100)) + (inp._remodCalc || 0);  // fallback legacy
   const tasaHarmony = ffUwTasaHml(inp) / 100;
   const mesesObra = negocio ? negocio.mesesObra : ffUwMesesObra(inp);
-  const intMensualHarmony = Math.round(prestamoBruto * tasaHarmony / 12);              // interest-only
-  const interesTotalObra = Math.round(prestamoBruto * tasaHarmony / 12 * mesesObra);   // el CARRY real (solo obra)
+  const R2i = n => Math.round(n * 100) / 100;
+  // solo interés: el PAGO MENSUAL no depende de los meses (295,856 × 12%/12 = 2,958.56 — con centavos)
+  const intMensualHarmony = R2i(prestamoBruto * tasaHarmony / 12);
+  const interesTotalObra = R2i(intMensualHarmony * mesesObra);                          // el CARRY real (solo los meses de obra)
   const dscrPrincipal = cashout.prestamoRefi || 0;
   const tasaDscr = ffUwTasaDscr(inp) / 100 / 12;
   const nDscr = ffUwPlazoDscr(inp) * 12;
@@ -630,36 +632,46 @@ function ffUwViewCashout() {
     + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Refi Cash-Out</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Meté 3 datos y te da el cash-out. Lo demás ya está calibrado con tus refis reales.</div></div>'
     + hero + inputs + adv + desglose + '</div>';
 }
-// ─── Calc 4 · UI patrón Cash-Out (ola 1): hero protagonista + 2 inputs + desglose. Lógica intacta. ───
+// ─── Calc 4 · DOS MODELITOS SEPARADOS (CEO 13-jul): dos préstamos, dos bases, dos fórmulas — nunca una sola tarjeta ───
+//   1) HML solo-interés: pago mensual = préstamo × tasa/12 (los meses SOLO mueven el total del hold)
+//   2) Refi DSCR amortizado: cuota P&I a 30 años sobre el préstamo del refi (⛓ Calc 3: LTV × valor / tope DSCR)
+//   Cada base viene ⛓ de su calc de origen — acá no se re-teclea nada.
 function ffUwViewIntereses() {
-  const inp = UW.a.inputs, o = ffUwComputeAll(), i = o.intereses;
-  const refReal = UW.a.inputs._ref30_real;
-  const hero = kitHero('Pago mensual después del refi (DSCR)', UW_M(i.pagoDscr),
-    'P&amp;I sobre ' + UW_M(i.dscrPrincipal) + ' a ' + i.plazoDscr + ' años @ ' + i.tasaDscr + '%' + (refReal ? ' · 🎯 PITI real (Airtable): <b>' + UW_M2(refReal) + '</b>' : ''), 'var(--a2,#2f6ef0)');
-  const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
-    + kitInput('Precio de compra', 'base del préstamo del hard money', inp.purchase, "ffUwSet('purchase',VAL)")
-    + kitInput('% que financia el hard money', 'porcentaje de la compra que pone el prestamista', inp.hml_finance_pct, "ffUwSet('hml_finance_pct',VAL)", { pct: true })
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">'
+  const inp = UW.a.inputs, o = ffUwComputeAll(), i = o.intereses, co = o.cashout;
+  const refReal = inp._ref30_real;
+  const amber = 'var(--amber,#e7b65e)', azul = 'var(--a2,#2f6ef0)';
+  // ═ MODELITO 1 · HARMONY (HML) — SOLO INTERÉS, durante la obra/hold ═
+  const heroHml = kitHero('🔨 Pago mensual al Harmony', UW_M2(i.intMensualHarmony) + '/mes',
+    'HML · ' + i.tasaHarmony + '%/año · solo interés · durante la obra/hold — <b>el pago mensual no depende de los meses</b>', amber);
+  const cardHml = '<div class="card" style="padding:18px 22px;border-radius:18px;margin-bottom:22px">'
+    + kitRow('Préstamo bruto del HML (⛓ Del Negocio: ' + (+inp.hml_finance_pct || 90) + '% × (compra + draw))', i.prestamoBruto)
+    + kitRow('× ' + i.tasaHarmony + '% ÷ 12 = pago mensual', i.intMensualHarmony, { money2: true })
+    + kitRow('<b>Interés total estimado del hold (' + i.mesesObra + ' m)</b>', i.interesTotalObra, { money2: true, big: true, color: amber, last: true })
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'
     + kitInputSm('Tasa HML (%/año)', i.tasaHarmony, "ffUwSet('hml_tasa_anual',VAL)", { pct: true })
-    + kitInputSm('Meses de OBRA', i.mesesObra, "ffUwSet('meses_obra',VAL)")
-    + kitInputSm('Tasa DSCR (%/año)', i.tasaDscr, "ffUwSet('dscr_tasa_anual',VAL)", { pct: true })
-    + kitInputSm('Plazo DSCR (años)', i.plazoDscr, "ffUwSet('dscr_plazo_anos',VAL)")
+    + kitInputSm('Meses de holding (estimado)', i.mesesObra, "ffUwSet('meses_obra',VAL)")
     + '</div>'
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9)">⛓ una sola fuente: tasa HML + meses de obra alimentan el interés del draw (Calc 1); la DSCR, el tope y pago del refi (Calc 3). Lo que cambies acá se refleja en TODAS las calcs.</div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">Los meses son un estimado (la refi todavía no se sabe) y solo mueven el <b>total</b>, no el pago mensual' + (i.mesesRenta > 0 ? ' (tras la obra quedan ' + i.mesesRenta + ' m rentando hasta el refi)' : '') + '. ⛓ Propaga: el pago mensual al flujo durante el hold (Calc 5) y al carry del déficit; el total a la reserva de interés del draw (Calc 1).</div>'
     + '</div>';
-  const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
-    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">🔨 HML — ' + i.tasaHarmony + '%/año · SOLO INTERÉS · durante la OBRA (' + i.mesesObra + ' m, no el hold de ' + i.mesesHold + ' m)</div>'
-    + kitRow('Préstamo bruto del HML (⛓ Del Negocio: ' + inp.hml_finance_pct + '% × compra + draw)', i.prestamoBruto)
-    + kitRow('Interés mensual', i.intMensualHarmony)
-    + kitRow('<b>Interés TOTAL de la obra (' + i.mesesObra + ' m) — el carry real</b>', i.interesTotalObra, { big: true, color: 'var(--amber,#e7b65e)' })
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">🏦 REFI / DSCR — ' + i.tasaDscr + '%/año · ' + i.plazoDscr + ' AÑOS · AMORTIZADO (después del refi)</div>'
-    + kitRow('Préstamo del refi (⛓ Calc 3: ' + (+inp.ltv_pct || 75) + '% × ARV)', i.dscrPrincipal)
-    + kitRow('<b>Pago mensual P&amp;I</b>', i.pagoDscr, { big: true, color: 'var(--a2,#2f6ef0)', last: !refReal })
-    + (refReal ? kitRow('PITI real de referencia (Airtable, incluye imp+seguro)', null, { txt: UW_M2(refReal), last: true }) : '')
+  // ═ MODELITO 2 · REFI (DSCR) — AMORTIZADO, después del refi ═
+  const baseTxt = co.prestamoReal > 0 ? 'préstamo real del refi (Airtable/override)' : (co.limitante === 'dscr' ? 'tope DSCR — la renta manda' : co.ltv + '% × ' + (co.usaAppraisal ? 'tasación del refi' : 'ARV'));
+  const heroRefi = kitHero('🏦 Pago mensual de la refi', UW_M(i.pagoDscr) + '/mes',
+    'DSCR · refinanciación · amortizado — P&amp;I sobre ' + UW_M(i.dscrPrincipal) + ' (' + baseTxt + ') a ' + i.plazoDscr + ' años @ ' + i.tasaDscr + '%', azul);
+  const cardRefi = '<div class="card" style="padding:18px 22px;border-radius:18px;margin-bottom:16px">'
+    + kitRow('Préstamo del refi (⛓ Cash-Out: ' + baseTxt + ')', i.dscrPrincipal)
+    + kitRow('<b>Cuota amortizada P&amp;I (' + (i.plazoDscr * 12) + ' cuotas @ ' + i.tasaDscr + '%/año)</b>', i.pagoDscr, { big: true, color: azul, last: !refReal })
+    + (refReal ? kitRow('🎯 PITI real de referencia (Airtable, incluye imp+seguro)', null, { txt: UW_M2(refReal), last: true }) : '')
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">'
+    + kitInputSm('Tasa DSCR (%/año)', i.tasaDscr, "ffUwSet('dscr_tasa_anual',VAL)", { pct: true })
+    + kitInputSm('Plazo (años)', i.plazoDscr, "ffUwSet('dscr_plazo_anos',VAL)")
+    + kitInputSm('Préstamo (override)', inp.refi_prestamo_real, "ffUwSet('refi_prestamo_real',VAL)")
+    + '</div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">La base NO tiene nada que ver con la compra ni con el HML: nace en el Cash-Out (LTV × valor tasado, con tope DSCR). Override vacío = ⛓ calculado. ⛓ Propaga: la cuota al flujo después del refi (Calc 5) y a Analítica; el préstamo al cash-out (Calc 3: refi − payoff − costos).</div>'
     + '</div>';
+  const porQue = '<div style="font-size:11px;color:var(--txt3,#9fb0c9);line-height:1.6;padding:0 4px">Son <b>dos préstamos, dos bases y dos fórmulas</b>: el HML es solo-interés sobre compra + draw (pago = préstamo × tasa ÷ 12); la refi es amortizada sobre el valor tasado (cuota a 30 años). Cambiar el ARV mueve la refi sin tocar el HML; cambiar el draw mueve el HML sin tocar la refi.</div>';
   return '<div style="max-width:560px;margin:0 auto">'
-    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Lo que se paga por mes: durante la obra (hard money) y después del refi (DSCR).</div></div>'
-    + hero + inputs + desglose + '</div>';
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Dos préstamos distintos, cada uno con su pago mensual: el hard money durante la obra/hold y el DSCR después del refi.</div></div>'
+    + heroHml + cardHml + heroRefi + cardRefi + porQue + '</div>';
 }
 // ─── Calc 5 · UI patrón Cash-Out (ola 1): hero flujo + 1 input + desglose. Lógica intacta. ───
 function ffUwViewIngreso() {
@@ -683,7 +695,9 @@ function ffUwViewIngreso() {
     + kitRow('&minus; Vacancy (' + UWc('vacancy_pct', 5) + '%)', g.vacancy, { neg: true })
     + kitRow('&minus; Mantenimiento (' + UWc('mantenimiento_pct', 5) + '%)', g.mantenimiento, { neg: true })
     + kitRow('<b>= Flujo mensual</b>', g.flujo, { big: true, color: pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)', last: true })
-    + '</div>';
+    + '</div>'
+    // ⛓ pago HML de la Calc 4: antes del refi el flujo paga el hard money, no la cuota DSCR
+    + (o.intereses.intMensualHarmony > 0 ? '<div class="card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--txt3,#9fb0c9)">⏳ <b>Durante el hold</b> (antes del refi, si ya renta): pagando el HML ' + UW_M(o.intereses.intMensualHarmony) + '/mes (⛓ Calc 4) en vez de la cuota DSCR → <b style="color:' + (g.flujo + g.pagoDscr - o.intereses.intMensualHarmony >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)') + '">' + UW_M(g.flujo + g.pagoDscr - o.intereses.intMensualHarmony) + '/mes</b></div>' : '');
   return '<div style="max-width:560px;margin:0 auto">'
     + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Ingreso Mensual</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">El flujo que deja la casa rentada, después de TODOS los gastos.</div></div>'
     + hero + inputs + desglose + '</div>';

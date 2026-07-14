@@ -306,6 +306,8 @@ async function osLoad() {
     OS.capital = await sb.from('v_capital_deployed').select('*').maybeSingle().then(r => r.data).catch(() => null);
     // B5: la ficha de casa lee equity/all-in/líder de la capa de KPIs (v_property_360)
     OS.p360 = await sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []);
+    // Ficha (14-jul): all-in/déficit con la definición nueva (compra + Total Draws, guardrail faltan_draws)
+    OS.ffPort = await sb.from('v_ff_portafolio').select('*').then(r => r.data || []).catch(() => []);
     // B4: ocupación ÚNICA desde v_ocupacion (48/45/3/0 = 93.75%) — mata el snapshot congelado
     OS.ocup = await sb.from('v_ocupacion').select('*').maybeSingle().then(r => r.data).catch(() => null);
     OS.pnl = pnl || [];
@@ -672,7 +674,30 @@ function osCasaMatch(slug, comp) {
   }
   const p360 = (pid && (OS.p360 || []).find(r => r.property_id === pid))
     || (OS.p360 || []).find(r => osHouseKey(r.address) === key) || null;
-  return { key, slug, addr, ff, remodel, prop, rentas, p360 };
+  const port = (pid && (OS.ffPort || []).find(r => r.property_id === pid))
+    || (ff && (OS.ffPort || []).find(r => r.address_norm === ff.address_norm)) || null;
+  return { key, slug, addr, ff, remodel, prop, rentas, p360, port };
+}
+// ── UNA sola cadena de lectura para la Ficha (tarjeta y fila espejo leen ESTO — jamás $0 sobre dato existente) ──
+function osFichaNums(m) {
+  const compra = (m.p360 && m.p360.compra != null) ? +m.p360.compra
+    : (m.ff && m.ff.purchase_price != null) ? +m.ff.purchase_price : null;
+  const rehabReal = (m.p360 && m.p360.rehab_real != null) ? +m.p360.rehab_real
+    : (m.ff && +m.ff.remodel_real > 0) ? +m.ff.remodel_real : null;   // "Costo Remodelación Real" (Airtable directo)
+  const rehabEst = (m.ff && +m.ff.remodel_est > 0) ? +m.ff.remodel_est : null;
+  const draws = (m.port && +m.port.total_draws > 0) ? +m.port.total_draws : null;
+  // all-in: compra + Total Draws → compra + rehab REAL → compra + rehab ESTIMADA (siempre rotulado)
+  let allIn = null, allInSub = '', faltan = false;
+  if (compra != null && draws != null) { allIn = compra + draws; allInSub = `compra ${OS_M(compra)} + draws ${OS_M(draws)}`; }
+  else if (compra != null && rehabReal != null) { allIn = compra + rehabReal; allInSub = `compra ${OS_M(compra)} + rehab real ${OS_M(rehabReal)} <span style="color:var(--amber)">(faltan draws)</span>`; faltan = true; }
+  else if (compra != null && rehabEst != null) { allIn = compra + rehabEst; allInSub = `compra ${OS_M(compra)} + rehab ESTIMADA ${OS_M(rehabEst)} <span style="color:var(--amber)">(faltan draws)</span>`; faltan = true; }
+  else if (compra != null) { allIn = compra; allInSub = `compra ${OS_M(compra)} <span style="color:var(--amber)">(sin rehab/draws cargados)</span>`; faltan = true; }
+  const arv = (m.ff && +m.ff.arv > 0) ? +m.ff.arv : (m.p360 && +m.p360.arv > 0 ? +m.p360.arv : null);
+  const equity = (arv != null && allIn != null) ? arv - allIn : null;
+  const rehabMostrar = draws != null ? { v: draws, lbl: 'draws desembolsados' }
+    : rehabReal != null ? { v: rehabReal, lbl: 'rehab real (faltan draws)' }
+    : rehabEst != null ? { v: rehabEst, lbl: 'rehab estimada' } : null;
+  return { compra, rehabReal, rehabEst, draws, allIn, allInSub, faltan, arv, equity, rehabMostrar };
 }
 function osCasaInsights(m) {
   const ins = [];
@@ -686,6 +711,7 @@ function osCasaInsights(m) {
 }
 function osCasa(comp) {
   const m = osCasaMatch(OS.route.slug, comp);
+  const fn = osFichaNums(m);   // UNA cadena de lectura: tarjeta y fila espejo muestran LO MISMO
   const kv = (l, v, cls) => `<div class="kv"><span>${l}</span><b class="${cls || ''}">${v}</b></div>`;
   if (!m.ff && !m.remodel && !m.rentas) {
     return `<div class="empty" style="padding:80px 40px"><div style="font-size:48px">🏚️</div><h1 style="margin-top:12px">Casa no encontrada</h1><div class="sub">No hay datos para <b>${OS_E(OS.route.slug)}</b> en Fix & Flip, Remodelación ni Rentas.</div><button class="cbtn" style="padding:10px 18px" data-osnav="/">← Volver al Panel Global</button></div>`;
@@ -720,14 +746,14 @@ function osCasa(comp) {
     <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).${fichaPid && window.reportCasa ? ` <button class="cbtn" style="margin-left:8px" onclick="reportCasa('${fichaPid}')">📄 Reporte PDF de la casa</button>` : ''}</div>
     <div class="grid k4">
       <div class="card"><div class="lab">Etapa actual</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
-      <div class="card"><div class="lab">All-in (compra + rehab real)</div><div class="big">${m.p360 && m.p360.all_in != null ? OS_M(+m.p360.all_in) : (m.ff ? OS_M(m.ff.allIn) : '—')}</div><div class="meta">${m.p360 && m.p360.compra != null ? `compra ${OS_M(+m.p360.compra)} + rehab ${m.p360.rehab_real != null ? OS_M(+m.p360.rehab_real) : '— sin dato'}` : (m.ff ? Math.round(m.ff.allInPct * 100) + '% del ARV' : 'sin deal F&F')}</div></div>
-      <div class="card"><div class="lab">ARV</div><div class="big">${m.ff && m.ff.arv ? OS_M(m.ff.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
-      <div class="card"><div class="lab">Equity incorporado</div><div class="big ${m.p360 && m.p360.equity != null ? (+m.p360.equity >= 0 ? 'up' : 'down') : ''}">${m.p360 && m.p360.equity != null ? OS_M(+m.p360.equity) : (m.ff && m.ff.arv ? OS_M(m.ff.arv - m.ff.allIn) : '—')}</div><div class="meta">ARV − (compra + rehab real) [v_property_360]${m.ff && m.ff.deficit < 0 ? ` · cash en hold ${OS_M(m.ff.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
+      <div class="card"><div class="lab">All-in (compra + draws)</div><div class="big">${fn.allIn != null ? OS_M(fn.allIn) : '—'}</div><div class="meta">${fn.allInSub || (m.ff ? 'sin datos de compra' : 'sin deal F&F')}</div></div>
+      <div class="card"><div class="lab">ARV</div><div class="big">${fn.arv != null ? OS_M(fn.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
+      <div class="card"><div class="lab">Equity incorporado</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">⚠ con datos incompletos</span>' : ''}${m.port && !m.port.faltan_draws && m.port.deficit < 0 ? ` · cash en hold ${OS_M(+m.port.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
     </div>
     <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
     <div class="grid k2" style="margin-top:12px">
       <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
-        <div class="overx">${m.ff ? `${kv('Compra', OS_M(m.ff.purchase))}${kv('Remodelación (est/draws)', OS_M(m.ff.remComplete))}${kv('Holding', OS_M(m.ff.holding))}${kv('All-in', OS_M(m.ff.allIn), m.ff.dq.revisar ? 'down' : '')}${kv('ARV', OS_M(m.ff.arv))}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', OS_M(m.ff.arv * 0.75 - m.ff.remComplete - m.ff.holding))}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
+        <div class="overx">${m.ff ? `${kv('Compra', fn.compra != null ? OS_M(fn.compra) : '—')}${kv('Remodelación', fn.rehabMostrar ? OS_M(fn.rehabMostrar.v) + ` <span style="font-size:10px;color:var(--mut2)">${fn.rehabMostrar.lbl}</span>` : '—')}${kv('Holding (draws)', m.ff.dr ? OS_M(m.ff.holding) : '—')}${kv('All-in', fn.allIn != null ? OS_M(fn.allIn) + (fn.faltan ? ' <span style="font-size:10px;color:var(--amber)">⚠ faltan draws</span>' : '') : '—', m.ff.dq.revisar ? 'down' : '')}${kv('ARV', fn.arv != null ? OS_M(fn.arv) : '—')}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', fn.arv != null ? OS_M(fn.arv * 0.75 - (fn.rehabMostrar ? fn.rehabMostrar.v : 0) - (m.ff.dr ? m.ff.holding : 0)) : '—')}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
       <div class="card"><div class="chart-h"><div class="t">🔨 Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
         <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div></div>
     </div>

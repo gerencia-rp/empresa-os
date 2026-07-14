@@ -120,7 +120,7 @@ function ffIngresoView() {
   const inp = UW.a.inputs;
   const st = igState();
   const o = ffUwComputeAll();
-  const ctx = { pagoDscr: o.intereses.pagoDscr || 0, impuestos: o.ingreso.impuestos || 0, seguro: UWc('seguro_mensual', 120), cashLeft: inp._cashLeftIn != null ? inp._cashLeftIn : 0 };
+  const ctx = { pagoDscr: o.intereses.pagoDscr || 0, pagoHml: o.intereses.intMensualHarmony || 0, impuestos: o.ingreso.impuestos || 0, seguro: UWc('seguro_mensual', 120), cashLeft: inp._cashLeftIn != null ? inp._cashLeftIn : 0 };
   const r = ffIngCalc(inp, ctx);
   const zona = igZona();
   const modeloSel = st.modelo || r.mejor;
@@ -183,7 +183,9 @@ function ffIngresoView() {
     + fila('− Mantenimiento (' + UWc('mantenimiento_pct', 5) + '%)', '−' + IG_M(x.mant), 'ap-neg')
     + '<div class="ap-mrow" style="border-top:2px solid var(--glassb,rgba(255,255,255,.15))"><span style="font-weight:800;color:var(--ink,#eaf0ff)">= Flujo neto</span><b class="' + (x.flujo >= 0 ? 'ap-pos' : 'ap-neg') + '" style="font-size:16px">' + IG_M(x.flujo) + '/mes</b></div>'
     + '<div class="ap-mrow" style="border-top:none"><span>Cash-on-cash (flujo anual ÷ ' + IG_M(ctx.cashLeft) + ' invertidos)</span><b>' + (x.coc != null ? x.coc + '%' : '—') + '</b></div>'
-    + '</div>';
+    + '</div>'
+    // ⛓ pago HML de la Calc 4: el flujo ANTES del refi paga el hard money, no la cuota DSCR
+    + (ctx.pagoHml > 0 ? '<div class="ap-card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--mut,#9fb0c9)">⏳ <b style="color:var(--ink,#eaf0ff)">Durante el hold</b> (antes del refi, si ya renta): mismo flujo pero pagando el HML ' + IG_M(Math.round(ctx.pagoHml)) + '/mes (⛓ Calc 4) en vez de la cuota DSCR → <b class="' + (x.flujo + ctx.pagoDscr - ctx.pagoHml >= 0 ? 'ap-pos' : 'ap-neg') + '">' + IG_M(Math.round(x.flujo + ctx.pagoDscr - ctx.pagoHml)) + '/mes</b></div>' : '');
 
   // TARIFAS de la zona + vacancy por modelo + gastos — editables de verdad (ff_uw_config)
   const tarifas = '<details class="ap-card" style="padding:14px;margin-top:14px"><summary style="cursor:pointer" class="ap-lab">⚙️ Tarifas de la zona ' + (IG_ZONAS.find(z => z[0] === zona) || [])[1] + ' + vacancy por modelo + gastos (editables — ff_uw_config)</summary>'

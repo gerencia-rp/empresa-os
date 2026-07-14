@@ -59,6 +59,25 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## FICHA DE CASA · "Compra $0" con dato existente (14-jul)
+| Qué | ANTES | DESPUÉS |
+|---|---|---|
+| Fila "Compra" del panel Fix & Flip | leía `m.ff.purchase` — campo INEXISTENTE (la columna es `purchase_price`) → $0/— en TODAS las fichas, no solo Charles | lee la cadena única `osFichaNums`: v_property_360.compra → deal.purchase_price — **Charles $247,000** ✔ |
+| Tarjeta ALL-IN vs fila espejo | dos caminos distintos (p360.all_in vs compute local con rehab×1.3) — mismo dato, distinta info | **UNA cadena para tarjeta Y fila**: all-in = compra + Total Draws → compra + rehab REAL (rotulado "faltan draws") → compra + rehab ESTIMADA (rotulado) — Charles **$357,000** = 247,000 + rehab real 110,000 ✔ (el "Costo Remodelación Real" fld9VNYFBzFI3tRdc estaba mapeado en el sync y NUNCA guardado — 2º campo fantasma encontrado; ahora espejado en ff_deals.remodel_real) |
+| Equity incorporado | p360.equity (rehab null → Charles daba $248,000 con rehab en 0 silencioso) | ARV − all-in de la MISMA cadena — Charles **$138,000** (495,000 − 357,000) ✔ · caveat "⚠ con datos incompletos" cuando faltan draws. **Deploy verificado EN PROD 7/7 · 0 pageerrors** (Charles 247,000/357,000×2/138,000 + barrido Capitol compra 200,000 · all-in compra+draws 263,750). Gotcha: el slug de la ficha es la DIRECCIÓN COMPLETA (3403-charles-street-austin-tx-78702) |
+| Resto del panel (Remodelación/Holding/All-in/MAO) | mezcla de fuentes (est×1.3 proxy sin rotular; holding $0 sin draws) | Remodelación = draws → rehab real → estimada (SIEMPRE rotulado cuál es) · Holding "—" si no hay draws · MAO sobre la misma base · Appraisal/Cash-out/HML "—" solo cuando el dato NO existe (Charles ✔) |
+
+## CC FIX & FLIP REDISEÑADO (14-jul — patrimonio real + déficit correcto)
+| Qué | ANTES | DESPUÉS (verificado contra Airtable vivo) |
+|---|---|---|
+| Bloque superior | "Capital del Holding" (no le decía nada al CEO) + all-in como capital | **VALOR DEL PORTAFOLIO $9,415,000 (23 casas)** — cuadre exacto: $11,450,000 (28) − $1,300,000 operador (Arthur/Bitter/Charles) − $735,000 vendidas (Arcadia/Slaughter) · **EQUITY $4,435,350** (valor − deuda) · **DEUDA $4,979,650** (refi>0→refi, si no HML; drill por casa + reconcile QBO $5,974,414 con Δ visible) · **RENDIMIENTO: operativo +$179,289/año · después de deuda −$363,406/año** (los dos, honesto: el carry HML se come el flujo — pago = hml_payment + ref30_payment, EXACTO al número del CEO) + yield del equity |
+| Conteos | deals activos/flip/hold | **23 hechas · 5 entregadas al inversionista · 23 en portafolio (19 renta · 2 rehab · 2 adquiridas)** — todos exactos |
+| Regla del portafolio | no existía | modelo_negocio ≠ Operador Y stage ≠ vendida, en la capa de vistas (v_ff_portafolio/_kpi, security_invoker, property_id) — espejo extendido: modelo_negocio (flddjD6WsvC98sM1k) + estrategia completa (fldyijwnFRD2yFrx5) + draws_menos_deficit (fldL4iMolqEibENFj), sync v13 corrido 28/28 |
+| Déficit por casa | dr.net_total (campo equivocado) → Wellington −$130k FALSO, Charles −$110k FALSO | **[Total Draws − Déficit Total] − Down Payment** (la fórmula del CEO): Capitol = −30,463.76 − 7,500 = **−$37,963.76 exacto** · GUARDRAIL: draws=0 con obra → "⚠ faltan draws" (Wellington/Charles/Slaughter/Harvest + 3 más = 7 casas), EXCLUIDAS del acumulado (**−$289,188** corregido) |
+| Pipeline + Propiedades | "HOLD" recortado · all-in compra+rehab+holding · vendidas mezcladas | estrategia PALABRA COMPLETA ("Fix and hold") · **all-in = compra + Total Draws** (fallback compra+rehab ROTULADO *rehab) · badges Operador/Vendida atenuadas (siguen visibles, NO cuentan en totales) |
+
+**Deploy verificado EN PROD** (smoke 13/13 · 0 pageerrors): los 4 KPIs con los números exactos del CEO + conteos + déficit corregido −$289,188 + estrategia completa + ⚠ faltan draws + badges Operador/Vendida. Gotcha QA: /fix-and-flip es la página de EMPRESA (cards) — el CC se abre por ruta de app (/fix-and-flip/underwriting) + ffGo(seccion).
+
 ## CALCS ENCADENADAS (14-jul, rama feat/calcs-encadenadas — "cuánto presta el HML → payoff → refi")
 | Qué | ANTES | DESPUÉS (verificado corriendo el código real: compra $200,000 · remod $100,000 · obra 3 m · renta 2 m) |
 |---|---|---|
@@ -145,6 +164,35 @@ Un solo motor (\`pm/ff-arv-engine.js\` UMD) para Simple, Experto y back-test (\`
 - Interés HML: invisible → 68% del ingreso · ICR 0.35× al tope en rojo + por casa en el P&L.
 - Anomalías: 2,927 crudas → grupos accionables priorizados por $.
 - Fantasmas: Arcadia/Cervin detectadas solas (C21); ghost F&F y units vacías fuera de conteos.
+
+## MÓDULO INVERSIONISTAS REHECHO (14-jul — ranking por capital desplegado, obs CEO "el módulo actual no sirve")
+| Qué | ANTES | DESPUÉS (verificado contra Airtable vivo) |
+|---|---|---|
+| Contenido del módulo | CRM plano (21 filas con rangos VIP/Blanco/Azul/Amarillo), "Capital del holding", KPI "Con socio"/"Contratos sin firmar" (—), 4 modelos con "✎ Generar propuesta" que mandaba al Cerebro, cap table paramétrica con aporte "típico" inventado (all-in/deals) | **LISTA de co-inversionistas ACTIVOS** rankeada de mayor a menor (capital desplegado, desempate nº casas) — todo lo demás se quitó; el generador de propuesta va al BACKLOG (INV-1) como modelo real fuera del Cerebro |
+| Quién entra | todos los del CRM (incluía comprados, operadores y la propia empresa) | **participación viva**: 0 < ownership nuestro < 100% (Porcentaje de Owner Ship flddh8bS7oP34ak1M). Ownership 100% = les compramos su parte → fuera (Valeria, Caldas×2, Yeisson, Yeison, Diego, Flipping Rentals). Ownership 0 = operador → fuera, va en su módulo (Hitalo, Mirna, MEK/Charles, Jefferson/Harvest, Camilo). Vendidas con sociedad = **salida realizada** (se listan, no suman): Ivy · 1109 Arcadia |
+| Capital | `capital_inversionista` coalesced ("Capital del inversionista" ?? aportado) — Stonleigh daba 45,000 | **`capital_aportado` PURO** (fldrePoqg3C3caiZ5, sync v14 + col nueva) — Stonleigh **35,000** ✔ |
+| Ranking (data viva) | — | **Jefferson $188,000/4 · MEK $112,870.14/2 · Ivy $77,000/1+1 salida · Michael $43,000 · Jessica $35,968 · Ronald/Johanna/Cesar/Héctor $35,000 · Kysbel $34,708 · Daniel $23,200 — TOTAL $654,746.14 · 11 inversionistas · 16 casas EXACTO** al esperado del CEO |
+| Rentabilidad | no existía | honesta desde `v_inversionistas` (security_invoker): rentada = participación × (renta − gastos) × 12 ÷ capital · vendida = utilidad entregada ÷ capital · sin renta/gastos = **"pendiente de dato"** (MEK: 2 casas s/dato), jamás $0. Detalle por casa: capital · % participación (1 − ownership) · etapa · flujo anual de su parte |
+
+---
+
+## 14-jul · Calc 4 Intereses = DOS MODELITOS SEPARADOS (obs del CEO, rama feat/calcs-encadenadas)
+
+**Pedido:** la calc de Intereses en dos modelitos distintos, en dos lugares distintos — (1) Harmony/HML y (2) Refinanciación/DSCR — cada uno con SU pago mensual, sin re-teclear datos que ya viven en otras calcs.
+
+### ANTES → DESPUÉS
+- **UI**: una sola vista con hero del DSCR + tarjeta de inputs que RE-PEDÍA compra y % financia + un desglose que mezclaba HML y REFI en la misma tarjeta → **dos modelitos separados**: tarjeta 1 "🔨 Pago mensual al Harmony" (hero ámbar, etiqueta *HML · solo interés · durante la obra/hold*) y tarjeta 2 "🏦 Pago mensual de la refi" (hero azul, etiqueta *DSCR · refinanciación · amortizado*), cada una con su base, sus inputs y su nota de propagación + cierre "por qué son dos" (dos préstamos, dos bases, dos fórmulas).
+- **Pago mensual HML**: redondeado a dólares ($2,959) → **con centavos** = préstamo × tasa/12 exacto (**$295,856 @12% → $2,958.56/mes**, verificado con el código real en node). El pago NO depende de los meses (probado: con 5 o 10 meses da idéntico); los meses (editables, estimado) solo mueven el **interés total del hold** ($2,958.56 × 5 = $14,792.80 exacto).
+- **Inputs**: compra y % financia re-tecleados en Calc 4 → **eliminados de la vista** (viven en Calc 1; la base llega ⛓ por `negocio.prestamo`). Quedan editables inline solo lo propio del modelito: tasa HML + meses (M1) · tasa DSCR + plazo + préstamo override (M2, mismo `refi_prestamo_real` que ya mandaba en Cash-Out).
+- **Base del refi**: rótulo fijo "75% × ARV" → **declara la fuente real ⛓ Cash-Out**: LTV% × (tasación del refi | ARV) o "tope DSCR — la renta manda" u override; verificado en cadena: ARV 449,297 → Cash-Out préstamo 336,973 → Calc 4 lee el MISMO número → **$2,270/mes @7.125%/30a** exacto.
+- **Propagación nueva**: el pago HML no llegaba al Ingreso → **Calc 5 (modelos + fallback) muestra "⏳ Durante el hold"**: mismo flujo pero pagando el HML ⛓ en vez de la cuota DSCR (antes del refi la casa paga el hard money). Las demás cadenas ya existían y quedan intactas: interés total → reserva del draw (Calc 1)/déficit · cuota DSCR → flujo post-refi (Calc 5) · préstamo refi → cash-out (Calc 3) · Analítica del portafolio usa pagos REALES (hml_payment + ref30_payment del CC FF).
+
+### Verificación
+- `scratchpad/verify-intereses.mjs` (corre el código REAL): 6/6 ✅ — 2,958.56 · 14,792.80 · invariancia a meses · 2,270 · cadena ARV→Cash-Out→Intereses sin re-cálculo.
+- Goldens `scripts/test-uw-cashout.mjs`: Michelle/Echo/Childress/Meadow **exactos** (sin cambios).
+- `npm run ci:gate`: **12/12 ✓** · `node --check` OK en los 2 archivos tocados.
+
+Commits: `04dde2c` (Calc 4 dos modelitos) · siguiente (propagación hold en Calc 5).
 
 ## ANALÍTICA FF — MÉTRICAS QUE SÍ SIRVEN (13-jul, main — rediseño pedido por el CEO)
 

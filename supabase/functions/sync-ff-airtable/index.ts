@@ -21,8 +21,8 @@ const T = {
 };
 
 const F = {
-  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M", apprLink: "fldOg97WmkVIQ0k0o" },
-  draws: { dir: "fldEU8dXcmwovZP16", total: "fld208iuposxA20W0", meses: "fldEVC4tKVI5gnvrm", intHml: "fldf3D0KEwJv8CLZA", utilHml: "fldXsh3w2phWLiAmE", intRent: "fldH5ARDkRu1QL3Ny", utilRent: "fldpmyUxjat9b1s2d", muebles: "fldXwCW30iscTn3iL", appraisal: "fldSB6YjUmMZku28J", otros: "fld7D7gN3GuhTMzaU", rent: "fldOezTNcwnaWW7bD", refi: "fldEYY25oThUoOOIb", remodelRealLk: "fldr4DfeUx99NYC5R" },
+  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", modeloNegocio: "flddjD6WsvC98sM1k", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M", apprLink: "fldOg97WmkVIQ0k0o" },
+  draws: { dir: "fldEU8dXcmwovZP16", drawsMenosDef: "fldL4iMolqEibENFj", total: "fld208iuposxA20W0", meses: "fldEVC4tKVI5gnvrm", intHml: "fldf3D0KEwJv8CLZA", utilHml: "fldXsh3w2phWLiAmE", intRent: "fldH5ARDkRu1QL3Ny", utilRent: "fldpmyUxjat9b1s2d", muebles: "fldXwCW30iscTn3iL", appraisal: "fldSB6YjUmMZku28J", otros: "fld7D7gN3GuhTMzaU", rent: "fldOezTNcwnaWW7bD", refi: "fldEYY25oThUoOOIb", remodelRealLk: "fldr4DfeUx99NYC5R" },
   inv: { nombre: "fldI09roeZswP65PK", etiqueta: "fldaSlCHNfi5dqKDi", email: "fldoixuufPLltt6ZF", tel: "fldZKnOD3pu8CP3WS", ciudad: "fldSvCPZsP5J1Mhf4", estado: "fldQukBRQ8bhCrffa", rangos: "fldnguKQ6cgTiBNBR", w9: "fldyLYGF9RuHQw2si", socio: "fldB0k2KTsR4rvZHJ", socioNombre: "fld5rdexk6h7iJ1UZ", propLink: "fldJZcAtnPeC8EN1c", capLookup: "fldXMQGQDauo5HnnV", capPagado: "fld0oPQaFZK8Drv3h" },
   eq: { name: "fldSsNBs1zQ6YZPxm", salario: "fldRIzVjmccCPyslQ", mes: "fldwdnqHKkr4Pvl9y", nombre: "fldckFo7H81jAMaBY" },
   pl: { plataforma: "fldZUdExLDg4nsjeY", mes: "fldMblARwfiZ2NVqq", valor: "fldaV7Mc21PaMYwg4" },
@@ -109,11 +109,14 @@ Deno.serve(async (req) => {
       return {
         airtable_id: r.id, address: addr, address_norm: norm(addr), city: f[F.deals.ciudad] || null,
         stage: stageNorm(f[F.deals.estado]), strategy: (() => { const s = (sel(f[F.deals.estrategia]) || "").toLowerCase(); return s.includes("flip") ? "flip" : s ? "hold" : null; })(),
-        purchase_price: num(f[F.deals.compra]), remodel_est: num(f[F.deals.remodelEst]), arv: num(f[F.deals.arv]),
+        estrategia: sel(f[F.deals.estrategia]) || null,        // palabra COMPLETA (obs CEO: no "HOLD" recortado)
+        modelo_negocio: sel(f[F.deals.modeloNegocio]) || null, // "Prestación de Servicios como Operador" ≠ portafolio
+        purchase_price: num(f[F.deals.compra]), remodel_est: num(f[F.deals.remodelEst]), remodel_real: num(f[F.deals.remodelReal]), arv: num(f[F.deals.arv]),
         appraisal: num(f[F.deals.appraisal]), appraisal_link: f[F.deals.apprLink] || null, hml_payment: num(f[F.deals.hmlPago]), ref30_payment: num(f[F.deals.ref30]),
         sqft: num(f[F.deals.sqft]), cashout: num(f[F.deals.cashout]), close_date: f[F.deals.cierre] || null,
         investor_rec_ids: linkIds(f[F.deals.invLink]),
         capital_inversionista: num(f[F.deals.capInv]) ?? num(f[F.deals.capAportado]),
+        capital_aportado: num(f[F.deals.capAportado]),  // fldrePoqg3C3caiZ5 PURO — la cifra del ranking de inversionistas
         rentabilidad_prometida: num(f[F.deals.rentProm]), utilidad_entregada: num(f[F.deals.utilEntregada]),
         deficit_total: num(f[F.deals.deficitTotal]), renta_mensual: num(f[F.deals.rentaMes]),
         gastos_mensuales: num(f[F.deals.gastosMes]), ownership_pct: num(f[F.deals.ownership]),
@@ -142,6 +145,7 @@ Deno.serve(async (req) => {
         hml_months: num(f[F.draws.meses]), interest_hml: intHml, services_hml: utils,
         interest_until_rent: intRent, furniture: muebles, other_costs: otros,
         net_total: num(f[F.draws.rent]), cashout_refi: sel(f[F.draws.refi]),
+        draws_menos_deficit: num(f[F.draws.drawsMenosDef]),    // fórmula Airtable [Total Draws − Déficit Total]
         active: true, archived_at: null, last_synced_at: now(),
       };
     }).filter((r) => r.address);

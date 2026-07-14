@@ -253,6 +253,11 @@ async function ffLoadAll() {
     FF.obrasKpi = await sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null);
     // N2: equity incorporado por casa — v_property_360 (O1)
     FF.p360 = await sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []);
+    // PORTAFOLIO del CEO (14-jul): regla única (≠operador, ≠vendida) + déficit correcto — v_ff_portafolio
+    FF.port = await sb.from('v_ff_portafolio').select('*').then(r => r.data || []).catch(() => []);
+    FF.portKpi = await sb.from('v_ff_portafolio_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // INVERSIONISTAS (rediseño 14-jul): ranking co-inversión activa (participación viva) — v_inversionistas
+    FF.invRank = await sb.from('v_inversionistas').select('*').order('capital_desplegado', { ascending: false }).order('casas_vivas', { ascending: false }).then(r => r.data || []).catch(() => []);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
@@ -268,17 +273,26 @@ async function ffLoadAll() {
 // ════════════════════════════════════════════════════════════════
 function ffCompute() {
   const drawByNorm = {}; FF.draws.forEach(d => drawByNorm[d.address_norm] = d);
+  const portByNorm = {}; (FF.port || []).forEach(p => portByNorm[p.address_norm] = p);
   const deals = FF.deals.map(d => {
     const dr = drawByNorm[d.address_norm] || null;
+    const port = portByNorm[d.address_norm] || null;
     const purchase = Number(d.purchase_price || 0);
     const remComplete = dr ? Number(dr.remodel_complete || 0) : Number(d.remodel_est || 0) * 1.3;
     const holding = dr ? (Number(dr.interest_hml || 0) + Number(dr.services_hml || 0) + Number(dr.interest_until_rent || 0) + Number(dr.furniture || 0) + Number(dr.other_costs || 0)) : 0;
-    const allIn = purchase + remComplete + holding;
+    // ALL-IN = compra + Total Draws desembolsados (v_ff_portafolio; fallback rotulado compra+rehab)
+    const faltanDraws = !!(port && port.faltan_draws);
+    const allIn = port && port.all_in != null ? Number(port.all_in) : (purchase + remComplete + holding);
+    const allInFuente = port ? (port.all_in_fuente || null) : 'compra + rehab + holding (legacy)';
     const arv = Number(d.arv || 0);
     const margin = arv - allIn; // margen bruto (antes de costos de venta)
     const marginPct = arv ? margin / arv : 0;
     const allInPct = arv ? allIn / arv : 0;
-    const deficit = dr ? Number(dr.net_total || 0) : 0; // <0 = déficit (cash inyectado)
+    // DÉFICIT del CEO = [Total Draws − Déficit Total] − Down Payment · GUARDRAIL: faltan draws → null (jamás rojo falso)
+    const deficit = port ? (faltanDraws || port.deficit == null ? 0 : Number(port.deficit)) : (dr ? Number(dr.net_total || 0) : 0);
+    const esPortafolio = port ? !!port.es_portafolio : true;
+    const motivoExcl = port ? port.motivo_exclusion : null;
+    const estrategia = d.estrategia || port && port.estrategia || null;   // palabra COMPLETA
     const equity = arv - allIn; // equity potencial
     const dq = ffDataQuality({ allIn, arv, allInPct, stage: d.stage });
     const loan = (FF.loans || []).find(l => l.address_norm === d.address_norm) || null;
@@ -288,7 +302,7 @@ function ffCompute() {
     const semAllin = arv > 0 && (allIn / arv) > (FF.cfg.all_in_max_pct || 0.75);
     const semHml = hmlDueDays != null && hmlDueDays <= (FF.cfg.hml_warn_days || 45);
     const semBudget = budgetDevPct != null && budgetDevPct > (FF.cfg.budget_warn_pct || 10);
-    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip', loan, hmlDueDays, budgetDevPct, semAllin, semHml, semBudget };
+    return { ...d, dr, port, purchase, remComplete, holding, allIn, allInFuente, faltanDraws, esPortafolio, motivoExcl, estrategia, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip', loan, hmlDueDays, budgetDevPct, semAllin, semHml, semBudget };
   });
   const active = deals.filter(d => d.stage !== 'vendida');
   // "confiables" = sin flags 'dato a revisar' / 'sin datos'. Los promedios/margen/déficit del
@@ -302,7 +316,9 @@ function ffCompute() {
     arvTotal: deals.reduce((s, d) => s + d.arv, 0),
     // Equity y déficit acumulado: SOLO deals confiables (los del error $189k los distorsionan)
     equity: activeConf.reduce((s, d) => s + Math.max(0, d.equity), 0),
-    deficitAcum: confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
+    // déficit acumulado CORREGIDO (14-jul): fórmula del CEO desde la vista, EXCLUYE faltan_draws y no-portafolio
+    deficitAcum: FF.portKpi && FF.portKpi.deficit_acumulado != null ? Number(FF.portKpi.deficit_acumulado)
+      : -confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
     marginPctAvg: activeConf.length ? activeConf.reduce((s, d) => s + d.marginPct, 0) / activeConf.length : 0,
     flips: deals.filter(d => d.isFlip).length, holds: deals.filter(d => d.strategy === 'hold').length,
     investors: FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length, // sin la propia empresa (18)
@@ -418,7 +434,23 @@ function ffHeader(title, accent, sub) {
     <div class="pills"><div class="pill"><span class="cdot"></span> Airtable en vivo</div>
     <div class="pill ai" onclick="ffGo('cerebro')">◆ <span class="shimmer">Cerebro IA</span></div></div></div>`;
 }
-function ffStratBadge(d) { return d.strategy === 'flip' ? '<span class="kstrat flip">FLIP</span>' : (d.strategy === 'hold' ? '<span class="kstrat hold">HOLD</span>' : ''); }
+// estrategia con la palabra COMPLETA (obs CEO: no "HOLD" recortado) — color por familia
+function ffStratBadge(d) {
+  const full = d.estrategia || (d.strategy === 'flip' ? 'Fix and flip' : d.strategy === 'hold' ? 'Fix and hold' : '');
+  if (!full) return '';
+  return `<span class="kstrat ${d.strategy === 'flip' ? 'flip' : 'hold'}" style="text-transform:none;letter-spacing:0">${FF_ESC(full)}</span>`;
+}
+// badge de contexto: casas que NO son portafolio del CEO (operador / vendida)
+function ffPortBadge(d) {
+  if (d.esPortafolio !== false) return '';
+  return d.motivoExcl === 'operador' ? ' <span class="badge b-warn" title="Prestación de Servicios como Operador — no es patrimonio del CEO">Operador</span>'
+    : ' <span class="badge" style="opacity:.7" title="Vendida — entregada al inversionista">Vendida</span>';
+}
+// all-in con GUARDRAIL: draws vacíos → jamás un all-in fingido en la celda
+function ffAllInCell(d) {
+  if (d.faltanDraws) return (d.purchase ? FF_MONEY(d.purchase) + ' <span style="color:var(--amber);font-size:10px">+ ⚠ faltan draws</span>' : '<span style="color:var(--amber)">⚠ faltan draws</span>');
+  return FF_MONEY(d.allIn) + (d.allInFuente && d.allInFuente.indexOf('rehab') >= 0 ? ' <span style="color:var(--mut2);font-size:9px" title="sin draws en Airtable — se usó compra + rehab real">*rehab</span>' : '');
+}
 
 // ─── COMMAND CENTER ───
 // ─── COMMAND (rediseño ADN premium 12-jul: veredicto + hero degradé + confianza + Simple/Experto) ───
@@ -436,12 +468,32 @@ function ffSecCommand(comp) {
       ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. 🧹')
       : kitVerdict('go', 'Portafolio sano — sin alertas críticas 🎉', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
   const conf = kitConfidence(flaggedDQ === 0 ? 'alta' : flaggedDQ <= 2 ? 'media' : 'baja', kpi.confiablesN + '/' + kpi.total + ' deals confiables');
-  const hero = ffCapitalHero('all-in de los deals activos (costo, no capital) <b>' + kitMoney(kpi.capital) + '</b> · ARV <b>' + kitMoney(kpi.arvTotal) + '</b> · equity potencial <b style="color:var(--pos)">' + kitMoney(kpi.equity) + '</b> &nbsp; ' + conf);
+  // ═ PATRIMONIO REAL (14-jul, pedido del CEO): valor / equity / deuda / rendimiento del PORTAFOLIO ═
+  // Portafolio = ≠operador y ≠vendida (v_ff_portafolio_kpi). Mata "Capital del Holding" en esta vista.
+  const pk = FF.portKpi || {};
+  const cap = FF.capital || {};
+  const deudaQbo = (Number(cap.deuda_hml_qbo) || 0) + (Number(cap.deuda_refi_qbo) || 0);
+  const deudaOs = Number(pk.deuda_portafolio) || 0;
+  const netoAnual = Number(pk.neto_despues_deuda_anual);
+  const opAnual = Number(pk.flujo_operativo_anual);
+  const yieldPct = (pk.equity_portafolio > 0 && !isNaN(netoAnual)) ? Math.round(netoAnual / pk.equity_portafolio * 1000) / 10 : null;
+  const deudaRows = (FF.port || []).filter(p => p.es_portafolio && p.deuda > 0).sort((a, b) => b.deuda - a.deuda)
+    .map(p => `<div class="krow" style="padding:4px 0"><span>${FF_ESC(p.casa)} <span style="opacity:.5">· ${p.deuda_tipo === 'refi' ? 'refi' : 'HML'}</span></span><b>${kitMoney(p.deuda)}</b></div>`).join('');
+  const hero = pk.casas_portafolio
+    ? kitHero('Valor del portafolio (en papel) 🏠', kitMoney(pk.valor_portafolio),
+      'ARV de tus <b>' + pk.casas_portafolio + ' casas</b> · no incluye vendidas ni operador &nbsp; ' + conf)
+    : kitHero('Valor del portafolio 🏠', '<span style="font-size:18px;color:var(--mut)">sin datos — v_ff_portafolio</span>', '');
   const kpis = `<div class="grid kpis">
-      <div class="card kpi"><div class="lab">Deals activos</div><div class="big">${kpi.activos}</div><div class="meta">${kpi.flips} flip · ${kpi.holds} hold · ${rehab} en rehab · ${venta} en venta</div></div>
-      <div class="card kpi"><div class="lab">Equity potencial</div><div class="big ${kpi.equity > 0 ? 'up' : ''}">${kitMoney(kpi.equity)}</div><div class="meta">ARV − all-in de los activos</div></div>
-      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">hoyo operativo declarado por casa</div></div>
-      <div class="card kpi"><div class="lab">Insights del Cerebro</div><div class="big">${insights.length || '—'}</div><div class="meta"><span class="${crit ? 'down' : ''}">${crit} críticas</span> · <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></div></div>
+      <div class="card kpi"><div class="lab">Equity del portafolio</div><div class="big ${pk.equity_portafolio > 0 ? 'up' : ''}">${kitMoney(pk.equity_portafolio)}</div><div class="meta">valor − deuda · lo que has construido en patrimonio</div></div>
+      <div class="card kpi"><details><summary style="cursor:pointer;list-style:none"><div class="lab">Deuda del portafolio ▾</div><div class="big">${kitMoney(deudaOs)}</div><div class="meta">refi o HML por casa · QBO: ${kitMoney(deudaQbo)} ${deudaQbo && Math.abs(deudaQbo - deudaOs) / deudaQbo > 0.05 ? '<span style="color:var(--amber)">Δ ' + kitMoney(deudaQbo - deudaOs) + '</span>' : '✓'}</div></summary><div style="max-height:220px;overflow:auto;margin-top:8px;font-size:11.5px">${deudaRows || 'sin desglose'}</div></details></div>
+      <div class="card kpi"><div class="lab">Rendimiento anual del portafolio</div><div class="big" style="font-size:19px;line-height:1.35">op. <span class="${opAnual >= 0 ? 'up' : 'down'}">${kitMoney(opAnual)}</span><br>c/deuda <span class="${netoAnual >= 0 ? 'up' : 'down'}">${kitMoney(netoAnual)}</span></div><div class="meta">operativo positivo, pero el servicio de deuda HML se lo come — casas aún en HML sin refinanciar${yieldPct != null ? ' · yield ' + yieldPct + '% del equity' : ''}</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">fórmula CEO (draws − gastos − down payment) · ${pk.casas_sin_draws || 0} casas con ⚠ faltan draws EXCLUIDAS</div></div>
+    </div>
+    <div class="card" style="margin-top:12px;padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;font-size:13px;align-items:center">
+      <span>🏗 <b>${pk.casas_hechas != null ? pk.casas_hechas : '—'}</b> casas hechas <span style="color:var(--mut2);font-size:11px">(sin las pendientes/adquiridas sin cerrar)</span></span>
+      <span>🤝 <b>${pk.entregadas_inversionista != null ? pk.entregadas_inversionista : '—'}</b> entregadas al inversionista <span style="color:var(--mut2);font-size:11px">(vendidas + operador)</span></span>
+      <span>💼 <b>${pk.casas_portafolio != null ? pk.casas_portafolio : '—'}</b> en mi portafolio <span style="color:var(--mut2);font-size:11px">(${pk.port_en_renta || 0} en renta · ${pk.port_en_rehab || 0} en rehab · ${pk.port_adquiridas || 0} adquiridas)</span></span>
+      <span style="margin-left:auto">🧠 Insights: <b class="${crit ? 'down' : ''}">${insights.length || '—'}</b> <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></span>
     </div>`;
   const experto = !exp ? '' : `
     <div class="grid row2">
@@ -468,9 +520,13 @@ function ffSecCommand(comp) {
     </div></div>`;
 }
 function ffDealTable(deals) {
-  const badge = d => d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
-  return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrat.</th><th>All-in</th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
-    ${deals.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_STAGE_LBL[d.stage] || d.stage}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${badge(d)}</td></tr>`).join('')}
+  const badge = d => d.faltanDraws ? '<span class="badge b-warn" title="Total Draws desembolsados en 0 — cargarlo en Airtable">⚠ faltan draws</span>'
+    : d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
+  const defCell = d => d.faltanDraws ? '<span style="color:var(--amber);font-size:11px">⚠ faltan datos de draws</span>'
+    : (d.port && d.port.deficit != null ? `<span class="${d.deficit < 0 ? 'down' : 'up'}">${FF_MONEY(d.deficit)}</span>` : '—');
+  const margCell = d => d.faltanDraws || d.allIn == null ? '—' : `<span class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</span>`;
+  return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrategia</th><th>All-in <span style="font-weight:400;color:var(--mut2)">(compra+draws)</span></th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
+    ${deals.map(d => `<tr${d.esPortafolio === false ? ' style="opacity:.62"' : ''}><td>${FF_ESC(ffShort(d.address))}${ffPortBadge(d)}</td><td>${FF_STAGE_LBL[d.stage] || d.stage}</td><td>${ffStratBadge(d)}</td><td>${ffAllInCell(d)}</td><td>${FF_MONEY(d.arv)}</td><td>${margCell(d)}</td><td>${defCell(d)}</td><td>${badge(d)}</td></tr>`).join('')}
   </tbody></table>`;
 }
 
@@ -500,10 +556,10 @@ function ffKanCard(d) {
     <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
     ${d.dq.flags.length ? `<div style="margin:5px 0 2px">${ffDQBadge(d.dq)}</div>` : ''}
     ${(d.semAllin || d.semHml || d.semBudget) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px">${d.semAllin ? `<span class="ff-dq ff-dq-rev" title="all-in supera el máximo configurado del ARV">🔴 all-in ${Math.round(d.allInPct * 100)}%</span>` : ''}${d.semHml ? `<span class="ff-dq ff-dq-rev" title="vencimiento del préstamo HML">⏰ HML ${d.hmlDueDays < 0 ? 'VENCIDO ' + Math.abs(d.hmlDueDays) + 'd' : 'vence ' + d.hmlDueDays + 'd'}</span>` : ''}${d.semBudget ? `<span class="ff-dq ff-dq-pre" title="desvío del presupuesto de remodelación (real vs estimado)">📈 presup +${d.budgetDevPct}%</span>` : ''}</div>` : ''}
-    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.dr ? '' : ' · <span style="color:var(--amber)">sin draws</span>'}</div>
-    <div class="krow"><span>All-in</span><b>${FF_MONEY(d.allIn)}</b></div>
+    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.faltanDraws ? ' · <span style="color:var(--amber)">⚠ faltan draws</span>' : ''}${d.esPortafolio === false ? ' · <span style="color:var(--mut2)">' + (d.motivoExcl === 'operador' ? 'operador' : 'vendida') + '</span>' : ''}</div>
+    <div class="krow"><span>All-in</span><b>${ffAllInCell(d)}</b></div>
     <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>
-    <div class="krow"><span>${d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${(d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}">${d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
+    <div class="krow"><span>${d.faltanDraws ? 'Déficit' : d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${d.faltanDraws ? '' : (d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}"${d.faltanDraws ? ' style="color:var(--amber);font-size:10.5px"' : ''}>${d.faltanDraws ? '⚠ faltan datos de draws' : d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
     <div class="kbar"><i style="width:${capturePct}%;background:${d.allInPct > 0.75 ? 'linear-gradient(90deg,var(--amber),var(--neg))' : 'linear-gradient(90deg,var(--a1),var(--a2))'}"></i></div>
     <div style="font-size:9px;color:var(--mut2);margin-top:4px">all-in ${Math.round(d.allInPct * 100)}% del ARV${d.invLabel ? ' · ' + FF_ESC(d.invLabel) : ''}</div>
     <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${window.osSlug ? osSlug(d.address) : ''}')">🏠 Ver ficha de casa →</div>
@@ -512,93 +568,62 @@ function ffKanCard(d) {
 
 // ─── PROPIEDADES ───
 function ffSecPropiedades(comp) {
-  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades`)}
+  const nExcl = comp.deals.filter(d => d.esPortafolio === false).length;
+  const nFalta = comp.deals.filter(d => d.faltanDraws).length;
+  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades · ${comp.deals.length - nExcl} en tu portafolio + ${nExcl} etiquetadas (operador/vendida, NO cuentan en los totales)${nFalta ? ' · ⚠ ' + nFalta + ' sin draws cargados en Airtable' : ''}`)}
     <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => a.deficit - b.deficit))}</div></div>`;
 }
-// ─── INVERSIONISTAS ───
-const FF_OWN = /flipping\s*rentals/i; // la propia empresa (se saca del CRM de inversionistas)
-const FF_MODELOS = [
-  { k: 'vender-sociedad', name: 'Vender · Sociedad', terms: 'Aporta capital · <b>split 50/50</b> de la ganancia de la venta', ret: '50% de la ganancia', contrato: 'JV / sociedad (venta)' },
-  { k: 'vender-servicio', name: 'Vender · Servicio', terms: 'Aporta capital · la empresa cobra <b>fee de servicio</b> · el inversionista se lleva la ganancia', ret: 'Ganancia − fee', contrato: 'Servicio (fee de gestión)' },
-  { k: 'rentar-sociedad', name: 'Rentar · Sociedad', terms: 'Aporta capital · <b>split 50/50</b> del cashflow + equity de la refi', ret: '50% cashflow + equity', contrato: 'JV / sociedad (hold)' },
-  { k: 'rentar-servicio', name: 'Rentar · Servicio', terms: 'Aporta capital · <b>15–18% anual fijo</b> · la empresa opera', ret: '15–18% anual', contrato: 'Servicio (renta fija)' },
-];
-function ffInvCrm() { return FF.investors.filter(x => !FF_OWN.test(x.name || '')); } // saca la propia empresa
-function ffInvIsLLC(x) { return /LLC/i.test(x.name || ''); }
-function ffInvRowsHTML(crm) {
-  const q = (FF.invQ || '').trim().toLowerCase();
-  const list = q ? crm.filter(x => (x.name || '').toLowerCase().includes(q)) : crm;
-  if (!list.length) return `<tr><td colspan="5">${kitEmpty('🔍', 'Ningún inversionista coincide con esa búsqueda')}</td></tr>`;
-  return list.map(x => `<tr><td>${FF_ESC(x.name || '—')}${(x.has_partner || '').toUpperCase() === 'SI' ? ` <span style="color:var(--a2);font-size:10px">+socio${x.partner_name ? ' ' + FF_ESC(x.partner_name) : ''}</span>` : ''}</td><td>${ffInvIsLLC(x) ? '<span class="badge b-warn">LLC</span>' : '<span class="badge b-ok">Persona</span>'}</td><td>${FF_ESC(x.ranges || '—')}</td><td style="font-size:11px">${FF_ESC((x.stage || '—')).slice(0, 26)}</td><td>${FF_ESC(x.city || '—')}</td></tr>`).join('');
+// ─── INVERSIONISTAS · ranking por capital desplegado (rediseño 14-jul, obs CEO) ───
+// Solo CO-INVERSIONISTAS con participación viva (0 < ownership nuestro < 100%) — v_inversionistas (capa O1).
+// ownership 100% = les compramos su parte (fuera) · ownership 0 = operador, va en su propio módulo (fuera).
+// Vendidas con sociedad = "salida realizada": se listan en el detalle pero NO suman al capital desplegado.
+// Se quitaron (obs CEO 14-jul): generar-propuesta-al-Cerebro (vuelve como modelo real, ver BACKLOG),
+// capital del holding, VIP/rangos, consocios, contratos sin firmar, cap table y los 4 modelos.
+function ffInvCasaRow(c) {
+  const et = c.salida
+    ? '<span class="badge b-warn" style="font-size:10px">Vendida · salida realizada</span>'
+    : '<span class="badge" style="font-size:10px">' + FF_ESC(FF_STAGE_LBL[c.stage] || c.stage || '—') + '</span>';
+  let rent;
+  if (c.salida) rent = c.utilidad_entregada != null
+    ? 'utilidad entregada <b>' + kitMoney(c.utilidad_entregada) + '</b>' + (c.rentab_pct != null ? ' <span style="color:var(--mut)">(' + c.rentab_pct + '% de su capital)</span>' : '')
+    : '<span style="color:var(--mut2)">utilidad pendiente de dato</span>';
+  else if (c.rentab_pct != null) rent = '<b style="color:var(--pos)">' + kitMoney(c.flujo_anual_inv) + '/año</b> <span style="color:var(--mut)">· ' + c.rentab_pct + '%</span>';
+  else rent = '<span style="color:var(--mut2)">pendiente de dato</span>';
+  return '<tr' + (c.salida ? ' style="opacity:.72"' : '') + '><td>' + FF_ESC(c.address || '—') + '</td><td>' + et + '</td>'
+    + '<td style="text-align:right">' + kitMoney(c.capital) + '</td>'
+    + '<td style="text-align:right">' + (c.participacion_pct != null ? c.participacion_pct + '%' : '—') + '</td>'
+    + '<td style="text-align:right;font-size:11.5px">' + rent + '</td></tr>';
 }
-function ffInvSearch(v) { FF.invQ = v; const tb = document.getElementById('ff-crm-tbody'); if (tb) tb.innerHTML = ffInvRowsHTML(ffInvCrm()); }
-window.ffInvSearch = ffInvSearch;
-// ─── Guía "¿qué hago acá?" del CRM (obs #12 CEO) — colapsable, estado persistido en localStorage ───
-function ffCrmGuiaToggle(open) { try { localStorage.setItem('ff_crm_guia', open ? 'abierta' : 'cerrada'); } catch (e) { /* storage bloqueado: no persiste, no rompe */ } }
-window.ffCrmGuiaToggle = ffCrmGuiaToggle;
-function ffCrmGuia() {
-  let abierta = true; try { abierta = localStorage.getItem('ff_crm_guia') !== 'cerrada'; } catch (e) { }
-  const paso = (n, t, d) => '<div style="display:flex;gap:10px;align-items:flex-start;margin-top:9px">'
-    + '<span style="flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--glass);border:1px solid var(--glassb);display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;color:var(--ink)">' + n + '</span>'
-    + '<div style="font-size:12px;line-height:1.55;color:var(--mut)"><b style="color:var(--ink)">' + t + '</b> — ' + d + '</div></div>';
-  return '<details class="card" style="margin-bottom:14px;padding:12px 16px"' + (abierta ? ' open' : '') + ' ontoggle="ffCrmGuiaToggle(this.open)">'
-    + '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink)">🧭 ¿Qué hago acá?<span style="font-weight:500;color:var(--mut2);font-size:11px">guía rápida del CRM · clic para abrir/cerrar</span></summary>'
-    + paso(1, 'Qué es esta pantalla', 'el CRM de inversionistas activos: quiénes son, qué capital mueven (comprometido vs aportado) y con qué modelo/contrato trabajan. Todo viene de Airtable — acá se mira y se decide, no se edita.')
-    + paso(2, 'Mirá primero', 'los KPIs de arriba: contratos sin firmar (cuando el dato exista en Airtable), sociedades a documentar y el capital del holding (comprometido vs aportado). Un contrato sin firma o un socio sin documentar va primero.')
-    + paso(3, 'Tomá acción', 'contactá al inversionista, generá una propuesta con los 4 modelos (botón ✎ Generar propuesta) o calculá el buy-out (capital + 15%) en la cap table. Lo que acuerdes se registra en Airtable — esta pantalla es SOLO LECTURA.')
-    + paso(4, 'Dónde sigue el flujo', 'la propuesta se convierte en deal (Pipeline / Underwriting), el deal se fondea y el inversionista sigue su plata en el Portal de Inversionistas (/inversionista). El ciclo completo: CRM → propuesta → deal → portal.')
-    + '</details>';
+function ffSecInversionistas() {
+  const R = FF.invRank || [];
+  const head = ffHeader('Inversionistas', 'Co-inversión activa', 'participación viva (ownership nuestro < 100%) · de mayor a menor por capital desplegado y nº de casas · todo de Airtable, solo lectura');
+  if (!R.length) return head + kitEmpty('💼', 'Sin datos de v_inversionistas', 'Corré el sync de Fix & Flip o revisá el acceso al área fix-flip');
+  const totCap = R.reduce((s, r) => s + (+r.capital_desplegado || 0), 0);
+  const totCasas = R.reduce((s, r) => s + (+r.casas_vivas || 0), 0);
+  const totSalidas = R.reduce((s, r) => s + (+r.salidas || 0), 0);
+  const hero = kitHero('Capital de co-inversión desplegado 💼', kitMoney(totCap),
+    R.length + ' inversionistas activos · ' + totCasas + ' casas en sociedad' + (totSalidas ? ' · ' + totSalidas + ' salida' + (totSalidas > 1 ? 's' : '') + ' realizada' + (totSalidas > 1 ? 's' : '') : '')
+    + ' · capital = "Capital aportado" [Airtable] · clic en un inversionista para su detalle');
+  const rows = R.map((r, ix) => {
+    const casas = Array.isArray(r.casas) ? r.casas : [];
+    const nSin = +r.casas_sin_dato || 0;
+    const rentBadge = r.rentab_pct != null
+      ? '<span class="badge b-ok" style="font-size:10px">&asymp; ' + r.rentab_pct + '% anual</span>' + (nSin ? ' <span style="font-size:10px;color:var(--mut2)">' + nSin + ' casa' + (nSin > 1 ? 's' : '') + ' sin dato</span>' : '')
+      : '<span style="font-size:10px;color:var(--mut2)">rentabilidad pendiente de dato</span>';
+    return '<details class="card" style="margin-bottom:10px;padding:0">'
+      + '<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px">'
+      + '<span style="flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--glass);border:1px solid var(--glassb);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--ink)">' + (ix + 1) + '</span>'
+      + '<span style="flex:1 1 220px;min-width:0"><b style="color:var(--ink);font-size:13.5px">' + FF_ESC(r.inversionista || '—') + '</b><br><span style="font-size:11px;color:var(--mut)">' + r.casas_vivas + ' casa' + (+r.casas_vivas > 1 ? 's' : '') + ' con participación viva' + (+r.salidas ? ' + ' + r.salidas + ' salida realizada' : '') + '</span></span>'
+      + '<span style="flex:0 0 auto;text-align:right"><b style="font-size:15px;color:var(--ink)">' + kitMoney(r.capital_desplegado) + '</b><br>' + rentBadge + '</span>'
+      + '</summary>'
+      + '<div class="overx" style="padding:0 18px 14px"><table class="ptable"><thead><tr><th>Casa</th><th>Etapa</th><th style="text-align:right">Capital aportado</th><th style="text-align:right">Su participación</th><th style="text-align:right">Rentabilidad de su inversión</th></tr></thead><tbody>'
+      + casas.map(ffInvCasaRow).join('')
+      + '</tbody></table></div></details>';
+  }).join('');
+  return head + hero
+    + '<div style="font-size:11px;color:var(--mut2);margin:2px 4px 12px;line-height:1.5">Fuera de esta lista: inversionistas a los que ya les compramos su parte (ownership 100%) y casas de "Prestación de Servicios como Operador" (van en su propio módulo). Rentabilidad = su participación &times; flujo anual de la casa &divide; su capital; en vendidas, utilidad final entregada &divide; capital. Donde falta renta o gastos en Airtable dice "pendiente" — jamás un cero falso.</div>'
+    + rows;
 }
-function ffSecInversionistas(comp) {
-  const crm = ffInvCrm();
-  const isLLC = ffInvIsLLC;
-  const byRango = {}; crm.forEach(x => { const r = x.ranges || 's/d'; byRango[r] = (byRango[r] || 0) + 1; });
-  const conSocio = crm.filter(x => (x.has_partner || '').toUpperCase() === 'SI').length;
-  const invertido = comp.deals.reduce((s, d) => s + d.allIn, 0);
-  const aporteBase = Math.round((invertido / (comp.deals.length || 1)) / 1000) * 1000;
-  const hero = ffCapitalHero(crm.length + ' inversionistas en el CRM · all-in de los deals (costo) <b>' + kitMoney(invertido) + '</b> · aporte base típico <b>' + kitMoney(aporteBase) + '</b>');
-  return `${ffHeader('Inversionistas', 'CRM + Modelos', `${crm.length} inversionistas (sin la propia empresa) · ${crm.filter(isLLC).length} LLCs · ${conSocio} con socio`)}
-    ${ffCrmGuia()}
-    ${hero}
-    <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-      <div class="card kpi"><div class="lab">Inversionistas</div><div class="big">${crm.length}</div><div class="meta">CRM depurado (sin Flipping Rentals LLC)</div></div>
-      <div class="card kpi"><div class="lab">VIP (+5 casas)</div><div class="big glow">${byRango['+5 casas'] || 0}</div><div class="meta">Blanco ${byRango['2-4 casas'] || 0} · Azul ${byRango['1 casa'] || 0} · Amarillo ${byRango['0 casas'] || 0}</div></div>
-      <div class="card kpi"><div class="lab">Con socio</div><div class="big">${conSocio}</div><div class="meta">sociedades a documentar</div></div>
-      <div class="card kpi"><div class="lab">Contratos sin firmar</div><div class="big">—</div><div class="meta">dato pendiente de Airtable (el CRM aún no tiene campo de firma)</div></div>
-    </div>
-    <div class="chart-h" style="margin:24px 4px 12px"><div class="t">4 modelos parametrizados</div><div class="k">vender/rentar × sociedad/servicio · elegí para generar propuesta</div></div>
-    <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-      ${FF_MODELOS.map(m => `<div class="card"><div style="display:flex;justify-content:space-between;align-items:start"><div class="an" style="font-size:14px;font-weight:700">${m.name}</div><span class="kstrat ${m.k.startsWith('vender') ? 'flip' : 'hold'}">${m.ret}</span></div>
-        <div style="font-size:12px;color:var(--mut);margin-top:6px;line-height:1.5">${m.terms}</div>
-        <div style="font-size:10.5px;color:var(--mut2);margin-top:8px">Contrato: <b style="color:var(--ink)">${m.contrato}</b></div>
-        <button class="repbtn" style="margin-top:11px" onclick="ffPropuesta('${m.k}')">✎ Generar propuesta</button></div>`).join('')}
-    </div>
-    <div class="grid row2">
-      <div class="card"><div class="chart-h"><div class="t">Cap table · rentabilidad y buy-out</div><div class="k">buy-out = capital + 15%</div></div>
-        <div class="uwrow"><label>Aporte base (configurable)</label><input id="ff-cap-base" value="${aporteBase}" oninput="ffCapCalc()" inputmode="decimal"></div>
-        <div class="uwres" id="ff-cap-res"></div>
-        <div class="meta" style="margin-top:8px">Parametrico: los aportes reales por inversionista se vinculan al deal en Airtable. Rentabilidad 15–18%; buy-out del capital + 15%.</div></div>
-      <div class="card"><div class="chart-h"><div class="t">CRM · inversionistas</div><div class="k">persona vs LLC · casco</div></div>
-        <input id="ff-inv-q" placeholder="🔎 Buscar por nombre…" value="${FF_ESC(FF.invQ || '')}" oninput="ffInvSearch(this.value)" style="width:100%;box-sizing:border-box;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:8px 12px;color:var(--ink);font-size:12.5px;outline:none;margin-bottom:10px">
-        <div class="overx"><table class="ptable"><thead><tr><th>Inversionista</th><th>Tipo</th><th>Casco</th><th>Etapa</th><th>Ciudad</th></tr></thead><tbody id="ff-crm-tbody">
-        ${ffInvRowsHTML(crm)}</tbody></table></div></div>
-    </div>`;
-}
-function ffCapCalc() {
-  const base = ffNum('ff-cap-base', 75000); const el = document.getElementById('ff-cap-res'); if (!el) return;
-  const r15 = base * 0.15, r165 = base * 0.165, r18 = base * 0.18, buyout = base * 1.15;
-  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:12.5px">
-    <div><div class="uwsub">Rentabilidad 15%/año</div><b class="up">${FF_MONEY(r15)}</b></div>
-    <div><div class="uwsub">Rentabilidad 18%/año</div><b class="up">${FF_MONEY(r18)}</b></div>
-    <div><div class="uwsub">Punto medio 16.5%</div><b>${FF_MONEY(r165)}</b></div>
-    <div><div class="uwsub">Buy-out (capital+15%)</div><b class="glow">${FF_MONEY(buyout)}</b></div></div>`;
-}
-window.ffCapCalc = ffCapCalc;
-function ffPropuesta(modelK) {
-  const m = FF_MODELOS.find(x => x.k === modelK); if (!m) return;
-  ffAsk(`Generá una PROPUESTA de inversión clara y profesional para el modelo "${m.name}" (${m.terms.replace(/<[^>]+>/g, '')}). Incluí: resumen del modelo, números de ejemplo con un aporte típico del portafolio, la rentabilidad (${m.ret}), el contrato (${m.contrato}), y las reglas del negocio (all-in ≤75% ARV, buy-out capital+15%). Español neutro, tono cercano pero profesional.`);
-}
-window.ffPropuesta = ffPropuesta;
 
 // ─── FINANZAS · QuickBooks + Analítica (cockpit) ───
 function ffGastosPorTipo() {
@@ -611,24 +636,6 @@ function ffGastosPorTipo() {
   };
   const total = Object.values(g).reduce((s, v) => s + v, 0);
   return { g, total, intPct: total ? Math.round(g['Intereses'] / total * 100) : 0 };
-}
-// ─── #2 (auditoría 13-jul): capital desplegado ÚNICO — equity separado de deuda, desde v_capital_deployed ───
-function ffCapitalHero(sub) {
-  const c = FF.capital;
-  if (!c) return kitHero('Capital del holding 💼', '<span style="font-size:18px;color:var(--mut)">sin datos — v_capital_deployed</span>', sub || '');
-  const asOf = c.qbo_as_of ? new Date(c.qbo_as_of).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—';
-  const drill = typeof kitDrill === 'function'
-    ? kitDrill('<b>' + kitMoney(c.equity_comprometido_airtable) + '</b>', 'Capital del holding — desglose', (typeof kitRow === 'function'
-      ? kitRow('Equity comprometido (aportes firmados)', null, { txt: kitMoney(c.equity_comprometido_airtable) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>' })
-      + kitRow('Equity contabilizado (Investor Contributions)', null, { txt: kitMoney(c.equity_qbo) + ' <span class="badge b-warn" style="font-size:8px">QBO al ' + asOf + '</span>' })
-      + kitRow('Deuda HML activa (espejo)', null, { txt: kitMoney(c.deuda_hml_os_activa) + ' <span class="badge b-warn" style="font-size:8px">Airtable</span>' })
-      + kitRow('Deuda Loan Payable–HML', null, { txt: kitMoney(c.deuda_hml_qbo) + ' <span class="badge b-warn" style="font-size:8px">QBO</span>' })
-      + kitRow('Deuda refi (HML-Refin)', null, { txt: kitMoney(c.deuda_refi_qbo) + ' <span class="badge b-warn" style="font-size:8px">QBO</span>', last: true })
-      + '<div style="font-size:11px;color:var(--mut);margin-top:10px">La deuda NUNCA se presenta como "capital desplegado": es apalancamiento. El capital del inversor es el equity.</div>' : ''), 'OS↔QBO')
-    : kitMoney(c.equity_comprometido_airtable);
-  return kitHero('Capital del holding 💼',
-    'EQUITY ' + drill + ' <span style="font-size:17px;font-weight:600;color:var(--mut)">+ deuda HML ' + kitMoney(c.deuda_hml_qbo != null ? c.deuda_hml_qbo : c.deuda_hml_os_activa) + '</span>',
-    'aportado real [Airtable] · en libros ' + kitMoney(c.equity_qbo) + ' [QBO al ' + asOf + '] · la deuda no es capital — clic en el número para el desglose' + (sub ? ' · ' + sub : ''));
 }
 function ffSecFinanzas(comp) {
   const gt = ffGastosPorTipo();
@@ -1298,7 +1305,6 @@ window.ffSecAnalitica = ffSecAnalitica; window.ffExportExcelFF = ffExportExcelFF
 function ffDestroyCharts() { FF._charts.forEach(c => { try { c.destroy(); } catch (e) {} }); FF._charts = []; }
 function ffMountCharts(comp) {
   if (document.getElementById('ff-mao-res')) ffUwCalc(); // calcula al montar Underwriting
-  if (document.getElementById('ff-cap-res')) ffCapCalc(); // cap table al montar Inversionistas
   if (!window.Chart) return;
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); FF._charts.push(new Chart(el, cfg)); };
   const ax = { grid: { color: ffGridC() }, ticks: { color: ffAx(), font: { size: 10 } } };
