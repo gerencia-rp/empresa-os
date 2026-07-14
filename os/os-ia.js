@@ -326,14 +326,32 @@ window.osiaCerrar = osiaCerrar;
 
 async function osiaAbrir(id) {
   const meta = OSIA.arts.find(a => a.id === id) || {};
-  let html = (OSIA._lastHtml && OSIA._lastHtml.id === id) ? OSIA._lastHtml.html : null;
-  if (!html) {
-    const { data } = await sb.from('ia_artifacts').select('html,ruta,titulo').eq('id', id).maybeSingle();
-    if (data && data.html) html = data.html;
-    else if (data && data.ruta) { if (/^https?:/i.test(data.ruta)) window.open(data.ruta, '_blank'); else osNav(data.ruta); return; }
-  }
+  const { data } = await sb.from('ia_artifacts').select('html,ruta,titulo,carril,ficha_json,aprobado_por').eq('id', id).maybeSingle();
+  let html = (data && data.html) || ((OSIA._lastHtml && OSIA._lastHtml.id === id) ? OSIA._lastHtml.html : null);
+  if (!html && data && data.ruta) { if (/^https?:/i.test(data.ruta)) window.open(data.ruta, '_blank'); else osNav(data.ruta); return; }
   if (!html) { if (window.toast) toast('Este artefacto no tiene contenido para abrir', 'error'); return; }
-  osiaModalHtml(meta.titulo || 'Artefacto', html);
+  // N8 · carril DATOS-LECTURA: la data whitelisted se trae ACÁ (con la sesión del usuario → su RLS)
+  // y se inyecta en el iframe como window.__IA_DATA__ — el sandbox nunca ve un token.
+  if (data && data.carril === 'datos') {
+    if (!data.aprobado_por) {
+      const admin = confirm('Este artefacto lee DATOS y todavía no tiene el OK de un admin.\n¿Sos admin y querés aprobarlo ahora?');
+      if (admin) {
+        const { error } = await sb.rpc('ia_aprobar_artifact', { aid: id });
+        if (error) { if (window.toast) toast('No se pudo aprobar: ' + error.message, 'error'); return; }
+        if (window.toast) toast('✅ Aprobado — queda en el audit log');
+      } else return;
+    }
+    const recursos = (data.ficha_json && (data.ficha_json.recursos || data.ficha_json.data_recursos)) || [];
+    const pack = {};
+    for (const rec of recursos) {
+      try {
+        const { data: r, error } = await sb.functions.invoke('ia-data', { body: { artifact_id: id, recurso: rec } });
+        pack[rec] = error ? { error: error.message } : (r && r.data) || [];
+      } catch (e) { pack[rec] = { error: String(e && e.message || e) }; }
+    }
+    html = '<script>window.__IA_DATA__=' + JSON.stringify(pack).replace(/</g, '\\u003c') + ';</script>' + html;
+  }
+  osiaModalHtml((meta.titulo || (data && data.titulo) || 'Artefacto') + (data && data.carril === 'datos' ? ' · 📊 datos read-only' : ''), html);
 }
 window.osiaAbrir = osiaAbrir;
 

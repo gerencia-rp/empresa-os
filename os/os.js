@@ -302,6 +302,12 @@ async function osLoad() {
       (async () => { const all = []; for (let pg = 0; pg < 5; pg++) { const { data } = await sb.from('sabueso_findings').select('*').eq('active', true).order('id').range(pg * 1000, pg * 1000 + 999); all.push(...(data || [])); if (!data || data.length < 1000) break; } return all; })().catch(() => []),
       sb.from('sabueso_config').select('*').eq('activo', true).then(r => r.data || []).catch(() => []),
     ]);
+    // #2 (auditoría 13-jul): capital único desde la capa de KPIs — equity ≠ deuda
+    OS.capital = await sb.from('v_capital_deployed').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // B5: la ficha de casa lee equity/all-in/líder de la capa de KPIs (v_property_360)
+    OS.p360 = await sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []);
+    // B4: ocupación ÚNICA desde v_ocupacion (48/45/3/0 = 93.75%) — mata el snapshot congelado
+    OS.ocup = await sb.from('v_ocupacion').select('*').maybeSingle().then(r => r.data).catch(() => null);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
@@ -386,13 +392,18 @@ function osCompute() {
   return {
     mb,
     ff: { deals: ff.length, activos: ffActive.length, capital: ffCapital, arv: ffArv, alertas: ffAlertas, list: ff },
-    rentas: { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
+    // B4 (auditoría 13-jul): la ocupación oficial viene de v_ocupacion (capa de KPIs) — misma cifra en todas las pantallas
+    rentas: OS.ocup
+      ? { casas: OS.props.length, unidades: +OS.ocup.unidades_rentables, ocupadas: +OS.ocup.ocupadas, occPct: Math.round(+OS.ocup.ocupacion_pct), mantenimiento: +OS.ocup.mantenimiento, disponibles: +OS.ocup.disponibles, ingresos: rentInc }
+      : { casas: OS.props.length, unidades: totalU, ocupadas: occU, occPct, ingresos: rentInc },
     cobranza,
     holding: { capital: ffCapital, arv: ffArv, unidades: totalU + ff.length, ingresosMes: rentInc, deudaCobranza: cobranza.total },
     remodel: (() => {
       const fin = OS.remodel.filter(o => o.proceso === 'Finalizado');
       const curso = OS.remodel.filter(o => o.proceso !== 'Finalizado');
-      const a = OS.remodel.map(o => Number(o.avance_pct || 0)).filter(x => x > 0);
+      // B7 (auditoría 13-jul): el avance promedio SOLO cuenta obras con % del Planner (avance_real);
+      // promediar el singleSelect legacy daba el 91% fantasma.
+      const a = OS.remodel.filter(o => o.avance_real != null).map(o => Number(o.avance_real)).filter(x => x > 0);
       return {
         obras: OS.remodel.length,
         activas: curso.length,
@@ -426,9 +437,9 @@ function osCobranza(mb) {
 function osInsights(comp) {
   const ins = [];
   // Fix & Flip: error de datos, appraisal>ARV, all-in>75% (leídos de ff_deals; el detalle fino vive en el CC de FF)
-  comp.ff.list.filter(d => d.appraisal > 0 && d.arv > 0 && d.appraisal > d.arv * 1.05).forEach(d => ins.push({ sev: 'warning', impact: d.appraisal - d.arv, tag: 'FIX&FLIP · APPRAISAL>ARV', tx: `<b>${OS_E((d.address || '').split(',')[0])}</b>: appraisal ${OS_M(d.appraisal)} > ARV ${OS_M(d.arv)}.` }));
+  comp.ff.list.filter(d => d.appraisal > 0 && d.arv > 0 && d.appraisal > d.arv * 1.05).forEach(d => ins.push({ sev: 'warning', impact: d.appraisal - d.arv, tag: 'FIX&FLIP · APPRAISAL>ARV', tx: `<b>${OS_E((d.address || '').split(',')[0])}</b>: appraisal ${OS_M(d.appraisal)} > ARV ${OS_M(d.arv)}.`, accion: 'actualizar el ARV en Airtable con el appraisal real', quien: 'Juan' }));
   // Cobranza (holding): casas con deuda
-  comp.cobranza.rows.slice(0, 3).forEach(r => ins.push({ sev: 'critical', impact: r.deuda, tag: 'COBRANZA · MORA', tx: `<b>${OS_E(r.casa)}</b>: deuda de <b>${OS_M(r.deuda)}</b> este mes (esperado ${OS_M(r.esperado)}, cobrado ${OS_M(r.cobrado)}). El Cerebro puede redactar el cobro.` }));
+  comp.cobranza.rows.slice(0, 3).forEach(r => ins.push({ sev: 'critical', impact: r.deuda, tag: 'COBRANZA · MORA', tx: `<b>${OS_E(r.casa)}</b>: deuda de <b>${OS_M(r.deuda)}</b> este mes (esperado ${OS_M(r.esperado)}, cobrado ${OS_M(r.cobrado)}). El Cerebro puede redactar el cobro.`, accion: 'contactar al inquilino y registrar el pago o el acuerdo', quien: 'Carlos' }));
   // Conocidos del negocio (info)
   try { const cf = osConcilFF(); const warn = (OS.concilWarn != null ? OS.concilWarn : 10) / 100;
     if (cf.aporteQB != null && Math.abs(cf.aporteOS - cf.aporteQB) / Math.max(cf.aporteQB, 1) > warn * 0.5) ins.push({ sev: 'warning', impact: Math.abs(cf.aporteOS - cf.aporteQB), tag: 'CONCILIACIÓN · APORTES', tx: `Aporte de inversionistas: OS <b>${OS_M(cf.aporteOS)}</b> vs QBO <b>${OS_M(cf.aporteQB)}</b> (Δ ${OS_M(cf.aporteOS - cf.aporteQB)}). Conciliar Investor Contributions.` });
@@ -510,10 +521,10 @@ function osGlobal(comp) {
   const unitCard = (slug, e, extra) => osCanArea(e.key) ? `<div class="card unit" data-osnav="/${slug}"><div class="ico">${e.icon}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>` : '';
   // KPIs macro por área: cada tarjeta solo si el usuario tiene el área (admin ve todo)
   const kpis = [
-    osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital desplegado (F&F)</div><div class="big glow">${OS_M(h.capital)}</div><div class="meta">${comp.ff.activos} deals activos · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
+    osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital del holding (F&F)</div><div class="big glow">${OS.capital ? OS_M(+OS.capital.equity_comprometido_airtable) : OS_M(h.capital)}</div><div class="meta">${OS.capital ? `equity aportado [Airtable] + deuda HML ${OS_K(+(OS.capital.deuda_hml_qbo != null ? OS.capital.deuda_hml_qbo : OS.capital.deuda_hml_os_activa))} [QBO] — la deuda no es capital` : 'v_capital_deployed sin datos'} · ${comp.ff.activos} deals · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ocupación Rentas</div><div class="big">${comp.rentas.occPct}%</div><div class="meta">${comp.rentas.ocupadas}/${comp.rentas.unidades} unidades · ${comp.rentas.casas} casas</div></div>` : '',
     osCanArea('rentas') ? `<div class="card"><div class="lab">Ingresos del mes · ${comp.mb.label}</div><div class="big up">${OS_M(comp.rentas.ingresos)}</div><div class="meta">renta del mes (tag Mes/Año)</div>${osMonthBadge(comp.mb.from.slice(0, 7))}</div>` : '',
-    (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Deuda de cobranza</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas</div></div>` : '',
+    (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Cobranza operativa</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas · A/R contable [QBO]: ${(() => { const ar = (OS.qbCache || []).find(x => x.report === 'balance' && x.label === 'Total Accounts Receivable'); return ar ? OS_M(+ar.value) : 'sin libros'; })()}</div></div>` : '',
   ].join('');
   const areaCards = [
     osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
@@ -521,7 +532,7 @@ function osGlobal(comp) {
   ].join('');
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
   const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
-        ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span></div></div>`).join('')}
+        ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span>${i.sev === 'critical' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('')}
         <div class="ask"><input id="os-ask" placeholder="Preguntá al Cerebro del holding…" onkeydown="if(event.key==='Enter')osAsk()"><button onclick="osAsk()">Enviar</button></div>
         <div id="os-chat" class="cc-chat"></div>
       </div>` : '';
@@ -659,15 +670,17 @@ function osCasaMatch(slug, comp) {
     const cobrado = OS.pay.filter(x => x.property_id === prop.id && x.paid_at >= mb.from && x.paid_at <= mb.to).reduce((s, x) => s + Number(x.amount || 0), 0);
     rentas = { prop, totalU, occU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, occRent: Math.round(occRent), cobrado: Math.round(cobrado), deuda: Math.round(Math.max(0, occRent - cobrado)) };
   }
-  return { key, slug, addr, ff, remodel, prop, rentas };
+  const p360 = (pid && (OS.p360 || []).find(r => r.property_id === pid))
+    || (OS.p360 || []).find(r => osHouseKey(r.address) === key) || null;
+  return { key, slug, addr, ff, remodel, prop, rentas, p360 };
 }
 function osCasaInsights(m) {
   const ins = [];
   if (m.ff && m.ff.dq && m.ff.dq.revisar) ins.push({ s: 'r', t: `Error de datos: all-in ${OS_M(m.ff.allIn)} = ${Math.round(m.ff.allInPct * 100)}% del ARV (imposible). Revisar la carga en Airtable (Draws).` });
-  if (m.ff && m.ff.dq && m.ff.dq.confiable && m.ff.deficit < -20000) ins.push({ s: 'r', t: `Déficit de ${OS_M(-m.ff.deficit)} (regla: OK si flujo+ y acumulado < $20k). Planear recuperación (refi/venta).` });
+  if (m.ff && m.ff.dq && m.ff.dq.confiable && m.ff.deficit < -20000) ins.push({ s: 'r', t: `Déficit de ${OS_M(-m.ff.deficit)} (regla: OK si flujo+ y acumulado < $20k). Planear recuperación (refi/venta).`, accion: 'armar plan de refi o venta', quien: 'Juan' });
   if (m.ff && Number(m.ff.appraisal) > 0 && m.ff.arv > 0 && Number(m.ff.appraisal) > m.ff.arv * 1.05) ins.push({ s: 'y', t: `Appraisal ${OS_M(m.ff.appraisal)} supera el ARV ${OS_M(m.ff.arv)} — revisar (afecta refi y equity).` });
   if (m.remodel && m.remodel.proceso !== 'Finalizado') ins.push({ s: 'y', t: `Obra EN CURSO (${OS_E(m.remodel.proceso || 's/estado')}, ${Math.round(Number(m.remodel.avance_pct || 0))}% avance) — la utilidad de remodelación es preliminar, no final.` });
-  if (m.rentas && m.rentas.deuda > 200) ins.push({ s: 'r', t: `Deuda de cobranza ${OS_M(m.rentas.deuda)} este mes (esperado ${OS_M(m.rentas.occRent)}, cobrado ${OS_M(m.rentas.cobrado)}).` });
+  if (m.rentas && m.rentas.deuda > 200) ins.push({ s: 'r', t: `Deuda de cobranza ${OS_M(m.rentas.deuda)} este mes (esperado ${OS_M(m.rentas.occRent)}, cobrado ${OS_M(m.rentas.cobrado)}).`, accion: 'gestionar cobro con el inquilino y registrar el pago', quien: 'Carlos' });
   if (/childress/i.test(m.addr)) ins.push({ s: 'y', t: `Contrato/documentación pendiente de firma (dato del negocio). Verificar antes de avanzar.` });
   return ins;
 }
@@ -702,26 +715,27 @@ function osCasa(comp) {
   // etapas del ciclo (barra)
   const cycle = ['Adquirida', 'En rehab', 'Venta/Renta', 'Refi/Salida'];
   const cyIdx = m.ff ? ({ adquirida: 0, en_rehab: 1, en_venta: 2, rentada: 2, refinanciada: 3, vendida: 3 }[m.ff.stage] ?? 0) : (remoEnCurso ? 1 : (m.rentas ? 2 : 3));
+  const fichaPid = (m.p360 && m.p360.property_id) || (m.prop && m.prop.property_id) || (m.ff && m.ff.property_id) || null;
   return `<h1>🏠 ${OS_E(ffShortAddr(m.addr))} <span>· Ficha de casa</span></h1>
-    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).</div>
+    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).${fichaPid && window.reportCasa ? ` <button class="cbtn" style="margin-left:8px" onclick="reportCasa('${fichaPid}')">📄 Reporte PDF de la casa</button>` : ''}</div>
     <div class="grid k4">
       <div class="card"><div class="lab">Etapa actual</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
-      <div class="card"><div class="lab">All-in</div><div class="big">${m.ff ? OS_M(m.ff.allIn) : '—'}</div><div class="meta">${m.ff ? Math.round(m.ff.allInPct * 100) + '% del ARV' : 'sin deal F&F'}</div></div>
+      <div class="card"><div class="lab">All-in (compra + rehab real)</div><div class="big">${m.p360 && m.p360.all_in != null ? OS_M(+m.p360.all_in) : (m.ff ? OS_M(m.ff.allIn) : '—')}</div><div class="meta">${m.p360 && m.p360.compra != null ? `compra ${OS_M(+m.p360.compra)} + rehab ${m.p360.rehab_real != null ? OS_M(+m.p360.rehab_real) : '— sin dato'}` : (m.ff ? Math.round(m.ff.allInPct * 100) + '% del ARV' : 'sin deal F&F')}</div></div>
       <div class="card"><div class="lab">ARV</div><div class="big">${m.ff && m.ff.arv ? OS_M(m.ff.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
-      <div class="card"><div class="lab">${m.ff && m.ff.deficit < 0 ? 'Déficit' : 'Margen/Equity'}</div><div class="big ${m.ff && m.ff.deficit < 0 ? 'down' : 'up'}">${m.ff ? (m.ff.deficit < 0 ? OS_M(m.ff.deficit) : OS_M(m.ff.arv - m.ff.allIn)) : '—'}</div><div class="meta">${m.ff && m.ff.dq && !m.ff.dq.confiable ? 'no confiable' : m.ff ? 'ARV − all-in' : ''}</div></div>
+      <div class="card"><div class="lab">Equity incorporado</div><div class="big ${m.p360 && m.p360.equity != null ? (+m.p360.equity >= 0 ? 'up' : 'down') : ''}">${m.p360 && m.p360.equity != null ? OS_M(+m.p360.equity) : (m.ff && m.ff.arv ? OS_M(m.ff.arv - m.ff.allIn) : '—')}</div><div class="meta">ARV − (compra + rehab real) [v_property_360]${m.ff && m.ff.deficit < 0 ? ` · cash en hold ${OS_M(m.ff.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
     </div>
     <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
     <div class="grid k2" style="margin-top:12px">
       <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
         <div class="overx">${m.ff ? `${kv('Compra', OS_M(m.ff.purchase))}${kv('Remodelación (est/draws)', OS_M(m.ff.remComplete))}${kv('Holding', OS_M(m.ff.holding))}${kv('All-in', OS_M(m.ff.allIn), m.ff.dq.revisar ? 'down' : '')}${kv('ARV', OS_M(m.ff.arv))}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', OS_M(m.ff.arv * 0.75 - m.ff.remComplete - m.ff.holding))}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
       <div class="card"><div class="chart-h"><div class="t">🔨 Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
-        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E(remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div></div>
+        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
         <div class="overx">${m.rentas ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
-        ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
+        ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}${i.s === 'r' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
         ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
       </div>
     </div>
@@ -1033,8 +1047,22 @@ function opsCeoView(o) {
   const tend = o.tend.slice(-10);
   const maxO = Math.max(...tend.map(x => x.overdue), 1);
   const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#f87171,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
+  // N12 (auditoría 13-jul): índice de disciplina por persona (fecha+dueño 50% · al día 30% · movimiento 20%)
+  if (OS.disciplina === undefined) { OS.disciplina = null; sb.from('v_disciplina_clickup').select('*').order('disciplina', { ascending: false }).then(r => { OS.disciplina = r.data || []; osRender(); }).catch(() => { OS.disciplina = []; }); }
+  // N7 (plantilla llenada 13-jul): huérfanas con dueño/fecha SUGERIDOS por lista — cura de origen del ruido
+  if (OS.huerfanas === undefined) { OS.huerfanas = null; sb.from('v_huerfanas_resumen').select('*').order('huerfanas', { ascending: false }).then(r => { OS.huerfanas = r.data || []; osRender(); }).catch(() => { OS.huerfanas = []; }); }
+  const hTot = (OS.huerfanas || []).reduce((s, x) => s + (+x.huerfanas || 0), 0);
+  const hCub = (OS.huerfanas || []).reduce((s, x) => s + (x.dueno_sugerido ? +x.huerfanas : 0), 0);
+  const huerfCard = (OS.huerfanas && OS.huerfanas.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧹 Tareas huérfanas (sin fecha/dueño) · plantilla N7 activa</div>
+    <div class="meta" style="margin-bottom:4px"><b>${hTot.toLocaleString()}</b> huérfanas · <b>${hTot ? Math.floor(100 * hCub / hTot) : 0}%</b> ya tienen dueño y vencimiento SUGERIDOS por la plantilla (asignado real más frecuente por lista) — se aplican por el flujo propuesta → OK humano → ClickUp</div>
+    ${OS.huerfanas.slice(0, 8).map(x => `<div class="krow" style="padding:5px 0"><span>${OS_E(x.list_name)} <span style="opacity:.5">· ${x.huerfanas}</span></span><b>${x.dueno_sugerido ? '→ ' + OS_E(x.dueno_sugerido) + ' · ' + x.dias_para_vencer + 'd' : '<span class="warn">sin plantilla</span>'}</b></div>`).join('')}
+    ${(OS.huerfanas.some(x => !x.dueno_sugerido)) ? `<div class="meta" style="margin-top:6px">Sin cubrir: ${OS.huerfanas.filter(x => !x.dueno_sugerido).map(x => OS_E(x.list_name) + ' (' + x.huerfanas + ')').join(' · ')} — lista sin nombre real, corregir en ClickUp</div>` : ''}</div>` : '';
+  const discCard = (OS.disciplina && OS.disciplina.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧭 Índice de disciplina por persona (ClickUp)</div><div class="meta" style="margin-bottom:4px">higiene (fecha+dueño) 50% · al día 30% · movimiento 7d 20% — accountability, no castigo</div>
+    ${OS.disciplina.slice(0, 8).map(p => `<div class="krow" style="padding:5px 0"><span>${OS_E(p.persona)} <span style="opacity:.5">· ${p.tareas} tareas</span></span><b class="${p.disciplina >= 60 ? 'up' : p.disciplina >= 30 ? 'warn' : 'down'}">${p.disciplina}</b></div>`).join('')}</div>` : '';
   return `${kpis}
     <div class="grid k3" style="margin-top:14px">${empCards}</div>
+    ${discCard}
+    ${huerfCard}
     <div class="grid k2" style="margin-top:14px">
       <div class="card"><div class="lab">🎯 Las 3 decisiones de la semana</div><div class="meta" style="margin-bottom:4px">rankeadas por impacto ($/inversionista primero)</div>${decHtml}</div>
       <div class="card"><div class="lab">Tendencia de vencidas · ${tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:54px;margin:12px 0 4px">${spark || '<span class="meta">sin snapshots</span>'}</div><div class="meta">${tend.length ? tend[0].d + ' → ' + tend[tend.length - 1].d : ''}</div><div class="krow" style="cursor:pointer;margin-top:8px" onclick="opsGo('sabueso')"><span>🐕 <b>${(OS.sabueso || []).length} anomalías</b> del Sabueso</span><b style="opacity:.5">ver →</b></div></div>
@@ -1095,6 +1123,19 @@ const SAB_CAT = { higiene: '🧼 Higiene', flujo: '🌊 Flujo', proceso: '⚙️
 function opsSabuesoView(o) {
   const all = (OS.sabueso || []).filter(x => x.active !== false);
   const f = OS.sabF = OS.sabF || { cat: '', emp: '', persona: '' };
+  // O9 (auditoría 13-jul): COLAPSO SEMÁNTICO — 2,927 anomalías crudas → ~grupos accionables,
+  // priorizados por severidad (las de plata/inversionista primero). El grano fino sigue abajo.
+  const grupos = {};
+  all.forEach(x => {
+    const k = (x.check_key || '?') + '|' + (x.categoria || '') + '|' + (x.empresa || '');
+    if (!grupos[k]) grupos[k] = { check: x.check_key, cat: x.categoria, emp: x.empresa, n: 0, crit: 0, dueno: x.dueno_sugerido, accion: x.accion, ej: x.task_name };
+    grupos[k].n++; if (x.severidad === 'critica') grupos[k].crit++;
+  });
+  const gList = Object.values(grupos).sort((a, b) => (b.cat === 'sla' ? 1 : 0) - (a.cat === 'sla' ? 1 : 0) || b.crit - a.crit || b.n - a.n);
+  const colapso = `<div class="card" style="margin-bottom:12px"><div class="lab">🧠 Colapso semántico — ${all.length.toLocaleString()} anomalías → ${gList.length} grupos accionables</div>
+    <div class="meta" style="margin-bottom:6px">un problema = una fila (no 3,000); prioridad: $/inversionista (sla) → críticas → volumen. La causa raíz del ruido se cura en origen (auto-scheduler N7).</div>
+    ${gList.slice(0, 12).map(g => `<div class="krow" style="cursor:pointer;padding:7px 0" onclick='OS.sabF={cat:${JSON.stringify(g.cat || '')},emp:"",persona:""};osRender()'><span><b>${OS_E(g.check + (g.cat ? ' · ' + g.cat : ''))}</b> ${g.emp ? '· ' + OS_E(g.emp) : ''} — ${g.n.toLocaleString()} caso(s)${g.crit ? ` · <b class="down">${g.crit} críticas</b>` : ''}${g.accion ? `<div class="meta">→ ${OS_E(g.accion)}${g.dueno ? ' · ' + OS_E(g.dueno) : ''}</div>` : ''}</span><b style="opacity:.5">filtrar →</b></div>`).join('')}
+  </div>`;
   let rows = all.slice();
   if (f.cat) rows = rows.filter(x => x.categoria === f.cat);
   if (f.emp) rows = rows.filter(x => x.empresa === OPS_EMP[f.emp]);
@@ -1109,7 +1150,7 @@ function opsSabuesoView(o) {
   const procesos = Object.values(byLista).filter(x => x.n >= 4).map(x => ({ ...x, higiene: Math.round(100 * x.conFyD / x.n), flujo: Math.round(100 * x.movido / x.n), salud: Math.round(100 * (0.5 * x.conFyD / x.n + 0.5 * x.movido / x.n)) })).sort((a, b) => a.salud - b.salud).slice(0, 12);
   const catChip = (k, l, n) => `<button class="repbtn ${f.cat === k ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="OS.sabF=Object.assign(OS.sabF||{},{cat:'${f.cat === k ? '' : k}'});osRender()">${l} (${n})</button>`;
   const fila = x => `<tr><td>${SAB_SEV[x.severidad]?.e || '⚪'}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: '📅 fecha', asignar_dueno: '👤 dueño', refechar: '📅 re-fechar', archivar: '📦 archivar', escalar: '⚠ escalar', asignar_lista: '🗂 lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
-  return `<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
+  return `${colapso}<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
       <div class="lab">🐕 El Sabueso olfateó</div>
       <div style="font-size:52px;font-weight:800;color:${all.length ? '#f87171' : '#34d399'}">${all.length}</div>
       <div class="meta">anomalías activas · ${bySev.critica || 0} críticas · ${bySev.alta || 0} altas · ${bySev.media || 0} medias · <b>norte: 0 = todo perfecto</b></div></div>

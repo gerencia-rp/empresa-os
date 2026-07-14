@@ -145,8 +145,23 @@ function wpInjectTheme() {
   const st = document.createElement('style'); st.id = 'wp-theme-css';
   st.textContent = `
   /* ===== Planner Semanal — diseño premium OS ===== */
-  #modal:has(#wp-root) > div{max-width:96vw !important;width:1500px;border-radius:20px;border:1px solid rgba(15,23,42,.08);box-shadow:0 40px 90px -40px rgba(2,6,23,.5)}
-  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;--wa1:#12b5a0;--wa2:#2f6ef0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#0f1c2e;--wmut:#64748b;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
+  /* Obs #20: el TABLERO es protagonista — el modal ocupa todo el viewport y el board estira full-height */
+  #modal:has(#wp-root){padding:10px}
+  #modal:has(#wp-root) > div{max-width:none !important;width:calc(100vw - 20px);height:calc(100vh - 20px);max-height:calc(100vh - 20px) !important;border-radius:16px;border:1px solid rgba(15,23,42,.08);box-shadow:0 40px 90px -40px rgba(2,6,23,.5)}
+  #modal:has(#wp-root) > div > div:first-child{padding:8px 18px}
+  #modal:has(#wp-root) #modal-body{padding:10px 14px 12px;overflow:hidden;display:flex;flex-direction:column}
+  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;flex:1;min-height:0;display:flex;flex-direction:column;--wa1:#12b5a0;--wa2:#2f6ef0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#0f1c2e;--wmut:#64748b;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
+  #wp-root .wp-shell{flex:1;min-height:0}
+  /* Topbar compacta siempre visible + bloque KPIs/filtros colapsable */
+  #wp-root .wp-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--wbord)}
+  #wp-root .wp-kpitoggle{font-size:12px;font-weight:700;padding:6px 12px;border-radius:9px;border:1px solid var(--wbord);background:var(--wglass);color:var(--wmut);cursor:pointer;transition:.15s;white-space:nowrap}
+  #wp-root .wp-kpitoggle:hover{color:var(--wink);border-color:var(--wa2)}
+  #wp-root .wp-kpis{margin-bottom:8px;max-height:45vh;overflow-y:auto;flex-shrink:0}
+  #wp-root .wp-topbar{flex-shrink:0}
+  /* Board: columnas de día anchas + scroll horizontal DENTRO del contenedor (no en el body) */
+  #wp-root .wp-grid{overscroll-behavior-x:contain}
+  #wp-root .wp-grid thead th{min-width:220px}
+  #wp-root .wp-grid thead th:first-child{min-width:180px;max-width:230px}
   #wp-root .rounded,#wp-root .rounded-lg{border-radius:10px}
   /* Toolbar: pills uniformes, densidad */
   #wp-root [onclick^="wpNav"],#wp-root button[onclick]{transition:.15s}
@@ -166,9 +181,10 @@ function wpInjectTheme() {
   #wp-root .bg-red-50{background:rgba(224,69,95,.09) !important}
   #wp-root .bg-red-600{background:var(--wneg) !important}#wp-root .bg-amber-600{background:var(--wamb) !important}#wp-root .bg-emerald-600{background:var(--wpos) !important}
   /* ===== TARJETA DE ACTIVIDAD PREMIUM (mismo lenguaje que la vista Desviación) ===== */
-  #wp-root td{padding:5px !important;vertical-align:top}
-  #wp-root .space-y-1{display:flex;flex-direction:column;gap:6px}
-  #wp-root .wp-acard{position:relative;background:var(--wglass);border:1px solid var(--wbord);border-left:3px solid var(--wmut);border-radius:10px;padding:8px 10px;transition:.16s;box-shadow:0 1px 2px rgba(2,6,23,.05)}
+  /* Obs #20: legibilidad > densidad — tipografías más grandes, padding generoso */
+  #wp-root td{padding:7px 6px !important;vertical-align:top}
+  #wp-root .space-y-1{display:flex;flex-direction:column;gap:8px}
+  #wp-root .wp-acard{position:relative;background:var(--wglass);border:1px solid var(--wbord);border-left:3px solid var(--wmut);border-radius:11px;padding:10px 12px;transition:.16s;box-shadow:0 1px 2px rgba(2,6,23,.05)}
   #wp-root .wp-acard:hover{border-color:var(--wa2);transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(2,6,23,.3)}
   #wp-root .wp-acard[data-st="done"]{border-left-color:var(--wpos)}
   #wp-root .wp-acard[data-st="late"],#wp-root .wp-acard[data-st="critical"],#wp-root .wp-acard[data-st="conflict"]{border-left-color:var(--wneg)}
@@ -178,12 +194,12 @@ function wpInjectTheme() {
   #wp-root .wp-ac-top{display:flex;align-items:flex-start;gap:8px}
   #wp-root .wp-ac-chk{margin-top:2px;cursor:pointer;flex-shrink:0;accent-color:var(--wpos)}
   #wp-root .wp-ac-body{flex:1;min-width:0;cursor:pointer}
-  #wp-root .wp-ac-name{font-size:11.5px;font-weight:650;line-height:1.32;color:var(--wink);word-break:break-word}
+  #wp-root .wp-ac-name{font-size:13.5px;font-weight:650;line-height:1.35;color:var(--wink);word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   #wp-root .wp-ac-name.wp-done{text-decoration:line-through;opacity:.5}
-  #wp-root .wp-ac-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
-  #wp-root .wp-ac-stage{font-size:9px;color:var(--wmut);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
-  #wp-root .wp-ac-day{font-size:8.5px;color:var(--wmut);background:rgba(100,116,139,.14);padding:1px 6px;border-radius:20px;font-weight:600;white-space:nowrap}
-  #wp-root .wp-ac-st{font-size:8.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  #wp-root .wp-ac-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px}
+  #wp-root .wp-ac-stage{font-size:10px;color:var(--wmut);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  #wp-root .wp-ac-day{font-size:10px;color:var(--wmut);background:rgba(100,116,139,.14);padding:2px 7px;border-radius:20px;font-weight:600;white-space:nowrap}
+  #wp-root .wp-ac-st{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
   /* A3: color = ETAPA (no alarma); rojo solo atrasado/crítico real */
   #wp-root .wp-acard[data-stage*="inter"]{border-left-color:#8b5cf6}
   #wp-root .wp-acard[data-stage*="exter"]{border-left-color:#0ea5e9}
@@ -200,10 +216,10 @@ function wpInjectTheme() {
   /* A5: VISTA LIMPIA — tarjeta minimalista */
   #wp-root.wp-clean .wp-ac-st,#wp-root.wp-clean .wp-ac-warn,#wp-root.wp-clean .wp-ac-sug{display:none}
   #wp-root.wp-clean .wp-chip{display:none}
-  #wp-root.wp-clean .wp-chip.crit{display:inline-block;font-size:8px;padding:1px 5px}
-  #wp-root.wp-clean .wp-acard{padding:6px 8px;border-radius:8px}
-  #wp-root.wp-clean .wp-ac-meta{margin-top:2px}
-  #wp-root.wp-clean .wp-ac-tags{margin-top:2px}
+  #wp-root.wp-clean .wp-chip.crit{display:inline-block;font-size:9.5px;padding:1px 6px}
+  #wp-root.wp-clean .wp-acard{padding:9px 11px;border-radius:10px}
+  #wp-root.wp-clean .wp-ac-meta{margin-top:3px}
+  #wp-root.wp-clean .wp-ac-tags{margin-top:3px}
   /* A1: panel lateral de alertas */
   #wp-alert-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:var(--wpanel,#fff);border-left:1px solid var(--wbord,#e2e8f0);box-shadow:-12px 0 40px -18px rgba(2,6,23,.35);z-index:9500;overflow:auto;padding:16px}
   #wp-alert-drawer h3{font-size:13px;font-weight:800;margin:0 0 4px}
@@ -215,13 +231,13 @@ function wpInjectTheme() {
   #wp-root .wp-acard[data-st="late"] .wp-ac-st,#wp-root .wp-acard[data-st="critical"] .wp-ac-st,#wp-root .wp-acard[data-st="conflict"] .wp-ac-st{background:rgba(224,69,95,.13);color:var(--wneg)}
   #wp-root .wp-acard[data-st="postponed"] .wp-ac-st,#wp-root .wp-acard[data-st="dep"] .wp-ac-st{background:rgba(192,125,22,.15);color:var(--wamb)}
   #wp-root .wp-acard[data-st="progress"] .wp-ac-st{background:rgba(47,110,240,.13);color:var(--wa2)}
-  #wp-root .wp-ac-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#wp-root .wp-ac-tags:empty{display:none}
-  #wp-root .wp-chip{font-size:8.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(100,116,139,.13);color:var(--wmut);border:none;cursor:pointer;line-height:1.4}
+  #wp-root .wp-ac-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}#wp-root .wp-ac-tags:empty{display:none}
+  #wp-root .wp-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(100,116,139,.13);color:var(--wmut);border:none;cursor:pointer;line-height:1.4}
   #wp-root .wp-chip.est{background:rgba(138,123,255,.15);color:#7b5bef}#wp-root .wp-chip.crit{background:rgba(224,69,95,.15);color:var(--wneg)}
   #wp-root .wp-chip.ok{background:rgba(14,163,113,.13);color:var(--wpos)}
-  #wp-root .wp-res{font-size:8.5px;padding:2px 7px;border-radius:20px;background:rgba(47,110,240,.11);color:var(--wa2);font-weight:600;white-space:nowrap}
-  #wp-root .wp-ac-warn{font-size:9px;color:var(--wneg);font-weight:700;margin-top:5px}
-  #wp-root .wp-ac-sug{font-size:9px;color:var(--wamb);font-weight:600;margin-top:4px}
+  #wp-root .wp-res{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(47,110,240,.11);color:var(--wa2);font-weight:600;white-space:nowrap}
+  #wp-root .wp-ac-warn{font-size:10.5px;color:var(--wneg);font-weight:700;margin-top:5px}
+  #wp-root .wp-ac-sug{font-size:10.5px;color:var(--wamb);font-weight:600;margin-top:4px}
   /* pestaña para reabrir el panel de actividades (colapsado) */
   #wp-root .wp-sbtab{border:1px solid var(--wbord);background:var(--wglass);color:var(--wmut);border-radius:10px;font-size:11px;font-weight:700;padding:10px 12px;cursor:pointer;transition:.15s;white-space:nowrap;box-shadow:0 1px 2px rgba(2,6,23,.05)}
   #wp-root .wp-sbtab:hover{color:var(--wink);border-color:var(--wa2);background:rgba(47,110,240,.06)}
@@ -470,17 +486,36 @@ function wpRender() {
       allHomes.length + ' obra' + (allHomes.length === 1 ? '' : 's'),
       doneThisWeek + '/' + totalThisWeek + ' actividades hechas esta semana (' + progressPct + '%)' + (overdueCount ? ' · <b>⏰ ' + overdueCount + ' atrasada(s)</b>' : ' · ✓ al día'))
     : '';
+  // Obs #20: KPIs + filtros colapsables (default: abiertos solo en pantallas anchas; persistido en localStorage wp_kpis_open)
+  const kpisOpen = wpKpisOpen();
+  const wpFiltersBar = `
+      <div class="wp-filters flex items-center gap-2 flex-wrap mb-2">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Filtros</span>
+        <select onchange="wpSetLiderFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por crew/líder">
+          <option value="all">👷 Todos los crews</option>
+          ${wpAllCrews.map(c => `<option value="${(c || '').replace(/"/g, '&quot;')}" ${wpState.liderFilter === c ? 'selected' : ''}>${(c || '').replace(/</g, '&lt;')}</option>`).join('')}
+        </select>
+        <select onchange="wpSetStageFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por etapa">
+          <option value="all">🧱 Todas las etapas</option>
+          ${wpAllStages.map(s => `<option value="${(s || '').replace(/"/g, '&quot;')}" ${wpState.stageFilter === s ? 'selected' : ''}>${(s || '').replace(/</g, '&lt;')}</option>`).join('')}
+        </select>
+        <button onclick="wpToggleOnlyLate()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border ${wpState.onlyLate ? 'wp-fon bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">⏰ Solo atrasadas</button>
+        <button onclick="wpToggleHideEmpty()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border bg-white text-slate-600 border-slate-300 hover:bg-slate-50" title="Mostrar u ocultar casas sin tareas esta semana">${wpState.hideEmpty ? '📦 Ocultar vacías: ON' : '👁 Ocultar vacías: OFF'}</button>
+        ${(wpAnyFilter) ? `<button onclick="wpState.liderFilter='all';wpState.stageFilter='all';wpState.onlyLate=false;wpRender()" class="text-xs px-2 py-1 text-slate-400 hover:text-slate-700 underline">limpiar</button>` : ''}
+        <span class="text-[10px] text-slate-400 ml-auto">${filteredHomes.length} casa(s) visible(s)</span>
+      </div>`;
+  const wpKpisBlock = kpisOpen ? ('<div class="wp-kpis">' + wpHero + overdueBanner + wpFiltersBar + '</div>') : '';
   root.innerHTML = `
-    <div class="flex flex-col h-full max-h-[80vh]">
-      ${wpHero}${criticasBanner}${wpAlertDrawerHtml(overdueAll, conflicts)}
-      ${overdueBanner}
-      <!-- HEADER -->
-      <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+    <div class="wp-shell flex flex-col h-full">
+      ${criticasBanner}${wpAlertDrawerHtml(overdueAll, conflicts)}
+      <!-- HEADER compacto (siempre visible) -->
+      <div class="wp-topbar">
         <div class="flex items-center gap-2">
           <button onclick="wpNavWeek(-1)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-sm">←</button>
           <div class="font-bold text-sm">${weekLabel}</div>
           <button onclick="wpNavWeek(1)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-sm">→</button>
           <button onclick="wpNavWeek(0)" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs ml-2">Hoy</button>
+          <button onclick="wpToggleKpis()" class="wp-kpitoggle" title="Mostrar/ocultar KPIs y filtros">📊 KPIs y filtros ${kpisOpen ? '▴' : '▾'}${!kpisOpen && wpAnyFilter ? ' <span class="text-rose-600">•</span>' : ''}</button>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs bg-slate-900 text-white px-2 py-1 rounded font-bold" title="Progreso de la semana">📊 ${doneThisWeek}/${totalThisWeek} (${progressPct}%)</span>
@@ -512,23 +547,7 @@ function wpRender() {
           </details>
         </div>
       </div>
-
-      <!-- A) BARRA DE FILTROS -->
-      <div class="wp-filters flex items-center gap-2 flex-wrap mb-2">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Filtros</span>
-        <select onchange="wpSetLiderFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por crew/líder">
-          <option value="all">👷 Todos los crews</option>
-          ${wpAllCrews.map(c => `<option value="${(c || '').replace(/"/g, '&quot;')}" ${wpState.liderFilter === c ? 'selected' : ''}>${(c || '').replace(/</g, '&lt;')}</option>`).join('')}
-        </select>
-        <select onchange="wpSetStageFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por etapa">
-          <option value="all">🧱 Todas las etapas</option>
-          ${wpAllStages.map(s => `<option value="${(s || '').replace(/"/g, '&quot;')}" ${wpState.stageFilter === s ? 'selected' : ''}>${(s || '').replace(/</g, '&lt;')}</option>`).join('')}
-        </select>
-        <button onclick="wpToggleOnlyLate()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border ${wpState.onlyLate ? 'wp-fon bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">⏰ Solo atrasadas</button>
-        <button onclick="wpToggleHideEmpty()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border bg-white text-slate-600 border-slate-300 hover:bg-slate-50" title="Mostrar u ocultar casas sin tareas esta semana">${wpState.hideEmpty ? '📦 Ocultar vacías: ON' : '👁 Ocultar vacías: OFF'}</button>
-        ${(wpAnyFilter) ? `<button onclick="wpState.liderFilter='all';wpState.stageFilter='all';wpState.onlyLate=false;wpRender()" class="text-xs px-2 py-1 text-slate-400 hover:text-slate-700 underline">limpiar</button>` : ''}
-        <span class="text-[10px] text-slate-400 ml-auto">${filteredHomes.length} casa(s) visible(s)</span>
-      </div>
+      ${wpKpisBlock}
       <!-- BODY: Sidebar tabbed + Grid calendario -->
       <div class="flex gap-3 flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
         <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) — colapsable con ✕ / pestaña Actividades -->
@@ -554,7 +573,7 @@ function wpRender() {
         </div>
 
         <!-- GRID -->
-        <div class="flex-1 overflow-auto border border-slate-200 rounded-lg">
+        <div class="wp-grid flex-1 overflow-auto border border-slate-200 rounded-lg">
           <table class="w-full text-xs border-collapse">
             <thead class="sticky top-0 z-10 bg-slate-50">
               <tr>
@@ -714,6 +733,22 @@ function wpToggleSidebar() {
   try { localStorage.setItem('wp_sidebar_hidden', wpState.sidebarHidden ? '1' : '0'); } catch (e) {}
   wpRender();
 }
+
+// Obs #20: bloque KPIs + filtros colapsable — solo presentación.
+// Default: abierto en pantallas >=1500px, colapsado por debajo; el toggle persiste en localStorage.
+function wpKpisOpen() {
+  try {
+    const v = localStorage.getItem('wp_kpis_open');
+    if (v === '1') return true;
+    if (v === '0') return false;
+  } catch (e) { /* localStorage bloqueado → cae al default por ancho */ }
+  return window.innerWidth >= 1500;
+}
+function wpToggleKpis() {
+  try { localStorage.setItem('wp_kpis_open', wpKpisOpen() ? '0' : '1'); } catch (e) {}
+  wpRender();
+}
+window.wpToggleKpis = wpToggleKpis;
 
 // ─── BLOQUE 1.1: Equipo FIJO por obra (crew/especialistas/herramientas/vehículos por casa, no por día) ───
 function wpTeamOf(houseId) {

@@ -10,7 +10,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const HOURS_TABLE = "tblyCieXLFdZM60El"; // Horas trabajadas semana
 const CREW_TABLE = "tblQzJoPvakTbz4gt";  // Cuadrillas
-const F = { fecha: "fldkFHa9K5pRlO29V", worker: "fldpIYjB33HK0tdEk", casa: "fldN20CWfhDsgwQNS", horas: "fldRWftVP66WRcbYD", pago: "fldP8mv5lJdehwvKx", pagoTotalDia: "fldKgQ5Eyv5esHpSQ" };
+const F = {
+  fecha: "fldkFHa9K5pRlO29V", worker: "fldpIYjB33HK0tdEk", casa: "fldN20CWfhDsgwQNS",
+  horas: "fldRWftVP66WRcbYD", pago: "fldP8mv5lJdehwvKx", pagoTotalDia: "fldKgQ5Eyv5esHpSQ",
+  // B8 (auditoría 13-jul): el LINK a Personal en Campo + el lookup de tarifa — Airtable YA resuelve
+  // la identidad; se acabó el re-match por texto libre ("OSCAR LIDER"/"Oscar").
+  personalLink: "flds9yFDE2din22ig", rateLookup: "fldKh0LVgaVCwcUix", propLink: "fldnouQ86a6cqMAkG",
+};
 const C = { nombre: "fldnSityxRqbpwDEF", experiencia: "fld4PEcliEXZ4kTgY", rate: "fld4bAKu6waby0jrR" };
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -52,9 +58,18 @@ Deno.serve(async (req) => {
       const casaArr = f[F.casa];
       const casaList = Array.isArray(casaArr) ? casaArr.map((x: any) => (x && x.name) || x) : (casaArr ? [casaArr] : []);
       const casa = casaList.join(", ");
+      const linkArr = f[F.personalLink];
+      const workerRec = Array.isArray(linkArr) && linkArr[0] ? (typeof linkArr[0] === "string" ? linkArr[0] : linkArr[0].id) : null;
+      const rateArr = f[F.rateLookup];
+      const rate = Array.isArray(rateArr) ? (typeof rateArr[0] === "number" ? rateArr[0] : null) : (typeof rateArr === "number" ? rateArr : null);
+      const propArr = f[F.propLink];
+      const propRec = Array.isArray(propArr) && propArr[0] ? (typeof propArr[0] === "string" ? propArr[0] : propArr[0].id) : null;
       return {
         airtable_id: r.id,
         worker: f[F.worker] || null,
+        worker_rec_id: workerRec,           // B8: identidad por LINK (Personal en Campo)
+        rate_hora: rate,                    // B8: tarifa lookup resuelta por Airtable
+        prop_rec_id: propRec,               // B8: casa por LINK (no el multipleSelect de texto)
         casa: casa || null,
         casa_norm: norm(casaList[0] || ""),
         fecha: f[F.fecha] || null,

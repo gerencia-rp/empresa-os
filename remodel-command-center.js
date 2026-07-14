@@ -208,8 +208,11 @@ function rcCompute() {
   const _sd = [..._dias].sort((a, b) => a - b);
   const desvDiasMed = _sd.length ? (_sd.length % 2 ? _sd[(_sd.length - 1) / 2] : Math.round((_sd[_sd.length / 2 - 1] + _sd[_sd.length / 2]) / 2)) : 0;
   const desvDiasRevN = _diasRev.length;
-  const _rent = fin.map(o => o.rentabilidad).filter(r => r != null).map(Number);
-  const rentProm = _rent.length ? +(_rent.reduce((s, x) => s + x, 0) / _rent.length).toFixed(1) : 0;
+  // B9 (auditoría 13-jul): rentabilidad = margen PONDERADO Σutilidad/Σingreso (valor_interno),
+  // excluyendo denominadores ≤0 (Stonleigh neg/neg daba 322%). JAMÁS promediar la columna %
+  // (llega como fracción de Airtable → mostraba "0.2%"). Debe dar 170,682/1,466,360 = 11.6%.
+  const _rentOK = fin.filter(o => (+o.valor_interno || 0) > 0);
+  const rentProm = _rentOK.length ? +((100 * _rentOK.reduce((s, o) => s + (+o.ganancia || 0), 0)) / _rentOK.reduce((s, o) => s + (+o.valor_interno || 0), 0)).toFixed(1) : 0;
   const _conDias = fin.filter(o => o.retraso_dias != null);
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
@@ -381,6 +384,53 @@ function rcSecObras(c) {
     <div class="kan">${cols.map(([t, list]) => `<div class="kcol"><div class="kcol-h">${RC_E(t)}<span class="cnt">${list.length}</span></div>${list.length ? list.map(rcObraCard).join('') : '<div class="meta" style="padding:14px 4px">—</div>'}</div>`).join('')}</div>`;
 }
 
+// ─── Scorecard por líder (obs #14 CEO): obras a cargo · % cumple presupuesto/tiempo · margen · Qué revisar ───
+// Convención de líder = la del CC (key exacto de lidMap: obra con 2 líderes queda como fila "A, B");
+// el conteo de EN CURSO sí matchea al líder individual dentro de strings combinados.
+function rcLiderScorecard(c) {
+  if (!c.lideres.length) return '';
+  const mkNext = (porque, accion, quien) => (typeof kitNext === 'function')
+    ? kitNext(porque, accion, quien)
+    : '<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--glassb);border-radius:10px;background:var(--glass)">'
+    + '<div style="font-size:11px;font-weight:800;color:var(--amber,#f59e0b);margin-bottom:3px">🔍 Qué revisar</div>'
+    + '<div style="font-size:12px;color:var(--mut)">' + porque + '</div>'
+    + '<div style="font-size:12px;color:var(--ink);margin-top:4px">→ <b>' + accion + '</b>' + (quien ? ' <span style="color:var(--mut)">· ' + RC_E(quien) + '</span>' : '') + '</div></div>';
+  const stat = (lab, txt, cls, sub) => '<div><div style="font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--mut2)">' + lab + '</div>'
+    + '<div class="' + (cls || '') + '" style="font-size:16px;font-weight:800;margin-top:1px">' + txt + '</div>'
+    + '<div style="font-size:9.5px;color:var(--mut2)">' + sub + '</div></div>';
+  const cards = c.lideres.map(l => {
+    // en curso: matchea el key exacto O al líder individual dentro de un "A, B" de la obra activa
+    const enCurso = c.activas.filter(o => {
+      const k = ((o.lider || '—').trim() || '—');
+      return k === l.lider || k.split(',').map(x => x.trim()).includes(l.lider);
+    }).length;
+    const conPres = l.obras.filter(o => o.devPct != null);                    // ambas puntas: costo real y presupuesto
+    const cumplePres = conPres.length ? Math.round(conPres.filter(o => o.devPct <= 0).length / conPres.length * 100) : null;
+    const conDias = l.obras.filter(o => o.dias != null);                      // desviación de días (retraso_dias)
+    const cumpleTiempo = conDias.length ? Math.round(conDias.filter(o => o.dias <= 0).length / conDias.length * 100) : null;
+    const margen = l.revenue > 0 ? l.margen : null;                           // ponderado ganancia/revenue — sin revenue = sin dato
+    const pctCls = v => v == null ? '' : (v >= 70 ? 'up' : (v < 50 ? 'down' : ''));
+    const subDe = (v, n) => v == null ? 'sin dato' : 'de ' + n + ' obra(s) con dato';
+    // Qué revisar: la peor obra por desviación de costo; si no hay costo, la de mayor atraso
+    const peorCosto = conPres.filter(o => o.devPct > 0).sort((a, b) => b.devPct - a.devPct)[0];
+    const peorDias = conDias.filter(o => o.dias > 0).sort((a, b) => b.dias - a.dias)[0];
+    let next;
+    if (peorCosto) next = mkNext('Revisar <b>' + RC_E(peorCosto.address) + '</b>: costo +' + peorCosto.devPct + '% sobre presupuesto' + (peorCosto.dias != null && peorCosto.dias > 0 ? ' y +' + peorCosto.dias + ' días de atraso' : ''), 'Validar draws vs SOW y carga de materiales con Alejandra', l.lider);
+    else if (peorDias) next = mkNext('Revisar <b>' + RC_E(peorDias.address) + '</b>: cerró con +' + peorDias.dias + ' días vs estimado', 'Revisar cronograma y lead-times de esa obra con el líder', l.lider);
+    else if (conPres.length || conDias.length) next = '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">✅ Sin obras sobre presupuesto ni con atraso — nada que revisar.</div>';
+    else next = '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">Sin presupuesto ni fechas en sus obras — no se puede evaluar. Cargar en Airtable.</div>';
+    return '<div class="card" style="padding:13px 15px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:13.5px">' + RC_E(l.lider) + '</b>'
+      + '<span class="meta">' + enCurso + ' en curso · ' + l.n + ' finalizada(s)</span></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">'
+      + stat('Cumple presupuesto', cumplePres == null ? '<span style="color:var(--mut2)">—</span>' : cumplePres + '%', pctCls(cumplePres), subDe(cumplePres, conPres.length))
+      + stat('Cumple tiempo', cumpleTiempo == null ? '<span style="color:var(--mut2)">—</span>' : cumpleTiempo + '%', pctCls(cumpleTiempo), subDe(cumpleTiempo, conDias.length))
+      + stat('Margen prom.', margen == null ? '<span style="color:var(--mut2)">—</span>' : margen + '%', margen == null ? '' : (margen >= 20 ? 'up' : (margen < 10 ? 'down' : '')), margen == null ? 'sin revenue cargado' : 'ponderado · objetivo 20%')
+      + '</div>' + next + '</div>';
+  }).join('');
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start;margin-bottom:14px">' + cards + '</div>';
+}
+
 function rcSecLideres(c) {
   const dchip = (v, unit) => v == null ? '<span style="color:var(--mut2)">—</span>' : `<span class="${v > 0 ? 'down' : 'up'}">${v > 0 ? '+' : ''}${v}${unit}</span>`;
   const detalle = l => l.obras.map(o => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:3px 0;border-top:1px solid var(--glassb)"><span>${RC_E(o.address)}</span><span style="color:var(--mut)">${o.devPct != null ? 'desv ' + (o.devPct > 0 ? '+' : '') + o.devPct + '%' : ''}${o.dias != null ? ' · ' + o.dias + 'd' : ''}${o.rent != null ? ' · rent ' + o.rent + '%' : ''}</span></div>`).join('');
@@ -389,7 +439,7 @@ function rcSecLideres(c) {
     const det = `<tr id="rc-lid-${i}" class="rc-hide"><td colspan="8" style="padding:0"><div style="padding:9px 12px;background:var(--glass)"><div style="font-size:9px;letter-spacing:1px;color:var(--mut2);margin-bottom:6px">OBRAS DE ${RC_E((l.lider || '').toUpperCase())}</div>${detalle(l)}</div></td></tr>`;
     return main + det;
   }).join('');
-  return rcHeader('Performance por líder', 'Desviación de costo/días, $/sqft logrado, productividad (hrs/sqft) y % sobre presupuesto — finalizadas. Click para ver sus obras.') + `
+  return rcHeader('Performance por líder', 'Scorecard por líder (presupuesto/tiempo/margen + qué revisar) y detalle: desviación de costo/días, $/sqft, hrs/sqft — finalizadas. Click en la fila para ver sus obras.') + rcLiderScorecard(c) + `
     <div class="card"><table class="ptable"><thead><tr><th>Líder</th><th>Obras</th><th>Ganancia</th><th>Desv costo</th><th>Desv días</th><th>$/sqft</th><th>hrs/sqft</th><th>% sobre pres.</th></tr></thead><tbody>
     ${c.lideres.length ? rows : '<tr><td colspan="8" class="meta" style="padding:20px">Sin obras finalizadas.</td></tr>'}
     </tbody></table></div>`;
