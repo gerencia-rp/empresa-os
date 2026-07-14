@@ -154,7 +154,11 @@ function ffUwCargarCasa(dealId) {
 }
 async function ffUwAbrir(id) {
   const a = UW.analyses.find(x => x.id === id); if (!a) return;
-  UW.a = { id: a.id, nombre: a.nombre, property_id: a.property_id, ff_deal_id: a.ff_deal_id, es_hipotetica: a.es_hipotetica, direccion: a.direccion, ciudad: a.ciudad, inputs: Object.assign(ffUwDefaults(), a.inputs || {}), outputs: a.outputs || {}, veredicto: a.veredicto };
+  // legacy: análisis guardados con meses_hold y sin meses_obra → NO pisar con los defaults nuevos
+  // (obra = hold viejo, renta = 0: los números guardados no cambian en silencio)
+  const base = ffUwDefaults(); const sIn = a.inputs || {};
+  if (+sIn.meses_hold > 0 && !(+sIn.meses_obra > 0)) { base.meses_obra = 0; base.meses_renta = ''; }
+  UW.a = { id: a.id, nombre: a.nombre, property_id: a.property_id, ff_deal_id: a.ff_deal_id, es_hipotetica: a.es_hipotetica, direccion: a.direccion, ciudad: a.ciudad, inputs: Object.assign(base, sIn), outputs: a.outputs || {}, veredicto: a.veredicto };
   UW.sub = 'negocio'; ffUwRender();
 }
 async function ffUwGuardar() {
