@@ -59,6 +59,10 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## FIX RLS ff_uw_config (14-jul, error del CEO "new row violates row-level security")
+- Causa raíz: `ff_uw_config` SOLO tenía policies de SELECT — **ninguna escritura de la UI funcionó nunca** (aplicar $/sqft calibrado, hold, bias, tasas por zip, % de tax, recalibración ARV: todos los botones apCfgSet tiraban RLS). Migr `20260714140000`: insert/update para has_area(fix-flip), delete sigue bloqueado. Verificado: update 200 · insert key nueva 201 · viewer sin área 403.
+- **Barrido completo del underwriting (smoke prod 9/9 · 0 pageerrors · 0 alerts de error)**: 6 tabs con hipotética vacía + con datos + casa real (Michelle) · ARV simple⇄experto · apCfgSet key existente y NUEVA · Calc 5 modelos · guardar. Escrituras del UW auditadas: ff_uw_config (fix), arv_calibracion ✓, ff_underwriting_analyses ✓ — todas con policy correcta.
+
 ## CALC 4 · PITI de la refi (14-jul): el pago mensual es el TOTAL PAYMENT — P&I + property tax mensual (2.1%/año del valor tasado, calibrado con los HUDs de Champions) + insurance/impound mensual (prima/12), desglosado con tax% y prima editables inline + Δ vs PITI real de Airtable. Verificado Michelle: 2,163 + 749 + 158.33 = **$3,070.33** vs real $3,032.26 (la misma calibración de los goldens). Smoke prod 6/6.
 
 ## CALC 1 · insurance + holding real + contingencia fija + FIX guardado (14-jul, pedido del CEO)
