@@ -44,6 +44,8 @@ async function ffUwLoad() {
     UW.draws = {}; (draws || []).forEach(dr => { if (dr.address_norm) UW.draws[dr.address_norm] = dr; });
     // O7 (auditoría 13-jul): supuestos calibrados desde la HISTORIA real — visibles y aplicables
     UW.calib = await sb.from('v_supuestos_calibrados').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // ARV certero: última calibración del motor (precisión medida en pantalla)
+    UW.arvCalib = await sb.from('v_arv_calibracion').select('*').maybeSingle().then(r => r.data).catch(() => null);
   } catch (e) { console.warn('ffUwLoad', e); }
 }
 

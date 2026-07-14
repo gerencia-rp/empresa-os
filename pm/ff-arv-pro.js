@@ -45,9 +45,31 @@ function apSubject() {
     pool: st.subj.pool != null ? !!st.subj.pool : !!feat.pool,
     garage: st.subj.garage != null ? !!st.subj.garage : !!(feat.garage || feat.garageSpaces),
     fireplace: st.subj.fireplace != null ? !!st.subj.fireplace : !!feat.fireplace,
+    tipo: p.propertyType || null,
     lat: AP_N(p.latitude), lng: AP_N(p.longitude),
     rcOk: !!(rc && rc !== 'loading' && rc.payload), rcLoading: rc === 'loading',
   };
+}
+// saneo (motor): dato del condado implausible y SIN override humano → dudoso, no se usa en silencio
+function apSubjectSano() {
+  const st = apState(); const s = apSubject(); if (!s) return s;
+  if ((st.subj.beds == null || st.subj.beds === '') && s.beds != null && s.beds <= 1 && s.sqft >= 1000) s.beds = null;
+  if ((st.subj.baths == null || st.subj.baths === '') && s.baths != null && s.baths < 1) s.baths = null;
+  return s;
+}
+// conflictos multi-fuente (RentCast vs Airtable vs manual) + dudosos del saneo — alimentan el gate PROVISIONAL
+function apConflictos() {
+  const st = apState(); if (!st) return [];
+  const p = apRcPayload('property') || {};
+  const fuentes = [{ nombre: 'RentCast', beds: p.bedrooms, baths: p.bathrooms, sqft: p.squareFootage, year: p.yearBuilt }];
+  const deal = UW.a && UW.a.ff_deal_id ? (UW.deals || []).find(d => d.id === UW.a.ff_deal_id) : null;
+  if (deal && +deal.sqft > 0) fuentes.push({ nombre: 'Airtable', sqft: +deal.sqft });
+  const cons = (window.ArvEngine ? ArvEngine.conflictos(fuentes, st.subj) : []);
+  if (window.ArvEngine) {
+    const sane = ArvEngine.saneaSubject({ sqft: p.squareFootage, beds: p.bedrooms, baths: p.bathrooms });
+    sane.dudosos.forEach(d => { if (st.subj[d.attr] == null || st.subj[d.attr] === '') cons.push({ attr: d.attr, lbl: d.lbl, tipo: 'dudoso', valores: [{ fuente: 'condado', v: d.v }], motivo: d.motivo }); });
+  }
+  return cons;
 }
 // ficha extendida (APN, condado, dueño, assessed, última venta) — solo lectura, para confirmar LA casa
 function apSubjectFicha() {
@@ -98,66 +120,24 @@ function apFiltros() {
     ano: f.ano != null ? +f.ano : apCfg('arv_filtro_ano', 20),
   };
 }
-function apPasaFiltro(s, c, f) {
-  const razones = [];
-  if (c.dist != null && c.dist > f.dist) razones.push('a ' + c.dist.toFixed(2) + ' mi (>' + f.dist + ')');
-  const m = apMesesDesde(c.fecha);
-  if (m != null && m > f.meses) razones.push('venta hace ' + Math.round(m) + 'm (>' + f.meses + ')');
-  if (s.sqft && c.sqft && Math.abs(c.sqft - s.sqft) / s.sqft * 100 > f.sqftPct) razones.push('sqft ±' + Math.round(Math.abs(c.sqft - s.sqft) / s.sqft * 100) + '% (>' + f.sqftPct + '%)');
-  if (s.beds != null && c.beds != null && Math.abs(c.beds - s.beds) > f.camas) razones.push('camas Δ' + Math.abs(c.beds - s.beds));
-  if (s.baths != null && c.baths != null && Math.abs(c.baths - s.baths) > f.banos) razones.push('baños Δ' + Math.abs(c.baths - s.baths));
-  if (s.year && c.year && Math.abs(c.year - s.year) > f.ano) razones.push('año Δ' + Math.abs(c.year - s.year));
-  return { pasa: razones.length === 0, razones };
-}
+function apPasaFiltro(s, c, f) { return ArvEngine.pasaFiltro(s, c, f); }
 
-// ─── MOTOR DE AJUSTES estilo 1004 (ajusto el COMP hacia el subject; + = el subject vale más) ───
-// (cat = etiqueta de presentación para la grilla; la matemática no cambia)
-function apAjustes(s, c) {
-  const st = apState(); const man = st.man[c.id] || {};
-  const rows = [];
-  const add = (cat, concepto, monto, fuente) => { if (monto) rows.push({ cat, concepto, monto: Math.round(monto), fuente }); };
-  if (s.sqft && c.sqft) add('gla', 'GLA ' + (s.sqft - c.sqft > 0 ? '+' : '') + Math.round(s.sqft - c.sqft) + ' sqft × $' + apGlaPsf(s.zip), (s.sqft - c.sqft) * apGlaPsf(s.zip), 'auto');
-  if (s.beds != null && c.beds != null && s.beds !== c.beds) add('cuartos', 'Cuartos Δ' + (s.beds - c.beds), (s.beds - c.beds) * apCfg('arv_adj_cuarto', 15000), 'auto');
-  if (s.baths != null && c.baths != null && s.baths !== c.baths) add('banos', 'Baños Δ' + (s.baths - c.baths), (s.baths - c.baths) * apCfg('arv_adj_bano', 15000), 'auto');
-  if (s.year && c.year && s.year !== c.year) add('ano', 'Año Δ' + (s.year - c.year), (s.year - c.year) * (apCfg('arv_adj_ano_pct', 0.5) / 100) * c.price, 'auto');
-  if (s.lot && c.lot && Math.abs(s.lot - c.lot) > 500) add('lote', 'Lote Δ' + Math.round(s.lot - c.lot) + ' sqft', (s.lot - c.lot) * apCfg('arv_adj_lote_psf', 2), 'auto');
-  const m = apMesesDesde(c.fecha);
-  const tend = apCfg('arv_mercado_pct_mes', 0);
-  if (m != null && tend) add('tend', 'Tendencia mercado ' + Math.round(m) + 'm × ' + tend + '%/m', m * (tend / 100) * c.price, 'auto');
-  add('man', 'Condición/reno (manual)', AP_N(man.cond) || 0, 'manual');
-  add('man', 'Ubicación/submercado (manual)', AP_N(man.ubic) || 0, 'manual');
-  add('man', 'Concesiones vendedor (manual)', -(AP_N(man.conces) || 0), 'manual');
-  add('man', 'Piscina/garaje/fireplace/otros (manual)', AP_N(man.otros) || 0, 'manual');
-  const neto = rows.reduce((x, r) => x + r.monto, 0);
-  const bruto = rows.reduce((x, r) => x + Math.abs(r.monto), 0);
-  return { rows, neto, bruto, valorAjustado: Math.round(c.price + neto), netPct: c.price ? neto / c.price * 100 : 0, grossPct: c.price ? bruto / c.price * 100 : 0 };
-}
-
-// ─── RECONCILIACIÓN: pondera por MENOR gross adj % (el más parecido pesa más) ───
+// ─── MOTOR: delegado a ArvEngine (pm/ff-arv-engine.js — el MISMO código del back-test) ───
+function apAjustes(s, c) { const st = apState(); return ArvEngine.ajustes(s, c, UW.cfg, st.man[c.id]); }
 function apReconciliar(s, comps) {
-  const st = apState(); const f = apFiltros();
-  const maxN = apCfg('arv_comps_max', 8), minN = apCfg('arv_comps_min', 3);
-  const grossWarn = apCfg('arv_gross_adj_warn_pct', 25);
-  const usables = comps.map(c => ({ c, filtro: apPasaFiltro(s, c, f), adj: apAjustes(s, c) }))
-    .filter(x => x.filtro.pasa && !st.excl[x.c.id])
-    .sort((a, b) => a.adj.grossPct - b.adj.grossPct)
-    .slice(0, maxN);
-  if (!usables.length) return { usables, arv: null, confianza: { nivel: 'sin comps', razones: ['ningún comp pasa filtros'] } };
-  let sw = 0, sv = 0;
-  usables.forEach(x => { const w = 1 / (x.adj.grossPct + 2); sw += w; sv += w * x.adj.valorAjustado; x.peso = w; });
-  usables.forEach(x => x.pesoPct = Math.round(100 * x.peso / sw));
-  const bias = apCfg('arv_bias_pct', 0);
-  const arv = Math.round((sv / sw) * (1 + bias / 100));
-  const rangoPct = apCfg('arv_rango_pct', 6);
-  const vals = usables.map(x => x.adj.valorAjustado);
-  const dispersion = arv ? (Math.max(...vals) - Math.min(...vals)) / arv * 100 : 0;
-  const grossProm = usables.reduce((x, u) => x + u.adj.grossPct, 0) / usables.length;
-  const razones = [usables.length + ' comps reconciliados', 'gross adj prom ' + grossProm.toFixed(1) + '%', 'dispersión ' + dispersion.toFixed(1) + '%'];
-  if (bias) razones.push('sesgo aplicado ' + bias + '%');
-  let nivel = 'baja';
-  if (usables.length >= minN && grossProm <= grossWarn && dispersion <= 15) nivel = usables.length >= 4 && grossProm <= 15 && dispersion <= 10 ? 'alta' : 'media';
-  if (usables.length < minN) razones.push('⚠ menos de ' + minN + ' comps');
-  return { usables, arv, conservador: Math.round(arv * (1 - rangoPct / 100)), optimista: Math.round(arv * (1 + rangoPct / 100)), confianza: { nivel, razones }, grossProm, dispersion, bias };
+  const st = apState();
+  const rec = ArvEngine.reconciliar(s, comps, UW.cfg, { man: st.man, excl: st.excl, filtrosOver: apFiltros() });
+  // gate PROVISIONAL: dato en conflicto o dudoso SIN confirmar → el ARV no es un número silencioso
+  rec.conflictos = apConflictos();
+  rec.provisional = rec.conflictos.some(c => c.tipo === 'conflicto' || c.tipo === 'dudoso' || (c.tipo === 'una_fuente' && c.attr === 'beds'));
+  return rec;
+}
+// estado del subject: AS-IS vs ARV (qué se está estimando)
+function apEstado() {
+  const st = apState();
+  if (st.estado) return st.estado;
+  const d = UW.a && UW.a.ff_deal_id ? (UW.deals || []).find(x => x.id === UW.a.ff_deal_id) : null;
+  return d && /rentad|refinanc|vendid|finaliz/.test(d.stage || '') ? 'remodelada' : 'a_reformar';
 }
 
 // ─── CALIBRACIÓN: desviación ARV vs appraisal real (aprendizaje con humano en el loop) ───
@@ -177,6 +157,93 @@ function apCalibracion() {
   const zips = Object.entries(porZip).filter(([z, arr]) => arr.length >= 3).map(([z, arr]) => ({ zip: z, n: arr.length, prom: arr.reduce((s, v) => s + v, 0) / arr.length }));
   return { filas, usadas, errorProm, errorAbs, sugerenciaBias: errorProm != null ? -errorProm : null, zips, meta: apCfg('arv_meta_error_pct', 5) };
 }
+
+// ─── PRECISIÓN DEL MOTOR (v_arv_calibracion): cuánto confiar, medido — no un adjetivo ───
+function apPrecision() {
+  const c = UW.arvCalib;
+  if (!c) return '<div class="ap-pill" style="margin-bottom:10px">🎯 precisión del motor: sin back-test corrido todavía — corré npm run arv:backtest</div>';
+  const fecha = String(c.run_at || '').slice(0, 10);
+  const nAhora = (UW.deals || []).filter(d => +d.appraisal > 0).length - String(UWct('arv_calib_excluir', '')).split(',').filter(x => x.trim()).length;
+  const nuevas = nAhora > c.n_casas ? nAhora - c.n_casas : 0;
+  return '<div class="ap-card" style="padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px">'
+    + '<b>🎯 Precisión del motor: ±' + (+c.mdape).toFixed(1) + '%</b> (error mediano) sobre <b>' + c.n_casas + ' casas</b> con tasación real'
+    + ' · sesgo ' + (c.sesgo > 0 ? '+' : '') + (+c.sesgo).toFixed(1) + '% · calibrado ' + fecha
+    + (nuevas ? ' <button class="ap-btn" style="padding:4px 10px;font-size:11px" onclick="apRecalibrar()">♻ Recalibrar (' + nuevas + ' casa' + (nuevas > 1 ? 's' : '') + ' nueva' + (nuevas > 1 ? 's' : '') + ' con tasación)</button>' : '')
+    + '</div>';
+}
+// ─── GATE PROVISIONAL: datos en conflicto/dudosos → confirmá antes de confiar en el número ───
+function apProvisionalBanner(rec) {
+  if (!rec || !rec.provisional || !rec.conflictos.length) return '';
+  const chips = rec.conflictos.map(cf => {
+    const vals = (cf.valores || []).map(v => '<b>' + v.v + '</b> (' + AP_E(v.fuente) + ')').join(' vs ');
+    const botones = (cf.valores || []).map(v => '<button class="ap-btn ghost" style="padding:3px 9px;font-size:11px" onclick="apSet(\'subj.' + cf.attr + '\',' + v.v + ')">✓ usar ' + v.v + '</button>').join(' ')
+      + ' <input style="width:64px;background:transparent;border:1px solid var(--line,rgba(255,255,255,.2));border-radius:7px;padding:3px 7px;color:inherit;font-size:11px" placeholder="otro" onchange="apSet(\'subj.' + cf.attr + '\',this.value)">';
+    const motivo = cf.tipo === 'conflicto' ? 'dato en conflicto' : cf.tipo === 'dudoso' ? (cf.motivo || 'dato dudoso') : 'una sola fuente — confirmalo';
+    return '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:7px"><span>⚠ <b>' + cf.lbl + '</b>: ' + vals + ' — ' + motivo + '</span>' + botones + '</div>';
+  }).join('');
+  return '<div class="ap-card" style="padding:13px 16px;margin-bottom:12px;border-color:rgba(231,182,94,.5);background:rgba(231,182,94,.07)">'
+    + '<b style="color:var(--amber,#e7b65e)">⚠ ARV PROVISIONAL — confirmá los datos del subject</b>'
+    + '<div class="ap-plain" style="font-size:12px;margin-top:2px">El valor cambia con estos datos (caso Cervin: 3 vs 4 camas = $40k). Elegí el correcto y el motor recalcula.</div>'
+    + chips + '</div>';
+}
+// ─── TRIANGULACIÓN: el ARV por comps AL LADO de señales independientes; divergencia >umbral = ⚠ con razón ───
+function apVistaSenales(rec, inp) {
+  if (!rec || !rec.arv) return '';
+  const fi = apSubjectFicha();
+  const avm = (ffUwRcSlot && ffUwRcSlot('value') && ffUwRcSlot('value') !== 'loading') ? AP_N(ffUwRcSlot('value').value) : null;
+  const facA = apCfg('arv_assessed_factor', 0);
+  const senales = [
+    { nombre: 'Comps (motor)', valor: rec.arv, sub: rec.usables.length + ' comps ajustados' },
+    { nombre: 'AVM RentCast', valor: avm, sub: 'modelo automático' },
+    (fi.assessed && facA > 0) ? { nombre: 'Assessed × ' + facA, valor: Math.round(fi.assessed.total * facA), sub: 'condado ' + fi.assessed.anio + ' (factor calibrado con tus tasaciones)' } : null,
+    (+inp.appraisal > 0) ? { nombre: 'Tasación previa', valor: +inp.appraisal, sub: 'Valuación por el Appraisal (Airtable)' } : null,
+    (+inp.arv_airtable > 0) ? { nombre: 'ARV Airtable', valor: +inp.arv_airtable, sub: 'fuente de verdad del análisis' } : null,
+  ].filter(Boolean);
+  const tri = ArvEngine.triangular(senales, UW.cfg, rec.conflictos);
+  const filas = tri.senales.map(x => {
+    const dPct = rec.arv ? (x.valor - rec.arv) / rec.arv * 100 : null;
+    return '<div class="ap-mrow"><span>' + AP_E(x.nombre) + ' <span class="ap-plain" style="font-size:10.5px">' + AP_E(x.sub || '') + '</span></span><b>' + AP_M(x.valor)
+      + (x.nombre !== 'Comps (motor)' && dPct != null ? ' <span style="font-size:10.5px;color:' + (Math.abs(dPct) > (tri.umbral || 8) ? 'var(--amber,#e7b65e)' : 'var(--mut,#9fb0c9)') + '">' + (dPct > 0 ? '+' : '') + dPct.toFixed(1) + '%</span>' : '') + '</b></div>';
+  }).join('');
+  return '<div class="ap-card" style="padding:16px 18px;margin-bottom:14px"><div class="ap-lab">🧭 Triangulación — señales independientes' + (tri.warn ? ' · <span style="color:var(--amber,#e7b65e)">⚠ divergen ' + tri.divergenciaPct.toFixed(0) + '%</span>' : ' · <span style="color:var(--pos,#34d399)">✓ consistentes</span>') + '</div>'
+    + filas
+    + (tri.warn ? '<div class="ap-plain" style="font-size:11.5px;margin-top:8px">' + tri.razones.map(AP_E).join('<br>') + '</div>' : '')
+    + '</div>';
+}
+// ─── RECALIBRACIÓN 1-click (mismo motor del back-test, comps cacheados 30d, persiste la corrida) ───
+async function apRecalibrar() {
+  if (!confirm('Recalibrar el motor contra TODAS las casas con tasación real (usa el cache de RentCast; puede consumir cuota si hay casas nuevas)?')) return;
+  const excl = String(UWct('arv_calib_excluir', '')).toLowerCase().split(',').map(x => x.trim().replace(/[^a-z0-9]/g, '')).filter(Boolean);
+  const deals = (UW.deals || []).filter(d => +d.appraisal > 0 && !excl.some(e => (d.address_norm || '').includes(e)));
+  if (window.toast) toast('♻ Recalibrando contra ' + deals.length + ' casas…');
+  const casas = [];
+  for (const d of deals) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const tok = session ? session.access_token : window.SUPABASE_ANON_KEY;
+      const rcFetch = ep => fetch(window.SUPABASE_URL + '/functions/v1/rentcast', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ address: d.address, endpoint: ep }) }).then(r => r.json());
+      const [prop, val] = await Promise.all([rcFetch('property'), rcFetch('value')]);
+      if (!prop.ok || !val.ok || !val.payload) continue;
+      const p = prop.payload || {}, feat = p.features || {};
+      const zip = apZip(d.address) || p.zipCode || null;
+      let s = { sqft: p.squareFootage || d.sqft, beds: p.bedrooms, baths: p.bathrooms, year: p.yearBuilt, lot: p.lotSize, pool: feat.pool != null ? !!feat.pool : null, garage: (feat.garage || feat.garageSpaces) ? true : null, zip, tipo: p.propertyType };
+      s = ArvEngine.saneaSubject(s).s;
+      const comps = (val.payload.comparables || []).map((c, i) => ({ id: 'c' + i, price: AP_N(c.price), sqft: AP_N(c.squareFootage), beds: AP_N(c.bedrooms), baths: AP_N(c.bathrooms), year: AP_N(c.yearBuilt), lot: AP_N(c.lotSize), dist: AP_N(c.distance), fecha: c.removedDate || c.lastSeenDate || c.listedDate, tipo: c.propertyType })).filter(c => c.price > 0);
+      casas.push({ casa: (d.address || '').split(',')[0], subject: s, comps, real: +d.appraisal });
+    } catch (e) { console.warn('recalib', d.address, e); }
+  }
+  if (casas.length < 5) { alert('Muy pocas casas con data (' + casas.length + ') para recalibrar con confianza.'); return; }
+  const cal = ArvEngine.calibrar(casas, UW.cfg, { pasadas: 3 });
+  const d2 = cal.despues;
+  const keys = ['arv_adj_gla_psf', 'arv_adj_cuarto', 'arv_adj_bano', 'arv_adj_ano_pct', 'arv_mercado_pct_mes', 'arv_adj_lote_psf', 'arv_outlier_mad_k', 'arv_bias_pct'].concat(Object.keys(cal.params).filter(k => /^arv_bias_pct_/.test(k)));
+  for (const k of keys) { await sb.from('ff_uw_config').upsert({ key: k, value: cal.params[k], updated_at: new Date().toISOString() }, { onConflict: 'key' }); UW.cfg[k] = cal.params[k]; }
+  const params = {}; keys.forEach(k => params[k] = cal.params[k]);
+  await sb.from('arv_calibracion').insert({ n_casas: d2.n, mdape: Math.round(d2.mdape * 100) / 100, mape: Math.round(d2.mape * 100) / 100, sesgo: Math.round(d2.sesgo * 100) / 100, params, detalle: d2.porCasa.map(x => ({ casa: x.casa, pred: x.pred, real: x.real, err_pct: x.errPct && Math.round(x.errPct * 100) / 100, n_comps: x.n })), fuente: 'recalibracion_auto' });
+  UW.arvCalib = { run_at: new Date().toISOString(), n_casas: d2.n, mdape: d2.mdape, sesgo: d2.sesgo };
+  if (window.toast) toast('✅ Recalibrado: MdAPE ±' + d2.mdape.toFixed(1) + '% · sesgo ' + d2.sesgo.toFixed(1) + '% sobre ' + d2.n + ' casas', 'success');
+  ffUwRender();
+}
+window.apRecalibrar = apRecalibrar;
 
 // ─── acciones ───
 async function apBuscar(refresh) {
@@ -356,9 +423,10 @@ function apRangeBar(rec, lbls) {
 // confianza EN PALABRAS (modo simple — para alguien nuevo del equipo de captación)
 function apConfPalabras(rec) {
   if (!rec || !rec.arv) return null;
-  const why = rec.dispersion > 15 ? 'las ventas varían bastante en la zona'
+  const why = rec.cv > apCfg('arv_cv_alto_pct', 15) ? 'las ventas ajustadas varían bastante (CV ' + rec.cv.toFixed(0) + '%)'
     : rec.usables.length < 4 ? 'hay pocas ventas comparables cerca'
     : rec.grossProm > 15 ? 'las casas cercanas necesitan ajustes grandes'
+    : rec.relajado ? 'hubo que expandir la búsqueda para juntar ventas'
     : 'las ventas cercanas son consistentes';
   return { nivel: rec.confianza.nivel, why };
 }
@@ -386,13 +454,17 @@ function apSubjStrip(s) {
 }
 function apHeroSimple(rec, inp) {
   const cp = apConfPalabras(rec);
-  const izq = '<div class="ap-card" style="padding:20px 22px">'
-    + '<div class="ap-lab">Valor de reventa estimado (ya remodelada)</div>'
+  const estado = apEstado();
+  const estadoChip = '<button class="ap-btn ghost" style="padding:3px 10px;font-size:10.5px" onclick="apSet(\'estado\',\'' + (estado === 'remodelada' ? 'a_reformar' : 'remodelada') + '\')">'
+    + (estado === 'remodelada' ? '✨ ya remodelada — valor ACTUAL' : '🏚 a reformar — valor DESPUÉS de la obra (ARV)') + ' ⇄</button>';
+  const prov = rec && rec.provisional;
+  const izq = '<div class="ap-card" style="padding:20px 22px' + (prov ? ';border-color:rgba(231,182,94,.45)' : '') + '">'
+    + '<div class="ap-lab" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' + (estado === 'remodelada' ? 'Valor estimado (ya remodelada)' : 'ARV — valor después de la reforma planeada') + ' ' + estadoChip + '</div>'
     + (rec && rec.arv
-      ? '<div class="ap-bigsimple">' + AP_M(rec.arv) + '</div>'
-      + '<div class="ap-plain">Basado en <b>' + rec.usables.length + ' casas parecidas</b> vendidas cerca en los últimos meses.</div>'
-      + '<span class="ap-conf" style="margin-top:12px;color:' + apConfColor(cp.nivel) + ';border-color:' + apConfColor(cp.nivel) + '">● Confianza ' + cp.nivel + ' · ' + cp.why + '</span>'
-      + apRangeBar(rec, ['Si sale flojo', 'Lo más probable', 'Si sale bien'])
+      ? '<div class="ap-bigsimple" style="' + (prov ? 'opacity:.65' : '') + '">' + AP_M(rec.arv) + (prov ? ' <span style="font-size:13px;color:var(--amber,#e7b65e);font-weight:700">PROVISIONAL</span>' : '') + '</div>'
+      + '<div class="ap-plain">Mediana ponderada de <b>' + rec.usables.length + ' casas parecidas</b> vendidas cerca, ajustadas a la tuya.' + (rec.relajado ? ' <span style="color:var(--amber,#e7b65e)">(búsqueda expandida por pocas ventas)</span>' : '') + '</div>'
+      + '<span class="ap-conf" style="margin-top:12px;color:' + apConfColor(cp.nivel) + ';border-color:' + apConfColor(cp.nivel) + '">● Confianza ' + cp.nivel + ' (' + (rec.score != null ? rec.score + '/100' : '—') + ') · ' + cp.why + '</span>'
+      + apRangeBar(rec, ['Si sale flojo (P25)', 'Lo más probable', 'Si sale bien (P75)'])
       : '<div class="ap-plain" style="padding:28px 0;text-align:center">Poné la dirección arriba y dale <b>Buscar</b> — el sistema trae las ventas de la zona.</div>')
     + '</div>';
   // ¿Conviene? — semáforo + oferta máxima con la cuenta simple visible (remod real de la Calc 1)
@@ -589,7 +661,7 @@ function ffArvProView() {
   const inp = UW.a.inputs;
   const st = apState();
   if (!st.dir) st.dir = UW.a.direccion || '';
-  const s = apSubject();
+  const s = apSubjectSano();
   const comps = apComps();
   const f = apFiltros();
   const rec = comps.length ? apReconciliar(s, comps) : null;
@@ -612,13 +684,15 @@ function ffArvProView() {
       + '<div style="position:relative"><div id="ap-map" style="height:300px"></div>'
       + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--mut,#9fb0c9);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">TU CASA + comps · click en un pin resalta la tarjeta</div></div>';
     setTimeout(apMapMount, 40);
-    return head + apSubjStrip(s) + apHeroSimple(rec, inp) + mapaS
+    return head + apPrecision() + apSubjStrip(s) + apProvisionalBanner(rec) + apHeroSimple(rec, inp) + apVistaSenales(rec, inp) + mapaS
       + '<div class="ap-sectitle">🏘️ Las casas parecidas que se vendieron cerca</div>' + apCompsSimple(s, comps, rec, f)
       + '<div class="ap-expnote" onclick="apSet(\'modo\',\'experto\')">👁️ ¿Querés ver cómo el sistema ajustó cada casa (tamaño, baños, año, lote…)? Pasate a <b>Experto (tasador)</b> para ver la grilla completa estilo appraisal.</div>';
   }
 
-  // grid: ficha | hero
-  const top = '<div class="grid k2" style="gap:14px;align-items:start;margin-bottom:14px">' + apVistaFicha(s) + apVistaHero(rec, inp) + '</div>';
+  // grid: ficha | hero (experto lee el MISMO motor)
+  const top = apPrecision() + apProvisionalBanner(rec)
+    + '<div class="grid k2" style="gap:14px;align-items:start;margin-bottom:14px">' + apVistaFicha(s) + apVistaHero(rec, inp) + '</div>'
+    + apVistaSenales(rec, inp);
 
   // mapa
   const mapa = '<div style="position:relative;margin-bottom:4px"><div id="ap-map"></div>'
