@@ -145,3 +145,20 @@ Un solo motor (\`pm/ff-arv-engine.js\` UMD) para Simple, Experto y back-test (\`
 - Interés HML: invisible → 68% del ingreso · ICR 0.35× al tope en rojo + por casa en el P&L.
 - Anomalías: 2,927 crudas → grupos accionables priorizados por $.
 - Fantasmas: Arcadia/Cervin detectadas solas (C21); ghost F&F y units vacías fuera de conteos.
+
+## ANALÍTICA FF — MÉTRICAS QUE SÍ SIRVEN (13-jul, main — rediseño pedido por el CEO)
+
+Módulo nuevo `pm/ff-analitica.js` (ffSecAnalitica delega; fallback = vista vieja). KPIs desde capa v_* + espejo ff_*; cada KPI con drill "de dónde sale" (kitDrill) y NextAction donde aplica; sin $0/rojo sobre vacío (kitKpi.falta / noZeroAsReal). Espejo extendido: campos de VENTA de "Datos por casa" → ff_hml_loans (migr `20260713110000`, sync v13) + `fecha_ref30` al select de ffLoadAll.
+
+| Qué | ANTES | DESPUÉS (verificado corriendo el código real, QA headless 12/12) |
+| --- | --- | --- |
+| Contenido | equity potencial + tablas por zona/modelo/inversionista (nada accionable) | 7 secciones: volumen+ritmo · rentabilidad realizada · renta op vs post-deuda · patrimonio · proyección · velocidad · salud/riesgo |
+| Volumen | no existía | 28 operaciones (19 renta = 15+4 refi · 2 rehab · 5 adquiridas · 2 vendidas) + ritmo 1.5/mes histórico (3/6/12m) + chart por mes [close_date fldG2SABUD5Ptcuj8] |
+| Vendidas | no existía | Arcadia $615,000 / bruta $110,653 / **NETA $11,928 / ROI 7.0%** · Slaughter "🟡 faltan datos" (jamás $0) + lectura: **el negocio hoy es HOLD, no flip** |
+| Renta | no existía | flujo OPERATIVO **+$179,289/año** vs DESPUÉS de deuda **−$363,406/año** (carry $542,696 = HML 357,431 + ref30 65,277+119,988) · yield op 5.2% · CoC −37.7% · refi 4/19 |
+| Patrimonio | no existía | valor **$9,415,000** (Σ ARV 23 propias — excluye 3 "Prestación de Servicios como Operador": Charles/Arthur Stiles/Bitter Creek) − deuda QBO **$5,974,414** = equity **$3,440,586** → multiplicador **3.6×** sobre $963,598 |
+| Proyección | 1 deal elegido en UW | portafolio completo 5/10/15/20a, slider 2–6% (default 4% en ff_uw_config.an_apreciacion_pct), equity proyectado con amortización DSCR, rotulado SUPUESTO + chart |
+| Velocidad | no existía | obra 55d/1.8m (v_supuestos_calibrados; crudo Datos por casa 57d n=19 ✓ valida) · hasta refi 194d (n=2, honesto) · 83% en presupuesto · 100% a tiempo vs plazo HML |
+| Riesgo | no existía | pipeline refi: 15 en HML con ARV/saldo/tope 75%/semáforo/NextAction por fila · concentración: Jefferson 28.7% > umbral 25% en rojo (co-inversión $654,746) · salud: buckets sanas/déficit/sin datos/obra clickeables (déficit = flujo post-deuda por casa, jamás draws) |
+
+QA: claro/oscuro + desktop/móvil (sonda solo marca los 🟡 de "falta" — deliberados) · 0 pageerrors · drill/slider/buckets probados · `ci:gate` **12/12 ✓**.
