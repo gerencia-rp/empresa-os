@@ -119,16 +119,22 @@ function rcFin(o) {
   const presupuesto = +o.presupuesto_interno || 0; // Presupuesto Remodelación
   return { mat, lab, ingreso, costoReal, presupuesto, margen: ingreso - costoReal, devCostoPct: presupuesto > 0 ? (costoReal - presupuesto) / presupuesto * 100 : null };
 }
+// Métricas LIMPIAS de Remodelación (campos fórmula de Airtable, separan la plata de Remodelación de la del flip):
+// utilidad_remodelacion = Valor al cliente − Gasto interno final (solo Finalizado) · rentabilidad_remodelacion = utilidad / valor al cliente (0-1) · deficit_ff = Draws Ingresados − Valor al cliente.
+// Las columnas viejas (ganancia/rentabilidad, arrancan de Draws) NO se borran: quedan como métrica "con Draws".
+function rcUtil(o) { return o.utilidad_remodelacion != null ? +o.utilidad_remodelacion : null; }
+function rcRentPct(o) { return o.rentabilidad_remodelacion != null ? +((+o.rentabilidad_remodelacion) * 100).toFixed(1) : null; }
 function rcObraDataset() {
   return (RC.obras || []).map(o => {
     const ff = rcFin(o); const sq = +o.sqft || 0; const dq = rcDQ(o);
     return {
       address: o.address, lider: o.lider || '—', estado: o.proceso || null, ciudad: o.city || null, sqft: sq,
-      ingreso: ff.ingreso, costo_real: ff.costoReal, presupuesto: ff.presupuesto, utilidad: +o.ganancia || 0,
-      margen: ff.ingreso > 0 ? Math.round((+o.ganancia || 0) / ff.ingreso * 100) : null,
+      ingreso: ff.ingreso, costo_real: ff.costoReal, presupuesto: ff.presupuesto, utilidad: rcUtil(o) != null ? rcUtil(o) : 0,
+      utilidad_con_draws: +o.ganancia || 0, deficit_ff: o.deficit_ff != null ? +o.deficit_ff : null,
+      margen: (+o.valor_cliente > 0 && rcUtil(o) != null) ? Math.round(rcUtil(o) / +o.valor_cliente * 100) : null,
       retraso: o.retraso_dias != null ? +o.retraso_dias : null,
       psf: sq > 0 ? Math.round(ff.costoReal / sq) : null,
-      rentabilidad: o.rentabilidad != null ? +o.rentabilidad : null,
+      rentabilidad: rcRentPct(o), rentabilidad_con_draws: o.rentabilidad != null ? +o.rentabilidad : null,
       fecha_inicio: o.fecha_inicio || null, fecha_real: o.fecha_real_fin || null,
       fin: dq.fin, sinDatos: dq.sinDatos
     };
@@ -140,7 +146,9 @@ function rcCompute() {
   const activas = obras.filter(o => !o.dq.fin);
   const pipeline = obras.filter(o => o.proceso === 'Pre construcción');
   // Histórico REAL (finalizadas)
-  const gananciaHist = fin.reduce((s, o) => s + (+o.ganancia || 0), 0);
+  const gananciaHist = fin.reduce((s, o) => s + (rcUtil(o) != null ? rcUtil(o) : 0), 0);
+  const gananciaConDraws = fin.reduce((s, o) => s + (+o.ganancia || 0), 0);
+  const deficitFFHist = fin.reduce((s, o) => s + (o.deficit_ff != null ? +o.deficit_ff : 0), 0);
   const revenueHist = fin.reduce((s, o) => s + (+o.valor_cliente || 0), 0);
   const margenHist = revenueHist > 0 ? Math.round(gananciaHist / revenueHist * 100) : 0;
   // P1-4: overhead (Gastos Empresariales + Nómina Admin + Plataformas) → Utilidad NETA = ganancia BRUTA − overhead
@@ -173,11 +181,11 @@ function rcCompute() {
     const k = (o.lider || '—').trim() || '—';
     if (!lidMap[k]) lidMap[k] = { lider: k, n: 0, ganancia: 0, revenue: 0, sobre: 0, sqft: 0, real: 0, presup: 0, diasSum: 0, diasN: 0, horas: 0, obras: [] };
     const L = lidMap[k]; const real = rcFin(o).costoReal; const presup = (+o.presupuesto_interno || 0);
-    L.n++; L.ganancia += (+o.ganancia || 0); L.revenue += (+o.valor_cliente || 0);
+    L.n++; L.ganancia += (rcUtil(o) != null ? rcUtil(o) : 0); L.revenue += (+o.valor_cliente || 0);
     if (o.dq.sobrePresup) L.sobre++;
     L.sqft += (+o.sqft || 0); L.real += real; L.presup += presup; L.horas += rcObraHoras(o);
     if (o.retraso_dias != null) { L.diasSum += +o.retraso_dias; L.diasN++; }
-    L.obras.push({ address: rcShort(o.address), devPct: presup > 0 ? Math.round((real - presup) / presup * 100) : null, dias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null });
+    L.obras.push({ address: rcShort(o.address), devPct: presup > 0 ? Math.round((real - presup) / presup * 100) : null, dias: o.retraso_dias != null ? +o.retraso_dias : null, rent: rcRentPct(o) });
   });
   const lideres = Object.values(lidMap).map(l => ({ ...l, margen: l.revenue > 0 ? Math.round(l.ganancia / l.revenue * 100) : 0, devCosto: l.presup > 0 ? Math.round((l.real - l.presup) / l.presup * 100) : null, desvDias: l.diasN ? Math.round(l.diasSum / l.diasN) : null, psf: l.sqft > 0 ? Math.round(l.real / l.sqft) : null, horasSqft: (l.sqft > 0 && l.horas > 0) ? +(l.horas / l.sqft).toFixed(2) : null, sobrePct: l.n ? Math.round(l.sobre / l.n * 100) : 0 }))
     .sort((a, b) => b.ganancia - a.ganancia);
@@ -194,7 +202,7 @@ function rcCompute() {
   // C) ESTIMADO vs REAL por casa (finalizadas confiables): presupuesto (est) vs monto_real (real)
   const evr = fin.filter(o => (+o.presupuesto_interno || 0) > 0 && rcFin(o).costoReal > 0).map(o => {
     const est = +o.presupuesto_interno || 0, real = rcFin(o).costoReal;
-    return { address: rcShort(o.address), lider: (o.lider || '—'), est, real, devAbs: real - est, devPct: Math.round((real - est) / est * 100), devDias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null };
+    return { address: rcShort(o.address), lider: (o.lider || '—'), est, real, devAbs: real - est, devPct: Math.round((real - est) / est * 100), devDias: o.retraso_dias != null ? +o.retraso_dias : null, rent: rcRentPct(o) };
   });
   const evrTot = { est: evr.reduce((s, x) => s + x.est, 0), real: evr.reduce((s, x) => s + x.real, 0) };
   evrTot.devAbs = evrTot.real - evrTot.est; evrTot.devPct = evrTot.est > 0 ? Math.round(evrTot.devAbs / evrTot.est * 100) : 0;
@@ -208,11 +216,11 @@ function rcCompute() {
   const _sd = [..._dias].sort((a, b) => a - b);
   const desvDiasMed = _sd.length ? (_sd.length % 2 ? _sd[(_sd.length - 1) / 2] : Math.round((_sd[_sd.length / 2 - 1] + _sd[_sd.length / 2]) / 2)) : 0;
   const desvDiasRevN = _diasRev.length;
-  // B9 (auditoría 13-jul): rentabilidad = margen PONDERADO Σutilidad/Σingreso (valor_interno),
-  // excluyendo denominadores ≤0 (Stonleigh neg/neg daba 322%). JAMÁS promediar la columna %
-  // (llega como fracción de Airtable → mostraba "0.2%"). Debe dar 170,682/1,466,360 = 11.6%.
-  const _rentOK = fin.filter(o => (+o.valor_interno || 0) > 0);
-  const rentProm = _rentOK.length ? +((100 * _rentOK.reduce((s, o) => s + (+o.ganancia || 0), 0)) / _rentOK.reduce((s, o) => s + (+o.valor_interno || 0), 0)).toFixed(1) : 0;
+  // B9 (auditoría 13-jul): rentabilidad = margen PONDERADO Σutilidad/Σvalor, excluyendo denominadores ≤0
+  // (JAMÁS promediar la columna % — fracción de Airtable, y el promedio simple infla outliers).
+  // Métrica LIMPIA: Σ utilidad_remodelacion / Σ valor_cliente (misma definición que rentabilidad_remodelacion, agregada).
+  const _rentOK = fin.filter(o => (+o.valor_cliente || 0) > 0 && rcUtil(o) != null);
+  const rentProm = _rentOK.length ? +((100 * _rentOK.reduce((s, o) => s + rcUtil(o), 0)) / _rentOK.reduce((s, o) => s + (+o.valor_cliente || 0), 0)).toFixed(1) : 0;
   const _conDias = fin.filter(o => o.retraso_dias != null);
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
@@ -231,7 +239,7 @@ function rcCompute() {
   const okrsList = okrsConfigured ? RC.okrs : OKR_DEFAULTS;
   const okrActual = { margen_bruto: margenHist, rentabilidad: rentProm, desv_costo: desvCostoProm, desv_dias: desvDiasProm, psf: psfProm, ebitda_margen: ebitdaMargen, a_tiempo: aTiempoPct, en_presupuesto: enPresupPct };
   const okrRows = okrsList.map(o => { const actual = okrActual[o.clave]; const meta = +o.objetivo; const cumple = actual == null ? null : (o.comparador === '≤' ? actual <= meta : actual >= meta); return { clave: o.clave, metrica: o.metrica, objetivo: meta, comparador: o.comparador, unidad: o.unidad, actual, cumple }; });
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, gananciaHist, gananciaConDraws, deficitFFHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -318,13 +326,14 @@ function rcSecCommand(c) {
   return rcHeader('Command Center', `${c.obras.length} obras · ${c.fin.length} finalizadas · ${c.activas.length} en curso — capital, ganancia realizada y pipeline.`) + `
     <div style="font-size:11px;padding:6px 12px;margin-bottom:10px;border-radius:8px;background:${parityBg};border:1px solid ${parityBd};color:var(--txt2)">${parityNote}</div>
     <div class="grid kpis">
-      <div class="card kpi"><div class="lab">Ganancia realizada</div><div class="big up glow">${RC_K(c.gananciaHist)}</div><div class="meta">BRUTO · ${c.fin.length} finalizadas · margen ${c.margenHist}%</div></div>
+      <div class="card kpi"><div class="lab">Utilidad Remodelación</div><div class="big up glow">${RC_K(c.gananciaHist)}</div><div class="meta">limpia (sin plata del flip) · ${c.fin.length} finalizadas · margen ${c.margenHist}% · con Draws: ${RC_K(c.gananciaConDraws)}</div></div>
       <div class="card kpi"><div class="lab">Obras en curso</div>${paritySync ? `<div class="big">${c.activas.length}</div>` : `<div class="big down" style="font-size:15px;line-height:1.15" title="El conteo de la app no coincide con Airtable">⚠ sync<br>desincronizado</div>`}<div class="meta">avance promedio ${c.avgAvance}% · ${c.obras.length} obras</div></div>
       <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big">${RC_K(c.capitalActivo)}</div><div class="meta">en obras activas · presup. ${RC_K(c.presupActivo)}</div></div>
       <div class="card kpi"><div class="lab">Pipeline <span class="warn">proyectado</span></div><div class="big warn">${RC_K(c.pipelineProj)}</div><div class="meta">NO realizado · ${c.pipeline.length} en pre-construcción</div></div>
     </div>
     <div class="grid kpis" style="margin-top:14px">
-      <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">histórico (${c.fin.length} finalizadas)</div></div>
+      <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">utilidad / valor cliente (limpia) · ${c.fin.length} finalizadas</div></div>
+      <div class="card kpi"><div class="lab">Déficit/Exceso F&F</div><div class="big ${c.deficitFFHist>=0?'up':'down'}">${RC_K(c.deficitFFHist)}</div><div class="meta">Draws ingresados − valor cliente · métrica Fix & Flip · ${c.fin.length} finalizadas</div></div>
       <div class="card kpi"><div class="lab">Desviación de costo prom</div><div class="big ${c.desvCostoProm>0?'down':'up'}">${c.desvCostoProm>0?'+':''}${c.desvCostoProm}%</div><div class="meta">real vs presupuesto · ${c.enPresupPct}% en presup.</div></div>
       <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">mediana ${c.desvDiasMed>0?'+':''}${c.desvDiasMed}d · ${c.aTiempoPct}% a tiempo${c.desvDiasRevN?` · <span class="warn">${c.desvDiasRevN} a revisar</span>`:''}</div></div>
       <div class="card kpi"><div class="lab">Margen realizado</div><div class="big ${c.margenReal>=0?'up':'down'}">${RC_K(c.margenReal)}</div><div class="meta">ingreso − costo real (${c.fin.length} fin)</div></div>
@@ -355,7 +364,7 @@ function rcCompletitud(o) {
 function rcObraCard(o) {
   const dq = o.dq, av = Math.round(+o.avance_pct || 0);
   const badge = dq.sinDatos ? '<span class="ff-dq ff-dq-nd">sin datos</span>' : dq.sobrePresup ? '<span class="ff-dq ff-dq-rev">⚠ sobre presupuesto</span>' : (!dq.fin ? '<span class="ff-dq ff-dq-pre">en curso · proyectado</span>' : '');
-  const util = dq.fin ? (+o.ganancia || 0) : ((+o.valor_cliente || 0) - dq.gasto);
+  const util = dq.fin ? (rcUtil(o) != null ? rcUtil(o) : 0) : ((+o.valor_cliente || 0) - dq.gasto);
   const slug = window.osSlug ? osSlug(o.address) : '';
   const _ff = rcFin(o), _sq = +o.sqft || 0;
   const _psf = _sq > 0 ? Math.round(_ff.costoReal / _sq) : null;
@@ -371,6 +380,7 @@ function rcObraCard(o) {
     <div class="krow"><span>$/sqft (mat+MO)</span><b>${_psfStr}</b></div>
     <div class="krow"><span>Valor cliente</span><b>${RC_M(+o.valor_cliente || 0)}</b></div>
     <div class="krow"><span>${dq.fin ? 'Utilidad' : 'Utilidad (proy.)'}</span><b class="${util >= 0 ? 'up' : 'down'}">${RC_M(util)}</b></div>
+    ${o.deficit_ff != null ? `<div class="krow"><span>Déficit/Exceso F&F</span><b class="${+o.deficit_ff >= 0 ? 'up' : 'down'}">${RC_M(+o.deficit_ff)}</b></div>` : ''}
     <div class="kbar"><i style="width:${Math.min(100, av)}%"></i></div>
     <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${slug}')">🏠 Ver ficha de casa →</div>
   </div>`;
@@ -516,7 +526,7 @@ function rcExportCSV() {
   const c = rcCompute();
   const rows = [['Casa', 'Lider', 'Estimado', 'Real', 'Desv $', 'Desv %', 'Dias atraso', 'Rentabilidad %']];
   c.evr.forEach(x => rows.push([x.address, x.lider, x.est, x.real, x.devAbs, x.devPct, x.devDias == null ? '' : x.devDias, x.rent == null ? '' : x.rent]));
-  rows.push([], ['KPIs'], ['Ganancia historica', c.gananciaHist], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
+  rows.push([], ['KPIs'], ['Utilidad Remodelacion (limpia)', c.gananciaHist], ['Ganancia con Draws (vieja)', c.gananciaConDraws], ['Deficit/Exceso F&F', c.deficitFFHist], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
   const csv = rows.map(r => r.map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'remodelacion-estimado-vs-real.csv'; a.click(); URL.revokeObjectURL(url);
