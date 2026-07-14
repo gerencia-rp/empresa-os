@@ -59,6 +59,14 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## FICHA DE CASA · "Compra $0" con dato existente (14-jul)
+| Qué | ANTES | DESPUÉS |
+|---|---|---|
+| Fila "Compra" del panel Fix & Flip | leía `m.ff.purchase` — campo INEXISTENTE (la columna es `purchase_price`) → $0/— en TODAS las fichas, no solo Charles | lee la cadena única `osFichaNums`: v_property_360.compra → deal.purchase_price — **Charles $247,000** ✔ |
+| Tarjeta ALL-IN vs fila espejo | dos caminos distintos (p360.all_in vs compute local con rehab×1.3) — mismo dato, distinta info | **UNA cadena para tarjeta Y fila**: all-in = compra + Total Draws → compra + rehab REAL (rotulado "faltan draws") → compra + rehab ESTIMADA (rotulado) — Charles **$357,000** = 247,000 + 110,000 est ✔ |
+| Equity incorporado | p360.equity (rehab null → Charles daba $248,000 con rehab en 0 silencioso) | ARV − all-in de la MISMA cadena — Charles **$138,000** (495,000 − 357,000) ✔ · caveat "⚠ con datos incompletos" cuando faltan draws |
+| Resto del panel (Remodelación/Holding/All-in/MAO) | mezcla de fuentes (est×1.3 proxy sin rotular; holding $0 sin draws) | Remodelación = draws → rehab real → estimada (SIEMPRE rotulado cuál es) · Holding "—" si no hay draws · MAO sobre la misma base · Appraisal/Cash-out/HML "—" solo cuando el dato NO existe (Charles ✔) |
+
 ## CC FIX & FLIP REDISEÑADO (14-jul — patrimonio real + déficit correcto)
 | Qué | ANTES | DESPUÉS (verificado contra Airtable vivo) |
 |---|---|---|
