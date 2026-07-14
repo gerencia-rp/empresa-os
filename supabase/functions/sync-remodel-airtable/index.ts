@@ -29,6 +29,9 @@ const FIELD_IDS = {
   utilidad_remodelacion: "fldQ3vhMvBuCDUJVR",
   rentabilidad_remodelacion: "fldywMYaieK1bQ9MP",
   deficit_ff: "fldXxmdccFiGk1zPI",
+  intereses_ff: "fldHCVca9YHhdCRrA",
+  servicios_publicos_ff: "fldvxo2bZXekrGSib",
+  muebles_ff: "fldILIa8f6cQCTsiW",
   desviacion: "fldVgmxP8Z1xtdrmj",
   inicio: "fldG2SABUD5Ptcuj8",
   fin_estimado: "fldQtRD47N2jHaRyh",
@@ -178,6 +181,11 @@ function projectFromAirtable(r: any, liderCache: Map<string, string>) {
   const proceso = getName(f[FIELD_IDS.proceso]);
   const avance_pct = parseAvance(f[FIELD_IDS.avance]);
   const desviacion = getName(f[FIELD_IDS.desviacion]);
+  const utilidadRem = typeof f[FIELD_IDS.utilidad_remodelacion] === "number" ? f[FIELD_IDS.utilidad_remodelacion] : null;
+  // Costo Fix & Flip = Intereses + Pagos Servicios Públicos + Muebles (campos existentes de Airtable; el cálculo vive acá, no allá)
+  const costoFF = (typeof f[FIELD_IDS.intereses_ff] === "number" ? f[FIELD_IDS.intereses_ff] : 0)
+    + (typeof f[FIELD_IDS.servicios_publicos_ff] === "number" ? f[FIELD_IDS.servicios_publicos_ff] : 0)
+    + (typeof f[FIELD_IDS.muebles_ff] === "number" ? f[FIELD_IDS.muebles_ff] : 0);
 
   return {
     airtable_id: r.id,
@@ -196,9 +204,11 @@ function projectFromAirtable(r: any, liderCache: Map<string, string>) {
     monto_por_gastar: typeof f[FIELD_IDS.monto_por_gastar] === "number" ? f[FIELD_IDS.monto_por_gastar] : null,
     rentabilidad: typeof f[FIELD_IDS.rentabilidad] === "number" ? f[FIELD_IDS.rentabilidad] : null,
     monto_real: typeof f[FIELD_IDS.monto_real] === "number" ? f[FIELD_IDS.monto_real] : null,
-    utilidad_remodelacion: typeof f[FIELD_IDS.utilidad_remodelacion] === "number" ? f[FIELD_IDS.utilidad_remodelacion] : null,
+    utilidad_remodelacion: utilidadRem,
     rentabilidad_remodelacion: typeof f[FIELD_IDS.rentabilidad_remodelacion] === "number" ? f[FIELD_IDS.rentabilidad_remodelacion] : null,
     deficit_ff: typeof f[FIELD_IDS.deficit_ff] === "number" ? f[FIELD_IDS.deficit_ff] : null,
+    costo_ff: costoFF,
+    resultado_empresa: utilidadRem != null ? utilidadRem - costoFF : null,
     sqft: f[FIELD_IDS.sqft] || null,
     desviacion_label: desviacion,
     fecha_inicio: f[FIELD_IDS.inicio] || null,
