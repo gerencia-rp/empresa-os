@@ -59,6 +59,15 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## CC FIX & FLIP REDISEÑADO (14-jul — patrimonio real + déficit correcto)
+| Qué | ANTES | DESPUÉS (verificado contra Airtable vivo) |
+|---|---|---|
+| Bloque superior | "Capital del Holding" (no le decía nada al CEO) + all-in como capital | **VALOR DEL PORTAFOLIO $9,415,000 (23 casas)** — cuadre exacto: $11,450,000 (28) − $1,300,000 operador (Arthur/Bitter/Charles) − $735,000 vendidas (Arcadia/Slaughter) · **EQUITY $4,435,350** (valor − deuda) · **DEUDA $4,979,650** (refi>0→refi, si no HML; drill por casa + reconcile QBO $5,974,414 con Δ visible) · **RENDIMIENTO: operativo +$179,289/año · después de deuda −$363,406/año** (los dos, honesto: el carry HML se come el flujo — pago = hml_payment + ref30_payment, EXACTO al número del CEO) + yield del equity |
+| Conteos | deals activos/flip/hold | **23 hechas · 5 entregadas al inversionista · 23 en portafolio (19 renta · 2 rehab · 2 adquiridas)** — todos exactos |
+| Regla del portafolio | no existía | modelo_negocio ≠ Operador Y stage ≠ vendida, en la capa de vistas (v_ff_portafolio/_kpi, security_invoker, property_id) — espejo extendido: modelo_negocio (flddjD6WsvC98sM1k) + estrategia completa (fldyijwnFRD2yFrx5) + draws_menos_deficit (fldL4iMolqEibENFj), sync v13 corrido 28/28 |
+| Déficit por casa | dr.net_total (campo equivocado) → Wellington −$130k FALSO, Charles −$110k FALSO | **[Total Draws − Déficit Total] − Down Payment** (la fórmula del CEO): Capitol = −30,463.76 − 7,500 = **−$37,963.76 exacto** · GUARDRAIL: draws=0 con obra → "⚠ faltan draws" (Wellington/Charles/Slaughter/Harvest + 3 más = 7 casas), EXCLUIDAS del acumulado (**−$289,188** corregido) |
+| Pipeline + Propiedades | "HOLD" recortado · all-in compra+rehab+holding · vendidas mezcladas | estrategia PALABRA COMPLETA ("Fix and hold") · **all-in = compra + Total Draws** (fallback compra+rehab ROTULADO *rehab) · badges Operador/Vendida atenuadas (siguen visibles, NO cuentan en totales) |
+
 ## CALCS ENCADENADAS (14-jul, rama feat/calcs-encadenadas — "cuánto presta el HML → payoff → refi")
 | Qué | ANTES | DESPUÉS (verificado corriendo el código real: compra $200,000 · remod $100,000 · obra 3 m · renta 2 m) |
 |---|---|---|
