@@ -59,6 +59,16 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## CALCS ENCADENADAS (14-jul, rama feat/calcs-encadenadas — "cuánto presta el HML → payoff → refi")
+| Qué | ANTES | DESPUÉS (verificado corriendo el código real: compra $200,000 · remod $100,000 · obra 3 m · renta 2 m) |
+|---|---|---|
+| Base del HML | **3 bases para el MISMO deal**: Calc 1 $291,780 (compra+draw ×90%) · Calc 4 $280,000 (compra×90%+remod) · mismo dato, distinta info | **UNA base**: préstamo bruto = %fin × (compra + DRAW TOTAL), resuelta por PUNTO FIJO (el interés del draw corre sobre el préstamo y converge en 2-3 vueltas) → **$295,856 idéntico en Calc 1 y Calc 4** |
+| Del Negocio | terminaba en "el inversionista pone" | + **EL HARD MONEY TE PRESTA**: bruto $295,856 − puntos 1.5% ($4,438) − fees lender ($2,990) = **desembolso neto $288,428** · + **PAYOFF DEL HML**: principal + capitalizados (editable) = **$295,856** — dos números DISTINTOS, visibles |
+| Payoff → Cash-Out | input manual = 0 → cash-out $293,216 que no significaba NADA | se auto-llena ⛓ desde Del Negocio (fuente visible; override manual con "↩ volver al calculado") → **cash-out = 311,830 − 295,856 − 18,614 = −$2,640** (honesto: este deal no recupera por refi) |
+| Obra vs renta | UN solo "meses de hold" (5m) — el interés del HML corría los 5 meses = carry INFLADO | **meses_obra (3) + meses_renta (2) = hold (5, derivado)**; interés HML = base × tasa × **meses_OBRA** ($8,876 = 295,856×1%×3, no ×5 = $14,793 inflado −40%); utilities sí corren el hold; deals reales: obra = meses cubiertos, renta = hueco (ff_draws) |
+| Intereses | base propia + solo el mensual | préstamo bruto ⛓ (misma base) · interés mensual $2,959 · **interés TOTAL de la obra $8,876 (el carry real)** · refi $311,830 @ 7.125%/30a → **P&I $2,101** · tasas + meses de obra editables inline → se reflejan en TODAS las calcs |
+| Legacy | — | análisis guardados con meses_hold viejo NO cambian (obra=hold, renta=0); goldens cash-out Michelle/Echo/Childress/Meadow EXACTOS |
+
 ## ARV CERTERO (13-jul, rama feat/arv-certero — directiva: error MEDIBLE contra tasaciones reales)
 Disparador: Cervin dio \$415,773 con 3 camas (RentCast/condado) cuando tiene 4 — Zillow \$471,900, assessed \$486,691.
 
