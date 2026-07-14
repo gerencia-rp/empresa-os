@@ -70,7 +70,7 @@ function unTimeline(c) {
       + '<div style="width:36px;height:36px;border-radius:50%;background:var(--glass,rgba(255,255,255,.06));border:2px solid var(--a1,#12b5a0);display:grid;place-items:center;margin:0 auto;font-size:15px;position:relative;z-index:1">' + p[0] + '</div>'
       + '<div style="font-size:11px;font-weight:700;margin-top:6px">' + p[1] + '</div>'
       + '<div style="font-size:11.5px;color:var(--mut,#9fb0c9)">' + p[2] + '</div></div>').join('')
-    + '</div><div style="font-size:10px;color:var(--mut,#9fb0c9);margin-top:10px">Tiempo hasta rentar: ' + (c.mesesHastaRenta ? c.mesesHastaRenta + ' meses (' + c.fuenteTiempo + ')' : 'sin datos') + '</div></div>';
+    + '</div><div style="font-size:10px;color:var(--mut,#9fb0c9);margin-top:10px">Tiempo: obra ' + (c.mesesObra || '—') + ' m + renta ' + (c.mesesRenta || 0) + ' m = hold ' + (c.mesesHastaRenta || '—') + ' m (' + c.fuenteTiempo + ')</div></div>';
 }
 
 function ffUnificadaView() {
