@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
         stage: stageNorm(f[F.deals.estado]), strategy: (() => { const s = (sel(f[F.deals.estrategia]) || "").toLowerCase(); return s.includes("flip") ? "flip" : s ? "hold" : null; })(),
         estrategia: sel(f[F.deals.estrategia]) || null,        // palabra COMPLETA (obs CEO: no "HOLD" recortado)
         modelo_negocio: sel(f[F.deals.modeloNegocio]) || null, // "Prestación de Servicios como Operador" ≠ portafolio
-        purchase_price: num(f[F.deals.compra]), remodel_est: num(f[F.deals.remodelEst]), arv: num(f[F.deals.arv]),
+        purchase_price: num(f[F.deals.compra]), remodel_est: num(f[F.deals.remodelEst]), remodel_real: num(f[F.deals.remodelReal]), arv: num(f[F.deals.arv]),
         appraisal: num(f[F.deals.appraisal]), appraisal_link: f[F.deals.apprLink] || null, hml_payment: num(f[F.deals.hmlPago]), ref30_payment: num(f[F.deals.ref30]),
         sqft: num(f[F.deals.sqft]), cashout: num(f[F.deals.cashout]), close_date: f[F.deals.cierre] || null,
         investor_rec_ids: linkIds(f[F.deals.invLink]),

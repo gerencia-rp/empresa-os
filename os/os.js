@@ -682,7 +682,8 @@ function osCasaMatch(slug, comp) {
 function osFichaNums(m) {
   const compra = (m.p360 && m.p360.compra != null) ? +m.p360.compra
     : (m.ff && m.ff.purchase_price != null) ? +m.ff.purchase_price : null;
-  const rehabReal = (m.p360 && m.p360.rehab_real != null) ? +m.p360.rehab_real : null;
+  const rehabReal = (m.p360 && m.p360.rehab_real != null) ? +m.p360.rehab_real
+    : (m.ff && +m.ff.remodel_real > 0) ? +m.ff.remodel_real : null;   // "Costo Remodelación Real" (Airtable directo)
   const rehabEst = (m.ff && +m.ff.remodel_est > 0) ? +m.ff.remodel_est : null;
   const draws = (m.port && +m.port.total_draws > 0) ? +m.port.total_draws : null;
   // all-in: compra + Total Draws → compra + rehab REAL → compra + rehab ESTIMADA (siempre rotulado)
