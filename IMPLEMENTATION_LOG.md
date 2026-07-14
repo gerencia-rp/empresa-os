@@ -59,6 +59,12 @@ Gate de CI post-Scope B: **12/12 ✓**. Gotcha nuevo: ia_artifacts tenía CHECK 
 - Mergeado a main (fast-forward, bundle 4227018da6a8) y verificado EN PROD con smoke headless: **15/15 · 0 pageerrors** (UW draw total+hold 1.8m+rótulos HML/DSCR+tasas inline · CRM guía · Estimador 3 pasos · Planner toggle KPIs · RC scorecard líderes · IA galería · portal 200) + **portal inversor con login QA real: 8/8** (Tus casas de un vistazo, Dove $25,400 · 13 meses · flujo últ. mes · déficit desglosado con interés HML · distribuciones · líder).
 
 
+## CALC 1 · insurance + holding real + contingencia fija + FIX guardado (14-jul, pedido del CEO)
+- **Insurance de la casa**: input mensual en Ajustes → insurance × meses de holding entra al draw (y por el punto fijo, al préstamo/interés/payoff). Config default `uw_insurance_mes`.
+- **Meses HASTA RENTAR O VENDER** (antes "rentando hasta el refi"): obra + hasta rentar/vender = HOLDING, y el interés/utilities/insurance corren sobre ESA suma (el CEO: "esa suma es lo real que voy a pagar de intereses y tener de los draws") — ejemplo 3+2: interés = préstamo × 1% × 5 = $15,876 (antes solo obra ×3). Calc 4 muestra "Interés total del holding (5 m = obra 3 + hasta rentar/vender 2)" con ambos meses editables.
+- **Contingencia FIJA** opcional (pisa el %): input en Ajustes; desglose rotula "Contingencia (FIJA)".
+- **BUG del guardado (2 patas, cazado con instrumentación en prod)**: (1) el re-render inmediato del onchange DESTRUÍA el botón 💾 entre mousedown y mouseup → el click se perdía en silencio → render diferido 150ms + trigger delegado por pointerup; (2) el valor tipeado con el foco aún en el input no llegaba a commitear → flush en pointerdown del 💾 (inputs con value ≠ defaultValue → dispatch change ANTES del blur). **Verificado en prod 8/8**: tipear compra/insurance/contingencia y clickear 💾 sin blur → los 3 valores en UW.a.inputs Y en la base.
+
 ## % DEL HML SEPARADO: compra vs remodelación (14-jul, pedido del CEO)
 - ANTES: un solo "% que financia" aplicado a toda la base → no modelaba la realidad (Harmony presta 90% de la compra y 100% de la remo). DESPUÉS: dos inputs en Calc 1 (`hml_pct_compra` 90 / `hml_pct_remo` 100 default) → **préstamo bruto = %compra×compra + %remo×draw** (punto fijo intacto).
 - PROPAGACIÓN por la cadena (verificado en prod 6/6): interés del draw, payoff → Calc 3, base → Calc 4, Unificada — ejemplo 200k/100k/3m/2m: préstamo $309,168 · **down = solo 10% de la compra ($20,000)** · payoff/base4 = mismo número; editar % en vivo recalcula todo (100% compra → down $0, caso Bethune).
