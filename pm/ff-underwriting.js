@@ -191,12 +191,21 @@ function ffUwSet(k, v) {
 }
 if (typeof document !== 'undefined' && !window.__uwSaveHook) {
   window.__uwSaveHook = true;
+  // pointerdown dispara ANTES del blur: acá se COMMITEAN los inputs editados que aún no dispararon
+  // su onchange (valor ≠ defaultValue del render) — sin esto, "tipear y clickear 💾" perdía el valor.
+  document.addEventListener('pointerdown', (e) => {
+    const b = e.target && e.target.closest && e.target.closest('[data-uw-guardar]');
+    if (!b || !UW.a) return;
+    document.querySelectorAll('#ff-uw-body input').forEach(el => {
+      if (el.value !== el.defaultValue) { try { el.dispatchEvent(new Event('change')); } catch (err) { /* noop */ } }
+    });
+  });
   document.addEventListener('pointerup', (e) => {
     const b = e.target && e.target.closest && e.target.closest('[data-uw-guardar]');
     if (!b || !UW.a) return;
     if (UW._lastSave && Date.now() - UW._lastSave < 800) return;   // anti doble-disparo (pointerup + click)
     UW._lastSave = Date.now();
-    setTimeout(() => ffUwGuardar(), 40);                           // deja que el onchange pendiente commitee primero
+    setTimeout(() => ffUwGuardar(), 40);                           // los change del pointerdown ya committearon
   });
 }
 function ffUwSub(s) { UW.sub = s; UW.visibles = null; ffUwRender(); }
