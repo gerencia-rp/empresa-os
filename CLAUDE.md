@@ -51,6 +51,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (13 Jul 2026 · noche — 📊 ANALÍTICA FF: métricas que sí sirven) · EN VIVO
+
+- 📊 **Analítica & KPIs del FF CC reconstruida** (módulo `pm/ff-analitica.js`; `ffSecAnalitica` delega, fallback = vista vieja): **7 secciones** — S1 volumen 28 ops + ritmo 1.5/mes (close_date) · S2 rentabilidad realizada (Arcadia $615k/neta $11,928/ROI 7.0%; Slaughter "🟡 faltan datos"; lectura: **HOLD, no flip**) · S3 flujo operativo **+$179,289/año** vs post-deuda **−$363,406/año** (carry = hml_payment + ref30_payment ×12 de las 19 en renta — los ref30 de casas "rentada" también cuentan) · S4 patrimonio **$9,415,000** − deuda QBO $5,974,414 = equity **$3,440,586** → multiplicador **3.6×** · S5 proyección con slider 2–6% (equity proyectado amortiza el DSCR) · S6 velocidad (55d calibración; crudo 57d valida) · S7 pipeline refi (15 en HML, 12 🟢 listas al 75%×ARV) + concentración (v_inversionistas: Jefferson 28.7% > umbral 25%) + salud (1 sana/16 déficit/2 sin datos/7 obra). Todo con kitDrill "de dónde sale" + kitNext. ci:gate 12/12 · smoke prod 12/12.
+- 🔑 **Reglas de negocio descubiertas** (verificadas al centavo): "casas propias" = activas, no vendidas y `modelo_negocio ≠ "Prestación de Servicios como Operador"` (Charles/Arthur Stiles/Bitter Creek se operan p/ terceros — NO patrimonio) · "co-inversión activa" = v_inversionistas ($654,746.14) NO Σ capital_aportado histórico ($917,598) · el post-deuda del CEO incluye cuotas ref30 en casas stage "rentada".
+- 🗄 Espejo: campos de VENTA de "Datos por casa" → `ff_hml_loans` (precio_venta/utilidad_bruta_venta/utilidad_neta_venta/roi_venta, migr `20260713110000`) + `fecha_ref30` al select de ffLoadAll. ⚠ coordinación multi-sesión: deployar sync-ff-airtable pisa la versión del otro — siempre partir del MERGED (pasó con modeloNegocio/venta: redeployado unificado).
+
+---
+
 ## 🎯 Estado (13 Jul 2026 — 🗓 Planner: sin domingos + barra colapsable + 📆 Reprogramar obra) · EN VIVO
 
 - 🗓 **Ajustes UI del Planner** (`weekly-planner.js`, aprobados por el CEO): vista **mensual Lun–Sáb** (columna domingo oculta, solo vista; si hay tareas cargadas en domingo aparece nota ámbar con fechas clickeables — no se esconden en silencio) · **barra de actividades colapsable** (✕ en las tabs cierra; pestaña vertical "📥 Actividades" reabre; preferencia en localStorage `wp_sidebar_hidden`; el toggle también quedó en "⋯ Más" para desktop). La grilla semanal YA era Lun–Sáb.
