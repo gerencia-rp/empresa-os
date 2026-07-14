@@ -29,7 +29,9 @@ const F = {
   hml: { prop: "fldDyPAYGHDBmBdvk", fecha: "fld7y5uQLeJlCHgno", pago: "fldDe1BDW4fP5s3WR", fee: "fldrSE3aeiMqkfpHE", ref30: "fldWACGPEKKhLp206", fechaRef: "fldlDpPWUnYhIsETm", check: "fldOOSgpzzdfw8ABA" },
   dc: { prop: "fldgRmcy4oAfn9JYQ", cierre: "fld58rjMzZuoEwtDj", down: "fldxuB3kYq8cNQHIK", ctc: "fldzH5n6milc56KAU", monto: "fldZnz7Sq9iSuTtLe", tasa: "fld4Hv76aZCjXVhQ3", plazo: "fldbnPE1wT9Fm6D46", ini: "fldFI4BNG08elmnO1", venc: "flddtzbmaVXAPSSoC", rehabIni: "fldlhgKbDSkeXrXzi", rehabFin: "fldPul8pDQ3bHrirm", drAprob: "fld3UZOKmHMOw6VmS", drCobr: "fldlyv2c38vhBLHDd",
     // refi (Calc 3 Cash-Out): préstamo DSCR real, payoff real, fecha y % del banco (lookup)
-    refiMonto: "fldif2zUp7yJDfiAu", refiPagado: "fldZsDNjV8DmJH7Wd", refiFecha: "fldttSOwH3FXQfZJr", refiPct: "fldiHb7SktnfkT5F1" },
+    refiMonto: "fldif2zUp7yJDfiAu", refiPagado: "fldZsDNjV8DmJH7Wd", refiFecha: "fldttSOwH3FXQfZJr", refiPct: "fldiHb7SktnfkT5F1",
+    // venta (Analítica S2 — rentabilidad realizada)
+    ventaPrecio: "fldvBmFii4u9OtKy9", ventaUtilBruta: "fldFB9AoZ6q3jJNRY", ventaUtilNeta: "fld5t3ETIYxpHD7Z5", ventaRoi: "fld0V8zYdDJhUX4mL" },
 };
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -203,6 +205,8 @@ Deno.serve(async (req) => {
         monto_prestamo_refi: num(f[F.dc.refiMonto]), monto_pagado_hml_refi: num(f[F.dc.refiPagado]),
         fecha_refi: f[F.dc.refiFecha] || null,
         pct_banco_refi: num(Array.isArray(f[F.dc.refiPct]) ? f[F.dc.refiPct][0] : f[F.dc.refiPct]), // lookup percent → decimal (0.75)
+        precio_venta: num(f[F.dc.ventaPrecio]), utilidad_bruta_venta: num(f[F.dc.ventaUtilBruta]),
+        utilidad_neta_venta: num(f[F.dc.ventaUtilNeta]), roi_venta: num(f[F.dc.ventaRoi]),
         active: true, archived_at: null, last_synced_at: now(),
       };
     }).filter((r) => r.address);
