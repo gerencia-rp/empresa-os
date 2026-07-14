@@ -253,6 +253,9 @@ async function ffLoadAll() {
     FF.obrasKpi = await sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null);
     // N2: equity incorporado por casa — v_property_360 (O1)
     FF.p360 = await sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []);
+    // PORTAFOLIO del CEO (14-jul): regla única (≠operador, ≠vendida) + déficit correcto — v_ff_portafolio
+    FF.port = await sb.from('v_ff_portafolio').select('*').then(r => r.data || []).catch(() => []);
+    FF.portKpi = await sb.from('v_ff_portafolio_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null);
     if (deals.error) throw deals.error;
     FF.deals = deals.data || []; FF.draws = draws.data || []; FF.investors = inv.data || [];
     FF.overhead = oh || []; FF.hml = hml || [];
@@ -268,17 +271,26 @@ async function ffLoadAll() {
 // ════════════════════════════════════════════════════════════════
 function ffCompute() {
   const drawByNorm = {}; FF.draws.forEach(d => drawByNorm[d.address_norm] = d);
+  const portByNorm = {}; (FF.port || []).forEach(p => portByNorm[p.address_norm] = p);
   const deals = FF.deals.map(d => {
     const dr = drawByNorm[d.address_norm] || null;
+    const port = portByNorm[d.address_norm] || null;
     const purchase = Number(d.purchase_price || 0);
     const remComplete = dr ? Number(dr.remodel_complete || 0) : Number(d.remodel_est || 0) * 1.3;
     const holding = dr ? (Number(dr.interest_hml || 0) + Number(dr.services_hml || 0) + Number(dr.interest_until_rent || 0) + Number(dr.furniture || 0) + Number(dr.other_costs || 0)) : 0;
-    const allIn = purchase + remComplete + holding;
+    // ALL-IN = compra + Total Draws desembolsados (v_ff_portafolio; fallback rotulado compra+rehab)
+    const faltanDraws = !!(port && port.faltan_draws);
+    const allIn = port && port.all_in != null ? Number(port.all_in) : (purchase + remComplete + holding);
+    const allInFuente = port ? (port.all_in_fuente || null) : 'compra + rehab + holding (legacy)';
     const arv = Number(d.arv || 0);
     const margin = arv - allIn; // margen bruto (antes de costos de venta)
     const marginPct = arv ? margin / arv : 0;
     const allInPct = arv ? allIn / arv : 0;
-    const deficit = dr ? Number(dr.net_total || 0) : 0; // <0 = déficit (cash inyectado)
+    // DÉFICIT del CEO = [Total Draws − Déficit Total] − Down Payment · GUARDRAIL: faltan draws → null (jamás rojo falso)
+    const deficit = port ? (faltanDraws || port.deficit == null ? 0 : Number(port.deficit)) : (dr ? Number(dr.net_total || 0) : 0);
+    const esPortafolio = port ? !!port.es_portafolio : true;
+    const motivoExcl = port ? port.motivo_exclusion : null;
+    const estrategia = d.estrategia || port && port.estrategia || null;   // palabra COMPLETA
     const equity = arv - allIn; // equity potencial
     const dq = ffDataQuality({ allIn, arv, allInPct, stage: d.stage });
     const loan = (FF.loans || []).find(l => l.address_norm === d.address_norm) || null;
@@ -288,7 +300,7 @@ function ffCompute() {
     const semAllin = arv > 0 && (allIn / arv) > (FF.cfg.all_in_max_pct || 0.75);
     const semHml = hmlDueDays != null && hmlDueDays <= (FF.cfg.hml_warn_days || 45);
     const semBudget = budgetDevPct != null && budgetDevPct > (FF.cfg.budget_warn_pct || 10);
-    return { ...d, dr, purchase, remComplete, holding, allIn, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip', loan, hmlDueDays, budgetDevPct, semAllin, semHml, semBudget };
+    return { ...d, dr, port, purchase, remComplete, holding, allIn, allInFuente, faltanDraws, esPortafolio, motivoExcl, estrategia, arv, margin, marginPct, allInPct, deficit, equity, dq, isFlip: d.strategy === 'flip', loan, hmlDueDays, budgetDevPct, semAllin, semHml, semBudget };
   });
   const active = deals.filter(d => d.stage !== 'vendida');
   // "confiables" = sin flags 'dato a revisar' / 'sin datos'. Los promedios/margen/déficit del
@@ -302,7 +314,9 @@ function ffCompute() {
     arvTotal: deals.reduce((s, d) => s + d.arv, 0),
     // Equity y déficit acumulado: SOLO deals confiables (los del error $189k los distorsionan)
     equity: activeConf.reduce((s, d) => s + Math.max(0, d.equity), 0),
-    deficitAcum: confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
+    // déficit acumulado CORREGIDO (14-jul): fórmula del CEO desde la vista, EXCLUYE faltan_draws y no-portafolio
+    deficitAcum: FF.portKpi && FF.portKpi.deficit_acumulado != null ? Number(FF.portKpi.deficit_acumulado)
+      : -confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
     marginPctAvg: activeConf.length ? activeConf.reduce((s, d) => s + d.marginPct, 0) / activeConf.length : 0,
     flips: deals.filter(d => d.isFlip).length, holds: deals.filter(d => d.strategy === 'hold').length,
     investors: FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length, // sin la propia empresa (18)
@@ -418,7 +432,23 @@ function ffHeader(title, accent, sub) {
     <div class="pills"><div class="pill"><span class="cdot"></span> Airtable en vivo</div>
     <div class="pill ai" onclick="ffGo('cerebro')">◆ <span class="shimmer">Cerebro IA</span></div></div></div>`;
 }
-function ffStratBadge(d) { return d.strategy === 'flip' ? '<span class="kstrat flip">FLIP</span>' : (d.strategy === 'hold' ? '<span class="kstrat hold">HOLD</span>' : ''); }
+// estrategia con la palabra COMPLETA (obs CEO: no "HOLD" recortado) — color por familia
+function ffStratBadge(d) {
+  const full = d.estrategia || (d.strategy === 'flip' ? 'Fix and flip' : d.strategy === 'hold' ? 'Fix and hold' : '');
+  if (!full) return '';
+  return `<span class="kstrat ${d.strategy === 'flip' ? 'flip' : 'hold'}" style="text-transform:none;letter-spacing:0">${FF_ESC(full)}</span>`;
+}
+// badge de contexto: casas que NO son portafolio del CEO (operador / vendida)
+function ffPortBadge(d) {
+  if (d.esPortafolio !== false) return '';
+  return d.motivoExcl === 'operador' ? ' <span class="badge b-warn" title="Prestación de Servicios como Operador — no es patrimonio del CEO">Operador</span>'
+    : ' <span class="badge" style="opacity:.7" title="Vendida — entregada al inversionista">Vendida</span>';
+}
+// all-in con GUARDRAIL: draws vacíos → jamás un all-in fingido en la celda
+function ffAllInCell(d) {
+  if (d.faltanDraws) return (d.purchase ? FF_MONEY(d.purchase) + ' <span style="color:var(--amber);font-size:10px">+ ⚠ faltan draws</span>' : '<span style="color:var(--amber)">⚠ faltan draws</span>');
+  return FF_MONEY(d.allIn) + (d.allInFuente && d.allInFuente.indexOf('rehab') >= 0 ? ' <span style="color:var(--mut2);font-size:9px" title="sin draws en Airtable — se usó compra + rehab real">*rehab</span>' : '');
+}
 
 // ─── COMMAND CENTER ───
 // ─── COMMAND (rediseño ADN premium 12-jul: veredicto + hero degradé + confianza + Simple/Experto) ───
@@ -436,12 +466,32 @@ function ffSecCommand(comp) {
       ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. 🧹')
       : kitVerdict('go', 'Portafolio sano — sin alertas críticas 🎉', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
   const conf = kitConfidence(flaggedDQ === 0 ? 'alta' : flaggedDQ <= 2 ? 'media' : 'baja', kpi.confiablesN + '/' + kpi.total + ' deals confiables');
-  const hero = ffCapitalHero('all-in de los deals activos (costo, no capital) <b>' + kitMoney(kpi.capital) + '</b> · ARV <b>' + kitMoney(kpi.arvTotal) + '</b> · equity potencial <b style="color:var(--pos)">' + kitMoney(kpi.equity) + '</b> &nbsp; ' + conf);
+  // ═ PATRIMONIO REAL (14-jul, pedido del CEO): valor / equity / deuda / rendimiento del PORTAFOLIO ═
+  // Portafolio = ≠operador y ≠vendida (v_ff_portafolio_kpi). Mata "Capital del Holding" en esta vista.
+  const pk = FF.portKpi || {};
+  const cap = FF.capital || {};
+  const deudaQbo = (Number(cap.deuda_hml_qbo) || 0) + (Number(cap.deuda_refi_qbo) || 0);
+  const deudaOs = Number(pk.deuda_portafolio) || 0;
+  const netoAnual = Number(pk.neto_despues_deuda_anual);
+  const opAnual = Number(pk.flujo_operativo_anual);
+  const yieldPct = (pk.equity_portafolio > 0 && !isNaN(netoAnual)) ? Math.round(netoAnual / pk.equity_portafolio * 1000) / 10 : null;
+  const deudaRows = (FF.port || []).filter(p => p.es_portafolio && p.deuda > 0).sort((a, b) => b.deuda - a.deuda)
+    .map(p => `<div class="krow" style="padding:4px 0"><span>${FF_ESC(p.casa)} <span style="opacity:.5">· ${p.deuda_tipo === 'refi' ? 'refi' : 'HML'}</span></span><b>${kitMoney(p.deuda)}</b></div>`).join('');
+  const hero = pk.casas_portafolio
+    ? kitHero('Valor del portafolio (en papel) 🏠', kitMoney(pk.valor_portafolio),
+      'ARV de tus <b>' + pk.casas_portafolio + ' casas</b> · no incluye vendidas ni operador &nbsp; ' + conf)
+    : kitHero('Valor del portafolio 🏠', '<span style="font-size:18px;color:var(--mut)">sin datos — v_ff_portafolio</span>', '');
   const kpis = `<div class="grid kpis">
-      <div class="card kpi"><div class="lab">Deals activos</div><div class="big">${kpi.activos}</div><div class="meta">${kpi.flips} flip · ${kpi.holds} hold · ${rehab} en rehab · ${venta} en venta</div></div>
-      <div class="card kpi"><div class="lab">Equity potencial</div><div class="big ${kpi.equity > 0 ? 'up' : ''}">${kitMoney(kpi.equity)}</div><div class="meta">ARV − all-in de los activos</div></div>
-      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">hoyo operativo declarado por casa</div></div>
-      <div class="card kpi"><div class="lab">Insights del Cerebro</div><div class="big">${insights.length || '—'}</div><div class="meta"><span class="${crit ? 'down' : ''}">${crit} críticas</span> · <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></div></div>
+      <div class="card kpi"><div class="lab">Equity del portafolio</div><div class="big ${pk.equity_portafolio > 0 ? 'up' : ''}">${kitMoney(pk.equity_portafolio)}</div><div class="meta">valor − deuda · lo que has construido en patrimonio</div></div>
+      <div class="card kpi"><details><summary style="cursor:pointer;list-style:none"><div class="lab">Deuda del portafolio ▾</div><div class="big">${kitMoney(deudaOs)}</div><div class="meta">refi o HML por casa · QBO: ${kitMoney(deudaQbo)} ${deudaQbo && Math.abs(deudaQbo - deudaOs) / deudaQbo > 0.05 ? '<span style="color:var(--amber)">Δ ' + kitMoney(deudaQbo - deudaOs) + '</span>' : '✓'}</div></summary><div style="max-height:220px;overflow:auto;margin-top:8px;font-size:11.5px">${deudaRows || 'sin desglose'}</div></details></div>
+      <div class="card kpi"><div class="lab">Rendimiento anual del portafolio</div><div class="big" style="font-size:19px;line-height:1.35">op. <span class="${opAnual >= 0 ? 'up' : 'down'}">${kitMoney(opAnual)}</span><br>c/deuda <span class="${netoAnual >= 0 ? 'up' : 'down'}">${kitMoney(netoAnual)}</span></div><div class="meta">operativo positivo, pero el servicio de deuda HML se lo come — casas aún en HML sin refinanciar${yieldPct != null ? ' · yield ' + yieldPct + '% del equity' : ''}</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">fórmula CEO (draws − gastos − down payment) · ${pk.casas_sin_draws || 0} casas con ⚠ faltan draws EXCLUIDAS</div></div>
+    </div>
+    <div class="card" style="margin-top:12px;padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;font-size:13px;align-items:center">
+      <span>🏗 <b>${pk.casas_hechas != null ? pk.casas_hechas : '—'}</b> casas hechas <span style="color:var(--mut2);font-size:11px">(sin las pendientes/adquiridas sin cerrar)</span></span>
+      <span>🤝 <b>${pk.entregadas_inversionista != null ? pk.entregadas_inversionista : '—'}</b> entregadas al inversionista <span style="color:var(--mut2);font-size:11px">(vendidas + operador)</span></span>
+      <span>💼 <b>${pk.casas_portafolio != null ? pk.casas_portafolio : '—'}</b> en mi portafolio <span style="color:var(--mut2);font-size:11px">(${pk.port_en_renta || 0} en renta · ${pk.port_en_rehab || 0} en rehab · ${pk.port_adquiridas || 0} adquiridas)</span></span>
+      <span style="margin-left:auto">🧠 Insights: <b class="${crit ? 'down' : ''}">${insights.length || '—'}</b> <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></span>
     </div>`;
   const experto = !exp ? '' : `
     <div class="grid row2">
@@ -468,9 +518,13 @@ function ffSecCommand(comp) {
     </div></div>`;
 }
 function ffDealTable(deals) {
-  const badge = d => d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
-  return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrat.</th><th>All-in</th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
-    ${deals.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${FF_STAGE_LBL[d.stage] || d.stage}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td>${FF_MONEY(d.arv)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${badge(d)}</td></tr>`).join('')}
+  const badge = d => d.faltanDraws ? '<span class="badge b-warn" title="Total Draws desembolsados en 0 — cargarlo en Airtable">⚠ faltan draws</span>'
+    : d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
+  const defCell = d => d.faltanDraws ? '<span style="color:var(--amber);font-size:11px">⚠ faltan datos de draws</span>'
+    : (d.port && d.port.deficit != null ? `<span class="${d.deficit < 0 ? 'down' : 'up'}">${FF_MONEY(d.deficit)}</span>` : '—');
+  const margCell = d => d.faltanDraws || d.allIn == null ? '—' : `<span class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</span>`;
+  return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrategia</th><th>All-in <span style="font-weight:400;color:var(--mut2)">(compra+draws)</span></th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
+    ${deals.map(d => `<tr${d.esPortafolio === false ? ' style="opacity:.62"' : ''}><td>${FF_ESC(ffShort(d.address))}${ffPortBadge(d)}</td><td>${FF_STAGE_LBL[d.stage] || d.stage}</td><td>${ffStratBadge(d)}</td><td>${ffAllInCell(d)}</td><td>${FF_MONEY(d.arv)}</td><td>${margCell(d)}</td><td>${defCell(d)}</td><td>${badge(d)}</td></tr>`).join('')}
   </tbody></table>`;
 }
 
@@ -500,10 +554,10 @@ function ffKanCard(d) {
     <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
     ${d.dq.flags.length ? `<div style="margin:5px 0 2px">${ffDQBadge(d.dq)}</div>` : ''}
     ${(d.semAllin || d.semHml || d.semBudget) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px">${d.semAllin ? `<span class="ff-dq ff-dq-rev" title="all-in supera el máximo configurado del ARV">🔴 all-in ${Math.round(d.allInPct * 100)}%</span>` : ''}${d.semHml ? `<span class="ff-dq ff-dq-rev" title="vencimiento del préstamo HML">⏰ HML ${d.hmlDueDays < 0 ? 'VENCIDO ' + Math.abs(d.hmlDueDays) + 'd' : 'vence ' + d.hmlDueDays + 'd'}</span>` : ''}${d.semBudget ? `<span class="ff-dq ff-dq-pre" title="desvío del presupuesto de remodelación (real vs estimado)">📈 presup +${d.budgetDevPct}%</span>` : ''}</div>` : ''}
-    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.dr ? '' : ' · <span style="color:var(--amber)">sin draws</span>'}</div>
-    <div class="krow"><span>All-in</span><b>${FF_MONEY(d.allIn)}</b></div>
+    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.faltanDraws ? ' · <span style="color:var(--amber)">⚠ faltan draws</span>' : ''}${d.esPortafolio === false ? ' · <span style="color:var(--mut2)">' + (d.motivoExcl === 'operador' ? 'operador' : 'vendida') + '</span>' : ''}</div>
+    <div class="krow"><span>All-in</span><b>${ffAllInCell(d)}</b></div>
     <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>
-    <div class="krow"><span>${d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${(d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}">${d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
+    <div class="krow"><span>${d.faltanDraws ? 'Déficit' : d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${d.faltanDraws ? '' : (d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}"${d.faltanDraws ? ' style="color:var(--amber);font-size:10.5px"' : ''}>${d.faltanDraws ? '⚠ faltan datos de draws' : d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
     <div class="kbar"><i style="width:${capturePct}%;background:${d.allInPct > 0.75 ? 'linear-gradient(90deg,var(--amber),var(--neg))' : 'linear-gradient(90deg,var(--a1),var(--a2))'}"></i></div>
     <div style="font-size:9px;color:var(--mut2);margin-top:4px">all-in ${Math.round(d.allInPct * 100)}% del ARV${d.invLabel ? ' · ' + FF_ESC(d.invLabel) : ''}</div>
     <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${window.osSlug ? osSlug(d.address) : ''}')">🏠 Ver ficha de casa →</div>
@@ -512,7 +566,9 @@ function ffKanCard(d) {
 
 // ─── PROPIEDADES ───
 function ffSecPropiedades(comp) {
-  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades`)}
+  const nExcl = comp.deals.filter(d => d.esPortafolio === false).length;
+  const nFalta = comp.deals.filter(d => d.faltanDraws).length;
+  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades · ${comp.deals.length - nExcl} en tu portafolio + ${nExcl} etiquetadas (operador/vendida, NO cuentan en los totales)${nFalta ? ' · ⚠ ' + nFalta + ' sin draws cargados en Airtable' : ''}`)}
     <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => a.deficit - b.deficit))}</div></div>`;
 }
 // ─── INVERSIONISTAS ───
