@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
         sqft: num(f[F.deals.sqft]), cashout: num(f[F.deals.cashout]), close_date: f[F.deals.cierre] || null,
         investor_rec_ids: linkIds(f[F.deals.invLink]),
         capital_inversionista: num(f[F.deals.capInv]) ?? num(f[F.deals.capAportado]),
+        capital_aportado: num(f[F.deals.capAportado]),  // fldrePoqg3C3caiZ5 PURO — la cifra del ranking de inversionistas
         rentabilidad_prometida: num(f[F.deals.rentProm]), utilidad_entregada: num(f[F.deals.utilEntregada]),
         deficit_total: num(f[F.deals.deficitTotal]), renta_mensual: num(f[F.deals.rentaMes]),
         gastos_mensuales: num(f[F.deals.gastosMes]), ownership_pct: num(f[F.deals.ownership]),
