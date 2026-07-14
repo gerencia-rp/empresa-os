@@ -5,7 +5,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|viral|diag|mi-plan|inversionista|diagnostico|.*\\.).*)",
+      "source": "/((?!api/|assets/|viral|diag|mi-plan|inversionista$|diagnostico|.*\\.).*)",
       "destination": "/"
     }
   ],
