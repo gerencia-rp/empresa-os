@@ -121,7 +121,7 @@ function rcFin(o) {
   return { mat, lab, ingreso, costoReal, presupuesto, margen: ingreso - costoReal, devCostoPct: presupuesto > 0 ? (costoReal - presupuesto) / presupuesto * 100 : null };
 }
 // Métricas LIMPIAS de Remodelación (campos fórmula de Airtable, separan la plata de Remodelación de la del flip):
-// utilidad_remodelacion = Valor al cliente − Gasto interno final (solo Finalizado) · rentabilidad_remodelacion = utilidad / valor al cliente (0-1) · deficit_ff = Draws Ingresados − Valor al cliente.
+// utilidad_remodelacion = Valor al cliente − Gasto interno final (solo Finalizado) · rentabilidad_remodelacion = utilidad / valor al cliente (0-1).
 // Las columnas viejas (ganancia/rentabilidad, arrancan de Draws) NO se borran: quedan como métrica "con Draws".
 function rcUtil(o) { return o.utilidad_remodelacion != null ? +o.utilidad_remodelacion : null; }
 function rcRentPct(o) { return o.rentabilidad_remodelacion != null ? +((+o.rentabilidad_remodelacion) * 100).toFixed(1) : null; }
@@ -131,7 +131,7 @@ function rcObraDataset() {
     return {
       address: o.address, lider: o.lider || '—', estado: o.proceso || null, ciudad: o.city || null, sqft: sq,
       ingreso: ff.ingreso, costo_real: ff.costoReal, presupuesto: ff.presupuesto, utilidad: rcUtil(o) != null ? rcUtil(o) : 0,
-      utilidad_con_draws: +o.ganancia || 0, deficit_ff: o.deficit_ff != null ? +o.deficit_ff : null,
+      utilidad_con_draws: +o.ganancia || 0,
       costo_ff: o.costo_ff != null ? +o.costo_ff : null, resultado_empresa: o.resultado_empresa != null ? +o.resultado_empresa : null,
       margen: (+o.valor_cliente > 0 && rcUtil(o) != null) ? Math.round(rcUtil(o) / +o.valor_cliente * 100) : null,
       retraso: o.retraso_dias != null ? +o.retraso_dias : null,
@@ -150,7 +150,6 @@ function rcCompute() {
   // Histórico REAL (finalizadas)
   const gananciaHist = fin.reduce((s, o) => s + (rcUtil(o) != null ? rcUtil(o) : 0), 0);
   const gananciaConDraws = fin.reduce((s, o) => s + (+o.ganancia || 0), 0);
-  const deficitFFHist = fin.reduce((s, o) => s + (o.deficit_ff != null ? +o.deficit_ff : 0), 0);
   // Servicio vs empresa: costo_ff = intereses+servicios públicos+muebles del flip · resultado_empresa = servicio − costo (del sync, una definición)
   const costoFFHist = fin.reduce((s, o) => s + (o.costo_ff != null ? +o.costo_ff : 0), 0);
   const resultadoEmpresaHist = fin.reduce((s, o) => s + (o.resultado_empresa != null ? +o.resultado_empresa : 0), 0);
@@ -253,7 +252,7 @@ function rcCompute() {
   const okrsList = okrsConfigured ? RC.okrs : OKR_DEFAULTS;
   const okrActual = { margen_bruto: margenHist, rentabilidad: rentProm, desv_costo: desvCostoProm, desv_dias: desvDiasProm, psf: psfProm, ebitda_margen: ebitdaMargen, a_tiempo: aTiempoPct, en_presupuesto: enPresupPct };
   const okrRows = okrsList.map(o => { const actual = okrActual[o.clave]; const meta = +o.objetivo; const cumple = actual == null ? null : (o.comparador === '≤' ? actual <= meta : actual >= meta); return { clave: o.clave, metrica: o.metrica, objetivo: meta, comparador: o.comparador, unidad: o.unidad, actual, cumple }; });
-  return { obras, fin, activas, pipeline, lideresCuadrilla, gananciaHist, gananciaConDraws, deficitFFHist, costoFFHist, resultadoEmpresaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, lideresCuadrilla, gananciaHist, gananciaConDraws, costoFFHist, resultadoEmpresaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -358,7 +357,6 @@ function rcSecCommand(c) {
     </div>
     <div class="grid kpis" style="margin-top:14px">
       <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">utilidad / valor cliente (limpia) · ${c.fin.length} finalizadas</div></div>
-      <div class="card kpi"><div class="lab">Déficit/Exceso F&F</div><div class="big ${c.deficitFFHist>=0?'up':'down'}">${RC_K(c.deficitFFHist)}</div><div class="meta">Draws ingresados − valor cliente · métrica Fix & Flip · ${c.fin.length} finalizadas</div></div>
       <div class="card kpi"><div class="lab">Desviación de costo prom</div><div class="big ${c.desvCostoProm>0?'down':'up'}">${c.desvCostoProm>0?'+':''}${c.desvCostoProm}%</div><div class="meta">real vs presupuesto · ${c.enPresupPct}% en presup.</div></div>
       <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">mediana ${c.desvDiasMed>0?'+':''}${c.desvDiasMed}d · ${c.aTiempoPct}% a tiempo${c.desvDiasRevN?` · <span class="warn">${c.desvDiasRevN} a revisar</span>`:''}</div></div>
       <div class="card kpi"><div class="lab">Margen realizado</div><div class="big ${c.margenReal>=0?'up':'down'}">${RC_K(c.margenReal)}</div><div class="meta">ingreso − costo real (${c.fin.length} fin)</div></div>
@@ -404,7 +402,6 @@ function rcObraCard(o) {
     <div class="krow"><span>$/sqft (mat+MO)</span><b>${_psfStr}</b></div>
     <div class="krow"><span>Valor cliente</span><b>${RC_M(+o.valor_cliente || 0)}</b></div>
     <div class="krow"><span>${dq.fin ? 'Utilidad' : 'Utilidad (proy.)'}</span><b class="${util >= 0 ? 'up' : 'down'}">${RC_M(util)}</b></div>
-    ${o.deficit_ff != null ? `<div class="krow"><span>Déficit/Exceso F&F</span><b class="${+o.deficit_ff >= 0 ? 'up' : 'down'}">${RC_M(+o.deficit_ff)}</b></div>` : ''}
     ${o.costo_ff != null && +o.costo_ff !== 0 ? `<div class="krow"><span>Costo F&F (int+serv+mueb)</span><b>${RC_M(+o.costo_ff)}</b></div>` : ''}
     ${o.resultado_empresa != null ? `<div class="krow"><span>Total empresa</span><b class="${+o.resultado_empresa >= 0 ? 'up' : 'down'}">${RC_M(+o.resultado_empresa)}</b></div>` : ''}
     <div class="kbar"><i style="width:${Math.min(100, av)}%"></i></div>
@@ -560,7 +557,7 @@ function rcExportCSV() {
   const c = rcCompute();
   const rows = [['Casa', 'Lider', 'Estimado', 'Real', 'Desv $', 'Desv %', 'Dias atraso', 'Rentabilidad %']];
   c.evr.forEach(x => rows.push([x.address, x.lider, x.est, x.real, x.devAbs, x.devPct, x.devDias == null ? '' : x.devDias, x.rent == null ? '' : x.rent]));
-  rows.push([], ['KPIs'], ['Servicio Remodelacion (utilidad limpia)', c.gananciaHist], ['Costo Fix & Flip (int+serv+mueb)', c.costoFFHist], ['Total empresa (servicio - costo)', c.resultadoEmpresaHist], ['Ganancia con Draws (vieja)', c.gananciaConDraws], ['Deficit/Exceso F&F', c.deficitFFHist], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
+  rows.push([], ['KPIs'], ['Servicio Remodelacion (utilidad limpia)', c.gananciaHist], ['Costo Fix & Flip (int+serv+mueb)', c.costoFFHist], ['Total empresa (servicio - costo)', c.resultadoEmpresaHist], ['Ganancia con Draws (vieja)', c.gananciaConDraws], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
   const csv = rows.map(r => r.map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'remodelacion-estimado-vs-real.csv'; a.click(); URL.revokeObjectURL(url);
