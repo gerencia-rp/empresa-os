@@ -67,6 +67,10 @@ function ffUwMesesRenta(inp) {
     ? Math.max(0, Math.round((cal.holding_meses_prom - cal.obra_meses_prom) * 10) / 10) : 0;
 }
 function ffUwMesesHold(inp) { return Math.round((ffUwMesesObra(inp) + ffUwMesesRenta(inp)) * 10) / 10; }
+// % que presta el HML, SEPARADO (pedido CEO 14-jul): compra (90 típico) ≠ remodelación/draws (100 típico).
+// Fallback = hml_finance_pct legacy → los análisis guardados dan el MISMO número que antes.
+function ffUwPctCompra(inp) { const v = +inp.hml_pct_compra; if (v > 0) return Math.min(100, v); const l = +inp.hml_finance_pct; return l > 0 ? Math.min(100, l) : 90; }
+function ffUwPctRemo(inp) { const v = +inp.hml_pct_remo; if (v > 0) return Math.min(100, v); const l = +inp.hml_finance_pct; return l > 0 ? Math.min(100, l) : 90; }
 // tasas por deal (override) con fallback a config — UNA sola fuente para las 5 calcs
 function ffUwTasaHml(inp) { return +inp.hml_tasa_anual > 0 ? +inp.hml_tasa_anual : UWc('harmony_tasa_anual', 12); }
 function ffUwTasaDscr(inp) { return +inp.dscr_tasa_anual > 0 ? +inp.dscr_tasa_anual : UWc('dscr_tasa_anual', 7.125); }
@@ -91,6 +95,7 @@ function ffUwDefaults() {
     contingencia_pct: UWc('draw_contingencia_pct', 10), permisos: 1500, dumpster: 800, ac: 0,
     // 1B · El inversionista pone (HUD-1, defaults calibrados con el HUD de Bethune)
     purchase: 0, hml_finance_pct: 90,
+    hml_pct_compra: 90, hml_pct_remo: 100,   // % separados (CEO 14-jul): 90 de la compra · 100 de la remodelación
     //   fees prestamista
     cc_origination_pct: UWc('cc_origination_pct', 1.5), cc_documentation: UWc('cc_documentation', 1495),
     cc_draw_fee: UWc('cc_draw_fee', 500), cc_underwriting: UWc('cc_underwriting', 995), cc_prepaid_interest: UWc('cc_prepaid_interest', 2042.40),
@@ -158,6 +163,8 @@ async function ffUwAbrir(id) {
   // (obra = hold viejo, renta = 0: los números guardados no cambian en silencio)
   const base = ffUwDefaults(); const sIn = a.inputs || {};
   if (+sIn.meses_hold > 0 && !(+sIn.meses_obra > 0)) { base.meses_obra = 0; base.meses_renta = ''; }
+  // legacy: guardados con hml_finance_pct único → no pisar con 90/100 (mismo % en compra y remo, como antes)
+  if (+sIn.hml_finance_pct > 0 && !(+sIn.hml_pct_compra > 0)) { base.hml_pct_compra = 0; base.hml_pct_remo = 0; }
   UW.a = { id: a.id, nombre: a.nombre, property_id: a.property_id, ff_deal_id: a.ff_deal_id, es_hipotetica: a.es_hipotetica, direccion: a.direccion, ciudad: a.ciudad, inputs: Object.assign(base, sIn), outputs: a.outputs || {}, veredicto: a.veredicto };
   UW.sub = 'negocio'; ffUwRender();
 }
@@ -189,17 +196,18 @@ function ffUwCalcNegocio(inp) {
   const mesesHold = Math.round((mesesObra + mesesRenta) * 10) / 10;
   const utilities = Math.round((+inp.utilities_mes || 0) * mesesHold);
   const extras = (+inp.muebles || 0) + (+inp.appraisal_cost || 0) + (+inp.cashout_en_draw || 0) + (+inp.permisos || 0) + (+inp.dumpster || 0) + (+inp.ac || 0);
-  // ═ UNA SOLA BASE DEL HML (punto 0): préstamo bruto = %financia × (compra + DRAW TOTAL) ═
-  // El interés (línea del draw) corre sobre ESE préstamo × meses_OBRA → punto fijo (converge en 2-3 vueltas;
-  // antes Calc 1 usaba compra+draw y Calc 4 compra×90%+remod: $291,780 ≠ $280,000 para el mismo deal).
-  const pctFin0 = Math.min(100, Math.max(0, +inp.hml_finance_pct || 90)) / 100;
+  // ═ UNA SOLA BASE DEL HML (punto 0): préstamo bruto = %COMPRA × compra + %REMO × DRAW TOTAL ═
+  // % SEPARADOS (CEO 14-jul): el HML presta distinto sobre la compra (90 típico) que sobre la remo (100).
+  // El interés (línea del draw) corre sobre ESE préstamo × meses_OBRA → punto fijo (converge en 2-3 vueltas).
+  const pctCompra0 = ffUwPctCompra(inp) / 100;
+  const pctRemo0 = ffUwPctRemo(inp) / 100;
   const baseModo0 = UWct('uw_base_modo', 'draw');
   let intereses = 0, subtotal = 0, contingencia = 0, draw = 0, prestamoIter = 0;
   for (let i = 0; i < 6; i++) {
     subtotal = remod + intereses + utilities + extras;
     contingencia = Math.round(subtotal * ((+inp.contingencia_pct || 0) / 100));
     draw = subtotal + contingencia;
-    prestamoIter = (+inp.purchase || 0) * pctFin0 + (baseModo0 === 'rehab' ? remod : draw) * pctFin0;
+    prestamoIter = (+inp.purchase || 0) * pctCompra0 + (baseModo0 === 'rehab' ? remod : draw) * pctRemo0;
     const nuevo = Math.round(prestamoIter * intMensual * mesesObra);
     if (nuevo === intereses) break;
     intereses = nuevo;
@@ -213,12 +221,12 @@ function ffUwCalcNegocio(inp) {
   //   modo 'rehab' (legacy, calibración Bethune compra+rehab) disponible via ff_uw_config uw_base_modo
   //   Inversionista pone = Down + gastos de cierre − créditos (earnest + option + proración: se ACREDITAN, no se suman)
   const R2 = n => Math.round(n * 100) / 100;
-  const pctFin = pctFin0;
-  const financia = Math.round((+inp.purchase || 0) * pctFin);   // legado: base de intereses (calc 4)
+  const financia = Math.round((+inp.purchase || 0) * pctCompra0);   // legado: base de intereses (calc 4)
   const baseModo = baseModo0;
   const baseHud = (+inp.purchase || 0) + (baseModo === 'rehab' ? remod : draw);
-  const prestamo = R2(baseHud * pctFin);                        // = LA base única del HML (misma del punto fijo)
-  const downPayment = R2(baseHud - prestamo);
+  // LA base única del HML (misma del punto fijo): %compra × compra + %remo × draw
+  const prestamo = R2((+inp.purchase || 0) * pctCompra0 + (baseModo === 'rehab' ? remod : draw) * pctRemo0);
+  const downPayment = R2(baseHud - prestamo);   // = compra×(1−%compra) + draw×(1−%remo)
   const origination = R2(prestamo * ((+inp.cc_origination_pct || 0) / 100));
   const feesPrestamista = R2(origination + (+inp.cc_documentation || 0) + (+inp.cc_draw_fee || 0) + (+inp.cc_underwriting || 0) + (+inp.cc_prepaid_interest || 0));
   const feesTitulo = R2((+inp.cc_title || 0) + (+inp.cc_escrow || 0) + (+inp.cc_recording || 0) + (+inp.cc_ucc || 0) + (+inp.cc_courier || 0) + (+inp.cc_guaranty || 0));
@@ -234,6 +242,7 @@ function ffUwCalcNegocio(inp) {
   const payoffHml = R2(prestamo + capitaliza);                  // → alimenta la Calc 3 (Cash-Out) solo
   return { remod, intereses, utilities, contingencia, draw, psfDraw: psfDraw ? Math.round(psfDraw) : null, psfAlerta, deficitRiesgo,
     mesesObra, mesesRenta, mesesHold, tasaHml: ffUwTasaHml(inp), baseModo,
+    pctCompra: ffUwPctCompra(inp), pctRemo: ffUwPctRemo(inp),
     financia, baseHud, prestamo, downPayment, origination, feesPrestamista, feesTitulo, assignment, closing, creditos, yaPagado, cashToClose,
     feesLenderCierre, desembolsoNeto, capitaliza, payoffHml,
     earnest: +inp.earnest || 0, ctcReal: inp._ctc_real || null, closingReal: inp._closing_real || null };
@@ -323,7 +332,7 @@ function ffUwCalcCashout(inp, arv) {
 function ffUwCalcIntereses(inp, cashout, negocio) {
   // ⛓ UNA base del HML (punto 0): el préstamo bruto de Del Negocio — se acabó el $291,780 vs $280,000
   const prestamoBruto = negocio && negocio.prestamo > 0 ? Math.round(negocio.prestamo)
-    : Math.round((+inp.purchase || 0) * ((+inp.hml_finance_pct || 90) / 100)) + (inp._remodCalc || 0);  // fallback legacy
+    : Math.round((+inp.purchase || 0) * (ffUwPctCompra(inp) / 100) + (inp._remodCalc || 0) * (ffUwPctRemo(inp) / 100));  // fallback legacy
   const tasaHarmony = ffUwTasaHml(inp) / 100;
   const mesesObra = negocio ? negocio.mesesObra : ffUwMesesObra(inp);
   const R2i = n => Math.round(n * 100) / 100;
@@ -442,7 +451,11 @@ function ffUwViewNegocio() {
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
     + kitInput('Precio de compra', 'lo que se paga por la casa', inp.purchase, "ffUwSet('purchase',VAL)")
     + estToggle + estBox
-    + kitInput('% que financia el prestamista', r.baseModo === 'rehab' ? 'sobre compra + rehab (modo legacy)' : 'sobre la base = compra + DRAW TOTAL (90 típico, 100 permitido)', inp.hml_finance_pct, "ffUwSet('hml_finance_pct',VAL)", { pct: true })
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    + kitInputSm('% de la COMPRA que presta', r.pctCompra, "ffUwSet('hml_pct_compra',VAL)", { pct: true })
+    + kitInputSm('% de la REMODELACIÓN que presta', r.pctRemo, "ffUwSet('hml_pct_remo',VAL)", { pct: true })
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--txt3,#9fb0c9);margin:-4px 0 10px">típico Harmony: <b>90%</b> de la compra · <b>100%</b> de la remo — préstamo = ' + r.pctCompra + '%×compra + ' + r.pctRemo + '%×' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + kitInputSm('Meses de OBRA (remodelación)', r.mesesObra, "ffUwSet('meses_obra',VAL)")
     + kitInputSm('Meses RENTANDO hasta el refi', r.mesesRenta, "ffUwSet('meses_renta',VAL)")
@@ -498,7 +511,7 @@ function ffUwViewNegocio() {
     + alerta + supuestosO7
     + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">El inversionista pone (HUD)</div>'
     + kitRow(r.baseModo === 'rehab' ? 'Base (compra ' + UW_M(+inp.purchase) + ' + rehab ' + UW_M(r.remod) + ')' : 'Base (compra ' + UW_M(+inp.purchase) + ' + DRAW TOTAL ' + UW_M(r.draw) + ')', r.baseHud)
-    + kitRow('&minus; Préstamo (' + inp.hml_finance_pct + '% de la base)', r.prestamo, { neg: true })
+    + kitRow('&minus; Préstamo (' + r.pctCompra + '% compra + ' + r.pctRemo + '% ' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + ')', r.prestamo, { neg: true })
     + kitRow('= Down payment', r.downPayment)
     + kitRow('+ Fees prestamista (orig ' + UW_M2(r.origination) + ' + doc + draw + uw + prepaid)', r.feesPrestamista)
     + kitRow('+ Título / escrow / registro', r.feesTitulo)
@@ -509,7 +522,7 @@ function ffUwViewNegocio() {
     + (r.closingReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Gastos de cierre reales (Airtable): ' + UW_M(r.closingReal) + ' &middot; &Delta; ' + UW_M(r.closing - r.closingReal) + '</div>' : '')
     // 1C · lo que RECIBE el negocio vs lo que DEBE al refinanciar — dos números distintos (punto 1)
     + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">El hard money te presta (desembolso neto)</div>'
-    + kitRow('Préstamo bruto (' + inp.hml_finance_pct + '% × base)', r.prestamo)
+    + kitRow('Préstamo bruto (' + r.pctCompra + '% compra + ' + r.pctRemo + '% ' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + ')', r.prestamo)
     + kitRow('&minus; Puntos/originación (' + (+inp.cc_origination_pct || 0) + '%)', r.origination, { neg: true })
     + kitRow('&minus; Fees de cierre del lender (doc + draw + uw)', r.feesLenderCierre, { neg: true })
     + kitRow('<b>= Desembolso neto al negocio</b>', null, { big: true, txt: UW_M2(r.desembolsoNeto), color: 'var(--pos,#34d399)' })
@@ -644,7 +657,7 @@ function ffUwViewIntereses() {
   const heroHml = kitHero('🔨 Pago mensual al Harmony', UW_M2(i.intMensualHarmony) + '/mes',
     'HML · ' + i.tasaHarmony + '%/año · solo interés · durante la obra/hold — <b>el pago mensual no depende de los meses</b>', amber);
   const cardHml = '<div class="card" style="padding:18px 22px;border-radius:18px;margin-bottom:22px">'
-    + kitRow('Préstamo bruto del HML (⛓ Del Negocio: ' + (+inp.hml_finance_pct || 90) + '% × (compra + draw))', i.prestamoBruto)
+    + kitRow('Préstamo bruto del HML (⛓ Del Negocio: ' + o.negocio.pctCompra + '% compra + ' + o.negocio.pctRemo + '% draw)', i.prestamoBruto)
     + kitRow('× ' + i.tasaHarmony + '% ÷ 12 = pago mensual', i.intMensualHarmony, { money2: true })
     + kitRow('<b>Interés total estimado del hold (' + i.mesesObra + ' m)</b>', i.interesTotalObra, { money2: true, big: true, color: amber, last: true })
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'
