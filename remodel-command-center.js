@@ -10,6 +10,7 @@
 const RC = { sys: null, section: 'command', obras: [], alerts: [], syncLog: null, names: {}, loading: false, chat: [] };
 window.RC = RC;
 const RC_FN_URL = () => `${window.SUPABASE_URL}/functions/v1/sync-remodel-airtable`;
+const RC_WK_URL = () => `${window.SUPABASE_URL}/functions/v1/sync-remodel-workers`;
 function RC_M(n) { return (typeof posMoney === 'function') ? posMoney(n) : '$' + Math.round(n || 0).toLocaleString(); }
 function RC_K(n) { return (typeof posMoneyK === 'function') ? posMoneyK(n) : RC_M(n); }
 function RC_E(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -276,11 +277,17 @@ function rcInsights(c) {
 async function rcPull() {
   const btn = document.getElementById('rc-pull'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Trayendo…'; }
   try {
-    const res = await fetch(RC_FN_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` }, body: JSON.stringify({ user_id: (window.state && state.user && state.user.id) || null }) });
-    const r = await res.json();
+    const hdrs = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` };
+    const body = JSON.stringify({ user_id: (window.state && state.user && state.user.id) || null });
+    // Pull = obras (sync-remodel-airtable) + horas de trabajadores (sync-remodel-workers), en paralelo.
+    // Si horas falla, el pull de obras NO se rompe: se avisa en el toast.
+    const [r, wk] = await Promise.all([
+      fetch(RC_FN_URL(), { method: 'POST', headers: hdrs, body }).then(x => x.json()),
+      fetch(RC_WK_URL(), { method: 'POST', headers: hdrs, body }).then(x => x.json()).catch(e2 => ({ ok: false, error: String(e2) })),
+    ]);
     if (!r.ok) throw new Error(r.error || 'Sync falló');
     await rcLoadAll(); rcRender();
-    if (window.toast) toast(`Airtable actualizado — ${r.records_synced || 0} obras`, 'success');
+    if (window.toast) toast(wk.ok ? `Airtable actualizado — ${r.records_synced || 0} obras + horas actualizadas` : `Obras actualizadas (${r.records_synced || 0}) — horas fallaron: ${wk.error || '?'}`, wk.ok ? 'success' : 'warning');
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Pull Airtable'; }
     if (window.toast) toast('Error en Pull: ' + e.message, 'error');
@@ -711,6 +718,13 @@ function rcPagoQuincenal() {
     + '<button class="repbtn" onclick="rcPagoGenerar()">Ver desglose →</button></div></div>';
   ov.appendChild(el);
 }
+// Nombre del trabajador (definición única): texto libre de Airtable → si falta, el LINK a
+// Personal en Campo (worker_rec_id, B8) resuelto contra remodel_crew_rates (ya en memoria) → '?'.
+function rcWorkerName(h) {
+  const t = String(h.worker || '').trim(); if (t) return t;
+  const cr = (RC.crewRates || []).find(c => c.airtable_id === h.worker_rec_id);
+  return (cr && String(cr.nombre || '').trim()) || '?';
+}
 async function rcPagoGenerar() {
   const casa = document.getElementById('pq-casa').value;
   const fechaPago = document.getElementById('pq-fecha').value;
@@ -737,7 +751,7 @@ async function rcPagoGenerar() {
     const label = o ? rcShort(o.address) : (rcShort(h.casa) || 'Sin casa asignada');
     if (!byCasa[label]) byCasa[label] = { label, recId: o ? (o.airtable_id || null) : null, lider: o ? (o.lider || '—') : '—', workers: {}, sem1: { horas: 0, pago: 0 }, sem2: { horas: 0, pago: 0 } };
     const g = byCasa[label];
-    const w = (h.worker || '?').trim();
+    const w = rcWorkerName(h);
     if (!g.workers[w]) g.workers[w] = { w, sem1: { horas: 0, pago: 0 }, sem2: { horas: 0, pago: 0 } };
     // Fuente ÚNICA del pago diario = "Pago Total Dia" (Airtable), NO recalcular.
     const ptd = Number(h.pago_total_dia);
