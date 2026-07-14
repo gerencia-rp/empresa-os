@@ -695,7 +695,9 @@ function ffUwViewIngreso() {
     + kitRow('&minus; Vacancy (' + UWc('vacancy_pct', 5) + '%)', g.vacancy, { neg: true })
     + kitRow('&minus; Mantenimiento (' + UWc('mantenimiento_pct', 5) + '%)', g.mantenimiento, { neg: true })
     + kitRow('<b>= Flujo mensual</b>', g.flujo, { big: true, color: pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)', last: true })
-    + '</div>';
+    + '</div>'
+    // ⛓ pago HML de la Calc 4: antes del refi el flujo paga el hard money, no la cuota DSCR
+    + (o.intereses.intMensualHarmony > 0 ? '<div class="card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--txt3,#9fb0c9)">⏳ <b>Durante el hold</b> (antes del refi, si ya renta): pagando el HML ' + UW_M(o.intereses.intMensualHarmony) + '/mes (⛓ Calc 4) en vez de la cuota DSCR → <b style="color:' + (g.flujo + g.pagoDscr - o.intereses.intMensualHarmony >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)') + '">' + UW_M(g.flujo + g.pagoDscr - o.intereses.intMensualHarmony) + '/mes</b></div>' : '');
   return '<div style="max-width:560px;margin:0 auto">'
     + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Ingreso Mensual</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">El flujo que deja la casa rentada, después de TODOS los gastos.</div></div>'
     + hero + inputs + desglose + '</div>';
