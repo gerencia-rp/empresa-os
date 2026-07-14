@@ -50,6 +50,8 @@ const BUNDLE_FILES = [
   "pm/ff-unificada-pro.js",
   "pm/ff-analitica.js",
   "os/os.js",
+  "os/os-lineage-views.js",
+  "os/os-lineage.js",
   "os/os-admin.js",
   "os/os-cierre-engine.js",
   "os/os-ct-sabueso.js",
