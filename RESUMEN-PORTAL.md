@@ -52,5 +52,8 @@
 - **Nombre del inversionista en el saludo** — inv_access no guarda nombre (el portal saluda genérico); si se quiere, agregar columna o param.
 - CoC de Dove sale **negativo con la operación real** (−$164/mes): es HONESTO — la cuota del refi al 11.39% supera la renta neta hoy (coincide con el déficit $10,358 del resumen). No es un bug.
 
+## Bug pre-existente encontrado y arreglado
+- El rewrite SPA de `vercel.json` excluía `inversionista` como PREFIJO → **`/inversionistas` (el admin) daba 404 en prod al entrar por URL directa** desde que existe la página standalone (8-jul). Anclado a `inversionista$`; verificado: `/inversionistas` = 200 (OS) y `/inversionista` sigue sirviendo el portal. Smoke admin prod 7/7.
+
 ## Reversibilidad
 - Todo aditivo: 1 migración de seed (4 filas `on conflict do nothing`), 3 archivos de front editados (git revert alcanza), soft-delete en todas las escrituras del admin.
