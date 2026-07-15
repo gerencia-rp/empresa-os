@@ -140,14 +140,19 @@ function ffUwDefaults() {
     // otras calc (se llenan en 2-6)
     arv: 0, appraisal: 0, ltv_pct: UWc('refi_ltv_pct', 75), payoff: 0,
     renta_mensual: 0, gastos_mensuales: 0,
-    // MODO VENTA (flip) — precio de venta = ARV, costos de venta, staging, split inversionista/operador
-    venta_precio: 0,                                            // 0 = usar arv.probable
-    venta_comision_pct: UWc('venta_comision_pct', 6), venta_closing: UWc('venta_closing', 2500),
-    venta_title_pct: UWc('venta_title_pct', 0), venta_staging: UWc('venta_staging', 1200),
-    venta_capital: 0,                                           // 0 = usar negocio.cashToClose (⛓ lo que puso el inversionista)
-    venta_payoff: 0,                                            // 0 = HML real del deal (saldo Airtable) o ⛓ modelado
-    venta_dias: 0,                                              // días del proyecto → ROI anualizado (0 = derivar de meses de hold)
+    // MODO VENTA (flip) — cascada de experto: precio − costos venta − all-in − interés HML − holding = utilidad
+    venta_precio: 0,                                            // 0 = usar arv.probable (precio de venta esperado, editable)
+    venta_comision_pct: UWc('venta_comision_pct', 6),          // comisión de venta (% del precio)
+    venta_cierre_pct: UWc('venta_cierre_pct', 1.5),            // cierre vendedor: title/escrow/transfer (% del precio)
+    venta_concesiones_pct: UWc('venta_concesiones_pct', 0),   // concesiones al comprador (% del precio)
+    venta_staging: UWc('venta_staging', 0),                    // staging / preparación ($, opcional)
+    venta_capital: 0,                                          // 0 = usar negocio.cashToClose (down + cierre compra + no cubierto por HML)
+    venta_payoff: 0,                                           // 0 = HML real del deal (saldo Airtable) o ⛓ modelado
+    venta_meses: 0,                                            // meses hasta vender (0 = derivar del hold) → carry HML + ROI anualizado
+    venta_holding_mes: 0,                                     // holding $/mes (0 = utilities + seguro + predial derivados)
+    venta_impuesto_pct: UWc('venta_impuesto_pct', 0),         // impuesto estimado sobre la utilidad (flip = ordinaria; editable)
     venta_split_inv_pct: UWc('venta_split_inversionista_pct', 50),
+    venta_dias: 0,                                            // legacy: días del proyecto (se convierte a meses)
     // 3 · Cash-Out refi DSCR (Champions) — itemizado, calibrado con los HUD de Michelle/Echo
     refi_prestamo_real: 0,                                              // override: préstamo real del refi (Airtable) — 0 = calculado
     refi_dscr_obj: UWc('refi_dscr_objetivo', 1.0),
@@ -449,41 +454,66 @@ function ffUwCalcIngreso(inp, arv, intereses) {
   const cashOnCash = cashLeft > 0 ? Math.round(100 * (flujo * 12) / cashLeft * 10) / 10 : null;
   return { renta, pagoDscr, impuestos, seguro, pmFee, vacancy, mantenimiento, flujo, cashOnCash, cashLeft };
 }
-// ═══ CALCULADORA · VENTA (MODO A: fix & flip) ═══
-// Salida = VENDER. El ARV es el precio de salida (una sola ganancia). Encadena la base del deal
-// (Calc 1: payoff del HML, capital que puso el inversionista) — acá NO se re-teclea compra/obra.
-// Reproduce el cierre real de Arcadia: Net Wire − staging − capital = utilidad; split 50/50; ROI del
-// inversionista = su parte ÷ su capital; anualizado = ROI × 365/días. (ff_hml_loans.roi_venta = 0.0702)
-function ffUwCalcVenta(inp, arv, negocio) {
+// ═══ CALCULADORA · VENTA (MODO A: fix & flip) — modelo de experto ═══
+// Salida = VENDER: el ARV es el PRECIO DE SALIDA (una sola ganancia). Cascada itemizada:
+//   precio − comisión − cierre vendedor − concesiones − ALL-IN (compra+rehab) − INTERÉS HML total
+//   (solo interés × meses hasta vender) − holding (utilities+seguro+predial) − staging = UTILIDAD NETA.
+//   El payoff del HML NO entra en la utilidad (el préstamo es financiación del all-in); sí en el Net Wire
+//   (cash en la mesa = precio − costos de venta − payoff). Encadena con Del Negocio (all-in, capital) e
+//   Intereses (pago mensual HML). Verificado contra el ejemplo del CEO: $449,177 → utilidad $65,638.
+function ffUwCalcVenta(inp, arv, negocio, intereses) {
   const R2 = n => Math.round(n * 100) / 100;
-  const precio = +inp.venta_precio > 0 ? +inp.venta_precio : (arv.probable || 0);   // precio de venta = ARV por default
+  const precio = +inp.venta_precio > 0 ? +inp.venta_precio : (arv.probable || 0);   // precio de venta = ARV por default (editable)
   const esArv = !(+inp.venta_precio > 0);
-  // costos de venta
-  const comision = R2(precio * ((+inp.venta_comision_pct || 0) / 100));
-  const titulo = R2(precio * ((+inp.venta_title_pct || 0) / 100));
-  const closing = +inp.venta_closing || 0;
-  const costosVenta = R2(comision + titulo + closing);
-  // payoff al vender = lo que le debés al HML: override manual → HML REAL del deal (saldo Airtable) → ⛓ modelado (Del Negocio)
+  // ── COSTOS DE VENTA (% del precio) ──
+  const comision = R2(precio * ((+inp.venta_comision_pct || 0) / 100));                     // default 6%
+  const cierre = R2(precio * ((+inp.venta_cierre_pct || 0) / 100));                         // title/escrow/transfer vendedor, default 1.5%
+  const concesiones = R2(precio * ((+inp.venta_concesiones_pct || 0) / 100));               // al comprador, default 0%
+  const costosVenta = R2(comision + cierre + concesiones);
+  // ── PAYOFF del HML (se cancela en el cierre; NO hay refi) → para el Net Wire ──
   let payoff, payoffFuente;
   if (+inp.venta_payoff > 0) { payoff = +inp.venta_payoff; payoffFuente = 'override manual'; }
   else if (+inp._hml_saldo > 0) { payoff = +inp._hml_saldo; payoffFuente = 'HML real del deal (Airtable)'; }
   else { payoff = negocio.payoffHml || 0; payoffFuente = '⛓ modelado (Del Negocio)'; }
-  const netWire = R2(precio - costosVenta - payoff);
+  const netWire = R2(precio - costosVenta - payoff);                                        // lo que te giran en la mesa de cierre
+  // ── TIEMPO hasta vender (meses) — driver del carry HML y del ROI anualizado ──
+  const meses = +inp.venta_meses > 0 ? +inp.venta_meses
+    : (+inp.venta_dias > 0 ? Math.round(+inp.venta_dias / 30.44 * 10) / 10 : (negocio.mesesHold > 0 ? negocio.mesesHold : null));
+  const mesesEstimado = !(+inp.venta_meses > 0);
+  // ── COSTOS DEL PROYECTO (economía real del flip, NO el payoff del préstamo) ──
+  const allIn = R2((+inp.purchase || 0) + (negocio.remod || 0));                            // compra + rehab (Total Draws)
+  const intMensualHml = (intereses && intereses.intMensualHarmony) || 0;                    // ⛓ Intereses (solo interés, sin DSCR)
+  const interesHmlTotal = R2(intMensualHml * (meses || 0));                                 // el carry real que se come la utilidad
+  const seguroMes = UWc('seguro_mensual', 120);
+  const predialMes = R2((arv.probable || 0) * (UWc('impuestos_pct_arv', 2.2) / 100) / 12);
+  const holdingMesCalc = R2((+inp.utilities_mes || 0) + seguroMes + predialMes);
+  const holdingMes = +inp.venta_holding_mes > 0 ? +inp.venta_holding_mes : holdingMesCalc;  // editable (0 = derivado)
+  const holdingMesEsCalc = !(+inp.venta_holding_mes > 0);
+  const holding = R2(holdingMes * (meses || 0));
   const staging = +inp.venta_staging || 0;
-  const capital = +inp.venta_capital > 0 ? +inp.venta_capital : (negocio.cashToClose || 0);   // ⛓ lo que puso el inversionista (HUD)
+  // ── UTILIDAD del proyecto (antes de impuestos) ──
+  const utilidadAntesImp = R2(precio - costosVenta - allIn - interesHmlTotal - holding - staging);
+  const impuestoPct = +inp.venta_impuesto_pct || 0;                                         // flip = ganancia ORDINARIA (editable, default 0)
+  const impuesto = (impuestoPct > 0 && utilidadAntesImp > 0) ? R2(utilidadAntesImp * impuestoPct / 100) : 0;
+  const utilidad = R2(utilidadAntesImp - impuesto);
+  // ── MÉTRICAS del flip ──
+  const margen = precio > 0 ? Math.round(10000 * utilidad / precio) / 100 : null;           // % sobre venta
+  const capital = +inp.venta_capital > 0 ? +inp.venta_capital : (negocio.cashToClose || 0); // down + cierre compra + lo no cubierto por HML
   const capitalEsCtc = !(+inp.venta_capital > 0);
-  const utilidad = R2(netWire - staging - capital);                                 // utilidad neta del proyecto
+  const roi = capital > 0 ? Math.round(10000 * utilidad / capital) / 100 : null;            // cash-on-cash
+  const roiAnual = (roi != null && meses > 0) ? Math.round(100 * roi * 12 / meses) / 100 : null;  // ★ velocidad manda
+  // ── CHECK regla 70% / MAO: all-in ≤ ARV × maxPct − costos de venta ──
+  const maoPct = UWc('allin_max_pct', 75);
+  const maoVenta = (arv.probable || 0) > 0 ? R2(arv.probable * maoPct / 100 - costosVenta) : null;
+  const regla70 = maoVenta != null ? allIn <= maoVenta : null;
+  // ── REPARTO: devolver capital a inversionistas → repartir la utilidad por % equity ──
   const splitInvPct = Math.min(100, Math.max(0, +inp.venta_split_inv_pct != null && inp.venta_split_inv_pct !== '' ? +inp.venta_split_inv_pct : 50));
   const parteInv = R2(utilidad * splitInvPct / 100);
   const parteOp = R2(utilidad - parteInv);
-  // ROI del INVERSIONISTA (definición del CEO / ff_hml_loans.roi_venta): su parte de la utilidad ÷ su capital
-  const roiPeriodo = capital > 0 ? Math.round(10000 * parteInv / capital) / 100 : null;        // %
-  const dias = +inp.venta_dias > 0 ? +inp.venta_dias : (negocio.mesesHold > 0 ? Math.round(negocio.mesesHold * 30.44) : null);
-  const diasEstimado = !(+inp.venta_dias > 0);
-  const roiAnual = (capital > 0 && dias) ? Math.round(10000 * (parteInv / capital) * (365 / dias)) / 100 : null;
-  const roiProyecto = capital > 0 ? Math.round(10000 * utilidad / capital) / 100 : null;        // utilidad total ÷ capital (referencia)
-  return { precio, esArv, comision, titulo, closing, costosVenta, payoff, payoffFuente, netWire, staging, capital, capitalEsCtc,
-    utilidad, splitInvPct, parteInv, parteOp, roiPeriodo, roiAnual, roiProyecto, dias, diasEstimado };
+  return { precio, esArv, comision, cierre, concesiones, costosVenta, payoff, payoffFuente, netWire,
+    meses, mesesEstimado, allIn, intMensualHml, interesHmlTotal, seguroMes, predialMes, holdingMes, holdingMesEsCalc, holding, staging,
+    utilidadAntesImp, impuestoPct, impuesto, utilidad, margen, capital, capitalEsCtc, roi, roiAnual,
+    maoPct, maoVenta, regla70, splitInvPct, parteInv, parteOp };
 }
 // ═══ CALCULADORA 6 · VISTA UNIFICADA ═══
 function ffUwComputeAll() {
@@ -498,7 +528,7 @@ function ffUwComputeAll() {
   // cash left in = cash to close − cash-out recuperado
   inp._cashLeftIn = Math.max(0, negocio.cashToClose - Math.max(0, cashout.cashOut));
   const ingreso = ffUwCalcIngreso(inp, arv, intereses);
-  const venta = ffUwCalcVenta(inp, arv, negocio);
+  const venta = ffUwCalcVenta(inp, arv, negocio, intereses);   // ⛓ el interés mensual del HML alimenta el carry de la venta
   // all-in = compra + remod + holding(intereses del draw) — común a los dos modos
   const allIn = (+inp.purchase || 0) + negocio.remod + negocio.intereses + negocio.utilities;
   const allInPct = arv.probable > 0 ? Math.round(100 * allIn / arv.probable) : null;
@@ -507,15 +537,17 @@ function ffUwComputeAll() {
   const gAllIn = allInPct != null && allInPct <= allInMax;
   const gDeficit = !negocio.deficitRiesgo;
   if (esVenta) {
-    // MODO VENTA: la ganancia es UNA vez (utilidad de la venta), no hay flujo/refi
+    // MODO VENTA: la ganancia es UNA vez (utilidad del flip). Guardrails: utilidad+, regla 70%, sin déficit.
     const gUtil = venta.utilidad > 0;
-    const go = gAllIn && gDeficit && gUtil;
-    const veredicto = go ? 'GO' : ((gAllIn && gUtil) || (gDeficit && gUtil)) ? 'revisar' : 'NO-GO';
+    const g70 = venta.regla70 !== false;                       // null (sin ARV) no penaliza
+    const go = gUtil && g70 && gDeficit;
+    const veredicto = go ? 'GO' : (gUtil && (g70 || gDeficit)) ? 'revisar' : 'NO-GO';
     return { negocio, arv, cashout, intereses, ingreso, venta,
       unificada: { modo: 'venta', allIn, allInPct, allInMax, mao, cashToClose: negocio.cashToClose,
-        precio: venta.precio, netWire: venta.netWire, utilidad: venta.utilidad, parteInv: venta.parteInv, parteOp: venta.parteOp,
-        splitInvPct: venta.splitInvPct, roiPeriodo: venta.roiPeriodo, roiAnual: venta.roiAnual, dias: venta.dias,
-        gAllIn, gDeficit, gUtil, veredicto } };
+        precio: venta.precio, netWire: venta.netWire, utilidad: venta.utilidad, margen: venta.margen,
+        parteInv: venta.parteInv, parteOp: venta.parteOp, splitInvPct: venta.splitInvPct,
+        roi: venta.roi, roiAnual: venta.roiAnual, meses: venta.meses, regla70: venta.regla70, maoVenta: venta.maoVenta,
+        gAllIn, gDeficit, gUtil, g70, veredicto } };
   }
   // MODO HOLD (refi + renta): lo de siempre
   const roi = inp._cashLeftIn > 0 ? Math.round(100 * (ingreso.flujo * 12) / inp._cashLeftIn * 10) / 10 : null;
