@@ -145,6 +145,7 @@ function ffUwDefaults() {
     venta_comision_pct: UWc('venta_comision_pct', 6), venta_closing: UWc('venta_closing', 2500),
     venta_title_pct: UWc('venta_title_pct', 0), venta_staging: UWc('venta_staging', 1200),
     venta_capital: 0,                                           // 0 = usar negocio.cashToClose (⛓ lo que puso el inversionista)
+    venta_payoff: 0,                                            // 0 = HML real del deal (saldo Airtable) o ⛓ modelado
     venta_dias: 0,                                              // días del proyecto → ROI anualizado (0 = derivar de meses de hold)
     venta_split_inv_pct: UWc('venta_split_inversionista_pct', 50),
     // 3 · Cash-Out refi DSCR (Champions) — itemizado, calibrado con los HUD de Michelle/Echo
@@ -462,7 +463,11 @@ function ffUwCalcVenta(inp, arv, negocio) {
   const titulo = R2(precio * ((+inp.venta_title_pct || 0) / 100));
   const closing = +inp.venta_closing || 0;
   const costosVenta = R2(comision + titulo + closing);
-  const payoff = negocio.payoffHml || 0;                                            // ⛓ Del Negocio (principal HML + capitalizado)
+  // payoff al vender = lo que le debés al HML: override manual → HML REAL del deal (saldo Airtable) → ⛓ modelado (Del Negocio)
+  let payoff, payoffFuente;
+  if (+inp.venta_payoff > 0) { payoff = +inp.venta_payoff; payoffFuente = 'override manual'; }
+  else if (+inp._hml_saldo > 0) { payoff = +inp._hml_saldo; payoffFuente = 'HML real del deal (Airtable)'; }
+  else { payoff = negocio.payoffHml || 0; payoffFuente = '⛓ modelado (Del Negocio)'; }
   const netWire = R2(precio - costosVenta - payoff);
   const staging = +inp.venta_staging || 0;
   const capital = +inp.venta_capital > 0 ? +inp.venta_capital : (negocio.cashToClose || 0);   // ⛓ lo que puso el inversionista (HUD)
@@ -477,7 +482,7 @@ function ffUwCalcVenta(inp, arv, negocio) {
   const diasEstimado = !(+inp.venta_dias > 0);
   const roiAnual = (capital > 0 && dias) ? Math.round(10000 * (parteInv / capital) * (365 / dias)) / 100 : null;
   const roiProyecto = capital > 0 ? Math.round(10000 * utilidad / capital) / 100 : null;        // utilidad total ÷ capital (referencia)
-  return { precio, esArv, comision, titulo, closing, costosVenta, payoff, netWire, staging, capital, capitalEsCtc,
+  return { precio, esArv, comision, titulo, closing, costosVenta, payoff, payoffFuente, netWire, staging, capital, capitalEsCtc,
     utilidad, splitInvPct, parteInv, parteOp, roiPeriodo, roiAnual, roiProyecto, dias, diasEstimado };
 }
 // ═══ CALCULADORA 6 · VISTA UNIFICADA ═══
@@ -882,6 +887,7 @@ function ffUwViewVenta() {
     + kitInputSm('Closing de venta ($)', inp.venta_closing, "ffUwSet('venta_closing',VAL)")
     + kitInputSm('Staging / preparación ($)', inp.venta_staging, "ffUwSet('venta_staging',VAL)")
     + kitInputSm('Capital invertido ($)', v.capital, "ffUwSet('venta_capital',VAL)", { foot: v.capitalEsCtc ? '⛓ = el inversionista pone (Calc 1)' : 'override manual' })
+    + kitInputSm('Payoff del HML ($)', v.payoff, "ffUwSet('venta_payoff',VAL)", { foot: 'fuente: ' + v.payoffFuente + (+inp.venta_payoff > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'venta_payoff\',0)">↩ auto</a>' : '') })
     + kitInputSm('Días del proyecto', v.dias || '', "ffUwSet('venta_dias',VAL)", { plain: true, foot: v.diasEstimado ? 'estimado de meses de hold' : 'compra → venta' })
     + '</div>'
     + kitInputSm('Reparto inversionista (%)', v.splitInvPct, "ffUwSet('venta_split_inv_pct',VAL)", { pct: true, foot: 'operador ' + (100 - v.splitInvPct) + '% · default 50/50 (editable por deal)' })
@@ -892,7 +898,7 @@ function ffUwViewVenta() {
     + kitRow('&minus; Comisión (' + inp.venta_comision_pct + '%)', v.comision, { neg: true })
     + (v.titulo > 0 ? kitRow('&minus; Título / escrow (' + inp.venta_title_pct + '%)', v.titulo, { neg: true }) : '')
     + kitRow('&minus; Closing de venta', v.closing, { neg: true })
-    + kitRow('&minus; Payoff del HML (⛓ Del Negocio)', v.payoff, { neg: true })
+    + kitRow('&minus; Payoff del HML (' + v.payoffFuente + ')', v.payoff, { neg: true })
     + kitRow('<b>= Net Wire</b>', v.netWire, { big: true, color: v.netWire >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' })
     + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Utilidad del proyecto</div>'
     + kitRow('Net Wire', v.netWire)
