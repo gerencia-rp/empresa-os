@@ -28,7 +28,6 @@ Pedido del CEO: la suite estaba armada para HOLD/refi; para una VENTA la matemá
 - ✅ **Distribuciones — bug Yeisson MUERTO**: el k1_url se guardaba pero la fila solo mostraba un emoji; ahora columna Links con **📎 pago ↗ y 📄 K-1 ↗ clickeables**, campos SEPARADOS `comprobante_url` (soporte) ≠ `k1_url` (fiscal), **edición ✎ auditada** + soft-delete; el portal del inversionista también muestra ambos links. Migr `20260715120000` aplicada.
 - ✅ **Casas & reparto**: buscador (casa o inversionista) + orden A-Z casa / inversionista / mayor inversión.
 - Vista del inversor ya separada por diseño (portal RLS solo-lectura); el modelo interno jamás sale.
->>>>>>> origin/main
 
 ## 15-jul (tarde) · 🕸 Linaje v3: overlays + lectura EN VIVO + ocupación única (commits d3f8d77 · c070f7e · 6c8a35d)
 - ✅ **Crawler v3 con drivers de OVERLAYS** — abre y recorre headless: FF CC (6 secciones + Underwriting con hipotético y las 6 calcs vía `ffUwSub`), Rentas CC (7 secciones), Remodel CC (7 secciones + Reportes CEO r1/r2/r5), PM clásico (7 tabs), Estimador Pro (4 tabs) — extractores por DNA de cada overlay (`.card.kpi`, `.kit-kpi`, `.hero-num`, `.kpi>.l+.v`, Tailwind uppercase+bold). **GATE TOTAL: 192/192 números vistos en 29 pantallas · 0 sin cadena · verificado también EN PROD**. 95 descubiertos → TODOS curados con fuente exacta en la misma sesión (0 pendientes). Filas-registro (direcciones) excluidas por diseño: su linaje es el de sus columnas. UW hipotético sin inputs no muestra números ("sin dato ≠ $0" comprobado por el crawler). ci:gate 15/15.
