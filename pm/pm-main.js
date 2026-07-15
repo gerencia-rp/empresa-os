@@ -180,7 +180,9 @@ async function pmLoadAll() {
     { name: 'templates',  optional: true,  q: () => sb.from('pm_message_templates').select('*').order('name') },
     { name: 'bookingHistory', optional: true, q: () => sb.from('pm_booking_history').select('*').order('moved_at', { ascending: false }).limit(2000) },
     { name: 'utilities',  optional: true,  q: () => sb.from('pm_utilities').select('*').order('service_name') },
-    { name: 'dataWarnings', optional: true, q: () => sb.from('pm_data_warnings').select('*').eq('resolved', false).order('detected_at', { ascending: false }).limit(500) }
+    { name: 'dataWarnings', optional: true, q: () => sb.from('pm_data_warnings').select('*').eq('resolved', false).order('detected_at', { ascending: false }).limit(500) },
+    // ocupación ÚNICA del holding (v_ocupacion, capa de KPIs) — la MISMA cifra que Global/Rentas CC
+    { name: 'ocupView', optional: true, q: () => sb.from('v_ocupacion').select('*') }
   ];
 
   const results = {};
@@ -232,6 +234,7 @@ async function pmLoadAll() {
   pmaState.bookingHistory = results.bookingHistory || [];
   pmaState.utilities = results.utilities || [];
   pmaState.dataWarnings = results.dataWarnings || [];
+  pmaState.ocupView = (results.ocupView || [])[0] || null;   // v_ocupacion (ocupación única del holding)
 
   console.log('[pm] Carga completa:', {
     properties: pmaState.properties.length,
@@ -784,11 +787,15 @@ function pmPayrollForMonth(y,m){
     .reduce((s,p)=>s+Number(p.salary||0),0);
 }
 function pmOccupancyAt(date){
-  // Ocupación sobre UNIDADES RENTABLES (no sobre pm_units físicas).
-  // Nota: el numerador/denominador "rentable" usa el booking activo de hoy
-  // (pmActiveBookingOf con default hoy); `date` se mantiene por compatibilidad.
   const active = new Set(pmaState.properties.filter(p=>p.active!==false).map(p=>p.id));
   const units = pmaState.units.filter(u=>active.has(u.property_id));
+  // OCUPACIÓN ÚNICA (15-jul): el headline sale de v_ocupacion (capa de KPIs, base rentable 48)
+  // — la MISMA cifra que Global y Rentas CC. La regla del dueño queda como fallback sin la
+  // vista y para el detalle por casa/cobranza (pmRentableUnitsOf, que no cambia).
+  const oc = pmaState.ocupView || null;
+  if (oc && +oc.unidades_rentables > 0) {
+    return { occupied: +oc.ocupadas, total: +oc.unidades_rentables, pct: +oc.ocupadas / +oc.unidades_rentables, units, fuente: 'v_ocupacion' };
+  }
   const total = pmTotalRentableUnits();
   const occ = pmTotalOccupiedRentableUnits();
   return { occupied: occ, total, pct: total?occ/total:0, units };
