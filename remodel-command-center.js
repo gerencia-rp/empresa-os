@@ -202,14 +202,23 @@ function rcCompute() {
   };
   const lideres = rcAggLideres(true);
   const lideresCuadrilla = rcAggLideres(false);
-  // Alertas críticas computadas + de la tabla
+  // Alertas críticas = SOLO obras En construcción (accionables hoy). Lo histórico de
+  // finalizadas (atrasos/sobrecostos al cierre) vive en Cerebro de obra + Estimado vs Real.
   const compAlerts = [];
-  activas.concat(fin).forEach(o => {
-    if (o.dq.sobrePresup) compAlerts.push({ sev: 'r', obra: rcShort(o.address), t: `Sobre presupuesto: gastó ${RC_M(o.dq.gasto)} vs ${RC_M(o.dq.presup)} presupuestado (${Math.round((o.dq.gasto / o.dq.presup - 1) * 100)}% más).` });
-    const fe = o.fecha_estimada_fin, fr = o.fecha_real_fin;
-    if (o.dq.fin && fe && fr && new Date(fr) > new Date(fe)) {
-      const d = Math.round((new Date(fr) - new Date(fe)) / 86400000);
-      if (d > 10) compAlerts.push({ sev: 'y', obra: rcShort(o.address), t: `Cerró con ${d} días de atraso (estimado ${fe}, real ${fr}).` });
+  const _scPct = (RC.sobrecostoPct != null ? RC.sobrecostoPct : 10) / 100;
+  const _hoy = new Date();
+  obras.filter(o => o.proceso === 'En construcción').forEach(o => {
+    const av = +o.avance_pct || 0, gasto = o.dq.gasto, presup = o.dq.presup;
+    // Sobre-presupuesto PROPORCIONAL: gasto acumulado vs presupuesto × avance%
+    if (presup > 0 && av > 0) {
+      const prop = presup * av / 100;
+      if (gasto > prop * (1 + _scPct)) compAlerts.push({ sev: 'r', obra: rcShort(o.address), t: `Sobre presupuesto al avance: gastó ${RC_M(gasto)} vs ${RC_M(prop)} proporcional (avance ${Math.round(av)}%): +${Math.round((gasto / prop - 1) * 100)}%.` });
+    }
+    // Atraso = HOY vs fecha ESTIMADA de finalización (no la real)
+    const fe = o.fecha_estimada_fin;
+    if (fe && _hoy > new Date(fe + 'T23:59:59')) {
+      const d = Math.round((_hoy - new Date(fe + 'T00:00:00')) / 86400000);
+      compAlerts.push({ sev: d > 10 ? 'r' : 'y', obra: rcShort(o.address), t: `Atrasada: +${d} días vs fecha estimada (${fe}) · avance ${Math.round(av)}%.` });
     }
   });
   // C) ESTIMADO vs REAL por casa (finalizadas confiables): presupuesto (est) vs monto_real (real)
@@ -258,6 +267,10 @@ function rcCompute() {
 function rcInsights(c) {
   const ins = [];
   if (c.sobreN > 0) ins.push({ s: 'r', t: `<b>${c.sobreN} obra(s) sobre presupuesto</b> (gasto real > 110% del presupuesto). Revisar antes de cerrar.` });
+  // Histórico de cierres con atraso (>10d) — acá y en Estimado vs Real, NO en alertas (no accionable)
+  const _finAtraso = c.fin.filter(o => o.fecha_estimada_fin && o.fecha_real_fin && (new Date(o.fecha_real_fin) - new Date(o.fecha_estimada_fin)) / 86400000 > 10)
+    .map(o => ({ a: rcShort(o.address), d: Math.round((new Date(o.fecha_real_fin) - new Date(o.fecha_estimada_fin)) / 86400000) })).sort((x, y) => y.d - x.d);
+  if (_finAtraso.length) ins.push({ s: 'y', t: `<b>${_finAtraso.length} finalizada(s) cerraron con >10 días de atraso</b> (peor: ${RC_E(_finAtraso[0].a)} +${_finAtraso[0].d}d) — ver Estimado vs Real.` });
   if (c.lideres.length) {
     const best = c.lideres[0], worst = c.lideres[c.lideres.length - 1];
     ins.push({ s: 'g', t: `Mejor líder por ganancia: <b>${RC_E(best.lider)}</b> — ${RC_M(best.ganancia)} en ${best.n} obra(s) (${best.margen}% margen).` });
