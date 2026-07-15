@@ -24,6 +24,7 @@ const OS_EMPRESAS = {
   'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
     { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenApp('rentas','property-manager')" },
     { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('rentas','cronograma')" },
+    { k: 'cartera', name: 'Informe de Cartera', icon: '📋', fn: "osNav('/cartera')" },
   ] },
   'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · estimación · pipeline', apps: [
     { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
@@ -227,6 +228,7 @@ function osParse(path) {
   if (seg[0] === 'admin') return { view: 'admin' };
   if (seg[0] === 'inversionistas') return { view: 'invadmin' };
   if (seg[0] === 'mapa') return { view: 'mapa' };
+  if (seg[0] === 'cartera') return { view: 'cartera' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (seg[0] === 'ia') { if (window.OSIA && seg[1]) OSIA.tab = seg[1]; return { view: 'empresa', empresa: 'ia' }; } // /ia/pedir|bandeja|galeria = tab del módulo
   if (OS_EMPRESAS[seg[0]]) {
@@ -243,6 +245,7 @@ function osTitle(r) {
   if (r.view === 'admin') return 'Admin · ' + base;
   if (r.view === 'invadmin') return 'Inversionistas · ' + base;
   if (r.view === 'mapa') return 'Mapa de Conexiones · ' + base;
+  if (r.view === 'cartera') return 'Informe de Cartera · ' + base;
   if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
   return 'No encontrado · ' + base;
@@ -480,6 +483,7 @@ function osRouteGuard(r) {
   else if ((r.view === 'empresa' || r.view === 'app') && OS_EMPRESAS[r.empresa]) need = [OS_EMPRESAS[r.empresa].key];
   else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
   else if (r.view === 'mapa') need = ['fix-flip', 'rentas', 'remodelacion', 'contable', 'operacion'];
+  else if (r.view === 'cartera') need = ['rentas', 'operacion', 'contable'];
   if (need && !need.some(osCanArea)) return need[0];
   return null;
 }
@@ -500,7 +504,7 @@ function osRender() {
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
