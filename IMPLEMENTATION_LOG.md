@@ -3,6 +3,24 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 15-jul (noche) · 🏷️ MODO VENTA (flip exit) — cascada de experto en el Underwriting
+Pedido del CEO: la suite estaba armada para HOLD/refi; para una VENTA la matemática es otra. Construido el modo de experto fix&flip, encadenado con las otras calcs (mismo deal = mismos números).
+
+**Item 0 — Toggle de estrategia + default desde Airtable** (ya venía de la sesión previa, confirmado): `[Vender (flip)] · [Rentar (hold)]` arriba; en Vender el nav OCULTA cashout/ingreso; default = Estrategia del deal (Fix and flip → Vender · Fix and hold → Rentar).
+
+**Item 1 — "Usar ARV" → precio de venta** (encadenado): el ARV oficial (`inp.arv`, fix de propagación previo) fluye a la calc de Venta como **precio de venta esperado** (editable, con "↩ volver al ARV"). Verificado end-to-end: confirmar otro ARV mueve el precio y la utilidad.
+
+**Item 2+3 — cascada de experto + métricas** (`ffUwCalcVenta`, reemplaza el modelo `netWire − capital`):
+- ANTES: `utilidad = Net Wire − staging − capital` (mezclaba el payoff del préstamo con la economía del proyecto).
+- DESPUÉS (modelo del CEO): `utilidad = precio − comisión% − cierre vendedor% − concesiones% − ALL-IN(compra+rehab) − INTERÉS HML total(solo interés × meses hasta vender) − holding(utilities+seguro+predial) − staging (− impuesto% opcional)`. El **payoff del HML NO entra en la utilidad** (es financiación del all-in); sí en el **Net Wire** (precio − costos venta − payoff = cash en la mesa, informativo).
+- Métricas: **margen sobre venta %**, **ROI cash-on-cash** (utilidad ÷ capital), **★ ROI ANUALIZADO** (ROI × 12/meses — la velocidad manda), **check regla 70/75%** (all-in ≤ ARV×maxPct − costos), meses hasta vender, semáforo del deal.
+- Reparto: **devolver capital a inversionistas → repartir la utilidad por % equity** (50/50 default, editable).
+- **Golden 26/26 (código real): ejemplo del CEO $449,177 → comisión 26,951 · cierre 6,738 · all-in 330,000 · interés HML 14,850 · holding 5,000 → utilidad $65,638 · margen 14.6% · ROI 140% · anualizado 335%.** ✓
+
+**Item 4/5 — Intereses en modo venta = SOLO HML**: se oculta todo el bloque DSCR/refi (préstamo del refi, cuota PITI, tope DSCR). Muestra solo el hard money: interés mensual × meses hasta vender = carry total que ⛓ alimenta la calc de Venta. El HML se cancela con el payoff en el cierre.
+
+**UI**: vista Venta con hero (utilidad + margen), semáforo, cascada itemizada, Net Wire, métricas del flip, reparto. Unificada + one-pager adaptados (KPIs de venta, utilidad del flip, ROI anualizado, regla 70%, timeline compra→obra→venta→utilidad). Config `venta_cierre_pct`/`venta_concesiones_pct`/`venta_impuesto_pct` seedeados (migr `20260715131000`, editables). node --check + golden verdes.
+
 ## 15-jul (tarde) · 🕸 Linaje v3: overlays + lectura EN VIVO + ocupación única (commits d3f8d77 · c070f7e · 6c8a35d)
 - ✅ **Crawler v3 con drivers de OVERLAYS** — abre y recorre headless: FF CC (6 secciones + Underwriting con hipotético y las 6 calcs vía `ffUwSub`), Rentas CC (7 secciones), Remodel CC (7 secciones + Reportes CEO r1/r2/r5), PM clásico (7 tabs), Estimador Pro (4 tabs) — extractores por DNA de cada overlay (`.card.kpi`, `.kit-kpi`, `.hero-num`, `.kpi>.l+.v`, Tailwind uppercase+bold). **GATE TOTAL: 192/192 números vistos en 29 pantallas · 0 sin cadena · verificado también EN PROD**. 95 descubiertos → TODOS curados con fuente exacta en la misma sesión (0 pendientes). Filas-registro (direcciones) excluidas por diseño: su linaje es el de sus columnas. UW hipotético sin inputs no muestra números ("sin dato ≠ $0" comprobado por el crawler). ci:gate 15/15.
 - ✅ **LECTURA EN VIVO activada** — `OS.lineage` se carga en osLoad; `osLineageRow(empresa, sistema, dato)` = fuente efectiva; primer número cableado: **"Renta mensual actual" de la Ficha** (dual-source real). **EVIDENCIA en prod (qa-switch 4/4): $4,850 FF·Propiedades → reasignar en el mapa → $4,800 Rentas·Unidades ⚡mapa → revertir → $4,850**; los 3 cambios en data_lineage_audit (quién/cuándo/antes→después). Contable sigue gateada (reasignar → pend hasta reconciliar QBO).

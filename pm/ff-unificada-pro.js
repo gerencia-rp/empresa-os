@@ -132,14 +132,15 @@ function ffUnificadaView() {
   const vo = o.venta;
   const ventaSec = unSec('La venta', [
     unKpi('Precio de venta', UN_M(vo.precio), vo.esArv ? '= ARV (Calc 2)' : 'precio fijado'),
-    unKpi('Net Wire', UN_M(vo.netWire), 'venta − costos de venta − payoff HML', { color: vo.netWire >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' }),
-    unKpi('Utilidad neta', UN_M(vo.utilidad), 'net wire − staging − capital', { big: true, color: vo.utilidad >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' }),
+    unKpi('Utilidad neta', UN_M(vo.utilidad), 'precio − costos − all-in − interés − holding', { big: true, color: vo.utilidad >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' }),
+    unKpi('Margen sobre venta', vo.margen != null ? vo.margen + '%' : '—', 'utilidad ÷ precio de venta'),
+    unKpi('Net Wire', UN_M(vo.netWire), 'en la mesa: precio − costos − payoff HML', { color: vo.netWire >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' }),
   ]);
   const ventaRet = unSec('El retorno (venta)', [
-    unKpi('ROI del período', vo.roiPeriodo != null ? vo.roiPeriodo + '%' : '—', 'utilidad del inversionista ÷ su capital'),
-    unKpi('ROI anualizado', vo.roiAnual != null ? vo.roiAnual + '%' : '—', vo.dias ? '× 365 ÷ ' + vo.dias + ' días' : 'cargá los días del proyecto', { big: true, color: 'var(--pos,#34d399)' }),
-    unKpi('Inversionista (' + vo.splitInvPct + '%)', UN_M(vo.parteInv), 'su parte de la utilidad', { color: 'var(--a2,#2f6ef0)' }),
-    unKpi('Operador (' + (100 - vo.splitInvPct) + '%)', UN_M(vo.parteOp), 'nuestra parte'),
+    unKpi('ROI (cash-on-cash)', vo.roi != null ? vo.roi + '%' : '—', 'utilidad ÷ capital ' + UN_M(vo.capital)),
+    unKpi('★ ROI anualizado', vo.roiAnual != null ? vo.roiAnual + '%' : '—', vo.meses ? '× 12 ÷ ' + vo.meses + ' meses' : 'cargá los meses hasta vender', { big: true, color: 'var(--pos,#34d399)' }),
+    unKpi('Regla 70/75%', vo.regla70 == null ? '—' : (vo.regla70 ? '✓ cumple' : '✗ no cumple'), 'all-in ≤ ' + UN_M(vo.maoVenta) + ' (MAO)', { color: vo.regla70 === false ? 'var(--neg,#f87171)' : vo.regla70 ? 'var(--pos,#34d399)' : undefined }),
+    unKpi('Reparto ' + vo.splitInvPct + '/' + (100 - vo.splitInvPct), UN_M(vo.parteInv) + ' / ' + UN_M(vo.parteOp), 'inversionista / operador (tras devolver capital)'),
   ]);
 
   return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><b style="font-size:18px">🎯 El deal completo de un vistazo</b><span class="ap-pill">' + (esVenta ? 'estrategia: vender (flip)' : 'estrategia: rentar (hold)') + ' — mismos números de las calculadoras</span></div>'
@@ -212,19 +213,22 @@ function ffUnificadaOnePager() {
     + sec('🔨 El proyecto',
       fila('Precio de compra', +inp.purchase > 0 ? M(+inp.purchase) : 'por definir') + fila('Remodelación', o.negocio.remod > 0 ? M(o.negocio.remod) : 'por definir')
       + fila('Draw total (obra + intereses)', M(o.negocio.draw)) + fila('Meses de obra', c.mesesObra ? c.mesesObra + ' meses' : 'por definir')
-      + (esVenta ? fila('Días del proyecto', o.venta.dias ? o.venta.dias + ' días' : 'por definir') : fila('Tiempo hasta rentar', c.mesesHastaRenta ? c.mesesHastaRenta + ' meses' : 'por definir'))
+      + (esVenta ? fila('Meses hasta vender', o.venta.meses != null ? o.venta.meses + ' meses' : 'por definir') : fila('Tiempo hasta rentar', c.mesesHastaRenta ? c.mesesHastaRenta + ' meses' : 'por definir'))
       + fila('All-in vs ARV', u.allInPct != null ? u.allInPct + '% (máx ' + u.allInMax + '%)' : '—'))
     + (esVenta
-      ? sec('🏦 La venta (Net Wire)',
+      ? sec('📈 Utilidad del flip',
         fila('Precio de venta', M(o.venta.precio)) + fila('− Comisión (' + inp.venta_comision_pct + '%)', '−' + M(o.venta.comision))
-        + (o.venta.titulo > 0 ? fila('− Título / escrow', '−' + M(o.venta.titulo)) : '') + fila('− Closing de venta', '−' + M(o.venta.closing))
-        + fila('− Payoff del HML', '−' + M(o.venta.payoff))
-        + fila('= Net Wire', '<b style="color:' + (o.venta.netWire >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.venta.netWire) + '</b>'))
-        + sec('📈 Utilidad y retorno',
-          fila('Net Wire', M(o.venta.netWire)) + fila('− Staging', '−' + M(o.venta.staging)) + fila('− Capital invertido', '−' + M(o.venta.capital))
-          + fila('= Utilidad neta', '<b style="color:' + (o.venta.utilidad >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.venta.utilidad) + '</b>')
-          + fila('Inversionista (' + o.venta.splitInvPct + '%)', M(o.venta.parteInv)) + fila('Operador (' + (100 - o.venta.splitInvPct) + '%)', M(o.venta.parteOp))
-          + fila('ROI del período', o.venta.roiPeriodo != null ? o.venta.roiPeriodo + '%' : '—') + fila('ROI anualizado', o.venta.roiAnual != null ? o.venta.roiAnual + '%' : '—'))
+        + fila('− Cierre vendedor (' + inp.venta_cierre_pct + '%)', '−' + M(o.venta.cierre))
+        + (o.venta.concesiones > 0 ? fila('− Concesiones (' + inp.venta_concesiones_pct + '%)', '−' + M(o.venta.concesiones)) : '')
+        + fila('− All-in (compra + rehab)', '−' + M(o.venta.allIn)) + fila('− Interés HML (' + (o.venta.meses != null ? o.venta.meses + 'm' : '') + ')', '−' + M(o.venta.interesHmlTotal))
+        + fila('− Holding' + (o.venta.staging > 0 ? ' + staging' : ''), '−' + M(o.venta.holding + o.venta.staging))
+        + (o.venta.impuesto > 0 ? fila('− Impuesto (' + o.venta.impuestoPct + '%)', '−' + M(o.venta.impuesto)) : '')
+        + fila('= Utilidad neta', '<b style="color:' + (o.venta.utilidad >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.venta.utilidad) + '</b>'))
+        + sec('🏁 Retorno y reparto',
+          fila('Margen sobre venta', o.venta.margen != null ? o.venta.margen + '%' : '—') + fila('ROI (cash-on-cash)', o.venta.roi != null ? o.venta.roi + '%' : '—')
+          + fila('★ ROI anualizado', o.venta.roiAnual != null ? '<b>' + o.venta.roiAnual + '%</b>' : '—') + fila('Net Wire (en la mesa)', M(o.venta.netWire))
+          + fila('↩ Capital devuelto', M(o.venta.capital))
+          + fila('Inversionista (' + o.venta.splitInvPct + '%)', M(o.venta.parteInv)) + fila('Operador (' + (100 - o.venta.splitInvPct) + '%)', M(o.venta.parteOp)))
       : sec('📈 Retorno proyectado',
         fila('ARV probable', M(o.arv.probable)) + (c.arvProfesional ? fila('Rango del tasador', M(c.arvProfesional.conservador) + ' – ' + M(c.arvProfesional.optimista)) : '')
         + fila('Oferta máxima (MAO)', M(u.mao)) + fila('Cash-out del refi', M(u.cashOut))
@@ -237,7 +241,7 @@ function ffUnificadaOnePager() {
     + '</div>'
     + sec(esVenta ? '💰 De compra a utilidad' : '💰 Recuperación del capital', '<div class="tl">' + pasos.map(p => '<div><div class="ic">' + p[0] + '</div>' + p[1] + '</div>').join('') + '</div>'
       + '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (esVenta
-        ? (o.venta.utilidad != null ? 'Al vender, el proyecto deja ' + M(o.venta.utilidad) + ' de utilidad neta (una sola vez), repartida ' + o.venta.splitInvPct + '/' + (100 - o.venta.splitInvPct) + ' entre inversionista y operador — ROI ' + (o.venta.roiPeriodo != null ? o.venta.roiPeriodo + '%' : '—') + ' del período' + (o.venta.roiAnual != null ? ' (' + o.venta.roiAnual + '% anualizado)' : '') + '.' : 'Cargá precio de venta y capital para ver la utilidad.')
+        ? (o.venta.utilidad != null ? 'Al vender, el proyecto deja ' + M(o.venta.utilidad) + ' de utilidad neta (una sola vez, margen ' + (o.venta.margen != null ? o.venta.margen + '%' : '—') + '), repartida ' + o.venta.splitInvPct + '/' + (100 - o.venta.splitInvPct) + ' entre inversionista y operador — ROI ' + (o.venta.roi != null ? o.venta.roi + '%' : '—') + (o.venta.roiAnual != null ? ' (' + o.venta.roiAnual + '% anualizado)' : '') + '.' : 'Cargá precio de venta y capital para ver la utilidad.')
         : (u.recuperaPct != null && u.recuperaPct >= 100
           ? 'Al refinanciar, el inversionista recupera el 100% de su capital y conserva la propiedad rentando — el retorno se vuelve infinito.'
           : u.recuperaPct != null ? 'Al refinanciar se recupera el ' + u.recuperaPct + '% del capital; el resto (' + M(u.cashLeftIn) + ') queda invertido generando ' + (u.roi != null ? u.roi + '% anual' : 'flujo mensual') + '.' : 'Proyección de refinanciación pendiente de ARV/appraisal.')) + '</div>')
