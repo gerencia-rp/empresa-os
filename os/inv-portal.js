@@ -632,9 +632,9 @@ function renderDist(pid, inv) {
     + kpi('K-1 disponibles', String(rows.filter(d => d.k1_url).length), 'documentos fiscales de tus distribuciones')
     + '</div>'
     + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Historial</div><div class="k"><button class="ibtn" onclick="ipDistCSV()">⬇ Exportar CSV</button></div></div>'
-    + (rows.length ? '<div class="overx"><table><thead><tr><th>Fecha</th><th>Casa</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>K-1</th></tr></thead><tbody>'
-      + rows.map(d => { const dd = (IP.params[d.property_id] || {}).direccion; return '<tr><td>' + esc(d.fecha) + '</td><td>' + esc(dd ? dd.value.split(',')[0] : '—') + '</td><td>' + esc(d.tipo) + '</td><td class="up">' + $money(d.monto) + '</td><td>' + (d.estado === 'pagada' ? '<span class="up">✓ pagada</span>' : '<span class="warn">programada</span>') + '</td><td>' + (d.k1_url ? '<a href="' + esc(d.k1_url) + '" target="_blank" style="color:var(--a2)">K-1 ↗</a>' : '—') + '</td></tr>'; }).join('')
-      + '</tbody></table></div>' : '<div class="empty">Todavía no hay distribuciones registradas. Cuando la casa reparta utilidades o cash-out, aparecen acá con su K-1.</div>')
+    + (rows.length ? '<div class="overx"><table><thead><tr><th>Fecha</th><th>Casa</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>Comprobante</th><th>K-1</th></tr></thead><tbody>'
+      + rows.map(d => { const dd = (IP.params[d.property_id] || {}).direccion; return '<tr><td>' + esc(d.fecha) + '</td><td>' + esc(dd ? dd.value.split(',')[0] : '—') + '</td><td>' + esc(d.tipo) + '</td><td class="up">' + $money(d.monto) + '</td><td>' + (d.estado === 'pagada' ? '<span class="up">✓ pagada</span>' : '<span class="warn">programada</span>') + '</td><td>' + (d.comprobante_url ? '<a href="' + esc(d.comprobante_url) + '" target="_blank" style="color:var(--a2)">📎 Ver ↗</a>' : '—') + '</td><td>' + (d.k1_url ? '<a href="' + esc(d.k1_url) + '" target="_blank" style="color:var(--a2)">K-1 ↗</a>' : '—') + '</td></tr>'; }).join('')
+      + '</tbody></table></div>' : '<div class="empty">Todavía no hay distribuciones registradas. Cuando la casa reparta utilidades o cash-out, aparecen acá con su comprobante y su K-1.</div>')
     + '</div>';
 }
 function ipDistCSV() {
