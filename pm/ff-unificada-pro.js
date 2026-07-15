@@ -56,13 +56,20 @@ function unSec(titulo, cards, cols) {
 function unTimeline(c) {
   const u = c.o.unificada;
   const rec = u.recuperaPct;
-  const pasos = [
-    ['🔑', 'Compra', c.inp.purchase > 0 ? UN_M(+c.inp.purchase) : '—'],
-    ['🔨', 'Obra', c.mesesObra ? c.mesesObra + ' meses' : '—'],
-    ['🏠', 'Renta', c.mesesHastaRenta ? 'mes ' + c.mesesHastaRenta : '—'],
-    ['🏦', 'Refi', c.o.cashout.prestamoRefi > 0 ? UN_M(c.o.cashout.prestamoRefi) : '—'],
-    ['💰', 'Capital recuperado', rec != null ? (rec >= 100 ? '♾️ ' + rec + '%' : rec + '%') : '—'],
-  ];
+  const pasos = u.modo === 'venta'
+    ? [
+      ['🔑', 'Compra', c.inp.purchase > 0 ? UN_M(+c.inp.purchase) : '—'],
+      ['🔨', 'Obra', c.mesesObra ? c.mesesObra + ' meses' : '—'],
+      ['🏦', 'Venta', c.o.venta.precio > 0 ? UN_M(c.o.venta.precio) : '—'],
+      ['💰', 'Utilidad', c.o.venta.utilidad != null ? UN_M(c.o.venta.utilidad) : '—'],
+    ]
+    : [
+      ['🔑', 'Compra', c.inp.purchase > 0 ? UN_M(+c.inp.purchase) : '—'],
+      ['🔨', 'Obra', c.mesesObra ? c.mesesObra + ' meses' : '—'],
+      ['🏠', 'Renta', c.mesesHastaRenta ? 'mes ' + c.mesesHastaRenta : '—'],
+      ['🏦', 'Refi', c.o.cashout.prestamoRefi > 0 ? UN_M(c.o.cashout.prestamoRefi) : '—'],
+      ['💰', 'Capital recuperado', rec != null ? (rec >= 100 ? '♾️ ' + rec + '%' : rec + '%') : '—'],
+    ];
   return '<div class="ap-card" style="padding:18px 20px;margin-top:16px"><div class="ap-lab" style="margin-bottom:14px">Línea de tiempo del deal</div>'
     + '<div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto">'
     + pasos.map((p, i) => '<div style="flex:1;min-width:105px;text-align:center;position:relative">'
@@ -77,6 +84,7 @@ function ffUnificadaView() {
   if (window.apCSS) apCSS();
   const c = unCtx();
   const o = c.o, u = o.unificada, inp = c.inp;
+  const esVenta = u.modo === 'venta';
   const verColor = u.veredicto === 'GO' ? 'var(--pos,#34d399)' : u.veredicto === 'NO-GO' ? 'var(--neg,#f87171)' : 'var(--amber,#e7b65e)';
   const verIco = u.veredicto === 'GO' ? '🟢' : u.veredicto === 'NO-GO' ? '🔴' : '🟡';
   const chip = (ok, l) => '<span class="ap-pill" style="color:' + (ok ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)') + ';border-color:currentColor">' + (ok ? '✓' : '⚠') + ' ' + l + '</span>';
@@ -86,7 +94,7 @@ function ffUnificadaView() {
   const banda = '<div class="ap-card" style="padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-color:' + verColor + ';box-shadow:0 0 0 1px ' + verColor + ',0 6px 22px rgba(23,43,77,.08)">'
     + '<div style="display:flex;align-items:center;gap:14px"><div style="font-size:40px">' + verIco + '</div><div>'
     + '<div style="font-size:30px;font-weight:800;color:' + verColor + ';line-height:1">' + u.veredicto + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' + chip(u.gAllIn, 'all-in ≤' + u.allInMax + '% del ARV') + chip(u.gDeficit, 'sin riesgo de déficit') + chip(u.gFlujo, 'flujo positivo') + '</div></div></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' + chip(u.gAllIn, 'all-in ≤' + u.allInMax + '% del ARV') + chip(u.gDeficit, 'sin riesgo de déficit') + (esVenta ? chip(u.gUtil, 'utilidad positiva') : chip(u.gFlujo, 'flujo positivo')) + '</div></div></div>'
     + '<button class="ap-btn" onclick="ffUwPresentacion()">📄 Generar presentación / Imprimir PDF</button></div>';
 
   const proyecto = unSec('El proyecto', [
@@ -120,8 +128,22 @@ function ffUnificadaView() {
     unKpi('All-in', u.allInPct != null ? u.allInPct + '%' : '—', 'del ARV (máx ' + u.allInMax + '%)' + allInBar),
   ]);
 
-  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><b style="font-size:18px">🎯 El deal completo de un vistazo</b><span class="ap-pill">encadena las 5 calculadoras — mismos números</span></div>'
-    + banda + proyecto + inversion + renta + retorno + unTimeline(c);
+  // ── MODO VENTA (fix & flip): salida = vender · la ganancia es UNA vez (no hay renta/refi) ──
+  const vo = o.venta;
+  const ventaSec = unSec('La venta', [
+    unKpi('Precio de venta', UN_M(vo.precio), vo.esArv ? '= ARV (Calc 2)' : 'precio fijado'),
+    unKpi('Net Wire', UN_M(vo.netWire), 'venta − costos de venta − payoff HML', { color: vo.netWire >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' }),
+    unKpi('Utilidad neta', UN_M(vo.utilidad), 'net wire − staging − capital', { big: true, color: vo.utilidad >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' }),
+  ]);
+  const ventaRet = unSec('El retorno (venta)', [
+    unKpi('ROI del período', vo.roiPeriodo != null ? vo.roiPeriodo + '%' : '—', 'utilidad del inversionista ÷ su capital'),
+    unKpi('ROI anualizado', vo.roiAnual != null ? vo.roiAnual + '%' : '—', vo.dias ? '× 365 ÷ ' + vo.dias + ' días' : 'cargá los días del proyecto', { big: true, color: 'var(--pos,#34d399)' }),
+    unKpi('Inversionista (' + vo.splitInvPct + '%)', UN_M(vo.parteInv), 'su parte de la utilidad', { color: 'var(--a2,#2f6ef0)' }),
+    unKpi('Operador (' + (100 - vo.splitInvPct) + '%)', UN_M(vo.parteOp), 'nuestra parte'),
+  ]);
+
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><b style="font-size:18px">🎯 El deal completo de un vistazo</b><span class="ap-pill">' + (esVenta ? 'estrategia: vender (flip)' : 'estrategia: rentar (hold)') + ' — mismos números de las calculadoras</span></div>'
+    + banda + proyecto + inversion + (esVenta ? ventaSec + ventaRet : renta + retorno) + unTimeline(c);
 }
 window.ffUnificadaView = ffUnificadaView;
 
@@ -129,6 +151,7 @@ window.ffUnificadaView = ffUnificadaView;
 function ffUnificadaOnePager() {
   const c = unCtx();
   const o = c.o, u = o.unificada, inp = c.inp, a = UW.a;
+  const esVenta = u.modo === 'venta';
   const verColor = u.veredicto === 'GO' ? '#0ea371' : u.veredicto === 'NO-GO' ? '#dc2626' : '#d97706';
   const fecha = new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
   const M = UN_M, M2 = UN_M2, E = UN_E;
@@ -142,7 +165,9 @@ function ffUnificadaOnePager() {
   const kpi = (l, v, sub) => '<div class="k"><div class="l">' + l + '</div><div class="v">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
   const fila = (l, v) => '<div class="row"><span>' + l + '</span><b>' + v + '</b></div>';
   const sec = (t, inner) => '<div class="sec"><div class="st">' + t + '</div>' + inner + '</div>';
-  const pasos = [['🔑', 'Compra'], ['🔨', 'Obra ' + (c.mesesObra ? c.mesesObra + 'm' : '')], ['🏠', 'Renta' + (c.mesesHastaRenta ? ' mes ' + c.mesesHastaRenta : '')], ['🏦', 'Refi'], ['💰', u.recuperaPct != null ? (u.recuperaPct >= 100 ? '♾️ ' : '') + u.recuperaPct + '% recuperado' : 'Recuperación']];
+  const pasos = esVenta
+    ? [['🔑', 'Compra'], ['🔨', 'Obra ' + (c.mesesObra ? c.mesesObra + 'm' : '')], ['🏦', 'Venta ' + M(o.venta.precio)], ['💰', o.venta.utilidad != null ? 'Utilidad ' + M(o.venta.utilidad) : 'Utilidad']]
+    : [['🔑', 'Compra'], ['🔨', 'Obra ' + (c.mesesObra ? c.mesesObra + 'm' : '')], ['🏠', 'Renta' + (c.mesesHastaRenta ? ' mes ' + c.mesesHastaRenta : '')], ['🏦', 'Refi'], ['💰', u.recuperaPct != null ? (u.recuperaPct >= 100 ? '♾️ ' : '') + u.recuperaPct + '% recuperado' : 'Recuperación']];
 
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + E(a.direccion || a.nombre) + ' · Rental Profits</title><style>'
     + 'body{font-family:-apple-system,"Segoe UI",Inter,sans-serif;color:#12203a;margin:0;padding:34px;max-width:760px;margin:0 auto;line-height:1.4;background:#fff}'
@@ -173,10 +198,11 @@ function ffUnificadaOnePager() {
     + '<span class="ver">' + (u.veredicto === 'GO' ? '✓ RECOMENDADO — GO' : u.veredicto === 'NO-GO' ? '✗ NO-GO' : '⚠ REVISAR') + '</span>'
     + mapa
     + '<div class="hero">'
-    + kpi('El inversionista pone', M2(o.negocio.cashToClose), 'cash total al cierre')
-    + kpi('Valor de reventa (ARV)', M(o.arv.probable), 'confianza ' + E(c.arvConf))
-    + kpi('Capital recuperado', u.recuperaPct != null ? (u.recuperaPct >= 100 ? '♾️ ' : '') + u.recuperaPct + '%' : '—', u.recuperaPct >= 100 ? 'retorno infinito' : 'al refinanciar')
-    + kpi('Flujo mensual', o.ingreso.renta > 0 ? M(o.ingreso.flujo) : '—', 'después de todos los gastos')
+    + kpi('El inversionista pone', M2(o.negocio.cashToClose), esVenta ? 'capital invertido' : 'cash total al cierre')
+    + kpi(esVenta ? 'Precio de venta (ARV)' : 'Valor de reventa (ARV)', M(o.arv.probable), esVenta ? 'precio de salida' : 'confianza ' + E(c.arvConf))
+    + (esVenta
+      ? kpi('Utilidad neta', M(o.venta.utilidad), 'del proyecto') + kpi('ROI anualizado', o.venta.roiAnual != null ? o.venta.roiAnual + '%' : '—', 'del inversionista')
+      : kpi('Capital recuperado', u.recuperaPct != null ? (u.recuperaPct >= 100 ? '♾️ ' : '') + u.recuperaPct + '%' : '—', u.recuperaPct >= 100 ? 'retorno infinito' : 'al refinanciar') + kpi('Flujo mensual', o.ingreso.renta > 0 ? M(o.ingreso.flujo) : '—', 'después de todos los gastos'))
     + '</div>'
     + '<div class="cols">'
     + sec('💵 Inversión requerida',
@@ -186,21 +212,35 @@ function ffUnificadaOnePager() {
     + sec('🔨 El proyecto',
       fila('Precio de compra', +inp.purchase > 0 ? M(+inp.purchase) : 'por definir') + fila('Remodelación', o.negocio.remod > 0 ? M(o.negocio.remod) : 'por definir')
       + fila('Draw total (obra + intereses)', M(o.negocio.draw)) + fila('Meses de obra', c.mesesObra ? c.mesesObra + ' meses' : 'por definir')
-      + fila('Tiempo hasta rentar', c.mesesHastaRenta ? c.mesesHastaRenta + ' meses' : 'por definir') + fila('All-in vs ARV', u.allInPct != null ? u.allInPct + '% (máx ' + u.allInMax + '%)' : '—'))
-    + sec('📈 Retorno proyectado',
-      fila('ARV probable', M(o.arv.probable)) + (c.arvProfesional ? fila('Rango del tasador', M(c.arvProfesional.conservador) + ' – ' + M(c.arvProfesional.optimista)) : '')
-      + fila('Oferta máxima (MAO)', M(u.mao)) + fila('Cash-out del refi', M(u.cashOut))
-      + fila('Capital que queda invertido', M(u.cashLeftIn)) + fila('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—'))
-    + sec('🏠 Renta y flujo mensual',
-      fila('Renta' + (c.modeloRenta ? ' · ' + c.modeloRenta.replace(/^\S+ /, '') : ''), o.ingreso.renta > 0 ? M(o.ingreso.renta) : 'por definir')
-      + fila('− Pago DSCR (refi 30 años)', '−' + M(o.intereses.pagoDscr)) + fila('− Impuestos + seguro', '−' + M(o.ingreso.impuestos + o.ingreso.seguro))
-      + fila('− PM + vacancy + mantenimiento', '−' + M(o.ingreso.pmFee + o.ingreso.vacancy + o.ingreso.mantenimiento))
-      + fila('= Flujo neto', '<b style="color:' + (o.ingreso.flujo >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.ingreso.flujo) + '/mes</b>'))
+      + (esVenta ? fila('Días del proyecto', o.venta.dias ? o.venta.dias + ' días' : 'por definir') : fila('Tiempo hasta rentar', c.mesesHastaRenta ? c.mesesHastaRenta + ' meses' : 'por definir'))
+      + fila('All-in vs ARV', u.allInPct != null ? u.allInPct + '% (máx ' + u.allInMax + '%)' : '—'))
+    + (esVenta
+      ? sec('🏦 La venta (Net Wire)',
+        fila('Precio de venta', M(o.venta.precio)) + fila('− Comisión (' + inp.venta_comision_pct + '%)', '−' + M(o.venta.comision))
+        + (o.venta.titulo > 0 ? fila('− Título / escrow', '−' + M(o.venta.titulo)) : '') + fila('− Closing de venta', '−' + M(o.venta.closing))
+        + fila('− Payoff del HML', '−' + M(o.venta.payoff))
+        + fila('= Net Wire', '<b style="color:' + (o.venta.netWire >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.venta.netWire) + '</b>'))
+        + sec('📈 Utilidad y retorno',
+          fila('Net Wire', M(o.venta.netWire)) + fila('− Staging', '−' + M(o.venta.staging)) + fila('− Capital invertido', '−' + M(o.venta.capital))
+          + fila('= Utilidad neta', '<b style="color:' + (o.venta.utilidad >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.venta.utilidad) + '</b>')
+          + fila('Inversionista (' + o.venta.splitInvPct + '%)', M(o.venta.parteInv)) + fila('Operador (' + (100 - o.venta.splitInvPct) + '%)', M(o.venta.parteOp))
+          + fila('ROI del período', o.venta.roiPeriodo != null ? o.venta.roiPeriodo + '%' : '—') + fila('ROI anualizado', o.venta.roiAnual != null ? o.venta.roiAnual + '%' : '—'))
+      : sec('📈 Retorno proyectado',
+        fila('ARV probable', M(o.arv.probable)) + (c.arvProfesional ? fila('Rango del tasador', M(c.arvProfesional.conservador) + ' – ' + M(c.arvProfesional.optimista)) : '')
+        + fila('Oferta máxima (MAO)', M(u.mao)) + fila('Cash-out del refi', M(u.cashOut))
+        + fila('Capital que queda invertido', M(u.cashLeftIn)) + fila('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—'))
+        + sec('🏠 Renta y flujo mensual',
+          fila('Renta' + (c.modeloRenta ? ' · ' + c.modeloRenta.replace(/^\S+ /, '') : ''), o.ingreso.renta > 0 ? M(o.ingreso.renta) : 'por definir')
+          + fila('− Pago DSCR (refi 30 años)', '−' + M(o.intereses.pagoDscr)) + fila('− Impuestos + seguro', '−' + M(o.ingreso.impuestos + o.ingreso.seguro))
+          + fila('− PM + vacancy + mantenimiento', '−' + M(o.ingreso.pmFee + o.ingreso.vacancy + o.ingreso.mantenimiento))
+          + fila('= Flujo neto', '<b style="color:' + (o.ingreso.flujo >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.ingreso.flujo) + '/mes</b>')))
     + '</div>'
-    + sec('💰 Recuperación del capital', '<div class="tl">' + pasos.map(p => '<div><div class="ic">' + p[0] + '</div>' + p[1] + '</div>').join('') + '</div>'
-      + '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (u.recuperaPct != null && u.recuperaPct >= 100
-        ? 'Al refinanciar, el inversionista recupera el 100% de su capital y conserva la propiedad rentando — el retorno se vuelve infinito.'
-        : u.recuperaPct != null ? 'Al refinanciar se recupera el ' + u.recuperaPct + '% del capital; el resto (' + M(u.cashLeftIn) + ') queda invertido generando ' + (u.roi != null ? u.roi + '% anual' : 'flujo mensual') + '.' : 'Proyección de refinanciación pendiente de ARV/appraisal.') + '</div>')
+    + sec(esVenta ? '💰 De compra a utilidad' : '💰 Recuperación del capital', '<div class="tl">' + pasos.map(p => '<div><div class="ic">' + p[0] + '</div>' + p[1] + '</div>').join('') + '</div>'
+      + '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (esVenta
+        ? (o.venta.utilidad != null ? 'Al vender, el proyecto deja ' + M(o.venta.utilidad) + ' de utilidad neta (una sola vez), repartida ' + o.venta.splitInvPct + '/' + (100 - o.venta.splitInvPct) + ' entre inversionista y operador — ROI ' + (o.venta.roiPeriodo != null ? o.venta.roiPeriodo + '%' : '—') + ' del período' + (o.venta.roiAnual != null ? ' (' + o.venta.roiAnual + '% anualizado)' : '') + '.' : 'Cargá precio de venta y capital para ver la utilidad.')
+        : (u.recuperaPct != null && u.recuperaPct >= 100
+          ? 'Al refinanciar, el inversionista recupera el 100% de su capital y conserva la propiedad rentando — el retorno se vuelve infinito.'
+          : u.recuperaPct != null ? 'Al refinanciar se recupera el ' + u.recuperaPct + '% del capital; el resto (' + M(u.cashLeftIn) + ') queda invertido generando ' + (u.roi != null ? u.roi + '% anual' : 'flujo mensual') + '.' : 'Proyección de refinanciación pendiente de ARV/appraisal.')) + '</div>')
     + '<div class="foot"><span>Preparado por <b>Rental Profits</b> · ' + fecha + '</span><span>Proyección basada en datos reales y supuestos calibrados — no constituye garantía de retorno.</span></div>'
     + '</body></html>';
   const w = window.open('', '_blank', 'width=820,height=1000');

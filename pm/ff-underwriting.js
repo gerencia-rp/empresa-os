@@ -24,6 +24,24 @@ const UW_NAV = [
   ['ingreso', '🏠', 'Ingreso Mensual', 'renta por modelo de negocio'],
   ['unificada', '🎯', 'Vista Unificada', 'one-pager GO/NO-GO'],
 ];
+// MODO VENTA (flip): el ARV es el precio de salida, no hay refi/renta → nav distinto
+const UW_NAV_VENTA = [
+  ['negocio', '💵', 'Del Negocio', 'Compra + obra'],
+  ['arv', '🏷️', 'ARV', 'precio de venta'],
+  ['venta', '🏦', 'Venta', 'Net Wire + utilidad + ROI'],
+  ['intereses', '📉', 'Intereses', 'HML durante la obra'],
+  ['unificada', '🎯', 'Vista Unificada', 'one-pager GO/NO-GO'],
+];
+function ffUwEstrategia() { return (UW.a && UW.a.inputs && UW.a.inputs.estrategia === 'venta') ? 'venta' : 'hold'; }
+function ffUwNav() { return ffUwEstrategia() === 'venta' ? UW_NAV_VENTA : UW_NAV; }
+// cambiar de estrategia: reencuadra el nav y evita quedar en un tab que ya no existe
+function ffUwSetEstrategia(estr) {
+  if (!UW.a) return;
+  UW.a.inputs.estrategia = (estr === 'venta') ? 'venta' : 'hold';
+  if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'negocio';
+  ffUwRender();
+}
+window.ffUwSetEstrategia = ffUwSetEstrategia;
 
 async function ffUwLoad() {
   try {
@@ -77,10 +95,19 @@ function ffUwTasaDscr(inp) { return +inp.dscr_tasa_anual > 0 ? +inp.dscr_tasa_an
 function ffUwPlazoDscr(inp) { return +inp.dscr_plazo_anos > 0 ? +inp.dscr_plazo_anos : UWc('dscr_plazo_anos', 30); }
 
 // ─── análisis: nuevo, cargar casa real, cargar guardado ───
-function ffUwNuevo(hipotetica) {
+function ffUwNuevo(hipotetica, estrategia) {
+  const inputs = ffUwDefaults();
+  if (estrategia === 'venta' || estrategia === 'hold') inputs.estrategia = estrategia;
   UW.a = { id: null, nombre: hipotetica ? 'Casa hipotética' : 'Nuevo análisis', property_id: null, ff_deal_id: null, es_hipotetica: !!hipotetica, direccion: '', ciudad: 'Austin',
-    inputs: ffUwDefaults(), outputs: {}, veredicto: null };
+    inputs, outputs: {}, veredicto: null };
   UW.sub = 'negocio'; ffUwRender();
+}
+// la estrategia por defecto sale del deal (flip → venta, hold/rentada → hold) — el usuario la puede cambiar
+function ffUwEstrategiaDeDeal(d) {
+  const s = String((d && d.strategy) || '').toLowerCase();
+  const stg = String((d && d.stage) || '').toLowerCase();
+  if (/flip|venta|sell|vend/.test(s) || /vendid/.test(stg)) return 'venta';
+  return 'hold';
 }
 function ffUwDefaults() {
   return {
@@ -108,9 +135,19 @@ function ffUwDefaults() {
     wholesale: false, cc_assignment: 0,
     //   créditos — se ACREDITAN al cierre (earnest/option ya pagados + proración de impuestos)
     earnest: 5000, option_fee: 0, prorata_impuestos: 0,
+    // ESTRATEGIA de salida (genera el flujo): 'hold' = refi y quedársela · 'venta' = flip/vender
+    estrategia: 'hold',
     // otras calc (se llenan en 2-6)
     arv: 0, appraisal: 0, ltv_pct: UWc('refi_ltv_pct', 75), payoff: 0,
     renta_mensual: 0, gastos_mensuales: 0,
+    // MODO VENTA (flip) — precio de venta = ARV, costos de venta, staging, split inversionista/operador
+    venta_precio: 0,                                            // 0 = usar arv.probable
+    venta_comision_pct: UWc('venta_comision_pct', 6), venta_closing: UWc('venta_closing', 2500),
+    venta_title_pct: UWc('venta_title_pct', 0), venta_staging: UWc('venta_staging', 1200),
+    venta_capital: 0,                                           // 0 = usar negocio.cashToClose (⛓ lo que puso el inversionista)
+    venta_payoff: 0,                                            // 0 = HML real del deal (saldo Airtable) o ⛓ modelado
+    venta_dias: 0,                                              // días del proyecto → ROI anualizado (0 = derivar de meses de hold)
+    venta_split_inv_pct: UWc('venta_split_inversionista_pct', 50),
     // 3 · Cash-Out refi DSCR (Champions) — itemizado, calibrado con los HUD de Michelle/Echo
     refi_prestamo_real: 0,                                              // override: préstamo real del refi (Airtable) — 0 = calculado
     refi_dscr_obj: UWc('refi_dscr_objetivo', 1.0),
@@ -131,8 +168,9 @@ function ffUwCargarCasa(dealId) {
   inp.usar_estimador = !(+dr.remodel_complete > 0);
   inp.est_sqft = +d.sqft || 1400;
   inp.purchase = +d.purchase_price || 0;
-  inp.arv_airtable = +d.arv || 0;                  // FIX 3b: ARV de Airtable = fuente única
-  inp.arv = +d.arv || 0; inp.appraisal = +d.appraisal || 0;
+  inp.arv_airtable = +d.arv || 0;                  // ancla original de Airtable (chip Δ)
+  inp.arv = +d.arv || 0; inp.appraisal = +d.appraisal || 0;   // inp.arv = ARV oficial (editable / confirmable)
+  inp.estrategia = ffUwEstrategiaDeDeal(d);        // flip → venta · hold/rentada → hold (cambiable en el shell)
   inp.cashout_en_draw = 0;
   inp._closing_real = +h.gastos_cierre || null;   // ancla real del HUD (Airtable) p/ comparar con las líneas
   inp.renta_mensual = +d.renta_mensual || 0; inp.gastos_mensuales = +d.gastos_mensuales || 0;
@@ -288,15 +326,19 @@ function ffUwCalcArv(inp) {
   const sqft = +inp.est_sqft || 0;
   const arvComps = Math.round(psfZona * sqft);                 // SOLO referencia (no alimenta MAO/cash-out)
   const appraisal = +inp.appraisal || 0;                        // ancla real
-  const arvAirtable = +inp.arv_airtable || +inp.arv || 0;       // FIX 3b: fuente de verdad = Propiedades.ARV
-  // el ARV núcleo (probable) = Airtable si existe; si no (hipotética), comps
-  const probable = arvAirtable > 0 ? arvAirtable : arvComps;
+  // ── FUENTE ÚNICA DEL ARV (fix propagación 15-jul) ──
+  // inp.arv = EL ARV oficial del análisis (editable en la Calc 2; lo setea apUsarArv al confirmar comps).
+  // inp.arv_airtable = ancla ORIGINAL de Airtable, SOLO para el chip Δ — nunca es el valor de cálculo.
+  // Antes probable leía el ancla primero → lo que el usuario confirmaba NO llegaba a Resumen/MAO/Cash-Out.
+  const arvOficial = +inp.arv || 0;
+  const arvAirtable = +inp.arv_airtable || 0;
+  const probable = arvOficial > 0 ? arvOficial : (arvAirtable > 0 ? arvAirtable : arvComps);
   const conservador = Math.round(probable * 0.92);
   const optimista = Math.round(probable * 1.08);
-  // confianza: alta si appraisal presente y comps cerca
-  const esAirtable = arvAirtable > 0;
-  const confianza = esAirtable ? 'alta (Airtable)' : appraisal > 0 ? 'media' : 'baja';
-  return { arvComps, appraisal, arvAirtable, esAirtable, probable, conservador, optimista, confianza, psfZona, sqft, mercadoVivo: false };
+  const esAirtable = arvOficial > 0 && arvAirtable > 0 && arvOficial === arvAirtable;      // coincide con el ancla
+  const confirmadoPro = arvOficial > 0 && arvAirtable > 0 && arvOficial !== arvAirtable;   // usuario confirmó otro (comps/manual)
+  const confianza = esAirtable ? 'alta (Airtable)' : confirmadoPro ? 'confirmado (comps/manual)' : appraisal > 0 ? 'media' : (arvOficial > 0 ? 'media' : 'baja');
+  return { arvComps, appraisal, arvAirtable, arvOficial, esAirtable, confirmadoPro, probable, conservador, optimista, confianza, psfZona, sqft, mercadoVivo: false };
 }
 // ═══ CALCULADORA 3 · CASH-OUT (refi DSCR itemizado — ingeniería inversa de Michelle/Echo, Champions Funding) ═══
 // Valor tasado (appraisal si existe, si no ARV — Childress probó que la tasación del refi manda, incluso > ARV)
@@ -304,8 +346,8 @@ function ffUwCalcArv(inp) {
 // El campo Airtable "Monto Pagado al HML con la Refi" = payoff + costos (todo menos el cash-out) → ancla exacta.
 function ffUwCalcCashout(inp, arv) {
   const R2 = n => Math.round(n * 100) / 100;
-  // 1) valor
-  const arvA = arv.arvAirtable || arv.probable || 0;
+  // 1) valor — usa el ARV oficial (probable), no el ancla de Airtable (fix propagación 15-jul)
+  const arvA = arv.probable || 0;
   const appraisal = +inp.appraisal || 0;
   const valorTasado = appraisal > 0 ? appraisal : arvA;     // base del préstamo y de los impuestos
   const usaAppraisal = appraisal > 0;
@@ -407,9 +449,46 @@ function ffUwCalcIngreso(inp, arv, intereses) {
   const cashOnCash = cashLeft > 0 ? Math.round(100 * (flujo * 12) / cashLeft * 10) / 10 : null;
   return { renta, pagoDscr, impuestos, seguro, pmFee, vacancy, mantenimiento, flujo, cashOnCash, cashLeft };
 }
+// ═══ CALCULADORA · VENTA (MODO A: fix & flip) ═══
+// Salida = VENDER. El ARV es el precio de salida (una sola ganancia). Encadena la base del deal
+// (Calc 1: payoff del HML, capital que puso el inversionista) — acá NO se re-teclea compra/obra.
+// Reproduce el cierre real de Arcadia: Net Wire − staging − capital = utilidad; split 50/50; ROI del
+// inversionista = su parte ÷ su capital; anualizado = ROI × 365/días. (ff_hml_loans.roi_venta = 0.0702)
+function ffUwCalcVenta(inp, arv, negocio) {
+  const R2 = n => Math.round(n * 100) / 100;
+  const precio = +inp.venta_precio > 0 ? +inp.venta_precio : (arv.probable || 0);   // precio de venta = ARV por default
+  const esArv = !(+inp.venta_precio > 0);
+  // costos de venta
+  const comision = R2(precio * ((+inp.venta_comision_pct || 0) / 100));
+  const titulo = R2(precio * ((+inp.venta_title_pct || 0) / 100));
+  const closing = +inp.venta_closing || 0;
+  const costosVenta = R2(comision + titulo + closing);
+  // payoff al vender = lo que le debés al HML: override manual → HML REAL del deal (saldo Airtable) → ⛓ modelado (Del Negocio)
+  let payoff, payoffFuente;
+  if (+inp.venta_payoff > 0) { payoff = +inp.venta_payoff; payoffFuente = 'override manual'; }
+  else if (+inp._hml_saldo > 0) { payoff = +inp._hml_saldo; payoffFuente = 'HML real del deal (Airtable)'; }
+  else { payoff = negocio.payoffHml || 0; payoffFuente = '⛓ modelado (Del Negocio)'; }
+  const netWire = R2(precio - costosVenta - payoff);
+  const staging = +inp.venta_staging || 0;
+  const capital = +inp.venta_capital > 0 ? +inp.venta_capital : (negocio.cashToClose || 0);   // ⛓ lo que puso el inversionista (HUD)
+  const capitalEsCtc = !(+inp.venta_capital > 0);
+  const utilidad = R2(netWire - staging - capital);                                 // utilidad neta del proyecto
+  const splitInvPct = Math.min(100, Math.max(0, +inp.venta_split_inv_pct != null && inp.venta_split_inv_pct !== '' ? +inp.venta_split_inv_pct : 50));
+  const parteInv = R2(utilidad * splitInvPct / 100);
+  const parteOp = R2(utilidad - parteInv);
+  // ROI del INVERSIONISTA (definición del CEO / ff_hml_loans.roi_venta): su parte de la utilidad ÷ su capital
+  const roiPeriodo = capital > 0 ? Math.round(10000 * parteInv / capital) / 100 : null;        // %
+  const dias = +inp.venta_dias > 0 ? +inp.venta_dias : (negocio.mesesHold > 0 ? Math.round(negocio.mesesHold * 30.44) : null);
+  const diasEstimado = !(+inp.venta_dias > 0);
+  const roiAnual = (capital > 0 && dias) ? Math.round(10000 * (parteInv / capital) * (365 / dias)) / 100 : null;
+  const roiProyecto = capital > 0 ? Math.round(10000 * utilidad / capital) / 100 : null;        // utilidad total ÷ capital (referencia)
+  return { precio, esArv, comision, titulo, closing, costosVenta, payoff, payoffFuente, netWire, staging, capital, capitalEsCtc,
+    utilidad, splitInvPct, parteInv, parteOp, roiPeriodo, roiAnual, roiProyecto, dias, diasEstimado };
+}
 // ═══ CALCULADORA 6 · VISTA UNIFICADA ═══
 function ffUwComputeAll() {
   const inp = UW.a.inputs;
+  const esVenta = inp.estrategia === 'venta';
   const negocio = ffUwCalcNegocio(inp);
   inp._remodCalc = negocio.remod; inp._ctcCalc = negocio.cashToClose;
   inp._payoffCalc = negocio.payoffHml;                 // ⛓ el payoff fluye SOLO a la Calc 3 (punto 2)
@@ -419,19 +498,31 @@ function ffUwComputeAll() {
   // cash left in = cash to close − cash-out recuperado
   inp._cashLeftIn = Math.max(0, negocio.cashToClose - Math.max(0, cashout.cashOut));
   const ingreso = ffUwCalcIngreso(inp, arv, intereses);
-  // all-in = compra + remod + holding(intereses del draw)
+  const venta = ffUwCalcVenta(inp, arv, negocio);
+  // all-in = compra + remod + holding(intereses del draw) — común a los dos modos
   const allIn = (+inp.purchase || 0) + negocio.remod + negocio.intereses + negocio.utilities;
   const allInPct = arv.probable > 0 ? Math.round(100 * allIn / arv.probable) : null;
   const allInMax = UWc('allin_max_pct', 75);
   const mao = arv.probable > 0 ? Math.round(arv.probable * allInMax / 100 - negocio.remod - negocio.intereses - negocio.utilities) : null;
-  const roi = inp._cashLeftIn > 0 ? Math.round(100 * (ingreso.flujo * 12) / inp._cashLeftIn * 10) / 10 : null;
-  // guardrails
   const gAllIn = allInPct != null && allInPct <= allInMax;
   const gDeficit = !negocio.deficitRiesgo;
+  if (esVenta) {
+    // MODO VENTA: la ganancia es UNA vez (utilidad de la venta), no hay flujo/refi
+    const gUtil = venta.utilidad > 0;
+    const go = gAllIn && gDeficit && gUtil;
+    const veredicto = go ? 'GO' : ((gAllIn && gUtil) || (gDeficit && gUtil)) ? 'revisar' : 'NO-GO';
+    return { negocio, arv, cashout, intereses, ingreso, venta,
+      unificada: { modo: 'venta', allIn, allInPct, allInMax, mao, cashToClose: negocio.cashToClose,
+        precio: venta.precio, netWire: venta.netWire, utilidad: venta.utilidad, parteInv: venta.parteInv, parteOp: venta.parteOp,
+        splitInvPct: venta.splitInvPct, roiPeriodo: venta.roiPeriodo, roiAnual: venta.roiAnual, dias: venta.dias,
+        gAllIn, gDeficit, gUtil, veredicto } };
+  }
+  // MODO HOLD (refi + renta): lo de siempre
+  const roi = inp._cashLeftIn > 0 ? Math.round(100 * (ingreso.flujo * 12) / inp._cashLeftIn * 10) / 10 : null;
   const gFlujo = ingreso.flujo >= 0;
   const go = gAllIn && gDeficit;
   const veredicto = go ? 'GO' : (gAllIn || gDeficit) ? 'revisar' : 'NO-GO';
-  return { negocio, arv, cashout, intereses, ingreso, unificada: { allIn, allInPct, allInMax, mao, cashToClose: negocio.cashToClose, cashOut: cashout.cashOut, recuperaPct: cashout.recuperaPct, cashLeftIn: inp._cashLeftIn, flujo: ingreso.flujo, roi, gAllIn, gDeficit, gFlujo, veredicto } };
+  return { negocio, arv, cashout, intereses, ingreso, venta, unificada: { modo: 'hold', allIn, allInPct, allInMax, mao, cashToClose: negocio.cashToClose, cashOut: cashout.cashOut, recuperaPct: cashout.recuperaPct, cashLeftIn: inp._cashLeftIn, flujo: ingreso.flujo, roi, gAllIn, gDeficit, gFlujo, veredicto } };
 }
 
 // ═══ SHELL + RENDER ═══
@@ -444,12 +535,19 @@ function ffUwShell() {
     <optgroup label="Cargar casa real (${UW.deals.length})">${UW.deals.map(d => `<option value="deal:${d.id}">${UW_E((d.address || '').split(',')[0])}</option>`).join('')}</optgroup>
     <optgroup label="Análisis guardados (${UW.analyses.length})">${UW.analyses.map(x => `<option value="an:${x.id}">${UW_E(x.nombre)}${x.veredicto ? ' · ' + x.veredicto : ''}</option>`).join('')}</optgroup>
   </select>`;
-  const nav = a ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:14px 0">${UW_NAV.map(([k, i, n]) => `<button onclick="ffUwSub('${k}')" style="padding:8px 13px;border-radius:9px;border:1px solid ${UW.sub === k ? 'var(--a1,#12b5a0)' : 'var(--line,rgba(255,255,255,.12))'};background:${UW.sub === k ? 'rgba(18,181,160,.12)' : 'transparent'};color:inherit;cursor:pointer;font-size:12px;font-weight:${UW.sub === k ? '700' : '500'}">${i} ${n}</button>`).join('')}</div>` : '';
-  const body = a ? ffUwSubBody() : `<div class="card" style="text-align:center;padding:40px"><div style="font-size:42px;margin-bottom:10px">📊</div><h2 style="margin-bottom:8px">Suite de Underwriting</h2><p style="color:var(--txt3,#9fb0c9);font-size:13px;margin-bottom:16px">Calibrada con ${UW.deals.length} casas reales · $/sqft: suave ${UWc('psf_suave', 45)} · media ${UWc('psf_media', 63)} · pesada ${UWc('psf_pesada', 77)}</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="repbtn" onclick="ffUwNuevo(false)">＋ Nuevo análisis</button><button class="repbtn ghost" onclick="ffUwNuevo(true)">🧪 Casa hipotética</button></div></div>`;
+  // toggle de estrategia (genera el flujo): venta = vender · hold = refinanciar y quedársela
+  const estr = ffUwEstrategia();
+  const estToggle = a ? `<div style="display:inline-flex;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:11px;padding:3px;gap:2px" title="La estrategia genera las entradas y salidas del análisis">
+    ${[['venta', '🏷️ Vender (flip)', 'salida = vender al ARV'], ['hold', '🏠 Rentar (hold)', 'salida = refinanciar y quedársela']].map(([k, lbl, tip]) => `<button onclick="ffUwSetEstrategia('${k}')" title="${tip}" style="border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:${estr === k ? '700' : '500'};cursor:pointer;background:${estr === k ? 'linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0))' : 'transparent'};color:${estr === k ? '#fff' : 'inherit'}">${lbl}</button>`).join('')}
+  </div>` : '';
+  const nav = a ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0">${estToggle}<div style="display:flex;gap:4px;flex-wrap:wrap">${ffUwNav().map(([k, i, n]) => `<button onclick="ffUwSub('${k}')" style="padding:8px 13px;border-radius:9px;border:1px solid ${UW.sub === k ? 'var(--a1,#12b5a0)' : 'var(--line,rgba(255,255,255,.12))'};background:${UW.sub === k ? 'rgba(18,181,160,.12)' : 'transparent'};color:inherit;cursor:pointer;font-size:12px;font-weight:${UW.sub === k ? '700' : '500'}">${i} ${n}</button>`).join('')}</div></div>` : '';
+  const body = a ? ffUwSubBody() : `<div class="card" style="text-align:center;padding:40px"><div style="font-size:42px;margin-bottom:10px">📊</div><h2 style="margin-bottom:8px">Suite de Underwriting</h2><p style="color:var(--txt3,#9fb0c9);font-size:13px;margin-bottom:16px">Elegí la estrategia y el análisis genera su flujo · calibrada con ${UW.deals.length} casas reales</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="repbtn" onclick="ffUwNuevo(false,'venta')">🏷️ Nuevo · Vender (flip)</button><button class="repbtn" onclick="ffUwNuevo(false,'hold')">🏠 Nuevo · Rentar (hold)</button><button class="repbtn ghost" onclick="ffUwNuevo(true,'venta')">🧪 Hipotética</button></div></div>`;
   return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sel}${a ? `<input value="${UW_E(a.nombre)}" onchange="UW.a.nombre=this.value" style="background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:8px 11px;color:inherit;font-size:13px" placeholder="nombre del análisis"><button class="repbtn" data-uw-guardar="1">💾 Guardar</button><span style="font-size:11px;opacity:.6">${a.ff_deal_id ? '📎 casa real' : a.es_hipotetica ? '🧪 hipotética' : ''} · calibrado con ${UW.deals.length} casas</span>` : ''}</div>${nav}${body}`;
 }
 function ffUwSubBody() {
-  return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, unificada: ffUwViewUnificada }[UW.sub] || ffUwViewNegocio)();
+  // guard: si la estrategia no incluye este tab (p.ej. venir de hold con sub='ingreso' a venta), volvé a Negocio
+  if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'negocio';
+  return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, venta: ffUwViewVenta, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, unificada: ffUwViewUnificada }[UW.sub] || ffUwViewNegocio)();
 }
 // ─── helpers de diseño (premium, legible para no-expertos) ───
 const UW_DLR = '\u0024';
@@ -647,7 +745,7 @@ function ffUwViewCashout() {
     + '<div style="font-size:42px;font-weight:800;color:' + heroCol + ';margin-top:4px;letter-spacing:-1px">' + UW_M2(c.cashOut) + '</div>'
     + '<div style="font-size:12px;color:' + heroCol + ';margin-top:4px;opacity:.9">' + heroNote + '</div>' + heroReal + recupera + '</div>';
   // ── SOLO 3 INPUTS visibles ──
-  const valorMostrado = (+inp.appraisal || 0) > 0 ? inp.appraisal : (inp.arv_airtable || inp.arv || 0);
+  const valorMostrado = (+inp.appraisal || 0) > 0 ? inp.appraisal : (+inp.arv || +inp.arv_airtable || 0);
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
     + IN3('Valor de refi / ARV', 'tasación esperada', 'appraisal', valorMostrado, { foot: c.usaAppraisal ? 'usando la tasación (appraisal)' : 'usando el ARV de Airtable — al escribir acá pasás a tasación' })
     + IN3('Renta mensual', 'para el tope DSCR', 'renta_mensual', inp.renta_mensual, { foot: c.topeDscr != null ? 'tope DSCR (' + c.dscrObj + 'x): ' + UW_M(c.topeDscr) + ' · tope LTV: ' + UW_M(c.prestamoLtv) : 'sin renta, el tope DSCR no se evalúa (solo LTV)' })
@@ -774,6 +872,51 @@ function ffUwViewIngreso() {
     + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Ingreso Mensual</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">El flujo que deja la casa rentada, después de TODOS los gastos.</div></div>'
     + hero + inputs + desglose + '</div>';
 }
+// ─── VENTA (MODO A · fix & flip): precio de salida = ARV, Net Wire, utilidad, ROI, split ───
+function ffUwViewVenta() {
+  const inp = UW.a.inputs, o = ffUwComputeAll(), v = o.venta;
+  const pos = v.utilidad >= 0;
+  const col = pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)';
+  const hero = kitHero('Utilidad neta del proyecto', UW_M2(v.utilidad),
+    'venta ' + UW_M(v.precio) + ' &minus; costos &minus; payoff HML &minus; staging &minus; capital · reparto <b>' + UW_M(v.parteInv) + '</b> inversionista (' + v.splitInvPct + '%) / <b>' + UW_M(v.parteOp) + '</b> operador', col);
+  const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
+    + kitInput('Precio de venta', 'por default = ARV (Calc 2); escribí para fijar otro', inp.venta_precio, "ffUwSet('venta_precio',VAL)", { foot: v.esArv ? '↩ usando el ARV oficial ' + UW_M(v.precio) + ' — al escribir acá lo fijás manual' : '<a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'venta_precio\',0)">↩ volver al ARV (' + UW_M(o.arv.probable) + ')</a>' })
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    + kitInputSm('Comisión de venta (%)', inp.venta_comision_pct, "ffUwSet('venta_comision_pct',VAL)", { pct: true })
+    + kitInputSm('Título / escrow venta (%)', inp.venta_title_pct, "ffUwSet('venta_title_pct',VAL)", { pct: true })
+    + kitInputSm('Closing de venta ($)', inp.venta_closing, "ffUwSet('venta_closing',VAL)")
+    + kitInputSm('Staging / preparación ($)', inp.venta_staging, "ffUwSet('venta_staging',VAL)")
+    + kitInputSm('Capital invertido ($)', v.capital, "ffUwSet('venta_capital',VAL)", { foot: v.capitalEsCtc ? '⛓ = el inversionista pone (Calc 1)' : 'override manual' })
+    + kitInputSm('Payoff del HML ($)', v.payoff, "ffUwSet('venta_payoff',VAL)", { foot: 'fuente: ' + v.payoffFuente + (+inp.venta_payoff > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'venta_payoff\',0)">↩ auto</a>' : '') })
+    + kitInputSm('Días del proyecto', v.dias || '', "ffUwSet('venta_dias',VAL)", { plain: true, foot: v.diasEstimado ? 'estimado de meses de hold' : 'compra → venta' })
+    + '</div>'
+    + kitInputSm('Reparto inversionista (%)', v.splitInvPct, "ffUwSet('venta_split_inv_pct',VAL)", { pct: true, foot: 'operador ' + (100 - v.splitInvPct) + '% · default 50/50 (editable por deal)' })
+    + '</div>';
+  const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
+    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">Net Wire (lo que sale del cierre de venta)</div>'
+    + kitRow('Precio de venta' + (v.esArv ? ' (= ARV)' : ''), v.precio)
+    + kitRow('&minus; Comisión (' + inp.venta_comision_pct + '%)', v.comision, { neg: true })
+    + (v.titulo > 0 ? kitRow('&minus; Título / escrow (' + inp.venta_title_pct + '%)', v.titulo, { neg: true }) : '')
+    + kitRow('&minus; Closing de venta', v.closing, { neg: true })
+    + kitRow('&minus; Payoff del HML (' + v.payoffFuente + ')', v.payoff, { neg: true })
+    + kitRow('<b>= Net Wire</b>', v.netWire, { big: true, color: v.netWire >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Utilidad del proyecto</div>'
+    + kitRow('Net Wire', v.netWire)
+    + kitRow('&minus; Staging / preparación', v.staging, { neg: true })
+    + kitRow('&minus; Capital invertido (⛓ HUD)', v.capital, { neg: true })
+    + kitRow('<b>= Utilidad neta</b>', null, { big: true, txt: UW_M2(v.utilidad), color: col, last: true })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Reparto y retorno</div>'
+    + kitRow('Inversionista (' + v.splitInvPct + '%)', v.parteInv, { color: 'var(--a2,#2f6ef0)' })
+    + kitRow('Operador (' + (100 - v.splitInvPct) + '%)', v.parteOp)
+    + kitRow('ROI del período (parte inv. ÷ capital)', null, { txt: v.roiPeriodo != null ? v.roiPeriodo + '%' : '—', color: col })
+    + kitRow('ROI anualizado' + (v.dias ? ' (× 365 ÷ ' + v.dias + ' d)' : ''), null, { txt: v.roiAnual != null ? v.roiAnual + '%' : '—', color: col, last: true })
+    + '<div style="font-size:11px;color:var(--txt2,#c9d5ea);margin-top:10px;background:color-mix(in srgb, ' + col + ' 8%, transparent);border-radius:8px;padding:8px 10px">La ganancia del flip es UNA vez: el ARV es el precio de salida. All-in ' + UW_M(o.unificada.allIn) + ' (' + (o.unificada.allInPct != null ? o.unificada.allInPct + '% del ARV, máx ' + o.unificada.allInMax + '%' : '—') + ') · MAO ' + UW_M(o.unificada.mao) + '.</div>'
+    + '</div>';
+  return '<div style="max-width:560px;margin:0 auto">'
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Venta (fix &amp; flip)</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Vendés al ARV: cuánto sale del cierre (Net Wire), la utilidad y el ROI, repartido inversionista/operador.</div></div>'
+    + hero + inputs + desglose + '</div>';
+}
+window.ffUwViewVenta = ffUwViewVenta;
 function ffUwViewUnificada() {
   // Calc 6 = VISTA UNIFICADA PRO (pm/ff-unificada-pro.js): resumen de un vistazo + one-pager inversionista.
   if (window.ffUnificadaView) return ffUnificadaView();
