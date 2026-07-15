@@ -3,6 +3,24 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 15-jul (noche) · 🏷️ MODO VENTA (flip exit) — cascada de experto en el Underwriting
+Pedido del CEO: la suite estaba armada para HOLD/refi; para una VENTA la matemática es otra. Construido el modo de experto fix&flip, encadenado con las otras calcs (mismo deal = mismos números).
+
+**Item 0 — Toggle de estrategia + default desde Airtable** (ya venía de la sesión previa, confirmado): `[Vender (flip)] · [Rentar (hold)]` arriba; en Vender el nav OCULTA cashout/ingreso; default = Estrategia del deal (Fix and flip → Vender · Fix and hold → Rentar).
+
+**Item 1 — "Usar ARV" → precio de venta** (encadenado): el ARV oficial (`inp.arv`, fix de propagación previo) fluye a la calc de Venta como **precio de venta esperado** (editable, con "↩ volver al ARV"). Verificado end-to-end: confirmar otro ARV mueve el precio y la utilidad.
+
+**Item 2+3 — cascada de experto + métricas** (`ffUwCalcVenta`, reemplaza el modelo `netWire − capital`):
+- ANTES: `utilidad = Net Wire − staging − capital` (mezclaba el payoff del préstamo con la economía del proyecto).
+- DESPUÉS (modelo del CEO): `utilidad = precio − comisión% − cierre vendedor% − concesiones% − ALL-IN(compra+rehab) − INTERÉS HML total(solo interés × meses hasta vender) − holding(utilities+seguro+predial) − staging (− impuesto% opcional)`. El **payoff del HML NO entra en la utilidad** (es financiación del all-in); sí en el **Net Wire** (precio − costos venta − payoff = cash en la mesa, informativo).
+- Métricas: **margen sobre venta %**, **ROI cash-on-cash** (utilidad ÷ capital), **★ ROI ANUALIZADO** (ROI × 12/meses — la velocidad manda), **check regla 70/75%** (all-in ≤ ARV×maxPct − costos), meses hasta vender, semáforo del deal.
+- Reparto: **devolver capital a inversionistas → repartir la utilidad por % equity** (50/50 default, editable).
+- **Golden 26/26 (código real): ejemplo del CEO $449,177 → comisión 26,951 · cierre 6,738 · all-in 330,000 · interés HML 14,850 · holding 5,000 → utilidad $65,638 · margen 14.6% · ROI 140% · anualizado 335%.** ✓
+
+**Item 4/5 — Intereses en modo venta = SOLO HML**: se oculta todo el bloque DSCR/refi (préstamo del refi, cuota PITI, tope DSCR). Muestra solo el hard money: interés mensual × meses hasta vender = carry total que ⛓ alimenta la calc de Venta. El HML se cancela con el payoff en el cierre.
+
+**UI**: vista Venta con hero (utilidad + margen), semáforo, cascada itemizada, Net Wire, métricas del flip, reparto. Unificada + one-pager adaptados (KPIs de venta, utilidad del flip, ROI anualizado, regla 70%, timeline compra→obra→venta→utilidad). Config `venta_cierre_pct`/`venta_concesiones_pct`/`venta_impuesto_pct` seedeados (migr `20260715131000`, editables). node --check + golden verdes.
+
 ## 15-jul (noche) · 💎 Inversor v2 — ajustes de Juan + mapa colapsable (commits 543ea3d · f16d252 · 3b88e9f; QA prod 19/19)
 - ✅ **Mapa**: árbol con empresas COLAPSABLES (chevron, cerradas por default salvo la activa, persistido; la búsqueda expande).
 - ✅ **Modelo & movimientos v2** — ANTES: línea P&L a mano, fecha completa, categorías sin guía, "# factura" texto que se perdía, movimientos sin edición, params en lista plana de 46 keys. DESPUÉS: **P&L derivado de la categoría** (ingreso/operativo/tax = SÍ · inversión/financiero = NO, tooltip "¿qué es P&L?") · fecha en vista **YYYY-MM** (completa guardada) · selector con **guía de flujos** (❓ panel: DRAW = financiero, utilities = operativo) + **sugerencia automática** por descripción · **factura_url** como link "📄 Ver factura" · movimientos **editables ✎ + soft-delete 🗑 con `inv_audit`** inmutable por trigger (insert/update/archive verificados) · **UNA FUENTE**: columna = ✍️ manuales (editables) + ⚙️ auto-importados del inv_ledger (FF/Rentas, badge auto·fuente, no se re-teclean); Ledger declarado vista de SOLO LECTURA de lo mismo.
