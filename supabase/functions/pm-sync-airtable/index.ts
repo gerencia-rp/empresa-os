@@ -132,6 +132,8 @@ const F = {
   pag_reserva:    "fldU0KUvfPEdpp1tY",  // link → Reservas
   pag_revisar:    "fldlvCJbf2CgTspx5",
   pag_concil_ia:  "fldBVvODboUMNwqHR",
+  pag_pactada:    "fldpUSJ1HdZQmQPMH",  // Renta pactada - Contrato (base del cálculo de cartera en el OS)
+  pag_deuda:      "flduMsIV5gZRIv1eU",  // Deuda Pendiente de Pago (fórmula Airtable, espejo p/ conciliar)
   // Gastos
   gst_concepto:   "fld3anzEcnkjUd8Wg",
   gst_tipo:       "fldrCKw1ODHixzyi6",
@@ -811,6 +813,8 @@ Deno.serve(async (req) => {
           category: "renta",
           concept: `${month || ""} ${year || ""}`.trim() || (r.fields?.[F.pag_pago] || ""),
           amount: r.fields?.[F.pag_monto] || 0,
+          renta_pactada: (typeof r.fields?.[F.pag_pactada] === "number") ? r.fields[F.pag_pactada] : null,
+          deuda: (typeof r.fields?.[F.pag_deuda] === "number") ? r.fields[F.pag_deuda] : null,
           paid_at: fechaPago || null,
           month, year: (year && !isNaN(year)) ? year : null,
           platform: getSel(r.fields?.[F.pag_plataforma]),
