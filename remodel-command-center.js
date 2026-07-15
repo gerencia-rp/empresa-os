@@ -10,6 +10,7 @@
 const RC = { sys: null, section: 'command', obras: [], alerts: [], syncLog: null, names: {}, loading: false, chat: [] };
 window.RC = RC;
 const RC_FN_URL = () => `${window.SUPABASE_URL}/functions/v1/sync-remodel-airtable`;
+const RC_WK_URL = () => `${window.SUPABASE_URL}/functions/v1/sync-remodel-workers`;
 function RC_M(n) { return (typeof posMoney === 'function') ? posMoney(n) : '$' + Math.round(n || 0).toLocaleString(); }
 function RC_K(n) { return (typeof posMoneyK === 'function') ? posMoneyK(n) : RC_M(n); }
 function RC_E(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -119,16 +120,23 @@ function rcFin(o) {
   const presupuesto = +o.presupuesto_interno || 0; // Presupuesto Remodelación
   return { mat, lab, ingreso, costoReal, presupuesto, margen: ingreso - costoReal, devCostoPct: presupuesto > 0 ? (costoReal - presupuesto) / presupuesto * 100 : null };
 }
+// Métricas LIMPIAS de Remodelación (campos fórmula de Airtable, separan la plata de Remodelación de la del flip):
+// utilidad_remodelacion = Valor al cliente − Gasto interno final (solo Finalizado) · rentabilidad_remodelacion = utilidad / valor al cliente (0-1).
+// Las columnas viejas (ganancia/rentabilidad, arrancan de Draws) NO se borran: quedan como métrica "con Draws".
+function rcUtil(o) { return o.utilidad_remodelacion != null ? +o.utilidad_remodelacion : null; }
+function rcRentPct(o) { return o.rentabilidad_remodelacion != null ? +((+o.rentabilidad_remodelacion) * 100).toFixed(1) : null; }
 function rcObraDataset() {
   return (RC.obras || []).map(o => {
     const ff = rcFin(o); const sq = +o.sqft || 0; const dq = rcDQ(o);
     return {
       address: o.address, lider: o.lider || '—', estado: o.proceso || null, ciudad: o.city || null, sqft: sq,
-      ingreso: ff.ingreso, costo_real: ff.costoReal, presupuesto: ff.presupuesto, utilidad: +o.ganancia || 0,
-      margen: ff.ingreso > 0 ? Math.round((+o.ganancia || 0) / ff.ingreso * 100) : null,
+      ingreso: ff.ingreso, costo_real: ff.costoReal, presupuesto: ff.presupuesto, utilidad: rcUtil(o) != null ? rcUtil(o) : 0,
+      utilidad_con_draws: +o.ganancia || 0,
+      costo_ff: o.costo_ff != null ? +o.costo_ff : null, resultado_empresa: o.resultado_empresa != null ? +o.resultado_empresa : null,
+      margen: (+o.valor_cliente > 0 && rcUtil(o) != null) ? Math.round(rcUtil(o) / +o.valor_cliente * 100) : null,
       retraso: o.retraso_dias != null ? +o.retraso_dias : null,
       psf: sq > 0 ? Math.round(ff.costoReal / sq) : null,
-      rentabilidad: o.rentabilidad != null ? +o.rentabilidad : null,
+      rentabilidad: rcRentPct(o), rentabilidad_con_draws: o.rentabilidad != null ? +o.rentabilidad : null,
       fecha_inicio: o.fecha_inicio || null, fecha_real: o.fecha_real_fin || null,
       fin: dq.fin, sinDatos: dq.sinDatos
     };
@@ -140,7 +148,11 @@ function rcCompute() {
   const activas = obras.filter(o => !o.dq.fin);
   const pipeline = obras.filter(o => o.proceso === 'Pre construcción');
   // Histórico REAL (finalizadas)
-  const gananciaHist = fin.reduce((s, o) => s + (+o.ganancia || 0), 0);
+  const gananciaHist = fin.reduce((s, o) => s + (rcUtil(o) != null ? rcUtil(o) : 0), 0);
+  const gananciaConDraws = fin.reduce((s, o) => s + (+o.ganancia || 0), 0);
+  // Servicio vs empresa: costo_ff = intereses+servicios públicos+muebles del flip · resultado_empresa = servicio − costo (del sync, una definición)
+  const costoFFHist = fin.reduce((s, o) => s + (o.costo_ff != null ? +o.costo_ff : 0), 0);
+  const resultadoEmpresaHist = fin.reduce((s, o) => s + (o.resultado_empresa != null ? +o.resultado_empresa : 0), 0);
   const revenueHist = fin.reduce((s, o) => s + (+o.valor_cliente || 0), 0);
   const margenHist = revenueHist > 0 ? Math.round(gananciaHist / revenueHist * 100) : 0;
   // P1-4: overhead (Gastos Empresariales + Nómina Admin + Plataformas) → Utilidad NETA = ganancia BRUTA − overhead
@@ -167,40 +179,57 @@ function rcCompute() {
   const avgAvance = activas.length ? Math.round(activas.reduce((s, o) => s + (+o.avance_pct || 0), 0) / activas.length) : 0;
   // Pipeline PROYECTADO (no final) — guard: NO se suma a la ganancia real
   const pipelineProj = activas.reduce((s, o) => s + ((+o.valor_cliente || 0) - (+o.presupuesto_interno || 0)), 0);
-  // Performance por líder (histórico, confiable)
-  const lidMap = {};
-  fin.forEach(o => {
-    const k = (o.lider || '—').trim() || '—';
-    if (!lidMap[k]) lidMap[k] = { lider: k, n: 0, ganancia: 0, revenue: 0, sobre: 0, sqft: 0, real: 0, presup: 0, diasSum: 0, diasN: 0, horas: 0, obras: [] };
-    const L = lidMap[k]; const real = rcFin(o).costoReal; const presup = (+o.presupuesto_interno || 0);
-    L.n++; L.ganancia += (+o.ganancia || 0); L.revenue += (+o.valor_cliente || 0);
-    if (o.dq.sobrePresup) L.sobre++;
-    L.sqft += (+o.sqft || 0); L.real += real; L.presup += presup; L.horas += rcObraHoras(o);
-    if (o.retraso_dias != null) { L.diasSum += +o.retraso_dias; L.diasN++; }
-    L.obras.push({ address: rcShort(o.address), devPct: presup > 0 ? Math.round((real - presup) / presup * 100) : null, dias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null });
-  });
-  const lideres = Object.values(lidMap).map(l => ({ ...l, margen: l.revenue > 0 ? Math.round(l.ganancia / l.revenue * 100) : 0, devCosto: l.presup > 0 ? Math.round((l.real - l.presup) / l.presup * 100) : null, desvDias: l.diasN ? Math.round(l.diasSum / l.diasN) : null, psf: l.sqft > 0 ? Math.round(l.real / l.sqft) : null, horasSqft: (l.sqft > 0 && l.horas > 0) ? +(l.horas / l.sqft).toFixed(2) : null, sobrePct: l.n ? Math.round(l.sobre / l.n * 100) : 0 }))
-    .sort((a, b) => b.ganancia - a.ganancia);
-  // Alertas críticas computadas + de la tabla
+  // Performance por líder (histórico, confiable) — una sola agregación, dos vistas:
+  // por PERSONA (default): explota "Lider asignado" por coma, cada casa se atribuye COMPLETA a cada líder
+  // (la suma por persona puede superar el total de la empresa); por CUADRILLA: el conjunto exacto, como antes.
+  const rcAggLideres = (porPersona) => {
+    const lidMap = {};
+    fin.forEach(o => {
+      const k0 = (o.lider || '—').trim() || '—';
+      const keys = porPersona ? (k0.split(',').map(x => x.trim()).filter(Boolean).length ? k0.split(',').map(x => x.trim()).filter(Boolean) : ['—']) : [k0];
+      keys.forEach(k => {
+        if (!lidMap[k]) lidMap[k] = { lider: k, n: 0, ganancia: 0, revenue: 0, sobre: 0, sqft: 0, real: 0, presup: 0, diasSum: 0, diasN: 0, horas: 0, obras: [] };
+        const L = lidMap[k]; const real = rcFin(o).costoReal; const presup = (+o.presupuesto_interno || 0);
+        L.n++; L.ganancia += (rcUtil(o) != null ? rcUtil(o) : 0); L.revenue += (+o.valor_cliente || 0);
+        if (o.dq.sobrePresup) L.sobre++;
+        L.sqft += (+o.sqft || 0); L.real += real; L.presup += presup; L.horas += rcObraHoras(o);
+        if (o.retraso_dias != null) { L.diasSum += +o.retraso_dias; L.diasN++; }
+        L.obras.push({ address: rcShort(o.address), devPct: presup > 0 ? Math.round((real - presup) / presup * 100) : null, dias: o.retraso_dias != null ? +o.retraso_dias : null, rent: rcRentPct(o) });
+      });
+    });
+    return Object.values(lidMap).map(l => ({ ...l, margen: l.revenue > 0 ? Math.round(l.ganancia / l.revenue * 100) : 0, devCosto: l.presup > 0 ? Math.round((l.real - l.presup) / l.presup * 100) : null, desvDias: l.diasN ? Math.round(l.diasSum / l.diasN) : null, psf: l.sqft > 0 ? Math.round(l.real / l.sqft) : null, horasSqft: (l.sqft > 0 && l.horas > 0) ? +(l.horas / l.sqft).toFixed(2) : null, sobrePct: l.n ? Math.round(l.sobre / l.n * 100) : 0 }))
+      .sort((a, b) => b.ganancia - a.ganancia);
+  };
+  const lideres = rcAggLideres(true);
+  const lideresCuadrilla = rcAggLideres(false);
+  // Alertas críticas = SOLO obras En construcción (accionables hoy). Lo histórico de
+  // finalizadas (atrasos/sobrecostos al cierre) vive en Cerebro de obra + Estimado vs Real.
   const compAlerts = [];
-  activas.concat(fin).forEach(o => {
-    if (o.dq.sobrePresup) compAlerts.push({ sev: 'r', obra: rcShort(o.address), t: `Sobre presupuesto: gastó ${RC_M(o.dq.gasto)} vs ${RC_M(o.dq.presup)} presupuestado (${Math.round((o.dq.gasto / o.dq.presup - 1) * 100)}% más).` });
-    const fe = o.fecha_estimada_fin, fr = o.fecha_real_fin;
-    if (o.dq.fin && fe && fr && new Date(fr) > new Date(fe)) {
-      const d = Math.round((new Date(fr) - new Date(fe)) / 86400000);
-      if (d > 10) compAlerts.push({ sev: 'y', obra: rcShort(o.address), t: `Cerró con ${d} días de atraso (estimado ${fe}, real ${fr}).` });
+  const _scPct = (RC.sobrecostoPct != null ? RC.sobrecostoPct : 10) / 100;
+  const _hoy = new Date();
+  obras.filter(o => o.proceso === 'En construcción').forEach(o => {
+    const av = +o.avance_pct || 0, gasto = o.dq.gasto, presup = o.dq.presup;
+    // Sobre-presupuesto PROPORCIONAL: gasto acumulado vs presupuesto × avance%
+    if (presup > 0 && av > 0) {
+      const prop = presup * av / 100;
+      if (gasto > prop * (1 + _scPct)) compAlerts.push({ sev: 'r', obra: rcShort(o.address), t: `Sobre presupuesto al avance: gastó ${RC_M(gasto)} vs ${RC_M(prop)} proporcional (avance ${Math.round(av)}%): +${Math.round((gasto / prop - 1) * 100)}%.` });
+    }
+    // Atraso = HOY vs fecha ESTIMADA de finalización (no la real)
+    const fe = o.fecha_estimada_fin;
+    if (fe && _hoy > new Date(fe + 'T23:59:59')) {
+      const d = Math.round((_hoy - new Date(fe + 'T00:00:00')) / 86400000);
+      compAlerts.push({ sev: d > 10 ? 'r' : 'y', obra: rcShort(o.address), t: `Atrasada: +${d} días vs fecha estimada (${fe}) · avance ${Math.round(av)}%.` });
     }
   });
   // C) ESTIMADO vs REAL por casa (finalizadas confiables): presupuesto (est) vs monto_real (real)
   const evr = fin.filter(o => (+o.presupuesto_interno || 0) > 0 && rcFin(o).costoReal > 0).map(o => {
     const est = +o.presupuesto_interno || 0, real = rcFin(o).costoReal;
-    return { address: rcShort(o.address), lider: (o.lider || '—'), est, real, devAbs: real - est, devPct: Math.round((real - est) / est * 100), devDias: o.retraso_dias != null ? +o.retraso_dias : null, rent: o.rentabilidad != null ? +o.rentabilidad : null };
+    return { address: rcShort(o.address), lider: (o.lider || '—'), est, real, devAbs: real - est, devPct: Math.round((real - est) / est * 100), devDias: o.retraso_dias != null ? +o.retraso_dias : null, rent: rcRentPct(o) };
   });
   const evrTot = { est: evr.reduce((s, x) => s + x.est, 0), real: evr.reduce((s, x) => s + x.real, 0) };
   evrTot.devAbs = evrTot.real - evrTot.est; evrTot.devPct = evrTot.est > 0 ? Math.round(evrTot.devAbs / evrTot.est * 100) : 0;
   const topDesv = [...evr].sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct)).slice(0, 8);
   const desvCostoProm = evr.length ? Math.round(evr.reduce((s, x) => s + x.devPct, 0) / evr.length) : 0;
-  const margenReal = fin.reduce((s, o) => { const ff = rcFin(o); return s + ((ff.ingreso > 0 && ff.costoReal > 0) ? ff.margen : 0); }, 0);
   const _diasAll = fin.map(o => o.retraso_dias).filter(d => d != null).map(Number);
   const _diasRev = _diasAll.filter(d => Math.abs(d) > 180);   // outliers |>180d| = dato a revisar
   const _dias = _diasAll.filter(d => Math.abs(d) <= 180);
@@ -208,11 +237,11 @@ function rcCompute() {
   const _sd = [..._dias].sort((a, b) => a - b);
   const desvDiasMed = _sd.length ? (_sd.length % 2 ? _sd[(_sd.length - 1) / 2] : Math.round((_sd[_sd.length / 2 - 1] + _sd[_sd.length / 2]) / 2)) : 0;
   const desvDiasRevN = _diasRev.length;
-  // B9 (auditoría 13-jul): rentabilidad = margen PONDERADO Σutilidad/Σingreso (valor_interno),
-  // excluyendo denominadores ≤0 (Stonleigh neg/neg daba 322%). JAMÁS promediar la columna %
-  // (llega como fracción de Airtable → mostraba "0.2%"). Debe dar 170,682/1,466,360 = 11.6%.
-  const _rentOK = fin.filter(o => (+o.valor_interno || 0) > 0);
-  const rentProm = _rentOK.length ? +((100 * _rentOK.reduce((s, o) => s + (+o.ganancia || 0), 0)) / _rentOK.reduce((s, o) => s + (+o.valor_interno || 0), 0)).toFixed(1) : 0;
+  // B9 (auditoría 13-jul): rentabilidad = margen PONDERADO Σutilidad/Σvalor, excluyendo denominadores ≤0
+  // (JAMÁS promediar la columna % — fracción de Airtable, y el promedio simple infla outliers).
+  // Métrica LIMPIA: Σ utilidad_remodelacion / Σ valor_cliente (misma definición que rentabilidad_remodelacion, agregada).
+  const _rentOK = fin.filter(o => (+o.valor_cliente || 0) > 0 && rcUtil(o) != null);
+  const rentProm = _rentOK.length ? +((100 * _rentOK.reduce((s, o) => s + rcUtil(o), 0)) / _rentOK.reduce((s, o) => s + (+o.valor_cliente || 0), 0)).toFixed(1) : 0;
   const _conDias = fin.filter(o => o.retraso_dias != null);
   const aTiempoPct = _conDias.length ? Math.round(_conDias.filter(o => +o.retraso_dias <= 0).length / _conDias.length * 100) : 0;
   const enPresupPct = evr.length ? Math.round(evr.filter(x => x.devPct <= 0).length / evr.length * 100) : 0;
@@ -231,12 +260,16 @@ function rcCompute() {
   const okrsList = okrsConfigured ? RC.okrs : OKR_DEFAULTS;
   const okrActual = { margen_bruto: margenHist, rentabilidad: rentProm, desv_costo: desvCostoProm, desv_dias: desvDiasProm, psf: psfProm, ebitda_margen: ebitdaMargen, a_tiempo: aTiempoPct, en_presupuesto: enPresupPct };
   const okrRows = okrsList.map(o => { const actual = okrActual[o.clave]; const meta = +o.objetivo; const cumple = actual == null ? null : (o.comparador === '≤' ? actual <= meta : actual >= meta); return { clave: o.clave, metrica: o.metrica, objetivo: meta, comparador: o.comparador, unidad: o.unidad, actual, cumple }; });
-  return { obras, fin, activas, pipeline, gananciaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, lideresCuadrilla, gananciaHist, gananciaConDraws, costoFFHist, resultadoEmpresaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
   const ins = [];
   if (c.sobreN > 0) ins.push({ s: 'r', t: `<b>${c.sobreN} obra(s) sobre presupuesto</b> (gasto real > 110% del presupuesto). Revisar antes de cerrar.` });
+  // Histórico de cierres con atraso (>10d) — acá y en Estimado vs Real, NO en alertas (no accionable)
+  const _finAtraso = c.fin.filter(o => o.fecha_estimada_fin && o.fecha_real_fin && (new Date(o.fecha_real_fin) - new Date(o.fecha_estimada_fin)) / 86400000 > 10)
+    .map(o => ({ a: rcShort(o.address), d: Math.round((new Date(o.fecha_real_fin) - new Date(o.fecha_estimada_fin)) / 86400000) })).sort((x, y) => y.d - x.d);
+  if (_finAtraso.length) ins.push({ s: 'y', t: `<b>${_finAtraso.length} finalizada(s) cerraron con >10 días de atraso</b> (peor: ${RC_E(_finAtraso[0].a)} +${_finAtraso[0].d}d) — ver Estimado vs Real.` });
   if (c.lideres.length) {
     const best = c.lideres[0], worst = c.lideres[c.lideres.length - 1];
     ins.push({ s: 'g', t: `Mejor líder por ganancia: <b>${RC_E(best.lider)}</b> — ${RC_M(best.ganancia)} en ${best.n} obra(s) (${best.margen}% margen).` });
@@ -255,11 +288,17 @@ function rcInsights(c) {
 async function rcPull() {
   const btn = document.getElementById('rc-pull'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Trayendo…'; }
   try {
-    const res = await fetch(RC_FN_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` }, body: JSON.stringify({ user_id: (window.state && state.user && state.user.id) || null }) });
-    const r = await res.json();
+    const hdrs = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` };
+    const body = JSON.stringify({ user_id: (window.state && state.user && state.user.id) || null });
+    // Pull = obras (sync-remodel-airtable) + horas de trabajadores (sync-remodel-workers), en paralelo.
+    // Si horas falla, el pull de obras NO se rompe: se avisa en el toast.
+    const [r, wk] = await Promise.all([
+      fetch(RC_FN_URL(), { method: 'POST', headers: hdrs, body }).then(x => x.json()),
+      fetch(RC_WK_URL(), { method: 'POST', headers: hdrs, body }).then(x => x.json()).catch(e2 => ({ ok: false, error: String(e2) })),
+    ]);
     if (!r.ok) throw new Error(r.error || 'Sync falló');
     await rcLoadAll(); rcRender();
-    if (window.toast) toast(`Airtable actualizado — ${r.records_synced || 0} obras`, 'success');
+    if (window.toast) toast(wk.ok ? `Airtable actualizado — ${r.records_synced || 0} obras + horas actualizadas` : `Obras actualizadas (${r.records_synced || 0}) — horas fallaron: ${wk.error || '?'}`, wk.ok ? 'success' : 'warning');
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Pull Airtable'; }
     if (window.toast) toast('Error en Pull: ' + e.message, 'error');
@@ -317,18 +356,21 @@ function rcSecCommand(c) {
   const parityBd = paritySync ? 'color-mix(in srgb, var(--pos,#34d399) 25%, transparent)' : 'color-mix(in srgb, var(--neg,#f87171) 35%, transparent)';
   return rcHeader('Command Center', `${c.obras.length} obras · ${c.fin.length} finalizadas · ${c.activas.length} en curso — capital, ganancia realizada y pipeline.`) + `
     <div style="font-size:11px;padding:6px 12px;margin-bottom:10px;border-radius:8px;background:${parityBg};border:1px solid ${parityBd};color:var(--txt2)">${parityNote}</div>
-    <div class="grid kpis">
-      <div class="card kpi"><div class="lab">Ganancia realizada</div><div class="big up glow">${RC_K(c.gananciaHist)}</div><div class="meta">BRUTO · ${c.fin.length} finalizadas · margen ${c.margenHist}%</div></div>
+    <div class="grid kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div class="card kpi"><div class="lab">Servicio (Remodelación)</div><div class="big ${c.gananciaHist>=0?'up glow':'down'}">${RC_K(c.gananciaHist)}</div><div class="meta">utilidad limpia · ${c.fin.length} finalizadas · margen ${c.margenHist}% · con Draws: ${RC_K(c.gananciaConDraws)}</div></div>
+      <div class="card kpi"><div class="lab">Costo Fix & Flip</div><div class="big">${RC_K(c.costoFFHist)}</div><div class="meta">intereses + servicios públicos + muebles del flip</div></div>
+      <div class="card kpi"><div class="lab">Total empresa</div><div class="big ${c.resultadoEmpresaHist>=0?'up glow':'down'}">${RC_K(c.resultadoEmpresaHist)}</div><div class="meta">servicio − costo F&F · ${c.fin.length} finalizadas</div></div>
+    </div>
+    <div class="grid kpis" style="margin-top:14px">
       <div class="card kpi"><div class="lab">Obras en curso</div>${paritySync ? `<div class="big">${c.activas.length}</div>` : `<div class="big down" style="font-size:15px;line-height:1.15" title="El conteo de la app no coincide con Airtable">⚠ sync<br>desincronizado</div>`}<div class="meta">avance promedio ${c.avgAvance}% · ${c.obras.length} obras</div></div>
       <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big">${RC_K(c.capitalActivo)}</div><div class="meta">en obras activas · presup. ${RC_K(c.presupActivo)}</div></div>
       <div class="card kpi"><div class="lab">Pipeline <span class="warn">proyectado</span></div><div class="big warn">${RC_K(c.pipelineProj)}</div><div class="meta">NO realizado · ${c.pipeline.length} en pre-construcción</div></div>
+      <div class="card kpi"><div class="lab">Alertas</div><div class="big ${c.compAlerts.length?'down':'up'}">${c.compAlerts.length}</div><div class="meta">sobre-presupuesto / atraso</div></div>
     </div>
     <div class="grid kpis" style="margin-top:14px">
-      <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">histórico (${c.fin.length} finalizadas)</div></div>
+      <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">utilidad / valor cliente (limpia) · ${c.fin.length} finalizadas</div></div>
       <div class="card kpi"><div class="lab">Desviación de costo prom</div><div class="big ${c.desvCostoProm>0?'down':'up'}">${c.desvCostoProm>0?'+':''}${c.desvCostoProm}%</div><div class="meta">real vs presupuesto · ${c.enPresupPct}% en presup.</div></div>
       <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">mediana ${c.desvDiasMed>0?'+':''}${c.desvDiasMed}d · ${c.aTiempoPct}% a tiempo${c.desvDiasRevN?` · <span class="warn">${c.desvDiasRevN} a revisar</span>`:''}</div></div>
-      <div class="card kpi"><div class="lab">Margen realizado</div><div class="big ${c.margenReal>=0?'up':'down'}">${RC_K(c.margenReal)}</div><div class="meta">ingreso − costo real (${c.fin.length} fin)</div></div>
-      <div class="card kpi"><div class="lab">Alertas</div><div class="big ${c.compAlerts.length?'down':'up'}">${c.compAlerts.length}</div><div class="meta">sobre-presupuesto / atraso</div></div>
     </div>
     <div class="card" style="margin-top:14px">
       <div class="chart-h"><div class="t">Overhead / EBITDA de Remodelación</div><div class="k">Ganancia BRUTA − overhead</div></div>
@@ -355,7 +397,7 @@ function rcCompletitud(o) {
 function rcObraCard(o) {
   const dq = o.dq, av = Math.round(+o.avance_pct || 0);
   const badge = dq.sinDatos ? '<span class="ff-dq ff-dq-nd">sin datos</span>' : dq.sobrePresup ? '<span class="ff-dq ff-dq-rev">⚠ sobre presupuesto</span>' : (!dq.fin ? '<span class="ff-dq ff-dq-pre">en curso · proyectado</span>' : '');
-  const util = dq.fin ? (+o.ganancia || 0) : ((+o.valor_cliente || 0) - dq.gasto);
+  const util = dq.fin ? (rcUtil(o) != null ? rcUtil(o) : 0) : ((+o.valor_cliente || 0) - dq.gasto);
   const slug = window.osSlug ? osSlug(o.address) : '';
   const _ff = rcFin(o), _sq = +o.sqft || 0;
   const _psf = _sq > 0 ? Math.round(_ff.costoReal / _sq) : null;
@@ -371,6 +413,8 @@ function rcObraCard(o) {
     <div class="krow"><span>$/sqft (mat+MO)</span><b>${_psfStr}</b></div>
     <div class="krow"><span>Valor cliente</span><b>${RC_M(+o.valor_cliente || 0)}</b></div>
     <div class="krow"><span>${dq.fin ? 'Utilidad' : 'Utilidad (proy.)'}</span><b class="${util >= 0 ? 'up' : 'down'}">${RC_M(util)}</b></div>
+    ${o.costo_ff != null && +o.costo_ff !== 0 ? `<div class="krow"><span>Costo F&F (int+serv+mueb)</span><b>${RC_M(+o.costo_ff)}</b></div>` : ''}
+    ${o.resultado_empresa != null ? `<div class="krow"><span>Total empresa</span><b class="${+o.resultado_empresa >= 0 ? 'up' : 'down'}">${RC_M(+o.resultado_empresa)}</b></div>` : ''}
     <div class="kbar"><i style="width:${Math.min(100, av)}%"></i></div>
     <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${slug}')">🏠 Ver ficha de casa →</div>
   </div>`;
@@ -387,7 +431,8 @@ function rcSecObras(c) {
 // ─── Scorecard por líder (obs #14 CEO): obras a cargo · % cumple presupuesto/tiempo · margen · Qué revisar ───
 // Convención de líder = la del CC (key exacto de lidMap: obra con 2 líderes queda como fila "A, B");
 // el conteo de EN CURSO sí matchea al líder individual dentro de strings combinados.
-function rcLiderScorecard(c) {
+function rcLiderScorecard(c, lids) {
+  lids = lids || c.lideres;
   if (!c.lideres.length) return '';
   const mkNext = (porque, accion, quien) => (typeof kitNext === 'function')
     ? kitNext(porque, accion, quien)
@@ -398,7 +443,7 @@ function rcLiderScorecard(c) {
   const stat = (lab, txt, cls, sub) => '<div><div style="font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--mut2)">' + lab + '</div>'
     + '<div class="' + (cls || '') + '" style="font-size:16px;font-weight:800;margin-top:1px">' + txt + '</div>'
     + '<div style="font-size:9.5px;color:var(--mut2)">' + sub + '</div></div>';
-  const cards = c.lideres.map(l => {
+  const cards = lids.map(l => {
     // en curso: matchea el key exacto O al líder individual dentro de un "A, B" de la obra activa
     const enCurso = c.activas.filter(o => {
       const k = ((o.lider || '—').trim() || '—');
@@ -431,17 +476,24 @@ function rcLiderScorecard(c) {
   return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start;margin-bottom:14px">' + cards + '</div>';
 }
 
+function rcSetLiderVista(v) { RC.liderVista = v; rcGo('lideres'); }
 function rcSecLideres(c) {
+  const porPersona = (RC.liderVista || 'persona') !== 'cuadrilla';
+  const lids = porPersona ? c.lideres : c.lideresCuadrilla;
+  const NOTA_PERSONA = 'Las casas con varios líderes se cuentan en cada uno, así que la suma por persona puede superar el total de la empresa.';
+  const tgl = (v, lab) => `<span class="chip" style="${(porPersona ? 'persona' : 'cuadrilla') === v ? 'background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff' : ''}" onclick="rcSetLiderVista('${v}')">${lab}</span>`;
+  const toggleBar = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">${tgl('persona', '👤 Por persona')}${tgl('cuadrilla', '👥 Por cuadrilla')}` +
+    (porPersona ? `<span class="meta" title="${NOTA_PERSONA}">ℹ ${NOTA_PERSONA}</span>` : '') + '</div>';
   const dchip = (v, unit) => v == null ? '<span style="color:var(--mut2)">—</span>' : `<span class="${v > 0 ? 'down' : 'up'}">${v > 0 ? '+' : ''}${v}${unit}</span>`;
   const detalle = l => l.obras.map(o => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:3px 0;border-top:1px solid var(--glassb)"><span>${RC_E(o.address)}</span><span style="color:var(--mut)">${o.devPct != null ? 'desv ' + (o.devPct > 0 ? '+' : '') + o.devPct + '%' : ''}${o.dias != null ? ' · ' + o.dias + 'd' : ''}${o.rent != null ? ' · rent ' + o.rent + '%' : ''}</span></div>`).join('');
-  const rows = c.lideres.map((l, i) => {
+  const rows = lids.map((l, i) => {
     const main = `<tr style="cursor:pointer" onclick="document.getElementById('rc-lid-${i}').classList.toggle('rc-hide')"><td><b>${RC_E(l.lider)}</b> <span style="color:var(--mut2);font-size:9px">▸</span></td><td>${l.n}</td><td class="${l.ganancia >= 0 ? 'up' : 'down'}">${RC_M(l.ganancia)}</td><td>${dchip(l.devCosto, '%')}</td><td>${dchip(l.desvDias, 'd')}</td><td>${l.psf != null ? '$' + l.psf : '—'}</td><td>${l.horasSqft != null ? l.horasSqft : '—'}</td><td class="${l.sobrePct > 30 ? 'down' : ''}">${l.sobrePct}%</td></tr>`;
     const det = `<tr id="rc-lid-${i}" class="rc-hide"><td colspan="8" style="padding:0"><div style="padding:9px 12px;background:var(--glass)"><div style="font-size:9px;letter-spacing:1px;color:var(--mut2);margin-bottom:6px">OBRAS DE ${RC_E((l.lider || '').toUpperCase())}</div>${detalle(l)}</div></td></tr>`;
     return main + det;
   }).join('');
-  return rcHeader('Performance por líder', 'Scorecard por líder (presupuesto/tiempo/margen + qué revisar) y detalle: desviación de costo/días, $/sqft, hrs/sqft — finalizadas. Click en la fila para ver sus obras.') + rcLiderScorecard(c) + `
+  return rcHeader('Performance por líder', 'Scorecard por líder (presupuesto/tiempo/margen + qué revisar) y detalle: desviación de costo/días, $/sqft, hrs/sqft — finalizadas. Click en la fila para ver sus obras.') + toggleBar + rcLiderScorecard(c, lids) + `
     <div class="card"><table class="ptable"><thead><tr><th>Líder</th><th>Obras</th><th>Ganancia</th><th>Desv costo</th><th>Desv días</th><th>$/sqft</th><th>hrs/sqft</th><th>% sobre pres.</th></tr></thead><tbody>
-    ${c.lideres.length ? rows : '<tr><td colspan="8" class="meta" style="padding:20px">Sin obras finalizadas.</td></tr>'}
+    ${lids.length ? rows : '<tr><td colspan="8" class="meta" style="padding:20px">Sin obras finalizadas.</td></tr>'}
     </tbody></table></div>`;
 }
 
@@ -516,7 +568,7 @@ function rcExportCSV() {
   const c = rcCompute();
   const rows = [['Casa', 'Lider', 'Estimado', 'Real', 'Desv $', 'Desv %', 'Dias atraso', 'Rentabilidad %']];
   c.evr.forEach(x => rows.push([x.address, x.lider, x.est, x.real, x.devAbs, x.devPct, x.devDias == null ? '' : x.devDias, x.rent == null ? '' : x.rent]));
-  rows.push([], ['KPIs'], ['Ganancia historica', c.gananciaHist], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
+  rows.push([], ['KPIs'], ['Servicio Remodelacion (utilidad limpia)', c.gananciaHist], ['Costo Fix & Flip (int+serv+mueb)', c.costoFFHist], ['Total empresa (servicio - costo)', c.resultadoEmpresaHist], ['Ganancia con Draws (vieja)', c.gananciaConDraws], ['Rentabilidad prom %', c.rentProm], ['Desv costo prom %', c.desvCostoProm], ['Desv dias prom', c.desvDiasProm], ['% a tiempo', c.aTiempoPct], ['% en presupuesto', c.enPresupPct], ['Obras finalizadas', c.fin.length], ['Obras en curso', c.activas.length]);
   const csv = rows.map(r => r.map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'remodelacion-estimado-vs-real.csv'; a.click(); URL.revokeObjectURL(url);
@@ -674,13 +726,20 @@ function rcPagoQuincenal() {
     + '<button class="repbtn" onclick="rcPagoGenerar()">Ver desglose →</button></div></div>';
   ov.appendChild(el);
 }
+// Nombre del trabajador (definición única): texto libre de Airtable → si falta, el LINK a
+// Personal en Campo (worker_rec_id, B8) resuelto contra remodel_crew_rates (ya en memoria) → '?'.
+function rcWorkerName(h) {
+  const t = String(h.worker || '').trim(); if (t) return t;
+  const cr = (RC.crewRates || []).find(c => c.airtable_id === h.worker_rec_id);
+  return (cr && String(cr.nombre || '').trim()) || '?';
+}
 async function rcPagoGenerar() {
   const casa = document.getElementById('pq-casa').value;
   const fechaPago = document.getElementById('pq-fecha').value;
   if (!fechaPago) { alert('Elegí la fecha de pago.'); return; }
   const q = rcQuincena(fechaPago);
   // '*' (no columnas explícitas) para degradar sin error si 'pago_total_dia' aún no existe (pre-migración).
-  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('*').gte('fecha', q.s1ini).lte('fecha', q.s2fin).limit(5000);
+  const { data: hrs, error } = await sb.from('remodel_worker_hours').select('*').is('archived_at', null).gte('fecha', q.s1ini).lte('fecha', q.s2fin).limit(5000);
   if (error) { alert('Error leyendo horas: ' + error.message); return; }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const obras = (RC.obras || []).filter(o => o.active !== false);
@@ -700,7 +759,7 @@ async function rcPagoGenerar() {
     const label = o ? rcShort(o.address) : (rcShort(h.casa) || 'Sin casa asignada');
     if (!byCasa[label]) byCasa[label] = { label, recId: o ? (o.airtable_id || null) : null, lider: o ? (o.lider || '—') : '—', workers: {}, sem1: { horas: 0, pago: 0 }, sem2: { horas: 0, pago: 0 } };
     const g = byCasa[label];
-    const w = (h.worker || '?').trim();
+    const w = rcWorkerName(h);
     if (!g.workers[w]) g.workers[w] = { w, sem1: { horas: 0, pago: 0 }, sem2: { horas: 0, pago: 0 } };
     // Fuente ÚNICA del pago diario = "Pago Total Dia" (Airtable), NO recalcular.
     const ptd = Number(h.pago_total_dia);

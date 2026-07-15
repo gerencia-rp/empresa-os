@@ -406,8 +406,9 @@ function osCompute() {
       const fin = OS.remodel.filter(o => o.proceso === 'Finalizado');
       const curso = OS.remodel.filter(o => o.proceso !== 'Finalizado');
       // B7 (auditoría 13-jul): el avance promedio SOLO cuenta obras con % del Planner (avance_real);
-      // promediar el singleSelect legacy daba el 91% fantasma.
-      const a = OS.remodel.filter(o => o.avance_real != null).map(o => Number(o.avance_real)).filter(x => x > 0);
+      // promediar el singleSelect legacy daba el 91% fantasma. Solo EN CURSO: con la regla única
+      // (remodel_avance_regla, 14-jul) las finalizadas tienen avance_real=100 y inflarían el promedio.
+      const a = curso.filter(o => o.avance_real != null).map(o => Number(o.avance_real)).filter(x => x > 0);
       return {
         obras: OS.remodel.length,
         activas: curso.length,

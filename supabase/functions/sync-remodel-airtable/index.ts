@@ -20,12 +20,19 @@ const FIELD_IDS = {
   trabajadores: "fldNmR8PgZWdjutIw",
   interno: "fldsRWMQJ4Lv86GOU",
   presupuesto: "fldPMBhxLYr4TMje0",
-  cliente: "fldAP3lI2FgXds14q",
+  // FIX 14-jul: valor_cliente ← "Valor Remodelación al cliente" (antes traía Draws Ingresados por error)
+  cliente: "fldsRWMQJ4Lv86GOU",
+  draws: "fldAP3lI2FgXds14q",
   ganancia: "fldW26WBuAFPnWhi8",
   retraso: "fld7Pl5a9YhAazAby",
   monto_por_gastar: "fldg9kWaf60x6SeJo",
   rentabilidad: "fldxyxgo4B4VcuQJX",
   monto_real: "fldq1Xpfb1SPPGIuz",
+  utilidad_remodelacion: "fldQ3vhMvBuCDUJVR",
+  rentabilidad_remodelacion: "fldywMYaieK1bQ9MP",
+  intereses_ff: "fldHCVca9YHhdCRrA",
+  servicios_publicos_ff: "fldvxo2bZXekrGSib",
+  muebles_ff: "fldILIa8f6cQCTsiW",
   desviacion: "fldVgmxP8Z1xtdrmj",
   inicio: "fldG2SABUD5Ptcuj8",
   fin_estimado: "fldQtRD47N2jHaRyh",
@@ -175,6 +182,11 @@ function projectFromAirtable(r: any, liderCache: Map<string, string>) {
   const proceso = getName(f[FIELD_IDS.proceso]);
   const avance_pct = parseAvance(f[FIELD_IDS.avance]);
   const desviacion = getName(f[FIELD_IDS.desviacion]);
+  const utilidadRem = typeof f[FIELD_IDS.utilidad_remodelacion] === "number" ? f[FIELD_IDS.utilidad_remodelacion] : null;
+  // Costo Fix & Flip = Intereses + Pagos Servicios Públicos + Muebles (campos existentes de Airtable; el cálculo vive acá, no allá)
+  const costoFF = (typeof f[FIELD_IDS.intereses_ff] === "number" ? f[FIELD_IDS.intereses_ff] : 0)
+    + (typeof f[FIELD_IDS.servicios_publicos_ff] === "number" ? f[FIELD_IDS.servicios_publicos_ff] : 0)
+    + (typeof f[FIELD_IDS.muebles_ff] === "number" ? f[FIELD_IDS.muebles_ff] : 0);
 
   return {
     airtable_id: r.id,
@@ -188,11 +200,16 @@ function projectFromAirtable(r: any, liderCache: Map<string, string>) {
     presupuesto_interno: f[FIELD_IDS.presupuesto] || null,
     valor_interno: f[FIELD_IDS.interno] || null,
     valor_cliente: f[FIELD_IDS.cliente] || null,
+    draws_ingresados: typeof f[FIELD_IDS.draws] === "number" ? f[FIELD_IDS.draws] : null,
     ganancia: f[FIELD_IDS.ganancia] || null,
     retraso_dias: typeof f[FIELD_IDS.retraso] === "number" ? f[FIELD_IDS.retraso] : null,
     monto_por_gastar: typeof f[FIELD_IDS.monto_por_gastar] === "number" ? f[FIELD_IDS.monto_por_gastar] : null,
     rentabilidad: typeof f[FIELD_IDS.rentabilidad] === "number" ? f[FIELD_IDS.rentabilidad] : null,
     monto_real: typeof f[FIELD_IDS.monto_real] === "number" ? f[FIELD_IDS.monto_real] : null,
+    utilidad_remodelacion: utilidadRem,
+    rentabilidad_remodelacion: typeof f[FIELD_IDS.rentabilidad_remodelacion] === "number" ? f[FIELD_IDS.rentabilidad_remodelacion] : null,
+    costo_ff: costoFF,
+    resultado_empresa: utilidadRem != null ? utilidadRem - costoFF : null,
     sqft: f[FIELD_IDS.sqft] || null,
     desviacion_label: desviacion,
     fecha_inicio: f[FIELD_IDS.inicio] || null,
@@ -537,6 +554,10 @@ Deno.serve(async (req) => {
     let wbStatus = "skip";
     // Backbone: asignar property_id (properties.id) a obras/proyectos/actividades nuevas (self-healing).
     try { await sb.rpc("remodel_backfill_property_ids"); } catch (e) { console.warn("property_id backfill skip:", String(e)); }
+
+    // Regla ÚNICA de avance (remodel_avance_regla): Finalizado/todas-done → 100, Pre construcción → 0,
+    // resto hechas/total del Planner — cubre casas SIN tareas, así el write-back de abajo llega a las 26.
+    try { await sb.rpc("remodel_recompute_avance_all"); } catch (e) { console.warn("avance recompute skip:", String(e)); }
 
     // Write-back del avance_real (Planner) → campo 'Avance Real (Planner)' en Airtable (Supabase es la fuente del avance).
     // Requiere que el AIRTABLE_TOKEN tenga scope data.records:write en la base de Remodelación (si no → 403, se saltea).
