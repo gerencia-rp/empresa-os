@@ -534,7 +534,7 @@ function osGlobal(comp) {
   const areaCards = [
     osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
     osCanArea('contable') ? `<div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>` : '',
-    `<div class="card unit" data-osnav="/mapa"><div class="ico">🗺️</div><div class="un">Mapa de Conexiones</div><div class="ut">DE DÓNDE SALE CADA NÚMERO</div><div class="kv"><span>Linaje de datos</span><b>4 empresas</b></div><div class="go">Abrir →</div></div>`,
+    `<div class="card unit" data-osnav="/mapa"><div class="ico">🗺️</div><div class="un">Mapa de Conexiones</div><div class="ut">DE DÓNDE SALE CADA NÚMERO</div><div class="kv"><span>Linaje de datos</span><b>viene → número → alimenta</b></div><div class="go">Abrir →</div></div>`,
   ].join('');
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
   const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>

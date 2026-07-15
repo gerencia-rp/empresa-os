@@ -48,6 +48,16 @@ const totalAssets = assets.reduce((s, x) => s + (+x.value || 0), 0);
 chk('(d) Total Assets del holding disponible', totalAssets > 0, '$' + Math.round(totalAssets).toLocaleString());
 chk('(d) equity contable ≤ assets (sanidad)', cap && +cap.equity_qbo <= totalAssets);
 
+// (e) LINAJE 100%: última corrida del crawler de cobertura (scripts/lineage-coverage.mjs --gate)
+// fresca (≤7 días) y con 0 números visibles sin entrada en data_lineage. Quien agrega un
+// número nuevo DEBE registrar de dónde viene (correr --register y curar en /mapa).
+const covRun = await q('lineage_coverage_runs?select=run_at,numeros_vistos,sin_linaje,ok&order=run_at.desc&limit=1');
+const cr = covRun[0];
+chk('(e) cobertura de linaje: corrida fresca (≤7 días)', cr && (Date.now() - new Date(cr.run_at).getTime()) / 86400000 <= 7, cr && String(cr.run_at).slice(0, 10));
+chk('(e) cobertura de linaje: 0 números visibles sin registro', cr && cr.sin_linaje === 0, cr && (cr.numeros_vistos - cr.sin_linaje) + '/' + cr.numeros_vistos);
+const sinFuente = await q('data_lineage_map?select=id&origen=eq.crawler&estado=eq.pend&active=is.true');
+chk('(e) descubiertos por el crawler ya curados (0 pendientes)', sinFuente.length === 0, sinFuente.length + ' sin fuente definida');
+
 console.log('\n🚦 GATE DE CI — ' + ok.length + ' OK · ' + bad.length + ' FALLAS');
 ok.forEach(x => console.log('  ✓ ' + x));
 if (bad.length) { bad.forEach(x => console.log('  ✗ ' + x)); process.exit(1); }
