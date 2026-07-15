@@ -107,22 +107,93 @@ async function iaAddParam() {
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaAddParam = iaAddParam;
+// ── Movimientos v2 (ajustes Juan 15-jul) ──
+// P&L derivado de la categoría (NO se elige a mano): ingreso/operativo/tax entran al Estado
+// de Resultados (afectan utilidad); inversión/financiero son capital/financiamiento.
+const IA_PNL_SI = ['ingreso', 'operativo', 'tax'];
+function iaPnl(cat) { return IA_PNL_SI.includes(String(cat || '').toLowerCase()); }
+const IA_PNL_TIP = 'P&L = ¿entra al Estado de Resultados (afecta la utilidad)? SÍ: ingreso, operativo, tax. NO: inversión y financiero (son capital/financiamiento, no ganancia).';
+const IA_CAT_GUIA = [
+  ['ingreso', '💵 Ingreso', 'renta recibida, otros ingresos'],
+  ['operativo', '🧾 Operativo', 'utilities, mantenimiento, property mgmt, HOA, seguro, limpieza'],
+  ['inversion', '🏗 Inversión', 'compra de propiedad, CapEx mayor, venta de propiedad'],
+  ['financiero', '🏦 Financiero', 'DRAW del HML (no es ingreso), aporte de capital, cash-out del refi, intereses/principal HML-refi, distribuciones'],
+  ['tax', '🏛 Tax', 'impuesto predial, impuesto de renta'],
+];
+// sugerencia automática de categoría según la descripción (editable siempre)
+function iaSugerirCat(txt) {
+  const t = String(txt || '').toLowerCase();
+  if (/draw|hml|inter[eé]s|refi|cash.?out|aporte|distribu|principal|pr[eé]stamo|harmony/.test(t)) return 'financiero';
+  if (/predial|impuesto|tax/.test(t)) return 'tax';
+  if (/compra|capex|venta de|remodelaci[oó]n/.test(t)) return 'inversion';
+  if (/renta|rent\b|dep[oó]sito de renta/.test(t)) return 'ingreso';
+  if (/util|electric|agua|water|luz|gas|internet|hoa|seguro|insurance|manten|limpieza|clean|property m|pm\b/.test(t)) return 'operativo';
+  return null;
+}
+function iaMovSugerir() {
+  const conc = (document.getElementById('ia-m-conc') || {}).value || '';
+  const sug = iaSugerirCat(conc);
+  const sel = document.getElementById('ia-m-cat');
+  if (sug && sel && !sel.dataset.tocado) { sel.value = sug; iaMovPnlPreview(); }
+}
+window.iaMovSugerir = iaMovSugerir;
+function iaMovPnlPreview() {
+  const sel = document.getElementById('ia-m-cat'); const out = document.getElementById('ia-m-pnl');
+  if (sel && out) out.innerHTML = iaPnlBadge(sel.value);
+}
+window.iaMovPnlPreview = iaMovPnlPreview;
+function iaPnlBadge(cat) {
+  const si = iaPnl(cat);
+  return '<span class="badge ' + (si ? 'b-ok' : 'b-warn') + '" title="' + IA_PNL_TIP + '" style="cursor:help">P&L ' + (si ? 'SÍ' : 'NO') + '</span>';
+}
+window.iaPnlBadge = iaPnlBadge;
+function iaCatSel(id, cur) {
+  return '<select id="' + id + '" class="osa-in" style="padding:6px" onchange="this.dataset.tocado=1;iaMovPnlPreview()">'
+    + IA_CAT_GUIA.map(c => '<option value="' + c[0] + '"' + (cur === c[0] ? ' selected' : '') + ' title="' + c[2] + '">' + c[1] + '</option>').join('') + '</select>';
+}
+function iaGuiaCat() {
+  return '<div id="ia-guia-cat" style="display:none;background:var(--glass);border:1px solid var(--glassb);border-radius:9px;padding:10px 12px;margin:8px 0;font-size:11.5px;line-height:1.7">'
+    + '<b>Guía de clasificación de flujos</b> · ' + IA_PNL_TIP + '<br>'
+    + IA_CAT_GUIA.map(c => c[1] + ' → ' + c[2]).join('<br>')
+    + '</div>';
+}
 async function iaAddMov() {
   const g = id => (document.getElementById(id) || {}).value || '';
-  const row = { property_id: IA.casa, fecha: g('ia-m-fecha'), linea: g('ia-m-linea') || 'otros', tipo: g('ia-m-tipo') || 'gasto', categoria: g('ia-m-cat') || 'operativo', item: g('ia-m-item'), concepto: g('ia-m-conc'), valor: parseFloat(g('ia-m-valor')) || 0, id_factura: g('ia-m-fact') || null, fuente: 'manual' };
+  const cat = g('ia-m-cat') || 'operativo';
+  const row = { property_id: IA.casa, fecha: g('ia-m-fecha'), linea: iaPnl(cat) ? 'P&L' : 'Capital', tipo: cat === 'ingreso' ? 'ingreso' : 'gasto', categoria: cat, item: g('ia-m-item'), concepto: g('ia-m-conc'), valor: parseFloat(g('ia-m-valor')) || 0, factura_url: g('ia-m-fact') || null, fuente: 'manual' };
   if (!row.fecha || !row.valor) return alert('Fecha y valor son obligatorios');
   const { error } = await sb.from('inv_cashflow_real').insert(row);
   if (error) return alert('Error: ' + error.message);
-  if (window.toast) toast('✓ Movimiento cargado', 'success');
+  if (window.toast) toast('✓ Movimiento cargado (queda en el audit)', 'success');
+  delete IA.ledgerCache[IA.casa];
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaAddMov = iaAddMov;
 async function iaDelMov(id) {
+  if (!confirm('¿Quitar este movimiento? (soft-delete, queda en el audit)')) return;
   const { error } = await sb.from('inv_cashflow_real').update({ active: false, archived_at: new Date().toISOString() }).eq('id', id);
   if (error) return alert('Error: ' + error.message);
+  delete IA.ledgerCache[IA.casa];
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaDelMov = iaDelMov;
+function iaEditMov(id) { IA.movEdit = id; osRender(); }
+window.iaEditMov = iaEditMov;
+async function iaSaveMov(id) {
+  const g = k => (document.getElementById('ia-me-' + k) || {}).value || '';
+  const cat = g('cat') || 'operativo';
+  const upd = { fecha: g('fecha'), categoria: cat, tipo: cat === 'ingreso' ? 'ingreso' : 'gasto', linea: iaPnl(cat) ? 'P&L' : 'Capital', valor: parseFloat(g('valor')) || 0, concepto: g('conc'), factura_url: g('fact') || null };
+  if (!upd.fecha || !upd.valor) return alert('Fecha y valor son obligatorios');
+  const { error } = await sb.from('inv_cashflow_real').update(upd).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  IA.movEdit = null;
+  if (window.toast) toast('✓ Movimiento editado (antes→después en el audit)', 'success');
+  delete IA.ledgerCache[IA.casa];
+  await iaLoadCasa(IA.casa); osRender();
+}
+window.iaSaveMov = iaSaveMov;
+function iaToggleGuia() { const el = document.getElementById('ia-guia-cat'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+window.iaToggleGuia = iaToggleGuia;
 
 // ─── vista ───
 function iaEngineParamsFromRows(rows, holdingPct) {
@@ -503,6 +574,111 @@ function iaTabLedger() {
     + "</tbody></table></div>";
 }
 
+// ── B: parámetros en los 9 BLOQUES de Juan (colapsables; mayoría auto-llenada con su fuente) ──
+const IA_BLOQUES = [
+  ['b1', '🏠 1 · Identificación', /^(direccion|nombre_corto|tipo|num_hab|banos|sqft|ano)$/],
+  ['b2', '🎯 2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|es_ejemplo)$/],
+  ['b3', '💰 3 · Financieros de compra', /^(compra|remodel_real|cierre_compra|arv|est_arv|est_remodel_total|est_cierre_pct|cash_atrapado_real)$/],
+  ['b4', '🏦 4 · Financiamiento HML', /^(hm_inicial|hm_tasa|hm_plazo|draw_m\d+|otros_inv_m\d+)$/],
+  ['b5', '🏛️ 5 · Refinanciación', /^(refi_|cierre_refi|cashout_real)/],
+  ['b6', '👥 6 · Inversionistas y equity', /^(reparto_inv)$/],
+  ['b7', '📊 7 · Operación mensual', /^(arriendo_hab|rampa|ocupacion_estable|piso_servicios|vacancy|servicios_mes|mantenimiento_mes|hoa_mes|seguro_mes|padsplit_pct|comision_pct|imp_propiedad_pct|imp_renta_pct)$/],
+  ['b8', '📈 8 · Supuestos (manual)', /^(valorizacion|inflacion|retorno_esperado|anios|ciclo_meses|postrefi_perfil|util_anual_postrefi|anio0_postrefi)$/],
+  ['b9', '🎯 9 · Metas del deal (manual)', /^(tir_objetivo|cap_objetivo|fecha_breakeven|fecha_recuperacion)$/],
+];
+const IA_METAS_KEYS = ['tir_objetivo', 'cap_objetivo', 'fecha_breakeven', 'fecha_recuperacion'];
+function iaTogglePB(id) { IA.pOpen = IA.pOpen || { b1: true }; IA.pOpen[id] = !IA.pOpen[id]; osRender(); }
+window.iaTogglePB = iaTogglePB;
+function iaFuenteBadge(fuente) {
+  const auto = /^real|^excel/.test(fuente || '');
+  return '<span class="badge ' + (auto ? 'b-ok' : 'b-warn') + '" style="font-size:8px" title="' + OS_E(fuente || '') + '">' + (auto ? 'auto · ' + OS_E((fuente || '').split(':')[1] || fuente) : 'manual') + '</span>';
+}
+function iaParamRow(p) {
+  const frac = /(_pct$|tasa|reparto|ocupacion|valorizacion|inflacion|retorno|piso_servicios)/.test(p.key);
+  return '<div class="kv"><span title="' + OS_E(p.descripcion || '') + '">' + OS_E(p.key) + ' ' + iaFuenteBadge(p.fuente) + '</span>'
+    + '<b style="display:inline-flex;align-items:center;gap:4px"><input id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:150px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(p.value) + '" onkeydown="if(event.key===\'Enter\')iaSaveParam(\'' + OS_E(p.key) + '\')">'
+    + (frac ? '<span style="color:var(--mut2);font-size:10px;font-weight:700" title="fracción: 0.5 = 50%">×</span>' : '') + '</b></div>';
+}
+function iaParamsBloques() {
+  IA.pOpen = IA.pOpen || { b1: true };
+  const grupos = {}; const otros = [];
+  IA.params.forEach(p => {
+    const b = IA_BLOQUES.find(x => x[2].test(p.key));
+    if (b) (grupos[b[0]] = grupos[b[0]] || []).push(p); else otros.push(p);
+  });
+  let html = '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">9 bloques · <span class="badge b-ok" style="font-size:8px">auto</span> viene de las bases · <span class="badge b-warn" style="font-size:8px">manual</span> lo cargás vos</div></div>';
+  IA_BLOQUES.forEach(([id, titulo]) => {
+    const rows = grupos[id] || [];
+    const open = !!IA.pOpen[id];
+    const autos = rows.filter(p => /^real|^excel/.test(p.fuente || '')).length;
+    html += '<div onclick="iaTogglePB(\'' + id + '\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700">'
+      + '<span>' + (open ? '▾' : '▸') + ' ' + titulo + '</span><span class="meta" style="font-weight:500">' + rows.length + (rows.length ? ' · ' + autos + ' auto' : ' · vacío') + '</span></div>';
+    if (open) {
+      html += rows.map(iaParamRow).join('') || '';
+      if (id === 'b3' && rows.length) {
+        const g = k => { const r = rows.find(x => x.key === k) || IA.params.find(x => x.key === k); return r ? parseFloat(r.value) || 0 : 0; };
+        const tot = g('compra') + (g('remodel_real') || g('est_remodel_total')) + g('cierre_compra');
+        if (tot > 0) html += '<div class="kv"><span><b>Total invertido</b> <span class="badge b-ok" style="font-size:8px">calculado</span></span><b>' + iaMoney(tot) + '</b></div>';
+      }
+      if (id === 'b6') {
+        const hs = IA.holdings.filter(h => h.property_id === IA.casa);
+        const sum = hs.reduce((s, h) => s + (+h.reparto_pct || 0), 0);
+        html += hs.map(h => '<div class="kv"><span>' + OS_E(iaInvName(h.investor_airtable_id)) + ' <span class="badge b-ok" style="font-size:8px">auto · inv_holdings</span></span><b>' + Math.round(h.reparto_pct * 100) + '% · ' + iaMoney(h.inversion_aportada) + '</b></div>').join('')
+          + '<div class="kv"><span>Operador (Flipping Rentals) <span class="badge b-ok" style="font-size:8px">calculado</span></span><b>' + Math.max(0, Math.round((1 - sum) * 100)) + '%</b></div>';
+      }
+      if (id === 'b9') {
+        const faltan = IA_METAS_KEYS.filter(k => !rows.some(p => p.key === k));
+        if (faltan.length) html += '<div class="meta" style="padding:6px 2px">Faltan: ' + faltan.map(k => '<a style="cursor:pointer;color:var(--a2)" onclick="document.getElementById(\'ia-np-key\').value=\'' + k + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + k + '</a>').join(' · ') + '</div>';
+      }
+    }
+  });
+  if (otros.length) {
+    const open = !!IA.pOpen.b0;
+    html += '<div onclick="iaTogglePB(\'b0\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700"><span>' + (open ? '▾' : '▸') + ' 🧩 Otros</span><span class="meta" style="font-weight:500">' + otros.length + '</span></div>';
+    if (open) html += otros.map(iaParamRow).join('');
+  }
+  return html + '</div>';
+}
+
+// ── A6+C: Movimientos = UNA fuente — manuales (editables) + auto-importados del ledger (badge) ──
+function iaMovsCard() {
+  const led = IA.ledgerCache[IA.casa];
+  if (led === undefined) iaLoadLedger(IA.casa);
+  const autos = Array.isArray(led) ? led.filter(m => !/^OS:manual/.test(m.fuente || '')) : null;
+  const editRow = m => {
+    if (IA.movEdit !== m.id) return '';
+    return '<div style="background:var(--glass);border:1px solid var(--a2);border-radius:9px;padding:10px;margin:4px 0">'
+      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'
+      + '<input id="ia-me-fecha" type="date" class="osa-in" style="padding:6px" value="' + OS_E(m.fecha) + '">'
+      + iaCatSel('ia-me-cat', m.categoria)
+      + '<input id="ia-me-valor" type="number" class="osa-in" style="padding:6px" value="' + OS_E(m.valor) + '">'
+      + '<input id="ia-me-conc" class="osa-in" style="padding:6px;grid-column:span 2" placeholder="concepto" value="' + OS_E(m.concepto || m.item || '') + '">'
+      + '<input id="ia-me-fact" class="osa-in" style="padding:6px" placeholder="URL factura (Drive)" value="' + OS_E(m.factura_url || '') + '">'
+      + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveMov(\'' + m.id + '\')">💾 Guardar</button><button class="ct-btn" onclick="IA.movEdit=null;osRender()">Cancelar</button></div></div>';
+  };
+  return '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Movimientos (una sola fuente)</div><div class="k"><a style="cursor:pointer;color:var(--a2)" onclick="iaToggleGuia()">❓ guía de clasificación</a></div></div>'
+    + iaGuiaCat()
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:4px">'
+    + '<input id="ia-m-fecha" type="date" class="osa-in" style="padding:6px" title="se guarda la fecha completa; la vista muestra Año-Mes">'
+    + iaCatSel('ia-m-cat', 'operativo')
+    + '<input id="ia-m-valor" type="number" class="osa-in" style="padding:6px" placeholder="valor $">'
+    + '<input id="ia-m-conc" class="osa-in" style="padding:6px;grid-column:span 2" placeholder="concepto / descripción (sugiere la categoría)" oninput="iaMovSugerir()">'
+    + '<input id="ia-m-item" class="osa-in" style="padding:6px" placeholder="ítem (opcional)">'
+    + '<input id="ia-m-fact" class="osa-in" style="padding:6px;grid-column:span 3" placeholder="URL de la factura (Google Drive) — se muestra como link">'
+    + '</div><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span id="ia-m-pnl">' + iaPnlBadge('operativo') + '</span><span class="meta" style="font-size:10.5px" title="' + IA_PNL_TIP + '">ⓘ P&L se deriva solo de la categoría</span></div>'
+    + '<button class="cbtn" style="width:100%" onclick="iaAddMov()">＋ Cargar movimiento manual</button>'
+    + '<div class="lab" style="margin-top:12px">✍️ Manuales (' + IA.cashflow.length + ') — editables</div>'
+    + (IA.cashflow.map(m => editRow(m) + '<div class="kv"><span title="' + OS_E(m.fecha) + '">' + OS_E(String(m.fecha || '').slice(0, 7)) + ' · ' + OS_E(m.concepto || m.item || m.linea) + ' <span class="badge b-warn" style="font-size:8px">manual</span> ' + iaPnlBadge(m.categoria) + (m.factura_url ? ' <a href="' + OS_E(m.factura_url) + '" target="_blank" style="color:var(--a2);font-size:10px">📄 Ver factura</a>' : (m.id_factura ? ' · #' + OS_E(m.id_factura) : '')) + '</span>'
+      + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.valor : -m.valor)
+      + ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" onclick="iaEditMov(\'' + m.id + '\')">✎</button><button class="ct-btn" style="padding:1px 6px;font-size:9px;color:var(--neg)" onclick="iaDelMov(\'' + m.id + '\')">🗑</button></b></div>').join('') || '<div class="meta" style="padding:6px 2px">Sin movimientos manuales.</div>')
+    + '<div class="lab" style="margin-top:12px">⚙️ Auto-importados (' + (autos ? autos.length : '⏳') + ') — de FF/Rentas, con su linaje, no se re-teclean</div>'
+    + (autos === null ? '<div class="meta">⏳ cargando…</div>'
+      : autos.slice(-40).reverse().map(m => '<div class="kv"><span title="' + OS_E(m.fecha) + ' · ' + OS_E(m.fuente) + '">' + OS_E(String(m.fecha || '').slice(0, 7)) + ' · ' + OS_E(m.concepto) + ' <span class="badge b-ok" style="font-size:8px">auto · ' + OS_E(String(m.fuente || '').split(':')[0]) + '</span> ' + iaPnlBadge(m.categoria === 'renta' ? 'ingreso' : m.categoria) + (m.comprobante ? ' <a href="' + OS_E(m.comprobante) + '" target="_blank" style="color:var(--a2);font-size:10px">📎</a>' : '') + '</span>'
+        + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.monto : -m.monto) + '</b></div>').join(''))
+    + '<div class="meta" style="margin-top:8px;font-size:10.5px">El 💰 Ledger es la vista de SOLO LECTURA de estos mismos movimientos (manuales + auto) agrupados por categoría — cero doble digitación. Para corregir un auto: cargá un movimiento manual de ajuste (queda auditado).</div>'
+    + '</div>';
+}
+
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
@@ -575,29 +751,10 @@ function invAdminView() {
       + '<select id="ia-np-fuente" class="osa-in"><option value="real:manual">real:manual</option><option value="supuesto">supuesto</option><option value="modelo">modelo</option></select>'
       + '<input id="ia-np-desc" class="osa-in" placeholder="descripción (opcional)">'
       + '</div><button class="cbtn" style="margin-top:10px" onclick="iaAddParam()">Guardar parámetro</button></div>'
-      + '<div class="grid k2" style="margin-top:14px">'
-      + '<div class="card" style="max-height:520px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">editá y Enter — fuente declarada</div></div>'
-      + IA.params.map(p => {
-        const frac = /(_pct$|tasa|reparto|ocupacion|valorizacion|inflacion|retorno|piso_servicios)/.test(p.key);
-        return '<div class="kv"><span title="' + OS_E(p.descripcion || '') + '">' + OS_E(p.key) + ' <span class="osbadge" style="font-size:8px;margin:0">' + OS_E((p.fuente || '').split(':')[0]) + '</span></span>'
-          + '<b style="display:inline-flex;align-items:center;gap:4px"><input id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:150px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(p.value) + '" onkeydown="if(event.key===\'Enter\')iaSaveParam(\'' + OS_E(p.key) + '\')">'
-          + (frac ? '<span style="color:var(--mut2);font-size:10px;font-weight:700" title="fracción: 0.5 = 50%">×</span>' : '') + '</b></div>';
-      }).join('')
-      + '</div>'
-      + '<div class="card" style="max-height:520px;overflow-y:auto"><div class="chart-h"><div class="t">Movimientos reales (' + IA.cashflow.length + ')</div><div class="k">hoja "Datos reales" — alimenta el escenario Realizado</div></div>'
-      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">'
-      + '<input id="ia-m-fecha" type="date" class="osa-in" style="padding:6px">'
-      + '<select id="ia-m-tipo" class="osa-in" style="padding:6px"><option value="gasto">gasto</option><option value="ingreso">ingreso</option></select>'
-      + '<select id="ia-m-cat" class="osa-in" style="padding:6px"><option>operativo</option><option>inversion</option><option>financiero</option><option>tax</option><option>ingreso</option></select>'
-      + '<input id="ia-m-valor" type="number" class="osa-in" style="padding:6px" placeholder="valor $">'
-      + '<input id="ia-m-linea" class="osa-in" style="padding:6px" placeholder="línea P&L">'
-      + '<input id="ia-m-item" class="osa-in" style="padding:6px" placeholder="ítem">'
-      + '<input id="ia-m-conc" class="osa-in" style="padding:6px" placeholder="concepto">'
-      + '<input id="ia-m-fact" class="osa-in" style="padding:6px" placeholder="# factura">'
-      + '</div><button class="cbtn" style="width:100%" onclick="iaAddMov()">＋ Cargar movimiento</button>'
-      + '<div style="margin-top:10px">'
-      + IA.cashflow.map(m => '<div class="kv"><span>' + OS_E(m.fecha) + ' · ' + OS_E(m.item || m.linea) + (m.id_factura ? ' · #' + OS_E(m.id_factura) : '') + '</span><b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + iaMoney(m.tipo === 'ingreso' ? m.valor : -m.valor) + ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" onclick="iaDelMov(\'' + m.id + '\')">🗑</button></b></div>').join('')
-      + '</div></div></div>';
+      + '<div class="grid k2" style="margin-top:14px;align-items:start">'
+      + iaParamsBloques()
+      + iaMovsCard()
+      + '</div>';
   }
 
   if (IA.tab === 'escenarios') body = iaTabEscenarios();
