@@ -835,6 +835,7 @@ function ffUwViewIntereses() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), i = o.intereses, co = o.cashout;
   const refReal = inp._ref30_real;
   const amber = 'var(--amber,#e7b65e)', azul = 'var(--a2,#2f6ef0)';
+  const esVenta = ffUwEstrategia() === 'venta';   // en venta NO hay refi/DSCR: solo el carry del HML hasta vender
   // ═ MODELITO 1 · HARMONY (HML) — SOLO INTERÉS, durante la obra/hold ═
   const heroHml = kitHero('🔨 Pago mensual al Harmony', UW_M2(i.intMensualHarmony) + '/mes',
     'HML · ' + i.tasaHarmony + '%/año · solo interés · durante la obra/hold — <b>el pago mensual no depende de los meses</b>', amber);
@@ -871,6 +872,23 @@ function ffUwViewIntereses() {
     + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">La base NO tiene nada que ver con la compra ni con el HML: nace en el Cash-Out (LTV × valor tasado, con tope DSCR). Override vacío = ⛓ calculado. ⛓ Propaga: la cuota al flujo después del refi (Calc 5) y a Analítica; el préstamo al cash-out (Calc 3: refi − payoff − costos).</div>'
     + '</div>';
   const porQue = '<div style="font-size:11px;color:var(--txt3,#9fb0c9);line-height:1.6;padding:0 4px">Son <b>dos préstamos, dos bases y dos fórmulas</b>: el HML es solo-interés sobre compra + draw (pago = préstamo × tasa ÷ 12); la refi es amortizada sobre el valor tasado (cuota a 30 años). Cambiar el ARV mueve la refi sin tocar el HML; cambiar el draw mueve el HML sin tocar la refi.</div>';
+  // ── MODO VENTA: solo el HML (no hay refi). El carry total = interés mensual × meses hasta vender, se come la utilidad. ──
+  if (esVenta) {
+    const v = o.venta;
+    const carryVenta = '<div class="card" style="padding:14px 18px;border-radius:16px;margin-top:-8px;background:color-mix(in srgb, ' + amber + ' 8%, transparent)">'
+      + kitRow('Interés mensual del HML', i.intMensualHarmony, { money2: true })
+      + kitRow('× meses hasta vender (' + (v.meses != null ? v.meses : '—') + (v.mesesEstimado ? ', estimado' : '') + ')', null, { txt: '×' + (v.meses != null ? v.meses : '—') })
+      + kitRow('<b>= Interés HML total (carry del flip)</b>', v.interesHmlTotal, { money2: true, big: true, color: amber, last: true })
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">'
+      + kitInputSm('Tasa HML (%/año)', i.tasaHarmony, "ffUwSet('hml_tasa_anual',VAL)", { pct: true })
+      + kitInputSm('Meses hasta vender', v.meses != null ? v.meses : '', "ffUwSet('venta_meses',VAL)")
+      + '</div>'
+      + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">⛓ Este <b>' + UW_M2(v.interesHmlTotal) + '</b> entra como COSTO en la calc de Venta (se come la utilidad). Al vender, el HML se cancela con el <b>payoff</b> en el cierre — no hay refinanciación.</div>'
+      + '</div>';
+    return '<div style="max-width:560px;margin:0 auto">'
+      + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses (venta)</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">En un flip solo pagás el <b>hard money</b> durante el holding hasta vender. Nada de DSCR/refi.</div></div>'
+      + heroHml + cardHml + carryVenta + '</div>';
+  }
   return '<div style="max-width:560px;margin:0 auto">'
     + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Dos préstamos distintos, cada uno con su pago mensual: el hard money durante la obra/hold y el DSCR después del refi.</div></div>'
     + heroHml + cardHml + heroRefi + cardRefi + porQue + '</div>';
