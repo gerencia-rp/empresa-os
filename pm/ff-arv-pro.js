@@ -550,7 +550,8 @@ function apVistaFicha(s) {
 function apVistaHero(rec, inp) {
   if (!rec || !rec.arv) return '<div class="ap-card"><div class="ap-lab">ARV estimado (comps ajustados)</div><div style="color:var(--mut,#9fb0c9);padding:26px 0;text-align:center">Buscá el subject para reconciliar comps.</div></div>';
   const cc = apConfColor(rec.confianza.nivel);
-  const arvAt = +inp.arv_airtable || +inp.arv || 0;
+  const arvAt = +inp.arv_airtable || +inp.arv || 0;   // ancla de Airtable (chip Δ)
+  const arvOfi = +inp.arv || 0;                        // ARV OFICIAL vigente del análisis (fuente única)
   const appr = +inp.appraisal || 0;
   return '<div class="ap-card">'
     + '<div class="ap-lab">ARV estimado (comps ajustados)</div>'
@@ -562,6 +563,8 @@ function apVistaHero(rec, inp) {
     + (appr ? '<span class="ap-pill">Appraisal ' + AP_M(appr) + ' · Δ <b class="' + (Math.abs(rec.arv - appr) / appr <= 0.05 ? 'ap-pos' : 'ap-neg') + '">' + ((rec.arv - appr) / appr * 100).toFixed(1) + '%</b></span>' : '')
     + '</div>'
     + '<button class="ap-btn" style="margin-top:12px" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>'
+    + (arvOfi ? '<div class="ap-plain" style="font-size:11.5px;margin-top:8px">ARV oficial del análisis ahora: <b style="color:var(--ink,#eaf0ff)">' + AP_M(arvOfi) + '</b>'
+        + (arvOfi === rec.arv ? ' · = este estimado ✓ (todo el análisis lo usa)' : ' — apretá el botón para que TODO el análisis (Resumen, MAO, Cash-Out, refi) use ' + AP_M(rec.arv)) + '</div>' : '')
     + '</div>';
 }
 
