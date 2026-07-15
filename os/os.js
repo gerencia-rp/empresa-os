@@ -312,6 +312,9 @@ async function osLoad() {
     OS.ffPort = await sb.from('v_ff_portafolio').select('*').then(r => r.data || []).catch(() => []);
     // B4: ocupación ÚNICA desde v_ocupacion (48/45/3/0 = 93.75%) — mata el snapshot congelado
     OS.ocup = await sb.from('v_ocupacion').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // 🗺️ LECTURA EN VIVO del Mapa de Conexiones: la fuente efectiva de los números con
+    // alternativas implementadas la decide data_lineage (editable en /mapa, auditado, reversible).
+    OS.lineage = await sb.from('data_lineage').select('metric_key,empresa,sistema,etiqueta,base,tabla,columna').limit(2000).then(r => r.data || []).catch(() => []);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
@@ -638,6 +641,11 @@ function osContable(comp) {
 // ════════════════════════════════════════════════════════════════
 function osHouseKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 function osSlug(addr) { return String(addr || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
+// fuente EFECTIVA de un número según el Mapa de Conexiones (reasignable en /mapa sin tocar código)
+function osLineageRow(empresa, sistema, dato) {
+  return (OS.lineage || []).find(x => x.empresa === empresa && x.sistema === sistema && x.etiqueta === dato) || null;
+}
+window.osLineageRow = osLineageRow;
 window.osSlug = osSlug;
 const OS_STAGE_LBL = { adquirida: 'Adquirida', en_rehab: 'En rehab', en_venta: 'En venta', rentada: 'Rentada', refinanciada: 'Refinanciada', vendida: 'Vendida' };
 function osOpenFicha(slug) {
@@ -693,7 +701,14 @@ function osCasaMatch(slug, comp) {
     const cobrado = OS.pay.filter(x => x.property_id === prop.id && x.paid_at >= mb.from && x.paid_at <= mb.to).reduce((s, x) => s + Number(x.amount || 0), 0);
     rentas = { prop, detalle: true, totalU, occU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, occRent: Math.round(occRent), cobrado: Math.round(cobrado), deuda: Math.round(Math.max(0, occRent - cobrado)) };
   }
-  if (ffRenta != null || flujoMes != null) rentas = Object.assign(rentas || { detalle: false }, { ffRenta, ffGastos, flujoMes, pagoDeuda: (port && port.pago_deuda_mes != null) ? +port.pago_deuda_mes : null });
+  // 🗺 LECTURA EN VIVO: la fuente de "Renta mensual actual" la decide el Mapa de Conexiones
+  // (dual-source conocido: FF·Propiedades·renta_mensual [default] vs Rentas·Unidades renta
+  // objetivo ocupadas). Reasignar en /mapa cambia esto sin tocar código; reversible + auditado.
+  const linRenta = (typeof osLineageRow === 'function') ? osLineageRow('Fix & Flip', 'Ficha de Casa', 'Renta mensual actual') : null;
+  const rentaViva = (linRenta && linRenta.base === 'Rentas')
+    ? { v: (rentas && rentas.detalle && rentas.occRent > 0) ? rentas.occRent : null, chip: 'Rentas·Unidades ⚡mapa' }
+    : { v: ffRenta, chip: 'FF·Propiedades' };
+  if (ffRenta != null || flujoMes != null || rentaViva.v != null) rentas = Object.assign(rentas || { detalle: false }, { renta: rentaViva.v, rentaChip: rentaViva.chip, ffRenta, ffGastos, flujoMes, pagoDeuda: (port && port.pago_deuda_mes != null) ? +port.pago_deuda_mes : null });
   return { key, slug, addr, ff, remodel, prop, rentas, p360, port };
 }
 // ── UNA sola cadena de lectura para la Ficha (tarjeta y fila espejo leen ESTO — jamás $0 sobre dato existente) ──
@@ -781,7 +796,7 @@ function osCasa(comp) {
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
-        <div class="overx">${m.rentas ? `${m.rentas.ffRenta != null ? kv('Renta mensual actual' + LIN('Renta mensual actual'), OS_M(m.rentas.ffRenta) + ` <span style="font-size:10px;color:var(--mut2)">FF·Propiedades</span>`) : (esRentada ? kv('Renta mensual actual' + LIN('Renta mensual actual'), faltaDato) : '')}${m.rentas.ffGastos != null ? kv('Gastos mensuales' + LIN('Gastos mensuales'), OS_M(m.rentas.ffGastos)) : (esRentada ? kv('Gastos mensuales', faltaDato) : '')}${m.rentas.flujoMes != null ? kv('Flujo mensual' + LIN('Flujo mensual'), OS_M(m.rentas.flujoMes), m.rentas.flujoMes >= 0 ? 'up' : 'down') : (esRentada ? kv('Flujo mensual', faltaDato) : '')}${m.rentas.pagoDeuda != null ? kv('Pago de deuda /mes', OS_M(m.rentas.pagoDeuda)) : ''}${m.rentas.detalle ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="meta" style="margin-top:8px">Sin espejo en la base de Rentas (detalle de unidades/cobranza no disponible) — los mensuales salen de FF·Propiedades.</div>`}` : (esRentada ? `<div class="empty" style="padding:26px;color:var(--amber)">⚠ La etapa dice <b>${OS_E(stageLbl)}</b> pero faltan los datos de renta en Airtable (FF·Propiedades: Renta mensual actual / Gastos mensuales) — es un dato FALTANTE, no "sin rentas".</div>` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`)}</div></div>
+        <div class="overx">${m.rentas ? `${m.rentas.renta != null ? kv('Renta mensual actual' + LIN('Renta mensual actual'), OS_M(m.rentas.renta) + ` <span style="font-size:10px;color:var(--mut2)">${OS_E(m.rentas.rentaChip)}</span>`) : (esRentada ? kv('Renta mensual actual' + LIN('Renta mensual actual'), faltaDato) : '')}${m.rentas.ffGastos != null ? kv('Gastos mensuales' + LIN('Gastos mensuales'), OS_M(m.rentas.ffGastos)) : (esRentada ? kv('Gastos mensuales', faltaDato) : '')}${m.rentas.flujoMes != null ? kv('Flujo mensual' + LIN('Flujo mensual'), OS_M(m.rentas.flujoMes), m.rentas.flujoMes >= 0 ? 'up' : 'down') : (esRentada ? kv('Flujo mensual', faltaDato) : '')}${m.rentas.pagoDeuda != null ? kv('Pago de deuda /mes', OS_M(m.rentas.pagoDeuda)) : ''}${m.rentas.detalle ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="meta" style="margin-top:8px">Sin espejo en la base de Rentas (detalle de unidades/cobranza no disponible) — los mensuales salen de FF·Propiedades.</div>`}` : (esRentada ? `<div class="empty" style="padding:26px;color:var(--amber)">⚠ La etapa dice <b>${OS_E(stageLbl)}</b> pero faltan los datos de renta en Airtable (FF·Propiedades: Renta mensual actual / Gastos mensuales) — es un dato FALTANTE, no "sin rentas".</div>` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`)}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
         ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}${i.s === 'r' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
         ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
