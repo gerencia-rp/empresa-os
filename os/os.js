@@ -226,6 +226,7 @@ function osParse(path) {
   if (seg[0] === 'contable') return { view: 'contable' };
   if (seg[0] === 'admin') return { view: 'admin' };
   if (seg[0] === 'inversionistas') return { view: 'invadmin' };
+  if (seg[0] === 'mapa') return { view: 'mapa' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (seg[0] === 'ia') { if (window.OSIA && seg[1]) OSIA.tab = seg[1]; return { view: 'empresa', empresa: 'ia' }; } // /ia/pedir|bandeja|galeria = tab del módulo
   if (OS_EMPRESAS[seg[0]]) {
@@ -241,6 +242,7 @@ function osTitle(r) {
   if (r.view === 'contable') return 'Contable · ' + base;
   if (r.view === 'admin') return 'Admin · ' + base;
   if (r.view === 'invadmin') return 'Inversionistas · ' + base;
+  if (r.view === 'mapa') return 'Mapa de Conexiones · ' + base;
   if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
   return 'No encontrado · ' + base;
@@ -310,6 +312,9 @@ async function osLoad() {
     OS.ffPort = await sb.from('v_ff_portafolio').select('*').then(r => r.data || []).catch(() => []);
     // B4: ocupación ÚNICA desde v_ocupacion (48/45/3/0 = 93.75%) — mata el snapshot congelado
     OS.ocup = await sb.from('v_ocupacion').select('*').maybeSingle().then(r => r.data).catch(() => null);
+    // 🗺️ LECTURA EN VIVO del Mapa de Conexiones: la fuente efectiva de los números con
+    // alternativas implementadas la decide data_lineage (editable en /mapa, auditado, reversible).
+    OS.lineage = await sb.from('data_lineage').select('metric_key,empresa,sistema,etiqueta,base,tabla,columna').limit(2000).then(r => r.data || []).catch(() => []);
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
@@ -404,8 +409,9 @@ function osCompute() {
       const fin = OS.remodel.filter(o => o.proceso === 'Finalizado');
       const curso = OS.remodel.filter(o => o.proceso !== 'Finalizado');
       // B7 (auditoría 13-jul): el avance promedio SOLO cuenta obras con % del Planner (avance_real);
-      // promediar el singleSelect legacy daba el 91% fantasma.
-      const a = OS.remodel.filter(o => o.avance_real != null).map(o => Number(o.avance_real)).filter(x => x > 0);
+      // promediar el singleSelect legacy daba el 91% fantasma. Solo EN CURSO: con la regla única
+      // (remodel_avance_regla, 14-jul) las finalizadas tienen avance_real=100 y inflarían el promedio.
+      const a = curso.filter(o => o.avance_real != null).map(o => Number(o.avance_real)).filter(x => x > 0);
       return {
         obras: OS.remodel.length,
         activas: curso.length,
@@ -473,6 +479,7 @@ function osRouteGuard(r) {
   else if (r.empresa === 'ia') need = null; // IA abierta a todo usuario logueado (Bandeja se gatea en el módulo)
   else if ((r.view === 'empresa' || r.view === 'app') && OS_EMPRESAS[r.empresa]) need = [OS_EMPRESAS[r.empresa].key];
   else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
+  else if (r.view === 'mapa') need = ['fix-flip', 'rentas', 'remodelacion', 'contable', 'operacion'];
   if (need && !need.some(osCanArea)) return need[0];
   return null;
 }
@@ -493,7 +500,7 @@ function osRender() {
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
@@ -531,6 +538,7 @@ function osGlobal(comp) {
   const areaCards = [
     osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
     osCanArea('contable') ? `<div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>` : '',
+    `<div class="card unit" data-osnav="/mapa"><div class="ico">🗺️</div><div class="un">Mapa de Conexiones</div><div class="ut">DE DÓNDE SALE CADA NÚMERO</div><div class="kv"><span>Linaje de datos</span><b>viene → número → alimenta</b></div><div class="go">Abrir →</div></div>`,
   ].join('');
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
   const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
@@ -563,7 +571,7 @@ function osEmpresa(comp) {
     : isRemo ? [['Obras activas', comp.remodel.activas, `de ${comp.remodel.obras} totales`], ['Avance promedio', comp.remodel.avance + '%', 'de las obras'], ['Utilidad finalizadas', OS_M(comp.remodel.gananciaFinal), 'realizada (obras terminadas)'], ['En curso (proyectado)', OS_M(comp.remodel.gananciaEnCurso), `${comp.remodel.enCursoN} obras · NO final`]]
     : isEdu ? (comp.educacion ? [['Alumnos activos', comp.educacion.activos, `${comp.educacion.conPlan} con plan`], ['Nuevos (30d)', comp.educacion.nuevos, ''], ['Antigüedad prom.', comp.educacion.antiguedad + 'd', 'en el programa'], ['Con plan activo', comp.educacion.conPlan, `de ${comp.educacion.activos}`]] : [['Sin datos', '—', 'no hay snapshot de educación cargado']])
     : [['—', '—', 'datos próximamente']];
-  return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag}</div>
+  return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag} · <a style="cursor:pointer;color:var(--a2)" data-osnav="/mapa">🗺️ Mapa de Conexiones (de dónde sale cada número) →</a></div>
     <div class="grid k4">${kpis.map(k => `<div class="card" title="${k[0]}"><div class="lab">${k[0]}</div><div class="big">${k[1]}</div><div class="meta">${k[2]}</div></div>`).join('')}</div>
     <div class="chart-h" style="margin:24px 4px 12px"><div class="t">Apps de ${e.name}</div><div class="k">clic para abrir</div></div>
     <div class="grid k3">${e.apps.map(a => `<div class="card app-card" ${a.soon ? '' : `onclick="${a.fn}"`}><div class="ai">${a.icon}</div><div style="flex:1;min-width:0"><div class="an" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</div><div class="at">${a.soon ? 'Fase 2' : 'Abrir app'}</div></div>${a.soon ? '<span class="soon">pronto</span>' : ''}</div>`).join('')}</div>`;
@@ -633,6 +641,11 @@ function osContable(comp) {
 // ════════════════════════════════════════════════════════════════
 function osHouseKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 function osSlug(addr) { return String(addr || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
+// fuente EFECTIVA de un número según el Mapa de Conexiones (reasignable en /mapa sin tocar código)
+function osLineageRow(empresa, sistema, dato) {
+  return (OS.lineage || []).find(x => x.empresa === empresa && x.sistema === sistema && x.etiqueta === dato) || null;
+}
+window.osLineageRow = osLineageRow;
 window.osSlug = osSlug;
 const OS_STAGE_LBL = { adquirida: 'Adquirida', en_rehab: 'En rehab', en_venta: 'En venta', rentada: 'Rentada', refinanciada: 'Refinanciada', vendida: 'Vendida' };
 function osOpenFicha(slug) {
@@ -651,14 +664,30 @@ function osOpenFicha(slug) {
 window.osOpenFicha = osOpenFicha;
 function osCasaMatch(slug, comp) {
   const key = osHouseKey(slug);
-  // Ancla: la casa de Rentas por slug; luego FF/Remodel por property_id (llave canónica), fallback dirección.
-  const prop = (OS.props || []).find(p => osHouseKey(p.address_normalized || p.name) === key) || null;
-  const pid = prop && prop.property_id;
-  const ff = (pid && (comp.ff.list || []).find(d => d.property_id === pid))
-    || (comp.ff.list || []).find(d => osHouseKey(d.address_norm || d.address) === key) || null;
-  const remodel = (pid && (OS.remodel || []).find(r => r.property_id === pid))
-    || (OS.remodel || []).find(r => osHouseKey(r.address) === key) || null;
+  // BUG 14-jul: la resolución anclaba SOLO en la casa de Rentas por dirección — si el slug venía
+  // de FF ("Austin, Texas") y Rentas escribe "Austin, TX", prop=null → pid=null → los paneles de
+  // Rentas y Remodelación salían vacíos con la casa rentada (Childress). Fix: 1ª pasada por
+  // dirección en CUALQUIER fuente → property_id canónico; 2ª pasada re-resuelve TODO por property_id.
+  let prop = (OS.props || []).find(p => osHouseKey(p.address_normalized || p.name) === key) || null;
+  let ff = (comp.ff.list || []).find(d => osHouseKey(d.address_norm || d.address) === key) || null;
+  let remodel = (OS.remodel || []).find(r => osHouseKey(r.address) === key) || null;
+  let p360 = (OS.p360 || []).find(r => osHouseKey(r.address) === key) || null;
+  const pid = (prop && prop.property_id) || (ff && ff.property_id) || (remodel && remodel.property_id) || (p360 && p360.property_id) || null;
+  if (pid) {
+    prop = prop || (OS.props || []).find(p => p.property_id === pid) || null;
+    ff = ff || (comp.ff.list || []).find(d => d.property_id === pid) || null;
+    remodel = remodel || (OS.remodel || []).find(r => r.property_id === pid) || null;
+    p360 = p360 || (OS.p360 || []).find(r => r.property_id === pid) || null;
+  }
   const addr = (ff && ff.address) || (remodel && remodel.address) || (prop && prop.name) || slug;
+  const port = (pid && (OS.ffPort || []).find(r => r.property_id === pid))
+    || (ff && (OS.ffPort || []).find(r => r.address_norm === ff.address_norm)) || null;
+  // ── Rentas: mensuales de FF·Propiedades (renta/gastos actuales) + detalle del espejo Rentas si existe ──
+  const ffRenta = (ff && +ff.renta_mensual > 0) ? +ff.renta_mensual : null;
+  const ffGastos = (ff && ff.gastos_mensuales != null && +ff.renta_mensual > 0) ? +ff.gastos_mensuales : null;
+  // flujo: UNA definición — v_ff_portafolio.flujo_mes (la misma del Command Center); fallback renta − gastos
+  const flujoMes = (port && port.flujo_mes != null) ? +port.flujo_mes
+    : (ffRenta != null && ffGastos != null) ? ffRenta - ffGastos : null;
   let rentas = null;
   if (prop) {
     const mb = comp.mb;
@@ -670,12 +699,16 @@ function osCasaMatch(slug, comp) {
     const occU = indep.filter(u => osUnitState(u) === 'ocupada').length + (hasR && rooms.some(u => osUnitState(u) === 'ocupada') ? 1 : 0);
     const occRent = us.filter(u => osUnitState(u) === 'ocupada').reduce((s, u) => s + Number(u.target_rent || 0), 0);
     const cobrado = OS.pay.filter(x => x.property_id === prop.id && x.paid_at >= mb.from && x.paid_at <= mb.to).reduce((s, x) => s + Number(x.amount || 0), 0);
-    rentas = { prop, totalU, occU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, occRent: Math.round(occRent), cobrado: Math.round(cobrado), deuda: Math.round(Math.max(0, occRent - cobrado)) };
+    rentas = { prop, detalle: true, totalU, occU, occPct: totalU ? Math.round(occU / totalU * 100) : 0, occRent: Math.round(occRent), cobrado: Math.round(cobrado), deuda: Math.round(Math.max(0, occRent - cobrado)) };
   }
-  const p360 = (pid && (OS.p360 || []).find(r => r.property_id === pid))
-    || (OS.p360 || []).find(r => osHouseKey(r.address) === key) || null;
-  const port = (pid && (OS.ffPort || []).find(r => r.property_id === pid))
-    || (ff && (OS.ffPort || []).find(r => r.address_norm === ff.address_norm)) || null;
+  // 🗺 LECTURA EN VIVO: la fuente de "Renta mensual actual" la decide el Mapa de Conexiones
+  // (dual-source conocido: FF·Propiedades·renta_mensual [default] vs Rentas·Unidades renta
+  // objetivo ocupadas). Reasignar en /mapa cambia esto sin tocar código; reversible + auditado.
+  const linRenta = (typeof osLineageRow === 'function') ? osLineageRow('Fix & Flip', 'Ficha de Casa', 'Renta mensual actual') : null;
+  const rentaViva = (linRenta && linRenta.base === 'Rentas')
+    ? { v: (rentas && rentas.detalle && rentas.occRent > 0) ? rentas.occRent : null, chip: 'Rentas·Unidades ⚡mapa' }
+    : { v: ffRenta, chip: 'FF·Propiedades' };
+  if (ffRenta != null || flujoMes != null || rentaViva.v != null) rentas = Object.assign(rentas || { detalle: false }, { renta: rentaViva.v, rentaChip: rentaViva.chip, ffRenta, ffGastos, flujoMes, pagoDeuda: (port && port.pago_deuda_mes != null) ? +port.pago_deuda_mes : null });
   return { key, slug, addr, ff, remodel, prop, rentas, p360, port };
 }
 // ── UNA sola cadena de lectura para la Ficha (tarjeta y fila espejo leen ESTO — jamás $0 sobre dato existente) ──
@@ -721,6 +754,8 @@ function osCasa(comp) {
   const strat = m.ff ? (m.ff.strategy === 'flip' ? 'FLIP' : m.ff.strategy === 'hold' ? 'HOLD' : '') : '';
   const dqBadge = (m.ff && m.ff.dq && m.ff.dq.revisar) ? `<span class="ff-dqx">⚠ dato a revisar</span>` : '';
   const insights = osCasaInsights(m);
+  const esRentada = m.ff ? /rentada|refinanciada/.test(m.ff.stage || '') : !!(m.rentas && m.rentas.detalle);
+  const faltaDato = `<span style="color:var(--amber)">faltan datos</span>`;
   const remoEnCurso = m.remodel && m.remodel.proceso !== 'Finalizado';
   const remoMat = m.remodel ? Number(m.remodel.gasto_materiales || 0) : 0, remoLab = m.remodel ? Number(m.remodel.gasto_trabajadores || 0) : 0;
   const remoR = m.remodel || {};
@@ -742,24 +777,26 @@ function osCasa(comp) {
   const cycle = ['Adquirida', 'En rehab', 'Venta/Renta', 'Refi/Salida'];
   const cyIdx = m.ff ? ({ adquirida: 0, en_rehab: 1, en_venta: 2, rentada: 2, refinanciada: 3, vendida: 3 }[m.ff.stage] ?? 0) : (remoEnCurso ? 1 : (m.rentas ? 2 : 3));
   const fichaPid = (m.p360 && m.p360.property_id) || (m.prop && m.prop.property_id) || (m.ff && m.ff.property_id) || null;
+  // ⓘ "de dónde sale": abre la cadena base·tabla·columna del Mapa de Conexiones (data_lineage_map)
+  const LIN = d => window.osLinI ? ' ' + osLinI('Fix & Flip', 'Ficha de Casa', d) : '';
   return `<h1>🏠 ${OS_E(ffShortAddr(m.addr))} <span>· Ficha de casa</span></h1>
     <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).${fichaPid && window.reportCasa ? ` <button class="cbtn" style="margin-left:8px" onclick="reportCasa('${fichaPid}')">📄 Reporte PDF de la casa</button>` : ''}</div>
     <div class="grid k4">
-      <div class="card"><div class="lab">Etapa actual</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
-      <div class="card"><div class="lab">All-in (compra + draws)</div><div class="big">${fn.allIn != null ? OS_M(fn.allIn) : '—'}</div><div class="meta">${fn.allInSub || (m.ff ? 'sin datos de compra' : 'sin deal F&F')}</div></div>
-      <div class="card"><div class="lab">ARV</div><div class="big">${fn.arv != null ? OS_M(fn.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
-      <div class="card"><div class="lab">Equity incorporado</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">⚠ con datos incompletos</span>' : ''}${m.port && !m.port.faltan_draws && m.port.deficit < 0 ? ` · cash en hold ${OS_M(+m.port.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
+      <div class="card"><div class="lab">Etapa actual${LIN('Etapa actual')}</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
+      <div class="card"><div class="lab">All-in (compra + draws)${LIN('All-in')}</div><div class="big">${fn.allIn != null ? OS_M(fn.allIn) : '—'}</div><div class="meta">${fn.allInSub || (m.ff ? 'sin datos de compra' : 'sin deal F&F')}</div></div>
+      <div class="card"><div class="lab">ARV${LIN('ARV')}</div><div class="big">${fn.arv != null ? OS_M(fn.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
+      <div class="card"><div class="lab">Equity incorporado${LIN('Equity incorporado')}</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">⚠ con datos incompletos</span>' : ''}${m.port && !m.port.faltan_draws && m.port.deficit < 0 ? ` · cash en hold ${OS_M(+m.port.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
     </div>
     <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
     <div class="grid k2" style="margin-top:12px">
       <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
-        <div class="overx">${m.ff ? `${kv('Compra', fn.compra != null ? OS_M(fn.compra) : '—')}${kv('Remodelación', fn.rehabMostrar ? OS_M(fn.rehabMostrar.v) + ` <span style="font-size:10px;color:var(--mut2)">${fn.rehabMostrar.lbl}</span>` : '—')}${kv('Holding (draws)', m.ff.dr ? OS_M(m.ff.holding) : '—')}${kv('All-in', fn.allIn != null ? OS_M(fn.allIn) + (fn.faltan ? ' <span style="font-size:10px;color:var(--amber)">⚠ faltan draws</span>' : '') : '—', m.ff.dq.revisar ? 'down' : '')}${kv('ARV', fn.arv != null ? OS_M(fn.arv) : '—')}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', fn.arv != null ? OS_M(fn.arv * 0.75 - (fn.rehabMostrar ? fn.rehabMostrar.v : 0) - (m.ff.dr ? m.ff.holding : 0)) : '—')}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
+        <div class="overx">${m.ff ? `${kv('Compra' + LIN('Compra'), fn.compra != null ? OS_M(fn.compra) : '—')}${kv('Remodelación' + LIN('Remodelación (draws)'), fn.rehabMostrar ? OS_M(fn.rehabMostrar.v) + ` <span style="font-size:10px;color:var(--mut2)">${fn.rehabMostrar.lbl}</span>` : '—')}${kv('Holding (draws)', m.ff.dr ? OS_M(m.ff.holding) : '—')}${kv('All-in', fn.allIn != null ? OS_M(fn.allIn) + (fn.faltan ? ' <span style="font-size:10px;color:var(--amber)">⚠ faltan draws</span>' : '') : '—', m.ff.dq.revisar ? 'down' : '')}${kv('ARV', fn.arv != null ? OS_M(fn.arv) : '—')}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', fn.arv != null ? OS_M(fn.arv * 0.75 - (fn.rehabMostrar ? fn.rehabMostrar.v : 0) - (m.ff.dr ? m.ff.holding : 0)) : '—')}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
       <div class="card"><div class="chart-h"><div class="t">🔨 Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
-        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`}</div></div>
+        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : ((m.ff && (/rentada|refinanciada|vendida|en_venta/.test(m.ff.stage || '') || fn.rehabReal != null || fn.draws != null)) ? `<div style="padding:14px 4px">${kv('Estado', '✔ Obra finalizada', 'up')}${fn.rehabReal != null ? kv('Costo de remodelación (real)', OS_M(fn.rehabReal)) : (fn.rehabEst != null ? kv('Remodelación (estimada)', OS_M(fn.rehabEst) + ' <span style="font-size:10px;color:var(--amber)">estimada</span>') : '')}${fn.draws != null ? kv('Draws desembolsados', OS_M(fn.draws)) : ''}<div class="meta" style="margin-top:8px">La casa ya pasó la etapa de obra (${OS_E(stageLbl)}). No hay registro de esta obra en la base de Remodelación — el resumen sale de Fix & Flip.</div></div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`)}</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
-        <div class="overx">${m.rentas ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`}</div></div>
+        <div class="overx">${m.rentas ? `${m.rentas.renta != null ? kv('Renta mensual actual' + LIN('Renta mensual actual'), OS_M(m.rentas.renta) + ` <span style="font-size:10px;color:var(--mut2)">${OS_E(m.rentas.rentaChip)}</span>`) : (esRentada ? kv('Renta mensual actual' + LIN('Renta mensual actual'), faltaDato) : '')}${m.rentas.ffGastos != null ? kv('Gastos mensuales' + LIN('Gastos mensuales'), OS_M(m.rentas.ffGastos)) : (esRentada ? kv('Gastos mensuales', faltaDato) : '')}${m.rentas.flujoMes != null ? kv('Flujo mensual' + LIN('Flujo mensual'), OS_M(m.rentas.flujoMes), m.rentas.flujoMes >= 0 ? 'up' : 'down') : (esRentada ? kv('Flujo mensual', faltaDato) : '')}${m.rentas.pagoDeuda != null ? kv('Pago de deuda /mes', OS_M(m.rentas.pagoDeuda)) : ''}${m.rentas.detalle ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="meta" style="margin-top:8px">Sin espejo en la base de Rentas (detalle de unidades/cobranza no disponible) — los mensuales salen de FF·Propiedades.</div>`}` : (esRentada ? `<div class="empty" style="padding:26px;color:var(--amber)">⚠ La etapa dice <b>${OS_E(stageLbl)}</b> pero faltan los datos de renta en Airtable (FF·Propiedades: Renta mensual actual / Gastos mensuales) — es un dato FALTANTE, no "sin rentas".</div>` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`)}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
         ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}${i.s === 'r' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
         ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}

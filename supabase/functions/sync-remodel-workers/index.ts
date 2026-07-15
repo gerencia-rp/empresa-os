@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
   try {
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const now = new Date().toISOString();
+    const runStart = now;
 
     const hours = await fetchAll(HOURS_TABLE);
     const hourRows = hours.map((r) => {
@@ -77,10 +78,27 @@ Deno.serve(async (req) => {
         pago: f[F.pago] ?? null,
         // "Pago Total Dia" (formula horas×rate) — fuente ÚNICA del pago diario para el desglose quincenal (NO recalcular en el front).
         pago_total_dia: f[F.pagoTotalDia] ?? null,
+        archived_at: null, // revive si el registro reapareció en Airtable
         last_synced_at: now,
       };
     });
     await upsertChunks(sb, "remodel_worker_hours", hourRows);
+
+    // Reconciliar BORRADOS (soft-delete): lo no-visto en este run se archiva, acotado a la
+    // ventana de fechas del pull (protege histórico si Airtable archiva semanas viejas);
+    // los registros con fecha null no son histórico y también se reconcilian.
+    let archivedCount = 0;
+    try {
+      const fechas = hourRows.map((r) => r.fecha).filter(Boolean).sort();
+      if (fechas.length) {
+        const { data: arch } = await sb.from("remodel_worker_hours")
+          .update({ archived_at: new Date().toISOString() })
+          .lt("last_synced_at", runStart).is("archived_at", null)
+          .or(`and(fecha.gte.${fechas[0]},fecha.lte.${fechas[fechas.length - 1]}),fecha.is.null`)
+          .select("airtable_id");
+        archivedCount = (arch || []).length;
+      }
+    } catch (e) { console.warn("reconcile skip:", String(e)); }
 
     const crews = await fetchAll(CREW_TABLE);
     const crewRows = crews.map((r) => {
@@ -96,7 +114,7 @@ Deno.serve(async (req) => {
     });
     await upsertChunks(sb, "remodel_crew_rates", crewRows);
 
-    return new Response(JSON.stringify({ ok: true, worker_hours: hourRows.length, crew_rates: crewRows.length }), {
+    return new Response(JSON.stringify({ ok: true, worker_hours: hourRows.length, crew_rates: crewRows.length, archived: archivedCount }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

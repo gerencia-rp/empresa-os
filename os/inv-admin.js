@@ -94,6 +94,19 @@ async function iaSaveParam(key) {
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaSaveParam = iaSaveParam;
+// ➕ parámetro NUEVO (para que todo "sin dato" del portal sea cargable desde acá)
+async function iaAddParam() {
+  const g = id => ((document.getElementById(id) || {}).value || '').trim();
+  const key = g('ia-np-key').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const value = g('ia-np-val');
+  if (!key || !value) return alert('Key y valor son obligatorios');
+  const row = { property_id: IA.casa, key, value, fuente: g('ia-np-fuente') || 'manual', descripcion: g('ia-np-desc') || null };
+  const { error } = await sb.from('inv_model_params').upsert(row, { onConflict: 'property_id,key' });
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('✓ Parámetro ' + key + ' guardado', 'success');
+  await iaLoadCasa(IA.casa); osRender();
+}
+window.iaAddParam = iaAddParam;
 async function iaAddMov() {
   const g = id => (document.getElementById(id) || {}).value || '';
   const row = { property_id: IA.casa, fecha: g('ia-m-fecha'), linea: g('ia-m-linea') || 'otros', tipo: g('ia-m-tipo') || 'gasto', categoria: g('ia-m-cat') || 'operativo', item: g('ia-m-item'), concepto: g('ia-m-conc'), valor: parseFloat(g('ia-m-valor')) || 0, id_factura: g('ia-m-fact') || null, fuente: 'manual' };
@@ -209,13 +222,52 @@ function iaTabEscenarios() {
 
 // ─── F1 producto: distribuciones + mensajes (admin) ───
 async function iaLoadProducto() {
-  const [d, m, dl, pj] = await Promise.all([
+  const [d, m, dl, pj, dc] = await Promise.all([
     sb.from('inv_distributions').select('*').eq('active', true).order('fecha', { ascending: false }),
     sb.from('inv_messages').select('*').eq('active', true).order('created_at', { ascending: false }).limit(100),
     sb.from('inv_deals').select('*').eq('active', true),
     sb.from('inv_projection').select('property_id,escenario,data,computed_at').eq('active', true).eq('escenario', 'proyectado'),
+    sb.from('inv_documents').select('*').eq('active', true).order('created_at', { ascending: false }),
   ]);
-  IA.dists = d.data || []; IA.msgs = m.data || []; IA.deals2 = dl.data || []; IA.proj = pj.data || [];
+  IA.dists = d.data || []; IA.msgs = m.data || []; IA.deals2 = dl.data || []; IA.proj = pj.data || []; IA.docsAll = dc.data || [];
+}
+// ─── 📄 documentos del inversionista (el portal los lista con buscador + audit) ───
+async function iaAddDoc() {
+  const g = id => ((document.getElementById(id) || {}).value || '').trim();
+  const row = { property_id: g('ia-doc-casa'), investor_airtable_id: g('ia-doc-inv') || null, tipo: g('ia-doc-tipo') || 'otro', nombre: g('ia-doc-nombre'), url: g('ia-doc-url') };
+  if (!row.property_id || !row.nombre || !row.url) return alert('Casa, nombre y URL son obligatorios');
+  const { error } = await sb.from('inv_documents').insert(row);
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('✓ Documento cargado — ya lo ve el inversionista en su portal', 'success');
+  await iaLoadProducto(); osRender();
+}
+window.iaAddDoc = iaAddDoc;
+async function iaDelDoc(id) {
+  const { error } = await sb.from('inv_documents').update({ active: false, archived_at: new Date().toISOString() }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  await iaLoadProducto(); osRender();
+}
+window.iaDelDoc = iaDelDoc;
+function iaTabDocs() {
+  const invOpts = '<option value="">🏠 Todos los inversionistas de la casa</option>' + IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
+  const docs = IA.docsAll || [];
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Subir documento al portal</div><div class="k">contrato · fiscal (K-1) · legal · otro — URL de Drive/Storage</div></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+    + '<select id="ia-doc-casa" class="osa-in">' + casaOpts + '</select>'
+    + '<select id="ia-doc-inv" class="osa-in">' + invOpts + '</select>'
+    + '<select id="ia-doc-tipo" class="osa-in"><option>contrato</option><option>fiscal</option><option>legal</option><option>otro</option></select>'
+    + '<input id="ia-doc-nombre" class="osa-in" placeholder="Nombre visible (ej: Operating Agreement 2025)">'
+    + '<input id="ia-doc-url" class="osa-in" placeholder="URL del documento" style="grid-column:span 2">'
+    + '</div><button class="cbtn" style="margin-top:10px" onclick="iaAddDoc()">Subir al portal</button>'
+    + '<div class="meta" style="margin-top:6px">Sin inversionista = lo ven todos los holders de la casa. Cada vista del inversionista queda en el audit log del documento.</div></div>'
+    + '<div class="card"><div class="chart-h"><div class="t">Documentos (' + docs.length + ')</div></div>'
+    + '<table class="ptable"><thead><tr><th>Documento</th><th>Casa</th><th>Para</th><th>Tipo</th><th>Vistas</th><th style="text-align:right"></th></tr></thead><tbody>'
+    + (docs.map(d => '<tr><td><a href="' + OS_E(d.url) + '" target="_blank" style="color:var(--a2)">' + OS_E(d.nombre) + ' ↗</a></td><td>' + OS_E(iaCasaName(d.property_id)) + '</td>'
+      + '<td>' + (d.investor_airtable_id ? OS_E(iaInvName(d.investor_airtable_id)) : '🏠 todos') + '</td><td>' + OS_E(d.tipo || '—') + '</td>'
+      + '<td>' + ((d.audit || []).length || 0) + '</td>'
+      + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDoc(\'' + d.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Sin documentos.</td></tr>')
+    + '</tbody></table></div>';
 }
 async function iaCrearDist() {
   const g = id => (document.getElementById(id) || {}).value || '';
@@ -455,7 +507,7 @@ function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return window.kitError ? kitError(IA.err, 'iaLoad(true)') : '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger']];
+  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IA.tab=\'' + t[0] + '\';osRender()">' + t[1] + '</button>').join(' ');
   let body = '';
 
@@ -511,8 +563,18 @@ function invAdminView() {
         + '<div class="card"><div class="lab">Equilibrio</div><div class="big warn">' + (i.puntoEquilibrio * 100).toFixed(0) + '%</div><div class="meta">ocupación mínima</div></div>'
         + '</div>';
     }
-    body = '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">' + casaSel + '<span class="meta">el portal del inversionista muestra EXACTAMENTE esto (motor compartido)</span></div>'
+    const esEjemplo = IA.params.some(p => p.key === 'es_ejemplo' && p.value === 'true');
+    body = '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">' + casaSel
+      + (esEjemplo ? '<span class="badge b-warn" title="Casa de ejemplo del Excel Modelo financiero - Renta VF">🧪 ejemplo del Excel</span>' : '')
+      + '<span class="meta">el portal del inversionista muestra EXACTAMENTE esto (motor compartido)</span></div>'
       + preview
+      + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">➕ Agregar parámetro</div><div class="k">todo "sin dato" del portal se carga acá (ej: estrategia, plan_salida, refi_lender, cashout_real)</div></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+      + '<input id="ia-np-key" class="osa-in" placeholder="key (ej: refi_lender)">'
+      + '<input id="ia-np-val" class="osa-in" placeholder="valor">'
+      + '<select id="ia-np-fuente" class="osa-in"><option value="real:manual">real:manual</option><option value="supuesto">supuesto</option><option value="modelo">modelo</option></select>'
+      + '<input id="ia-np-desc" class="osa-in" placeholder="descripción (opcional)">'
+      + '</div><button class="cbtn" style="margin-top:10px" onclick="iaAddParam()">Guardar parámetro</button></div>'
       + '<div class="grid k2" style="margin-top:14px">'
       + '<div class="card" style="max-height:520px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">editá y Enter — fuente declarada</div></div>'
       + IA.params.map(p => {
@@ -539,9 +601,10 @@ function invAdminView() {
   }
 
   if (IA.tab === 'escenarios') body = iaTabEscenarios();
-  const needsProd = ['dist', 'msgs', 'pipeline', 'global'].includes(IA.tab);
+  const needsProd = ['dist', 'msgs', 'pipeline', 'global', 'docs2'].includes(IA.tab);
   if (needsProd && !IA.dists) { iaLoadProducto().then(osRender); body = '<div class="empty">⏳</div>'; }
   else if (IA.tab === 'dist') body = iaTabDist();
+  else if (IA.tab === 'docs2') body = iaTabDocs();
   else if (IA.tab === 'msgs') body = iaTabMsgs();
   else if (IA.tab === 'pipeline') body = iaTabPipeline();
   else if (IA.tab === 'global') body = iaTabGlobal();

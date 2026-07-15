@@ -42,7 +42,31 @@
   .login input{width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:14px;outline:none;margin:14px 0 10px}
   .empty{padding:44px;text-align:center;color:var(--mut2)}
   .overx{overflow-x:auto}
-  @media(max-width:900px){.k4,.k3,.k2{grid-template-columns:minmax(0,1fr)}.wrap{padding:16px 12px 50px}}
+  /* tabs activos + botón ℹ + overlay explicador + línea de tiempo */
+  .tabb.on{border-color:var(--a2);color:var(--ink);font-weight:700}
+  .infob{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;border:1px solid var(--glassb);background:var(--glass);color:var(--mut);cursor:pointer;font-size:11px;line-height:1}
+  .infob:hover{color:var(--ink);border-color:var(--a2)}
+  .ipov{position:fixed;inset:0;background:rgba(2,6,12,.55);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:999;padding:18px}
+  .ipov-card{background:var(--card-solid,#0b1017);border:1px solid var(--glassb);border-radius:16px;padding:18px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,.4)}
+  .ipov-f{font-size:12.5px;line-height:1.7;font-variant-numeric:tabular-nums;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;margin-top:6px}
+  .tl{display:flex;flex-direction:column;gap:0}
+  .tl-it{display:flex;gap:12px;align-items:flex-start;padding:8px 0;position:relative;opacity:.62}
+  .tl-it.past{opacity:1}
+  .tl-it:not(:last-child):before{content:'';position:absolute;left:15px;top:38px;bottom:-6px;width:2px;background:var(--glassb)}
+  .tl-dot{width:32px;height:32px;border-radius:50%;background:var(--glass);border:1px solid var(--glassb);display:grid;place-items:center;font-size:14px;flex:none}
+  @media(max-width:900px){.k4,.k3,.k2{grid-template-columns:minmax(0,1fr)}.wrap{padding:16px 12px 50px}.hide-sm{display:none}.big{font-size:21px}}
+  /* ── TEMA CLARO (canon del OS: fondo tintado, tarjetas blancas, contraste AA) ── */
+  html[data-theme="light"]{--bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
+    --a1:#0d9488;--a2:#2563eb;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309;--card-solid:#ffffff}
+  html[data-theme="light"] body{background:radial-gradient(760px 520px at 8% -6%,rgba(13,148,136,.08),transparent 58%),
+    radial-gradient(820px 560px at 100% 4%,rgba(37,99,235,.07),transparent 56%),#eef1f7;color:var(--ink)}
+  html[data-theme="light"] .card{background:#ffffff;border-color:#e2e8f0;box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06);backdrop-filter:none}
+  html[data-theme="light"] .src{background:rgba(37,99,235,.1);color:#2563eb}
+  html[data-theme="light"] .src.sup{background:#fef3c7;color:#b45309}
+  html[data-theme="light"] .ipov{background:rgba(15,23,42,.35)}
+  html[data-theme="light"] .ipov-card{box-shadow:0 18px 50px rgba(15,23,42,.25)}
+  html[data-theme="light"] .cbtn{color:#ffffff}
+  html[data-theme="light"] .logo{color:#ffffff}
 </style>
 </head>
 <body>

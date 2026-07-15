@@ -107,7 +107,7 @@ function ffUnificadaView() {
 
   const inversion = unSec('La inversión', [
     unKpi('El inversionista pone', UN_M2(o.negocio.cashToClose), 'HUD: down + cierre − créditos · ya pagado ' + UN_M(o.negocio.yaPagado), { big: true, color: 'var(--a2,#2f6ef0)' }),
-    unKpi('Presta el Harmony', UN_M(o.negocio.prestamo), inp.hml_finance_pct + '% de compra + rehab'),
+    unKpi('Presta el Harmony', UN_M(o.negocio.prestamo), o.negocio.pctCompra + '% compra + ' + o.negocio.pctRemo + '% remo'),
     tieneArv ? unKpi('ARV (valor de reventa)', UN_M(o.arv.probable), 'confianza ' + UN_E(c.arvConf)) : unKpi('ARV', '', '', { falta: 'buscá comps en ARV', tab: 'arv' }),
     tieneArv ? unKpi('Oferta máxima (MAO)', UN_M(u.mao), 'para cumplir all-in ≤' + u.allInMax + '%' + (tienePurchase ? (u.mao >= +inp.purchase ? ' · ✓ compra por debajo' : ' · ⚠ compra arriba') : '')) : unKpi('MAO', '', '', { falta: 'necesita ARV', tab: 'arv' }),
   ]);
@@ -208,7 +208,7 @@ function ffUnificadaOnePager() {
     + sec('💵 Inversión requerida',
       fila('Down payment', M2(o.negocio.downPayment)) + fila('+ Gastos de cierre', M2(o.negocio.closing)) + fila('− Créditos (earnest/option/proración)', '−' + M2(o.negocio.creditos))
       + fila('= El inversionista pone', '<b style="color:#2563eb">' + M2(o.negocio.cashToClose) + '</b>') + fila('Ya pagado como earnest/option', M(o.negocio.yaPagado))
-      + fila('Presta el Harmony (' + inp.hml_finance_pct + '%)', M(o.negocio.prestamo)))
+      + fila('Presta el Harmony (' + o.negocio.pctCompra + '% compra + ' + o.negocio.pctRemo + '% remo)', M(o.negocio.prestamo)))
     + sec('🔨 El proyecto',
       fila('Precio de compra', +inp.purchase > 0 ? M(+inp.purchase) : 'por definir') + fila('Remodelación', o.negocio.remod > 0 ? M(o.negocio.remod) : 'por definir')
       + fila('Draw total (obra + intereses)', M(o.negocio.draw)) + fila('Meses de obra', c.mesesObra ? c.mesesObra + ' meses' : 'por definir')
