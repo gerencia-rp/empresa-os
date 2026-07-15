@@ -20,7 +20,9 @@ const FIELD_IDS = {
   trabajadores: "fldNmR8PgZWdjutIw",
   interno: "fldsRWMQJ4Lv86GOU",
   presupuesto: "fldPMBhxLYr4TMje0",
-  cliente: "fldAP3lI2FgXds14q",
+  // FIX 14-jul: valor_cliente ← "Valor Remodelación al cliente" (antes traía Draws Ingresados por error)
+  cliente: "fldsRWMQJ4Lv86GOU",
+  draws: "fldAP3lI2FgXds14q",
   ganancia: "fldW26WBuAFPnWhi8",
   retraso: "fld7Pl5a9YhAazAby",
   monto_por_gastar: "fldg9kWaf60x6SeJo",
@@ -198,6 +200,7 @@ function projectFromAirtable(r: any, liderCache: Map<string, string>) {
     presupuesto_interno: f[FIELD_IDS.presupuesto] || null,
     valor_interno: f[FIELD_IDS.interno] || null,
     valor_cliente: f[FIELD_IDS.cliente] || null,
+    draws_ingresados: typeof f[FIELD_IDS.draws] === "number" ? f[FIELD_IDS.draws] : null,
     ganancia: f[FIELD_IDS.ganancia] || null,
     retraso_dias: typeof f[FIELD_IDS.retraso] === "number" ? f[FIELD_IDS.retraso] : null,
     monto_por_gastar: typeof f[FIELD_IDS.monto_por_gastar] === "number" ? f[FIELD_IDS.monto_por_gastar] : null,

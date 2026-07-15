@@ -230,7 +230,6 @@ function rcCompute() {
   evrTot.devAbs = evrTot.real - evrTot.est; evrTot.devPct = evrTot.est > 0 ? Math.round(evrTot.devAbs / evrTot.est * 100) : 0;
   const topDesv = [...evr].sort((a, b) => Math.abs(b.devPct) - Math.abs(a.devPct)).slice(0, 8);
   const desvCostoProm = evr.length ? Math.round(evr.reduce((s, x) => s + x.devPct, 0) / evr.length) : 0;
-  const margenReal = fin.reduce((s, o) => { const ff = rcFin(o); return s + ((ff.ingreso > 0 && ff.costoReal > 0) ? ff.margen : 0); }, 0);
   const _diasAll = fin.map(o => o.retraso_dias).filter(d => d != null).map(Number);
   const _diasRev = _diasAll.filter(d => Math.abs(d) > 180);   // outliers |>180d| = dato a revisar
   const _dias = _diasAll.filter(d => Math.abs(d) <= 180);
@@ -261,7 +260,7 @@ function rcCompute() {
   const okrsList = okrsConfigured ? RC.okrs : OKR_DEFAULTS;
   const okrActual = { margen_bruto: margenHist, rentabilidad: rentProm, desv_costo: desvCostoProm, desv_dias: desvDiasProm, psf: psfProm, ebitda_margen: ebitdaMargen, a_tiempo: aTiempoPct, en_presupuesto: enPresupPct };
   const okrRows = okrsList.map(o => { const actual = okrActual[o.clave]; const meta = +o.objetivo; const cumple = actual == null ? null : (o.comparador === '≤' ? actual <= meta : actual >= meta); return { clave: o.clave, metrica: o.metrica, objetivo: meta, comparador: o.comparador, unidad: o.unidad, actual, cumple }; });
-  return { obras, fin, activas, pipeline, lideresCuadrilla, gananciaHist, gananciaConDraws, costoFFHist, resultadoEmpresaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, margenReal, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
+  return { obras, fin, activas, pipeline, lideresCuadrilla, gananciaHist, gananciaConDraws, costoFFHist, resultadoEmpresaHist, revenueHist, margenHist, matPctHist, capitalActivo, presupActivo, avgAvance, pipelineProj, lideres, compAlerts, evr, evrTot, topDesv, desvCostoProm, desvDiasProm, desvDiasMed, desvDiasRevN, psfProm, matPsfProm, labPsfProm, overheadTotal, overheadBy, overheadOpex, overheadCapex, utilidadNeta, ebitda, ebitdaMargen, ingresoTotal, okrRows, okrsConfigured, rentProm, aTiempoPct, enPresupPct, gastoTipo, sinDatosN: obras.filter(o => o.dq.sinDatos).length, sobreN: obras.filter(o => o.dq.sobrePresup).length };
 }
 
 function rcInsights(c) {
@@ -372,7 +371,6 @@ function rcSecCommand(c) {
       <div class="card kpi"><div class="lab">Rentabilidad prom</div><div class="big ${c.rentProm>=0?'up':'down'}">${c.rentProm}%</div><div class="meta">utilidad / valor cliente (limpia) · ${c.fin.length} finalizadas</div></div>
       <div class="card kpi"><div class="lab">Desviación de costo prom</div><div class="big ${c.desvCostoProm>0?'down':'up'}">${c.desvCostoProm>0?'+':''}${c.desvCostoProm}%</div><div class="meta">real vs presupuesto · ${c.enPresupPct}% en presup.</div></div>
       <div class="card kpi"><div class="lab">Desviación de días prom</div><div class="big ${c.desvDiasProm>0?'down':'up'}">${c.desvDiasProm>0?'+':''}${c.desvDiasProm}d</div><div class="meta">mediana ${c.desvDiasMed>0?'+':''}${c.desvDiasMed}d · ${c.aTiempoPct}% a tiempo${c.desvDiasRevN?` · <span class="warn">${c.desvDiasRevN} a revisar</span>`:''}</div></div>
-      <div class="card kpi"><div class="lab">Margen realizado</div><div class="big ${c.margenReal>=0?'up':'down'}">${RC_K(c.margenReal)}</div><div class="meta">ingreso − costo real (${c.fin.length} fin)</div></div>
     </div>
     <div class="card" style="margin-top:14px">
       <div class="chart-h"><div class="t">Overhead / EBITDA de Remodelación</div><div class="k">Ganancia BRUTA − overhead</div></div>
