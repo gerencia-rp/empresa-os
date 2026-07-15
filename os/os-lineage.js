@@ -12,7 +12,7 @@
 // ════════════════════════════════════════════════════════════════
 /* global sb, OS, osRender, osNav, OS_E, LINEAGE_VIEWS */
 
-const LM = { rows: null, loading: false, err: null, emp: null, sys: null, q: '', mode: 'lista', focus: null, edit: null };
+const LM = { rows: null, loading: false, err: null, emp: null, sys: null, q: '', qn: '', mode: 'lista', focus: null, edit: null, sel: null, cov: null };
 window.LM = LM;
 
 const LM_COLORS = { 'Fix & Flip': '#ef6c47', 'Rentas': '#3aa0ff', 'Remodelación': '#37c98b', 'Contable / QBO': '#c084fc', 'Supabase (vista)': '#8a93ad' };
@@ -28,6 +28,7 @@ async function lmLoad(force) {
       .order('empresa').order('sistema').order('orden').order('dato').limit(2000);
     if (error) throw error;
     LM.rows = data || [];
+    LM.cov = await sb.from('lineage_coverage_runs').select('*').order('run_at', { ascending: false }).limit(1).maybeSingle().then(r => r.data).catch(() => null);
   } catch (e) { LM.err = e.message || String(e); }
   LM.loading = false;
   osRender();
@@ -96,8 +97,46 @@ async function lmAdd() {
 window.lmAdd = lmAdd;
 function lmSetQ(v) { LM.q = v; osRender(); const el = document.getElementById('lm-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 window.lmSetQ = lmSetQ;
-function lmGo(emp, sys) { LM.emp = emp || null; LM.sys = sys || null; LM.focus = null; LM.edit = null; osRender(); }
+function lmGo(emp, sys) { LM.emp = emp || null; LM.sys = sys || null; LM.focus = null; LM.edit = null; LM.sel = null; osRender(); }
 window.lmGo = lmGo;
+// seleccionar un NÚMERO → vista de flujo "viene → número → alimenta"
+function lmSel(mk) {
+  const r = (LM.rows || []).find(x => x.metric_key === mk);
+  if (!r) return;
+  LM.sel = mk; LM.emp = r.empresa; LM.sys = r.sistema; LM.focus = null; LM.edit = null;
+  osRender();
+  const main = document.querySelector('.lm-wrap > div:last-child'); if (main) main.scrollIntoView({ block: 'start' });
+}
+window.lmSel = lmSel;
+function lmSetQn(v) { LM.qn = v; osRender(); const el = document.getElementById('lm-qn'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+window.lmSetQn = lmSetQn;
+// tabla Airtable/QBO → tabla espejo pg (para cruzar con la metadata de las vistas)
+const LM_MIRROR = { 'propiedades': ['ff_deals'], 'desglose draws': ['ff_draws'], 'datos por casa': ['ff_hml_loans', 'ff_hml_payments'],
+  'casas': ['pm_properties'], 'pagos': ['pm_payments'], 'gastos x casa': ['pm_expenses'], 'inquilinos': ['pm_tenants'], 'unidades': ['pm_units'],
+  'reservas': ['pm_bookings'], 'accesos': ['pm_credentials'], 'propiedad en reparación': ['remodel_at_properties'], 'quickbooks': ['qb_report_cache'] };
+function lmMirrorOf(tabla) {
+  const t = String(tabla || '').toLowerCase().replace(/[^a-zñáéíóú ]/g, '').trim();
+  for (const k of Object.keys(LM_MIRROR)) if (t.includes(k)) return LM_MIRROR[k];
+  const m = String(tabla || '').match(/\(espejo ([a-z_]+)\)/); if (m) return [m[1]];
+  return [];
+}
+// downstream AUTOMÁTICO (grafo inverso): feeds explícitos + mismo origen tabla·columna + vistas que consumen la tabla
+function lmDownstream(r) {
+  const out = []; const seen = new Set([r.metric_key]);
+  const add = (row, w) => { if (row && !seen.has(row.metric_key)) { seen.add(row.metric_key); out.push({ row, w }); } };
+  (r.feeds || []).forEach(mk => add((LM.rows || []).find(x => x.metric_key === mk), 'cadena'));
+  const mirrors = lmMirrorOf(r.tabla);
+  (LM.rows || []).forEach(x => {
+    if (x.tabla === r.tabla && x.columna === r.columna && x.metric_key !== r.metric_key) add(x, 'mismo origen');
+    else if (mirrors.length && x.vista && typeof LINEAGE_VIEWS !== 'undefined' && LINEAGE_VIEWS[x.vista]
+      && LINEAGE_VIEWS[x.vista].some(d => mirrors.includes(d.t))) add(x, 'vía ' + x.vista);
+  });
+  return out;
+}
+// upstream inverso: qué números declaran alimentar a ESTE (feeds que lo contienen)
+function lmUpstreamOf(r) {
+  return (LM.rows || []).filter(x => (x.feeds || []).includes(r.metric_key));
+}
 function lmMode(m) { LM.mode = m; LM.focus = null; osRender(); }
 window.lmMode = lmMode;
 function lmFocus(id) { LM.focus = LM.focus === id ? null : id; osRender(); }
@@ -179,6 +218,25 @@ function lmCSS() {
     + '#os-root .lm-hl{box-shadow:0 0 0 2px var(--a2) inset;opacity:1!important}'
     + '#os-root .lm-detail{position:sticky;bottom:8px;margin-top:12px;background:var(--bg,#0f1220);border:1px solid var(--a2);border-radius:12px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.35)}'
     + '#os-root .lm-grp{padding:6px 12px;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--mut2);border-top:1px solid var(--glassb);background:var(--glass)}'
+    + '#os-root .lm-syslabel{padding:6px 10px 3px 24px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut2);cursor:pointer;border-radius:6px}'
+    + '#os-root .lm-syslabel:hover{color:var(--ink)}'
+    + '#os-root .lm-syslabel.on{color:var(--a2);font-weight:700}'
+    + '#os-root .lm-num{padding:5px 10px 5px 26px;font-size:12px;color:var(--mut);cursor:pointer;border-radius:7px;display:flex;align-items:center;gap:7px}'
+    + '#os-root .lm-num:hover{background:var(--glass);color:var(--ink)}'
+    + '#os-root .lm-num.on{background:var(--glass);color:var(--ink);font-weight:600;border:1px solid var(--glassb)}'
+    + '#os-root .lm-sd{width:7px;height:7px;border-radius:50%;flex:none}'
+    + '#os-root .lm-flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}'
+    + '#os-root .lm-node{border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;background:var(--glass);min-width:130px}'
+    + '#os-root .lm-node .lab{margin-bottom:5px}'
+    + '#os-root .lm-node .val{font-size:13.5px;font-weight:600}'
+    + '#os-root .lm-node.number{background:linear-gradient(180deg,rgba(201,162,39,.16),rgba(201,162,39,.05));border-color:rgba(201,162,39,.5)}'
+    + '#os-root .lm-arrow{display:flex;align-items:center;justify-content:center;color:var(--mut2);font-size:20px;padding:0 9px}'
+    + '#os-root .lm-formula{background:var(--glass);border:1px solid var(--glassb);border-radius:9px;padding:10px 14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--mut);line-height:1.6;margin-top:12px}'
+    + '#os-root .lm-feeds{display:flex;gap:10px;flex-wrap:wrap}'
+    + '#os-root .lm-feed{border:1px solid var(--glassb);border-radius:9px;padding:9px 13px;background:var(--glass);font-size:12.5px;cursor:pointer;font-weight:600}'
+    + '#os-root .lm-feed:hover{border-color:var(--a2)}'
+    + '#os-root .lm-feed .w{display:block;font-size:10.5px;color:var(--mut2);margin-top:2px;font-weight:500}'
+    + '@media(max-width:820px){#os-root .lm-arrow{transform:rotate(90deg);width:100%;padding:4px 0}}'
     + '@media(max-width:900px){#os-root .lm-wrap{grid-template-columns:1fr}}';
   document.head.appendChild(st);
 }
@@ -189,32 +247,48 @@ function osLineageView() {
   if (!LM.rows && !LM.err) { lmLoad(); return '<div class="empty">⏳ Cargando el mapa de conexiones…</div>'; }
   if (LM.err) return '<div class="empty down">' + LM_E(LM.err) + ' <button class="cbtn" onclick="lmLoad(true)">Reintentar</button></div>';
   const tree = lmTreeData();
+  const qn = (LM.qn || '').trim().toLowerCase();
+  const stDot = s => '<span class="lm-sd" style="background:' + (s === 'ok' ? 'var(--pos)' : s === 'warn' ? 'var(--amber)' : s === 'bug' ? 'var(--neg)' : 'var(--mut2)') + '"></span>';
   const treeHtml = '<div class="card lm-tree" style="padding:12px">'
-    + '<div style="font-weight:800;font-size:14px;margin:2px 6px 2px">🗺️ Explorador</div>'
-    + '<div class="meta" style="margin:0 6px 10px">Empresa → Sistema → cada número</div>'
+    + '<div style="font-weight:800;font-size:14px;margin:2px 6px 2px">🔎 Conexiones al detalle</div>'
+    + '<div class="meta" style="margin:0 6px 8px">Elegí un número → ves de dónde viene y qué alimenta.</div>'
+    + '<input id="lm-qn" class="lm-in" style="margin:0 4px 10px;width:calc(100% - 8px)" placeholder="Buscar número…" value="' + LM_E(LM.qn) + '" oninput="lmSetQn(this.value)">'
     + Object.keys(tree).map(emp => {
       const sist = tree[emp];
+      const items = Object.keys(sist).map(sys => ({ sys, rows: sist[sys].filter(r => !qn || (r.dato + ' ' + r.tabla + ' ' + r.columna).toLowerCase().includes(qn)) })).filter(x => x.rows.length);
+      if (!items.length) return '';
       const tot = Object.values(sist).reduce((s, a) => s + a.length, 0);
-      return '<div><div class="emp-h" onclick="lmGo(\'' + LM_E(emp) + '\', null)"><span class="bdot" style="background:' + lmColor(emp) + '"></span>' + LM_E(emp) + '<span class="cnt">' + Object.keys(sist).length + ' sist · ' + tot + '</span></div>'
-        + '<ul>' + Object.keys(sist).map(sys => {
-          const rows = sist[sys];
-          const bugs = rows.filter(x => x.estado === 'bug').length, warns = rows.filter(x => x.estado === 'warn').length;
-          const on = LM.emp === emp && LM.sys === sys;
-          return '<li class="' + (on ? 'on' : '') + '" onclick="lmGo(\'' + LM_E(emp) + '\',\'' + LM_E(sys).replace(/'/g, "\\'") + '\')">' + LM_E(sys)
-            + '<span class="n">' + rows.length + (bugs ? ' <b style="color:var(--neg)">●' + bugs + '</b>' : '') + (warns ? ' <b style="color:var(--amber)">●' + warns + '</b>' : '') + '</span></li>';
-        }).join('') + '</ul></div>';
+      const sinF = Object.values(sist).flat().filter(r => r.origen === 'crawler' && r.estado === 'pend').length;
+      return '<div><div class="emp-h" onclick="lmGo(\'' + LM_E(emp) + '\', null)"><span class="bdot" style="background:' + lmColor(emp) + '"></span>' + LM_E(emp) + '<span class="cnt">' + (tot - sinF) + '/' + tot + ' con fuente</span></div>'
+        + items.map(({ sys, rows }) => {
+          const on = LM.emp === emp && LM.sys === sys && !LM.sel;
+          return '<div class="lm-syslabel' + (on ? ' on' : '') + '" onclick="lmGo(\'' + LM_E(emp) + '\',\'' + LM_E(sys).replace(/'/g, "\\'") + '\')" title="abrir el sistema (lista + diagrama)">' + LM_E(sys) + ' <span style="float:right">' + rows.length + '</span></div>'
+            + rows.map(r => '<div class="lm-num' + (LM.sel === r.metric_key ? ' on' : '') + '" onclick="lmSel(\'' + LM_E(r.metric_key) + '\')">' + stDot(r.estado) + LM_E(r.dato) + '</div>').join('');
+        }).join('') + '</div>';
     }).join('')
-    + '<div class="meta" style="margin:8px 6px 2px;font-size:10.5px">El linaje vista→tabla·columna se regenera solo desde la metadata de Postgres (scripts/lineage-gen.mjs). Cada edición queda en el audit (quién/cuándo).</div>'
+    + '<div class="meta" style="margin:8px 6px 2px;font-size:10.5px">Clic en el SISTEMA = lista/diagrama completo · clic en un NÚMERO = su flujo. El linaje de vistas se regenera solo (scripts/lineage-gen.mjs); toda edición queda en el audit.</div>'
     + '</div>';
 
   let main;
-  if (!LM.sys) {
+  const selRow = LM.sel ? (LM.rows || []).find(x => x.metric_key === LM.sel) : null;
+  if (selRow) {
+    main = lmFlujo(selRow);
+  } else if (!LM.sys) {
     const rows = lmRowsSel();
     const bugs = (LM.rows || []).filter(x => x.estado === 'bug'), warns = (LM.rows || []).filter(x => x.estado === 'warn');
     main = '<div class="card">'
       + '<h1 style="font-size:19px">🗺️ Mapa de Conexiones <span>· de dónde sale cada número</span></h1>'
       + '<div class="sub">' + (LM.rows || []).length + ' números trazados en ' + Object.keys(tree).length + ' empresas · <b style="color:var(--pos)">' + ((LM.rows || []).length - bugs.length - warns.length) + ' OK</b> · <b style="color:var(--amber)">' + warns.length + ' a revisar</b> · <b style="color:var(--neg)">' + bugs.length + ' bug</b></div>'
       + '<div class="lm-key">🔑 <b>La llave que une las bases:</b> la casa (<b>property_id</b> ↔ Dirección). La misma casa vive en Fix & Flip, Rentas y Remodelación — si la dirección está escrita distinto, el property_id la cruza igual (por eso la Ficha se arregló resolviendo por property_id).</div>'
+      + (() => {
+        const sinF = (LM.rows || []).filter(r => r.origen === 'crawler' && r.estado === 'pend').length;
+        const tot = (LM.rows || []).length;
+        const cov = LM.cov;
+        return '<div class="kv" style="margin-top:10px"><span>📈 <b>Cobertura de linaje</b> (gate de CI: ningún número visible sin registro)</span><b>'
+          + (cov ? (cov.sin_linaje === 0 ? '<span style="color:var(--pos)">✓ ' + cov.con_linaje + '/' + cov.numeros_vistos + ' números vistos con registro</span>' : '<span style="color:var(--neg)">' + cov.sin_linaje + ' sin registro de ' + cov.numeros_vistos + '</span>') + ' <span class="meta">(' + String(cov.run_at || '').slice(0, 10) + ' · ' + cov.pantallas + ' pantallas)</span>' : '<span class="meta">sin corrida del crawler todavía (npm run gate:lineage)</span>')
+          + '</b></div>'
+          + '<div class="kv"><span>Fuente exacta definida</span><b>' + (tot - sinF) + '/' + tot + ' registrados' + (sinF ? ' · <span style="color:var(--amber)">' + sinF + ' descubiertos por el crawler esperando curación</span>' : ' <span style="color:var(--pos)">✓</span>') + '</b></div>';
+      })()
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="ibtn" onclick="lmJSON(true)">⬇ JSON completo</button><button class="ibtn" onclick="lmCSV(true)">⬇ CSV completo</button></div>'
       + ((warns.length || bugs.length) ? '<div class="lab" style="margin-top:16px">⚠ Casos marcados (dual-source / cálculo sobre vacío / a revisar)</div>'
         + bugs.concat(warns).slice(0, 12).map(r => '<div class="kv" style="cursor:pointer" onclick="lmGo(\'' + LM_E(r.empresa) + '\',\'' + LM_E(r.sistema).replace(/'/g, "\\'") + '\')"><span><span class="lm-pill ' + r.estado + '">' + LM_PILL[r.estado] + '</span> ' + LM_E(r.empresa) + ' › ' + LM_E(r.sistema) + ' › <b>' + LM_E(r.dato) + '</b></span><b class="meta" style="max-width:45%;text-align:right;font-weight:500">' + LM_E(r.nota || r.formula || '') + '</b></div>').join('') : '')
@@ -241,6 +315,41 @@ function osLineageView() {
   return '<div class="lm-wrap">' + treeHtml + '<div>' + main + '</div></div>';
 }
 window.osLineageView = osLineageView;
+
+// ─── FLUJO por número: ① de dónde viene → [número] → ② qué alimenta (réplica del HTML "conexiones-al-detalle") ───
+function lmFlujo(r) {
+  const node = (lab, val, mono, cls) => '<div class="lm-node' + (cls ? ' ' + cls : '') + '"><div class="lab">' + lab + '</div><div class="val' + (mono ? ' lm-mono' : '') + '">' + val + '</div></div>';
+  const arrow = '<div class="lm-arrow">→</div>';
+  const chain = [];
+  chain.push(node('Base', '<span style="color:' + lmColor(r.base) + '">' + LM_E(r.base) + '</span>'));
+  chain.push(node('Tabla', LM_E(r.tabla), 1));
+  chain.push(node('Columna', LM_E(r.columna), 1));
+  if (r.vista) chain.push(node('Vista (Supabase)', LM_E(r.vista), 1));
+  if (r.formula) chain.push(node('Fórmula', 'ƒ', 0));
+  const flow = chain.join(arrow) + arrow + '<div class="lm-node number"><div class="lab" style="color:#c9a227">Número en la app</div><div class="val" style="font-size:15px">' + LM_E(r.dato) + '</div><div class="meta" style="font-size:10px">' + LM_E(r.sistema) + '</div></div>';
+  const vc = lmViewChain(r.vista || r.tabla);
+  const upInv = lmUpstreamOf(r);
+  const feeds = lmDownstream(r);
+  const feedCard = f => '<div class="lm-feed" onclick="lmSel(\'' + LM_E(f.row.metric_key) + '\')">' + LM_E(f.row.dato)
+    + '<span class="w">en ' + LM_E(f.row.empresa) + ' · ' + LM_E(f.row.sistema) + (f.w !== 'cadena' ? ' <i style="opacity:.7">(' + LM_E(f.w) + ')</i>' : '') + '</span></div>';
+  return '<div class="card">'
+    + '<div class="meta">' + LM_E(r.empresa) + ' › ' + LM_E(r.sistema) + (r.grupo ? ' › ' + LM_E(r.grupo) : '') + '</div>'
+    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:2px 0 4px"><h1 style="font-size:21px;margin:0">' + LM_E(r.dato) + '</h1><span class="lm-pill ' + r.estado + '">' + LM_PILL[r.estado] + '</span>'
+    + '<span style="margin-left:auto;display:flex;gap:6px"><button class="ibtn" onclick="LM.sel=null;LM.mode=\'lista\';lmEdit(\'' + r.id + '\')">✎ Cambiar fuente</button>'
+    + '<button class="ibtn" onclick="LM.sel=null;LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">🕸 Ver en el diagrama</button></span></div>'
+    + '<div class="meta" style="margin-bottom:16px">De dónde viene y qué alimenta.</div>'
+    + '<div class="lab" style="margin-bottom:10px">① De dónde viene (Airtable/QBO → app)</div>'
+    + '<div class="lm-flow">' + flow + '</div>'
+    + (r.formula ? '<div class="lm-formula">ƒ &nbsp; ' + LM_E(r.formula) + '</div>' : '')
+    + (r.nota ? '<div style="color:var(--amber);font-size:12.5px;margin-top:8px">⚠ ' + LM_E(r.nota) + '</div>' : '')
+    + (vc ? '<div class="meta" style="margin-top:8px">🧬 La vista <b>' + LM_E(vc.view) + '</b> lee de: ' + vc.deps.map(d => '<span class="lm-mono">' + LM_E(d.t) + '</span> (' + d.c.length + ' col)').join(' · ') + ' <span style="opacity:.7">(metadata generada de Postgres)</span></div>' : '')
+    + (upInv.length ? '<div class="lab" style="margin-top:18px;margin-bottom:8px">⬅ Se alimenta también de</div><div class="lm-feeds">' + upInv.map(x => '<div class="lm-feed" onclick="lmSel(\'' + LM_E(x.metric_key) + '\')">' + LM_E(x.dato) + '<span class="w">en ' + LM_E(x.empresa) + ' · ' + LM_E(x.sistema) + '</span></div>').join('') + '</div>' : '')
+    + '<div class="lab" style="margin-top:18px;margin-bottom:8px">② Qué alimenta (este número → otros)</div>'
+    + '<div class="lm-feeds">' + (feeds.length ? feeds.map(feedCard).join('') : '<span class="meta">— dato final (no alimenta otros números registrados)</span>') + '</div>'
+    + '<div class="lm-key" style="margin-top:20px">🔑 La misma casa se une entre bases por la <b>Dirección (property_id)</b>. Clic en una tarjeta de "alimenta" para saltar a ese número y seguir la cadena.</div>'
+    + '<div class="meta" style="margin-top:8px;font-size:10.5px">Editado por ' + LM_E(r.editado_por || '—') + ' · ' + LM_E(String(r.updated_at || '').slice(0, 16).replace('T', ' ')) + ' · origen del registro: ' + LM_E(r.origen || 'curado') + '</div>'
+    + '</div>';
+}
 
 // ─── modo LISTA ───
 function lmLista(rows) {

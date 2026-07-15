@@ -1,0 +1,36 @@
+-- 🗺️ Linaje v2 — seed del grafo DOWNSTREAM (feeds) de las cadenas clave (idempotente:
+-- pisa feeds de esas filas con la versión curada; el resto se calcula automático en el módulo).
+-- Aplicada en prod el 15-jul vía MCP. Referencia: prompt CEO "viene → número → alimenta".
+update data_lineage_map set feeds = v.f::text[] from (values
+  ('fix_flip|ficha_de_casa|compra', '{fix_flip|ficha_de_casa|all_in,fix_flip|ficha_de_casa|equity_incorporado,fix_flip|ficha_de_casa|mao,fix_flip|underwriting|base_hml,fix_flip|command_center|all_in_por_casa}'),
+  ('fix_flip|ficha_de_casa|remodelacion_draws_', '{fix_flip|ficha_de_casa|all_in,fix_flip|ficha_de_casa|deficit,fix_flip|command_center|deficit_del_ceo,fix_flip|underwriting|base_hml}'),
+  ('fix_flip|ficha_de_casa|all_in', '{fix_flip|ficha_de_casa|equity_incorporado,fix_flip|ficha_de_casa|mao,fix_flip|command_center|margen_por_casa}'),
+  ('fix_flip|ficha_de_casa|arv', '{fix_flip|ficha_de_casa|equity_incorporado,fix_flip|ficha_de_casa|mao,fix_flip|ficha_de_casa|cash_out,fix_flip|command_center|valor_del_portafolio,fix_flip|underwriting|pago_mensual_refi_p_i_}'),
+  ('fix_flip|ficha_de_casa|equity_incorporado', '{fix_flip|command_center|equity_del_portafolio}'),
+  ('fix_flip|ficha_de_casa|deficit', '{fix_flip|command_center|deficit_del_ceo}'),
+  ('fix_flip|ficha_de_casa|hml_pago_', '{fix_flip|ficha_de_casa|flujo_mensual,fix_flip|command_center|rendimiento_anual_doble_}'),
+  ('fix_flip|ficha_de_casa|renta_mensual_actual', '{fix_flip|ficha_de_casa|flujo_mensual,fix_flip|command_center|rendimiento_anual_doble_,fix_flip|inversionistas|rentabilidad_por_inversionista}'),
+  ('fix_flip|ficha_de_casa|gastos_mensuales', '{fix_flip|ficha_de_casa|flujo_mensual,fix_flip|command_center|rendimiento_anual_doble_,fix_flip|inversionistas|rentabilidad_por_inversionista}'),
+  ('fix_flip|ficha_de_casa|flujo_mensual', '{fix_flip|command_center|rendimiento_anual_doble_,fix_flip|analitica|flujo_del_portafolio}'),
+  ('fix_flip|ficha_de_casa|avance_de_obra', '{remodelacion|command_center|avance_de_obra}'),
+  ('fix_flip|ficha_de_casa|utilidad_de_obra', '{remodelacion|command_center|utilidad_margen,remodelacion|reportes_ceo|ebitda}'),
+  ('fix_flip|command_center|valor_del_portafolio', '{fix_flip|command_center|equity_del_portafolio}'),
+  ('fix_flip|command_center|deuda_del_portafolio', '{fix_flip|command_center|equity_del_portafolio,contable_qbo|balance_capital|deuda_hml}'),
+  ('fix_flip|inversionistas|capital_desplegado', '{fix_flip|analitica|concentracion_por_inversionista,contable_qbo|balance_capital|capital_desplegado,fix_flip|portal_inversionista|capital_aportado}'),
+  ('fix_flip|underwriting|base_hml', '{fix_flip|underwriting|payoff_del_hml,fix_flip|underwriting|pago_mensual_harmony}'),
+  ('fix_flip|underwriting|payoff_del_hml', '{fix_flip|ficha_de_casa|cash_out}'),
+  ('fix_flip|underwriting|arv_tasador_', '{fix_flip|ficha_de_casa|arv,fix_flip|underwriting|pago_mensual_refi_p_i_}'),
+  ('rentas|pagos|pago_realizado', '{rentas|property_manager_resumen|ingresos_del_mes,rentas|property_manager_resumen|cobrado_en_el_mes_caja_,fix_flip|ficha_de_casa|cobrado_del_mes,fix_flip|portal_inversionista|flujo_mensual_portal_,contable_qbo|p_l_resultados|p_l_por_casa}'),
+  ('rentas|pagos|mes_de_renta', '{rentas|property_manager_resumen|ingresos_del_mes}'),
+  ('rentas|gastos|gasto_por_casa', '{rentas|property_manager_resumen|gastos_del_mes,fix_flip|portal_inversionista|flujo_mensual_portal_,contable_qbo|p_l_resultados|p_l_por_casa}'),
+  ('rentas|propiedades|unidades', '{rentas|property_manager_resumen|_ocupacion,fix_flip|ficha_de_casa|ocupacion_unidades}'),
+  ('rentas|propiedades|renta_objetivo', '{rentas|property_manager_resumen|_ocupacion,fix_flip|ficha_de_casa|ocupacion_unidades}'),
+  ('rentas|inquilinos|monto_renta', '{rentas|property_manager_resumen|ingresos_del_mes}'),
+  ('remodelacion|planner|avance_real', '{remodelacion|command_center|avance_de_obra,fix_flip|ficha_de_casa|avance_de_obra}'),
+  ('remodelacion|estimador_presupuesto|gasto_real_mat_mo_', '{remodelacion|command_center|utilidad_margen,remodelacion|estimador_presupuesto|_sqft_calibrado,remodelacion|reportes_ceo|ebitda}'),
+  ('remodelacion|nomina_de_campo|horas_pago', '{remodelacion|estimador_presupuesto|gasto_real_mat_mo_}'),
+  ('remodelacion|command_center|utilidad_margen', '{remodelacion|reportes_ceo|ebitda,fix_flip|ficha_de_casa|utilidad_de_obra}'),
+  ('contable_qbo|p_l_resultados|interes_hml_pagado', '{contable_qbo|p_l_resultados|p_l_por_casa,contable_qbo|p_l_resultados|net_income_ytd}'),
+  ('contable_qbo|balance_capital|deuda_hml', '{fix_flip|command_center|deuda_del_portafolio,contable_qbo|sabueso|_sin_conciliar}'),
+  ('contable_qbo|p_l_resultados|p_l_por_casa', '{fix_flip|ficha_de_casa|flujo_mensual,fix_flip|portal_inversionista|cash_on_cash}')
+) as v(mk, f) where data_lineage_map.metric_key = v.mk;
