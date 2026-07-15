@@ -110,6 +110,11 @@ function lmSel(mk) {
 window.lmSel = lmSel;
 function lmSetQn(v) { LM.qn = v; osRender(); const el = document.getElementById('lm-qn'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 window.lmSetQn = lmSetQn;
+// empresas colapsables del árbol (persistido): cerradas por default salvo la activa
+function lmOpenMap() { try { return JSON.parse(localStorage.getItem('lm_emp_open') || '{}'); } catch (e) { return {}; } }
+function lmEmpOpen(emp) { const m = lmOpenMap(); return m[emp] != null ? !!m[emp] : (LM.emp === emp); }
+function lmToggleEmp(emp) { const m = lmOpenMap(); m[emp] = !lmEmpOpen(emp); try { localStorage.setItem('lm_emp_open', JSON.stringify(m)); } catch (e) {} osRender(); }
+window.lmToggleEmp = lmToggleEmp;
 // tabla Airtable/QBO → tabla espejo pg (para cruzar con la metadata de las vistas)
 const LM_MIRROR = { 'propiedades': ['ff_deals'], 'desglose draws': ['ff_draws'], 'datos por casa': ['ff_hml_loans', 'ff_hml_payments'],
   'casas': ['pm_properties'], 'pagos': ['pm_payments'], 'gastos x casa': ['pm_expenses'], 'inquilinos': ['pm_tenants'], 'unidades': ['pm_units'],
@@ -259,12 +264,14 @@ function osLineageView() {
       if (!items.length) return '';
       const tot = Object.values(sist).reduce((s, a) => s + a.length, 0);
       const sinF = Object.values(sist).flat().filter(r => r.origen === 'crawler' && r.estado === 'pend').length;
-      return '<div><div class="emp-h" onclick="lmGo(\'' + LM_E(emp) + '\', null)"><span class="bdot" style="background:' + lmColor(emp) + '"></span>' + LM_E(emp) + '<span class="cnt">' + (tot - sinF) + '/' + tot + ' con fuente</span></div>'
-        + items.map(({ sys, rows }) => {
+      // empresa COLAPSABLE (pedido CEO): cerrada por default salvo la activa o si hay búsqueda
+      const open = qn ? true : lmEmpOpen(emp);
+      return '<div><div class="emp-h" onclick="lmToggleEmp(\'' + LM_E(emp) + '\')"><span style="width:12px;color:var(--mut2);font-size:10px">' + (open ? '▾' : '▸') + '</span><span class="bdot" style="background:' + lmColor(emp) + '"></span>' + LM_E(emp) + '<span class="cnt">' + (tot - sinF) + '/' + tot + ' con fuente</span></div>'
+        + (open ? items.map(({ sys, rows }) => {
           const on = LM.emp === emp && LM.sys === sys && !LM.sel;
           return '<div class="lm-syslabel' + (on ? ' on' : '') + '" onclick="lmGo(\'' + LM_E(emp) + '\',\'' + LM_E(sys).replace(/'/g, "\\'") + '\')" title="abrir el sistema (lista + diagrama)">' + LM_E(sys) + ' <span style="float:right">' + rows.length + '</span></div>'
             + rows.map(r => '<div class="lm-num' + (LM.sel === r.metric_key ? ' on' : '') + '" onclick="lmSel(\'' + LM_E(r.metric_key) + '\')">' + stDot(r.estado) + LM_E(r.dato) + '</div>').join('');
-        }).join('') + '</div>';
+        }).join('') : '') + '</div>';
     }).join('')
     + '<div class="meta" style="margin:8px 6px 2px;font-size:10.5px">Clic en el SISTEMA = lista/diagrama completo · clic en un NÚMERO = su flujo. El linaje de vistas se regenera solo (scripts/lineage-gen.mjs); toda edición queda en el audit.</div>'
     + '</div>';
