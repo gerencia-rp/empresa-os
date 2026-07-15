@@ -3,6 +3,15 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 15-jul (noche 2) · 📋 Informe de Cartera — Rentas (commits 48a663f · 08db546 · bcf656d; QA prod 17/17)
+- ✅ **Sync**: pm_payments += `renta_pactada` (fldpUSJ1HdZQmQPMH) + `deuda` (flduMsIV5gZRIv1eU) — causa del descuadre $32,261 vs $51,997.50: sin la renta pactada el OS no podía calcular deuda. Migr aditiva + pm-sync-airtable deployada + resync (205 con pactada / 45 con deuda).
+- ✅ **UNA definición, TRES números** (RPC `cartera_informe(p_mes, p_desde)` invoker/RLS + v_cartera_*): DEUDA VENCIDA (meses cerrados = mora real) · POR COBRAR DEL MES (NO es mora) · SALDO A FAVOR (adelantos CON renta pactada; los negativos históricos sin contrato espejado NO cuentan, se declaran). ANTES el informe manual sumaba todo como "vencido" (+195%).
+- ✅ **NETEO POR INQUILINO** (a favor cubre vencido primero, luego mes en curso): Xinquan 7,200 vs 3,600 → julio cubierto, **neto $0** · Jackelin → **debe 1,700, no 3,400** (verificados en QA con datos reales).
+- ✅ **VALIDACIÓN AL CENTAVO vs el informe manual del CEO**: jun **9,860.00** · jul **42,137.50** · a favor **6,900.00** · total **51,997.50** — EXACTOS. Crítico ≥2k neteado **22,000** (CEO estimó ~21,300; el neteo Xinquan+Jackelin da exactamente −5,300 — la dif es qué inquilinos entran al corte crítico).
+- ✅ **Vista /cartera** (app en Rentas): período con un clic (mes + ventana de vencidos), KPIs con ⓘ linaje, **aging 0-30/30-60/60+**, variación con ⚠ >100% ("¿real o carga de registros?" — julio da +352% justamente por la carga de registros nuevos con pactada), anexo por inquilino con detalle mes a mes, **⬇ CSV + 🖨 PDF** (reportOpen). 6 números en data_lineage + pantalla en el crawler (gate 199/199 en 30 pantallas).
+- ✅ **Sabueso C22**: (a) moroso con saldo a favor que lo cubre → "neto $0, no es moroso" · (b) "Deuda Pendiente" de Airtable incluye el mes en curso → por cobrar, no mora · (c) variación >100% → mora real vs carga de registros (umbral `cartera_var_pct`). Los 3 disparan hoy con casos reales.
+- 🐛 Fix cazado por el QA: `desde=null` ("todo el historial") se pisaba con el default mes-1.
+
 ## 15-jul (noche) · 🏷️ MODO VENTA (flip exit) — cascada de experto en el Underwriting
 Pedido del CEO: la suite estaba armada para HOLD/refi; para una VENTA la matemática es otra. Construido el modo de experto fix&flip, encadenado con las otras calcs (mismo deal = mismos números).
 
