@@ -1,0 +1,10 @@
+-- 📣 COBROS FASE 1 (15-jul, aplicada en prod vía MCP) — recordatorios con link de pago.
+-- Base: propuesta de Carlos + definición CORREGIDA de cartera. Twilio+Resend (NO TextNow/Gmail).
+-- BLOQUEANTE respetado: construido sobre renta_pactada+deuda sincronizadas y neteo por inquilino.
+-- Contenido completo: pm_tenants += config TCPA (consentimiento_sms/opt_out/idioma/telefono_sms/
+-- dia_exacto_pago/late_fee_pct[f2]/payment_link) · cobros_config (modo sandbox default, followup_dias
+-- 3-7-10, quiet 8-20, tz) · cobros_recordatorios (log de CADA envío con provider_response, RLS lectura
+-- rentas/operacion/contable, escribe solo el motor) · v_cobros_estado (security_invoker, contrato
+-- activo derivado: manual > is_currently_renting > renta pactada del mes corriente) · 4 plantillas
+-- ES/EN en pm_message_templates (cobros_due_*, cobros_followup_*) cordiales (TDCA), con {{link_pago}}.
+-- Ver definiciones exactas en el historial MCP (idempotentes con create or replace / if not exists).
