@@ -3,6 +3,12 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 15-jul (noche 4) · 📣 COBROS — dashboard de cobranza (OK del CEO al checkpoint) (commit 3b16016; QA prod 14/14)
+- ✅ **Dashboard /cobros** (app en Rentas, guard rentas/operacion): 4 métricas SEPARADAS (vencida neta 9,991 · por cobrar mes · a favor · total) + % cobranza del mes (cobrado/pactado billing_ym) + aging + filtros/búsqueda + CSV/PDF. **Checklist de encendido** visible: sin consentimiento SMS (26) / sin teléfono (2) / sin email (28) / sin link de pago (28) — lo que falta para live, editable ahí mismo.
+- ✅ **Timeline por inquilino**: pagos mes a mes (pactado/pagado/deuda) + recordatorios con estado de ENTREGA del proveedor. **Config TCPA inline** (RLS rentas): consentimiento con fecha+origen al marcarlo, idioma, teléfono, día de pago, link QBO; STOP visible. **▶ Dry-run del motor desde la UI** (JWT admin, no escribe).
+- ✅ El propio gate de cobertura cazó 3 números sin linaje (cards del checklist) → registrados → **211/211 en 31 pantallas**, ci:gate 15/15. QA: config editada y revertida en Jackelin, Xinquan current $0.
+- ⏸ Envío real sigue bloqueado: modo sandbox + sin secrets + sin A2P + cron sin programar (por diseño).
+
 ## 15-jul (noche 3) · 📣 COBROS FASE 1 — motor de recordatorios (SANDBOX, checkpoint CEO antes de UI) (commit a7dc51f)
 - ✅ **Bloqueante respetado**: construido SOBRE la definición corregida (v_cobros_estado → v_cartera_inquilino). Dry-run sobre los 38 casos reales: **Xinquan NETO $0 (current, 0 followups) · Jackelin $1,700 · Shamyra $637.50 (pago parcial reconocido)** · 12 vencidos reales / 21 mes en curso / 5 current · totales neteados 9,991 vencido / 36,034.35 mes en curso / 11,259.50 a favor.
 - ✅ Schema (migr `20260715150000` aplicada): pm_tenants += TCPA (consentimiento_sms/opt_out/idioma/telefono_sms/dia_exacto_pago/payment_link) · cobros_config (modo **sandbox** default, followups 3/7/10, quiet 8-20) · cobros_recordatorios (todo envío con provider_response) · 4 plantillas ES/EN cordiales (TDCA) con {{link_pago}}.
