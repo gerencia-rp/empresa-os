@@ -52,6 +52,8 @@ const BUNDLE_FILES = [
   "os/os.js",
   "os/os-lineage-views.js",
   "os/os-lineage.js",
+  "os/os-cartera.js",
+  "os/os-cobros.js",
   "os/os-admin.js",
   "os/os-cierre-engine.js",
   "os/os-ct-sabueso.js",

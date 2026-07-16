@@ -53,6 +53,13 @@ async function ctLoad(force) {
       sb.from('v_obras_kpi').select('*').maybeSingle().then(r => r.data).catch(() => null),
       g(sb.from('v_casas_fantasma').select('*')),
     ]);
+    // C22 · cartera (informe 15-jul): neteo por inquilino + variación mensual del pendiente
+    const [cartera, cartPagos] = await Promise.all([
+      g(sb.from('v_cartera_inquilino').select('*')),
+      g(sb.from('pm_payments').select('billing_ym,deuda').eq('active', true).not('deuda', 'is', null)),
+    ]);
+    CT.cartera = cartera;
+    CT.cartPagos = cartPagos;
     CT.eng = { hmlPays, extensiones: ext, remodel: remodelC, matPays, workerHours: wh, pmPay: pmPayC, pmExp: pmExpC };
     CT.diverg = diverg;
     CT.obrasKpi = obrasKpi;
@@ -295,6 +302,35 @@ function ctRunChecks() {
       ? 'avance legacy ' + dv.valor_legacy + '% ≠ Planner ' + dv.valor_derivado + '% — la app lee el Planner; corregir o retirar el singleSelect en Airtable (retiro = acción humana en la UI)'
       : 'campo "Unidades" manual = ' + dv.valor_legacy + ' ≠ conteo real ' + dv.valor_derivado + ' — corregir el manual en Airtable (la app usa el conteo real)'),
     0, 'media', 'Airtable', dv));
+
+  // ══ C22 · CARTERA (informe 15-jul) — la mora no se mezcla con el mes en curso ni con adelantos ══
+  // (a) inquilino clasificado como moroso cuyo SALDO A FAVOR cubre (total o parcialmente) el vencido
+  (CT.cartera || []).filter(c => +c.vencido_bruto > 0 && +c.a_favor > 0).forEach(c => add('C22', 'rentas',
+    'cart-favor-' + String(c.inquilino || c.tenant_id || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 22),
+    'Cartera · ' + (c.inquilino || 'inquilino') + ' figura con vencido ' + OS_M(+c.vencido_bruto) + ' pero tiene saldo a favor ' + OS_M(+c.a_favor)
+      + (+c.a_favor >= +c.vencido_bruto ? ' que LO CUBRE — neto $0, no es moroso' : ' — neto real ' + OS_M(+c.vencido_bruto - +c.a_favor)) + ' (neteo por inquilino del 📋 Informe de Cartera)',
+    Math.min(+c.a_favor, +c.vencido_bruto), +c.a_favor >= +c.vencido_bruto ? 'media' : 'info', 'OS', { inquilino: c.inquilino, vencido: +c.vencido_bruto, a_favor: +c.a_favor }));
+  // (b) el "Deuda Pendiente" de Airtable incluye el MES EN CURSO como si fuera mora
+  {
+    const ymNow = new Date().toISOString().slice(0, 7);
+    const pcMes = (CT.cartPagos || []).filter(x => x.billing_ym === ymNow && +x.deuda > 0).reduce((s, x) => s + +x.deuda, 0);
+    if (pcMes > 0) add('C22', 'rentas', 'cart-mes-curso-' + ymNow.replace('-', ''),
+      'Cartera · "Deuda Pendiente" de Airtable suma ' + OS_M(pcMes) + ' del MES EN CURSO (' + ymNow + ') — es POR COBRAR normal, no mora; mezclarlo inflaba el informe manual (+195%). Usar el 📋 Informe de Cartera (3 métricas separadas)',
+      pcMes, 'info', 'Airtable', { mes: ymNow, por_cobrar: pcMes });
+  }
+  // (c) variación del pendiente > umbral vs mes anterior → ¿mora real o carga de registros nuevos?
+  {
+    const varMax = ctNum('cartera_var_pct', 100) / 100;
+    const ymNow = new Date().toISOString().slice(0, 7);
+    const dPrev = new Date(); dPrev.setMonth(dPrev.getMonth() - 1);
+    const ymPrev = dPrev.toISOString().slice(0, 7);
+    const tot = ym => (CT.cartPagos || []).filter(x => x.billing_ym === ym && +x.deuda > 0).reduce((s, x) => s + +x.deuda, 0);
+    const nReg = ym => (CT.cartPagos || []).filter(x => x.billing_ym === ym && +x.deuda > 0).length;
+    const cur = tot(ymNow), prev = tot(ymPrev);
+    if (prev > 0 && (cur - prev) / prev > varMax) add('C22', 'rentas', 'cart-var-' + ymNow.replace('-', ''),
+      'Cartera · el pendiente de ' + ymNow + ' (' + OS_M(cur) + ' en ' + nReg(ymNow) + ' registros) creció ' + Math.round((cur - prev) / prev * 100) + '% vs ' + ymPrev + ' (' + OS_M(prev) + ' en ' + nReg(ymPrev) + ') — verificar si es mora REAL o carga de registros nuevos con renta pactada (umbral cartera_var_pct)',
+      cur - prev, 'media', 'OS', { mes: ymNow, cur, prev, regs_cur: nReg(ymNow), regs_prev: nReg(ymPrev) });
+  }
 
   return F;
 }
