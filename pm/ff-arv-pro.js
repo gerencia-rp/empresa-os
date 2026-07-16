@@ -267,6 +267,101 @@ function apExclToggle(id) { const st = apState(); st.excl[id] = !st.excl[id]; ff
 window.apExclToggle = apExclToggle;
 function apUsarArv(v) { if (!UW.a || !(v > 0)) return; UW.a.inputs.arv = v; UW.a.inputs.arv_airtable = UW.a.inputs.arv_airtable || 0; ffUwRender(); if (window.toast) toast('ARV del análisis ← ' + AP_M(v) + ' (profesional)', 'success'); }
 window.apUsarArv = apUsarArv;
+
+// ═══ SLIDER de ARV ajustable (draggable + marcas con snap + campo numérico) — fuente ÚNICA del ARV ═══
+// El motor da rango (conservador·probable·optimista). El usuario puede ARRASTRAR para fijar el suyo; el
+// valor elegido (ajustado o el probable) es el que "Usar como ARV" manda a TODAS las calcs (Venta/Refi/MAO/
+// Equity). Persiste en el análisis (inputs.arvpro.arvSlider/arvManual + inputs.arv/arv_manual/arv_fuente).
+let AP_SLIDER = null;   // anclas para el update EN VIVO durante el drag: { motor, cons, opt, min, max, airtable, appraisal }
+function apArvChosen(rec) {
+  const st = apState(); if (!st) return rec ? rec.arv : 0;
+  return (st.arvManual && +st.arvSlider > 0) ? +st.arvSlider : (rec ? rec.arv : 0);
+}
+function apArvDeltaHtml(val) {
+  const s = AP_SLIDER; if (!s) return '';
+  const parts = [];
+  const dMotor = val - s.motor, pMotor = s.motor ? dMotor / s.motor * 100 : 0;
+  parts.push(dMotor === 0 ? '= estimado del motor' : (dMotor > 0 ? '+' : '') + AP_M(dMotor) + ' (' + (pMotor > 0 ? '+' : '') + pMotor.toFixed(1) + '%) vs motor');
+  if (s.appraisal > 0) parts.push(Math.abs(val - s.appraisal) < 500 ? '= appraisal' : ((val - s.appraisal) / s.appraisal * 100).toFixed(1) + '% vs appraisal');
+  if (s.airtable > 0 && s.airtable !== s.motor) parts.push(Math.abs(val - s.airtable) < 500 ? '= ARV Airtable' : ((val - s.airtable) / s.airtable * 100).toFixed(1) + '% vs Airtable');
+  return parts.join(' · ');
+}
+function apArvGuardHtml(val) {
+  const s = AP_SLIDER; if (!s) return '';
+  if (val > s.opt) return '⚠ por ENCIMA del rango de comps (optimista ' + AP_M(s.opt) + ') — justificá el valor';
+  if (val < s.cons) return '⚠ por DEBAJO del rango de comps (conservador ' + AP_M(s.cons) + ') — justificá el valor';
+  return '';
+}
+function apArvSlide(val) {   // oninput (drag): update EN VIVO sin re-render → fluido
+  const st = apState(); if (!st || !AP_SLIDER) return;
+  val = Math.round(+val || 0);
+  st.arvSlider = val; st.arvManual = (val !== AP_SLIDER.motor);
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  set('ap-arv-val', AP_M(val));
+  set('ap-arv-tag', st.arvManual ? '<span style="color:var(--amber,#e7b65e)">ajustado por vos</span>' : '<span style="color:var(--pos,#34d399)">del motor</span>');
+  set('ap-arv-delta', apArvDeltaHtml(val));
+  const g = document.getElementById('ap-arv-guard'); const gh = apArvGuardHtml(val);
+  if (g) { g.innerHTML = gh; g.style.display = gh ? 'block' : 'none'; }
+  const num = document.getElementById('ap-arv-num'); if (num && document.activeElement !== num) num.value = val.toLocaleString('en-US');
+  set('ap-arv-usar', '→ Usar ' + AP_M(val) + ' como ARV del análisis');
+}
+window.apArvSlide = apArvSlide;
+function apArvNum(val) {   // campo numérico → mueve el slider (re-render p/ sincronizar el thumb)
+  const st = apState(); if (!st) return;
+  const v = Math.round(parseFloat(String(val).replace(/[^0-9.]/g, '')) || 0);
+  if (!(v > 0)) return;
+  st.arvSlider = v; st.arvManual = !(AP_SLIDER && v === AP_SLIDER.motor);
+  ffUwRender();
+}
+window.apArvNum = apArvNum;
+function apArvSnap(kind) {   // clic en una marca (conservador/probable/optimista)
+  const st = apState(); if (!st || !AP_SLIDER) return;
+  st.arvSlider = kind === 'cons' ? AP_SLIDER.cons : kind === 'opt' ? AP_SLIDER.opt : AP_SLIDER.motor;
+  st.arvManual = kind !== 'motor';
+  ffUwRender();
+}
+window.apArvSnap = apArvSnap;
+function apUsarArvSlider() {   // "Usar como ARV": toma el valor del slider (ajustado o motor) → fluye a TODO
+  const st = apState(); if (!st) return;
+  const v = Math.round(+st.arvSlider || 0); if (!(v > 0)) return;
+  UW.a.inputs.arv = v;
+  UW.a.inputs.arv_manual = !!st.arvManual;
+  UW.a.inputs.arv_fuente = st.arvManual ? 'ajustado por el usuario sobre el estimado del motor (comps)' : 'estimado del motor (comps ajustados)';
+  ffUwRender();
+  if (window.toast) toast('ARV del análisis ← ' + AP_M(v) + (st.arvManual ? ' (ajustado por vos)' : ' (motor)'), 'success');
+}
+window.apUsarArvSlider = apUsarArvSlider;
+// componente: barra arrastrable + marcas + campo numérico + etiqueta + guardrail + botón "Usar"
+function apArvSlider(rec) {
+  if (!rec || !(rec.arv > 0)) return '';
+  const st = apState(); const inp = UW.a.inputs;
+  const cons = rec.conservador, motor = rec.arv, opt = rec.optimista;
+  const airtable = +inp.arv_airtable || 0, appraisal = +inp.appraisal || 0;
+  const span = Math.max(1, opt - cons);
+  const min = Math.round(cons - span * 0.4), max = Math.round(opt + span * 0.4);   // permite ir un poco más allá de las marcas
+  AP_SLIDER = { motor, cons, opt, min, max, airtable, appraisal };
+  const chosen = apArvChosen(rec);
+  const manual = st.arvManual && chosen !== motor;
+  const pct = v => Math.max(0, Math.min(100, (v - min) / (max - min) * 100));
+  const tick = (v, lbl, kind) => '<div class="ap-tick" style="left:' + pct(v).toFixed(1) + '%" onclick="apArvSnap(\'' + kind + '\')"><span class="ap-tickdot"></span><span class="ap-ticklbl">' + lbl + '<br><b>' + AP_M(v) + '</b></span></div>';
+  const guard = apArvGuardHtml(chosen);
+  return '<div class="ap-arvsld" style="margin-top:16px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">'
+    + '<div><div class="ap-lab">ARV elegido · <span id="ap-arv-tag">' + (manual ? '<span style="color:var(--amber,#e7b65e)">ajustado por vos</span>' : '<span style="color:var(--pos,#34d399)">del motor</span>') + '</span></div>'
+    + '<div id="ap-arv-val" style="font-size:30px;font-weight:800;line-height:1.1;margin-top:2px">' + AP_M(chosen) + '</div></div>'
+    + '<div style="display:flex;align-items:center;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.16));border-radius:10px;padding:4px 11px"><span style="opacity:.5;font-size:14px">$</span><input id="ap-arv-num" value="' + chosen.toLocaleString('en-US') + '" onchange="apArvNum(this.value)" title="escribí el ARV exacto (ej. la tasación)" style="width:104px;background:none;border:none;color:inherit;font-size:15px;font-weight:700;text-align:right;outline:none"></div>'
+    + '</div>'
+    + '<div class="ap-sldtrack"><input type="range" class="ap-slider" min="' + min + '" max="' + max + '" step="500" value="' + chosen + '" oninput="apArvSlide(this.value)">'
+    + tick(cons, 'Conservador', 'cons') + tick(motor, 'Probable', 'motor') + tick(opt, 'Optimista', 'opt') + '</div>'
+    + '<div style="height:34px"></div>'
+    + '<div id="ap-arv-delta" class="ap-plain" style="font-size:11.5px">' + apArvDeltaHtml(chosen) + '</div>'
+    + '<div id="ap-arv-guard" style="display:' + (guard ? 'block' : 'none') + ';margin-top:6px;font-size:11.5px;color:var(--amber,#e7b65e);background:rgba(231,182,94,.1);border:1px solid rgba(231,182,94,.32);border-radius:8px;padding:6px 10px">' + guard + '</div>'
+    + '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">'
+    + '<button class="ap-btn" onclick="apUsarArvSlider()"><span id="ap-arv-usar">→ Usar ' + AP_M(chosen) + ' como ARV del análisis</span></button>'
+    + (manual ? '<button class="ap-btn ghost" style="font-size:11.5px;padding:7px 12px" onclick="apArvSnap(\'motor\')">↩ volver al motor (' + AP_M(motor) + ')</button>' : '')
+    + '</div></div>';
+}
+window.apArvSlider = apArvSlider;
 async function apCfgSet(key, v) {
   const num = AP_N(v); if (num == null) return;
   const { error } = await sb.from('ff_uw_config').upsert({ key, value: num, updated_at: new Date().toISOString() }, { onConflict: 'key' });
@@ -329,6 +424,16 @@ function apCSS() {
     '.ap-grid .best td{box-shadow:inset 0 2px 0 var(--a1,#12b5a0)}',
     '.ap-cbx{accent-color:var(--a1,#12b5a0);width:15px;height:15px;cursor:pointer}',
     '.ap-man input{width:64px;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:6px;padding:3px 6px;color:inherit;font-size:10.5px;text-align:right}',
+    // ── slider de ARV ajustable ──
+    '.ap-sldtrack{position:relative;margin:16px 6px 0}',
+    '.ap-slider{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:6px;background:linear-gradient(90deg,var(--a1,#12b5a0),var(--a2,#2f6ef0));outline:none;cursor:pointer;margin:0}',
+    '.ap-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--a2,#2f6ef0);box-shadow:0 2px 8px rgba(15,23,42,.35);cursor:grab}',
+    '.ap-slider::-webkit-slider-thumb:active{cursor:grabbing}',
+    '.ap-slider::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--a2,#2f6ef0);box-shadow:0 2px 8px rgba(15,23,42,.35);cursor:grab}',
+    '.ap-tick{position:absolute;top:11px;transform:translateX(-50%);text-align:center;cursor:pointer;z-index:2}',
+    '.ap-tickdot{display:block;width:3px;height:15px;background:var(--ink,#eaf0ff);opacity:.45;margin:-15px auto 0;border-radius:2px;pointer-events:none}',
+    '.ap-ticklbl{display:block;white-space:nowrap;margin-top:5px;font-size:10px;color:var(--mut,#9fb0c9);line-height:1.25}',
+    '.ap-ticklbl b{color:var(--ink,#eaf0ff)}',
     // ── modo SIMPLE (mockup claro 12-jul) — tarjetas suaves con sombra, legible en claro Y oscuro ──
     '.ap-card,.ap-comp{box-shadow:0 6px 22px rgba(23,43,77,.08)}',
     '.ap-card,.ap-comp,.ap-searchbar,.ap-seg,.ap-grid,.ap-expnote,.ap-strip{color:var(--ink,#eaf0ff)}',
@@ -464,13 +569,14 @@ function apHeroSimple(rec, inp) {
       ? '<div class="ap-bigsimple" style="' + (prov ? 'opacity:.65' : '') + '">' + AP_M(rec.arv) + (prov ? ' <span style="font-size:13px;color:var(--amber,#e7b65e);font-weight:700">PROVISIONAL</span>' : '') + '</div>'
       + '<div class="ap-plain">Mediana ponderada de <b>' + rec.usables.length + ' casas parecidas</b> vendidas cerca, ajustadas a la tuya.' + (rec.relajado ? ' <span style="color:var(--amber,#e7b65e)">(búsqueda expandida por pocas ventas)</span>' : '') + '</div>'
       + '<span class="ap-conf" style="margin-top:12px;color:' + apConfColor(cp.nivel) + ';border-color:' + apConfColor(cp.nivel) + '">● Confianza ' + cp.nivel + ' (' + (rec.score != null ? rec.score + '/100' : '—') + ') · ' + cp.why + '</span>'
-      + apRangeBar(rec, ['Si sale flojo (P25)', 'Lo más probable', 'Si sale bien (P75)'])
+      + apArvSlider(rec)
       : '<div class="ap-plain" style="padding:28px 0;text-align:center">Poné la dirección arriba y dale <b>Buscar</b> — el sistema trae las ventas de la zona.</div>')
     + '</div>';
   // ¿Conviene? — semáforo + oferta máxima con la cuenta simple visible (remod real de la Calc 1)
   const negocio = (typeof ffUwCalcNegocio === 'function') ? ffUwCalcNegocio(inp) : { remod: 0 };
   const pct = apCfg('allin_max_pct', 75);
-  const oferta = rec && rec.arv ? Math.round(rec.arv * pct / 100 - (negocio.remod || 0)) : null;
+  const arvSel = apArvChosen(rec);   // ⛓ la oferta usa el ARV ELEGIDO en la barra (no el motor fijo)
+  const oferta = arvSel > 0 ? Math.round(arvSel * pct / 100 - (negocio.remod || 0)) : null;
   const compra = +inp.purchase || 0;
   const tol = apCfg('arv_semaforo_tol_pct', 5) / 100;
   let sem;
@@ -484,11 +590,11 @@ function apHeroSimple(rec, inp) {
     + '<div style="display:flex;align-items:center;gap:11px;margin-top:10px"><div class="ap-light">' + sem.ico + '</div><div><div class="ap-vword" style="color:' + sem.color + '">' + sem.word + '</div><div class="ap-plain" style="font-size:12px">' + sem.txt + '</div></div></div>'
     + (oferta != null
       ? '<div class="ap-lab" style="margin-top:16px">Oferta máxima (para ganar)</div><div class="ap-moffer">' + AP_M(oferta) + '</div>'
-      + '<div class="ap-mrow"><span>' + pct + '% del valor de reventa</span><b>' + AP_M(rec.arv * pct / 100) + '</b></div>'
+      + '<div class="ap-mrow"><span>' + pct + '% del valor de reventa (ARV elegido ' + AP_M(arvSel) + ')</span><b>' + AP_M(arvSel * pct / 100) + '</b></div>'
       + '<div class="ap-mrow"><span>− remodelación estimada (Calc 1)</span><b>−' + AP_M(negocio.remod || 0) + '</b></div>'
       + '<div class="ap-mrow" style="border-bottom:1px solid var(--line,rgba(255,255,255,.1))"><span>= máximo a ofrecer</span><b>' + AP_M(oferta) + '</b></div>'
       + (compra ? '<div class="ap-mrow" style="border-top:none;padding-top:9px"><span>Precio de compra actual</span><b>' + AP_M(compra) + '</b></div>' : '')
-      + (rec && rec.arv ? '<button class="ap-btn ghost" style="margin-top:10px;font-size:11.5px" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>' : '')
+      + '<div class="ap-plain" style="font-size:10.5px;margin-top:8px">La oferta usa el ARV elegido en la barra de la izquierda. Movela y apretá “Usar como ARV”.</div>'
       : '')
     + '</div>';
   return '<div class="grid k2" style="gap:14px;align-items:stretch;margin-bottom:6px">' + izq + der + '</div>';
@@ -557,14 +663,14 @@ function apVistaHero(rec, inp) {
     + '<div class="ap-lab">ARV estimado (comps ajustados)</div>'
     + '<div class="ap-big">' + AP_M(rec.arv) + '</div>'
     + '<span class="ap-conf" style="color:' + cc + ';border-color:' + cc + ';background:transparent">● confianza ' + rec.confianza.nivel + ' · ' + rec.usables.length + ' comps · dispersión ' + rec.dispersion.toFixed(0) + '%</span>'
-    + apRangeBar(rec)
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:11.5px">'
     + (arvAt ? '<span class="ap-pill">ARV Airtable ' + AP_M(arvAt) + ' · Δ <b class="' + (rec.arv - arvAt >= 0 ? 'ap-pos' : 'ap-neg') + '">' + AP_M(rec.arv - arvAt) + '</b></span>' : '')
     + (appr ? '<span class="ap-pill">Appraisal ' + AP_M(appr) + ' · Δ <b class="' + (Math.abs(rec.arv - appr) / appr <= 0.05 ? 'ap-pos' : 'ap-neg') + '">' + ((rec.arv - appr) / appr * 100).toFixed(1) + '%</b></span>' : '')
     + '</div>'
-    + '<button class="ap-btn" style="margin-top:12px" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>'
-    + (arvOfi ? '<div class="ap-plain" style="font-size:11.5px;margin-top:8px">ARV oficial del análisis ahora: <b style="color:var(--ink,#eaf0ff)">' + AP_M(arvOfi) + '</b>'
-        + (arvOfi === rec.arv ? ' · = este estimado ✓ (todo el análisis lo usa)' : ' — apretá el botón para que TODO el análisis (Resumen, MAO, Cash-Out, refi) use ' + AP_M(rec.arv)) + '</div>' : '')
+    + apArvSlider(rec)
+    + (arvOfi ? '<div class="ap-plain" style="font-size:11px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line,rgba(255,255,255,.1))">ARV <b>oficial</b> vigente del análisis: <b style="color:var(--ink,#eaf0ff)">' + AP_M(arvOfi) + '</b>'
+        + (arvOfi === apArvChosen(rec) ? ' · ✓ = el elegido (todo el análisis lo usa)' : ' — apretá “Usar” para aplicar el del slider')
+        + (inp.arv_manual ? ' · <span style="color:var(--amber,#e7b65e)">manual: ' + AP_E(inp.arv_fuente || 'ajustado') + '</span>' : '') + '</div>' : '')
     + '</div>';
 }
 

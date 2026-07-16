@@ -3,6 +3,16 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 16-jul · 🎚 SLIDER de ARV ajustable (draggable) → fuente única que fluye a todo
+Pedido del CEO: el motor da rango (conservador·probable·optimista); poder MOVER la barra para fijar el ARV propio y usarlo en las otras calcs.
+- **ANTES**: `apRangeBar` era una barra SOLO visual (dot fijo al 50%); el único valor usable era el probable del motor (botón "Usar $X").
+- **DESPUÉS** (`apArvSlider` en `pm/ff-arv-pro.js`, compartido por modo Simple y Experto):
+  - **Slider draggable** (`<input type=range>` estilizado, thumb 24px) sobre el rango real (min = cons − 40% del span · max = opt + 40%, permite ir más allá). **Marcas** Conservador/Probable/Optimista clickeables con **snap**. **Campo numérico** sincronizado (escribir el ARV exacto, ej. la tasación) que mueve el slider y viceversa. **Update EN VIVO durante el drag sin re-render** (labels por `getElementById`, fluido).
+  - **Etiqueta de estado**: "del motor" (verde) vs "ajustado por vos" (ámbar) + **Δ vs motor / appraisal / Airtable** en vivo ("= appraisal", "−5.3% vs motor"). El estimado del motor queda como ancla (no se borra).
+  - **"Usar como ARV"** toma el valor DEL SLIDER (ajustado o probable) → `inp.arv` (la fuente única del fix de propagación) → fluye a **Venta (precio) · Cash-Out/Refi (75%×ARV) · MAO · Equity · Command Center · Analítica**, recalculando en cascada. Persiste con `inputs.arvpro.arvSlider/arvManual` + `inputs.arv_manual`/`arv_fuente` (linaje "elegido por el usuario sobre el estimado del motor"). Chip "ARV oficial vigente" muestra manual + fuente.
+  - **Guardrail**: si el valor supera el optimista o baja del conservador → aviso "fuera del rango de comps — justificá" (no bloquea). La oferta máxima del modo Simple ahora usa el ARV ELEGIDO (no el motor fijo).
+- **Tests 13/13 (2 módulos cargados juntos)**: chosen motor↔ajustado · "Usar" → inp.arv=500,000 (la tasación) + manual + linaje → Resumen/Cash-Out/Venta/MAO todos en 500,000 · guardrail arriba/abajo · snap-al-motor. Venta golden 26/26 intacto · ci:gate 15/15 · node --check.
+
 ## 15-jul (noche) · 🏷️ MODO VENTA (flip exit) — cascada de experto en el Underwriting
 Pedido del CEO: la suite estaba armada para HOLD/refi; para una VENTA la matemática es otra. Construido el modo de experto fix&flip, encadenado con las otras calcs (mismo deal = mismos números).
 
