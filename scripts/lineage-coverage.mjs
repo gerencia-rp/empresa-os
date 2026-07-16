@@ -33,6 +33,7 @@ const SCREENS = [
   S('Contable / QBO', 'Contable (OS)', "osNav('/contable')"),
   S('Fix & Flip', 'Ficha de Casa', "osNav('/casa/' + osSlug('9909 Childress Dr, Austin, Texas 78753'))"),
   S('Rentas', 'Informe de Cartera', "osNav('/cartera'); await new Promise(r=>setTimeout(r,2500))"),
+  S('Rentas', 'Cobros', "osNav('/cobros'); await new Promise(r=>setTimeout(r,2500))"),
   // FF Command Center
   S('Fix & Flip', 'Command Center', FF_OPEN + "; window.ffGo('command')", '#ff-overlay', '.card.kpi'),
   S('Fix & Flip', 'Deals', "window.ffGo('deals')", '#ff-overlay'),
