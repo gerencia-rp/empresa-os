@@ -3,6 +3,14 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 15-jul (noche 3) · 📣 COBROS FASE 1 — motor de recordatorios (SANDBOX, checkpoint CEO antes de UI) (commit a7dc51f)
+- ✅ **Bloqueante respetado**: construido SOBRE la definición corregida (v_cobros_estado → v_cartera_inquilino). Dry-run sobre los 38 casos reales: **Xinquan NETO $0 (current, 0 followups) · Jackelin $1,700 · Shamyra $637.50 (pago parcial reconocido)** · 12 vencidos reales / 21 mes en curso / 5 current · totales neteados 9,991 vencido / 36,034.35 mes en curso / 11,259.50 a favor.
+- ✅ Schema (migr `20260715150000` aplicada): pm_tenants += TCPA (consentimiento_sms/opt_out/idioma/telefono_sms/dia_exacto_pago/payment_link) · cobros_config (modo **sandbox** default, followups 3/7/10, quiet 8-20) · cobros_recordatorios (todo envío con provider_response) · 4 plantillas ES/EN cordiales (TDCA) con {{link_pago}}.
+- ✅ Edge fns deployadas: **cobros-motor** (dry_run default; due el día de pago; followups SOLO vencido neto>0; dedupe/mes; gates plantilla→destino→opt-out→TCPA→link→quiet; live=Twilio+Resend por secrets) · **cobros-twilio-webhook** (STOP→opt_out permanente + firma validada; delivery receipts → provider_status).
+- ✅ Simulación día de pago: 56 candidatos, **TODOS frenados por las barandas** (26 skip_consent TCPA + 30 sin destino) — no sale nada ni en live hasta cargar consentimientos/teléfonos/links. Cron NO programado a propósito (no se enciende sin OK).
+- ⚠ Gotcha del dry-run: is_currently_renting no viene poblado del sync → contrato activo se deriva de renta pactada del mes corriente (fix en la vista). Followups con día de pago 1 caen los días 4/8/11 (due+3/7/10).
+- ⬜ Pendiente para encender: cargar consentimiento_sms (con fecha+origen del lease), teléfonos/emails, payment_link QBO por inquilino (o link_pago_default), A2P 10DLC aprobado, secrets TWILIO_*/RESEND_API_KEY en Supabase, modo→live, cron diario. Dashboard UI: tras el checkpoint del CEO. Fase 2 (late fee §92.019, notices §24.005) espera al abogado.
+
 ## 15-jul (noche 2) · 📋 Informe de Cartera — Rentas (commits 48a663f · 08db546 · bcf656d; QA prod 17/17)
 - ✅ **Sync**: pm_payments += `renta_pactada` (fldpUSJ1HdZQmQPMH) + `deuda` (flduMsIV5gZRIv1eU) — causa del descuadre $32,261 vs $51,997.50: sin la renta pactada el OS no podía calcular deuda. Migr aditiva + pm-sync-airtable deployada + resync (205 con pactada / 45 con deuda).
 - ✅ **UNA definición, TRES números** (RPC `cartera_informe(p_mes, p_desde)` invoker/RLS + v_cartera_*): DEUDA VENCIDA (meses cerrados = mora real) · POR COBRAR DEL MES (NO es mora) · SALDO A FAVOR (adelantos CON renta pactada; los negativos históricos sin contrato espejado NO cuentan, se declaran). ANTES el informe manual sumaba todo como "vencido" (+195%).
