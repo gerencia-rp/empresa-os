@@ -4,6 +4,14 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (17 Jul 2026 · 3 — 💵 PM: estatus de cobranza por BALANCE, no por fecha) · EN VIVO
+
+- 🐛 **"Atrasados" falsos del PM MUERTOS** (rama fix/estatus-cobranza-balance-v2): `pmTenantPayStatus`/`pmLateBookings` marcaban atrasado por días-desde-vencimiento del MES ACTUAL sobre TODAS las filas históricas (Enero 2026 mostraba a Matthew/Daryl/Melissa con balance 0/0/−50). Ahora el estatus se deriva SOLO de **`pm_payments.deuda`** (espejo de "Balance de pago" flduMsIV5gZRIv1eU = renta pactada del período − pago, las MISMAS columnas del /cartera de 15-jul) por período `billing_ym`: deuda≤0 (guard ±$6) = al día aunque el pago haya entrado tarde · deuda>0 en período CERRADO = Atrasado mostrando EL BALANCE (no la renta) · deuda>0 en mes en curso = "Pendiente del mes" · sin renta_pactada = "Revisar" (nunca asumir la renta actual) · PadSplit = plataforma, jamás deuda. Funciones nuevas: `pmPayStatus`/`pmPayBalance`/`pmTenantDebt` (pm-main.js junto a pmBillYm). Contador "Pagos atrasados" = inquilinos únicos con deuda>0 del mes visto; lista CEO muestra Σ deuda real. Verificación 14/14 contra el código real + deuda vencida DB $13,596.01 = Airtable exacto.
+- 🔧 **3 typos de decimal corregidos en Airtable** (Renta pactada sin punto: Taylor jul-25 73136→731.36 · Abigail oct-25 40000→400 · jul-25 20000→200) — inflaban $131,804.64 de deuda falsa.
+- ⚠ **Gotchas de esta sesión**: (1) casi-duplico renta_pactada/deuda con columnas nuevas por trabajar sobre un checkout desactualizado — SIEMPRE `git pull origin main` antes de tocar el sync (la regla multi-sesión aplica también al repo, no solo al deploy); las columnas duplicadas expected_amount/balance fueron dropeadas y su migración borrada del historial. (2) **pg_net está ROTO en prod**: "Couldn\'t resolve host name" en TODAS las llamadas de `cron_invoke_function` (los crons pm-sync-airtable-every-15min, sync-remodel, clickup, etc. NO están corriendo — revisar; el sync manual vía sb_secret sí funciona).
+
+---
+
 ## 🎯 Estado (17 Jul 2026 · 2 — 💎 PORTAL INVERSOR v3: RLS real + params guardables + acceso manual) · EN VIVO
 
 - 🐛 **BUG RLS del portal MUERTO** (migr `20260717110000`; commits 4ee0472+53d10b7+356448a): inversionistas con perfil OS (Juan, Prueba OS tienen área fix-flip) veían las 23 casas/$955,846 por la rama `or has_area('fix-flip')` de las policies inv_* — y las write policies `FOR ALL` regalaban SELECT (permissive OR). Fix: **`inv_is_investor()`** → si tenés inv_access activo, la rama admin NO aplica (read+write, todas las inv_*, inv_portal_resumen, inv_ledger). Verificado server-side: Prueba OS 24→**2 holdings/$46,000**, Juan 24→0 (sin casas asignadas), gerencia intacta. ⚠ regla nueva: inversionista+staff pierde admin de inv_* — decidir por persona (log).

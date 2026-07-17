@@ -35,7 +35,7 @@ const pmaState = {
   tenantsFiltersLoaded: false,
   tenantDetailId: null,                   // tenant_id → vista detalle CRM
   ceoDetailKey: null,                     // alerta CEO con detalle expandido (overlay)
-  payStatusFilter: 'all',                 // Pagos: all·aldia·proximo·atrasado·sincontrato
+  payStatusFilter: 'all',                 // Pagos: all·aldia·pendiente·proximo·atrasado·revisar·sincontrato
   payRecurrenceFilter: null,              // mensual·quincenal·airbnb
   paySearch: '',
   payFiltersLoaded: false,
@@ -409,6 +409,52 @@ function pmTileState(tile) {
 // paid_at queda SOLO para la vista de flujo de caja ("cobrado en el mes").
 function pmBillYm(x) { return (x && (x.billing_ym || (x.paid_at || x.expense_date || '').slice(0, 7))) || ''; }
 
+// ═══ ESTATUS DE COBRANZA (regla dura): se deriva SOLO del balance espejado de
+// Airtable — pm_payments.deuda = "Balance de pago" (renta pactada del período −
+// pago), las MISMAS columnas que usa /cartera — por PERÍODO Mes/Año. Un pago que
+// cubre el mes (deuda ≤ 0) NUNCA es "Atrasado", sin importar cuándo se recibió.
+// "Días de atraso" queda como dato informativo; no define el estatus.
+const PM_BAL_GUARD = 6; // |balance| ≤ $6 = diferencia de centavos/redondeo → $0
+
+function pmHoyYm() { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; }
+
+// Balance real del pago: columna deuda del sync; fallback = renta pactada − pago
+// (la MISMA fórmula de Airtable, jamás la renta fija del inquilino).
+function pmPayBalance(p) {
+  if (!p) return null;
+  let b = (typeof p.deuda === 'number') ? p.deuda
+        : (typeof p.renta_pactada === 'number') ? p.renta_pactada - Number(p.amount || 0)
+        : null;
+  if (b == null) return null;
+  return Math.abs(b) <= PM_BAL_GUARD ? 0 : b;
+}
+// ¿Ingreso de plataforma (PadSplit)? No es deuda de inquilino: nunca "Atrasado".
+function pmPayEsPlataforma(p) {
+  const n = ((p && p.tenant_id ? pmTenantName(p.tenant_id) : '') || (p && p.concept) || '').toLowerCase();
+  return /pads?\s*s?plit|pads?lit/.test(n);
+}
+// Estatus de UN pago. debe = lo que realmente se debe (balance), NUNCA la renta.
+function pmPayStatus(p) {
+  if (pmPayEsPlataforma(p)) return { key: 'aldia', label: '🏦 Plataforma', cls: 'text-slate-500 bg-slate-50', debe: 0 };
+  // Sin "Renta pactada - Contrato" no hay balance confiable (la fórmula da 0 igual):
+  // → revisar, nunca asumir la renta actual del inquilino.
+  const bal = (p && typeof p.renta_pactada !== 'number') ? null : pmPayBalance(p);
+  if (bal == null) return { key: 'revisar', label: '⚠️ Revisar (sin renta pactada)', cls: 'text-amber-700 bg-amber-50', debe: 0 };
+  if (bal < 0) return { key: 'aldia', label: '💚 Saldo a favor', cls: 'text-emerald-700 bg-emerald-50', debe: 0 };
+  if (bal === 0) return { key: 'aldia', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50', debe: 0 };
+  // bal > 0 → período cerrado = atrasado · mes en curso/futuro = pendiente (no vencido)
+  const ym = pmBillYm(p);
+  if (ym && ym < pmHoyYm()) return { key: 'atrasado', label: `🔴 Atrasado · debe $${bal.toLocaleString()}`, cls: 'text-red-700 bg-red-50', debe: bal };
+  return { key: 'pendiente', label: '⏳ Pendiente del mes', cls: 'text-amber-700 bg-amber-50', debe: bal };
+}
+// Deuda vencida real de un inquilino = Σ balance>0 de sus pagos en períodos cerrados.
+function pmTenantDebt(tenantId) {
+  if (!tenantId) return 0;
+  return pmaState.payments
+    .filter(p => p.type === 'ingreso' && p.tenant_id === tenantId)
+    .reduce((s, p) => { const st = pmPayStatus(p); return s + (st.key === 'atrasado' ? st.debe : 0); }, 0);
+}
+
 function pmFinanceOf(propertyId, monthDate = null) {
   // monthDate: Date|null. null = all-time, else solo el mes específico (mes de renta)
   let pays = pmaState.payments.filter(p => p.property_id === propertyId && p.status === 'pagado');
@@ -444,19 +490,15 @@ function pmUpcomingBookings() {
   return pmaState.bookings.filter(b => b.status === 'confirmado' && b.start_date && b.start_date > today);
 }
 function pmLateBookings() {
-  // Renta esperada = 1 pago/mes desde start_date. Mes en curso sin pago (paid_at en ese mes)
-  // y ya pasado el día 5 → ATRASADO. Con pago en el mes → AL DÍA. Días 1-4 = gracia.
-  const now = new Date();
-  if (now.getDate() < 5) return [];   // dentro de la gracia: nadie atrasado todavía
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const todayISO = now.toISOString().slice(0, 10);
-  const paidThisMonth = (b) => pmaState.payments.some(p =>
-    p.type === 'ingreso' && p.paid_at && String(p.paid_at).startsWith(ym) &&
-    (p.booking_id === b.id || (b.tenant_id && p.tenant_id === b.tenant_id)));
-  return pmActiveBookings().filter(b =>
-    b.start_date && b.start_date <= todayISO   // ya inició (no cuenta antes de empezar)
-    && !paidThisMonth(b)
-  );
+  // ATRASADO = SOLO por balance (deuda >0 tras guard) en un período Mes/Año ya
+  // cerrado. El mes en curso sin pago es "pendiente", NO atrasado; un pago que
+  // cubrió el mes (deuda ≤ 0) jamás aparece acá aunque haya entrado tarde.
+  const lateTenants = new Set();
+  for (const p of pmaState.payments) {
+    if (p.type !== 'ingreso' || !p.tenant_id) continue;
+    if (pmPayStatus(p).key === 'atrasado') lateTenants.add(p.tenant_id);
+  }
+  return pmActiveBookings().filter(b => b.tenant_id && lateTenants.has(b.tenant_id));
 }
 function pmLastPaymentOf(bookingId) {
   const b = pmaState.bookings.find(x => x.id === bookingId);
@@ -889,7 +931,7 @@ function pmCeoBodyLate() {
       <td class="px-2 py-2 text-slate-600">${pmPropertyName(b.property_id).replace(/</g,'&lt;').slice(0,14)} · ${(u?.code||u?.name||'').replace(/</g,'&lt;')}</td>
       <td class="px-2 py-2 text-slate-500">${lp?.paid_at||'nunca'}</td>
       <td class="px-2 py-2 text-right font-bold text-red-600">${days!=null?days+'d':'+30'}</td>
-      <td class="px-2 py-2 text-right text-slate-700 font-bold">$${Number(b.rent_amount||0).toLocaleString()}</td>
+      <td class="px-2 py-2 text-right text-slate-700 font-bold" title="Σ balance >0 en períodos cerrados (lo que realmente debe, no la renta)">$${pmTenantDebt(b.tenant_id).toLocaleString()}</td>
       <td class="px-2 py-2 text-center whitespace-nowrap">
         <button onclick="pmMarkPayment('${b.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-1 rounded">Marcar pago</button>
         ${phone?`<a href="https://wa.me/${phone}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-1 rounded text-xs inline-block">💬</a>`:''}
@@ -3039,21 +3081,27 @@ function pmRecurrenceDay(paymentDay) {
   return 1;
 }
 // Estatus de pago del inquilino (al día / próximo / atrasado / sin contrato)
+// Estatus de pago del inquilino (al día / próximo / atrasado / sin contrato).
+// "Atrasado" SOLO por deuda de balance en períodos cerrados (pmTenantDebt) — el
+// día de vencimiento solo informa "próximo cobro", nunca mete a nadie en atrasados.
 function pmTenantPayStatus(booking) {
   if (!booking) return { key: 'sincontrato', label: '💤 Sin contrato', cls: 'text-slate-400 bg-slate-50' };
   const rec = pmRecurrenceOf(booking.payment_day);
   if (rec.kind === 'airbnb') return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  const debe = pmTenantDebt(booking.tenant_id);
+  if (debe > 0) return { key: 'atrasado', label: `🔴 Atrasado · debe $${debe.toLocaleString()}`, cls: 'text-red-700 bg-red-50' };
+  // ¿El período del mes en curso ya quedó cubierto (balance ≤ 0)? → al día.
+  const ymNow = pmHoyYm();
+  const cubierto = pmaState.payments.some(p => p.type === 'ingreso' && pmBillYm(p) === ymNow &&
+    (p.booking_id === booking.id || (booking.tenant_id && p.tenant_id === booking.tenant_id)) &&
+    (pmPayBalance(p) == null || pmPayBalance(p) <= 0));
+  if (cubierto) return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
   const today = new Date();
-  const lastPay = pmLastPaymentOf(booking.id);
-  const monthStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
-  if (lastPay && (lastPay.paid_at || '') >= monthStart) return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
   const day = pmRecurrenceDay(booking.payment_day);
-  // Normalizar a medianoche AMBAS fechas: si no, la hora actual hace que el floor dé el mismo
-  // "2d" para todos (bug). Días reales = hoy(00:00) − vencimiento(00:00).
   const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
   const diff = Math.round((due - t0) / 86400000);
-  if (diff < 0) return { key: 'atrasado', label: `🔴 Atrasado ${Math.abs(diff)}d`, cls: 'text-red-700 bg-red-50' };
+  if (diff < 0) return { key: 'pendiente', label: '⏳ Pendiente del mes', cls: 'text-amber-700 bg-amber-50' };
   if (diff <= 7) return { key: 'proximo', label: `⏰ Próximo (${diff}d)`, cls: 'text-amber-700 bg-amber-50' };
   return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
 }
@@ -4099,7 +4147,13 @@ function pmPaymentsFiltered() {
   if (pmaState.payFilterProperty) pays = pays.filter(p => p.property_id === pmaState.payFilterProperty);
   if (pmaState.payFilterPlatform) pays = pays.filter(p => p.platform === pmaState.payFilterPlatform);
   if (pmaState.payRecurrenceFilter) pays = pays.filter(p => { const b = pmPaymentBooking(p); return b && pmRecurrenceOf(b.payment_day).kind === pmaState.payRecurrenceFilter; });
-  if (pmaState.payStatusFilter && pmaState.payStatusFilter !== 'all') pays = pays.filter(p => pmTenantPayStatus(pmPaymentBooking(p)).key === pmaState.payStatusFilter);
+  if (pmaState.payStatusFilter && pmaState.payStatusFilter !== 'all') {
+    const f = pmaState.payStatusFilter;
+    // Estatus POR PAGO (balance del período); proximo/sincontrato siguen siendo del inquilino.
+    pays = (f === 'proximo' || f === 'sincontrato')
+      ? pays.filter(p => pmTenantPayStatus(pmPaymentBooking(p)).key === f)
+      : pays.filter(p => pmPayStatus(p).key === f);
+  }
   const q = (pmaState.paySearch || '').toLowerCase().trim();
   if (q) pays = pays.filter(p => `${p.tenant_id ? pmTenantName(p.tenant_id) : ''} ${p.concept||''} ${p.platform||''}`.toLowerCase().includes(q));
   return pays.sort((a, b) => (b.paid_at||'').localeCompare(a.paid_at||''));
@@ -4125,7 +4179,7 @@ function pmPaymentsTableHtml() {
           const url = p.proof_url || p.attachment_url;
           const bk = pmPaymentBooking(p);
           const rec = bk ? pmRecurrenceOf(bk.payment_day).label : '—';
-          const st = pmTenantPayStatus(bk);
+          const st = pmPayStatus(p);   // estatus del PAGO por balance del período, no del inquilino
           const orphan = !p.property_id;
           const atLink = (p._src === 'expense') ? null : pmAirtableLink(p.external_id, 'tbl5p63dUEhrzgHVJ');
           return `<tr class="border-t border-slate-100 ${orphan ? 'bg-red-50' : 'hover:bg-slate-50'}">
@@ -4175,7 +4229,8 @@ function pmRenderPayments() {
   const cashPays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym) && (!propFilter || p.property_id === propFilter));
   const cobradoCash = cashPays.reduce((s,p) => s + Number(p.amount||0), 0);
   const activeBs = pmActiveBookings().filter(b => !propFilter || b.property_id === propFilter);
-  const atrasados = activeBs.filter(b => pmTenantPayStatus(b).key === 'atrasado');
+  // Atrasados DEL MES visto = inquilinos únicos con balance>0 en ese período (no por fecha).
+  const atrasados = [...new Set(monthPays.filter(p => pmPayStatus(p).key === 'atrasado').map(p => p.tenant_id || p.concept))];
 
   // Próximos cobros (7 días): activos no pagados este mes con próximo vencimiento ≤7d
   const proximosList = activeBs.filter(b => {
@@ -4251,7 +4306,7 @@ function pmRenderPayments() {
     <!-- Filtros (dropdowns) -->
     <div class="pm-filters-bar">
       ${pmFilterSelect('Mes', '📅', periodF==='month'?pmCurrentYM():periodF, pmMonthOptions(), "pmPaymentsSetFilter('period', this.value)")}
-      ${pmFilterSelect('Estatus', '⚡', statF==='all'?'':statF, [['','Todos'],['aldia','Al día'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['sincontrato','Sin contrato']], "pmPaymentsSetFilter('status', this.value||'all')")}
+      ${pmFilterSelect('Estatus', '⚡', statF==='all'?'':statF, [['','Todos'],['aldia','Al día'],['pendiente','Pendiente del mes'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['revisar','Revisar'],['sincontrato','Sin contrato']], "pmPaymentsSetFilter('status', this.value||'all')")}
       ${pmFilterSelect('Casa', '🏠', propFilter, [['','Todas'], ...propsWithPay.map(p=>[p.id, p.name||''])], "pmPaymentsSetFilter('property', this.value||null)")}
       ${pmFilterSelect('Recurrencia', '🔁', recF, [['','Todas'],['mensual','🗓 Mensual'],['quincenal','⏱ Quincenal'],['airbnb','🏖 Airbnb']], "pmPaymentsSetFilter('recurrence', this.value||null)")}
       ${pmFilterSelect('Plataforma', '💳', pmaState.payFilterPlatform, [['','Todas'], ...platforms.map(pl=>[pl, pl])], "pmPaymentsSetFilter('platform', this.value||null)")}
