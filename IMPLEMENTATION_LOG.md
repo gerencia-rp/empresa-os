@@ -3,6 +3,24 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 17-jul · 🧭 MAPA: identificadores EXACTOS de Airtable (base·tabla·columna con IDs) + base efectiva por módulo (commits cba5c9a · 4123b2b)
+Pedido del CEO: el mapa mostraba el alias amistoso ("Rentas") pero hay CUATRO bases llamadas "Empresa Rentas" — no se podía ubicar el dato para verificarlo/modificarlo.
+- ✅ **Registro generado `os/os-lineage-airtable.js`** (nuevo; en index.html + BUNDLE antes de os-lineage.js; regenerable con `scripts/lineage-airtable-gen.mjs`, PAT con schema.bases:read): nombres EXACTOS + IDs de base/tabla/campo de las 3 bases leídas (esquema completo vía API meta, 17-jul) + 4 realms QBO reales (qb_connections) + lista de bases parecidas NO leídas.
+- ✅ **① De dónde viene con IDs reales** (`lmATBase/lmATTables/lmATCols` en os-lineage.js): nodo BASE = nombre exacto + baseId (alias corto de subtítulo, sync que la lee, ⚠ si sandbox) · nodo TABLA = nombre exacto + tableId por cada tabla real (alias curados `LM_AT_TALIAS`: "Pagos HML"→"Pagos interes (HML & REFI)", "Nómina Admin"→"Nomina Equipo Administrativo - Remodelación", "Plataformas"→"Gasto Por Plataformas - Remodelación") · nodo COLUMNA = **UNA por campo**: derivados listados uno por uno con su field ID (split ' / ', ' + ', ' → ', ' × '; los fld ya inline se resuelven por ID → muestra el nombre VIGENTE en Airtable, ej. flduMsIV5gZRIv1eU hoy se llama "Balance de pago"); lo que no es campo directo queda declarado "derivado / columna del espejo" — jamás se inventa un field ID. Aplica a flujo, LISTA, panel del diagrama y ⓘ overlay; export JSON/CSV += base_exacta/base_id/tabla_ids/field_ids/url_airtable.
+- ✅ **🔗 Abrir en Airtable**: botón por tabla → `https://airtable.com/<baseId>/<tableId>` (flujo, lista ↗, diagrama, ⓘ). El "editado por / origen del registro" se mantuvo.
+- ✅ **📡 Base efectiva por módulo declarada en /mapa** (overview + línea compacta en cada sistema): verificado con `supabase secrets list` que **AIRTABLE_BASE_ID / _FF / _REMODEL NO existen** → el default del código de cada sync ES la base efectiva. Alerta `⚠ BASE DE PRUEBA` si el nombre contiene sandbox/plantilla/ejemplo/prueba/test → **Rentas dispara la alerta** (ver tabla). FF confirmado: lee la matriz real, NO la Plantilla appvfqSPiwuiD1iLm ni "Rental Profitss | Producción".
+- 📋 **Mapeo base-ID → módulo (para que el CEO confirme la de producción)**:
+  | Módulo (sync) | Base que lee HOY | Base ID | Estado |
+  |---|---|---|---|
+  | pm-sync-airtable (Rentas) | "Empresa Rentas — Modelo Nuevo (sandbox)" | `apptTKRYbx6gu701i` | ⚠ **el nombre dice sandbox** — si ya es la operativa real, renombrarla en Airtable (sacarle "(sandbox)") y regenerar el registro; la alerta se apaga sola |
+  | sync-ff-airtable (Fix & Flip) | "Flipping Rentals matriz " | `applMXFyPq1hXj7iN` | ✓ la real (no la Plantilla) |
+  | sync-remodel-airtable + sync-remodel-workers | "Empresa de Remodelación" | `appwFRqnkyyRljOld` | ✓ |
+  | qb-oauth/qb-sync (Contable) | QuickBooks: Flipping Rentals LLC 9341456865356422 · Structure One LLC 9341456789703342 · EverHome LLC 9341456789885517 · Rental Profits LLC 9341456789875094 | — | ✓ 4 realms |
+  | NO leídas (parecidas) | "Empresa Rentas" vieja `appzEnsuy4qPT6iHj` (deprecada) · "Empresa Rentas" `appHZs8DWIBhwhunZ` · "Empresa Rentas (Ejemplo)" `appQRDa3usFb6Loei` · "…matriz Plantilla" `appvfqSPiwuiD1iLm` · "Rental Profitss | Producción" `app0XnxP7XtQJL1sC` | — | declaradas en el mapa (colapsable) |
+- **ANTES**: nodo columna "Reserva / Unidad / Fecha Entrada / Salida" en un solo texto, base "Rentas" sin ID, sin salto a Airtable. **DESPUÉS**: cada parte con su campo exacto + fld ID (verificado en node con el código real: "Monto préstamo Refi / tasa / plazo" → fldif2zUp7yJDfiAu · fld4Hv76aZCjXVhQ3 · fldbnPE1wT9Fm6D46; "(Gasto Materiales + Gasto trabajadores) × 1.05" → fldtqskgPEajaJT4Y + fldNmR8PgZWdjutIw; overhead 3 tablas → tblk1vS2/tblv77D/tblgd4w), botón directo a la tabla.
+- ✅ node --check todos · build OK · **ci:gate 15/15** (cobertura de linaje 211/211 intacta — solo cambió el render, no las claves de data_lineage).
+- ⬜ Humano: confirmar si `apptTKRYbx6gu701i` es la base operativa definitiva de Rentas (y renombrarla sin "(sandbox)") o si hay que apuntar el sync a otra; si algún día se setean los secrets AIRTABLE_BASE_ID*, correr `scripts/lineage-airtable-gen.mjs` y actualizar el registro.
+
 ## 16-jul · 🎚 SLIDER de ARV ajustable (draggable) → fuente única que fluye a todo
 Pedido del CEO: el motor da rango (conservador·probable·optimista); poder MOVER la barra para fijar el ARV propio y usarlo en las otras calcs.
 - **ANTES**: `apRangeBar` era una barra SOLO visual (dot fijo al 50%); el único valor usable era el probable del motor (botón "Usar $X").

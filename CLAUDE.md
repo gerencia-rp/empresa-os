@@ -4,6 +4,11 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (17 Jul 2026 — 🧭 MAPA con identificadores EXACTOS de Airtable) · EN RAMA feat/portal-inversionista-v2
+
+- 🧭 **/mapa muestra la identidad REAL de Airtable por número** (commits cba5c9a+4123b2b; ci:gate 15/15): registro generado **`os/os-lineage-airtable.js`** (bases/tablas/campos con nombres EXACTOS + IDs, esquema API meta 17-jul; regenerar con `scripts/lineage-airtable-gen.mjs`) → nodo Base = nombre exacto + baseId (+ sync + ⚠ sandbox) · Tabla(s) = nombre + tableId · Columna(s) = **una por campo con field ID** (derivados listados uno a uno; texto sin campo directo = "derivado/espejo", sin inventar IDs; fld inline se resuelve al nombre VIGENTE) · botón **🔗 Abrir en Airtable** (`airtable.com/<baseId>/<tableId>`) en flujo/lista/diagrama/ⓘ · export += IDs. Resolución de alias en `LM_AT_TALIAS` ("Pagos HML"→"Pagos interes (HML & REFI)", etc.).
+- 📡 **Base efectiva por módulo DECLARADA** (verificado 17-jul: secrets `AIRTABLE_BASE_ID/_FF/_REMODEL` NO existen → el default del código es la base real): Rentas → **"Empresa Rentas — Modelo Nuevo (sandbox)" `apptTKRYbx6gu701i` ⚠ el nombre dice sandbox** (pendiente CEO: confirmar/renombrar) · FF → "Flipping Rentals matriz " `applMXFyPq1hXj7iN` (NO la Plantilla) · Remodel → "Empresa de Remodelación" `appwFRqnkyyRljOld` · QBO → 4 realms (Flipping Rentals/Structure One/EverHome/Rental Profits). Las 5 bases parecidas NO leídas quedan listadas en el mapa. Tabla completa en IMPLEMENTATION_LOG 17-jul. ⚠ gotcha: FF y Remodel comparten table IDs idénticos (`tblw28KVOUcCAKZBU` es "Propiedades" en FF y "Propiedad en Reparación" en Remodel — bases duplicadas en su origen): el diccionario SIEMPRE se keyea por baseId.
+
 ## 🎯 Estado (14 Jul 2026 — RC: métricas LIMPIAS de Remodelación) · EN VIVO
 
 - 💰 **El CC de Remodelación muestra utilidad/rentabilidad LIMPIAS** (separan la plata de Remodelación de la del flip): 3 campos fórmula nuevos en Airtable → columnas aditivas `utilidad_remodelacion` (fldQ3vhMvBuCDUJVR) / `rentabilidad_remodelacion` (fldywMYaieK1bQ9MP) / `deficit_ff` (fldXxmdccFiGk1zPI, Draws − Valor cliente) en `remodel_at_properties` (migr `remodel_at_properties_add_metricas_limpias`), mapeadas en `sync-remodel-airtable` v49. Solo Finalizado tiene utilidad/rent limpia (la fórmula lo exige).
