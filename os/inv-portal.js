@@ -64,7 +64,7 @@ async function ipLoad() {
     return;
   }
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
-  const [prm, cf, dc, acc, dist, msg, res, pj] = await Promise.all([
+  const [prm, cf, dc, acc, dist, msg, res, pj, ovr] = await Promise.all([
     sb.from('inv_model_params').select('*').in('property_id', props).eq('active', true),
     sb.from('inv_cashflow_real').select('*').in('property_id', props).eq('active', true).order('fecha'),
     sb.from('inv_documents').select('*').in('property_id', props).eq('active', true),
@@ -73,9 +73,16 @@ async function ipLoad() {
     sb.from('inv_messages').select('*').eq('active', true),
     sb.from('v_portal_inversor').select('*').then(r => r.data || []).catch(() => []),
     sb.from('inv_projection').select('property_id,escenario,data,computed_at').eq('active', true).then(r => r.data || []).catch(() => []),
+    sb.from('inv_param_overrides').select('*').in('property_id', props).eq('active', true).then(r => r.data || []).catch(() => []),
   ]);
   IP.resumen = res || []; IP.proj = pj || [];
   IP.params = {}; (prm.data || []).forEach(r => { (IP.params[r.property_id] = IP.params[r.property_id] || {})[r.key] = r; });
+  // overrides del admin: el valor EFECTIVO es el ajustado a mano; la fuente original queda declarada
+  (ovr || []).forEach(o => {
+    const P = (IP.params[o.property_id] = IP.params[o.property_id] || {});
+    const b = P[o.key];
+    P[o.key] = { ...(b || { property_id: o.property_id, key: o.key }), value: o.valor, fuente: 'manual', descripcion: 'ajustado por el equipo' + (b && b.fuente ? ' (origen: ' + b.fuente + ')' : '') };
+  });
   IP.cashflow = {}; (cf.data || []).forEach(r => { (IP.cashflow[r.property_id] = IP.cashflow[r.property_id] || []).push(r); });
   IP.docs = {}; (dc.data || []).forEach(r => { (IP.docs[r.property_id] = IP.docs[r.property_id] || []).push(r); });
   IP.myIds = [...new Set((acc.data || []).map(a => a.investor_airtable_id))];
@@ -120,9 +127,13 @@ function ipEngineParams(pid) {
   };
 }
 function srcChip(P, k) {
+  // origen en cristiano (pedido Juan): real = dato de la base · estimado = lo calcula el
+  // modelo (no hay dato real todavía) · manual = lo cargó el equipo (override declarado)
   const r = (P || {})[k]; if (!r) return '';
-  const sup = !/^real|^excel|^modelo/.test(r.fuente || '');
-  return '<span class="src' + (sup ? ' sup' : '') + '" title="' + esc(r.fuente) + (r.descripcion ? ' — ' + esc(r.descripcion) : '') + '">' + esc((r.fuente || '').split(':')[0]) + '</span>';
+  const f = r.fuente || '';
+  const lbl = /^(manual|real:manual)/.test(f) ? 'manual'
+    : (/^real:|^excel/.test(f) && !/\((estimado|derivado)/.test(f)) ? 'real' : 'estimado';
+  return '<span class="src' + (lbl === 'real' ? '' : ' sup') + '" title="' + esc(f) + (r.descripcion ? ' — ' + esc(r.descripcion) : '') + '">' + lbl + '</span>';
 }
 
 // ─── ℹ explicador de métricas (concepto + fórmula con los números reales) ───
