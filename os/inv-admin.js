@@ -23,6 +23,7 @@ async function iaLoad(force) {
       sb.from('ff_deals').select('airtable_id,address,address_norm,property_id,stage,capital_inversionista,investor_rec_ids').eq('active', true),
     ]);
     IA.access = acc.data || []; IA.holdings = hold.data || []; IA.investors = inv.data || []; IA.deals = deals.data || [];
+    if (!IA.email) { try { const u = await sb.auth.getUser(); IA.email = (u.data && u.data.user && u.data.user.email) || ''; } catch (e) { IA.email = ''; } }
     IA.casa = IA.casa || (IA.holdings[0] && IA.holdings[0].property_id) || null;
     if (IA.casa) await iaLoadCasa(IA.casa);
     IA.loaded = true;
@@ -32,16 +33,87 @@ async function iaLoad(force) {
 }
 window.iaLoad = iaLoad;
 async function iaLoadCasa(pid) {
-  const [prm, cf] = await Promise.all([
+  const [prm, cf, ov] = await Promise.all([
     sb.from('inv_model_params').select('*').eq('property_id', pid).eq('active', true).order('key'),
     sb.from('inv_cashflow_real').select('*').eq('property_id', pid).eq('active', true).order('fecha', { ascending: false }).limit(200),
+    sb.from('inv_param_overrides').select('*').eq('property_id', pid).eq('active', true).then(r => r.data || []).catch(() => []),
   ]);
   IA.params = prm.data || []; IA.cashflow = cf.data || [];
+  // overrides: el valor EFECTIVO es el override; el de la fuente queda en _base (reversible ↩)
+  IA.ovr = {}; (ov || []).forEach(o => { IA.ovr[o.key] = o; });
+  IA.params.forEach(p => { const o = IA.ovr[p.key]; if (o) { p._base = p.value; p._ov = o; p.value = o.valor; } });
+  IA.pDirty = {}; IA.pSaved = {};
 }
-async function iaSetCasa(pid) { IA.casa = pid; await iaLoadCasa(pid); osRender(); }
+async function iaSetCasa(pid) {
+  if (iaDirtyAny() && !confirm('⚠ Tenés cambios sin guardar en Parámetros del modelo. ¿Cambiar de casa igual y perderlos?')) return;
+  IA.casa = pid; await iaLoadCasa(pid); osRender();
+}
 window.iaSetCasa = iaSetCasa;
+// ─── guardado por bloque + overrides (ajustes Juan v3) ───
+function iaDirtyAny() { return Object.keys(IA.pDirty || {}).length > 0; }
+function iaGoTab(t) {
+  if (iaDirtyAny() && !confirm('⚠ Tenés cambios sin guardar en Parámetros del modelo. ¿Salir igual y perderlos?')) return;
+  IA.pDirty = {}; IA.tab = t; osRender();
+}
+window.iaGoTab = iaGoTab;
+function iaDirty(bid) {
+  (IA.pDirty = IA.pDirty || {})[bid] = 1;
+  const el = document.getElementById('ia-bst-' + bid);
+  if (el) { el.textContent = '● sin guardar'; el.style.color = 'var(--amber)'; }
+}
+window.iaDirty = iaDirty;
+if (!window._iaBeforeUnload) {
+  window._iaBeforeUnload = 1;
+  window.addEventListener('beforeunload', e => { if (window.IA && iaDirtyAny()) { e.preventDefault(); e.returnValue = ''; } });
+}
+// ¿el parámetro es AUTO (viene de Airtable/espejo)? → editarlo NO pisa la fuente: va a override
+function iaEsAuto(p) { return /^real:|^excel/.test(p.fuente || '') && !/^real:manual/.test(p.fuente || ''); }
+async function iaPersistParam(p, val) {
+  if (p._ov || iaEsAuto(p)) {
+    const row = { property_id: IA.casa, key: p.key, valor: val, valor_origen: p._base != null ? p._base : p.value, fuente_origen: p.fuente || null, tipo: 'override_de_auto', editado_por: IA.email || null, active: true, archived_at: null, updated_at: new Date().toISOString() };
+    return (await sb.from('inv_param_overrides').upsert(row, { onConflict: 'property_id,key' })).error;
+  }
+  return (await sb.from('inv_model_params').update({ value: val, updated_at: new Date().toISOString() }).eq('property_id', IA.casa).eq('key', p.key)).error;
+}
+async function iaSaveBloque(bid) {
+  const b = IA_BLOQUES.find(x => x[0] === bid);
+  const rows = IA.params.filter(p => bid === 'b0' ? !IA_BLOQUES.some(x => x[2].test(p.key)) : (b && b[2].test(p.key)));
+  let n = 0; const errs = [];
+  for (const p of rows) {
+    const el = document.getElementById('ia-p-' + p.key);
+    if (!el) continue;
+    const val = el.value.trim();
+    if (val === String(p.value)) continue;
+    const error = await iaPersistParam(p, val);
+    if (error) errs.push(p.key + ': ' + error.message); else n++;
+  }
+  delete (IA.pDirty = IA.pDirty || {})[bid];
+  (IA.pSaved = IA.pSaved || {})[bid] = true;
+  if (errs.length) return alert('Errores guardando:\n' + errs.join('\n'));
+  if (window.toast) toast(n ? '💾 ' + n + ' parámetro(s) guardados — los auto quedan como override reversible, todo en el audit' : '✓ Sin cambios en este bloque', 'success');
+  await iaLoadCasa(IA.casa); osRender();
+}
+window.iaSaveBloque = iaSaveBloque;
+async function iaRevertOverride(key) {
+  if (!confirm('↩ ¿Volver al valor de origen (' + ((IA.ovr[key] || {}).valor_origen != null ? IA.ovr[key].valor_origen : '—') + ')? El override se archiva (queda en el audit).')) return;
+  const { error } = await sb.from('inv_param_overrides').update({ active: false, archived_at: new Date().toISOString() }).eq('property_id', IA.casa).eq('key', key);
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('↩ ' + key + ' volvió al valor de la fuente', 'success');
+  await iaLoadCasa(IA.casa); osRender();
+}
+window.iaRevertOverride = iaRevertOverride;
 
-function iaInvName(id) { const x = IA.investors.find(i => i.airtable_id === id); return x ? x.name : id; }
+function iaInvName(id) {
+  const x = IA.investors.find(i => i.airtable_id === id); if (x) return x.name;
+  const a = (IA.access || []).find(y => y.investor_airtable_id === id); // inversionista MANUAL (app-side)
+  return a && a.nombre ? a.nombre : id;
+}
+// opciones de inversionista para selects: sincronizados de Airtable + manuales (app-side)
+function iaInvOptions() {
+  const man = (IA.access || []).filter(a => a.origen === 'manual' && a.active);
+  return IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('')
+    + man.map(a => '<option value="' + OS_E(a.investor_airtable_id) + '">✍️ ' + OS_E(a.nombre || a.email) + ' (manual)</option>').join('');
+}
 function iaCasaName(pid) { const d = IA.deals.find(x => x.property_id === pid); return d ? (d.address || '').split(',')[0] : (pid || '').slice(0, 8); }
 
 // ─── acciones ───
@@ -49,12 +121,45 @@ async function iaCrearAcceso() {
   const invId = document.getElementById('ia-acc-inv').value;
   const email = (document.getElementById('ia-acc-email').value || '').trim().toLowerCase();
   if (!invId || !email) return alert('Elegí inversionista y email');
-  const { error } = await sb.from('inv_access').insert({ investor_airtable_id: invId, email, estado: 'invitado' });
+  const inv = IA.investors.find(i => i.airtable_id === invId);
+  const { error } = await sb.from('inv_access').insert({ investor_airtable_id: invId, email, estado: 'invitado', origen: 'airtable', nombre: inv ? inv.name : null, created_by: IA.email || null });
   if (error) return alert('Error: ' + error.message);
   if (window.toast) toast('✓ Acceso creado. Mandale el link con "✉️ Invitar".', 'success');
   await iaLoad(true);
 }
 window.iaCrearAcceso = iaCrearAcceso;
+// acceso MANUAL (nombre+email, sin Airtable ni sync): inversionista app-side, RLS igual —
+// solo verá las casas que se le asignen en Casas & reparto (o ninguna hasta asignarle)
+async function iaCrearAccesoManual() {
+  const nombre = ((document.getElementById('ia-accm-nombre') || {}).value || '').trim();
+  const email = ((document.getElementById('ia-accm-email') || {}).value || '').trim().toLowerCase();
+  if (!nombre || !email) return alert('Nombre y email son obligatorios');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return alert('Email inválido');
+  const id = 'manual-' + Math.random().toString(36).slice(2, 10);
+  const { error } = await sb.from('inv_access').insert({ investor_airtable_id: id, email, nombre, estado: 'invitado', origen: 'manual', created_by: IA.email || null });
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('✓ Acceso manual creado (' + nombre + '). Asignale casas en 🏠 Casas & reparto y mandale "✉️ Invitar".', 'success');
+  await iaLoad(true);
+}
+window.iaCrearAccesoManual = iaCrearAccesoManual;
+function iaAccMode(m) { IA.accMode = m; osRender(); }
+window.iaAccMode = iaAccMode;
+// vincular un acceso manual a un inversionista de Airtable cuando aparece en el sync
+async function iaLinkManual(accId, oldId) {
+  const sel = document.getElementById('ia-link-' + accId); if (!sel || !sel.value) return alert('Elegí el inversionista de Airtable');
+  const newId = sel.value;
+  if (!confirm('¿Vincular este acceso manual a "' + iaInvName(newId) + '" (Airtable)? Sus casas, distribuciones, documentos y mensajes se re-apuntan al registro de Airtable.')) return;
+  const { error } = await sb.from('inv_access').update({ investor_airtable_id: newId, origen: 'airtable' }).eq('id', accId);
+  if (error) return alert('Error: ' + error.message);
+  for (const t of ['inv_holdings', 'inv_distributions', 'inv_documents', 'inv_messages']) {
+    const r = await sb.from(t).update({ investor_airtable_id: newId }).eq('investor_airtable_id', oldId);
+    if (r.error) alert('⚠ ' + t + ': ' + r.error.message);
+  }
+  IA.linkEdit = null;
+  if (window.toast) toast('⇄ Vinculado al registro de Airtable (todo re-apuntado, queda en el audit)', 'success');
+  await iaLoad(true);
+}
+window.iaLinkManual = iaLinkManual;
 async function iaEnviarLink(email) {
   const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + '/inversionista', shouldCreateUser: true } });
   if (error) return alert('Error enviando el link: ' + error.message);
@@ -87,10 +192,12 @@ async function iaSoftDeleteHolding(id) {
 }
 window.iaSoftDeleteHolding = iaSoftDeleteHolding;
 async function iaSaveParam(key) {
+  // ruta única de guardado (Enter en una fila): manual → update directo · auto → OVERRIDE
   const el = document.getElementById('ia-p-' + key); if (!el) return;
-  const { error } = await sb.from('inv_model_params').update({ value: el.value, updated_at: new Date().toISOString() }).eq('property_id', IA.casa).eq('key', key);
+  const p = IA.params.find(x => x.key === key); if (!p) return;
+  const error = await iaPersistParam(p, el.value.trim());
   if (error) return alert('Error: ' + error.message);
-  if (window.toast) toast('✓ ' + key + ' actualizado', 'success');
+  if (window.toast) toast('✓ ' + key + ' guardado' + (iaEsAuto(p) || p._ov ? ' como override (la fuente no se pisa — ↩ reversible)' : ''), 'success');
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaSaveParam = iaSaveParam;
@@ -320,7 +427,7 @@ async function iaDelDoc(id) {
 }
 window.iaDelDoc = iaDelDoc;
 function iaTabDocs() {
-  const invOpts = '<option value="">🏠 Todos los inversionistas de la casa</option>' + IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const invOpts = '<option value="">🏠 Todos los inversionistas de la casa</option>' + iaInvOptions();
   const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
   const docs = IA.docsAll || [];
   return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Subir documento al portal</div><div class="k">contrato · fiscal (K-1) · legal · otro — URL de Drive/Storage</div></div>'
@@ -390,7 +497,7 @@ async function iaEnviarMsgAdmin() {
 window.iaEnviarMsgAdmin = iaEnviarMsgAdmin;
 
 function iaTabDist() {
-  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const invOpts = iaInvOptions();
   const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
   const linkTag = (url, lbl) => url ? '<a href="' + OS_E(url) + '" target="_blank" style="color:var(--a2);white-space:nowrap">' + lbl + ' ↗</a>' : '<span class="meta">—</span>';
   const editRow = d => {
@@ -424,7 +531,7 @@ function iaTabDist() {
     + '</tbody></table></div>';
 }
 function iaTabMsgs() {
-  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">👤 ' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const invOpts = iaInvOptions();
   const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="casa:' + c + '">🏠 Todos los de ' + OS_E(iaCasaName(c)) + '</option>').join('');
   return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">✉️ Enviar mensaje</div><div class="k">a un inversionista o fan-out a todos los holders de una casa</div></div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><select id="ia-mm-dest" class="osa-in">' + casaOpts + invOpts + '</select>'
@@ -615,14 +722,112 @@ const IA_BLOQUES = [
 const IA_METAS_KEYS = ['tir_objetivo', 'cap_objetivo', 'fecha_breakeven', 'fecha_recuperacion'];
 function iaTogglePB(id) { IA.pOpen = IA.pOpen || { b1: true }; IA.pOpen[id] = !IA.pOpen[id]; osRender(); }
 window.iaTogglePB = iaTogglePB;
-function iaFuenteBadge(fuente) {
-  const auto = /^real|^excel/.test(fuente || '');
-  return '<span class="badge ' + (auto ? 'b-ok' : 'b-warn') + '" style="font-size:8px" title="' + OS_E(fuente || '') + '">' + (auto ? 'auto · ' + OS_E((fuente || '').split(':')[1] || fuente) : 'manual') + '</span>';
+// ─── ORIGEN claro de cada parámetro (duda de Juan: "auto" era ambiguo) ───
+// real · Airtable (tabla) = dato real traído de la base · estimado · calculado = lo estima el
+// modelo (no hay dato real todavía) · manual = lo cargás vos · manual · override = ajuste tuyo
+// SOBRE un auto (reversible ↩, la fuente no se pisa).
+const IA_FTAB = { ff_deals: 'Airtable FF · Propiedades', ff_draws: 'Airtable FF · Desglose Draws', ff_hml_loans: 'Airtable FF · Datos por casa', ff_hml_payments: 'Airtable FF · Pagos interes (HML & REFI)' };
+function iaOrigen(p) {
+  if (p._ov) return { st: 'background:rgba(192,132,252,.16);color:#c084fc', lab: 'manual · override', tip: 'ajustado a mano sobre el valor de origen (' + (p._base != null ? p._base : '—') + ' · ' + (p.fuente || '') + ') — reversible con ↩' };
+  const f = p.fuente || '';
+  if (/^(manual|real:manual)/.test(f)) return { st: 'background:rgba(192,132,252,.16);color:#c084fc', lab: 'manual', tip: 'lo cargás vos [' + f + ']' };
+  if (/\(estimado\)/.test(f)) return { st: 'background:rgba(58,160,255,.14);color:#3aa0ff', lab: /^draw_m/.test(p.key) ? 'estimado · repartido en partes iguales' : 'estimado · calculado', tip: (p.descripcion || 'el modelo lo estima — cuando el dato real se cargue en Airtable, lo reemplaza') + ' [' + f + ']' };
+  if (/\(derivado/.test(f)) return { st: 'background:rgba(58,160,255,.14);color:#3aa0ff', lab: 'estimado · calculado', tip: 'derivado de datos reales: ' + (p.descripcion || '') + ' [' + f + ']' };
+  if (/^(supuesto|modelo|estructura|default|seed|real:calc)/.test(f)) return { st: 'background:rgba(58,160,255,.14);color:#3aa0ff', lab: 'estimado · ' + (f === 'supuesto' ? 'supuesto' : 'calculado'), tip: 'premisa del modelo (no hay dato real todavía) [' + f + ']' };
+  if (/^excel/.test(f)) return { st: '', cls: 'b-ok', lab: 'real · Excel calibrado', tip: 'calibrado contra el Excel "Renta VF" [' + f + ']' };
+  const m = f.match(/^real:([a-z_]+)/);
+  if (m) return { st: '', cls: 'b-ok', lab: 'real · ' + (IA_FTAB[m[1]] || m[1]), tip: 'dato REAL traído de la base [' + f + ']' };
+  return { st: 'background:rgba(58,160,255,.14);color:#3aa0ff', lab: 'estimado', tip: f || 'sin fuente declarada' };
 }
-function iaParamRow(p) {
+function iaOrigenBadge(p) {
+  const o = iaOrigen(p);
+  return '<span class="badge ' + (o.cls || '') + '" style="font-size:8px;' + (o.st || '') + '" title="' + OS_E(o.tip) + '">' + OS_E(o.lab) + '</span>';
+}
+// ⓘ explicador por parámetro: qué es + fórmula + de dónde sale (en cristiano)
+const IA_PINFO = {
+  compra: ['Precio de compra de la casa (lo que se pagó al cierre).'],
+  remodel_real: ['Costo REAL de la remodelación (lo que cobró la empresa de Remodelación).'],
+  cierre_compra: ['Gastos de cierre de la COMPRA: título, escrow, fees del prestamista.'],
+  arv: ['Valor de la casa ya remodelada (After Repair Value) — la base del refi.', 'préstamo refi ≈ ARV × % del banco'],
+  est_arv: ['ARV que se usó en el underwriting original (escenario Estimado).'],
+  est_remodel_total: ['Remodelación estimada del underwriting original.'],
+  est_cierre_pct: ['% de originación estimado del underwriting.'],
+  cash_atrapado_real: ['Plata propia que quedó atrapada en el deal después del refi (año 0 oficial de TIR/VPN).'],
+  hm_inicial: ['Plata del Hard Money desembolsada AL CIERRE (sin draws).', 'monto_hml − Σ draws'],
+  hm_tasa: ['Tasa anual del Hard Money (solo interés).', 'interés mensual = préstamo × tasa ÷ 12'],
+  hm_plazo: ['Plazo del Hard Money en meses.'],
+  refi_mes: ['Mes del ciclo en que la casa se refinancia (entra el banco a 30 años y se paga el HML).'],
+  refi_monto: ['Monto del préstamo del refi (banco 30 años).', '≈ valor tasado × % que presta el banco'],
+  refi_tasa: ['Tasa anual del préstamo refi (fracción: 0.07125 = 7.125%).'],
+  refi_plazo_m: ['Plazo del refi en MESES (360 = 30 años).'],
+  cierre_refi: ['Costos de cierre del refi (fees, título, prepagados, escrows).'],
+  cashout_real: ['Cash-out REAL que entró con el refi (préstamo − payoff HML − costos).'],
+  refi_lender: ['Prestamista del refi (banco de los 30 años).'],
+  reparto_inv: ['Participación del inversionista en la casa (fracción: 0.5 = 50%).'],
+  num_hab: ['Número de habitaciones rentables (modelo por habitaciones).'],
+  arriendo_hab: ['Renta mensual por habitación.', 'ingreso = num_hab × arriendo_hab × ocupación'],
+  rampa: ['Ocupación mes a mes del arranque (lista separada por comas, 0 a 1).'],
+  ocupacion_estable: ['Ocupación de crucero una vez estabilizada (fracción).'],
+  piso_servicios: ['Piso de servicios: mínimo de gasto aunque la ocupación baje (fracción del gasto).'],
+  mantenimiento_mes: ['Mantenimiento mensual presupuestado.'],
+  servicios_mes: ['Servicios públicos mensuales (luz, agua, gas, internet).'],
+  hoa_mes: ['Cuota mensual de la HOA (si aplica).'],
+  seguro_mes: ['Seguro mensual de la propiedad.'],
+  padsplit_pct: ['Comisión de la plataforma (PadSplit) como % del ingreso.'],
+  comision_pct: ['Comisión de administración como % del ingreso.'],
+  imp_propiedad_pct: ['Impuesto a la propiedad, % ANUAL sobre el avalúo.', 'impuesto = avalúo × % ÷ 12 por mes'],
+  imp_renta_pct: ['Impuesto a la renta sobre la utilidad (si está en 0, apagado).'],
+  valorizacion: ['Apreciación anual del valor de la casa (fracción: 0.053 = 5.3%).'],
+  inflacion: ['Inflación anual aplicada a rentas y gastos.'],
+  retorno_esperado: ['Tu retorno alternativo — la tasa de descuento del VPN.'],
+  anios: ['Horizonte del análisis (31 años = hold completo del Excel).'],
+  ciclo_meses: ['Meses del ciclo inicial compra→remo→renta→refi.'],
+  postrefi_perfil: ['Perfil de proyección post-refi: motor (crecimiento) o plano (como el Excel).'],
+  util_anual_postrefi: ['Utilidad anual post-refi calibrada contra el Excel.'],
+  anio0_postrefi: ['Año 0 oficial post-refi (cash atrapado) calibrado contra el Excel.'],
+  fecha_cierre: ['Fecha del cierre de compra — ancla de toda la línea de tiempo.'],
+  estrategia: ['Estrategia del deal (BRRRR, flip, hold…).'],
+  estado_casa: ['Etapa actual de la casa en el pipeline.'],
+  plan_salida: ['Cómo se recupera la inversión (refi, venta, hold).'],
+  tir_objetivo: ['Meta de TIR del deal (para comparar contra la proyectada).'],
+  cap_objetivo: ['Meta de CAP rate del deal.'],
+  fecha_breakeven: ['Fecha meta en que la operación cubre sus gastos.'],
+  fecha_recuperacion: ['Fecha meta de recuperación del capital del inversionista.'],
+};
+function iaParamInfo(key) {
+  const p = IA.params.find(x => x.key === key); if (!p) return;
+  let info = IA_PINFO[key];
+  const mDraw = key.match(/^draw_m(\d+)$/), mOtros = key.match(/^otros_inv_m(\d+)$/);
+  if (!info && mDraw) info = ['Draw de remodelación del mes ' + mDraw[1] + ': plata del Hard Money desembolsada para la obra ese mes.' + (/\(estimado\)/.test(p.fuente || '') ? ' HOY es ESTIMADO: la casa no tiene registro en Desglose Draws (Airtable) → el modelo estima la remodelación y la reparte en partes iguales. Cuando se carguen los draws reales, reemplazan la estimación.' : '')];
+  if (!info && mOtros) info = ['Otra inversión propia del mes ' + mOtros[1] + ' (plata que no vino del HML).'];
+  if (!info) info = [p.descripcion || 'Parámetro del modelo financiero de esta casa.'];
+  const o = iaOrigen(p);
+  const esAirtable = /^real:ff_/.test(p.fuente || '') && !p._ov;
+  const old = document.getElementById('ia-pinfo-ov'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'ia-pinfo-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,12,.55);display:grid;place-items:center;z-index:99999;padding:18px';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div style="background:var(--bg,#0f1220);border:1px solid var(--glassb,#2a2f4a);border-radius:14px;padding:18px;max-width:460px;width:100%;color:var(--ink,#e8eaf2);box-shadow:0 18px 50px rgba(0,0,0,.45)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><b style="font-size:14px">ⓘ ' + OS_E(key) + '</b><button class="ibtn" onclick="document.getElementById(\'ia-pinfo-ov\').remove()">✕</button></div>'
+    + '<div style="font-size:12.5px;line-height:1.65;color:var(--mut,#9aa0b8)">' + OS_E(info[0]) + '</div>'
+    + (info[1] ? '<div style="margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:var(--glass,rgba(255,255,255,.04));border:1px solid var(--glassb,#2a2f4a);border-radius:8px;padding:8px 11px">ƒ ' + OS_E(info[1]) + '</div>' : '')
+    + '<div style="margin-top:12px;font-size:12px"><b>De dónde sale:</b> <span class="badge" style="font-size:9px;' + (o.st || '') + '">' + OS_E(o.lab) + '</span>'
+    + '<div class="meta" style="font-size:11px;margin-top:4px">' + OS_E(o.tip) + '</div>'
+    + (esAirtable ? '<div class="meta" style="font-size:11px;margin-top:4px">🗺 La cadena completa (base · tabla · columna con IDs exactos) vive en el <a style="color:var(--a2);cursor:pointer" onclick="document.getElementById(\'ia-pinfo-ov\').remove();osNav(\'/mapa\')">Mapa de Conexiones</a>.</div>' : '')
+    + '<div style="font-size:11px;margin-top:6px;color:var(--mut2,#8a93ad)">Valor actual: <b>' + OS_E(p.value) + '</b>' + (p._ov ? ' · origen: ' + OS_E(p._base != null ? p._base : '—') + ' <a style="color:var(--a2);cursor:pointer" onclick="document.getElementById(\'ia-pinfo-ov\').remove();iaRevertOverride(\'' + OS_E(key) + '\')">↩ volver al origen</a>' : '') + '</div>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+}
+window.iaParamInfo = iaParamInfo;
+function iaParamRow(p, bid) {
   const frac = /(_pct$|tasa|reparto|ocupacion|valorizacion|inflacion|retorno|piso_servicios)/.test(p.key);
-  return '<div class="kv"><span title="' + OS_E(p.descripcion || '') + '">' + OS_E(p.key) + ' ' + iaFuenteBadge(p.fuente) + '</span>'
-    + '<b style="display:inline-flex;align-items:center;gap:4px"><input id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:150px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(p.value) + '" onkeydown="if(event.key===\'Enter\')iaSaveParam(\'' + OS_E(p.key) + '\')">'
+  return '<div class="kv"><span title="' + OS_E(p.descripcion || '') + '">'
+    + '<span class="lm-act" style="padding:0 4px;cursor:pointer;font-size:11px" title="¿qué es y de dónde sale?" onclick="iaParamInfo(\'' + OS_E(p.key) + '\')">ⓘ</span> '
+    + OS_E(p.key) + ' ' + iaOrigenBadge(p)
+    + (p._ov ? ' <a style="cursor:pointer;color:var(--a2);font-size:9.5px" title="volver al valor de origen (' + OS_E(p._base != null ? p._base : '—') + ')" onclick="iaRevertOverride(\'' + OS_E(p.key) + '\')">↩ origen</a>' : '')
+    + '</span>'
+    + '<b style="display:inline-flex;align-items:center;gap:4px"><input id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:150px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(p.value) + '" oninput="iaDirty(\'' + bid + '\')" onkeydown="if(event.key===\'Enter\')iaSaveBloque(\'' + bid + '\')">'
     + (frac ? '<span style="color:var(--mut2);font-size:10px;font-weight:700" title="fracción: 0.5 = 50%">×</span>' : '') + '</b></div>';
 }
 function iaParamsBloques() {
@@ -632,15 +837,22 @@ function iaParamsBloques() {
     const b = IA_BLOQUES.find(x => x[2].test(p.key));
     if (b) (grupos[b[0]] = grupos[b[0]] || []).push(p); else otros.push(p);
   });
-  let html = '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">9 bloques · <span class="badge b-ok" style="font-size:8px">auto</span> viene de las bases · <span class="badge b-warn" style="font-size:8px">manual</span> lo cargás vos</div></div>';
+  const estadoChip = (id, rows) => {
+    if (IA.pDirty && IA.pDirty[id]) return '<span id="ia-bst-' + id + '" style="color:var(--amber);font-weight:600">● sin guardar</span>';
+    if (IA.pSaved && IA.pSaved[id]) return '<span id="ia-bst-' + id + '" style="color:var(--pos);font-weight:600">✓ guardado</span>';
+    return '<span id="ia-bst-' + id + '"></span>';
+  };
+  const saveBtn = id => '<button class="ct-btn" style="padding:2px 9px;font-size:10px" onclick="event.stopPropagation();iaSaveBloque(\'' + id + '\')">💾 Guardar</button>';
+  let html = '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">9 bloques con 💾 por bloque · <span class="badge b-ok" style="font-size:8px">real</span> de la base · <span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff">estimado</span> lo calcula el modelo · <span class="badge" style="font-size:8px;background:rgba(192,132,252,.16);color:#c084fc">manual</span> lo cargás vos (editar un real = override reversible, la fuente no se pisa)</div></div>';
   IA_BLOQUES.forEach(([id, titulo]) => {
     const rows = grupos[id] || [];
     const open = !!IA.pOpen[id];
-    const autos = rows.filter(p => /^real|^excel/.test(p.fuente || '')).length;
-    html += '<div onclick="iaTogglePB(\'' + id + '\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700">'
-      + '<span>' + (open ? '▾' : '▸') + ' ' + titulo + '</span><span class="meta" style="font-weight:500">' + rows.length + (rows.length ? ' · ' + autos + ' auto' : ' · vacío') + '</span></div>';
+    const autos = rows.filter(p => iaEsAuto(p) && !p._ov).length;
+    const ovs = rows.filter(p => p._ov).length;
+    html += '<div onclick="iaTogglePB(\'' + id + '\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700;align-items:center">'
+      + '<span>' + (open ? '▾' : '▸') + ' ' + titulo + '</span><span class="meta" style="font-weight:500;display:inline-flex;gap:8px;align-items:center">' + estadoChip(id, rows) + rows.length + (rows.length ? ' · ' + autos + ' real' + (ovs ? ' · ' + ovs + ' override' : '') : ' · vacío') + (open && rows.length ? saveBtn(id) : '') + '</span></div>';
     if (open) {
-      html += rows.map(iaParamRow).join('') || '';
+      html += rows.map(p => iaParamRow(p, id)).join('') || '';
       if (id === 'b3' && rows.length) {
         const g = k => { const r = rows.find(x => x.key === k) || IA.params.find(x => x.key === k); return r ? parseFloat(r.value) || 0 : 0; };
         const tot = g('compra') + (g('remodel_real') || g('est_remodel_total')) + g('cierre_compra');
@@ -660,8 +872,8 @@ function iaParamsBloques() {
   });
   if (otros.length) {
     const open = !!IA.pOpen.b0;
-    html += '<div onclick="iaTogglePB(\'b0\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700"><span>' + (open ? '▾' : '▸') + ' 🧩 Otros</span><span class="meta" style="font-weight:500">' + otros.length + '</span></div>';
-    if (open) html += otros.map(iaParamRow).join('');
+    html += '<div onclick="iaTogglePB(\'b0\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700;align-items:center"><span>' + (open ? '▾' : '▸') + ' 🧩 Otros</span><span class="meta" style="font-weight:500;display:inline-flex;gap:8px;align-items:center">' + estadoChip('b0', otros) + otros.length + (open ? saveBtn('b0') : '') + '</span></div>';
+    if (open) html += otros.map(p => iaParamRow(p, 'b0')).join('');
   }
   return html + '</div>';
 }
@@ -710,29 +922,49 @@ function invAdminView() {
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return window.kitError ? kitError(IA.err, 'iaLoad(true)') : '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
   const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger']];
-  const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IA.tab=\'' + t[0] + '\';osRender()">' + t[1] + '</button>').join(' ');
+  const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaGoTab(\'' + t[0] + '\')">' + t[1] + '</button>').join(' ');
   let body = '';
 
   if (IA.tab === 'accesos') {
     const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
-    body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Crear acceso al portal</div><div class="k">el inversionista entra en /inversionista con magic link (sin contraseña)</div></div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
-      + iaLbl('Inversionista', '<select id="ia-acc-inv" class="osa-in" onchange="var i=IA.investors.find(x=>x.airtable_id===this.value); if(i&&i.email) document.getElementById(\'ia-acc-email\').value=i.email">' + invOpts + '</select>')
+    const mode = IA.accMode || 'airtable';
+    const modeBtn = (m, lab) => '<button class="ibtn" style="' + (mode === m ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaAccMode(\'' + m + '\')">' + lab + '</button>';
+    const formAirtable = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+      + iaLbl('Inversionista (sincronizado de Airtable)', '<select id="ia-acc-inv" class="osa-in" onchange="var i=IA.investors.find(x=>x.airtable_id===this.value); if(i&&i.email) document.getElementById(\'ia-acc-email\').value=i.email">' + invOpts + '</select>')
       + iaLbl('Email del portal', '<input id="ia-acc-email" class="osa-in" style="max-width:280px" placeholder="email del inversionista">')
-      + '<button class="cbtn" onclick="iaCrearAcceso()">Crear acceso</button></div></div>'
-      + '<div class="card"><div class="chart-h"><div class="t">Accesos (' + IA.access.length + ')</div></div>'
-      + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Email</th><th>Estado</th><th>Reclamado</th><th style="text-align:right">Acciones</th></tr></thead><tbody>'
-      + (IA.access.map(a => '<tr><td>' + OS_E(iaInvName(a.investor_airtable_id)) + '</td><td>' + OS_E(a.email) + '</td>'
-        + '<td><span class="badge ' + (a.estado === 'activo' ? 'b-ok' : a.estado === 'revocado' ? 'b-red' : 'b-warn') + '">' + a.estado + '</span></td>'
-        + '<td>' + (a.claimed_at ? new Date(a.claimed_at).toLocaleDateString('es-MX') : '—') + '</td>'
-        + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" onclick="iaEnviarLink(\'' + OS_E(a.email) + '\')">✉️ Invitar</button> '
-        + (a.estado === 'revocado' ? '<button class="ct-btn" onclick="iaRevocar(\'' + a.id + '\', true)">↩︎ Rehabilitar</button>' : '<button class="ct-btn" style="color:var(--neg)" onclick="iaRevocar(\'' + a.id + '\', false)">⏸ Revocar</button>')
-        + '</td></tr>').join('') || '<tr><td colspan="5" class="empty">Sin accesos.</td></tr>')
+      + '<button class="cbtn" onclick="iaCrearAcceso()">Crear acceso</button></div>';
+    const formManual = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+      + iaLbl('Nombre', '<input id="ia-accm-nombre" class="osa-in" style="max-width:240px" placeholder="nombre del socio">')
+      + iaLbl('Email del portal', '<input id="ia-accm-email" class="osa-in" style="max-width:280px" placeholder="email">')
+      + '<button class="cbtn" onclick="iaCrearAccesoManual()">Crear acceso manual</button></div>'
+      + '<div class="meta" style="margin-top:6px">Sin ir a Airtable ni esperar el sync — queda marcado ✍️ manual. Solo verá las casas que le asignes en 🏠 Casas &amp; reparto (RLS igual de estricta; sin casas = portal vacío). Después se puede vincular ⇄ a su registro de Airtable si aparece.</div>';
+    body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Crear acceso al portal</div><div class="k">el inversionista entra en /inversionista con magic link (sin contraseña)</div></div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:10px">' + modeBtn('airtable', '📋 Elegir de Airtable') + modeBtn('manual', '✍️ Agregar manual') + '</div>'
+      + (mode === 'manual' ? formManual : formAirtable) + '</div>'
+      + '<div class="card overx"><div class="chart-h"><div class="t">Accesos (' + IA.access.length + ')</div><div class="k">quién creó cada acceso queda auditado (inv_audit)</div></div>'
+      + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Email</th><th>Origen</th><th>Estado</th><th>Reclamado</th><th>Creado por</th><th style="text-align:right">Acciones</th></tr></thead><tbody>'
+      + (IA.access.map(a => {
+        const manual = a.origen === 'manual';
+        const nCasas = IA.holdings.filter(h => h.investor_airtable_id === a.investor_airtable_id).length;
+        const linkRow = (manual && IA.linkEdit === a.id)
+          ? '<tr><td colspan="7" style="background:var(--glass)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0">⇄ Vincular a Airtable: <select id="ia-link-' + a.id + '" class="osa-in" style="max-width:260px"><option value="">— elegí el inversionista —</option>' + invOpts + '</select>'
+            + '<button class="cbtn" style="padding:6px 12px" onclick="iaLinkManual(\'' + a.id + '\',\'' + OS_E(a.investor_airtable_id) + '\')">Vincular</button><button class="ct-btn" onclick="IA.linkEdit=null;osRender()">Cancelar</button></div></td></tr>'
+          : '';
+        return linkRow + '<tr><td>' + OS_E(iaInvName(a.investor_airtable_id)) + (manual ? ' <span class="meta" style="font-size:10px">(' + nCasas + ' casa' + (nCasas === 1 ? '' : 's') + ' asignada' + (nCasas === 1 ? '' : 's') + ')</span>' : '') + '</td><td>' + OS_E(a.email) + '</td>'
+          + '<td>' + (manual ? '<span class="badge" style="font-size:9px;background:rgba(192,132,252,.16);color:#c084fc">✍️ manual</span>' : '<span class="badge b-ok" style="font-size:9px">Airtable</span>') + '</td>'
+          + '<td><span class="badge ' + (a.estado === 'activo' ? 'b-ok' : a.estado === 'revocado' ? 'b-red' : 'b-warn') + '">' + a.estado + '</span></td>'
+          + '<td>' + (a.claimed_at ? new Date(a.claimed_at).toLocaleDateString('es-MX') : '—') + '</td>'
+          + '<td class="meta" style="font-size:10.5px">' + OS_E(a.created_by || '—') + '</td>'
+          + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" onclick="iaEnviarLink(\'' + OS_E(a.email) + '\')">✉️ Invitar</button> '
+          + (manual ? '<button class="ct-btn" title="vincular a un inversionista de Airtable" onclick="IA.linkEdit=\'' + a.id + '\';osRender()">⇄</button> ' : '')
+          + (a.estado === 'revocado' ? '<button class="ct-btn" onclick="iaRevocar(\'' + a.id + '\', true)">↩︎ Rehabilitar</button>' : '<button class="ct-btn" style="color:var(--neg)" onclick="iaRevocar(\'' + a.id + '\', false)">⏸ Revocar</button>')
+          + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="empty">Sin accesos.</td></tr>')
       + '</tbody></table></div>';
   }
 
   if (IA.tab === 'holdings') {
-    const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+    const invOpts = iaInvOptions();
     const casaOpts = IA.deals.filter(d => d.property_id).map(d => '<option value="' + d.property_id + '">' + OS_E((d.address || '').split(',')[0]) + '</option>').join('');
     body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Vincular inversionista a casa</div><div class="k">reparto configurable por casa · default 50/50</div></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
