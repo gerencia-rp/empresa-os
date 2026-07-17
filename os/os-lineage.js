@@ -329,6 +329,33 @@ function lmCSS() {
   document.head.appendChild(st);
 }
 
+// ─── 📡 declaración de la base REAL que lee cada módulo HOY (config de los syncs) ───
+// Resuelve la ambigüedad "¿cuál de las 4 Empresa Rentas?": nombre EXACTO + base ID por módulo,
+// con alerta si la base efectiva es sandbox/plantilla/ejemplo.
+function lmBasesDecl() {
+  const B = window.LM_AT_BASES || {};
+  if (!Object.keys(B).length) return '';
+  const rows = ['Rentas', 'Fix & Flip', 'Remodelación', 'Contable / QBO'].map(alias => {
+    const b = B[alias]; if (!b) return '';
+    if (b.tipo === 'airtable') {
+      const sand = lmATSandbox(b.nombre);
+      return '<div class="kv"><span><span class="lm-btag" style="background:' + lmColor(alias) + '22;color:' + lmColor(alias) + '">' + LM_E(alias) + '</span> <span class="meta" style="font-size:10px">' + LM_E(b.modulo) + '</span></span>'
+        + '<b style="text-align:right">"' + LM_E(b.nombre) + '" <span class="lm-mono" style="font-size:10px">' + b.id + '</span> '
+        + (sand ? '<span class="lm-pill warn">⚠ BASE DE PRUEBA</span>' : '<span class="lm-pill ok">OK</span>')
+        + ' <a class="lm-act" href="' + lmATUrl(b.id) + '" target="_blank" rel="noopener" title="abrir la base en Airtable">↗</a></b></div>';
+    }
+    if (b.tipo === 'qbo') {
+      return '<div class="kv"><span><span class="lm-btag" style="background:' + lmColor(alias) + '22;color:' + lmColor(alias) + '">' + LM_E(alias) + '</span> <span class="meta" style="font-size:10px">' + LM_E(b.modulo) + '</span></span>'
+        + '<b style="text-align:right;font-size:11px">' + (b.realms || []).map(x => LM_E(x.company) + ' <span class="lm-mono" style="font-size:9px">' + x.realm + '</span>').join('<br>') + '</b></div>';
+    }
+    return '';
+  }).join('');
+  const otras = (window.LM_AT_OTRAS || []).map(o => '"' + LM_E(o.nombre) + '" <span class="lm-mono" style="font-size:9px">' + o.id + '</span> — ' + LM_E(o.nota)).join('<br>');
+  return '<div class="lab" style="margin-top:16px">📡 De qué base lee la app HOY (config real de los syncs)</div>' + rows
+    + '<div class="meta" style="font-size:10px;margin-top:6px">Verificado 17-jul-2026: los secrets AIRTABLE_BASE_ID / _FF / _REMODEL NO están seteados en Supabase → el default del código de cada sync ES la base efectiva. Regenerar registro: scripts/lineage-airtable-gen.mjs.</div>'
+    + (otras ? '<details style="margin-top:6px"><summary class="meta" style="cursor:pointer;font-size:10.5px">⚠ Bases con nombre parecido que la app NO lee (para no confundirse)</summary><div class="meta" style="font-size:10px;margin-top:4px;line-height:1.7">' + otras + '</div></details>' : '');
+}
+
 // ─── vista principal ───
 function osLineageView() {
   lmCSS();
@@ -370,6 +397,7 @@ function osLineageView() {
       + '<h1 style="font-size:19px">🗺️ Mapa de Conexiones <span>· de dónde sale cada número</span></h1>'
       + '<div class="sub">' + (LM.rows || []).length + ' números trazados en ' + Object.keys(tree).length + ' empresas · <b style="color:var(--pos)">' + ((LM.rows || []).length - bugs.length - warns.length) + ' OK</b> · <b style="color:var(--amber)">' + warns.length + ' a revisar</b> · <b style="color:var(--neg)">' + bugs.length + ' bug</b></div>'
       + '<div class="lm-key">🔑 <b>La llave que une las bases:</b> la casa (<b>property_id</b> ↔ Dirección). La misma casa vive en Fix & Flip, Rentas y Remodelación — si la dirección está escrita distinto, el property_id la cruza igual (por eso la Ficha se arregló resolviendo por property_id).</div>'
+      + lmBasesDecl()
       + (() => {
         const sinF = (LM.rows || []).filter(r => r.origen === 'crawler' && r.estado === 'pend').length;
         const tot = (LM.rows || []).length;
@@ -398,6 +426,15 @@ function osLineageView() {
       + '<button class="ibtn" onclick="lmAdd()">＋ Agregar dato</button>'
       + '<button class="ibtn" onclick="lmJSON(false)">⬇ JSON</button><button class="ibtn" onclick="lmCSV(false)">⬇ CSV</button></span></div>'
       + '<input id="lm-q" class="lm-in" style="max-width:340px;margin-top:10px" placeholder="🔍 Buscar número, tabla o columna…" value="' + LM_E(LM.q) + '" oninput="lmSetQ(this.value)">'
+      + (() => {
+        // declaración compacta: base efectiva de la empresa activa (con alerta sandbox)
+        const b = lmATBase(LM.emp);
+        if (!b || b.tipo !== 'airtable') return '';
+        const sand = lmATSandbox(b.nombre);
+        return '<div class="meta" style="margin-top:8px;font-size:11px">📡 Base efectiva: <b>"' + LM_E(b.nombre) + '"</b> <span class="lm-mono" style="font-size:10px">' + b.id + '</span>'
+          + (sand ? ' <span style="color:var(--amber);font-weight:700">⚠ estás leyendo de una base de prueba</span>' : '')
+          + ' · sync: ' + LM_E(b.modulo) + ' <a class="lm-act" href="' + lmATUrl(b.id) + '" target="_blank" rel="noopener">↗</a></div>';
+      })()
       + '</div>';
     main = head + (LM.mode === 'diagrama' ? lmDiagrama(rows) : lmLista(rows));
   }
