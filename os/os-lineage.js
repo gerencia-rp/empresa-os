@@ -125,6 +125,77 @@ function lmMirrorOf(tabla) {
   const m = String(tabla || '').match(/\(espejo ([a-z_]+)\)/); if (m) return [m[1]];
   return [];
 }
+// ─── identificadores EXACTOS de Airtable (registro generado os/os-lineage-airtable.js) ───
+// El CEO tiene CUATRO bases llamadas "Empresa Rentas" — el alias amistoso no alcanza para
+// ubicar un dato. Acá se resuelve alias → base real (nombre exacto + baseId), texto de tabla →
+// tabla(s) exacta(s) (nombre + tableId) y texto de columna → campo(s) exacto(s) (nombre + fieldId).
+function lmATNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9ñ&# ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function lmATBase(alias) { return (window.LM_AT_BASES || {})[alias] || null; }
+function lmATSandbox(nombre) { return /sandbox|plantilla|ejemplo|prueba|test/i.test(String(nombre || '')); }
+function lmATUrl(baseId, tableId) { return 'https://airtable.com/' + baseId + (tableId ? '/' + tableId : ''); }
+// texto de tabla del linaje ("💵 Pagos (espejo pm_payments)", "Datos por casa + Desglose Draws")
+// → [{id, n}] tablas exactas de la base efectiva
+function lmATTables(r) {
+  const b = lmATBase(r.base);
+  if (!b || !b.id || typeof LM_AT_SCHEMA === 'undefined' || !LM_AT_SCHEMA[b.id]) return [];
+  const sch = LM_AT_SCHEMA[b.id];
+  const ids = Object.keys(sch);
+  const found = [];
+  const push = (id) => { if (id && !found.some(x => x.id === id)) found.push({ id, n: sch[id].n }); };
+  String(r.tabla || '').replace(/\(espejo[^)]*\)/gi, '').split('+').forEach(part => {
+    let p = lmATNorm(part);
+    if (!p) return;
+    const ali = (window.LM_AT_TALIAS || {})[p];
+    if (ali) p = lmATNorm(ali);
+    let hit = ids.find(id => lmATNorm(sch[id].n) === p);
+    if (!hit) {
+      const cand = ids.filter(id => { const n = lmATNorm(sch[id].n); return n.includes(p) || p.includes(n); });
+      if (cand.length) hit = cand[0];
+    }
+    push(hit);
+  });
+  return found;
+}
+// texto de columna → UNA entrada POR columna: [{txt, fid, fname, tid}] — si es derivado de
+// varias, se listan una por una (pedido CEO); lo que no matchea un campo real queda declarado
+// como derivado/columna del espejo (sin inventar field IDs).
+function lmATCols(r, tables) {
+  const b = lmATBase(r.base);
+  const sch = (b && b.id && typeof LM_AT_SCHEMA !== 'undefined') ? LM_AT_SCHEMA[b.id] : null;
+  const parts = String(r.columna || '').split(/\s\/\s|\s\+\s|\s→\s|\s×\s/).map(x => x.trim())
+    .filter(p => p && !/^[\d.,%\s]+$/.test(p));
+  return parts.map(p => {
+    let fid = null, fname = null, tid = null;
+    if (sch) {
+      const m = p.match(/fld[A-Za-z0-9]{14}/);
+      const scan = (tables && tables.length) ? tables : Object.keys(sch).map(id => ({ id }));
+      if (m) { for (const t of scan) { if (sch[t.id].f[m[0]]) { fid = m[0]; fname = sch[t.id].f[fid]; tid = t.id; break; } } }
+      if (!fid) {
+        const pn = lmATNorm(p.replace(/\([^)]*\)/g, '').replace(/[×÷=].*$/, '').replace(/^[Σσ]\s*/, ''));
+        if (pn && tables) {
+          for (const t of tables) {
+            const fs = sch[t.id].f;
+            let hits = Object.keys(fs).filter(id => lmATNorm(fs[id]) === pn);
+            if (!hits.length) {
+              hits = Object.keys(fs).filter(id => { const n = lmATNorm(fs[id]); return n.includes(pn) || pn.includes(n); });
+              if (hits.length !== 1) hits = [];
+            }
+            if (hits.length === 1) { fid = hits[0]; fname = fs[fid]; tid = t.id; break; }
+          }
+        }
+      }
+    }
+    return { txt: p, fid, fname, tid };
+  });
+}
+// chip HTML del campo: nombre exacto + fieldId, o el texto declarado como derivado
+function lmATColChip(c) {
+  if (c.fid) return '<div style="padding:3px 0"><b>' + LM_E(c.fname) + '</b> <span class="lm-mono" style="font-size:10px;opacity:.8">' + c.fid + '</span></div>';
+  return '<div style="padding:3px 0;color:var(--mut)">' + LM_E(c.txt) + ' <span style="font-size:9.5px;color:var(--mut2)">(derivado / columna del espejo — no es un campo directo de Airtable)</span></div>';
+}
 // downstream AUTOMÁTICO (grafo inverso): feeds explícitos + mismo origen tabla·columna + vistas que consumen la tabla
 function lmDownstream(r) {
   const out = []; const seen = new Set([r.metric_key]);
@@ -150,7 +221,17 @@ window.lmFocus = lmFocus;
 // ─── export (el mapa es la fuente de verdad del linaje — compartible y versionable) ───
 function lmExportRows(todo) {
   const rows = todo ? (LM.rows || []) : lmRowsSel();
-  return rows.map(r => ({ empresa: r.empresa, pantalla: r.sistema, dato: r.dato, base: r.base, tabla: r.tabla, columna: r.columna, formula: r.formula || '', nota: r.nota || '', estado: r.estado }));
+  return rows.map(r => {
+    const b = lmATBase(r.base), ts = lmATTables(r);
+    const isAt = !!(b && b.tipo === 'airtable');
+    const cs = isAt ? lmATCols(r, ts).filter(c => c.fid) : [];
+    return { empresa: r.empresa, pantalla: r.sistema, dato: r.dato, base: r.base,
+      base_exacta: b ? b.nombre : '', base_id: (isAt && b.id) || '',
+      tabla: r.tabla, tabla_ids: ts.map(t => t.n + ':' + t.id).join('; '),
+      columna: r.columna, field_ids: cs.map(c => c.fname + ':' + c.fid).join('; '),
+      url_airtable: (isAt && ts.length) ? lmATUrl(b.id, ts[0].id) : '',
+      formula: r.formula || '', nota: r.nota || '', estado: r.estado };
+  });
 }
 function lmDownload(name, text, type) {
   const a = document.createElement('a');
@@ -160,7 +241,7 @@ function lmJSON(todo) { lmDownload('mapa_conexiones' + (todo ? '_completo' : '')
 window.lmJSON = lmJSON;
 function lmCSV(todo) {
   const rows = lmExportRows(todo);
-  const head = ['empresa', 'pantalla', 'dato', 'base', 'tabla', 'columna', 'formula', 'nota', 'estado'];
+  const head = ['empresa', 'pantalla', 'dato', 'base', 'base_exacta', 'base_id', 'tabla', 'tabla_ids', 'columna', 'field_ids', 'url_airtable', 'formula', 'nota', 'estado'];
   const csv = [head.join(',')].concat(rows.map(r => head.map(h => '"' + String(r[h] || '').replace(/"/g, '""') + '"').join(','))).join('\n');
   lmDownload('mapa_conexiones' + (todo ? '_completo' : '') + '.csv', csv, 'text/csv');
 }
@@ -201,6 +282,8 @@ function lmCSS() {
     + '#os-root .lm-table tr.bug{background:rgba(255,92,108,.06)}'
     + '#os-root .lm-mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--mut)}'
     + '#os-root .lm-act{cursor:pointer;padding:2px 6px;border-radius:6px;color:var(--mut2);font-size:12px}'
+    + '#os-root a.lm-act,#os-root a.ibtn{text-decoration:none}'
+    + '#os-root a.ibtn{display:inline-flex;align-items:center;gap:4px}'
     + '#os-root .lm-act:hover{color:var(--ink);background:var(--glass)}'
     + '#os-root .lm-sel{background:var(--glass);color:var(--ink);border:1px solid var(--glassb);border-radius:7px;padding:4px 6px;font-size:11px;max-width:170px}'
     + '#os-root .lm-in{background:var(--glass);color:var(--ink);border:1px solid var(--glassb);border-radius:7px;padding:6px 9px;font-size:12px;width:100%}'
@@ -327,12 +410,39 @@ window.osLineageView = osLineageView;
 function lmFlujo(r) {
   const node = (lab, val, mono, cls) => '<div class="lm-node' + (cls ? ' ' + cls : '') + '"><div class="lab">' + lab + '</div><div class="val' + (mono ? ' lm-mono' : '') + '">' + val + '</div></div>';
   const arrow = '<div class="lm-arrow">→</div>';
+  // identificadores EXACTOS (pedido CEO): nombre real de la base + baseId, tabla + tableId,
+  // columna(s) + fieldId — el alias corto ("Rentas") queda como subtítulo.
+  const atB = lmATBase(r.base), atT = lmATTables(r);
+  const isAt = !!(atB && atB.tipo === 'airtable');
+  const atC = isAt ? lmATCols(r, atT) : [];
+  const sand = isAt && lmATSandbox(atB.nombre);
+  let baseVal;
+  if (isAt) {
+    baseVal = '<span style="color:' + lmColor(r.base) + '">"' + LM_E(atB.nombre) + '"</span>'
+      + '<div class="lm-mono" style="font-size:10.5px;margin-top:2px">' + atB.id + '</div>'
+      + '<div class="meta" style="font-size:10px;font-weight:400">alias: ' + LM_E(r.base) + ' · sync: ' + LM_E(atB.modulo) + '</div>'
+      + (sand ? '<div style="color:var(--amber);font-size:10.5px;font-weight:700;margin-top:3px">⚠ estás leyendo de una base de prueba</div>' : '');
+  } else if (atB && atB.tipo === 'qbo') {
+    baseVal = '<span style="color:' + lmColor(r.base) + '">QuickBooks Online</span>'
+      + '<div class="meta" style="font-size:9.5px;font-weight:400;margin-top:2px">' + (atB.realms || []).map(x => LM_E(x.company) + ' · realm ' + x.realm).join('<br>') + '</div>';
+  } else {
+    baseVal = '<span style="color:' + lmColor(r.base) + '">' + LM_E(atB ? atB.nombre : r.base) + '</span>';
+  }
   const chain = [];
-  chain.push(node('Base', '<span style="color:' + lmColor(r.base) + '">' + LM_E(r.base) + '</span>'));
-  chain.push(node('Tabla', LM_E(r.tabla), 1));
-  chain.push(node('Columna', LM_E(r.columna), 1));
+  chain.push(node('Base', baseVal));
+  chain.push(node('Tabla', (isAt && atT.length)
+    ? atT.map(t => '<div style="padding:2px 0">' + LM_E(t.n) + ' <span class="lm-mono" style="font-size:10px;opacity:.8">' + t.id + '</span></div>').join('')
+    : LM_E(r.tabla), (isAt && atT.length) ? 0 : 1));
+  chain.push(node('Columna' + (atC.length > 1 ? 's (derivado — una por una)' : ''),
+    (isAt && atC.length) ? atC.map(lmATColChip).join('') : LM_E(r.columna), (isAt && atC.length) ? 0 : 1));
   if (r.vista) chain.push(node('Vista (Supabase)', LM_E(r.vista), 1));
   if (r.formula) chain.push(node('Fórmula', 'ƒ', 0));
+  // 🔗 salto al lugar EXACTO en Airtable (base/tabla) para verificar o modificar
+  const openBtns = (isAt && atT.length)
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' + atT.map(t =>
+      '<a class="ibtn" href="' + lmATUrl(atB.id, t.id) + '" target="_blank" rel="noopener">🔗 Abrir en Airtable · ' + LM_E(t.n) + '</a>').join('')
+      + '<span class="meta" style="align-self:center;font-size:10px">abre "' + LM_E(atB.nombre) + '" → la tabla exacta; el field ID de la columna está arriba</span></div>'
+    : '';
   const flow = chain.join(arrow) + arrow + '<div class="lm-node number"><div class="lab" style="color:#c9a227">Número en la app</div><div class="val" style="font-size:15px">' + LM_E(r.dato) + '</div><div class="meta" style="font-size:10px">' + LM_E(r.sistema) + '</div></div>';
   const vc = lmViewChain(r.vista || r.tabla);
   const upInv = lmUpstreamOf(r);
@@ -347,6 +457,7 @@ function lmFlujo(r) {
     + '<div class="meta" style="margin-bottom:16px">De dónde viene y qué alimenta.</div>'
     + '<div class="lab" style="margin-bottom:10px">① De dónde viene (Airtable/QBO → app)</div>'
     + '<div class="lm-flow">' + flow + '</div>'
+    + openBtns
     + (r.formula ? '<div class="lm-formula">ƒ &nbsp; ' + LM_E(r.formula) + '</div>' : '')
     + (r.nota ? '<div style="color:var(--amber);font-size:12.5px;margin-top:8px">⚠ ' + LM_E(r.nota) + '</div>' : '')
     + (vc ? '<div class="meta" style="margin-top:8px">🧬 La vista <b>' + LM_E(vc.view) + '</b> lee de: ' + vc.deps.map(d => '<span class="lm-mono">' + LM_E(d.t) + '</span> (' + d.c.length + ' col)').join(' · ') + ' <span style="opacity:.7">(metadata generada de Postgres)</span></div>' : '')
@@ -378,14 +489,29 @@ function lmLista(rows) {
           + '<span class="meta" style="align-self:center">Reasignar la fuente de una cifra contable la deja PENDIENTE hasta reconciliar con QBO.</span></div>'
           + '</td></tr>';
       }
+      // identificadores exactos por fila: base ID debajo del alias, table IDs, y la(s)
+      // columna(s) resueltas a campo exacto + field ID (derivados: una por una)
+      const atB = lmATBase(r.base), atT = lmATTables(r);
+      const isAt = !!(atB && atB.tipo === 'airtable');
+      const atC = isAt ? lmATCols(r, atT) : [];
+      const sand = isAt && lmATSandbox(atB.nombre);
       return '<tr class="' + r.estado + '">'
         + '<td><b>' + LM_E(r.dato) + '</b>' + (r.nota ? '<div class="meta" style="font-size:10.5px;max-width:280px">' + LM_E(r.nota) + '</div>' : '') + '</td>'
-        + '<td>' + btag(r.base) + '</td>'
-        + '<td class="lm-mono">' + LM_E(r.tabla) + (vc ? '<div class="meta" style="font-size:9.5px">lee de: ' + vc.deps.map(d => LM_E(d.t)).join(', ') + '</div>' : '') + '</td>'
-        + '<td class="lm-mono">' + LM_E(r.columna) + '</td>'
+        + '<td>' + btag(r.base)
+        + (isAt ? '<div class="meta" style="font-size:9px;max-width:170px">"' + LM_E(atB.nombre) + '"<br><span class="lm-mono" style="font-size:9px">' + atB.id + '</span>' + (sand ? ' <span style="color:var(--amber);font-weight:700">⚠ prueba</span>' : '') + '</div>' : '')
+        + (atB && atB.tipo === 'qbo' ? '<div class="meta" style="font-size:9px;max-width:170px">' + (atB.realms || []).length + ' realms QBO</div>' : '')
+        + '</td>'
+        + '<td class="lm-mono">' + LM_E(r.tabla)
+        + ((isAt && atT.length) ? '<div class="meta" style="font-size:9px">' + atT.map(t => LM_E(t.n) + ' · ' + t.id).join('<br>') + '</div>' : '')
+        + (vc ? '<div class="meta" style="font-size:9.5px">lee de: ' + vc.deps.map(d => LM_E(d.t)).join(', ') + '</div>' : '') + '</td>'
+        + '<td class="lm-mono">' + ((isAt && atC.length)
+          ? atC.map(c => c.fid ? '<div>' + LM_E(c.fname) + ' <span class="meta" style="font-size:9px">' + c.fid + '</span></div>' : '<div class="meta">' + LM_E(c.txt) + '</div>').join('')
+          : LM_E(r.columna)) + '</td>'
         + '<td class="lm-mono" style="max-width:220px">' + LM_E(r.formula || '—') + '</td>'
         + '<td>' + estadoSel(r) + '</td>'
-        + '<td style="white-space:nowrap"><span class="lm-act" title="ver en el diagrama" onclick="LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">🔗</span><span class="lm-act" title="cambiar fuente" onclick="lmEdit(\'' + r.id + '\')">✎</span><span class="lm-act" title="quitar" onclick="lmArchive(\'' + r.id + '\')">✕</span></td>'
+        + '<td style="white-space:nowrap">'
+        + ((isAt && atT.length) ? '<a class="lm-act" title="abrir en Airtable (tabla exacta)" href="' + lmATUrl(atB.id, atT[0].id) + '" target="_blank" rel="noopener">↗</a>' : '')
+        + '<span class="lm-act" title="ver en el diagrama" onclick="LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">🔗</span><span class="lm-act" title="cambiar fuente" onclick="lmEdit(\'' + r.id + '\')">✎</span><span class="lm-act" title="quitar" onclick="lmArchive(\'' + r.id + '\')">✕</span></td>'
         + '</tr>';
     }).join('')
     + '</tbody></table></div>';
@@ -416,11 +542,19 @@ function lmDiagrama(rows) {
     + '</div>';
   const f = rows.find(r => r.id === LM.focus);
   const vc = f ? lmViewChain(f.tabla) : null;
+  const fB = f ? lmATBase(f.base) : null, fT = f ? lmATTables(f) : [];
+  const fAt = !!(fB && fB.tipo === 'airtable');
+  const fC = fAt ? lmATCols(f, fT) : [];
   const detail = f ? '<div class="lm-detail">'
-    + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>' + LM_E(f.dato) + '</b><span style="display:flex;gap:6px"><button class="ibtn" onclick="LM.mode=\'lista\';lmEdit(\'' + f.id + '\')">✎ Cambiar fuente</button><button class="ibtn" onclick="lmFocus(\'' + f.id + '\')">✕</button></span></div>'
-    + '<div class="kv"><span>Base</span><b><span class="lm-btag" style="background:' + lmColor(f.base) + '22;color:' + lmColor(f.base) + '">' + LM_E(f.base) + '</span></b></div>'
-    + '<div class="kv"><span>Tabla</span><b class="lm-mono">' + LM_E(f.tabla) + '</b></div>'
-    + '<div class="kv"><span>Columna</span><b class="lm-mono">' + LM_E(f.columna) + '</b></div>'
+    + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>' + LM_E(f.dato) + '</b><span style="display:flex;gap:6px">'
+    + (fAt && fT.length ? '<a class="ibtn" href="' + lmATUrl(fB.id, fT[0].id) + '" target="_blank" rel="noopener">🔗 Abrir en Airtable</a>' : '')
+    + '<button class="ibtn" onclick="LM.mode=\'lista\';lmEdit(\'' + f.id + '\')">✎ Cambiar fuente</button><button class="ibtn" onclick="lmFocus(\'' + f.id + '\')">✕</button></span></div>'
+    + '<div class="kv"><span>Base</span><b><span class="lm-btag" style="background:' + lmColor(f.base) + '22;color:' + lmColor(f.base) + '">' + LM_E(f.base) + '</span>'
+    + (fAt ? ' "' + LM_E(fB.nombre) + '" <span class="lm-mono" style="font-size:10px">' + fB.id + '</span>' + (lmATSandbox(fB.nombre) ? ' <span style="color:var(--amber);font-weight:700">⚠ base de prueba</span>' : '') : '') + '</b></div>'
+    + '<div class="kv"><span>Tabla</span><b class="lm-mono">' + ((fAt && fT.length) ? fT.map(t => LM_E(t.n) + ' · ' + t.id).join('<br>') : LM_E(f.tabla)) + '</b></div>'
+    + '<div class="kv"><span>Columna' + (fC.length > 1 ? 's (derivado)' : '') + '</span><b class="lm-mono" style="max-width:60%;text-align:right">' + ((fAt && fC.length)
+      ? fC.map(c => c.fid ? LM_E(c.fname) + ' <span style="font-size:9px;opacity:.8">' + c.fid + '</span>' : '<span style="opacity:.7">' + LM_E(c.txt) + '</span>').join('<br>')
+      : LM_E(f.columna)) + '</b></div>'
     + (f.formula ? '<div class="kv"><span>Fórmula</span><b class="lm-mono" style="max-width:60%;text-align:right">' + LM_E(f.formula) + '</b></div>' : '')
     + (f.nota ? '<div class="kv"><span>Nota</span><b style="max-width:60%;text-align:right;font-weight:500;font-size:11px">' + LM_E(f.nota) + '</b></div>' : '')
     + '<div class="kv"><span>Estado</span><b><span class="lm-pill ' + f.estado + '">' + LM_PILL[f.estado] + '</span></b></div>'
@@ -483,15 +617,25 @@ async function osLineageInfo(empresa, sistema, dato) {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,12,.55);display:grid;place-items:center;z-index:99999;padding:18px';
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
   const vc = r ? lmViewChain(r.tabla) : null;
+  const iB = r ? lmATBase(r.base) : null, iT = r ? lmATTables(r) : [];
+  const iAt = !!(iB && iB.tipo === 'airtable');
+  const iC = iAt ? lmATCols(r, iT) : [];
   const kv = (k, v) => '<div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--glassb,#2a2f4a)"><span style="color:var(--mut,#9aa0b8)">' + k + '</span><b style="text-align:right;font-family:ui-monospace,Menlo,monospace;max-width:60%">' + v + '</b></div>';
   ov.innerHTML = '<div style="background:var(--bg,#0f1220);border:1px solid var(--glassb,#2a2f4a);border-radius:14px;padding:18px;max-width:480px;width:100%;color:var(--ink,#e8eaf2);box-shadow:0 18px 50px rgba(0,0,0,.45)">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px"><b style="font-size:14px">ⓘ ¿De dónde sale "' + LM_E(dato) + '"?</b><button class="ibtn" onclick="document.getElementById(\'lm-info-ov\').remove()">✕</button></div>'
     + (r
-      ? kv('Base', '<span style="color:' + lmColor(r.base) + '">' + LM_E(r.base) + '</span>') + kv('Tabla', LM_E(r.tabla)) + kv('Columna', LM_E(r.columna))
+      ? kv('Base', '<span style="color:' + lmColor(r.base) + '">' + LM_E(iAt ? '"' + iB.nombre + '"' : r.base) + '</span>'
+          + (iAt ? '<br><span style="font-size:10px">' + iB.id + '</span>' + (lmATSandbox(iB.nombre) ? '<br><span style="color:var(--amber,#f5b23d);font-size:10.5px">⚠ base de prueba</span>' : '') : ''))
+        + kv('Tabla', (iAt && iT.length) ? iT.map(t => LM_E(t.n) + ' <span style="font-size:9.5px;opacity:.8">' + t.id + '</span>').join('<br>') : LM_E(r.tabla))
+        + kv('Columna' + (iC.length > 1 ? 's' : ''), (iAt && iC.length)
+          ? iC.map(c => c.fid ? LM_E(c.fname) + ' <span style="font-size:9px;opacity:.8">' + c.fid + '</span>' : '<span style="opacity:.7">' + LM_E(c.txt) + '</span>').join('<br>')
+          : LM_E(r.columna))
         + (r.formula ? kv('Fórmula', LM_E(r.formula)) : '') + (r.nota ? kv('Nota', '<span style="font-weight:500;font-size:11px">' + LM_E(r.nota) + '</span>') : '')
         + kv('Estado', '<span class="lm-pill ' + r.estado + '">' + LM_PILL[r.estado] + '</span>')
         + (vc ? kv('La vista lee de', '<span style="font-size:10px">' + vc.deps.map(d => LM_E(d.t)).join(' · ') + '</span>') : '')
-        + '<div style="margin-top:12px;display:flex;gap:8px"><button class="cbtn" style="padding:8px 14px" onclick="document.getElementById(\'lm-info-ov\').remove();osNav(\'/mapa\');LM.emp=\'' + LM_E(empresa) + '\';LM.sys=\'' + LM_E(sistema).replace(/'/g, "\\'") + '\';osRender()">🗺️ Abrir en el mapa (y reasignar fuente)</button></div>'
+        + '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
+        + ((iAt && iT.length) ? '<a class="ibtn" style="padding:8px 14px" href="' + lmATUrl(iB.id, iT[0].id) + '" target="_blank" rel="noopener">🔗 Abrir en Airtable</a>' : '')
+        + '<button class="cbtn" style="padding:8px 14px" onclick="document.getElementById(\'lm-info-ov\').remove();osNav(\'/mapa\');LM.emp=\'' + LM_E(empresa) + '\';LM.sys=\'' + LM_E(sistema).replace(/'/g, "\\'") + '\';osRender()">🗺️ Abrir en el mapa (y reasignar fuente)</button></div>'
       : '<div style="padding:16px 0;color:var(--mut,#9aa0b8);font-size:12.5px">Este número todavía no está trazado en el mapa. Agregalo desde 🗺️ /mapa → ' + LM_E(empresa) + ' → ' + LM_E(sistema) + ' → ＋ Agregar dato.</div>')
     + '</div>';
   document.body.appendChild(ov);

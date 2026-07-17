@@ -51,6 +51,7 @@ const BUNDLE_FILES = [
   "pm/ff-analitica.js",
   "os/os.js",
   "os/os-lineage-views.js",
+  "os/os-lineage-airtable.js",
   "os/os-lineage.js",
   "os/os-cartera.js",
   "os/os-cobros.js",
