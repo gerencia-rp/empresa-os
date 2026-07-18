@@ -4326,7 +4326,7 @@ function pmRenderPayments() {
       ${card('Renta del mes', pmMoney(cobrado), pmYmLabelC(ym) + ' · por tag Mes/Año', 'text-emerald-700')}<div class="mt-2">${pmMonthBadge(ym)}</div>
       ${card('Cobrado en el mes', pmMoney(cobradoCash), 'flujo de caja (por fecha de pago)', 'text-slate-700')}
       ${card('Pagos del mes', monthPays.length, 'con tag ' + pmYmLabelC(ym))}
-      ${card('Pagos atrasados', pagosAtrasados.length, pagosAtrasados.length ? pmMoney(deudaAtrasada) + ' adeudado' : 'sin deuda vencida', pagosAtrasados.length?'text-red-600':'text-slate-900')}
+      ${card('Total atrasado', pmMoney(deudaAtrasada), pagosAtrasados.length ? `suma de lo adeudado · ${pagosAtrasados.length} pagos` : 'sin deuda vencida', pagosAtrasados.length?'text-red-600':'text-slate-900')}
       ${card('Próximos 7 días', proximosList.length, 'por cobrar', proximosList.length?'text-amber-600':'text-slate-900')}
     </div>
 
