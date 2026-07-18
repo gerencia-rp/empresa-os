@@ -213,16 +213,6 @@ const MES_NUM: Record<string, string> = {
   julio: "07", agosto: "08", septiembre: "09", setiembre: "09", octubre: "10",
   noviembre: "11", diciembre: "12"
 };
-function expenseDate(fecha: any, mesCell: any, createdTime?: string): string | null {
-  if (fecha) return fecha;
-  const mesRaw = getMultiSel(mesCell)[0] || getSel(mesCell);
-  if (!mesRaw) return null;
-  const m = MES_NUM[mesRaw.trim().toLowerCase()];
-  if (!m) return null;
-  const year = (createdTime && /^\d{4}/.test(createdTime)) ? createdTime.slice(0, 4)
-             : String(new Date().getFullYear());
-  return `${year}-${m}-01`;
-}
 function extractZip(addr: string): { zip?: string; city?: string; state?: string } {
   const m = (addr || "").match(/(\d{5})/);
   const zip = m?.[1];
@@ -607,6 +597,13 @@ Deno.serve(async (req) => {
     });
 
     // 3b) Bookings = 1 por Reserva.
+    // El Estado de Airtable MANDA (Reservada se preserva como status propio);
+    // deriveStatus por fechas queda solo como fallback si el Estado falta.
+    const ESTADO_MAP: Record<string, string> = {
+      "Activa": "activo",
+      "Histórica": "finalizado",
+      "Reservada": "reservada",
+    };
     const deriveStatus = (ci: string | null, co: string | null): string => {
       if (ci && ci > todayISO) return "confirmado";
       if (co && co < todayISO) return "finalizado";
@@ -654,7 +651,7 @@ Deno.serve(async (req) => {
         rent_period: "mensual",
         payment_day: null,
         platform_account: null,
-        status: deriveStatus(startDate, checkOut),
+        status: ESTADO_MAP[(getSel(r.fields?.[F.res_estado]) || "").trim()] || deriveStatus(startDate, checkOut),
         notes: null,
         ...mirrorFields()
       });
@@ -668,7 +665,7 @@ Deno.serve(async (req) => {
     }
     await mirrorArchive("pm_bookings", "external_id", "active", bookingsUpsertOK && resBookings.length > 0);
     if (!dry_run && MIRROR && ARCHIVE_ENABLED) {
-      await supabase.from("pm_bookings").update({ status: "finalizado" }).eq("active", false).in("status", ["activo", "confirmado"]);
+      await supabase.from("pm_bookings").update({ status: "finalizado" }).eq("active", false).in("status", ["activo", "confirmado", "reservada"]);
     }
     stats.bookings = resBookings.length;
     stats.bookings_sin_tenant = resSinTenant;
@@ -871,7 +868,7 @@ Deno.serve(async (req) => {
           property_id: propId,
           scope: "casa",
           amount: r.fields?.[F.gst_valor] || 0,
-          expense_date: expenseDate(r.fields?.[F.gst_fecha], r.fields?.[F.gst_mes], r.createdTime),
+          expense_date: r.fields?.[F.gst_fecha] || null,   // la Fecha REAL o null — NUNCA fabricada (el período sale del tag Mes/Año)
           month: getSel(r.fields?.[F.gst_mes])?.toLowerCase() || null,
           year: gYearRaw ? parseInt(gYearRaw) : null,   // alimenta billing_ym (mes de renta)
           description: r.fields?.[F.gst_concepto] || tipo || "Gasto",
@@ -896,7 +893,7 @@ Deno.serve(async (req) => {
           property_id: null,
           scope: "empresa",
           amount: r.fields?.[F.ge_valor] || 0,
-          expense_date: expenseDate(r.fields?.[F.ge_fecha], r.fields?.[F.ge_mes], r.createdTime),
+          expense_date: r.fields?.[F.ge_fecha] || null,    // la Fecha REAL o null — NUNCA fabricada
           month: getSel(r.fields?.[F.ge_mes])?.toLowerCase() || null,
           year: yRaw ? parseInt(yRaw) : null,
           description: r.fields?.[F.ge_concepto] || tipo || "Gasto empresa",
