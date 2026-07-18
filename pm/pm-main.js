@@ -4482,7 +4482,7 @@ function pmRenderHouseExpenses() {
   const statusFilter = pmaState.expStatusFilter || 'all';
   const houseExp = pmaState.expenses.filter(e => ['house','cleaning'].includes(e.category));
 
-  let rows = houseExp.filter(e => (e.expense_date||'').startsWith(ym));
+  let rows = houseExp.filter(e => pmBillYm(e) === ym);
   const subcats = [...new Set(houseExp.map(e => e.subcategory).filter(Boolean))].sort();
   if (propFilter) rows = rows.filter(e => e.property_id === propFilter);
   if (subcatFilter) rows = rows.filter(e => e.subcategory === subcatFilter);
@@ -4490,7 +4490,7 @@ function pmRenderHouseExpenses() {
   else if (statusFilter === 'pending') rows = rows.filter(e => !e.paid);
   rows = [...rows].sort((a,b) => (b.expense_date||'').localeCompare(a.expense_date||''));
 
-  const monthAll = houseExp.filter(e => (e.expense_date||'').startsWith(ym));
+  const monthAll = houseExp.filter(e => pmBillYm(e) === ym);
   const totalMonth = rows.reduce((s,e) => s + Number(e.amount||0), 0);
   const paidSum = rows.filter(e => e.paid).reduce((s,e) => s + Number(e.amount||0), 0);
   const pendSum = totalMonth - paidSum;
@@ -4510,7 +4510,7 @@ function pmRenderHouseExpenses() {
   const top3 = catEntries.slice(0,3);
   // Tendencia vs mes anterior
   const prevYm = pmYmShift(ym, -1);
-  const prevTotal = houseExp.filter(e => (e.expense_date||'').startsWith(prevYm)).reduce((s,e) => s + Number(e.amount||0), 0);
+  const prevTotal = houseExp.filter(e => pmBillYm(e) === prevYm).reduce((s,e) => s + Number(e.amount||0), 0);
   const monthTotalAll = monthAll.reduce((s,e) => s + Number(e.amount||0), 0);
   const trendPct = prevTotal ? Math.round((monthTotalAll - prevTotal)/prevTotal*100) : (monthTotalAll>0?100:0);
 
@@ -4572,7 +4572,7 @@ function pmRenderOperationalExpenses() {
   const subcatFilter = pmaState.expFilterSubcat;
   const opExp = pmaState.expenses.filter(e => e.category === 'operational');
 
-  let rows = opExp.filter(e => (e.expense_date||'').startsWith(ym));
+  let rows = opExp.filter(e => pmBillYm(e) === ym);
   const subcats = [...new Set(opExp.map(e => e.subcategory).filter(Boolean))].sort();
   if (subcatFilter) rows = rows.filter(e => e.subcategory === subcatFilter);
   rows = [...rows].sort((a,b) => (b.expense_date||'').localeCompare(a.expense_date||''));
@@ -4588,7 +4588,7 @@ function pmRenderOperationalExpenses() {
   const trend = [];
   for (let i=11; i>=0; i--) {
     const m = pmYmShift(ym, -i);
-    const tot = opExp.filter(e => (e.expense_date||'').startsWith(m)).reduce((s,e) => s + Number(e.amount||0), 0);
+    const tot = opExp.filter(e => pmBillYm(e) === m).reduce((s,e) => s + Number(e.amount||0), 0);
     trend.push({ label: PM_ES_MONTHS_SHORT[pmYmMonthIdx(m)], value: tot });
   }
 
@@ -5117,8 +5117,8 @@ function pmFinTrend(nMonths, anchorYm) {
   for (let i = nMonths-1; i >= 0; i--) {
     const d = new Date(ay, am-1-i, 1);
     const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const income = pmaState.payments.filter(p => p.type==='ingreso' && (p.paid_at||'').startsWith(ym)).reduce((s,p)=>s+Number(p.amount||0),0);
-    const exps = pmaState.expenses.filter(e => (e.expense_date||'').startsWith(ym)).reduce((s,e)=>s+Number(e.amount||0),0);
+    const income = pmaState.payments.filter(p => p.type==='ingreso' && pmBillYm(p) === ym).reduce((s,p)=>s+Number(p.amount||0),0);
+    const exps = pmaState.expenses.filter(e => pmBillYm(e) === ym).reduce((s,e)=>s+Number(e.amount||0),0);
     const pr = (pmaState.payroll||[]).filter(p => Number(p.year)===d.getFullYear() && PM_ES_MONTHS.indexOf((p.month||'').toLowerCase())===d.getMonth()).reduce((s,p)=>s+Number(p.salary||0),0);
     const gastos = exps + pr;
     out.push({ ym, label: `${PM_ES_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, income, gastos, net: income-gastos });
@@ -5216,7 +5216,7 @@ function pmRenderFinance() {
   const lowOcc = activeProps.filter(p => (pmOccupancyOf(p.id).pct/100) < 0.70);
   const risingExp = activeProps.filter(p => {
     const e = []; for (let i=2;i>=0;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      e.push(pmaState.expenses.filter(x=>x.property_id===p.id && ['house','cleaning'].includes(x.category) && (x.expense_date||'').startsWith(ym)).reduce((s,x)=>s+Number(x.amount||0),0)); }
+      e.push(pmaState.expenses.filter(x=>x.property_id===p.id && ['house','cleaning'].includes(x.category) && pmBillYm(x) === ym).reduce((s,x)=>s+Number(x.amount||0),0)); }
     return e[0]>0 && e[1]>e[0] && e[2]>e[1];
   });
 
