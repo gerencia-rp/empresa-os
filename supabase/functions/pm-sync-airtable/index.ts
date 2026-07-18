@@ -94,6 +94,7 @@ const F = {
   inq_fecha_out:  "fld4fnXiwSYRYEWHy",
   inq_metodo:     "fldVz4dXzg8Pg8nn9",
   inq_deposito:   "fldJ4tTS1NEtWTKKw",
+  inq_vencimiento:"fldrUJY0EOjKEb0Qf",  // Vencimiento Pago Renta (texto: "Primeros 3 dias del mes")
   inq_casa:       "fldeTQFmUfpeZNpZk",  // link → Casas
   inq_obs_ia:     "fldjpVuBes0xpGN5c",
   // Reservas
@@ -488,6 +489,7 @@ Deno.serve(async (req) => {
         contract_start: r.fields?.[F.inq_fecha_in] || null,
         contract_end: r.fields?.[F.inq_fecha_out] || null,
         deposit: typeof r.fields?.[F.inq_deposito] === "number" ? r.fields[F.inq_deposito] : null,
+        vencimiento_pago: r.fields?.[F.inq_vencimiento] || null,
         ai_summary: r.fields?.[F.inq_obs_ia] || null,
         notes: null,
         ...mirrorFields()

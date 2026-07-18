@@ -409,11 +409,12 @@ function pmTileState(tile) {
 // paid_at queda SOLO para la vista de flujo de caja ("cobrado en el mes").
 function pmBillYm(x) { return (x && (x.billing_ym || (x.paid_at || x.expense_date || '').slice(0, 7))) || ''; }
 
-// ═══ ESTATUS DE COBRANZA (regla dura): se deriva SOLO del balance espejado de
-// Airtable — pm_payments.deuda = "Balance de pago" (renta pactada del período −
-// pago), las MISMAS columnas que usa /cartera — por PERÍODO Mes/Año. Un pago que
-// cubre el mes (deuda ≤ 0) NUNCA es "Atrasado", sin importar cuándo se recibió.
-// "Días de atraso" queda como dato informativo; no define el estatus.
+// ═══ ESTATUS DE COBRANZA (regla dura): el MONTO se deriva SOLO del balance
+// espejado de Airtable — pm_payments.deuda = "Balance de pago" (renta pactada
+// del período − pago, mismas columnas que /cartera) — por PERÍODO Mes/Año. Un
+// pago que cubre el mes (deuda ≤ 0) NUNCA es "Atrasado", sin importar cuándo se
+// recibió. Con saldo, el TIEMPO lo define el vencimiento del inquilino
+// ("Vencimiento Pago Renta"): vencido → Atrasado · N días (incluye mes en curso).
 const PM_BAL_GUARD = 6; // |balance| ≤ $6 = diferencia de centavos/redondeo → $0
 
 function pmHoyYm() { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; }
@@ -433,21 +434,50 @@ function pmPayEsPlataforma(p) {
   const n = ((p && p.tenant_id ? pmTenantName(p.tenant_id) : '') || (p && p.concept) || '').toLowerCase();
   return /pads?\s*s?plit|pads?lit/.test(n);
 }
+// ── Vencimiento POR INQUILINO (👤 "Vencimiento Pago Renta", texto libre) ──
+const PM_DIA_VENC_DEFAULT = 3; // fallback si el inquilino aún no tiene día definido
+// "Primeros 3 dias del mes" → 3 · "Dia 27 de cada mes" → 27
+function pmDiaVenc(texto) {
+  const m = String(texto || '').match(/\d{1,2}/);
+  if (m) { const d = parseInt(m[0], 10); if (d >= 1 && d <= 31) return d; }
+  return PM_DIA_VENC_DEFAULT;
+}
+// Días vencido del período del pago (0 si aún no vence). Vence el día del
+// inquilino dentro del Mes/Año del PERÍODO de renta (billing_ym).
+function pmDiasVencido(p, hoy = new Date()) {
+  const ym = pmBillYm(p);
+  if (!/^\d{4}-\d{2}$/.test(ym)) return 0;
+  const anio = +ym.slice(0, 4), mes = +ym.slice(5, 7);
+  const t = pmaState.tenants.find(x => x.id === p.tenant_id);
+  const dia = pmDiaVenc(t && t.vencimiento_pago);
+  const ultimo = new Date(anio, mes, 0).getDate();
+  const venc = new Date(anio, mes - 1, Math.min(dia, ultimo));
+  const t0 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const dias = Math.floor((t0 - venc) / 86400000);
+  return dias > 0 ? dias : 0;
+}
+function pmTextoVencido(dias) {
+  if (dias <= 0) return '';
+  if (dias < 31) return `${dias} ${dias === 1 ? 'día' : 'días'}`;
+  const m = Math.floor(dias / 30), r = dias % 30;
+  return r ? `${m} ${m === 1 ? 'mes' : 'meses'} ${r} d` : `${m} ${m === 1 ? 'mes' : 'meses'}`;
+}
 // Estatus de UN pago. debe = lo que realmente se debe (balance), NUNCA la renta.
+// Atrasado = saldo pendiente y ya pasó el día de vencimiento del inquilino
+// (incluye el mes en curso). Antes de vencer → Pendiente.
 function pmPayStatus(p) {
-  if (pmPayEsPlataforma(p)) return { key: 'aldia', label: '🏦 Plataforma', cls: 'text-slate-500 bg-slate-50', debe: 0 };
+  if (pmPayEsPlataforma(p)) return { key: 'aldia', label: '🏦 Plataforma', cls: 'text-slate-500 bg-slate-50', debe: 0, dias: 0 };
   // Sin "Renta pactada - Contrato" no hay balance confiable (la fórmula da 0 igual):
   // → revisar, nunca asumir la renta actual del inquilino.
   const bal = (p && typeof p.renta_pactada !== 'number') ? null : pmPayBalance(p);
-  if (bal == null) return { key: 'revisar', label: '⚠️ Revisar (sin renta pactada)', cls: 'text-amber-700 bg-amber-50', debe: 0 };
-  if (bal < 0) return { key: 'aldia', label: '💚 Saldo a favor', cls: 'text-emerald-700 bg-emerald-50', debe: 0 };
-  if (bal === 0) return { key: 'aldia', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50', debe: 0 };
-  // bal > 0 → período cerrado = atrasado · mes en curso/futuro = pendiente (no vencido)
-  const ym = pmBillYm(p);
-  if (ym && ym < pmHoyYm()) return { key: 'atrasado', label: `🔴 Atrasado · debe $${bal.toLocaleString()}`, cls: 'text-red-700 bg-red-50', debe: bal };
-  return { key: 'pendiente', label: '⏳ Pendiente del mes', cls: 'text-amber-700 bg-amber-50', debe: bal };
+  if (bal == null) return { key: 'revisar', label: '⚠️ Revisar (sin renta pactada)', cls: 'text-amber-700 bg-amber-50', debe: 0, dias: 0 };
+  if (bal < 0) return { key: 'aldia', label: '💚 Saldo a favor', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
+  if (bal === 0) return { key: 'aldia', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
+  const dias = pmDiasVencido(p);
+  if (dias > 0) return { key: 'atrasado', label: `🔴 Atrasado · ${pmTextoVencido(dias)} · debe $${bal.toLocaleString()}`, cls: 'text-red-700 bg-red-50', debe: bal, dias };
+  return { key: 'pendiente', label: '⏳ Pendiente', cls: 'text-amber-700 bg-amber-50', debe: bal, dias: 0 };
 }
-// Deuda vencida real de un inquilino = Σ balance>0 de sus pagos en períodos cerrados.
+// Deuda vencida real de un inquilino = Σ balance>0 de sus pagos ya vencidos.
 function pmTenantDebt(tenantId) {
   if (!tenantId) return 0;
   return pmaState.payments
@@ -490,9 +520,9 @@ function pmUpcomingBookings() {
   return pmaState.bookings.filter(b => b.status === 'confirmado' && b.start_date && b.start_date > today);
 }
 function pmLateBookings() {
-  // ATRASADO = SOLO por balance (deuda >0 tras guard) en un período Mes/Año ya
-  // cerrado. El mes en curso sin pago es "pendiente", NO atrasado; un pago que
-  // cubrió el mes (deuda ≤ 0) jamás aparece acá aunque haya entrado tarde.
+  // ATRASADO = balance (deuda >0 tras guard) ya VENCIDO según el día del
+  // inquilino (incluye mes en curso). Un pago que cubrió el mes (deuda ≤ 0)
+  // jamás aparece acá aunque haya entrado tarde.
   const lateTenants = new Set();
   for (const p of pmaState.payments) {
     if (p.type !== 'ingreso' || !p.tenant_id) continue;
@@ -3097,7 +3127,8 @@ function pmTenantPayStatus(booking) {
     (pmPayBalance(p) == null || pmPayBalance(p) <= 0));
   if (cubierto) return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
   const today = new Date();
-  const day = pmRecurrenceDay(booking.payment_day);
+  const tIn = pmaState.tenants.find(x => x.id === booking.tenant_id);
+  const day = (tIn && tIn.vencimiento_pago) ? pmDiaVenc(tIn.vencimiento_pago) : pmRecurrenceDay(booking.payment_day);
   const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
   const diff = Math.round((due - t0) / 86400000);
