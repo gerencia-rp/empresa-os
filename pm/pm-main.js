@@ -474,7 +474,7 @@ function pmPayStatus(p) {
   if (bal < 0) return { key: 'aldia', label: '💚 Saldo a favor', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
   if (bal === 0) return { key: 'aldia', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
   const dias = pmDiasVencido(p);
-  if (dias > 0) return { key: 'atrasado', label: `🔴 Atrasado · ${pmTextoVencido(dias)} · debe $${bal.toLocaleString()}`, cls: 'text-red-700 bg-red-50', debe: bal, dias };
+  if (dias > 0) return { key: 'atrasado', label: `🔴 Atrasado · ${pmTextoVencido(dias)}`, cls: 'text-red-700 bg-red-50', debe: bal, dias };
   return { key: 'pendiente', label: '⏳ Pendiente', cls: 'text-amber-700 bg-amber-50', debe: bal, dias: 0 };
 }
 // Deuda vencida real de un inquilino = Σ balance>0 de sus pagos ya vencidos.
@@ -4219,7 +4219,7 @@ function pmPaymentsTableHtml() {
             <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,24)}</td>
             <td class="px-3 py-2 ${orphan?'text-amber-700':'text-slate-600'}">${orphan ? `<span class="inline-flex items-center gap-1"><span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="Este pago no tiene casa asignada. ¿Vincular manualmente o archivar?">⚠️ Sin vincular</span>${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-[10px] text-blue-700 hover:underline font-bold">Vincular a casa…</button> <button onclick="pmArchivePaymentLegacy('${p.id}')" class="text-[10px] text-slate-500 hover:underline">Archivar</button>`}</span>` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
             <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
-            <td class="px-3 py-2 text-right font-bold text-emerald-700">$${Number(p.amount||0).toLocaleString()}</td>
+            <td class="px-3 py-2 text-right font-bold ${st.debe > 0 ? 'text-red-700' : 'text-slate-500'}" title="Lo que debe (balance del período) · pagado: $${Number(p.amount||0).toLocaleString()}">$${Number(st.debe||0).toLocaleString()}</td>
             <td class="px-3 py-2 text-slate-600">${(p.platform||'—').replace(/</g,'&lt;')}</td>
             <td class="px-3 py-2 text-slate-600 whitespace-nowrap">${rec}</td>
             <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${st.cls}">${st.label}</span></td>
