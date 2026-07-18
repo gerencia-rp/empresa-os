@@ -4677,7 +4677,8 @@ function pmExpenseTable(rows, withHouse, flagOrphans) {
       <table class="w-full text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
           <tr>
-            <th class="px-3 py-2 text-left">Fecha</th>
+            <th class="px-3 py-2 text-left" title="Período que agrupa (tag Mes/Año de Airtable)">Mes gasto</th>
+            <th class="px-3 py-2 text-left" title="Cuándo se pagó — solo informativa, no agrupa">Fecha</th>
             ${withHouse?'<th class="px-3 py-2 text-left">Casa</th>':''}
             <th class="px-3 py-2 text-left">Categoría</th>
             <th class="px-3 py-2 text-right">Monto</th>
@@ -4693,8 +4694,11 @@ function pmExpenseTable(rows, withHouse, flagOrphans) {
             const note = e.description || e.notes || '';
             const orphan = flagOrphans && !e.property_id;
             const atLink = e.external_id ? pmAirtableLink(e.external_id, 'tblGBQ5xn9Zp6YrTN') : null;
+            const mesTag = e.month ? `${e.month.charAt(0).toUpperCase()+e.month.slice(1)} ${e.year||''}`.trim() : null;
+            const ymE = pmBillYm(e);
             return `<tr class="border-t border-slate-100 ${orphan?'bg-red-50':'hover:bg-slate-50'}">
-              <td class="px-3 py-2 whitespace-nowrap text-slate-700">${e.expense_date||'—'}</td>
+              <td class="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">${mesTag || (ymE ? `${pmYmLabel(ymE)} <span class="text-[10px] text-slate-400 font-normal" title="Sin tag Mes/Año: período tomado de la fecha">· fecha</span>` : '<span class="text-amber-600" title="Sin Mes/Año ni Fecha en Airtable">sin mes</span>')}</td>
+              <td class="px-3 py-2 whitespace-nowrap text-slate-500">${e.expense_date||'—'}</td>
               ${withHouse?`<td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan?`⚠️ Sin casa${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir'}`:(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
               <td class="px-3 py-2 text-slate-700">${(e.subcategory||e.category||'—').replace(/</g,'&lt;')}</td>
               <td class="px-3 py-2 text-right font-bold text-red-600">$${Number(e.amount||0).toLocaleString()}</td>
