@@ -38,6 +38,8 @@ const pmaState = {
   payStatusFilter: 'all',                 // Pagos: all·aldia·pendiente·proximo·atrasado·revisar·sincontrato
   payRecurrenceFilter: null,              // mensual·quincenal·airbnb
   paySearch: '',
+  paySortKey: null,                       // columna de orden de la tabla Pagos (null = default paid_at desc)
+  paySortDir: 'asc',
   payFiltersLoaded: false,
   expStatusFilter: 'all',                 // Gastos: all·paid·pending
   expFiltersLoaded: false,
@@ -4187,19 +4189,55 @@ function pmPaymentsFiltered() {
   }
   const q = (pmaState.paySearch || '').toLowerCase().trim();
   if (q) pays = pays.filter(p => `${p.tenant_id ? pmTenantName(p.tenant_id) : ''} ${p.concept||''} ${p.platform||''}`.toLowerCase().includes(q));
-  return pays.sort((a, b) => (b.paid_at||'').localeCompare(a.paid_at||''));
+  // Orden por columna (clic en el encabezado). Sin elección → default: cobrado desc.
+  const k = pmaState.paySortKey;
+  if (!k) return pays.sort((a, b) => (b.paid_at||'').localeCompare(a.paid_at||''));
+  const dir = pmaState.paySortDir === 'desc' ? -1 : 1;
+  const val = (p) => {
+    switch (k) {
+      case 'mes': return pmBillYm(p);
+      case 'cobrado': return p.paid_at || '';
+      case 'inquilino': return p.tenant_id ? pmTenantName(p.tenant_id) : (p.concept || '');
+      case 'casa': return (pmaState.properties.find(x => x.id === p.property_id) || {}).name || '';
+      case 'unit': { const u = pmaState.units.find(x => x.id === p.unit_id); return (u && (u.code || u.name)) || ''; }
+      case 'monto': return pmPayStatus(p).debe;
+      case 'plataforma': return p.platform || '';
+      case 'recurrencia': { const b2 = pmPaymentBooking(p); return b2 ? pmRecurrenceOf(b2.payment_day).label : ''; }
+      case 'estatus': return pmPayStatus(p).label;
+      default: return '';
+    }
+  };
+  return pays.sort((a, b) => {
+    const va = val(a), vb = val(b);
+    if (typeof va === 'number' || typeof vb === 'number') return (Number(va||0) - Number(vb||0)) * dir;
+    return String(va).localeCompare(String(vb), 'es', { sensitivity: 'base' }) * dir;
+  });
 }
+// Encabezado ordenable: clic alterna A→Z / Z→A; flecha indica columna y dirección.
+function pmPaySort(key) {
+  if (pmaState.paySortKey === key) {
+    if (pmaState.paySortDir === 'asc') pmaState.paySortDir = 'desc';
+    else { pmaState.paySortKey = null; pmaState.paySortDir = 'asc'; }   // 3er clic = volver al default
+  } else { pmaState.paySortKey = key; pmaState.paySortDir = 'asc'; }
+  const list = document.getElementById('pm-pay-list'); if (list) list.innerHTML = pmPaymentsTableHtml();
+}
+window.pmPaySort = pmPaySort;
 function pmPaymentsTableHtml() {
   const pays = pmPaymentsFiltered();
+  const th = (key, label, align, title) => {
+    const active = pmaState.paySortKey === key;
+    const arrow = active ? (pmaState.paySortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    return `<th class="px-3 py-2 text-${align} cursor-pointer select-none hover:text-slate-800 ${active ? 'text-slate-800' : ''}" ${title ? `title="${title} · clic para ordenar"` : 'title="Clic para ordenar"'} onclick="pmPaySort('${key}')">${label}${arrow}</th>`;
+  };
   return `
     <table class="w-full text-xs">
       <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
         <tr>
-          <th class="px-3 py-2 text-left" title="Mes de renta (tag Mes/Año de Airtable)">Mes renta</th>
-          <th class="px-3 py-2 text-left" title="Fecha en que se cobró (flujo de caja)">Cobrado</th><th class="px-3 py-2 text-left">Inquilino</th>
-          <th class="px-3 py-2 text-left">Casa</th><th class="px-3 py-2 text-left">Unit</th>
-          <th class="px-3 py-2 text-right">Monto</th><th class="px-3 py-2 text-left">Plataforma</th>
-          <th class="px-3 py-2 text-left">Recurrencia</th><th class="px-3 py-2 text-left">Estatus</th>
+          ${th('mes','Mes renta','left','Mes de renta (tag Mes/Año de Airtable)')}
+          ${th('cobrado','Cobrado','left','Fecha en que se cobró (flujo de caja)')}${th('inquilino','Inquilino','left')}
+          ${th('casa','Casa','left')}${th('unit','Unit','left')}
+          ${th('monto','Monto','right')}${th('plataforma','Plataforma','left')}
+          ${th('recurrencia','Recurrencia','left')}${th('estatus','Estatus','left')}
           <th class="px-3 py-2 text-center">Compr.</th><th class="px-3 py-2 text-center">Acc.</th>
         </tr>
       </thead>
