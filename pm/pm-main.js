@@ -4491,6 +4491,9 @@ function pmRenderHouseExpenses() {
   rows = [...rows].sort((a,b) => (b.expense_date||'').localeCompare(a.expense_date||''));
 
   const monthAll = houseExp.filter(e => pmBillYm(e) === ym);
+  // Sin período (ni tag Mes/Año ni Fecha): nunca se pierden — bucket aparte p/ completar.
+  const sinMes = houseExp.filter(e => !pmBillYm(e));
+  const sinMesMonto = sinMes.reduce((s,e) => s + Number(e.amount||0), 0);
   const totalMonth = rows.reduce((s,e) => s + Number(e.amount||0), 0);
   const paidSum = rows.filter(e => e.paid).reduce((s,e) => s + Number(e.amount||0), 0);
   const pendSum = totalMonth - paidSum;
@@ -4540,10 +4543,26 @@ function pmRenderHouseExpenses() {
       ${card('Tendencia vs mes ant.', (trendPct>=0?'+':'')+trendPct+'%', `ant. ${pmMoney(prevTotal)}`, trendPct>0?'text-red-600':'text-emerald-700')}
     </div>
 
-    <div class="grid lg:grid-cols-2 gap-3">
+    ${sinMes.length ? `<div class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800">
+      ⚠️ <strong>${sinMes.length}</strong> gasto${sinMes.length>1?'s':''} sin mes (ni tag Mes/Año ni Fecha) · ${pmMoney(sinMesMonto)} — no entran a ningún período · <strong>completar en Airtable</strong>: ${sinMes.slice(0,4).map(e => (e.description||'—').replace(/</g,'&lt;').slice(0,26)).join(' · ')}${sinMes.length>4?' · …':''}
+    </div>` : ''}
+
+    <div class="grid lg:grid-cols-3 gap-3">
       <div class="bg-white border border-slate-200 rounded-xl p-4">
         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Desglose por categoría</div>
         ${pmPieChart(catEntries)}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Desglose por casa · ${pmYmLabel(ym)}</div>
+        ${propEntries.length ? `<div class="space-y-1 max-h-52 overflow-y-auto">${propEntries.map(([pid, v]) => {
+          const pct = monthTotalAll ? Math.round(v/monthTotalAll*100) : 0;
+          return `<div class="flex items-center gap-2 text-[11px]">
+            <button onclick="pmExpensesSetFilter('property','${pid}')" class="text-slate-700 hover:text-[#b8941f] hover:underline text-left truncate flex-1">${pmPropertyName(pid).replace(/</g,'&lt;').slice(0,24)}</button>
+            <div class="w-20 bg-slate-100 rounded-full h-1.5 flex-shrink-0"><div class="bg-red-400 h-1.5 rounded-full" style="width:${pct}%"></div></div>
+            <span class="font-bold text-slate-800 whitespace-nowrap">${pmMoney(v)}</span>
+          </div>`;
+        }).join('')}</div>` : '<div class="text-[11px] text-slate-400 italic">Sin gastos con casa este mes.</div>'}
+        ${orphanCount ? `<div class="text-[10px] text-amber-700 mt-2">+ ${pmMoney(orphanSum)} sin casa (${orphanCount})</div>` : ''}
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-4">
         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Pagado vs pendiente (filtrado)</div>
