@@ -5185,6 +5185,11 @@ function pmRenderFinance() {
   const t12i = trend.reduce((s,t)=>s+t.income,0), t12g = trend.reduce((s,t)=>s+t.gastos,0);
   const period = pmaState.finPeriod || 'this_month';
 
+  // Gastos SIN período (ni tag Mes/Año ni Fecha): no entran a ningún mes — se
+  // muestran como "sin fecha · revisar" en vez de perderse en silencio.
+  const gSinPeriodo = pmaState.expenses.filter(e => !pmBillYm(e));
+  const gSinPeriodoMonto = gSinPeriodo.reduce((sm, e) => sm + Number(e.amount||0), 0);
+
   // ── Métricas clave portafolio ──
   const activeProps = pmaState.properties.filter(p => p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
@@ -5245,6 +5250,10 @@ function pmRenderFinance() {
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-4 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
+
+    ${gSinPeriodo.length ? `<div class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800">
+      ⚠️ <strong>${gSinPeriodo.length}</strong> gasto${gSinPeriodo.length>1?'s':''} sin fecha ni Mes/Año (${pmMoney(gSinPeriodoMonto)}) — no entran a ningún período · <strong>revisar en Airtable</strong>: ${gSinPeriodo.slice(0,4).map(e => (e.description||'—').replace(/</g,'&lt;').slice(0,28)).join(' · ')}${gSinPeriodo.length>4?' · …':''}
+    </div>` : ''}
 
     <!-- Header + período -->
     <div class="flex items-center justify-between flex-wrap gap-2">
