@@ -366,7 +366,7 @@ function ccInsights(comp) {
     tx: `Zona <b>${ccZoneLabel(z === 'sin' ? null : z)}</b>: ocupación ${Math.round(v.o / v.t * 100)}% (${v.free} libres).`, action: `Enfocar publicación en zona ${ccZoneLabel(z === 'sin' ? null : z)}` }));
   // 4) Reservas por vencer (30 días)
   const today = new Date().toISOString().slice(0, 10); const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-  const venc = CC.book.filter(b => b.end_date && b.end_date >= today && b.end_date <= in30 && ['activo', 'confirmado'].includes(b.status));
+  const venc = CC.book.filter(b => b.end_date && b.end_date >= today && b.end_date <= in30 && ['activo', 'confirmado', 'reservada'].includes(b.status));
   if (venc.length) ins.push({ sev: 'warning', impact: venc.length * 1000, tag: 'RESERVAS', sec: 'reservas',
     tx: `<b>${venc.length} reserva(s)</b> vencen en 30 días — renovar o preparar turnover.`, action: 'Contactar inquilinos por renovación y avisar a limpieza' });
   // 5) Outliers de gasto (hipoteca)
@@ -814,7 +814,7 @@ function ccSecFinanzas(comp) {
 // ─── SECCIÓN: RESERVAS ───
 function ccSecReservas(comp) {
   const today = new Date().toISOString().slice(0, 10);
-  const activas = CC.book.filter(b => ['activo', 'confirmado'].includes(b.status));
+  const activas = CC.book.filter(b => ['activo', 'confirmado', 'reservada'].includes(b.status));
   const tName = id => CC.tenants.find(t => t.id === id)?.full_name || '—';
   const pName = id => CC.props.find(p => p.id === id)?.name || '—';
   // Cadena viva: cada reserva puede tener su tarea de turnover/recepción (auto-generada en el sync).

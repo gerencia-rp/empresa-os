@@ -293,7 +293,7 @@ function pmActiveBookingOf(unitId, date = new Date()) {
   const d = (typeof date === 'string') ? date : date.toISOString().slice(0,10);
   return pmaState.bookings.find(b =>
     b.unit_id === unitId
-    && ['activo','confirmado'].includes(b.status)
+    && ['activo','confirmado','reservada'].includes(b.status)
     && b.start_date <= d
     && (!b.end_date || b.end_date >= d)
   );
@@ -402,7 +402,7 @@ function pmTileState(tile) {
   if (us.some(u => u.maintenance_status === 'en_mantenimiento')) return 'mantenimiento';
   if (us.some(u => pmUnitOccupied(u))) return 'ocupada';
   if (us.some(u => pmUnitState(u) === 'reservada')) return 'reservada';
-  if (tile._roomIds.some(id => pmaState.bookings.some(b => b.unit_id === id && b.status === 'confirmado' && (b.start_date || '') > today))) return 'reservada';
+  if (tile._roomIds.some(id => pmaState.bookings.some(b => b.unit_id === id && ['confirmado','reservada'].includes(b.status) && (b.start_date || '') > today))) return 'reservada';
   return 'libre';
 }
 // ═══ UNA definición de "mes" para dinero (regla dura): el MES DE RENTA es el tag
@@ -503,7 +503,7 @@ function pmFinanceOf(propertyId, monthDate = null) {
 function pmActiveBookings() {
   const today = new Date().toISOString().slice(0,10);
   return pmaState.bookings.filter(b =>
-    ['activo','confirmado'].includes(b.status)
+    ['activo','confirmado','reservada'].includes(b.status)
     && (!b.end_date || b.end_date >= today)
   );
 }
@@ -519,7 +519,7 @@ function pmExpiringIn(days = 30) {
 // "Por ingresar": reservas confirmadas cuyo check_in es a futuro (aún no activas).
 function pmUpcomingBookings() {
   const today = new Date().toISOString().slice(0,10);
-  return pmaState.bookings.filter(b => b.status === 'confirmado' && b.start_date && b.start_date > today);
+  return pmaState.bookings.filter(b => ['confirmado','reservada'].includes(b.status) && b.start_date && b.start_date > today);
 }
 function pmLateBookings() {
   // ATRASADO = balance (deuda >0 tras guard) ya VENCIDO según el día del
@@ -896,7 +896,7 @@ function pmCeoActions(){
   const now=new Date(), actions=[];
   const activeProps = pmaState.properties.filter(p=>p.active!==false);
   const activePropIds = new Set(activeProps.map(p=>p.id));
-  const activeBookings = pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
+  const activeBookings = pmaState.bookings.filter(b=>['activo','confirmado','reservada'].includes(b.status));
   const cutoff = new Date(now); cutoff.setDate(cutoff.getDate()-30);
   const recentPayers = new Set(pmaState.payments.filter(p=>p.type==='ingreso' && p.tenant_id && p.paid_at && new Date(p.paid_at)>=cutoff).map(p=>p.tenant_id));
   const late = activeBookings.filter(b=> b.tenant_id && !(b.start_date && new Date(b.start_date)>cutoff) && !recentPayers.has(b.tenant_id));
@@ -1082,7 +1082,7 @@ function pmRenderDashboard(){
 
   // Quick stats
   const activeProps=pmaState.properties.filter(p=>p.active!==false);
-  const activeBookings=pmaState.bookings.filter(b=>['activo','confirmado'].includes(b.status));
+  const activeBookings=pmaState.bookings.filter(b=>['activo','confirmado','reservada'].includes(b.status));
   const activeTenants=new Set(activeBookings.map(b=>b.tenant_id).filter(Boolean)).size;
   const rentableTotal=pmTotalRentableUnits();
   // Renta promedio / unidad = ingresos del mes / unidades rentables del portafolio
@@ -1202,7 +1202,7 @@ function pmRenderPropertiesList() {
         </div>
       </div>
       ${view === 'availability' ? pmRenderAvailability() : `
-      <div class="text-xs text-slate-500">${props.length} propiedades · ${pmTotalRentableUnits()} unidades rentables (${pmTotalOccupiedRentableUnits()} ocupadas · ${pmFreeRentableUnits()} libres) · ${pmaState.bookings.filter(b => ['activo','confirmado'].includes(b.status)).length} reservas activas</div>
+      <div class="text-xs text-slate-500">${props.length} propiedades · ${pmTotalRentableUnits()} unidades rentables (${pmTotalOccupiedRentableUnits()} ocupadas · ${pmFreeRentableUnits()} libres) · ${pmaState.bookings.filter(b => ['activo','confirmado','reservada'].includes(b.status)).length} reservas activas</div>
       ${!props.length ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
           <div class="text-5xl mb-2">🏠</div>
@@ -1238,7 +1238,7 @@ function pmUnitState(u) {
   if (/disponible|libre|vacante/.test(s))  return 'libre';
   // Sin Estado sincronizado en Airtable → fallback por reservas (no debería pasar).
   if (pmActiveBookingOf(u.id)) return 'ocupada';
-  if (pmaState.bookings.some(b => b.unit_id===u.id && b.status==='confirmado' && (b.start_date||'') > today)) return 'reservada';
+  if (pmaState.bookings.some(b => b.unit_id===u.id && ['confirmado','reservada'].includes(b.status) && (b.start_date||'') > today)) return 'reservada';
   return 'libre';
 }
 // Paleta ÚNICA y coherente en toda la app (ficha, disponibilidad, tiles):
@@ -1305,7 +1305,7 @@ window.pmShowFreeUnits = pmShowFreeUnits;
 async function pmMarkMaintenance(unitId) {
   const u = pmaState.units.find(x => x.id === unitId);
   if (!u) return;
-  const active = pmActiveBookingOf(unitId) || pmaState.bookings.find(b => b.unit_id===unitId && b.status==='confirmado' && b.status!=='cancelado');
+  const active = pmActiveBookingOf(unitId) || pmaState.bookings.find(b => b.unit_id===unitId && ['confirmado','reservada'].includes(b.status) && b.status!=='cancelado');
   if (active) {
     if (!confirm('⚠️ Esta unidad tiene una reserva ('+pmTenantName(active.tenant_id)+'). Hay que mover esa reserva antes. ¿Abrir "Mover reserva" para reubicarla en una unidad libre?')) return;
     closeModal();
@@ -1422,7 +1422,7 @@ function pmRenderPropertyCardInline(p) {
   // nunca se muestran acá aunque showArchived esté prendido). El set activo = base Modelo Nuevo.
   for (const u of pmUnitsOf(p.id).filter(x => x.is_active !== false)) {
     const k = `${(u.code||u.id)}|${u.target_rent||0}`;
-    const score = x => (pmActiveBookingOf(x.id)?4:0) + (pmaState.bookings.some(b=>b.unit_id===x.id&&b.status==='confirmado')?2:0) + (x.is_active!==false?1:0);
+    const score = x => (pmActiveBookingOf(x.id)?4:0) + (pmaState.bookings.some(b=>b.unit_id===x.id&&['confirmado','reservada'].includes(b.status))?2:0) + (x.is_active!==false?1:0);
     if (!_uByKey[k] || score(u) > score(_uByKey[k])) _uByKey[k] = u;
   }
   const units = Object.values(_uByKey);
@@ -1559,9 +1559,9 @@ function pmRenderUnitRow(u, p) {
     .filter(b => b.status !== 'cancelado' && (!b.end_date || b.end_date >= today))
     .sort((a,b) => (a.start_date||'').localeCompare(b.start_date||''));
   // Reserva vigente HOY (antes se leía un global `active` inexistente → ReferenceError latente)
-  const active = unitBookings.find(b => b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado'].includes(b.status)) || null;
+  const active = unitBookings.find(b => b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado','reservada'].includes(b.status)) || null;
   const bookingChip = (b) => {
-    const isActive = b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado'].includes(b.status);
+    const isActive = b.start_date && b.start_date <= today && (!b.end_date || b.end_date >= today) && ['activo','confirmado','reservada'].includes(b.status);
     const isUpcoming = b.start_date && b.start_date > today;
     const cls = isActive ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : isUpcoming ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-600';
     const tag = isActive ? 'Actual' : isUpcoming ? 'Próxima' : (b.status||'');
@@ -1662,7 +1662,7 @@ function pmRenderPropertyDetail() {
   // Inquilinos al día (con pago en los últimos 30d) vs total con inquilino
   const cutoff = new Date(now); cutoff.setDate(cutoff.getDate()-30);
   const recentPayers = new Set(pmaState.payments.filter(x=>x.type==='ingreso' && x.tenant_id && x.paid_at && new Date(x.paid_at)>=cutoff).map(x=>x.tenant_id));
-  const propBookings = pmaState.bookings.filter(b=>b.property_id===p.id && ['activo','confirmado'].includes(b.status) && b.tenant_id);
+  const propBookings = pmaState.bookings.filter(b=>b.property_id===p.id && ['activo','confirmado','reservada'].includes(b.status) && b.tenant_id);
   const alDia = propBookings.filter(b=>recentPayers.has(b.tenant_id)).length;
 
   const SUBTABS = [['units','Unidades'],['creds','Acceso y credenciales'],['pnl','Histórico P&L'],['docs','Documentos'],['tasks','Tareas']];
@@ -1890,7 +1890,7 @@ function pmCalcUnitGaps(unit, year) {
   // Construir set de días ocupados
   const occupied = new Array(totalDays).fill(false);
   const bks = pmMergedBookings(unit).filter(b =>
-    b.start_date && ['activo','confirmado','finalizado','vencido'].includes(b.status)
+    b.start_date && ['activo','confirmado','reservada','finalizado','vencido'].includes(b.status)
   );
   bks.forEach(b => {
     const s = new Date(b.start_date);
@@ -2593,8 +2593,8 @@ function pmRenderBookingSidePanel(bookingId) {
   const property = pmaState.properties.find(p => p.id === b.property_id);
   const dur = (b.start_date && b.end_date) ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1 : null;
   const isPast = b.end_date && new Date(b.end_date) < new Date();
-  const tagLabel = isPast ? 'Huésped anterior' : (b.status === 'confirmado' ? 'Próximo huésped' : 'Huésped actual');
-  const tagColor = isPast ? 'bg-slate-200 text-slate-700' : (b.status === 'confirmado' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800');
+  const tagLabel = isPast ? 'Huésped anterior' : (['confirmado','reservada'].includes(b.status) ? 'Próximo huésped' : 'Huésped actual');
+  const tagColor = isPast ? 'bg-slate-200 text-slate-700' : (['confirmado','reservada'].includes(b.status) ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800');
   const platformLabel = {contrato_directo:'Contrato directo',airbnb:'Airbnb',vrbo:'VRBO',booking:'Booking',hospitable:'Hospitable',padsplit:'Padsplit',reserva_corta:'Reserva corta',otro:'Otro'}[b.booking_type] || b.booking_type;
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
   return `
@@ -2957,6 +2957,7 @@ function pmShowBookingDetail(bookingId) {
   const statusColor = {
     activo: 'bg-emerald-100 text-emerald-800',
     confirmado: 'bg-blue-100 text-blue-800',
+    reservada: 'bg-amber-100 text-amber-800',
     borrador: 'bg-slate-100 text-slate-700',
     vencido: 'bg-amber-100 text-amber-800',
     cancelado: 'bg-red-100 text-red-800',
@@ -5800,7 +5801,7 @@ async function pmEditBooking(id, unitId) {
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Estado</label>
           <select id="pm-bf-status" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            ${[['activo','Activo'],['confirmado','Confirmado'],['borrador','Borrador'],['vencido','Vencido'],['finalizado','Finalizado'],['cancelado','Cancelado']].map(([v,l])=>`<option value="${v}" ${(b.status||'activo')===v?'selected':''}>${l}</option>`).join('')}
+            ${[['activo','Activo'],['confirmado','Confirmado'],['reservada','Reservada'],['borrador','Borrador'],['vencido','Vencido'],['finalizado','Finalizado'],['cancelado','Cancelado']].map(([v,l])=>`<option value="${v}" ${(b.status||'activo')===v?'selected':''}>${l}</option>`).join('')}
           </select></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Día de pago</label>
           <input id="pm-bf-payday" value="${(b.payment_day||'').replace(/"/g,'&quot;')}" placeholder="primer_dia / 15 / biweekly" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
@@ -7522,7 +7523,7 @@ async function pmSendWelcomeGuide(propertyId, unitId) {
   const p = pmaState.properties.find(x => x.id === propertyId);
   if (!p) return toast('Casa no encontrada.', 'error');
   // Teléfono del inquilino actual (si hay reserva activa en la casa).
-  const bk = pmaState.bookings.find(b => b.property_id === propertyId && ['activo','confirmado'].includes(b.status));
+  const bk = pmaState.bookings.find(b => b.property_id === propertyId && ['activo','confirmado','reservada'].includes(b.status));
   const tenant = bk ? pmaState.tenants.find(t => t.id === bk.tenant_id) : null;
   const unit = unitId ? pmaState.units.find(u => u.id === unitId) : null;
   const acc = p.access_code || (unit && unit.access_codes) || '(ver guía)';
