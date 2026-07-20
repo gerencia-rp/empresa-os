@@ -3,6 +3,12 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 20-jul · 📋 RESERVAS: botón "📄 Guía" por tarjeta + fix reserva duplicada en "Pasadas"
+Dos reemplazos puntuales en `pm/pm-main.js` (pedido exacto del CEO):
+- ✅ **Botón "📄 Guía" en cada tarjeta de reserva** (no finalizada/cancelada): llama `pmGenerateWelcomeGuide(property_id, unit_id?)` — la guía de bienvenida por unidad ya existente, ahora accesible directo desde la reserva sin pasar por la ficha de la casa.
+- 🐛 **Fix duplicado en "Pasadas / Finalizadas"**: `pastOrFinished` usaba `(b.end_date || '') < today` — el string vacío ordena antes que cualquier fecha, así que TODA reserva sin fecha de salida (`end_date` null, ej. J'Onna Heath) caía también al grupo de pasadas y se mostraba duplicada. Ahora exige `end_date` presente: `(b.end_date && b.end_date < today)`.
+- ✅ node --check OK · `pmGenerateWelcomeGuide` verificada global (pm-main.js:7526-7531).
+
 ## 20-jul · 🗓 PLANNER: el importador no reconocía las fechas del cronograma (mes en LETRAS)
 Diagnóstico verificado contra `Seguimiento_Arthur_Stiles_Rd.xlsx`: **59 actividades, 0 con fecha**.
 - **Causa**: las columnas Inicio/Fin vienen como TEXTO con mes en letras ("08-Jul", "16-Jul", sin año) y `wpParseExcelDate()` solo entendía Date/serial/ISO/"DD/MM/YYYY" → null en todas las filas. No era problema de datos ni del Estimador — solo el parser del importador (`weekly-planner.js`).

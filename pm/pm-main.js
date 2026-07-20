@@ -3259,6 +3259,7 @@ function pmRenderBookingRow(b) {
           </div>
         </div>
         <div class="text-right flex items-center gap-1.5 flex-shrink-0">
+          ${(b.status !== 'finalizado' && b.status !== 'cancelado') ? `<button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${b.property_id}'${b.unit_id ? `,'${b.unit_id}'` : ''})" title="Generar Guía de Bienvenida (PDF) para esta reserva" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1.5 rounded">📄 Guía</button>` : ''}
           ${t?.phone ? `<a href="https://wa.me/${t.phone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
           <button onclick="event.stopPropagation();pmMoveBooking('${b.id}')" title="Mover de unidad" class="bg-slate-50 hover:bg-slate-100 text-slate-600 p-1.5 rounded text-sm">↔</button>
           <div class="cursor-pointer" onclick="pmEditBooking('${b.id}')">
@@ -3275,7 +3276,7 @@ function pmBookingsListHtml() {
   const filtered = pmBookingsFilteredAll();
   const activeOrFuture = filtered.filter(b => (b.end_date || '9999') >= today && b.status !== 'cancelado')
     .sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
-  const pastOrFinished = filtered.filter(b => (b.end_date || '') < today || b.status === 'finalizado' || b.status === 'cancelado')
+  const pastOrFinished = filtered.filter(b => (b.end_date && b.end_date < today) || b.status === 'finalizado' || b.status === 'cancelado')
     .sort((a,b) => (b.start_date||'').localeCompare(a.start_date||''));
   return `
     <div>
