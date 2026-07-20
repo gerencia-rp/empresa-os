@@ -3,6 +3,14 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 20-jul · 🗓 PLANNER: el importador no reconocía las fechas del cronograma (mes en LETRAS)
+Diagnóstico verificado contra `Seguimiento_Arthur_Stiles_Rd.xlsx`: **59 actividades, 0 con fecha**.
+- **Causa**: las columnas Inicio/Fin vienen como TEXTO con mes en letras ("08-Jul", "16-Jul", sin año) y `wpParseExcelDate()` solo entendía Date/serial/ISO/"DD/MM/YYYY" → null en todas las filas. No era problema de datos ni del Estimador — solo el parser del importador (`weekly-planner.js`).
+- **Fix**: `WP_MESES` es/en (ene/jan…dic/dec, con sept y normalización sin acentos) + patrón "DD-Mmm[-YYYY]" con año opcional; el año lo fija `wpDoImportExcel` con **`wpImportBaseYear` = año del `start_date` del proyecto destino** (fallback año actual) — el cronograma no trae año. Se mantienen serial/ISO/numérico; `v===0` ya no se descarta.
+- **ANTES**: 59 leídas / 0 con fecha. **DESPUÉS (esperado con el mismo Excel)**: ~58/59 con fecha, rango 08-jul-2026 → 17-sep-2026; el preview muestra Inicio/Fin y duración por fila (sin-fecha quedan excluidas por default, como siempre).
+- **Verificación**: parser 14/14 strings reales ("08-Jul", "17-sep", "05-Sept", "8 Ago", "12-dic-25", ISO, DD/MM, serial, basura→null) + E2E de `wpParseCronogramaSheet` con hoja sintética de la MISMA estructura (etapas "N. ETAPA" + filas "08-Jul") → 4/5 con fecha, projectStart 2026-07-08, la sin-fecha queda null. node --check · ci:gate 15/15.
+- ⚠ Borde declarado: cronograma que cruce de año (dic→ene) necesita año explícito en la celda; con proyectos dentro del mismo año, el año base del proyecto resuelve el 100%.
+
 ## 17-jul · 💎 PORTAL INVERSOR v3 — RLS de verdad, guardar parámetros, origen claro, acceso manual (commits 4ee0472 · 53d10b7 · 356448a)
 Ajustes de Juan. Migr `20260717110000_portal_inversor_v3` aplicada en prod (+ parche write policies en la misma migr del repo).
 - 🐛 **BUG RLS (el serio) — causa raíz encontrada**: Juan (`juan.sanchez49115@`) y "Prueba OS" (`info.flippingrentals@`) tienen perfil OS con área **fix-flip** → TODAS las policies `inv_*` tenían la rama `or has_area('fix-flip')` → en el PORTAL veían las 23 casas y el capital total. Encima las policies de escritura `FOR ALL using(has_area)` regalaban SELECT por la vía permissive-OR (segundo leak). **Fix**: helper `inv_is_investor()` (tiene inv_access activo) — si sos inversionista, la rama admin NO aplica, ni en read ni en write; el preview-admin queda para staff SIN identidad de inversionista. También `inv_portal_resumen()` y `inv_ledger()`.
