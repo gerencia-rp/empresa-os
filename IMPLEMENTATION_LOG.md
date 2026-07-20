@@ -9,6 +9,11 @@ Dos reemplazos puntuales en `pm/pm-main.js` (pedido exacto del CEO):
 - 🐛 **Fix duplicado en "Pasadas / Finalizadas"**: `pastOrFinished` usaba `(b.end_date || '') < today` — el string vacío ordena antes que cualquier fecha, así que TODA reserva sin fecha de salida (`end_date` null, ej. J'Onna Heath) caía también al grupo de pasadas y se mostraba duplicada. Ahora exige `end_date` presente: `(b.end_date && b.end_date < today)`.
 - ✅ node --check OK · `pmGenerateWelcomeGuide` verificada global (pm-main.js:7526-7531).
 
+## 20-jul · 📊 GASTOS: tablas ordenables por columna (Por Casa + Operativos)
+- `pmExpenseTable` (compartida por las sub-pestañas Por Casa y Operativos) ganó encabezados clickeables: 1er clic A→Z ↑, 2º Z→A ↓, 3º vuelve al orden por defecto. Columnas: Mes gasto (billing_ym), Fecha, Casa, Categoría, Monto (numérico), Pagado, Notas — Factura y Acc. quedan fijas.
+- Estado `expSortKey/expSortDir` en pmaState + `pmExpenseSortVal/pmExpensesSorted/pmExpenseSort` (localeCompare es, sensitivity base). La tabla de Nómina es aparte — pendiente si se pide.
+- Verificación: node --check + build OK + suite de estatus 17/17 intacta.
+
 ## 20-jul · 🗓 PLANNER: el importador no reconocía las fechas del cronograma (mes en LETRAS)
 Diagnóstico verificado contra `Seguimiento_Arthur_Stiles_Rd.xlsx`: **59 actividades, 0 con fecha**.
 - **Causa**: las columnas Inicio/Fin vienen como TEXTO con mes en letras ("08-Jul", "16-Jul", sin año) y `wpParseExcelDate()` solo entendía Date/serial/ISO/"DD/MM/YYYY" → null en todas las filas. No era problema de datos ni del Estimador — solo el parser del importador (`weekly-planner.js`).

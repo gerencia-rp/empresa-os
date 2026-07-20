@@ -40,6 +40,8 @@ const pmaState = {
   paySearch: '',
   paySortKey: null,                       // columna de orden de la tabla Pagos (null = default paid_at desc)
   paySortDir: 'asc',
+  expSortKey: null,                       // columna de orden de la tabla Gastos
+  expSortDir: 'asc',
   payFiltersLoaded: false,
   expStatusFilter: 'all',                 // Gastos: all·paid·pending
   expFiltersLoaded: false,
@@ -4686,20 +4688,56 @@ function pmLineChart(series) {
 }
 
 // Tabla de gastos compartida (withHouse = mostrar columna Casa)
+function pmExpenseSortVal(e, key) {
+  switch (key) {
+    case 'mes': return pmBillYm(e) || '';
+    case 'fecha': return e.expense_date || '';
+    case 'casa': return e.property_id ? pmPropertyName(e.property_id) : '';
+    case 'categoria': return (e.subcategory || e.category || '');
+    case 'monto': return Number(e.amount || 0);
+    case 'pagado': return e.paid ? 1 : 0;
+    case 'notas': return (e.description || e.notes || '');
+    default: return '';
+  }
+}
+function pmExpensesSorted(rows) {
+  const k = pmaState.expSortKey;
+  if (!k) return rows;
+  const dir = pmaState.expSortDir === 'desc' ? -1 : 1;
+  return rows.slice().sort((a, b) => {
+    const va = pmExpenseSortVal(a, k), vb = pmExpenseSortVal(b, k);
+    if (typeof va === 'number' || typeof vb === 'number') return (Number(va || 0) - Number(vb || 0)) * dir;
+    return String(va).localeCompare(String(vb), 'es', { sensitivity: 'base' }) * dir;
+  });
+}
+function pmExpenseSort(key) {
+  if (pmaState.expSortKey === key) {
+    if (pmaState.expSortDir === 'asc') pmaState.expSortDir = 'desc';
+    else { pmaState.expSortKey = null; pmaState.expSortDir = 'asc'; }  // 3er clic = vuelve al orden por defecto
+  } else { pmaState.expSortKey = key; pmaState.expSortDir = 'asc'; }
+  pmRender();
+}
+window.pmExpenseSort = pmExpenseSort;
 function pmExpenseTable(rows, withHouse, flagOrphans) {
+  rows = pmExpensesSorted(rows);
+  const eth = (key, label, align, title) => {
+    const active = pmaState.expSortKey === key;
+    const arrow = active ? (pmaState.expSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    return `<th class="px-3 py-2 text-${align} cursor-pointer select-none hover:text-slate-800 ${active ? 'text-slate-800' : ''}" ${title ? `title="${title} · clic para ordenar"` : 'title="Clic para ordenar"'} onclick="pmExpenseSort('${key}')">${label}${arrow}</th>`;
+  };
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <table class="w-full text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
           <tr>
-            <th class="px-3 py-2 text-left" title="Período que agrupa (tag Mes/Año de Airtable)">Mes gasto</th>
-            <th class="px-3 py-2 text-left" title="Cuándo se pagó — solo informativa, no agrupa">Fecha</th>
-            ${withHouse?'<th class="px-3 py-2 text-left">Casa</th>':''}
-            <th class="px-3 py-2 text-left">Categoría</th>
-            <th class="px-3 py-2 text-right">Monto</th>
+            ${eth('mes','Mes gasto','left','Período que agrupa (tag Mes/Año de Airtable)')}
+            ${eth('fecha','Fecha','left','Cuándo se pagó — solo informativa, no agrupa')}
+            ${withHouse?eth('casa','Casa','left'):''}
+            ${eth('categoria','Categoría','left')}
+            ${eth('monto','Monto','right')}
             <th class="px-3 py-2 text-center">Factura</th>
-            <th class="px-3 py-2 text-center">Pagado</th>
-            <th class="px-3 py-2 text-left">Notas</th>
+            ${eth('pagado','Pagado','center')}
+            ${eth('notas','Notas','left')}
             <th class="px-3 py-2 text-center">Acc.</th>
           </tr>
         </thead>
