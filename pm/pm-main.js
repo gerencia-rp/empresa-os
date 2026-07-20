@@ -4280,30 +4280,50 @@ function pmPaymentsSearchInput(value) {
   clearTimeout(window.__pmPaySearchT);
   window.__pmPaySearchT = setTimeout(() => {
     const list = document.getElementById('pm-pay-list'); if (list) list.innerHTML = pmPaymentsTableHtml();
+    const cards = document.getElementById('pm-pay-cards'); if (cards) cards.innerHTML = pmPayCardsHtml();
     const cnt = document.getElementById('pm-pay-count'); if (cnt) cnt.innerHTML = pmPaymentsCountLabel();
     const clr = document.getElementById('pm-pay-clearx'); if (clr) clr.style.display = value ? '' : 'none';
   }, 150);
 }
 window.pmPaymentsSearchInput = pmPaymentsSearchInput;
 
+// Cards del tab Pagos = resumen de EXACTAMENTE lo que muestra la tabla (reusa
+// pmPaymentsFiltered: Mes, Casa, Plataforma, Recurrencia, Estatus y buscador).
+// El buscador también las refresca (pmPaymentsSearchInput).
+function pmPayCardsHtml() {
+  const ym = pmaState.payMonth || pmDefaultYM();
+  const now = new Date();
+  const propFilter = pmaState.payFilterProperty;
+  const Fp = pmPaymentsFiltered();
+  const cobrado = Fp.reduce((s,p) => s + Number(p.amount||0), 0);
+  const cobradoCash = Fp.filter(p => p.paid_at).reduce((s,p) => s + Number(p.amount||0), 0);
+  const pagosAtrasados = Fp.filter(p => pmPayStatus(p).key === 'atrasado');
+  const deudaAtrasada = pagosAtrasados.reduce((s, p) => s + pmPayStatus(p).debe, 0);
+  const activeBs = pmActiveBookings().filter(b => !propFilter || b.property_id === propFilter);
+  const proximos = activeBs.filter(b => {
+    const due = pmNextDueDate(b); if (!due) return false;
+    const diff = Math.floor((due - now) / 86400000);
+    if (!(diff >= -3 && diff <= 7)) return false;
+    const paid = pmaState.payments.some(p => p.type==='ingreso' && pmBillYm(p) === ym && (p.booking_id===b.id || (b.tenant_id && p.tenant_id===b.tenant_id)));
+    return !paid;
+  }).length;
+  const card = (label, value, sub, accent) => `<div class="bg-white border border-slate-200 rounded-xl p-4"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div><div class="text-2xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div>${sub?`<div class="text-[11px] text-slate-500 mt-0.5">${sub}</div>`:''}</div>`;
+  return `
+      ${card('Renta', pmMoney(cobrado), 'Σ de lo filtrado (tag Mes/Año)', 'text-emerald-700')}<div class="mt-2">${pmMonthBadge(ym)}</div>
+      ${card('Cobrado', pmMoney(cobradoCash), 'de lo filtrado, con fecha de pago', 'text-slate-700')}
+      ${card('Pagos', Fp.length, 'filas mostradas en la tabla')}
+      ${card('Pagos atrasados', pagosAtrasados.length, 'con saldo vencido (del filtro)', pagosAtrasados.length?'text-red-600':'text-slate-900')}
+      ${card('Total atrasado', pmMoney(deudaAtrasada), 'suma de lo adeudado (del filtro)', pagosAtrasados.length?'text-red-600':'text-slate-900')}
+      ${card('Próximos 7 días', proximos, 'por cobrar', proximos?'text-amber-600':'text-slate-900')}`;
+}
 function pmRenderPayments() {
   pmPaymentsInitFilters();
   const ym = pmaState.payMonth || pmDefaultYM();   // default unificado = último mes cerrado
   const now = new Date();
   const propFilter = pmaState.payFilterProperty;
 
-  // Cards del mes (snapshot) — RENTA DEL MES = tag Mes/Año (billing), no fecha de cobro.
-  const monthPays = pmaState.payments.filter(p => p.type === 'ingreso' && pmBillYm(p) === ym && (!propFilter || p.property_id === propFilter));
-  const cobrado = monthPays.reduce((s,p) => s + Number(p.amount||0), 0);
-  // Flujo de caja: lo efectivamente COBRADO dentro del mes calendario (por paid_at)
-  const cashPays = pmaState.payments.filter(p => p.type === 'ingreso' && (p.paid_at||'').startsWith(ym) && (!propFilter || p.property_id === propFilter));
-  const cobradoCash = cashPays.reduce((s,p) => s + Number(p.amount||0), 0);
+  // "Próximos 7 días" es proyección hacia adelante (por bookings): respeta solo Casa.
   const activeBs = pmActiveBookings().filter(b => !propFilter || b.property_id === propFilter);
-  // Pagos atrasados REALES = filas con saldo vencido (cualquier período, respeta filtro Casa).
-  // PadSplit ya queda fuera (pmPayStatus lo marca plataforma). + total adeudado.
-  const pagosAtrasados = pmaState.payments.filter(p => p.type === 'ingreso'
-    && (!propFilter || p.property_id === propFilter) && pmPayStatus(p).key === 'atrasado');
-  const deudaAtrasada = pagosAtrasados.reduce((s, p) => s + pmPayStatus(p).debe, 0);
 
   // Próximos cobros (7 días): activos no pagados este mes con próximo vencimiento ≤7d
   const proximosList = activeBs.filter(b => {
@@ -4360,15 +4380,8 @@ function pmRenderPayments() {
         </div>
       </div>` : ''}
 
-    <!-- cards del mes -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-2">
-      ${card('Renta del mes', pmMoney(cobrado), pmYmLabelC(ym) + ' · por tag Mes/Año', 'text-emerald-700')}<div class="mt-2">${pmMonthBadge(ym)}</div>
-      ${card('Cobrado en el mes', pmMoney(cobradoCash), 'flujo de caja (por fecha de pago)', 'text-slate-700')}
-      ${card('Pagos del mes', monthPays.length, 'con tag ' + pmYmLabelC(ym))}
-      ${card('Pagos atrasados', pagosAtrasados.length, 'filas con saldo vencido', pagosAtrasados.length?'text-red-600':'text-slate-900')}
-      ${card('Total atrasado', pmMoney(deudaAtrasada), 'suma de lo adeudado', pagosAtrasados.length?'text-red-600':'text-slate-900')}
-      ${card('Próximos 7 días', proximosList.length, 'por cobrar', proximosList.length?'text-amber-600':'text-slate-900')}
-    </div>
+    <!-- cards = resumen de la tabla filtrada -->
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-2" id="pm-pay-cards">${pmPayCardsHtml()}</div>
 
     <!-- Buscador estático -->
     <div class="relative">
