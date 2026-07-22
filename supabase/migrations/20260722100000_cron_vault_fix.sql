@@ -1,0 +1,9 @@
+-- FIX 22-jul (aplicado por MCP en prod): crons de edge functions MUERTOS en silencio.
+-- Causas: (1) app.settings.service_role_key jamás configurada → cron_invoke_function hacía
+-- skip "succeeded" sin llamar nada (TODOS los syncs por cron, no solo Rentas);
+-- (2) job 20 duplicado con URL placeholder TU_PROJECT_REF → "Couldn't resolve host" cada 15';
+-- (3) pg_net timeout default 5s vs syncs de 30-90s.
+-- Arreglo: key en VAULT (secreto 'service_role_key'; alter database denegado al rol del MCP),
+-- cron_invoke_function lee vault→setting con timeout_milliseconds=240000; cron.unschedule(20).
+-- Verificado: net._http_response status 200 · last_synced_at fresco.
+-- (cuerpo de la función en la migración cron_invoke_function_vault_fix de Supabase)
