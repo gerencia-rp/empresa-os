@@ -1463,7 +1463,7 @@ function pmRenderPropertyCardInline(p) {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <strong class="text-sm text-slate-900 pm-clamp2 pm-property-name" title="${(p.name||'').replace(/"/g,'&quot;')}">${(p.name||'').replace(/</g,'&lt;')}</strong>
-              <span class="text-[10px] px-2 py-0.5 rounded uppercase font-bold ${p.active===false?'bg-red-100 text-red-700':'bg-emerald-100 text-emerald-800'}">${p.active===false?'INACTIVA':'ACTIVA'}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded uppercase font-bold ${p.active===false?(p.archived_manual?'bg-amber-100 text-amber-700':'bg-red-100 text-red-700'):'bg-emerald-100 text-emerald-800'}">${p.active===false?(p.archived_manual?'📦 ARCHIVADA':'INACTIVA'):'ACTIVA'}</span>
             </div>
             <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
               <span>📍 ${(p.address||'').replace(/</g,'&lt;')}</span>
@@ -1482,7 +1482,9 @@ function pmRenderPropertyCardInline(p) {
           </div>
           <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1.5 rounded" title="Generar la Guía de Bienvenida / Check-in en PDF">📄 Guía Check-in</button>
           <button onclick="event.stopPropagation();pmEditProperty('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1" title="Editar">✏️</button>
-          <button onclick="event.stopPropagation();pmDeleteProperty('${p.id}')" class="text-slate-400 hover:text-red-600 p-1" title="Eliminar">🗑</button>
+          ${p.active === false
+            ? `<button onclick="event.stopPropagation();pmArchiveProperty('${p.id}', false)" class="text-emerald-600 hover:text-emerald-700 text-[11px] font-bold px-2 py-1 rounded bg-emerald-50" title="Reactivar: vuelve a contar en ocupación y KPIs">↩ Reactivar</button>`
+            : `<button onclick="event.stopPropagation();pmArchiveProperty('${p.id}', true)" class="text-slate-400 hover:text-amber-600 p-1" title="Archivar (reversible): deja de contar en ocupación y KPIs; el sync la respeta">📦</button>`}
         </div>
       </div>
 
@@ -5741,6 +5743,24 @@ async function pmSaveProperty(id) {
   await pmAfterCrud();
 }
 window.pmSaveProperty = pmSaveProperty;
+
+async function pmArchiveProperty(id, on) {
+  const p = pmaState.properties.find(x => x.id === id) || ((pmaState._raw||{}).properties || []).find(x => x.id === id) || {};
+  const nombre = p.name || p.address || 'esta propiedad';
+  if (!confirm(on
+    ? `📦 ¿Archivar "${nombre}"?
+
+· Deja de contar en propiedades, unidades y ocupación
+· El sync de Airtable NO la reactiva (marca manual)
+· Reversible: ↩ Reactivar (visible con 📦 Mostrar archivados)`
+    : `↩ ¿Reactivar "${nombre}"? Vuelve a contar en ocupación y KPIs.`)) return;
+  const { data, error } = await sb.rpc('pm_archive_property', { p_id: id, p_on: on });
+  if (error || !(data && data.ok)) { alert('Error: ' + (error ? error.message : ((data && data.error) || 'desconocido'))); return; }
+  const raw = ((pmaState._raw||{}).properties || []).find(x => x.id === id);
+  if (raw) { raw.active = !on; raw.archived_manual = on; }
+  pmApplyActiveFilter(); pmRender();
+}
+window.pmArchiveProperty = pmArchiveProperty;
 
 async function pmDeleteProperty(id) {
   if (!confirm('¿Eliminar esta propiedad y todas sus unidades/reservas?')) return;

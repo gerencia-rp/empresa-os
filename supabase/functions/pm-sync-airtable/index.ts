@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
     srcCounts.pm_properties = casas.length;
 
     // Existentes: mapa por recId de Casa y por address_normalized (conserva id / no duplica).
-    const { data: existingProps0 } = await supabase.from("pm_properties").select("id, address, address_normalized, airtable_address_id");
+    const { data: existingProps0 } = await supabase.from("pm_properties").select("id, address, address_normalized, airtable_address_id, archived_manual");
     const propIdByRec: Record<string, string> = {};
     const propIdByNorm: Record<string, string> = {};
     for (const p of existingProps0 || []) {
@@ -431,6 +431,10 @@ Deno.serve(async (req) => {
         const { _rec, ...payload } = row as any;
         const existingId = propIdByRec[_rec] || propIdByNorm[payload.address_normalized] || null;
         if (existingId) {
+          // 📦 archivado MANUAL (22-jul): si el humano archivó la casa desde el PM, el sync
+          // NO pisa active/status/archived_at aunque la casa siga en Airtable (reversible en la app)
+          const manual = (existingProps0 || []).some((x: any) => x.id === existingId && x.archived_manual);
+          if (manual) { delete (payload as any).active; delete (payload as any).status; delete (payload as any).archived_at; }
           const { error } = await supabase.from("pm_properties").update(payload).eq("id", existingId);
           if (error) { errors.push("property update " + _rec + ": " + error.message); propsUpsertOK = false; }
           else { propsUpdated++; propIdByRec[_rec] = existingId; }
