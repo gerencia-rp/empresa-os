@@ -354,16 +354,31 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
 
   // ── info del deal ──
   const estrategia = txt(P, 'estrategia'), planSalida = txt(P, 'plan_salida'), lender = txt(P, 'refi_lender');
+  // E3: nunca "sin dato" en estrategia/plan — "Pendiente de definir"; HML en líneas separadas
+  // (compra vs rehab/escrow) SIN duplicar montos; casos borde declarados
+  const pend = v => (v == null || String(v).trim() === '') ? '<span class="warn" title="el equipo todavía no lo definió">Pendiente de definir</span>' : esc(v);
+  const hmC = num(P, 'hm_compra', null), hmR = num(P, 'hm_rehab', null);
+  let hmLineas;
+  if (hmC == null && hmR == null) {
+    hmLineas = p.hmInicial
+      ? '<div class="kv"><span>Hard Money' + srcChip(P, 'hm_inicial') + '</span><b>' + $money(p.hmInicial) + (p.hmTasa ? ' @ ' + $pct(p.hmTasa) : '') + '</b></div>'
+      : '<div class="kv"><span>Hard Money</span><b><span class="warn">Pendiente</span></b></div>';
+  } else {
+    hmLineas = '<div class="kv"><span>HML para compra' + srcChip(P, 'hm_compra') + '</span><b>'
+      + (hmC == null ? '<span class="warn">Pendiente</span>' : (hmC === 0 ? 'Compra: cash <span class="meta">(sin HML en la compra)</span>' : $money(hmC) + (p.hmTasa ? ' @ ' + $pct(p.hmTasa) : ''))) + '</b></div>'
+      + '<div class="kv"><span>HML para rehab (escrow)' + srcChip(P, 'hm_rehab') + '</span><b>'
+      + (hmR == null ? '<span class="warn">Pendiente</span>' : $money(hmR)) + '</b></div>';
+  }
   const dealInfo = '<div class="grid k2" style="margin-top:14px">'
     + '<div class="card"><div class="chart-h"><div class="t">Info del deal</div><div class="k">' + esc(dir) + '</div></div>'
-    + '<div class="kv"><span>Estrategia' + srcChip(P, 'estrategia') + '</span><b>' + sd(estrategia) + '</b></div>'
+    + '<div class="kv"><span>Estrategia' + srcChip(P, 'estrategia') + '</span><b>' + pend(estrategia) + '</b></div>'
     + '<div class="kv"><span>Estado' + srcChip(P, 'estado_casa') + '</span><b>' + sd(estado) + '</b></div>'
     + '<div class="kv"><span>Tu % de equity</span><b>' + $pct(met.inv) + '</b></div>'
     + '<div class="kv"><span>Compra' + srcChip(P, 'compra') + '</span><b>' + $money(p.compra || null) + (cierre ? ' <span class="meta">(' + esc(cierre) + ')</span>' : '') + '</b></div>'
-    + '<div class="kv"><span>Hard Money' + srcChip(P, 'hm_inicial') + '</span><b>' + (p.hmInicial ? $money(p.hmInicial) + ' @ ' + $pct(p.hmTasa) : SD) + '</b></div>'
+    + hmLineas
     + '<div class="kv"><span>ARV (valor remodelada)' + srcChip(P, 'arv') + '</span><b>' + $money(p.arv || null) + '</b></div>'
-    + '<div class="kv"><span>Refinanciación' + srcChip(P, 'refi_monto') + '</span><b>' + (p.refiMes != null ? $money(p.refiMonto) + ' @ ' + $pct(p.refiTasa) + ' · ' + Math.round(p.refiPlazoM / 12) + ' años' : SD) + '</b></div>'
-    + '<div class="kv"><span>Plan de salida' + srcChip(P, 'plan_salida') + '</span><b style="max-width:60%;text-align:right;font-weight:600;font-size:11.5px">' + sd(planSalida) + '</b></div>'
+    + '<div class="kv"><span>Refinanciación' + srcChip(P, 'refi_monto') + '</span><b>' + (p.refiMes != null ? $money(p.refiMonto) + ' @ ' + $pct(p.refiTasa) + ' · ' + Math.round(p.refiPlazoM / 12) + ' años' : '<span class="warn">Pendiente</span>') + '</b></div>'
+    + '<div class="kv"><span>Plan de salida' + srcChip(P, 'plan_salida') + '</span><b style="max-width:60%;text-align:right;font-weight:600;font-size:11.5px">' + pend(planSalida) + '</b></div>'
     + '<div class="kv"><span>Próxima actualización</span><b>' + prox1.toISOString().slice(0, 10) + ' <span class="meta">(1° de mes)</span></b></div>'
     + '</div>'
     + renderRefiCard(pid, P, p, r, met, lender)
