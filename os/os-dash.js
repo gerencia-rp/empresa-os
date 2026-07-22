@@ -189,7 +189,7 @@ function dhViewFF() {
     { lab: 'Déficit acumulado', glos: 'deficit_harmony', v: D.deficit, txt: dhM(D.deficit), meta: 'ff_deficit', fuente: 'Σ ff_deals.deficit_total (Airtable FF)', linea: 'Harmony + rentas · plata propia tapando huecos', cls: D.deficit > 0 ? 'down' : 'up' },
   ]);
   const venc60 = D.ind.filter(r => { const ln = D.loans.find(l => (l.address || '').startsWith(r.casa)); return ln && ln.fecha_vencimiento && !ln.fecha_refi && !r.vendida && (new Date(ln.fecha_vencimiento) - Date.now()) < 60 * 86400000; });
-  const ue = '<div class="card overx" style="margin:0"><table class="dh-tbl"><thead><tr><th>Casa</th><th class="dh-num">All-in</th><th class="dh-num">Papel</th><th>Fuente</th><th class="dh-num">Margen s/all-in</th><th class="dh-num">Compra → Papel</th><th class="dh-num">Aprec./año</th><th class="dh-num">Equity hoy</th><th class="dh-num">Deuda</th><th>Vence HML</th></tr></thead><tbody>'
+  const ue = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Por casa</div><div class="k"><a style="cursor:pointer;color:var(--a2)" onclick="window.IA&&(IA.tab=\'analizador\');osNav(\'/inversionistas\')">🔮 Analizador: escenarios de venta 3/5/8 + waterfall →</a></div></div><table class="dh-tbl"><thead><tr><th>Casa</th><th class="dh-num">All-in</th><th class="dh-num">Papel</th><th>Fuente</th><th class="dh-num">Margen s/all-in</th><th class="dh-num">Compra → Papel</th><th class="dh-num">Aprec./año</th><th class="dh-num">Equity hoy</th><th class="dh-num">Deuda</th><th>Vence HML</th><th></th></tr></thead><tbody>'
     + D.casas.slice().sort((a, b) => (b.multAllIn || 0) - (a.multAllIn || 0)).map(c => {
       const ln = D.loans.find(l => (l.address || '').startsWith(c.casa)) || {};
       const vencSoon = ln.fecha_vencimiento && !ln.fecha_refi && !c.vendida && (new Date(ln.fecha_vencimiento) - Date.now()) < 60 * 86400000;
@@ -200,7 +200,8 @@ function dhViewFF() {
         + '<td class="dh-num">' + (c.tirNA ? 'n/a' : dhP(c.aprecAnual)) + '</td>'
         + '<td class="dh-num">' + (c.equityHoy != null ? dhM(c.equityHoy) : '—') + '</td>'
         + '<td class="dh-num">' + (c.deuda_vigente != null ? dhM(c.deuda_vigente) : dhPend('por completar')) + '</td>'
-        + '<td>' + (ln.fecha_vencimiento ? OS_E(ln.fecha_vencimiento) + (vencSoon ? ' <b class="down">⚠ <60d</b>' : '') : '—') + '</td></tr>';
+        + '<td>' + (ln.fecha_vencimiento ? OS_E(ln.fecha_vencimiento) + (vencSoon ? ' <b class="down">⚠ <60d</b>' : '') : '—') + '</td>'
+        + '<td><a style="cursor:pointer;color:var(--a2);font-size:10px" title="escenarios de venta 3/5/8 de esta casa" onclick="window.IA&&(IA.tab=\'analizador\');osNav(\'/inversionistas\')">🔮 3/5/8</a></td></tr>';
     }).join('') + '</tbody></table></div>';
   const extra = '<div class="grid k3" style="margin-top:12px;align-items:start">'
     + '<div class="card" style="margin:0"><div class="lab">Precisión de estimación' + dhIGlos('appraisal', dhP(D.errArv)) + '</div><div class="big">' + dhP(D.errArv) + '</div><div class="meta">error |appraisal − ARV| promedio · ¿compramos bien?' + dhSrc('ff_deals (casas con ambos)') + '</div></div>'
