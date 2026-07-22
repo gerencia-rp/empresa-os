@@ -31,7 +31,8 @@ const F = {
     // refi (Calc 3 Cash-Out): préstamo DSCR real, payoff real, fecha y % del banco (lookup)
     refiMonto: "fldif2zUp7yJDfiAu", refiPagado: "fldZsDNjV8DmJH7Wd", refiFecha: "fldttSOwH3FXQfZJr", refiPct: "fldiHb7SktnfkT5F1",
     // venta (Analítica S2 — rentabilidad realizada)
-    ventaPrecio: "fldvBmFii4u9OtKy9", ventaUtilBruta: "fldFB9AoZ6q3jJNRY", ventaUtilNeta: "fld5t3ETIYxpHD7Z5", ventaRoi: "fld0V8zYdDJhUX4mL" },
+    ventaPrecio: "fldvBmFii4u9OtKy9", ventaUtilBruta: "fldFB9AoZ6q3jJNRY", ventaUtilNeta: "fld5t3ETIYxpHD7Z5", ventaRoi: "fld0V8zYdDJhUX4mL",
+    ventaFecha: "fldq9iOwlJ0jY8hen" }, // "Fecha de Venta" — XIRR con la venta REAL en su fecha (E4)
 };
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -211,6 +212,7 @@ Deno.serve(async (req) => {
         pct_banco_refi: num(Array.isArray(f[F.dc.refiPct]) ? f[F.dc.refiPct][0] : f[F.dc.refiPct]), // lookup percent → decimal (0.75)
         precio_venta: num(f[F.dc.ventaPrecio]), utilidad_bruta_venta: num(f[F.dc.ventaUtilBruta]),
         utilidad_neta_venta: num(f[F.dc.ventaUtilNeta]), roi_venta: num(f[F.dc.ventaRoi]),
+        fecha_venta: f[F.dc.ventaFecha] || null,
         active: true, archived_at: null, last_synced_at: now(),
       };
     }).filter((r) => r.address);

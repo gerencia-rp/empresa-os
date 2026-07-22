@@ -411,14 +411,17 @@ function iaTabEscenarios() {
 
 // ─── F1 producto: distribuciones + mensajes (admin) ───
 async function iaLoadProducto() {
-  const [d, m, dl, pj, dc] = await Promise.all([
+  const [d, m, dl, pj, dc, ind, gl] = await Promise.all([
     sb.from('inv_distributions').select('*').eq('active', true).order('fecha', { ascending: false }),
     sb.from('inv_messages').select('*').eq('active', true).order('created_at', { ascending: false }).limit(100),
     sb.from('inv_deals').select('*').eq('active', true),
     sb.from('inv_projection').select('property_id,escenario,data,computed_at').eq('active', true).eq('escenario', 'proyectado'),
     sb.from('inv_documents').select('*').eq('active', true).order('created_at', { ascending: false }),
+    sb.rpc('inv_indicadores_data').then(r => r.data || []).catch(() => []),
+    sb.from('glosario_terminos').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
   ]);
   IA.dists = d.data || []; IA.msgs = m.data || []; IA.deals2 = dl.data || []; IA.proj = pj.data || []; IA.docsAll = dc.data || [];
+  IA.indData = ind || []; IA.glos = gl || [];
 }
 // ─── 📄 documentos del inversionista (el portal los lista con buscador + audit) ───
 async function iaAddDoc() {
@@ -653,6 +656,48 @@ function iaTabPipeline() {
 }
 
 // ─── F3: dashboard global ───
+// ─── 📈 E4: portafolio (XIRR, múltiplos, LTV) — cálculo compartido os/inv-indicadores.js ───
+function iaPctI(v) { return v == null ? 'n/a' : (v * 100).toFixed(1) + '%'; }
+function iaXI(v) { return v == null ? '—' : v.toFixed(2) + 'x'; }
+function iaSecPortafolioE4() {
+  if (!window.invInd || !(IA.indData || []).length) return '';
+  const hoy = new Date().toISOString().slice(0, 10);
+  const rows = IA.indData;
+  const casas = rows.map(r => invInd.casa(r, hoy));
+  const port = invInd.portfolio(rows, hoy);
+  // agregados de inversionistas (DPI/RVPI/TVPI del fondo): capital y dists de TODOS
+  const capTotal = IA.holdings.reduce((s, h) => s + (+h.inversion_aportada || 0), 0);
+  const distPag = (IA.dists || []).filter(d => d.estado === 'pagada').reduce((s, d) => s + (+d.monto || 0), 0);
+  let residual = 0;
+  IA.holdings.forEach(h => { const ci = casas.find(x => x.property_id === h.property_id); if (ci && ci.equityHoy != null) residual += Math.max(0, ci.equityHoy) * (+h.reparto_pct || 0); });
+  const dpi = capTotal ? distPag / capTotal : null, rvpi = capTotal ? residual / capTotal : null;
+  const sem = c => c.ltvSem == null ? '' : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:' + (c.ltvSem === 'verde' ? 'var(--pos)' : c.ltvSem === 'ambar' ? 'var(--amber)' : 'var(--neg)') + '"></span>';
+  const kpi = (lab, val, meta) => '<div class="card"><div class="lab">' + lab + '</div><div class="big">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
+  const tabla = '<div class="card overx" style="margin-top:14px"><div class="chart-h"><div class="t">Indicadores por casa (papel · corte ' + hoy + ')</div><div class="k">TIR = (V/C)^(365/días)−1 · vendidas con precio real en su fecha</div></div>'
+    + '<table class="ptable"><thead><tr><th>Casa</th><th>Etapa</th><th style="text-align:right">All-in</th><th style="text-align:right">Valor papel</th><th>Fuente</th><th style="text-align:right">TIR</th><th style="text-align:right">×All-in</th><th style="text-align:right">×Equity</th><th style="text-align:right">LTV</th><th style="text-align:right">Yield</th><th style="text-align:right">Aprec./año</th></tr></thead><tbody>'
+    + casas.slice().sort((a, b) => (b.tirActivo || -9) - (a.tirActivo || -9)).map(c => '<tr' + (c.porCompletar ? ' style="opacity:.6"' : '') + '><td>' + OS_E(c.casa) + '</td><td class="meta">' + OS_E(c.etapa || '—') + '</td>'
+      + '<td style="text-align:right">' + iaMoney(c.all_in) + '</td><td style="text-align:right">' + iaMoney(c.paper_value) + '</td><td class="meta" style="font-size:10px">' + OS_E(c.paper_fuente || '') + '</td>'
+      + '<td style="text-align:right" class="' + (c.tirActivo > 0 ? 'up' : 'down') + '">' + (c.tirNA ? 'n/a' : iaPctI(c.tirActivo)) + '</td>'
+      + '<td style="text-align:right">' + iaXI(c.multAllIn) + '</td>'
+      + '<td style="text-align:right">' + (c.porCompletar ? '<span class="badge b-warn" style="font-size:8px">por completar</span>' : (c.equityLeq0 ? '<span title="la deuda financió todo — el retorno sale de la valorización">equity ≤ 0</span>' : iaXI(c.multEquity))) + '</td>'
+      + '<td style="text-align:right">' + sem(c) + iaPctI(c.ltv) + '</td>'
+      + '<td style="text-align:right">' + iaPctI(c.yieldOnCost) + '</td><td style="text-align:right">' + iaPctI(c.aprecAnual) + '</td></tr>').join('')
+    + '</tbody></table>'
+    + (port.porCompletar.length ? '<div class="meta" style="margin-top:8px">📋 <b>Por completar (checklist deuda HML)</b>: ' + port.porCompletar.map(r => OS_E(r.casa)).join(' · ') + '</div>' : '')
+    + '</div>';
+  return '<div class="card" style="margin-bottom:14px;border-color:rgba(245,178,61,.4)"><div style="font-size:12px;color:var(--amber)">📄 Indicadores sobre <b>valor en papel</b> (appraisal/ARV) — no incluyen rentas, intereses ni gastos; no son ganancias realizadas hasta la venta o refi. Vendidas usan precio REAL en su fecha (Arcadia $615,000 · 2026-05-04); Slaughter usa ARV como proxy (precio de venta por completar).</div></div>'
+    + '<div class="grid k4">'
+    + kpi('XIRR portafolio (all-in)', iaPctI(port.xirrAllIn), port.n + ' casas · flujos compra→papel/venta [inv_indicadores_data]')
+    + kpi('XIRR solo compra', iaPctI(port.xirrCompra), 'sin contar la obra (draws)')
+    + kpi('Múltiplo sobre equity', iaXI(port.multEquity), '(papel − deuda) ÷ (all-in − HML) · ' + port.nConDeuda + ' casas con deuda')
+    + kpi('LTV promedio ponderado', iaPctI(port.ltvPond), 'deuda vigente ÷ valor papel')
+    + '</div><div class="grid k4" style="margin-top:10px">'
+    + kpi('Inversión total (all-in)', iaMoney(port.invTotal), 'compra + draws de todas las casas')
+    + kpi('Valor papel total', iaMoney(port.paperTotal), 'appraisal/ARV + ventas reales')
+    + kpi('Equity invertido → hoy', iaMoney(port.equityInv) + ' → ' + iaMoney(port.equityHoy), 'plata propia vs lo que vale hoy')
+    + kpi('Fondo: DPI · RVPI · TVPI', (dpi != null ? dpi.toFixed(2) : '—') + 'x · ' + (rvpi != null ? rvpi.toFixed(2) : '—') + 'x · ' + (dpi != null && rvpi != null ? (dpi + rvpi).toFixed(2) : '—') + 'x', 'Σ dists pagadas / Σ capital · residual en papel')
+    + '</div>' + tabla;
+}
 function iaTabGlobal() {
   const caps = {};
   IA.holdings.forEach(h => { caps[h.investor_airtable_id] = (caps[h.investor_airtable_id] || 0) + (+h.inversion_aportada || 0); });
@@ -669,7 +714,7 @@ function iaTabGlobal() {
   [...new Set(IA.holdings.map(h => h.property_id))].filter(pid => !projs.some(p => p.property_id === pid)).forEach(pid => alertas.push('📐 Casa con capital SIN modelo/proyección: ' + iaCasaName(pid) + ' — cargar params y guardar cache'));
   const cerradas = (IA.deals2 || []).filter(d => d.closure);
   const kpi = (lab, val, meta) => '<div class="card"><div class="lab">' + lab + '</div><div class="big">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
-  return '<div class="grid k4">'
+  return iaSecPortafolioE4() + '<div class="grid k4" style="margin-top:14px">'
     + kpi('Capital total invertido', iaMoney(capTotal), Object.keys(caps).length + ' inversionistas · ' + Object.keys(porCasa).length + ' casas [inv_holdings]')
     + kpi('TIR promedio proyectada', tirs.length ? (tirs.reduce((s, x) => s + x, 0) / tirs.length * 100).toFixed(1) + '%' : 'sin datos', tirs.length + ' de ' + projs.length + ' casas con proyección (resto en calibración)')
     + kpi('VPN agregado (31a)', vpns.length ? iaMoney(vpns.reduce((s, x) => s + x, 0)) : 'sin datos', 'suma de proyecciones [inv_projection]')
@@ -961,11 +1006,94 @@ function iaMovsCard() {
     + '</div>';
 }
 
+// ─── 👁 E4.5E: "ver como inversionista" (guard: sin markup) + 🖨 guía imprimible ───
+function iaCasaInd(pid) {
+  if (!window.invInd || !(IA.indData || []).length) return null;
+  const r = (IA.indData || []).find(x => x.property_id === pid);
+  return r ? invInd.casa(r, new Date().toISOString().slice(0, 10)) : null;
+}
+function iaGlosDe(clave) { return (IA.glos || []).find(g => g.clave === clave) || {}; }
+function iaIndResumen(pid, forPrint) {
+  const c = iaCasaInd(pid);
+  if (!c) return '<div class="meta">Sin datos de indicadores para esta casa (¿tiene deal FF con property_id?).</div>';
+  const P = v => v == null ? 'n/a' : (v * 100).toFixed(1) + '%';
+  const X = v => v == null ? '—' : v.toFixed(2) + 'x';
+  const fila = (clave, lab, val, estado) => {
+    const g = iaGlosDe(clave);
+    return '<div style="padding:8px 0;border-top:1px solid ' + (forPrint ? '#ddd' : 'var(--glassb)') + '"><b>' + lab + ': ' + val + '</b>'
+      + (estado ? '<div style="font-size:11px;color:#b45309">' + estado + '</div>' : '')
+      + (g.que_es ? '<div style="font-size:11.5px;opacity:.75;margin-top:2px">' + OS_E(g.que_es) + (g.para_que ? ' ➜ ' + OS_E(g.para_que) : '') + '</div>' : '') + '</div>';
+  };
+  return '<div style="font-size:12.5px">'
+    + '<div style="padding:7px 10px;border:1px solid #e0a83d66;background:#e0a83d14;border-radius:8px;font-size:11px">📄 Indicadores sobre valor en PAPEL (' + OS_E(c.paper_fuente || '') + ') — no son ganancias realizadas hasta la venta o el refi.</div>'
+    + fila('tir', 'TIR del activo', c.tirNA ? 'n/a' : P(c.tirActivo), c.tirNA ? 'n/a: muy reciente para anualizar — mirar el múltiplo' : null)
+    + fila('mult_allin', 'Múltiplo all-in', X(c.multAllIn))
+    + fila('mult_equity', 'Múltiplo sobre equity', c.porCompletar ? 'por completar' : (c.equityLeq0 ? 'equity ≤ 0' : X(c.multEquity)), c.equityLeq0 ? 'la deuda financió todo — el retorno sale de la valorización' : (c.porCompletar ? 'falta registrar el HML de esta casa' : null))
+    + fila('ltv', 'LTV actual', P(c.ltv))
+    + fila('yield_on_cost', 'Yield on cost', P(c.yieldOnCost))
+    + fila('apreciacion', 'Apreciación anualizada', P(c.aprecAnual))
+    + '<div style="margin-top:8px;font-size:11px;opacity:.7">Valor papel ' + iaMoney(c.paper_value) + ' · all-in ' + iaMoney(c.all_in) + ' · deuda ' + (c.deuda_vigente != null ? iaMoney(c.deuda_vigente) : 'por completar') + ' (' + OS_E(c.deuda_fuente || '') + ') · corte ' + new Date().toISOString().slice(0, 10) + '</div></div>';
+}
+function iaVerComoInversor(pid) {
+  const old = document.getElementById('ia-vci-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'ia-vci-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,12,.55);display:grid;place-items:center;z-index:99999;padding:18px';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div style="background:var(--bg,#0f1220);border:1px solid var(--glassb,#2a2f4a);border-radius:14px;padding:18px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto;color:var(--ink,#e8eaf2)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><b>👁 Lo que ve el inversionista · ' + OS_E(iaCasaName(pid)) + '</b><button class="ibtn" onclick="document.getElementById(\'ia-vci-ov\').remove()">✕</button></div>'
+    + '<div class="meta" style="margin-bottom:8px">Vista SIN markup ni datos de otros inversionistas (mismo cálculo que el portal).</div>'
+    + iaIndResumen(pid, false) + '</div>';
+  document.body.appendChild(ov);
+}
+window.iaVerComoInversor = iaVerComoInversor;
+function iaGuiaPantalla(pid) {
+  const w = window.open('', '_blank');
+  if (!w) return alert('Permití pop-ups para imprimir la guía');
+  w.document.write('<html><head><title>Guía · ' + OS_E(iaCasaName(pid)) + '</title><style>body{font-family:system-ui;margin:32px;color:#111;max-width:720px}h1{font-size:20px}b{font-weight:700}</style></head><body>'
+    + '<h1>Guía de indicadores · ' + OS_E(iaCasaName(pid)) + '</h1>'
+    + '<p style="font-size:12px;color:#555">Para leer con el inversionista — cada indicador con su explicación y sus números. Generado ' + new Date().toISOString().slice(0, 10) + '.</p>'
+    + iaIndResumen(pid, true)
+    + '</body></html>');
+  w.document.close();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+}
+window.iaGuiaPantalla = iaGuiaPantalla;
+
+// ─── 📚 E4.5: editor del glosario (los textos viven en glosario_terminos, sin hardcode) ───
+async function iaGlosSave(clave) {
+  const g = k => { const el = document.getElementById('ia-g-' + k); return el ? el.value : null; };
+  const upd = { que_es: g('quees'), para_que: g('paraque'), formula: g('formula') || null, ejemplo_template: g('ejemplo') || null, updated_at: new Date().toISOString() };
+  const { error } = await sb.from('glosario_terminos').update(upd).eq('clave', clave);
+  if (error) return alert('Error: ' + error.message);
+  IA.glosEdit = null;
+  if (window.toast) toast('✓ ' + clave + ' actualizado — tooltips, glosario y asistente lo leen de acá', 'success');
+  await iaLoadProducto(); osRender();
+}
+window.iaGlosSave = iaGlosSave;
+function iaTabGlosario() {
+  const list = (IA.glos || []).slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+  return '<div class="card"><div class="chart-h"><div class="t">📚 Glosario (' + list.length + ' términos)</div><div class="k">alimenta los ⓘ, la pestaña Aprende del portal y el asistente — editable acá, sin código</div></div>'
+    + list.map(g => {
+      if (IA.glosEdit === g.clave) {
+        return '<div style="background:var(--glass);border:1px solid var(--a2);border-radius:9px;padding:10px;margin:6px 0">'
+          + '<b>' + OS_E(g.termino_es) + '</b> <span class="meta">(' + OS_E(g.clave) + ' · ' + OS_E(g.tema) + ')</span>'
+          + '<div class="lab" style="margin-top:6px">Qué es</div><textarea id="ia-g-quees" rows="2" class="osa-in" style="width:100%">' + OS_E(g.que_es) + '</textarea>'
+          + '<div class="lab" style="margin-top:6px">Para qué sirve</div><textarea id="ia-g-paraque" rows="2" class="osa-in" style="width:100%">' + OS_E(g.para_que || '') + '</textarea>'
+          + '<div class="lab" style="margin-top:6px">Fórmula</div><input id="ia-g-formula" class="osa-in" style="width:100%" value="' + OS_E(g.formula || '') + '">'
+          + '<div class="lab" style="margin-top:6px">Plantilla "Tu caso" ({{placeholders}})</div><input id="ia-g-ejemplo" class="osa-in" style="width:100%" value="' + OS_E(g.ejemplo_template || '') + '">'
+          + '<div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaGlosSave(\'' + OS_E(g.clave) + '\')">💾 Guardar</button><button class="ct-btn" onclick="IA.glosEdit=null;osRender()">Cancelar</button></div></div>';
+      }
+      return '<div class="kv"><span><b>' + OS_E(g.termino_es) + '</b> <span class="meta" style="font-size:10px">' + OS_E(g.tema) + '</span><div class="meta" style="font-size:11px;max-width:520px">' + OS_E(g.que_es) + '</div></span>'
+        + '<b><button class="ct-btn" style="padding:2px 8px" onclick="IA.glosEdit=\'' + OS_E(g.clave) + '\';osRender()">✎</button></b></div>';
+    }).join('')
+    + '</div>';
+}
+
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return window.kitError ? kitError(IA.err, 'iaLoad(true)') : '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger']];
+  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger'], ['glosario', '📚 Glosario']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaGoTab(\'' + t[0] + '\')">' + t[1] + '</button>').join(' ');
   let body = '';
 
@@ -1056,6 +1184,8 @@ function invAdminView() {
     const esEjemplo = IA.params.some(p => p.key === 'es_ejemplo' && p.value === 'true');
     body = '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">' + casaSel
       + (esEjemplo ? '<span class="badge b-warn" title="Casa de ejemplo del Excel Modelo financiero - Renta VF">🧪 ejemplo del Excel</span>' : '')
+      + '<button class="ibtn" onclick="iaVerComoInversor(IA.casa)">👁 Ver como inversionista</button>'
+      + '<button class="ibtn" onclick="iaGuiaPantalla(IA.casa)">🖨 Guía de esta pantalla</button>'
       + '<span class="meta">el portal del inversionista muestra EXACTAMENTE esto (motor compartido)</span></div>'
       + preview
       + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">➕ Agregar parámetro</div><div class="k">todo "sin dato" del portal se carga acá (ej: estrategia, plan_salida, refi_lender, cashout_real)</div></div>'
@@ -1072,7 +1202,7 @@ function invAdminView() {
   }
 
   if (IA.tab === 'escenarios') body = iaTabEscenarios();
-  const needsProd = ['dist', 'msgs', 'pipeline', 'global', 'docs2'].includes(IA.tab);
+  const needsProd = ['dist', 'msgs', 'pipeline', 'global', 'docs2', 'glosario', 'modelo'].includes(IA.tab);
   if (needsProd && !IA.dists) { iaLoadProducto().then(osRender); body = '<div class="empty">⏳</div>'; }
   else if (IA.tab === 'dist') body = iaTabDist();
   else if (IA.tab === 'docs2') body = iaTabDocs();
@@ -1080,6 +1210,7 @@ function invAdminView() {
   else if (IA.tab === 'pipeline') body = iaTabPipeline();
   else if (IA.tab === 'global') body = iaTabGlobal();
   else if (IA.tab === 'ledger') body = iaTabLedger();
+  else if (IA.tab === 'glosario') body = iaTabGlosario();
 
   return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'

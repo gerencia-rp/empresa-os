@@ -64,7 +64,7 @@ async function ipLoad() {
     return;
   }
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
-  const [prm, cf, dc, acc, dist, msg, res, pj, ovr] = await Promise.all([
+  const [prm, cf, dc, acc, dist, msg, res, pj, ovr, indD, glosL] = await Promise.all([
     sb.from('inv_model_params').select('*').in('property_id', props).eq('active', true),
     sb.from('inv_cashflow_real').select('*').in('property_id', props).eq('active', true).order('fecha'),
     sb.from('inv_documents').select('*').in('property_id', props).eq('active', true),
@@ -74,8 +74,12 @@ async function ipLoad() {
     sb.from('v_portal_inversor').select('*').then(r => r.data || []).catch(() => []),
     sb.from('inv_projection').select('property_id,escenario,data,computed_at').eq('active', true).then(r => r.data || []).catch(() => []),
     sb.from('inv_param_overrides').select('*').in('property_id', props).eq('active', true).then(r => r.data || []).catch(() => []),
+    sb.rpc('inv_indicadores_data').then(r => r.data || []).catch(() => []),
+    sb.from('glosario_terminos').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
   ]);
   IP.resumen = res || []; IP.proj = pj || [];
+  IP.indData = indD || [];
+  IP.glos = {}; (glosL || []).forEach(g => { IP.glos[g.clave] = g; });
   IP.params = {}; (prm.data || []).forEach(r => { (IP.params[r.property_id] = IP.params[r.property_id] || {})[r.key] = r; });
   // overrides del admin: el valor EFECTIVO es el ajustado a mano; la fuente original queda declarada
   (ovr || []).forEach(o => {
@@ -205,6 +209,119 @@ function ipMetrics(pid, p, r, holding) {
   return { inv, cap, distTotal, distMias, riquezaHoy, abonoHoy, valHoy, mesesDesde, real, cocBase, cocMensual, cocAnualPct, em, roiAnu, mesesInv, flujoAnualCasa };
 }
 
+// ─── 📚 E4.5: capa educativa — ⓘ universal desde glosario_terminos (tabla, sin hardcode) ───
+IP._glosVals = {};
+function ipInterp(tpl, vals) { return String(tpl || '').replace(/\{\{(\w+)\}\}/g, (_, k) => (vals && vals[k] != null) ? vals[k] : '—'); }
+// ícono ⓘ inline: guarda los NÚMEROS REALES del inversionista para interpolar en "Tu caso"
+function gI(clave, vals) {
+  if (vals) IP._glosVals[clave] = vals;
+  return (IP.glos || {})[clave] ? ' <span style="cursor:pointer;color:var(--mut2);font-size:10px;vertical-align:middle" title="¿Qué es esto?" onclick="event.stopPropagation();ipGlos(\'' + clave + '\')">ⓘ</span>' : '';
+}
+window.gI = gI;
+function ipGlos(clave) {
+  const g = (IP.glos || {})[clave]; if (!g) return;
+  const vals = IP._glosVals[clave] || {};
+  const old = document.getElementById('ip-info-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'ip-info-ov'; ov.className = 'ipov';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  const caso = g.ejemplo_template ? ipInterp(g.ejemplo_template, vals) : null;
+  ov.innerHTML = '<div class="ipov-card">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><b style="font-size:15px">' + esc(g.termino_es) + '</b><button class="ibtn" onclick="document.getElementById(\'ip-info-ov\').remove()">✕ Cerrar</button></div>'
+    + '<div class="lab">Qué es</div><div style="font-size:13px;line-height:1.6;color:var(--mut)">' + esc(g.que_es) + '</div>'
+    + (g.para_que ? '<div class="lab" style="margin-top:10px">Para qué te sirve</div><div style="font-size:12.5px;line-height:1.55;color:var(--mut)">' + esc(g.para_que) + '</div>' : '')
+    + (g.formula ? '<div class="lab" style="margin-top:10px">Fórmula</div><div class="ipov-f">' + esc(g.formula) + '</div>' : '')
+    + (caso ? '<div class="lab" style="margin-top:10px">Tu caso</div><div class="ipov-f">' + esc(caso) + '</div>' : '')
+    + '</div>';
+  document.body.appendChild(ov);
+}
+window.ipGlos = ipGlos;
+
+// ─── 📈 E4: indicadores de retorno (VALOR EN PAPEL) — cálculo = os/inv-indicadores.js ───
+function renderIndicadores(pid, met) {
+  if (!window.invInd || !(IP.indData || []).length) return '';
+  const hoy = new Date().toISOString().slice(0, 10);
+  const cAll = (IP.indData || []).map(r => invInd.casa(r, hoy));
+  const c = cAll.find(x => x.property_id === pid);
+  const $x = v => v == null ? '—' : v.toFixed(2) + 'x';
+  // por inversionista (todas sus casas): DPI/RVPI/TVPI + TIR combinada
+  const aportes = IP.holdings.map(h => ({ fecha: h.fecha_entrada || (((IP.params[h.property_id] || {}).fecha_cierre || {}).value || null), monto: +h.inversion_aportada || 0 }));
+  let residual = 0, residualParcial = false;
+  IP.holdings.forEach(h => {
+    const ci = cAll.find(x => x.property_id === h.property_id);
+    const rep = +h.reparto_pct || 0;
+    if (ci && ci.equityHoy != null) residual += Math.max(0, ci.equityHoy) * rep; else residualParcial = true;
+  });
+  const distsPag = (IP.dists || []).filter(d => d.estado === 'pagada');
+  const im = invInd.inversionista(aportes, distsPag, residual, hoy);
+  IP.lastInd = { casa: c ? { casa: c.casa, tir: c.tirActivo, tirNA: c.tirNA, multAllIn: c.multAllIn, multEquity: c.multEquity, equityLeq0: c.equityLeq0, ltv: c.ltv, yield: c.yieldOnCost, aprec: c.aprecAnual, paper: c.paper_value, paper_fuente: c.paper_fuente, porCompletar: c.porCompletar } : null, inversor: im, residualParcial };
+  const vals = { capital: $money(im.capital), dist: $money(im.distTotal), residual: $money(residual), dpi: im.dpi != null ? im.dpi.toFixed(2) + 'x' : '—', rvpi: im.rvpi != null ? im.rvpi.toFixed(2) + 'x' : '—', tvpi: im.tvpi != null ? im.tvpi.toFixed(2) + 'x' : '—', tir: $pct(im.tir), ltv: c ? $pct(c.ltv) : '—', mult_equity: c ? $x(c.multEquity) : '—', mult_allin: c ? $x(c.multAllIn) : '—', yield: c ? $pct(c.yieldOnCost) : '—', aprec: c ? $pct(c.aprecAnual) : '—' };
+  const card = (lab, clave, val, linea, cls) => '<div class="card"><div class="lab">' + lab + gI(clave, vals) + '</div><div class="big ' + (cls || '') + '">' + val + '</div><div class="meta">' + linea + '</div></div>';
+  let casaCards = '';
+  if (c) {
+    const tirVal = c.tirNA ? 'n/a' : $pct(c.tirActivo);
+    const tirLinea = c.tirNA ? 'muy reciente para anualizar — mirá el múltiplo' : 'tu inversión crece a este ritmo anual, en papel';
+    const eqVal = c.porCompletar ? 'por completar' : (c.equityLeq0 ? 'equity ≤ 0' : $x(c.multEquity));
+    const eqLinea = c.porCompletar ? 'sin HML registrado — el equipo está completando la deuda' : (c.equityLeq0 ? 'la deuda financió todo — tu retorno sale de la valorización' : 'cuántas veces se multiplicó la plata propia');
+    const ltvDot = c.ltvSem ? '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:' + (c.ltvSem === 'verde' ? 'var(--pos)' : c.ltvSem === 'ambar' ? 'var(--amber)' : 'var(--neg)') + '"></span>' : '';
+    const ltvLinea = c.ltv != null ? 'el banco es dueño del ' + Math.round(c.ltv * 100) + '% del valor; vos del ' + Math.max(0, 100 - Math.round(c.ltv * 100)) + '%' : (c.vendida ? 'vendida — deuda saldada' : 'deuda por completar');
+    casaCards = '<div class="grid k3" style="margin-top:10px">'
+      + card('TIR del activo (papel)', 'tir', tirVal, tirLinea, c.tirActivo > 0 ? 'up' : '')
+      + card('Múltiplo all-in', 'mult_allin', $x(c.multAllIn), 'valor hoy ÷ todo lo que costó (compra + obra)', c.multAllIn >= 1 ? 'up' : 'down')
+      + card('Múltiplo sobre equity', 'mult_equity', eqVal, eqLinea, c.multEquity != null && c.multEquity >= 1 ? 'up' : '')
+      + '</div><div class="grid k3" style="margin-top:10px">'
+      + card('LTV actual', 'ltv', ltvDot + $pct(c.ltv), ltvLinea, '')
+      + card('Yield on cost', 'yield_on_cost', $pct(c.yieldOnCost), c.yieldOnCost != null ? 'renta anual ÷ inversión total' : 'sin renta registrada todavía', '')
+      + card('Apreciación anualizada', 'apreciacion', $pct(c.aprecAnual), 'cuánto sube el valor por año desde la compra', c.aprecAnual > 0 ? 'up' : '')
+      + '</div>'
+      + '<div class="meta" style="margin-top:6px">Valor en papel: <b>' + $money(c.paper_value) + '</b> <span class="src' + (/venta real|appraisal/.test(c.paper_fuente || '') ? '' : ' sup') + '">' + esc(c.paper_fuente || '') + '</span>' + gI('paper_value', vals) + ' · corte: ' + hoy + '</div>';
+  }
+  const invCards = '<div class="grid k4" style="margin-top:14px">'
+    + card('DPI', 'dpi', vals.dpi, 'lo YA recibido por cada dólar que pusiste', im.dpi > 0 ? 'up' : '')
+    + card('RVPI', 'rvpi', vals.rvpi, 'lo que tu parte vale HOY en papel, por dólar' + (residualParcial ? ' (parcial: hay casas sin deuda registrada)' : ''), '')
+    + card('TVPI', 'tvpi', vals.tvpi, 'retorno total = DPI + RVPI · 1.0x = empatás', im.tvpi >= 1 ? 'up' : '')
+    + card('Tu TIR combinada', 'tir', $pct(im.tir), 'XIRR de tus aportes, distribuciones y tu equity de hoy', im.tir > 0 ? 'up' : '')
+    + '</div>';
+  return '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">📈 Indicadores de retorno' + (c ? ' · ' + esc(c.casa) : '') + '</div><div class="k">metodología del Excel IRR Portafolio · una definición (os/inv-indicadores.js)</div></div>'
+    + '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber)">📄 Indicadores sobre <b>valor en papel</b> (appraisal/ARV) — no incluyen rentas, intereses ni gastos; <b>no son ganancias realizadas</b> hasta la venta o el refi.</div>'
+    + casaCards
+    + '<div class="lab" style="margin-top:14px">Tu posición como inversionista (todas tus casas)</div>'
+    + invCards
+    + '</div>';
+}
+
+// ─── 📚 E4.5: pestaña "Aprende" — glosario agrupado + cómo leer el dashboard ───
+function ipGlosQ(v) { IP.glosQ = v; render(); const el = document.getElementById('ip-glos-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+window.ipGlosQ = ipGlosQ;
+function renderGlosario() {
+  const temas = [['retorno', '💰 Tu retorno'], ['deuda', '🏦 La deuda'], ['propiedad', '🏠 La propiedad'], ['proceso', '🧭 El proceso']];
+  const q = (IP.glosQ || '').toLowerCase();
+  const list = Object.values(IP.glos || {}).sort((a, b) => (a.orden || 0) - (b.orden || 0))
+    .filter(g => !q || (g.termino_es + ' ' + (g.termino_en || '') + ' ' + g.que_es).toLowerCase().includes(q));
+  const guia = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">Cómo leer tu dashboard en 2 minutos</div></div>'
+    + '<div style="font-size:12.5px;line-height:1.8;color:var(--mut)">'
+    + '1️⃣ <b>Tu inversión</b>: cuánto pusiste y qué % de la casa es tuyo.<br>'
+    + '2️⃣ <b>Indicadores de retorno</b>: TVPI = la foto completa (recibido + papel). TIR = a qué ritmo anual crece. LTV = cuánta deuda tiene la casa.<br>'
+    + '3️⃣ <b>Info del deal</b>: la estrategia, el préstamo (HML) y el plan de salida — cómo y cuándo vuelve tu plata.<br>'
+    + '4️⃣ <b>Flujo Mensual</b>: la operación real (renta − gastos). Los draws y la deuda aparecen aparte como [P&L NO] — informativos.<br>'
+    + '5️⃣ <b>Distribuciones</b>: la plata que YA te pagamos, con comprobante y K-1.<br>'
+    + 'Tocá cualquier <b>ⓘ</b> para ver qué es, para qué sirve y TU caso con tus números.</div></div>';
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">📚 Aprende — glosario del inversionista</div><div class="k">todo término del portal, explicado sin jerga</div></div>'
+    + '<input id="ip-glos-q" placeholder="🔍 Buscar término…" value="' + esc(IP.glosQ || '') + '" oninput="ipGlosQ(this.value)" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13px;outline:none">'
+    + '</div>' + guia
+    + temas.map(([t, tit]) => {
+      const rows = list.filter(g => g.tema === t);
+      if (!rows.length) return '';
+      return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + tit + '</div></div>'
+        + rows.map(g => '<div style="padding:9px 0;border-top:1px solid var(--glassb)">'
+          + '<b style="font-size:13px">' + esc(g.termino_es) + '</b>' + (g.termino_en && g.termino_en !== g.termino_es ? ' <span class="meta">(' + esc(g.termino_en) + ')</span>' : '')
+          + '<div style="font-size:12.5px;color:var(--mut);margin-top:3px">' + esc(g.que_es) + '</div>'
+          + (g.para_que ? '<div class="meta" style="margin-top:2px">➜ ' + esc(g.para_que) + '</div>' : '')
+          + (g.formula ? '<div class="meta" style="margin-top:2px;font-family:ui-monospace,Menlo,monospace">ƒ ' + esc(g.formula) + '</div>' : '')
+          + '</div>').join('')
+        + '</div>';
+    }).join('');
+}
+
 // ─── render raíz ───
 function render() {
   IP.charts.forEach(c => { try { c.destroy(); } catch (e) {} }); IP.charts = [];
@@ -227,7 +344,7 @@ function render() {
       }).join('') + '</select>' : '';
 
   const noLeidos = (IP.msgs || []).filter(m => m.de === 'admin' && !(m.read_by || []).includes(IP.email.toLowerCase())).length;
-  const TABS = [['port', '🏠 Mi Portafolio'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
+  const TABS = [['port', '🏠 Mi Portafolio'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
   const head = ''
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector
@@ -240,6 +357,7 @@ function render() {
   else if (IP.tab === 'dist') body = renderDist(pid, p.repartoInv);
   else if (IP.tab === 'msgs') body = renderMsgs(pid);
   else if (IP.tab === 'docs') body = renderDocs(docs);
+  else if (IP.tab === 'glos') body = renderGlosario();
   else if (IP.tab === 'ia') body = renderIA();
   else body = renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir);
 
@@ -455,7 +573,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
   const disclaimer = '<div class="meta" style="margin-top:16px;opacity:.75">Proyección del modelo financiero (valorización ' + $pct(p.valorizacion) + '/año · inflación ' + $pct(p.inflacion) + ' · descuento ' + $pct(p.retornoEsperado) + ') — no constituye garantía de retorno. <span class="src">real</span> = dato de la operación · <span class="src sup">supuesto</span> = premisa en calibración. Los faltantes dicen "sin dato" y se cargan desde administración — este portal nunca inventa números.</div>';
 
   return saludo + resumenCards + '<h1 style="font-size:18px;margin-top:6px">' + esc(dir.split(',')[0]) + ' <span>· tu inversión en detalle</span></h1>'
-    + hero + dealInfo + tl + pnl + tesis + charts + escTable + gastosCard + disclaimer;
+    + hero + renderIndicadores(pid, met) + dealInfo + tl + pnl + tesis + charts + escTable + gastosCard + disclaimer;
 }
 
 // ─── evento de refinanciación ───
@@ -728,7 +846,7 @@ window.ipMarcarLeido = ipMarcarLeido;
 
 // ─── 🤖 Asistente IA ───
 function renderIA() {
-  const sugeridos = ['¿Cómo va mi inversión?', '¿Cómo viene mi flujo de efectivo?', '¿Cuál es mi ROI y qué significa?', '¿Cuándo recupero mi capital?'];
+  const sugeridos = ['Explícame mis indicadores', '¿Qué es el TVPI?', '¿Por qué mi TIR dice n/a?', '¿Cómo va mi inversión?', '¿Cuándo recupero mi capital?'];
   return '<div class="card"><div class="chart-h"><div class="t">🤖 Investor Assistant</div><div class="k">responde SOLO con los datos de TU inversión · números concretos · honesto sobre riesgos</div></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + sugeridos.map(s => '<button class="ibtn" onclick="ipAsk(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</button>').join('') + '</div>'
     + '<div id="ip-chat" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;margin-bottom:10px">'
@@ -750,7 +868,7 @@ async function ipAsk(q) {
     const tok = session ? session.access_token : '';
     const res = await fetch('/api/brain-chat', {
       method: 'POST', headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) },
-      body: JSON.stringify({ mode: 'investor', question, snapshot: IP.lastSnapshot || {}, history: IP.chat.filter(m => m.content !== '…pensando').slice(0, -1) }),
+      body: JSON.stringify({ mode: 'investor', question, snapshot: { ...(IP.lastSnapshot || {}), indicadores: IP.lastInd || null, glosario: Object.values(IP.glos || {}).map(g => ({ t: g.termino_es, q: g.que_es })) }, history: IP.chat.filter(m => m.content !== '…pensando').slice(0, -1) }),
     });
     const d = await res.json();
     IP.chat.pop();
