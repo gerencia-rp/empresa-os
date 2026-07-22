@@ -213,14 +213,15 @@ function ipMetrics(pid, p, r, holding) {
 IP._glosVals = {};
 function ipInterp(tpl, vals) { return String(tpl || '').replace(/\{\{(\w+)\}\}/g, (_, k) => (vals && vals[k] != null) ? vals[k] : '—'); }
 // ícono ⓘ inline: guarda los NÚMEROS REALES del inversionista para interpolar en "Tu caso"
-function gI(clave, vals) {
-  if (vals) IP._glosVals[clave] = vals;
-  return (IP.glos || {})[clave] ? ' <span style="cursor:pointer;color:var(--mut2);font-size:10px;vertical-align:middle" title="¿Qué es esto?" onclick="event.stopPropagation();ipGlos(\'' + clave + '\')">ⓘ</span>' : '';
+function gI(clave, vals, key) {
+  const k = key || clave;
+  if (vals) IP._glosVals[k] = vals;
+  return (IP.glos || {})[clave] ? ' <span style="cursor:pointer;color:var(--mut2);font-size:10px;vertical-align:middle" title="¿Qué es esto?" onclick="event.stopPropagation();ipGlos(\'' + clave + '\',\'' + k + '\')">ⓘ</span>' : '';
 }
 window.gI = gI;
-function ipGlos(clave) {
+function ipGlos(clave, key) {
   const g = (IP.glos || {})[clave]; if (!g) return;
-  const vals = IP._glosVals[clave] || {};
+  const vals = IP._glosVals[key || clave] || {};
   const old = document.getElementById('ip-info-ov'); if (old) old.remove();
   const ov = document.createElement('div'); ov.id = 'ip-info-ov'; ov.className = 'ipov';
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
@@ -254,7 +255,11 @@ function renderIndicadores(pid, met) {
   const distsPag = (IP.dists || []).filter(d => d.estado === 'pagada');
   const im = invInd.inversionista(aportes, distsPag, residual, hoy);
   IP.lastInd = { casa: c ? { casa: c.casa, tir: c.tirActivo, tirNA: c.tirNA, multAllIn: c.multAllIn, multEquity: c.multEquity, equityLeq0: c.equityLeq0, ltv: c.ltv, yield: c.yieldOnCost, aprec: c.aprecAnual, paper: c.paper_value, paper_fuente: c.paper_fuente, porCompletar: c.porCompletar } : null, inversor: im, residualParcial };
-  const vals = { capital: $money(im.capital), dist: $money(im.distTotal), residual: $money(residual), dpi: im.dpi != null ? im.dpi.toFixed(2) + 'x' : '—', rvpi: im.rvpi != null ? im.rvpi.toFixed(2) + 'x' : '—', tvpi: im.tvpi != null ? im.tvpi.toFixed(2) + 'x' : '—', tir: $pct(im.tir), ltv: c ? $pct(c.ltv) : '—', mult_equity: c ? $x(c.multEquity) : '—', mult_allin: c ? $x(c.multAllIn) : '—', yield: c ? $pct(c.yieldOnCost) : '—', aprec: c ? $pct(c.aprecAnual) : '—' };
+  const vals = { capital: $money(im.capital), dist: $money(im.distTotal), residual: $money(residual), dpi: im.dpi != null ? im.dpi.toFixed(2) + 'x' : '—', rvpi: im.rvpi != null ? im.rvpi.toFixed(2) + 'x' : '—', tvpi: im.tvpi != null ? im.tvpi.toFixed(2) + 'x' : '—', tir: $pct(im.tir), ltv: c ? $pct(c.ltv) : '—',
+    mult_equity: !c ? '—' : (c.porCompletar ? 'por completar (falta registrar el HML: ' + $money(c.all_in) + ' invertidos)' : (c.equityLeq0 ? 'equity ≤ 0: la deuda (' + $money(c.deuda_vigente) + ') financió toda la inversión (' + $money(c.all_in) + ') — tu retorno sale de la valorización' : $x(c.multEquity))),
+    mult_allin: c ? $x(c.multAllIn) : '—', yield: c ? $pct(c.yieldOnCost) : '—', aprec: c ? $pct(c.aprecAnual) : '—',
+    paper: c ? $money(c.paper_value) : '—', paper_fuente: c ? String(c.paper_fuente || '') : '—' };
+  const valsCasa = c ? { ...vals, tir: c.tirNA ? 'n/a (muy reciente para anualizar)' : $pct(c.tirActivo) } : vals;
   const card = (lab, clave, val, linea, cls) => '<div class="card"><div class="lab">' + lab + gI(clave, vals) + '</div><div class="big ' + (cls || '') + '">' + val + '</div><div class="meta">' + linea + '</div></div>';
   let casaCards = '';
   if (c) {
@@ -265,7 +270,7 @@ function renderIndicadores(pid, met) {
     const ltvDot = c.ltvSem ? '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:' + (c.ltvSem === 'verde' ? 'var(--pos)' : c.ltvSem === 'ambar' ? 'var(--amber)' : 'var(--neg)') + '"></span>' : '';
     const ltvLinea = c.ltv != null ? 'el banco es dueño del ' + Math.round(c.ltv * 100) + '% del valor; vos del ' + Math.max(0, 100 - Math.round(c.ltv * 100)) + '%' : (c.vendida ? 'vendida — deuda saldada' : 'deuda por completar');
     casaCards = '<div class="grid k3" style="margin-top:10px">'
-      + card('TIR del activo (papel)', 'tir', tirVal, tirLinea, c.tirActivo > 0 ? 'up' : '')
+      + '<div class="card"><div class="lab">TIR del activo (papel)' + gI('tir', valsCasa, 'tir@casa') + '</div><div class="big ' + (c.tirActivo > 0 ? 'up' : '') + '">' + tirVal + '</div><div class="meta">' + tirLinea + '</div></div>'
       + card('Múltiplo all-in', 'mult_allin', $x(c.multAllIn), 'valor hoy ÷ todo lo que costó (compra + obra)', c.multAllIn >= 1 ? 'up' : 'down')
       + card('Múltiplo sobre equity', 'mult_equity', eqVal, eqLinea, c.multEquity != null && c.multEquity >= 1 ? 'up' : '')
       + '</div><div class="grid k3" style="margin-top:10px">'
