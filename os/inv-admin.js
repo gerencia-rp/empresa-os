@@ -1103,11 +1103,138 @@ function iaTabGlosario() {
     + '</div>';
 }
 
+// ─── 🔮 ANALIZADOR DE PORTAFOLIO (A): escenarios de venta 3/5/8 + waterfall ───
+// Motor = os/inv-escenarios.js (18/18 del ejemplo validados). La RECOMENDACIÓN es SOLO ADMIN.
+async function iaLoadAnalizador() {
+  if (IA.escData) return;
+  const props = [...new Set(IA.holdings.map(h => h.property_id))];
+  const [prm, ovr, cfg] = await Promise.all([
+    sb.from('inv_model_params').select('property_id,key,value').eq('active', true).in('property_id', props).then(r => r.data || []).catch(() => []),
+    sb.from('inv_param_overrides').select('property_id,key,valor').eq('active', true).in('property_id', props).then(r => r.data || []).catch(() => []),
+    sb.from('ff_uw_config').select('key,value').like('key', 'esc\_%').then(r => r.data || []).catch(() => []),
+  ]);
+  const P = {}; prm.forEach(r => { (P[r.property_id] = P[r.property_id] || {})[r.key] = r.value; });
+  ovr.forEach(o => { (P[o.property_id] = P[o.property_id] || {})[o.key] = o.valor; });
+  IA.escData = { P, cfg: invEsc.cfgDesde(cfg) };
+}
+function iaEscCasas() {
+  const D = IA.escData;
+  const porCasa = {};
+  IA.holdings.forEach(h => { const o = porCasa[h.property_id] = porCasa[h.property_id] || { aporte: 0, pct: 0 }; o.aporte += +h.inversion_aportada || 0; o.pct += +h.reparto_pct || 0; });
+  return (IA.indData || []).filter(i => !i.vendida && porCasa[i.property_id]).map(i => {
+    const c = invEsc.desdeDatos(i, D.P[i.property_id] || {}, { inversion_aportada: porCasa[i.property_id].aporte, reparto_pct: Math.min(1, porCasa[i.property_id].pct) });
+    return c;
+  });
+}
+function iaRecomendar(e, bench) {
+  // SOLO ADMIN. Regla declarada: riesgo primero, después equilibrio TIR↔múltiplo vs benchmark.
+  const riesgos = [];
+  if (e.base.dscrAlerta) riesgos.push('DSCR ' + (e.base.dscr != null ? e.base.dscr.toFixed(2) + 'x' : '—') + ' < 1.20');
+  if (e.flujoNegativo) riesgos.push('flujo negativo hoy (drena caja)');
+  if (e.base.equity > 0 && e.base.coc != null && e.base.coc < 0.04) riesgos.push('equity atrapado (equity alto, CoC ' + (e.base.coc * 100).toFixed(1) + '%)');
+  if (e.supuestos.origen.apreciacion === 'manual' && e.supuestos.apreciacion > 0.04) riesgos.push('apreciación manual optimista (' + (e.supuestos.apreciacion * 100).toFixed(1) + '%)');
+  if (e.porCompletar) return { txt: '📋 Completar datos (deuda/renta) antes de decidir', riesgos };
+  if (e.flujoNegativo || (e.base.dscr != null && e.base.dscr < 1)) {
+    return { txt: '🔴 Vender pronto (≤3 años) o refinanciar — la casa drena caja y el escenario largo amplifica el déficit', riesgos };
+  }
+  const ok = e.filas.filter(f => f.irrBruta != null && f.irrBruta >= bench);
+  if (!ok.length) return { txt: '🟡 Conservar (renta): ninguna venta supera el benchmark ' + (bench * 100).toFixed(0) + '% — el valor está en el hold', riesgos };
+  const mejor = ok.slice().sort((a, b) => b.multBruto - a.multBruto)[0];
+  const f3 = e.filas.find(f => f.n === 3);
+  const txt = mejor.n === 8
+    ? '🟢 Conservar hasta ~8 años: la TIR (' + (mejor.irrBruta * 100).toFixed(1) + '%) sigue sobre el benchmark y el múltiplo crece a ' + mejor.multBruto.toFixed(2) + 'x'
+    : '🟢 Vender a ' + mejor.n + ' años: equilibrio TIR ' + (mejor.irrBruta * 100).toFixed(1) + '% / múltiplo ' + mejor.multBruto.toFixed(2) + 'x' + (f3 && f3.irrBruta > mejor.irrBruta ? ' (a 3 años la TIR es mayor, ' + (f3.irrBruta * 100).toFixed(1) + '%, pero el múltiplo cae a ' + f3.multBruto.toFixed(2) + 'x)' : '');
+  return { txt, riesgos };
+}
+function iaTabAnalizador() {
+  if (!window.invEsc || !window.invEngine) return '<div class="empty">Falta el motor de escenarios.</div>';
+  if (!IA.escData) { iaLoadAnalizador().then(osRender); return '<div class="empty">⏳ Armando escenarios…</div>'; }
+  invEsc.setEngine(invEngine);
+  const cfg = IA.escData.cfg;
+  const casas = iaEscCasas();
+  const escs = casas.map(c => ({ c, e: invEsc.escenarios(c, cfg, [3, 5, 8]) }));
+  const agg = invEsc.agregado(casas, cfg, [3, 5, 8]);
+  const $=v=>v==null?'—':(v<0?'−$':'$')+Math.abs(Math.round(v)).toLocaleString('en-US');
+  const p1=v=>v==null?'n/a':(v*100).toFixed(1)+'%';
+  const x2=v=>v==null?'—':v.toFixed(2)+'x';
+  const sup = '<div class="card" style="margin-bottom:12px;border-color:rgba(245,178,61,.4)"><div style="font-size:11.5px;color:var(--amber)">📐 <b>Supuestos (editables en ff_uw_config esc_* · override por casa en params)</b>: vacancia ' + p1(cfg.vacancia) + ' · apreciación ' + p1(cfg.apreciacion_anual) + '/año · renta +' + p1(cfg.crec_renta_anual) + '/año · costo de venta ' + p1(cfg.costo_venta) + ' · benchmark TIR value-add <b>' + p1(cfg.benchmark_tir) + '</b> (objetivo mínimo 15–16%) · preferred ' + (cfg.preferred_on ? p1(cfg.preferred_pct) : 'OFF') + '. Escenarios en papel — no son promesas. Deuda: refinanciada = amortizada 30a · HML = solo interés · sin registrar = por completar (jamás se inventa).</div></div>';
+  const estado = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Estado actual por casa</div><div class="k">fuentes: ff_deals (renta/gastos) · inv_indicadores_data (papel/deuda) · inv_holdings (aporte)</div></div>'
+    + '<table class="ptable"><thead><tr><th>Casa</th><th class="dh-num" style="text-align:right">Aporte</th><th style="text-align:right">NOI</th><th style="text-align:right">Cap impl.</th><th style="text-align:right">Flujo/mes</th><th style="text-align:right">CoC</th><th style="text-align:right">Equity</th><th style="text-align:right">DSCR</th></tr></thead><tbody>'
+    + escs.map(({c, e}) => '<tr' + (e.porCompletar ? ' style="opacity:.55"' : '') + '><td>' + OS_E(c.casa) + (e.porCompletar ? ' <span class="badge b-warn" style="font-size:8px">por completar</span>' : '') + '</td>'
+      + '<td style="text-align:right">' + $(c.aporte) + '</td><td style="text-align:right">' + (e.porCompletar ? '—' : $(e.base.noi)) + '</td>'
+      + '<td style="text-align:right">' + (e.porCompletar ? '—' : p1(e.base.cap)) + '</td>'
+      + '<td style="text-align:right" class="' + (e.base.flujo >= 0 ? 'up' : 'down') + '">' + (e.base.flujo != null ? $(e.base.flujo / 12) : '—') + '</td>'
+      + '<td style="text-align:right">' + p1(e.base.coc) + '</td><td style="text-align:right">' + $(e.base.equity) + '</td>'
+      + '<td style="text-align:right">' + (e.base.dscr != null ? (e.base.dscr.toFixed(2) + 'x' + (e.base.dscrAlerta ? ' <b class="down">⚠</b>' : '')) : '—') + '</td></tr>').join('')
+    + '</tbody></table></div>';
+  const venta = '<div class="card overx" style="margin-top:12px"><div class="chart-h"><div class="t">Escenarios de venta 3 / 5 / 8 años</div><div class="k">TIR bruta = deal completo · TIR neta = inversionista post-waterfall (capital primero, excedente × %)</div></div>'
+    + '<table class="ptable"><thead><tr><th>Casa</th>' + [3,5,8].map(n => '<th style="text-align:right">' + n + 'a: prod. neto</th><th style="text-align:right">TIR bruta</th><th style="text-align:right">TIR neta</th><th style="text-align:right">×bruto</th>').join('') + '</tr></thead><tbody>'
+    + escs.map(({c, e}) => '<tr' + (e.porCompletar ? ' style="opacity:.55"' : '') + '><td>' + OS_E(c.casa) + (e.flujoNegativo ? ' <span class="badge b-warn" style="font-size:8px" title="flujo negativo hoy: el modelo amplifica el déficit — señal de salida temprana">flujo −</span>' : '') + '</td>'
+      + (e.porCompletar ? '<td colspan="12" class="meta">por completar (deuda/renta sin registrar — no se inventa)</td>'
+        : e.filas.map(f => '<td style="text-align:right">' + $(f.productoNeto) + '</td><td style="text-align:right" class="' + (f.irrBruta >= cfg.benchmark_tir ? 'up' : 'down') + '">' + p1(f.irrBruta) + '</td><td style="text-align:right">' + p1(f.irrNeta) + '</td><td style="text-align:right">' + x2(f.multBruto) + '</td>').join(''))
+      + '</tr>').join('')
+    + '</tbody></table><div class="meta" style="margin-top:6px;font-size:10px">verde/rojo = vs benchmark ' + p1(cfg.benchmark_tir) + ' · TIR redondeada a 1 decimal · neta &lt; bruta por el waterfall (correcto, no bug)</div></div>';
+  const cons = '<div class="grid k4" style="margin-top:12px">'
+    + '<div class="card" style="margin:0"><div class="lab">Total invertido (aportes)</div><div class="big">' + $(agg.baseAgg.aporteT) + '</div><div class="meta">' + agg.completas + '/' + agg.n + ' casas con datos completos</div></div>'
+    + '<div class="card" style="margin:0"><div class="lab">Equity total · flujo anual</div><div class="big">' + $(agg.baseAgg.equityT) + '</div><div class="meta">flujo ' + $(agg.baseAgg.flujoT) + '/año · cap ponderado ' + p1(agg.baseAgg.capPond) + '</div></div>'
+    + agg.filas.map(f => '').join('')
+    + '<div class="card" style="margin:0"><div class="lab">TIR bruta agregada 3/5/8</div><div class="big" style="font-size:16px">' + agg.filas.map(f => p1(f.irrBruta)).join(' · ') + '</div><div class="meta">todas las casas completas juntas</div></div>'
+    + '<div class="card" style="margin:0"><div class="lab">Múltiplo agregado 3/5/8</div><div class="big" style="font-size:16px">' + agg.filas.map(f => x2(f.multBruto)).join(' · ') + '</div><div class="meta">producto + rentas ÷ aportes</div></div>'
+    + '</div>';
+  const d5 = escs.filter(x => !x.e.porCompletar).map(x => invEsc.descomposicion(x.c, cfg, 5)).filter(Boolean);
+  const dT = d5.reduce((a, d) => ({ renta: a.renta + d.renta, amort: a.amort + d.amortizacion, plus: a.plus + d.plusvalia }), { renta: 0, amort: 0, plus: 0 });
+  const desc = '<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">De dónde sale el retorno (a 5 años, agregado)</div><div class="k">renta + amortización + plusvalía — antes de costos de venta</div></div>'
+    + '<div class="kv"><span>💵 Renta acumulada (flujo)</span><b class="' + (dT.renta >= 0 ? 'up' : 'down') + '">' + $(dT.renta) + '</b></div>'
+    + '<div class="kv"><span>🏦 Amortización de deuda</span><b class="up">' + $(dT.amort) + '</b></div>'
+    + '<div class="kv"><span>📈 Plusvalía (apreciación ' + p1(cfg.apreciacion_anual) + ' supuesta)</span><b class="up">' + $(dT.plus) + '</b></div>'
+    + '</div>';
+  const reco = '<div class="card" style="margin-top:12px;border-color:var(--a2)"><div class="chart-h"><div class="t">🎯 Recomendación por casa</div><div class="k"><b>SOLO ADMIN</b> — jamás visible al inversionista</div></div>'
+    + escs.map(({c, e}) => { const r = iaRecomendar(e, cfg.benchmark_tir); return '<div style="padding:8px 0;border-top:1px solid var(--glassb)"><b style="font-size:12.5px">' + OS_E(c.casa) + '</b><div style="font-size:12px;margin-top:2px">' + r.txt + '</div>' + (r.riesgos.length ? '<div class="meta" style="font-size:10.5px;color:var(--amber)">⚠ ' + r.riesgos.join(' · ') + '</div>' : '') + '</div>'; }).join('')
+    + '</div>';
+  const hoja = '<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">🖨 Hoja de 1 página por inversionista</div><div class="k">imprimible / compartible — lenguaje simple, TIR neta, disclaimer</div></div>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="ia-hoja-inv" class="osa-in">' + iaInvOptions() + '</select>'
+    + '<button class="cbtn" onclick="iaHojaInversionista(document.getElementById(\'ia-hoja-inv\').value)">🖨 Generar hoja</button></div></div>';
+  return sup + estado + venta + cons + desc + reco + hoja;
+}
+function iaHojaInversionista(inv) {
+  invEsc.setEngine(invEngine);
+  const cfg = IA.escData.cfg;
+  const hs = IA.holdings.filter(h => h.investor_airtable_id === inv);
+  if (!hs.length) return alert('Este inversionista no tiene casas vinculadas.');
+  const nombre = iaInvName(inv);
+  const $=v=>v==null?'—':(v<0?'−$':'$')+Math.abs(Math.round(v)).toLocaleString('en-US');
+  const p1=v=>v==null?'n/a':(v*100).toFixed(1)+'%'; const x2=v=>v==null?'—':v.toFixed(2)+'x';
+  let cuerpo = '';
+  for (const h of hs) {
+    const ind = (IA.indData || []).find(i => i.property_id === h.property_id);
+    if (!ind) continue;
+    const c = invEsc.desdeDatos(ind, (IA.escData.P || {})[h.property_id] || {}, h);
+    const e = invEsc.escenarios(c, cfg, [3, 5, 8]);
+    cuerpo += '<h2 style="font-size:15px;margin:18px 0 4px">' + OS_E(c.casa) + '</h2>'
+      + '<p style="font-size:12px;margin:2px 0">Pusiste <b>' + $(c.aporte) + '</b> (' + p1(c.pct) + ' de la casa). Hoy la casa vale <b>' + $(c.arv) + '</b> en papel (' + OS_E(c.arv_fuente || '') + ') y debe <b>' + (c.deuda_saldo != null ? $(c.deuda_saldo) : 'por completar') + '</b>.</p>'
+      + (e.porCompletar ? '<p style="font-size:12px;color:#b45309">Escenarios por completar: falta registrar ' + (!(+ind.renta_anual > 0) ? 'la renta' : 'la deuda') + ' de esta casa.</p>'
+        : '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px"><tr style="text-align:left"><th style="border-bottom:1px solid #ccc;padding:4px">Si vendemos en…</th><th style="border-bottom:1px solid #ccc;padding:4px">Te tocaría de la venta</th><th style="border-bottom:1px solid #ccc;padding:4px">Tu TIR (neta)</th><th style="border-bottom:1px solid #ccc;padding:4px">Tu múltiplo</th></tr>'
+        + e.filas.map(f => '<tr><td style="padding:4px;border-bottom:1px solid #eee">' + f.n + ' años</td><td style="padding:4px;border-bottom:1px solid #eee">' + $(f.reparto) + '</td><td style="padding:4px;border-bottom:1px solid #eee">' + p1(f.irrNeta) + '</td><td style="padding:4px;border-bottom:1px solid #eee">' + x2(f.multNeto) + '</td></tr>').join('') + '</table>'
+        + (e.flujoNegativo ? '<p style="font-size:11px;color:#b45309">Hoy la casa no cubre su cuota con la renta — el plan contempla salida por refinanciación o venta.</p>' : ''));
+  }
+  const w = window.open('', '_blank');
+  if (!w) return alert('Permití pop-ups');
+  w.document.write('<html><head><title>Tu inversión · ' + OS_E(nombre) + '</title><style>body{font-family:system-ui;margin:36px;color:#111;max-width:700px}h1{font-size:20px}</style></head><body>'
+    + '<h1>Tu inversión con Flipping Rentals — ' + OS_E(nombre) + '</h1>'
+    + '<p style="font-size:12px;color:#555">Generado ' + new Date().toISOString().slice(0, 10) + ' · escenarios con SUPUESTOS declarados: apreciación ' + p1(cfg.apreciacion_anual) + '/año, renta +' + p1(cfg.crec_renta_anual) + '/año, costo de venta ' + p1(cfg.costo_venta) + ', vacancia ' + p1(cfg.vacancia) + '. El reparto de venta devuelve primero tu capital y divide la ganancia según tu porcentaje (waterfall).</p>'
+    + cuerpo
+    + '<p style="font-size:10.5px;color:#777;margin-top:24px;border-top:1px solid #ccc;padding-top:8px">Análisis interno con supuestos — no es una promesa de retorno ni asesoría de inversión.</p>'
+    + '</body></html>');
+  w.document.close();
+  setTimeout(() => { try { w.print(); } catch (err) {} }, 400);
+}
+window.iaHojaInversionista = iaHojaInversionista;
+
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return window.kitError ? kitError(IA.err, 'iaLoad(true)') : '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger'], ['glosario', '📚 Glosario']];
+  const tabs = [['global', '📊 Global'], ['analizador', '🔮 Analizador'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger'], ['glosario', '📚 Glosario']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaGoTab(\'' + t[0] + '\')">' + t[1] + '</button>').join(' ');
   let body = '';
 
@@ -1216,7 +1343,7 @@ function invAdminView() {
   }
 
   if (IA.tab === 'escenarios') body = iaTabEscenarios();
-  const needsProd = ['dist', 'msgs', 'pipeline', 'global', 'docs2', 'glosario', 'modelo'].includes(IA.tab);
+  const needsProd = ['dist', 'msgs', 'pipeline', 'global', 'docs2', 'glosario', 'modelo', 'analizador'].includes(IA.tab);
   if (needsProd && !IA.dists) { iaLoadProducto().then(osRender); body = '<div class="empty">⏳</div>'; }
   else if (IA.tab === 'dist') body = iaTabDist();
   else if (IA.tab === 'docs2') body = iaTabDocs();
@@ -1225,6 +1352,7 @@ function invAdminView() {
   else if (IA.tab === 'global') body = iaTabGlobal();
   else if (IA.tab === 'ledger') body = iaTabLedger();
   else if (IA.tab === 'glosario') body = iaTabGlosario();
+  else if (IA.tab === 'analizador') body = iaTabAnalizador();
 
   return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'

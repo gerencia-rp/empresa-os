@@ -75,6 +75,7 @@ async function ipLoadComo() {
   IP.docs = {}; (pay.docs || []).forEach(r => { (IP.docs[r.property_id] = IP.docs[r.property_id] || []).push(r); });
   const glosL = await sb.from('glosario_terminos').select('*').eq('active', true).then(r => r.data || []).catch(() => []);
   IP.glos = {}; glosL.forEach(g => { IP.glos[g.clave] = g; });
+  IP.escCfg = await sb.rpc('inv_esc_config').then(r => (window.invEsc ? invEsc.cfgDesde(r.data || []) : null)).catch(() => null);
   const qc = new URLSearchParams(location.search).get('casa');
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
   IP.casa = (qc && props.includes(qc)) ? qc : props[0];
@@ -103,7 +104,7 @@ async function ipLoad() {
     return;
   }
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
-  const [prm, cf, dc, acc, dist, msg, res, pj, ovr, indD, glosL] = await Promise.all([
+  const [prm, cf, dc, acc, dist, msg, res, pj, ovr, indD, glosL, escCfgL] = await Promise.all([
     sb.from('inv_model_params').select('*').in('property_id', props).eq('active', true),
     sb.from('inv_cashflow_real').select('*').in('property_id', props).eq('active', true).order('fecha'),
     sb.from('inv_documents').select('*').in('property_id', props).eq('active', true),
@@ -115,10 +116,12 @@ async function ipLoad() {
     sb.from('inv_param_overrides').select('*').in('property_id', props).eq('active', true).then(r => r.data || []).catch(() => []),
     sb.rpc('inv_indicadores_data').then(r => r.data || []).catch(() => []),
     sb.from('glosario_terminos').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
+    sb.rpc('inv_esc_config').then(r => r.data || []).catch(() => []),
   ]);
   IP.resumen = res || []; IP.proj = pj || [];
   IP.indData = indD || [];
   IP.glos = {}; (glosL || []).forEach(g => { IP.glos[g.clave] = g; });
+  IP.escCfg = window.invEsc ? invEsc.cfgDesde(escCfgL || []) : null;
   IP.params = {}; (prm.data || []).forEach(r => { (IP.params[r.property_id] = IP.params[r.property_id] || {})[r.key] = r; });
   // overrides del admin: el valor EFECTIVO es el ajustado a mano; la fuente original queda declarada
   (ovr || []).forEach(o => {
@@ -680,13 +683,38 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
     + (rc.proxima_dist_fecha ? '<div class="kv"><span>Próxima distribución (estimada)</span><b>' + esc(rc.proxima_dist_fecha) + (rc.proxima_dist_monto != null ? ' · ' + $money(rc.proxima_dist_monto) : '') + '</b></div>' : '')
     + '<div class="kv"><span>Próxima actualización de datos</span><b>' + prox1 + ' <span class="meta">(1° de mes)</span></b></div>'
     + '</div>';
+  // ── 🔮 ¿Y si vendemos? (escenarios 3/5/8 — TIR NETA post-waterfall, supuestos visibles) ──
+  let secVender = '';
+  if (window.invEsc && window.invEngine && IP.escCfg) {
+    invEsc.setEngine(invEngine);
+    const indRow = (IP.indData || []).find(x => x.property_id === pid);
+    const h = IP.holdings.find(x => x.property_id === pid);
+    if (indRow && h) {
+      const Pv = {}; Object.keys(P).forEach(k => Pv[k] = P[k].value);
+      const casaE = invEsc.desdeDatos(indRow, Pv, h);
+      const e = invEsc.escenarios(casaE, IP.escCfg, [3, 5, 8]);
+      const x2 = v => v == null ? '—' : v.toFixed(2) + 'x';
+      const valsV = { ...vals };
+      secVender = '<div class="card" style="margin:0">'
+        + '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:8px">🔮 Escenarios con <b>supuestos</b> (apreciación ' + $pct(e.supuestos.apreciacion) + '/año · renta +' + $pct(e.supuestos.crec_renta) + '/año · costo de venta ' + $pct(e.supuestos.costo_venta) + ' · vacancia ' + $pct(e.supuestos.vacancia) + ') — <b>no son promesas</b>.</div>'
+        + (e.porCompletar
+          ? '<div class="empty" style="padding:14px">Escenarios por completar: falta registrar ' + (!(+indRow.renta_anual > 0) ? 'la renta de esta casa (está en obra o sin espejo)' : 'el préstamo de esta casa') + ' — no inventamos números.</div>'
+          : '<div class="overx"><table><thead><tr><th>Si vendemos en…</th><th style="text-align:right">Te tocaría de la venta' + gI('waterfall', valsV) + '</th><th style="text-align:right">Tu TIR (neta)' + gI('tir_neta', valsV) + '</th><th style="text-align:right">Tu múltiplo</th></tr></thead><tbody>'
+            + e.filas.map(f => '<tr><td><b>' + f.n + ' años</b></td><td style="text-align:right" class="up">' + $money(f.reparto) + '</td><td style="text-align:right">' + $pct(f.irrNeta) + '</td><td style="text-align:right">' + x2(f.multNeto) + '</td></tr>').join('')
+            + '</tbody></table></div>'
+            + '<div class="meta" style="margin-top:8px;font-size:11px">El reparto devuelve primero TU capital y la ganancia se divide según tu ' + $pct(casaE.pct) + gI('waterfall', valsV) + ' · la TIR del deal completo (bruta' + gI('tir_bruta', valsV) + ') es mayor — la tuya es después del reparto. <b>Por cada $1 que pusiste, hoy vale ' + (met.em != null ? '$' + met.em.toFixed(2) : '—') + '</b>.</div>'
+            + (e.flujoNegativo ? '<div class="meta" style="margin-top:4px;font-size:11px;color:var(--amber)">⚠ Hoy la renta no cubre la cuota — el plan contempla salir por refinanciación o venta (por eso vender más temprano rinde mejor acá).</div>' : ''))
+        + '</div>';
+    }
+  }
   const lab = t => '<div class="lab" style="margin:16px 0 8px">' + t + '</div>';
   return '<h1 style="font-size:18px">' + esc(dir.split(',')[0]) + ' <span>· tu casa de un vistazo</span></h1>'
     + lab('1 · Los 5 números de tu casa') + sec1
     + lab('2 · Tu riqueza en el tiempo') + '<div class="card" style="margin:0"><div style="position:relative;height:260px;width:100%;overflow:hidden"><canvas id="chCasa"></canvas></div><div class="meta" style="margin-top:6px;font-size:10.5px">tu parte año a año: amortización + rentabilidad + valorización (modelo)' + gI('valorizacion', vals) + '</div></div>'
     + lab('3 · Tu casa en números simples') + sec3
     + lab('4 · Riesgos') + sec4
-    + lab('5 · Qué sigue') + sec5;
+    + lab('5 · Qué sigue') + sec5
+    + lab('6 · ¿Y si vendemos?') + secVender;
 }
 function drawCasaChart(r, inv) {
   const el = document.getElementById('chCasa'); if (!el || !window.Chart) return;
