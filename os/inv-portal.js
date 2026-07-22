@@ -451,20 +451,22 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
   };
 
   // ── hero métricas con ℹ ──
+  // Auditoría "Buffett" 2.7/2.9: la PRIMERA fila responde en 30 segundos
+  // "cuánto puse · cuánto vale hoy · cuánto me pagaron · cuánto es en total"
   const hero = '<div class="grid k4" style="margin-top:14px">'
     + kpiI('Tu inversión', $money(met.cap), 'aportada el ' + sd(holding.fecha_entrada || cierre) + ' · participación <b>' + $pct(met.inv) + '</b>', '', null)
-    + kpiI('Cash-on-Cash', $pct(met.cocAnualPct), (met.cocMensual != null ? $money(met.cocMensual) + ' /mes en tu bolsillo · ' : '') + (met.cocBase === 'real' ? 'con la operación real' : 'según el modelo (aún sin rentas)'), met.cocAnualPct != null && met.cocAnualPct > 0 ? 'up' : '', 'coc')
-    + kpiI('Equity Multiple', met.em != null ? met.em.toFixed(2) + '×' : '—', 'distribuciones + riqueza hoy ÷ capital', met.em != null && met.em >= 1 ? 'up' : '', 'em')
-    + kpiI('ROI anualizado', $pct(met.roiAnu), met.roiAnu == null ? 'se calcula con 3+ meses de historia' : 'crecimiento anual compuesto desde tu entrada', met.roiAnu != null && met.roiAnu > 0 ? 'up' : '', 'roi')
+    + kpiI('Tu riqueza hoy', $money(met.riquezaHoy), 'lo que vale tu posición: capital + equity amortizado + valorización × tu %', 'up', 'riq')
+    + kpiI('Distribuciones recibidas', $money(met.distTotal), met.distMias.length + ' pagos ya en tu bolsillo · ver pestaña 💸', met.distTotal > 0 ? 'up' : '', 'dist')
+    + kpiI('Equity Multiple', met.em != null ? met.em.toFixed(2) + '×' : '—', 'retorno total: (recibido + riqueza hoy) ÷ capital · 1.0× = empatás', met.em != null && met.em >= 1 ? 'up' : '', 'em')
     + '</div>'
     + '<div class="grid k4" style="margin-top:14px">'
-    + kpiI('Tu riqueza hoy', $money(met.riquezaHoy), 'capital + equity amortizado + valorización × tu %', 'up', 'riq')
+    + kpiI('Cash-on-Cash', $pct(met.cocAnualPct), (met.cocMensual != null ? $money(met.cocMensual) + ' /mes en tu bolsillo · ' : '') + (met.cocBase === 'real' ? 'con la operación real' : 'según el modelo (aún sin rentas)'), met.cocAnualPct != null && met.cocAnualPct > 0 ? 'up' : '', 'coc')
+    + kpiI('ROI anualizado', $pct(met.roiAnu), met.roiAnu == null ? 'se calcula con 3+ meses de historia' : 'crecimiento anual compuesto desde tu entrada', met.roiAnu != null && met.roiAnu > 0 ? 'up' : '', 'roi')
     + kpiI('DSCR', i.dscr ? i.dscr.toFixed(2) + '×' : '—', 'la renta cubre la deuda · equilibrio: ' + $pct(i.puntoEquilibrio) + ' de ocupación', i.dscr >= 1.2 ? 'up' : 'warn', 'dscr')
     + kpiI('CAP rate', $pct(i.capValor), 'NOI ' + $money(i.noiAnual) + ' ÷ valor · sobre costo ' + $pct(i.capCosto), '', 'cap')
-    + kpiI('Tu VPN a 31 años', $money(i.vpn31PostRefi * met.inv), 'casa completa ' + $money(i.vpn31PostRefi) + ' · descuento ' + $pct(p.retornoEsperado), 'up', 'vpn')
     + '</div>'
     + '<div class="grid k4" style="margin-top:14px">'
-    + kpiI('Distribuciones recibidas', $money(met.distTotal), met.distMias.length + ' pagos de esta casa · ver pestaña 💸', met.distTotal > 0 ? 'up' : '', 'dist')
+    + kpiI('Tu VPN a 31 años', $money(i.vpn31PostRefi * met.inv), 'casa completa ' + $money(i.vpn31PostRefi) + ' · descuento ' + $pct(p.retornoEsperado), 'up', 'vpn')
     + kpiI('Tu Profit (hold 31a)', $money(i.profit.inversionista), 'utilidad total proyectada del plan completo, con venta al final', 'up', 'profit')
     + kpiI('TIR a 31 años', $pct(i.tir31PostRefi), 'retorno anual del hold completo (base post-refi del Excel)', 'up', null)
     + kpiI('Escenario', escenario === 'realizado' ? '✅ Real' : '🎯 Proyectado', escenario === 'realizado' ? movsCasa.length + ' movimientos reales cargados' : 'premisas del modelo — lo real se carga desde administración', '', null)
