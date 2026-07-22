@@ -14,6 +14,10 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (22 Jul 2026 · 2 — 🔮 ANALIZADOR DE PORTAFOLIO: venta 3/5/8 + waterfall) · EN VIVO
+
+- 🔮 **`os/inv-escenarios.js`** (puro; IRR = invEngine, equity/paper/deuda = inv_indicadores_data — cero redefiniciones): escenarios de venta 3/5/8 con TIR BRUTA (deal) y NETA (inversionista post-waterfall capital-primero) SIEMPRE juntas; **validación del ejemplo de la spec 18/18 exacta**; mapeo único `desdeDatos` (admin = portal = vista-del-inversor). Config `esc_*` en ff_uw_config + override por casa (etiquetado); flujo negativo = bandera honesta (Dove: cuota 11.39% > renta — consistente con su déficit conocido). Salidas: tab 🔮 Analizador (admin, con recomendación SOLO-ADMIN y benchmark 15%) · "¿Y si vendemos?" en Mi Casa (neta + ⓘ + "no son promesas") · 🖨 hoja 1 página por inversionista con disclaimer. Sin deuda/renta = "por completar". Smoke 16/16.
+
 ## 🎯 Estado (22 Jul 2026 — 🚑 RENTAS: sync por cron REVIVIDO + archivado manual + TCPA fuera) · EN VIVO
 
 - 🚑 **TODOS los crons de edge functions estaban MUERTOS** (no solo Rentas): `cron_invoke_function` skippeaba en silencio sin `app.settings.service_role_key` (jamás configurada) + job 20 duplicado con host placeholder + pg_net timeout 5s. Fix: key en **VAULT** (`service_role_key`), función lee vault→setting con timeout 240s, `unschedule(20)`. Verificado: 200s, last_synced_at fresco, tick autónomo 3×200. ⚠ regla: cron nuevo de función = `cron_invoke_function` (ya autenticada); si se rota la secret key, actualizar el secreto en Vault.
