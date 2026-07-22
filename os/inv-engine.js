@@ -314,5 +314,33 @@
     return out;
   }
 
-  return { run, PMT, NPV, IRR, amortizacion, escenario, movsPorMes };
+  // ─── Regla ÚNICA P&L (mega-build E1): el saldo/balance OPERATIVO se calcula SOLO con
+  // movimientos P&L SÍ, por FLAG de categoría (no por nombre suelto):
+  //   SÍ: ingreso operativo (renta, otros) · operativo (utilities, mantenimiento, mgmt,
+  //       HOA, seguro, limpieza) · tax.
+  //   NO: inversion (compra, capex, venta) · financiero (draws HML, aportes, cash-out,
+  //       intereses/principal HML-refi) · distribucion.
+  const PNL_SI = ['renta', 'ingreso', 'operativo', 'tax'];
+  function pnlSi(categoria) { return PNL_SI.includes(String(categoria || '').toLowerCase()); }
+  // "Julio 2026" — formato ÚNICO de mes en todos los selectores (Ledger, Flujo, Distribuciones)
+  const MESES_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  function mesEs(ym) { const m = String(ym || '').match(/^(\d{4})-(\d{2})/); return m ? MESES_ES[+m[2] - 1] + ' ' + m[1] : String(ym || ''); }
+  // E2: draws del modelo reconstruidos desde los movimientos migrados ("Draws (construcción)",
+  // item "Migrado desde draw_mN" conserva el mes del modelo). Sin marcador → mes por fecha.
+  function drawsFromMovs(movs, fechaCierre) {
+    const out = {};
+    (movs || []).forEach(m => {
+      if (!/draws?\s*\(construcci/i.test(String(m.concepto || ''))) return;
+      let mes = null;
+      const mk = String(m.item || '').match(/draw_m(\d+)/i);
+      if (mk) mes = +mk[1];
+      else if (fechaCierre && m.fecha) {
+        mes = Math.max(1, Math.round((new Date(m.fecha + 'T00:00:00') - new Date(fechaCierre + 'T00:00:00')) / (30.44 * 86400000)));
+      }
+      if (mes != null) out[mes] = (out[mes] || 0) + Math.abs(parseFloat(m.valor != null ? m.valor : m.monto) || 0);
+    });
+    return out;
+  }
+
+  return { run, PMT, NPV, IRR, amortizacion, escenario, movsPorMes, pnlSi, mesEs, drawsFromMovs };
 });

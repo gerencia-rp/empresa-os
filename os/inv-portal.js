@@ -552,8 +552,10 @@ function renderFlujo(pid, inv) {
   // la OPERACIÓN se corta a HOY: movimientos con fecha futura (gastos programados) no inflan los totales
   const w = led.filter(m => (F === 'todos' || String(m.fecha || '').startsWith(F)) && String(m.fecha || '') <= hoyIso);
   // operación mensual: renta / operativos / deuda — SIN draws-inversión y SIN distribuciones
-  const rentas = w.filter(m => m.categoria === 'renta');
-  const oper = w.filter(m => m.categoria === 'operativo');
+  // E1: la OPERACIÓN = solo movimientos P&L SÍ (regla única invEngine.pnlSi);
+  // la deuda (financiero) NO entra al balance — se declara informativa
+  const rentas = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'ingreso');
+  const oper = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'gasto');
   const deuda = w.filter(m => m.categoria === 'financiero' && m.tipo === 'gasto');
   const tRenta = rentas.reduce((s, m) => s + +m.monto, 0);
   const tOper = oper.reduce((s, m) => s + +m.monto, 0);
@@ -572,14 +574,13 @@ function renderFlujo(pid, inv) {
   const tres = '<div class="grid k3">'
     + box('💵 Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
     + box('🧾 Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
-    + box('⚖️ Balance', $money(balanceOp), (balanceOp >= 0 ? 'superávit' : 'déficit') + ' operativo · con deuda (' + $money(tDeuda) + ' de HML + banco): <b class="' + (balanceTot >= 0 ? 'up' : 'down') + '">' + $money(balanceTot) + '</b>', balanceOp >= 0 ? 'up' : 'down')
+    + box('⚖️ Balance operativo del período', $money(balanceOp), 'renta − gastos (solo P&L SÍ) · <span title="la deuda es financiero · P&L NO — no afecta el balance operativo">Deuda HML pendiente: ' + $money(tDeuda) + ' — informativo</span>', balanceOp >= 0 ? 'up' : 'down')
     + '</div>';
 
   // detalle anual → mensual (ingresos vs gastos vs flujo neto de la OPERACIÓN)
   const porMes = {};
   led.forEach(m => {
-    if (!['renta', 'operativo', 'financiero'].includes(m.categoria)) return;
-    if (m.categoria === 'financiero' && m.tipo !== 'gasto') return;
+    if (!invEngine.pnlSi(m.categoria)) return; // detalle año→mes: SOLO P&L SÍ (E1)
     if (String(m.fecha || '') > hoyIso) return; // lo programado a futuro no es operación ocurrida
     const ym = String(m.fecha || '').slice(0, 7); if (!ym) return;
     const o = porMes[ym] = porMes[ym] || { ing: 0, gas: 0 };
@@ -601,8 +602,8 @@ function renderFlujo(pid, inv) {
   }).join('');
 
   // línea de tiempo completa (todos los movimientos, con filtros)
-  let acum = 0;
-  const full = led.map(m => { acum += (m.tipo === 'ingreso' ? 1 : -1) * (+m.monto || 0); return { ...m, acum }; });
+  let acum = 0; // saldo OPERATIVO: solo avanza con P&L SÍ; las filas NO repiten el anterior
+  const full = led.map(m => { const si = invEngine.pnlSi(m.categoria); if (si) acum += (m.tipo === 'ingreso' ? 1 : -1) * (+m.monto || 0); return { ...m, acum, pnl: si }; });
   const mesesAll = [...new Set(led.map(m => String(m.fecha || '').slice(0, 7)))].sort().reverse();
   const LF = IP.ledgerF;
   const rows = full.filter(m => (LF.tipo === 'todos' || m.tipo === LF.tipo) && (LF.mes === 'todos' || String(m.fecha || '').startsWith(LF.mes)));
@@ -614,14 +615,14 @@ function renderFlujo(pid, inv) {
     + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Detalle año → mes</div><div class="k">operación: renta − gastos − deuda · sin draws ni distribuciones</div></div>' + (anual || '<div class="empty" style="padding:18px">Sin operación en el período elegido.</div>') + '</div>'
     + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Todos los movimientos · ' + led.length + '</div><div class="k" style="display:flex;gap:6px;flex-wrap:wrap">'
     + sel('tipo', [['todos', 'Todos'], ['ingreso', '↑ Ingresos'], ['gasto', '↓ Gastos']], LF.tipo)
-    + sel('mes', [['todos', 'Todos los meses']].concat(mesesAll.map(m => [m, m])), LF.mes)
+    + sel('mes', [['todos', 'Todos los meses']].concat(mesesAll.map(m => [m, invEngine.mesEs(m)])), LF.mes)
     + '</div></div>'
-    + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right">Saldo acum.</th><th>Fuente</th></tr></thead><tbody>'
-    + rows.slice().reverse().map(m => '<tr><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
-      + '<td>' + esc(m.concepto) + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">📎</a>' : '') + '</td>'
+    + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right">Saldo operativo</th><th>Fuente</th></tr></thead><tbody>'
+    + rows.slice().reverse().map(m => '<tr' + (m.pnl ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
+      + '<td>' + esc(m.concepto) + (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>') + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">📎</a>' : '') + '</td>'
       + '<td>' + esc(m.categoria) + '</td>'
       + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
-      + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '">' + $money(m.acum) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO: repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'
       + '<td>' + srcTag(m.fuente) + '</td></tr>').join('')
     + '</tbody></table></div>'
     + '<div class="meta" style="margin-top:10px">Cada movimiento declara su fuente (FF = Fix &amp; Flip · Rentas = property management · OS = registro del holding). El detalle es de la casa completa; tu parte de la utilidad es el ' + $pct(inv) + '. Los draws vienen agregados (la fuente no fecha draw por draw).</div>'

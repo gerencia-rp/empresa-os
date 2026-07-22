@@ -266,7 +266,12 @@ function iaGuiaCat() {
 }
 async function iaAddMov() {
   const g = id => (document.getElementById(id) || {}).value || '';
-  const cat = g('ia-m-cat') || 'operativo';
+  let cat = g('ia-m-cat') || 'operativo';
+  // E1B: un draw JAMÁS es P&L SÍ — siempre financiero (advertencia + corrección automática)
+  if (/draw/i.test(g('ia-m-conc') + ' ' + g('ia-m-item')) && iaPnl(cat)) {
+    alert('⚠ Los draws SIEMPRE son financiero · P&L NO (no afectan el balance operativo). Se guarda como financiero.');
+    cat = 'financiero';
+  }
   const row = { property_id: IA.casa, fecha: g('ia-m-fecha'), linea: iaPnl(cat) ? 'P&L' : 'Capital', tipo: cat === 'ingreso' ? 'ingreso' : 'gasto', categoria: cat, item: g('ia-m-item'), concepto: g('ia-m-conc'), valor: parseFloat(g('ia-m-valor')) || 0, factura_url: g('ia-m-fact') || null, fuente: 'manual' };
   if (!row.fecha || !row.valor) return alert('Fecha y valor son obligatorios');
   const { error } = await sb.from('inv_cashflow_real').insert(row);
@@ -288,7 +293,11 @@ function iaEditMov(id) { IA.movEdit = id; osRender(); }
 window.iaEditMov = iaEditMov;
 async function iaSaveMov(id) {
   const g = k => (document.getElementById('ia-me-' + k) || {}).value || '';
-  const cat = g('cat') || 'operativo';
+  let cat = g('cat') || 'operativo';
+  if (/draw/i.test(g('conc')) && iaPnl(cat)) {
+    alert('⚠ Los draws SIEMPRE son financiero · P&L NO. Se guarda como financiero.');
+    cat = 'financiero';
+  }
   const upd = { fecha: g('fecha'), categoria: cat, tipo: cat === 'ingreso' ? 'ingreso' : 'gasto', linea: iaPnl(cat) ? 'P&L' : 'Capital', valor: parseFloat(g('valor')) || 0, concepto: g('conc'), factura_url: g('fact') || null };
   if (!upd.fecha || !upd.valor) return alert('Fecha y valor son obligatorios');
   const { error } = await sb.from('inv_cashflow_real').update(upd).eq('id', id);
@@ -691,19 +700,31 @@ function iaTabLedger() {
   if (led === undefined) { iaLoadLedger(IA.casa); return casaSel + "<div class=\"empty\">⏳ Armando el ledger…</div>"; }
   if (led.err) return casaSel + (window.kitError ? kitError(led.err, "delete IA.ledgerCache[IA.casa];osRender()") : "<div class=\"empty down\">" + OS_E(led.err) + "</div>");
   if (!led.length) return casaSel + "<div class=\"empty\">Sin movimientos para esta casa.</div>";
+  // ── E1: saldo OPERATIVO = SOLO movimientos P&L SÍ (regla única invEngine.pnlSi) ──
+  const pnl = m => invEngine.pnlSi(m.categoria);
+  // acumulado sobre TODO el historial: las filas P&L NO repiten el saldo anterior
   let acum = 0;
-  const full = led.map(m => { acum += (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0); return { ...m, acum }; });
+  const full = led.map(m => { if (pnl(m)) acum += (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0); return { ...m, acum, pnl: pnl(m) }; });
+  // filtro de MES ("Julio 2026", solo meses con movimientos, default Todos)
+  const mesesAll = [...new Set(led.map(m => String(m.fecha || "").slice(0, 7)))].filter(Boolean).sort().reverse();
+  const mf = IA.ledgerMes && mesesAll.includes(IA.ledgerMes) ? IA.ledgerMes : "todos";
+  const mesSel = "<select class=\"osa-in\" style=\"padding:6px\" onchange=\"IA.ledgerMes=this.value;osRender()\"><option value=\"todos\">Todos los meses</option>" + mesesAll.map(m => "<option value=\"" + m + "\"" + (mf === m ? " selected" : "") + ">" + invEngine.mesEs(m) + "</option>").join("") + "</select>";
+  const vis = full.filter(m => mf === "todos" || String(m.fecha || "").startsWith(mf));
+  const saldoPer = vis.filter(m => m.pnl).reduce((s2, m) => s2 + (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0), 0);
   const cats = {};
-  led.forEach(m => { const k = m.tipo + ":" + m.categoria; cats[k] = (cats[k] || 0) + +m.monto; });
-  const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span>" + OS_E(k.replace(":", " · ")) + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
-  return "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap\">" + casaSel + "<span class=\"meta\">" + led.length + " movimientos · saldo final <b style=\"color:" + (acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(acum) + "</b> · <b>vista de SOLO LECTURA</b> de Movimientos (manuales + auto-importados, misma RPC del portal) — se edita en 📐 Modelo & movimientos</span></div>"
+  vis.forEach(m => { const k = m.tipo + ":" + m.categoria; cats[k] = (cats[k] || 0) + +m.monto; });
+  const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span>" + OS_E(k.replace(":", " · ")) + (invEngine.pnlSi(k.split(":")[1]) ? "" : " <span class=\"badge b-warn\" style=\"font-size:8px\" title=\"informativo — no afecta balance operativo\">P&L NO</span>") + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
+  const tagNo = "<span class=\"badge b-warn\" style=\"font-size:8px\" title=\"informativo — no afecta balance operativo\">P&L NO</span>";
+  return "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap\">" + casaSel + mesSel
+    + "<span style=\"font-size:14px;font-weight:800\">Saldo operativo (P&L)" + (mf === "todos" ? "" : " · " + OS_E(invEngine.mesEs(mf))) + ": <span style=\"color:" + (saldoPer >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(saldoPer) + "</span></span>"
+    + "<span class=\"meta\">" + vis.length + " movimientos · solo P&L SÍ mueve el saldo (inversión/financiero/distribución = informativos) · <b>SOLO LECTURA</b> — se edita en 📐 Modelo & movimientos</span></div>"
     + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div></div>" + subt + "</div>"
     + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
-    + Object.entries(led.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
-    + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th>Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\">Saldo</th><th>Fuente</th></tr></thead><tbody>"
-    + full.slice().reverse().map(m => "<tr><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
+    + Object.entries(vis.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
+    + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th>Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\">Saldo operativo</th><th>Fuente</th></tr></thead><tbody>"
+    + vis.slice().reverse().map(m => "<tr" + (m.pnl ? "" : " style=\"opacity:.55\"") + "><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.pnl ? "" : " " + tagNo) + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
       + "<td style=\"text-align:right\" class=\"" + (m.tipo === "ingreso" ? "up" : "down") + "\">" + (m.tipo === "ingreso" ? "+" : "−") + iaMoney(m.monto) + "</td>"
-      + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>").join("")
+      + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\"" + (m.pnl ? "" : " title=\"P&L NO: repite el saldo anterior\"") + ">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>").join("")
     + "</tbody></table></div>";
 }
 

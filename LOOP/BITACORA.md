@@ -138,3 +138,13 @@ PARTE B (solo UI, lógica intacta): helpers nuevos UW_HERO (tarjeta resultado gr
 
 ## 8-jul · RENTCAST mercado en vivo (Parte A) — proxy + cache + UI, pendiente secret
 Edge function rentcast (proxy: la key SOLO en RENTCAST_API_KEY secret, nunca en el bundle; agrega X-Api-Key server-side). Endpoints /avm/value y /avm/rent/long-term. Cache 30 días (rentcast_cache, soft-delete) + contador (rentcast_usage, límite 50 gratis). Manejo con gracia: sin key o error → {disponible:false} → UI "mercado no disponible" + sigue con $/sqft zona. UI: pestaña ARV bloque comps → ffUwRcCompsBox (valor+comps RentCast con fecha, "referencia NO alimenta cálculos"; ARV Airtable sigue mandando MAO/cash-out) + botón "actualizar mercado" + contador. Pestaña Ingreso → ffUwRcRentBox (renta sugerida + botón "usar esta renta"). Verificado UI sin key: botones presentes, ARV sigue 360k Airtable, 0 pageerrors. PENDIENTE: setear RENTCAST_API_KEY (hook bloquea secrets set, lo corre el CEO) → probar 2-3 casas.
+
+## 21-jul-2026 · MEGA-BUILD Portal Inversionistas — ETAPA 1 ✅ (saldo operativo P&L + filtros de mes)
+- Regla ÚNICA en `invEngine.pnlSi(categoria)` (os/inv-engine.js, compartido admin+portal): P&L SÍ = renta/ingreso/operativo/tax · NO = inversion/financiero/distribucion. `mesEs()` = "Julio 2026" para TODOS los selectores.
+- Admin Ledger: título "Saldo operativo (P&L): $X", acumulado solo P&L SÍ (filas NO en tenue + [P&L NO] "informativo — no afecta balance operativo", repiten saldo anterior), filtro de mes es-ES (solo meses con movimientos, default Todos), subtotales por categoría se mantienen (con tag en los NO).
+- Portal Flujo Mensual: Renta/Gastos/Balance solo P&L SÍ + "Deuda HML pendiente: $Y — informativo"; detalle año→mes solo P&L SÍ; listado completo con tenue+tag; meses en español.
+- BUG corregido (data, auditado): Starbright "Draw 1 +$37,000" estaba categoria=ingreso → financiero/Capital (1 fila, 0 draws P&L SÍ restantes). Validación nueva en alta/edición: concepto con "draw" jamás P&L SÍ (aviso + corrección a financiero).
+- ✅ VERIFICACIÓN (server-side, regla nueva sobre inv_ledger real):
+  · Starbright: 4 movimientos, 0 P&L SÍ → saldo operativo **$0** (antes −$427,000) ✓
+  · + renta TEST $3,000 → saldo $3,000 · + utilities TEST $200 → $2,800 · revertidos con soft-delete (2 archivados, quedan 4 movs, saldo $0) ✓
+  · 3 propiedades: Starbright 0.00 · Dove Springs 30,652.84 (antes mezclado −2,015.81) · Childress 26,414.83 (antes 6,298.45) ✓
