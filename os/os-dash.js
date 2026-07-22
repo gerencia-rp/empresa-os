@@ -158,14 +158,14 @@ async function dhLoadFF() {
     return Math.round((new Date(fin) - new Date(r.close_date)) / 86400000);
   });
   const ciclo = ciclos.length ? ciclos.reduce((s, x) => s + x, 0) / ciclos.length : null;
-  const { data: defRows } = await sb.from('ff_deals').select('address,deficit_total').eq('active', true).catch(() => ({ data: null }));
+  const defRows = await sb.from('ff_deals').select('address,deficit_total').eq('active', true).then(r => r.data).catch(() => null);
   const deficit = defRows ? defRows.reduce((s, d) => s + (+d.deficit_total || 0), 0) : null;
   // TVPI/DPI/RVPI agregado inversionistas
   const capT = holds.reduce((s, h) => s + (+h.inversion_aportada || 0), 0);
   const distT = dists.reduce((s, d) => s + (+d.monto || 0), 0);
   let resid = 0; holds.forEach(h => { const c = casas.find(x => x.property_id === h.property_id); if (c && c.equityHoy != null) resid += Math.max(0, c.equityHoy) * (+h.reparto_pct || 0); });
   // precisión de estimación: |appraisal − ARV|/ARV (solo casas con ambos)
-  const { data: errRows } = await sb.from('ff_deals').select('appraisal,arv').eq('active', true).gt('appraisal', 0).gt('arv', 0).catch(() => ({ data: null }));
+  const errRows = await sb.from('ff_deals').select('appraisal,arv').eq('active', true).gt('appraisal', 0).gt('arv', 0).then(r => r.data).catch(() => null);
   const errArv = errRows && errRows.length ? errRows.reduce((s, d) => s + Math.abs(+d.appraisal - +d.arv) / +d.arv, 0) / errRows.length : null;
   // tendencia: TIR y capital al corte de cada fin de mes (12m)
   const meses = []; const dNow = new Date();
