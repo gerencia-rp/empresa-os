@@ -312,12 +312,14 @@ function iaToggleGuia() { const el = document.getElementById('ia-guia-cat'); if 
 window.iaToggleGuia = iaToggleGuia;
 
 // ─── vista ───
-function iaEngineParamsFromRows(rows, holdingPct) {
+function iaEngineParamsFromRows(rows, holdingPct, movs) {
   const P = {}; rows.forEach(r => P[r.key] = r);
   const g = (k, d) => { const r = P[k]; const v = r ? parseFloat(r.value) : NaN; return isNaN(v) ? d : v; };
   const draws = {}, otros = {};
   rows.forEach(r => { let m = r.key.match(/^draw_m(\d+)$/); if (m) draws[+m[1]] = parseFloat(r.value) || 0; m = r.key.match(/^otros_inv_m(\d+)$/); if (m) otros[+m[1]] = parseFloat(r.value) || 0; });
-  return { compra: g('compra', 0), cierreCompra: g('cierre_compra', 0), hmInicial: g('hm_inicial', 0), hmTasa: g('hm_tasa', 0), draws, otrosInversionMes: otros,
+  // E2: draws desde los movimientos migrados; hm_compra reemplaza a hm_inicial en el motor
+  const drawsEf = Object.keys(draws).length ? draws : invEngine.drawsFromMovs(movs || IA.cashflow || [], P.fecha_cierre ? P.fecha_cierre.value : null);
+  return { compra: g('compra', 0), cierreCompra: g('cierre_compra', 0), hmInicial: g('hm_compra', g('hm_inicial', 0)), hmTasa: g('hm_tasa', 0), draws: drawsEf, otrosInversionMes: otros,
     refiMes: g('refi_mes', null), refiMonto: g('refi_monto', 0), refiTasa: g('refi_tasa', 0), refiPlazoM: g('refi_plazo_m', 360), cierreRefi: g('cierre_refi', 0),
     arv: g('arv', 0), valorizacion: g('valorizacion', 0), inflacion: g('inflacion', 0), retornoEsperado: g('retorno_esperado', 0.08),
     numHab: g('num_hab', 1), arriendoHab: g('arriendo_hab', 0), rampa: P.rampa ? P.rampa.value.split(',').map(parseFloat) : [],
@@ -333,7 +335,7 @@ function iaEngineParamsFromRows(rows, holdingPct) {
 // ─── F2: escenarios + simulador ───
 function iaBaseParams() {
   const h = IA.holdings.find(x => x.property_id === IA.casa);
-  return iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null);
+  return iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null, IA.cashflow);
 }
 function iaEstOpts() {
   const P = {}; IA.params.forEach(r => P[r.key] = r);
@@ -731,9 +733,9 @@ function iaTabLedger() {
 // ── B: parámetros en los 9 BLOQUES de Juan (colapsables; mayoría auto-llenada con su fuente) ──
 const IA_BLOQUES = [
   ['b1', '🏠 1 · Identificación', /^(direccion|nombre_corto|tipo|num_hab|banos|sqft|ano)$/],
-  ['b2', '🎯 2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|es_ejemplo)$/],
+  ['b2', '🎯 2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|fecha_exit_proyectada|es_ejemplo)$/],
   ['b3', '💰 3 · Financieros de compra', /^(compra|remodel_real|cierre_compra|arv|est_arv|est_remodel_total|est_cierre_pct|cash_atrapado_real)$/],
-  ['b4', '🏦 4 · Financiamiento HML', /^(hm_inicial|hm_tasa|hm_plazo|draw_m\d+|otros_inv_m\d+)$/],
+  ['b4', '🏦 4 · Financiamiento HML', /^(hm_compra|hm_rehab|hm_tasa|hm_plazo|hm_fecha_inicio|hm_puntos|otros_inv_m\d+)$/],
   ['b5', '🏛️ 5 · Refinanciación', /^(refi_|cierre_refi|cashout_real)/],
   ['b6', '👥 6 · Inversionistas y equity', /^(reparto_inv)$/],
   ['b7', '📊 7 · Operación mensual', /^(arriendo_hab|rampa|ocupacion_estable|piso_servicios|vacancy|servicios_mes|mantenimiento_mes|hoa_mes|seguro_mes|padsplit_pct|comision_pct|imp_propiedad_pct|imp_renta_pct)$/],
@@ -775,6 +777,11 @@ const IA_PINFO = {
   est_cierre_pct: ['% de originación estimado del underwriting.'],
   cash_atrapado_real: ['Plata propia que quedó atrapada en el deal después del refi (año 0 oficial de TIR/VPN).'],
   hm_inicial: ['Plata del Hard Money desembolsada AL CIERRE (sin draws).', 'monto_hml − Σ draws'],
+  hm_compra: ['HML para COMPRA: lo que el Hard Money desembolsó al cierre para comprar la casa.', 'hm_inicial (HML total) = hm_compra + hm_rehab'],
+  hm_rehab: ['HML para REHAB: el escrow del Hard Money reservado para la obra (se libera en draws).', 'los draws ejecutados viven como movimientos "Draws (construcción)" — no deberían superar este monto'],
+  hm_puntos: ['Puntos de originación del Hard Money (% del préstamo cobrado al cierre).'],
+  hm_fecha_inicio: ['Fecha de inicio del préstamo Hard Money.'],
+  fecha_exit_proyectada: ['Fecha ESTIMADA de salida del deal (venta o refi) — supuesto, no compromiso.'],
   hm_tasa: ['Tasa anual del Hard Money (solo interés).', 'interés mensual = préstamo × tasa ÷ 12'],
   hm_plazo: ['Plazo del Hard Money en meses.'],
   refi_mes: ['Mes del ciclo en que la casa se refinancia (entra el banco a 30 años y se paga el HML).'],
@@ -874,6 +881,22 @@ function iaParamsBloques() {
       + '<span>' + (open ? '▾' : '▸') + ' ' + titulo + '</span><span class="meta" style="font-weight:500;display:inline-flex;gap:8px;align-items:center">' + estadoChip(id, rows) + rows.length + (rows.length ? ' · ' + autos + ' real' + (ovs ? ' · ' + ovs + ' override' : '') : ' · vacío') + (open && rows.length ? saveBtn(id) : '') + '</span></div>';
     if (open) {
       html += rows.map(p => iaParamRow(p, id)).join('') || '';
+      if (id === 'b2') {
+        // E2D: claves nuevas del deal, cargables con un clic si faltan
+        const faltan2 = [['estrategia', 'Fix & Flip / Fix & Hold / BRRRR / Wholesale / Otro'], ['plan_salida', 'Venta / Refinanciación / Renta a largo plazo / Sin definir aún'], ['fecha_exit_proyectada', 'fecha estimada de salida (estimado·supuesto)']].filter(x => !rows.some(p2 => p2.key === x[0]));
+        if (faltan2.length) html += '<div class="meta" style="padding:6px 2px">Faltan: ' + faltan2.map(x => '<a style="cursor:pointer;color:var(--a2)" title="' + x[1] + '" onclick="document.getElementById(\'ia-np-key\').value=\'' + x[0] + '\';document.getElementById(\'ia-np-desc\').value=\'' + x[1] + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + x[0] + '</a>').join(' · ') + '</div>';
+      }
+      if (id === 'b4') {
+        // E2A/C: hm_inicial = hm_compra + hm_rehab (calculado, no editable) + guardia de draws
+        const g4 = k => { const r = rows.find(x => x.key === k); return r ? parseFloat(r.value) || 0 : 0; };
+        const hmTot = g4('hm_compra') + g4('hm_rehab');
+        if (rows.length) html += '<div class="kv"><span><b>hm_inicial (HML total)</b> <span class="badge b-ok" style="font-size:8px" title="no editable — suma de los dos términos fijos">calculado · hm_compra + hm_rehab</span></span><b>' + iaMoney(hmTot) + '</b></div>';
+        const drawsEj = (IA.cashflow || []).filter(m => /draws?\s*\(construcci/i.test(m.concepto || '')).reduce((s2, m) => s2 + (+m.valor || 0), 0);
+        if (drawsEj > 0) html += '<div class="kv"><span>Draws (construcción) ejecutados <span class="badge b-ok" style="font-size:8px">Σ movimientos financiero</span></span><b>' + iaMoney(drawsEj) + '</b></div>';
+        if (rows.length && drawsEj > g4('hm_rehab')) html += '<div style="margin:6px 0;padding:8px 11px;border:1px solid rgba(245,178,61,.5);background:rgba(245,178,61,.1);border-radius:9px;color:var(--amber);font-size:11.5px;font-weight:600">⚠️ Los draws ejecutados (' + iaMoney(drawsEj) + ') superan el HML asignado a rehab (' + iaMoney(g4('hm_rehab')) + '). Verificar.</div>';
+        const faltan4 = ['hm_compra', 'hm_rehab', 'hm_tasa', 'hm_plazo', 'hm_fecha_inicio', 'hm_puntos'].filter(k => !rows.some(p2 => p2.key === k));
+        if (faltan4.length) html += '<div class="meta" style="padding:6px 2px">Faltan: ' + faltan4.map(k => '<a style="cursor:pointer;color:var(--a2)" onclick="document.getElementById(\'ia-np-key\').value=\'' + k + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + k + '</a>').join(' · ') + '</div>';
+      }
       if (id === 'b3' && rows.length) {
         const g = k => { const r = rows.find(x => x.key === k) || IA.params.find(x => x.key === k); return r ? parseFloat(r.value) || 0 : 0; };
         const tot = g('compra') + (g('remodel_real') || g('est_remodel_total')) + g('cierre_compra');
@@ -1021,7 +1044,7 @@ function invAdminView() {
     let preview = '<div class="meta">Sin parámetros para esta casa.</div>';
     if (IA.params.length && window.invEngine) {
       const h = IA.holdings.find(x => x.property_id === IA.casa);
-      const r = invEngine.run(iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null));
+      const r = invEngine.run(iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null, IA.cashflow));
       const i = r.indicadores;
       preview = '<div class="grid k4">'
         + '<div class="card"><div class="lab">TIR 31a (post-refi)</div><div class="big up">' + (i.tir31PostRefi != null ? (i.tir31PostRefi * 100).toFixed(1) + '%' : '—') + '</div></div>'

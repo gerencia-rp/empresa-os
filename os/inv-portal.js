@@ -102,10 +102,13 @@ function ipEngineParams(pid) {
     m = k.match(/^otros_inv_m(\d+)$/); if (m) otros[+m[1]] = parseFloat(P[k].value) || 0;
   });
   const holding = IP.holdings.find(h => h.property_id === pid) || {};
+  // E2: draws ya no viven como params — se reconstruyen de los movimientos migrados;
+  // hm_compra (HML al cierre) reemplaza a hm_inicial (que ahora es compra+rehab, calculado)
+  const drawsEf = Object.keys(draws).length ? draws : invEngine.drawsFromMovs(IP.cashflow[pid] || [], txt(P, 'fecha_cierre'));
   return {
     compra: num(P, 'compra', 0), cierreCompra: num(P, 'cierre_compra', 0),
-    hmInicial: num(P, 'hm_inicial', 0), hmTasa: num(P, 'hm_tasa', 0),
-    draws, otrosInversionMes: otros,
+    hmInicial: num(P, 'hm_compra', num(P, 'hm_inicial', 0)), hmTasa: num(P, 'hm_tasa', 0),
+    draws: drawsEf, otrosInversionMes: otros,
     refiMes: num(P, 'refi_mes', null), refiMonto: num(P, 'refi_monto', 0), refiTasa: num(P, 'refi_tasa', 0),
     refiPlazoM: num(P, 'refi_plazo_m', 360), cierreRefi: num(P, 'cierre_refi', 0),
     arv: num(P, 'arv', 0), valorizacion: num(P, 'valorizacion', 0), inflacion: num(P, 'inflacion', 0),
