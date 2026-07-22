@@ -53,6 +53,7 @@ const BUNDLE_FILES = [
   "os/os-lineage-views.js",
   "os/os-lineage-airtable.js",
   "os/os-lineage.js",
+  "os/os-dash.js",
   "os/os-cartera.js",
   "os/os-cobros.js",
   "os/os-admin.js",

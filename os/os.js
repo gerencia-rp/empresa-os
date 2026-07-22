@@ -20,14 +20,17 @@ const OS_EMPRESAS = {
     { k: 'inversionistas', name: 'Inversionistas', icon: '◍', fn: "osOpenApp('fix-and-flip','inversionistas')" },
     { k: 'portal-inv', name: 'Portal Inversionistas', icon: '💎', fn: "osNav('/inversionistas')" },
     { k: 'finanzas', name: 'Finanzas · QuickBooks', icon: '$', fn: "osOpenApp('fix-and-flip','finanzas')" },
+    { k: 'dash', name: 'Dashboard Ejecutivo', icon: '📊', fn: "osNav('/fix-and-flip/dashboard')" },
   ] },
   'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
     { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenApp('rentas','property-manager')" },
     { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('rentas','cronograma')" },
     { k: 'cartera', name: 'Informe de Cartera', icon: '📋', fn: "osNav('/cartera')" },
     { k: 'cobros', name: 'Cobranza (recordatorios)', icon: '📣', fn: "osNav('/cobros')" },
+    { k: 'dash', name: 'Dashboard Ejecutivo', icon: '📊', fn: "osNav('/rentas/dashboard')" },
   ] },
   'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · estimación · pipeline', apps: [
+    { k: 'dash', name: 'Dashboard Ejecutivo', icon: '📊', fn: "osNav('/remodelacion/dashboard')" },
     { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
     { k: 'command-center', name: 'Command Center', icon: '◆', fn: "osOpenApp('remodelacion','command-center')" },
     { k: 'planner', name: 'Planner Semanal', icon: '🗓', fn: "osOpenApp('remodelacion','planner')" },
@@ -37,6 +40,7 @@ const OS_EMPRESAS = {
     // Fuera del panel (código intacto, se retoman después): Dashboard de Obras (→ Command Center), Cronograma (queda en Rentas), ClickUp Análisis.
   ] },
   'educacion': { key: 'education', name: 'Educación', icon: '🎓', tag: 'Universidad de Real Estate', apps: [
+    { k: 'dash', name: 'Dashboard Ejecutivo', icon: '📊', fn: "osNav('/educacion/dashboard')" },
     { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
     { k: 'reportes', name: 'Informes Ejecutivos', icon: '▤', fn: "osOpenApp('educacion','reportes')" },
   ] },
@@ -230,10 +234,12 @@ function osParse(path) {
   if (seg[0] === 'inversionistas') return { view: 'invadmin' };
   if (seg[0] === 'mapa') return { view: 'mapa' };
   if (seg[0] === 'cartera') return { view: 'cartera' };
+  if (seg[0] === 'holding') return { view: 'dash', dashEmp: 'holding' };
   if (seg[0] === 'cobros') return { view: 'cobros' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (seg[0] === 'ia') { if (window.OSIA && seg[1]) OSIA.tab = seg[1]; return { view: 'empresa', empresa: 'ia' }; } // /ia/pedir|bandeja|galeria = tab del módulo
   if (OS_EMPRESAS[seg[0]]) {
+    if (seg[1] === 'dashboard') return { view: 'dash', dashEmp: seg[0], empresa: seg[0] };
     if (seg[1]) return { view: 'app', empresa: seg[0], app: seg[1], slug: seg[2] || null };
     return { view: 'empresa', empresa: seg[0] };
   }
@@ -248,6 +254,7 @@ function osTitle(r) {
   if (r.view === 'invadmin') return 'Inversionistas · ' + base;
   if (r.view === 'mapa') return 'Mapa de Conexiones · ' + base;
   if (r.view === 'cartera') return 'Informe de Cartera · ' + base;
+  if (r.view === 'dash') return 'Dashboard Ejecutivo · ' + base;
   if (r.view === 'cobros') return 'Cobranza · ' + base;
   if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
@@ -487,6 +494,7 @@ function osRouteGuard(r) {
   else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
   else if (r.view === 'mapa') need = ['fix-flip', 'rentas', 'remodelacion', 'contable', 'operacion'];
   else if (r.view === 'cartera') need = ['rentas', 'operacion', 'contable'];
+  else if (r.view === 'dash') need = r.dashEmp === 'holding' ? ['contable', 'operacion'] : [OS_EMPRESAS[r.dashEmp] ? OS_EMPRESAS[r.dashEmp].key : 'contable'];
   else if (r.view === 'cobros') need = ['rentas', 'operacion'];
   if (need && !need.some(osCanArea)) return need[0];
   return null;
@@ -508,7 +516,7 @@ function osRender() {
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), cobros: (window.osCobrosView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), cobros: (window.osCobrosView || os404), dash: (window.osDashView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
@@ -546,6 +554,7 @@ function osGlobal(comp) {
   const areaCards = [
     osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
     osCanArea('contable') ? `<div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>` : '',
+    `<div class="card unit" data-osnav="/holding"><div class="ico">📊</div><div class="un">Dashboard del Holding</div><div class="ut">LOS 5 NÚMEROS DE CADA EMPRESA</div><div class="kv"><span>Consolidado</span><b>EBITDA · cash · D/E · equity · anomalías</b></div><div class="go">Abrir →</div></div>`,
     `<div class="card unit" data-osnav="/mapa"><div class="ico">🗺️</div><div class="un">Mapa de Conexiones</div><div class="ut">DE DÓNDE SALE CADA NÚMERO</div><div class="kv"><span>Linaje de datos</span><b>viene → número → alimenta</b></div><div class="go">Abrir →</div></div>`,
   ].join('');
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
