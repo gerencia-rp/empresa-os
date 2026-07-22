@@ -683,7 +683,9 @@ function iaSecPortafolioE4() {
       + '<td style="text-align:right">' + sem(c) + iaPctI(c.ltv) + '</td>'
       + '<td style="text-align:right">' + iaPctI(c.yieldOnCost) + '</td><td style="text-align:right">' + iaPctI(c.aprecAnual) + '</td></tr>').join('')
     + '</tbody></table>'
-    + (port.porCompletar.length ? '<div class="meta" style="margin-top:8px">📋 <b>Por completar (checklist deuda HML)</b>: ' + port.porCompletar.map(r => OS_E(r.casa)).join(' · ') + '</div>' : '')
+    + (port.porCompletar.length ? '<div style="margin-top:10px;padding:9px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px">📋 <b>Por completar — deuda HML (' + port.porCompletar.length + ' casas)</b>: los montos salen de los <b>term sheets reales</b> que Juan carga en Airtable → "Datos por casa" (jamás se inventan). Al cargarlos, el sync los trae y el múltiplo se recalcula solo.<div style="margin-top:5px;display:flex;gap:8px;flex-wrap:wrap">'
+      + port.porCompletar.map(r => '<a href="https://airtable.com/applMXFyPq1hXj7iN/' + (r.at_loan_id ? 'tbluy4xlHJav9RtrZ/' + OS_E(r.at_loan_id) : 'tblw28KVOUcCAKZBU/' + OS_E(r.at_deal_id || '')) + '" target="_blank" rel="noopener" style="color:var(--a2);text-decoration:none;border:1px solid var(--glassb);border-radius:7px;padding:3px 9px;font-size:11px" title="' + (r.at_loan_id ? 'abrir su registro en Datos por casa' : 'abrir la casa en Propiedades — crearle su registro de Datos por casa') + '">🔗 ' + OS_E(r.casa) + (r.at_loan_id ? '' : ' <span style="opacity:.7">(sin registro aún)</span>') + '</a>').join('')
+      + '</div></div>' : '')
     + '</div>';
   return '<div class="card" style="margin-bottom:14px;border-color:rgba(245,178,61,.4)"><div style="font-size:12px;color:var(--amber)">📄 Indicadores sobre <b>valor en papel</b> (appraisal/ARV) — no incluyen rentas, intereses ni gastos; no son ganancias realizadas hasta la venta o refi. Vendidas usan precio REAL en su fecha (Arcadia $615,000 · 2026-05-04); Slaughter usa ARV como proxy (precio de venta por completar).</div></div>'
     + '<div class="grid k4">'

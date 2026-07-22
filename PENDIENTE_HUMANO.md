@@ -14,3 +14,11 @@
   (1003 Arthur Stiles, 2425 Bitter Creek, 3403 Charles) — definen qué cuenta como portafolio del CEO.
 - Espejar la fecha de refi en Airtable ("Datos por casa") para las casas ya refinanciadas sin fecha —
   el portal del inversionista muestra "fecha sin espejar" en esas.
+
+## 21-jul-2026 · Deuda HML de 7 casas — JUAN (term sheets reales, NO se inventa)
+Denfield · Wellington · Starbright · Arthur Stiles · Charles · Bitter Creek · Harvest no tienen
+"Datos por casa" en Airtable (Flipping Rentals matriz → tbluy4xlHJav9RtrZ) → el OS las muestra
+"por completar" (múltiplo equity del portafolio las cuenta con deuda 0, sesgo declarado en la UI).
+Juan carga Monto HML/tasa/plazo/fechas del term sheet real → el sync los trae y todo se recalcula solo.
+Deep-links directos en Admin → Inversionistas → 📊 Global → checklist "Por completar".
+También pendiente: precio de venta de Slaughter (hoy ARV como proxy, declarado).
