@@ -14,6 +14,12 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (22 Jul 2026 — 🚑 RENTAS: sync por cron REVIVIDO + archivado manual + TCPA fuera) · EN VIVO
+
+- 🚑 **TODOS los crons de edge functions estaban MUERTOS** (no solo Rentas): `cron_invoke_function` skippeaba en silencio sin `app.settings.service_role_key` (jamás configurada) + job 20 duplicado con host placeholder + pg_net timeout 5s. Fix: key en **VAULT** (`service_role_key`), función lee vault→setting con timeout 240s, `unschedule(20)`. Verificado: 200s, last_synced_at fresco, tick autónomo 3×200. ⚠ regla: cron nuevo de función = `cron_invoke_function` (ya autenticada); si se rota la secret key, actualizar el secreto en Vault.
+- 📦 **Archivado MANUAL de propiedades**: `pm_properties.archived_manual` + RPC `pm_archive_property` + botón 📦/↩ en la card del PM (🗑 delete eliminado — revivía con el sync); el sync respeta la marca; `v_ocupacion` excluye casas inactivas. Arcadia + Cervin archivadas (21→19). Gastos junio $48,986 visible (era el sync, no el código).
+- 📵 **TCPA/consentimiento SMS RETIRADO de /cobros** (UI) y **canal SMS deshabilitado en cobros-motor** (solo email) — el CEO no textea. `consentimiento_sms` sigue en pm_tenants sin UI; reactivar = restaurar canal en el motor.
+
 ## 🎯 Estado (21 Jul 2026 — 💎 MEGA-BUILD Portal Inversionistas E1-E4.5) · EN VIVO
 
 - 💰 **E1 Saldo OPERATIVO por flag P&L** (`invEngine.pnlSi`: SÍ=renta/ingreso/operativo/tax · NO=inversion/financiero/distribucion): Ledger admin ("Saldo operativo (P&L): $X", filas NO en tenue [P&L NO] repitiendo saldo) + Flujo portal (balance = renta−gastos P&L SÍ, deuda informativa) + meses "Julio 2026" (`invEngine.mesEs`) en todos los selectores. Starbright: draw recategorizado → saldo $0 (antes −$427k). Draw jamás P&L SÍ (validación alta/edición).
