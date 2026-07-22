@@ -114,7 +114,9 @@ Deno.serve(async (req) => {
       ? (idioma === "en" ? "Rent reminder · " + vars.direccion : "Recordatorio de renta · " + vars.direccion)
       : (idioma === "en" ? "Outstanding balance · " + vars.direccion : "Saldo pendiente · " + vars.direccion);
 
-    for (const canal of ["sms", "email"]) {
+    // 22-jul (decisión CEO): NO se textea — canal SMS deshabilitado por completo
+    // (el gate TCPA queda moot; email es el único canal). Reactivar = volver a ["sms","email"].
+    for (const canal of ["email"]) {
       if (yaEnviado.has((r.tenant_id as string) + "|" + tipo + "|" + canal)) continue;   // dedupe mes
       let estado = modo === "sandbox" ? "sandbox" : "pendiente";
       let motivo: string | undefined;

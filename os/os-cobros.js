@@ -3,7 +3,7 @@
 // Cuatro números SEPARADOS (jamás sumados como "vencido"): DEUDA VENCIDA (mora real,
 // neteada) · POR COBRAR DEL MES (no es mora) · SALDO A FAVOR · TOTAL POR COBRAR.
 // Historial por inquilino: pagos mes a mes + recordatorios enviados con ESTADO DE
-// ENTREGA del proveedor + config TCPA editable (consentimiento con fecha/origen).
+// ENTREGA del proveedor + config operativa del inquilino (SMS/TCPA retirado 22-jul: no se textea).
 // El motor corre en SANDBOX; el checklist de encendido muestra qué falta para live.
 // Ruta /cobros (guard rentas/operacion). Fuentes: v_cobros_estado + cartera_informe +
 // cobros_recordatorios + pm_payments (billing_ym) — todo con linaje en /mapa.
@@ -44,18 +44,15 @@ window.cbSet = cbSet;
 function cbToggle(id) { CB.open[id] = !CB.open[id]; osRender(); }
 window.cbToggle = cbToggle;
 
-// config TCPA/operativa del inquilino — editable acá; el consentimiento queda con fecha+origen
+// config OPERATIVA del inquilino (idioma/tel/email/día/link). El consentimiento SMS se retiró de la UI.
 async function cbSaveCfg(tid) {
+  // 22-jul: el CEO no usa SMS → la UI de consentimiento TCPA se quitó; la columna
+  // consentimiento_sms queda en la tabla, sin tocar desde acá.
   const g = k => { const el = document.getElementById('cb-c-' + k); return el ? (el.type === 'checkbox' ? el.checked : el.value.trim()) : null; };
-  const consent = g('consent');
   const upd = {
     idioma: g('idioma') || 'es', telefono_sms: g('tel') || null, email: g('email') || null,
     dia_exacto_pago: parseInt(g('dia')) || null, payment_link: g('link') || null,
-    consentimiento_sms: !!consent,
   };
-  const row = CB.est.find(x => x.tenant_id === tid);
-  if (consent && row && !row.consentimiento_sms) { upd.consentimiento_sms_fecha = new Date().toISOString(); upd.consentimiento_sms_origen = g('origen') || 'dashboard'; }
-  if (!consent) { upd.consentimiento_sms_fecha = null; upd.consentimiento_sms_origen = null; }
   const { error } = await sb.from('pm_tenants').update(upd).eq('id', tid);
   if (error) return alert('Error: ' + error.message);
   if (window.toast) toast('✓ Config del inquilino guardada', 'success');
@@ -133,7 +130,6 @@ function osCobrosView() {
   const rows = cbRows();
   const LIN = d => (window.osLinI ? ' ' + osLinI('Rentas', 'Cobros', d) : '');
   const activos = (CB.est || []).filter(r => r.estado_contrato === 'activo' && ((+r.vencido_neto || 0) + (+r.por_cobrar_neto || 0)) > 0);
-  const sinConsent = activos.filter(r => !r.consentimiento_sms).length;
   const sinTel = activos.filter(r => !r.telefono).length;
   const sinEmail = activos.filter(r => !r.email).length;
   const sinLink = CB.cfg.link_pago_default ? 0 : activos.filter(r => !r.payment_link).length;
@@ -154,8 +150,7 @@ function osCobrosView() {
   return '<h1>📣 Cobranza <span>· Rentas</span></h1>'
     + '<div class="sub">Cuatro números SEPARADOS con neteo por inquilino — el mes en curso jamás se suma como mora. Motor de recordatorios en modo <b>' + OS_E(modo) + '</b>' + (modo !== 'live' ? ' (registra sin enviar — A2P 10DLC en trámite)' : '') + '.</div>'
     + '<div class="card" style="margin:10px 0;border-color:' + (modo === 'live' ? 'var(--pos)' : 'var(--amber)') + '"><div class="chart-h"><div class="t">🔌 Checklist de encendido</div><div class="k"><button class="ibtn" ' + (CB.dryLoading ? 'disabled' : '') + ' onclick="cbDryRun()">' + (CB.dryLoading ? '⏳…' : '▶ Dry-run del motor (no envía)') + '</button></div></div>'
-    + '<div class="grid k4">'
-    + kpi('Sin consentimiento SMS', sinConsent, 'TCPA: sin esto NO se textea — cargarlo abajo con fecha y origen', sinConsent ? 'warn' : 'up')
+    + '<div class="grid k3">'
     + kpi('Sin teléfono', sinTel, 'de los activos con pendiente', sinTel ? 'warn' : 'up')
     + kpi('Sin email', sinEmail, 'canal de respaldo', sinEmail ? 'warn' : 'up')
     + kpi('Sin link de pago', sinLink, 'QBO payment link por inquilino (o link_pago_default en config)', sinLink ? 'warn' : 'up')
@@ -183,8 +178,7 @@ function osCobrosView() {
       const open = CB.open[r.tenant_id];
       const recs = CB.recs[r.tenant_id] || [];
       const ult = recs.find(x => !/skip|entrante/.test(x.estado));
-      const cfgChips = (r.consentimiento_sms ? '<span class="src" title="consentimiento SMS registrado">SMS✓</span>' : '<span class="src sup" title="TCPA: sin consentimiento — no se textea">SMS✗</span>')
-        + (r.opt_out ? ' <span class="src sup" style="color:var(--neg)">STOP</span>' : '')
+      const cfgChips = (r.opt_out ? '<span class="src sup" style="color:var(--neg)">STOP</span>' : '')
         + (r.payment_link ? ' <span class="src">link✓</span>' : ' <span class="src sup">sin link</span>');
       return '<tr onclick="cbToggle(\'' + r.tenant_id + '\')" style="cursor:pointer">'
         + '<td>' + (open ? '▾ ' : '▸ ') + OS_E(r.inquilino || '—') + '</td><td>' + OS_E(String(r.casa || '—').split(',')[0]) + '</td>'
@@ -212,10 +206,8 @@ function cbDetalle(r, recs) {
     + '<div><div class="lab" style="margin-bottom:6px">Línea de tiempo (pagos + recordatorios con entrega)</div>'
     + (tl.length ? tl.slice(0, 14).map(x => '<div style="font-size:11.5px;padding:3px 0;border-bottom:1px dashed var(--glassb)">' + x.txt + '</div>').join('') : '<div class="meta">Sin historial en la ventana de 6 meses.</div>')
     + '</div>'
-    + '<div><div class="lab" style="margin-bottom:6px">Config del inquilino (TCPA + operativa)</div>'
+    + '<div><div class="lab" style="margin-bottom:6px">Config del inquilino (operativa)</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" onclick="event.stopPropagation()">'
-    + '<label style="display:flex;gap:6px;align-items:center;font-size:12px;grid-column:span 2"><input type="checkbox" id="cb-c-consent" ' + (r.consentimiento_sms ? 'checked' : '') + '> Consentimiento SMS (TCPA) — queda con fecha y origen</label>'
-    + '<input id="cb-c-origen" class="ibtn" placeholder="origen (lease / formulario)" value="">'
     + '<select id="cb-c-idioma" class="ibtn"><option value="es"' + (r.idioma === 'es' ? ' selected' : '') + '>Español</option><option value="en"' + (r.idioma === 'en' ? ' selected' : '') + '>English</option></select>'
     + '<input id="cb-c-tel" class="ibtn" placeholder="teléfono SMS" value="' + OS_E(r.telefono || '') + '">'
     + '<input id="cb-c-email" class="ibtn" placeholder="email" value="' + OS_E(r.email || '') + '">'
