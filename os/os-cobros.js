@@ -173,7 +173,7 @@ function osCobrosView() {
     + '<select class="ibtn" onchange="cbSet(\'fCasa\', this.value)"><option value="todos">Todas las casas</option>' + casas.map(c => '<option value="' + OS_E(c) + '"' + (CB.fCasa === c ? ' selected' : '') + '>' + OS_E(String(c).split(',')[0]) + '</option>').join('') + '</select>'
     + '<select class="ibtn" onchange="cbSet(\'fEstado\', this.value)">' + [['todos', 'Todos'], ['vencido', '🔴 Vencidos'], ['mes_en_curso', '🟡 Mes en curso'], ['current', '🟢 Current']].map(o => '<option value="' + o[0] + '"' + (CB.fEstado === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
     + '<button class="ibtn" onclick="cbCSV()">⬇ CSV</button><button class="ibtn" onclick="cbPDF()">🖨 PDF</button></div></div>'
-    + '<table><thead><tr><th>Inquilino</th><th>Casa</th><th style="text-align:right;padding-left:14px">Vencido</th><th style="text-align:right;padding-left:14px">Mes</th><th style="text-align:right;padding-left:14px">A favor</th><th style="padding-left:14px">Aging</th><th>Último recordatorio</th><th>Config</th></tr></thead><tbody>'
+    + '<table class="cbtable"><thead><tr><th>Inquilino</th><th>Casa</th><th style="text-align:right;padding-left:14px">Vencido</th><th style="text-align:right;padding-left:14px">Mes</th><th style="text-align:right;padding-left:14px">A favor</th><th style="padding-left:14px">Aging</th><th>Último recordatorio</th><th>Config</th></tr></thead><tbody>'
     + rows.map(r => {
       const open = CB.open[r.tenant_id];
       const recs = CB.recs[r.tenant_id] || [];
@@ -188,7 +188,7 @@ function osCobrosView() {
         + '<td>' + (r.aging ? '<span style="color:' + (r.aging === '60+' ? 'var(--neg)' : r.aging === '30-60' ? 'var(--amber)' : 'var(--pos)') + ';font-weight:700">' + r.aging + '</span>' : '—') + '</td>'
         + '<td class="meta" style="font-size:10.5px">' + (ult ? OS_E(String(ult.created_at).slice(0, 10)) + ' · ' + OS_E(ult.tipo) + ' · ' + OS_E(ult.canal) + ' · <b>' + OS_E(ult.provider_status || ult.estado) + '</b>' : 'ninguno') + '</td>'
         + '<td style="font-size:10px;white-space:nowrap">' + cfgChips + '</td></tr>'
-        + (open ? '<tr><td colspan="8" style="background:var(--glass);padding:12px 16px">' + cbDetalle(r, recs) + '</td></tr>' : '');
+        + (open ? '<tr class="cb-detail"><td colspan="8" style="padding:12px 16px">' + cbDetalle(r, recs) + '</td></tr>' : '');
     }).join('')
     + '</tbody></table></div>'
     + '<div class="meta" style="margin-top:12px">Neteo por inquilino (el a favor cubre vencido → mes en curso). Los recordatorios los decide el motor diario SOLO sobre deuda vencida neteada (+ aviso amistoso el día de pago); un pago registrado los frena solo en la próxima corrida. Fase 2 (late fees §92.019, notices §24.005) espera confirmación del abogado.</div>';

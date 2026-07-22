@@ -122,6 +122,14 @@ function osInjectCSS() {
   #os-root .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #os-root .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--glassb);font-weight:700}
   #os-root .ptable td{padding:10px 8px;border-bottom:1px solid var(--glassb)}#os-root .ptable tr:hover td{background:var(--glass)}
+  /* Tabla de Cobranza: rejilla completa (columnas + filas marcadas) */
+  #os-root .cbtable{width:100%;border-collapse:collapse;font-size:12.5px}
+  #os-root .cbtable thead th{position:sticky;top:0;z-index:1;background:var(--card,var(--glass));text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 10px;border:1px solid var(--glassb);font-weight:700}
+  #os-root .cbtable td{padding:9px 10px;border:1px solid var(--glassb);vertical-align:top}
+  #os-root .cbtable td[style*="text-align:right"]{font-variant-numeric:tabular-nums}
+  #os-root .cbtable tbody tr:not(.cb-detail):nth-child(4n-1){background:color-mix(in srgb,var(--glass) 45%,transparent)}
+  #os-root .cbtable tbody tr:not(.cb-detail):hover td{background:var(--glass)}
+  #os-root .cbtable tr.cb-detail td{background:var(--glass)}
   #os-root .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}#os-root .b-red{background:rgba(240,104,122,.13);color:var(--neg)}#os-root .b-warn{background:rgba(231,182,94,.13);color:var(--amber)}#os-root .b-ok{background:rgba(72,214,156,.13);color:var(--pos)}
   #os-root .chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}#os-root .chart-h .t{font-size:13.5px;font-weight:640}#os-root .chart-h .k{font-size:11px;color:var(--mut2)}
   #os-root .op-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--glassb);font-size:12px}#os-root .op-time{color:var(--mut2);width:46px;font-variant-numeric:tabular-nums}
