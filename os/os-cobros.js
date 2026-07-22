@@ -10,7 +10,7 @@
 // ════════════════════════════════════════════════════════════════
 /* global sb, OS, osRender, OS_E, OS_M, osLinI, reportOpen */
 
-const CB = { est: null, recs: {}, det: {}, mesPag: null, cfg: {}, loading: false, err: null, q: '', fCasa: 'todos', fEstado: 'todos', open: {}, dry: null, dryLoading: false };
+const CB = { est: null, recs: {}, det: {}, mesPag: null, cfg: {}, loading: false, err: null, q: '', fCasa: 'todos', fEstado: 'todos', open: {}, dry: null, dryLoading: false, sortKey: null, sortDir: 'asc', colOrder: null };
 window.CB = CB;
 const cbM = v => (v == null || isNaN(+v)) ? '—' : '$' + Math.abs(+v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cbYm = () => new Date().toISOString().slice(0, 7);
@@ -76,9 +76,21 @@ async function cbDryRun() {
 }
 window.cbDryRun = cbDryRun;
 
+// Valor CRUDO por columna para exports (sin HTML; sigue el orden visible de cbCols)
+const CB_RAW = {
+  inquilino: r => r.inquilino || '', casa: r => r.casa || '',
+  vencido: r => +r.vencido_neto || 0, mes: r => +r.por_cobrar_neto || 0,
+  afavor: r => +r.a_favor || 0, aging: r => r.aging || '',
+  ult: r => { const c = cbCtx(r); return c.ult ? String(c.ult.created_at).slice(0, 10) + ' ' + (c.ult.tipo || '') + ' ' + (c.ult.canal || '') : ''; },
+  config: r => (r.opt_out ? 'STOP ' : '') + (r.payment_link ? 'link' : 'sin link'),
+};
 function cbCSV() {
-  const head = ['inquilino', 'casa', 'vencido_neto', 'por_cobrar_mes', 'a_favor', 'total', 'aging', 'estado', 'consentimiento_sms', 'telefono', 'email', 'payment_link'];
-  const csv = [head.join(',')].concat(cbRows().map(r => [r.inquilino, r.casa, r.vencido_neto, r.por_cobrar_neto, r.a_favor, (+r.vencido_neto || 0) + (+r.por_cobrar_neto || 0), r.aging || '', r.estado_cobro, r.consentimiento_sms, r.telefono || '', r.email || '', r.payment_link || ''].map(x => '"' + String(x ?? '').replace(/"/g, '""') + '"').join(','))).join('\n');
+  const vis = cbCols();
+  const head = vis.map(c => c.label).concat(['total', 'estado', 'consentimiento_sms', 'telefono', 'email', 'payment_link']);
+  const csv = [head.join(',')].concat(cbRows().map(r =>
+    vis.map(c => CB_RAW[c.key](r))
+      .concat([(+r.vencido_neto || 0) + (+r.por_cobrar_neto || 0), r.estado_cobro, r.consentimiento_sms, r.telefono || '', r.email || '', r.payment_link || ''])
+      .map(x => '"' + String(x ?? '').replace(/"/g, '""') + '"').join(','))).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'cobranza_' + cbYm() + '.csv'; a.click();
 }
@@ -97,8 +109,16 @@ function cbPDF() {
         { lab: 'Saldo A FAVOR', val: cbM(t.favor), sub: 'adelantos ya neteados', estado: 'ok' },
         { lab: '% cobranza del mes', val: t.pctCobranza != null ? Math.round(t.pctCobranza * 100) + '%' : null, sub: 'cobrado ' + cbM(t.cobrado) + ' de ' + cbM(t.pactado), estado: 'ok' },
       ] },
-      { t: 'tabla', titulo: 'Por inquilino (neteado)', cols: ['Inquilino', 'Casa', 'Vencido', 'Mes', 'A favor', 'Aging'],
-        rows: cbRows().filter(r => +r.vencido_neto > 0 || +r.por_cobrar_neto > 0).map(r => [OS_E(r.inquilino), OS_E(String(r.casa || '').split(',')[0]), +r.vencido_neto > 0 ? cbM(r.vencido_neto) : '—', +r.por_cobrar_neto > 0 ? cbM(r.por_cobrar_neto) : '—', +r.a_favor > 0 ? cbM(r.a_favor) : '—', r.aging || '—']) },
+      (() => {
+        const pdfFmt = {
+          inquilino: r => OS_E(r.inquilino), casa: r => OS_E(String(r.casa || '').split(',')[0]),
+          vencido: r => +r.vencido_neto > 0 ? cbM(r.vencido_neto) : '—', mes: r => +r.por_cobrar_neto > 0 ? cbM(r.por_cobrar_neto) : '—',
+          afavor: r => +r.a_favor > 0 ? cbM(r.a_favor) : '—', aging: r => r.aging || '—',
+        };
+        const vis = cbCols().filter(c => pdfFmt[c.key]);   // ult/config no van al reporte
+        return { t: 'tabla', titulo: 'Por inquilino (neteado)', cols: vis.map(c => c.label),
+          rows: cbRows().filter(r => +r.vencido_neto > 0 || +r.por_cobrar_neto > 0).map(r => vis.map(c => pdfFmt[c.key](r))) };
+      })(),
     ],
     conclusion: 'Mora real: <b>' + cbM(t.vencido) + '</b> en ' + t.morosos + ' inquilinos. Recordatorios en modo <b>' + (CB.cfg.modo || 'sandbox') + '</b>' + (CB.cfg.modo !== 'live' ? ' (sin envíos reales)' : '') + '.',
   });
@@ -107,11 +127,22 @@ window.cbPDF = cbPDF;
 
 function cbRows() {
   const q = CB.q.toLowerCase();
-  return (CB.est || []).filter(r =>
+  let rows = (CB.est || []).filter(r =>
     (CB.fCasa === 'todos' || r.casa === CB.fCasa)
     && (CB.fEstado === 'todos' || r.estado_cobro === CB.fEstado)
-    && (!q || ((r.inquilino || '') + ' ' + (r.casa || '')).toLowerCase().includes(q)))
-    .sort((a, b) => ((+b.vencido_neto || 0) + (+b.por_cobrar_neto || 0)) - ((+a.vencido_neto || 0) + (+a.por_cobrar_neto || 0)));
+    && (!q || ((r.inquilino || '') + ' ' + (r.casa || '')).toLowerCase().includes(q)));
+  const col = CB.sortKey && CB_COLS.find(c => c.key === CB.sortKey);
+  if (col) {
+    const dir = CB.sortDir === 'desc' ? -1 : 1;
+    rows.sort((a, b) => {
+      const va = col.get(a, cbCtx(a)), vb = col.get(b, cbCtx(b));
+      if (typeof va === 'number' || typeof vb === 'number') return ((+va || 0) - (+vb || 0)) * dir;
+      return String(va).localeCompare(String(vb), 'es', { sensitivity: 'base' }) * dir;
+    });
+  } else {
+    rows.sort((a, b) => ((+b.vencido_neto || 0) + (+b.por_cobrar_neto || 0)) - ((+a.vencido_neto || 0) + (+a.por_cobrar_neto || 0)));
+  }
+  return rows;
 }
 function cbTotales() {
   const es = CB.est || [];
@@ -123,6 +154,68 @@ function cbTotales() {
     morosos: es.filter(r => +r.vencido_neto > 0).length };
 }
 
+// ── Tabla funcional: modelo de columnas (ordenar + arrastrar para reordenar) ──
+const CB_COLS = [
+  { key:'inquilino', label:'Inquilino', align:'left', sortable:true,
+    get:r=>(r.inquilino||'').toLowerCase(),
+    cell:(r,c)=>(c.open?'▾ ':'▸ ')+OS_E(r.inquilino||'—') },
+  { key:'casa', label:'Casa', align:'left', sortable:true,
+    get:r=>String(r.casa||'').split(',')[0].toLowerCase(),
+    cell:r=>OS_E(String(r.casa||'—').split(',')[0]) },
+  { key:'vencido', label:'Vencido', align:'right', sortable:true,
+    get:r=>+r.vencido_neto||0,
+    cell:r=>'<span class="'+(+r.vencido_neto>0?'down':'')+'">'+(+r.vencido_neto>0?cbM(r.vencido_neto):'—')+'</span>' },
+  { key:'mes', label:'Mes', align:'right', sortable:true,
+    get:r=>+r.por_cobrar_neto||0,
+    cell:r=>(+r.por_cobrar_neto>0?cbM(r.por_cobrar_neto):'—') },
+  { key:'afavor', label:'A favor', align:'right', sortable:true,
+    get:r=>+r.a_favor||0,
+    cell:r=>'<span class="up">'+(+r.a_favor>0?cbM(r.a_favor):'—')+'</span>' },
+  { key:'aging', label:'Aging', align:'left', sortable:true,
+    get:r=>({'0-30':1,'30-60':2,'60+':3}[r.aging]||0),
+    cell:r=>r.aging?'<span style="color:'+(r.aging==='60+'?'var(--neg)':r.aging==='30-60'?'var(--amber)':'var(--pos)')+';font-weight:700">'+r.aging+'</span>':'—' },
+  { key:'ult', label:'Último recordatorio', align:'left', sortable:true,
+    get:(r,c)=>c.ult?String(c.ult.created_at):'',
+    cell:(r,c)=>c.ult?OS_E(String(c.ult.created_at).slice(0,10))+' · '+OS_E(c.ult.tipo)+' · '+OS_E(c.ult.canal)+' · <b>'+OS_E(c.ult.provider_status||c.ult.estado)+'</b>':'ninguno' },
+  { key:'config', label:'Config', align:'left', sortable:false,
+    get:()=>'', cell:(r,c)=>c.cfgChips },
+];
+let cbDragKey = null;
+function cbCols(){
+  if (CB.colOrder == null) { try { CB.colOrder = JSON.parse(localStorage.getItem('cb_col_order')||'null'); } catch(_) { CB.colOrder = null; } }
+  const def = CB_COLS.map(c=>c.key);
+  let ord = (CB.colOrder && CB.colOrder.length) ? CB.colOrder.filter(k=>def.includes(k)) : def.slice();
+  def.forEach(k=>{ if(!ord.includes(k)) ord.push(k); });
+  return ord.map(k=>CB_COLS.find(c=>c.key===k));
+}
+function cbCtx(r){
+  const recs = CB.recs[r.tenant_id] || [];
+  const ult = recs.find(x=>!/skip|entrante/.test(x.estado));
+  const cfgChips = (r.opt_out ? '<span class="src sup" style="color:var(--neg)">STOP</span>' : '')
+    + (r.payment_link ? ' <span class="src">link✓</span>' : ' <span class="src sup">sin link</span>');
+  return { open: CB.open[r.tenant_id], ult, cfgChips, recs };
+}
+function cbSort(key){
+  const col = CB_COLS.find(c=>c.key===key);
+  if(!col || !col.sortable) return;
+  if(CB.sortKey===key){ if(CB.sortDir==='asc') CB.sortDir='desc'; else { CB.sortKey=null; CB.sortDir='asc'; } }
+  else { CB.sortKey=key; CB.sortDir='asc'; }
+  osRender();
+}
+window.cbSort = cbSort;
+function cbDragStart(e,key){ cbDragKey=key; try{ e.dataTransfer.effectAllowed='move'; }catch(_){} }
+window.cbDragStart = cbDragStart;
+function cbDrop(e,key){
+  e.preventDefault();
+  if(!cbDragKey || cbDragKey===key){ cbDragKey=null; return; }
+  let ord = cbCols().map(c=>c.key).filter(k=>k!==cbDragKey);
+  ord.splice(ord.indexOf(key), 0, cbDragKey);
+  CB.colOrder = ord;
+  try{ localStorage.setItem('cb_col_order', JSON.stringify(ord)); }catch(_){}
+  cbDragKey = null;
+  osRender();
+}
+window.cbDrop = cbDrop;
 function osCobrosView() {
   if (!CB.est && !CB.err) { cbLoad(); return '<div class="empty">⏳ Calculando la cobranza…</div>'; }
   if (CB.err) return '<div class="empty down">' + OS_E(CB.err) + ' <button class="cbtn" onclick="cbLoad(true)">Reintentar</button></div>';
@@ -173,23 +266,21 @@ function osCobrosView() {
     + '<select class="ibtn" onchange="cbSet(\'fCasa\', this.value)"><option value="todos">Todas las casas</option>' + casas.map(c => '<option value="' + OS_E(c) + '"' + (CB.fCasa === c ? ' selected' : '') + '>' + OS_E(String(c).split(',')[0]) + '</option>').join('') + '</select>'
     + '<select class="ibtn" onchange="cbSet(\'fEstado\', this.value)">' + [['todos', 'Todos'], ['vencido', '🔴 Vencidos'], ['mes_en_curso', '🟡 Mes en curso'], ['current', '🟢 Current']].map(o => '<option value="' + o[0] + '"' + (CB.fEstado === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
     + '<button class="ibtn" onclick="cbCSV()">⬇ CSV</button><button class="ibtn" onclick="cbPDF()">🖨 PDF</button></div></div>'
-    + '<table class="cbtable"><thead><tr><th>Inquilino</th><th>Casa</th><th style="text-align:right;padding-left:14px">Vencido</th><th style="text-align:right;padding-left:14px">Mes</th><th style="text-align:right;padding-left:14px">A favor</th><th style="padding-left:14px">Aging</th><th>Último recordatorio</th><th>Config</th></tr></thead><tbody>'
+    + '<table class="cbtable"><thead><tr>' + cbCols().map(c => {
+        const active = CB.sortKey === c.key;
+        const arrow = active ? (CB.sortDir === 'asc' ? ' ↑' : ' ↓') : (c.sortable ? ' <span style="opacity:.35">↕</span>' : '');
+        const al = c.align === 'right' ? 'text-align:right;' : '';
+        return '<th draggable="true" ondragstart="cbDragStart(event,\'' + c.key + '\')" ondragover="event.preventDefault()" ondrop="cbDrop(event,\'' + c.key + '\')"'
+          + (c.sortable ? ' onclick="cbSort(\'' + c.key + '\')"' : '')
+          + ' title="' + (c.sortable ? 'Clic: ordenar · ' : '') + 'Arrastrá para mover" style="' + al + 'cursor:grab;white-space:nowrap;user-select:none">'
+          + OS_E(c.label) + arrow + '</th>';
+      }).join('') + '</tr></thead><tbody>'
     + rows.map(r => {
-      const open = CB.open[r.tenant_id];
-      const recs = CB.recs[r.tenant_id] || [];
-      const ult = recs.find(x => !/skip|entrante/.test(x.estado));
-      const cfgChips = (r.opt_out ? '<span class="src sup" style="color:var(--neg)">STOP</span>' : '')
-        + (r.payment_link ? ' <span class="src">link✓</span>' : ' <span class="src sup">sin link</span>');
-      return '<tr onclick="cbToggle(\'' + r.tenant_id + '\')" style="cursor:pointer">'
-        + '<td>' + (open ? '▾ ' : '▸ ') + OS_E(r.inquilino || '—') + '</td><td>' + OS_E(String(r.casa || '—').split(',')[0]) + '</td>'
-        + '<td style="text-align:right" class="' + (+r.vencido_neto > 0 ? 'down' : '') + '">' + (+r.vencido_neto > 0 ? cbM(r.vencido_neto) : '—') + '</td>'
-        + '<td style="text-align:right">' + (+r.por_cobrar_neto > 0 ? cbM(r.por_cobrar_neto) : '—') + '</td>'
-        + '<td style="text-align:right" class="up">' + (+r.a_favor > 0 ? cbM(r.a_favor) : '—') + '</td>'
-        + '<td>' + (r.aging ? '<span style="color:' + (r.aging === '60+' ? 'var(--neg)' : r.aging === '30-60' ? 'var(--amber)' : 'var(--pos)') + ';font-weight:700">' + r.aging + '</span>' : '—') + '</td>'
-        + '<td class="meta" style="font-size:10.5px">' + (ult ? OS_E(String(ult.created_at).slice(0, 10)) + ' · ' + OS_E(ult.tipo) + ' · ' + OS_E(ult.canal) + ' · <b>' + OS_E(ult.provider_status || ult.estado) + '</b>' : 'ninguno') + '</td>'
-        + '<td style="font-size:10px;white-space:nowrap">' + cfgChips + '</td></tr>'
-        + (open ? '<tr class="cb-detail"><td colspan="8" style="padding:12px 16px">' + cbDetalle(r, recs) + '</td></tr>' : '');
-    }).join('')
+        const ctx = cbCtx(r);
+        const tds = cbCols().map(c => '<td' + (c.align === 'right' ? ' style="text-align:right"' : '') + '>' + c.cell(r, ctx) + '</td>').join('');
+        return '<tr onclick="cbToggle(\'' + r.tenant_id + '\')" style="cursor:pointer">' + tds + '</tr>'
+          + (ctx.open ? '<tr class="cb-detail"><td colspan="' + cbCols().length + '" style="padding:12px 16px">' + cbDetalle(r, ctx.recs) + '</td></tr>' : '');
+      }).join('')
     + '</tbody></table></div>'
     + '<div class="meta" style="margin-top:12px">Neteo por inquilino (el a favor cubre vencido → mes en curso). Los recordatorios los decide el motor diario SOLO sobre deuda vencida neteada (+ aviso amistoso el día de pago); un pago registrado los frena solo en la próxima corrida. Fase 2 (late fees §92.019, notices §24.005) espera confirmación del abogado.</div>';
 }
