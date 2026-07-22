@@ -92,18 +92,21 @@
     });
     const inv = usadas.reduce((s, r) => s + +r.all_in, 0);
     const paper = usadas.reduce((s, r) => s + +r.paper_value, 0);
+    // múltiplo equity — definición CANÓNICA del Excel "IRR Portafolio": TODAS las casas,
+    // deuda no registrada cuenta como 0 (⚠ sobreestima el equity hasta completar la deuda
+    // de esas casas — declarado en la UI con el checklist "por completar")
+    const deuda = usadas.reduce((s, r) => s + (+r.deuda_vigente || 0), 0);
+    const hml = usadas.reduce((s, r) => s + (+r.hml_original || 0), 0);
     const conDeuda = usadas.filter(r => r.deuda_vigente != null && r.hml_original != null);
-    const deuda = conDeuda.reduce((s, r) => s + +r.deuda_vigente, 0);
-    const hml = conDeuda.reduce((s, r) => s + +r.hml_original, 0);
+    const deudaReg = conDeuda.reduce((s, r) => s + +r.deuda_vigente, 0);
     const paperConDeuda = conDeuda.reduce((s, r) => s + +r.paper_value, 0);
-    const allInConDeuda = conDeuda.reduce((s, r) => s + +r.all_in, 0);
     return {
       n: usadas.length, nConDeuda: conDeuda.length,
       xirrAllIn: xirr(fA), xirrCompra: xirr(fC),
       invTotal: inv, paperTotal: paper,
-      equityInv: allInConDeuda - hml, equityHoy: paperConDeuda - deuda,
-      multEquity: (allInConDeuda - hml) > 0 ? (paperConDeuda - deuda) / (allInConDeuda - hml) : null,
-      ltvPond: paperConDeuda > 0 ? deuda / paperConDeuda : null,
+      equityInv: inv - hml, equityHoy: paper - deuda,
+      multEquity: (inv - hml) > 0 ? (paper - deuda) / (inv - hml) : null,
+      ltvPond: paperConDeuda > 0 ? deudaReg / paperConDeuda : null,
       porCompletar: (rows || []).filter(r => (r.deuda_vigente == null || r.hml_original == null) && !r.vendida),
     };
   }
