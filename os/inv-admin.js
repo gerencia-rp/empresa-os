@@ -1037,6 +1037,19 @@ function iaIndResumen(pid, forPrint) {
     + '<div style="margin-top:8px;font-size:11px;opacity:.7">Valor papel ' + iaMoney(c.paper_value) + ' · all-in ' + iaMoney(c.all_in) + ' · deuda ' + (c.deuda_vigente != null ? iaMoney(c.deuda_vigente) : 'por completar') + ' (' + OS_E(c.deuda_fuente || '') + ') · corte ' + new Date().toISOString().slice(0, 10) + '</div></div>';
 }
 function iaVerComoInversor(pid) {
+  // 👁 abre el PORTAL REAL en modo vista (misma UI, datos filtrados server-side por el
+  // inversionista objetivo vía inv_portal_como — solo admin, auditado, read-only)
+  pid = pid || IA.casa;
+  const hs = IA.holdings.filter(h => h.property_id === pid);
+  const inv = hs.length ? hs[0].investor_airtable_id : null;
+  if (!inv) return alert('Esta casa no tiene inversionistas vinculados — vinculá uno en 🏠 Casas & reparto.');
+  if (hs.length > 1 && window.toast) toast('👁 La casa tiene ' + hs.length + ' inversionistas — abriendo como ' + iaInvName(inv) + ' (cambiá con el selector de arriba en la vista)', 'success');
+  window.open('/inversionista?ver=' + encodeURIComponent(inv) + '&casa=' + encodeURIComponent(pid), '_blank');
+}
+window.iaVerComoInversor = iaVerComoInversor;
+function iaVerComo(inv, pid) { window.open('/inversionista?ver=' + encodeURIComponent(inv) + (pid ? '&casa=' + encodeURIComponent(pid) : ''), '_blank'); }
+window.iaVerComo = iaVerComo;
+function iaVerComoInversorModalViejo(pid) {
   const old = document.getElementById('ia-vci-ov'); if (old) old.remove();
   const ov = document.createElement('div'); ov.id = 'ia-vci-ov';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,12,.55);display:grid;place-items:center;z-index:99999;padding:18px';
@@ -1047,7 +1060,6 @@ function iaVerComoInversor(pid) {
     + iaIndResumen(pid, false) + '</div>';
   document.body.appendChild(ov);
 }
-window.iaVerComoInversor = iaVerComoInversor;
 function iaGuiaPantalla(pid) {
   const w = window.open('', '_blank');
   if (!w) return alert('Permití pop-ups para imprimir la guía');
@@ -1163,7 +1175,7 @@ function invAdminView() {
           + (rows.map(h => '<tr><td>' + OS_E(iaInvName(h.investor_airtable_id)) + '</td><td>' + OS_E(iaCasaName(h.property_id)) + '</td>'
             + '<td style="text-align:right">' + iaMoney(h.inversion_aportada) + '</td><td style="text-align:right">' + Math.round(h.reparto_pct * 100) + '%</td>'
             + '<td>' + (h.fecha_entrada || '—') + '</td>'
-            + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg)" onclick="iaSoftDeleteHolding(\'' + h.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Nada coincide.</td></tr>')
+            + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" title="ver el portal como este inversionista (solo lectura, auditado)" onclick="iaVerComo(\'' + OS_E(h.investor_airtable_id) + '\',\'' + h.property_id + '\')">👁</button><button class="ct-btn" style="color:var(--neg)" onclick="iaSoftDeleteHolding(\'' + h.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Nada coincide.</td></tr>')
           + '</tbody></table></div>';
       })();
   }

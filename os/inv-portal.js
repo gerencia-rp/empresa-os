@@ -11,7 +11,7 @@
 // ════════════════════════════════════════════════════════════════
 
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'port', myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' }, anio: 'todos', anioOpen: {}, docQ: '', docTipo: 'todos', proj: [], infoDefs: {}, resumen: [] };
+const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'port', myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' }, anio: 'todos', anioOpen: {}, docQ: '', docTipo: 'todos', proj: [], infoDefs: {}, resumen: [], viewOnly: false, ver: null, verNombre: '', verList: [] };
 window.IP = IP;
 
 const $money = v => (v == null || isNaN(+v)) ? '—' : (+v < 0 ? '−$' : '$') + Math.abs(Math.round(+v)).toLocaleString('en-US');
@@ -50,6 +50,45 @@ async function ipSendLink() {
 window.ipSendLink = ipSendLink;
 async function ipLogout() { await sb.auth.signOut(); loginView(); }
 window.ipLogout = ipLogout;
+
+// ─── 👁 modo VISTA DEL INVERSOR (solo admin): mismos datasets, filtrados server-side
+// por el inversionista objetivo vía inv_portal_como (guard rol admin + audit). Read-only.
+function ipRO() { alert('👁 Modo vista — solo lectura. Ninguna acción se ejecuta.'); }
+async function ipLoadComo() {
+  const pay = await sb.rpc('inv_portal_como', { p_inv: IP.ver }).then(r => r.data).catch(() => null);
+  if (!pay) {
+    app().innerHTML = '<div class="login card"><h1>Vista no <span>disponible</span></h1><div class="meta" style="margin-top:10px">La vista del inversor es SOLO para administradores (queda auditada). Tu usuario no tiene ese rol.</div><button class="ibtn" style="margin-top:14px" onclick="location.href=\'/inversionista\'">Ir a mi portal</button></div>';
+    return;
+  }
+  sb.rpc('inv_portal_como_log', { p_inv: IP.ver }).then(() => {}, () => {});
+  IP.viewOnly = true; IP.verNombre = pay.nombre || IP.ver; IP.verList = pay.selector || [];
+  IP.holdings = pay.holdings || [];
+  IP.resumen = pay.resumen || []; IP.proj = pay.proj || []; IP.indData = pay.ind || [];
+  IP.dists = pay.dists || []; IP.msgs = pay.msgs || []; IP.myIds = [IP.ver];
+  IP.params = {}; (pay.params || []).forEach(r => { (IP.params[r.property_id] = IP.params[r.property_id] || {})[r.key] = r; });
+  (pay.overrides || []).forEach(o => {
+    const P = (IP.params[o.property_id] = IP.params[o.property_id] || {});
+    const b = P[o.key];
+    P[o.key] = { ...(b || { property_id: o.property_id, key: o.key }), value: o.valor, fuente: 'manual', descripcion: 'ajustado por el equipo' + (b && b.fuente ? ' (origen: ' + b.fuente + ')' : '') };
+  });
+  IP.cashflow = {}; (pay.cashflow || []).forEach(r => { (IP.cashflow[r.property_id] = IP.cashflow[r.property_id] || []).push(r); });
+  IP.docs = {}; (pay.docs || []).forEach(r => { (IP.docs[r.property_id] = IP.docs[r.property_id] || []).push(r); });
+  const glosL = await sb.from('glosario_terminos').select('*').eq('active', true).then(r => r.data || []).catch(() => []);
+  IP.glos = {}; glosL.forEach(g => { IP.glos[g.clave] = g; });
+  const qc = new URLSearchParams(location.search).get('casa');
+  const props = [...new Set(IP.holdings.map(h => h.property_id))];
+  IP.casa = (qc && props.includes(qc)) ? qc : props[0];
+  if (!IP.holdings.length) { app().innerHTML = '<div class="login card"><h1>👁 ' + esc(IP.verNombre) + '</h1><div class="meta" style="margin-top:10px">Este inversionista no tiene casas asignadas todavía — su portal se ve vacío (igual que lo vería él).</div>' + ipVerBar() + '</div>'; return; }
+  render();
+}
+function ipVerBar() {
+  if (!IP.viewOnly) return '';
+  const sel = (IP.verList || []).length > 1
+    ? '<select class="ibtn" onchange="location.href=\'/inversionista?ver=\'+encodeURIComponent(this.value)">' + IP.verList.map(v => '<option value="' + esc(v.inv) + '"' + (v.inv === IP.ver ? ' selected' : '') + '>' + esc(v.nombre || v.email) + '</option>').join('') + '</select>' : '';
+  return '<div style="position:sticky;top:0;z-index:999;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(245,178,61,.14);border:1px solid rgba(245,178,61,.5);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:12.5px">'
+    + '👁 <b>Estás viendo como ' + esc(IP.verNombre) + '</b> — solo lectura (mismos datos y componente que su portal real)' + sel
+    + '<button class="ibtn" style="margin-left:auto" onclick="location.href=\'/inversionistas\'">Salir de la vista</button></div>';
+}
 
 // ─── carga (solo inv_* — RLS) ───
 async function ipLoad() {
@@ -349,8 +388,8 @@ function render() {
       }).join('') + '</select>' : '';
 
   const noLeidos = (IP.msgs || []).filter(m => m.de === 'admin' && !(m.read_by || []).includes(IP.email.toLowerCase())).length;
-  const TABS = [['port', '🏠 Mi Portafolio'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
-  const head = ''
+  const TABS = [['port', '🏠 Mi Portafolio'], ['casa', '🏡 Mi Casa'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
+  const head = ipVerBar()
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector
     + '<button class="ibtn" title="tema claro / oscuro" onclick="ipToggleTheme()">◐</button>'
@@ -358,7 +397,8 @@ function render() {
     + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' + TABS.map(t => '<button class="ibtn tabb' + (IP.tab === t[0] ? ' on' : '') + '" onclick="IP.tab=\'' + t[0] + '\';render()">' + t[1] + '</button>').join('') + '</div>';
 
   let body = '';
-  if (IP.tab === 'flujo') body = renderFlujo(pid, p.repartoInv);
+  if (IP.tab === 'casa') body = renderCasaDash(pid, P, holding, p, r, dir);
+  else if (IP.tab === 'flujo') body = renderFlujo(pid, p.repartoInv);
   else if (IP.tab === 'dist') body = renderDist(pid, p.repartoInv);
   else if (IP.tab === 'msgs') body = renderMsgs(pid);
   else if (IP.tab === 'docs') body = renderDocs(docs);
@@ -368,6 +408,7 @@ function render() {
 
   app().innerHTML = head + body;
   if (IP.tab === 'port' || !IP.tab) drawCharts(r, p.repartoInv);
+  if (IP.tab === 'casa') drawCasaChart(r, p.repartoInv);
   const met = ipMetrics(pid, p, r, holding);
   IP.lastSnapshot = { casa: dir, escenario, inversion: met.cap || 0, reparto: met.inv, tir31: r.indicadores.tir31PostRefi, vpn31: r.indicadores.vpn31PostRefi, vpn31_inv: r.indicadores.vpn31PostRefi * met.inv, cap: r.indicadores.capValor, dscr: r.indicadores.dscr, equilibrio: r.indicadores.puntoEquilibrio, riqueza_hoy: met.riquezaHoy, coc_anual: met.cocAnualPct, equity_multiple: met.em, roi_anualizado: met.roiAnu, fases: r.indicadores.fases, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
 }
@@ -581,6 +622,79 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
 
   return saludo + resumenCards + '<h1 style="font-size:18px;margin-top:6px">' + esc(dir.split(',')[0]) + ' <span>· tu inversión en detalle</span></h1>'
     + hero + renderIndicadores(pid, met) + dealInfo + tl + pnl + tesis + charts + escTable + gastosCard + disclaimer;
+}
+
+// ─── 🏡 MI CASA: mini-dashboard simple por casa (misma estructura de 5 secciones
+// que los ejecutivos, en versión entendible; ⓘ del glosario en todo) ───
+function renderCasaDash(pid, P, holding, p, r, dir) {
+  if (IP.ledger[pid] === undefined) ipLoadLedger(pid, true);
+  const met = ipMetrics(pid, p, r, holding);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const cAll = (IP.indData || []).map(x => (window.invInd ? invInd.casa(x, hoy) : x));
+  const c = cAll.find(x => x.property_id === pid) || null;
+  const rc = (IP.resumen || []).find(x => x.property_id === pid) || {};
+  const vals = { capital: $money(met.cap), residual: c && c.equityHoy != null ? $money(Math.max(0, c.equityHoy) * met.inv) : '—', dist: $money(met.distTotal), tvpi: met.em != null ? met.em.toFixed(2) + 'x' : '—', paper: c ? $money(c.paper_value) : '—', paper_fuente: c ? String(c.paper_fuente || '') : '—', tir: c ? (c.tirNA ? 'n/a (muy reciente)' : $pct(c.tirActivo)) : '—' };
+  const card5 = (lab, clave, val, linea, cls) => '<div class="card" style="margin:0"><div class="lab">' + lab + (clave ? gI(clave, vals) : '') + '</div><div class="big ' + (cls || '') + '">' + val + '</div><div class="meta" style="font-size:10.5px">' + linea + '</div></div>';
+  const sec1 = '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:10px">📄 "Lo que vale tu casa" es <b>valor en papel</b> (' + esc(vals.paper_fuente) + ') — se vuelve ganancia real al vender o refinanciar.</div>'
+    + '<div class="grid k5" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">'
+    + card5('Tu inversión', null, $money(met.cap), 'lo que pusiste · ' + $pct(met.inv) + ' de la casa')
+    + card5('Lo que vale tu casa hoy', 'paper_value', c ? $money(c.paper_value) : SD, 'en papel · fuente: ' + esc(vals.paper_fuente))
+    + card5('Tu riqueza hoy', 'equity', $money(met.riquezaHoy), 'capital + equity + valorización × tu %', 'up')
+    + card5('Lo que te han pagado', 'distribucion', $money(met.distTotal), met.distMias.length + ' pagos — 100% tuyos', met.distTotal > 0 ? 'up' : '')
+    + card5('Tu retorno', 'tvpi', (met.em != null ? met.em.toFixed(2) + '×' : '—'), c && c.tirNA ? 'TIR n/a: la casa es muy reciente para anualizar' : 'TIR de la casa: ' + vals.tir, met.em >= 1 ? 'up' : '')
+    + '</div><style>@media(max-width:900px){.grid.k5{grid-template-columns:repeat(2,1fr)!important}}@media(max-width:560px){.grid.k5{grid-template-columns:1fr!important}}</style>';
+  // 3 · tu casa en números simples (mes actual, solo P&L SÍ)
+  const led = Array.isArray(IP.ledger[pid]) ? IP.ledger[pid] : [];
+  const ym = hoy.slice(0, 7);
+  const pnl = m => (window.invEngine ? invEngine.pnlSi(m.categoria) : ['renta', 'ingreso', 'operativo', 'tax'].includes(m.categoria));
+  const rMes = led.filter(m => String(m.fecha || '').slice(0, 7) === ym && pnl(m) && m.tipo === 'ingreso').reduce((s, m) => s + +m.monto, 0);
+  const gMes = led.filter(m => String(m.fecha || '').slice(0, 7) === ym && pnl(m) && m.tipo === 'gasto').reduce((s, m) => s + +m.monto, 0);
+  const lender = txt(P, 'refi_lender');
+  const deudaTxt = c && c.deuda_vigente != null
+    ? $money(c.deuda_vigente) + ' <span class="meta">(' + (c.refinanciada ? 'banco a 30 años' + (lender ? ': ' + esc(lender) : '') : 'Hard Money') + ')</span>'
+    : '<span class="warn" title="el equipo está registrando el préstamo">en registro</span>';
+  const enObra = rc.etapa && !/rentada|refinanciad|vendida/i.test(rc.etapa);
+  const sec3 = '<div class="card" style="margin:0"><div class="chart-h"><div class="t">Tu casa en números simples · ' + esc((window.invEngine && invEngine.mesEs) ? invEngine.mesEs(ym) : ym) + '</div><div class="k">solo operación (P&L SÍ) — los draws y la deuda no inflan esto</div></div>'
+    + '<div class="kv"><span>Renta que produce' + gI('noi', vals) + '</span><b class="up">' + (rMes ? $money(rMes) : (enObra ? '<span class="warn">todavía no genera — en remodelación</span>' : $money(0))) + '</b></div>'
+    + '<div class="kv"><span>Gastos del mes</span><b class="down">' + (gMes ? '−' + $money(gMes) : $money(0)) + '</b></div>'
+    + '<div class="kv"><span><b>Balance operativo del mes</b></span><b class="' + (rMes - gMes >= 0 ? 'up' : 'down') + '">' + $money(rMes - gMes) + '</b></div>'
+    + '<div class="kv"><span>Deuda de la casa' + gI('deuda_vigente', vals) + '</span><b>' + deudaTxt + '</b></div>'
+    + (enObra ? '<div class="kv"><span>Etapa de la obra</span><b>' + esc((rc.etapa || '').replace(/_/g, ' ')) + (rc.avance_planner != null ? ' · ' + Math.round(rc.avance_planner) + '% de avance' : '') + '</b></div>' : '')
+    + '</div>';
+  // 4 · riesgos en lenguaje humano (solo lo que le afecta a ÉL)
+  const riesgos = [];
+  if (enObra && !rMes) riesgos.push('🔨 Tu casa está en remodelación — todavía no genera renta. Es lo normal en esta etapa: primero la obra, después la renta.');
+  if (+rc.deficit > 0) riesgos.push('🕳 La operación usó ' + $money(rc.deficit) + ' más de lo que entró hasta ahora. Se cubre con la refinanciación o la venta' + (rc.fecha_estimada_pago ? ' (fecha estimada: ' + esc(rc.fecha_estimada_pago) + ')' : '') + '.');
+  if (c && c.deuda_vigente == null && !c.vendida) riesgos.push('📋 El equipo está terminando de registrar el préstamo de esta casa — mientras tanto, algunos indicadores dicen "en registro" en vez de inventar un número.');
+  if (!enObra && rMes && rMes - gMes < 0) riesgos.push('⚖️ Este mes la renta no alcanzó a cubrir los gastos — mirá el detalle en 📅 Flujo Mensual.');
+  const sec4 = '<div class="card" style="margin:0"><div class="chart-h"><div class="t">Riesgos, en cristiano</div><div class="k">solo lo que afecta a TU casa</div></div>'
+    + (riesgos.length ? riesgos.map(t => '<div style="padding:8px 0;border-top:1px solid var(--glassb);font-size:12.5px;line-height:1.55;color:var(--mut)">' + t + '</div>').join('') : '<div class="empty" style="padding:14px">Sin alertas para tu casa hoy 🎯</div>')
+    + '</div>';
+  // 5 · qué sigue
+  const fExit = txt(P, 'fecha_exit_proyectada');
+  const prox1 = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10);
+  const pend = v => (v == null || String(v).trim() === '') ? '<span class="warn">Pendiente de definir</span>' : esc(v);
+  const sec5 = '<div class="card" style="margin:0"><div class="chart-h"><div class="t">Qué sigue</div></div>'
+    + '<div class="kv"><span>Plan de salida' + gI('plan_salida', vals) + '</span><b>' + pend(txt(P, 'plan_salida')) + '</b></div>'
+    + '<div class="kv"><span>Fecha proyectada del exit</span><b>' + pend(fExit) + (fExit ? ' <span class="src sup">estimado</span>' : '') + '</b></div>'
+    + (rc.proxima_dist_fecha ? '<div class="kv"><span>Próxima distribución (estimada)</span><b>' + esc(rc.proxima_dist_fecha) + (rc.proxima_dist_monto != null ? ' · ' + $money(rc.proxima_dist_monto) : '') + '</b></div>' : '')
+    + '<div class="kv"><span>Próxima actualización de datos</span><b>' + prox1 + ' <span class="meta">(1° de mes)</span></b></div>'
+    + '</div>';
+  const lab = t => '<div class="lab" style="margin:16px 0 8px">' + t + '</div>';
+  return '<h1 style="font-size:18px">' + esc(dir.split(',')[0]) + ' <span>· tu casa de un vistazo</span></h1>'
+    + lab('1 · Los 5 números de tu casa') + sec1
+    + lab('2 · Tu riqueza en el tiempo') + '<div class="card" style="margin:0"><div style="position:relative;height:260px;width:100%;overflow:hidden"><canvas id="chCasa"></canvas></div><div class="meta" style="margin-top:6px;font-size:10.5px">tu parte año a año: amortización + rentabilidad + valorización (modelo)' + gI('valorizacion', vals) + '</div></div>'
+    + lab('3 · Tu casa en números simples') + sec3
+    + lab('4 · Riesgos') + sec4
+    + lab('5 · Qué sigue') + sec5;
+}
+function drawCasaChart(r, inv) {
+  const el = document.getElementById('chCasa'); if (!el || !window.Chart) return;
+  const light = ipTheme() === 'light';
+  const A = r.anios.filter(x => x.a >= 1);
+  IP.charts.push(new Chart(el, { type: 'line', data: { labels: A.map(x => 'año ' + x.a), datasets: [
+    { label: 'Tu riqueza (patrimonio)', data: A.map(x => Math.round(x.patrimonioInv)), borderColor: '#4f8dff', pointRadius: 0, fill: true, backgroundColor: 'rgba(79,141,255,.10)' },
+  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#475569' : '#93a0b6', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#64748b' : '#5b6780', font: { size: 9 } } }, y: { ticks: { color: light ? '#64748b' : '#5b6780', font: { size: 9 } } } } } }));
 }
 
 // ─── evento de refinanciación ───
@@ -821,12 +935,14 @@ function renderDocs(docs) {
     : (docs.length ? '<div class="empty" style="padding:20px">Nada coincide con la búsqueda.</div> ' : '<div class="empty" style="padding:20px">Todavía no hay documentos cargados. Tus contratos, K-1 y documentos legales van a aparecer acá cuando administración los suba.</div>'))
     + '</div>';
 }
-async function ipVerDoc(id, url) { try { await sb.rpc('inv_doc_log', { doc: id, accion: 'ver' }); } catch (e) {} window.open(url, '_blank'); }
+async function ipVerDoc(id, url) { if (!IP.viewOnly) { try { await sb.rpc('inv_doc_log', { doc: id, accion: 'ver' }); } catch (e) {} } window.open(url, '_blank'); }
 window.ipVerDoc = ipVerDoc;
 
 // ─── 💬 Mensajes del gestor ───
 function renderMsgs(pid) {
   const rows = (IP.msgs || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  if (IP.viewOnly) return '<div class="card" style="margin-bottom:14px"><div class="empty" style="padding:14px">👁 Modo vista: el formulario de mensajes está deshabilitado (solo lectura).</div></div>'
+    + (rows.length ? rows.map(m => '<div class="card" style="margin-bottom:8px"><div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 Flipping Rentals' : '👤 Inversionista') + ' · ' + esc((m.created_at || '').slice(0, 10)) + '</span></div>' + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:4px 0">' + esc(m.asunto) + '</div>' : '') + '<div style="font-size:12.5px;color:var(--mut);white-space:pre-wrap">' + esc(m.cuerpo) + '</div></div>').join('') : '<div class="empty">Sin mensajes todavía.</div>');
   return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">Escribinos</div><div class="k">te respondemos en el portal — nada se envía sin que toques "Enviar"</div></div>'
     + '<input id="ip-msg-asunto" placeholder="Asunto" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;margin-bottom:8px;outline:none">'
     + '<textarea id="ip-msg-cuerpo" rows="3" placeholder="Tu mensaje…" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;outline:none"></textarea>'
@@ -840,6 +956,7 @@ function renderMsgs(pid) {
     }).join('') : '<div class="empty">Sin mensajes todavía.</div>');
 }
 async function ipEnviarMsg() {
+  if (IP.viewOnly) return ipRO();
   const asunto = (document.getElementById('ip-msg-asunto').value || '').trim();
   const cuerpo = (document.getElementById('ip-msg-cuerpo').value || '').trim();
   if (!cuerpo) return;
@@ -848,7 +965,8 @@ async function ipEnviarMsg() {
   await ipReloadProducto(); render();
 }
 window.ipEnviarMsg = ipEnviarMsg;
-async function ipMarcarLeido(id) { await sb.rpc('inv_msg_marcar_leido', { msg: id }); await ipReloadProducto(); render(); }
+async function ipMarcarLeido(id) {
+  if (IP.viewOnly) return; await sb.rpc('inv_msg_marcar_leido', { msg: id }); await ipReloadProducto(); render(); }
 window.ipMarcarLeido = ipMarcarLeido;
 
 // ─── 🤖 Asistente IA ───
@@ -863,6 +981,7 @@ function renderIA() {
     + '</div>';
 }
 async function ipAsk(q) {
+  if (IP.viewOnly) return ipRO();
   const input = document.getElementById('ip-ia-q');
   const question = (q || (input ? input.value : '') || '').trim();
   if (!question) return;
@@ -929,11 +1048,12 @@ window.render = render;
 // ─── boot ───
 (async function main() {
   if (location.hash.includes('access_token')) history.replaceState(null, '', location.pathname);
+  IP.ver = new URLSearchParams(location.search).get('ver');
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { loginView(); }
-  else { IP.email = session.user.email || ''; await ipLoad(); }
+  else { IP.email = session.user.email || ''; await (IP.ver ? ipLoadComo() : ipLoad()); }
   sb.auth.onAuthStateChange(async (ev, s) => {
-    if (ev === 'SIGNED_IN' && s && !IP.holdings.length) { IP.email = s.user.email || ''; await ipLoad(); }
+    if (ev === 'SIGNED_IN' && s && !IP.holdings.length) { IP.email = s.user.email || ''; await (IP.ver ? ipLoadComo() : ipLoad()); }
     if (ev === 'SIGNED_OUT') loginView();
   });
 })();
