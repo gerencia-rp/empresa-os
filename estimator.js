@@ -69,71 +69,71 @@ const EST_MERCADO = {
 };
 
 const EST_TIPOS = {
-  lipstick:{nombre:'Lipstick',icon:'✨',desc:'Solo cosmético menor',hpsf:0.30},
-  light:   {nombre:'Cosmético Ligero',icon:'🖌️',desc:'Cosmético completo',hpsf:0.70},
-  heavy:   {nombre:'Cosmético Pesado',icon:'🔧',desc:'Cocina O baños',hpsf:1.15},
-  full:    {nombre:'Renovación Total',icon:'🔨',desc:'Cocina + baños + sist.',hpsf:1.60},
-  gut:     {nombre:'Gut Renovation',icon:'⛏️',desc:'Todo a los studs',hpsf:2.20}
+  lipstick:{nombre:'Lipstick',icon:osIcon('sparkles'),desc:'Solo cosmético menor',hpsf:0.30},
+  light:   {nombre:'Cosmético Ligero',icon:osIcon('palette'),desc:'Cosmético completo',hpsf:0.70},
+  heavy:   {nombre:'Cosmético Pesado',icon:osIcon('wrench'),desc:'Cocina O baños',hpsf:1.15},
+  full:    {nombre:'Renovación Total',icon:osIcon('hammer'),desc:'Cocina + baños + sist.',hpsf:1.60},
+  gut:     {nombre:'Gut Renovation',icon:osIcon('construction'),desc:'Todo a los studs',hpsf:2.20}
 };
 
 // ─── CATÁLOGO TRABAJOS ───
 const EST_TRABAJOS = {
-  cocina_completa:{nombre:'Cocina completa',desc:'Gabinetes + cuarzo + backsplash + sink + appliances + plomería',icon:'👨‍🍳',cat:'Cocina',mat:9800,matSqft:0,weight:22,matPct:0.72,lrc:['Kitchen Cabinets','Kitchen Countertops','Backsplash','Appliances','Plumbing Final/ Fixtures']},
-  cocina_cosmetica:{nombre:'Cocina cosmética',desc:'Pintar gabinetes + encimera + backsplash + fixtures',icon:'👨‍🍳',cat:'Cocina',mat:3000,matSqft:0,weight:7,matPct:0.55,lrc:['Kitchen Countertops','Backsplash','Hardware']},
-  bano_completo:{nombre:'Baño completo (c/u)',desc:'Tile + vanity + toilet + plomería + ducha',icon:'🛁',cat:'Baños',mat:2800,matSqft:0,weight:9,matPct:0.55,mult:true,lrc:['Bathroom Cabinets','Bathroom Vanity Tops','Bathroom Floors','Bathtubs/ Showers','Tile - Bathroom','Plumbing Final/ Fixtures']},
-  bano_cosmetico:{nombre:'Baño cosmético (c/u)',desc:'Vanity + toilet + pintura + fixtures',icon:'🛁',cat:'Baños',mat:1000,matSqft:0,weight:3,matPct:0.50,mult:true,lrc:['Bathroom Cabinets','Mirrors','Hardware']},
-  pintura_interior_total:{nombre:'Pintura interior total',desc:'Toda la casa: primer + 2 capas',icon:'🖌️',cat:'Acabados',mat:0,matSqft:1.10,weight:7,matPct:0.25,lrc:['Interior Paint']},
-  pintura_parcial:{nombre:'Pintura parcial',desc:'Solo algunas áreas',icon:'🖌️',cat:'Acabados',mat:0,matSqft:0.40,weight:2,matPct:0.25,lrc:['Interior Paint']},
+  cocina_completa:{nombre:'Cocina completa',desc:'Gabinetes + cuarzo + backsplash + sink + appliances + plomería',icon:'‍',cat:'Cocina',mat:9800,matSqft:0,weight:22,matPct:0.72,lrc:['Kitchen Cabinets','Kitchen Countertops','Backsplash','Appliances','Plumbing Final/ Fixtures']},
+  cocina_cosmetica:{nombre:'Cocina cosmética',desc:'Pintar gabinetes + encimera + backsplash + fixtures',icon:'‍',cat:'Cocina',mat:3000,matSqft:0,weight:7,matPct:0.55,lrc:['Kitchen Countertops','Backsplash','Hardware']},
+  bano_completo:{nombre:'Baño completo (c/u)',desc:'Tile + vanity + toilet + plomería + ducha',icon:osIcon('wrench'),cat:'Baños',mat:2800,matSqft:0,weight:9,matPct:0.55,mult:true,lrc:['Bathroom Cabinets','Bathroom Vanity Tops','Bathroom Floors','Bathtubs/ Showers','Tile - Bathroom','Plumbing Final/ Fixtures']},
+  bano_cosmetico:{nombre:'Baño cosmético (c/u)',desc:'Vanity + toilet + pintura + fixtures',icon:osIcon('wrench'),cat:'Baños',mat:1000,matSqft:0,weight:3,matPct:0.50,mult:true,lrc:['Bathroom Cabinets','Mirrors','Hardware']},
+  pintura_interior_total:{nombre:'Pintura interior total',desc:'Toda la casa: primer + 2 capas',icon:osIcon('palette'),cat:'Acabados',mat:0,matSqft:1.10,weight:7,matPct:0.25,lrc:['Interior Paint']},
+  pintura_parcial:{nombre:'Pintura parcial',desc:'Solo algunas áreas',icon:osIcon('palette'),cat:'Acabados',mat:0,matSqft:0.40,weight:2,matPct:0.25,lrc:['Interior Paint']},
   pisos_completos:{nombre:'Pisos completos (LVP)',desc:'Reemplazo total + underlayment',icon:'⬜',cat:'Acabados',mat:300,matSqft:3.20,weight:6,matPct:0.60,lrc:['Vinl Flooring']},
   pisos_parcial:{nombre:'Pisos parciales',desc:'Solo áreas específicas',icon:'⬜',cat:'Acabados',mat:200,matSqft:1.60,weight:2.5,matPct:0.60,lrc:['Vinl Flooring']},
   drywall_completo:{nombre:'Drywall completo',desc:'Reemplazo + textura + masa toda la casa',icon:'▦',cat:'Acabados',mat:0,matSqft:1.40,weight:5,matPct:0.45,lrc:['Drywall']},
   drywall_reparacion:{nombre:'Drywall reparación',desc:'Solo agujeros, grietas y daños puntuales',icon:'▦',cat:'Acabados',mat:200,matSqft:0,weight:1.2,matPct:0.45,lrc:['Drywall']},
   insulation:{nombre:'Insulation',desc:'Aislamiento térmico paredes y ático',icon:'▦',cat:'Acabados',mat:1800,matSqft:0,weight:1.5,matPct:0.55,lrc:['Insulation']},
-  interior_doors:{nombre:'Interior doors',desc:'Reemplazo de puertas interiores',icon:'🚪',cat:'Acabados',mat:2200,matSqft:0,weight:1.8,matPct:0.65,lrc:['Interior Doors']},
+  interior_doors:{nombre:'Interior doors',desc:'Reemplazo de puertas interiores',icon:osIcon('door'),cat:'Acabados',mat:2200,matSqft:0,weight:1.8,matPct:0.65,lrc:['Interior Doors']},
   interior_trim:{nombre:'Interior trim',desc:'Baseboard, molduras, marcos',icon:'▦',cat:'Acabados',mat:1500,matSqft:0,weight:1.5,matPct:0.50,lrc:['Interior Trim & Doors']},
   carpet:{nombre:'Carpet',desc:'Alfombra en dormitorios',icon:'⬜',cat:'Acabados',mat:0,matSqft:2.20,weight:2,matPct:0.55,lrc:['Carpet']},
-  appliances:{nombre:'Appliances',desc:'Stove, fridge, microwave, dishwasher',icon:'👨‍🍳',cat:'Acabados',mat:3500,matSqft:0,weight:0.8,matPct:0.95,lrc:['Appliances']},
+  appliances:{nombre:'Appliances',desc:'Stove, fridge, microwave, dishwasher',icon:'‍',cat:'Acabados',mat:3500,matSqft:0,weight:0.8,matPct:0.95,lrc:['Appliances']},
   techo_completo:{nombre:'Techo completo',desc:'Shingles + underlayment + flashing',icon:'☁️',cat:'Exterior',mat:1800,matSqft:3.20,weight:5,matPct:0.50,lrc:['Roofing Material','Roofing Labor']},
   techo_reparacion:{nombre:'Techo reparación',desc:'Solo área dañada + sellado',icon:'☁️',cat:'Exterior',mat:500,matSqft:0,weight:1.2,matPct:0.50,lrc:['Roofing Material','Roofing Labor']},
-  siding_completo:{nombre:'Siding completo',desc:'Fiber cement + pintura exterior',icon:'🪟',cat:'Exterior',mat:800,matSqft:2.80,weight:6,matPct:0.55,lrc:['Siding','Exterior Paint']},
-  siding_parcial:{nombre:'Siding reparación',desc:'Solo paneles dañados',icon:'🪟',cat:'Exterior',mat:400,matSqft:0,weight:1.5,matPct:0.55,lrc:['Siding']},
-  ventanas_todas:{nombre:'Ventanas todas',desc:'Reemplazo 8-12 ventanas',icon:'🚪',cat:'Exterior',mat:3200,matSqft:0,weight:3.5,matPct:0.70,lrc:['Windows']},
-  ventanas_pocas:{nombre:'Ventanas pocas (2-3)',desc:'Solo ventanas críticas',icon:'🚪',cat:'Exterior',mat:900,matSqft:0,weight:1,matPct:0.70,lrc:['Windows']},
-  cerca_completa:{nombre:'Cerca completa',desc:'Postes + pickets + concreto',icon:'🚧',cat:'Exterior',mat:2200,matSqft:0,weight:3.5,matPct:0.50,lrc:['Fencing']},
-  cerca_reparacion:{nombre:'Cerca reparación',desc:'Solo postes/pickets dañados',icon:'🚧',cat:'Exterior',mat:300,matSqft:0,weight:0.8,matPct:0.50,lrc:['Fencing']},
-  jardineria_full:{nombre:'Jardinería completa',desc:'Sod + plantas + mulch + gradas',icon:'🌳',cat:'Exterior',mat:800,matSqft:0,weight:2,matPct:0.35,lrc:['Landscaping']},
-  jardineria_basica:{nombre:'Jardinería básica',desc:'Limpieza + sod + pintura puerta',icon:'🌳',cat:'Exterior',mat:300,matSqft:0,weight:0.8,matPct:0.35,lrc:['Landscaping']},
-  facsia_soffit:{nombre:'Facsia / Soffit',desc:'Borde del techo + ventilación',icon:'🪟',cat:'Exterior',mat:900,matSqft:0,weight:1.5,matPct:0.50,lrc:['Facsia/ Soffit']},
-  garage_doors:{nombre:'Garage doors',desc:'Puerta de garaje + motor',icon:'🚪',cat:'Exterior',mat:1100,matSqft:0,weight:1,matPct:0.70,lrc:['Garage Doors']},
+  siding_completo:{nombre:'Siding completo',desc:'Fiber cement + pintura exterior',icon:osIcon('ruler'),cat:'Exterior',mat:800,matSqft:2.80,weight:6,matPct:0.55,lrc:['Siding','Exterior Paint']},
+  siding_parcial:{nombre:'Siding reparación',desc:'Solo paneles dañados',icon:osIcon('ruler'),cat:'Exterior',mat:400,matSqft:0,weight:1.5,matPct:0.55,lrc:['Siding']},
+  ventanas_todas:{nombre:'Ventanas todas',desc:'Reemplazo 8-12 ventanas',icon:osIcon('door'),cat:'Exterior',mat:3200,matSqft:0,weight:3.5,matPct:0.70,lrc:['Windows']},
+  ventanas_pocas:{nombre:'Ventanas pocas (2-3)',desc:'Solo ventanas críticas',icon:osIcon('door'),cat:'Exterior',mat:900,matSqft:0,weight:1,matPct:0.70,lrc:['Windows']},
+  cerca_completa:{nombre:'Cerca completa',desc:'Postes + pickets + concreto',icon:osIcon('construction'),cat:'Exterior',mat:2200,matSqft:0,weight:3.5,matPct:0.50,lrc:['Fencing']},
+  cerca_reparacion:{nombre:'Cerca reparación',desc:'Solo postes/pickets dañados',icon:osIcon('construction'),cat:'Exterior',mat:300,matSqft:0,weight:0.8,matPct:0.50,lrc:['Fencing']},
+  jardineria_full:{nombre:'Jardinería completa',desc:'Sod + plantas + mulch + gradas',icon:osIcon('ruler'),cat:'Exterior',mat:800,matSqft:0,weight:2,matPct:0.35,lrc:['Landscaping']},
+  jardineria_basica:{nombre:'Jardinería básica',desc:'Limpieza + sod + pintura puerta',icon:osIcon('ruler'),cat:'Exterior',mat:300,matSqft:0,weight:0.8,matPct:0.35,lrc:['Landscaping']},
+  facsia_soffit:{nombre:'Facsia / Soffit',desc:'Borde del techo + ventilación',icon:osIcon('ruler'),cat:'Exterior',mat:900,matSqft:0,weight:1.5,matPct:0.50,lrc:['Facsia/ Soffit']},
+  garage_doors:{nombre:'Garage doors',desc:'Puerta de garaje + motor',icon:osIcon('door'),cat:'Exterior',mat:1100,matSqft:0,weight:1,matPct:0.70,lrc:['Garage Doors']},
   masonry:{nombre:'Masonry / Stucco',desc:'Reparación o aplicación de estuco',icon:'▦',cat:'Exterior',mat:2200,matSqft:0,weight:2,matPct:0.45,lrc:['Masonry/ Stucco']},
   driveway:{nombre:'Driveway / Flatwork',desc:'Reparación o nueva entrada de auto',icon:'⬜',cat:'Exterior',mat:2800,matSqft:0,weight:2.5,matPct:0.50,lrc:['Driveway/ Flatwork']},
-  pressure_wash:{nombre:'Pressure wash',desc:'Limpieza a presión exterior',icon:'🗑️',cat:'Exterior',mat:100,matSqft:0,weight:0.5,matPct:0.10,lrc:['Pressure Wash']},
-  patio_decking:{nombre:'Patio / Decking',desc:'Construcción de deck o patio',icon:'🪟',cat:'Exterior',mat:2800,matSqft:0,weight:2.5,matPct:0.55,lrc:['Patio / Outdoor decking']},
+  pressure_wash:{nombre:'Pressure wash',desc:'Limpieza a presión exterior',icon:osIcon('trash'),cat:'Exterior',mat:100,matSqft:0,weight:0.5,matPct:0.10,lrc:['Pressure Wash']},
+  patio_decking:{nombre:'Patio / Decking',desc:'Construcción de deck o patio',icon:osIcon('ruler'),cat:'Exterior',mat:2800,matSqft:0,weight:2.5,matPct:0.55,lrc:['Patio / Outdoor decking']},
   rain_gutters:{nombre:'Rain gutters',desc:'Canaletas + downspouts',icon:'☁️',cat:'Exterior',mat:700,matSqft:0,weight:0.8,matPct:0.55,lrc:['Rain Gutters']},
-  sprinklers:{nombre:'Sprinkler system',desc:'Sistema de riego automático',icon:'🌳',cat:'Exterior',mat:1800,matSqft:0,weight:1.5,matPct:0.55,lrc:['Sprinkler System']},
-  pool_service:{nombre:'Pool service',desc:'Reparación/limpieza piscina',icon:'🌳',cat:'Exterior',mat:4000,matSqft:0,weight:2.5,matPct:0.55,lrc:['Pool']},
-  plomeria_ajuste:{nombre:'Plomería - ajuste menor',desc:'Reparar fuga, válvula, ajuste',icon:'💧',cat:'Plomería',mat:150,matSqft:0,weight:0.6,matPct:0.40,lrc:['Plumbing Rough']},
-  plomeria_fixtures:{nombre:'Plomería - fixtures',desc:'Sinks, faucets, toilets, regaderas',icon:'💧',cat:'Plomería',mat:550,matSqft:0,weight:1.5,matPct:0.55,lrc:['Plumbing Final/ Fixtures']},
-  plomeria_parcial:{nombre:'Plomería - red parcial',desc:'Re-pipe cocina O baños',icon:'💧',cat:'Plomería',mat:1700,matSqft:0,weight:3,matPct:0.40,lrc:['Plumbing Rough','Plumbing Top Out']},
-  plomeria_repipe:{nombre:'Plomería - red completa',desc:'Re-pipe completo + drenajes',icon:'💧',cat:'Plomería',mat:3800,matSqft:0,weight:6.5,matPct:0.40,lrc:['Plumbing Rough','Plumbing Top Out','Plumbing Final/ Fixtures']},
-  calentador_agua:{nombre:'Calentador de agua',desc:'Reemplazo de water heater',icon:'💧',cat:'Plomería',mat:850,matSqft:0,weight:0.8,matPct:0.70,lrc:['Plumbing Final/ Fixtures']},
-  electrico_ajuste:{nombre:'Eléctrico - ajuste',desc:'Reparar circuito',icon:'🔌',cat:'Eléctrico',mat:150,matSqft:0,weight:0.6,matPct:0.35,lrc:['Electrical Rough']},
-  electrico_outlets:{nombre:'Eléctrico - outlets',desc:'Outlets, switches, GFCI',icon:'🔌',cat:'Eléctrico',mat:280,matSqft:0,weight:1.2,matPct:0.40,lrc:['Electrical - Final/Fixtures']},
-  electrico_panel:{nombre:'Eléctrico - panel',desc:'Upgrade panel principal',icon:'🔌',cat:'Eléctrico',mat:1300,matSqft:0,weight:2,matPct:0.50,lrc:['Electrical Service']},
-  electrico_parcial:{nombre:'Eléctrico - parcial',desc:'Re-cablear cocina O cuartos',icon:'🔌',cat:'Eléctrico',mat:1400,matSqft:0,weight:2.5,matPct:0.35,lrc:['Electrical Rough']},
-  electrico_completo:{nombre:'Eléctrico - completo',desc:'Re-cableado total + panel',icon:'🔌',cat:'Eléctrico',mat:3200,matSqft:0,weight:5.5,matPct:0.35,lrc:['Electrical Service','Electrical Rough','Electrical - Final/Fixtures']},
-  luminarias:{nombre:'Luminarias',desc:'Recessed + ceiling fans + fixtures',icon:'🔌',cat:'Eléctrico',mat:600,matSqft:0,weight:1.2,matPct:0.55,lrc:['Electrical - Final/Fixtures']},
-  hvac_mantenimiento:{nombre:'HVAC - mantenimiento',desc:'Tune-up + filtros + limpieza',icon:'💨',cat:'HVAC',mat:120,matSqft:0,weight:0.4,matPct:0.50,lrc:['HVAC Rough']},
-  hvac_reparacion:{nombre:'HVAC - reparación',desc:'Reparar AC o furnace',icon:'💨',cat:'HVAC',mat:450,matSqft:0,weight:1.2,matPct:0.60,lrc:['HVAC Rough']},
-  hvac_unidad:{nombre:'HVAC - 1 unidad nueva',desc:'Solo AC O solo furnace',icon:'💨',cat:'HVAC',mat:2500,matSqft:0,weight:2,matPct:0.70,lrc:['HVAC Set Out']},
-  hvac_sistema_completo:{nombre:'HVAC - sistema completo',desc:'AC + furnace + ductos',icon:'💨',cat:'HVAC',mat:5500,matSqft:0,weight:3.5,matPct:0.70,lrc:['HVAC Rough','HVAC Set Out']},
-  foundation_repair:{nombre:'Foundation / nivelación',desc:'Leveling + reparación de cimentación',icon:'🏢',cat:'Estructural',mat:1500,matSqft:0,weight:3,matPct:0.60,lrc:['Foundation']},
-  framing_repair:{nombre:'Framing - reparación',desc:'Reparar/agregar framing en áreas dañadas',icon:'🏢',cat:'Estructural',mat:2000,matSqft:0,weight:3.5,matPct:0.55,lrc:['Framing - Material','Framing - Labor']},
-  demolicion_parcial:{nombre:'Demolición parcial',desc:'Tumbar 1-2 paredes',icon:'⛏️',cat:'Estructural',mat:300,matSqft:0,weight:2,matPct:0.10,lrc:['Demolition']},
-  demolicion_total:{nombre:'Demolición a studs',desc:'Gut completo',icon:'⛏️',cat:'Estructural',mat:900,matSqft:0,weight:7,matPct:0.10,lrc:['Demolition']},
+  sprinklers:{nombre:'Sprinkler system',desc:'Sistema de riego automático',icon:osIcon('ruler'),cat:'Exterior',mat:1800,matSqft:0,weight:1.5,matPct:0.55,lrc:['Sprinkler System']},
+  pool_service:{nombre:'Pool service',desc:'Reparación/limpieza piscina',icon:osIcon('ruler'),cat:'Exterior',mat:4000,matSqft:0,weight:2.5,matPct:0.55,lrc:['Pool']},
+  plomeria_ajuste:{nombre:'Plomería - ajuste menor',desc:'Reparar fuga, válvula, ajuste',icon:osIcon('wrench'),cat:'Plomería',mat:150,matSqft:0,weight:0.6,matPct:0.40,lrc:['Plumbing Rough']},
+  plomeria_fixtures:{nombre:'Plomería - fixtures',desc:'Sinks, faucets, toilets, regaderas',icon:osIcon('wrench'),cat:'Plomería',mat:550,matSqft:0,weight:1.5,matPct:0.55,lrc:['Plumbing Final/ Fixtures']},
+  plomeria_parcial:{nombre:'Plomería - red parcial',desc:'Re-pipe cocina O baños',icon:osIcon('wrench'),cat:'Plomería',mat:1700,matSqft:0,weight:3,matPct:0.40,lrc:['Plumbing Rough','Plumbing Top Out']},
+  plomeria_repipe:{nombre:'Plomería - red completa',desc:'Re-pipe completo + drenajes',icon:osIcon('wrench'),cat:'Plomería',mat:3800,matSqft:0,weight:6.5,matPct:0.40,lrc:['Plumbing Rough','Plumbing Top Out','Plumbing Final/ Fixtures']},
+  calentador_agua:{nombre:'Calentador de agua',desc:'Reemplazo de water heater',icon:osIcon('wrench'),cat:'Plomería',mat:850,matSqft:0,weight:0.8,matPct:0.70,lrc:['Plumbing Final/ Fixtures']},
+  electrico_ajuste:{nombre:'Eléctrico - ajuste',desc:'Reparar circuito',icon:osIcon('link'),cat:'Eléctrico',mat:150,matSqft:0,weight:0.6,matPct:0.35,lrc:['Electrical Rough']},
+  electrico_outlets:{nombre:'Eléctrico - outlets',desc:'Outlets, switches, GFCI',icon:osIcon('link'),cat:'Eléctrico',mat:280,matSqft:0,weight:1.2,matPct:0.40,lrc:['Electrical - Final/Fixtures']},
+  electrico_panel:{nombre:'Eléctrico - panel',desc:'Upgrade panel principal',icon:osIcon('link'),cat:'Eléctrico',mat:1300,matSqft:0,weight:2,matPct:0.50,lrc:['Electrical Service']},
+  electrico_parcial:{nombre:'Eléctrico - parcial',desc:'Re-cablear cocina O cuartos',icon:osIcon('link'),cat:'Eléctrico',mat:1400,matSqft:0,weight:2.5,matPct:0.35,lrc:['Electrical Rough']},
+  electrico_completo:{nombre:'Eléctrico - completo',desc:'Re-cableado total + panel',icon:osIcon('link'),cat:'Eléctrico',mat:3200,matSqft:0,weight:5.5,matPct:0.35,lrc:['Electrical Service','Electrical Rough','Electrical - Final/Fixtures']},
+  luminarias:{nombre:'Luminarias',desc:'Recessed + ceiling fans + fixtures',icon:osIcon('link'),cat:'Eléctrico',mat:600,matSqft:0,weight:1.2,matPct:0.55,lrc:['Electrical - Final/Fixtures']},
+  hvac_mantenimiento:{nombre:'HVAC - mantenimiento',desc:'Tune-up + filtros + limpieza',icon:osIcon('wrench'),cat:'HVAC',mat:120,matSqft:0,weight:0.4,matPct:0.50,lrc:['HVAC Rough']},
+  hvac_reparacion:{nombre:'HVAC - reparación',desc:'Reparar AC o furnace',icon:osIcon('wrench'),cat:'HVAC',mat:450,matSqft:0,weight:1.2,matPct:0.60,lrc:['HVAC Rough']},
+  hvac_unidad:{nombre:'HVAC - 1 unidad nueva',desc:'Solo AC O solo furnace',icon:osIcon('wrench'),cat:'HVAC',mat:2500,matSqft:0,weight:2,matPct:0.70,lrc:['HVAC Set Out']},
+  hvac_sistema_completo:{nombre:'HVAC - sistema completo',desc:'AC + furnace + ductos',icon:osIcon('wrench'),cat:'HVAC',mat:5500,matSqft:0,weight:3.5,matPct:0.70,lrc:['HVAC Rough','HVAC Set Out']},
+  foundation_repair:{nombre:'Foundation / nivelación',desc:'Leveling + reparación de cimentación',icon:osIcon('building'),cat:'Estructural',mat:1500,matSqft:0,weight:3,matPct:0.60,lrc:['Foundation']},
+  framing_repair:{nombre:'Framing - reparación',desc:'Reparar/agregar framing en áreas dañadas',icon:osIcon('building'),cat:'Estructural',mat:2000,matSqft:0,weight:3.5,matPct:0.55,lrc:['Framing - Material','Framing - Labor']},
+  demolicion_parcial:{nombre:'Demolición parcial',desc:'Tumbar 1-2 paredes',icon:osIcon('construction'),cat:'Estructural',mat:300,matSqft:0,weight:2,matPct:0.10,lrc:['Demolition']},
+  demolicion_total:{nombre:'Demolición a studs',desc:'Gut completo',icon:osIcon('construction'),cat:'Estructural',mat:900,matSqft:0,weight:7,matPct:0.10,lrc:['Demolition']},
   ampliacion:{nombre:'Ampliación (sqft)',desc:'Construcción nueva — ingresar sqft',icon:'⛶',cat:'Estructural',mat:0,matSqft:0,weight:0,customSqft:true,matSqftNuevo:28,matPct:0.55,lrc:['Framing - Material','Framing - Labor']},
   adu:{nombre:'ADU / cuarto extra',desc:'Unidad accesoria 400-800sqft',icon:'↔️',cat:'Estructural',mat:22000,matSqft:0,weight:13,matPct:0.55,lrc:['Framing - Material','Framing - Labor']},
-  final_cleaning:{nombre:'Final cleaning',desc:'Limpieza profesional al final',icon:'🗑️',cat:'Limpieza',mat:100,matSqft:0,weight:0.8,matPct:0.10,lrc:['Final Cleaning']}
+  final_cleaning:{nombre:'Final cleaning',desc:'Limpieza profesional al final',icon:osIcon('trash'),cat:'Limpieza',mat:100,matSqft:0,weight:0.8,matPct:0.10,lrc:['Final Cleaning']}
 };
 
 const EST_CATEGORIAS = ['Cocina','Baños','Acabados','Exterior','Plomería','Eléctrico','HVAC','Estructural','Limpieza'];
@@ -163,23 +163,23 @@ const estState = {
 
 // ─── FASES CONSTRUCTIVAS (orden CPM profesional residencial) ───
 const EST_PHASES = {
-  preconstruction:{order:1,  name:'Pre-construcción',         color:'#64748b', emoji:'📋', desc:'Permits, planning, dumpster, kickoff'},
-  demo:           {order:2,  name:'Demolición',               color:'#dc2626', emoji:'⛏️', desc:'Tumbar, sacar escombros, preparar sitio'},
-  structural:     {order:3,  name:'Estructural',              color:'#ea580c', emoji:'🏗️', desc:'Foundation, framing, modificaciones estructurales'},
-  rough:          {order:4,  name:'Rough-in (instalaciones)', color:'#d97706', emoji:'🔌', desc:'Plumbing, electrical, HVAC dentro de paredes'},
-  inspectionRough:{order:5,  name:'Inspección Rough',         color:'#a16207', emoji:'🔍', desc:'Inspector valida instalaciones antes de cerrar'},
+  preconstruction:{order:1,  name:'Pre-construcción',         color:'#756c5c', emoji:osIcon('clipboard'), desc:'Permits, planning, dumpster, kickoff'},
+  demo:           {order:2,  name:'Demolición',               color:'#dc2626', emoji:osIcon('construction'), desc:'Tumbar, sacar escombros, preparar sitio'},
+  structural:     {order:3,  name:'Estructural',              color:'#ea580c', emoji:osIcon('construction'), desc:'Foundation, framing, modificaciones estructurales'},
+  rough:          {order:4,  name:'Rough-in (instalaciones)', color:'#d97706', emoji:osIcon('link'), desc:'Plumbing, electrical, HVAC dentro de paredes'},
+  inspectionRough:{order:5,  name:'Inspección Rough',         color:'#a16207', emoji:osIcon('search'), desc:'Inspector valida instalaciones antes de cerrar'},
   insulation:     {order:6,  name:'Aislamiento',              color:'#ca8a04', emoji:'▦', desc:'Insulation en paredes y ático'},
   drywall:        {order:7,  name:'Drywall',                  color:'#65a30d', emoji:'⬜', desc:'Instalar, tape, mud, sand, texturizar'},
-  flooring:       {order:8,  name:'Pisos',                    color:'#16a34a', emoji:'🪵', desc:'LVP, tile, carpet — primero baños luego resto'},
-  cabinets:       {order:9,  name:'Gabinetes cocina/baños',   color:'#0d9488', emoji:'🪟', desc:'Instalación de gabinetes'},
-  countertops:    {order:10, name:'Encimeras',                color:'#0891b2', emoji:'🪨', desc:'Template + fabricación + instalación (1 sem espera)'},
+  flooring:       {order:8,  name:'Pisos',                    color:'#16a34a', emoji:osIcon('ruler'), desc:'LVP, tile, carpet — primero baños luego resto'},
+  cabinets:       {order:9,  name:'Gabinetes cocina/baños',   color:'#0d9488', emoji:osIcon('ruler'), desc:'Instalación de gabinetes'},
+  countertops:    {order:10, name:'Encimeras',                color:'#2f6b4f', emoji:osIcon('ruler'), desc:'Template + fabricación + instalación (1 sem espera)'},
   tile:           {order:11, name:'Tile (showers/backsplash)',color:'#0284c7', emoji:'▦', desc:'Showers, bathroom floors, kitchen backsplash'},
-  trim:           {order:12, name:'Trim, puertas y molduras', color:'#2563eb', emoji:'🚪', desc:'Baseboards, door frames, crown molding'},
-  paint:          {order:13, name:'Pintura final',            color:'#4f46e5', emoji:'🖌️', desc:'Primer + 2 capas, touch-ups'},
-  fixtures:       {order:14, name:'Fixtures finales',         color:'#7c3aed', emoji:'💧', desc:'Plumbing fixtures, electrical fixtures, HVAC trim'},
-  appliances:     {order:15, name:'Appliances',               color:'#9333ea', emoji:'🍳', desc:'Conectar stove, fridge, dishwasher, microwave'},
-  exterior:       {order:16, name:'Exterior',                 color:'#c026d3', emoji:'🏠', desc:'Roof, siding, paint, fencing, landscaping (puede ir en paralelo)'},
-  cleaning:       {order:17, name:'Limpieza final',           color:'#db2777', emoji:'🧹', desc:'Deep clean, punch list, ready for showing'}
+  trim:           {order:12, name:'Trim, puertas y molduras', color:'#2f6b4f', emoji:osIcon('door'), desc:'Baseboards, door frames, crown molding'},
+  paint:          {order:13, name:'Pintura final',            color:'#4f46e5', emoji:osIcon('palette'), desc:'Primer + 2 capas, touch-ups'},
+  fixtures:       {order:14, name:'Fixtures finales',         color:'#7c3aed', emoji:osIcon('wrench'), desc:'Plumbing fixtures, electrical fixtures, HVAC trim'},
+  appliances:     {order:15, name:'Appliances',               color:'#9333ea', emoji:osIcon('package'), desc:'Conectar stove, fridge, dishwasher, microwave'},
+  exterior:       {order:16, name:'Exterior',                 color:'#c026d3', emoji:osIcon('house'), desc:'Roof, siding, paint, fencing, landscaping (puede ir en paralelo)'},
+  cleaning:       {order:17, name:'Limpieza final',           color:'#db2777', emoji:osIcon('sparkles'), desc:'Deep clean, punch list, ready for showing'}
 };
 
 // ─── MAPA: cada trabajo → fase + min días (overrides cálculo por horas) ───
@@ -334,7 +334,7 @@ async function estFetchMarketPrices(force = false) {
   const jobKeys = Object.keys(estState.trabajos);
   if (jobKeys.length === 0) { alert('Selecciona al menos un trabajo primero'); return; }
   estState.loadingMarket = true;
-  estState.marketStatus = `🔄 Buscando precios actuales para ${estState.city}, ${estState.state}... (puede tardar 30-60s)`;
+  estState.marketStatus = `Buscando precios actuales para ${estState.city}, ${estState.state}... (puede tardar 30-60s)`;
   estRenderTab();
   try {
     const { data, error } = await sb.functions.invoke('get-market-prices', {
@@ -347,7 +347,7 @@ async function estFetchMarketPrices(force = false) {
       ? `✓ ${data.prices.length} precios desde cache para ${estState.city}, ${estState.state}`
       : `✓ ${data.fetched} precios actualizados de internet · ${data.prices.length} total disponibles`;
   } catch (e) {
-    estState.marketStatus = `⚠️ Error: ${e.message}`;
+    estState.marketStatus = `Error: ${e.message}`;
   } finally {
     estState.loadingMarket = false;
     estRenderTab();
@@ -526,10 +526,10 @@ async function openEstimator(sys) {
   if (Object.keys(estState.trabajos).length > 0) {
     const covered = Object.keys(estState.trabajos).filter(k => estState.marketPrices[k]).length;
     if (covered / Object.keys(estState.trabajos).length < 0.5) {
-      estState.marketStatus = `💡 Tip: click "Actualizar precios mercado" para tiempos y precios reales de ${estState.city}.`;
+      estState.marketStatus = `Tip: click "Actualizar precios mercado" para tiempos y precios reales de ${estState.city}.`;
     }
   }
-  openModal(`🧮 ${sys.name}`, '<div id="est-root"></div>');
+  openModal(`${sys.name}`, '<div id="est-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   estRender();
@@ -539,14 +539,14 @@ async function openEstimator(sys) {
 function estRender() {
   const root = document.getElementById('est-root');
   const tabs = [
-    { id:'estimador', label:'🧮 Estimador' },
-    { id:'lrc',       label:'📊 Vista LRC' },
-    { id:'comparador',label:'🔍 Similares' },
-    { id:'mercado',   label:'⚖️ Mercado' },
-    { id:'calibradores',label:'🏆 Calibradores' },
-    { id:'cronograma',label:'📅 Cronograma' },
-    { id:'lideres',   label:'👷 Líderes' },
-    { id:'historico', label:'📈 Histórico' }
+    { id:'estimador', label:'Estimador' },
+    { id:'lrc',       label:'Vista LRC' },
+    { id:'comparador',label:'Similares' },
+    { id:'mercado',   label:'Mercado' },
+    { id:'calibradores',label:'Calibradores' },
+    { id:'cronograma',label:'Cronograma' },
+    { id:'lideres',   label:'Líderes' },
+    { id:'historico', label:'Histórico' }
   ];
   root.innerHTML = `
     ${propertySelectorHtml(estState.propertyId, 'estOnPropertyChange', 'estSaveProperty')}
@@ -642,10 +642,10 @@ function estRenderCronograma(body) {
       <!-- Banner de calidad de data -->
       <div class="${isFresh?'bg-emerald-50 border-emerald-300':'bg-amber-50 border-amber-300'} border-2 rounded-xl p-3 flex items-center justify-between">
         <div>
-          <div class="text-xs font-bold ${isFresh?'text-emerald-900':'text-amber-900'} uppercase">${isFresh?'✅ Cronograma con tiempos REALES del mercado':'⚠️ Cronograma con tiempos calculados (no real-time)'}</div>
+          <div class="text-xs font-bold ${isFresh?'text-emerald-900':'text-amber-900'} uppercase">${isFresh?'Cronograma con tiempos REALES del mercado':'Cronograma con tiempos calculados (no real-time)'}</div>
           <div class="text-xs ${isFresh?'text-emerald-700':'text-amber-700'} mt-0.5">${sched.liveDataUsed} de ${sched.totalTasks} tareas con duración de internet (${sched.liveCoverage.toFixed(0)}%). ${!isFresh?`Para precisión máxima, click "Actualizar precios mercado" en el tab Estimador.`:''}</div>
         </div>
-        ${!isFresh?`<button onclick="estFetchMarketPrices(false)" ${estState.loadingMarket?'disabled':''} class="bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 text-white text-xs px-3 py-2 rounded font-bold whitespace-nowrap">🌐 Traer data real</button>`:''}
+        ${!isFresh?`<button onclick="estFetchMarketPrices(false)" ${estState.loadingMarket?'disabled':''} class="bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 text-white text-xs px-3 py-2 rounded font-bold whitespace-nowrap">${osIcon('globe')} Traer data real</button>`:''}
       </div>
 
       <!-- Inputs de equipo -->
@@ -702,7 +702,7 @@ function estRenderCronograma(body) {
 
       <!-- Gantt -->
       <div class="bg-white rounded-xl border border-slate-200 p-4 overflow-x-auto">
-        <h3 class="text-sm font-bold text-slate-700 uppercase mb-3">📊 Gantt visual</h3>
+        <h3 class="text-sm font-bold text-slate-700 uppercase mb-3">${osIcon('chart')} Gantt visual</h3>
         <div class="space-y-1.5 min-w-[600px]">
           ${sched.timeline.map(t => {
             const left = pctOf(t.startD);
@@ -725,7 +725,7 @@ function estRenderCronograma(body) {
 
       <!-- Tabla detallada por fase -->
       <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-sm font-bold text-slate-700 uppercase mb-3">📋 Desglose por fase (secuencia constructiva profesional)</h3>
+        <h3 class="text-sm font-bold text-slate-700 uppercase mb-3">${osIcon('clipboard')} Desglose por fase (secuencia constructiva profesional)</h3>
         <div class="space-y-3">
           ${sched.timeline.map((t, i) => `
             <div class="border-l-4 pl-3 py-2" style="border-color:${t.phaseInfo.color};">
@@ -733,7 +733,7 @@ function estRenderCronograma(body) {
                 <div>
                   <span class="text-xs text-slate-400 font-mono">${(i+1).toString().padStart(2,'0')}</span>
                   <span class="text-sm font-bold ml-1">${t.phaseInfo.emoji} ${t.phaseInfo.name}</span>
-                  ${t.hasLive?'<span class="ml-1 text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold">🌐 LIVE</span>':''}
+                  ${t.hasLive?'<span class="ml-1 text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold">' + osIcon('globe') + ' LIVE</span>':''}
                   <span class="text-xs text-slate-500 ml-2">${t.phaseInfo.desc}</span>
                 </div>
                 <div class="text-xs">
@@ -746,7 +746,7 @@ function estRenderCronograma(body) {
                   ${t.tasks.map(task => {
                     const live = estState.marketPrices[task.key];
                     const liveLabel = live && live.duration_days_typical ? `<span class="text-[9px] text-emerald-600 ml-1">(mkt: ${live.duration_days_typical}d, crew ${live.crew_size_typical||'?'})</span>` : '';
-                    return `<li>• ${task.nombre}${task.count>1?` ×${task.count}`:''} <span class="text-slate-400">(${Math.round(task.hours||0)}h)</span>${liveLabel}${live?.notes?` <span class="text-[10px] text-amber-700">📝 ${live.notes}</span>`:''}</li>`;
+                    return `<li>• ${task.nombre}${task.count>1?` ×${task.count}`:''} <span class="text-slate-400">(${Math.round(task.hours||0)}h)</span>${liveLabel}${live?.notes?` <span class="text-[10px] text-amber-700">${osIcon('pencil-line')} ${live.notes}</span>`:''}</li>`;
                   }).join('')}
                 </ul>
               ` : ''}
@@ -757,7 +757,7 @@ function estRenderCronograma(body) {
 
       <!-- Notas profesionales -->
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <h3 class="text-sm font-bold text-amber-900 uppercase mb-2">💡 Notas constructivas</h3>
+        <h3 class="text-sm font-bold text-amber-900 uppercase mb-2">${osIcon('lightbulb')} Notas constructivas</h3>
         <ul class="text-xs text-amber-950 space-y-1">
           <li>• <strong>Orden CPM:</strong> demo → estructural → rough-in → inspección → drywall → flooring → cabinets → countertops → tile → trim → paint → fixtures → appliances → cleaning</li>
           <li>• <strong>Inspección rough es obligatoria</strong> antes de cerrar paredes con drywall (city of ${estState.city}).</li>
@@ -796,7 +796,7 @@ function estRenderLideres(body) {
 
   body.innerHTML = `
     <div class="space-y-4">
-      <h2 class="text-lg font-bold">👷 Performance por líder de obra</h2>
+      <h2 class="text-lg font-bold">${osIcon('hard-hat')} Performance por líder de obra</h2>
       <p class="text-xs text-slate-500">Score = (verdes × 2 + en presupuesto) − (rojos × 3). Mayor score = mejor track record.</p>
 
       <div class="overflow-x-auto border border-slate-200 rounded-lg">
@@ -806,9 +806,9 @@ function estRenderLideres(body) {
               <th class="text-left px-3 py-2 font-semibold">Líder</th>
               <th class="text-center px-2 py-2">Casas</th>
               <th class="text-center px-2 py-2">Finalizadas</th>
-              <th class="text-center px-2 py-2 text-emerald-700">🟢 Verdes</th>
+              <th class="text-center px-2 py-2 text-emerald-700">${kitStatusDot('ok')} Verdes</th>
               <th class="text-center px-2 py-2 text-green-700">⚪ En presup</th>
-              <th class="text-center px-2 py-2 text-red-700">🔴 Rojos</th>
+              <th class="text-center px-2 py-2 text-red-700">${kitStatusDot('bad')} Rojos</th>
               <th class="text-right px-2 py-2">Desv. avg</th>
               <th class="text-right px-2 py-2">Ganancia total</th>
               <th class="text-center px-2 py-2">Score</th>
@@ -817,7 +817,7 @@ function estRenderLideres(body) {
           <tbody>
             ${rows.map((r, i) => `
               <tr class="border-t border-slate-200 ${i===0?'bg-amber-50':''}">
-                <td class="px-3 py-2 font-bold">${i===0?'🏆 ':''}${r.name}</td>
+                <td class="px-3 py-2 font-bold">${i===0?osIcon('trophy'):''}${r.name}</td>
                 <td class="px-2 py-2 text-center">${r.count}</td>
                 <td class="px-2 py-2 text-center text-slate-600">${r.finalizadas}</td>
                 <td class="px-2 py-2 text-center text-emerald-700 font-bold">${r.verdes}</td>
@@ -878,9 +878,9 @@ function estRenderEstimador(body) {
             </div>
           </div>
           <div class="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
-            <button onclick="estFetchMarketPrices(false)" ${estState.loadingMarket?'disabled':''} class="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded font-semibold">🔄 Actualizar precios mercado</button>
+            <button onclick="estFetchMarketPrices(false)" ${estState.loadingMarket?'disabled':''} class="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded font-semibold">${osIcon('refresh')} Actualizar precios mercado</button>
             <button onclick="estFetchMarketPrices(true)" ${estState.loadingMarket?'disabled':''} class="text-xs text-slate-500 hover:text-slate-900" title="Forzar refresh ignorando cache">↻ Forzar</button>
-            <span class="text-xs ${estState.marketStatus.includes('⚠️')?'text-red-600':estState.marketStatus.includes('✓')?'text-emerald-700':'text-slate-500'}">${estState.marketStatus || (Object.keys(estState.marketPrices).length>0?`✓ ${Object.keys(estState.marketPrices).length} precios en cache para ${estState.city}`:'Usando precios default Austin 2026')}</span>
+            <span class="text-xs ${estState.marketStatus.includes(osIcon('alert'))?'text-red-600':estState.marketStatus.includes('✓')?'text-emerald-700':'text-slate-500'}">${estState.marketStatus || (Object.keys(estState.marketPrices).length>0?`✓ ${Object.keys(estState.marketPrices).length} precios en cache para ${estState.city}`:'Usando precios default Austin 2026')}</span>
           </div>
         </div>
 
@@ -902,7 +902,7 @@ function estRenderEstimador(body) {
         <div class="bg-white rounded-xl p-4 border border-slate-200">
           <div class="flex justify-between items-center mb-2">
             <div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">3</div><h3 class="text-sm font-bold">Trabajos (${Object.keys(EST_TRABAJOS).length})</h3></div>
-            ${Object.keys(estState.trabajos).length ? `<button onclick="estState.trabajos={}; estRenderTab()" class="text-xs text-red-600">🗑 Limpiar (${Object.keys(estState.trabajos).length})</button>` : ''}
+            ${Object.keys(estState.trabajos).length ? `<button onclick="estState.trabajos={}; estRenderTab()" class="text-xs text-red-600">${osIcon('trash')} Limpiar (${Object.keys(estState.trabajos).length})</button>` : ''}
           </div>
           ${EST_CATEGORIAS.map(cat => {
             const tCat = Object.entries(EST_TRABAJOS).filter(([_,t])=>t.cat===cat);
@@ -947,7 +947,7 @@ function estRenderEstimador(body) {
         <!-- AVANZADO -->
         <div class="bg-white rounded-xl border border-slate-200">
           <button onclick="estState.showAvanzado=!estState.showAvanzado; estRenderTab()" class="w-full p-3 flex justify-between items-center text-sm text-slate-600">
-            <span>⚙️ Ajustes avanzados</span><span>${estState.showAvanzado?'▲':'▼'}</span>
+            <span>${osIcon('settings')} Ajustes avanzados</span><span>${estState.showAvanzado?'▲':'▼'}</span>
           </button>
           ${estState.showAvanzado ? `
             <div class="p-3 pt-0 space-y-3 border-t border-slate-100">
@@ -966,7 +966,7 @@ function estRenderEstimador(body) {
 
       <!-- RESULTADO -->
       <div class="lg:col-span-5 space-y-3">
-        ${!e.hasJobs ? `<div class="bg-slate-50 rounded-xl p-8 border border-slate-200 text-center"><div class="text-4xl mb-2">🔨</div><p class="text-sm text-slate-500">Selecciona trabajos</p></div>` : `
+        ${!e.hasJobs ? `<div class="bg-slate-50 rounded-xl p-8 border border-slate-200 text-center"><div class="text-4xl mb-2">${osIcon('hammer')}</div><p class="text-sm text-slate-500">Selecciona trabajos</p></div>` : `
           ${e.estado ? `
             <div class="rounded-xl p-4 border-2 ${e.estado.color==='red'?'bg-red-50 border-red-300':e.estado.color==='amber'?'bg-amber-50 border-amber-300':e.estado.color==='green'?'bg-green-50 border-green-300':'bg-emerald-50 border-emerald-300'}">
               <div class="text-xs font-bold uppercase mb-1 ${e.estado.color==='red'?'text-red-700':e.estado.color==='amber'?'text-amber-700':e.estado.color==='green'?'text-green-700':'text-emerald-700'}">${e.estado.label}</div>
@@ -981,7 +981,7 @@ function estRenderEstimador(body) {
           </div>
 
           <div class="bg-slate-900 text-white rounded-xl p-5">
-            <div class="text-xs text-slate-400 uppercase font-bold mb-1">🎯 Precio Recomendado</div>
+            <div class="text-xs text-slate-400 uppercase font-bold mb-1">${osIcon('target')} Precio Recomendado</div>
             <div class="text-3xl font-bold text-amber-400">${estFmt(e.precioRec)}</div>
             <div class="text-xs text-slate-400 mt-1">$${(e.precioRec/estState.sqft).toFixed(0)}/sqft · margen ${e.margenRec.toFixed(1)}%</div>
           </div>
@@ -992,7 +992,7 @@ function estRenderEstimador(body) {
             <div class="bg-amber-50 rounded-lg p-2 border-2 border-amber-300"><div class="text-[10px] text-amber-700 font-bold uppercase">Híbrido</div><div class="text-base font-bold text-amber-700">${estFmt(e.precioRec)}</div></div>
           </div>
 
-          <button onclick="estExportLRC()" class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-bold">📊 Exportar CSV LRC</button>
+          <button onclick="estExportLRC()" class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-bold">${osIcon('chart')} Exportar CSV LRC</button>
 
           <div class="bg-white rounded-lg p-3 border border-slate-200">
             <div class="text-xs text-slate-500 uppercase font-bold mb-2">Costo interno</div>
@@ -1016,7 +1016,7 @@ function estRenderEstimador(body) {
           ${(()=>{ const sch = estGenerateSchedule(); if (!sch) return ''; return `
           <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3">
             <div class="flex justify-between items-baseline mb-1">
-              <div class="text-xs font-bold text-blue-900 uppercase">📅 Cronograma</div>
+              <div class="text-xs font-bold text-blue-900 uppercase">${osIcon('calendar')} Cronograma</div>
               <button onclick="estSetTab('cronograma')" class="text-[10px] text-blue-700 hover:underline">Ver detalle →</button>
             </div>
             <div class="text-2xl font-bold text-blue-900">${sch.calendarDays} días</div>
@@ -1148,7 +1148,7 @@ function estRenderComparador(body) {
   const valid = estState.cases.filter(c => !c.is_atypical);
   const sim = valid.map(c => ({ ...c, diff: Math.abs(c.sqft - estState.sqft) })).sort((a,b) => a.diff - b.diff).slice(0,3);
   body.innerHTML = `
-    <h3 class="font-bold mb-3">🔍 Casas similares a ${estState.sqft} sqft</h3>
+    <h3 class="font-bold mb-3">${osIcon('search')} Casas similares a ${estState.sqft} sqft</h3>
     <div class="grid md:grid-cols-3 gap-3">
       ${sim.map((c,i) => {
         const ppsf = c.internal_cost / c.sqft;
@@ -1166,7 +1166,7 @@ function estRenderComparador(body) {
               <div class="flex justify-between"><span class="text-slate-500">$/sqft:</span><span class="text-emerald-700">$${ppsf.toFixed(0)}</span></div>
             </div>
             <div class="mt-2 text-[10px] font-bold p-1.5 rounded ${est.color==='red'?'bg-red-100 text-red-700':est.color==='amber'?'bg-amber-100 text-amber-700':est.color==='green'?'bg-green-100 text-green-700':'bg-emerald-100 text-emerald-700'}">${est.label} (${c.deviation_pct>0?'+':''}${(c.deviation_pct||0).toFixed(1)}%)</div>
-            ${c.is_calibrator?'<div class="mt-1 text-xs text-purple-700 font-bold">⭐ CALIBRADOR</div>':''}
+            ${c.is_calibrator?'<div class="mt-1 text-xs text-purple-700 font-bold">' + osIcon('star') + ' CALIBRADOR</div>':''}
           </div>
         `;
       }).join('')}
@@ -1192,16 +1192,16 @@ function estRenderMercado(body) {
   body.innerHTML = `
     <div class="flex items-start justify-between mb-3">
       <div>
-        <h2 class="text-lg font-bold">⚖️ Mercado ${estState.city}, ${estState.state}</h2>
+        <h2 class="text-lg font-bold">${osIcon('scale')} Mercado ${estState.city}, ${estState.state}</h2>
         <p class="text-xs text-slate-500">Precios incluyen margen GC 25%. Costo equivalente = Precio ÷ 1.25</p>
         <p class="text-xs text-slate-500 mt-1">${fresh} precios actualizados de internet · resto usa benchmark default Austin 2026</p>
       </div>
       <div class="text-right">
-        <button onclick="estFetchMarketPrices(false)" ${estState.loadingMarket?'disabled':''} class="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded font-semibold">🔄 Actualizar trabajos seleccionados</button>
+        <button onclick="estFetchMarketPrices(false)" ${estState.loadingMarket?'disabled':''} class="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-3 py-1.5 rounded font-semibold">${osIcon('refresh')} Actualizar trabajos seleccionados</button>
         <div class="text-[10px] text-slate-400 mt-1">Cache 30 días</div>
       </div>
     </div>
-    ${estState.marketStatus ? `<div class="text-xs ${estState.marketStatus.includes('⚠️')?'bg-red-50 text-red-700':estState.marketStatus.includes('✓')?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'} p-2 rounded mb-3">${estState.marketStatus}</div>` : ''}
+    ${estState.marketStatus ? `<div class="text-xs ${estState.marketStatus.includes(osIcon('alert'))?'bg-red-50 text-red-700':estState.marketStatus.includes('✓')?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'} p-2 rounded mb-3">${estState.marketStatus}</div>` : ''}
     <div class="overflow-x-auto border border-slate-200 rounded-lg">
       <table class="w-full text-xs">
         <thead class="bg-slate-50"><tr><th class="text-left py-2 px-2">Trabajo</th><th class="text-left py-2 px-2">Categoría</th><th class="text-right py-2 px-2">Min</th><th class="text-right py-2 px-2">Típico</th><th class="text-right py-2 px-2">Max</th><th class="text-right py-2 px-2">Costo equiv</th><th class="text-center py-2 px-2">Fuente</th></tr></thead>
@@ -1216,7 +1216,7 @@ function estRenderMercado(body) {
               <td class="py-1.5 px-2 text-right text-blue-700">${r.isPerSqft?`$${(r.typ/1.25).toFixed(1)}/sqft`:estFmt(r.typ/1.25)}</td>
               <td class="py-1.5 px-2 text-center text-[10px]">
                 ${r.source==='live'
-                  ? `<span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="${r.sourceSummary || ''}">🌐 live ${r.days!==null?`(${r.days}d)`:''}</span>`
+                  ? `<span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="${r.sourceSummary || ''}">live ${r.days!==null?`(${r.days}d)`:''}</span>`
                   : `<span class="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">default</span>`}
               </td>
             </tr>
@@ -1230,7 +1230,7 @@ function estRenderMercado(body) {
 // ─── TAB: CALIBRADORES ───
 function estRenderCalibradores(body) {
   body.innerHTML = `
-    <h2 class="text-lg font-bold mb-2">🏆 Pool de 5 calibradores</h2>
+    <h2 class="text-lg font-bold mb-2">${osIcon('trophy')} Pool de 5 calibradores</h2>
     <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
       ${Object.values(EST_CALIBRADORES).map(c => `
         <div class="bg-amber-50 rounded-lg p-3 border border-amber-200">
@@ -1254,7 +1254,7 @@ function estRenderCalibradores(body) {
 function estRenderHistorico(body) {
   body.innerHTML = `
     <div class="flex justify-between items-center mb-3">
-      <h2 class="text-lg font-bold">📈 Histórico (${estState.cases.length} casas validadas)</h2>
+      <h2 class="text-lg font-bold">${osIcon('trending-up')} Histórico (${estState.cases.length} casas validadas)</h2>
       <button onclick="estShowAddCase()" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-sm font-semibold">+ Agregar</button>
     </div>
     <div class="overflow-x-auto border border-slate-200 rounded-lg">
@@ -1279,7 +1279,7 @@ function estRenderHistorico(body) {
               <td class="py-1.5 px-2 text-right">${d.sold_for?estFmtK(d.sold_for):'—'}</td>
               <td class="py-1.5 px-2 text-right font-bold ${est.color==='red'?'text-red-700':est.color==='amber'?'text-amber-700':est.color==='green'?'text-green-700':'text-emerald-700'}">${devShown>0?'+':''}${devShown.toFixed(1)}%</td>
               <td class="py-1.5 px-2 text-right font-bold ${ganancia<0?'text-red-700':'text-emerald-700'}">${estFmt(ganancia)}</td>
-              <td class="py-1.5 px-2 text-right">${!d.is_seed ? `<button onclick="estDeleteCase('${d.id}')" class="text-red-600 hover:text-red-800">🗑</button>` : ''}</td>
+              <td class="py-1.5 px-2 text-right">${!d.is_seed ? `<button onclick="estDeleteCase('${d.id}')" class="text-red-600 hover:text-red-800">${osIcon('trash')}</button>` : ''}</td>
             </tr>`;
           }).join('')}
         </tbody>

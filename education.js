@@ -65,13 +65,13 @@ async function eduLoadStudentPlanSnapshot(studentId) {
 // (Plan + Tareas + Diagnóstico viven SOLO en Metodología FlipMentoría)
 // ════════════════════════════════════════════════════════════════════════
 const EDU_TABS = [
-  { key: 'dashboard',    label: '📊 Dashboard' },
-  { key: 'students',     label: '👥 Estudiantes' },
-  { key: 'cohorts',      label: '👨‍👩‍👧‍👦 Cohortes' },
-  { key: 'alerts',       label: '🚨 Alertas' },
-  { key: 'progress',     label: '📈 Progreso' },
-  { key: 'calls',        label: '📅 Calendario' },
-  { key: 'config',       label: '⚙️ Config' }
+  { key: 'dashboard',    label: 'Dashboard' },
+  { key: 'students',     label: 'Estudiantes' },
+  { key: 'cohorts',      label: '‍‍‍Cohortes' },
+  { key: 'alerts',       label: 'Alertas' },
+  { key: 'progress',     label: 'Progreso' },
+  { key: 'calls',        label: 'Calendario' },
+  { key: 'config',       label: 'Config' }
   // 'resources' eliminada — los recursos viven dentro de Metodología FlipMentoría (cada bloque trae sus herramientas y links)
 ];
 // NOTA: Presentaciones e Informes son sistemas INDEPENDIENTES ahora
@@ -84,7 +84,7 @@ async function openEduManager(sys) {
   if (!EDU_TABS.find(t => t.key === eduState.tab)) {
     eduState.tab = 'students';
   }
-  openModal(`🎓 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
+  openModal(`${sys.name}`, '<div id="edu-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await eduLoadAll();
@@ -185,11 +185,11 @@ function eduIsStageOverdue(s) {
 function eduRender() {
   const root = document.getElementById('edu-root');
   if (!root) return;
-  if (eduState.loading) { root.innerHTML = (typeof kitLoading === 'function') ? kitLoading('Cargando mentorías…') : '<div class="text-center py-12 text-slate-400">⏳ Cargando...</div>'; return; }
+  if (eduState.loading) { root.innerHTML = (typeof kitLoading === 'function') ? kitLoading('Cargando mentorías…') : '<div class="text-center py-12 text-slate-400">' + osIcon('loader') + ' Cargando...</div>'; return; }
   if (eduState.mentorships.length === 0) {
     root.innerHTML = `
       <div class="text-center py-12">
-        <div class="text-5xl mb-3">📭</div>
+        <div class="text-5xl mb-3">${osIcon('inbox')}</div>
         <div class="font-bold text-slate-700">Sin mentorías configuradas</div>
         <div class="text-xs text-slate-500 mt-2">Falta correr el SQL <code>education-schema.sql</code> en Supabase.</div>
       </div>`;
@@ -205,7 +205,7 @@ function eduRender() {
   const eduHero = (typeof kitHero === 'function')
     ? kitHero((cur ? cur.icon + ' ' + cur.name : 'Mentorías') + ' · Estudiantes activos',
       eduActivosN + ' activo' + (eduActivosN === 1 ? '' : 's'),
-      myStudents.length + ' estudiante(s) en total · ' + (myAlerts.length ? '<b>⚠️ ' + myAlerts.length + ' alerta(s) abierta(s)</b>' : '✓ sin alertas abiertas'))
+      myStudents.length + ' estudiante(s) en total · ' + (myAlerts.length ? '<b>' + osIcon('alert') + ' ' + myAlerts.length + ' alerta(s) abierta(s)</b>' : '✓ sin alertas abiertas'))
     : '';
 
   root.innerHTML = `
@@ -220,11 +220,11 @@ function eduRender() {
           </button>
         `).join('')}
         <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500">
-          ${cur?.airtable_base_id ? `<span>🔗 Airtable: <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">${cur.airtable_base_id}</code></span>` : '<span class="text-amber-700">⚠️ Airtable no configurado</span>'}
-          <button onclick="eduOpenCeoMobile()" class="bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded font-bold" title="Vista CEO en formato celular">📱 CEO</button>
-          <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-bold" title="Análisis IA del rendimiento del mentor">🤖 IA</button>
-          <button onclick="eduTriggerSync()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">🔄 Sync</button>
-          <button onclick="eduDebugDB()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold" title="Ver qué hay en la DB">🔍 Debug DB</button>
+          ${cur?.airtable_base_id ? `<span>${osIcon('link')} Airtable: <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[9px]">${cur.airtable_base_id}</code></span>` : '<span class="text-amber-700">' + osIcon('alert') + ' Airtable no configurado</span>'}
+          <button onclick="eduOpenCeoMobile()" class="bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded font-bold" title="Vista CEO en formato celular">${osIcon('phone')} CEO</button>
+          <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded font-bold" title="Análisis IA del rendimiento del mentor">${osIcon('bot')} IA</button>
+          <button onclick="eduTriggerSync()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">${osIcon('refresh')} Sync</button>
+          <button onclick="eduDebugDB()" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold" title="Ver qué hay en la DB">${osIcon('search')} Debug DB</button>
         </div>
       </div>
 
@@ -307,24 +307,24 @@ function eduRenderDashboard() {
       <!-- CTA: Diagnóstico vive en Metodología -->
       <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <div class="text-xs font-bold uppercase text-amber-800 mb-1">📘 Plan de acción del estudiante</div>
+          <div class="text-xs font-bold uppercase text-amber-800 mb-1">Plan de acción del estudiante</div>
           <div class="text-sm text-slate-700">El diagnóstico + plan vive en <strong>Metodología FlipMentoría</strong>. Andá al tab <strong>Estudiantes</strong>, abrí la ficha y hacé click en "Ver / generar Plan".</div>
         </div>
-        <button onclick="eduSetTab('students')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-4 py-2 rounded-lg whitespace-nowrap">👥 Ir a Estudiantes →</button>
+        <button onclick="eduSetTab('students')" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-4 py-2 rounded-lg whitespace-nowrap">${osIcon('users')} Ir a Estudiantes →</button>
       </div>
 
-      <!-- 🆕 SEGUIMIENTOS DEL DÍA · vista operativa #1 del coach -->
+      <!-- SEGUIMIENTOS DEL DÍA · vista operativa #1 del coach -->
       ${eduRenderFollowupsToday(students)}
 
-      <!-- 🆕 Bridge a los otros 2 sistemas -->
+      <!-- Bridge a los otros 2 sistemas -->
       <div class="grid md:grid-cols-2 gap-3">
         <button onclick="eduOpenSystemFromManager('edu-reports')" class="bg-gradient-to-r from-indigo-900 to-slate-900 hover:from-indigo-800 hover:to-slate-800 text-white rounded-xl p-4 text-left">
-          <div class="text-[10px] uppercase font-bold text-indigo-200">📋 Informe ejecutivo</div>
+          <div class="text-[10px] uppercase font-bold text-indigo-200">${osIcon('clipboard')} Informe ejecutivo</div>
           <div class="text-base font-bold mt-1">Ver dashboard board-ready →</div>
           <div class="text-[11px] text-indigo-100 mt-1">KPIs en vivo, salud del programa, insights para junta directiva</div>
         </button>
         <button onclick="eduOpenSystemFromManager('edu-methodology')" class="bg-gradient-to-r from-violet-700 to-fuchsia-700 hover:from-violet-600 hover:to-fuchsia-600 text-white rounded-xl p-4 text-left">
-          <div class="text-[10px] uppercase font-bold text-violet-100">📘 Metodología FlipMentoría</div>
+          <div class="text-[10px] uppercase font-bold text-violet-100">Metodología FlipMentoría</div>
           <div class="text-base font-bold mt-1">Biblioteca + diagnóstico + crédito →</div>
           <div class="text-[11px] text-violet-100 mt-1">Currículum, planes generados, módulo de crédito (12 fases · 49 acciones)</div>
         </button>
@@ -333,7 +333,7 @@ function eduRenderDashboard() {
       <!-- Embudo por etapa -->
       ${(m?.stages || []).length ? `
         <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-slate-700 mb-3">📈 Distribución por etapa · ${m.name}</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-3">${osIcon('trending-up')} Distribución por etapa · ${m.name}</div>
           <div class="space-y-1.5">
             ${m.stages.map(st => {
               const n = byStage[st.key] || 0;
@@ -356,10 +356,10 @@ function eduRenderDashboard() {
 
       <!-- Atajos -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-        <button onclick="eduSetTab('students')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">👥 Estudiantes</button>
-        <button onclick="eduSetTab('alerts')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">🚨 Alertas (${myAlerts.length})</button>
-        <button onclick="eduSetTab('progress')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">📈 Progreso</button>
-        <button onclick="eduSetTab('calls')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">📅 Calendario</button>
+        <button onclick="eduSetTab('students')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">${osIcon('users')} Estudiantes</button>
+        <button onclick="eduSetTab('alerts')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">${osIcon('alert')} Alertas (${myAlerts.length})</button>
+        <button onclick="eduSetTab('progress')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">${osIcon('trending-up')} Progreso</button>
+        <button onclick="eduSetTab('calls')" class="bg-slate-100 hover:bg-slate-200 rounded p-3 text-left font-bold">${osIcon('calendar')} Calendario</button>
       </div>
     </div>
   `;
@@ -414,12 +414,12 @@ function eduRenderFollowupsToday(students) {
     <div class="bg-gradient-to-br from-slate-900 to-blue-900 text-white rounded-xl overflow-hidden">
       <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-[10px] uppercase font-bold text-blue-200 tracking-wider">🔥 Seguimientos del día</div>
+          <div class="text-[10px] uppercase font-bold text-blue-200 tracking-wider">${osIcon('flame')} Seguimientos del día</div>
           <div class="text-base font-bold mt-0.5">Top 5 estudiantes a contactar ahora</div>
           <div class="text-[11px] text-blue-200">Score promedio: <strong>${promedio}/100</strong> · ranking automático por urgencia</div>
         </div>
         <div class="flex gap-2">
-          <button onclick="eduStartFollowupSession()" class="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs px-3 py-2 rounded">▶️ Empezar sesión seguimiento</button>
+          <button onclick="eduStartFollowupSession()" class="bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs px-3 py-2 rounded">${osIcon('play')} Empezar sesión seguimiento</button>
         </div>
       </div>
       <div class="grid md:grid-cols-5 gap-2 p-3 bg-white">
@@ -432,9 +432,9 @@ function eduRenderFollowupsToday(students) {
               ${reasons.slice(0,2).map(r => `<li>• ${r}</li>`).join('')}
             </ul>
             <div class="flex gap-1">
-              ${s.phone ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1 rounded" title="WhatsApp">💬</button>` : `<button disabled class="flex-1 bg-slate-300 text-white text-[10px] py-1 rounded" title="Sin teléfono">📞</button>`}
-              <button onclick="eduOpenStudent('${s.id}')" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded" title="Ver ficha">👁</button>
-              <button onclick="eduQuickLogInteraction('${s.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1 rounded" title="Registrar contacto manual">📝</button>
+              ${s.phone ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1 rounded" title="WhatsApp">${osIcon('message')}</button>` : `<button disabled class="flex-1 bg-slate-300 text-white text-[10px] py-1 rounded" title="Sin teléfono">${osIcon('phone')}</button>`}
+              <button onclick="eduOpenStudent('${s.id}')" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold py-1 rounded" title="Ver ficha">${osIcon('eye')}</button>
+              <button onclick="eduQuickLogInteraction('${s.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1 rounded" title="Registrar contacto manual">${osIcon('pencil-line')}</button>
             </div>
           </div>
         `).join('')}
@@ -459,7 +459,7 @@ function eduFollowupNext() {
   const q = eduState._followupQueue || [];
   const i = eduState._followupIdx || 0;
   if (i >= q.length) {
-    return alert('✅ Terminaste tu sesión de seguimiento. ' + q.length + ' estudiantes contactados.');
+    return alert('Terminaste tu sesión de seguimiento. ' + q.length + ' estudiantes contactados.');
   }
   const s = eduMyStudents().find(x => x.id === q[i]);
   if (!s) {
@@ -480,26 +480,26 @@ function eduFollowupNext() {
 function eduQuickLogInteraction(studentId) {
   const s = eduMyStudents().find(x => x.id === studentId);
   if (!s) return;
-  openModal('📝 Registrar contacto · ' + (s.full_name||''), `
+  openModal('Registrar contacto · ' + (s.full_name||''), `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Canal</label>
           <select id="qli-channel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            <option value="call">📞 Llamada</option>
-            <option value="meet">🎥 Videollamada</option>
-            <option value="session">🪑 Sesión presencial</option>
-            <option value="email">📧 Email</option>
+            <option value="call">${osIcon('phone')} Llamada</option>
+            <option value="meet">${osIcon('video')} Videollamada</option>
+            <option value="session">Sesión presencial</option>
+            <option value="email">${osIcon('mail')} Email</option>
             <option value="manual">✍️ Otro</option>
           </select>
         </div>
         <div>
           <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Resultado</label>
           <select id="qli-outcome" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            <option value="answered">✅ Respondió / asistió</option>
-            <option value="scheduled">📅 Agendamos siguiente paso</option>
-            <option value="no_response">❌ No respondió</option>
-            <option value="sent">📨 Solo enviado</option>
+            <option value="answered">${osIcon('check-circle')} Respondió / asistió</option>
+            <option value="scheduled">${osIcon('calendar')} Agendamos siguiente paso</option>
+            <option value="no_response">${osIcon('x-circle')} No respondió</option>
+            <option value="sent">${osIcon('mail')} Solo enviado</option>
           </select>
         </div>
       </div>
@@ -509,7 +509,7 @@ function eduQuickLogInteraction(studentId) {
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="eduSaveQuickLog('${studentId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+        <button onclick="eduSaveQuickLog('${studentId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">${osIcon('save')} Guardar</button>
       </div>
     </div>
   `);
@@ -563,11 +563,11 @@ function eduRenderStudents() {
 
   // Análisis
   const insights = [];
-  if (total === 0) insights.push(`📭 Sin estudiantes en ${m?.name}. Configurá Airtable + Sync, o agregá manual.`);
+  if (total === 0) insights.push(`Sin estudiantes en ${m?.name}. Configurá Airtable + Sync, o agregá manual.`);
   else {
-    if (expiringSoon > 0) insights.push(`⏰ <strong>${expiringSoon}</strong> estudiante${expiringSoon>1?'s':''} con mentoría que vence en ≤30 días. Pasar a comercial.`);
-    if (atRisk > 0) insights.push(`⚠️ <strong>${atRisk}</strong> en estado at_risk. Revisar progreso individual.`);
-    if (overdue > 0) insights.push(`🐢 <strong>${overdue}</strong> estudiante${overdue>1?'s':''} llevan más tiempo del target en su etapa actual. Posible 1-on-1.`);
+    if (expiringSoon > 0) insights.push(`${osIcon('clock')} <strong>${expiringSoon}</strong> estudiante${expiringSoon>1?'s':''} con mentoría que vence en ≤30 días. Pasar a comercial.`);
+    if (atRisk > 0) insights.push(`${osIcon('alert')} <strong>${atRisk}</strong> en estado at_risk. Revisar progreso individual.`);
+    if (overdue > 0) insights.push(`<strong>${overdue}</strong> estudiante${overdue>1?'s':''} llevan más tiempo del target en su etapa actual. Posible 1-on-1.`);
   }
 
   return `
@@ -584,7 +584,7 @@ function eduRenderStudents() {
 
       ${insights.length ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis</div>
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('bot')} Análisis</div>
           <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
         </div>
       ` : ''}
@@ -592,8 +592,8 @@ function eduRenderStudents() {
       <!-- Filtros -->
       <div class="flex items-center gap-2 flex-wrap">
         <div class="flex-1 min-w-[260px] relative">
-          <input type="text" placeholder="🔍 Ej: 'inactivos en etapa Crédito' / 'pago vencido privada' / 'estancados sin contacto'" value="${(eduState.searchQuery||'').replace(/"/g,'&quot;')}" oninput="eduState.searchQuery=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs w-full" />
-          ${eduState.searchQuery ? `<div class="absolute -bottom-4 left-0 text-[10px] text-slate-500">🤖 Detecté: ${eduDescribirFiltros(eduState.searchQuery)}</div>` : ''}
+          <input type="text" placeholder="Ej: 'inactivos en etapa Crédito' / 'pago vencido privada' / 'estancados sin contacto'" value="${(eduState.searchQuery||'').replace(/"/g,'&quot;')}" oninput="eduState.searchQuery=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs w-full" />
+          ${eduState.searchQuery ? `<div class="absolute -bottom-4 left-0 text-[10px] text-slate-500">${osIcon('bot')} Detecté: ${eduDescribirFiltros(eduState.searchQuery)}</div>` : ''}
         </div>
         <select onchange="eduState.stageFilter=this.value; eduRender()" class="border border-slate-300 rounded px-2 py-1 text-xs">
           <option value="all" ${eduState.stageFilter==='all'?'selected':''}>Todas las etapas</option>
@@ -603,13 +603,13 @@ function eduRenderStudents() {
           <option value="all" ${eduState.statusFilter==='all'?'selected':''}>Todos los status</option>
           ${['active','at_risk','paused','graduated','dropped'].map(st => `<option value="${st}" ${eduState.statusFilter===st?'selected':''}>${st}</option>`).join('')}
         </select>
-        <button onclick="eduExportStudentsCSV()" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 text-xs font-bold px-3 py-1 rounded" title="Descargar CSV con los filtros actuales">📥 CSV</button>
+        <button onclick="eduExportStudentsCSV()" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 text-xs font-bold px-3 py-1 rounded" title="Descargar CSV con los filtros actuales">${osIcon('inbox')} CSV</button>
         <button onclick="eduAddStudent()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded">+ Estudiante manual</button>
         <div class="text-[10px] text-slate-500">${filtered.length} de ${students.length}</div>
       </div>
 
       <!-- Lista CRM simplificada: Nombre / Etapa / Fecha mod etapa / Fecha entrada / Activo / Pago -->
-      ${filtered.length === 0 ? ((typeof kitEmpty === 'function') ? kitEmpty('🎓', 'Sin alumnos con este filtro') : `<div class="text-center py-12 text-slate-400 text-xs">Sin estudiantes con esos filtros.</div>`) : `
+      ${filtered.length === 0 ? ((typeof kitEmpty === 'function') ? kitEmpty(osIcon('graduation-cap'), 'Sin alumnos con este filtro') : `<div class="text-center py-12 text-slate-400 text-xs">Sin estudiantes con esos filtros.</div>`) : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50">
@@ -635,7 +635,7 @@ function eduRenderStudents() {
                 // "Última actualización" = ultima_fecha_seguimiento si existe, sino stage_started_at
                 const ultimaFecha = s.ultima_fecha_seguimiento || s.stage_started_at;
                 const activo = s.status === 'active' && s.payment_status !== 'expired' && s.payment_status !== 'cancelled';
-                const pagoLbl = ({ active: '✓ Al día', past_due: '⚠️ Atrasado', expired: '🚫 Vencido', paused: '⏸ Pausado', cancelled: '❌ Cancelado' })[s.payment_status] || '—';
+                const pagoLbl = ({ active: '✓ Al día', past_due: 'Atrasado', expired: 'Vencido', paused: 'Pausado', cancelled: 'Cancelado' })[s.payment_status] || '—';
                 const pagoCls = s.payment_status === 'active' ? 'bg-emerald-100 text-emerald-800' :
                                 s.payment_status === 'past_due' ? 'bg-amber-100 text-amber-800' :
                                 s.payment_status === 'expired' || s.payment_status === 'cancelled' ? 'bg-red-100 text-red-800' :
@@ -652,7 +652,7 @@ function eduRenderStudents() {
                   <td class="p-2"><span class="text-[10px] ${pagoCls} px-1.5 py-0.5 rounded font-bold">${pagoLbl}</span></td>
                   <td class="p-2">
                     <div class="flex gap-1 justify-end" onclick="event.stopPropagation()">
-                      ${s.phone ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded" title="WhatsApp rápido">💬</button>` : ''}
+                      ${s.phone ? `<button onclick="eduOpenWhatsappQuick('${s.id}')" class="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded" title="WhatsApp rápido">${osIcon('message')}</button>` : ''}
                       <span onclick="eduShowStudentDetail('${s.id}')" class="text-blue-600 text-[10px] hover:underline cursor-pointer">ver →</span>
                     </div>
                   </td>
@@ -737,15 +737,15 @@ function eduRenderProgress() {
       <!-- KPIs -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div class="bg-slate-900 text-white rounded-xl p-3"><div class="text-[10px] text-slate-400 uppercase font-bold">GLScore prom</div><div class="text-3xl font-bold">${avgScoreDisplay}</div>${avgScore==null?'<div class="text-[9px] text-slate-500 mt-0.5">cobertura <30%</div>':''}</div>
-        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div class="text-[10px] text-emerald-700 uppercase font-bold">🏆 Excelente</div><div class="text-3xl font-bold text-emerald-900">${bands.excelente}</div><div class="text-[10px] text-emerald-700">≥80</div></div>
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] text-blue-700 uppercase font-bold">✅ Bueno</div><div class="text-3xl font-bold text-blue-900">${bands.bueno}</div><div class="text-[10px] text-blue-700">60-79</div></div>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[10px] text-amber-700 uppercase font-bold">⚠️ Atención</div><div class="text-3xl font-bold text-amber-900">${bands['atención']}</div><div class="text-[10px] text-amber-700">40-59</div></div>
-        <div class="bg-red-50 border border-red-200 rounded-xl p-3"><div class="text-[10px] text-red-700 uppercase font-bold">🔴 Crítico</div><div class="text-3xl font-bold text-red-900">${bands['crítico']}</div><div class="text-[10px] text-red-700">&lt;40</div></div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div class="text-[10px] text-emerald-700 uppercase font-bold">${osIcon('trophy')} Excelente</div><div class="text-3xl font-bold text-emerald-900">${bands.excelente}</div><div class="text-[10px] text-emerald-700">≥80</div></div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3"><div class="text-[10px] text-blue-700 uppercase font-bold">${osIcon('check-circle')} Bueno</div><div class="text-3xl font-bold text-blue-900">${bands.bueno}</div><div class="text-[10px] text-blue-700">60-79</div></div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[10px] text-amber-700 uppercase font-bold">${osIcon('alert')} Atención</div><div class="text-3xl font-bold text-amber-900">${bands['atención']}</div><div class="text-[10px] text-amber-700">40-59</div></div>
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3"><div class="text-[10px] text-red-700 uppercase font-bold">${kitStatusDot('bad')} Crítico</div><div class="text-3xl font-bold text-red-900">${bands['crítico']}</div><div class="text-[10px] text-red-700">&lt;40</div></div>
       </div>
 
       <!-- Distribución por etapa (funnel-style) -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">🎯 Distribución por etapa</div>
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('target')} Distribución por etapa</div>
         <div class="p-3 space-y-1">
           ${(m?.stages || []).map(st => {
             const n = byStage[st.key] || 0;
@@ -764,7 +764,7 @@ function eduRenderProgress() {
       <!-- Top performers + worst -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-emerald-200 rounded-xl overflow-hidden">
-          <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 text-xs font-bold uppercase text-emerald-900">🏆 Top 10 GLScore</div>
+          <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 text-xs font-bold uppercase text-emerald-900">${osIcon('trophy')} Top 10 GLScore</div>
           <table class="w-full text-xs">
             <tbody>
               ${[...students].sort((a,b) => (b.glscore||0)-(a.glscore||0)).slice(0,10).map(s => `<tr class="border-t border-slate-100"><td class="p-2 font-semibold">${s.full_name}</td><td class="p-2 text-right font-bold text-emerald-700">${s.glscore||50}</td><td class="p-2 text-[10px] text-slate-500">${eduStageObj(s.current_stage)?.name||'—'}</td></tr>`).join('')}
@@ -772,7 +772,7 @@ function eduRenderProgress() {
           </table>
         </div>
         <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
-          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">🔴 Bottom 10 — necesitan atención</div>
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">${kitStatusDot('bad')} Bottom 10 — necesitan atención</div>
           <table class="w-full text-xs">
             <tbody>
               ${[...students].sort((a,b) => (a.glscore||0)-(b.glscore||0)).slice(0,10).map(s => `<tr class="border-t border-slate-100"><td class="p-2 font-semibold">${s.full_name}</td><td class="p-2 text-right font-bold text-red-700">${s.glscore||50}</td><td class="p-2 text-[10px] text-slate-500">${eduStageObj(s.current_stage)?.name||'—'}</td></tr>`).join('')}
@@ -799,7 +799,7 @@ function eduRenderResources() {
       </div>
       ${resources.length === 0 ? `<div class="text-center py-12 text-slate-400 text-xs">Sin recursos. Agregá slides, docs y links para que el plan IA los referencie automáticamente.</div>` : ''}
 
-      ${(m?.stages || []).concat([{key:'__all__', name:'📌 General (todas las etapas)'}]).map(st => {
+      ${(m?.stages || []).concat([{key:'__all__', name:'General (todas las etapas)'}]).map(st => {
         const items = byStage[st.key] || [];
         if (items.length === 0 && st.key !== '__all__') return '';
         return `
@@ -810,13 +810,13 @@ function eduRenderResources() {
                 ${items.map(r => `
                   <div class="p-2 flex justify-between items-center hover:bg-slate-50">
                     <div class="flex-1 min-w-0">
-                      <div class="text-xs font-semibold">${r.type === 'slide'?'🎬':r.type==='video'?'📹':r.type==='doc'?'📄':r.type==='template'?'📋':r.type==='checklist'?'☑️':'🔗'} ${r.title}</div>
+                      <div class="text-xs font-semibold">${r.type === 'slide'?osIcon('video'):r.type==='video'?'📹':r.type==='doc'?osIcon('file'):r.type==='template'?osIcon('clipboard'):r.type==='checklist'?osIcon('check-circle'):osIcon('link')} ${r.title}</div>
                       ${r.description ? `<div class="text-[10px] text-slate-500">${r.description}</div>` : ''}
                       ${r.tags?.length ? `<div class="flex gap-1 mt-1">${r.tags.map(t => `<span class="bg-slate-100 text-slate-700 text-[9px] px-1 rounded">${t}</span>`).join('')}</div>` : ''}
                     </div>
                     <div class="flex gap-1">
                       ${r.url ? `<a href="${r.url}" target="_blank" class="text-blue-600 text-[10px] hover:underline">abrir↗</a>` : ''}
-                      <button onclick="eduDeleteResource('${r.id}')" class="text-red-500 hover:text-red-700 text-[10px]">🗑</button>
+                      <button onclick="eduDeleteResource('${r.id}')" class="text-red-500 hover:text-red-700 text-[10px]">${osIcon('trash')}</button>
                     </div>
                   </div>
                 `).join('')}
@@ -848,7 +848,7 @@ function eduRenderCalls() {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-blue-50 border-b border-blue-200 px-3 py-2 text-xs font-bold uppercase text-blue-900">📅 Próximas (${upcoming.length})</div>
+          <div class="bg-blue-50 border-b border-blue-200 px-3 py-2 text-xs font-bold uppercase text-blue-900">${osIcon('calendar')} Próximas (${upcoming.length})</div>
           ${upcoming.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin llamadas programadas.</div>' : `
             <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
               ${upcoming.map(c => `
@@ -861,12 +861,12 @@ function eduRenderCalls() {
           `}
         </div>
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">🕓 Recientes (${recent.length})</div>
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">Recientes (${recent.length})</div>
           ${recent.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin llamadas recientes.</div>' : `
             <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
               ${recent.slice(0,15).map(c => `
                 <div class="p-2 text-xs">
-                  <div class="font-semibold">${studentName(c.student_id)} ${c.attended===false?'❌':c.attended===true?'✓':''}</div>
+                  <div class="font-semibold">${studentName(c.student_id)} ${c.attended===false?osIcon('x-circle'):c.attended===true?'✓':''}</div>
                   <div class="text-[10px] text-slate-500">${new Date(c.scheduled_at).toLocaleString('es-MX')} · ${c.type}</div>
                   ${c.notes_md ? `<div class="text-[10px] text-slate-600 mt-1 line-clamp-2">${c.notes_md}</div>` : ''}
                 </div>
@@ -926,7 +926,7 @@ function eduRenderAlertsLegacy() {
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><div class="text-[10px] text-slate-600 uppercase font-bold">Total</div><div class="text-3xl font-bold text-slate-700">${all.length}</div></div>
       </div>
 
-      ${all.length === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">✅</div><div class="font-bold mt-2">Sin alertas activas</div><div class="text-xs text-slate-500 mt-1">Todos los estudiantes están al día.</div></div>` :
+      ${all.length === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">${osIcon('check-circle')}</div><div class="font-bold mt-2">Sin alertas activas</div><div class="text-xs text-slate-500 mt-1">Todos los estudiantes están al día.</div></div>` :
         ['critical','high','normal','low'].map(sev => {
           const items = grouped[sev];
           if (items.length === 0) return '';
@@ -961,12 +961,12 @@ function eduRenderConfig() {
   return `
     <div class="space-y-3">
       <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        💡 <strong>Configurá esta mentoría</strong>: Airtable IDs para sync de estudiantes, etapas, weights del GLScore.
+        ${osIcon('lightbulb')} <strong>Configurá esta mentoría</strong>: Airtable IDs para sync de estudiantes, etapas, weights del GLScore.
       </div>
 
       <!-- Airtable config -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">🔗 Airtable</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('link')} Airtable</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Base ID (ej. appXXX...)</label>
@@ -977,13 +977,13 @@ function eduRenderConfig() {
             <input id="edu-cfg-table" value="${m.airtable_students_table||''}" placeholder="Estudiantes" class="w-full border border-slate-300 rounded px-2 py-1.5 text-[11px]" />
           </div>
         </div>
-        <div class="text-[10px] text-slate-500 mt-2">💡 El Airtable API key se guarda en Supabase Vault, no acá. Decime cuando estés listo y te indico cómo agregarlo.</div>
-        <button onclick="eduSaveConfig()" class="mt-2 bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">💾 Guardar config</button>
+        <div class="text-[10px] text-slate-500 mt-2">${osIcon('lightbulb')} El Airtable API key se guarda en Supabase Vault, no acá. Decime cuando estés listo y te indico cómo agregarlo.</div>
+        <button onclick="eduSaveConfig()" class="mt-2 bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('save')} Guardar config</button>
       </div>
 
       <!-- Etapas -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">🎯 Etapas del programa</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('target')} Etapas del programa</div>
         <div class="space-y-1">
           ${(m.stages || []).map((s, i) => `
             <div class="flex items-center gap-2 text-xs">
@@ -999,7 +999,7 @@ function eduRenderConfig() {
 
       <!-- GLScore weights -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 GLScore Weights (%)</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('chart')} GLScore Weights (%)</div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
           ${Object.entries(m.glscore_weights || {}).map(([k,v]) => `
             <div>
@@ -1011,11 +1011,11 @@ function eduRenderConfig() {
         <div class="text-[10px] text-slate-500 mt-2 italic">Configuración avanzada. Si querés cambiar los weights, decímelo.</div>
       </div>
 
-      <!-- 🩺 Health check de schema -->
+      <!-- Health check de schema -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
         <div class="flex items-center justify-between mb-2">
-          <div class="text-xs font-bold uppercase text-slate-700">🩺 Health check de base de datos</div>
-          <button onclick="eduRunHealthCheck()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">▶️ Ejecutar diagnóstico</button>
+          <div class="text-xs font-bold uppercase text-slate-700">Health check de base de datos</div>
+          <button onclick="eduRunHealthCheck()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('play')} Ejecutar diagnóstico</button>
         </div>
         <div class="text-[10px] text-slate-500 mb-2">Valida que todas las tablas críticas existan en Supabase. Si falta alguna, te muestro el SQL exacto a correr.</div>
         <div id="edu-health-results" class="text-xs"></div>
@@ -1048,7 +1048,7 @@ const EDU_CRITICAL_TABLES = [
 async function eduRunHealthCheck() {
   const container = document.getElementById('edu-health-results');
   if (!container) return;
-  container.innerHTML = '<div class="text-slate-500">⏳ Chequeando ' + EDU_CRITICAL_TABLES.length + ' tablas/vistas...</div>';
+  container.innerHTML = '<div class="text-slate-500">' + osIcon('loader') + ' Chequeando ' + EDU_CRITICAL_TABLES.length + ' tablas/vistas...</div>';
 
   const results = [];
   for (const t of EDU_CRITICAL_TABLES) {
@@ -1105,8 +1105,8 @@ async function eduRunHealthCheck() {
           ${results.map(r => `
             <tr class="border-t border-slate-100 ${!r.ok && r.critical ? 'bg-red-50' : !r.ok ? 'bg-amber-50' : ''}">
               <td class="p-1.5 font-mono">${r.table}</td>
-              <td class="p-1.5 text-center">${r.is_view ? '👁️' : '📋'}</td>
-              <td class="p-1.5 text-center">${r.critical ? '🔴' : '○'}</td>
+              <td class="p-1.5 text-center">${r.is_view ? osIcon('eye') : osIcon('clipboard')}</td>
+              <td class="p-1.5 text-center">${r.critical ? kitStatusDot('bad') : '○'}</td>
               <td class="p-1.5 text-right font-mono">${r.count ?? '—'}</td>
               <td class="p-1.5 ${r.ok?'text-emerald-700':'text-red-700'} font-bold">${r.ok ? '✓ OK' : '✗ ' + r.error}</td>
             </tr>
@@ -1117,15 +1117,15 @@ async function eduRunHealthCheck() {
 
     ${missingSqls.size > 0 ? `
       <div class="mt-3 bg-amber-50 border border-amber-300 rounded p-2">
-        <div class="text-[10px] font-bold uppercase text-amber-900 mb-1">📋 SQLs a correr en Supabase</div>
+        <div class="text-[10px] font-bold uppercase text-amber-900 mb-1">${osIcon('clipboard')} SQLs a correr en Supabase</div>
         <div class="text-[10px] text-amber-800 mb-1.5">Encontré tablas faltantes. Corré estos archivos en orden desde el SQL Editor:</div>
         <ul class="space-y-0.5 text-[11px] font-mono">
-          ${Array.from(missingSqls).map(s => `<li class="bg-white px-2 py-1 rounded border border-amber-200">📄 supabase/${s}</li>`).join('')}
+          ${Array.from(missingSqls).map(s => `<li class="bg-white px-2 py-1 rounded border border-amber-200">${osIcon('file')} supabase/${s}</li>`).join('')}
         </ul>
       </div>
     ` : `
       <div class="mt-3 bg-emerald-50 border border-emerald-200 rounded p-2 text-[11px] text-emerald-900 text-center font-bold">
-        ✅ Todas las tablas críticas existen. Sistema saludable.
+        ${osIcon('check-circle')} Todas las tablas críticas existen. Sistema saludable.
       </div>
     `}
   `;
@@ -1232,21 +1232,21 @@ async function eduTriggerSync() {
     if (!r.ok) throw new Error(r.error || 'falló');
 
     // Diagnóstico detallado
-    let msg = `✅ Sync ejecutado\n\n`;
-    msg += `📥 De Airtable: ${r.fetched_from_airtable} records\n`;
-    msg += `💾 Guardados en DB: ${r.synced}\n`;
-    if (r.errors?.length) msg += `\n⚠️ Errores: ${r.errors.join('; ')}\n`;
+    let msg = `Sync ejecutado\n\n`;
+    msg += `De Airtable: ${r.fetched_from_airtable} records\n`;
+    msg += `Guardados en DB: ${r.synced}\n`;
+    if (r.errors?.length) msg += `\nErrores: ${r.errors.join('; ')}\n`;
     if (r.debug?.airtable_field_names?.length) {
-      msg += `\n🔍 Columnas detectadas en Airtable (las primeras 12):\n${r.debug.airtable_field_names.slice(0,12).join(' · ')}\n`;
+      msg += `\nColumnas detectadas en Airtable (las primeras 12):\n${r.debug.airtable_field_names.slice(0,12).join(' · ')}\n`;
     }
     if (r.fetched_from_airtable === 0) {
-      msg += `\n⚠️ Airtable devolvió 0 records. Verificá:\n• Que la tabla tenga registros\n• Que el table_id sea el correcto\n`;
+      msg += `\nAirtable devolvió 0 records. Verificá:\n• Que la tabla tenga registros\n• Que el table_id sea el correcto\n`;
     }
     if (r.debug?.sample_mapped_record) {
       const s = r.debug.sample_mapped_record;
-      msg += `\n📋 Primer registro mapeado:\n• full_name: ${s.full_name}\n• email: ${s.email||'(vacío)'}\n• enrolled_at: ${s.enrolled_at||'(vacío)'}\n• current_stage: ${s.current_stage||'(vacío)'}\n`;
+      msg += `\nPrimer registro mapeado:\n• full_name: ${s.full_name}\n• email: ${s.email||'(vacío)'}\n• enrolled_at: ${s.enrolled_at||'(vacío)'}\n• current_stage: ${s.current_stage||'(vacío)'}\n`;
       if (s.full_name?.startsWith('Estudiante ')) {
-        msg += `\n⚠️ No detectó el campo NOMBRE. Decime cómo se llama la columna en Airtable y la mapeo.`;
+        msg += `\nNo detectó el campo NOMBRE. Decime cómo se llama la columna en Airtable y la mapeo.`;
       }
     }
     alert(msg);
@@ -1266,11 +1266,11 @@ async function eduDebugDB() {
     .eq('mentorship_id', m.id)
     .limit(5);
   if (error) return alert('Error consultando DB: ' + error.message);
-  let msg = `📊 Estado en la DB Supabase\n\n`;
+  let msg = `Estado en la DB Supabase\n\n`;
   msg += `Mentoría: ${m.name}\n`;
   msg += `Estudiantes guardados: ${count}\n\n`;
   if (count === 0) {
-    msg += 'NO hay registros para esta mentoría.\n\nPosibles causas:\n• El sync nunca corrió correctamente\n• Falló el INSERT silenciosamente\n• El mentorship_id está mal seteado\n\nProbá:\n1. Click "🔄 Sync" otra vez\n2. Mirá si el alert de sync dice "synced > 0"';
+    msg += 'NO hay registros para esta mentoría.\n\nPosibles causas:\n• El sync nunca corrió correctamente\n• Falló el INSERT silenciosamente\n• El mentorship_id está mal seteado\n\nProbá:\n1. Click "Sync" otra vez\n2. Mirá si el alert de sync dice "synced > 0"';
   } else {
     msg += 'Primeros 5 estudiantes:\n';
     data.forEach((s, i) => {
@@ -1278,7 +1278,7 @@ async function eduDebugDB() {
       msg += `\n   email: ${s.email||'—'} | etapa: ${s.current_stage||'—'} | status: ${s.status}`;
       msg += `\n   airtable_id: ${s.airtable_record_id?.slice(0,15) || '—'}`;
     });
-    msg += '\n\n✅ La DB tiene registros. Si el UI los muestra en 0, hard refresh.';
+    msg += '\n\nLa DB tiene registros. Si el UI los muestra en 0, hard refresh.';
   }
   alert(msg);
 }
@@ -1290,7 +1290,7 @@ async function eduDebugDB() {
 // ============================================================
 async function openEduReportsSystem(sys) {
   eduState.sys = sys;
-  openModal(`📈 ${sys.name}`, '<div id="edu-root"><div class="p-6 text-center"><div class="text-2xl animate-pulse">📊</div><div class="text-xs text-slate-500 mt-2">Cargando datos del informe...</div><div class="text-[10px] text-slate-400 mt-1">Si se queda colgado > 10s, refrescá la página (sesión puede haber expirado).</div></div></div>');
+  openModal(`${sys.name}`, '<div id="edu-root"><div class="p-6 text-center"><div class="text-2xl animate-pulse">' + osIcon('chart') + '</div><div class="text-xs text-slate-500 mt-2">Cargando datos del informe...</div><div class="text-[10px] text-slate-400 mt-1">Si se queda colgado > 10s, refrescá la página (sesión puede haber expirado).</div></div></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-6xl');
   try {
@@ -1308,7 +1308,7 @@ async function openEduReportsSystem(sys) {
       root.innerHTML = `
         <div class="p-6">
           <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-            <h3 class="font-bold text-red-900 mb-2">⚠️ No pude abrir el informe</h3>
+            <h3 class="font-bold text-red-900 mb-2">${osIcon('alert')} No pude abrir el informe</h3>
             <pre class="text-xs text-red-700 bg-white p-3 rounded border whitespace-pre-wrap">${(window.esc||((s)=>s))(err?.message || String(err))}</pre>
             <div class="text-xs text-slate-600 mt-3">
               Posibles causas:
@@ -1446,7 +1446,7 @@ function eduRenderReportsStandalone() {
     root.innerHTML = `
       <div class="p-6">
         <div class="bg-red-50 border border-red-200 rounded-xl p-6">
-          <h3 class="font-bold text-red-900 mb-2">⚠️ Error renderizando informe</h3>
+          <h3 class="font-bold text-red-900 mb-2">${osIcon('alert')} Error renderizando informe</h3>
           <pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap mt-2">${(window.esc||((s)=>s))(err?.message || String(err))}</pre>
           ${err?.stack ? `<details class="mt-2"><summary class="text-xs text-slate-600 cursor-pointer">Stack trace</summary><pre class="text-[10px] bg-white p-2 rounded mt-1 overflow-x-auto">${(window.esc||((s)=>s))(err.stack)}</pre></details>` : ''}
           <div class="text-xs text-slate-600 mt-3">
@@ -1568,13 +1568,13 @@ function eduRenderBoardSummary(board) {
     <div class="bg-gradient-to-br from-slate-900 to-indigo-900 text-white rounded-xl overflow-hidden mb-4">
       <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-[10px] font-bold uppercase text-indigo-200 tracking-wider">📋 RESUMEN EJECUTIVO · ${m?.name || ''}</div>
+          <div class="text-[10px] font-bold uppercase text-indigo-200 tracking-wider">${osIcon('clipboard')} RESUMEN EJECUTIVO · ${m?.name || ''}</div>
           <div class="text-lg font-bold mt-1">Informe para Junta Directiva</div>
           <div class="text-[11px] text-indigo-200">Datos en vivo · ${new Date().toLocaleDateString('es', { day:'numeric', month:'long', year:'numeric' })}</div>
         </div>
         <div class="flex gap-2 flex-wrap">
-          <button onclick="eduOpenSystemFromReports('edu-manager')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">🎓 Ver CRM →</button>
-          <button onclick="eduOpenSystemFromReports('edu-methodology')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">📘 Ver Metodología →</button>
+          <button onclick="eduOpenSystemFromReports('edu-manager')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('graduation-cap')} Ver CRM →</button>
+          <button onclick="eduOpenSystemFromReports('edu-methodology')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">Ver Metodología →</button>
         </div>
       </div>
 
@@ -1612,7 +1612,7 @@ function eduRenderBoardSummary(board) {
         <div class="px-5 pb-4">
           <div class="bg-amber-500/20 border border-amber-300/30 rounded-lg px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div class="text-xs text-amber-100">
-              <strong class="text-amber-50">⚠️ ${alertasAbiertas} alerta${alertasAbiertas===1?'':'s'} sin atender</strong> · estudiantes que requieren intervención inmediata
+              <strong class="text-amber-50">${osIcon('alert')} ${alertasAbiertas} alerta${alertasAbiertas===1?'':'s'} sin atender</strong> · estudiantes que requieren intervención inmediata
             </div>
             <button onclick="eduOpenSystemFromReports('edu-manager','alerts')" class="bg-amber-400 hover:bg-amber-300 text-amber-900 text-xs font-bold px-3 py-1 rounded">Ver alertas →</button>
           </div>
@@ -1623,7 +1623,7 @@ function eduRenderBoardSummary(board) {
     <!-- Distribución por etapa · embudo visual -->
     <div class="bg-white border border-slate-200 rounded-xl p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
-        <div class="text-sm font-bold text-slate-900">📈 Embudo por etapa</div>
+        <div class="text-sm font-bold text-slate-900">${osIcon('trending-up')} Embudo por etapa</div>
         <div class="text-[10px] text-slate-500">${m?.stages?.length || 0} etapas · ${total} estudiantes</div>
       </div>
       <div class="space-y-2">
@@ -1649,7 +1649,7 @@ function eduRenderBoardSummary(board) {
     <div class="grid md:grid-cols-2 gap-4 mb-4">
       <!-- Top cohortes -->
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-sm font-bold text-slate-900 mb-3">👨‍👩‍👧‍👦 Top cohortes</div>
+        <div class="text-sm font-bold text-slate-900 mb-3">‍‍‍Top cohortes</div>
         ${topCohortes.length ? topCohortes.map(([nom, n]) => `
           <div class="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
             <div class="text-sm text-slate-700 truncate flex-1 mr-2">${(nom||'').replace(/</g,'&lt;')}</div>
@@ -1659,7 +1659,7 @@ function eduRenderBoardSummary(board) {
       </div>
       <!-- Distribución de perfiles -->
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-sm font-bold text-slate-900 mb-3">🎯 Distribución de perfiles (planes activos)</div>
+        <div class="text-sm font-bold text-slate-900 mb-3">${osIcon('target')} Distribución de perfiles (planes activos)</div>
         ${Object.keys(perfilesDist).length ? Object.entries(perfilesDist).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([nom, n]) => {
           const pct = plansCount ? Math.round(100 * n / plansCount) : 0;
           return `
@@ -1769,16 +1769,16 @@ function eduRenderBoardInsights(metrics) {
   }
 
   const colorMap = {
-    critica: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-900', accent: 'bg-red-600', label: '🚨 CRÍTICO' },
-    atencion: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900', accent: 'bg-amber-500', label: '⚠️ ATENCIÓN' },
-    win: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-900', accent: 'bg-emerald-600', label: '✅ FORTALEZA' },
-    oportunidad: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', accent: 'bg-blue-600', label: '💡 OPORTUNIDAD' }
+    critica: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-900', accent: 'bg-red-600', label: 'CRÍTICO' },
+    atencion: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900', accent: 'bg-amber-500', label: 'ATENCIÓN' },
+    win: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-900', accent: 'bg-emerald-600', label: 'FORTALEZA' },
+    oportunidad: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', accent: 'bg-blue-600', label: 'OPORTUNIDAD' }
   };
 
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
       <div class="bg-slate-900 text-white px-5 py-3">
-        <div class="font-bold text-sm">💼 Insights ejecutivos · qué presentar a la junta</div>
+        <div class="font-bold text-sm">${osIcon('briefcase')} Insights ejecutivos · qué presentar a la junta</div>
         <div class="text-[10px] text-slate-400 mt-0.5">Conclusiones accionables generadas automáticamente desde los datos</div>
       </div>
       <div class="p-4 space-y-3">
@@ -1798,7 +1798,7 @@ function eduRenderBoardInsights(metrics) {
         }).join('')}
       </div>
       <div class="bg-slate-50 border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">
-        💡 Estos insights se generan en vivo desde el CRM y Metodología. La narrativa IA completa se genera más abajo.
+        ${osIcon('lightbulb')} Estos insights se generan en vivo desde el CRM y Metodología. La narrativa IA completa se genera más abajo.
       </div>
     </div>
   `;
@@ -1941,11 +1941,11 @@ function eduRenderMarketingDashboard(mkt) {
     <div class="bg-white border-2 border-pink-300 rounded-xl overflow-hidden">
       <div class="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-4 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-[10px] font-bold uppercase text-pink-100 tracking-wider">📣 INFORME MARKETING & VENTAS</div>
+          <div class="text-[10px] font-bold uppercase text-pink-100 tracking-wider">${osIcon('megaphone')} INFORME MARKETING & VENTAS</div>
           <div class="text-lg font-bold mt-0.5">Datos para decisiones de campaña y producto</div>
           <div class="text-[11px] text-pink-100">Últimos 30 días · ${total} estudiantes · ${totalLeads} leads · ${totalClientes} clientes</div>
         </div>
-        <button onclick="eduExportMarketingCsv()" class="bg-white text-pink-700 text-xs font-bold px-3 py-1.5 rounded">📥 Export CSV</button>
+        <button onclick="eduExportMarketingCsv()" class="bg-white text-pink-700 text-xs font-bold px-3 py-1.5 rounded">${osIcon('inbox')} Export CSV</button>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-pink-50">
         <div class="bg-white rounded-lg p-3 border border-pink-100"><div class="text-[10px] uppercase text-slate-500 font-bold">Leads totales</div><div class="text-2xl font-bold text-slate-900 mt-1">${totalLeads}</div><div class="text-[10px] text-slate-500">${acq.length} canales activos</div></div>
@@ -1954,26 +1954,26 @@ function eduRenderMarketingDashboard(mkt) {
         <div class="bg-white rounded-lg p-3 border border-pink-100"><div class="text-[10px] uppercase text-slate-500 font-bold">Logins / estudiante</div><div class="text-2xl font-bold text-slate-900 mt-1">${loginsPerStudent}</div><div class="text-[10px] text-slate-500">30d${avgTaskMin?` · ${avgTaskMin}min/tarea`:''}</div></div>
       </div>
       <div class="p-4 border-t border-pink-100">
-        <div class="text-xs font-bold text-slate-900 mb-2">🎯 Origen + conversión por canal</div>
+        <div class="text-xs font-bold text-slate-900 mb-2">${osIcon('target')} Origen + conversión por canal</div>
         ${acq.length ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-100 text-slate-700"><tr><th class="px-2 py-1 text-left">Canal</th><th class="px-2 py-1 text-left">Campaña</th><th class="px-2 py-1 text-right">Leads</th><th class="px-2 py-1 text-right">Clientes</th><th class="px-2 py-1 text-right">Conv.</th><th class="px-2 py-1 text-right">Revenue</th></tr></thead><tbody>${acq.sort((a,b)=>(b.revenue||0)-(a.revenue||0)).map(a => `<tr class="border-b border-slate-100"><td class="px-2 py-1 font-semibold">${(a.canal||'').replace(/</g,'&lt;')}</td><td class="px-2 py-1 text-slate-600 text-[10px]">${(a.campania||'—').replace(/</g,'&lt;')}</td><td class="px-2 py-1 text-right">${a.leads||0}</td><td class="px-2 py-1 text-right">${a.clientes||0}</td><td class="px-2 py-1 text-right font-bold ${(a.conv_pct||0)>=15?'text-emerald-700':(a.conv_pct||0)>=5?'text-amber-700':'text-slate-600'}">${a.conv_pct||0}%</td><td class="px-2 py-1 text-right">$${Number(a.revenue||0).toLocaleString('en-US')}</td></tr>`).join('')}</tbody></table></div>` : `<div class="text-xs text-slate-400 italic">No hay datos de origen. Capturá <code>lead_source</code> al crear estudiantes para analizar canales.</div>`}
       </div>
       <div class="grid md:grid-cols-2 gap-4 p-4 border-t border-pink-100">
         <div>
-          <div class="text-xs font-bold text-slate-900 mb-2">👥 Engagement actual</div>
+          <div class="text-xs font-bold text-slate-900 mb-2">${osIcon('users')} Engagement actual</div>
           <div class="space-y-1.5 text-xs">
-            <div class="flex items-center justify-between"><span class="text-emerald-700">🟢 Activos (últimos 3d)</span><strong>${engCount.activo||0}</strong></div>
-            <div class="flex items-center justify-between"><span class="text-amber-700">🟡 Tibios (3-14d)</span><strong>${engCount.tibio||0}</strong></div>
-            <div class="flex items-center justify-between"><span class="text-red-700">🔴 Fríos (+14d)</span><strong>${engCount.frio||0}</strong></div>
+            <div class="flex items-center justify-between"><span class="text-emerald-700">${kitStatusDot('ok')} Activos (últimos 3d)</span><strong>${engCount.activo||0}</strong></div>
+            <div class="flex items-center justify-between"><span class="text-amber-700">${kitStatusDot('warn')} Tibios (3-14d)</span><strong>${engCount.tibio||0}</strong></div>
+            <div class="flex items-center justify-between"><span class="text-red-700">${kitStatusDot('bad')} Fríos (+14d)</span><strong>${engCount.frio||0}</strong></div>
             <div class="flex items-center justify-between"><span class="text-slate-500">⚪ Nunca abrió portal</span><strong>${engCount.nunca||0}</strong></div>
           </div>
         </div>
         <div>
-          <div class="text-xs font-bold text-slate-900 mb-2">🎯 Perfiles del cliente (diagnóstico)</div>
+          <div class="text-xs font-bold text-slate-900 mb-2">${osIcon('target')} Perfiles del cliente (diagnóstico)</div>
           ${Object.keys(perfiles).length ? Object.entries(perfiles).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n, c]) => { const pct = diag.length ? Math.round(100*c/diag.length) : 0; return `<div class="mb-1"><div class="flex justify-between text-[11px]"><span class="truncate">${n.replace(/</g,'&lt;')}</span><span><strong>${c}</strong> · ${pct}%</span></div><div class="w-full bg-slate-100 rounded-full h-1.5"><div class="bg-pink-500 h-1.5 rounded-full" style="width:${pct}%"></div></div></div>`; }).join('') : '<div class="text-xs text-slate-400 italic">Aún no hay diagnósticos.</div>'}
         </div>
       </div>
       <div class="p-4 border-t border-pink-100 bg-amber-50">
-        <div class="text-xs font-bold text-slate-900 mb-3">💡 Análisis del diagnóstico — qué te dice el cliente</div>
+        <div class="text-xs font-bold text-slate-900 mb-3">${osIcon('lightbulb')} Análisis del diagnóstico — qué te dice el cliente</div>
         <div class="grid md:grid-cols-3 gap-3 text-xs">
           <div>
             <div class="text-[10px] font-bold uppercase text-amber-700 mb-1">Top metas declaradas</div>
@@ -1991,20 +1991,20 @@ function eduRenderMarketingDashboard(mkt) {
       </div>
       <div class="grid md:grid-cols-2 gap-4 p-4 border-t border-pink-100">
         <div>
-          <div class="text-xs font-bold text-slate-900 mb-2">📚 Top 5 lecciones más vistas</div>
+          <div class="text-xs font-bold text-slate-900 mb-2">${osIcon('book')} Top 5 lecciones más vistas</div>
           ${Object.keys(lessonViews).length ? Object.entries(lessonViews).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,c]) => `<div class="flex justify-between text-[11px] py-1 border-b border-slate-100"><span class="truncate">${n.replace(/</g,'&lt;')}</span><strong>${c} vistas</strong></div>`).join('') : '<div class="text-xs text-slate-400 italic">Sin tracking aún. Loguear lesson_view al abrir lecciones para activar.</div>'}
         </div>
         <div>
-          <div class="text-xs font-bold text-slate-900 mb-2">⏱ Top 5 tareas más completadas</div>
+          <div class="text-xs font-bold text-slate-900 mb-2">${osIcon('clock')} Top 5 tareas más completadas</div>
           ${Object.keys(taskComplete).length ? Object.entries(taskComplete).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,c]) => `<div class="flex justify-between text-[11px] py-1 border-b border-slate-100"><span class="truncate">${n.replace(/</g,'&lt;')}</span><strong>${c}×</strong></div>`).join('') : '<div class="text-xs text-slate-400 italic">Sin tracking aún. Loguear task_complete con duration_seconds.</div>'}
         </div>
       </div>
       <div class="p-4 border-t border-pink-100 bg-blue-50">
-        <div class="text-xs font-bold text-slate-900 mb-2">💬 Templates WhatsApp — ranking por respuesta</div>
+        <div class="text-xs font-bold text-slate-900 mb-2">${osIcon('message')} Templates WhatsApp — ranking por respuesta</div>
         ${topTemplates.length ? `<table class="w-full text-xs"><thead><tr class="text-slate-700"><th class="text-left">Template</th><th class="text-right">Enviados</th><th class="text-right">Respondieron</th><th class="text-right">% respuesta</th></tr></thead><tbody>${topTemplates.map(t => `<tr class="border-t border-blue-200"><td class="py-1">${t.label.replace(/</g,'&lt;')}</td><td class="py-1 text-right">${t.total}</td><td class="py-1 text-right">${t.replied}</td><td class="py-1 text-right font-bold ${t.reply_pct>=50?'text-emerald-700':t.reply_pct>=25?'text-amber-700':'text-slate-600'}">${t.reply_pct}%</td></tr>`).join('')}</tbody></table>` : `<div class="text-xs text-slate-400 italic">Aún no hay datos. Empezá a usar los templates de WhatsApp y los datos se llenan solos.</div>`}
       </div>
       <div class="p-4 border-t border-pink-100">
-        <div class="text-xs font-bold text-slate-900 mb-3">🚀 Recomendaciones accionables para próximas campañas</div>
+        <div class="text-xs font-bold text-slate-900 mb-3">${osIcon('rocket')} Recomendaciones accionables para próximas campañas</div>
         <div class="space-y-2">
           ${recs.map(r => {
             const cmap = {
@@ -2164,17 +2164,17 @@ function _eduRenderReportsStandaloneInner(root) {
 
       <div class="flex-1 overflow-y-auto space-y-3">
 
-        <!-- 🆕 RESUMEN EJECUTIVO EN VIVO (board-friendly · no depende de vistas SQL) -->
+        <!-- RESUMEN EJECUTIVO EN VIVO (board-friendly · no depende de vistas SQL) -->
         ${cur ? eduRenderBoardSummary(boardSummary) : ''}
 
-        <!-- 🆕 DASHBOARD MARKETING & VENTAS -->
+        <!-- DASHBOARD MARKETING & VENTAS -->
         ${cur ? eduRenderMarketingDashboard(mktData) : ''}
 
         <!-- KPIs dashboard (auto desde DB) -->
         <div class="bg-slate-900 text-white rounded-xl p-4">
           <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <div class="text-xs font-bold uppercase text-slate-400">📊 KPIs Postventa</div>
+              <div class="text-xs font-bold uppercase text-slate-400">${osIcon('chart')} KPIs Postventa</div>
               <div class="flex items-center gap-2 mt-1">
                 <button onclick="eduReportNavMes(-1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">←</button>
                 <div class="text-xl font-bold capitalize">${mesLabel}</div>
@@ -2182,16 +2182,16 @@ function _eduRenderReportsStandaloneInner(root) {
               </div>
             </div>
             <div class="flex gap-2">
-              <button onclick="withLoading(this, eduGenerateReport)" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">🤖 Generar narrativa con IA</button>
-              <button onclick="eduExportKpisCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Export CSV</button>
+              <button onclick="withLoading(this, eduGenerateReport)" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('bot')} Generar narrativa con IA</button>
+              <button onclick="eduExportKpisCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('inbox')} Export CSV</button>
             </div>
           </div>
           ${!cur ? `<div class="mt-3 text-amber-300 text-xs">Seleccioná una mentoría arriba.</div>` : ''}
-          ${cur && !kpis ? `<div class="mt-3 text-slate-400 text-xs">⏳ Cargando KPIs del mes...</div>` : ''}
+          ${cur && !kpis ? `<div class="mt-3 text-slate-400 text-xs">${osIcon('loader')} Cargando KPIs del mes...</div>` : ''}
           ${cur && kpis ? eduRenderKpisDashboard(kpis) : ''}
         </div>
 
-        <!-- 🆕 Dashboard CEO — vista ejecutiva (Health Score + OKRs + funnel + cuellos botella) -->
+        <!-- Dashboard CEO — vista ejecutiva (Health Score + OKRs + funnel + cuellos botella) -->
         <div id="edu-ceo-section"></div>
 
         ${cur && kpis ? eduRenderInformeProfundo(kpis) : ''}
@@ -2201,14 +2201,14 @@ function _eduRenderReportsStandaloneInner(root) {
         ${(() => {
           const aiKey = `edu-report-profundo-${eduState.mentorshipId}`;
           const ai = (window.aiState && window.aiState[aiKey]) || {};
-          if (ai.loading) return `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-center text-violet-900 text-sm">🧠 IA generando narrativa ejecutiva...</div>`;
-          if (ai.error) return `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">⚠️ ${ai.error}</div>`;
+          if (ai.loading) return `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-center text-violet-900 text-sm">${osIcon('brain')} IA generando narrativa ejecutiva...</div>`;
+          if (ai.error) return `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">${osIcon('alert')} ${ai.error}</div>`;
           if (ai.narrativa) {
             const n = ai.narrativa;
             return `
               <div class="bg-white border-2 border-violet-300 rounded-xl overflow-hidden mt-4">
                 <div class="bg-violet-50 px-4 py-3 border-b border-violet-200">
-                  <h3 class="font-bold text-sm text-violet-900">📝 Narrativa ejecutiva (IA)</h3>
+                  <h3 class="font-bold text-sm text-violet-900">${osIcon('pencil-line')} Narrativa ejecutiva (IA)</h3>
                 </div>
                 <div class="p-4 prose prose-sm max-w-none text-xs whitespace-pre-wrap">
                   ${(n.summary_md || JSON.stringify(n, null, 2)).replace(/##\s/g,'\n## ').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}
@@ -2221,15 +2221,15 @@ function _eduRenderReportsStandaloneInner(root) {
 
         <!-- Form de generación con IA (opcional, abajo) -->
         <details class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-          <summary class="cursor-pointer font-bold text-violet-900 text-xs uppercase">🤖 Generar narrativa ejecutiva con IA (opcional)</summary>
+          <summary class="cursor-pointer font-bold text-violet-900 text-xs uppercase">${osIcon('bot')} Generar narrativa ejecutiva con IA (opcional)</summary>
           <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label class="block text-[10px] font-bold text-slate-600 mb-1">Período</label>
               <select onchange="eduState._reportPeriod=this.value; eduRenderReportsStandalone()" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-                <option value="weekly" ${period==='weekly'?'selected':''}>📅 Semanal</option>
-                <option value="biweekly" ${period==='biweekly'?'selected':''}>📆 Quincenal</option>
-                <option value="monthly" ${period==='monthly'?'selected':''}>🗓 Mensual</option>
-                <option value="quarterly" ${period==='quarterly'?'selected':''}>📊 Trimestral</option>
+                <option value="weekly" ${period==='weekly'?'selected':''}>${osIcon('calendar')} Semanal</option>
+                <option value="biweekly" ${period==='biweekly'?'selected':''}>${osIcon('calendar')} Quincenal</option>
+                <option value="monthly" ${period==='monthly'?'selected':''}>${osIcon('calendar-days')} Mensual</option>
+                <option value="quarterly" ${period==='quarterly'?'selected':''}>${osIcon('chart')} Trimestral</option>
               </select>
             </div>
             <div>
@@ -2242,23 +2242,23 @@ function _eduRenderReportsStandaloneInner(root) {
             </div>
           </div>
           <div class="mt-2">
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">📝 Notas de las clases grabadas (opcional)</label>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">${osIcon('pencil-line')} Notas de las clases grabadas (opcional)</label>
             <textarea id="edu-rep-classes" rows="3" placeholder="Pega un resumen de las clases del período: temas cubiertos, dudas frecuentes, casos discutidos." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
           </div>
-          <button onclick="withLoading(this, eduGenerateReport)" class="mt-3 w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded">🤖 Generar narrativa con IA</button>
+          <button onclick="withLoading(this, eduGenerateReport)" class="mt-3 w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded">${osIcon('bot')} Generar narrativa con IA</button>
           <div class="text-[10px] text-violet-700 mt-2 italic">Los KPIs ya están arriba (números reales del DB). La IA agrega narrativa, highlights y recomendaciones.</div>
         </details>
 
-        ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-3xl animate-pulse">🧠</div><div class="mt-2 font-bold text-violet-900">Generando informe...</div></div>` : ''}
-        ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+        ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-3xl animate-pulse">${osIcon('brain')}</div><div class="mt-2 font-bold text-violet-900">Generando informe...</div></div>` : ''}
+        ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">${osIcon('alert')} ${ai.error}</div>` : ''}
 
         ${ai.report ? `
           <div class="bg-white border-2 border-emerald-300 rounded-xl overflow-hidden">
             <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 flex justify-between items-center">
-              <div class="text-xs font-bold uppercase text-emerald-900">✅ Informe generado</div>
+              <div class="text-xs font-bold uppercase text-emerald-900">${osIcon('check-circle')} Informe generado</div>
               <div class="flex gap-1">
-                <button onclick="eduCopyReport()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📋 Copiar markdown</button>
-                <button onclick="eduDownloadReport()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 .md</button>
+                <button onclick="eduCopyReport()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('clipboard')} Copiar markdown</button>
+                <button onclick="eduDownloadReport()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('inbox')} .md</button>
               </div>
             </div>
             <div class="p-4 max-h-[55vh] overflow-y-auto">
@@ -2274,14 +2274,14 @@ function _eduRenderReportsStandaloneInner(root) {
               <!-- Highlights -->
               ${(ai.report.highlights||[]).length ? `
                 <div class="mt-4 pt-3 border-t border-slate-200">
-                  <div class="text-xs font-bold uppercase mb-2">⭐ Highlights del período</div>
+                  <div class="text-xs font-bold uppercase mb-2">${osIcon('star')} Highlights del período</div>
                   ${ai.report.highlights.map(h => `<div class="text-xs mb-1"><span class="bg-${h.type==='win'?'emerald':h.type==='risk'?'red':'amber'}-100 text-${h.type==='win'?'emerald':h.type==='risk'?'red':'amber'}-800 px-1.5 py-0.5 rounded font-bold text-[10px]">${h.type}</span> <strong>${h.student_name}</strong>: ${h.detail}</div>`).join('')}
                 </div>
               ` : ''}
               <!-- Recommendations -->
               ${(ai.report.recommendations||[]).length ? `
                 <div class="mt-4 pt-3 border-t border-slate-200">
-                  <div class="text-xs font-bold uppercase mb-2">🎯 Acciones recomendadas</div>
+                  <div class="text-xs font-bold uppercase mb-2">${osIcon('target')} Acciones recomendadas</div>
                   <ul class="text-xs space-y-1.5">
                     ${ai.report.recommendations.map(r => `<li>• <strong>[${r.priority||'med'}]</strong> ${r.action} <span class="text-slate-500">(${r.owner||'?'}, en ${r.due_in_days||7}d)</span></li>`).join('')}
                   </ul>
@@ -2294,7 +2294,7 @@ function _eduRenderReportsStandaloneInner(root) {
         <!-- Historial -->
         ${reports.length ? `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">📚 Historial (${reports.length})</div>
+            <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">${osIcon('book')} Historial (${reports.length})</div>
             <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
               ${reports.map(r => `
                 <div class="p-2 flex justify-between items-center hover:bg-slate-50">
@@ -2304,7 +2304,7 @@ function _eduRenderReportsStandaloneInner(root) {
                   </div>
                   <div class="flex gap-1 flex-shrink-0">
                     <button onclick="eduLoadReport('${r.id}')" class="text-blue-600 text-[10px] hover:underline">cargar</button>
-                    <button onclick="eduDeleteReport('${r.id}')" class="text-red-500 text-[10px]">🗑</button>
+                    <button onclick="eduDeleteReport('${r.id}')" class="text-red-500 text-[10px]">${osIcon('trash')}</button>
                   </div>
                 </div>
               `).join('')}
@@ -2522,11 +2522,11 @@ const FM_DIAG_QUESTIONS = [
     id: 'objetivo', bloque: 'A · Objetivo',
     pregunta: '¿Cuál es tu resultado objetivo en los próximos 12 meses?',
     opciones: [
-      { val: 'flip',         label: '🏠 Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
-      { val: 'hold',         label: '🏘️ Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
-      { val: 'hibrido',      label: '🔀 Mix flips + holds' },
-      { val: 'escalar',      label: '🚀 Escalar negocio existente (sistemas, equipo, múltiples deals)' },
-      { val: 'lender',       label: '💰 Ser private money lender (prestar capital, no operar)' }
+      { val: 'flip',         label: 'Cerrar mi primer Fix & Flip (compra, remodelo, vendo)' },
+      { val: 'hold',         label: 'Empezar portfolio de Fix & Hold (rentas long-term, cash flow)' },
+      { val: 'hibrido',      label: 'Mix flips + holds' },
+      { val: 'escalar',      label: 'Escalar negocio existente (sistemas, equipo, múltiples deals)' },
+      { val: 'lender',       label: 'Ser private money lender (prestar capital, no operar)' }
     ]
   },
   {
@@ -2538,10 +2538,10 @@ const FM_DIAG_QUESTIONS = [
     id: 'estrategia_renta', bloque: 'A · Objetivo',
     pregunta: 'Si vas por Fix & Hold, ¿qué modelo de renta?',
     opciones: [
-      { val: 'tradicional',  label: '🏠 Renta tradicional (12 meses, familia)' },
-      { val: 'coliving',     label: '🛏️ Coliving / room-by-room (PadSplit, SpareRoom)' },
-      { val: 'airbnb',       label: '🌴 Short-Term Rental (Airbnb/VRBO)' },
-      { val: 'corporate',    label: '💼 Corporate housing / Furnished Finder' },
+      { val: 'tradicional',  label: 'Renta tradicional (12 meses, familia)' },
+      { val: 'coliving',     label: 'Coliving / room-by-room (PadSplit, SpareRoom)' },
+      { val: 'airbnb',       label: 'Short-Term Rental (Airbnb/VRBO)' },
+      { val: 'corporate',    label: 'Corporate housing / Furnished Finder' },
       { val: 'na',           label: 'No aplica — voy por Flip' }
     ],
     skipIf: (a) => a.objetivo === 'flip' || a.objetivo === 'lender'
@@ -2599,11 +2599,11 @@ const FM_DIAG_QUESTIONS = [
     id: 'hml_status', bloque: 'B · Capital',
     pregunta: '¿Tenés Hard Money Lender (HML) pre-aprobado?',
     opciones: [
-      { val: 'primario_backup', label: '✅ Sí, primario + backup' },
-      { val: 'solo_primario',   label: '✅ Sí, solo primario' },
-      { val: 'hablado',         label: '🟡 He hablado con HMLs pero sin pre-aprobación formal' },
-      { val: 'investigando',    label: '🟠 Estoy investigando opciones' },
-      { val: 'ninguno',         label: '❌ Ningún contacto con HML todavía' }
+      { val: 'primario_backup', label: 'Sí, primario + backup' },
+      { val: 'solo_primario',   label: 'Sí, solo primario' },
+      { val: 'hablado',         label: 'He hablado con HMLs pero sin pre-aprobación formal' },
+      { val: 'investigando',    label: 'Estoy investigando opciones' },
+      { val: 'ninguno',         label: 'Ningún contacto con HML todavía' }
     ]
   },
   {
@@ -2624,9 +2624,9 @@ const FM_DIAG_QUESTIONS = [
     id: 'llc', bloque: 'C · Fundación',
     pregunta: '¿Tenés LLC formada?',
     opciones: [
-      { val: 'si_mismo',     label: '✅ Sí, en el estado donde planeo invertir' },
-      { val: 'si_otro',      label: '⚠️ Sí, pero en otro estado distinto al de inversión' },
-      { val: 'no',           label: '❌ No, todavía no la formé' },
+      { val: 'si_mismo',     label: 'Sí, en el estado donde planeo invertir' },
+      { val: 'si_otro',      label: 'Sí, pero en otro estado distinto al de inversión' },
+      { val: 'no',           label: 'No, todavía no la formé' },
       { val: 'otra_entidad', label: 'Tengo otra entidad (S-Corp, INC)' }
     ]
   },
@@ -2669,9 +2669,9 @@ const FM_DIAG_QUESTIONS = [
     id: 'inmigracion', bloque: 'C · Fundación',
     pregunta: 'Tu situación en USA:',
     opciones: [
-      { val: 'residente',    label: '🇺🇸 Ciudadano o residente USA con SSN' },
-      { val: 'itin',         label: '📋 Tengo ITIN (sin SSN)' },
-      { val: 'internacional',label: '🌎 Internacional sin ITIN (visito USA)' }
+      { val: 'residente',    label: 'Ciudadano o residente USA con SSN' },
+      { val: 'itin',         label: 'Tengo ITIN (sin SSN)' },
+      { val: 'internacional',label: 'Internacional sin ITIN (visito USA)' }
     ]
   },
 
@@ -2682,20 +2682,20 @@ const FM_DIAG_QUESTIONS = [
     id: 'buybox', bloque: 'D · Mercado',
     pregunta: '¿Tenés Buy Box (perfil de propiedad ideal) definido?',
     opciones: [
-      { val: 'completo',     label: '✅ 5+ Buy Box por estrategia con criterios numéricos documentados' },
-      { val: 'parcial',      label: '🟡 1-2 Buy Box parciales, faltan validar números' },
-      { val: 'mental',       label: '🟠 Sé qué quiero pero no está documentado' },
-      { val: 'cero',         label: '❌ No tengo Buy Box' }
+      { val: 'completo',     label: '5+ Buy Box por estrategia con criterios numéricos documentados' },
+      { val: 'parcial',      label: '1-2 Buy Box parciales, faltan validar números' },
+      { val: 'mental',       label: 'Sé qué quiero pero no está documentado' },
+      { val: 'cero',         label: 'No tengo Buy Box' }
     ]
   },
   {
     id: 'arv_skill', bloque: 'D · Mercado',
     pregunta: '¿Sabés calcular ARV y MAO de una propiedad?',
     opciones: [
-      { val: 'experto',      label: '✅ Sí, lo hago con 5+ comps y ajustes documentados' },
-      { val: 'basico',       label: '🟡 Conozco la fórmula básica (ARV × 75% - rehab)' },
-      { val: 'concepto',     label: '🟠 Sé qué significan pero no lo he practicado' },
-      { val: 'no',           label: '❌ No estoy familiarizado con estos términos' }
+      { val: 'experto',      label: 'Sí, lo hago con 5+ comps y ajustes documentados' },
+      { val: 'basico',       label: 'Conozco la fórmula básica (ARV × 75% - rehab)' },
+      { val: 'concepto',     label: 'Sé qué significan pero no lo he practicado' },
+      { val: 'no',           label: 'No estoy familiarizado con estos términos' }
     ]
   },
   {
@@ -2726,10 +2726,10 @@ const FM_DIAG_QUESTIONS = [
     id: 'gc_status', bloque: 'E · Red operativa',
     pregunta: '¿Tenés General Contractor (GC) primario identificado y validado?',
     opciones: [
-      { val: 'primario_backup',label: '✅ Sí, primario + backup con licencia/seguros verificados' },
-      { val: 'primario',     label: '✅ Sí, solo primario' },
-      { val: 'hablado',      label: '🟡 He hablado con varios pero sin elegir' },
-      { val: 'cero',         label: '❌ No tengo contactos de GC' }
+      { val: 'primario_backup',label: 'Sí, primario + backup con licencia/seguros verificados' },
+      { val: 'primario',     label: 'Sí, solo primario' },
+      { val: 'hablado',      label: 'He hablado con varios pero sin elegir' },
+      { val: 'cero',         label: 'No tengo contactos de GC' }
     ]
   },
   {
@@ -2760,29 +2760,29 @@ const FM_DIAG_QUESTIONS = [
     id: 'mayor_obstaculo', bloque: 'F · Disponibilidad',
     pregunta: '¿Cuál es tu MAYOR obstáculo percibido hoy?',
     opciones: [
-      { val: 'capital',      label: '💰 Capital — me siento sin recursos suficientes' },
-      { val: 'conocimiento', label: '📚 Conocimiento — no sé por dónde empezar' },
-      { val: 'red',          label: '🤝 Red — no tengo contactos' },
-      { val: 'tiempo',       label: '⏰ Tiempo — estoy ocupado con otras cosas' },
-      { val: 'miedo',        label: '😰 Miedo / parálisis — no me animo a ofertar' },
-      { val: 'mercado',      label: '🏘️ Mercado — no encuentro deals buenos' },
-      { val: 'equipo',       label: '👥 Equipo — necesito gente que ejecute conmigo' }
+      { val: 'capital',      label: 'Capital — me siento sin recursos suficientes' },
+      { val: 'conocimiento', label: 'Conocimiento — no sé por dónde empezar' },
+      { val: 'red',          label: 'Red — no tengo contactos' },
+      { val: 'tiempo',       label: 'Tiempo — estoy ocupado con otras cosas' },
+      { val: 'miedo',        label: 'Miedo / parálisis — no me animo a ofertar' },
+      { val: 'mercado',      label: 'Mercado — no encuentro deals buenos' },
+      { val: 'equipo',       label: 'Equipo — necesito gente que ejecute conmigo' }
     ]
   }
 ];
 
 const FM_ETAPAS = [
-  { id: 'INDICE',  label: '📘 Índice',         color: 'slate' },
-  { id: 'E0',      label: '🏛️ E0 · Fundación', color: 'amber' },
-  { id: 'E1',      label: '🔍 E1 · Evaluar',    color: 'blue' },
-  { id: 'E2',      label: '🏗️ E2 · Estructurar', color: 'indigo' },
-  { id: 'E3',      label: '🔨 E3 · Ejecutar',   color: 'purple' },
-  { id: 'E4',      label: '💰 E4 · Salida',     color: 'emerald' },
-  { id: 'E5',      label: '🚀 E5 · Escalar',    color: 'rose' },
-  { id: 'TODOS',   label: '📇 Stack Completo',  color: 'slate' },
-  { id: 'ANEXO_A', label: '📚 Anexo A · Caso',  color: 'teal' },
-  { id: 'ANEXO_B', label: '🧮 Anexo B · Calc',  color: 'cyan' },
-  { id: 'ANEXO_C', label: '🧠 Anexo C · Mind',  color: 'fuchsia' }
+  { id: 'INDICE',  label: 'Índice',         color: 'slate' },
+  { id: 'E0',      label: 'E0 · Fundación', color: 'amber' },
+  { id: 'E1',      label: 'E1 · Evaluar',    color: 'blue' },
+  { id: 'E2',      label: 'E2 · Estructurar', color: 'indigo' },
+  { id: 'E3',      label: 'E3 · Ejecutar',   color: 'purple' },
+  { id: 'E4',      label: 'E4 · Salida',     color: 'emerald' },
+  { id: 'E5',      label: 'E5 · Escalar',    color: 'rose' },
+  { id: 'TODOS',   label: 'Stack Completo',  color: 'slate' },
+  { id: 'ANEXO_A', label: 'Anexo A · Caso',  color: 'teal' },
+  { id: 'ANEXO_B', label: 'Anexo B · Calc',  color: 'cyan' },
+  { id: 'ANEXO_C', label: 'Anexo C · Mind',  color: 'fuchsia' }
 ];
 
 async function openEduMethodologySystem(sys) {
@@ -2828,7 +2828,7 @@ function fmRender() {
     console.error('[fmRender]', err);
     const root = document.getElementById('content');
     if (root) {
-      root.innerHTML = `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">⚠️ Error de render</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${String(err?.message || err).replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;')}</pre><div class="text-xs text-slate-600 mt-3">Stack: <pre class="bg-white p-2 rounded mt-1 text-xs overflow-x-auto">${String(err?.stack || '').replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;')}</pre></div><button onclick="fmDiagReset();" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">🔄 Reiniciar diagnóstico</button></div></div>`;
+      root.innerHTML = `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">${osIcon('alert')} Error de render</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${String(err?.message || err).replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;')}</pre><div class="text-xs text-slate-600 mt-3">Stack: <pre class="bg-white p-2 rounded mt-1 text-xs overflow-x-auto">${String(err?.stack || '').replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;')}</pre></div><button onclick="fmDiagReset();" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">${osIcon('refresh')} Reiniciar diagnóstico</button></div></div>`;
     }
   }
 }
@@ -2841,7 +2841,7 @@ function fmRenderInner() {
     return;
   }
   if (!fmState.docs.length) {
-    root.innerHTML = `<div class="p-8 max-w-2xl"><div class="bg-amber-50 border border-amber-200 rounded-xl p-6"><h3 class="font-bold text-amber-900 mb-2">⚠️ Biblioteca vacía</h3><p class="text-sm text-amber-800">Corré primero <code class="bg-amber-100 px-2 py-1 rounded">supabase/fm-methodology-schema.sql</code> y luego <code class="bg-amber-100 px-2 py-1 rounded">supabase/fm-methodology-seed.sql</code> en Supabase SQL Editor.</p></div></div>`;
+    root.innerHTML = `<div class="p-8 max-w-2xl"><div class="bg-amber-50 border border-amber-200 rounded-xl p-6"><h3 class="font-bold text-amber-900 mb-2">${osIcon('alert')} Biblioteca vacía</h3><p class="text-sm text-amber-800">Corré primero <code class="bg-amber-100 px-2 py-1 rounded">supabase/fm-methodology-schema.sql</code> y luego <code class="bg-amber-100 px-2 py-1 rounded">supabase/fm-methodology-seed.sql</code> en Supabase SQL Editor.</p></div></div>`;
     return;
   }
 
@@ -2851,20 +2851,20 @@ function fmRenderInner() {
       <div class="bg-white border-b border-slate-200 px-6 pt-4">
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h2 class="font-bold text-slate-900 text-lg">📘 ${fmState.sys.name}</h2>
+            <h2 class="font-bold text-slate-900 text-lg">${fmState.sys.name}</h2>
             <p class="text-xs text-slate-500">71 tareas · 400+ contactos · 3 anexos · IA Coach</p>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="eduOpenSystemFromMethodology('edu-manager')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded">🎓 CRM Mentorías</button>
-            <button onclick="eduOpenSystemFromMethodology('edu-reports')" class="text-[11px] bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold px-3 py-1.5 rounded">📋 Informe ejecutivo</button>
+            <button onclick="eduOpenSystemFromMethodology('edu-manager')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded">${osIcon('graduation-cap')} CRM Mentorías</button>
+            <button onclick="eduOpenSystemFromMethodology('edu-reports')" class="text-[11px] bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold px-3 py-1.5 rounded">${osIcon('clipboard')} Informe ejecutivo</button>
             <button onclick="window.history.back()" class="text-sm text-slate-500 hover:text-slate-700">← Volver</button>
           </div>
         </div>
         <div class="flex gap-1 -mb-px">
-          <button onclick="fmSetTab('biblioteca')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'biblioteca' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">📚 Biblioteca</button>
-          <button onclick="fmSetTab('buscador')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'buscador' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">🔍 Buscador IA</button>
-          <button onclick="fmSetTab('diagnostico')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'diagnostico' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">🎯 Diagnóstico</button>
-          <button onclick="fmSetTab('credito')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'credito' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">💳 Crédito</button>
+          <button onclick="fmSetTab('biblioteca')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'biblioteca' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">${osIcon('book')} Biblioteca</button>
+          <button onclick="fmSetTab('buscador')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'buscador' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">${osIcon('search')} Buscador IA</button>
+          <button onclick="fmSetTab('diagnostico')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'diagnostico' ? 'border-blue-500 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">${osIcon('target')} Diagnóstico</button>
+          <button onclick="fmSetTab('credito')" class="px-4 py-2 text-sm font-medium border-b-2 transition ${fmState.activeTab === 'credito' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}">${osIcon('credit-card')} Crédito</button>
         </div>
       </div>
 
@@ -2895,7 +2895,7 @@ function fmRenderBiblioteca() {
     <div class="flex h-full">
       <aside class="w-72 bg-white border-r border-slate-200 flex flex-col">
         <div class="p-4 border-b border-slate-200">
-          <input id="fm-search" type="text" placeholder="🔎 Buscar en biblioteca..." value="${fmState.searchQuery}"
+          <input id="fm-search" type="text" placeholder="Buscar en biblioteca..." value="${fmState.searchQuery}"
             class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
             oninput="fmSearch(this.value)"/>
         </div>
@@ -2927,7 +2927,7 @@ function fmRenderBiblioteca() {
       </aside>
       <main class="flex-1 overflow-y-auto bg-slate-50">
         <div class="max-w-5xl mx-auto px-8 py-6">
-          ${activeDoc ? fmRenderDoc(activeDoc) : `<div class="text-center py-20 text-slate-500"><div class="text-6xl mb-4">📘</div><p>Seleccioná un documento del menú izquierdo</p></div>`}
+          ${activeDoc ? fmRenderDoc(activeDoc) : `<div class="text-center py-20 text-slate-500"><div class="text-6xl mb-4"></div><p>Seleccioná un documento del menú izquierdo</p></div>`}
         </div>
       </main>
     </div>
@@ -2939,7 +2939,7 @@ function fmRenderBuscadorIA() {
     <div class="h-full flex flex-col bg-slate-50">
       <div class="max-w-4xl mx-auto w-full flex-1 flex flex-col p-6 overflow-hidden">
         <div class="bg-white rounded-xl border border-slate-200 p-4 mb-4 flex-shrink-0">
-          <h3 class="font-bold text-slate-900 mb-1">🤖 Buscador IA — Coach Asistente</h3>
+          <h3 class="font-bold text-slate-900 mb-1">${osIcon('bot')} Buscador IA — Coach Asistente</h3>
           <p class="text-sm text-slate-600">Hacé cualquier pregunta sobre la metodología. La IA responde basándose ÚNICAMENTE en los 71 tareas, 400+ contactos, calculadoras y mindset de FlipMentoría — con citas a códigos específicos (E0.1.1, B.3, etc).</p>
           <div class="mt-3 flex flex-wrap gap-2 text-xs">
             <button onclick="fmSearchQuickAsk('¿Cuáles son los 5 errores más comunes que matan un primer flip?')" class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100">5 errores comunes que matan un flip</button>
@@ -2949,9 +2949,9 @@ function fmRenderBuscadorIA() {
           </div>
         </div>
         <div class="flex-1 overflow-y-auto bg-white rounded-xl border border-slate-200 p-6 mb-4 space-y-4 scrollbar-thin">
-          ${fmState.searchChat.length === 0 ? `<div class="text-center text-slate-400 py-12"><div class="text-5xl mb-2">💬</div><p>Empezá la conversación con una pregunta</p></div>` : ''}
+          ${fmState.searchChat.length === 0 ? `<div class="text-center text-slate-400 py-12"><div class="text-5xl mb-2">${osIcon('message')}</div><p>Empezá la conversación con una pregunta</p></div>` : ''}
           ${fmState.searchChat.map((m, i) => fmRenderChatMessage(m, i, 'search')).join('')}
-          ${fmState.searchLoading ? `<div class="flex items-start gap-3"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">🤖</div><div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600 italic">Pensando<span class="animate-pulse">...</span></div></div>` : ''}
+          ${fmState.searchLoading ? `<div class="flex items-start gap-3"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">${osIcon('bot')}</div><div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-600 italic">Pensando<span class="animate-pulse">...</span></div></div>` : ''}
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-3 flex gap-2 flex-shrink-0">
           <input id="fm-search-input" type="text" placeholder="Hacé una pregunta sobre la metodología..."
@@ -2960,9 +2960,9 @@ function fmRenderBuscadorIA() {
             ${fmState.searchLoading ? 'disabled' : ''} />
           <button onclick="fmSearchSend()" ${fmState.searchLoading ? 'disabled' : ''}
             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-            ${fmState.searchLoading ? '⏳' : '→'}
+            ${fmState.searchLoading ? osIcon('loader') : '→'}
           </button>
-          ${fmState.searchChat.length > 0 ? `<button onclick="fmSearchReset()" class="px-3 py-2 text-slate-500 hover:text-slate-700 text-sm">🔄</button>` : ''}
+          ${fmState.searchChat.length > 0 ? `<button onclick="fmSearchReset()" class="px-3 py-2 text-slate-500 hover:text-slate-700 text-sm">${osIcon('refresh')}</button>` : ''}
         </div>
       </div>
     </div>
@@ -2986,7 +2986,7 @@ function fmRenderDiagnostico() {
   const studentSelector = `
     <div class="bg-white border border-amber-300 rounded-xl p-3 mb-4">
       <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-        <div class="text-xs font-bold uppercase text-amber-800">👤 Diagnóstico para estudiante</div>
+        <div class="text-xs font-bold uppercase text-amber-800">${osIcon('user')} Diagnóstico para estudiante</div>
         ${selStudent ? `<button onclick="fmSelectStudentForDiag(null)" class="text-[10px] text-slate-500 hover:text-red-700">✕ Limpiar selección</button>` : ''}
       </div>
       ${selStudent ? `
@@ -2999,12 +2999,12 @@ function fmRenderDiagnostico() {
               </div>
               <div class="text-[10px] text-emerald-700 mt-1">✓ Respuestas pre-llenadas desde el CRM. Revisá y ajustá lo que necesites.</div>
             </div>
-            <button onclick="eduShareDiagnosticForm('${selStudent.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded shadow whitespace-nowrap" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Enviarle a ${(selStudent.full_name||'').split(' ')[0].replace(/</g,'&lt;')}</button>
+            <button onclick="eduShareDiagnosticForm('${selStudent.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded shadow whitespace-nowrap" title="Generar link único para que el estudiante complete el diagnóstico solo">Enviarle a ${(selStudent.full_name||'').split(' ')[0].replace(/</g,'&lt;')}</button>
           </div>
         </div>
       ` : `
         <div class="text-[11px] text-slate-600 mb-2">Elegí un estudiante para auto-rellenar respuestas desde el CRM y vincular el plan generado al estudiante.</div>
-        <input id="fm-diag-student-search" type="text" placeholder="🔍 Buscar por nombre, email o etapa..." value="${(fmState.diagStudentSearch||'').replace(/"/g,'&quot;')}"
+        <input id="fm-diag-student-search" type="text" placeholder="Buscar por nombre, email o etapa..." value="${(fmState.diagStudentSearch||'').replace(/"/g,'&quot;')}"
           oninput="fmSetDiagStudentSearch(this.value)"
           class="w-full border border-slate-300 rounded px-3 py-1.5 text-xs mb-2"/>
         <div class="max-h-44 overflow-y-auto scrollbar-thin border border-slate-200 rounded">
@@ -3042,7 +3042,7 @@ function fmRenderDiagnostico() {
       <div class="max-w-3xl mx-auto px-6 py-8">
         <!-- Header -->
         <div class="bg-white rounded-xl border border-amber-200 p-5 mb-4 shadow-sm">
-          <h3 class="font-bold text-slate-900 mb-1">🎯 Análisis Profundo del Cliente</h3>
+          <h3 class="font-bold text-slate-900 mb-1">${osIcon('target')} Análisis Profundo del Cliente</h3>
           <p class="text-sm text-slate-600">${total} preguntas en 6 bloques para análisis completo: objetivo, capital, fundación, mercado, red operativa y mindset. Al final recibís un plan estructurado por bloques.</p>
         </div>
 
@@ -3092,7 +3092,7 @@ function fmRenderDiagnostico() {
           ${q.tipo === 'text' || q.multiSelect ? `
             <button onclick="fmDiagNext()" class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600">Siguiente →</button>
           ` : ''}
-          <button onclick="fmDiagReset()" class="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">🔄 Reiniciar</button>
+          <button onclick="fmDiagReset()" class="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">${osIcon('refresh')} Reiniciar</button>
         </div>
       </div>
     </div>
@@ -3230,23 +3230,23 @@ function fmAnalizarPerfilCompleto(a) {
 
   // Perfil 8: Lender pasivo
   if (a.objetivo === 'lender') {
-    perfil = { num: 8, nombre: 'Lender Pasivo (Private Money)', emoji: '💰', color: 'emerald' };
+    perfil = { num: 8, nombre: 'Lender Pasivo (Private Money)', emoji: osIcon('dollar'), color: 'emerald' };
     etapa = 'E5';
     cronograma = 'Inmediato — no opera el negocio';
   }
   // Perfil 4: Escalar (ya cerró deals)
   else if (a.deals_cerrados === '5_mas' || a.objetivo === 'escalar') {
-    perfil = { num: 4, nombre: 'Cerró deals y quiere escalar', emoji: '🚀', color: 'rose' };
+    perfil = { num: 4, nombre: 'Cerró deals y quiere escalar', emoji: osIcon('rocket'), color: 'rose' };
     etapa = 'E5';
     cronograma = 'Continuo — sistemas, equipo, expansión';
   }
   else if (a.deals_cerrados === '2_4') {
-    perfil = { num: 4, nombre: 'Cerró 1+ deals y quiere escalar', emoji: '🚀', color: 'rose' };
+    perfil = { num: 4, nombre: 'Cerró 1+ deals y quiere escalar', emoji: osIcon('rocket'), color: 'rose' };
     etapa = 'E5';
     cronograma = '3-6 meses para infraestructura de escala';
   }
   else if (a.deals_cerrados === '1') {
-    perfil = { num: 4, nombre: 'Primer deal cerrado, post-mortem pendiente', emoji: '📊', color: 'purple' };
+    perfil = { num: 4, nombre: 'Primer deal cerrado, post-mortem pendiente', emoji: osIcon('chart'), color: 'purple' };
     // FIX: FM_ETAPAS solo tiene E0-E5. 'E5.1' nunca matcheaba en el render
     // y los bloques quedaban invisibles. Asignar a E5 con la subetapa
     // específica codificada en el cronograma.
@@ -3261,13 +3261,13 @@ function fmAnalizarPerfilCompleto(a) {
   }
   // Perfil 5: Fix & Hold
   else if (a.objetivo === 'hold') {
-    perfil = { num: 5, nombre: 'Fix & Hold (rentas long-term)', emoji: '🏘️', color: 'teal' };
+    perfil = { num: 5, nombre: 'Fix & Hold (rentas long-term)', emoji: osIcon('building'), color: 'teal' };
     etapa = 'E0';
     cronograma = '9-15 meses al primer deal rentado';
   }
   // Perfil 2: Capital pero sin crédito
   else if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
-    perfil = { num: 2, nombre: 'Capital pero sin crédito sólido', emoji: '🏗️', color: 'amber' };
+    perfil = { num: 2, nombre: 'Capital pero sin crédito sólido', emoji: osIcon('construction'), color: 'amber' };
     etapa = 'E0';
     cronograma = '6-12 meses (track paralelo: reconstruir crédito + LLC)';
   }
@@ -3279,7 +3279,7 @@ function fmAnalizarPerfilCompleto(a) {
   }
   // Perfil 3: Atascado en evaluación
   else if ((a.llc === 'si_mismo' || a.llc === 'si_otro') && a.deals_cerrados === '0') {
-    perfil = { num: 3, nombre: 'Atascado en evaluación', emoji: '🔄', color: 'orange' };
+    perfil = { num: 3, nombre: 'Atascado en evaluación', emoji: osIcon('refresh'), color: 'orange' };
     etapa = 'E1+E2';
     cronograma = '30 días breakthrough (forzar volumen de ofertas)';
   }
@@ -3355,7 +3355,7 @@ async function fmSearchSend(forcedQuery = null) {
     if (!r.ok) throw new Error(r.error || 'falló');
     fmState.searchChat.push({ role: 'assistant', content: r.response });
   } catch (e) {
-    fmState.searchChat.push({ role: 'assistant', content: `❌ Error: ${e.message}\n\n¿Está deployada la edge function \`fm-ai-coach\`?` });
+    fmState.searchChat.push({ role: 'assistant', content: `Error: ${e.message}\n\n¿Está deployada la edge function \`fm-ai-coach\`?` });
   }
   fmState.searchLoading = false;
   fmRender();
@@ -3399,11 +3399,11 @@ function eduRenderStudentDetail(studentId) {
           <!-- Status compuesto: alertas -->
           ${(() => {
             const alertas = eduCalcularAlertasEstudiante(s);
-            if (!alertas.length) return `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-900">✅ Sin alertas activas</div>`;
+            if (!alertas.length) return `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-900">${osIcon('check-circle')} Sin alertas activas</div>`;
             return `<div class="space-y-1">${alertas.map(a => `
               <div class="bg-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-50 border border-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-200 rounded-lg p-2.5 text-xs">
-                <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?'🚨':a.severity==='high'?'⚠️':'📌'} ${a.mensaje}</div>
-                <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">💡 ${a.accion}</div>
+                <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?osIcon('alert'):a.severity==='high'?osIcon('alert'):osIcon('map-pin')} ${a.mensaje}</div>
+                <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">${a.accion}</div>
               </div>
             `).join('')}</div>`;
           })()}
@@ -3447,11 +3447,11 @@ function eduRenderStudentDetail(studentId) {
           </div>
 
           <div class="flex gap-2 pt-2">
-            <button onclick="event.stopPropagation(); eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
-            <button onclick="event.stopPropagation(); eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}');" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700" title="Abre Metodología FlipMentoría → Diagnóstico con este estudiante pre-cargado">🎯 Ver / generar Plan →</button>
-            <button onclick="event.stopPropagation(); try { eduShareDiagnosticForm('${s.id}'); } catch(e) { console.error('share err', e); alert('Error: ' + e.message); }" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700" title="Generar link único para que el estudiante complete el diagnóstico solo">📨 Compartir formulario</button>
-            ${s.phone ? `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">💬 WhatsApp rápido</button>` : `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">📞 WhatsApp</button>`}
-            <button onclick="event.stopPropagation(); eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">🎓 Certificado</button>
+            <button onclick="event.stopPropagation(); eduGuardarEstudiante('${s.id}')" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">${osIcon('save')} Guardar + Sync Airtable</button>
+            <button onclick="event.stopPropagation(); eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}');" class="px-4 py-2 bg-amber-600 text-white text-sm font-bold rounded hover:bg-amber-700" title="Abre Metodología FlipMentoría → Diagnóstico con este estudiante pre-cargado">${osIcon('target')} Ver / generar Plan →</button>
+            <button onclick="event.stopPropagation(); try { eduShareDiagnosticForm('${s.id}'); } catch(e) { console.error('share err', e); alert('Error: ' + e.message); }" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700" title="Generar link único para que el estudiante complete el diagnóstico solo">${osIcon('mail')} Compartir formulario</button>
+            ${s.phone ? `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-emerald-500 text-white text-sm font-bold rounded hover:bg-emerald-600">${osIcon('message')} WhatsApp rápido</button>` : `<button onclick="event.stopPropagation(); eduOpenWhatsappQuick('${s.id}')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600" title="Sin teléfono — abrí para agregarlo">${osIcon('phone')} WhatsApp</button>`}
+            <button onclick="event.stopPropagation(); eduGenerateCertificate('${s.id}')" class="px-4 py-2 bg-violet-600 text-white text-sm font-bold rounded hover:bg-violet-700" title="Genera certificado PDF de finalización">${osIcon('graduation-cap')} Certificado</button>
             ${s.airtable_record_id ? `<a href="https://airtable.com/${m?.airtable_base_id||''}/${m?.airtable_students_table||''}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
           </div>
 
@@ -3465,8 +3465,8 @@ function eduRenderStudentDetail(studentId) {
             <div><div class="font-bold text-slate-500 uppercase text-[10px]">Ciudad</div><div class="text-slate-900">${s.city||'—'}</div></div>
           </div>
 
-          ${s.notes ? `<div class="border-t border-slate-200 pt-3"><div class="text-xs font-bold uppercase text-slate-600 mb-1">📝 Notas generales</div><div class="text-xs text-slate-700 whitespace-pre-wrap bg-slate-50 p-2 rounded">${s.notes.replace(/</g,'&lt;')}</div></div>` : ''}
-          ${s.evidencia_url ? `<div><a href="${s.evidencia_url}" target="_blank" class="text-xs text-blue-600 hover:underline">📎 Ver evidencia</a></div>` : ''}
+          ${s.notes ? `<div class="border-t border-slate-200 pt-3"><div class="text-xs font-bold uppercase text-slate-600 mb-1">${osIcon('pencil-line')} Notas generales</div><div class="text-xs text-slate-700 whitespace-pre-wrap bg-slate-50 p-2 rounded">${s.notes.replace(/</g,'&lt;')}</div></div>` : ''}
+          ${s.evidencia_url ? `<div><a href="${s.evidencia_url}" target="_blank" class="text-xs text-blue-600 hover:underline">${osIcon('paperclip')} Ver evidencia</a></div>` : ''}
         </div>
       </div>
     </div>
@@ -3491,24 +3491,24 @@ function eduShowStudentDetail(studentId) {
       <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
         <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white p-4 flex items-start justify-between gap-3 flex-shrink-0">
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-amber-300 tracking-wider mb-0.5">📊 CRM 360° · FICHA COMPLETA</div>
+            <div class="text-[10px] font-bold text-amber-300 tracking-wider mb-0.5">${osIcon('chart')} CRM 360° · FICHA COMPLETA</div>
             <h2 class="text-xl font-bold truncate">${escFn(s.full_name || '—')}</h2>
             <div class="text-xs text-slate-300 mt-0.5">${escFn(s.grupo||'')}${s.email?' · '+escFn(s.email):''}${s.phone?' · '+escFn(s.phone):''}</div>
           </div>
           <button onclick="eduCloseStudentDetail()" class="text-white/70 hover:text-white text-2xl leading-none flex-shrink-0">×</button>
         </div>
         <div class="border-b border-slate-200 flex gap-1 px-3 pt-2 bg-slate-50 overflow-x-auto flex-shrink-0">
-          <button data-crm360-tab="resumen" onclick="eduCRM360ShowTab('${s.id}','resumen')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-900 text-white whitespace-nowrap">📊 Resumen</button>
-          <button data-crm360-tab="diagnostico" onclick="eduCRM360ShowTab('${s.id}','diagnostico')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">📝 Diagnóstico <span id="crm360-badge-diag" class="ml-1 text-[10px] opacity-70"></span></button>
-          <button data-crm360-tab="plan" onclick="eduCRM360ShowTab('${s.id}','plan')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">🎯 Plan & Progreso <span id="crm360-badge-plan" class="ml-1 text-[10px] opacity-70"></span></button>
-          <button data-crm360-tab="timeline" onclick="eduCRM360ShowTab('${s.id}','timeline')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">⏱ Timeline</button>
-          <button data-crm360-tab="notas" onclick="eduCRM360ShowTab('${s.id}','notas')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">✏️ Notas + Editar</button>
+          <button data-crm360-tab="resumen" onclick="eduCRM360ShowTab('${s.id}','resumen')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-900 text-white whitespace-nowrap">${osIcon('chart')} Resumen</button>
+          <button data-crm360-tab="diagnostico" onclick="eduCRM360ShowTab('${s.id}','diagnostico')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">${osIcon('pencil-line')} Diagnóstico <span id="crm360-badge-diag" class="ml-1 text-[10px] opacity-70"></span></button>
+          <button data-crm360-tab="plan" onclick="eduCRM360ShowTab('${s.id}','plan')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">${osIcon('target')} Plan & Progreso <span id="crm360-badge-plan" class="ml-1 text-[10px] opacity-70"></span></button>
+          <button data-crm360-tab="timeline" onclick="eduCRM360ShowTab('${s.id}','timeline')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">${osIcon('clock')} Timeline</button>
+          <button data-crm360-tab="notas" onclick="eduCRM360ShowTab('${s.id}','notas')" class="px-3 py-2 text-xs font-bold rounded-t bg-slate-100 text-slate-700 whitespace-nowrap">${osIcon('pencil')} Notas + Editar</button>
         </div>
         <div class="bg-slate-50 border-b border-slate-200 px-3 py-2 flex flex-wrap gap-1.5 flex-shrink-0">
-          <button onclick="eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}');" class="px-2.5 py-1 bg-amber-600 text-white text-[11px] font-bold rounded hover:bg-amber-700">🎯 Ver/Generar Plan</button>
-          <button onclick="try { eduShareDiagnosticForm('${s.id}'); } catch(e) { alert('Error: '+e.message); }" class="px-2.5 py-1 bg-blue-600 text-white text-[11px] font-bold rounded hover:bg-blue-700">📨 Enviar diagnóstico</button>
-          <button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-2.5 py-1 ${s.phone?'bg-emerald-500 hover:bg-emerald-600':'bg-amber-500 hover:bg-amber-600'} text-white text-[11px] font-bold rounded">💬 WhatsApp</button>
-          <button onclick="eduGenerateCertificate('${s.id}')" class="px-2.5 py-1 bg-violet-600 text-white text-[11px] font-bold rounded hover:bg-violet-700">🎓 Certificado</button>
+          <button onclick="eduCloseStudentDetail(); eduOpenStudentInDiagnostico('${s.id}');" class="px-2.5 py-1 bg-amber-600 text-white text-[11px] font-bold rounded hover:bg-amber-700">${osIcon('target')} Ver/Generar Plan</button>
+          <button onclick="try { eduShareDiagnosticForm('${s.id}'); } catch(e) { alert('Error: '+e.message); }" class="px-2.5 py-1 bg-blue-600 text-white text-[11px] font-bold rounded hover:bg-blue-700">${osIcon('mail')} Enviar diagnóstico</button>
+          <button onclick="eduOpenWhatsappQuick('${s.id}')" class="px-2.5 py-1 ${s.phone?'bg-emerald-500 hover:bg-emerald-600':'bg-amber-500 hover:bg-amber-600'} text-white text-[11px] font-bold rounded">${osIcon('message')} WhatsApp</button>
+          <button onclick="eduGenerateCertificate('${s.id}')" class="px-2.5 py-1 bg-violet-600 text-white text-[11px] font-bold rounded hover:bg-violet-700">${osIcon('graduation-cap')} Certificado</button>
         </div>
         <div id="crm360-content" class="p-4 overflow-y-auto flex-1">
           <div class="text-center text-slate-500 py-8">
@@ -3607,10 +3607,10 @@ function eduCRM360RenderResumen(s, data) {
     alertasHTML = alertas.length
       ? `<div class="space-y-1">${alertas.map(a => `
           <div class="bg-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-50 border border-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-200 rounded-lg p-2.5 text-xs">
-            <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?'🚨':a.severity==='high'?'⚠️':'📌'} ${escFn(a.mensaje)}</div>
-            <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">💡 ${escFn(a.accion)}</div>
+            <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?osIcon('alert'):a.severity==='high'?osIcon('alert'):osIcon('map-pin')} ${escFn(a.mensaje)}</div>
+            <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">${escFn(a.accion)}</div>
           </div>`).join('')}</div>`
-      : `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-900">✅ Sin alertas activas</div>`;
+      : `<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-900">${osIcon('check-circle')} Sin alertas activas</div>`;
   } catch {}
 
   // ── Mentorship para link Airtable ──
@@ -3627,7 +3627,7 @@ function eduCRM360RenderResumen(s, data) {
   return `
     <div class="space-y-3">
 
-      <!-- 🚨 ALERTAS ACTIVAS (lo de la ficha vieja) -->
+      <!-- ALERTAS ACTIVAS (lo de la ficha vieja) -->
       ${alertasHTML}
 
       <!-- KPIs principales (4 cards) -->
@@ -3653,16 +3653,16 @@ function eduCRM360RenderResumen(s, data) {
         </div>
       </div>
 
-      <!-- 📞 ÚLTIMO CONTACTO (manual del mentor) — banner destacado -->
+      <!-- ÚLTIMO CONTACTO (manual del mentor) — banner destacado -->
       <div class="bg-${colorContacto}-50 border border-${colorContacto}-200 rounded-lg p-3 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <div class="text-xl">📞</div>
+          <div class="text-xl">${osIcon('phone')}</div>
           <div>
             <div class="text-[10px] font-bold uppercase text-${colorContacto}-800">ÚLTIMO CONTACTO DEL MENTOR</div>
             <div class="text-sm font-bold text-${colorContacto}-900">${ultimaFecha ? ultimaFecha.toLocaleDateString('es') : 'Sin registrar'}${diasUltimoContacto!=null?` · hace ${diasUltimoContacto}d`:''}</div>
           </div>
         </div>
-        <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-xs bg-white border border-${colorContacto}-300 text-${colorContacto}-700 font-bold px-2.5 py-1 rounded hover:bg-${colorContacto}-100">✏️ Actualizar</button>
+        <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-xs bg-white border border-${colorContacto}-300 text-${colorContacto}-700 font-bold px-2.5 py-1 rounded hover:bg-${colorContacto}-100">${osIcon('pencil')} Actualizar</button>
       </div>
 
       <!-- Plan activo -->
@@ -3670,64 +3670,64 @@ function eduCRM360RenderResumen(s, data) {
         <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-lg p-3">
           <div class="text-[10px] font-bold uppercase text-slate-600 mb-1">PLAN ACTIVO</div>
           <div class="font-bold text-sm">${escFn(planTitle)}</div>
-          ${currentBlock ? `<div class="text-xs text-slate-700 mt-1">📍 Bloque actual: <strong>${escFn(currentBlock.subetapa)}</strong> (${escFn(currentBlock.etapa)})</div>` : '<div class="text-xs text-emerald-700 mt-1">🎉 Plan completado</div>'}
+          ${currentBlock ? `<div class="text-xs text-slate-700 mt-1">${osIcon('map-pin')} Bloque actual: <strong>${escFn(currentBlock.subetapa)}</strong> (${escFn(currentBlock.etapa)})</div>` : '<div class="text-xs text-emerald-700 mt-1">' + osIcon('party') + ' Plan completado</div>'}
           <div class="h-1.5 bg-white rounded-full mt-2 overflow-hidden"><div class="h-full bg-emerald-500" style="width:${pct}%"></div></div>
         </div>` : `
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">⚠️ Sin plan asignado todavía.</div>`}
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">${osIcon('alert')} Sin plan asignado todavía.</div>`}
 
-      <!-- 📞 DATOS CRM con etiquetas más claras y links -->
+      <!-- DATOS CRM con etiquetas más claras y links -->
       <div class="bg-white border border-slate-200 rounded-lg p-3">
         <div class="flex items-center justify-between mb-2">
-          <div class="text-[10px] font-bold uppercase text-slate-600">📞 DATOS CRM (contacto + comercial)</div>
+          <div class="text-[10px] font-bold uppercase text-slate-600">${osIcon('phone')} DATOS CRM (contacto + comercial)</div>
           ${airtableLink ? `<a href="${airtableLink}" target="_blank" class="text-[10px] bg-blue-50 border border-blue-200 text-blue-700 font-bold px-2 py-0.5 rounded hover:bg-blue-100">↗ Ver en Airtable</a>` : `<span class="text-[10px] text-slate-400">Sin link Airtable</span>`}
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">📧 Email</span> <strong class="truncate ml-2">${escFn(s.email||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('mail')} Email</span> <strong class="truncate ml-2">${escFn(s.email||'—')}</strong></div>
           <div class="flex items-center justify-between border-b border-slate-100 pb-1">
-            <span class="text-slate-500">📱 Phone</span>
+            <span class="text-slate-500">${osIcon('phone')} Phone</span>
             ${s.phone ? `<a href="https://wa.me/${escFn(String(s.phone).replace(/\\D/g,''))}" target="_blank" class="font-bold text-emerald-700 hover:underline">${escFn(s.phone)}</a>` : '<strong>—</strong>'}
           </div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">📍 Ciudad</span> <strong>${escFn(s.city||'—')}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">👥 Cohorte</span> <strong>${escFn(s.grupo||'—')}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">💳 Pago</span> <strong class="${s.payment_status==='active'?'text-emerald-700':s.payment_status==='past_due'?'text-red-700':'text-slate-700'}">${escFn(s.payment_status||'—')}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">⚡ Status</span> <strong class="${s.status==='active'?'text-emerald-700':s.status==='at_risk'?'text-amber-700':s.status==='dropped'?'text-red-700':'text-slate-700'}">${escFn(s.status||'—')}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">📅 Entrada</span> <strong>${s.enrolled_at?new Date(s.enrolled_at).toLocaleDateString('es'):'—'}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">⏳ Vence</span> <strong>${s.expires_at?new Date(s.expires_at).toLocaleDateString('es'):'—'}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">💰 Capital</span> <strong>${s.capital_actual?'$'+Number(s.capital_actual).toLocaleString():'—'}</strong></div>
-          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">⌛ Días en etapa</span> <strong>${eduDaysInStage(s)??'—'}d</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('map-pin')} Ciudad</span> <strong>${escFn(s.city||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('users')} Cohorte</span> <strong>${escFn(s.grupo||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('credit-card')} Pago</span> <strong class="${s.payment_status==='active'?'text-emerald-700':s.payment_status==='past_due'?'text-red-700':'text-slate-700'}">${escFn(s.payment_status||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('zap')} Status</span> <strong class="${s.status==='active'?'text-emerald-700':s.status==='at_risk'?'text-amber-700':s.status==='dropped'?'text-red-700':'text-slate-700'}">${escFn(s.status||'—')}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('calendar')} Entrada</span> <strong>${s.enrolled_at?new Date(s.enrolled_at).toLocaleDateString('es'):'—'}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('loader')} Vence</span> <strong>${s.expires_at?new Date(s.expires_at).toLocaleDateString('es'):'—'}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('dollar')} Capital</span> <strong>${s.capital_actual?'$'+Number(s.capital_actual).toLocaleString():'—'}</strong></div>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1"><span class="text-slate-500">${osIcon('hourglass')} Días en etapa</span> <strong>${eduDaysInStage(s)??'—'}d</strong></div>
         </div>
       </div>
 
-      <!-- 📝 OBSERVACIONES DE SEGUIMIENTO (preview con link a editar) -->
+      <!-- OBSERVACIONES DE SEGUIMIENTO (preview con link a editar) -->
       ${s.observaciones_seguimiento || s.notes ? `
         <div class="grid grid-cols-1 ${s.observaciones_seguimiento && s.notes ? 'md:grid-cols-2' : ''} gap-2">
           ${s.observaciones_seguimiento ? `
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <div class="flex items-center justify-between mb-1">
-                <div class="text-[10px] font-bold uppercase text-amber-800">📋 OBSERVACIONES DE SEGUIMIENTO</div>
-                <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[10px] text-amber-700 hover:underline">✏️ editar</button>
+                <div class="text-[10px] font-bold uppercase text-amber-800">${osIcon('clipboard')} OBSERVACIONES DE SEGUIMIENTO</div>
+                <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[10px] text-amber-700 hover:underline">${osIcon('pencil')} editar</button>
               </div>
               <div class="text-xs text-slate-800 whitespace-pre-wrap line-clamp-6">${escFn(s.observaciones_seguimiento)}</div>
             </div>` : ''}
           ${s.notes ? `
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div class="flex items-center justify-between mb-1">
-                <div class="text-[10px] font-bold uppercase text-blue-800">💼 NOTAS COMERCIALES / MARKETING</div>
-                <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[10px] text-blue-700 hover:underline">✏️ editar</button>
+                <div class="text-[10px] font-bold uppercase text-blue-800">${osIcon('briefcase')} NOTAS COMERCIALES / MARKETING</div>
+                <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[10px] text-blue-700 hover:underline">${osIcon('pencil')} editar</button>
               </div>
               <div class="text-xs text-slate-800 whitespace-pre-wrap line-clamp-6">${escFn(s.notes)}</div>
             </div>` : ''}
         </div>` : `
         <div class="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-3 text-xs text-slate-600 flex items-center justify-between">
           <span>Sin observaciones ni notas comerciales registradas.</span>
-          <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[11px] bg-slate-900 text-white font-bold px-2 py-1 rounded hover:bg-slate-700">➕ Agregar</button>
+          <button onclick="eduCRM360ShowTab('${s.id}','notas')" class="text-[11px] bg-slate-900 text-white font-bold px-2 py-1 rounded hover:bg-slate-700">${osIcon('plus')} Agregar</button>
         </div>`}
 
-      <!-- 📎 EVIDENCIA (si tiene URL) -->
+      <!-- EVIDENCIA (si tiene URL) -->
       ${s.evidencia_url ? `
         <a href="${escFn(s.evidencia_url)}" target="_blank" class="block bg-violet-50 border border-violet-200 rounded-lg p-3 hover:bg-violet-100 transition">
           <div class="flex items-center gap-2">
-            <div class="text-xl">📎</div>
+            <div class="text-xl">${osIcon('paperclip')}</div>
             <div class="flex-1 min-w-0">
               <div class="text-[10px] font-bold uppercase text-violet-800">EVIDENCIA</div>
               <div class="text-xs text-violet-900 truncate">${escFn(s.evidencia_url)}</div>
@@ -3802,8 +3802,8 @@ function eduCRM360RenderDiagnostico(s, data) {
             <details ${isLast ? 'open' : ''}>
               <summary class="cursor-pointer p-3 bg-slate-50 flex items-center justify-between list-none">
                 <div>
-                  <div class="text-[10px] font-bold uppercase text-slate-600">${isLast ? '🆕 ÚLTIMO' : 'Diagnóstico'} · ${new Date(inv.created_at).toLocaleDateString('es')}</div>
-                  <div class="text-sm font-bold mt-0.5">${completado ? '✅ Completado ' + new Date(inv.completed_at).toLocaleDateString('es') : '⏳ Enviado, sin completar'}</div>
+                  <div class="text-[10px] font-bold uppercase text-slate-600">${isLast ? 'ÚLTIMO' : 'Diagnóstico'} · ${new Date(inv.created_at).toLocaleDateString('es')}</div>
+                  <div class="text-sm font-bold mt-0.5">${completado ? 'Completado ' + new Date(inv.completed_at).toLocaleDateString('es') : 'Enviado, sin completar'}</div>
                 </div>
                 <div class="text-xs text-slate-500">${respondidas} respuestas</div>
               </summary>
@@ -3820,7 +3820,7 @@ function eduCRM360RenderDiagnostico(s, data) {
                 }).join('')}
                 ${Object.keys(ans).filter(k => !DIAG_Q_LABELS[k] && ans[k] != null && ans[k] !== '').length ? `
                   <details class="p-3 bg-slate-50">
-                    <summary class="text-xs font-bold text-slate-600 cursor-pointer">📦 Otros campos (raw)</summary>
+                    <summary class="text-xs font-bold text-slate-600 cursor-pointer">${osIcon('package')} Otros campos (raw)</summary>
                     <pre class="text-[10px] text-slate-700 mt-2 whitespace-pre-wrap">${escFn(JSON.stringify(Object.fromEntries(Object.entries(ans).filter(([k,val])=>!DIAG_Q_LABELS[k] && val != null && val !== '')), null, 2))}</pre>
                   </details>` : ''}
               </div>
@@ -3899,7 +3899,7 @@ function eduCRM360RenderPlan(s, data) {
 
       ${plans.length > 1 ? `
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-700">
-          📚 Historial: ${plans.length} planes totales (${plans.filter(p=>p.status==='archived').length} archivados)
+          ${osIcon('book')} Historial: ${plans.length} planes totales (${plans.filter(p=>p.status==='archived').length} archivados)
         </div>` : ''}
     </div>
   `;
@@ -3910,17 +3910,17 @@ function eduCRM360RenderTimeline(s, data) {
   const { invites, plans, activePlanTasks } = data;
   const events = [];
 
-  if (s.enrolled_at) events.push({ date: s.enrolled_at, icon: '🎓', text: 'Inscripción al programa', type: 'milestone' });
+  if (s.enrolled_at) events.push({ date: s.enrolled_at, icon: osIcon('graduation-cap'), text: 'Inscripción al programa', type: 'milestone' });
 
   invites.forEach(i => {
-    events.push({ date: i.created_at, icon: '📨', text: 'Diagnóstico enviado al estudiante', type: 'action' });
-    if (i.completed_at) events.push({ date: i.completed_at, icon: '✅', text: 'Estudiante completó el diagnóstico', type: 'milestone' });
-    if (i.result_plan_id && i.completed_at) events.push({ date: i.completed_at, icon: '🎯', text: 'Plan generado automáticamente desde el diagnóstico', type: 'milestone' });
+    events.push({ date: i.created_at, icon: osIcon('mail'), text: 'Diagnóstico enviado al estudiante', type: 'action' });
+    if (i.completed_at) events.push({ date: i.completed_at, icon: osIcon('check-circle'), text: 'Estudiante completó el diagnóstico', type: 'milestone' });
+    if (i.result_plan_id && i.completed_at) events.push({ date: i.completed_at, icon: osIcon('target'), text: 'Plan generado automáticamente desde el diagnóstico', type: 'milestone' });
   });
 
   plans.forEach(p => {
     const title = p.perfil?.perfil?.nombre || p.perfil?.titulo || 'Plan personalizado';
-    events.push({ date: p.created_at, icon: '📋', text: `Plan "${title}" ${p.status==='active'?'asignado y activo':'creado (archivado)'}`, type: 'milestone' });
+    events.push({ date: p.created_at, icon: osIcon('clipboard'), text: `Plan "${title}" ${p.status==='active'?'asignado y activo':'creado (archivado)'}`, type: 'milestone' });
   });
 
   activePlanTasks.filter(t => t.completed_at).forEach(t => {
@@ -3934,7 +3934,7 @@ function eduCRM360RenderTimeline(s, data) {
 
   return `
     <div class="space-y-2">
-      <div class="text-xs text-slate-600 mb-2">📊 ${events.length} eventos en orden cronológico (más reciente primero)</div>
+      <div class="text-xs text-slate-600 mb-2">${osIcon('chart')} ${events.length} eventos en orden cronológico (más reciente primero)</div>
       ${events.map(e => {
         const cls = e.type==='milestone'?'border-emerald-300 bg-emerald-50':e.type==='action'?'border-blue-300 bg-blue-50':'border-slate-200 bg-white';
         return `
@@ -3962,10 +3962,10 @@ function eduCRM360RenderNotas(s) {
     alertasHTML = alertas.length
       ? `<div class="space-y-1">${alertas.map(a => `
           <div class="bg-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-50 border border-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-200 rounded p-2 text-xs">
-            <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?'🚨':a.severity==='high'?'⚠️':'📌'} ${escFn(a.mensaje)}</div>
-            <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">💡 ${escFn(a.accion)}</div>
+            <div class="font-bold text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-900">${a.severity==='critical'?osIcon('alert'):a.severity==='high'?osIcon('alert'):osIcon('map-pin')} ${escFn(a.mensaje)}</div>
+            <div class="text-${a.severity==='critical'?'red':a.severity==='high'?'amber':'blue'}-700 mt-0.5">${escFn(a.accion)}</div>
           </div>`).join('')}</div>`
-      : `<div class="bg-emerald-50 border border-emerald-200 rounded p-2 text-xs text-emerald-900">✅ Sin alertas activas</div>`;
+      : `<div class="bg-emerald-50 border border-emerald-200 rounded p-2 text-xs text-emerald-900">${osIcon('check-circle')} Sin alertas activas</div>`;
   } catch {}
 
   return `
@@ -4016,7 +4016,7 @@ function eduCRM360RenderNotas(s) {
       <div>
         <label class="text-[10px] font-bold uppercase text-slate-600">URL de evidencia (PDF, foto, link Drive…)</label>
         <input id="crm360-evidencia" type="url" value="${(s.evidencia_url||'').replace(/"/g,'&quot;')}" class="mt-1 w-full border border-slate-300 rounded px-2 py-1.5 text-sm" placeholder="https://…" />
-        ${s.evidencia_url ? `<a href="${escFn(s.evidencia_url)}" target="_blank" class="text-xs text-blue-600 hover:underline mt-1 inline-block">📎 Abrir evidencia actual</a>` : ''}
+        ${s.evidencia_url ? `<a href="${escFn(s.evidencia_url)}" target="_blank" class="text-xs text-blue-600 hover:underline mt-1 inline-block">${osIcon('paperclip')} Abrir evidencia actual</a>` : ''}
       </div>
 
       <!-- Stats info read-only -->
@@ -4030,8 +4030,8 @@ function eduCRM360RenderNotas(s) {
       </div>
 
       <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
-        <button onclick="eduCRM360SaveAll('${s.id}', true)" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">💾 Guardar + Sync Airtable</button>
-        <button onclick="eduCRM360SaveAll('${s.id}', false)" class="px-4 py-2 bg-slate-200 text-slate-900 text-sm font-bold rounded hover:bg-slate-300" title="Solo guarda en Supabase, sin tocar Airtable">💾 Guardar (sin sync)</button>
+        <button onclick="eduCRM360SaveAll('${s.id}', true)" class="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded hover:bg-slate-700">${osIcon('save')} Guardar + Sync Airtable</button>
+        <button onclick="eduCRM360SaveAll('${s.id}', false)" class="px-4 py-2 bg-slate-200 text-slate-900 text-sm font-bold rounded hover:bg-slate-300" title="Solo guarda en Supabase, sin tocar Airtable">${osIcon('save')} Guardar (sin sync)</button>
         ${s.airtable_record_id && m?.airtable_base_id && m?.airtable_students_table ? `<a href="https://airtable.com/${m.airtable_base_id}/${m.airtable_students_table}/${s.airtable_record_id}" target="_blank" class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold rounded hover:bg-blue-100">↗ Abrir en Airtable</a>` : ''}
       </div>
     </div>
@@ -4114,7 +4114,7 @@ async function eduGuardarEstudiante(studentId) {
           airtable_record_id: s.airtable_record_id,
           fields: {
             'Etapa actual': stage,
-            'Estado del Estudiante': status === 'active' ? '🟢 Activo' : status === 'paused' ? '⏸ Pausado' : status === 'graduated' ? '🎓 Graduado' : '🚫 Inactivo',
+            'Estado del Estudiante': status === 'active' ? 'Activo' : status === 'paused' ? 'Pausado' : status === 'graduated' ? 'Graduado' : 'Inactivo',
             'Estado de Pago': pago === 'active' ? 'Al día' : pago === 'past_due' ? 'Atrasado' : 'Vencido',
             'Última fecha de seguimiento': ultima,
             'Observaciones de Seguimiento': obs
@@ -4122,11 +4122,11 @@ async function eduGuardarEstudiante(studentId) {
         })
       });
       const r = await res.json();
-      atSync = r.ok ? '\n✅ Airtable actualizado' : '\n⚠️ Airtable: ' + (r.error||'falló');
-    } catch (e) { atSync = '\n⚠️ Sync Airtable falló: ' + e.message; }
+      atSync = r.ok ? '\nAirtable actualizado' : '\nAirtable: ' + (r.error||'falló');
+    } catch (e) { atSync = '\nSync Airtable falló: ' + e.message; }
   }
 
-  alert(`✅ Estudiante actualizado${atSync}`);
+  alert(`Estudiante actualizado${atSync}`);
   eduCloseStudentDetail();
   await eduLoadAll();
   eduRender();
@@ -4149,7 +4149,7 @@ function eduDescargarPlan(format) {
   const pct = total ? Math.round(100*done/total) : 0;
   const perfil = plan.perfil?.perfil || {};
 
-  let md = `# 🎯 Plan de Acción — ${student.full_name}\n\n`;
+  let md = `# Plan de Acción — ${student.full_name}\n\n`;
   md += `**Perfil:** ${perfil.emoji||''} ${perfil.nombre||'—'}\n`;
   md += `**Cronograma:** ${plan.perfil?.cronograma||'—'}\n`;
   md += `**Avance actual:** ${done}/${total} tareas (${pct}%)\n`;
@@ -4168,15 +4168,15 @@ function eduDescargarPlan(format) {
   if (format === 'pdf') {
     // Imprimir como PDF — abrir ventana con HTML formateado
     const html = `<!DOCTYPE html><html><head><title>Plan ${student.full_name}</title><style>
-      body{font-family:system-ui;max-width:780px;margin:2rem auto;padding:1rem;color:#0F172A;line-height:1.5}
-      h1{font-size:1.8rem;color:#0F172A;border-bottom:2px solid #D97706;padding-bottom:0.5rem}
-      h2{font-size:1.2rem;color:#1E293B;margin-top:1.5rem;background:#F1F5F9;padding:0.5rem 0.75rem;border-left:4px solid #D97706}
-      em{color:#64748B;font-size:0.85rem}
+      body{font-family:system-ui;max-width:780px;margin:2rem auto;padding:1rem;color:#211e17;line-height:1.5}
+      h1{font-size:1.8rem;color:#211e17;border-bottom:2px solid #D97706;padding-bottom:0.5rem}
+      h2{font-size:1.2rem;color:#252017;margin-top:1.5rem;background:#f2efe8;padding:0.5rem 0.75rem;border-left:4px solid #D97706}
+      em{color:#756c5c;font-size:0.85rem}
       ul{list-style:none;padding-left:0.5rem}
-      li{padding:0.25rem 0;border-bottom:1px solid #F1F5F9}
-      hr{border:none;border-top:1px solid #E2E8F0;margin:1rem 0}
-      strong{color:#0F172A}
-    </style></head><body>${md.replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^_(.+)_$/gm,'<em>$1</em>').replace(/^- \[x\] (.+)$/gm,'<li>✅ <s>$1</s></li>').replace(/^- \[ \] (.+)$/gm,'<li>☐ $1</li>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/^---$/gm,'<hr/>').replace(/\n/g,'<br>')}<script>window.onload=()=>window.print()</script></body></html>`;
+      li{padding:0.25rem 0;border-bottom:1px solid #f2efe8}
+      hr{border:none;border-top:1px solid #e8e3d9;margin:1rem 0}
+      strong{color:#211e17}
+    </style></head><body>${md.replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^_(.+)_$/gm,'<em>$1</em>').replace(/^- \[x\] (.+)$/gm,'<li>' + osIcon('check-circle') + ' <s>$1</s></li>').replace(/^- \[ \] (.+)$/gm,'<li>☐ $1</li>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/^---$/gm,'<hr/>').replace(/\n/g,'<br>')}<script>window.onload=()=>window.print()</script></body></html>`;
     const w = window.open('', '_blank');
     w.document.write(html); w.document.close();
     return;
@@ -4201,14 +4201,14 @@ function eduRenderProgressFunnel() {
   return `
     <div class="space-y-4">
       <div class="bg-slate-900 text-white rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-slate-400 mb-1">📈 Funnel de progreso</div>
+        <div class="text-xs font-bold uppercase text-slate-400 mb-1">${osIcon('trending-up')} Funnel de progreso</div>
         <div class="text-2xl font-bold">${students.length} estudiantes · ${totalActivos} activos</div>
         <div class="text-xs text-slate-300 mt-1">${dist.length} etapas distintas detectadas</div>
       </div>
 
       <!-- Funnel visual -->
       <div class="bg-white border border-slate-200 rounded-xl p-5">
-        <div class="text-xs font-bold uppercase text-slate-600 mb-4">📊 Distribución por etapa (ordenado por cantidad)</div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-4">${osIcon('chart')} Distribución por etapa (ordenado por cantidad)</div>
         <div class="space-y-2">
           ${dist.map((d, i) => {
             const w = Math.round((d.total / maxCount) * 100);
@@ -4222,7 +4222,7 @@ function eduRenderProgressFunnel() {
                   <div class="flex items-center gap-3 text-[11px]">
                     <span class="font-bold text-slate-900">${d.total} estudiantes</span>
                     <span class="text-slate-500">${d.dias_promedio}d avg</span>
-                    ${stalled ? `<span class="text-red-700 font-bold">${d.estancados} 🐢 (${stalledPct}%)</span>` : ''}
+                    ${stalled ? `<span class="text-red-700 font-bold">${d.estancados} (${stalledPct}%)</span>` : ''}
                   </div>
                 </div>
                 <div class="bg-slate-100 rounded-full h-3 overflow-hidden">
@@ -4237,7 +4237,7 @@ function eduRenderProgressFunnel() {
       <!-- Velocidad: días promedio + estancados -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-3">⚡ Etapas más rápidas (mejor)</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-3">${osIcon('zap')} Etapas más rápidas (mejor)</div>
           <ul class="space-y-1 text-xs">
             ${dist.filter(d => d.dias_promedio > 0).sort((a,b) => a.dias_promedio - b.dias_promedio).slice(0,5).map(d => `
               <li class="flex justify-between p-2 bg-emerald-50 rounded"><span>${d.stage}</span><span class="font-bold text-emerald-700">${d.dias_promedio}d avg</span></li>
@@ -4245,12 +4245,12 @@ function eduRenderProgressFunnel() {
           </ul>
         </div>
         <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-3">🐢 Etapas con más estancamiento (atención)</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-3">Etapas con más estancamiento (atención)</div>
           <ul class="space-y-1 text-xs">
             ${dist.filter(d => d.estancados > 0).sort((a,b) => b.estancados - a.estancados).slice(0,5).map(d => `
               <li class="flex justify-between p-2 bg-red-50 rounded"><span>${d.stage}</span><span class="font-bold text-red-700">${d.estancados} de ${d.total}</span></li>
             `).join('')}
-            ${dist.filter(d => d.estancados > 0).length === 0 ? '<li class="text-emerald-600 p-2">✅ Sin estancamientos</li>' : ''}
+            ${dist.filter(d => d.estancados > 0).length === 0 ? '<li class="text-emerald-600 p-2">' + osIcon('check-circle') + ' Sin estancamientos</li>' : ''}
           </ul>
         </div>
       </div>
@@ -4285,23 +4285,23 @@ function eduRenderResourcesIntegrated() {
     byEtapa[d.etapa].push(d);
   });
   const labels = {
-    'INDICE': '📘 Índice + Diagnóstico',
-    'E0': '🏛️ E0 · Fundación',
-    'E1': '🔍 E1 · Evaluar',
-    'E2': '🏗️ E2 · Estructurar',
-    'E3': '🔨 E3 · Ejecutar',
-    'E4': '💰 E4 · Salida',
-    'E5': '🚀 E5 · Escalar',
-    'TODOS': '📇 Stack Completo',
-    'ANEXO_A': '📚 Anexo A · Caso',
-    'ANEXO_B': '🧮 Anexo B · Calculadoras',
-    'ANEXO_C': '🧠 Anexo C · Mindset'
+    'INDICE': 'Índice + Diagnóstico',
+    'E0': 'E0 · Fundación',
+    'E1': 'E1 · Evaluar',
+    'E2': 'E2 · Estructurar',
+    'E3': 'E3 · Ejecutar',
+    'E4': 'E4 · Salida',
+    'E5': 'E5 · Escalar',
+    'TODOS': 'Stack Completo',
+    'ANEXO_A': 'Anexo A · Caso',
+    'ANEXO_B': 'Anexo B · Calculadoras',
+    'ANEXO_C': 'Anexo C · Mindset'
   };
 
   return `
     <div class="space-y-3">
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-blue-700 mb-1">📚 Recursos de Metodología FlipMentoría</div>
+        <div class="text-xs font-bold uppercase text-blue-700 mb-1">${osIcon('book')} Recursos de Metodología FlipMentoría</div>
         <p class="text-xs text-blue-900">Estos son los documentos vivos de la metodología — todo lo que el estudiante necesita organizado por etapa. Click para ver en el sistema de Metodología.</p>
       </div>
       ${Object.keys(labels).filter(k => byEtapa[k]).map(k => `
@@ -4351,7 +4351,7 @@ function fmRenderSavedPlansSection() {
   return `
     <div class="bg-white border border-slate-200 rounded-xl mb-4 overflow-hidden">
       <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 text-xs font-bold uppercase text-slate-700">
-        📋 Planes ya guardados (vinculados al CRM) — ${fmSavedPlansCache.length}
+        ${osIcon('clipboard')} Planes ya guardados (vinculados al CRM) — ${fmSavedPlansCache.length}
       </div>
       <ul class="divide-y divide-slate-100 max-h-48 overflow-y-auto">
         ${fmSavedPlansCache.slice(0, 10).map(p => `
@@ -4419,7 +4419,7 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
     const total = tasks.length;
     const pct = total ? Math.round(done / total * 100) : 0;
     const planTitle = perfil.nombre || planData.titulo || 'Plan personalizado';
-    const planEmoji = perfil.emoji || '🚀';
+    const planEmoji = perfil.emoji || osIcon('rocket');
 
     // Bloque actual (donde el estudiante está parado)
     const currentBlockIdx = blocks.findIndex(b => {
@@ -4440,7 +4440,7 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
               <h2 class="text-xl font-bold leading-tight">${planEmoji} ${escFn(planTitle)}</h2>
               <div class="text-xs text-slate-300 mt-1">${blocks.length} bloques · ${total} tareas${perfil.num ? ` · Perfil #${escFn(perfil.num)}` : ''}</div>
             </div>
-            ${studentLink ? `<a href="${escFn(studentLink)}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap">👁️ Ver como estudiante</a>` : ''}
+            ${studentLink ? `<a href="${escFn(studentLink)}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap">${osIcon('eye')} Ver como estudiante</a>` : ''}
           </div>
           <div class="mt-4 bg-white/15 backdrop-blur rounded-lg p-3">
             <div class="flex items-center justify-between text-xs mb-1">
@@ -4453,29 +4453,29 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
           </div>
           ${isAllDone ? `
             <div class="mt-3 bg-emerald-500/30 border border-emerald-300/50 rounded-lg p-2 text-center text-xs font-bold">
-              🎉 PLAN COMPLETADO — el estudiante terminó todos los bloques
+              ${osIcon('party')} PLAN COMPLETADO — el estudiante terminó todos los bloques
             </div>` : currentBlock ? `
             <div class="mt-3 bg-amber-500/30 border border-amber-300/50 rounded-lg p-2 text-xs">
-              <div class="font-bold text-amber-100">📍 ETAPA ACTUAL DEL ESTUDIANTE</div>
+              <div class="font-bold text-amber-100">${osIcon('map-pin')} ETAPA ACTUAL DEL ESTUDIANTE</div>
               <div class="text-white mt-0.5">Bloque ${currentBlockIdx+1} de ${blocks.length}: ${escFn(currentBlock.subetapa || currentBlock.etapa)}</div>
             </div>` : ''}
         </div>
 
         ${planData.objetivo_operativo ? `
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div class="text-[10px] font-bold text-blue-800 tracking-wider mb-1">🎯 OBJETIVO OPERATIVO</div>
+            <div class="text-[10px] font-bold text-blue-800 tracking-wider mb-1">${osIcon('target')} OBJETIVO OPERATIVO</div>
             <p class="text-xs text-slate-800">${escFn(planData.objetivo_operativo)}</p>
           </div>` : ''}
 
         ${planData.regla_plan ? `
           <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <span class="text-[10px] font-bold text-amber-800 tracking-wider">📏 REGLA: </span>
+            <span class="text-[10px] font-bold text-amber-800 tracking-wider">${osIcon('ruler')} REGLA: </span>
             <span class="text-xs text-slate-800">${escFn(planData.regla_plan)}</span>
           </div>` : ''}
 
         ${(planData.analisis_profundo || []).length ? `
           <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">🔬 Análisis profundo</div>
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">${osIcon('search')} Análisis profundo</div>
             <div class="space-y-2 text-xs text-slate-700 leading-relaxed">
               ${planData.analisis_profundo.map(p => `<p>${escFn(p)}</p>`).join('')}
             </div>
@@ -4485,18 +4485,18 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             ${(planData.fortalezas||[]).length ? `
               <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                <div class="text-[10px] font-bold text-emerald-800 mb-1">✅ FORTALEZAS</div>
+                <div class="text-[10px] font-bold text-emerald-800 mb-1">${osIcon('check-circle')} FORTALEZAS</div>
                 <ul class="text-xs text-emerald-900 space-y-0.5">${planData.fortalezas.map(f => `<li>• ${escFn(f)}</li>`).join('')}</ul>
               </div>` : ''}
             ${(planData.riesgos||[]).length ? `
               <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div class="text-[10px] font-bold text-red-800 mb-1">⚠️ RIESGOS</div>
+                <div class="text-[10px] font-bold text-red-800 mb-1">${osIcon('alert')} RIESGOS</div>
                 <ul class="text-xs text-red-900 space-y-0.5">${planData.riesgos.map(r => `<li>• ${escFn(r)}</li>`).join('')}</ul>
               </div>` : ''}
           </div>` : ''}
 
         <div class="space-y-2">
-          <div class="text-xs font-bold uppercase tracking-wider text-slate-700">📋 Bloques (${blocks.length})</div>
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-700">${osIcon('clipboard')} Bloques (${blocks.length})</div>
           ${blocks.length === 0 ? `<div class="bg-slate-50 border border-dashed border-slate-300 rounded p-4 text-center text-xs text-slate-500">Sin tareas guardadas para este plan.</div>` : blocks.map((b, idx) => {
             const bDone = b.tasks.filter(t => t.completed).length;
             const bTotal = b.tasks.length;
@@ -4511,7 +4511,7 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
                     <div class="flex items-center gap-2 flex-1 min-w-0">
                       <div class="w-7 h-7 rounded-full ${isDone ? 'bg-emerald-600' : 'bg-amber-600'} text-white text-xs font-bold flex items-center justify-center flex-shrink-0">${idx+1}</div>
                       <div class="flex-1 min-w-0">
-                        <div class="text-[10px] uppercase font-bold ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${escFn(b.etapa)}${isCurrent ? ' · 📍 ACTUAL' : ''}</div>
+                        <div class="text-[10px] uppercase font-bold ${isDone ? 'text-emerald-700' : 'text-amber-700'}">${escFn(b.etapa)}${isCurrent ? ' · ACTUAL' : ''}</div>
                         <div class="text-sm font-bold text-slate-900 truncate">${escFn(b.subetapa)}</div>
                       </div>
                     </div>
@@ -4538,7 +4538,7 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
 
         ${planData.frase_final ? `
           <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-3">
-            <div class="text-[10px] font-bold text-amber-700 tracking-wider mb-1">💬 FRASE FINAL</div>
+            <div class="text-[10px] font-bold text-amber-700 tracking-wider mb-1">${osIcon('message')} FRASE FINAL</div>
             <p class="text-sm italic text-slate-800">${escFn(planData.frase_final)}</p>
           </div>` : ''}
       </div>
@@ -4553,10 +4553,10 @@ async function fmAbrirPlanGuardado(planId, studentId, mentorshipId) {
     overlay.innerHTML = `
       <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col" onclick="event.stopPropagation()">
         <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0">
-          <div class="font-bold text-sm">📋 Plan de ${escFn(studentName)}</div>
+          <div class="font-bold text-sm">${osIcon('clipboard')} Plan de ${escFn(studentName)}</div>
           <div class="flex items-center gap-2">
-            ${studentLink ? `<button onclick="navigator.clipboard.writeText('${escFn(studentLink)}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='📋 Copiar link',1500)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded">📋 Copiar link</button>` : ''}
-            <button onclick="window.print()" class="text-xs bg-slate-700 hover:bg-slate-900 text-white font-bold px-3 py-1.5 rounded">🖨️ PDF</button>
+            ${studentLink ? `<button onclick="navigator.clipboard.writeText('${escFn(studentLink)}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='${osIcon('clipboard')} Copiar link',1500)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded">${osIcon('clipboard')} Copiar link</button>` : ''}
+            <button onclick="window.print()" class="text-xs bg-slate-700 hover:bg-slate-900 text-white font-bold px-3 py-1.5 rounded">${osIcon('printer')} PDF</button>
             <button onclick="document.getElementById('fm-plan-guardado-modal')?.remove()" class="text-2xl leading-none text-slate-500 hover:text-slate-900 ml-1">×</button>
           </div>
         </div>
@@ -4633,7 +4633,7 @@ function eduRenderWizard() {
       <div class="max-w-3xl mx-auto bg-white rounded-2xl my-4 shadow-2xl overflow-hidden">
         <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-5 py-3 flex items-center justify-between text-white">
           <div>
-            <div class="text-xs font-bold opacity-90">🎯 CUALIFICACIÓN PARA PLAN DE ACCIÓN</div>
+            <div class="text-xs font-bold opacity-90">${osIcon('target')} CUALIFICACIÓN PARA PLAN DE ACCIÓN</div>
             <div class="text-base font-bold">${sName}</div>
           </div>
           <button onclick="eduCerrarWizard()" class="text-white/80 hover:text-white text-2xl leading-none">×</button>
@@ -4664,7 +4664,7 @@ function eduRenderWizard() {
             ${q.tipo === 'text' || q.multiSelect ? `
               <button onclick="eduWizNext()" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold">Siguiente →</button>
             ` : ''}
-            <div class="text-xs text-slate-500">💡 Respuestas pre-llenadas según datos del CRM</div>
+            <div class="text-xs text-slate-500">${osIcon('lightbulb')} Respuestas pre-llenadas según datos del CRM</div>
           </div>
         </div>
       </div>
@@ -4772,7 +4772,7 @@ async function eduWizFinish() {
   if (tasks.length) await sb.from('edu_student_plan_tasks').insert(tasks);
 
   eduCerrarWizard();
-  alert(`✅ Plan creado para ${student.full_name}\n\n${bloques.length} bloques · ${tasks.length} tareas`);
+  alert(`Plan creado para ${student.full_name}\n\n${bloques.length} bloques · ${tasks.length} tareas`);
   await eduLoadStudentPlan(studentId);
   eduRender();
 }
@@ -4885,11 +4885,11 @@ async function fmAbrirVincularEstudiante() {
     <div class="min-h-screen p-4 flex items-start justify-center">
       <div class="max-w-2xl w-full bg-white rounded-2xl my-4 shadow-2xl overflow-hidden">
         <div class="bg-amber-500 px-5 py-3 flex items-center justify-between text-slate-900">
-          <div class="font-bold text-sm">💾 Vincular plan a estudiante del CRM</div>
+          <div class="font-bold text-sm">${osIcon('save')} Vincular plan a estudiante del CRM</div>
           <button onclick="document.getElementById('fm-link-student-modal').remove()" class="text-2xl leading-none">×</button>
         </div>
         <div class="p-4">
-          <input id="fm-link-search" type="text" placeholder="🔍 Buscar por nombre, email o grupo..." oninput="fmLinkSearchFilter()" class="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 text-sm" />
+          <input id="fm-link-search" type="text" placeholder="Buscar por nombre, email o grupo..." oninput="fmLinkSearchFilter()" class="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-amber-500 text-sm" />
           <div id="fm-link-results" class="mt-3 max-h-[60vh] overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg">
             ${students.slice(0, 30).map(s => `
               <div onclick="fmLinkPlanAStudiante('${s.id}', '${s.mentorship_id}')" class="p-3 hover:bg-amber-50 cursor-pointer">
@@ -5037,7 +5037,7 @@ async function fmLinkPlanAStudiante(studentId, mentorshipId) {
   // Cerrar modal y notificar
   document.getElementById('fm-link-student-modal')?.remove();
   const student = (window._fmLinkStudents || []).find(s => s.id === studentId);
-  alert(`✅ Plan vinculado a ${student?.full_name || 'estudiante'}\n\n${bloques.length} bloques · ${tasks.length} tareas\n\nLo podés ver en Mentorías Manager → ${student?.full_name} → Plan Acción`);
+  alert(`Plan vinculado a ${student?.full_name || 'estudiante'}\n\n${bloques.length} bloques · ${tasks.length} tareas\n\nLo podés ver en Mentorías Manager → ${student?.full_name} → Plan Acción`);
 
   // Refrescar cache de planes guardados
   fmSavedPlansCache = null;
@@ -5166,7 +5166,7 @@ async function eduLoadAllTasks() {
 function eduRenderTasksOverview() {
   if (!eduTasksState.loaded) {
     eduLoadAllTasks().then(() => eduRender());
-    return '<div class="p-8 text-center text-slate-400">⏳ Cargando tareas...</div>';
+    return '<div class="p-8 text-center text-slate-400">' + osIcon('loader') + ' Cargando tareas...</div>';
   }
   const students = eduMyStudents();
   const studentById = Object.fromEntries(students.map(s => [s.id, s]));
@@ -5225,14 +5225,14 @@ function eduRenderTasksOverview() {
           <button onclick="eduTasksState.filterStatus='pending'; eduRender()" class="px-2 py-1 rounded ${eduTasksState.filterStatus==='pending'?'bg-white shadow':''}">Pendientes</button>
           <button onclick="eduTasksState.filterStatus='done'; eduRender()" class="px-2 py-1 rounded ${eduTasksState.filterStatus==='done'?'bg-white shadow':''}">Hechas</button>
         </div>
-        <button onclick="eduTasksState.loaded=false; eduRender()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded font-bold">🔄 Refrescar</button>
+        <button onclick="eduTasksState.loaded=false; eduRender()" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded font-bold">${osIcon('refresh')} Refrescar</button>
         <div class="ml-auto text-[10px] text-slate-500">${tasks.length} tarea(s) visible(s)</div>
       </div>
 
       <!-- Lista de tareas agrupadas por estudiante -->
       ${Object.keys(byStudent).length === 0 ? `
         <div class="text-center py-12 text-slate-400 text-sm">
-          ${eduTasksState.filterStatus==='pending' ? '🎉 Sin tareas pendientes con esos filtros.' : 'Sin tareas para mostrar.'}
+          ${eduTasksState.filterStatus==='pending' ? 'Sin tareas pendientes con esos filtros.' : 'Sin tareas para mostrar.'}
         </div>
       ` : Object.entries(byStudent).map(([studentId, sTasks]) => {
         const s = studentById[studentId];
@@ -5351,17 +5351,17 @@ async function eduShareDiagnosticForm(studentId) {
   const { data: invite, error: invErr } = await sb.from('edu_diagnostic_invites').insert(invitePayload).select().single();
   if (invErr) {
     if (/relation .* does not exist|Could not find the table/i.test(invErr.message)) {
-      return alert('❌ Falta correr el SQL para crear la tabla edu_diagnostic_invites.\n\nAndá a Supabase → SQL Editor → pegá supabase/edu-diagnostic-invites-schema.sql y corré.');
+      return alert('Falta correr el SQL para crear la tabla edu_diagnostic_invites.\n\nAndá a Supabase → SQL Editor → pegá supabase/edu-diagnostic-invites-schema.sql y corré.');
     }
     if (/row.level security/i.test(invErr.message) || invErr.code === '42501') {
-      return alert('❌ RLS bloqueó el insert. Verificá que existe la policy "edu_diag_inv_insert_authed" en Supabase.');
+      return alert('RLS bloqueó el insert. Verificá que existe la policy "edu_diag_inv_insert_authed" en Supabase.');
     }
     return alert('Error creando link: ' + invErr.message);
   }
 
   const { data: verify } = await sb.from('edu_diagnostic_invites').select('id, token').eq('token', token).maybeSingle();
   if (!verify) {
-    return alert('⚠️ La invitación se creó pero no la puedo leer con el token.\n\nVerificá la policy "edu_diag_inv_select_all" en edu_diagnostic_invites.');
+    return alert('La invitación se creó pero no la puedo leer con el token.\n\nVerificá la policy "edu_diag_inv_select_all" en edu_diagnostic_invites.');
   }
 
   console.log('[eduShareDiagnosticForm] invite OK:', invite.token);
@@ -5384,15 +5384,15 @@ function eduShowShareModal(s, invite, hasPlan) {
   const nombre = (s.full_name || '').split(' ')[0];
 
   const waMsg = hasPlan
-    ? `¡Hola ${nombre}! 👋\n\nAcá tenés tu plan de acción personalizado de FlipMentoría:\n\n${link}\n\nEn el portal podés marcar cada tarea a medida que la completás. Yo voy a ir viendo tu progreso en tiempo real.\n\nVamos. 💪`
-    : `¡Hola ${nombre}! 👋\n\nSoy tu mentor de FlipMentoría. Antes de nuestra próxima sesión, completá este diagnóstico de 21 preguntas (5-7 minutos):\n\n${link}\n\nApenas termines, te llevo automático a tu portal personalizado con todas las tareas que tenés que hacer.\n\nCualquier duda, decime. 💪`;
+    ? `¡Hola ${nombre}! \n\nAcá tenés tu plan de acción personalizado de FlipMentoría:\n\n${link}\n\nEn el portal podés marcar cada tarea a medida que la completás. Yo voy a ir viendo tu progreso en tiempo real.\n\nVamos. `
+    : `¡Hola ${nombre}! \n\nSoy tu mentor de FlipMentoría. Antes de nuestra próxima sesión, completá este diagnóstico de 21 preguntas (5-7 minutos):\n\n${link}\n\nApenas termines, te llevo automático a tu portal personalizado con todas las tareas que tenés que hacer.\n\nCualquier duda, decime. `;
 
   const phoneClean = typeof eduCleanPhone === 'function' ? eduCleanPhone(s.phone) : (s.phone||'').replace(/\D/g,'');
   const waUrl = phoneClean && phoneClean.length >= 10
     ? `https://wa.me/${phoneClean}?text=${encodeURIComponent(waMsg)}`
     : null;
 
-  openModal((hasPlan ? '🎯 Portal del estudiante · ' : '📨 Formulario compartible · ') + (s.full_name||''), `
+  openModal((hasPlan ? 'Portal del estudiante · ' : 'Formulario compartible · ') + (s.full_name||''), `
     <div class="space-y-3">
       <div class="${hasPlan ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-blue-50 border-blue-200 text-blue-900'} border rounded p-3 text-xs">
         ${hasPlan
@@ -5401,27 +5401,27 @@ function eduShowShareModal(s, invite, hasPlan) {
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">🔗 ${hasPlan ? 'Link al portal de tareas' : 'Link del diagnóstico'}</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('link')} ${hasPlan ? 'Link al portal de tareas' : 'Link del diagnóstico'}</label>
         <div class="flex gap-2">
           <input type="text" readonly value="${link}" class="flex-1 border border-slate-300 rounded px-2 py-2 text-xs font-mono bg-slate-50" onclick="this.select()"/>
-          <button onclick="navigator.clipboard.writeText('${link}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='📋 Copiar', 1500)" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">📋 Copiar</button>
+          <button onclick="navigator.clipboard.writeText('${link}'); this.textContent='✓ Copiado'; setTimeout(()=>this.textContent='${osIcon('clipboard')} Copiar', 1500)" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('clipboard')} Copiar</button>
         </div>
-        <div class="text-[10px] text-slate-500 mt-1">⚠️ No compartas este link con otra persona — está asociado al estudiante.</div>
+        <div class="text-[10px] text-slate-500 mt-1">${osIcon('alert')} No compartas este link con otra persona — está asociado al estudiante.</div>
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📱 Mensaje WhatsApp pre-armado</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('phone')} Mensaje WhatsApp pre-armado</label>
         <textarea rows="8" class="w-full border border-emerald-300 rounded p-2 text-xs font-mono">${waMsg.replace(/</g,'&lt;')}</textarea>
       </div>
 
       ${hasPlan ? `<div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
-        💡 Si querés <strong>regenerar el plan desde cero</strong> (nuevo diagnóstico), borrá la invite vieja desde Supabase o pedile al estudiante que vaya al diagnóstico de nuevo.
+        ${osIcon('lightbulb')} Si querés <strong>regenerar el plan desde cero</strong> (nuevo diagnóstico), borrá la invite vieja desde Supabase o pedile al estudiante que vaya al diagnóstico de nuevo.
       </div>` : ''}
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
-        <a href="${link}" target="_blank" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded text-center">👁️ Ver portal</a>
-        ${waUrl ? `<a href="${waUrl}" target="_blank" onclick="closeModal()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded text-center">💬 WhatsApp</a>` : `<button disabled class="flex-1 bg-slate-300 text-white text-sm font-bold py-2 rounded">📞 Sin tel</button>`}
+        <a href="${link}" target="_blank" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded text-center">${osIcon('eye')} Ver portal</a>
+        ${waUrl ? `<a href="${waUrl}" target="_blank" onclick="closeModal()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded text-center">${osIcon('message')} WhatsApp</a>` : `<button disabled class="flex-1 bg-slate-300 text-white text-sm font-bold py-2 rounded">${osIcon('phone')} Sin tel</button>`}
       </div>
     </div>
   `);
@@ -5599,7 +5599,7 @@ function eduNotifyMentorNewPlans(n) {
   }
   banner.innerHTML = `
     <div class="flex items-start gap-3">
-      <div class="text-2xl">🎓</div>
+      <div class="text-2xl">${osIcon('graduation-cap')}</div>
       <div class="flex-1">
         <div class="font-bold text-sm">${n} estudiante${n>1?'s':''} completaron su diagnóstico</div>
         <div class="text-xs opacity-90 mt-0.5">Plan${n>1?'es':''} listo${n>1?'s':''} para que veas el progreso</div>
@@ -5640,15 +5640,15 @@ function eduGenerateCertificate(studentId) {
 <style>
   @page { size: landscape; margin: 0; }
   @media print { body { margin: 0; } .no-print { display: none !important; } }
-  body { font-family: 'Georgia', serif; background: #f8fafc; }
-  .border-deco { border: 12px double #0f172a; }
-  .border-deco-inner { border: 2px solid #94a3b8; }
+  body { font-family: 'Georgia', serif; background: #faf8f4; }
+  .border-deco { border: 12px double #211e17; }
+  .border-deco-inner { border: 2px solid #a89f8f; }
   .seal { background: radial-gradient(circle at center, #fbbf24 0%, #f59e0b 60%, #d97706 100%); }
 </style>
 </head>
 <body class="bg-slate-50 p-8">
   <div class="no-print mb-4 flex justify-center gap-2">
-    <button onclick="window.print()" class="bg-emerald-600 text-white text-lg font-bold px-6 py-3 rounded-xl">🖨️ Imprimir / PDF</button>
+    <button onclick="window.print()" class="bg-emerald-600 text-white text-lg font-bold px-6 py-3 rounded-xl">${osIcon('printer')} Imprimir / PDF</button>
     <button onclick="window.close()" class="bg-slate-100 text-lg px-6 py-3 rounded-xl">✕ Cerrar</button>
   </div>
 
@@ -5678,7 +5678,7 @@ function eduGenerateCertificate(studentId) {
         <div class="flex justify-center">
           <div class="seal w-32 h-32 rounded-full flex items-center justify-center shadow-xl">
             <div class="bg-white rounded-full w-24 h-24 flex flex-col items-center justify-center">
-              <div class="text-3xl">🎓</div>
+              <div class="text-3xl">${osIcon('graduation-cap')}</div>
               <div class="text-[8px] uppercase tracking-wider text-slate-700 font-bold">Verificado</div>
             </div>
           </div>
@@ -5725,13 +5725,13 @@ function eduOpenCeoMobile() {
   // Estado general
   let estado, color, icon, msg;
   if (enRiesgo.length > 5 || atRisk > total*0.2) {
-    estado = 'ATENCIÓN REQUERIDA'; color = 'from-red-600 to-red-800'; icon = '🔴';
+    estado = 'ATENCIÓN REQUERIDA'; color = 'from-red-600 to-red-800'; icon = kitStatusDot('bad');
     msg = `${enRiesgo.length} estudiante${enRiesgo.length>1?'s':''} en riesgo · ${atRisk} at_risk`;
   } else if (enRiesgo.length > 0 || expiringSoon > 3) {
-    estado = 'OPERACIÓN ESTABLE'; color = 'from-amber-500 to-amber-700'; icon = '🟡';
+    estado = 'OPERACIÓN ESTABLE'; color = 'from-amber-500 to-amber-700'; icon = kitStatusDot('warn');
     msg = `${enRiesgo.length} en seguimiento · ${expiringSoon} vence pronto`;
   } else {
-    estado = 'MENTORÍA SANA'; color = 'from-emerald-600 to-emerald-800'; icon = '✅';
+    estado = 'MENTORÍA SANA'; color = 'from-emerald-600 to-emerald-800'; icon = osIcon('check-circle');
     msg = 'Todos los estudiantes activos en buen ritmo';
   }
 
@@ -5752,7 +5752,7 @@ function eduOpenCeoMobile() {
             <div class="text-[10px] uppercase opacity-75 font-bold tracking-wider">${m?.name || 'Mentoría'}</div>
             <div class="text-sm opacity-90">${new Date().toLocaleDateString('es', { day:'numeric', month:'long' })}</div>
           </div>
-          <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-500 hover:bg-emerald-600 rounded-lg px-3 py-2 text-sm font-bold">🤖</button>
+          <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-500 hover:bg-emerald-600 rounded-lg px-3 py-2 text-sm font-bold">${osIcon('bot')}</button>
         </div>
         <div class="text-center">
           <div class="text-4xl">${icon}</div>
@@ -5782,7 +5782,7 @@ function eduOpenCeoMobile() {
       <div class="p-3 max-w-2xl mx-auto w-full space-y-3">
         ${enRiesgo.length > 0 ? `
           <div class="bg-white border-2 border-amber-300 rounded-xl overflow-hidden">
-            <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-3 py-2 text-xs font-bold uppercase">⚠️ Top en riesgo · contactar hoy</div>
+            <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-3 py-2 text-xs font-bold uppercase">${osIcon('alert')} Top en riesgo · contactar hoy</div>
             <div class="divide-y divide-slate-100">
               ${enRiesgo.map(s => `
                 <div class="px-3 py-2.5 flex items-center justify-between gap-2">
@@ -5790,36 +5790,36 @@ function eduOpenCeoMobile() {
                     <div class="font-semibold text-sm truncate">${(s.full_name||'—').replace(/</g,'&lt;')}</div>
                     <div class="text-[11px] text-amber-700 font-bold">${s._riskReason}</div>
                   </button>
-                  ${s.phone ? `<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg flex-shrink-0">💬</a>` : ''}
+                  ${s.phone ? `<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg flex-shrink-0">${osIcon('message')}</a>` : ''}
                 </div>
               `).join('')}
             </div>
           </div>
         ` : `
           <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-            <div class="text-3xl">🎉</div>
+            <div class="text-3xl">${osIcon('party')}</div>
             <div class="text-sm font-bold text-emerald-900 mt-1">Sin estudiantes en riesgo</div>
           </div>
         `}
 
         <div class="grid grid-cols-2 gap-2">
           <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='students'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
-            <div class="text-2xl">👥</div>
+            <div class="text-2xl">${osIcon('users')}</div>
             <div class="text-sm font-bold mt-1">Estudiantes</div>
             <div class="text-[10px] text-slate-500">${total} total</div>
           </button>
           <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='alerts'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
-            <div class="text-2xl">🚨</div>
+            <div class="text-2xl">${osIcon('alert')}</div>
             <div class="text-sm font-bold mt-1">Alertas</div>
             <div class="text-[10px] text-slate-500">Riesgo / atrasos</div>
           </button>
           <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='calls'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
-            <div class="text-2xl">📅</div>
+            <div class="text-2xl">${osIcon('calendar')}</div>
             <div class="text-sm font-bold mt-1">Calendario</div>
             <div class="text-[10px] text-slate-500">Sesiones</div>
           </button>
           <button onclick="eduCloseCeoMobile(); setTimeout(()=>{eduState.tab='alerts'; eduRender();}, 200)" class="bg-white border border-slate-200 rounded-xl p-3 text-left hover:shadow-md">
-            <div class="text-2xl">🚨</div>
+            <div class="text-2xl">${osIcon('alert')}</div>
             <div class="text-sm font-bold mt-1">Alertas</div>
             <div class="text-[10px] text-slate-500">${(eduState.alerts||[]).length} activas</div>
           </button>
@@ -5827,7 +5827,7 @@ function eduOpenCeoMobile() {
       </div>
 
       <div class="sticky bottom-0 bg-white border-t-2 border-slate-200 p-3 grid grid-cols-2 gap-2 shadow-lg">
-        <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">🤖 Análisis IA</button>
+        <button onclick="eduRunMentorAIAnalysis()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">${osIcon('bot')} Análisis IA</button>
         <button onclick="eduCloseCeoMobile()" class="bg-slate-900 text-white text-sm font-bold py-3 rounded-xl">✕ Cerrar</button>
       </div>
     </div>
@@ -5890,7 +5890,7 @@ DATOS:
 ${JSON.stringify(summary, null, 2)}`;
 
   // Abrir modal de loading
-  openModal('🤖 Analizando con IA...', '<div class="p-8 text-center"><div class="text-4xl">⏳</div><div class="text-sm mt-2">Claude está analizando tu mentoría...</div></div>');
+  openModal('Analizando con IA...', '<div class="p-8 text-center"><div class="text-4xl">' + osIcon('loader') + '</div><div class="text-sm mt-2">Claude está analizando tu mentoría...</div></div>');
 
   try {
     const token = await window.getAccessToken();
@@ -5914,7 +5914,7 @@ ${JSON.stringify(summary, null, 2)}`;
     const color = colorMap[a.estado_general] || 'from-slate-700 to-slate-900';
     const impColor = i => i === 'alto' ? 'bg-red-100 text-red-800 border-red-300' : i === 'medio' ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-300';
 
-    openModal('🤖 Análisis IA · ' + (m?.name || 'Mentoría'), `
+    openModal('Análisis IA · ' + (m?.name || 'Mentoría'), `
       <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
         <div class="bg-gradient-to-br ${color} text-white rounded-2xl p-4 shadow-lg">
           <div class="text-[10px] uppercase tracking-widest opacity-80 font-bold">Estado · ${(a.estado_general||'').toUpperCase()}</div>
@@ -5938,19 +5938,19 @@ ${JSON.stringify(summary, null, 2)}`;
 
         ${(a.fortalezas||[]).length > 0 ? `
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-emerald-900 mb-2">✅ Fortalezas</div>
+          <div class="text-xs font-bold uppercase text-emerald-900 mb-2">${osIcon('check-circle')} Fortalezas</div>
           <ul class="space-y-1 text-sm text-emerald-900">${a.fortalezas.map(f => `<li>• ${f.replace(/</g,'&lt;')}</li>`).join('')}</ul>
         </div>` : ''}
 
         ${(a.alertas||[]).length > 0 ? `
         <div class="bg-red-50 border border-red-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-red-900 mb-2">🚨 Alertas</div>
+          <div class="text-xs font-bold uppercase text-red-900 mb-2">${osIcon('alert')} Alertas</div>
           <ul class="space-y-1 text-sm text-red-900">${a.alertas.map(x => `<li>• ${x.replace(/</g,'&lt;')}</li>`).join('')}</ul>
         </div>` : ''}
 
         ${(a.acciones_priorizadas||[]).length > 0 ? `
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700 mb-1.5">🎯 Acciones priorizadas</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-1.5">${osIcon('target')} Acciones priorizadas</div>
           <div class="space-y-2">
             ${a.acciones_priorizadas.map((acc, i) => `
               <div class="border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
@@ -5969,18 +5969,18 @@ ${JSON.stringify(summary, null, 2)}`;
 
         ${a.foco_proxima_semana ? `
         <div class="bg-violet-50 border-l-4 border-violet-600 rounded-r-xl p-3">
-          <div class="text-xs font-bold uppercase text-violet-900 mb-1">🎯 Foco próxima semana</div>
+          <div class="text-xs font-bold uppercase text-violet-900 mb-1">${osIcon('target')} Foco próxima semana</div>
           <div class="text-sm text-violet-900">${a.foco_proxima_semana.replace(/</g,'&lt;')}</div>
         </div>` : ''}
 
         <div class="flex gap-2 pt-2 border-t border-slate-200">
           <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
-          <button onclick="eduRunMentorAIAnalysis()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">🔄 Re-analizar</button>
+          <button onclick="eduRunMentorAIAnalysis()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">${osIcon('refresh')} Re-analizar</button>
         </div>
       </div>
     `);
   } catch (e) {
-    openModal('Error', `<div class="p-4"><div class="text-sm text-red-700">❌ ${e.message}</div><button onclick="closeModal()" class="mt-3 bg-slate-100 px-3 py-1.5 rounded text-sm">Cerrar</button></div>`);
+    openModal('Error', `<div class="p-4"><div class="text-sm text-red-700">${osIcon('x-circle')} ${e.message}</div><button onclick="closeModal()" class="mt-3 bg-slate-100 px-3 py-1.5 rounded text-sm">Cerrar</button></div>`);
   }
 }
 
@@ -5990,7 +5990,7 @@ ${JSON.stringify(summary, null, 2)}`;
 // ════════════════════════════════════════════════════════════
 function eduRenderCohorts() {
   const students = eduMyStudents();
-  if (!students.length) return (typeof kitEmpty === 'function') ? kitEmpty('🎓', 'Sin alumnos para comparar cohortes') : '<div class="p-8 text-center text-slate-400 text-sm">Sin estudiantes para comparar.</div>';
+  if (!students.length) return (typeof kitEmpty === 'function') ? kitEmpty(osIcon('graduation-cap'), 'Sin alumnos para comparar cohortes') : '<div class="p-8 text-center text-slate-400 text-sm">Sin estudiantes para comparar.</div>';
 
   const now = Date.now();
   const dayMs = 86400000;
@@ -6044,7 +6044,7 @@ function eduRenderCohorts() {
   return `
     <div class="space-y-3">
       <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        👨‍👩‍👧‍👦 <strong>Cohortes</strong>: comparativa entre grupos. Detectá qué cohortes retienen mejor, gradúan más rápido y tienen mejor salud financiera.
+        ‍‍‍<strong>Cohortes</strong>: comparativa entre grupos. Detectá qué cohortes retienen mejor, gradúan más rápido y tienen mejor salud financiera.
       </div>
 
       <!-- Cards de cohortes -->
@@ -6089,7 +6089,7 @@ function eduRenderCohorts() {
               <div class="flex justify-between text-[10px] text-slate-500 pt-1">
                 <span>Avg días en mentoría: <strong>${c.avgDias}d</strong></span>
                 <span>Etapa promedio: <strong>#${Math.round(c.avgStageIdx)+1}</strong></span>
-                ${c.enRiesgo > 0 ? `<span class="text-amber-700 font-bold">⚠️ ${c.enRiesgo} sin contacto >14d</span>` : ''}
+                ${c.enRiesgo > 0 ? `<span class="text-amber-700 font-bold">${osIcon('alert')} ${c.enRiesgo} sin contacto >14d</span>` : ''}
               </div>
             </div>
           </div>
@@ -6098,7 +6098,7 @@ function eduRenderCohorts() {
 
       <!-- Tabla comparativa -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">📊 Tabla comparativa</div>
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase">${osIcon('chart')} Tabla comparativa</div>
         <div class="overflow-x-auto">
           <table class="w-full text-xs">
             <thead class="bg-slate-50">
@@ -6109,7 +6109,7 @@ function eduRenderCohorts() {
                 <th class="text-right p-2">Graduación</th>
                 <th class="text-right p-2">Pagos OK</th>
                 <th class="text-right p-2">Avg días</th>
-                <th class="text-right p-2">⚠️ Riesgo</th>
+                <th class="text-right p-2">${osIcon('alert')} Riesgo</th>
               </tr>
             </thead>
             <tbody>
@@ -6131,7 +6131,7 @@ function eduRenderCohorts() {
 
       ${cohortStats.length >= 2 ? `
         <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
-          💡 <strong>Insight automático:</strong>
+          ${osIcon('lightbulb')} <strong>Insight automático:</strong>
           ${(() => {
             const mejor = cohortStats.slice().sort((a,b) => b.retencion - a.retencion)[0];
             const peor = cohortStats.slice().sort((a,b) => a.retencion - b.retencion)[0];

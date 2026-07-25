@@ -7,7 +7,7 @@
 const RP_MODELS = {
   long_term: {
     nombre: 'Long-Term Rental',
-    icon: '🏠',
+    icon: osIcon('house'),
     desc: 'Renta tradicional 12+ meses. Mkt: $2,400/3BR Austin',
     rentDefault: 2400,        // 3BR Austin promedio Zillow/RentCafe 2026
     utilities: 0,
@@ -20,7 +20,7 @@ const RP_MODELS = {
   },
   by_room: {
     nombre: 'Renta por Habitación',
-    icon: '🛏️',
+    icon: osIcon('bed'),
     desc: 'PadSplit / Roommates. Mkt: $680-758/hab Austin',
     rentDefault: 720,         // PadSplit Austin $680-758
     utilities: 450,           // todo incluido (luz, agua, wifi, gas)
@@ -33,7 +33,7 @@ const RP_MODELS = {
   },
   mid_term: {
     nombre: 'Mid-Term (Furnished Finder)',
-    icon: '🗓️',
+    icon: osIcon('calendar-days'),
     desc: 'Travel nurses 13 sem. Mkt: $1,200-2,500/mes Austin',
     rentDefault: 2200,        // Furnished Finder Austin avg, mid de rango
     utilities: 380,           // incluido en renta típicamente
@@ -247,7 +247,7 @@ function rpRenderAIResult(a) {
   return `
     <div class="space-y-3 mt-2">
       <div class="bg-white rounded-lg p-3 border border-purple-200">
-        <div class="text-[10px] font-bold text-purple-900 uppercase mb-1">📈 Renta validada del mercado</div>
+        <div class="text-[10px] font-bold text-purple-900 uppercase mb-1">${osIcon('trending-up')} Renta validada del mercado</div>
         <div class="grid grid-cols-3 gap-2 text-xs">
           <div class="text-center"><div class="text-[9px] text-slate-500">Low</div><div class="font-bold">${rpFmt(vr.low)}</div></div>
           <div class="text-center bg-emerald-50 rounded p-1"><div class="text-[9px] text-emerald-700">Típico</div><div class="font-bold text-emerald-800">${rpFmt(vr.typical)}</div></div>
@@ -259,7 +259,7 @@ function rpRenderAIResult(a) {
 
       ${cfr.typical !== undefined ? `
       <div class="bg-white rounded-lg p-3 border border-purple-200">
-        <div class="text-[10px] font-bold text-purple-900 uppercase mb-1">💰 Cashflow esperado (corregido)</div>
+        <div class="text-[10px] font-bold text-purple-900 uppercase mb-1">${osIcon('dollar')} Cashflow esperado (corregido)</div>
         <div class="grid grid-cols-3 gap-2 text-xs">
           <div class="text-center"><div class="text-[9px] text-slate-500">Low</div><div class="font-bold ${cfr.low<0?'text-red-700':'text-slate-700'}">${rpFmt(cfr.low)}</div></div>
           <div class="text-center bg-amber-50 rounded p-1"><div class="text-[9px] text-amber-700">Típico</div><div class="font-bold ${cfr.typical<0?'text-red-700':cfr.typical<300?'text-amber-700':'text-emerald-700'}">${rpFmt(cfr.typical)}/mes</div></div>
@@ -269,7 +269,7 @@ function rpRenderAIResult(a) {
 
       ${a.market_comps?.length ? `
       <div class="bg-white rounded-lg p-3 border border-purple-200">
-        <div class="text-[10px] font-bold text-purple-900 uppercase mb-1">🔗 Comps reales encontrados (${a.market_comps.length})</div>
+        <div class="text-[10px] font-bold text-purple-900 uppercase mb-1">${osIcon('link')} Comps reales encontrados (${a.market_comps.length})</div>
         <div class="space-y-1 text-[10px]">
           ${a.market_comps.slice(0,5).map(c => `<div class="flex justify-between"><span class="text-slate-600">${c.source}: ${rpFmt(c.price)}</span>${c.url?`<a href="${c.url}" target="_blank" class="text-purple-700 hover:underline">ver→</a>`:''}</div>`).join('')}
         </div>
@@ -282,32 +282,32 @@ function rpRenderAIResult(a) {
 
       ${a.legal_restrictions?.length ? `
       <div class="bg-amber-50 rounded-lg p-3 border border-amber-200">
-        <div class="text-[10px] font-bold text-amber-900 uppercase mb-1">⚖️ Restricciones legales</div>
+        <div class="text-[10px] font-bold text-amber-900 uppercase mb-1">${osIcon('scale')} Restricciones legales</div>
         <ul class="text-[10px] text-amber-950 ml-3 list-disc">${a.legal_restrictions.map(r => `<li>${r}</li>`).join('')}</ul>
       </div>` : ''}
 
       ${a.best_model_for_this_property ? `
       <div class="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
-        <div class="text-[10px] font-bold text-emerald-900 uppercase">🏆 Mejor modelo para esta propiedad</div>
+        <div class="text-[10px] font-bold text-emerald-900 uppercase">${osIcon('trophy')} Mejor modelo para esta propiedad</div>
         <div class="text-xs text-emerald-950 mt-1">${a.best_model_for_this_property}</div>
       </div>` : ''}
 
       ${a.key_risks?.length ? `
       <div class="bg-red-50 rounded-lg p-3 border border-red-200">
-        <div class="text-[10px] font-bold text-red-900 uppercase mb-1">⚠️ Riesgos clave</div>
+        <div class="text-[10px] font-bold text-red-900 uppercase mb-1">${osIcon('alert')} Riesgos clave</div>
         <ul class="text-[10px] text-red-950 ml-3 list-disc">${a.key_risks.map(r => `<li>${r}</li>`).join('')}</ul>
       </div>` : ''}
 
       ${a.recommendations?.length ? `
       <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
-        <div class="text-[10px] font-bold text-blue-900 uppercase mb-1">💡 Recomendaciones</div>
+        <div class="text-[10px] font-bold text-blue-900 uppercase mb-1">${osIcon('lightbulb')} Recomendaciones</div>
         <ul class="text-[10px] text-blue-950 ml-3 list-disc">${a.recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
       </div>` : ''}
 
       ${a.summary ? `<div class="text-xs text-slate-700 italic bg-slate-50 rounded p-2">"${a.summary}"</div>` : ''}
 
       <div class="flex items-center justify-between text-[10px] text-slate-500">
-        <span>${a._fromCache ? `📦 Desde cache (${new Date(a._cachedAt).toLocaleDateString()})` : '🌐 Recién analizado'}</span>
+        <span>${a._fromCache ? `Desde cache (${new Date(a._cachedAt).toLocaleDateString()})` : 'Recién analizado'}</span>
         <button onclick="rpRunAIAnalysis(true)" class="text-purple-700 hover:underline">↻ Forzar refresh</button>
       </div>
     </div>
@@ -428,7 +428,7 @@ function rpNewPrediction() {
 async function openRentalPredictor(sys) {
   rpState.sys = sys;
   await Promise.all([rpLoadPredictions(), rpLoadProperties()]);
-  openModal(`💵 ${sys.name}`, '<div id="rp-root"></div>');
+  openModal(`${sys.name}`, '<div id="rp-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   rpRender();
@@ -444,9 +444,9 @@ function rpOnPropertyChange(propId) {
 function rpRender() {
   const root = document.getElementById('rp-root');
   const tabs = [
-    { id:'estimador', label:'💵 Predictor' },
-    { id:'comparador', label:'⚖️ Comparar Modelos' },
-    { id:'guardadas', label:`📁 Guardadas (${rpState.predictions.length})` }
+    { id:'estimador', label:'Predictor' },
+    { id:'comparador', label:'Comparar Modelos' },
+    { id:'guardadas', label:`Guardadas (${rpState.predictions.length})` }
   ];
   root.innerHTML = `
     <div class="flex gap-1 mb-4 border-b border-slate-200 -mx-6 px-6 overflow-x-auto">
@@ -520,7 +520,7 @@ function rpRenderEstimador(body) {
 
         <!-- VISTA SIMPLE (5 inputs clave) -->
         <div class="bg-white rounded-xl p-4 border-2 border-slate-300">
-          <h3 class="text-sm font-bold mb-3">⚡ Análisis rápido</h3>
+          <h3 class="text-sm font-bold mb-3">${osIcon('zap')} Análisis rápido</h3>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">ARV / Valor casa</label>
@@ -547,7 +547,7 @@ function rpRenderEstimador(body) {
         <!-- CONFIGURACIÓN AVANZADA (colapsable) -->
         <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <button onclick="rpState.simpleMode=!rpState.simpleMode; rpRenderTab()" class="w-full p-3 flex justify-between items-center text-sm text-slate-700 hover:bg-slate-50">
-            <span class="font-semibold">⚙️ Configuración avanzada</span><span>${rpState.simpleMode?'▼':'▲'}</span>
+            <span class="font-semibold">${osIcon('settings')} Configuración avanzada</span><span>${rpState.simpleMode?'▼':'▲'}</span>
           </button>
           ${!rpState.simpleMode ? `
             <div class="p-4 pt-0 space-y-3 border-t border-slate-100">
@@ -588,7 +588,7 @@ function rpRenderEstimador(body) {
           <label class="block text-[10px] font-medium text-slate-500 mb-1">Nombre del escenario (para guardar)</label>
           <div class="flex gap-2">
             <input value="${rpState.name}" oninput="rpState.name=this.value" placeholder="Ej: Echo Lane Airbnb" class="flex-1 border border-slate-300 rounded px-3 py-2 text-sm" />
-            <button onclick="rpSavePrediction()" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold px-4 py-2 rounded">${rpState.currentId?'💾 Guardar':'💾 Guardar'}</button>
+            <button onclick="rpSavePrediction()" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold px-4 py-2 rounded">${rpState.currentId?'Guardar':'Guardar'}</button>
           </div>
         </div>
       </div>
@@ -596,7 +596,7 @@ function rpRenderEstimador(body) {
       <!-- RESULTADO -->
       <div class="lg:col-span-5 space-y-3">
         <div class="rounded-xl p-5 border-2 ${cashBg}">
-          <div class="text-xs font-bold uppercase ${cashColor.replace('text-','text-')}">${r.netCashflow < 0 ? '🔴 Pérdida mensual' : r.netCashflow < 300 ? '🟡 Margen ajustado' : '🟢 Cashflow positivo'}</div>
+          <div class="text-xs font-bold uppercase ${cashColor.replace('text-','text-')}">${r.netCashflow < 0 ? 'Pérdida mensual' : r.netCashflow < 300 ? 'Margen ajustado' : 'Cashflow positivo'}</div>
           <div class="text-4xl font-bold ${cashColor} mt-1">${rpFmt(r.netCashflow)}/mes</div>
           <div class="text-xs text-slate-600 mt-1">${rpFmt(r.annualCashflow)}/año · ${m.icon} ${m.nombre}</div>
         </div>
@@ -637,9 +637,9 @@ function rpRenderEstimador(body) {
         </div>
 
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-950">
-          <strong>📊 Análisis básico:</strong><br>
+          <strong>${osIcon('chart')} Análisis básico:</strong><br>
           • Total gastos: ${rpFmt(r.totalExpenses)}/mes (${((r.totalExpenses/r.grossRent)*100||0).toFixed(0)}% de renta bruta)<br>
-          • Ratio renta/hipoteca: ${(r.grossRent/(rpState.mortgage_monthly||1)).toFixed(2)}x ${r.grossRent/(rpState.mortgage_monthly||1) < 1.5 ? '⚠️ bajo' : '✓'}<br>
+          • Ratio renta/hipoteca: ${(r.grossRent/(rpState.mortgage_monthly||1)).toFixed(2)}x ${r.grossRent/(rpState.mortgage_monthly||1) < 1.5 ? 'bajo' : '✓'}<br>
           • Anualizado: ${rpFmt(r.annualCashflow)} netos al año
         </div>
 
@@ -647,15 +647,15 @@ function rpRenderEstimador(body) {
         <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4">
           <div class="flex items-start justify-between gap-2 mb-2">
             <div>
-              <h3 class="text-sm font-bold text-purple-900 uppercase">🤖 Validación con datos del mercado en vivo</h3>
+              <h3 class="text-sm font-bold text-purple-900 uppercase">${osIcon('bot')} Validación con datos del mercado en vivo</h3>
               <p class="text-[10px] text-purple-700">Claude busca en internet: rent comps reales, ADR Airbnb, vacancy local, restricciones legales, competencia</p>
             </div>
-            <button onclick="rpRunAIAnalysis(false)" ${rpState.aiLoading?'disabled':''} class="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">${rpState.aiLoading?'🔄 Analizando...':'🚀 Analizar con IA'}</button>
+            <button onclick="rpRunAIAnalysis(false)" ${rpState.aiLoading?'disabled':''} class="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">${rpState.aiLoading?'Analizando...':'Analizar con IA'}</button>
           </div>
-          ${rpState.aiError ? `<div class="text-xs text-red-700 bg-red-100 rounded p-2 mt-2">⚠️ ${rpState.aiError}</div>` : ''}
+          ${rpState.aiError ? `<div class="text-xs text-red-700 bg-red-100 rounded p-2 mt-2">${osIcon('alert')} ${rpState.aiError}</div>` : ''}
           ${rpState.aiLoading ? `
             <div class="text-center py-6 text-purple-700">
-              <div class="text-3xl animate-pulse">🔍</div>
+              <div class="text-3xl animate-pulse">${osIcon('search')}</div>
               <p class="text-xs mt-2">Buscando en Zillow, AirDNA, Furnished Finder, PadSplit, regulaciones locales... (30-60s)</p>
             </div>
           ` : rpState.aiAnalysis ? rpRenderAIResult(rpState.aiAnalysis) : ''}
@@ -666,20 +666,20 @@ function rpRenderEstimador(body) {
           const st = rpStressTest();
           return `
           <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="text-xs font-bold text-slate-700 uppercase mb-2">🎯 Stress Test (3 escenarios)</div>
+            <div class="text-xs font-bold text-slate-700 uppercase mb-2">${osIcon('target')} Stress Test (3 escenarios)</div>
             <div class="grid grid-cols-3 gap-2 text-xs">
               <div class="bg-red-50 rounded p-2 text-center">
-                <div class="text-[10px] text-red-700 font-bold uppercase">😰 Pesimista</div>
+                <div class="text-[10px] text-red-700 font-bold uppercase">Pesimista</div>
                 <div class="font-bold ${st.pessim.netCashflow < 0 ? 'text-red-700' : 'text-amber-700'}">${rpFmt(st.pessim.netCashflow)}</div>
                 <div class="text-[9px] text-slate-500">vacancy +5, renta -10%</div>
               </div>
               <div class="bg-slate-100 rounded p-2 text-center border-2 border-slate-400">
-                <div class="text-[10px] text-slate-700 font-bold uppercase">⚖️ Realista</div>
+                <div class="text-[10px] text-slate-700 font-bold uppercase">${osIcon('scale')} Realista</div>
                 <div class="font-bold text-slate-900">${rpFmt(st.realist.netCashflow)}</div>
                 <div class="text-[9px] text-slate-500">tus inputs actuales</div>
               </div>
               <div class="bg-emerald-50 rounded p-2 text-center">
-                <div class="text-[10px] text-emerald-700 font-bold uppercase">🚀 Optimista</div>
+                <div class="text-[10px] text-emerald-700 font-bold uppercase">${osIcon('rocket')} Optimista</div>
                 <div class="font-bold text-emerald-700">${rpFmt(st.optim.netCashflow)}</div>
                 <div class="text-[9px] text-slate-500">vacancy -3, renta +5%</div>
               </div>
@@ -689,7 +689,7 @@ function rpRenderEstimador(body) {
 
         <!-- MARKET NOTES Austin TX 2026 -->
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-950">
-          <strong>📰 Mercado Austin TX — mayo 2026:</strong>
+          <strong>Mercado Austin TX — mayo 2026:</strong>
           <ul class="mt-1 space-y-0.5 ml-4 list-disc">
             <li>Vacancy multifamily Q1 2026: <strong>13.5%</strong> (sobreoferta, esperan 6-7% para fin 2026)</li>
             <li>Rent dropping ~4-7% YoY. Concessions tipo "2 meses gratis" comunes</li>
@@ -732,7 +732,7 @@ function rpRenderComparador(body) {
           const color = r.calc.netCashflow < 0 ? 'border-red-300' : r.calc.netCashflow < 300 ? 'border-amber-300' : 'border-emerald-300';
           return `
             <div class="bg-white rounded-xl border-2 ${color} ${isBest?'ring-2 ring-amber-400':''} p-4">
-              ${isBest?'<div class="text-[10px] text-amber-700 font-bold mb-1">🏆 MEJOR OPCIÓN</div>':''}
+              ${isBest?'<div class="text-[10px] text-amber-700 font-bold mb-1">' + osIcon('trophy') + ' MEJOR OPCIÓN</div>':''}
               <div class="text-2xl mb-1">${r.model.icon}</div>
               <div class="text-sm font-bold">${r.model.nombre}</div>
               <p class="text-[10px] text-slate-500 mt-0.5 leading-tight">${r.model.desc}</p>
@@ -754,7 +754,7 @@ function rpRenderComparador(body) {
       </div>
 
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-blue-950">
-        <strong>💡 Cómo leer:</strong> los 4 modelos comparados con los MISMOS gastos base (ARV, hipoteca, beds). Los defaults de utilities, vacancy, mgmt, plataforma y cleaning cambian según modelo (realistas para cada tipo). <strong>${best.model.nombre}</strong> es el que más cashflow genera con esta casa: ${rpFmt(best.calc.netCashflow)}/mes.
+        <strong>${osIcon('lightbulb')} Cómo leer:</strong> los 4 modelos comparados con los MISMOS gastos base (ARV, hipoteca, beds). Los defaults de utilities, vacancy, mgmt, plataforma y cleaning cambian según modelo (realistas para cada tipo). <strong>${best.model.nombre}</strong> es el que más cashflow genera con esta casa: ${rpFmt(best.calc.netCashflow)}/mes.
       </div>
     </div>
   `;
@@ -791,8 +791,8 @@ function rpRenderGuardadas(body) {
               <td class="py-2 px-2 text-right font-bold ${color}">${rpFmt(calc.netCashflow)}/mes</td>
               <td class="py-2 px-2 text-right">${calc.cocReturn===null?'—':calc.cocReturn.toFixed(1)+'%'}</td>
               <td class="py-2 px-2 text-right whitespace-nowrap">
-                <button onclick='rpLoadPrediction(${JSON.stringify(p).replace(/'/g,"&#39;")})' class="text-xs text-slate-600 hover:text-slate-900 mr-1">📝 Editar</button>
-                <button onclick="rpDeletePrediction('${p.id}')" class="text-xs text-red-600 hover:text-red-800">🗑</button>
+                <button onclick='rpLoadPrediction(${JSON.stringify(p).replace(/'/g,"&#39;")})' class="text-xs text-slate-600 hover:text-slate-900 mr-1">${osIcon('pencil-line')} Editar</button>
+                <button onclick="rpDeletePrediction('${p.id}')" class="text-xs text-red-600 hover:text-red-800">${osIcon('trash')}</button>
               </td>
             </tr>`;
           }).join('')}

@@ -40,7 +40,7 @@ async function openRemodelCommandCenter(sys) {
   let ov = document.getElementById('rc-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'rc-overlay'; document.body.appendChild(ov); }
   if (typeof posApplyTheme === 'function') posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable Remodelación…</div></main></div><button class="pos-theme-btn" onclick="rcToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeRemodelCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#7c7365">' + osIcon('loader') + ' Conectando con Airtable Remodelación…</div></main></div><button class="pos-theme-btn" onclick="rcToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeRemodelCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await rcLoadAll();
   rcRender();
@@ -286,7 +286,7 @@ function rcInsights(c) {
 
 // ─── Pull Airtable (mismo endpoint que el Dashboard, JWT del user) ───
 async function rcPull() {
-  const btn = document.getElementById('rc-pull'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Trayendo…'; }
+  const btn = document.getElementById('rc-pull'); if (btn) { btn.disabled = true; btn.textContent = 'Trayendo…'; }
   try {
     const hdrs = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await window.getAccessToken()}` };
     const body = JSON.stringify({ user_id: (window.state && state.user && state.user.id) || null });
@@ -312,10 +312,10 @@ const RC_NAV = [
   ['evr', '⇄', 'Estimado vs Real'],
   ['obras', '▤', 'Obras'],
   ['lideres', '◈', 'Líderes'],
-  ['inspeccion', '🔍', 'Inspección'],
-  ['nomina', '💵', 'Nómina y Pagos'],
+  ['inspeccion', osIcon('search'), 'Inspección'],
+  ['nomina', osIcon('banknote'), 'Nómina y Pagos'],
   ['gestion', '◎', 'Gestión (EVM)'],
-  ['reportes', '📑', 'Reportes CEO'],
+  ['reportes', osIcon('file'), 'Reportes CEO'],
   ['cerebro', '✦', 'Cerebro de obra'],
 ];
 function rcRender() {
@@ -324,7 +324,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">🏥</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">🔍 Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">${osIcon('stethoscope')}</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">${osIcon('search')} Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
@@ -333,7 +333,7 @@ window.rcGo = rcGo;
 
 function rcSidebar(c) {
   const sync = RC.syncLog && RC.syncLog.synced_at ? new Date(RC.syncLog.synced_at).toLocaleDateString('es') : '—';
-  return `<div class="brand"><div class="logo">🔨</div><div><b>Remodelación</b><span>COMMAND CENTER</span></div></div>
+  return `<div class="brand"><div class="logo">${osIcon('hammer')}</div><div><b>Remodelación</b><span>COMMAND CENTER</span></div></div>
     <div class="navlbl">Obra</div>
     <nav class="nav">${RC_NAV.map(([k, i, n]) => `<a class="${RC.section === k ? 'on' : ''}" onclick="rcGo('${k}')"><span class="i">${i}</span>${n}${k === 'obras' ? `<span class="b">${c.obras.length}</span>` : ''}${k === 'lideres' ? `<span class="b">${c.lideres.length}</span>` : ''}</a>`).join('')}</nav>
     <div class="foot">Fuente: <b>Airtable en vivo</b> (Remodelación).<br>Último sync: ${sync}<br>${c.fin.length} finalizadas · ${c.activas.length} en curso</div>`;
@@ -345,15 +345,15 @@ function rcHeader(title, sub) {
 
 function rcSecCommand(c) {
   const atrasadas = (RC.avanceVivo || []).filter(x => x.atrasada_cronograma && x.proceso === 'En construcción');
-  const bannerAtraso = atrasadas.length ? `<div class="card" style="border:1px solid rgba(248,113,113,.5);margin-bottom:12px"><div class="lab" style="color:#f87171">📉 ${atrasadas.length} OBRA(S) ATRASADA(S) SEGÚN CRONOGRAMA</div>${atrasadas.map(o => `<div class="krow"><span><b>${RC_E(rcShort(o.address))}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado</span><b class="down">${o.atraso_pts} pts · ~${o.atraso_dias}d</b></div>`).join('')}</div>` : '';
+  const bannerAtraso = atrasadas.length ? `<div class="card" style="border:1px solid rgba(248,113,113,.5);margin-bottom:12px"><div class="lab" style="color:#e4756a">${osIcon('trending-down')} ${atrasadas.length} OBRA(S) ATRASADA(S) SEGÚN CRONOGRAMA</div>${atrasadas.map(o => `<div class="krow"><span><b>${RC_E(rcShort(o.address))}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado</span><b class="down">${o.atraso_pts} pts · ~${o.atraso_dias}d</b></div>`).join('')}</div>` : '';
   const ins = rcInsights(c);
   const parN = RC.parity ? RC.parity.airtable_count : c.obras.length;
   const paritySync = RC.parity ? (RC.parity.in_sync !== false && (RC.parity.airtable_count == null || RC.parity.airtable_count === c.obras.length)) : true;
   const parityNote = paritySync
-    ? `Última verificación de paridad: <b style="color:var(--pos,#34d399)">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
-    : `Última verificación de paridad: <b style="color:#f87171">ALERTA</b> · app ${c.obras.length} vs Airtable ${parN} — sync desincronizado`;
-  const parityBg = paritySync ? 'color-mix(in srgb, var(--pos,#34d399) 10%, transparent)' : 'color-mix(in srgb, var(--neg,#f87171) 12%, transparent)';
-  const parityBd = paritySync ? 'color-mix(in srgb, var(--pos,#34d399) 25%, transparent)' : 'color-mix(in srgb, var(--neg,#f87171) 35%, transparent)';
+    ? `Última verificación de paridad: <b style="color:var(--pos,#63c08e)">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
+    : `Última verificación de paridad: <b style="color:#e4756a">ALERTA</b> · app ${c.obras.length} vs Airtable ${parN} — sync desincronizado`;
+  const parityBg = paritySync ? 'color-mix(in srgb, var(--pos,#63c08e) 10%, transparent)' : 'color-mix(in srgb, var(--neg,#e4756a) 12%, transparent)';
+  const parityBd = paritySync ? 'color-mix(in srgb, var(--pos,#63c08e) 25%, transparent)' : 'color-mix(in srgb, var(--neg,#e4756a) 35%, transparent)';
   return rcHeader('Command Center', `${c.obras.length} obras · ${c.fin.length} finalizadas · ${c.activas.length} en curso — capital, ganancia realizada y pipeline.`) + `
     <div style="font-size:11px;padding:6px 12px;margin-bottom:10px;border-radius:8px;background:${parityBg};border:1px solid ${parityBd};color:var(--txt2)">${parityNote}</div>
     <div class="grid kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -362,7 +362,7 @@ function rcSecCommand(c) {
       <div class="card kpi"><div class="lab">Total empresa</div><div class="big ${c.resultadoEmpresaHist>=0?'up glow':'down'}">${RC_K(c.resultadoEmpresaHist)}</div><div class="meta">servicio − costo F&F · ${c.fin.length} finalizadas</div></div>
     </div>
     <div class="grid kpis" style="margin-top:14px">
-      <div class="card kpi"><div class="lab">Obras en curso</div>${paritySync ? `<div class="big">${c.activas.length}</div>` : `<div class="big down" style="font-size:15px;line-height:1.15" title="El conteo de la app no coincide con Airtable">⚠ sync<br>desincronizado</div>`}<div class="meta">avance promedio ${c.avgAvance}% · ${c.obras.length} obras</div></div>
+      <div class="card kpi"><div class="lab">Obras en curso</div>${paritySync ? `<div class="big">${c.activas.length}</div>` : `<div class="big down" style="font-size:15px;line-height:1.15" title="El conteo de la app no coincide con Airtable">${osIcon('alert')} sync<br>desincronizado</div>`}<div class="meta">avance promedio ${c.avgAvance}% · ${c.obras.length} obras</div></div>
       <div class="card kpi"><div class="lab">Capital desplegado</div><div class="big">${RC_K(c.capitalActivo)}</div><div class="meta">en obras activas · presup. ${RC_K(c.presupActivo)}</div></div>
       <div class="card kpi"><div class="lab">Pipeline <span class="warn">proyectado</span></div><div class="big warn">${RC_K(c.pipelineProj)}</div><div class="meta">NO realizado · ${c.pipeline.length} en pre-construcción</div></div>
       <div class="card kpi"><div class="lab">Alertas</div><div class="big ${c.compAlerts.length?'down':'up'}">${c.compAlerts.length}</div><div class="meta">sobre-presupuesto / atraso</div></div>
@@ -396,7 +396,7 @@ function rcCompletitud(o) {
 }
 function rcObraCard(o) {
   const dq = o.dq, av = Math.round(+o.avance_pct || 0);
-  const badge = dq.sinDatos ? '<span class="ff-dq ff-dq-nd">sin datos</span>' : dq.sobrePresup ? '<span class="ff-dq ff-dq-rev">⚠ sobre presupuesto</span>' : (!dq.fin ? '<span class="ff-dq ff-dq-pre">en curso · proyectado</span>' : '');
+  const badge = dq.sinDatos ? '<span class="ff-dq ff-dq-nd">sin datos</span>' : dq.sobrePresup ? '<span class="ff-dq ff-dq-rev">' + osIcon('alert') + ' sobre presupuesto</span>' : (!dq.fin ? '<span class="ff-dq ff-dq-pre">en curso · proyectado</span>' : '');
   const util = dq.fin ? (rcUtil(o) != null ? rcUtil(o) : 0) : ((+o.valor_cliente || 0) - dq.gasto);
   const slug = window.osSlug ? osSlug(o.address) : '';
   const _ff = rcFin(o), _sq = +o.sqft || 0;
@@ -405,7 +405,7 @@ function rcObraCard(o) {
   let _psfStr = '—';
   if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
   const _comp = rcCompletitud(o);
-  const _cc = _comp.n >= 5 ? 'var(--pos,#34d399)' : _comp.n >= 3 ? 'var(--amber,#e7b65e)' : 'var(--neg,#f87171)';
+  const _cc = _comp.n >= 5 ? 'var(--pos,#63c08e)' : _comp.n >= 3 ? 'var(--amber,#dca94f)' : 'var(--neg,#e4756a)';
   return `<div class="kcard"><!-- fix 12-jul: ${'$'}{bannerAtraso} era fuera de scope (vive en rcSecCommand) → crasheaba la sección Obras -->
     <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
@@ -416,7 +416,7 @@ function rcObraCard(o) {
     ${o.costo_ff != null && +o.costo_ff !== 0 ? `<div class="krow"><span>Costo F&F (int+serv+mueb)</span><b>${RC_M(+o.costo_ff)}</b></div>` : ''}
     ${o.resultado_empresa != null ? `<div class="krow"><span>Total empresa</span><b class="${+o.resultado_empresa >= 0 ? 'up' : 'down'}">${RC_M(+o.resultado_empresa)}</b></div>` : ''}
     <div class="kbar"><i style="width:${Math.min(100, av)}%"></i></div>
-    <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${slug}')">🏠 Ver ficha de casa →</div>
+    <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${slug}')">${osIcon('house')} Ver ficha de casa →</div>
   </div>`;
 }
 const RC_STAGES = ['Pre construcción', 'En construcción', 'Pre-entrega', 'Entrega', 'Finalizado'];
@@ -437,7 +437,7 @@ function rcLiderScorecard(c, lids) {
   const mkNext = (porque, accion, quien) => (typeof kitNext === 'function')
     ? kitNext(porque, accion, quien)
     : '<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--glassb);border-radius:10px;background:var(--glass)">'
-    + '<div style="font-size:11px;font-weight:800;color:var(--amber,#f59e0b);margin-bottom:3px">🔍 Qué revisar</div>'
+    + '<div style="font-size:11px;font-weight:800;color:var(--amber,#f59e0b);margin-bottom:3px">' + osIcon('search') + ' Qué revisar</div>'
     + '<div style="font-size:12px;color:var(--mut)">' + porque + '</div>'
     + '<div style="font-size:12px;color:var(--ink);margin-top:4px">→ <b>' + accion + '</b>' + (quien ? ' <span style="color:var(--mut)">· ' + RC_E(quien) + '</span>' : '') + '</div></div>';
   const stat = (lab, txt, cls, sub) => '<div><div style="font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--mut2)">' + lab + '</div>'
@@ -462,7 +462,7 @@ function rcLiderScorecard(c, lids) {
     let next;
     if (peorCosto) next = mkNext('Revisar <b>' + RC_E(peorCosto.address) + '</b>: costo +' + peorCosto.devPct + '% sobre presupuesto' + (peorCosto.dias != null && peorCosto.dias > 0 ? ' y +' + peorCosto.dias + ' días de atraso' : ''), 'Validar draws vs SOW y carga de materiales con Alejandra', l.lider);
     else if (peorDias) next = mkNext('Revisar <b>' + RC_E(peorDias.address) + '</b>: cerró con +' + peorDias.dias + ' días vs estimado', 'Revisar cronograma y lead-times de esa obra con el líder', l.lider);
-    else if (conPres.length || conDias.length) next = '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">✅ Sin obras sobre presupuesto ni con atraso — nada que revisar.</div>';
+    else if (conPres.length || conDias.length) next = '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + osIcon('check-circle') + ' Sin obras sobre presupuesto ni con atraso — nada que revisar.</div>';
     else next = '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">Sin presupuesto ni fechas en sus obras — no se puede evaluar. Cargar en Airtable.</div>';
     return '<div class="card" style="padding:13px 15px">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:13.5px">' + RC_E(l.lider) + '</b>'
@@ -482,8 +482,8 @@ function rcSecLideres(c) {
   const lids = porPersona ? c.lideres : c.lideresCuadrilla;
   const NOTA_PERSONA = 'Las casas con varios líderes se cuentan en cada uno, así que la suma por persona puede superar el total de la empresa.';
   const tgl = (v, lab) => `<span class="chip" style="${(porPersona ? 'persona' : 'cuadrilla') === v ? 'background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff' : ''}" onclick="rcSetLiderVista('${v}')">${lab}</span>`;
-  const toggleBar = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">${tgl('persona', '👤 Por persona')}${tgl('cuadrilla', '👥 Por cuadrilla')}` +
-    (porPersona ? `<span class="meta" title="${NOTA_PERSONA}">ℹ ${NOTA_PERSONA}</span>` : '') + '</div>';
+  const toggleBar = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">${tgl('persona', 'Por persona')}${tgl('cuadrilla', 'Por cuadrilla')}` +
+    (porPersona ? `<span class="meta" title="${NOTA_PERSONA}">${NOTA_PERSONA}</span>` : '') + '</div>';
   const dchip = (v, unit) => v == null ? '<span style="color:var(--mut2)">—</span>' : `<span class="${v > 0 ? 'down' : 'up'}">${v > 0 ? '+' : ''}${v}${unit}</span>`;
   const detalle = l => l.obras.map(o => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:3px 0;border-top:1px solid var(--glassb)"><span>${RC_E(o.address)}</span><span style="color:var(--mut)">${o.devPct != null ? 'desv ' + (o.devPct > 0 ? '+' : '') + o.devPct + '%' : ''}${o.dias != null ? ' · ' + o.dias + 'd' : ''}${o.rent != null ? ' · rent ' + o.rent + '%' : ''}</span></div>`).join('');
   const rows = lids.map((l, i) => {
@@ -613,12 +613,12 @@ function rcSecGestion(c) {
       ${rcVivoCard()}
       <div class="card"><div class="chart-h"><div class="t">Control de presupuesto por casa</div><div class="k">material (pagos) + MO (horas×rate) · alerta > presup +${RC.sobrecostoPct != null ? RC.sobrecostoPct : 10}%</div></div>
         <table class="ptable"><thead><tr><th>Casa</th><th class="r" style="text-align:right">Presup.</th><th style="text-align:right">Material</th><th style="text-align:right">MO (horas)</th><th style="text-align:right">Total real</th><th style="text-align:right">%</th></tr></thead><tbody>
-        ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">⚠ SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
+        ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">' + osIcon('alert') + ' SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
         </tbody></table>
-        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rcPagoQuincenal()">💵 Generar pago quincenal</button></div>
-        ${(() => { const tot = (RC.ledger || []).length; const sin = (RC.ledger || []).filter(x => x.rate_conocido === false).length; return sin ? `<div class="meta" style="margin-bottom:6px">⚠ Cobertura parcial: ${sin} de ${tot} filas del ledger sin rate conocido (nombre no matchea Personal en Campo) — su devengado no se computa. Corregir nombres en Airtable para cobertura total.</div>` : ''; })()}
+        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#756c5c);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rcPagoQuincenal()">${osIcon('banknote')} Generar pago quincenal</button></div>
+        ${(() => { const tot = (RC.ledger || []).length; const sin = (RC.ledger || []).filter(x => x.rate_conocido === false).length; return sin ? `<div class="meta" style="margin-bottom:6px">${osIcon('alert')} Cobertura parcial: ${sin} de ${tot} filas del ledger sin rate conocido (nombre no matchea Personal en Campo) — su devengado no se computa. Corregir nombres en Airtable para cobertura total.</div>` : ''; })()}
         ${(() => { const map = {}; (RC.ledger || []).forEach(r => { if (!map[r.worker]) map[r.worker] = { w: r.worker, horas: 0, dev: 0, pag: 0, deuda: 0, casas: [] }; const m2 = map[r.worker]; m2.horas += +r.horas || 0; m2.dev += +r.devengado || 0; m2.pag += +r.pagado || 0; m2.deuda += +r.deuda || 0; if (+r.deuda > 100) m2.casas.push(rcShort(r.casa) + ' ' + RC_M(+r.deuda)); }); const tot = Object.values(map).filter(x => Math.abs(x.deuda) > 100).sort((x, y) => y.deuda - x.deuda); const deudaTotal = tot.reduce((s2, x) => s2 + Math.max(0, x.deuda), 0); return `<div class="krow"><span><b>DEUDA TOTAL</b></span><b class="down">${RC_M(deudaTotal)}</b></div>` + tot.slice(0, 8).map(x => `<div class="krow"><span>${RC_E(x.w)} <span style="opacity:.5;font-size:10px">(${Math.round(x.horas)}h · ${x.casas.slice(0, 2).join(', ')})</span></span><b class="${x.deuda > 0 ? 'down' : 'up'}">${RC_M(x.deuda)}</b></div>`).join(''); })()}
-        ${(RC.receipts || []).length ? `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Recibos quincenales registrados</div>` + (RC.receipts || []).slice(0, 6).map(rc2 => `<div class="krow"><span>${rc2.fecha_pago} · <b>${RC_E(rc2.lider || '—')}</b> · ${RC_E((rc2.casa || '').slice(0, 22))} <span style="opacity:.5;font-size:10px">(${rc2.periodo_ini}→${rc2.periodo_fin})</span></span><span><b>${RC_M(+rc2.total || 0)}</b> <span class="badge ${rc2.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:8px">${RC_E(rc2.estado)}</span>${rc2.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px">↗AT pend.</span>' : ''}</span></div>`).join('') : ''}
+        ${(RC.receipts || []).length ? `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#756c5c);text-transform:uppercase;letter-spacing:.5px">Recibos quincenales registrados</div>` + (RC.receipts || []).slice(0, 6).map(rc2 => `<div class="krow"><span>${rc2.fecha_pago} · <b>${RC_E(rc2.lider || '—')}</b> · ${RC_E((rc2.casa || '').slice(0, 22))} <span style="opacity:.5;font-size:10px">(${rc2.periodo_ini}→${rc2.periodo_fin})</span></span><span><b>${RC_M(+rc2.total || 0)}</b> <span class="badge ${rc2.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:8px">${RC_E(rc2.estado)}</span>${rc2.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px">↗AT pend.</span>' : ''}</span></div>`).join('') : ''}
         <div class="meta" style="margin-top:8px">Fuente: remodel_material_payments (${(RC.presupCasa || []).length ? 'espejo Pago de Materiales' : '—'}) + remodel_worker_pay_summary. Muestra en-construcción + cualquier sobrecosto.</div>
       </div>
     </div>
@@ -629,7 +629,7 @@ function rcSecGestion(c) {
         <div class="krow"><span>Desviación de costo prom</span><b class="${c.desvCostoProm > 0 ? 'down' : 'up'}">${c.desvCostoProm > 0 ? '+' : ''}${c.desvCostoProm}%</b></div>
         <div class="krow"><span>Desviación de días prom</span><b>${c.desvDiasProm > 0 ? '+' : ''}${c.desvDiasProm}d</b></div>
         <div class="krow"><span>Ratio material histórico</span><b>${c.matPctHist}%</b></div>
-        ${(() => { const h = (RC.calibCostos || []).find(x => x.ventana === 'historico') || {}; const u = (RC.calibCostos || []).find(x => x.ventana === 'ultimas_5') || {}; const et = (RC.calibEtapas || []).filter(x => x.aplicable); const converge = (u.desv_costo_pct != null && h.desv_costo_pct != null) ? (Math.abs(+u.desv_costo_pct) <= Math.abs(+h.desv_costo_pct)) : null; const etRows = et.map(x => `<div class="krow"><span>factor días · ${RC_E(x.etapa)} (n=${x.n_tareas})</span><b class="${+x.factor_dias > 1.05 ? 'down' : 'up'}">×${(+x.factor_dias).toFixed(3)}</b></div>`).join(''); return `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:10px 0 6px;padding-top:8px;font-size:10px;color:var(--txt3,#64748b);text-transform:uppercase;letter-spacing:.5px">Tendencia (se afina con cada obra cerrada)</div><div class="krow"><span>Desv. costo — histórico (${h.n || 0})</span><b>${h.desv_costo_pct > 0 ? '+' : ''}${h.desv_costo_pct}%</b></div><div class="krow"><span>Desv. costo — últimas 5</span><b class="${converge === false ? 'down' : 'up'}">${u.desv_costo_pct > 0 ? '+' : ''}${u.desv_costo_pct}%${converge === false ? ' ⚠ empeorando' : converge === true ? ' ✓ converge' : ''}</b></div><div class="krow"><span>$/sqft real — hist → últimas 5</span><b>${h.psf_real} → ${u.psf_real}</b></div>${etRows}`; })()}
+        ${(() => { const h = (RC.calibCostos || []).find(x => x.ventana === 'historico') || {}; const u = (RC.calibCostos || []).find(x => x.ventana === 'ultimas_5') || {}; const et = (RC.calibEtapas || []).filter(x => x.aplicable); const converge = (u.desv_costo_pct != null && h.desv_costo_pct != null) ? (Math.abs(+u.desv_costo_pct) <= Math.abs(+h.desv_costo_pct)) : null; const etRows = et.map(x => `<div class="krow"><span>factor días · ${RC_E(x.etapa)} (n=${x.n_tareas})</span><b class="${+x.factor_dias > 1.05 ? 'down' : 'up'}">×${(+x.factor_dias).toFixed(3)}</b></div>`).join(''); return `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:10px 0 6px;padding-top:8px;font-size:10px;color:var(--txt3,#756c5c);text-transform:uppercase;letter-spacing:.5px">Tendencia (se afina con cada obra cerrada)</div><div class="krow"><span>Desv. costo — histórico (${h.n || 0})</span><b>${h.desv_costo_pct > 0 ? '+' : ''}${h.desv_costo_pct}%</b></div><div class="krow"><span>Desv. costo — últimas 5</span><b class="${converge === false ? 'down' : 'up'}">${u.desv_costo_pct > 0 ? '+' : ''}${u.desv_costo_pct}%${converge === false ? ' empeorando' : converge === true ? ' ✓ converge' : ''}</b></div><div class="krow"><span>$/sqft real — hist → últimas 5</span><b>${h.psf_real} → ${u.psf_real}</b></div>${etRows}`; })()}
         <div class="meta" style="margin-top:12px"><b>LOOP ACTIVO</b>: los factores de días por etapa (real del Planner) y el $/sqft real YA se aplican a la generación del cronograma y al pronosticador (rmAutoGenPlanner · remodel_forecast_params). Se recalibra solo con cada obra cerrada.</div>
       </div>
     </div>`;
@@ -648,21 +648,21 @@ window.rcSetCobro = rcSetCobro;
 function rcVivoGanancia(o) {
   const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
   const neg = +o.ganancia_proyectada < 0;
-  const bg = o.sem_ganancia === 'rojo' ? 'color-mix(in srgb, var(--neg,#f87171) 10%, transparent)' : 'color-mix(in srgb, var(--pos,#34d399) 8%, transparent)';
-  const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#f87171;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
-  const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#e7b65e;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
+  const bg = o.sem_ganancia === 'rojo' ? 'color-mix(in srgb, var(--neg,#e4756a) 10%, transparent)' : 'color-mix(in srgb, var(--pos,#63c08e) 8%, transparent)';
+  const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#e4756a;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
+  const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#dca94f;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
   const modoSel = '<select onchange="rcSetCobro(&quot;' + o.property_id + '&quot;, this.value)" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:inherit;font-size:9px;padding:1px 4px" title="Cómo cobra Structure One esta obra">'
     + '<option value="fijo"' + (o.modo_cobro !== 'costplus' ? ' selected' : '') + '>PRECIO FIJO (real)</option>'
     + '<option value="costplus"' + (o.modo_cobro === 'costplus' ? ' selected' : '') + '>COST-PLUS ×1.05 (what-if)</option></select>';
   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
-    + '<span style="font-size:10px;color:var(--txt3,#64748b)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? '🔴 PÉRDIDA' : '🟢') + tentativo + precioTent + '</span>' + modoSel
+    + '<span style="font-size:10px;color:var(--txt3,#756c5c)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? 'PÉRDIDA' : kitStatusDot('ok')) + tentativo + precioTent + '</span>' + modoSel
     + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'
     + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
     + '<div class="meta" style="margin-top:3px;font-size:9px">cobra proy. ' + M(o.valor_cobro_proyectado != null ? o.valor_cobro_proyectado : o.valor_remodelacion) + ' (' + (o.modo_cobro === 'costplus' ? 'what-if cost-plus' : 'Valor Remodelación') + ') · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
 }
 function rcVivoCard() {
   const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
-  const SEM = { verde: '🟢', amarillo: '🟡', rojo: '🔴', gris: '⚪' };
+  const SEM = { verde: kitStatusDot('ok'), amarillo: kitStatusDot('warn'), rojo: kitStatusDot('bad'), gris: '⚪' };
   const bar = (pct, color) => `<div style="height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin:3px 0 7px"><i style="display:block;height:100%;width:${Math.min(100, +pct || 0)}%;background:${color}"></i></div>`;
   const card = (o) => {
     const revisar = [];
@@ -674,19 +674,19 @@ function rcVivoCard() {
     if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
     return `<div class="card" style="min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b>${RC_E(rcShort(o.address))}</b><span style="font-size:11px;opacity:.7">${o.done || 0}/${o.total || 0} tareas</span></div>
-      <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado_actividad' ? '⭐ $ por actividad' : o.metodo === 'ponderado_etapa' ? '⭐ por etapa' : '(conteo)'} · ${o.pct_tecnico || 0}%${o.tareas_sin_map > 0 && o.metodo === 'conteo' ? ` <span style="color:#e7b65e" title="Tareas del Planner que no cruzan con actividades del Estimador (planner manual o pronóstico sin guardar) — no ponderan hasta mapear">· ${o.tareas_sin_map} sin mapear</span>` : ''}</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
-      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE FINANCIERO${o.fuente_presupuesto === 'pronostico' ? ' (presup. del pronóstico)' : ''} · ${o.pct_financiero != null ? o.pct_financiero + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_financiero, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
-      <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#64748b,#94a3b8)')}
+      <div style="font-size:10px;color:var(--txt3,#756c5c);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado_actividad' ? '$ por actividad' : o.metodo === 'ponderado_etapa' ? 'por etapa' : '(conteo)'} · ${o.pct_tecnico || 0}%${o.tareas_sin_map > 0 && o.metodo === 'conteo' ? ` <span style="color:#dca94f" title="Tareas del Planner que no cruzan con actividades del Estimador (planner manual o pronóstico sin guardar) — no ponderan hasta mapear">· ${o.tareas_sin_map} sin mapear</span>` : ''}</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#6fbf95,#2f6ef0)')}
+      <div style="font-size:10px;color:var(--txt3,#756c5c)">AVANCE FINANCIERO${o.fuente_presupuesto === 'pronostico' ? ' (presup. del pronóstico)' : ''} · ${o.pct_financiero != null ? o.pct_financiero + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_financiero, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#dca94f,#e4756a)' : 'linear-gradient(90deg,#63c08e,#6fbf95)')}
+      <div style="font-size:10px;color:var(--txt3,#756c5c)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#756c5c,#a89f8f)')}
       ${(o.valor_remodelacion > 0 || o.modo_cobro === 'costplus') ? rcVivoGanancia(o) : ''}
       <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
         <span>${SEM[o.sem_costo] || '⚪'} costo ${o.costo_proyectado ? `<span style="opacity:.6">(proy. a hoy $${(+o.costo_proyectado).toLocaleString('en-US')})</span>` : ''}</span>
         <span>${SEM[o.sem_tiempo] || '⚪'} tiempo <span style="opacity:.6">(${o.pct_dias != null ? o.pct_dias + '% días' : 's/cronograma'})</span></span></div>
-      ${revisar.length ? `<div class="meta" style="margin-top:8px;color:var(--amber,#e7b65e)">🔍 Qué revisar: ${RC_E(revisar.join(' · '))}</div>` : '<div class="meta" style="margin-top:8px;color:#34d399">En plan ✓</div>'}
+      ${revisar.length ? `<div class="meta" style="margin-top:8px;color:var(--amber,#dca94f)">${osIcon('search')} Qué revisar: ${RC_E(revisar.join(' · '))}</div>` : '<div class="meta" style="margin-top:8px;color:#63c08e">En plan ✓</div>'}
     </div>`;
   };
   return `<div class="card"><div class="chart-h"><div class="t">Avance de obra EN VIVO</div><div class="k">tareas (Planner) vs plata (pagos+horas) · desviación contra cronograma · ${obras.length} en construcción</div></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:10px">${obras.map(card).join('') || '<div class="meta">Sin obras en construcción.</div>'}</div>
-    <div class="meta" style="margin-top:10px">Definiciones: tareas = v_remodel_progress (cronograma del Planner cumplido) · plata = C2 (material_payments + horas×rate ÷ presupuesto) · proyección lineal sobre el cronograma · umbral = alerta_sobrecosto_pct. ⚠ Write-back del % a Airtable parqueado: falta scope write del token.</div></div>`;
+    <div class="meta" style="margin-top:10px">Definiciones: tareas = v_remodel_progress (cronograma del Planner cumplido) · plata = C2 (material_payments + horas×rate ÷ presupuesto) · proyección lineal sobre el cronograma · umbral = alerta_sobrecosto_pct. ${osIcon('alert')} Write-back del % a Airtable parqueado: falta scope write del token.</div></div>`;
 }
 
 // ─── RM-M2 · Desglose de nómina QUINCENAL por CASA (Lun–Dom; la Fecha de Pago cubre las 2 semanas que cierran antes) ───
@@ -715,7 +715,7 @@ function rcPagoQuincenal() {
   el.id = 'rc-pq-modal';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:99999;display:flex;align-items:center;justify-content:center;color:var(--ink)';
   el.innerHTML = '<div class="card" style="width:480px;max-width:94vw;background:var(--bg);border:1px solid var(--glassb);color:var(--ink);color-scheme:dark light">'
-    + '<div class="chart-h"><div class="t">💵 Desglose de nómina quincenal</div><div class="k">por casa · horas del espejo</div></div>'
+    + '<div class="chart-h"><div class="t">' + osIcon('banknote') + ' Desglose de nómina quincenal</div><div class="k">por casa · horas del espejo</div></div>'
     + '<div style="margin:12px 0"><label style="font-size:11px;color:var(--mut)">Casa<br>'
     + '<select id="pq-casa" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:9px;color:var(--ink);margin:4px 0 12px">'
     + '<option value="">(todas las casas del período)</option>' + casas.map(c => '<option>' + RC_E(c) + '</option>').join('') + '</select></label>'
@@ -800,9 +800,9 @@ function rcDesgloseOverlay() {
   el.id = 'rc-desglose-ov';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:99999;overflow:auto;padding:24px;color:var(--ink)';
   el.innerHTML = '<div class="card" style="max-width:920px;margin:0 auto;background:var(--bg);border:1px solid var(--glassb);color:var(--ink)">'
-    + '<div class="chart-h"><div class="t">💵 Desglose quincenal · ' + RC_E(d.casaSel) + '</div><div class="k">pago ' + RC_E(d.fechaPago) + '</div></div>'
+    + '<div class="chart-h"><div class="t">' + osIcon('banknote') + ' Desglose quincenal · ' + RC_E(d.casaSel) + '</div><div class="k">pago ' + RC_E(d.fechaPago) + '</div></div>'
     + '<div class="meta">' + per + '</div>'
-    + (d.faltaPTD ? '<div class="meta" style="color:var(--amber);margin-top:6px">⚠ Hay filas sin “Pago Total Dia” (falta re-correr el sync de workers tras la migración) — se computan como $0.</div>' : '')
+    + (d.faltaPTD ? '<div class="meta" style="color:var(--amber);margin-top:6px">' + osIcon('alert') + ' Hay filas sin “Pago Total Dia” (falta re-correr el sync de workers tras la migración) — se computan como $0.</div>' : '')
     + d.casas.map(casaCard).join('')
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:12px;border-radius:10px;background:var(--glass)"><b>TOTAL QUINCENA</b><b style="font-size:17px">' + M(d.total) + '</b></div>'
     + '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="repbtn ghost" onclick="document.getElementById(\'rc-desglose-ov\').remove()">Cerrar</button></div></div>';
@@ -826,8 +826,8 @@ function rcReciboOverlay(r) {
   el.innerHTML = `<style>
     #rc-recibo-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;overflow:auto;padding:20px}
     #rc-recibo-doc{background:#fff;color:#111;max-width:720px;margin:0 auto;padding:34px;border-radius:12px;font-family:-apple-system,Segoe UI,sans-serif}
-    #rc-recibo-doc .rrh{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b45309;padding-bottom:12px}
-    #rc-recibo-doc .rrlogo{font-size:21px;font-weight:800;color:#b45309}#rc-recibo-doc .rrlogo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
+    #rc-recibo-doc .rrh{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #8a6400;padding-bottom:12px}
+    #rc-recibo-doc .rrlogo{font-size:21px;font-weight:800;color:#8a6400}#rc-recibo-doc .rrlogo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
     #rc-recibo-doc table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
     #rc-recibo-doc th{text-align:left;font-size:10px;text-transform:uppercase;color:#666;border-bottom:1px solid #ccc;padding:6px 4px}
     #rc-recibo-doc th:nth-child(n+2),#rc-recibo-doc td:nth-child(n+2){text-align:right}
@@ -851,8 +851,8 @@ function rcReciboOverlay(r) {
     </div>
     <div class="rrbtns">
       <button class="rrbtn" style="background:#e5e7eb" onclick="document.getElementById('rc-recibo-ov').remove()">Cerrar</button>
-      <button class="rrbtn" style="background:#374151;color:#fff" onclick="window.print()">🖨 Imprimir / PDF</button>
-      <button class="rrbtn" style="background:#b45309;color:#fff" onclick="rcReciboGuardar()">✍️ Firmar y registrar pago</button>
+      <button class="rrbtn" style="background:#374151;color:#fff" onclick="window.print()">${osIcon('printer')} Imprimir / PDF</button>
+      <button class="rrbtn" style="background:#8a6400;color:#fff" onclick="rcReciboGuardar()">✍️ Firmar y registrar pago</button>
     </div>`;
   (document.getElementById('rc-overlay') || document.body).appendChild(el);
   const cv = document.getElementById('rc-firma-canvas');
@@ -909,7 +909,7 @@ async function rcWritebackPreview(receiptId) {
   const body = okDry
     ? '<div class="meta" style="margin:8px 0">Se escribiría este registro en Airtable «Nomina Trabajadores en Campo» (tabla tblsmtrvcJbwwLjch):</div>'
       + '<pre style="background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:320px;color:var(--ink);white-space:pre-wrap">' + RC_E(JSON.stringify({ preview: r.preview, resuelto: r.resolved }, null, 2)) + '</pre>'
-      + ((r.warnings && r.warnings.length) ? '<div class="meta" style="color:var(--amber)">⚠ ' + RC_E(r.warnings.join(' · ')) + '</div>' : '')
+      + ((r.warnings && r.warnings.length) ? '<div class="meta" style="color:var(--amber)">' + osIcon('alert') + ' ' + RC_E(r.warnings.join(' · ')) + '</div>' : '')
     : '<div class="meta" style="color:var(--neg);margin:8px 0">No se pudo preparar el write-back: ' + RC_E((r && r.error) || 'error') + '</div>';
   const canWrite = okDry && !r.blocking;
   el.innerHTML = '<div class="card" style="width:620px;max-width:95vw;background:var(--bg);border:1px solid var(--glassb);color:var(--ink);max-height:88vh;overflow:auto">'
@@ -924,8 +924,8 @@ async function rcWritebackConfirm(receiptId, btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Escribiendo…'; }
   const r = await rcNominaWriteback(receiptId, false);
   document.getElementById('rc-wb-modal')?.remove();
-  if (r && r.ok) alert('✅ Escrito en Airtable. recId: ' + (r.record_id || '—'));
-  else alert('❌ No se pudo escribir: ' + ((r && r.error) || 'error'));
+  if (r && r.ok) alert('Escrito en Airtable. recId: ' + (r.record_id || '—'));
+  else alert('No se pudo escribir: ' + ((r && r.error) || 'error'));
   await rcReloadRecibos();
   rcRender();
 }
@@ -952,15 +952,15 @@ function rcSecNomina(c) {
       <div class="card kpi"><div class="lab">Deuda NETA total</div><div class="big down">${RC_M(deudaTotal)}</div><div class="meta">devengado − pagado (C4)</div></div>
       <div class="card kpi"><div class="lab">Recibos registrados</div><div class="big">${(RC.receipts || []).length}</div><div class="meta">quincenas firmadas</div></div>
       <div class="card kpi"><div class="lab">Cobertura de tarifas</div><div class="big ${sinRate ? 'warn' : 'up'}">${led.length ? Math.round(100 * (led.length - sinRate) / led.length) : 0}%</div><div class="meta">${sinRate} filas sin rate (nombres ≠ Personal en Campo)</div></div>
-      <div class="card kpi" style="display:flex;flex-direction:column;justify-content:center"><button class="repbtn" style="font-size:13px;padding:10px" onclick="rcPagoQuincenal()">💵 Generar pago quincenal</button><div class="meta" style="margin-top:6px;text-align:center">desglose por casa · recibo firmable</div></div>
+      <div class="card kpi" style="display:flex;flex-direction:column;justify-content:center"><button class="repbtn" style="font-size:13px;padding:10px" onclick="rcPagoQuincenal()">${osIcon('banknote')} Generar pago quincenal</button><div class="meta" style="margin-top:6px;text-align:center">desglose por casa · recibo firmable</div></div>
     </div>
     <div class="grid row2" style="margin-top:14px">
       <div class="card"><div class="chart-h"><div class="t">Deuda por trabajador</div><div class="k">click para detalle por casa · grano: trabajador×casa×día</div></div>
         <table class="ptable"><thead><tr><th>Trabajador</th><th style="text-align:right">Horas</th><th style="text-align:right">Devengado</th><th style="text-align:right">Pagado</th><th style="text-align:right">Deuda</th></tr></thead><tbody>
-        ${workers.filter(x => Math.abs(x.deuda) > 100).map(filaW).join('') || '<tr><td colspan="5" style="padding:12px;color:#48d69c">Sin deudas ✓</td></tr>'}</tbody></table></div>
+        ${workers.filter(x => Math.abs(x.deuda) > 100).map(filaW).join('') || '<tr><td colspan="5" style="padding:12px;color:#63c08e">Sin deudas ✓</td></tr>'}</tbody></table></div>
       <div class="card"><div class="chart-h"><div class="t">Historial de pagos quincenales</div><div class="k">recibos firmados (firma guardada en el registro)</div></div>
         <table class="ptable"><thead><tr><th>Pago</th><th>Líder</th><th>Casa</th><th>Período</th><th style="text-align:right">Total</th><th style="text-align:right">Estado</th></tr></thead><tbody>
-        ${recibos || '<tr><td colspan="6" style="padding:12px;opacity:.6">Aún sin recibos — generá el primero con el botón 💵.</td></tr>'}</tbody></table>
+        ${recibos || '<tr><td colspan="6" style="padding:12px;opacity:.6">Aún sin recibos — generá el primero con el botón ' + osIcon('banknote') + '.</td></tr>'}</tbody></table>
         <div class="meta" style="margin-top:8px">Al firmar un recibo queda registrado como REALIZADO con la firma embebida. El write-back a "Nomina Trabajadores en Campo" (Airtable) se genera UN recibo por casa, en DRY-RUN: se muestra qué se va a escribir y se aprueba a mano (✓AT = escrito). Requiere PAT con scope write.</div></div>
     </div>`;
 }

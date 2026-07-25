@@ -43,6 +43,14 @@ const MAP = {
   '⚖': 'scale', '🛡': 'shield', '🎉': 'party', '🥳': 'party', '👍': 'thumbs-up', '📜': 'file', '🌙': 'moon', '☀': 'sun',
   '🎨': 'palette', '📷': 'camera', '📸': 'camera', '🎬': 'video', '▶': 'play', '⏸': 'pause', '🎛': 'settings', '🎚': 'settings',
   '🔌': 'link', '🧩': 'package', '📌': 'map-pin', '🏷': 'clipboard', '🗃': 'folder', '🧰': 'wrench',
+  '🏚': 'construction', '🔁': 'refresh', '🔂': 'refresh', '📏': 'ruler', '📽': 'video', '🎥': 'video',
+  '🔬': 'search', '🛎': 'bell', '🛒': 'package', '📱': 'phone', '🧪': 'flask', '📡': 'globe', '📲': 'phone',
+  '🗒': 'notebook', '📒': 'notebook', '📇': 'folder', '🗳': 'inbox', '📮': 'inbox', '🔦': 'search',
+  '🧯': 'shield', '🚧': 'construction', '🏙': 'building', '🏬': 'store', '🏪': 'store', '🖥': 'globe', '💻': 'globe',
+  '📉': 'trending-down', '💠': 'gem', '🔷': 'gem', '🔶': 'gem', '⏱': 'clock', '⏲': 'clock', '🗝': 'key',
+  '🖌': 'palette', '🖍': 'palette', '🪟': 'ruler', '🌳': 'ruler', '🌲': 'ruler', '🌎': 'globe', '🌍': 'globe',
+  '🅰': 'store', '🅱': 'store', '💧': 'wrench', '🚰': 'wrench', '🧴': 'wrench', '🪛': 'wrench', '🪜': 'construction',
+  '🛁': 'wrench', '🚿': 'wrench', '💨': 'wrench', '❄': 'wrench', '🪵': 'ruler', '🪨': 'ruler', '🍳': 'package', '🧹': 'sparkles', '⛏': 'construction', '🔥': 'flame',
 };
 const STATUS = { '🟢': 'ok', '🟩': 'ok', '🟡': 'warn', '🟨': 'warn', '🟠': 'warn', '🟧': 'warn', '🔴': 'bad', '🟥': 'bad' };
 
@@ -67,11 +75,19 @@ function findStrings(s) {
     return i;
   }
   // salta una expresión `${ ... }` balanceada (respeta strings/templates/comentarios anidados)
+  // keywords tras las que `/` SIEMPRE inicia un regex (no división)
+  const RX_KW = new Set(['return', 'typeof', 'case', 'in', 'of', 'do', 'else', 'void', 'delete', 'yield', 'await', 'instanceof', 'new', 'throw']);
   // ¿un `/` en la posición i inicia un regex? (heurística por token previo significativo)
   function regexHere(i, prevSig) {
-    // división si el previo es fin-de-valor: identificador, `)`, `]`, `}`, dígito, comilla de cierre
     if (prevSig === null) return true;
-    if (/[)\]}A-Za-z0-9_$'"`]/.test(prevSig)) return false;
+    // si el char previo es identificador/dígito, puede ser `x / y` (división) O `return /re/` (keyword→regex)
+    if (/[A-Za-z0-9_$]/.test(prevSig)) {
+      let j = i - 1; while (j >= 0 && /\s/.test(s[j])) j--;
+      let e = j; while (j >= 0 && /[A-Za-z0-9_$]/.test(s[j])) j--;
+      const word = s.slice(j + 1, e + 1);
+      return RX_KW.has(word); // keyword → regex; identificador/nº normal → división
+    }
+    if (/[)\]}'"`]/.test(prevSig)) return false; // fin-de-valor → división
     return true; // (, =, :, ;, {, [, operadores, coma, etc. → regex
   }
   function skipRegex(i) { // i en el `/` inicial; devuelve índice tras el `/` de cierre (+flags)
@@ -133,15 +149,42 @@ function insideTag(content, rel) {
 // ¿el contenido del string es SOLO emojis/espacios? (típico `icon:'🏠'` — no stripear a '')
 const ALL_EMOJI = /^[\s\u{1F000}-\u{1FAFF}\u{2190}-\u{27BF}\u{2B00}-\u{2BFF}️]*$/u;
 
+const bareMode = process.argv.includes('--bare');
+const stripRest = process.argv.includes('--strip-rest'); // estripa pictográficos NO mapeados que queden
+const noStrip = process.argv.includes('--no-strip');     // NO estripar emojis en strings de texto plano
+// (para archivos de CONTENIDO: WhatsApp/captions/slides — sus emojis en texto son contenido, no UI)
+// Verificado en este repo: los emojis nunca aparecen en comparaciones/métodos de string
+// (0 hits de === '🟢' / .includes('🧪') / etc.) → son puramente presentacionales. Sin guard.
+function lineHasCompare() { return false; }
+// ¿el code point cae en un plano de emoji pictográfico ALTO? (para --strip-rest de sobrantes no mapeados)
+// Solo planos inequívocamente emoji: 0x1F000–0x1FAFF. Los símbolos BMP (0x2600-0x26FF: ♾ ☾ ✓ ⚡…)
+// quedan (o ya están en MAP) — no se estripan para no borrar glifos con significado.
+function isPicto(cp) { return cp >= 0x1F000 && cp <= 0x1FAFF; }
+// nivel de status del contenido bare (primer char status); o null
+function bareStatusLevel(content) { for (const ch of content.trim()) { const l = STATUS[baseChar(ch)]; if (l) return l; } return null; }
+// nombre de icono si el bare es UN solo emoji mapeado; o null
+function bareIconName(content) {
+  const t = content.trim(); const cps = [...t]; const real = cps.filter(c => !/\s/.test(c) && c !== VS);
+  if (real.length !== 1) return null; return MAP[baseChar(real[0])] || null;
+}
+
 const strings = findStrings(src);
-let splice = 0, strip = 0, sdot = 0; const left = {}; const review = [];
+let splice = 0, strip = 0, sdot = 0, bare = 0; const left = {}; const review = [];
 // procesar de atrás hacia adelante para no invalidar offsets
 const edits = [];
 for (const st of strings) {
   const content = src.slice(st.start + 1, st.end); // sin comillas
   const hasMarkup = content.includes('<');
-  // string que es SOLO emoji(s) sin markup: NO tocar (probable valor `icon:`/comparación) → revisión manual
-  if (!hasMarkup && ALL_EMOJI.test(content) && content.trim() !== '') { review.push({ start: st.start, text: content }); continue; }
+  // string que es SOLO emoji(s) sin markup: valor bare (icon:/estado). En --bare se convierte
+  // (whole-string → osIcon/kitStatusDot) salvo en líneas con comparación; si no, va a revisión.
+  if (!hasMarkup && ALL_EMOJI.test(content) && content.trim() !== '') {
+    if (bareMode && st.quote !== 'tpl' && !lineHasCompare(st.start)) {
+      const lvl = bareStatusLevel(content); const nm = bareIconName(content);
+      if (lvl && !nm) { edits.push({ s: st.start, e: st.end + 1, repl: `kitStatusDot('${lvl}')` }); sdot++; continue; }
+      if (nm) { edits.push({ s: st.start, e: st.end + 1, repl: `osIcon('${nm}')` }); bare++; continue; }
+    }
+    review.push({ start: st.start, text: content }); continue;
+  }
   // recorrer por code points
   for (let k = 0; k < content.length; k++) {
     const cp = content.codePointAt(k);
@@ -155,7 +198,14 @@ for (const st of strings) {
     const emo = base;
     const isStatus = STATUS[emo];
     const name = MAP[emo];
-    if (!isStatus && !name) { k += consume - 1; continue; }
+    if (!isStatus && !name) {
+      // --strip-rest: sobrante pictográfico no mapeado (decorativo en texto) → estripar
+      if (stripRest && isPicto(cp)) {
+        const aS = st.start + 1 + k; let aE = aS + raw.length; if (src[aE] === ' ') aE++;
+        edits.push({ s: aS, e: aE, repl: '' }); strip++; k += consume - 1; continue;
+      }
+      k += consume - 1; continue;
+    }
     const absStart = st.start + 1 + k;
     const absEnd = absStart + raw.length; // fin del emoji (+VS)
     // ¿espacio contiguo a absorber al hacer strip?
@@ -167,12 +217,12 @@ for (const st of strings) {
       if (hasMarkup && !inTag) {
         const call = `kitStatusDot('${isStatus}')`;
         edits.push({ s: absStart, e: absEnd, repl: spliceExpr(st.quote, call) }); sdot++;
-      } else { edits.push({ s: delStart, e: delEnd, repl: '' }); strip++; }
+      } else if (!noStrip) { edits.push({ s: delStart, e: delEnd, repl: '' }); strip++; }
     } else {
       if (hasMarkup && !inTag) {
         const call = `osIcon('${name}')`;
         edits.push({ s: absStart, e: absEnd, repl: spliceExpr(st.quote, call) }); splice++;
-      } else { edits.push({ s: delStart, e: delEnd, repl: '' }); strip++; left[emo] = 'strip'; }
+      } else if (!noStrip) { edits.push({ s: delStart, e: delEnd, repl: '' }); strip++; left[emo] = 'strip'; }
     }
     k += consume - 1;
   }
@@ -187,7 +237,7 @@ edits.sort((a, b) => b.s - a.s);
 for (const e of edits) src = src.slice(0, e.s) + e.repl + src.slice(e.e);
 
 if (!dry) writeFileSync(file, src);
-console.log(`${file}  splice=${splice} strip=${strip} statusdot=${sdot} review=${review.length}${dry ? ' (DRY)' : ''}`);
+console.log(`${file}  splice=${splice} strip=${strip} statusdot=${sdot} bareIcon=${bare} review=${review.length}${dry ? ' (DRY)' : ''}`);
 if (review.length) {
   // ubicar línea de cada string a revisar (bare-emoji → posible icon: field)
   const lines = [];

@@ -87,7 +87,7 @@ function rmRenderCrewForPhase(p, diasFase) {
   return `
     <div class="pt-2 mt-2 border-t border-dashed border-purple-300">
       <div class="flex items-center justify-between mb-1">
-        <span class="text-[10px] font-bold uppercase text-purple-700">👷 Cuadrilla de la etapa (MO por persona)</span>
+        <span class="text-[10px] font-bold uppercase text-purple-700">${osIcon('hard-hat', {size:12})} Cuadrilla de la etapa (MO por persona)</span>
         ${crew.length ? `<span class="text-[10px] text-purple-700 font-bold">MO etapa = ${rmFmt(moCrew)}</span>` : ''}
       </div>
       <div class="text-[9px] text-slate-400 mb-1">Horas por defecto = ${diasFase ? diasFase.toFixed(1) : 0}d × ${jornada}h = ${horasDefault.toFixed(0)}h (editable por persona). Con ≥1 persona con tarifa, este MO reemplaza el labor por coeficiente de la etapa.</div>
@@ -114,7 +114,7 @@ function rmRenderEditor(body) {
   if (isEmpty && forecasts.length === 0 && (rmState.projects || []).length === 0) {
     body.innerHTML = `
       <div class="max-w-md mx-auto text-center py-16">
-        <div class="text-5xl mb-3">🔮</div>
+        <div class="mb-3">${osIcon('chart-line', {size:40, color:'var(--mut2)'})}</div>
         <h3 class="text-lg font-bold text-slate-800">Primero hacé un pronóstico</h3>
         <p class="text-sm text-slate-500 mt-2">Para usar el Editor detallado necesitás subir un archivo Taskade y generar un pronóstico de la casa. El detalle parte de ahí.</p>
         <button onclick="rmSetTab('forecast')" class="mt-5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg">→ Ir al Pronosticador</button>
@@ -130,7 +130,7 @@ function rmRenderEditor(body) {
         ${savedProjectsForGate.length > 0 ? `
           <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-400 rounded-2xl p-6">
             <div class="text-center mb-4">
-              <div class="text-4xl mb-2">📂</div>
+              <div class="mb-2">${osIcon('folder-open', {size:32})}</div>
               <h3 class="text-lg font-bold text-emerald-900">Tenés ${savedProjectsForGate.length} proyecto${savedProjectsForGate.length>1?'s':''} ya guardado${savedProjectsForGate.length>1?'s':''}</h3>
               <p class="text-xs text-emerald-800 mt-1">Continuá donde dejaste: actividades, qty, vu, todo el detalle.</p>
             </div>
@@ -143,7 +143,7 @@ function rmRenderEditor(body) {
         ${forecasts.length > 0 ? `
           <div class="bg-gradient-to-br from-blue-50 to-violet-50 border-2 border-blue-300 rounded-2xl p-6">
             <div class="text-center mb-4">
-              <div class="text-4xl mb-2">🔮</div>
+              <div class="mb-2">${osIcon('chart-line', {size:32})}</div>
               <h3 class="text-lg font-bold text-blue-900">${savedProjectsForGate.length > 0 ? 'O empezá uno nuevo desde un pronóstico' : 'Cargá un pronóstico para empezar el detalle'}</h3>
               <p class="text-xs text-blue-800 mt-1">El Editor detallado parte de un pronóstico previo (Taskade + Pronosticador).</p>
             </div>
@@ -164,7 +164,7 @@ function rmRenderEditor(body) {
   const savedProjects = rmState.projects || [];
   const projectPicker = savedProjects.length > 0 ? `
     <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-2 flex items-center gap-2">
-      <label class="text-[10px] font-bold uppercase text-emerald-900 whitespace-nowrap">📂 Abrir proyecto guardado:</label>
+      <label class="text-[10px] font-bold uppercase text-emerald-900 whitespace-nowrap">${osIcon('folder-open', {size:12})} Abrir proyecto guardado:</label>
       <select onchange="rmPickSavedProject(this.value)" class="flex-1 border border-emerald-300 rounded px-2 py-1 text-xs">
         <option value="">— ${savedProjects.length} proyectos guardados —</option>
         ${savedProjects.map(p => `<option value="${p.id}" ${rmState.currentProject?.id===p.id?'selected':''}>${p.name||'(sin nombre)'} · ${p.sqft||'?'}sqft · ${p.budget_total?'$'+Math.round(p.budget_total).toLocaleString():''} · ${new Date(p.updated_at).toLocaleDateString('es-MX')}</option>`).join('')}
@@ -172,7 +172,7 @@ function rmRenderEditor(body) {
     </div>` : '';
   const forecastPicker = forecasts.length > 0 ? `
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center gap-2">
-      <label class="text-[10px] font-bold uppercase text-blue-900 whitespace-nowrap">🔮 Cargar otro pronóstico:</label>
+      <label class="text-[10px] font-bold uppercase text-blue-900 whitespace-nowrap">${osIcon('chart-line', {size:12})} Cargar otro pronóstico:</label>
       <select onchange="if(this.value && confirm('Esto reemplaza el proyecto actual. ¿Continuar?'))rmLoadFromForecast(this.value); else this.value=''" class="flex-1 border border-blue-300 rounded px-2 py-1 text-xs">
         <option value="">— ${forecasts.length} pronósticos disponibles —</option>
         ${forecasts.map(f => `<option value="${f.id}">${f.propiedad} · ${f.sqft||'?'}sqft · ${new Date(f.created_at).toLocaleDateString('es-MX')}</option>`).join('')}
@@ -183,7 +183,7 @@ function rmRenderEditor(body) {
     <div class="bg-gradient-to-r from-violet-100 to-fuchsia-100 border-2 border-violet-400 rounded-xl p-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-2xl">📎</span>
+          <span>${osIcon('paperclip', {size:22})}</span>
           <div>
             <div class="text-xs font-bold text-violet-900">Vinculado a Taskade Visita Previa</div>
             <div class="text-[11px] text-violet-800">${linked.propiedad} · ${linked.veredicto || '—'} · daño global ${linked.dano_global_pct?.toFixed(1)}% · ${linked.archivo_nombre || ''}</div>
@@ -213,7 +213,7 @@ function rmRenderEditor(body) {
           </div>
           <!-- QW4 — Tags chips -->
           <div class="mt-3">
-            <label class="block text-[10px] text-slate-500 mb-1">🏷️ Tags <span class="text-slate-400 font-normal">(presioná Enter o coma para agregar)</span></label>
+            <label class="block text-[10px] text-slate-500 mb-1">Tags <span class="text-slate-400 font-normal">(presioná Enter o coma para agregar)</span></label>
             <div class="flex flex-wrap gap-1 items-center border border-slate-300 rounded px-2 py-1.5 min-h-[36px]">
               ${(rmState.editTags || []).map(t => `
                 <span class="inline-flex items-center gap-1 bg-slate-900 text-white text-[11px] px-2 py-0.5 rounded-full">
@@ -232,11 +232,11 @@ function rmRenderEditor(body) {
         <!-- Activos del proyecto: Matterport + scope + audio + planos -->
         ${rmRenderAssets()}
 
-        <!-- 🪄 AUTO-LLENADO INTELIGENTE -->
+        <!-- AUTO-LLENADO INTELIGENTE -->
         <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-3">
           <div class="flex justify-between items-start gap-2 flex-wrap mb-2">
             <div>
-              <div class="text-sm font-bold text-violet-900">🪄 Auto-llenar el catálogo</div>
+              <div class="text-sm font-bold text-violet-900">${osIcon('sparkles')} Auto-llenar el catálogo</div>
               <div class="text-[11px] text-violet-700 mt-0.5">Elegí el tipo de remodelación + ya tenés <strong>${rmState.editSqft || '?'} ft²</strong> → llena todo el catálogo con cantidades realistas. Después ajustás lo que no aplique.</div>
             </div>
             ${Object.keys(rmState.selectedActivities).length > 0 ? `<span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold">✓ ${Object.keys(rmState.selectedActivities).length} ya cargadas</span>` : ''}
@@ -259,7 +259,7 @@ function rmRenderEditor(body) {
 
         <!-- QW3 — Buscador en catálogo -->
         <div class="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-2">
-          <span class="text-lg">🔎</span>
+          <span>${osIcon('search', {size:18})}</span>
           <input
             type="text"
             value="${(rmState.catalogFilter || '').replace(/"/g,'&quot;')}"
@@ -352,12 +352,12 @@ function rmRenderEditor(body) {
           const txt = lowMargin ? 'red' : okMargin ? 'amber' : 'emerald';
           return `
             <div class="bg-gradient-to-br ${card} border-2 rounded-xl p-4">
-              <h3 class="text-xs font-bold text-${txt}-900 uppercase mb-1">💵 Precio al cliente</h3>
+              <h3 class="text-xs font-bold text-${txt}-900 uppercase mb-1">${osIcon('banknote')} Precio al cliente</h3>
               <div class="text-3xl font-bold text-${txt}-700">${rmFmt(e.pricing.clientPrice)}</div>
               <div class="text-xs text-${txt}-800 mt-1">Ganancia: <strong>${rmFmt(e.pricing.profit)}</strong> (${pm.toFixed(1)}% margen)</div>
               ${lowMargin ? `
                 <div class="mt-3 pt-3 border-t border-red-300 text-[11px] text-red-900 font-semibold flex items-start gap-1.5">
-                  <span class="text-base leading-none">⚠️</span>
+                  <span class="leading-none">${osIcon('alert')}</span>
                   <span>Margen <strong>${pm.toFixed(1)}%</strong> está bajo industria (18-25%). Subí <strong>Markup %</strong> a ≥25% en Ajustes de pricing.</span>
                 </div>
               ` : okMargin ? `
@@ -369,7 +369,7 @@ function rmRenderEditor(body) {
 
         <!-- BREAKDOWN PRICING -->
         <div class="bg-slate-900 text-white rounded-xl p-4">
-          <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">📊 Desglose pricing</h3>
+          <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">${osIcon('chart')} Desglose pricing</h3>
           <table class="w-full text-xs">
             <tbody>
               <tr class="border-b border-slate-700"><td class="py-1 text-slate-400">Costo directo</td><td class="py-1 text-right">${rmFmt(e.pricing.directCost)}</td></tr>
@@ -397,7 +397,7 @@ function rmRenderEditor(body) {
           const inp = (k, lbl) => '<div><label class="block text-[10px] text-slate-500">' + lbl + '</label><input type="number" step="100" value="' + (dw[k] || 0) + '" onchange="rmState.draw.' + k + '=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /></div>';
           return `
             <div class="bg-white rounded-xl border-2 ${dw.total > 0 && brecha > 0 ? 'border-red-400' : 'border-slate-200'} p-4">
-              <h3 class="text-xs font-bold text-slate-700 uppercase mb-1">💰 Regla del draw — no cobrar de menos</h3>
+              <h3 class="text-xs font-bold text-slate-700 uppercase mb-1">${osIcon('dollar')} Regla del draw — no cobrar de menos</h3>
               <p class="text-[10px] text-slate-500 mb-2">Valor a cobrar = gasto interno esperado + rentabilidad objetivo + lo que sale del mismo draw (intereses + servicios + muebles).</p>
               <div class="grid grid-cols-2 gap-2 mb-2">
                 ${inp('total', 'Draws ingresados $')}${inp('int', 'Intereses del draw $')}${inp('serv', 'Servicios del draw $')}${inp('mueb', 'Muebles del draw $')}
@@ -406,7 +406,7 @@ function rmRenderEditor(body) {
                 <tbody>
                   <tr class="border-b border-slate-100"><td class="py-1 text-slate-500">Valor a COBRAR</td><td class="py-1 text-right font-bold">${rmFmt(p.valorACobrar.valor)}</td></tr>
                   <tr class="border-b border-slate-100"><td class="py-1 text-slate-500">Monto real disponible del draw</td><td class="py-1 text-right font-bold">${dw.total > 0 ? rmFmt(p.montoRealDisponible.valor) : '—'}</td></tr>
-                  ${dw.total > 0 ? '<tr><td class="py-1 ' + (brecha > 0 ? 'text-red-600 font-bold' : 'text-emerald-600') + '">' + (brecha > 0 ? '⚠️ Brecha (el draw NO alcanza)' : '✓ El draw cubre lo cobrado') + '</td><td class="py-1 text-right font-bold ' + (brecha > 0 ? 'text-red-600' : 'text-emerald-600') + '">' + rmFmt(Math.abs(brecha)) + '</td></tr>' : ''}
+                  ${dw.total > 0 ? '<tr><td class="py-1 ' + (brecha > 0 ? 'text-red-600 font-bold' : 'text-emerald-600') + '">' + (brecha > 0 ? osIcon('alert', {size:12}) + ' Brecha (el draw NO alcanza)' : '✓ El draw cubre lo cobrado') + '</td><td class="py-1 text-right font-bold ' + (brecha > 0 ? 'text-red-600' : 'text-emerald-600') + '">' + rmFmt(Math.abs(brecha)) + '</td></tr>' : ''}
                 </tbody>
               </table>
               ${dw.total > 0 && brecha > 0 ? '<div class="mt-2 text-[10px] text-red-700 font-semibold">Cobrar ' + rmFmt(p.valorACobrar.valor) + ' con solo ' + rmFmt(p.montoRealDisponible.valor) + ' disponibles = déficit que sale de la caja de F&F (caso Capitol: $36k). Pedí draw mayor o ajustá el precio.</div>' : ''}
@@ -416,7 +416,7 @@ function rmRenderEditor(body) {
 
         <!-- CONTROLES PRICING -->
         <details class="bg-white rounded-xl border border-slate-200">
-          <summary class="cursor-pointer p-3 text-xs font-bold uppercase text-slate-700 hover:bg-slate-50">⚙️ Ajustes de pricing</summary>
+          <summary class="cursor-pointer p-3 text-xs font-bold uppercase text-slate-700 hover:bg-slate-50">${osIcon('settings', {size:12})} Ajustes de pricing</summary>
           <div class="p-3 pt-0 space-y-2 border-t border-slate-100">
             <div class="grid grid-cols-2 gap-2">
               <div><label class="block text-[10px] text-slate-500">Contingencia %</label><input type="number" step="1" value="${rmState.contingencyPct}" onchange="rmState.contingencyPct=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" /><p class="text-[9px] text-slate-400">Industria: 15-20% remodel</p></div>
@@ -424,7 +424,7 @@ function rmRenderEditor(body) {
               <div>
                 <label class="block text-[10px] text-slate-500 flex items-center justify-between">
                   <span>Permits $</span>
-                  <button onclick="rmAutoPermitsAustin()" class="text-[9px] bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded font-bold" title="Auto Austin TX: $1,500 base + $0.50/ft² sobre 1,500">📐 Auto Austin</button>
+                  <button onclick="rmAutoPermitsAustin()" class="text-[9px] bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded font-bold" title="Auto Austin TX: $1,500 base + $0.50/ft² sobre 1,500">${osIcon('ruler', {size:10})} Auto Austin</button>
                 </label>
                 <input type="number" value="${rmState.permitsCost}" onchange="rmState.permitsCost=+this.value; rmRenderTabDebounced()" class="w-full border border-slate-300 rounded px-2 py-1 text-xs" />
               </div>
@@ -458,7 +458,7 @@ function rmRenderEditor(body) {
 
         <!-- GRÁFICOS -->
         <div class="bg-white rounded-lg p-3 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">📊 Distribución visual</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">${osIcon('chart')} Distribución visual</h3>
           <div class="text-[10px] text-slate-500 mb-1">Costo por grupo macro</div>
           <canvas id="rm-chart-pie" height="170"></canvas>
           <div class="text-[10px] text-slate-500 mt-3 mb-1">Material / MO / Equipo por grupo</div>
@@ -467,15 +467,15 @@ function rmRenderEditor(body) {
 
         <!-- EXPORT EXCEL — 12 hojas formato Denfield -->
         <button onclick="rmExportEditorExcelDenfield()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
-          📥 Descargar Excel completo (12 hojas estilo Denfield)
+          ${osIcon('download')} Descargar Excel completo (12 hojas estilo Denfield)
         </button>
         <button onclick="rmExportEditorExcel()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-1.5 rounded-lg" title="Versión vieja, 3 hojas, sin estilos">
-          📄 Excel simple (legacy 3 hojas)
+          ${osIcon('file', {size:12})} Excel simple (legacy 3 hojas)
         </button>
 
         <!-- S5-G11: PROPUESTA CLIENTE PDF -->
         <button onclick="rmGenerateProposalPDF()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
-          📄 Generar propuesta cliente PDF
+          ${osIcon('file')} Generar propuesta cliente PDF
         </button>
 
         <div class="bg-white rounded-lg p-3 border border-slate-200">
@@ -498,7 +498,7 @@ function rmRenderEditor(body) {
         <!-- Comparación con calibración -->
         ${rmState.calibrationHouses.length ? `
           <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <h3 class="text-xs font-bold text-amber-900 uppercase mb-2">🎯 Benchmark calibradoras</h3>
+            <h3 class="text-xs font-bold text-amber-900 uppercase mb-2">${osIcon('target')} Benchmark calibradoras</h3>
             <p class="text-[10px] text-amber-800">Costo total promedio en 5 casas reales:</p>
             ${(() => {
               const houses = rmState.calibrationHouses;
@@ -514,11 +514,11 @@ function rmRenderEditor(body) {
 
         ${aiBoxHtml('remodel-pro', 'Validar con mercado actual + ingeniería', 'Claude busca pricing real Texas, lead times, permits ciudad, hidden costs por edad, supply chain, labor market', 'rmRunAI')}
 
-        <button onclick="withLoading(this, rmSaveProject)" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${rmState.currentProject?'💾 Guardar cambios':'💾 Crear proyecto'}</button>
+        <button onclick="withLoading(this, rmSaveProject)" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${rmState.currentProject?osIcon('save')+' Guardar cambios':osIcon('save')+' Crear proyecto'}</button>
 
         ${rmState.currentProject ? `
         <button onclick="rmSyncToPlanner()" class="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
-          📅 Enviar al Planner Semanal →
+          ${osIcon('calendar')} Enviar al Planner Semanal →
         </button>
         <p class="text-[10px] text-slate-500 text-center">Crea actividades en cada día según el cronograma. Editable después.</p>
         ` : ''}

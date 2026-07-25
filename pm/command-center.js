@@ -36,15 +36,15 @@ function ccInjectCSS() {
   const st = document.createElement('style'); st.id = 'cc-styles';
   st.textContent = `
   #cc-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
-    --bg:#06080d;--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
-    --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
+    --bg:#14110c;--ink:#efe9de;--mut:#a89f8f;--mut2:#7c7365;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
+    --a1:#6fbf95;--a2:#4e9b72;--a3:#c9a85c;--pos:#63c08e;--neg:#e4756a;--amber:#dca94f;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
   /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
   #cc-overlay[data-theme="light"]{
-    --bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
-    --a1:#2563eb;--a2:#1d4ed8;--a3:#6b5bef;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309}
+    --bg:#f7f5f0;--ink:#211e17;--mut:#5f594c;--mut2:#756c5c;--glass:#ffffff;--glassb:#e8e3d9;
+    --a1:#2f6b4f;--a2:#275c43;--a3:#8a6a2f;--pos:#1f7a4d;--neg:#dc2626;--amber:#8a6400}
   #cc-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
-  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(37,99,235,.06),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(29,78,216,.05),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.05),transparent 60%),linear-gradient(180deg,#f3f5fa,#e9edf5)}
+  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(37,99,235,.06),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(29,78,216,.05),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.05),transparent 60%),linear-gradient(180deg,#f9f7f2,#f2efe8)}
   #cc-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
   #cc-overlay[data-theme="light"] .card{box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
   #cc-overlay[data-theme="light"] .glow{text-shadow:none}#cc-overlay[data-theme="light"] .ring i{background:#f6f8fc}
@@ -69,7 +69,7 @@ function ccInjectCSS() {
   #cc-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
     radial-gradient(760px 520px at 8% -6%,rgba(69,227,198,.14),transparent 58%),
     radial-gradient(820px 560px at 100% 4%,rgba(79,141,255,.15),transparent 56%),
-    radial-gradient(700px 620px at 70% 118%,rgba(138,123,255,.12),transparent 60%),linear-gradient(180deg,#070a11,#05070c)}
+    radial-gradient(700px 620px at 70% 118%,rgba(138,123,255,.12),transparent 60%),linear-gradient(180deg,#16130d,#100e08)}
   #cc-overlay .gridfx{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
     background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
     background-size:44px 44px;-webkit-mask:radial-gradient(circle at 50% 30%,#000,transparent 78%);mask:radial-gradient(circle at 50% 30%,#000,transparent 78%)}
@@ -91,14 +91,14 @@ function ccInjectCSS() {
   #cc-overlay .main{padding:24px 32px 46px;max-width:1560px}
   #cc-overlay .top{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px;padding-right:104px}
   #cc-overlay .top h1{font-size:23px;font-weight:760;letter-spacing:-.3px}
-  #cc-overlay .top h1 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #cc-overlay .top h1 span{color:var(--a1)}
   #cc-overlay .sub{color:var(--mut);font-size:12.5px;margin-top:5px}
   #cc-overlay .pills{margin-left:auto;display:flex;gap:9px;align-items:center}
   #cc-overlay .pill{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:8px 13px;border-radius:22px;backdrop-filter:blur(10px)}
   #cc-overlay .cdot{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1)}
   #cc-overlay .cdot.live{animation:ccpulse 2s infinite}@keyframes ccpulse{0%,100%{opacity:1}50%{opacity:.35}}
   #cc-overlay .pill.ai{background:linear-gradient(90deg,rgba(138,123,255,.22),rgba(79,141,255,.14));border-color:rgba(138,123,255,.4);color:#eaeaff;cursor:pointer}
-  #cc-overlay .shimmer{background:linear-gradient(90deg,#eaeaff 30%,#fff 50%,#eaeaff 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ccsh 3s linear infinite}
+  #cc-overlay .shimmer{background:linear-gradient(90deg,#c9bfa8 30%,#f3ede0 50%,#c9bfa8 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ccsh 3s linear infinite}
   @keyframes ccsh{to{background-position:-200% 0}}
   #cc-overlay .ccclose{position:fixed;top:16px;right:20px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
   #cc-overlay .ccclose:hover{color:#fff;border-color:rgba(255,255,255,.2)}
@@ -113,7 +113,7 @@ function ccInjectCSS() {
   #cc-overlay .up{color:var(--pos)}#cc-overlay .down{color:var(--neg)}#cc-overlay .warn{color:var(--amber)}
   #cc-overlay .spark{position:absolute;right:14px;bottom:12px;width:88px;height:34px;z-index:1;opacity:.7;pointer-events:none}
   #cc-overlay .ring{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 24px -4px rgba(69,227,198,.35)}
-  #cc-overlay .ring i{width:50px;height:50px;border-radius:50%;background:#0a0e16;display:grid;place-items:center;font-style:normal;font-weight:760;font-size:15px}
+  #cc-overlay .ring i{width:50px;height:50px;border-radius:50%;background:#17140f;display:grid;place-items:center;font-style:normal;font-weight:760;font-size:15px}
   #cc-overlay .kpi.occ{display:flex;gap:15px;align-items:center}
   #cc-overlay .row2{grid-template-columns:1.6fr 1fr;margin-top:16px}#cc-overlay .row3{grid-template-columns:1fr 1fr 1fr;margin-top:16px}
   #cc-overlay .chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -122,7 +122,7 @@ function ccInjectCSS() {
   #cc-overlay canvas{max-width:100%}
   #cc-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(138,123,255,.28);box-shadow:0 26px 70px -34px rgba(90,70,230,.5),0 1px 0 rgba(255,255,255,.06) inset}
   #cc-overlay .bh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-  #cc-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#a9f5e6,#45e3c6 30%,#4f8dff 70%,#2a2f66);box-shadow:0 0 22px rgba(79,141,255,.55)}
+  #cc-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#6fbf95 30%,#4e9b72 70%,#1c3327);box-shadow:0 0 22px rgba(79,141,255,.55)}
   #cc-overlay .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ccspin 6s linear infinite;opacity:.7}
   @keyframes ccspin{to{transform:rotate(360deg)}}
   #cc-overlay .bh b{font-size:14px}#cc-overlay .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.5px;margin-top:2px}
@@ -134,7 +134,7 @@ function ccInjectCSS() {
   #cc-overlay .iaction{font-size:11px;color:var(--a1);margin-top:5px;font-weight:500;opacity:.92}
   #cc-overlay .daybanner{display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px 18px;border-radius:14px;
     background:linear-gradient(90deg,rgba(138,123,255,.12),rgba(79,141,255,.06));border:1px solid rgba(138,123,255,.24);backdrop-filter:blur(12px)}
-  #cc-overlay .daytxt{font-size:13px;line-height:1.55;color:#e6ebf5}#cc-overlay .daytxt b,#cc-overlay .daytxt strong{color:#fff}
+  #cc-overlay .daytxt{font-size:13px;line-height:1.55;color:#efe9de}#cc-overlay .daytxt b,#cc-overlay .daytxt strong{color:#fff}
   #cc-overlay .daytxt p{margin:0 0 4px}#cc-overlay .daytxt p:last-child{margin:0}
   #cc-overlay .dayre{flex-shrink:0;background:rgba(255,255,255,.06);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px}
   #cc-overlay .dayre:hover{color:#fff;border-color:rgba(138,123,255,.5)}#cc-overlay .dayre:disabled{opacity:.5;cursor:default}
@@ -190,14 +190,14 @@ function ccInjectCSS() {
   #cc-overlay .tbtn{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--mut);width:28px;height:26px;border-radius:7px;cursor:pointer;font-size:12px}
   #cc-overlay .tbtn:hover{color:#fff;border-color:rgba(69,227,198,.5)}
   #cc-overlay .reptools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glassb)}
-  #cc-overlay .reptitle{font-size:12px;font-weight:650;color:#e6ebf5}
+  #cc-overlay .reptitle{font-size:12px;font-weight:650;color:#efe9de}
   #cc-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}
   #cc-overlay .repbtn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--ink)}
   #cc-overlay .repbtn:hover{filter:brightness(1.08)}#cc-overlay .rephint{font-size:10.5px;color:var(--mut2);margin-left:auto}
   #cc-overlay .rtask{font-size:9.5px;padding:2px 8px;border-radius:12px;background:rgba(69,227,198,.12);color:var(--a1)}
   #cc-overlay .empty-sec{padding:60px;text-align:center;color:var(--mut2)}
   #cc-overlay .dqcat{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}#cc-overlay .dqcat:last-child{border-bottom:none}
-  #cc-overlay .dqhead{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:640;color:#e6ebf5;margin-bottom:7px}
+  #cc-overlay .dqhead{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:640;color:#efe9de;margin-bottom:7px}
   #cc-overlay .dqcount{font-size:10px;font-weight:700;background:rgba(240,104,122,.14);color:var(--neg);padding:2px 9px;border-radius:20px}
   #cc-overlay .dqrow{display:flex;gap:12px;font-size:11.5px;padding:3px 0 3px 22px;color:var(--mut)}
   #cc-overlay .dqitem{color:#cdd6e6;min-width:150px;font-weight:500}#cc-overlay .dqdetail{color:var(--mut2)}
@@ -239,7 +239,7 @@ async function openCommandCenter(sys) {
   let ov = document.getElementById('cc-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'cc-overlay'; document.body.appendChild(ov); }
   if (window.posApplyTheme) posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#7c7365">' + osIcon('loader') + ' Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ccLoadAll();
   if (!CC.chatLoaded) { try { await ccLoadChat(); } catch (e) {} }
@@ -414,20 +414,20 @@ function ccDataQuality(comp) {
   const cats = [];
   const push = (cat, icon, tabla, items) => { if (items.length) cats.push({ cat, icon, tabla, items }); };
   // 1) Ocupadas sin ingreso (cobranza/registro)
-  push('Ocupadas sin ingreso registrado', '💸', 'Pagos', comp.houses
+  push('Ocupadas sin ingreso registrado', osIcon('banknote'), 'Pagos', comp.houses
     .filter(h => h.occ > 0 && h.occRent > 0 && h.inc < h.occRent * 0.35)
     .sort((a, b) => (b.occRent - b.inc) - (a.occRent - a.inc))
     .map(h => ({ item: h.name.split(',')[0], detail: `${h.occ} u. ocupada(s) · facturó ${CC_MONEY(h.inc)} de ~${CC_MONEY(h.occRent)}` })));
   // 2) Unidades sin renta objetivo
-  push('Unidades sin renta objetivo', '🏷️', 'Unidades', CC.units
+  push('Unidades sin renta objetivo', osIcon('clipboard'), 'Unidades', CC.units
     .filter(u => !Number(u.target_rent) && ccUnitState(u) !== 'libre')
     .map(u => ({ item: `${pName(u.property_id)} · ${CC_ESC(u.name || u.unit_type || 'unidad')}`, detail: 'Renta objetivo vacía' })));
   // 3) Reservas sin fecha de entrada
-  push('Reservas sin fecha de entrada', '📅', 'Reservas', CC.book
+  push('Reservas sin fecha de entrada', osIcon('calendar'), 'Reservas', CC.book
     .filter(b => !b.start_date)
     .map(b => ({ item: pName(b.property_id), detail: `estado ${b.status || '—'} · sin Fecha Entrada` })));
   // 4) Gastos sin monto
-  push('Gastos sin monto', '🧾', 'Gastos', CC.exp
+  push('Gastos sin monto', osIcon('receipt'), 'Gastos', CC.exp
     .filter(e => !Number(e.amount))
     .slice(0, 30)
     .map(e => ({ item: pName(e.property_id), detail: `${CC_ESC(e.subcategory || e.category || 'gasto')} · monto vacío` })));
@@ -438,13 +438,13 @@ function ccDataQualityCard(comp) {
   const dq = ccDataQuality(comp);
   const notaTabla = t => `Corregir en Airtable → tabla <b>${t}</b>`;
   return `<div class="grid" style="margin-top:16px"><div class="card">
-    <div class="chart-h"><div class="t">🔎 Calidad de datos${dq.total ? ` · <span class="down">${dq.total} para revisar</span>` : ' · <span class="up">todo en orden ✓</span>'}</div><div class="k">la app no escribe — se corrige en Airtable</div></div>
+    <div class="chart-h"><div class="t">${osIcon('search')} Calidad de datos${dq.total ? ` · <span class="down">${dq.total} para revisar</span>` : ' · <span class="up">todo en orden ✓</span>'}</div><div class="k">la app no escribe — se corrige en Airtable</div></div>
     ${dq.total ? dq.cats.map(c => `<div class="dqcat">
       <div class="dqhead"><span>${c.icon} ${c.cat}</span><span class="dqcount">${c.items.length}</span></div>
       ${c.items.slice(0, 6).map(it => `<div class="dqrow"><span class="dqitem">${it.item}</span><span class="dqdetail">${it.detail}</span></div>`).join('')}
       ${c.items.length > 6 ? `<div class="dqmore">+ ${c.items.length - 6} más…</div>` : ''}
       <div class="dqnote">➜ ${notaTabla(c.tabla)}</div>
-    </div>`).join('') : '<div style="color:#48d69c;font-size:12.5px;padding:12px 0">No se detectaron inconsistencias de datos. 🎉</div>'}
+    </div>`).join('') : '<div style="color:#63c08e;font-size:12.5px;padding:12px 0">No se detectaron inconsistencias de datos. ' + osIcon('party') + '</div>'}
   </div></div>`;
 }
 
@@ -465,7 +465,7 @@ const CC_NAV = [
 function ccRender() {
   const ov = document.getElementById('cc-overlay'); if (!ov) return;
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
-  if (CC.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">⚠️</div><div style="color:#f0687a;margin-top:10px">${CC_ESC(CC.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ccReload()">Reintentar</button></div>`; return; }
+  if (CC.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">${osIcon('alert')}</div><div style="color:#e4756a;margin-top:10px">${CC_ESC(CC.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ccReload()">Reintentar</button></div>`; return; }
   const comp = ccCompute();
   side.innerHTML = ccSidebar();
   ccDestroyCharts();
@@ -546,7 +546,7 @@ function ccSecCommand(comp) {
       <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;overflow:hidden;height:280px;width:100%"><canvas id="cc-house"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Operación de hoy</div><div class="k">cronograma real · ${todayTasks.length} tareas</div></div>
-        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#5b6780;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
+        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#7c7365;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
         <div style="margin-top:13px;font-size:11px;color:var(--mut)"><span class="chip" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</span></div></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card">
@@ -563,7 +563,7 @@ function ccPropTable(houses, opts = {}) {
   return `<table class="ptable"><thead><tr><th>Casa</th><th>Zona</th><th>Modelo</th><th>Ocupación</th><th>Renta pot.</th><th>Cashflow</th><th>Estado</th>${guide ? '<th>Guía</th>' : ''}</tr></thead><tbody>
     ${houses.slice(0, lim).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 30)}</td><td>${ccZoneLabel(h.zone)}</td><td>${modelLbl(h.model)} · ${h.total}u</td>
       <td><span class="mini-bar"><i style="width:${h.pct}%"></i></span>${h.pct}%</td><td>${CC_MONEY(h.pot)}</td>
-      <td class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td>${badge(h)}</td>${guide ? `<td><button class="tbtn" title="Guía de Bienvenida (check-in) en PDF" onclick="ccWelcomeGuide('${h.id}')">📄</button></td>` : ''}</tr>`).join('')}
+      <td class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td>${badge(h)}</td>${guide ? `<td><button class="tbtn" title="Guía de Bienvenida (check-in) en PDF" onclick="ccWelcomeGuide('${h.id}')">${osIcon('file')}</button></td>` : ''}</tr>`).join('')}
   </tbody></table>`;
 }
 // Puentes a las funciones de reportes/guía de pm-main (SOLO LECTURA: generan PDF vía impresión).
@@ -604,7 +604,7 @@ function ccMdSafe(t) {
 function ccChatHTML() {
   return CC.chat.map((m, idx) => m.role === 'user'
     ? `<div class="cbub u">${CC_ESC(m.content)}</div>`
-    : `<div class="cbub a${m.error ? ' err' : ''}${m.thinking ? ' think' : ''}">${m.thinking ? 'Pensando' : ccMdSafe(m.content)}${(!m.thinking && !m.error) ? `<button class="memsave" title="Guardar en la memoria del Cerebro" onclick="ccSaveToMemory(${idx})">🧠 Guardar</button>` : ''}</div>`).join('');
+    : `<div class="cbub a${m.error ? ' err' : ''}${m.thinking ? ' think' : ''}">${m.thinking ? 'Pensando' : ccMdSafe(m.content)}${(!m.thinking && !m.error) ? `<button class="memsave" title="Guardar en la memoria del Cerebro" onclick="ccSaveToMemory(${idx})">${osIcon('brain')} Guardar</button>` : ''}</div>`).join('');
 }
 function ccRenderChat() {
   const el = document.getElementById('cc-chat'); if (!el) return;
@@ -672,7 +672,7 @@ async function ccLoadMemories() {
   } catch (e) { CC.memories = []; CC._memErr = e.message || String(e); }
   ccRenderMemList();
 }
-const CC_MEM_TIPO = { hecho: '📌 Hecho', 'decisión': '🎯 Decisión', aprendizaje: '💡 Aprendizaje', nota: '📝 Nota' };
+const CC_MEM_TIPO = { hecho: 'Hecho', 'decisión': 'Decisión', aprendizaje: 'Aprendizaje', nota: 'Nota' };
 function ccMemCardHTML() {
   return `<div class="grid" style="margin-top:16px"><div class="card">
     <div class="bh"><div class="orb" style="width:26px;height:26px"></div><div><b>Memoria del Cerebro</b><span>LO QUE EL CEREBRO RECUERDA · SE INYECTA EN EL CHAT</span></div></div>
@@ -685,15 +685,15 @@ function ccMemCardHTML() {
   </div></div>`;
 }
 function ccMemListHTML() {
-  if (!CC.memLoaded) return '<div style="color:#5b6780;font-size:12px;padding:14px 0">⏳ Cargando memoria…</div>';
-  if (CC._memErr) return `<div style="color:#f0687a;font-size:12px;padding:14px 0">${CC_ESC(CC._memErr)}</div>`;
-  if (!CC.memories.length) return '<div style="color:#5b6780;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
+  if (!CC.memLoaded) return '<div style="color:#7c7365;font-size:12px;padding:14px 0">' + osIcon('loader') + ' Cargando memoria…</div>';
+  if (CC._memErr) return `<div style="color:#e4756a;font-size:12px;padding:14px 0">${CC_ESC(CC._memErr)}</div>`;
+  if (!CC.memories.length) return '<div style="color:#7c7365;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
   return CC.memories.map(m => `<div class="memrow${m.activo ? '' : ' off'}">
     <span class="memtipo t-${m.tipo === 'decisión' ? 'dec' : m.tipo}">${CC_MEM_TIPO[m.tipo] || m.tipo}</span>
-    <div class="memtxt">${CC_ESC(m.texto)}<div class="memmeta">${m.fuente || 'manual'} · ${(m.fecha || '').slice(0, 10)}${m.has_embedding ? ' · 🔎 vectorizada' : ''}</div></div>
+    <div class="memtxt">${CC_ESC(m.texto)}<div class="memmeta">${m.fuente || 'manual'} · ${(m.fecha || '').slice(0, 10)}${m.has_embedding ? ' · vectorizada' : ''}</div></div>
     <div class="memacts">
-      <button title="Editar" onclick="ccMemEdit('${m.id}')">✎</button>
-      <button title="${m.activo ? 'Desactivar' : 'Activar'}" onclick="ccMemToggle('${m.id}',${!m.activo})">${m.activo ? '🚫' : '↺'}</button>
+      <button title="Editar" onclick="ccMemEdit('${m.id}')">${osIcon('pencil')}</button>
+      <button title="${m.activo ? 'Desactivar' : 'Activar'}" onclick="ccMemToggle('${m.id}',${!m.activo})">${m.activo ? osIcon('ban') : '↺'}</button>
     </div></div>`).join('');
 }
 function ccRenderMemList() { const el = document.getElementById('cc-memlist'); if (el) el.innerHTML = ccMemListHTML(); }
@@ -717,16 +717,16 @@ async function ccSaveToMemory(idx) {
   if (texto === null || !texto.trim()) return;
   if (!document.getElementById('cc-memlist')) { ccGo('cerebro'); await new Promise(r => setTimeout(r, 120)); }
   await ccMemPost('POST', { tipo: 'aprendizaje', texto: texto.trim(), fuente: 'chat' });
-  if (window.toast) toast('🧠 Guardado en la memoria del Cerebro.', 'success');
+  if (window.toast) toast('Guardado en la memoria del Cerebro.', 'success');
 }
 async function ccMemPost(method, body) {
   try {
     const tok = await ccAuthToken();
     const r = await fetch('/api/brain-chat?resource=memory', { method, headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) { if (window.toast) toast('⚠️ ' + (d.error || 'No se pudo guardar la memoria'), 'error'); return; }
+    if (!r.ok) { if (window.toast) toast((d.error || 'No se pudo guardar la memoria'), 'error'); return; }
     CC.memLoaded = false; await ccLoadMemories();
-  } catch (e) { if (window.toast) toast('⚠️ ' + (e.message || e), 'error'); }
+  } catch (e) { if (window.toast) toast((e.message || e), 'error'); }
 }
 window.ccMemAdd = ccMemAdd; window.ccMemToggle = ccMemToggle; window.ccMemEdit = ccMemEdit; window.ccSaveToMemory = ccSaveToMemory;
 
@@ -736,7 +736,7 @@ function ccDailyHTML() {
   const inner = d.loading
     ? '<span class="daytxt shimmer">El Cerebro está leyendo tus números…</span>'
     : d.error
-      ? `<span class="daytxt" style="color:#f0687a">${CC_ESC(d.error)}</span>`
+      ? `<span class="daytxt" style="color:#e4756a">${CC_ESC(d.error)}</span>`
       : d.text
         ? `<span class="daytxt">${ccMdSafe(d.text)}</span>`
         : '<span class="daytxt" style="color:var(--mut2)">El Cerebro puede resumirte el día. Tocá ⟳ para generarlo.</span>';
@@ -783,7 +783,7 @@ async function ccPersistChat(question, answer) {
 function ccSecPropiedades(comp) {
   return `${ccHeader('Propiedades', 'Rentas', `${CC.props.length} casas · ${comp.kpi.totalU} unidades (regla) · ocupación ${comp.kpi.occPct}%`)}
     <div class="grid"><div class="card">
-      <div class="chart-h"><div class="t">Todas las propiedades</div><div class="k">📄 = Guía de Bienvenida (check-in)</div></div>
+      <div class="chart-h"><div class="t">Todas las propiedades</div><div class="k">${osIcon('file')} = Guía de Bienvenida (check-in)</div></div>
       ${ccPropTable([...comp.houses].filter(h => h.total).sort((a, b) => a.net - b.net), { guide: true, limit: 99 })}</div></div>`;
 }
 // ─── SECCIÓN: FINANZAS ───
@@ -793,7 +793,7 @@ function ccSecFinanzas(comp) {
   const top = houses.filter(h => h.net > 0).sort((a, b) => b.net - a.net).slice(0, 6);
   return `${ccHeader('Finanzas', comp.mb.label, `Ingresos ${CC_MONEY(kpi.inc)} · Gastos ${CC_MONEY(kpi.expT)} · Cashflow ${CC_MONEY(kpi.cashflow)}`)}
     <div class="reptools">
-      <span class="reptitle">📄 Reportes (PDF)</span>
+      <span class="reptitle">${osIcon('file')} Reportes (PDF)</span>
       <button class="repbtn" onclick="ccReport('weekly')">Generar semanal (operación)</button>
       <button class="repbtn" onclick="ccReport('monthly')">Generar mensual (finanzas)</button>
       <button class="repbtn ghost" onclick="ccSendReport('monthly')">Compartir ›</button>
@@ -805,10 +805,10 @@ function ccSecFinanzas(comp) {
       <div class="card kpi"><div class="lab">Cashflow neto</div><div class="big ${kpi.cashflow >= 0 ? 'up' : 'down'}">${CC_MONEY(kpi.cashflow)}</div></div>
     </div>
     ${ccCobranzaPanel()}
-    ${(() => { const hs = houses.filter(h => h.total > 0 || h.hipoFija > 0).sort((x, y) => x.flujoEstructural - y.flujoEstructural); const fila = h => `<tr><td>${CC_ESC((h.name || '').split(',')[0])}<div style="font-size:9px;opacity:.55">${CC_ESC(h.loanType || '')}</div></td><td style="text-align:right" class="up">${CC_MONEY(h.inc)}</td><td style="text-align:right">${CC_MONEY(h.exp)}</td><td style="text-align:right">${h.hipoFija ? CC_MONEY(h.hipoFija) : '—'}<div style="font-size:9px;opacity:.55">${h.hipo ? 'pagada ' + CC_MONEY(h.hipo) : 'sin pago reg.'}</div></td><td style="text-align:right" class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td style="text-align:right" class="${h.flujoEstructural >= 0 ? 'up' : 'down'}"><b>${CC_MONEY(h.flujoEstructural)}</b> ${h.flujoEstructural >= 0 ? '🟢' : '🔴'}</td></tr>`; const okN = hs.filter(h => h.flujoEstructural >= 0).length; return `<div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">P&L por casa — flujo estructural</div><div class="k">renta objetivo ocupada − hipoteca FIJA · regla del Cerebro: déficit OK si flujo+ · ${okN}/${hs.length} en verde</div></div><table class="ptable"><thead><tr><th>Casa</th><th style="text-align:right">Ingreso mes</th><th style="text-align:right">Gastos mes</th><th style="text-align:right">Hipoteca fija</th><th style="text-align:right">Flujo real</th><th style="text-align:right">Flujo estructural</th></tr></thead><tbody>${hs.map(fila).join('')}</tbody></table><div class="meta" style="margin-top:8px">Hipoteca FIJA = obligación mensual (espejo de Casas.Hipoteca mensual, 19 casas). "Flujo real" = ingreso − gastos del mes (depende de lo registrado); "flujo estructural" = capacidad de la casa a ocupación actual.</div></div></div>`; })()}
+    ${(() => { const hs = houses.filter(h => h.total > 0 || h.hipoFija > 0).sort((x, y) => x.flujoEstructural - y.flujoEstructural); const fila = h => `<tr><td>${CC_ESC((h.name || '').split(',')[0])}<div style="font-size:9px;opacity:.55">${CC_ESC(h.loanType || '')}</div></td><td style="text-align:right" class="up">${CC_MONEY(h.inc)}</td><td style="text-align:right">${CC_MONEY(h.exp)}</td><td style="text-align:right">${h.hipoFija ? CC_MONEY(h.hipoFija) : '—'}<div style="font-size:9px;opacity:.55">${h.hipo ? 'pagada ' + CC_MONEY(h.hipo) : 'sin pago reg.'}</div></td><td style="text-align:right" class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td style="text-align:right" class="${h.flujoEstructural >= 0 ? 'up' : 'down'}"><b>${CC_MONEY(h.flujoEstructural)}</b> ${h.flujoEstructural >= 0 ? kitStatusDot('ok') : kitStatusDot('bad')}</td></tr>`; const okN = hs.filter(h => h.flujoEstructural >= 0).length; return `<div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">P&L por casa — flujo estructural</div><div class="k">renta objetivo ocupada − hipoteca FIJA · regla del Cerebro: déficit OK si flujo+ · ${okN}/${hs.length} en verde</div></div><table class="ptable"><thead><tr><th>Casa</th><th style="text-align:right">Ingreso mes</th><th style="text-align:right">Gastos mes</th><th style="text-align:right">Hipoteca fija</th><th style="text-align:right">Flujo real</th><th style="text-align:right">Flujo estructural</th></tr></thead><tbody>${hs.map(fila).join('')}</tbody></table><div class="meta" style="margin-top:8px">Hipoteca FIJA = obligación mensual (espejo de Casas.Hipoteca mensual, 19 casas). "Flujo real" = ingreso − gastos del mes (depende de lo registrado); "flujo estructural" = capacidad de la casa a ocupación actual.</div></div></div>`; })()}
     <div class="grid row2"><div class="card"><div class="chart-h"><div class="t">Casas en pérdida (${rojo.length})</div><div class="k">peor primero</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Ingreso</th><th>Hipoteca</th><th>Gasto</th><th>Neto</th></tr></thead><tbody>
-      ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#48d69c">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
+      ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#63c08e">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div></div>`;
 }
 // ─── SECCIÓN: RESERVAS ───
@@ -819,7 +819,7 @@ function ccSecReservas(comp) {
   const pName = id => CC.props.find(p => p.id === id)?.name || '—';
   // Cadena viva: cada reserva puede tener su tarea de turnover/recepción (auto-generada en el sync).
   const relTask = b => CC.tasks.find(t => t.property_id === b.property_id && ['cleaning', 'recepcion'].includes(t.task_type) && !['completado', 'cancelado'].includes(t.status));
-  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#5b6780">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? '🧹 turnover' : '🛎 recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
+  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#7c7365">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? 'turnover' : 'recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
   return `${ccHeader('Reservas', 'Calendario', `${CC.book.length} reservas · ${activas.length} activas · cadena reserva → turnover → gasto → KPI`)}
     <div class="grid"><div class="card"><div class="chart-h"><div class="t">Reservas activas</div><div class="k">reserva → tarea de operación</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Inquilino</th><th>Entrada</th><th>Salida</th><th>Estado</th><th>Operación</th></tr></thead><tbody>
@@ -839,7 +839,7 @@ function ccSecOperacion(comp) {
     </div>
     <div class="grid" style="margin-top:16px"><div class="card empty-sec">
       <div class="orb" style="margin:0 auto 14px"></div>
-      <div style="color:#eef2f8;font-size:15px;font-weight:600">Cronograma unificado</div>
+      <div style="color:#efe9de;font-size:15px;font-weight:600">Cronograma unificado</div>
       <div style="margin-top:6px;max-width:440px;margin-inline:auto">El motor de operación (Armar día por zona, turnover automático desde check-outs, WhatsApp al equipo) ya vive en el módulo <b>Cronograma</b>.</div>
       <button class="chip" style="margin-top:16px;padding:10px 18px" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</button>
     </div></div>`;
@@ -855,11 +855,11 @@ function ccSecInquilinos(comp) {
 // ─── SECCIÓN: ANALÍTICA & KPIs ───
 function ccSecAnalitica(comp) {
   const { kpi, houses } = comp;
-  const tools = `<div class="reptools"><span class="reptitle">📊 Informes CEO</span><button class="repbtn" onclick="window.print()">🖨️ PDF</button><button class="repbtn" onclick="ccExportExcelRentas()">⬇ Excel</button><button class="repbtn ghost" onclick="ccCopyResumenRentas()">📋 Copiar resumen</button></div>`;
+  const tools = `<div class="reptools"><span class="reptitle">${osIcon('chart')} Informes CEO</span><button class="repbtn" onclick="window.print()">${osIcon('printer')} PDF</button><button class="repbtn" onclick="ccExportExcelRentas()">⬇ Excel</button><button class="repbtn ghost" onclick="ccCopyResumenRentas()">${osIcon('clipboard')} Copiar resumen</button></div>`;
   // N5 (auditoría 13-jul): RENT-ROLL VIVO — potencial vs realizada, gap en $ por casa (v_rent_roll)
   if (CC.rentRoll === undefined) { CC.rentRoll = null; sb.from('v_rent_roll').select('*').order('gap', { ascending: false }).then(r => { CC.rentRoll = r.data || []; ccRender(); }).catch(() => { CC.rentRoll = []; }); }
   const rrRows = (CC.rentRoll || []).slice(0, 12);
-  const rentRoll = rrRows.length ? `<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">💵 Rent-roll vivo — potencial vs realizada (${rrRows[0].mes_renta})</div><div class="k">v_rent_roll · el gap es vacancia o cobranza, en plata</div></div>
+  const rentRoll = rrRows.length ? `<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">${osIcon('banknote')} Rent-roll vivo — potencial vs realizada (${rrRows[0].mes_renta})</div><div class="k">v_rent_roll · el gap es vacancia o cobranza, en plata</div></div>
     <div class="overx"><table class="ptable"><thead><tr><th>Casa</th><th>Modelo</th><th>Unid (ocup)</th><th>Potencial</th><th>Realizada</th><th>Gap</th></tr></thead><tbody>
     ${rrRows.map(r => `<tr><td>${CC_ESC(r.casa)}</td><td>${CC_ESC(r.modelo || '—')}</td><td>${r.unidades} (${r.ocupadas})</td><td>${CC_MONEY(+r.potencial)}</td><td>${CC_MONEY(+r.realizada)}</td><td class="${+r.gap > 500 ? 'down' : 'up'}">${CC_MONEY(+r.gap)}</td></tr>`).join('')}</tbody></table></div></div>` : '';
   // N6: analítica por MODELO de negocio × mes de renta (billing_ym) — no solo agregados por zona
@@ -870,7 +870,7 @@ function ccSecAnalitica(comp) {
     (CC.pay || []).forEach(p => { if (!p.billing_ym || !meses.includes(p.billing_ym)) return; const m = propModelo[p.property_id] || '(sin modelo)'; agg[m] = agg[m] || {}; agg[m][p.billing_ym] = (agg[m][p.billing_ym] || 0) + (+p.amount || 0); });
     const modelos = Object.keys(agg).sort();
     if (!modelos.length) return '';
-    return `<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">📐 Ingreso por MODELO de negocio × mes de renta</div><div class="k">qué modelo repetir y cuál frenar</div></div>
+    return `<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">${osIcon('ruler')} Ingreso por MODELO de negocio × mes de renta</div><div class="k">qué modelo repetir y cuál frenar</div></div>
       <div class="overx"><table class="ptable"><thead><tr><th>Modelo</th>${meses.map(m => `<th>${m}</th>`).join('')}</tr></thead><tbody>
       ${modelos.map(mo => `<tr><td><b>${CC_ESC(mo)}</b></td>${meses.map(m => `<td>${agg[mo][m] ? CC_MONEY(Math.round(agg[mo][m])) : '<span style="opacity:.4">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
   })();
@@ -969,8 +969,8 @@ function ccExpTypeSeries(n = 6) {
 }
 function ccMountCharts(comp) {
   if (!window.Chart) return;
-  const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#5b6780', font: { size: 10 } } };
-  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#5b6780', font: { size: 10 } } }, y: ax } };
+  const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#7c7365', font: { size: 10 } } };
+  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#7c7365', font: { size: 10 } } }, y: ax } };
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); CC._charts.push(new Chart(el, cfg)); };
   const grad = (ctx, c1, c2) => { const g = ctx.createLinearGradient(0, 0, 0, 150); g.addColorStop(0, c1); g.addColorStop(1, c2); return g; };
   // sparklines
@@ -978,32 +978,32 @@ function ccMountCharts(comp) {
   const tr = ccTrend6();
   // ingresos vs gastos
   const cfEl = document.getElementById('cc-cf');
-  if (cfEl) { const ctx = cfEl.getContext('2d'); mk('cc-cf', { type: 'line', data: { labels: tr.labels, datasets: [{ label: 'Ingresos', data: tr.inc, borderColor: '#48d69c', backgroundColor: grad(ctx, 'rgba(72,214,156,.20)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }, { label: 'Gastos', data: tr.exp, borderColor: '#f0687a', backgroundColor: grad(ctx, 'rgba(240,104,122,.14)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }] }, options: gext }); }
+  if (cfEl) { const ctx = cfEl.getContext('2d'); mk('cc-cf', { type: 'line', data: { labels: tr.labels, datasets: [{ label: 'Ingresos', data: tr.inc, borderColor: '#63c08e', backgroundColor: grad(ctx, 'rgba(72,214,156,.20)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }, { label: 'Gastos', data: tr.exp, borderColor: '#e4756a', backgroundColor: grad(ctx, 'rgba(240,104,122,.14)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }] }, options: gext }); }
   // cashflow por casa
   const hs = [...comp.houses].filter(h => h.inc > 0 || h.exp > 0).sort((a, b) => b.net - a.net).slice(0, 10);
-  mk('cc-house', { type: 'bar', data: { labels: hs.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hs.map(h => h.net), borderRadius: 5, backgroundColor: hs.map(h => h.net >= 0 ? '#48d69c' : '#f0687a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#93a0b6', font: { size: 10 } } } } } });
+  mk('cc-house', { type: 'bar', data: { labels: hs.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hs.map(h => h.net), borderRadius: 5, backgroundColor: hs.map(h => h.net >= 0 ? '#63c08e' : '#e4756a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#a89f8f', font: { size: 10 } } } } } });
   // donut gastos por tipo
   const mb = comp.mb; const inM = d => d && d >= mb.from && d <= mb.to;
   const bucket = e => { const s = (e.subcategory || '').toLowerCase(); if (/hipotec/.test(s)) return 'Hipoteca'; if (/servicio|públic|publico/.test(s)) return 'Servicios'; if (/nómina|nomina|equipo/.test(s)) return 'Nómina'; if (/plataforma/.test(s)) return 'Plataforma'; if (/aseo|podada|mantenim/.test(s)) return 'Mantenimiento'; return 'Otros'; };
   const byB = {}; CC.exp.filter(e => inM(e.expense_date)).forEach(e => byB[bucket(e)] = (byB[bucket(e)] || 0) + Number(e.amount || 0));
   const bl = Object.keys(byB), bv = Object.values(byB);
-  mk('cc-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4f8dff', '#45e3c6', '#8a7bff', '#3a6f74', '#4a5568', '#e7b65e'], borderColor: '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
+  mk('cc-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4e9b72', '#6fbf95', '#c9a85c', '#3a6f74', '#4a5568', '#dca94f'], borderColor: '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: '#a89f8f', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
 
   // ─── Charts de ANALÍTICA (solo si la sección está activa) ───
   if (document.getElementById('cc-an-ie')) {
     const s12 = ccMonthsSeries(12); const inc12 = s12.inc.map(v => v / 1000), exp12 = s12.exp.map(v => v / 1000), cf12 = s12.cf.map(v => v / 1000);
     const ieEl = document.getElementById('cc-an-ie'); const ictx = ieEl.getContext('2d');
     mk('cc-an-ie', { type: 'line', data: { labels: s12.labels, datasets: [
-      { label: 'Ingresos', data: inc12, borderColor: '#48d69c', backgroundColor: grad(ictx, 'rgba(72,214,156,.18)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
-      { label: 'Gastos', data: exp12, borderColor: '#f0687a', backgroundColor: grad(ictx, 'rgba(240,104,122,.12)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: gext });
-    mk('cc-an-cf', { type: 'bar', data: { labels: s12.labels, datasets: [{ data: cf12, borderRadius: 4, backgroundColor: cf12.map(v => v >= 0 ? '#48d69c' : '#f0687a') }] }, options: gext });
+      { label: 'Ingresos', data: inc12, borderColor: '#63c08e', backgroundColor: grad(ictx, 'rgba(72,214,156,.18)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
+      { label: 'Gastos', data: exp12, borderColor: '#e4756a', backgroundColor: grad(ictx, 'rgba(240,104,122,.12)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: gext });
+    mk('cc-an-cf', { type: 'bar', data: { labels: s12.labels, datasets: [{ data: cf12, borderRadius: 4, backgroundColor: cf12.map(v => v >= 0 ? '#63c08e' : '#e4756a') }] }, options: gext });
     const occ = ccOccSeries(12);
-    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#4f8dff', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(79,141,255,.18)', 'rgba(79,141,255,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#5b6780', font: { size: 10 }, callback: v => v + '%' } } } } });
+    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#4e9b72', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(79,141,255,.18)', 'rgba(79,141,255,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#7c7365', font: { size: 10 }, callback: v => v + '%' } } } } });
     const hn = [...comp.houses].filter(h => h.inc > 0 || h.exp > 0).sort((a, b) => b.net - a.net);
-    mk('cc-an-noibar', { type: 'bar', data: { labels: hn.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hn.map(h => h.net), borderRadius: 4, backgroundColor: hn.map(h => h.net >= 0 ? '#48d69c' : '#f0687a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#93a0b6', font: { size: 9 } } } } } });
-    mk('cc-an-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4f8dff', '#45e3c6', '#8a7bff', '#3a6f74', '#4a5568', '#e7b65e'], borderColor: '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
-    const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#f0687a', 'Servicios': '#4f8dff', 'Mantenim.': '#45e3c6', 'Nómina': '#8a7bff', 'Plataforma': '#e7b65e', 'Otros': '#4a5568' };
-    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#93a0b6', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#5b6780', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
+    mk('cc-an-noibar', { type: 'bar', data: { labels: hn.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hn.map(h => h.net), borderRadius: 4, backgroundColor: hn.map(h => h.net >= 0 ? '#63c08e' : '#e4756a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#a89f8f', font: { size: 9 } } } } } });
+    mk('cc-an-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4e9b72', '#6fbf95', '#c9a85c', '#3a6f74', '#4a5568', '#dca94f'], borderColor: '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: '#a89f8f', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
+    const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#e4756a', 'Servicios': '#4e9b72', 'Mantenim.': '#6fbf95', 'Nómina': '#c9a85c', 'Plataforma': '#dca94f', 'Otros': '#4a5568' };
+    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#a89f8f', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#7c7365', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
   }
 }
 
@@ -1066,7 +1066,7 @@ function ccDraftCobro(tenantId) {
 window.ccCobranzaAging = ccCobranzaAging; window.ccDraftCobro = ccDraftCobro;
 function ccCobranzaPanel() {
   const ag = ccCobranzaAging();
-  const fila = r => `<tr><td><b>${CC_ESC(r.nombre)}</b><div style="font-size:10px;opacity:.6">${CC_ESC(r.casa)}${r.unidad ? ' · ' + CC_ESC(r.unidad) : ''}</div></td><td style="text-align:right">${CC_MONEY(r.rent)}</td><td style="text-align:right">${r.b0 ? CC_MONEY(r.b0) : '—'}</td><td style="text-align:right" class="${r.b1 ? 'down' : ''}">${r.b1 == null ? 'n/a' : r.b1 ? CC_MONEY(r.b1) : '—'}</td><td style="text-align:right" class="${r.b2 ? 'down' : ''}">${r.b2 == null ? 'n/a' : r.b2 ? CC_MONEY(r.b2) : '—'}</td><td style="text-align:right"><b class="down">${CC_MONEY(r.total)}</b></td><td style="text-align:right"><button class="repbtn" style="padding:3px 8px;font-size:10px" onclick="ccDraftCobro('${r.tenant_id}')">📱 cobrar</button></td></tr>`;
+  const fila = r => `<tr><td><b>${CC_ESC(r.nombre)}</b><div style="font-size:10px;opacity:.6">${CC_ESC(r.casa)}${r.unidad ? ' · ' + CC_ESC(r.unidad) : ''}</div></td><td style="text-align:right">${CC_MONEY(r.rent)}</td><td style="text-align:right">${r.b0 ? CC_MONEY(r.b0) : '—'}</td><td style="text-align:right" class="${r.b1 ? 'down' : ''}">${r.b1 == null ? 'n/a' : r.b1 ? CC_MONEY(r.b1) : '—'}</td><td style="text-align:right" class="${r.b2 ? 'down' : ''}">${r.b2 == null ? 'n/a' : r.b2 ? CC_MONEY(r.b2) : '—'}</td><td style="text-align:right"><b class="down">${CC_MONEY(r.total)}</b></td><td style="text-align:right"><button class="repbtn" style="padding:3px 8px;font-size:10px" onclick="ccDraftCobro('${r.tenant_id}')">${osIcon('phone')} cobrar</button></td></tr>`;
   return `<div class="grid kpis" style="grid-template-columns:repeat(4,1fr);margin-top:14px">
       <div class="card kpi"><div class="lab">Deuda VENCIDA (meses previos)</div><div class="big down">${CC_MONEY(ag.vencida)}</div><div class="meta">${ag.rows.filter(r => (r.b1 || 0) + (r.b2 || 0) > 0).length} inquilino(s) en mora</div></div>
       <div class="card kpi"><div class="lab">Por cobrar (mes en curso)</div><div class="big warn">${CC_MONEY(ag.porCobrar)}</div><div class="meta">aún no vencido — ${ag.meses[0].label}</div></div>
@@ -1075,7 +1075,7 @@ function ccCobranzaPanel() {
     </div>
     <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">Cobranza · aging por inquilino</div><div class="k">últimos 3 meses · draft de cobro con un click</div></div>
       <table class="ptable"><thead><tr><th>Inquilino</th><th style="text-align:right">Renta/mes</th><th style="text-align:right">${ag.meses[0].label}</th><th style="text-align:right">${ag.meses[1].label}</th><th style="text-align:right">${ag.meses[2].label}</th><th style="text-align:right">Deuda</th><th></th></tr></thead><tbody>
-      ${ag.rows.map(fila).join('') || '<tr><td colspan="7" style="color:#48d69c;padding:14px">Sin deuda de cobranza ✓</td></tr>'}</tbody></table>
+      ${ag.rows.map(fila).join('') || '<tr><td colspan="7" style="color:#63c08e;padding:14px">Sin deuda de cobranza ✓</td></tr>'}</tbody></table>
       <div class="meta" style="margin-top:8px">"n/a" = el inquilino aún no vivía ese mes. El draft se copia al portapapeles y abre WhatsApp si hay teléfono (no se envía solo — lo aprobás vos).</div></div></div>`;
 }
 
@@ -1091,7 +1091,7 @@ function ccContratosPanel() {
   return `<div class="grid row2" style="margin-top:14px">
     <div class="card"><div class="chart-h"><div class="t">Contratos por vencer (60 días)</div><div class="k">${porVencer.length} de ${activos.length} activos</div></div>
       <table class="ptable"><thead><tr><th>Inquilino</th><th>Fin de contrato</th><th style="text-align:right">Vence en</th><th style="text-align:right">Renta</th><th style="text-align:right">Depósito</th></tr></thead><tbody>
-      ${porVencer.map(fila).join('') || '<tr><td colspan="5" style="color:#48d69c;padding:12px">Ningún contrato vence en 60 días ✓</td></tr>'}</tbody></table></div>
+      ${porVencer.map(fila).join('') || '<tr><td colspan="5" style="color:#63c08e;padding:12px">Ningún contrato vence en 60 días ✓</td></tr>'}</tbody></table></div>
     <div class="card"><div class="chart-h"><div class="t">Depósitos en custodia</div><div class="k">regla del Cerebro: los depósitos NO son renta</div></div>
       <div class="grid kpis" style="grid-template-columns:1fr 1fr"><div class="card kpi"><div class="lab">Total en custodia</div><div class="big warn">${CC_MONEY(depTotal)}</div><div class="meta">${depositos.length} inquilino(s) activos con depósito</div></div>
       <div class="card kpi"><div class="lab">Pasivo</div><div class="big" style="font-size:13px;line-height:1.4">devolver al salir (o aplicar a daños)</div><div class="meta">fuente: Inquilinos.Depósito</div></div></div>

@@ -390,23 +390,23 @@ function reelCard(r, i) {
         <h3 class="text-lg font-bold">${esc(r.titulo)}</h3>
       </div>
       <div class="flex gap-1 shrink-0">
-        <button onclick="saveGen('reels', ${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">💾 Guardar</button>
-        <button onclick="copyReel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">📋 Copiar</button>
+        <button onclick="saveGen('reels', ${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">${osIcon('save')} Guardar</button>
+        <button onclick="copyReel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">${osIcon('clipboard')} Copiar</button>
       </div>
     </div>
     <div class="grid sm:grid-cols-2 gap-3 mb-4 text-sm">
-      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">🎣 HOOK</div>${esc(r.hook)}</div>
-      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">🗣️ CHISME</div>${esc(r.chisme)}</div>
-      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">🌉 PUENTE</div>${esc(r.puente)}</div>
-      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">💎 VALOR OCULTO</div>${esc(r.valor_oculto)}</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">${osIcon('zap')} HOOK</div>${esc(r.hook)}</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">${osIcon('message')} CHISME</div>${esc(r.chisme)}</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">${osIcon('link')} PUENTE</div>${esc(r.puente)}</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">${osIcon('gem')} VALOR OCULTO</div>${esc(r.valor_oculto)}</div>
     </div>
     <details open class="mb-3">
-      <summary class="cursor-pointer text-xs font-semibold text-zinc-400 mb-2">📝 Guion (${guion.length} tomas)</summary>
+      <summary class="cursor-pointer text-xs font-semibold text-zinc-400 mb-2">${osIcon('pencil-line')} Guion (${guion.length} tomas)</summary>
       <table class="w-full mt-2"><thead><tr class="text-[10px] uppercase text-zinc-600 text-left"><th></th><th>Dice</th><th>Toma</th><th>En pantalla</th></tr></thead><tbody>${beats}</tbody></table>
     </details>
     <div class="grid sm:grid-cols-2 gap-3 text-sm">
-      <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">📣 CTA</div>${esc(r.cta)}</div>
-      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">✂️ EDICIÓN</div>${esc(r.edicion)}</div>
+      <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">${osIcon('megaphone')} CTA</div>${esc(r.cta)}</div>
+      <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">${osIcon('pencil')} EDICIÓN</div>${esc(r.edicion)}</div>
     </div>
     <div class="mt-3 text-xs text-zinc-500"><b class="text-zinc-400">Por qué funciona:</b> ${esc(r.por_que_funciona)}</div>
   </div>`;
@@ -432,7 +432,7 @@ VALOR OCULTO: ${r.valor_oculto}
 CTA: ${r.cta}
 EDICIÓN: ${r.edicion}`;
   navigator.clipboard.writeText(txt);
-  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
+  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.innerHTML = osIcon('clipboard') + ' Copiar'; }, 1500); }
 }
 
 function loadingHTML(n) {
@@ -445,7 +445,7 @@ function errorHTML(msg) {
   const friendly = msg === 'NO_KEY' ? 'Falta tu API key. Ábrela en Ajustes.' : msg;
   return `<div class="border border-red-900/50 bg-red-950/20 rounded-xl p-5 text-sm text-red-300">
     <b>Error:</b> ${esc(friendly)}
-    <div class="text-xs text-red-400/70 mt-2">Si es error 404 de modelo, cambia el modelo en ⚙ Ajustes.</div>
+    <div class="text-xs text-red-400/70 mt-2">Si es error 404 de modelo, cambia el modelo en Ajustes.</div>
   </div>`;
 }
 
@@ -498,7 +498,7 @@ function carruselCard(c, i) {
         <span class="text-[9px] uppercase text-zinc-600">${esc(s.tipo || '')}</span>
       </div>
       <div class="text-sm font-medium leading-snug flex-1">${esc(s.texto)}</div>
-      <div class="text-[10px] text-zinc-500 mt-2 border-t border-zinc-800 pt-1">📷 ${esc(s.visual || '')}</div>
+      <div class="text-[10px] text-zinc-500 mt-2 border-t border-zinc-800 pt-1">${osIcon('camera')} ${esc(s.visual || '')}</div>
     </div>`).join('');
   return `
   <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-5">
@@ -508,12 +508,12 @@ function carruselCard(c, i) {
         <h3 class="text-lg font-bold">${esc(c.titulo)}</h3>
       </div>
       <div class="flex gap-1 shrink-0">
-        <button onclick="saveGen('carruseles', ${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">💾 Guardar</button>
-        <button onclick="copyCarrusel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">📋 Copiar</button>
+        <button onclick="saveGen('carruseles', ${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">${osIcon('save')} Guardar</button>
+        <button onclick="copyCarrusel(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">${osIcon('clipboard')} Copiar</button>
       </div>
     </div>
     <div class="flex gap-3 overflow-x-auto scrollbar-thin pb-2 mb-3">${slideEls}</div>
-    <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 text-sm mb-2"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">📝 CAPTION</div>${esc(c.caption)}</div>
+    <div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 text-sm mb-2"><div class="text-[11px] text-purple-400 font-semibold mb-0.5">${osIcon('pencil-line')} CAPTION</div>${esc(c.caption)}</div>
     <div class="text-xs text-zinc-500"><b class="text-zinc-400">Por qué funciona:</b> ${esc(c.por_que_funciona)}</div>
   </div>`;
 }
@@ -524,7 +524,7 @@ function copyCarrusel(i, btn) {
 ${slides.map(s => `SLIDE ${s.n ?? ''} (${s.tipo || ''}): ${s.texto}  | imagen: ${s.visual || ''}`).join('\n')}
 CAPTION: ${c.caption}`;
   navigator.clipboard.writeText(txt);
-  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
+  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.innerHTML = osIcon('clipboard') + ' Copiar'; }, 1500); }
 }
 
 // ---------- Generar YouTube ----------
@@ -589,18 +589,18 @@ function youtubeCard(v, i) {
   <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-5">
     <div class="flex items-start justify-between gap-3 mb-3">
       <div>
-        <div class="text-[11px] uppercase tracking-wide text-fuchsia-400 font-semibold">▶️ YouTube · vector: ${esc(v.vector_viral)}</div>
+        <div class="text-[11px] uppercase tracking-wide text-fuchsia-400 font-semibold">${osIcon('play')} YouTube · vector: ${esc(v.vector_viral)}</div>
         <h3 class="text-lg font-bold">${esc(v.titulo_principal)}</h3>
       </div>
-      <button onclick="copyYoutube(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
+      <button onclick="copyYoutube(${i}, this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">${osIcon('clipboard')} Copiar</button>
     </div>
-    <div class="bg-zinc-950 rounded-lg p-3 text-sm mb-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">💡 IDEA (remix)</div>${esc(v.idea)}<div class="text-xs text-zinc-500 mt-1">Outlier ref: ${esc(v.outlier_referencia)}</div></div>
+    <div class="bg-zinc-950 rounded-lg p-3 text-sm mb-3"><div class="text-[11px] text-zinc-500 font-semibold mb-0.5">${osIcon('lightbulb')} IDEA (remix)</div>${esc(v.idea)}<div class="text-xs text-zinc-500 mt-1">Outlier ref: ${esc(v.outlier_referencia)}</div></div>
     <div class="mb-3">
-      <div class="text-[11px] text-zinc-500 font-semibold mb-1">🏷️ TÍTULOS (por palanca)</div>
+      <div class="text-[11px] text-zinc-500 font-semibold mb-1">${osIcon('list')} TÍTULOS (por palanca)</div>
       <ul>${titulosEl}</ul>
     </div>
     <div class="mb-3">
-      <div class="text-[11px] text-zinc-500 font-semibold mb-1">🖼️ MINIATURAS (3 variantes · A/B test)</div>
+      <div class="text-[11px] text-zinc-500 font-semibold mb-1">${osIcon('image')} MINIATURAS (3 variantes · A/B test)</div>
       <div class="grid sm:grid-cols-3 gap-2">${minis.map((m, k) => `
         <div class="bg-zinc-950 rounded-lg p-3">
           <div class="text-[10px] uppercase font-bold text-accent mb-1">Variante ${esc(m.variante || String.fromCharCode(65 + k))}</div>
@@ -611,10 +611,10 @@ function youtubeCard(v, i) {
         </div>`).join('')}</div>
     </div>
     <details class="mb-3">
-      <summary class="cursor-pointer text-xs font-semibold text-zinc-400 mb-2">🎬 Guion / retención (${guion.length})</summary>
+      <summary class="cursor-pointer text-xs font-semibold text-zinc-400 mb-2">${osIcon('video')} Guion / retención (${guion.length})</summary>
       <table class="w-full mt-2"><tbody>${guionEl}</tbody></table>
     </details>
-    ${cortes.length ? `<div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 mb-2"><div class="text-[11px] text-purple-400 font-semibold mb-1">✂️ CORTES A REELS</div><ul>${cortesEl}</ul></div>` : ''}
+    ${cortes.length ? `<div class="bg-purple-950/30 border border-purple-900/40 rounded-lg p-3 mb-2"><div class="text-[11px] text-purple-400 font-semibold mb-1">${osIcon('copy')} CORTES A REELS</div><ul>${cortesEl}</ul></div>` : ''}
     <div class="text-xs text-zinc-500"><b class="text-zinc-400">Por qué funciona:</b> ${esc(v.por_que_funciona)}</div>
   </div>`;
 }
@@ -633,7 +633,7 @@ GUION:
 ${guion.map(g => `${g.seccion} (${g.tiempo}): ${g.contenido}`).join('\n')}
 CORTES A REELS: ${(v.cortes_reels || []).join(' / ')}`;
   navigator.clipboard.writeText(txt);
-  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
+  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.innerHTML = osIcon('clipboard') + ' Copiar'; }, 1500); }
 }
 
 // ---------- Generar calendario ----------
@@ -675,7 +675,7 @@ function renderCalendario(cal) {
   const head = `
     <div class="flex items-start justify-between gap-3 mb-3">
       <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-sm flex-1"><b class="text-zinc-400">Estrategia:</b> ${esc(cal.resumen)}</div>
-      <button onclick="copyCalendario(this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar todo</button>
+      <button onclick="copyCalendario(this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">${osIcon('clipboard')} Copiar todo</button>
     </div>`;
   const grid = dias.map(d => calDayCard(d)).join('');
   out.innerHTML = head + `<div class="grid sm:grid-cols-2 gap-3">${grid}</div>`;
@@ -691,7 +691,7 @@ function calDayCard(d) {
         <span class="text-[10px] text-zinc-400">${esc(p.canal || '')}${p.formato ? ' · ' + esc(p.formato) : ''}</span>
       </div>
       <div class="text-sm">${esc(p.idea)}</div>
-      ${p.cta ? `<div class="text-[11px] text-purple-300 mt-0.5">📣 ${esc(p.cta)}</div>` : ''}
+      ${p.cta ? `<div class="text-[11px] text-purple-300 mt-0.5">${osIcon('megaphone')} ${esc(p.cta)}</div>` : ''}
       ${p.dolor ? `<div class="text-[10px] text-zinc-600 mt-0.5">${esc(p.dolor)}</div>` : ''}
     </div>`).join('');
   return `
@@ -711,7 +711,7 @@ function copyCalendario(btn) {
       `  ${p.hora || ''} · ${p.canal || ''} · ${p.tipo || ''} (${p.formato || ''}): ${p.idea}${p.cta ? ' | CTA: ' + p.cta : ''}`).join('\n')
   ).join('\n\n');
   navigator.clipboard.writeText(txt);
-  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar todo'; }, 1500); }
+  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.innerHTML = osIcon('clipboard') + ' Copiar todo'; }, 1500); }
 }
 
 // ---------- Generar historias (Método H.I.L.O.) ----------
@@ -771,7 +771,7 @@ function renderHistorias(s) {
 }
 function frameCard(f) {
   const fi = FASE_INFO[f.fase] || { label: esc(f.fase || ''), color: 'bg-zinc-800 text-zinc-300' };
-  const stick = f.sticker && f.sticker !== 'ninguno' ? `<div class="mt-2 text-[11px] bg-purple-950/40 border border-purple-900/40 rounded px-2 py-1 text-purple-200">🎯 ${esc(f.sticker)}</div>` : '';
+  const stick = f.sticker && f.sticker !== 'ninguno' ? `<div class="mt-2 text-[11px] bg-purple-950/40 border border-purple-900/40 rounded px-2 py-1 text-purple-200">${osIcon('target')} ${esc(f.sticker)}</div>` : '';
   const crit = Array.isArray(f.criterios) && f.criterios.length ? `<div class="flex flex-wrap gap-1 mt-2">${f.criterios.map(c => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300">✓ ${esc(c)}</span>`).join('')}</div>` : '';
   return `
   <div class="border-t border-zinc-800 pt-3 mt-3">
@@ -781,9 +781,9 @@ function frameCard(f) {
       ${f.objetivo_frame ? `<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">${esc(f.objetivo_frame)}</span>` : ''}
     </div>
     ${f.debil ? `<div class="text-[11px] text-red-400/70 mb-1 line-through decoration-red-700/40">débil: ${esc(f.debil)}</div>` : ''}
-    <div class="bg-zinc-950 rounded-lg p-2 text-sm font-semibold mb-1">📱 ${esc(f.texto_en_pantalla)}</div>
+    <div class="bg-zinc-950 rounded-lg p-2 text-sm font-semibold mb-1">${osIcon('message')} ${esc(f.texto_en_pantalla)}</div>
     ${f.voz_o_caption ? `<div class="text-sm text-zinc-300">${esc(f.voz_o_caption)}</div>` : ''}
-    ${f.elemento_visual ? `<div class="text-[11px] text-zinc-500 mt-1">🎬 ${esc(f.elemento_visual)}</div>` : ''}
+    ${f.elemento_visual ? `<div class="text-[11px] text-zinc-500 mt-1">${osIcon('video')} ${esc(f.elemento_visual)}</div>` : ''}
     ${stick}
     ${crit}
     ${f.nota_grabacion ? `<div class="text-[10px] text-zinc-600 mt-1">↳ ${esc(f.nota_grabacion)}</div>` : ''}
@@ -805,14 +805,14 @@ function historiaCard(s) {
         </div>
         <h3 class="text-lg font-bold mt-1">${esc(s.titulo_secuencia)}</h3>
       </div>
-      <button onclick="copyHistoria(this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">📋 Copiar</button>
+      <button onclick="copyHistoria(this)" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 shrink-0">${osIcon('clipboard')} Copiar</button>
     </div>
     ${frames.map(frameCard).join('')}
     <div class="bg-emerald-950/30 border border-emerald-900/40 rounded-lg p-3 text-sm mt-3">
-      <div class="text-[11px] text-emerald-400 font-semibold mb-0.5">📣 CTA FINAL (${esc(cta.tipo || '')})</div>
+      <div class="text-[11px] text-emerald-400 font-semibold mb-0.5">${osIcon('megaphone')} CTA FINAL (${esc(cta.tipo || '')})</div>
       Comenta <b>${esc(cta.palabra_clave || '')}</b> y te mando ${esc(cta.recurso || '')}
     </div>
-    ${vars.length ? `<div class="mt-3"><div class="text-[11px] text-zinc-500 font-semibold mb-1">🔀 Hooks alternativos (A/B)</div>${vars.map(v => `<div class="text-xs text-zinc-400">• ${esc(v)}</div>`).join('')}</div>` : ''}
+    ${vars.length ? `<div class="mt-3"><div class="text-[11px] text-zinc-500 font-semibold mb-1">${osIcon('refresh')} Hooks alternativos (A/B)</div>${vars.map(v => `<div class="text-xs text-zinc-400">• ${esc(v)}</div>`).join('')}</div>` : ''}
     ${chk.length ? `<div class="mt-3 flex flex-wrap gap-1">${chk.map(c => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">✓ ${esc(c)}</span>`).join('')}</div>` : ''}
   </div>`;
 }
@@ -824,7 +824,7 @@ function copyHistoria(btn) {
     frames.map(f => `FRAME ${f.n} (${f.fase})${f.debil ? '\n  DÉBIL: ' + f.debil : ''}\n  PANTALLA: ${f.texto_en_pantalla}\n  VOZ: ${f.voz_o_caption || ''}\n  VISUAL: ${f.elemento_visual || ''}${f.sticker && f.sticker !== 'ninguno' ? '\n  STICKER: ' + f.sticker : ''}${f.nota_grabacion ? '\n  NOTA: ' + f.nota_grabacion : ''}`).join('\n\n') +
     `\n\nCTA FINAL (${cta.tipo || ''}): Comenta ${cta.palabra_clave || ''} y te mando ${cta.recurso || ''}`;
   navigator.clipboard.writeText(txt);
-  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 1500); }
+  if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.innerHTML = osIcon('clipboard') + ' Copiar'; }, 1500); }
 }
 
 // ---------- Estrategia (guía operativa) ----------
@@ -835,7 +835,7 @@ function renderEstrategia() {
   const card = (title, body) => `<div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5"><h3 class="font-bold text-base mb-3">${title}</h3>${body}</div>`;
   const li = (arr) => `<ul class="space-y-1.5 text-sm text-zinc-300">${arr.map(x => `<li class="flex gap-2"><span class="text-fuchsia-400">▸</span><span>${x}</span></li>`).join('')}</ul>`;
 
-  const principios = card('🧭 Principios maestros (las reglas que nunca rompes)', li([
+  const principios = card(osIcon('compass') + ' Principios maestros (las reglas que nunca rompes)', li([
     '<b>La marca NUNCA es el tema aparente.</b> El "chisme" (Messi, una camioneta, un drama) tapa el valor. Regala en público, vende en privado.',
     '<b>Criterio &gt; Capital.</b> Tu avatar cree que el problema es la plata; el real es el criterio para encontrar el deal. Ataca lo que QUIERE (comprar/jubilarse) → hazlo consciente de lo que NECESITA (criterio + sistema + acompañamiento).',
     '<b>Estático aburre, dinámico conecta.</b> Datos sueltos no mueven a nadie; contexto + beneficio + escenario sí.',
@@ -844,7 +844,7 @@ function renderEstrategia() {
     '<b>La interacción es contenido.</b> Encuestas, quiz y preguntas suben alcance y declaran intención de compra.',
   ]));
 
-  const rutina = card('☀️ Rutina diaria (mínimo 2-3 publicaciones)', `
+  const rutina = card(osIcon('sun') + ' Rutina diaria (mínimo 2-3 publicaciones)', `
     <div class="overflow-x-auto"><table class="w-full text-sm">
       <thead><tr class="text-[10px] uppercase text-zinc-600 text-left"><th class="pb-2 pr-3">Hora</th><th class="pb-2 pr-3">Qué subir</th><th class="pb-2">Para qué</th></tr></thead>
       <tbody class="text-zinc-300">
@@ -856,7 +856,7 @@ function renderEstrategia() {
       </tbody></table></div>
     <div class="mt-3 text-xs text-zinc-500"><b class="text-zinc-400">Siempre:</b> responde TODOS los comentarios y DMs (ahí se vende), y mira TikTok 10 min para tomar formatos virales que ya funcionan.</div>`);
 
-  const mes = card('🌱 Ritmo del mes (siembra → cosecha)', li([
+  const mes = card(osIcon('calendar-days') + ' Ritmo del mes (siembra → cosecha)', li([
     '<b>Días 1-20 — SIEMBRA:</b> valor + hand-raisers (recursos gratis), conversaciones sin presión. NO vendes de frente.',
     '<b>Días 21-27 — COSECHA:</b> vendes sobre todo por <b>historias</b>, con urgencia/escasez real (Why Now). Máx 4-5 historias de venta en la semana.',
     '<b>Día 28:</b> vuelves a siembra.',
@@ -865,7 +865,7 @@ function renderEstrategia() {
     'Un lead frío necesita <b>7-14 recursos</b> antes de contratar: ten paciencia con la siembra.',
   ]));
 
-  const queSubir = card('📋 Qué subir (pilares de contenido)', li([
+  const queSubir = card(osIcon('clipboard') + ' Qué subir (pilares de contenido)', li([
     '<b>Números:</b> los 4 números (MAO · rehab · ARV · margen), por qué el contratista cuesta más.',
     '<b>Criterio / búsqueda ★:</b> el Buy Box en 10 pasos, cómo inspeccionar una casa, dónde comprar por estado. (Es el cuello de botella real → máximo valor.)',
     '<b>Financiamiento:</b> Harmony Lender, ITIN/DSCR, "no necesitas 2 años de empresa", cómo usar tu crédito.',
@@ -875,7 +875,7 @@ function renderEstrategia() {
     '<b>Modelos:</b> Fix&Flip, Fix&Hold, BRRRR, Arbitraje. <b>Legado:</b> patrimonio, herencia, primera generación.',
   ]));
 
-  const comoSubir = card('🎬 Cómo subir (mecánicas y edición)', li([
+  const comoSubir = card(osIcon('video') + ' Cómo subir (mecánicas y edición)', li([
     '<b>Repost reciclado:</b> copia el link de un reel +5M → <code>saveclip.app/es</code> → descarga → en CapCut pon tu @ encima de la marca de agua → copia el copy tal cual → publica y <b>oculta del perfil</b> (sube alcance sin ensuciar el feed).',
     '<b>4 técnicas visuales:</b> time-lapse (antes→después de remodelación) · b-roll + texto grande · pantalla doble (comparación) · colores estridentes.',
     '<b>B-roll escrito</b> (frase potente sobre lifestyle) y <b>flatlays</b> para limpiar el feed y dar autoridad.',
@@ -884,7 +884,7 @@ function renderEstrategia() {
     '<b>Texto en pantalla ≤ 12 palabras</b> (legible en mobile).',
   ]));
 
-  const formulas = card('🧱 Las fórmulas (lo que genera la app)', `
+  const formulas = card(osIcon('brick') + ' Las fórmulas (lo que genera la app)', `
     <div class="grid sm:grid-cols-2 gap-3 text-sm">
       <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-fuchsia-400 font-semibold mb-1">REEL (Julio)</div>Hook → Chisme → Valor oculto → CTA (sígueme + comenta X). "Si no me sigues, no te llega."</div>
       <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-sky-400 font-semibold mb-1">REEL que vende (Sell Your Knowledge)</div>Hook → Problema → Solución (nuevo paradigma) → Prueba social → CTA.</div>
@@ -892,7 +892,7 @@ function renderEstrategia() {
       <div class="bg-zinc-950 rounded-lg p-3"><div class="text-[11px] text-amber-400 font-semibold mb-1">YOUTUBE (Richard)</div>Idea = remix (formato outlier + tema + vector viral) · título por palanca (miedo/curiosidad/deseo) · miniatura por capas.</div>
     </div>`);
 
-  const embudo = card('🔻 El embudo (cómo se convierte)', li([
+  const embudo = card(osIcon('filter') + ' El embudo (cómo se convierte)', li([
     '<b>Reel</b> = atrae (alcance frío). <b>Historias</b> = venden (el vendedor). <b>Hand-raiser</b> = palabra clave → DM automático → conversación → llamada/venta.',
     '<b>3 secuencias de historias</b> (1 por día, 3-4 historias, alternando): <b>Lead Magnet</b> (hook de resultado → vehículo → CTA suave "comenta YO") · <b>CTA Directo</b> (muestra trabajo con clientes → CTA explícito "comenta DOC") · <b>Awareness</b> (momentos de trabajo + victorias, sin vender).',
     'Espaciá las historias cada 30-90 min, renová el hilo cada 24h. La 1ª del día tiene más alcance.',
@@ -900,7 +900,7 @@ function renderEstrategia() {
     'Automatiza el DM con ManyChat / Sell by Chat (responde 2-15 min después).',
   ]));
 
-  const recursos = card('🎁 Recursos gratuitos (hand raisers)', li([
+  const recursos = card(osIcon('package') + ' Recursos gratuitos (hand raisers)', li([
     '<b>Qué es:</b> contenido gratis (video, PDF/Notion, plantilla, calculadora, mini-curso, audio) que inicia una <b>conversación calificada</b>. No es regalar por regalar.',
     '<b>3 objetivos:</b> iniciar conversación · activar microcompromisos · generar confianza.',
     '<b>Sube el nivel de conciencia:</b> inconsciente del problema → consciente del problema → consciente de la solución.',
@@ -910,20 +910,20 @@ function renderEstrategia() {
     '<b>Reutiliza</b> el mismo recurso con 3 ángulos distintos. Un lead frío necesita <b>7-14 recursos</b> antes de contratar.',
   ]));
 
-  const metricas = card('📊 Qué mirar (métricas)', li([
+  const metricas = card(osIcon('chart') + ' Qué mirar (métricas)', li([
     'Retención ≥ 50% → tiende a volverse viral.',
     'Comentarios · guardados · compartidos (la interacción manda).',
     '% visita→seguidor · clics en bio · DMs respondidos · agendas desde el perfil.',
     'Después de cada lanzamiento: qué historia/frame tuvo más respuestas → mejóralo el próximo.',
   ]));
 
-  const perfil = card('🪪 Optimización del perfil (tu landing del embudo)', `
+  const perfil = card(osIcon('user') + ' Optimización del perfil (tu landing del embudo)', `
     <p class="text-sm text-zinc-400 mb-3">Tu perfil es la landing principal del embudo: en <b>5 segundos</b> debe quedar claro <b>qué haces, para quién, cómo y qué hacer ahora</b>. Vende el que transmite claridad, no el que grita más fuerte.</p>
     ${li([
       '<b>Foto:</b> tu cara en primer plano, fondo neutro, expresión cercana → confianza al instante. Sin logos confusos.',
       '<b>Nombre visible:</b> <code>Nombre | Especialidad</code> (ej. "Nicolás | Inversión en Bienes Raíces"). Instagram lo indexa → te encuentran al buscar tu tema.',
       '<b>Bio línea por línea:</b> (1) el resultado que ayudas a lograr · (2) resultados tuyos/de clientes · (3) método único (opcional) · (4) CTA claro.',
-      '<b>El diferencial debe ser específico:</b> ❌ "Ayudo a invertir en bienes raíces" → ✅ "Ayudo a latinos en USA a cerrar su primer flip sin perder su capital".',
+      '<b>El diferencial debe ser específico:</b> ' + osIcon('x-circle') + ' "Ayudo a invertir en bienes raíces" → ' + osIcon('check-circle') + ' "Ayudo a latinos en USA a cerrar su primer flip sin perder su capital".',
       '<b>Link en bio:</b> 1 solo link optimizado con objetivo único. NO un Linktree con 10 botones.',
       '<b>Historias destacadas:</b> Sobre mí (de A a B) · Cómo trabajo (oferta + paso a paso) · Testimonios · FAQs.',
       '<b>3 reels fijados:</b> (1) cómo trabajas / la oportunidad · (2) tu historia · (3) un caso de éxito fuerte (A→B).',
@@ -931,7 +931,7 @@ function renderEstrategia() {
     ])}
     <div class="mt-3 text-xs text-zinc-500"><b class="text-zinc-400">Pregúntate:</b> si alguien entra a tu perfil ahora, ¿entiende qué vendes en 5 segundos? ¿Te escribiría hoy y agendaría una llamada?</div>`);
 
-  const fuentes = card('📚 Tu información, integrada aquí', `<p class="text-xs text-zinc-500 leading-relaxed">Esta guía y el generador se alimentan de TODO lo que subiste: la grabación con tu mentora, el deck de Julio Iero, el video de Richard (YouTube), la reunión de ideas de fix &amp; flip, el banco de conocimiento (29 dolores), el playbook VIRALIDAD, los carruseles de historias (monikmontanez / danaherrera) y el brief del Método H.I.L.O. Nada se perdió — todo está plasmado en lo que tienes que hacer.</p>`);
+  const fuentes = card(osIcon('book') + ' Tu información, integrada aquí', `<p class="text-xs text-zinc-500 leading-relaxed">Esta guía y el generador se alimentan de TODO lo que subiste: la grabación con tu mentora, el deck de Julio Iero, el video de Richard (YouTube), la reunión de ideas de fix &amp; flip, el banco de conocimiento (29 dolores), el playbook VIRALIDAD, los carruseles de historias (monikmontanez / danaherrera) y el brief del Método H.I.L.O. Nada se perdió — todo está plasmado en lo que tienes que hacer.</p>`);
 
   out.innerHTML = `
     <div class="mb-4">
@@ -958,7 +958,7 @@ function saveGen(kind, i, btn) {
   const obj = kind === 'reels' ? LAST_REELS[i] : LAST_CARR[i];
   if (!obj || !window.operaSave) return;
   window.operaSave(kind, obj);
-  if (btn) { btn.textContent = '✓ Guardado'; setTimeout(() => { btn.textContent = '💾 Guardar'; }, 1500); }
+  if (btn) { btn.textContent = '✓ Guardado'; setTimeout(() => { btn.innerHTML = osIcon('save') + ' Guardar'; }, 1500); }
 }
 
 // ---------- Indicador de fase del mes (siembra/cosecha) ----------
@@ -967,8 +967,8 @@ function setFaseBadge() {
   const d = new Date().getDate();
   const cosecha = d >= 21 && d <= 27;
   el.innerHTML = cosecha
-    ? '🌾 <b>Cosecha</b> (días 21-27): vendé desde historias con urgencia/escasez real. Máx 4-5 historias de venta esta semana.'
-    : '🌱 <b>Siembra</b> (días 1-20, 28+): valor + hand-raisers, sin vender de frente. CTA de respuesta, no link.';
+    ? '<b>Cosecha</b> (días 21-27): vendé desde historias con urgencia/escasez real. Máx 4-5 historias de venta esta semana.'
+    : '<b>Siembra</b> (días 1-20, 28+): valor + hand-raisers, sin vender de frente. CTA de respuesta, no link.';
   el.className = 'text-[11px] px-3 py-2 rounded-lg ' + (cosecha ? 'bg-emerald-900/40 text-emerald-200' : 'bg-sky-900/30 text-sky-200');
 }
 

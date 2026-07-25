@@ -53,20 +53,20 @@ window.dSetTab = dSetTab; window.dToggleTheme = dToggleTheme;
 
 // ─── SHELL ───
 function dRender() {
-  const TABS = [['evaluar', '🔍 Evaluar'], ['db', '📊 Base de Datos'], ['checklist', '✅ Checklist'], ['propiedades', '🏘️ Propiedades']];
+  const TABS = [['evaluar', 'Evaluar'], ['db', 'Base de Datos'], ['checklist', 'Checklist'], ['propiedades', 'Propiedades']];
   const body = { evaluar: dTabEvaluar, db: dTabDB, checklist: dTabChecklist, propiedades: dTabPropiedades }[D.tab] || dTabEvaluar;
   let inner = '';
   try { inner = body(); } catch (e) { inner = `<div class="card"><b class="down">Error en la pestaña</b><div style="font-size:12px;opacity:.7;margin-top:6px">${E(e.message)}</div></div>`; console.warn(e); }
   $(`<div class="top">
-    <div class="ic">🏥</div>
+    <div class="ic">${osIcon('stethoscope')}</div>
     <div><h1>Diagnóstico Patológico de Vivienda</h1><div class="sub">Rental Profits · Remodelación</div></div>
     <div class="right">
       <span class="sync"><i></i> Nube sincronizada</span>
-      <button class="iconbtn" onclick="dToggleTheme()" title="Tema claro/oscuro">${D.theme === 'dark' ? '☀︎' : '☾'}</button>
+      <button class="iconbtn" onclick="dToggleTheme()" title="Tema claro/oscuro">${D.theme === 'dark' ? '︎' : '☾'}</button>
     </div></div>
     <div class="tabs">${TABS.map(([k, l]) => `<button class="tab ${D.tab === k ? 'on' : ''}" onclick="dSetTab('${k}')">${l}</button>`).join('')}</div>
     <div id="tabbody">${inner}</div>
-    <div class="aibubble" onclick="dOpenAI()" title="Asistente de obra IA">🤖</div>`);
+    <div class="aibubble" onclick="dOpenAI()" title="Asistente de obra IA">${osIcon('bot')}</div>`);
 }
 
 // ═══ PESTAÑA 1 · EVALUAR (wizard) ═══
@@ -76,7 +76,7 @@ function dBuildSteps(w) {
   ['acceso_externo', 'techo', 'estructura', 'muros'].forEach(k => { const d = D.divisiones.find(x => x.key === k); if (d) steps.push({ tipo: 'division', division: k, titulo: d.nombre, emoji: d.emoji, seccion: secDe[k] }); });
   steps.push({ tipo: 'pisos', titulo: '¿Cuántos pisos?', seccion: 'Estructura' });
   if ((w.numero_pisos || 1) >= 2) {
-    steps.push({ tipo: 'division', division: 'placa', titulo: 'Placa de entrepiso', emoji: '🏗️', seccion: 'Placa & Escaleras', subgrupo: 'placa_entrepiso' });
+    steps.push({ tipo: 'division', division: 'placa', titulo: 'Placa de entrepiso', emoji: osIcon('construction'), seccion: 'Placa & Escaleras', subgrupo: 'placa_entrepiso' });
     steps.push({ tipo: 'division', division: 'placa', titulo: 'Escaleras', emoji: '🪜', seccion: 'Placa & Escaleras', subgrupo: 'escaleras' });
   }
   ['piso', 'carpinteria', 'redes'].forEach(k => { const d = D.divisiones.find(x => x.key === k); if (d) steps.push({ tipo: k === 'redes' ? 'redes' : k === 'carpinteria' ? 'carpinteria' : 'division', division: k, titulo: d.nombre, emoji: d.emoji, seccion: 'Interno' }); });
@@ -103,14 +103,14 @@ function dWizardCompute() {
 }
 function dTabEvaluar() {
   const w = D.wizard;
-  if (!w) return `<div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:10px">🔍</div><h2 style="margin-bottom:8px">Asistente de inspección</h2><p style="color:var(--mut);font-size:13px;margin-bottom:16px">Recorré la vivienda por partes; el daño global se calcula en vivo.</p><button class="btn" onclick="dStartWizard()">＋ Nueva inspección</button></div>`;
+  if (!w) return `<div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:10px">${osIcon('search')}</div><h2 style="margin-bottom:8px">Asistente de inspección</h2><p style="color:var(--mut);font-size:13px;margin-bottom:16px">Recorré la vivienda por partes; el daño global se calcula en vivo.</p><button class="btn" onclick="dStartWizard()">＋ Nueva inspección</button></div>`;
   const step = w.steps[w.idx], total = w.steps.length, pct = Math.round(100 * w.idx / (total - 1));
   const res = dWizardCompute();
   const barra = (label, val, emoji) => `<div style="margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>${emoji || ''} ${E(label)}</span><b>${val != null ? val + '%' : '—'}</b></div><div class="bar"><i style="width:${Math.min(100, val || 0)}%;background:${(val || 0) >= 60 ? 'var(--neg)' : (val || 0) >= 40 ? 'var(--amber)' : 'var(--pos)'}"></i></div></div>`;
   const panel = `<div class="card"><div style="text-align:center;padding:6px 0"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut2)">Daño Global Estimado</div><div style="font-size:38px;font-weight:800;color:${dVerColor(res.global)}">${res.global != null ? res.global + '%' : '—'}</div><div style="font-size:11px;color:var(--mut)">${E(dVeredicto(res.global))}</div></div>
     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px;color:var(--mut2)">Divisiones Técnicas</div>${D.divisiones.map(d => barra(d.nombre, res.divisiones[d.key], d.emoji)).join('')}
     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px;color:var(--mut2)">Patologías · en vivo</div>${D.patologias.map(p => barra(p.nombre, res.patologias[p.key], p.emoji)).join('')}</div>`;
-  const av = (w.avisos || []).length ? `<div class="card" style="border-color:var(--amber);margin-bottom:10px"><div style="color:var(--amber);font-size:11px;font-weight:700">⚠ Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin-top:3px">• ${E(a)}</div>`).join('')}</div>` : '';
+  const av = (w.avisos || []).length ? `<div class="card" style="border-color:var(--amber);margin-bottom:10px"><div style="color:var(--amber);font-size:11px;font-weight:700">${osIcon('alert')} Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin-top:3px">• ${E(a)}</div>`).join('')}</div>` : '';
   const body = dStepBody(step, w, res);
   const nav = `<div style="display:flex;justify-content:space-between;margin-top:12px"><button class="btn ghost" ${w.idx === 0 ? 'disabled' : ''} onclick="dNav(-1)">← Atrás</button><span style="font-size:11px;color:var(--mut2);align-self:center">Paso ${w.idx + 1} de ${total} · ${step.seccion} · ${pct}%</span>${w.idx < total - 1 ? `<button class="btn" onclick="dNav(1)">Siguiente →</button>` : '<span></span>'}</div>`;
   // Minimapa del wizard: un chip por paso — actual resaltado, recorridos con ✓ (clickeables via dGoStep), futuros apagados
@@ -132,25 +132,25 @@ function dStepBody(step, w, res) {
     <div style="font-size:11px;color:var(--mut);margin-bottom:3px">Nombre / Referencia *</div><input id="d-nom" value="${E(w.nombre_ref)}" style="width:100%;margin-bottom:10px">
     <div style="font-size:11px;color:var(--mut);margin-bottom:3px">Dirección</div><input id="d-dir" value="${E(w.direccion || '')}" style="width:100%;margin-bottom:10px">
     <div style="font-size:11px;color:var(--mut);margin-bottom:3px">Casa (Ficha por property_id)</div><select id="d-pid" style="width:100%;margin-bottom:10px"><option value="">(sin casa)</option>${D.props.map(p => `<option value="${p.property_id}" ${w.property_id === p.property_id ? 'selected' : ''}>${E((p.address || '').split(',')[0])}</option>`).join('')}</select>
-    <div style="font-size:11px;color:var(--mut);margin-bottom:4px">¿Compra o Renta?</div><div style="display:flex;gap:8px">${['compra', 'renta'].map(u => `<button class="btn ${w.uso === u ? '' : 'ghost'}" onclick="D.wizard.uso='${u}';dRender()">${u === 'compra' ? '🏷️ Compra' : '🔑 Renta'}</button>`).join('')}</div></div>`;
+    <div style="font-size:11px;color:var(--mut);margin-bottom:4px">¿Compra o Renta?</div><div style="display:flex;gap:8px">${['compra', 'renta'].map(u => `<button class="btn ${w.uso === u ? '' : 'ghost'}" onclick="D.wizard.uso='${u}';dRender()">${u === 'compra' ? 'Compra' : 'Renta'}</button>`).join('')}</div></div>`;
   if (step.tipo === 'pisos') return `<div class="card"><h3 style="margin-bottom:6px">¿Cuántos pisos tiene?</h3><p style="font-size:12px;color:var(--mut);margin-bottom:10px">2+ agrega Placa de entrepiso y Escaleras.</p><div style="display:flex;gap:10px">${[[1, '1 Piso'], [2, '2 o más pisos']].map(([n, l]) => `<button class="btn ${(w.numero_pisos >= 2 ? 2 : 1) === n ? '' : 'ghost'}" style="flex:1;padding:14px" onclick="dSetPisos(${n})">${l}</button>`).join('')}</div></div>`;
-  if (step.tipo === 'redes') { const raw = w.raw.redes = w.raw.redes || {}; return `<div class="card"><h3>🔌 Redes</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Cada red pesa ${Dcfg('red_peso_pct', 33.33)}% · solo cuenta "No funciona".</p>${['plomeria', 'gas', 'electricidad'].map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><b style="text-transform:capitalize">${r}</b><div style="display:flex;gap:6px">${[['funciona', 'Funciona'], ['no_funciona', 'No funciona']].map(([v, l]) => `<button class="btn ${raw[r] === v ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="dSetRed('${r}','${v}')">${l}</button>`).join('')}</div></div>`).join('')}</div>`; }
-  if (step.tipo === 'carpinteria') { const raw = w.raw.carpinteria = w.raw.carpinteria || {}; return `<div class="card"><h3>🪚 Carpintería</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Ratio de unidades dañadas → score (no afecta otras patologías).</p>${[['ventanas', 'Ventanas'], ['puertas_int', 'Puertas interiores'], ['gabinetes', 'Gabinetes']].map(([k, l]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0"><span>${l}</span><span style="font-size:11px">dañadas <input type="number" min="0" value="${raw[k + '_mal'] || 0}" onchange="dSetCarp('${k}_mal',this.value)" style="width:52px;text-align:right;padding:3px"> de <input type="number" min="0" value="${raw[k + '_tot'] || 0}" onchange="dSetCarp('${k}_tot',this.value)" style="width:52px;text-align:right;padding:3px"></span></div>`).join('')}</div>`; }
-  if (step.tipo === 'patio') { const raw = w.raw.patio = w.raw.patio || {}; return `<div class="card"><h3>🌳 Patio trasero</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">¿Cuenta con pérgola, hangar o depósito? Solo "Malo" suma (tope ${Dcfg('pergola_max_pct', 2)}% del total).</p><div style="display:flex;gap:8px">${[['no', 'No tiene'], ['bueno', 'Bueno'], ['regular', 'Regular'], ['malo', 'Malo']].map(([v, l]) => `<button class="btn ${raw.estado === v ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="D.wizard.raw.patio={estado:'${v}'};dRender()">${l}</button>`).join('')}</div></div>`; }
-  if (step.tipo === 'limpieza') { const items = ['Retiro de escombros', 'Limpieza profunda interior', 'Limpieza de fachada', 'Retiro de basura/enseres', 'Limpieza de patio/jardín']; return `<div class="card"><h3>🧹 Limpieza</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">NO pondera el daño — solo BD y entregable.</p>${items.map(it => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px"><input type="checkbox" ${(w.limpieza || []).includes(it) ? 'checked' : ''} onchange="dToggleLimpieza('${E(it).replace(/'/g, '')}')"> ${it}</label>`).join('')}</div>`; }
+  if (step.tipo === 'redes') { const raw = w.raw.redes = w.raw.redes || {}; return `<div class="card"><h3>${osIcon('link')} Redes</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Cada red pesa ${Dcfg('red_peso_pct', 33.33)}% · solo cuenta "No funciona".</p>${['plomeria', 'gas', 'electricidad'].map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><b style="text-transform:capitalize">${r}</b><div style="display:flex;gap:6px">${[['funciona', 'Funciona'], ['no_funciona', 'No funciona']].map(([v, l]) => `<button class="btn ${raw[r] === v ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="dSetRed('${r}','${v}')">${l}</button>`).join('')}</div></div>`).join('')}</div>`; }
+  if (step.tipo === 'carpinteria') { const raw = w.raw.carpinteria = w.raw.carpinteria || {}; return `<div class="card"><h3>Carpintería</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Ratio de unidades dañadas → score (no afecta otras patologías).</p>${[['ventanas', 'Ventanas'], ['puertas_int', 'Puertas interiores'], ['gabinetes', 'Gabinetes']].map(([k, l]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0"><span>${l}</span><span style="font-size:11px">dañadas <input type="number" min="0" value="${raw[k + '_mal'] || 0}" onchange="dSetCarp('${k}_mal',this.value)" style="width:52px;text-align:right;padding:3px"> de <input type="number" min="0" value="${raw[k + '_tot'] || 0}" onchange="dSetCarp('${k}_tot',this.value)" style="width:52px;text-align:right;padding:3px"></span></div>`).join('')}</div>`; }
+  if (step.tipo === 'patio') { const raw = w.raw.patio = w.raw.patio || {}; return `<div class="card"><h3>Patio trasero</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">¿Cuenta con pérgola, hangar o depósito? Solo "Malo" suma (tope ${Dcfg('pergola_max_pct', 2)}% del total).</p><div style="display:flex;gap:8px">${[['no', 'No tiene'], ['bueno', 'Bueno'], ['regular', 'Regular'], ['malo', 'Malo']].map(([v, l]) => `<button class="btn ${raw.estado === v ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="D.wizard.raw.patio={estado:'${v}'};dRender()">${l}</button>`).join('')}</div></div>`; }
+  if (step.tipo === 'limpieza') { const items = ['Retiro de escombros', 'Limpieza profunda interior', 'Limpieza de fachada', 'Retiro de basura/enseres', 'Limpieza de patio/jardín']; return `<div class="card"><h3>Limpieza</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">NO pondera el daño — solo BD y entregable.</p>${items.map(it => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px"><input type="checkbox" ${(w.limpieza || []).includes(it) ? 'checked' : ''} onchange="dToggleLimpieza('${E(it).replace(/'/g, '')}')"> ${it}</label>`).join('')}</div>`; }
   if (step.tipo === 'reporte') return dReporte(w, res);
   // division genérica (5 patologías)
   const cur = step.subgrupo ? (w.subScores[step.subgrupo] || {}) : (w.scores[step.division] || {});
-  const cubierta = step.division === 'techo' ? `<div style="background:rgba(231,182,94,.12);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--amber);margin-bottom:10px">⚠ Debe buscar la forma de subir a la cubierta y verificar el estado de la estructura antes de continuar. La cubierta (exterior) y el interior del techo pesan ambos en esta división.</div>` : '';
+  const cubierta = step.division === 'techo' ? `<div style="background:rgba(231,182,94,.12);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--amber);margin-bottom:10px">${osIcon('alert')} Debe buscar la forma de subir a la cubierta y verificar el estado de la estructura antes de continuar. La cubierta (exterior) y el interior del techo pesan ambos en esta división.</div>` : '';
   return `<div class="card"><h3>${step.emoji} ${E(step.titulo)}</h3>${cubierta}<p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Respondé solo lo que aplique · escala 1 (sin daño) a 5 (crítico).</p>
     ${D.patologias.map(p => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:12px;margin-bottom:5px">${p.emoji} <b>${E(p.nombre)}</b> <span style="color:var(--mut);font-size:10px">${E(p.pregunta)}</span></div><div style="display:flex;gap:5px">${[1, 2, 3, 4, 5].map(s => `<button class="btn ${cur[p.key] === s ? '' : 'ghost'}" style="flex:1;padding:5px;font-size:11px" onclick="dSetScore('${step.subgrupo || step.division}','${p.key}',${s},${step.subgrupo ? 'true' : 'false'})">${s}</button>`).join('')}</div></div>`).join('')}</div>`;
 }
 function dReporte(w, res) {
-  return `<div class="card"><h3>📊 Reporte — ${E(w.nombre_ref || 'Sin nombre')}</h3>
+  return `<div class="card"><h3>${osIcon('chart')} Reporte — ${E(w.nombre_ref || 'Sin nombre')}</h3>
     <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${dVerColor(res.global)}">${res.global != null ? res.global + '%' : '—'}</div><div style="color:var(--mut)">${E(dVeredicto(res.global))}</div></div>
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--mut2);margin:8px 0 4px">Daño por etapa de renovación</div>
     <table><tbody>${D.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${E(e.etapa)}</td><td style="text-align:right"><b class="${(res.etapas[e.etapa] || 0) >= 50 ? 'down' : ''}">${res.etapas[e.etapa] != null ? res.etapas[e.etapa] + '%' : '—'}</b></td></tr>`).join('')}</tbody></table>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="dSaveWizard()">💾 Guardar</button><button class="btn ghost" onclick="dPrellenar()">→ Estimador</button></div></div>`;
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="dSaveWizard()">${osIcon('save')} Guardar</button><button class="btn ghost" onclick="dPrellenar()">→ Estimador</button></div></div>`;
 }
 function dNav(dir) { const w = D.wizard; if (dir > 0 && w.idx === 0) { w.nombre_ref = (document.getElementById('d-nom') || {}).value || w.nombre_ref; w.direccion = (document.getElementById('d-dir') || {}).value || ''; w.property_id = (document.getElementById('d-pid') || {}).value || null; if (!w.nombre_ref.trim()) { alert('El Nombre / Referencia es obligatorio.'); return; } } w.idx = Math.max(0, Math.min(w.steps.length - 1, w.idx + dir)); w.maxIdx = Math.max(w.maxIdx || 0, w.idx); dRender(); }
 function dGoStep(i) { // salto directo desde el minimapa — SOLO a pasos ya recorridos
@@ -183,12 +183,12 @@ function dToast(msg, ms) { // feedback breve no bloqueante (usa window.toast si 
 window.dToast = dToast;
 async function dSaveWizard() {
   const w = D.wizard, res = dWizardCompute();
-  dToast('💾 Guardando…', 6000);
+  dToast('Guardando…', 6000);
   const row = { property_id: w.property_id || null, nombre_ref: w.nombre_ref, direccion: w.direccion || null, uso: w.uso || null, numero_pisos: w.numero_pisos || 1, scores: w.scores, raw_answers: w.raw, limpieza_items: w.limpieza || [], dano_global_pct: res.global, dano_divisiones: res.divisiones, dano_patologias: res.patologias, dano_etapas: res.etapas, veredicto: dVeredicto(res.global), estado: 'completa', updated_at: new Date().toISOString() };
   const { data: { session } } = await sb.auth.getSession(); row.created_by = (session && session.user && session.user.email) || 'diagnostico';
   let error; if (w.id) ({ error } = await sb.from('remodel_inspecciones').update(row).eq('id', w.id)); else ({ error } = await sb.from('remodel_inspecciones').insert(row));
   if (error) { alert('No se pudo guardar: ' + error.message); return; }
-  dToast('✅ Inspección guardada' + (res.global != null ? ' — daño global ' + res.global + '%' : ''));
+  dToast('Inspección guardada' + (res.global != null ? ' — daño global ' + res.global + '%' : ''));
   D.wizard = null; await dLoad(); D.tab = 'db'; dRender();
 }
 function dPrellenar() { const w = D.wizard, res = dWizardCompute(); try { localStorage.setItem('rm_insp_handoff', JSON.stringify({ property_id: w.property_id, nombre: w.nombre_ref, direccion: w.direccion, uso: w.uso, afectacion_por_etapa: res.etapas, dano_global: res.global })); } catch (e) {} alert(`Handoff listo para el Estimador Pro (${w.nombre_ref}).\nAbrí Remodelación → Estimador: arranca con estas afectaciones por etapa.`); }
@@ -294,9 +294,9 @@ function dOpenAI() {
   if (!last) { alert('Primero registrá o abrí una inspección.'); return; }
   const et = last.dano_etapas || {};
   const orden = Object.entries(et).filter(([k]) => k !== 'Limpieza').sort((a, b) => b[1] - a[1]);
-  const prioridades = orden.map(([e, v], i) => `${i + 1}. ${e} — ${v}% de daño${v >= 60 ? ' ⚠ prioritario' : ''}`).join('\n');
-  const dealbreaker = (et['Estructura'] || 0) >= 70 ? '\n\n🚩 DEAL-BREAKER: daño estructural alto — revisar viabilidad del negocio antes de comprar.' : '';
-  alert(`🤖 Asistente de obra (propuesta, dry-run)\n\nCasa: ${last.nombre_ref} · daño global ${last.dano_global_pct}%\n\nScope sugerido por prioridad:\n${prioridades}${dealbreaker}\n\n(Esto es una propuesta; ninguna acción se ejecuta sin tu aprobación. Usá "→ Estimador" para convertirlo en presupuesto.)`);
+  const prioridades = orden.map(([e, v], i) => `${i + 1}. ${e} — ${v}% de daño${v >= 60 ? ' prioritario' : ''}`).join('\n');
+  const dealbreaker = (et['Estructura'] || 0) >= 70 ? '\n\nDEAL-BREAKER: daño estructural alto — revisar viabilidad del negocio antes de comprar.' : '';
+  alert(`Asistente de obra (propuesta, dry-run)\n\nCasa: ${last.nombre_ref} · daño global ${last.dano_global_pct}%\n\nScope sugerido por prioridad:\n${prioridades}${dealbreaker}\n\n(Esto es una propuesta; ninguna acción se ejecuta sin tu aprobación. Usá "→ Estimador" para convertirlo en presupuesto.)`);
 }
 window.dOpenAI = dOpenAI;
 

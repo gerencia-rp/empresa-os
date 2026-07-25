@@ -29,7 +29,7 @@ const wpsState = {
 
 async function openEduWhatsappSystem(sys) {
   wpsState.sys = sys;
-  openModal('💬 ' + (sys.name || 'WhatsApp Masivo IA'), '<div id="wps-root">Cargando...</div>');
+  openModal(osIcon('message') + (sys.name || 'WhatsApp Masivo IA'), '<div id="wps-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await wpsLoad();
@@ -69,7 +69,7 @@ async function wpsLoad() {
 function wpsRender() {
   const root = document.getElementById('wps-root');
   if (!root) return;
-  if (wpsState.loading) { root.innerHTML = '<div class="p-8 text-slate-500">⏳ Cargando...</div>'; return; }
+  if (wpsState.loading) { root.innerHTML = '<div class="p-8 text-slate-500">' + osIcon('loader') + ' Cargando...</div>'; return; }
 
   if (wpsState.activeView === 'new') return wpsRenderNew();
   if (wpsState.activeView === 'detail' && wpsState.activeCampaignId) return wpsRenderDetail();
@@ -85,17 +85,17 @@ function wpsRenderList() {
       <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-xl p-4 text-white shadow-lg">
         <div class="flex items-center gap-3 flex-wrap">
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">⚡ Modo rápido</div>
+            <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">${osIcon('zap')} Modo rápido</div>
             <div class="text-xl font-bold mt-0.5">Seguimiento semanal en 1 click</div>
             <div class="text-xs opacity-90 mt-1">Plantilla pre-armada con nombre + etapa + tareas pendientes. Sin IA, sin esperas.</div>
           </div>
-          <button onclick="wpsOpenQuickWeekly()" class="bg-white text-emerald-700 font-bold text-sm px-4 py-3 rounded-lg shadow hover:bg-emerald-50 whitespace-nowrap">📤 Empezar →</button>
+          <button onclick="wpsOpenQuickWeekly()" class="bg-white text-emerald-700 font-bold text-sm px-4 py-3 rounded-lg shadow hover:bg-emerald-50 whitespace-nowrap">${osIcon('upload')} Empezar →</button>
         </div>
       </div>
 
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700">💬 Campañas con IA (modo avanzado)</div>
+          <div class="text-xs font-bold uppercase text-slate-700">${osIcon('message')} Campañas con IA (modo avanzado)</div>
           <div class="text-lg font-bold text-slate-900">${cs.length} campañas</div>
           <div class="text-[11px] text-slate-600">IA personaliza cada mensaje · tarda 1-3 min · ideal para mensajes complejos</div>
         </div>
@@ -118,11 +118,11 @@ function wpsRenderList() {
               ${cs.map(c => {
                 const statBadge = {
                   draft: '<span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">BORRADOR</span>',
-                  generating: '<span class="bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">🧠 GENERANDO</span>',
+                  generating: '<span class="bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('brain') + ' GENERANDO</span>',
                   ready: '<span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✓ LISTA</span>',
-                  sending: '<span class="bg-violet-200 text-violet-800 px-1.5 py-0.5 rounded text-[9px] font-bold">📤 ENVIANDO</span>',
-                  completed: '<span class="bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✅ COMPLETA</span>',
-                  archived: '<span class="bg-slate-300 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">📁 ARCHIVADA</span>'
+                  sending: '<span class="bg-violet-200 text-violet-800 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('upload') + ' ENVIANDO</span>',
+                  completed: '<span class="bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('check-circle') + ' COMPLETA</span>',
+                  archived: '<span class="bg-slate-300 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('folder') + ' ARCHIVADA</span>'
                 }[c.status] || c.status;
                 return `<tr class="border-t border-slate-100 hover:bg-slate-50">
                   <td class="p-2 font-medium">${(c.name||'?').replace(/</g,'&lt;')}</td>
@@ -158,7 +158,7 @@ function wpsRenderNew() {
     <div class="space-y-3">
       <div class="flex items-center justify-between">
         <button onclick="wpsState.activeView='list'; wpsRender()" class="text-xs text-slate-600 hover:text-slate-900">← Volver a campañas</button>
-        <div class="text-sm font-bold">📝 Nueva campaña</div>
+        <div class="text-sm font-bold">${osIcon('pencil-line')} Nueva campaña</div>
       </div>
 
       <!-- Nombre + prompt -->
@@ -176,7 +176,7 @@ function wpsRenderNew() {
 
       <!-- Filtros de selección -->
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-        <div class="text-xs font-bold uppercase text-blue-800">🎯 Filtros de destinatarios</div>
+        <div class="text-xs font-bold uppercase text-blue-800">${osIcon('target')} Filtros de destinatarios</div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Etapa</label>
@@ -214,8 +214,8 @@ function wpsRenderNew() {
               return !p || p.length < 10;
             }).length;
             if (sinTel === 0) return '<span class="text-emerald-700 ml-2 font-bold">✓ Todos con teléfono válido</span>';
-            if (sinTel === filtered.length) return `<span class="text-amber-700 ml-2">⚠️ ${sinTel} sin teléfono (podés agregarlos al enviar)</span>`;
-            return `<span class="text-amber-700 ml-2">⚠️ ${sinTel} sin teléfono</span>`;
+            if (sinTel === filtered.length) return `<span class="text-amber-700 ml-2">${osIcon('alert')} ${sinTel} sin teléfono (podés agregarlos al enviar)</span>`;
+            return `<span class="text-amber-700 ml-2">${osIcon('alert')} ${sinTel} sin teléfono</span>`;
           })()}
         </div>
       </div>
@@ -235,7 +235,7 @@ function wpsRenderNew() {
       </details>
 
       <div class="flex gap-2">
-        <button onclick="wpsGenerateCampaign()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-2.5 rounded-lg">🧠 Generar mensajes con IA (${filtered.length})</button>
+        <button onclick="wpsGenerateCampaign()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-2.5 rounded-lg">${osIcon('brain')} Generar mensajes con IA (${filtered.length})</button>
         <button onclick="wpsState.activeView='list'; wpsRender()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
@@ -346,7 +346,7 @@ function wpsRenderDetail() {
     <div class="space-y-3">
       <div class="flex items-center justify-between">
         <button onclick="wpsState.activeView='list'; wpsState.activeCampaignId=null; wpsRender()" class="text-xs text-slate-600 hover:text-slate-900">← Volver</button>
-        <div class="text-sm font-bold">📋 ${(c.name||'').replace(/</g,'&lt;')}</div>
+        <div class="text-sm font-bold">${osIcon('clipboard')} ${(c.name||'').replace(/</g,'&lt;')}</div>
       </div>
 
       <div class="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -359,7 +359,7 @@ function wpsRenderDetail() {
 
       ${c.status === 'generating' || c.status === 'draft' ? `
         <div class="bg-violet-50 border border-violet-200 rounded p-4 text-center">
-          <div class="text-3xl animate-pulse">🧠</div>
+          <div class="text-3xl animate-pulse">${osIcon('brain')}</div>
           <div class="mt-2 font-bold text-violet-900">IA generando mensajes personalizados...</div>
           <div class="text-[10px] text-violet-700 mt-1">Esto puede tardar 1-3 minutos. Quedate en esta pestaña o volvé después.</div>
         </div>
@@ -367,7 +367,7 @@ function wpsRenderDetail() {
 
       ${msgs.length === 0 && (c.status === 'ready' || c.status === 'completed') ? `
         <div class="bg-red-50 border-2 border-red-300 rounded-xl p-4">
-          <div class="text-sm font-bold text-red-900 mb-2">⚠️ Campaña creada sin mensajes</div>
+          <div class="text-sm font-bold text-red-900 mb-2">${osIcon('alert')} Campaña creada sin mensajes</div>
           <div class="text-xs text-red-800 mb-3">El insert de mensajes falló silenciosamente. Posibles causas:
             <ul class="list-disc list-inside mt-1 space-y-0.5">
               <li>Restricción RLS sobre la tabla <code>edu_whatsapp_messages</code></li>
@@ -376,9 +376,9 @@ function wpsRenderDetail() {
             </ul>
           </div>
           <div class="flex gap-2 flex-wrap">
-            <button onclick="wpsRetryInsertForCampaign('${c.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">🔄 Reintentar insertar mensaje</button>
-            <button onclick="wpsDeleteEmptyCampaign('${c.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded">🗑️ Eliminar esta campaña vacía</button>
-            <button onclick="wpsDiagnoseDB()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded">🔍 Diagnosticar DB</button>
+            <button onclick="wpsRetryInsertForCampaign('${c.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('refresh')} Reintentar insertar mensaje</button>
+            <button onclick="wpsDeleteEmptyCampaign('${c.id}')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('trash')} Eliminar esta campaña vacía</button>
+            <button onclick="wpsDiagnoseDB()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('search')} Diagnosticar DB</button>
           </div>
         </div>
       ` : ''}
@@ -388,30 +388,30 @@ function wpsRenderDetail() {
         <div class="bg-gradient-to-br from-blue-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <div class="flex-1 min-w-0">
-              <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">⚡ Envío 100% automático</div>
+              <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">${osIcon('zap')} Envío 100% automático</div>
               <div class="text-base font-bold mt-0.5">Cloud API · sin abrir pestañas</div>
               <div class="text-xs opacity-90 mt-1">Manda los mensajes directo desde el server con WhatsApp Business Cloud API (Meta). Setup de 30 min, 1000 msgs/mes gratis.</div>
             </div>
             <div class="flex gap-1.5">
-              <button onclick="wpsSendCloudAPI()" class="bg-white text-indigo-700 font-bold text-sm px-3 py-2 rounded shadow hover:bg-indigo-50 whitespace-nowrap">🚀 Enviar todos</button>
-              <button onclick="wpsShowCloudSetup()" class="bg-white/20 hover:bg-white/30 text-white font-bold text-xs px-3 py-2 rounded">⚙️ Setup</button>
+              <button onclick="wpsSendCloudAPI()" class="bg-white text-indigo-700 font-bold text-sm px-3 py-2 rounded shadow hover:bg-indigo-50 whitespace-nowrap">${osIcon('rocket')} Enviar todos</button>
+              <button onclick="wpsShowCloudSetup()" class="bg-white/20 hover:bg-white/30 text-white font-bold text-xs px-3 py-2 rounded">${osIcon('settings')} Setup</button>
             </div>
           </div>
         </div>
 
         <!-- Toolbar manual (wa.me) -->
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-emerald-900 mb-2">📲 Envío manual (wa.me)</div>
+          <div class="text-xs font-bold uppercase text-emerald-900 mb-2">${osIcon('phone')} Envío manual (wa.me)</div>
           <div class="flex flex-wrap items-center gap-2">
-            <button onclick="wpsCheckAll(true)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☑ Marcar todos pendientes</button>
+            <button onclick="wpsCheckAll(true)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">${osIcon('check-circle')} Marcar todos pendientes</button>
             <button onclick="wpsCheckAll(false)" class="text-[11px] bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded font-bold">☐ Desmarcar</button>
-            <button onclick="wpsOpenSelected()" class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Abre 1 wa.me por cada seleccionado con pausa de 300ms">📤 Abrir seleccionados (lento)</button>
-            <button onclick="wpsOpenSelectedTurbo()" class="text-[11px] bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold" title="Abre TODOS al mismo tiempo (modo ráfaga). El browser puede pedir permitir popups la primera vez.">⚡ MODO RÁFAGA (todos)</button>
+            <button onclick="wpsOpenSelected()" class="text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" title="Abre 1 wa.me por cada seleccionado con pausa de 300ms">${osIcon('upload')} Abrir seleccionados (lento)</button>
+            <button onclick="wpsOpenSelectedTurbo()" class="text-[11px] bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold" title="Abre TODOS al mismo tiempo (modo ráfaga). El browser puede pedir permitir popups la primera vez.">${osIcon('zap')} MODO RÁFAGA (todos)</button>
             <button onclick="wpsMarkAllSent()" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold" title="Marca como enviados los seleccionados">✓ Marcar enviados</button>
           </div>
           <div class="mt-2 text-[10px] text-slate-600">
-            <strong>📲 wa.me</strong> abre WhatsApp Web/app con el mensaje listo — solo tap "enviar". El browser te pedirá permitir popups la primera vez.
-            <br><strong>🚀 Cloud API</strong> envía solo, sin abrir pestañas. Requiere setup de credenciales Meta (botón ⚙️ arriba).
+            <strong>${osIcon('phone')} wa.me</strong> abre WhatsApp Web/app con el mensaje listo — solo tap "enviar". El browser te pedirá permitir popups la primera vez.
+            <br><strong>${osIcon('rocket')} Cloud API</strong> envía solo, sin abrir pestañas. Requiere setup de credenciales Meta (botón ${osIcon('settings')} arriba).
           </div>
         </div>
 
@@ -516,7 +516,7 @@ async function wpsSendCloudAPI() {
   // Mostrar progreso
   const progress = document.createElement('div');
   progress.className = 'fixed top-4 right-4 z-[200] bg-indigo-700 text-white px-4 py-3 rounded-xl shadow-2xl';
-  progress.innerHTML = '<div class="text-xs uppercase font-bold">⏳ Enviando vía Cloud API...</div>';
+  progress.innerHTML = '<div class="text-xs uppercase font-bold">' + osIcon('loader') + ' Enviando vía Cloud API...</div>';
   document.body.appendChild(progress);
 
   try {
@@ -553,11 +553,11 @@ async function wpsSendCloudAPI() {
 
 function wpsShowCloudSetup(opts) {
   opts = opts || {};
-  openModal('⚙️ Setup · WhatsApp Cloud API (Meta)', `
+  openModal('Setup · WhatsApp Cloud API (Meta)', `
     <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
       ${opts.reason === 'function_not_deployed' ? `
         <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
-          ⚠️ La edge function <code>edu-whatsapp-send-cloud</code> todavía no está deployada en tu Supabase. Sigue los pasos abajo y cuando termines, decime para hacer el deploy.
+          ${osIcon('alert')} La edge function <code>edu-whatsapp-send-cloud</code> todavía no está deployada en tu Supabase. Sigue los pasos abajo y cuando termines, decime para hacer el deploy.
         </div>
       ` : ''}
 
@@ -567,7 +567,7 @@ function wpsShowCloudSetup(opts) {
 
       <!-- Pasos -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📋 Pasos para activarla (~30 minutos):</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('clipboard')} Pasos para activarla (~30 minutos):</div>
         <ol class="text-xs text-slate-700 space-y-2 list-decimal list-inside">
           <li>
             <strong>Crear cuenta WhatsApp Business</strong>
@@ -605,7 +605,7 @@ supabase secrets set META_WHATSAPP_TEMPLATE_NAME="seguimiento_semanal"</pre>
 
       <!-- Alternativa: Twilio -->
       <details class="bg-violet-50 border border-violet-200 rounded p-3">
-        <summary class="cursor-pointer text-xs font-bold text-violet-900">🔄 Alternativa más fácil: Twilio (click para ver)</summary>
+        <summary class="cursor-pointer text-xs font-bold text-violet-900">${osIcon('refresh')} Alternativa más fácil: Twilio (click para ver)</summary>
         <div class="mt-2 text-xs text-violet-900 space-y-1">
           <div>Twilio simplifica el proceso. Setup en <strong>10 minutos</strong> pero cuesta ~$0.005/mensaje desde el inicio (sin tier gratis).</div>
           <ol class="list-decimal list-inside ml-2 mt-1 space-y-1">
@@ -618,7 +618,7 @@ supabase secrets set META_WHATSAPP_TEMPLATE_NAME="seguimiento_semanal"</pre>
       </details>
 
       <div class="bg-emerald-50 border border-emerald-300 rounded p-3 text-xs text-emerald-900">
-        💡 <strong>Sin Cloud API podés seguir usando los botones manuales</strong> (📤 lento o ⚡ ráfaga). Cloud API es para cuando querés automatizar el envío masivo recurrente sin click manual.
+        ${osIcon('lightbulb')} <strong>Sin Cloud API podés seguir usando los botones manuales</strong> (${osIcon('upload')} lento o ${osIcon('zap')} ráfaga). Cloud API es para cuando querés automatizar el envío masivo recurrente sin click manual.
       </div>
 
       <button onclick="closeModal()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">Entendido</button>
@@ -666,10 +666,10 @@ function wpsRenderMessage(m) {
   const s = m.student || {};
   const stat = m.status || 'pending';
   const statBadge = {
-    pending: '<span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">⏳ PEND</span>',
-    sent: '<span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[9px] font-bold">📤 ENV</span>',
+    pending: '<span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('loader') + ' PEND</span>',
+    sent: '<span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('upload') + ' ENV</span>',
     responded: '<span class="bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✓ RESP</span>',
-    no_response: '<span class="bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">⌛ SIN RESP</span>',
+    no_response: '<span class="bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('hourglass') + ' SIN RESP</span>',
     failed: '<span class="bg-red-200 text-red-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✗ FAIL</span>'
   }[stat] || stat;
 
@@ -690,17 +690,17 @@ function wpsRenderMessage(m) {
         </div>
         <div class="flex gap-1">
           ${waUrl
-            ? `<a href="${waUrl}" target="_blank" onclick="wpsMarkSent('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2 py-1 rounded">📤 WhatsApp</a>`
-            : `<button onclick="wpsEditPhoneAndSend('${m.id}', \`${(m.message_text||'').replace(/`/g,'\\\`').replace(/\\/g,'\\\\')}\`)" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-2 py-1 rounded" title="Sin teléfono — editar y enviar">📞 Agregar nº</button>`
+            ? `<a href="${waUrl}" target="_blank" onclick="wpsMarkSent('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2 py-1 rounded">${osIcon('upload')} WhatsApp</a>`
+            : `<button onclick="wpsEditPhoneAndSend('${m.id}', \`${(m.message_text||'').replace(/`/g,'\\\`').replace(/\\/g,'\\\\')}\`)" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-2 py-1 rounded" title="Sin teléfono — editar y enviar">${osIcon('phone')} Agregar nº</button>`
           }
-          <button onclick="eduOpenWhatsappQuick('${s.id||''}', { message: \`${(m.message_text||'').replace(/`/g,'\\\`').replace(/\\/g,'\\\\')}\` })" class="bg-slate-500 hover:bg-slate-600 text-white text-xs font-bold px-2 py-1 rounded" title="Abrir editor de WhatsApp rápido">✏️</button>
-          <button onclick="wpsOpenResponseModal('${m.id}')" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-2 py-1 rounded" title="Pegar respuesta del estudiante y analizar con IA">📥 Resp</button>
+          <button onclick="eduOpenWhatsappQuick('${s.id||''}', { message: \`${(m.message_text||'').replace(/`/g,'\\\`').replace(/\\/g,'\\\\')}\` })" class="bg-slate-500 hover:bg-slate-600 text-white text-xs font-bold px-2 py-1 rounded" title="Abrir editor de WhatsApp rápido">${osIcon('pencil')}</button>
+          <button onclick="wpsOpenResponseModal('${m.id}')" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-2 py-1 rounded" title="Pegar respuesta del estudiante y analizar con IA">${osIcon('inbox')} Resp</button>
         </div>
       </div>
       <div class="bg-emerald-50 border border-emerald-100 rounded p-2 text-xs whitespace-pre-wrap">${(m.message_text||'').replace(/</g,'&lt;')}</div>
       ${m.response_text ? `
         <div class="mt-2 bg-blue-50 border border-blue-200 rounded p-2">
-          <div class="text-[10px] font-bold text-blue-800 uppercase mb-1">💬 Respuesta del estudiante</div>
+          <div class="text-[10px] font-bold text-blue-800 uppercase mb-1">${osIcon('message')} Respuesta del estudiante</div>
           <div class="text-xs whitespace-pre-wrap">${(m.response_text||'').replace(/</g,'&lt;')}</div>
         </div>
       ` : ''}
@@ -721,7 +721,7 @@ function wpsRenderAnalysis(a, planUpdated) {
   return `
     <div class="mt-2 bg-violet-50 border border-violet-200 rounded p-2 space-y-1.5">
       <div class="flex items-center gap-2 flex-wrap text-[10px]">
-        <span class="text-violet-800 font-bold uppercase">🧠 IA</span>
+        <span class="text-violet-800 font-bold uppercase">${osIcon('brain')} IA</span>
         <span class="${sentBadge} px-1.5 py-0.5 rounded font-bold">${(a.sentimiento||'').toUpperCase()}</span>
         <span class="${urgBadge} px-1.5 py-0.5 rounded font-bold">${(a.urgencia||'').toUpperCase()}</span>
         ${a.categoria ? `<span class="bg-slate-200 px-1.5 py-0.5 rounded">${a.categoria}</span>` : ''}
@@ -756,7 +756,7 @@ function wpsOpenResponseModal(messageId) {
       <div class="text-xs text-slate-700">Pegá la respuesta del estudiante. La IA va a analizar, sugerir acción y actualizar el plan si corresponde.</div>
       <textarea id="wps-resp-text" rows="6" placeholder="Pegá acá lo que respondió el estudiante en WhatsApp..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
       <div class="flex gap-2">
-        <button onclick="wpsSubmitResponse('${messageId}')" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 rounded">🧠 Analizar con IA</button>
+        <button onclick="wpsSubmitResponse('${messageId}')" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 rounded">${osIcon('brain')} Analizar con IA</button>
         <button onclick="closeModal2()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cancelar</button>
       </div>
     </div>
@@ -768,7 +768,7 @@ function wpsOpenResponseModal(messageId) {
   overlay.innerHTML = `
     <div class="bg-white rounded-xl w-full max-w-xl">
       <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-        <div class="text-sm font-bold">📥 Capturar respuesta</div>
+        <div class="text-sm font-bold">${osIcon('inbox')} Capturar respuesta</div>
         <button onclick="closeModal2()" class="text-2xl leading-none">×</button>
       </div>
       <div class="p-4">${html}</div>
@@ -963,7 +963,7 @@ function eduOpenWhatsappQuick(studentId, opts) {
     templates: EDU_WA_TEMPLATES.filter(t => t.cat === c.key)
   })).filter(c => c.templates.length);
 
-  openModal('💬 Enviar WhatsApp', `
+  openModal('Enviar WhatsApp', `
     <div class="space-y-3" ${s ? `data-student-id="${s.id}"` : ''}>
       ${s ? `
         <div class="bg-emerald-50 border border-emerald-200 rounded p-2">
@@ -1002,13 +1002,13 @@ function eduOpenWhatsappQuick(studentId, opts) {
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Mensaje</label>
         <textarea id="wa-msg" rows="6" class="w-full border border-emerald-300 rounded p-2 text-sm" placeholder="Escribí tu mensaje o usá una plantilla...">${initialMsg.replace(/</g,'&lt;')}</textarea>
-        ${s ? `<div class="text-[9px] text-slate-500 mt-0.5">💡 Las plantillas reemplazan automáticamente {nombre}, {etapa}, {tarea}, {dias_sin_contacto} y {progreso} con datos reales del estudiante.</div>` : ''}
+        ${s ? `<div class="text-[9px] text-slate-500 mt-0.5">${osIcon('lightbulb')} Las plantillas reemplazan automáticamente {nombre}, {etapa}, {tarea}, {dias_sin_contacto} y {progreso} con datos reales del estudiante.</div>` : ''}
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="eduCopyWaMessage()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Copia solo el mensaje al portapapeles">📋 Copiar</button>
-        <button onclick="eduSendWaQuick(${studentId ? `'${studentId}'` : 'null'})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Abrir WhatsApp</button>
+        <button onclick="eduCopyWaMessage()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Copia solo el mensaje al portapapeles">${osIcon('clipboard')} Copiar</button>
+        <button onclick="eduSendWaQuick(${studentId ? `'${studentId}'` : 'null'})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('message')} Abrir WhatsApp</button>
       </div>
     </div>
   `);
@@ -1179,7 +1179,7 @@ function wpsOpenQuickWeekly() {
     <div class="space-y-3">
       <div class="flex items-center justify-between">
         <button onclick="wpsState.activeView='list'; wpsRender()" class="text-xs text-slate-600 hover:text-slate-900">← Volver a campañas</button>
-        <div class="text-sm font-bold">⚡ Seguimiento semanal rápido</div>
+        <div class="text-sm font-bold">${osIcon('zap')} Seguimiento semanal rápido</div>
       </div>
 
       <!-- Elegir plantilla -->
@@ -1199,7 +1199,7 @@ function wpsOpenQuickWeekly() {
       <!-- Panel de configuración IA -->
       <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4 space-y-3">
         <div class="flex items-center gap-2">
-          <div class="text-2xl">🤖</div>
+          <div class="text-2xl">${osIcon('bot')}</div>
           <div>
             <div class="text-xs font-bold uppercase text-violet-900">Generador de mensajes con IA</div>
             <div class="text-[10px] text-violet-700">Claude escribe un mensaje único para cada estudiante usando su perfil + el contexto que indiques</div>
@@ -1208,9 +1208,9 @@ function wpsOpenQuickWeekly() {
 
         <!-- Contexto adicional (el más importante) -->
         <div>
-          <label class="block text-xs font-bold uppercase text-violet-900 mb-1">📝 Contexto / qué querés comunicar esta semana</label>
+          <label class="block text-xs font-bold uppercase text-violet-900 mb-1">${osIcon('pencil-line')} Contexto / qué querés comunicar esta semana</label>
           <textarea id="wps-ai-context" rows="4" oninput="wpsQuickState.aiContext=this.value" placeholder="Ej: 'Estamos cerrando trimestre y necesito que entreguen análisis de propiedades. Quien tenga deudas pendientes que avise. Recordales que el viernes hay webinar de financiamiento Hard Money con José.'" class="w-full border border-violet-300 rounded px-3 py-2 text-sm">${(wpsQuickState.aiContext||'').replace(/</g,'&lt;')}</textarea>
-          <div class="text-[10px] text-slate-600 mt-1">💡 Cuanto más específico, mejor. La IA va a tomar esto + datos de cada estudiante (etapa, tareas, días sin contacto) y armar un mensaje único.</div>
+          <div class="text-[10px] text-slate-600 mt-1">${osIcon('lightbulb')} Cuanto más específico, mejor. La IA va a tomar esto + datos de cada estudiante (etapa, tareas, días sin contacto) y armar un mensaje único.</div>
         </div>
 
         <!-- Configuración del tono y formato -->
@@ -1221,7 +1221,7 @@ function wpsOpenQuickWeekly() {
               <option value="amigable" ${wpsQuickState.aiTono==='amigable'?'selected':''}>😊 Amigable</option>
               <option value="formal" ${wpsQuickState.aiTono==='formal'?'selected':''}>🎩 Formal</option>
               <option value="motivacional" ${wpsQuickState.aiTono==='motivacional'?'selected':''}>💪 Motivacional</option>
-              <option value="urgente" ${wpsQuickState.aiTono==='urgente'?'selected':''}>⚡ Urgente</option>
+              <option value="urgente" ${wpsQuickState.aiTono==='urgente'?'selected':''}>${osIcon('zap')} Urgente</option>
               <option value="casual" ${wpsQuickState.aiTono==='casual'?'selected':''}>🙌 Casual</option>
             </select>
           </div>
@@ -1257,12 +1257,12 @@ function wpsOpenQuickWeekly() {
 
         <!-- Botón Preview -->
         <div class="bg-white border border-violet-200 rounded-lg p-2">
-          <button onclick="wpsAIPreviewMessage()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold py-2 rounded">✨ Ver muestra de 3 mensajes antes de crear todos</button>
+          <button onclick="wpsAIPreviewMessage()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold py-2 rounded">${osIcon('sparkles')} Ver muestra de 3 mensajes antes de crear todos</button>
           <div id="wps-ai-preview-result" class="mt-2"></div>
         </div>
 
         <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
-          ⚠️ Generar ${filteredAll.length} mensajes con IA toma ${Math.max(15, Math.round(filteredAll.length * 1.2))}-${Math.round(filteredAll.length * 2.5)} segundos. Cada mensaje es único.
+          ${osIcon('alert')} Generar ${filteredAll.length} mensajes con IA toma ${Math.max(15, Math.round(filteredAll.length * 1.2))}-${Math.round(filteredAll.length * 2.5)} segundos. Cada mensaje es único.
         </div>
       </div>
       ` : ''}
@@ -1300,12 +1300,12 @@ function wpsOpenQuickWeekly() {
               return !p || p.length < 10;
             }).length;
             if (sinTel === 0) return ' · <span class="text-emerald-700 font-bold">Todos con teléfono ✓</span>';
-            if (sinTel === filteredAll.length) return ` · <span class="text-amber-700">⚠️ Todos sin teléfono — clic abajo "🔄 Traer desde Airtable"</span>`;
-            return ` · <span class="text-amber-700">⚠️ ${sinTel} sin teléfono</span>`;
+            if (sinTel === filteredAll.length) return ` · <span class="text-amber-700">${osIcon('alert')} Todos sin teléfono — clic abajo "${osIcon('refresh')} Traer desde Airtable"</span>`;
+            return ` · <span class="text-amber-700">${osIcon('alert')} ${sinTel} sin teléfono</span>`;
           })()}
         </div>
         <div class="mt-2 flex items-center gap-2 flex-wrap">
-          <button onclick="wpsResyncFromAirtable()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded">🔄 Traer números desde Airtable</button>
+          <button onclick="wpsResyncFromAirtable()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded">${osIcon('refresh')} Traer números desde Airtable</button>
           <span class="text-[10px] text-slate-500">Si tus estudiantes salen "sin teléfono", esto trae los números desde Airtable. Asumiendo USA (+1) como código país.</span>
         </div>
       </div>
@@ -1321,7 +1321,7 @@ function wpsOpenQuickWeekly() {
       <!-- 🧪 Modo prueba (probar antes de mandar a todos) -->
       <details class="bg-amber-50 border border-amber-300 rounded-xl p-3">
         <summary class="cursor-pointer text-xs font-bold uppercase text-amber-900 flex items-center gap-2">
-          🧪 Probar primero con un número (recomendado)
+          ${osIcon('flask')} Probar primero con un número (recomendado)
           <span class="text-[10px] font-normal text-amber-700">click para abrir ▾</span>
         </summary>
         <div class="mt-3 space-y-2">
@@ -1335,8 +1335,8 @@ function wpsOpenQuickWeekly() {
               <input id="wps-test-phone" type="text" placeholder="521234567890" value="${(localStorage.getItem('wps_test_phone')||'').replace(/\D/g,'')}" oninput="try{localStorage.setItem('wps_test_phone', this.value.replace(/\\D/g,''))}catch(e){}" class="w-full border border-amber-400 rounded px-2 py-1.5 text-sm font-mono"/>
             </div>
           </div>
-          <button onclick="wpsCreateQuickTest()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2.5 rounded">🧪 Crear 1 mensaje de prueba</button>
-          <div class="text-[10px] text-slate-500">Se crea una campaña con prefijo "🧪 PRUEBA" y un solo mensaje hacia tu número. Lo abrís, lo enviás a vos mismo y validás cómo queda.</div>
+          <button onclick="wpsCreateQuickTest()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2.5 rounded">${osIcon('flask')} Crear 1 mensaje de prueba</button>
+          <div class="text-[10px] text-slate-500">Se crea una campaña con prefijo "${osIcon('flask')} PRUEBA" y un solo mensaje hacia tu número. Lo abrís, lo enviás a vos mismo y validás cómo queda.</div>
         </div>
       </details>
 
@@ -1434,7 +1434,7 @@ async function wpsCreateAICampaign(students, template, campaignName) {
   overlay.className = 'fixed inset-0 z-[200] bg-slate-900/80 flex items-center justify-center p-4';
   overlay.innerHTML = `
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-      <div class="text-4xl mb-3 animate-pulse">🤖</div>
+      <div class="text-4xl mb-3 animate-pulse">${osIcon('bot')}</div>
       <div class="font-bold text-lg text-slate-900">Generando mensajes con IA</div>
       <div class="text-sm text-slate-600 mt-1">Claude está escribiendo un mensaje único para cada estudiante</div>
       <div class="mt-4 bg-slate-100 rounded-full h-3 overflow-hidden">
@@ -1751,7 +1751,7 @@ async function wpsAIPreviewMessage() {
 
   const container = document.getElementById('wps-ai-preview-result');
   if (!container) return;
-  container.innerHTML = '<div class="text-center py-3 text-xs text-slate-500">⏳ Generando 3 muestras...</div>';
+  container.innerHTML = '<div class="text-center py-3 text-xs text-slate-500">' + osIcon('loader') + ' Generando 3 muestras...</div>';
 
   const samples = filtered.slice(0, 3);
   const results = [];
@@ -1769,7 +1769,7 @@ async function wpsAIPreviewMessage() {
       <div class="text-[10px] font-bold uppercase text-violet-700">${(r.student.full_name||'').replace(/</g,'&lt;')} · ${(r.student.current_stage||'').replace(/</g,'&lt;')}</div>
       <div class="text-xs mt-1 whitespace-pre-wrap ${r.ok?'text-slate-800':'text-red-700'}">${r.msg.replace(/</g,'&lt;')}</div>
     </div>
-  `).join('') + '<div class="text-[10px] text-slate-500 italic text-center mt-1">💡 Si te gustan, dale a "🚀 Crear todos" abajo.</div>';
+  `).join('') + '<div class="text-[10px] text-slate-500 italic text-center mt-1">' + osIcon('lightbulb') + ' Si te gustan, dale a "' + osIcon('rocket') + ' Crear todos" abajo.</div>';
 }
 
 window.wpsAIPreviewMessage = wpsAIPreviewMessage;
@@ -1976,12 +1976,12 @@ async function wpsDiagnoseDB() {
   const text = log.join('\n');
   console.log(text);
 
-  openModal('🔍 Diagnóstico DB', `
+  openModal('Diagnóstico DB', `
     <div class="space-y-3">
       <div class="text-xs text-slate-600">Resultados del diagnóstico de la tabla edu_whatsapp_messages.</div>
       <pre class="bg-slate-900 text-emerald-300 p-3 rounded text-[10px] overflow-x-auto whitespace-pre-wrap max-h-[60vh]">${text.replace(/</g,'&lt;')}</pre>
       <div class="flex gap-2">
-        <button onclick="navigator.clipboard.writeText(${JSON.stringify(text).replace(/</g,'&lt;')}); alert('Copiado')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">📋 Copiar para soporte</button>
+        <button onclick="navigator.clipboard.writeText(${JSON.stringify(text).replace(/</g,'&lt;')}); alert('Copiado')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">${osIcon('clipboard')} Copiar para soporte</button>
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
       </div>
     </div>
@@ -2107,7 +2107,7 @@ async function wpsDiagnoseAirtablePhoneField() {
   const tableName = m?.airtable_students_table || 'Estudiantes';
   const url = baseId ? `https://airtable.com/${baseId}` : null;
 
-  openModal('🔍 Diagnóstico: campos de teléfono en Airtable', `
+  openModal('Diagnóstico: campos de teléfono en Airtable', `
     <div class="space-y-3">
       <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
         El sync corrió pero <strong>0 estudiantes</strong> recibieron teléfono. Significa que el campo de teléfono en Airtable se llama distinto a lo esperado.
@@ -2131,12 +2131,12 @@ async function wpsDiagnoseAirtablePhoneField() {
           <li>Buscá la columna donde tenés los números de teléfono</li>
           <li>Mirá el nombre exacto de esa columna</li>
           <li>Renombrala a <strong>"Phone"</strong> (recomendado) o uno de los nombres de la lista de arriba</li>
-          <li>Volvé acá y dale otra vez a "🔄 Traer números desde Airtable"</li>
+          <li>Volvé acá y dale otra vez a "${osIcon('refresh')} Traer números desde Airtable"</li>
         </ol>
       </div>
 
       <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
-        💡 <strong>Alternativa rápida:</strong> Si no querés renombrar el campo en Airtable, decime cómo se llama y agrego el nombre exacto al sync.
+        ${osIcon('lightbulb')} <strong>Alternativa rápida:</strong> Si no querés renombrar el campo en Airtable, decime cómo se llama y agrego el nombre exacto al sync.
       </div>
 
       <div class="flex gap-2">
@@ -2159,7 +2159,7 @@ async function wpsSubmitResponse(messageId) {
 
   document.getElementById('wps-resp-modal').innerHTML = `
     <div class="bg-white rounded-xl w-full max-w-xl p-8 text-center">
-      <div class="text-3xl animate-pulse">🧠</div>
+      <div class="text-3xl animate-pulse">${osIcon('brain')}</div>
       <div class="mt-2 font-bold text-violet-900">Analizando respuesta con IA...</div>
     </div>
   `;

@@ -13,29 +13,29 @@ function rmRenderAssets() {
     matterportPreview = `
       <div class="mt-2 border-2 border-blue-300 rounded-lg p-3 bg-blue-50">
         <div class="flex items-center gap-3">
-          <div class="text-4xl">🌐</div>
+          <div>${osIcon('globe', {size:34})}</div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-bold text-blue-900">Tour 360° vinculado ✓</div>
             ${modelId ? `<div class="text-[10px] text-slate-500 font-mono">Model ID: ${modelId}</div>` : ''}
             <div class="text-[10px] text-blue-700 truncate">${rmEsc(cleanUrl)}</div>
           </div>
-          <a href="${rmEsc(cleanUrl)}" target="_blank" rel="noopener" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">🚀 Abrir tour</a>
+          <a href="${rmEsc(cleanUrl)}" target="_blank" rel="noopener" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">${osIcon('rocket')} Abrir tour</a>
         </div>
-        <p class="text-[10px] text-slate-500 mt-2">⚠️ Matterport bloquea embed inline. Abre en nueva pestaña para medir. Claude SÍ puede analizarlo cuando ejecutes 🤖 IA.</p>
+        <p class="text-[10px] text-slate-500 mt-2">${osIcon('alert', {size:12})} Matterport bloquea embed inline. Abre en nueva pestaña para medir. Claude SÍ puede analizarlo cuando ejecutes ${osIcon('bot', {size:12})} IA.</p>
       </div>
     `;
   }
 
   return `
     <div class="bg-white rounded-xl p-4 border border-slate-200">
-      <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">📐 Activos del proyecto (mejoran precisión IA)</h3>
+      <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('ruler')} Activos del proyecto (mejoran precisión IA)</h3>
 
       <!-- Matterport -->
       <div class="mb-4">
-        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">🌐 Tour 360° Matterport (URL)</label>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">${osIcon('globe', {size:12})} Tour 360° Matterport (URL)</label>
         <input value="${rmEsc(rmState.matterportUrl)}" oninput="rmState.matterportUrl=this.value.trim()" onchange="rmRenderTabPreservingFocus()" placeholder="https://my.matterport.com/show/?m=XXXXX" class="w-full border ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? 'border-amber-400' : 'border-slate-300'} rounded px-3 py-2 text-sm" />
         ${rmState.matterportUrl && !rmIsValidMatterport(rmState.matterportUrl) ? `
-          <p class="text-[10px] text-amber-700 mt-0.5 flex items-start gap-1"><span>⚠️</span><span>URL no parece de Matterport (esperado <code class="bg-amber-50 px-1 rounded">/show/?m=…</code>, <code class="bg-amber-50 px-1 rounded">/models/…</code> o <code class="bg-amber-50 px-1 rounded">/discover/space/…</code>). Se guarda igual.</span></p>
+          <p class="text-[10px] text-amber-700 mt-0.5 flex items-start gap-1"><span>${osIcon('alert', {size:12})}</span><span>URL no parece de Matterport (esperado <code class="bg-amber-50 px-1 rounded">/show/?m=…</code>, <code class="bg-amber-50 px-1 rounded">/models/…</code> o <code class="bg-amber-50 px-1 rounded">/discover/space/…</code>). Se guarda igual.</span></p>
         ` : `
           <p class="text-[10px] text-slate-400 mt-0.5">Pega el link y click fuera del campo para preview.</p>
         `}
@@ -44,19 +44,19 @@ function rmRenderAssets() {
 
       <!-- Scope text -->
       <div class="mb-4">
-        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">📝 Scope del proyecto (texto)</label>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">${osIcon('pencil-line', {size:12})} Scope del proyecto (texto)</label>
         <textarea oninput="rmState.scopeText=this.value" rows="5" placeholder="Describe qué vas a hacer: 'Cocina completa nueva con cabinets blancos, quartz countertop, backsplash subway. Bañera principal tear out completo con tile floor + walls, vanity doble. Pintar toda la casa, cambiar pisos a LVP roble. Reparar foundation crack en sala...'" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${rmState.scopeText}</textarea>
         <p class="text-[10px] text-slate-400 mt-0.5">Cuanto más específico, mejor la estimación de IA.</p>
       </div>
 
       <!-- Audio recorder + upload -->
       <div class="mb-4">
-        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">🎙️ Audio scope (graba o sube)</label>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">${osIcon('mic', {size:12})} Audio scope (graba o sube)</label>
         <div class="flex gap-2 items-center">
-          <button onclick="rmToggleRecord()" class="${rmState.isRecording?'bg-red-600 animate-pulse':'bg-slate-900'} hover:opacity-80 text-white text-xs font-bold px-3 py-2 rounded">${rmState.isRecording?'⏹ Detener':'🎙️ Grabar'}</button>
+          <button onclick="rmToggleRecord()" class="${rmState.isRecording?'bg-red-600 animate-pulse':'bg-slate-900'} hover:opacity-80 text-white text-xs font-bold px-3 py-2 rounded">${rmState.isRecording?osIcon('pause')+' Detener':osIcon('mic')+' Grabar'}</button>
           <input type="file" id="rm-audio-upload" accept="audio/*" class="hidden" onchange="rmUploadAudio(this.files[0])" />
-          <label for="rm-audio-upload" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded cursor-pointer">📁 Subir audio</label>
-          ${rmState.scopeAudioPath ? `<button onclick="rmPlayAudio()" class="text-xs bg-blue-600 text-white px-3 py-2 rounded">▶️ Reproducir</button><button onclick="rmTranscribeAudio()" class="text-xs bg-purple-600 text-white px-3 py-2 rounded">📝 Transcribir</button>` : ''}
+          <label for="rm-audio-upload" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded cursor-pointer">${osIcon('upload', {size:12})} Subir audio</label>
+          ${rmState.scopeAudioPath ? `<button onclick="rmPlayAudio()" class="text-xs bg-blue-600 text-white px-3 py-2 rounded">${osIcon('play', {size:12})} Reproducir</button><button onclick="rmTranscribeAudio()" class="text-xs bg-purple-600 text-white px-3 py-2 rounded">${osIcon('pencil-line', {size:12})} Transcribir</button>` : ''}
           ${rmState.scopeAudioPath ? `<span class="text-[10px] text-emerald-700">✓ Audio guardado</span>` : ''}
         </div>
         ${rmState.scopeAudioTranscript ? `<div class="mt-2 bg-slate-50 rounded p-2 text-xs"><strong>Transcripción:</strong> ${rmState.scopeAudioTranscript}</div>` : ''}
@@ -64,13 +64,13 @@ function rmRenderAssets() {
 
       <!-- Planos -->
       <div class="mb-4">
-        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">📐 Planos (PDF / imagen)</label>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">${osIcon('ruler', {size:12})} Planos (PDF / imagen)</label>
         <input type="file" id="rm-plans-upload" accept=".pdf,image/*" multiple class="hidden" onchange="rmUploadFiles(this.files, 'plans')" />
         <label for="rm-plans-upload" class="inline-block text-xs bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded cursor-pointer">+ Subir planos</label>
         <div class="mt-2 grid grid-cols-3 gap-2">
           ${rmState.plans.map((p, i) => `
             <div class="bg-slate-50 rounded p-2 text-xs flex items-center justify-between">
-              <span class="truncate">${p.type==='pdf'?'📄':'🖼️'} ${p.name}</span>
+              <span class="truncate">${p.type==='pdf'?osIcon('file',{size:12}):osIcon('image',{size:12})} ${p.name}</span>
               <button onclick="rmRemoveAsset('plans', ${i})" class="text-red-600 hover:text-red-800 ml-1">✕</button>
             </div>
           `).join('')}
@@ -79,13 +79,13 @@ function rmRenderAssets() {
 
       <!-- Fotos -->
       <div>
-        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">📷 Fotos de la casa (antes)</label>
+        <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">${osIcon('camera', {size:12})} Fotos de la casa (antes)</label>
         <input type="file" id="rm-photos-upload" accept="image/*" multiple class="hidden" onchange="rmUploadFiles(this.files, 'photos')" />
         <label for="rm-photos-upload" class="inline-block text-xs bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded cursor-pointer">+ Subir fotos</label>
         <div class="mt-2 grid grid-cols-4 gap-2">
           ${rmState.photos.map((p, i) => `
             <div class="bg-slate-50 rounded p-1 text-xs flex items-center justify-between">
-              <span class="truncate">🖼️ ${p.name}</span>
+              <span class="truncate">${osIcon('image',{size:12})} ${p.name}</span>
               <button onclick="rmRemoveAsset('photos', ${i})" class="text-red-600 hover:text-red-800 ml-1">✕</button>
             </div>
           `).join('')}
@@ -183,7 +183,7 @@ async function rmTranscribeAudio() {
   };
   recog.onerror = e => alert('Error transcribiendo: ' + e.error);
   recog.start();
-  alert('🎙️ Reproduciendo audio y transcribiendo en vivo. Dicta lo que dice el audio o reprodúcelo cerca del mic. Click el botón otra vez para detener.');
+  alert('Reproduciendo audio y transcribiendo en vivo. Dicta lo que dice el audio o reprodúcelo cerca del mic. Click el botón otra vez para detener.');
   setTimeout(() => recog.stop(), 60000); // máximo 1 min
 }
 

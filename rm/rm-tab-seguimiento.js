@@ -12,21 +12,21 @@ function rmRenderSeguimiento(body) {
 
   const view = rmState.seguimientoView || 'fase';
   const isFase = view === 'fase';
-  const _plannerAv = (rmState.currentProject && rmState.currentProject.progress_real != null) ? `<div class="mt-1 inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5" title="Avance único calculado desde el Planner (done/total) — misma fuente que Command Center y Ficha">📅 Avance real (Planner): ${Math.round(rmState.currentProject.progress_real)}%</div>` : '';
+  const _plannerAv = (rmState.currentProject && rmState.currentProject.progress_real != null) ? `<div class="mt-1 inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5" title="Avance único calculado desde el Planner (done/total) — misma fuente que Command Center y Ficha">${osIcon('calendar', {size:12})} Avance real (Planner): ${Math.round(rmState.currentProject.progress_real)}%</div>` : '';
 
   body.innerHTML = rmSegSelector() + `
     <div class="flex items-end justify-between mb-3 flex-wrap gap-2">
       <div>
-        <h2 class="text-lg font-bold">🔄 Seguimiento — ${rmState.editName || 'Proyecto'}</h2>
+        <h2 class="text-lg font-bold">${osIcon('refresh')} Seguimiento — ${rmState.editName || 'Proyecto'}</h2>
         <p class="text-xs text-slate-500">Registrá el avance real. ${isFase ? 'Vista por fase = rápido, agregado.' : 'Vista por actividad = granular, alimenta el modelo de aprendizaje.'}</p>
         ${_plannerAv}
       </div>
       <!-- S1-G1 — Sub-tabs Por fase / Por actividad -->
       <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden text-xs">
         <button onclick="rmState.seguimientoView='fase'; rmRenderTab()"
-          class="px-3 py-1.5 font-semibold ${isFase?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">📊 Por fase</button>
+          class="px-3 py-1.5 font-semibold ${isFase?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">${osIcon('chart')} Por fase</button>
         <button onclick="rmState.seguimientoView='actividad'; rmRenderTab()"
-          class="px-3 py-1.5 font-semibold ${!isFase?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">🎯 Por actividad</button>
+          class="px-3 py-1.5 font-semibold ${!isFase?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">${osIcon('target')} Por actividad</button>
       </div>
     </div>
 
@@ -114,7 +114,7 @@ function rmRenderSeguimientoFase(e) {
                 <td class="p-2 text-center ${v===null?'text-slate-400':v>10?'text-red-700 font-bold':v>0?'text-amber-700':'text-emerald-700'}">${v===null?'—':(v>0?'+':'')+v+'%'}</td>
                 <td class="p-2 text-center">
                   <select onchange="rmSetTracking('${p}','status',this.value)" class="border border-slate-300 rounded px-1 py-1 text-xs">
-                    ${STATUSES.map(s => `<option value="${s}" ${status===s?'selected':''}>${s==='pendiente'?'⚪ Pendiente':s==='en_progreso'?'🔵 En progreso':'✅ Hecho'}</option>`).join('')}
+                    ${STATUSES.map(s => `<option value="${s}" ${status===s?'selected':''}>${s==='pendiente'?'Pendiente':s==='en_progreso'?'En progreso':'Hecho'}</option>`).join('')}
                   </select>
                 </td>
               </tr>
@@ -124,8 +124,8 @@ function rmRenderSeguimientoFase(e) {
       </table>
     </div>
 
-    <button onclick="rmSaveTracking()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar seguimiento</button>
-    ${!rmState.currentProject ? '<p class="text-[10px] text-amber-600 text-center mt-2">⚠️ Guardá el proyecto primero (Editor) para persistir el seguimiento.</p>' : ''}
+    <button onclick="rmSaveTracking()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('save')} Guardar seguimiento</button>
+    ${!rmState.currentProject ? '<p class="text-[10px] text-amber-600 text-center mt-2">' + osIcon('alert', {size:12}) + ' Guardá el proyecto primero (Editor) para persistir el seguimiento.</p>' : ''}
   `;
 }
 
@@ -185,7 +185,7 @@ function rmRenderSeguimientoActividad(e) {
   const segEmptyRow = totalN === 0
     ? '<tr><td colspan="8" class="p-4">' +
         (typeof kitEmpty === 'function'
-          ? kitEmpty('🔍', 'Sin actividades en esta etapa.')
+          ? kitEmpty('search', 'Sin actividades en esta etapa.')
           : '<div class="text-center text-slate-500 py-6">Sin actividades en esta etapa.</div>') +
       '</td></tr>'
     : '';
@@ -226,7 +226,7 @@ function rmRenderSeguimientoActividad(e) {
       </div>
       <div class="bg-${statusProj==='completed'?'emerald':'amber'}-50 border border-${statusProj==='completed'?'emerald':'amber'}-200 rounded-xl p-3">
         <div class="text-[10px] uppercase font-bold text-${statusProj==='completed'?'emerald':'amber'}-700">Status modelo</div>
-        <div class="text-sm font-bold text-${statusProj==='completed'?'emerald':'amber'}-900">${statusProj==='completed'?'✅ Alimentando':'⏳ Pending'}</div>
+        <div class="text-sm font-bold text-${statusProj==='completed'?'emerald':'amber'}-900">${statusProj==='completed'?osIcon('check-circle',{size:14})+' Alimentando':osIcon('hourglass',{size:14})+' Pending'}</div>
         <div class="text-[10px] text-slate-500">${completedAt?'Completado '+rmFmtDate(completedAt):'No alimenta benchmarks hasta marcar completado'}</div>
       </div>
     </div>
@@ -300,15 +300,15 @@ function rmRenderSeguimientoActividad(e) {
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-      <button onclick="rmSaveActuals()" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar actuales</button>
+      <button onclick="rmSaveActuals()" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('save')} Guardar actuales</button>
       <button onclick="rmMarkProjectCompleted()" ${statusProj==='completed'?'disabled':''}
         class="bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-bold py-2.5 rounded-lg">
-        ${statusProj==='completed'?'✅ Ya completado':'🎯 Marcar como completado'}
+        ${statusProj==='completed'?osIcon('check-circle')+' Ya completado':osIcon('target')+' Marcar como completado'}
       </button>
     </div>
 
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px] text-blue-950">
-      <strong>💡 Cómo funciona el modelo de aprendizaje:</strong>
+      <strong>${osIcon('lightbulb')} Cómo funciona el modelo de aprendizaje:</strong>
       <ul class="mt-1 ml-4 list-disc space-y-0.5">
         <li>Llenás <strong>Real $ / Real d / Real hrs</strong> a medida que ejecutás cada actividad.</li>
         <li><strong>Guardar actuales</strong> hace upsert en <code class="bg-blue-100 px-1 rounded">remodel_actuals</code> (1 fila por activity_code).</li>
@@ -316,7 +316,7 @@ function rmRenderSeguimientoActividad(e) {
         <li>El <strong>stage_key</strong> mostrado debajo del código es el bucket de aprendizaje (uno de los 16).</li>
       </ul>
     </div>
-    ${!rmState.currentProject ? '<p class="text-[10px] text-amber-600 text-center mt-2">⚠️ Guardá el proyecto primero (Editor) para persistir actuales.</p>' : ''}
+    ${!rmState.currentProject ? '<p class="text-[10px] text-amber-600 text-center mt-2">' + osIcon('alert', {size:12}) + ' Guardá el proyecto primero (Editor) para persistir actuales.</p>' : ''}
   `;
 }
 
@@ -461,7 +461,7 @@ function rmSegSelector() {
       ${projs.map(p => `<option value="${p.id}" ${rmState.currentProject && rmState.currentProject.id === p.id ? 'selected' : ''}>${(p.name || '').replace(/</g, '&lt;')}${p.sqft ? ' · ' + p.sqft + 'sqft' : ''}</option>`).join('')}
     </select>
     <input type="file" id="rm-seg-xls" accept=".xlsx,.xls,.csv" style="display:none" onchange="rmSegImportExcel(this.files[0])">
-    <button onclick="document.getElementById('rm-seg-xls').click()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-2.5 py-1 rounded font-bold" title="Importar avance real: columnas activity_code, real_cost, real_days">📥 Importar Excel (avance)</button>
+    <button onclick="document.getElementById('rm-seg-xls').click()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-2.5 py-1 rounded font-bold" title="Importar avance real: columnas activity_code, real_cost, real_days">${osIcon('inbox')} Importar Excel (avance)</button>
   </div>`;
 }
 async function rmSelectProjectForTracking(id) {

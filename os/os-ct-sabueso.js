@@ -10,7 +10,7 @@
 const CT = { loaded: false, loading: false, err: null, cfg: {}, hml: [], pmf: [], db: [], run: [], extra: {}, fEmp: '', fSev: '', lastRunAt: null, modo: 'sabueso', eng: null, docx: [] };
 window.CT = CT;
 
-const CT_EMP_LBL = { fix_flip: '🏚 Fix & Flip', rentas: '🏠 Rentas', remodelacion: '🔨 Remodelación', educacion: '🎓 Educación', holding: '🏛 Holding' };
+const CT_EMP_LBL = { fix_flip: 'Fix & Flip', rentas: 'Rentas', remodelacion: 'Remodelación', educacion: 'Educación', holding: 'Holding' };
 const CT_SEV = { critica: { lbl: 'CRÍTICO', cls: 'b-red' }, media: { lbl: 'REVISAR', cls: 'b-warn' }, info: { lbl: 'INFO', cls: 'b-ok' } };
 
 function ctNum(key, def) { const r = CT.cfg[key]; const v = r != null ? parseFloat(r) : NaN; return isNaN(v) ? def : v; }
@@ -308,14 +308,14 @@ function ctRunChecks() {
   (CT.cartera || []).filter(c => +c.vencido_bruto > 0 && +c.a_favor > 0).forEach(c => add('C22', 'rentas',
     'cart-favor-' + String(c.inquilino || c.tenant_id || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 22),
     'Cartera · ' + (c.inquilino || 'inquilino') + ' figura con vencido ' + OS_M(+c.vencido_bruto) + ' pero tiene saldo a favor ' + OS_M(+c.a_favor)
-      + (+c.a_favor >= +c.vencido_bruto ? ' que LO CUBRE — neto $0, no es moroso' : ' — neto real ' + OS_M(+c.vencido_bruto - +c.a_favor)) + ' (neteo por inquilino del 📋 Informe de Cartera)',
+      + (+c.a_favor >= +c.vencido_bruto ? ' que LO CUBRE — neto $0, no es moroso' : ' — neto real ' + OS_M(+c.vencido_bruto - +c.a_favor)) + ' (neteo por inquilino del Informe de Cartera)',
     Math.min(+c.a_favor, +c.vencido_bruto), +c.a_favor >= +c.vencido_bruto ? 'media' : 'info', 'OS', { inquilino: c.inquilino, vencido: +c.vencido_bruto, a_favor: +c.a_favor }));
   // (b) el "Deuda Pendiente" de Airtable incluye el MES EN CURSO como si fuera mora
   {
     const ymNow = new Date().toISOString().slice(0, 7);
     const pcMes = (CT.cartPagos || []).filter(x => x.billing_ym === ymNow && +x.deuda > 0).reduce((s, x) => s + +x.deuda, 0);
     if (pcMes > 0) add('C22', 'rentas', 'cart-mes-curso-' + ymNow.replace('-', ''),
-      'Cartera · "Deuda Pendiente" de Airtable suma ' + OS_M(pcMes) + ' del MES EN CURSO (' + ymNow + ') — es POR COBRAR normal, no mora; mezclarlo inflaba el informe manual (+195%). Usar el 📋 Informe de Cartera (3 métricas separadas)',
+      'Cartera · "Deuda Pendiente" de Airtable suma ' + OS_M(pcMes) + ' del MES EN CURSO (' + ymNow + ') — es POR COBRAR normal, no mora; mezclarlo inflaba el informe manual (+195%). Usar el Informe de Cartera (3 métricas separadas)',
       pcMes, 'info', 'Airtable', { mes: ymNow, por_cobrar: pcMes });
   }
   // (c) variación del pendiente > umbral vs mes anterior → ¿mora real o carga de registros nuevos?
@@ -402,7 +402,7 @@ async function ctCierre() {
   L.push('— RESUELTOS ESTA SEMANA (' + resueltos.length + ') —');
   resueltos.forEach(f => L.push('✓ ' + f.titulo + ' (' + OS_M(+f.impacto_usd) + ')'));
   const txt = L.join('\n');
-  try { await navigator.clipboard.writeText(txt); if (window.toast) toast('📋 Cierre copiado al portapapeles (' + ab.length + ' pendientes, ' + resueltos.length + ' resueltos)', 'success'); }
+  try { await navigator.clipboard.writeText(txt); if (window.toast) toast('Cierre copiado al portapapeles (' + ab.length + ' pendientes, ' + resueltos.length + ' resueltos)', 'success'); }
   catch (e) { alert(txt.slice(0, 4000)); }
 }
 window.ctCierre = ctCierre;
@@ -417,12 +417,12 @@ function ctCierreMes() {
   return '<div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;margin:2px 0 10px">'
     + '<div><span style="font-size:30px;font-weight:800" class="' + (ab.length ? 'down' : 'up') + '">' + ab.length + '</span> <span class="lab">excepciones</span></div>'
     + '<div><span style="font-size:22px;font-weight:760" class="warn">' + OS_M(total) + '</span> <span class="lab">impacto</span></div>'
-    + '<div class="meta">solo lo que NO cuadra (nada de casa por casa) · dueño único por dato · cierre de 30–60 min · <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctCopiarCierreMes()">📋 Copiar cierre del mes</button></div></div>'
+    + '<div class="meta">solo lo que NO cuadra (nada de casa por casa) · dueño único por dato · cierre de 30–60 min · <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctCopiarCierreMes()">' + osIcon('clipboard') + ' Copiar cierre del mes</button></div></div>'
     + (ab.length ? duenos.map(d => {
       const fs = porDueno[d]; const sub = fs.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
-      return '<div class="card" style="margin-bottom:10px"><div class="lab">👤 ' + OS_E(d) + ' — ' + fs.length + ' pendiente(s) · ' + OS_M(sub) + '</div>'
+      return '<div class="card" style="margin-bottom:10px"><div class="lab">' + osIcon('user') + ' ' + OS_E(d) + ' — ' + fs.length + ' pendiente(s) · ' + OS_M(sub) + '</div>'
         + '<div style="overflow-x:auto"><table class="ptable"><tbody>' + fs.map(ctFindingRow).join('') + '</tbody></table></div></div>';
-    }).join('') : '<div class="empty" style="padding:24px">🎯 <b class="up">$0 — el mes cierra sin excepciones.</b></div>');
+    }).join('') : '<div class="empty" style="padding:24px">' + osIcon('target') + ' <b class="up">$0 — el mes cierra sin excepciones.</b></div>');
 }
 
 async function ctCopiarCierreMes() {
@@ -434,7 +434,7 @@ async function ctCopiarCierreMes() {
     L.push('', '— ' + d.toUpperCase() + ' —');
     porDueno[d].forEach((f, i) => L.push((i + 1) + '. [' + (CT_SEV[f.severidad] || {}).lbl + ' · ' + OS_M(+f.impacto_usd) + ' · ' + f.check_id + '] ' + f.titulo));
   });
-  try { await navigator.clipboard.writeText(L.join('\n')); if (window.toast) toast('📋 Cierre del mes copiado', 'success'); } catch (e) { alert(L.join('\n').slice(0, 4000)); }
+  try { await navigator.clipboard.writeText(L.join('\n')); if (window.toast) toast('Cierre del mes copiado', 'success'); } catch (e) { alert(L.join('\n').slice(0, 4000)); }
 }
 window.ctCopiarCierreMes = ctCopiarCierreMes;
 
@@ -445,14 +445,14 @@ function ctDocOpen() {
   el = document.createElement('div'); el.id = 'ct-doc-modal';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px';
   el.innerHTML = '<div class="card" style="max-width:640px;width:100%;max-height:85vh;overflow:auto;background:var(--bg,#0a0e14);border:1px solid var(--glassb)">'
-    + '<div class="chart-h"><div class="t">📄 Cargar statement HML / factura</div><div class="k"><button class="ct-btn" onclick="document.getElementById(\'ct-doc-modal\').remove()">✕ Cerrar</button></div></div>'
+    + '<div class="chart-h"><div class="t">' + osIcon('file') + ' Cargar statement HML / factura</div><div class="k"><button class="ct-btn" onclick="document.getElementById(\'ct-doc-modal\').remove()">✕ Cerrar</button></div></div>'
     + '<div class="meta" style="margin-bottom:8px">El parser extrae fecha/pago/interés/escrow/fee (statement) o ítems material/mueble/herramienta (factura). TODO entra como propuesta: nada cuenta hasta que un humano lo aprueba. Sin comprobante el pago NO se da por bueno.</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
     + '<select id="ct-doc-tipo" class="ct-btn" style="padding:6px 8px"><option value="hml_statement">Statement HML</option><option value="factura">Factura / recibo</option></select>'
     + '<input id="ct-doc-file" type="file" accept="application/pdf,image/*" class="ct-btn" style="padding:6px 8px">'
     + '<input id="ct-doc-casa" placeholder="Casa (dirección)" class="ct-btn" style="padding:6px 8px;flex:1;min-width:160px">'
     + '<input id="ct-doc-url" placeholder="Link específico al comprobante (Drive)" class="ct-btn" style="padding:6px 8px;flex:1;min-width:200px">'
-    + '<button class="ct-btn" style="padding:6px 12px" onclick="ctDocParse()">🔍 Extraer</button></div>'
+    + '<button class="ct-btn" style="padding:6px 12px" onclick="ctDocParse()">' + osIcon('search') + ' Extraer</button></div>'
     + '<div id="ct-doc-out" class="meta">Elegí el archivo y dale Extraer.</div></div>';
   document.body.appendChild(el);
 }
@@ -463,7 +463,7 @@ async function ctDocParse() {
   const out = document.getElementById('ct-doc-out');
   if (!file) { out.textContent = 'Falta el archivo.'; return; }
   if (file.size > 3 * 1024 * 1024) { out.textContent = 'Archivo muy grande (máx 3MB — límite del body de Vercel).'; return; }
-  out.textContent = '⏳ Extrayendo con IA…';
+  out.textContent = 'Extrayendo con IA…';
   try {
     const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
     const { data: { session } } = await sb.auth.getSession();
@@ -475,7 +475,7 @@ async function ctDocParse() {
     if (!resp.ok || j.error) throw new Error(j.error || ('HTTP ' + resp.status));
     CT.docParsed = j.extract || {};
     out.innerHTML = '<div style="overflow-x:auto"><pre style="font-size:10.5px;white-space:pre-wrap;background:var(--glass);padding:10px;border-radius:8px">' + OS_E(JSON.stringify(CT.docParsed, null, 2)) + '</pre></div>'
-      + '<button class="ct-btn" style="padding:6px 12px;margin-top:6px" onclick="ctDocGuardar()">💾 Guardar como propuesta</button>';
+      + '<button class="ct-btn" style="padding:6px 12px;margin-top:6px" onclick="ctDocGuardar()">' + osIcon('save') + ' Guardar como propuesta</button>';
   } catch (e) { out.textContent = 'Error: ' + (e.message || e); }
 }
 window.ctDocParse = ctDocParse;
@@ -489,7 +489,7 @@ async function ctDocGuardar() {
     estado: 'propuesta', created_by: user && user.email,
   });
   if (error) return alert('Error: ' + error.message);
-  if (window.toast) toast('💾 Guardado como propuesta — apróbala en el Sabueso', 'success');
+  if (window.toast) toast('Guardado como propuesta — apróbala en el Sabueso', 'success');
   document.getElementById('ct-doc-modal').remove();
   ctLoad(true);
 }
@@ -508,7 +508,7 @@ async function ctDocResolver(id, estado) {
         address: d.casa, address_norm: (d.casa || '').toLowerCase().replace(/\s+/g, ' ').trim(), monto: +ext.monto,
         meses: +ext.meses || 1, fecha: ext.fecha || null, comprobante_url: d.comprobante_url, fuente: 'parser', created_by: user && user.email,
       });
-      if (window.toast) toast('🆕 Pago de extensión registrado (' + OS_M(+ext.monto) + ')', 'success');
+      if (window.toast) toast('Pago de extensión registrado (' + OS_M(+ext.monto) + ')', 'success');
     }
   }
   // factura aprobada → propuesta para que Michell la cargue/etiquete en Airtable (material/mueble/herramienta)
@@ -526,8 +526,8 @@ window.ctDocResolver = ctDocResolver;
 
 function ctDocxBlock() {
   if (!(CT.docx || []).length) return '';
-  return '<div class="card" style="margin-bottom:12px;border-color:rgba(94,182,231,.3)"><div class="lab">📄 Documentos parseados esperando aprobación (' + CT.docx.length + ')</div>'
-    + CT.docx.map(d => '<div class="kv"><span>' + OS_E((d.tipo === 'hml_statement' ? 'Statement · ' : 'Factura · ') + (d.casa || 'sin casa') + ' · ' + new Date(d.created_at).toLocaleDateString('es-MX')) + (d.comprobante_url ? ' <a href="' + OS_E(d.comprobante_url) + '" target="_blank">📎</a>' : ' <span class="warn">sin comprobante</span>') + '</span>'
+  return '<div class="card" style="margin-bottom:12px;border-color:rgba(94,182,231,.3)"><div class="lab">' + osIcon('file') + ' Documentos parseados esperando aprobación (' + CT.docx.length + ')</div>'
+    + CT.docx.map(d => '<div class="kv"><span>' + OS_E((d.tipo === 'hml_statement' ? 'Statement · ' : 'Factura · ') + (d.casa || 'sin casa') + ' · ' + new Date(d.created_at).toLocaleDateString('es-MX')) + (d.comprobante_url ? ' <a href="' + OS_E(d.comprobante_url) + '" target="_blank">' + osIcon('paperclip') + '</a>' : ' <span class="warn">sin comprobante</span>') + '</span>'
       + '<b><button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctDocResolver(\'' + d.id + '\',\'aprobado\')">✓ Aprobar</button> <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctDocResolver(\'' + d.id + '\',\'rechazado\')">✕ Rechazar</button></b></div>').join('')
     + '</div>';
 }
@@ -545,9 +545,9 @@ function ctSemaforo(emp) {
   const ab = ctAbiertos().filter(f => f.empresa === emp);
   const critAb = ab.some(f => f.severidad === 'critica');
   if (emp === 'educacion' && r.ebitda == null) return { ico: '⚪', lbl: 'sin libros' };
-  if ((r.utilidad_bruta != null && +r.utilidad_bruta < 0) || critAb) return { ico: '🔴', lbl: 'atención' };
-  if ((r.ebitda != null && +r.ebitda < 0) || ab.length) return { ico: '🟡', lbl: 'revisar' };
-  return { ico: '🟢', lbl: 'sano' };
+  if ((r.utilidad_bruta != null && +r.utilidad_bruta < 0) || critAb) return { ico: kitStatusDot('bad'), lbl: 'atención' };
+  if ((r.ebitda != null && +r.ebitda < 0) || ab.length) return { ico: kitStatusDot('warn'), lbl: 'revisar' };
+  return { ico: kitStatusDot('ok'), lbl: 'sano' };
 }
 function ctCardEmpresa(emp) {
   const r = (OS.pnl || []).find(x => x.empresa === emp) || {};
@@ -592,31 +592,31 @@ function ctReconciliador() {
     const rojo = delta != null && Math.abs(delta) / Math.max(Math.abs(f.qbo || 0), 1) * 100 > warnPct;
     return '<tr' + (rojo ? ' style="background:rgba(240,104,122,.07)"' : '') + '><td>' + f.c + '<div style="font-size:9px;opacity:.5">' + f.nota + '</div></td>'
       + '<td style="text-align:right">' + cell(f.os) + '</td><td style="text-align:right;font-weight:700">' + cell(f.qbo) + '</td><td style="text-align:right">' + cell(f.air) + '</td>'
-      + '<td style="text-align:right" class="' + (rojo ? 'down' : 'up') + '">' + (delta != null ? OS_M(delta) + (rojo ? ' ⚠' : ' ✓') : '—') + '</td></tr>';
+      + '<td style="text-align:right" class="' + (rojo ? 'down' : 'up') + '">' + (delta != null ? OS_M(delta) + (rojo ? osIcon('alert') : ' ✓') : '—') + '</td></tr>';
   }).join('');
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">🔗 Reconciliador OS ↔ QBO ↔ Airtable</div><div class="k">Δ vs QBO · alerta si |Δ| &gt; ' + warnPct + '% · libros al ' + ctFmtD(ctQbFecha()) + '</div></div>'
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('link') + ' Reconciliador OS ↔ QBO ↔ Airtable</div><div class="k">Δ vs QBO · alerta si |Δ| &gt; ' + warnPct + '% · libros al ' + ctFmtD(ctQbFecha()) + '</div></div>'
     + '<div style="overflow-x:auto"><table class="ptable"><thead><tr><th>Concepto</th><th style="text-align:right">OS</th><th style="text-align:right">QBO</th><th style="text-align:right">Airtable</th><th style="text-align:right">Δ</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
     + '<div class="meta" style="margin-top:8px">Cada línea debe coincidir con QBO vivo o pintarse roja (test B10). El espejo QBO se refresca con qb-oauth/sync y estampa as_of.</div></div>';
 }
 
 function ctFindingRow(f) {
   const sev = CT_SEV[f.severidad] || CT_SEV.media;
-  const est = { abierto: '', marcado_contadora: '<span class="osbadge warn">📌 p/ contadora</span>', ajuste_propuesto: '<span class="osbadge warn">📝 ajuste propuesto</span>', aceptado: '<span class="osbadge ok">aceptado</span>' }[f.estado] || '';
+  const est = { abierto: '', marcado_contadora: '<span class="osbadge warn">' + osIcon('map-pin') + ' p/ contadora</span>', ajuste_propuesto: '<span class="osbadge warn">' + osIcon('pencil-line') + ' ajuste propuesto</span>', aceptado: '<span class="osbadge ok">aceptado</span>' }[f.estado] || '';
   const acts = [];
   if (f.estado === 'abierto' || f.estado === 'marcado_contadora') {
-    if (f.estado === 'abierto') acts.push('<button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctSetEstado(\'' + f.id + '\',\'marcado_contadora\')">📌 Contadora</button>');
-    acts.push('<button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctProponerAjuste(\'' + f.id + '\')">📝 Proponer ajuste</button>');
+    if (f.estado === 'abierto') acts.push('<button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctSetEstado(\'' + f.id + '\',\'marcado_contadora\')">' + osIcon('map-pin') + ' Contadora</button>');
+    acts.push('<button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctProponerAjuste(\'' + f.id + '\')">' + osIcon('pencil-line') + ' Proponer ajuste</button>');
     acts.push('<button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctSetEstado(\'' + f.id + '\',\'aceptado\')" title="No es un error: diferencia entendida/aceptada">✓ Aceptar</button>');
   }
   return '<tr><td style="white-space:nowrap"><span class="badge ' + sev.cls + '">' + sev.lbl + '</span></td>'
     + '<td style="white-space:nowrap;font-weight:700;text-align:right">' + (f.impacto_usd ? OS_M(+f.impacto_usd) : '—') + '</td>'
-    + '<td>' + OS_E(f.titulo) + ctChipFuente(f.fuente) + ' ' + est + '<div style="font-size:9px;opacity:.5">' + (CT_EMP_LBL[f.empresa] || f.empresa || '') + ' · ' + f.check_id + ' · 👤 ' + OS_E(ctDueno(f)) + ' · visto desde ' + ctFmtD(f.first_seen) + '</div></td>'
+    + '<td>' + OS_E(f.titulo) + ctChipFuente(f.fuente) + ' ' + est + '<div style="font-size:9px;opacity:.5">' + (CT_EMP_LBL[f.empresa] || f.empresa || '') + ' · ' + f.check_id + ' · ' + OS_E(ctDueno(f)) + ' · visto desde ' + ctFmtD(f.first_seen) + '</div></td>'
     + '<td style="white-space:nowrap;text-align:right">' + acts.join(' ') + '</td></tr>';
 }
 
 function ctSabuesoBlock(comp) {
   ctCSS();
-  if (!CT.loaded && !CT.err) { ctLoad(); return '<div class="card" style="margin-top:16px"><div class="empty">🐕 Sabueso Contable corriendo los checks…</div></div>'; }
+  if (!CT.loaded && !CT.err) { ctLoad(); return '<div class="card" style="margin-top:16px"><div class="empty">' + osIcon('dog') + ' Sabueso Contable corriendo los checks…</div></div>'; }
   if (CT.err) return '<div class="card" style="margin-top:16px"><div class="empty down">Sabueso: ' + OS_E(CT.err) + ' <button class="cbtn" onclick="ctLoad(true)">Reintentar</button></div></div>';
   const ab = ctAbiertos();
   // B2 (auditoría 13-jul): "sin conciliar" = SOLO checks de CONCILIACIÓN OS↔QBO (C1–C3), neteado por
@@ -638,17 +638,17 @@ function ctSabuesoBlock(comp) {
   const sevs = ['', 'critica', 'media', 'info'];
   const kv = (k, v, cls) => '<div class="kv"><span>' + k + '</span><b class="' + (cls || '') + '">' + v + '</b></div>';
 
-  const hdr = '<div class="chart-h"><div class="t">🐕 Sabueso Contable</div><div class="k">libros QBO al ' + ctFmtD(ctQbFecha()) + ' · corrida ' + ctFmtD(CT.lastRunAt)
-    + ' · <button class="ct-btn" style="padding:3px 8px;font-size:10px' + (CT.modo === 'sabueso' ? ';color:var(--ink);border-color:var(--a2)' : '') + '" onclick="CT.modo=\'sabueso\';osRender()">🐕 Microscopio</button>'
-    + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px' + (CT.modo === 'cierre' ? ';color:var(--ink);border-color:var(--a2)' : '') + '" onclick="CT.modo=\'cierre\';osRender()">🗓 Cierre del mes</button>'
-    + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctDocOpen()">📄 Statement/Factura</button>'
-    + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctLoad(true)">↻ Re-correr</button> <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctCierre()">📋 Cierre p/ contadora</button></div></div>';
+  const hdr = '<div class="chart-h"><div class="t">' + osIcon('dog') + ' Sabueso Contable</div><div class="k">libros QBO al ' + ctFmtD(ctQbFecha()) + ' · corrida ' + ctFmtD(CT.lastRunAt)
+    + ' · <button class="ct-btn" style="padding:3px 8px;font-size:10px' + (CT.modo === 'sabueso' ? ';color:var(--ink);border-color:var(--a2)' : '') + '" onclick="CT.modo=\'sabueso\';osRender()">' + osIcon('dog') + ' Microscopio</button>'
+    + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px' + (CT.modo === 'cierre' ? ';color:var(--ink);border-color:var(--a2)' : '') + '" onclick="CT.modo=\'cierre\';osRender()">' + osIcon('calendar-days') + ' Cierre del mes</button>'
+    + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctDocOpen()">' + osIcon('file') + ' Statement/Factura</button>'
+    + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctLoad(true)">↻ Re-correr</button> <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctCierre()">' + osIcon('clipboard') + ' Cierre p/ contadora</button></div></div>';
   if (CT.modo === 'cierre') return '<div class="card" style="margin-top:16px;border-color:rgba(231,182,94,.3)">' + hdr + ctDocxBlock() + ctCierreMes() + '</div>';
   return '<div class="card" style="margin-top:16px;border-color:rgba(231,182,94,.3)">'
     + hdr + ctDocxBlock()
     + '<div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;margin:2px 0 12px">'
-    + (motorErr ? '<div style="flex-basis:100%">' + (typeof reconcileLE === 'function' ? reconcileLE(total, assetsHolding, 'Σ descuadres vs Total Assets del holding').html : '<div class="down">⛔ motor en error: Σ descuadres supera el balance</div>') + '</div>' : '')
-    + '<div><span style="font-size:30px;font-weight:800" class="' + (motorErr ? 'warn' : total ? 'down' : 'up') + '">' + (motorErr ? '⛔ motor en error' : OS_M(total)) + '</span> <span class="lab">sin conciliar (OS↔QBO, C1–C3)</span></div>'
+    + (motorErr ? '<div style="flex-basis:100%">' + (typeof reconcileLE === 'function' ? reconcileLE(total, assetsHolding, 'Σ descuadres vs Total Assets del holding').html : '<div class="down">' + osIcon('ban') + ' motor en error: Σ descuadres supera el balance</div>') + '</div>' : '')
+    + '<div><span style="font-size:30px;font-weight:800" class="' + (motorErr ? 'warn' : total ? 'down' : 'up') + '">' + (motorErr ? 'motor en error' : OS_M(total)) + '</span> <span class="lab">sin conciliar (OS↔QBO, C1–C3)</span></div>'
     + '<div><span style="font-size:22px;font-weight:760" class="warn">' + OS_M(senalado) + '</span> <span class="lab">$ señalado a revisar (higiene/anomalías)</span></div>'
     + '<div><span style="font-size:22px;font-weight:760" class="' + (ab.length ? 'warn' : 'up') + '">' + ab.length + '</span> <span class="lab">descuadres abiertos</span></div>'
     + '<div class="meta">el norte: <b class="up">$0 = todo cuadra</b> · cada cifra declara su fuente [OS / QBO / Airtable]</div></div>'
@@ -669,7 +669,7 @@ function ctSabuesoBlock(comp) {
     + kv('Refinanciadas (HML orig.) <span style="opacity:.5">[OS]</span>', OS_M(pre.osRefi)) + kv('HML-Refin <span style="opacity:.5">[QBO]</span>', pre.qboRefin != null ? OS_M(pre.qboRefin) + ' <span class="ff-dqx">sin espejo OS</span>' : '—')
     + '</div>'
     + '<div class="card"><div class="lab">Apalancamiento y caja</div>'
-    + kv('Deuda / Equity <span style="opacity:.5">[QBO F&F]</span>', apal.de != null ? apal.de.toFixed(1) + '× ' + (deOk ? '' : '⚠ > ' + ctNum('de_max', 8) + '×') : '—', deOk ? '' : 'down')
+    + kv('Deuda / Equity <span style="opacity:.5">[QBO F&F]</span>', apal.de != null ? apal.de.toFixed(1) + '× ' + (deOk ? '' : '> ' + ctNum('de_max', 8) + '×') : '—', deOk ? '' : 'down')
     + Object.keys(cash).map(e => kv('Cash ' + (CT_EMP_LBL[e] || e) + ' <span style="opacity:.5">[QBO]</span>', OS_M(cash[e]))).join('')
     + kv('Cash Rentas', 'sin QBO conectado', 'warn')
     + '<div class="meta" style="margin-top:6px">Runway: pendiente P&L mensual QBO (no se inventa burn).</div></div>'
@@ -681,7 +681,7 @@ function ctSabuesoBlock(comp) {
     + '<span class="meta" style="align-self:center">' + list.length + ' de ' + ab.length + ' · acciones: siempre propuesta, un humano aprueba</span></div>'
     + (list.length
       ? '<div style="overflow-x:auto"><table class="ptable"><thead><tr><th>Sev</th><th style="text-align:right">$ impacto</th><th>Descuadre</th><th style="text-align:right">Acción</th></tr></thead><tbody>' + list.map(ctFindingRow).join('') + '</tbody></table></div>'
-      : '<div class="empty" style="padding:24px">🎯 <b class="up">$0 — todo cuadra</b> con los filtros actuales.</div>')
+      : '<div class="empty" style="padding:24px">' + osIcon('target') + ' <b class="up">$0 — todo cuadra</b> con los filtros actuales.</div>')
     + '</div>';
 }
 window.ctSabuesoBlock = ctSabuesoBlock;

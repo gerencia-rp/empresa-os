@@ -41,20 +41,20 @@ function ffDataQuality(d) {
 }
 function ffDQBadge(dq) {
   if (!dq || !dq.flags.length) return '';
-  if (dq.revisar) return `<span class="ff-dq ff-dq-rev" title="all-in > 100% del ARV — imposible, probable error de carga">⚠ dato a revisar</span>`;
+  if (dq.revisar) return `<span class="ff-dq ff-dq-rev" title="all-in > 100% del ARV — imposible, probable error de carga">${osIcon('alert')} dato a revisar</span>`;
   if (dq.sinDatos) return `<span class="ff-dq ff-dq-nd" title="all-in y/o ARV en 0 — casa esqueleto sin datos">◌ sin datos</span>`;
-  if (dq.preliminar) return `<span class="ff-dq ff-dq-pre" title="obra no finalizada — resultado en curso, no final">⏳ preliminar</span>`;
+  if (dq.preliminar) return `<span class="ff-dq ff-dq-pre" title="obra no finalizada — resultado en curso, no final">${osIcon('loader')} preliminar</span>`;
   return '';
 }
 // Indicador GLOBAL de calidad de datos: cuántos deals hay que revisar + la lista.
 function ffDQBar(comp) {
   const k = comp.kpi; const flagged = k.revisar + k.sinDatos;
   if (!flagged && !k.preliminar) return `<div class="ff-dqbar clean"><div><div class="t">✓ Datos consistentes</div><div class="d">${k.confiablesN}/${k.total} deals confiables · sin valores imposibles</div></div></div>`;
-  if (!flagged) return `<div class="ff-dqbar clean"><div><div class="t">✓ Datos consistentes · ${k.preliminar} en obra</div><div class="d">${k.confiablesN}/${k.total} deals confiables · los ${k.preliminar} preliminares (obra en curso) no entran en promedios hasta terminar 🏗</div></div></div>`;
+  if (!flagged) return `<div class="ff-dqbar clean"><div><div class="t">✓ Datos consistentes · ${k.preliminar} en obra</div><div class="d">${k.confiablesN}/${k.total} deals confiables · los ${k.preliminar} preliminares (obra en curso) no entran en promedios hasta terminar ${osIcon('construction')}</div></div></div>`;
   const revNames = k.revisarList.map(d => `${FF_ESC(ffShort(d.address))} (${Math.round(d.allInPct * 100)}%)`).join(', ');
-  return `<div class="ff-dqbar"><div><div class="t">⚠ ${flagged} deal(s) con datos a revisar</div><div class="d">${k.revisar} imposibles (all-in > 100% ARV) · ${k.sinDatos} sin datos · ${k.preliminar} preliminares (obra en curso). <b>Excluidos de promedios/márgenes.</b></div></div>${revNames ? `<div class="lst">${revNames}</div>` : ''}</div>`;
+  return `<div class="ff-dqbar"><div><div class="t">${osIcon('alert')} ${flagged} deal(s) con datos a revisar</div><div class="d">${k.revisar} imposibles (all-in > 100% ARV) · ${k.sinDatos} sin datos · ${k.preliminar} preliminares (obra en curso). <b>Excluidos de promedios/márgenes.</b></div></div>${revNames ? `<div class="lst">${revNames}</div>` : ''}</div>`;
 }
-function ffAx() { return posGetTheme() === 'light' ? '#64748b' : '#5b6780'; }
+function ffAx() { return posGetTheme() === 'light' ? '#756c5c' : '#7c7365'; }
 function ffGridC() { return posGetTheme() === 'light' ? 'rgba(15,23,42,.06)' : 'rgba(255,255,255,.05)'; }
 
 // ─── CSS (mismo look del ecosistema, scoped bajo #ff-overlay, con tema claro) ───
@@ -63,15 +63,15 @@ function ffInjectCSS() {
   const st = document.createElement('style'); st.id = 'ff-styles';
   st.textContent = `
   #ff-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
-    --bg:#06080d;--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
-    --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
-    --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#070a11,#05070c);
+    --bg:#14110c;--ink:#efe9de;--mut:#a89f8f;--mut2:#7c7365;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
+    --a1:#6fbf95;--a2:#4e9b72;--a3:#c9a85c;--pos:#63c08e;--neg:#e4756a;--amber:#dca94f;
+    --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#16130d,#100e08);
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
   /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
   #ff-overlay[data-theme="light"]{
-    --bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
-    --a1:#2563eb;--a2:#1d4ed8;--a3:#6b5bef;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309;
-    --mesh1:rgba(37,99,235,.06);--mesh2:rgba(29,78,216,.05);--mesh3:rgba(107,91,239,.05);--bggrad:linear-gradient(180deg,#f3f5fa,#e9edf5)}
+    --bg:#f7f5f0;--ink:#211e17;--mut:#5f594c;--mut2:#756c5c;--glass:#ffffff;--glassb:#e8e3d9;
+    --a1:#2f6b4f;--a2:#275c43;--a3:#8a6a2f;--pos:#1f7a4d;--neg:#dc2626;--amber:#8a6400;
+    --mesh1:rgba(37,99,235,.06);--mesh2:rgba(29,78,216,.05);--mesh3:rgba(107,91,239,.05);--bggrad:linear-gradient(180deg,#f9f7f2,#f2efe8)}
   #ff-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
   #ff-overlay *{box-sizing:border-box;margin:0;padding:0}
   #ff-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
@@ -130,7 +130,7 @@ function ffInjectCSS() {
   #ff-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(138,123,255,.28)}
   #ff-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,123,255,.10),rgba(79,141,255,.05))}
   #ff-overlay .bh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-  #ff-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#a9f5e6,#45e3c6 30%,#4f8dff 70%,#2a2f66);box-shadow:0 0 22px rgba(79,141,255,.55)}
+  #ff-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#6fbf95 30%,#4e9b72 70%,#1c3327);box-shadow:0 0 22px rgba(79,141,255,.55)}
   #ff-overlay .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ffspin 6s linear infinite;opacity:.7}@keyframes ffspin{to{transform:rotate(360deg)}}
   #ff-overlay .bh b{font-size:14px}#ff-overlay .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.5px;margin-top:2px}
   #ff-overlay .insight{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--glassb)}#ff-overlay .insight:last-of-type{border-bottom:none}
@@ -150,7 +150,7 @@ function ffInjectCSS() {
   #ff-overlay .cbub p{margin:0 0 6px}#ff-overlay .cbub p:last-child{margin:0}#ff-overlay .cbub ul,#ff-overlay .cbub ol{margin:4px 0 6px 18px}#ff-overlay .cbub li{margin:3px 0}
   @keyframes ffblink{0%,100%{opacity:.35}50%{opacity:1}}#ff-overlay .cbub.think::after{content:"▋";animation:ffblink 1s infinite}
   #ff-overlay .ff-zsel td{background:var(--glass)}
-#ff-um-modelos .pullbtn.on{background:linear-gradient(135deg,#4f8dff,#45e3c6);color:#fff;border-color:transparent}
+#ff-um-modelos .pullbtn.on{background:linear-gradient(135deg,#4e9b72,#6fbf95);color:#fff;border-color:transparent}
 .uwbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   #ff-overlay .uwbar label{font-size:12px;color:var(--mut)}#ff-overlay .uwtag{font-size:11px;color:var(--a1)}
   #ff-overlay .uwrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -220,7 +220,7 @@ async function openFFCommandCenter(sys) {
   let ov = document.getElementById('ff-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'ff-overlay'; document.body.appendChild(ov); }
   posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#5b6780">⏳ Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#7c7365">' + osIcon('loader') + ' Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ffLoadAll();
   ffRender();
@@ -389,7 +389,7 @@ const FF_NAV = [
   ['command', '◧', 'Command Center', null],
   ['deals', '▦', 'Deals & Pipeline', () => FF.deals.length],
   ['propiedades', '⌂', 'Propiedades', null],
-  ['uwsuite', '🧮', 'Underwriting', null],
+  ['uwsuite', osIcon('calculator'), 'Underwriting', null],
   ['inversionistas', '◍', 'Inversionistas', () => FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length || null],
   ['finanzas', '$', 'Finanzas · QuickBooks', null],
   ['analitica', '▤', 'Analítica & KPIs', null],
@@ -399,14 +399,14 @@ function ffRender() {
   const ov = document.getElementById('ff-overlay'); if (!ov) return;
   posApplyTheme(ov);
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
-  if (FF.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">⚠️</div><div style="color:var(--neg);margin-top:10px">${FF_ESC(FF.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ffReload()">Reintentar</button></div>`; return; }
+  if (FF.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">${osIcon('alert')}</div><div style="color:var(--neg);margin-top:10px">${FF_ESC(FF.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ffReload()">Reintentar</button></div>`; return; }
   const comp = ffCompute();
   side.innerHTML = ffSidebar();
   ffDestroyCharts();
   main.innerHTML = ({
     command: () => ffSecCommand(comp), deals: () => ffSecDeals(comp), propiedades: () => ffSecPropiedades(comp),
-    underwriting: () => { FF.section='uwsuite'; setTimeout(()=>{ if(window.ffUwLoad) ffUwLoad().then(()=>ffUwRender()); },30); return `<div class="sec-head"><h2>🧮 Underwriting</h2><p>6 calculadoras calibradas · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando…</div></div>`; },
-    uwsuite: () => { setTimeout(() => { if (window.ffUwLoad) ffUwLoad().then(() => ffUwRender()); }, 30); return `<div class="sec-head"><h2>🧮 Suite de Underwriting</h2><p>6 calculadoras calibradas con el histórico · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando calibración…</div></div>`; },
+    underwriting: () => { FF.section='uwsuite'; setTimeout(()=>{ if(window.ffUwLoad) ffUwLoad().then(()=>ffUwRender()); },30); return `<div class="sec-head"><h2>${osIcon('calculator')} Underwriting</h2><p>6 calculadoras calibradas · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando…</div></div>`; },
+    uwsuite: () => { setTimeout(() => { if (window.ffUwLoad) ffUwLoad().then(() => ffUwRender()); }, 30); return `<div class="sec-head"><h2>${osIcon('calculator')} Suite de Underwriting</h2><p>6 calculadoras calibradas con el histórico · memoria · casa real o hipotética</p></div><div id="ff-uw-body"><div class="empty-sec">Cargando calibración…</div></div>`; },
     inversionistas: () => ffSecInversionistas(comp),
     finanzas: () => ffSecFinanzas(comp),
     analitica: () => ffSecAnalitica(comp),
@@ -448,7 +448,7 @@ function ffPortBadge(d) {
 }
 // all-in con GUARDRAIL: draws vacíos → jamás un all-in fingido en la celda
 function ffAllInCell(d) {
-  if (d.faltanDraws) return (d.purchase ? FF_MONEY(d.purchase) + ' <span style="color:var(--amber);font-size:10px">+ ⚠ faltan draws</span>' : '<span style="color:var(--amber)">⚠ faltan draws</span>');
+  if (d.faltanDraws) return (d.purchase ? FF_MONEY(d.purchase) + ' <span style="color:var(--amber);font-size:10px">+ ' + osIcon('alert') + ' faltan draws</span>' : '<span style="color:var(--amber)">' + osIcon('alert') + ' faltan draws</span>');
   return FF_MONEY(d.allIn) + (d.allInFuente && d.allInFuente.indexOf('rehab') >= 0 ? ' <span style="color:var(--mut2);font-size:9px" title="sin draws en Airtable — se usó compra + rehab real">*rehab</span>' : '');
 }
 
@@ -463,10 +463,10 @@ function ffSecCommand(comp) {
   const critTop = insights.find(i => i.sev === 'critical');
   const flaggedDQ = kpi.revisar + kpi.sinDatos;
   const verdict = crit > 0
-    ? kitVerdict('revisar', crit + (crit === 1 ? ' alerta crítica' : ' alertas críticas') + ' en el portafolio — <a style="cursor:pointer;text-decoration:underline" onclick="ffGo(\'cerebro\')">ver en el Cerebro</a>', (critTop ? critTop.tx + (critTop.action ? ' — 👉 ' + FF_ESC(critTop.action) : '') : ''))
+    ? kitVerdict('revisar', crit + (crit === 1 ? ' alerta crítica' : ' alertas críticas') + ' en el portafolio — <a style="cursor:pointer;text-decoration:underline" onclick="ffGo(\'cerebro\')">ver en el Cerebro</a>', (critTop ? critTop.tx + (critTop.action ? ' — ' + FF_ESC(critTop.action) : '') : ''))
     : flaggedDQ > 0
-      ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. 🧹')
-      : kitVerdict('go', 'Portafolio sano — sin alertas críticas 🎉', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
+      ? kitVerdict('revisar', flaggedDQ + ' deal(s) con datos a revisar', 'Los números gruesos están bien, pero hay datos que corregir en Airtable antes de confiar en los promedios. ')
+      : kitVerdict('go', 'Portafolio sano — sin alertas críticas ', kpi.activos + ' deals activos trabajando · el Cerebro no ve nada urgente hoy.');
   const conf = kitConfidence(flaggedDQ === 0 ? 'alta' : flaggedDQ <= 2 ? 'media' : 'baja', kpi.confiablesN + '/' + kpi.total + ' deals confiables');
   // ═ PATRIMONIO REAL (14-jul, pedido del CEO): valor / equity / deuda / rendimiento del PORTAFOLIO ═
   // Portafolio = ≠operador y ≠vendida (v_ff_portafolio_kpi). Mata "Capital del Holding" en esta vista.
@@ -480,20 +480,20 @@ function ffSecCommand(comp) {
   const deudaRows = (FF.port || []).filter(p => p.es_portafolio && p.deuda > 0).sort((a, b) => b.deuda - a.deuda)
     .map(p => `<div class="krow" style="padding:4px 0"><span>${FF_ESC(p.casa)} <span style="opacity:.5">· ${p.deuda_tipo === 'refi' ? 'refi' : 'HML'}</span></span><b>${kitMoney(p.deuda)}</b></div>`).join('');
   const hero = pk.casas_portafolio
-    ? kitHero('Valor del portafolio (en papel) 🏠', kitMoney(pk.valor_portafolio),
+    ? kitHero('Valor del portafolio (en papel) ', kitMoney(pk.valor_portafolio),
       'ARV de tus <b>' + pk.casas_portafolio + ' casas</b> · no incluye vendidas ni operador &nbsp; ' + conf)
-    : kitHero('Valor del portafolio 🏠', '<span style="font-size:18px;color:var(--mut)">sin datos — v_ff_portafolio</span>', '');
+    : kitHero('Valor del portafolio ', '<span style="font-size:18px;color:var(--mut)">sin datos — v_ff_portafolio</span>', '');
   const kpis = `<div class="grid kpis">
       <div class="card kpi"><div class="lab">Equity del portafolio</div><div class="big ${pk.equity_portafolio > 0 ? 'up' : ''}">${kitMoney(pk.equity_portafolio)}</div><div class="meta">valor − deuda · lo que has construido en patrimonio</div></div>
       <div class="card kpi"><details><summary style="cursor:pointer;list-style:none"><div class="lab">Deuda del portafolio ▾</div><div class="big">${kitMoney(deudaOs)}</div><div class="meta">refi o HML por casa · QBO: ${kitMoney(deudaQbo)} ${deudaQbo && Math.abs(deudaQbo - deudaOs) / deudaQbo > 0.05 ? '<span style="color:var(--amber)">Δ ' + kitMoney(deudaQbo - deudaOs) + '</span>' : '✓'}</div></summary><div style="max-height:220px;overflow:auto;margin-top:8px;font-size:11.5px">${deudaRows || 'sin desglose'}</div></details></div>
       <div class="card kpi"><div class="lab">Rendimiento anual del portafolio</div><div class="big" style="font-size:19px;line-height:1.35">op. <span class="${opAnual >= 0 ? 'up' : 'down'}">${kitMoney(opAnual)}</span><br>c/deuda <span class="${netoAnual >= 0 ? 'up' : 'down'}">${kitMoney(netoAnual)}</span></div><div class="meta">operativo positivo, pero el servicio de deuda HML se lo come — casas aún en HML sin refinanciar${yieldPct != null ? ' · yield ' + yieldPct + '% del equity' : ''}</div></div>
-      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">fórmula CEO (draws − gastos − down payment) · ${pk.casas_sin_draws || 0} casas con ⚠ faltan draws EXCLUIDAS</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">fórmula CEO (draws − gastos − down payment) · ${pk.casas_sin_draws || 0} casas con ${osIcon('alert')} faltan draws EXCLUIDAS</div></div>
     </div>
     <div class="card" style="margin-top:12px;padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;font-size:13px;align-items:center">
-      <span>🏗 <b>${pk.casas_hechas != null ? pk.casas_hechas : '—'}</b> casas hechas <span style="color:var(--mut2);font-size:11px">(sin las pendientes/adquiridas sin cerrar)</span></span>
-      <span>🤝 <b>${pk.entregadas_inversionista != null ? pk.entregadas_inversionista : '—'}</b> entregadas al inversionista <span style="color:var(--mut2);font-size:11px">(vendidas + operador)</span></span>
-      <span>💼 <b>${pk.casas_portafolio != null ? pk.casas_portafolio : '—'}</b> en mi portafolio <span style="color:var(--mut2);font-size:11px">(${pk.port_en_renta || 0} en renta · ${pk.port_en_rehab || 0} en rehab · ${pk.port_adquiridas || 0} adquiridas)</span></span>
-      <span style="margin-left:auto">🧠 Insights: <b class="${crit ? 'down' : ''}">${insights.length || '—'}</b> <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></span>
+      <span>${osIcon('construction')} <b>${pk.casas_hechas != null ? pk.casas_hechas : '—'}</b> casas hechas <span style="color:var(--mut2);font-size:11px">(sin las pendientes/adquiridas sin cerrar)</span></span>
+      <span>${osIcon('handshake')} <b>${pk.entregadas_inversionista != null ? pk.entregadas_inversionista : '—'}</b> entregadas al inversionista <span style="color:var(--mut2);font-size:11px">(vendidas + operador)</span></span>
+      <span>${osIcon('briefcase')} <b>${pk.casas_portafolio != null ? pk.casas_portafolio : '—'}</b> en mi portafolio <span style="color:var(--mut2);font-size:11px">(${pk.port_en_renta || 0} en renta · ${pk.port_en_rehab || 0} en rehab · ${pk.port_adquiridas || 0} adquiridas)</span></span>
+      <span style="margin-left:auto">${osIcon('brain')} Insights: <b class="${crit ? 'down' : ''}">${insights.length || '—'}</b> <span class="chip" style="cursor:pointer" onclick="ffGo('cerebro')">abrir Cerebro</span></span>
     </div>`;
   const experto = !exp ? '' : `
     <div class="grid row2">
@@ -508,7 +508,7 @@ function ffSecCommand(comp) {
       <div class="card"><div class="chart-h"><div class="t">Deals por etapa</div><div class="k">${kpi.total} total</div></div><div style="position:relative;height:320px;width:100%;overflow:hidden"><canvas id="ff-donut"></canvas></div></div>
     </div>`;
   return `${ffHeader('Command Center', 'Fix &amp; Flip', 'Todo el negocio de Fix &amp; Flip en una vista — pipeline, capital, márgenes, inversionistas y Cerebro.')}
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">${kitToggle('✨ Simple', '🔬 Experto', exp, "FF.exp=!FF.exp;ffRender()")}</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">${kitToggle('Simple', 'Experto', exp, "FF.exp=!FF.exp;ffRender()")}</div>
     ${verdict}
     ${ffDQBar(comp)}
     ${hero}
@@ -520,9 +520,9 @@ function ffSecCommand(comp) {
     </div></div>`;
 }
 function ffDealTable(deals) {
-  const badge = d => d.faltanDraws ? '<span class="badge b-warn" title="Total Draws desembolsados en 0 — cargarlo en Airtable">⚠ faltan draws</span>'
+  const badge = d => d.faltanDraws ? '<span class="badge b-warn" title="Total Draws desembolsados en 0 — cargarlo en Airtable">' + osIcon('alert') + ' faltan draws</span>'
     : d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
-  const defCell = d => d.faltanDraws ? '<span style="color:var(--amber);font-size:11px">⚠ faltan datos de draws</span>'
+  const defCell = d => d.faltanDraws ? '<span style="color:var(--amber);font-size:11px">' + osIcon('alert') + ' faltan datos de draws</span>'
     : (d.port && d.port.deficit != null ? `<span class="${d.deficit < 0 ? 'down' : 'up'}">${FF_MONEY(d.deficit)}</span>` : '—');
   const margCell = d => d.faltanDraws || d.allIn == null ? '—' : `<span class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</span>`;
   return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrategia</th><th>All-in <span style="font-weight:400;color:var(--mut2)">(compra+draws)</span></th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
@@ -540,14 +540,14 @@ function ffSecDeals(comp) {
   // banda de decisión: derivada del déficit que YA calcula ffCompute (sin lógica nueva)
   const enRojo = deals.filter(d => d.deficit < -20000).sort((a, b) => a.deficit - b.deficit);
   const verdict = enRojo.length
-    ? kitVerdict('revisar', enRojo.length + (enRojo.length === 1 ? ' deal con déficit fuerte' : ' deals con déficit fuerte') + ' (más de $20k) 🕳', enRojo.map(d => FF_ESC(ffShort(d.address)) + ' (' + kitMoney(d.deficit) + ')').join(' · ') + ' — 👉 plan de recuperación vía refi o venta')
-    : kitVerdict('go', 'Pipeline sano — sin déficits fuertes 💪', kpi.activos + ' deals activos trabajando · ninguno arrastra más de $20k de déficit acumulado.');
-  return `${ffHeader('Pipeline de casas', 'Blueprint FF', `${kpi.total} deals · semáforos: 🔴 all-in ${nAllin} · ⏰ HML ${nHml} · 📈 presupuesto ${nBud} (umbrales de ff_uw_config)`)}
+    ? kitVerdict('revisar', enRojo.length + (enRojo.length === 1 ? ' deal con déficit fuerte' : ' deals con déficit fuerte') + ' (más de $20k) ', enRojo.map(d => FF_ESC(ffShort(d.address)) + ' (' + kitMoney(d.deficit) + ')').join(' · ') + ' — plan de recuperación vía refi o venta')
+    : kitVerdict('go', 'Pipeline sano — sin déficits fuertes ', kpi.activos + ' deals activos trabajando · ninguno arrastra más de $20k de déficit acumulado.');
+  return `${ffHeader('Pipeline de casas', 'Blueprint FF', `${kpi.total} deals · semáforos: all-in ${nAllin} · HML ${nHml} · presupuesto ${nBud} (umbrales de ff_uw_config)`)}
     ${verdict}
     ${ffDQBar(comp)}
     <div class="kan">${cols.map(c => `<div class="kcol">
       <div class="kcol-h"><span>${c.lbl}</span><span class="cnt">${c.items.length}</span></div>
-      ${c.items.sort((a, b) => a.deficit - b.deficit).map(d => ffKanCard(d)).join('') || kitEmpty('👻', 'sin deals acá')}
+      ${c.items.sort((a, b) => a.deficit - b.deficit).map(d => ffKanCard(d)).join('') || kitEmpty(osIcon('ghost'), 'sin deals acá')}
     </div>`).join('')}</div>`;
 }
 function ffKanCard(d) {
@@ -555,14 +555,14 @@ function ffKanCard(d) {
   return `<div class="kcard"${d.dq.revisar ? ' style="border-color:rgba(240,104,122,.4)"' : ''}>
     <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
     ${d.dq.flags.length ? `<div style="margin:5px 0 2px">${ffDQBadge(d.dq)}</div>` : ''}
-    ${(d.semAllin || d.semHml || d.semBudget) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px">${d.semAllin ? `<span class="ff-dq ff-dq-rev" title="all-in supera el máximo configurado del ARV">🔴 all-in ${Math.round(d.allInPct * 100)}%</span>` : ''}${d.semHml ? `<span class="ff-dq ff-dq-rev" title="vencimiento del préstamo HML">⏰ HML ${d.hmlDueDays < 0 ? 'VENCIDO ' + Math.abs(d.hmlDueDays) + 'd' : 'vence ' + d.hmlDueDays + 'd'}</span>` : ''}${d.semBudget ? `<span class="ff-dq ff-dq-pre" title="desvío del presupuesto de remodelación (real vs estimado)">📈 presup +${d.budgetDevPct}%</span>` : ''}</div>` : ''}
-    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.faltanDraws ? ' · <span style="color:var(--amber)">⚠ faltan draws</span>' : ''}${d.esPortafolio === false ? ' · <span style="color:var(--mut2)">' + (d.motivoExcl === 'operador' ? 'operador' : 'vendida') + '</span>' : ''}</div>
+    ${(d.semAllin || d.semHml || d.semBudget) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px">${d.semAllin ? `<span class="ff-dq ff-dq-rev" title="all-in supera el máximo configurado del ARV">${kitStatusDot('bad')} all-in ${Math.round(d.allInPct * 100)}%</span>` : ''}${d.semHml ? `<span class="ff-dq ff-dq-rev" title="vencimiento del préstamo HML">${osIcon('clock')} HML ${d.hmlDueDays < 0 ? 'VENCIDO ' + Math.abs(d.hmlDueDays) + 'd' : 'vence ' + d.hmlDueDays + 'd'}</span>` : ''}${d.semBudget ? `<span class="ff-dq ff-dq-pre" title="desvío del presupuesto de remodelación (real vs estimado)">${osIcon('trending-up')} presup +${d.budgetDevPct}%</span>` : ''}</div>` : ''}
+    <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.faltanDraws ? ' · <span style="color:var(--amber)">' + osIcon('alert') + ' faltan draws</span>' : ''}${d.esPortafolio === false ? ' · <span style="color:var(--mut2)">' + (d.motivoExcl === 'operador' ? 'operador' : 'vendida') + '</span>' : ''}</div>
     <div class="krow"><span>All-in</span><b>${ffAllInCell(d)}</b></div>
     <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>
-    <div class="krow"><span>${d.faltanDraws ? 'Déficit' : d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${d.faltanDraws ? '' : (d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}"${d.faltanDraws ? ' style="color:var(--amber);font-size:10.5px"' : ''}>${d.faltanDraws ? '⚠ faltan datos de draws' : d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
+    <div class="krow"><span>${d.faltanDraws ? 'Déficit' : d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${d.faltanDraws ? '' : (d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}"${d.faltanDraws ? ' style="color:var(--amber);font-size:10.5px"' : ''}>${d.faltanDraws ? 'faltan datos de draws' : d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
     <div class="kbar"><i style="width:${capturePct}%;background:${d.allInPct > 0.75 ? 'linear-gradient(90deg,var(--amber),var(--neg))' : 'linear-gradient(90deg,var(--a1),var(--a2))'}"></i></div>
     <div style="font-size:9px;color:var(--mut2);margin-top:4px">all-in ${Math.round(d.allInPct * 100)}% del ARV${d.invLabel ? ' · ' + FF_ESC(d.invLabel) : ''}</div>
-    <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${window.osSlug ? osSlug(d.address) : ''}')">🏠 Ver ficha de casa →</div>
+    <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${window.osSlug ? osSlug(d.address) : ''}')">${osIcon('house')} Ver ficha de casa →</div>
   </div>`;
 }
 
@@ -570,7 +570,7 @@ function ffKanCard(d) {
 function ffSecPropiedades(comp) {
   const nExcl = comp.deals.filter(d => d.esPortafolio === false).length;
   const nFalta = comp.deals.filter(d => d.faltanDraws).length;
-  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades · ${comp.deals.length - nExcl} en tu portafolio + ${nExcl} etiquetadas (operador/vendida, NO cuentan en los totales)${nFalta ? ' · ⚠ ' + nFalta + ' sin draws cargados en Airtable' : ''}`)}
+  return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades · ${comp.deals.length - nExcl} en tu portafolio + ${nExcl} etiquetadas (operador/vendida, NO cuentan en los totales)${nFalta ? ' · ' + nFalta + ' sin draws cargados en Airtable' : ''}`)}
     <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => a.deficit - b.deficit))}</div></div>`;
 }
 // ─── INVERSIONISTAS · ranking por capital desplegado (rediseño 14-jul, obs CEO) ───
@@ -597,11 +597,11 @@ function ffInvCasaRow(c) {
 function ffSecInversionistas() {
   const R = FF.invRank || [];
   const head = ffHeader('Inversionistas', 'Co-inversión activa', 'participación viva (ownership nuestro < 100%) · de mayor a menor por capital desplegado y nº de casas · todo de Airtable, solo lectura');
-  if (!R.length) return head + kitEmpty('💼', 'Sin datos de v_inversionistas', 'Corré el sync de Fix & Flip o revisá el acceso al área fix-flip');
+  if (!R.length) return head + kitEmpty(osIcon('briefcase'), 'Sin datos de v_inversionistas', 'Corré el sync de Fix & Flip o revisá el acceso al área fix-flip');
   const totCap = R.reduce((s, r) => s + (+r.capital_desplegado || 0), 0);
   const totCasas = R.reduce((s, r) => s + (+r.casas_vivas || 0), 0);
   const totSalidas = R.reduce((s, r) => s + (+r.salidas || 0), 0);
-  const hero = kitHero('Capital de co-inversión desplegado 💼', kitMoney(totCap),
+  const hero = kitHero('Capital de co-inversión desplegado ', kitMoney(totCap),
     R.length + ' inversionistas activos · ' + totCasas + ' casas en sociedad' + (totSalidas ? ' · ' + totSalidas + ' salida' + (totSalidas > 1 ? 's' : '') + ' realizada' + (totSalidas > 1 ? 's' : '') : '')
     + ' · capital = "Capital aportado" [Airtable] · clic en un inversionista para su detalle');
   const rows = R.map((r, ix) => {
@@ -658,12 +658,12 @@ function ffSecFinanzas(comp) {
   const worst = [...comp.deals].filter(d => d.arv > 0 && d.dq.confiable).sort((a, b) => a.margin - b.margin).slice(0, 6);
   const excluidos = comp.kpi.total - comp.kpi.confiablesN; // flaggeados por calidad de datos
   const conf = kitConfidence(excluidos === 0 ? 'alta' : 'media', excluidos === 0 ? comp.kpi.confiablesN + '/' + comp.kpi.total + ' deals confiables' : excluidos + ' deal(s) excluidos por calidad de datos');
-  const hero = kitHero('Equity potencial del portafolio 💰', kitMoney(equity),
+  const hero = kitHero('Equity potencial del portafolio ', kitMoney(equity),
     'ARV − all-in de los deals confiables · invertido <b>' + kitMoney(invertido) + '</b> · déficit acumulado <b style="color:var(--neg)">' + kitMoney(deficit) + '</b> &nbsp; ' + conf);
   const rankTable = (rows, cls) => rows.length
     ? `<div class="overx"><table class="ptable"><thead><tr><th>Casa</th><th>All-in</th><th>ARV</th><th>Margen</th></tr></thead><tbody>
         ${rows.map(d => `<tr><td>${FF_ESC(ffShort(d.address))} ${d.dq.preliminar ? ffDQBadge(d.dq) : ''}</td><td>${kitMoney(d.allIn)}</td><td>${kitMoney(d.arv)}</td><td class="${cls}">${kitMoney(d.margin)}</td></tr>`).join('')}</tbody></table></div>`
-    : kitEmpty('📭', 'Sin deals con datos confiables para rankear');
+    : kitEmpty(osIcon('inbox'), 'Sin deals con datos confiables para rankear');
   // N4 (auditoría 13-jul): el costo #1 del negocio AL TOPE con semáforo — interés/ingreso e ICR
   const anioIni = new Date().getFullYear() + '-01-01';
   const intYtd = (FF.hml || []).filter(x => x.fecha && x.fecha >= anioIni).reduce((t, x) => t + (+x.pago_hml || 0), 0);
@@ -709,7 +709,7 @@ function ffSecFinanzas(comp) {
       <div style="flex:1;height:9px;border-radius:6px;background:var(--glass)"><div style="height:100%;width:${w}%;border-radius:6px;background:${v >= 0 ? 'var(--pos)' : 'var(--neg)'}"></div></div>
       <span style="width:90px;text-align:right;font-size:12.5px">${val}</span></div>`;
   };
-  const equityPanel = eqCasas.length ? `<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">💎 Equity incorporado del holding</div><div class="k">Σ(ARV − all-in) por casa con obra · el verdadero pitch al inversor</div></div>
+  const equityPanel = eqCasas.length ? `<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">${osIcon('gem')} Equity incorporado del holding</div><div class="k">Σ(ARV − all-in) por casa con obra · el verdadero pitch al inversor</div></div>
       <div style="font-size:30px;font-weight:800;color:var(--pos);margin:2px 0 10px">${kitMoney(eqTotal)}</div>
       ${eqCasas.slice(0, 12).map(eqBar).join('')}
       ${eqCasas.length > 12 ? `<div class="meta" style="margin-top:6px">+ ${eqCasas.length - 12} casas más</div>` : ''}</div>` : '';
@@ -794,7 +794,7 @@ function ffChatHTML() {
   return FF.chat.map(m => {
     if (m.role === 'user') return `<div class="cbub u">${FF_ESC(m.content)}</div>`;
     if (m.error) return `<div style="align-self:flex-start;max-width:82%">${kitError(m.content)}</div>`; // error humano, no JSON crudo
-    return `<div class="cbub a${m.thinking ? ' think' : ''}">${m.thinking ? '⏳ pensando…' : (window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(m.content)) : FF_ESC(m.content))}</div>`;
+    return `<div class="cbub a${m.thinking ? ' think' : ''}">${m.thinking ? 'pensando…' : (window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(m.content)) : FF_ESC(m.content))}</div>`;
   }).join('');
 }
 function ffRenderChat() { const el = document.getElementById('ff-chat'); if (el) { el.innerHTML = ffChatHTML(); el.scrollTop = el.scrollHeight; } }
@@ -808,7 +808,7 @@ async function ffAsk(q) {
     const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question, snapshot: ffSnapshot(ffCompute()), history }) });
     const data = await r.json().catch(() => ({})); FF.chat.pop();
     FF.chat.push(r.ok ? { role: 'assistant', content: data.answer || 'Sin respuesta.' } : { role: 'assistant', content: `El Cerebro no pudo responder (HTTP ${r.status}). Esperá un momento y volvé a preguntar.`, error: true });
-  } catch (e) { FF.chat.pop(); FF.chat.push({ role: 'assistant', content: 'No hay conexión con el Cerebro — revisá tu internet y volvé a intentar. 📡', error: true }); }
+  } catch (e) { FF.chat.pop(); FF.chat.push({ role: 'assistant', content: 'No hay conexión con el Cerebro — revisá tu internet y volvé a intentar. ', error: true }); }
   finally { FF.chatBusy = false; ffRenderChat(); }
 }
 window.ffAsk = ffAsk;
@@ -863,17 +863,17 @@ function ffSecUnderwriting(comp) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>${ffUwIn('refi-app', 'Appraisal', dv.app)}${ffUwIn('refi-ltv', 'LTV (%)', FF.cfg.refi_ltv_pct)}${ffUwIn('refi-payoff', 'Payoff (deuda actual)', dv.payoff)}</div>
           <div>${ffUwIn('refi-rate', 'Tasa refi (%)', FF.cfg.refi_rate_pct)}${ffUwIn('refi-cur', 'Pago actual/mes', sel ? Math.round(sel.hml_payment || sel.holding / 6) : '')}<div class="uwres" id="ff-refi-res"></div></div></div></div>
-      <div class="card"><div class="chart-h"><div class="t">🔁 Ingeniería inversa · la fórmula que funciona</div><div class="k">casas que NO nacen en déficit · ⏳ = resultado preliminar (obra en curso)</div></div>
+      <div class="card"><div class="chart-h"><div class="t">${osIcon('refresh')} Ingeniería inversa · la fórmula que funciona</div><div class="k">casas que NO nacen en déficit · ${osIcon('loader')} = resultado preliminar (obra en curso)</div></div>
         <div class="k" style="margin-bottom:8px">El draw que cubrió la operación (Remodelación → Rentas). Aplicá esta estructura a deals nuevos.</div>
         <table class="ptable"><thead><tr><th>Casa</th><th>Draw total</th><th>Remod.</th><th>Holding</th><th>Resultado</th></tr></thead><tbody>
         ${sanas.map(d => `<tr><td>${FF_ESC(ffShort(d.address))}${d.dq.preliminar ? ' ' + ffDQBadge(d.dq) : ''}</td><td>${FF_MONEY(d.dr.total_draws)}</td><td>${FF_MONEY(d.dr.remodel_complete)}</td><td>${FF_MONEY(Number(d.dr.interest_hml || 0) + Number(d.dr.services_hml || 0) + Number(d.dr.interest_until_rent || 0))}</td><td class="${d.dq.preliminar ? 'warn' : 'up'}">${FF_MONEY(d.dr.net_total)}${d.dq.preliminar ? ' <span style="font-size:9px">prelim.</span>' : ''}</td></tr>`).join('')}</tbody></table></div>
     </div>
-    <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">ROI y recuperación del déficit</div><div class="k">semáforo: &lt;12m 🟢 · 12–36m 🟡 · &gt;36m 🔴 (neto mensual ~0.5% ARV)</div></div>
+    <div class="grid" style="margin-top:16px"><div class="card"><div class="chart-h"><div class="t">ROI y recuperación del déficit</div><div class="k">semáforo: &lt;12m ${kitStatusDot('ok')} · 12–36m ${kitStatusDot('warn')} · &gt;36m ${kitStatusDot('bad')} (neto mensual ~0.5% ARV)</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Estrat.</th><th>All-in</th><th>Margen/Equity</th><th>ROI</th><th>Déficit</th><th>Recuperación</th></tr></thead><tbody>
       ${recRows.map(d => d.dq.revisar
         ? `<tr style="opacity:.75"><td>${FF_ESC(ffShort(d.address))} ${ffDQBadge(d.dq)}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td style="color:var(--mut2)">${FF_MONEY(d.margin)}</td><td style="color:var(--mut2)">—</td><td style="color:var(--mut2)">—</td><td><span style="color:var(--neg);font-weight:700">excluido</span></td></tr>`
         : `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td>${Math.round(d.roi * 100)}%</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${d.rec != null ? `<span style="color:${semColor(d.rec)};font-weight:700">${d.rec} meses</span>` : '<span class="up">sin déficit ✓</span>'}</td></tr>`).join('')}</tbody></table>
-        <div class="meta" style="margin-top:8px">Las filas <b>⚠ dato a revisar</b> (all-in &gt; 100% del ARV) se excluyen del ROI y del semáforo — el margen/déficit está distorsionado por el error de carga.</div></div></div>`;
+        <div class="meta" style="margin-top:8px">Las filas <b>${osIcon('alert')} dato a revisar</b> (all-in &gt; 100% del ARV) se excluyen del ROI y del semáforo — el margen/déficit está distorsionado por el error de carga.</div></div></div>`;
 }
 function ffUwIn(id, label, val) { return `<div class="uwrow"><label>${label}</label><input id="ff-${id}" value="${val === '' || val == null ? '' : val}" oninput="ffUwCalc()" inputmode="decimal"></div>`; }
 function ffUwPick(id) { FF.uw = FF.uw || {}; FF.uw.dealId = id || null; const d = id ? FF.deals.find(x => x.id === id) : null; if (d && !FF.uw.modeloManual) FF.uw.modelo = d.strategy === 'flip' ? 'fixflip' : 'renta'; ffRender(); }
@@ -887,7 +887,7 @@ function ffMao() {
   const mao = arv * factor - rem - hold - close - lend - cont;
   const buy = FF.uw.dealId ? (FF.deals.find(d => d.id === FF.uw.dealId)?.purchase_price || 0) : 0;
   const el = document.getElementById('ff-mao-res'); if (!el) return;
-  el.innerHTML = arv > 0 ? `<div class="uwbig">${FF_MONEY(mao)}</div><div class="uwsub">máxima oferta recomendada${buy ? ` · compra real ${FF_MONEY(buy)} <b class="${buy <= mao ? 'up' : 'down'}">${buy <= mao ? '✓ bajo MAO' : '⚠ sobre MAO'}</b>` : ''}</div>` : '<div class="uwsub">Ingresá el ARV.</div>';
+  el.innerHTML = arv > 0 ? `<div class="uwbig">${FF_MONEY(mao)}</div><div class="uwsub">máxima oferta recomendada${buy ? ` · compra real ${FF_MONEY(buy)} <b class="${buy <= mao ? 'up' : 'down'}">${buy <= mao ? '✓ bajo MAO' : 'sobre MAO'}</b>` : ''}</div>` : '<div class="uwsub">Ingresá el ARV.</div>';
 }
 window.ffMao = ffMao;
 function ffEstim() {
@@ -903,7 +903,7 @@ function ffValRemod() {
   const el = document.getElementById('ff-est-val'); if (!el) return;
   if (!(sqft > 0 && val > 0)) { el.innerHTML = '<div class="uwsub">Sqft + monto para validar.</div>'; return; }
   const psf = val / sqft; const dentro = psf >= cal.min && psf <= cal.max;
-  el.innerHTML = `<div class="uwbig" style="color:${dentro ? 'var(--pos)' : 'var(--neg)'}">$${Math.round(psf)}/sqft ${dentro ? '✓' : '⚠ FUERA DE RANGO'}</div><div class="uwsub">rango real $${Math.round(cal.min)}–${Math.round(cal.max)}/sqft${dentro ? '' : ' · revisá el monto (posible error de carga)'}</div>`;
+  el.innerHTML = `<div class="uwbig" style="color:${dentro ? 'var(--pos)' : 'var(--neg)'}">$${Math.round(psf)}/sqft ${dentro ? '✓' : 'FUERA DE RANGO'}</div><div class="uwsub">rango real $${Math.round(cal.min)}–${Math.round(cal.max)}/sqft${dentro ? '' : ' · revisá el monto (posible error de carga)'}</div>`;
 }
 window.ffValRemod = ffValRemod;
 function ffHml() {
@@ -918,7 +918,7 @@ function ffRefi() {
   const newLoan = app * ltv; const cashOut = newLoan - payoff; const newPay = newLoan * rate / 12;
   const el = document.getElementById('ff-refi-res'); if (!el) return;
   const supera = cur > 0 && newPay > cur;
-  el.innerHTML = app > 0 ? `<div class="uwbig ${cashOut >= 0 ? 'up' : 'down'}">${FF_MONEY(cashOut)}</div><div class="uwsub">cash-out · nuevo pago ${FF_MONEY(newPay)}/mes${cur ? ` <b class="${supera ? 'down' : 'up'}">${supera ? '⚠ supera el pago actual' : '✓ ≤ pago actual'}</b>` : ''}</div>` : '<div class="uwsub">Ingresá el appraisal.</div>';
+  el.innerHTML = app > 0 ? `<div class="uwbig ${cashOut >= 0 ? 'up' : 'down'}">${FF_MONEY(cashOut)}</div><div class="uwsub">cash-out · nuevo pago ${FF_MONEY(newPay)}/mes${cur ? ` <b class="${supera ? 'down' : 'up'}">${supera ? 'supera el pago actual' : '✓ ≤ pago actual'}</b>` : ''}</div>` : '<div class="uwsub">Ingresá el appraisal.</div>';
 }
 window.ffRefi = ffRefi;
 
@@ -1039,15 +1039,15 @@ function ffUmCard(sel) {
   const zrows = Object.entries(zonas).map(([z, v]) => ffUmZRow(z, v, z === zonaSel)).join('');
   const cfgChips = ['arv_factor', 'closing_pct', 'lender_fee_pct', 'contingency_pct', 'hml_rate_annual', 'hml_ltc_pct', 'holding_months', 'refi_ltv_pct', 'vacancy_pct', 'opex_pct'].map(k => ffUmChip(k, cfg)).join(' ');
   return `<div class="grid row2" style="margin-bottom:16px">
-    <div class="card"><div class="chart-h"><div class="t">⚙️ Modelo unificado por casa</div><div class="k">cambiá el ARV → TODO recalcula en cascada</div></div>
+    <div class="card"><div class="chart-h"><div class="t">${osIcon('settings')} Modelo unificado por casa</div><div class="k">cambiá el ARV → TODO recalcula en cascada</div></div>
       ${ffUwIn2('um-arv', 'ARV', dv.arv)}${ffUwIn2('um-rehab', 'Remodelación', dv.rehab)}
       <div class="uwrow"><label></label><button onclick="ffUmUseCalib()" class="pullbtn" style="font-size:10px;padding:4px 8px">usar el $/sqft calibrado de la zona</button></div>
       ${ffUwIn2('um-renta', 'Renta esperada /mes (opcional)', '')}
       <div id="ff-um-modelos" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${FF_UW_MODELOS.map(([k, lbl]) => `<button data-mo="${k}" onclick="ffUmSetModelo('${k}')" class="pullbtn${(FF.uw && FF.uw.modelo) === k ? ' on' : ''}" style="font-size:10px;padding:4px 9px">${lbl}</button>`).join('')}</div>
       <div class="uwres" id="ff-um-out"></div>
-      <button onclick="ffDeckGenerate()" class="pullbtn" style="margin-top:10px;font-size:11px;padding:7px 12px">📽 Generar deck para inversionista (.pptx)</button>
+      <button onclick="ffDeckGenerate()" class="pullbtn" style="margin-top:10px;font-size:11px;padding:7px 12px">${osIcon('video')} Generar deck para inversionista (.pptx)</button>
       <div class="meta" style="margin-top:8px">Supuestos (de <b>ff_uw_config</b>, no hardcodeados): ${cfgChips}</div></div>
-    <div class="card"><div class="chart-h"><div class="t">📐 Calibración $/sqft por zona</div><div class="k">histórico de casas con ciclo cerrado</div></div>
+    <div class="card"><div class="chart-h"><div class="t">${osIcon('ruler')} Calibración $/sqft por zona</div><div class="k">histórico de casas con ciclo cerrado</div></div>
       <table class="ptable"><thead><tr><th>Zona</th><th style="text-align:right">n</th><th style="text-align:right">rango</th><th style="text-align:right">prom</th></tr></thead><tbody>${zrows}</tbody></table>
       <div class="meta" style="margin-top:8px">La banda de la zona alimenta "usar $/sqft calibrado" y el validador. Fuente: ff_deals + ff_draws (remodel real = base Remodelación). Zonas operativas: <b>${FF_ESC((FF.cfgT && FF.cfgT.calib_zonas) || 'todas')}</b> · piso ${(FF.cfg.calib_psf_min || 0)}/sqft.${(ffCalibZona._excl || []).length ? ` Excluidas por dato incompleto: ${ffCalibZona._excl.map(x => FF_ESC(x.casa) + ' (' + x.psf + ')').join(', ')}.` : ''}</div></div>
   </div>`;
@@ -1055,7 +1055,7 @@ function ffUmCard(sel) {
 
 
 // ─── M3 · Selector de modelo por casa (Blueprint FF §3) ───
-const FF_UW_MODELOS = [['fixflip', '🔨 Fix & Flip'], ['brrrr', '♻️ BRRRR'], ['renta', '🏠 Renta'], ['wholesale', '📄 Wholesale']];
+const FF_UW_MODELOS = [['fixflip', 'Fix & Flip'], ['brrrr', 'BRRRR'], ['renta', 'Renta'], ['wholesale', 'Wholesale']];
 function ffModelStrategy(m, modelo, cfgIn) {
   const cfg = cfgIn || FF.cfg || {};
   const f = (k, d) => (cfg[k] != null ? +cfg[k] : d);
@@ -1071,7 +1071,7 @@ function ffModelStrategy(m, modelo, cfgIn) {
     const cashLeft = m.aporte - Math.max(0, m.cashOut);
     const rentaNetaRefi = m.renta > 0 ? m.renta * (1 - f('vacancy_pct', 8) / 100) - m.renta * f('opex_pct', 35) / 100 - m.refiPago : null;
     const reglaOk = m.refiPago <= m.pagoHml;
-    return { modelo, rows: [['Refi (' + Math.round(f('refi_ltv_pct', 75)) + '% LTV)', m.refiLoan], ['Cash-out (devuelve capital)', m.cashOut], ['Cash que queda adentro', cashLeft], ['Buy-out inversionista (capital +' + Math.round(f('investor_buyout_pct', 15)) + '%)', buyout], ['Renta neta post-refi /mes', rentaNetaRefi], ['Regla: pago refi ≤ pago HML', reglaOk ? '✓ cumple' : '⚠ NO cumple'], ['Equity retenido', m.arv - m.refiLoan]], buyout, cashLeft, rentaNetaRefi };
+    return { modelo, rows: [['Refi (' + Math.round(f('refi_ltv_pct', 75)) + '% LTV)', m.refiLoan], ['Cash-out (devuelve capital)', m.cashOut], ['Cash que queda adentro', cashLeft], ['Buy-out inversionista (capital +' + Math.round(f('investor_buyout_pct', 15)) + '%)', buyout], ['Renta neta post-refi /mes', rentaNetaRefi], ['Regla: pago refi ≤ pago HML', reglaOk ? '✓ cumple' : 'NO cumple'], ['Equity retenido', m.arv - m.refiLoan]], buyout, cashLeft, rentaNetaRefi };
   }
   if (modelo === 'renta') {
     const noiMes = m.renta > 0 ? m.renta * (1 - f('vacancy_pct', 8) / 100 - f('opex_pct', 35) / 100) : 0;
@@ -1249,15 +1249,15 @@ function ffSecAnalitica(comp) {
   }
   return `${ffHeader('Analítica & KPIs', 'Informes', 'Rentabilidad por zona/modelo/inversionista · proyección 5 años · export.')}
     <div style="display:flex;gap:8px;margin-bottom:14px" class="no-print">
-      <button onclick="window.print()" class="pullbtn">🖨️ PDF</button>
+      <button onclick="window.print()" class="pullbtn">${osIcon('printer')} PDF</button>
       <button onclick="ffExportExcelFF()" class="pullbtn">⬇ Excel</button>
-      <button onclick="ffCopyResumenFF()" class="pullbtn">📋 Copiar resumen</button>
+      <button onclick="ffCopyResumenFF()" class="pullbtn">${osIcon('clipboard')} Copiar resumen</button>
     </div>
     <div class="grid kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       <div class="card kpi"><div class="lab">Equity aportado · deuda HML</div><div class="big glow">${FF.capital ? FF_MONEY(FF.capital.equity_comprometido_airtable) : 'sin datos'}<span style="font-size:13px;color:var(--mut)"> + ${FF.capital ? FF_MONEY(FF.capital.deuda_hml_qbo != null ? FF.capital.deuda_hml_qbo : FF.capital.deuda_hml_os_activa) : '—'}</span></div><div class="meta">v_capital_deployed · all-in (costo) ${FF_MONEY(kpi.capital)} · ${kpi.total} deals · ${cerradas} cerrados</div></div>
       <div class="card kpi"><div class="lab">Equity potencial</div><div class="big up">${FF_MONEY(kpi.equity)}</div><div class="meta">confiables</div></div>
       <div class="card kpi"><div class="lab">Utilidad entregada</div><div class="big up">${FF_MONEY(utilEnt)}</div><div class="meta">a inversionistas, histórica</div></div>
-      <div class="card kpi"><div class="lab">Semáforos</div><div class="big ${nAllin + nHml + nBud ? 'down' : 'up'}">${nAllin + nHml + nBud}</div><div class="meta">🔴 ${nAllin} · ⏰ ${nHml} · 📈 ${nBud}</div></div>
+      <div class="card kpi"><div class="lab">Semáforos</div><div class="big ${nAllin + nHml + nBud ? 'down' : 'up'}">${nAllin + nHml + nBud}</div><div class="meta">${kitStatusDot('bad')} ${nAllin} · ${nHml} · ${nBud}</div></div>
     </div>
     <div class="grid row2" style="margin-top:14px">
       <div class="card"><div class="chart-h"><div class="t">Rentabilidad por zona</div><div class="k">margen solo confiables</div></div>
@@ -1267,7 +1267,7 @@ function ffSecAnalitica(comp) {
     </div>
     <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">Por inversionista</div><div class="k">capital account (top 10)</div></div>
       <table class="ptable"><thead><tr><th>Inversionista</th><th style="text-align:right">Deals</th><th style="text-align:right">Capital</th><th style="text-align:right">Distribuido</th><th style="text-align:right">Utilidad entregada</th><th style="text-align:right">En trabajo</th></tr></thead><tbody>${invs.map(irow).join('')}</tbody></table></div></div>
-    <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">📈 Proyección 5 años — hold vs sell vs refi</div><div class="k">supuestos de config</div></div>${proy}</div></div>`;
+    <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">${osIcon('trending-up')} Proyección 5 años — hold vs sell vs refi</div><div class="k">supuestos de config</div></div>${proy}</div></div>`;
 }
 function ffExportExcelFF() {
   if (typeof XLSX === 'undefined') { alert('Librería Excel no disponible.'); return; }
@@ -1311,14 +1311,14 @@ function ffMountCharts(comp) {
   const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 10 } } }, y: ax } };
   // capital por etapa
   const byStage = FF_STAGES.map(([k, lbl]) => ({ lbl, v: comp.deals.filter(d => d.stage === k).reduce((s, d) => s + d.allIn, 0) / 1000 }));
-  mk('ff-stage', { type: 'bar', data: { labels: byStage.map(x => x.lbl), datasets: [{ data: byStage.map(x => x.v), borderRadius: 5, backgroundColor: '#4f8dff' }] }, options: gext });
+  mk('ff-stage', { type: 'bar', data: { labels: byStage.map(x => x.lbl), datasets: [{ data: byStage.map(x => x.v), borderRadius: 5, backgroundColor: '#4e9b72' }] }, options: gext });
   // margen/déficit por deal
   const md = comp.deals.filter(d => d.arv > 0).map(d => ({ n: ffShort(d.address).slice(0, 16), v: (d.deficit < 0 ? d.deficit : d.margin) })).sort((a, b) => a.v - b.v).slice(0, 14);
-  mk('ff-margin', { type: 'bar', data: { labels: md.map(x => x.n), datasets: [{ data: md.map(x => Math.round(x.v / 1000)), borderRadius: 4, backgroundColor: md.map(x => x.v >= 0 ? '#48d69c' : '#f0687a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 9 } } } } } });
+  mk('ff-margin', { type: 'bar', data: { labels: md.map(x => x.n), datasets: [{ data: md.map(x => Math.round(x.v / 1000)), borderRadius: 4, backgroundColor: md.map(x => x.v >= 0 ? '#63c08e' : '#e4756a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 9 } } } } } });
   // deals por etapa (donut)
   const dc = FF_STAGES.map(([k, lbl]) => ({ lbl, n: comp.deals.filter(d => d.stage === k).length })).filter(x => x.n);
-  mk('ff-donut', { type: 'doughnut', data: { labels: dc.map(x => x.lbl), datasets: [{ data: dc.map(x => x.n), backgroundColor: ['#4f8dff', '#45e3c6', '#e7b65e', '#8a7bff', '#48d69c', '#93a0b6'], borderColor: posGetTheme() === 'light' ? '#fff' : '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } });
+  mk('ff-donut', { type: 'doughnut', data: { labels: dc.map(x => x.lbl), datasets: [{ data: dc.map(x => x.n), backgroundColor: ['#4e9b72', '#6fbf95', '#dca94f', '#c9a85c', '#63c08e', '#a89f8f'], borderColor: posGetTheme() === 'light' ? '#fff' : '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } });
   // Finanzas: gastos por tipo
   if (document.getElementById('ff-fin-donut')) { const gt = ffGastosPorTipo(); const gl = Object.keys(gt.g), gv = Object.values(gt.g).map(v => Math.round(v / 1000));
-    mk('ff-fin-donut', { type: 'doughnut', data: { labels: gl, datasets: [{ data: gv, backgroundColor: ['#f0687a', '#4f8dff', '#45e3c6', '#e7b65e', '#8a7bff'], borderColor: posGetTheme() === 'light' ? '#fff' : '#0a0e16', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } }); }
+    mk('ff-fin-donut', { type: 'doughnut', data: { labels: gl, datasets: [{ data: gv, backgroundColor: ['#e4756a', '#4e9b72', '#6fbf95', '#dca94f', '#c9a85c'], borderColor: posGetTheme() === 'light' ? '#fff' : '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } }); }
 }

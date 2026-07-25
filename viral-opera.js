@@ -137,12 +137,12 @@ function renderManifiesto() {
         <div class="text-sm text-light/70 mt-2">${E(id.tagline)}</div>
         <div class="inline-block mt-3 text-xs px-3 py-1 rounded-full bg-accent/15 text-accent border border-accent/30">${E(id.framework)}</div>
       </div>` +
-      oCard('⚡ Frase maestra', `<p class="font-display text-xl text-light">${E(id.fraseMaestra)}</p>`) +
-      oCard('🎯 Promesa principal', `<p class="text-sm text-zinc-200 leading-relaxed">${E(id.promesaPrincipal)}</p>`) +
-      oCard('📖 Narrativa oficial', `<p class="text-sm text-zinc-200 leading-relaxed">${E(id.narrativaOficial)}</p>`) +
-      oCard('✊ Manifiesto', `<div class="space-y-0.5">${manifiestoHTML}</div>`) +
-      oCard('🎚️ Variantes del eslogan', `<div class="grid sm:grid-cols-2 gap-2">${variantes}</div>`, 'Cuándo usar cada una') +
-      oCard('🧱 Foco del mensaje', `<div class="grid sm:grid-cols-2 gap-3 text-sm">
+      oCard(osIcon('zap') + ' Frase maestra', `<p class="font-display text-xl text-light">${E(id.fraseMaestra)}</p>`) +
+      oCard(osIcon('target') + ' Promesa principal', `<p class="text-sm text-zinc-200 leading-relaxed">${E(id.promesaPrincipal)}</p>`) +
+      oCard(osIcon('book') + ' Narrativa oficial', `<p class="text-sm text-zinc-200 leading-relaxed">${E(id.narrativaOficial)}</p>`) +
+      oCard(osIcon('flame') + ' Manifiesto', `<div class="space-y-0.5">${manifiestoHTML}</div>`) +
+      oCard(osIcon('list') + ' Variantes del eslogan', `<div class="grid sm:grid-cols-2 gap-2">${variantes}</div>`, 'Cuándo usar cada una') +
+      oCard(osIcon('brick') + ' Foco del mensaje', `<div class="grid sm:grid-cols-2 gap-3 text-sm">
         <div class="bg-billete/15 border border-billete/40 rounded-lg p-3"><b class="text-emerald-300">95% — ${E(m.focoPrincipal)}</b><div class="text-zinc-300 mt-1">El protagonista del contenido.</div></div>
         <div class="bg-primary/40 border border-zinc-800 rounded-lg p-3"><b class="text-accent">5% — Credibilidad</b><div class="text-zinc-300 mt-1">${E(m.subcomunicacion)}</div></div>
       </div>`);
@@ -175,17 +175,17 @@ function renderIdentidad() {
     const frasesGrupo = (tit, arr, c) => `<div class="mb-3"><div class="text-[11px] uppercase font-bold ${c} mb-1.5">${tit}</div>${oList(arr)}</div>`;
     out.innerHTML =
       oHero('El arquetipo: ' + a.nombre, a.fusion) +
-      oCard('🧬 Quién sos', `<p class="text-sm text-zinc-200 leading-relaxed">${E(a.descripcion)}</p>`) +
-      oCard('⚔️ Los dos enemigos', `<div class="grid sm:grid-cols-2 gap-3">
+      oCard(osIcon('dna') + ' Quién sos', `<p class="text-sm text-zinc-200 leading-relaxed">${E(a.descripcion)}</p>`) +
+      oCard(osIcon('shield') + ' Los dos enemigos', `<div class="grid sm:grid-cols-2 gap-3">
         ${enemyCard(en.principal, 'bg-bordeaux/40 text-red-200', 'border-bordeaux/40')}
         ${enemyCard(en.invisible, 'bg-zinc-700 text-zinc-200', 'border-accent/30')}
       </div>`, 'Principal = la cara visible · Invisible = la columna vertebral de todo el mensaje') +
-      oCard('🎯 Los 10 enemigos tácticos', `<div class="grid sm:grid-cols-2 gap-3">${tacticos}</div>`, 'Cada uno: dolor + frase + tu solución') +
-      oCard('💬 Frases recurrentes',
-        frasesGrupo('🚩 Bandera', fr.bandera, 'text-accent') +
-        frasesGrupo('🌉 Puente', fr.puente, 'text-sky-400') +
-        frasesGrupo('🎬 Cierre', fr.cierre, 'text-emerald-400')) +
-      oCard('🔤 Palabras', `<div class="grid sm:grid-cols-2 gap-4">
+      oCard(osIcon('target') + ' Los 10 enemigos tácticos', `<div class="grid sm:grid-cols-2 gap-3">${tacticos}</div>`, 'Cada uno: dolor + frase + tu solución') +
+      oCard(osIcon('message') + ' Frases recurrentes',
+        frasesGrupo(osIcon('star') + ' Bandera', fr.bandera, 'text-accent') +
+        frasesGrupo(osIcon('link') + ' Puente', fr.puente, 'text-sky-400') +
+        frasesGrupo(osIcon('check-circle') + ' Cierre', fr.cierre, 'text-emerald-400')) +
+      oCard(osIcon('pencil-line') + ' Palabras', `<div class="grid sm:grid-cols-2 gap-4">
         <div><div class="text-[11px] uppercase font-bold text-red-300 mb-2">Prohibidas</div>${oChips(a.palabrasProhibidas, 'bg-bordeaux/20 text-red-300 border border-bordeaux/40 line-through')}</div>
         <div><div class="text-[11px] uppercase font-bold text-emerald-300 mb-2">De marca</div>${oChips(a.palabrasDeMarca)}</div>
       </div>`);
@@ -212,11 +212,11 @@ function renderVisual() {
     out.innerHTML =
       oHero('Identidad visual', 'Símbolo, paleta, tipografía, vestuario y lenguaje corporal') +
       (OPERA._visualFromV1 ? '' : '') +
-      oCard('💎 Símbolo: ' + E(s.nombre), `<div class="grid sm:grid-cols-[140px_1fr] gap-4 items-start"><div class="bg-dark rounded-xl p-3">${hexSVG}</div><div><div class="text-[11px] uppercase font-bold text-zinc-400 mb-1.5">Significado</div>${oList(s.significado)}<div class="text-[11px] uppercase font-bold text-zinc-400 mt-3 mb-1.5">Dónde va</div>${oList(s.ubicacion)}<div class="text-[11px] uppercase font-bold text-zinc-400 mt-3 mb-1.5">Versiones</div>${oChips(s.versiones)}</div></div>`) +
-      oCard('🎨 Paleta de colores', `<div class="text-[11px] uppercase font-bold text-zinc-400 mb-2">Primarios</div><div class="grid grid-cols-3 gap-2 mb-4">${p.primarios.map(swatch).join('')}</div><div class="text-[11px] uppercase font-bold text-zinc-400 mb-2">Secundarios</div><div class="grid grid-cols-3 gap-2 mb-4">${p.secundarios.map(swatch).join('')}</div><div class="text-[11px] uppercase font-bold text-red-300 mb-2">Prohibidos</div>${oList(p.prohibidos, 'text-red-400')}`) +
-      oCard('🔠 Tipografía', `<div class="grid sm:grid-cols-2 gap-3 mb-3"><div class="bg-primary/40 border border-zinc-800 rounded-lg p-3"><div class="text-[11px] text-zinc-500">DISPLAY</div><div class="font-display text-xl text-light">${E(t.display)}</div></div><div class="bg-primary/40 border border-zinc-800 rounded-lg p-3"><div class="text-[11px] text-zinc-500">BODY</div><div class="text-xl text-light">${E(t.body)}</div></div></div>${oList(t.reglas)}`) +
-      oCard('👔 Vestuario', `<div class="grid sm:grid-cols-3 gap-3 mb-4"><div><div class="text-[11px] uppercase font-bold text-zinc-400 mb-1.5">Principios</div>${oList(ve.principios)}</div><div><div class="text-[11px] uppercase font-bold text-emerald-300 mb-1.5">Siempre</div>${oList(ve.siempre, 'text-emerald-400')}</div><div><div class="text-[11px] uppercase font-bold text-red-300 mb-1.5">Nunca</div>${oList(ve.nunca, 'text-red-400')}</div></div><div class="grid sm:grid-cols-2 gap-3">${escenarios}</div>`) +
-      oCard('🤚 Lenguaje corporal', `<div class="grid sm:grid-cols-2 gap-x-6">${gestoBlock('Cómo pararte', g.comoPararte) + gestoBlock('Mirada a cámara', g.comoMirarCamara) + gestoBlock('Manos SÍ', g.manosSi, 'text-emerald-400') + gestoBlock('Respiración', g.respiracion)}${gestoBlock('Manos NO', g.manosNo, 'text-red-400') + gestoBlock('Cómo entrar', g.comoEntrar) + gestoBlock('Cómo cerrar', g.comoCerrar)}</div>`);
+      oCard(osIcon('gem') + ' Símbolo: ' + E(s.nombre), `<div class="grid sm:grid-cols-[140px_1fr] gap-4 items-start"><div class="bg-dark rounded-xl p-3">${hexSVG}</div><div><div class="text-[11px] uppercase font-bold text-zinc-400 mb-1.5">Significado</div>${oList(s.significado)}<div class="text-[11px] uppercase font-bold text-zinc-400 mt-3 mb-1.5">Dónde va</div>${oList(s.ubicacion)}<div class="text-[11px] uppercase font-bold text-zinc-400 mt-3 mb-1.5">Versiones</div>${oChips(s.versiones)}</div></div>`) +
+      oCard(osIcon('palette') + ' Paleta de colores', `<div class="text-[11px] uppercase font-bold text-zinc-400 mb-2">Primarios</div><div class="grid grid-cols-3 gap-2 mb-4">${p.primarios.map(swatch).join('')}</div><div class="text-[11px] uppercase font-bold text-zinc-400 mb-2">Secundarios</div><div class="grid grid-cols-3 gap-2 mb-4">${p.secundarios.map(swatch).join('')}</div><div class="text-[11px] uppercase font-bold text-red-300 mb-2">Prohibidos</div>${oList(p.prohibidos, 'text-red-400')}`) +
+      oCard(osIcon('pencil-line') + ' Tipografía', `<div class="grid sm:grid-cols-2 gap-3 mb-3"><div class="bg-primary/40 border border-zinc-800 rounded-lg p-3"><div class="text-[11px] text-zinc-500">DISPLAY</div><div class="font-display text-xl text-light">${E(t.display)}</div></div><div class="bg-primary/40 border border-zinc-800 rounded-lg p-3"><div class="text-[11px] text-zinc-500">BODY</div><div class="text-xl text-light">${E(t.body)}</div></div></div>${oList(t.reglas)}`) +
+      oCard(osIcon('user') + ' Vestuario', `<div class="grid sm:grid-cols-3 gap-3 mb-4"><div><div class="text-[11px] uppercase font-bold text-zinc-400 mb-1.5">Principios</div>${oList(ve.principios)}</div><div><div class="text-[11px] uppercase font-bold text-emerald-300 mb-1.5">Siempre</div>${oList(ve.siempre, 'text-emerald-400')}</div><div><div class="text-[11px] uppercase font-bold text-red-300 mb-1.5">Nunca</div>${oList(ve.nunca, 'text-red-400')}</div></div><div class="grid sm:grid-cols-2 gap-3">${escenarios}</div>`) +
+      oCard(osIcon('activity') + ' Lenguaje corporal', `<div class="grid sm:grid-cols-2 gap-x-6">${gestoBlock('Cómo pararte', g.comoPararte) + gestoBlock('Mirada a cámara', g.comoMirarCamara) + gestoBlock('Manos SÍ', g.manosSi, 'text-emerald-400') + gestoBlock('Respiración', g.respiracion)}${gestoBlock('Manos NO', g.manosNo, 'text-red-400') + gestoBlock('Cómo entrar', g.comoEntrar) + gestoBlock('Cómo cerrar', g.comoCerrar)}</div>`);
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
 
@@ -232,7 +232,7 @@ function renderPsicologia() {
       <div class="bg-primary/40 border border-zinc-800 rounded-lg p-3 flex gap-3">
         <div class="font-display text-2xl font-black text-accent/70 shrink-0 w-8">${l.ley}</div>
         <div><div class="font-semibold text-sm">${E(l.nombre)}</div><div class="text-xs text-zinc-400 mt-0.5">${E(l.explicacion)}</div>
-        <div class="text-[11px] text-emerald-300/80 mt-1">🛠️ ${E(l.herramienta)}</div></div>
+        <div class="text-[11px] text-emerald-300/80 mt-1">${osIcon('wrench')} ${E(l.herramienta)}</div></div>
       </div>`).join('');
     const tacticas = ps.tacticasAplicadas.map(t => `
       <tr class="border-t border-zinc-800 align-top">
@@ -244,8 +244,8 @@ function renderPsicologia() {
       </tr>`).join('');
     out.innerHTML =
       oHero('Psicología aplicada', 'Cada ley/táctica tiene su herramienta concreta en la app') +
-      oCard('⚖️ 7 leyes universales', `<div class="space-y-2">${leyes}</div>`) +
-      oCard('🎯 16 tácticas aplicadas', `<div class="overflow-x-auto"><table class="w-full"><thead><tr class="text-[10px] uppercase text-zinc-600 text-left"><th></th><th>Maestro</th><th>Técnica</th><th>Tu versión</th><th>Herramienta app</th></tr></thead><tbody>${tacticas}</tbody></table></div>`);
+      oCard(osIcon('scale') + ' 7 leyes universales', `<div class="space-y-2">${leyes}</div>`) +
+      oCard(osIcon('target') + ' 16 tácticas aplicadas', `<div class="overflow-x-auto"><table class="w-full"><thead><tr class="text-[10px] uppercase text-zinc-600 text-left"><th></th><th>Maestro</th><th>Técnica</th><th>Tu versión</th><th>Herramienta app</th></tr></thead><tbody>${tacticas}</tbody></table></div>`);
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
 
@@ -263,16 +263,16 @@ function renderRedes() {
     const kpiRow = (lbl, base, obj) => `<div class="border-t border-zinc-800 py-2 flex items-center justify-between text-sm"><span class="text-zinc-300">${lbl}</span><span><span class="text-zinc-500">${NUM(base)}</span> → <span class="text-accent font-bold">${NUM(obj)}</span></span></div>`;
     out.innerHTML =
       oHero('Mis redes', 'Bios nuevas, highlights y decisión de handle') +
-      oCard('📸 Instagram · ' + E(ig.handle),
+      oCard(osIcon('camera') + ' Instagram · ' + E(ig.handle),
         `<div class="text-sm text-zinc-400 mb-2">${NUM(ig.seguidores)} seguidores · Foto: ${E(ig.fotoPerfil)}</div>${bio(ig.bioNueva)}
         <div class="text-[11px] uppercase font-bold text-zinc-400 mt-3 mb-1.5">Highlights nuevos</div><div class="grid grid-cols-3 sm:grid-cols-6 gap-2">${highlights}</div>
         <div class="text-[11px] uppercase font-bold text-zinc-400 mt-3 mb-1.5">3 reels fijos</div>${reelsFijos}`) +
-      oCard('🎵 TikTok · ' + E(tt.handle), `<div class="text-sm text-zinc-400 mb-2">Display nuevo: <b class="text-light">${E(tt.displayNuevo)}</b></div>${bio(tt.bioNueva)}`) +
-      oCard('▶️ YouTube · ' + E(yt.handleActual),
+      oCard(osIcon('mic') + ' TikTok · ' + E(tt.handle), `<div class="text-sm text-zinc-400 mb-2">Display nuevo: <b class="text-light">${E(tt.displayNuevo)}</b></div>${bio(tt.bioNueva)}`) +
+      oCard(osIcon('play') + ' YouTube · ' + E(yt.handleActual),
         `<div class="bg-accent/10 border border-accent/25 rounded-lg p-3 mb-2"><div class="text-[11px] uppercase text-accent font-bold mb-1">Decisión de handle</div><div class="text-sm text-zinc-200">${E(yt.decisionPendiente)}</div></div>
         <div class="text-sm"><b class="text-accent">Nombre nuevo:</b> ${E(yt.nuevoNombreCanal)}</div>
         <div class="text-sm text-zinc-300 mt-1"><b class="text-zinc-400">Descripción:</b> ${E(yt.descripcion)}</div>`) +
-      oCard('🎯 KPIs · baseline → objetivo 30 días',
+      oCard(osIcon('target') + ' KPIs · baseline → objetivo 30 días',
         kpiRow('Instagram', k.baseline.instagram, k.objetivosDia30.instagram) +
         kpiRow('TikTok', k.baseline.tiktok, k.objetivosDia30.tiktok) +
         kpiRow('YouTube', k.baseline.youtube, k.objetivosDia30.youtube) +
@@ -312,11 +312,11 @@ function renderSistema() {
       if (SFR_DOCS[h.nombre]) return `<details><summary class="cursor-pointer text-xs text-accent">Ver contenido</summary><p class="text-sm text-zinc-300 mt-2 whitespace-pre-line">${E(SFR_DOCS[h.nombre])}</p></details>`;
       return '';
     };
-    const TIPO_ICON = { calculadora: '🧮', wizard: '🧭', checklist: '✅', plantilla: '📄', guia: '📘', matriz: '🗂️' };
+    const TIPO_ICON = { calculadora: osIcon('calculator'), wizard: osIcon('compass'), checklist: osIcon('check-circle'), plantilla: osIcon('file'), guia: osIcon('book'), matriz: osIcon('folder') };
     const fases = sfr.fases.map(f => {
       const tools = f.herramientas.map(h => `
         <div class="bg-primary/40 border border-zinc-800 rounded-lg p-3">
-          <div class="flex items-center gap-2 mb-1"><span>${TIPO_ICON[h.tipo] || '🔧'}</span><span class="font-semibold text-sm">${E(h.nombre)}</span><span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-accent/15 text-accent ml-auto">${E(h.tipo)}</span></div>
+          <div class="flex items-center gap-2 mb-1"><span>${TIPO_ICON[h.tipo] || osIcon('wrench')}</span><span class="font-semibold text-sm">${E(h.nombre)}</span><span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-accent/15 text-accent ml-auto">${E(h.tipo)}</span></div>
           <div class="text-[11px] text-zinc-500 mb-2">${E(h.descripcion)}</div>
           ${toolBody(h)}
         </div>`).join('');
@@ -328,7 +328,7 @@ function renderSistema() {
     }).join('');
     out.innerHTML =
       oHero(sfr.nombre, sfr.descripcion) +
-      oCard('🧱 Principios', oList(sfr.principios)) +
+      oCard(osIcon('brick') + ' Principios', oList(sfr.principios)) +
       fases;
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
@@ -409,7 +409,7 @@ const BUYBOX_Q = [
 function buyBoxWizard() {
   return `<div class="space-y-2">${BUYBOX_Q.map(q => `<label class="block"><span class="text-[11px] text-zinc-400">${E(q.q)}</span>
     <input id="bb-${q.id}" placeholder="${E(q.ph)}" class="w-full bg-dark border border-zinc-800 rounded px-2 py-1.5 text-sm focus:border-accent outline-none"></label>`).join('')}
-    <button onclick="buyBoxBuild(this)" class="w-full bg-accent text-primary font-semibold py-2 rounded text-sm">🧭 Construir Buy Box + copiar</button>
+    <button onclick="buyBoxBuild(this)" class="w-full bg-accent text-primary font-semibold py-2 rounded text-sm">${osIcon('compass')} Construir Buy Box + copiar</button>
     <div id="bb-out" class="text-xs text-zinc-400 whitespace-pre-line"></div></div>`;
 }
 function buyBoxBuild(btn) {
@@ -421,7 +421,7 @@ Rehab máx: $${o.rehabMax} | Margen mín: $${o.margenMin} | Exit: ${o.exit}
 Regla: si un deal no entra en esta caja → NEXT (sin emoción).`;
   navigator.clipboard.writeText(txt);
   document.getElementById('bb-out').textContent = txt;
-  if (btn) { btn.textContent = '✓ Copiado al portapapeles'; setTimeout(() => btn.textContent = '🧭 Construir Buy Box + copiar', 1600); }
+  if (btn) { btn.textContent = '✓ Copiado al portapapeles'; setTimeout(() => btn.innerHTML = osIcon('compass') + ' Construir Buy Box + copiar', 1600); }
 }
 window.buyBoxBuild = buyBoxBuild;
 
@@ -464,7 +464,7 @@ function renderRecursos() {
         </div>
         ${t.queTeDa ? `<div class="text-[11px] uppercase font-bold text-zinc-400 mt-2 mb-1">Qué te da</div>${oList(t.queTeDa)}` : ''}
         ${t.comoSacarlo ? `<details class="mt-2"><summary class="cursor-pointer text-xs text-accent">Cómo sacarlo paso a paso</summary><div class="mt-1">${oList(t.comoSacarlo)}</div></details>` : ''}
-        ${t.tipPro ? `<div class="text-[11px] text-amber-300/90 mt-2">💡 ${E(t.tipPro)}</div>` : ''}
+        ${t.tipPro ? `<div class="text-[11px] text-amber-300/90 mt-2">${osIcon('lightbulb')} ${E(t.tipPro)}</div>` : ''}
       </div>`).join('');
     const pres = r.presupuestoSugerido;
     const ccUrl = 'https://ads.tiktok.com/business/creativecenter/inspiration/popular/pc/en';
@@ -521,9 +521,9 @@ function renderTransformador() {
               <input id="tf-cta" placeholder="auto (MÉTODO…)" class="mt-1 w-full bg-dark border border-zinc-800 rounded px-3 py-2 text-sm focus:border-accent outline-none"></label>
           </div>
           <label class="flex items-center gap-2 text-xs text-zinc-300"><input id="tf-framework" type="checkbox" checked class="accent-[#C8A864]"><span>Inyectar Sistema Flip Anti-Riesgos™ donde encaje</span></label>
-          <button id="tf-go" onclick="tfRun(this)" class="w-full bg-accent text-primary font-semibold py-2.5 rounded-lg glow">⚡ Transformar a mi marca</button>
+          <button id="tf-go" onclick="tfRun(this)" class="w-full bg-accent text-primary font-semibold py-2.5 rounded-lg glow">${osIcon('zap')} Transformar a mi marca</button>
         </div>
-        <div id="tf-out" class="min-h-[200px]"><div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-20"><div><div class="text-4xl mb-2">🔄</div><p class="text-sm">Pegá contenido viral y transformalo a tu nicho + tu marca.</p></div></div></div>
+        <div id="tf-out" class="min-h-[200px]"><div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-20"><div><div class="text-4xl mb-2">${osIcon('refresh')}</div><p class="text-sm">Pegá contenido viral y transformalo a tu nicho + tu marca.</p></div></div></div>
       </div>`;
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
@@ -561,7 +561,7 @@ Conservá la ESTRUCTURA/fórmula del original (hook, pattern interrupts, ritmo) 
     const txt = await window.callClaudeMessages([{ role: 'user', content: userContent }], { system, max_tokens: 2000, model: 'claude-sonnet-4-5' });
     out.innerHTML = `<div class="bg-primary/40 border border-accent/15 rounded-xl p-5">
       <div class="flex items-center justify-between mb-2"><div class="font-display font-bold text-accent">Transformado</div>
-      <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText);this.textContent='✓ Copiado'" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">📋 Copiar</button></div>
+      <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText);this.textContent='✓ Copiado'" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">${osIcon('clipboard')} Copiar</button></div>
       <div class="text-sm text-zinc-100 whitespace-pre-line leading-relaxed">${E(txt)}</div></div>`;
   } catch (e) {
     out.innerHTML = `<div class="border border-red-900/50 bg-red-950/20 rounded-xl p-5 text-sm text-red-300"><b>Error:</b> ${E(e.message)}</div>`;
@@ -613,15 +613,15 @@ window.operaCycleEstado = operaCycleEstado; window.operaFilterBiblio = operaFilt
 function copyReelLib(id) {
   const r = (OPERA.biblioteca.reels || []).find(p => p.id === id); if (!r) return;
   navigator.clipboard.writeText(`${r.thumbnail} [${r.tema}]\nHOOK: ${r.hook}\nCHISME: ${r.chisme}\nVALOR: ${r.valor}\nCTA: ${r.cta}\nMECÁNICA: ${r.mecanica}`);
-  const b = document.querySelector('[data-copy="' + id + '"]'); if (b) { b.textContent = '✓'; setTimeout(() => b.textContent = '📋', 1200); }
+  const b = document.querySelector('[data-copy="' + id + '"]'); if (b) { b.textContent = '✓'; setTimeout(() => b.textContent = osIcon('clipboard'), 1200); }
 }
 window.copyReelLib = copyReelLib;
 function loadBiblioMemory() {
   const el = document.getElementById('biblio-memory'); if (!el) return;
   if (!window.Memory || !window.Memory.enabled()) { el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="text-xs text-zinc-600">🧠 Cargando lo que generaste…</div>`;
+  el.innerHTML = `<div class="text-xs text-zinc-600">${osIcon('brain')} Cargando lo que generaste…</div>`;
   window.Memory.listGenerations({ limit: 50 }).then(gens => {
-    if (!gens.length) { el.innerHTML = `<div class="text-xs text-zinc-600">🧠 Memoria: todavía no generaste nada. Lo que crees en Studio aparece acá.</div>`; return; }
+    if (!gens.length) { el.innerHTML = `<div class="text-xs text-zinc-600">${osIcon('brain')} Memoria: todavía no generaste nada. Lo que crees en Studio aparece acá.</div>`; return; }
     const cards = gens.map(g => {
       const v0 = Array.isArray(g.output_variantes) ? g.output_variantes[0] : (g.output_variantes && g.output_variantes.variantes ? g.output_variantes.variantes[0] : null);
       const titulo = (v0 && (v0.thumbnail_text || v0.hook)) || g.input_idea || '(sin título)';
@@ -633,8 +633,8 @@ function loadBiblioMemory() {
         <div class="text-[10px] text-zinc-600 mt-1">estado: ${E(g.estado || 'producida')}</div>
       </div>`;
     }).join('');
-    el.innerHTML = `<h3 class="font-display text-lg font-bold text-accent mb-2">🧠 Generadas (memoria · ${gens.length})</h3><div class="grid sm:grid-cols-2 gap-3">${cards}</div>`;
-  }).catch(() => { el.innerHTML = `<div class="text-xs text-zinc-600">🧠 Memoria no disponible ahora.</div>`; });
+    el.innerHTML = `<h3 class="font-display text-lg font-bold text-accent mb-2">${osIcon('brain')} Generadas (memoria · ${gens.length})</h3><div class="grid sm:grid-cols-2 gap-3">${cards}</div>`;
+  }).catch(() => { el.innerHTML = `<div class="text-xs text-zinc-600">${osIcon('brain')} Memoria no disponible ahora.</div>`; });
 }
 function renderBiblioteca() {
   const out = document.getElementById('tab-biblioteca'); if (!out || out.dataset.rendered) return;
@@ -655,22 +655,22 @@ function renderBiblioteca() {
         <div class="flex items-start justify-between gap-2 mb-2">
           <div class="min-w-0"><div class="font-semibold text-sm truncate">${E(r.thumbnail)}</div><div class="text-[10px] uppercase text-accent/70">${E(r.tema)}</div></div>
           <div class="flex items-center gap-1 shrink-0">
-            <button data-copy="${r.id}" onclick="copyReelLib('${r.id}')" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button>
+            <button data-copy="${r.id}" onclick="copyReelLib('${r.id}')" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">${osIcon('clipboard')}</button>
             <button onclick="operaCycleEstado('${r.id}')" class="text-[10px] uppercase px-2 py-1 rounded ${ESTADO_STYLE[est]}">${est}</button>
           </div>
         </div>
-        ${row('🎣 Hook:', r.hook, 'text-accent')}${row('🗣️ Chisme:', r.chisme)}${row('💎 Valor:', r.valor, 'text-emerald-400')}${row('📣 CTA:', r.cta, 'text-purple-300')}${row('🏛️', r.mecanica, 'text-zinc-600')}
-        <button onclick="studioFromReel('${r.id}')" class="mt-3 w-full text-xs px-3 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 font-semibold">🎯 Llevar a Studio</button>
+        ${row('🎣 Hook:', r.hook, 'text-accent')}${row('🗣️ Chisme:', r.chisme)}${row('💎 Valor:', r.valor, 'text-emerald-400')}${row('📣 CTA:', r.cta, 'text-purple-300')}${row(osIcon('landmark'), r.mecanica, 'text-zinc-600')}
+        <button onclick="studioFromReel('${r.id}')" class="mt-3 w-full text-xs px-3 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 font-semibold">${osIcon('target')} Llevar a Studio</button>
       </div>`;
     }).join('') || '<p class="text-xs text-zinc-600">— nada en este filtro/búsqueda —</p>';
     const saved = OSTATE.get('saved', []);
-    const savedSec = saved.length ? `<div class="mt-6"><h3 class="font-display text-lg font-bold text-accent mb-3">⭐ Guardados por vos (${saved.length})</h3>
-      <div class="grid sm:grid-cols-2 gap-3">${saved.map((it, idx) => `<div class="bg-primary/40 border border-accent/25 rounded-xl p-4"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-sm truncate">${E(it.title)}</div><div class="text-[10px] uppercase text-accent/70">${E(it.kind)}</div></div><div class="flex gap-1 shrink-0"><button onclick="operaCopySaved(${idx})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button><button onclick="operaRemoveSaved(${idx})" class="text-xs px-2 py-1 rounded bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">🗑</button></div></div></div>`).join('')}</div></div>` : '';
+    const savedSec = saved.length ? `<div class="mt-6"><h3 class="font-display text-lg font-bold text-accent mb-3">${osIcon('star')} Guardados por vos (${saved.length})</h3>
+      <div class="grid sm:grid-cols-2 gap-3">${saved.map((it, idx) => `<div class="bg-primary/40 border border-accent/25 rounded-xl p-4"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-sm truncate">${E(it.title)}</div><div class="text-[10px] uppercase text-accent/70">${E(it.kind)}</div></div><div class="flex gap-1 shrink-0"><button onclick="operaCopySaved(${idx})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">${osIcon('clipboard')}</button><button onclick="operaRemoveSaved(${idx})" class="text-xs px-2 py-1 rounded bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">${osIcon('trash')}</button></div></div></div>`).join('')}</div></div>` : '';
     out.innerHTML =
       oHero('Biblioteca de contenido', '15 reels base + lo que generaste (memoria)') +
       `<div id="biblio-memory" class="mb-6"></div>` +
-      `<h3 class="font-display text-lg font-bold text-accent mb-2">📋 Reels base (semilla)</h3>` +
-      `<input id="biblio-search" value="${E(BIBLIO_SEARCH || '')}" oninput="operaSearchBiblio(this.value)" placeholder="🔎 Buscar por tema, hook, palabra…" class="w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none mb-3">
+      `<h3 class="font-display text-lg font-bold text-accent mb-2">${osIcon('clipboard')} Reels base (semilla)</h3>` +
+      `<input id="biblio-search" value="${E(BIBLIO_SEARCH || '')}" oninput="operaSearchBiblio(this.value)" placeholder="${osIcon('search')} Buscar por tema, hook, palabra…" class="w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none mb-3">
       <div class="flex flex-wrap gap-2 mb-5">${filtros}</div>` +
       `<div class="grid sm:grid-cols-2 gap-3">${cards}</div>` + savedSec;
     const si = document.getElementById('biblio-search'); if (si && q) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
@@ -695,8 +695,8 @@ function renderCalendario() {
     top.innerHTML = oHero('Calendario', 'Plan de re-launch con tracking + ritmo del mes + generador de semanas') +
       faseBanner +
       `<div id="cal-relaunch-mount" class="mb-4"></div>
-       <details class="bg-primary/40 border border-accent/15 rounded-xl mb-4"><summary class="cursor-pointer px-4 py-3 font-display font-bold text-accent">📖 Playbook operativo (principios, rutina, fórmulas)</summary><div class="px-4 pb-4" id="cal-estrategia-mount"></div></details>
-       <div class="text-xs text-zinc-400 mb-2 font-semibold">🗓️ Generar semanas custom ⬇️</div>`;
+       <details class="bg-primary/40 border border-accent/15 rounded-xl mb-4"><summary class="cursor-pointer px-4 py-3 font-display font-bold text-accent">${osIcon('book')} Playbook operativo (principios, rutina, fórmulas)</summary><div class="px-4 pb-4" id="cal-estrategia-mount"></div></details>
+       <div class="text-xs text-zinc-400 mb-2 font-semibold">${osIcon('calendar-days')} Generar semanas custom ⬇️</div>`;
     out.insertBefore(top, out.firstChild);
     // Mover Re-Launch (plan 30 días + tracking) adentro
     renderRelaunch();
@@ -732,8 +732,8 @@ function renderRelaunch() {
         `<label data-check="${ldCid}" class="flex items-start gap-2 cursor-pointer ${ldOn ? 'opacity-50' : ''} mb-2">
           <input type="checkbox" ${ldOn ? 'checked' : ''} onchange="operaToggleCheck('${ldCid}', this.checked)" class="mt-1 accent-[#C8A864]">
           <span class="text-sm font-semibold">${E(ld.principal)}</span></label>
-        <div class="text-sm text-zinc-300 mb-1">📌 ${E(ld.stories)}</div>
-        <div class="bg-accent/10 border border-accent/25 rounded-lg p-3 text-sm text-accent mt-2">📣 ${E(ld.cta)}</div>`);
+        <div class="text-sm text-zinc-300 mb-1">${osIcon('map-pin')} ${E(ld.stories)}</div>
+        <div class="bg-accent/10 border border-accent/25 rounded-lg p-3 text-sm text-accent mt-2">${osIcon('megaphone')} ${E(ld.cta)}</div>`);
   }).catch(e => { out.innerHTML = `<p class="text-sm text-red-400">Error: ${E(e.message)}</p>`; });
 }
 
@@ -752,7 +752,7 @@ function amplificarEstrategia() {
     ];
     const card = document.createElement('div');
     card.className = 'bg-primary/40 border border-accent/15 rounded-xl p-5 mt-4';
-    card.innerHTML = `<h3 class="font-display text-lg font-bold text-accent mb-3">🏛️ Eco histórico de las 4 fórmulas</h3><div class="space-y-3">${ecos.map(x => `<div class="border-l-2 border-accent/40 pl-3"><div class="text-sm font-semibold text-light">${E(x.f)}</div><div class="text-xs text-zinc-400 mt-0.5">${E(x.eco)}</div></div>`).join('')}</div>`;
+    card.innerHTML = `<h3 class="font-display text-lg font-bold text-accent mb-3">${osIcon('landmark')} Eco histórico de las 4 fórmulas</h3><div class="space-y-3">${ecos.map(x => `<div class="border-l-2 border-accent/40 pl-3"><div class="text-sm font-semibold text-light">${E(x.f)}</div><div class="text-xs text-zinc-400 mt-0.5">${E(x.eco)}</div></div>`).join('')}</div>`;
     (out.querySelector('.space-y-4') || out).appendChild(card);
   });
 }
@@ -765,12 +765,12 @@ function renderMarca() {
   ensureOpera().then(ensureVisual).then(() => {
     out.dataset.rendered = '1';
     const secs = [
-      { fn: renderManifiesto, id: 'tab-manifiesto', icon: '🧭', title: 'Quién soy', sub: 'Manifiesto, narrativa, eslogan, foco' },
+      { fn: renderManifiesto, id: 'tab-manifiesto', icon: osIcon('compass'), title: 'Quién soy', sub: 'Manifiesto, narrativa, eslogan, foco' },
       { fn: renderIdentidad, id: 'tab-identidad', icon: '🗣️', title: 'Cómo hablo / Quién me ataca', sub: 'Arquetipo, enemigo dual + 10 tácticos, frases, palabras' },
-      { fn: renderVisual, id: 'tab-visual', icon: '🎨', title: 'Cómo me veo', sub: 'Símbolo, paleta, tipografía, vestuario, gestos' },
-      { fn: renderPsicologia, id: 'tab-psicologia', icon: '🧠', title: 'Cómo persuado', sub: '7 leyes + 16 tácticas históricas' },
+      { fn: renderVisual, id: 'tab-visual', icon: osIcon('palette'), title: 'Cómo me veo', sub: 'Símbolo, paleta, tipografía, vestuario, gestos' },
+      { fn: renderPsicologia, id: 'tab-psicologia', icon: osIcon('brain'), title: 'Cómo persuado', sub: '7 leyes + 16 tácticas históricas' },
       { fn: renderAvatares, id: 'tab-avatares', icon: '🎭', title: 'Mis avatares', sub: 'Flipper escalando vs Empleado empezando' },
-      { fn: renderRedes, id: 'tab-redes', icon: '📊', title: 'Mis redes', sub: 'Bios nuevas, handle YT, KPIs' },
+      { fn: renderRedes, id: 'tab-redes', icon: osIcon('chart'), title: 'Mis redes', sub: 'Bios nuevas, handle YT, KPIs' },
     ];
     out.innerHTML = oHero('Marca', 'Tu estrategia completa — el engine que alimenta Studio. Tocá cada sección para desplegar.') +
       secs.map((s, i) => `<details class="bg-primary/40 border border-accent/15 rounded-xl mb-2" ${i === 0 ? 'open' : ''}>
@@ -836,31 +836,31 @@ function renderStudio() {
     out.dataset.rendered = '1';
     const data = OPERA;
     const tipos = STUDIO_TIPOS.map(t => `<button data-stype="${t.id}" onclick="studioPickType('${t.id}')" class="stype-btn px-3 py-3 rounded-xl text-sm font-semibold border ${t.id === STUDIO.tipo ? 'bg-accent text-primary border-accent' : 'bg-primary/40 text-zinc-300 border-zinc-800 hover:border-accent/40'}">${t.label}</button>`).join('');
-    const enemigoOpts = `<option value="auto">⚙️ Auto (según dolor)</option>`
+    const enemigoOpts = `<option value="auto">${osIcon('settings')} Auto (según dolor)</option>`
       + `<option value="principal">${E(data.arquetipo.enemigos.principal.nombre)}</option>`
       + `<option value="invisible">${E(data.arquetipo.enemigos.invisible.nombre)}</option>`
       + data.arquetipo.enemigos.tacticos.map(t => `<option value="${t.id}">${E(t.nombre)}</option>`).join('');
-    const tacticaOpts = `<option value="auto">⚙️ Auto (según tipo)</option>`
+    const tacticaOpts = `<option value="auto">${osIcon('settings')} Auto (según tipo)</option>`
       + data.psicologia.tacticasAplicadas.map(t => `<option value="${t.id}">${E(t.maestro)} — ${E(t.tecnica)}</option>`).join('');
     const fld = (label, inner) => `<div><label class="text-xs font-semibold text-zinc-400">${label}</label>${inner}</div>`;
     const selCls = 'mt-1 w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none';
     out.innerHTML =
       oHero('Studio', 'Producí contenido con toda tu estrategia inyectada automáticamente') +
       `<div class="flex flex-wrap gap-2 mb-4">
-        <button onclick="document.querySelector('[data-tab=marca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">⚙️ Marca</button>
-        <button onclick="document.querySelector('[data-tab=biblioteca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">📚 Biblioteca</button>
-        <button onclick="document.querySelector('[data-tab=recursos]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">🔥 Tendencias</button>
-        <button onclick="document.querySelector('[data-tab=agente]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">💬 Agente</button>
+        <button onclick="document.querySelector('[data-tab=marca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">${osIcon('settings')} Marca</button>
+        <button onclick="document.querySelector('[data-tab=biblioteca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">${osIcon('book')} Biblioteca</button>
+        <button onclick="document.querySelector('[data-tab=recursos]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">${osIcon('flame')} Tendencias</button>
+        <button onclick="document.querySelector('[data-tab=agente]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40">${osIcon('message')} Agente</button>
       </div>
       `+ studioModeToggle() +`
       <div class="bg-primary/40 border border-accent/15 rounded-xl p-4 mb-4">
         <div class="text-xs font-semibold text-zinc-400 mb-2">¿QUÉ CREÁS HOY?</div>
         <div class="grid grid-cols-3 gap-2">${tipos}</div>
         <div id="st-estilo-carrusel-row" class="mt-3" style="display:none">
-          ${fld('🎨 Estilo del carrusel', `<select id="st-estilo-carrusel" class="${selCls}"><option value="auto">✨ Auto (Claude decide según tema)</option><option value="ramiro_style">🤖 Ramiro Style (tutorial, sistemático)</option><option value="alejandra_style">🎬 Alejandra Style (confesional, storytelling)</option></select>`)}
+          ${fld('🎨 Estilo del carrusel', `<select id="st-estilo-carrusel" class="${selCls}"><option value="auto">${osIcon('sparkles')} Auto (Claude decide según tema)</option><option value="ramiro_style">${osIcon('bot')} Ramiro Style (tutorial, sistemático)</option><option value="alejandra_style">${osIcon('video')} Alejandra Style (confesional, storytelling)</option></select>`)}
         </div>
         <div id="st-estilo-reel-row" class="mt-3" style="display:none">
-          ${fld('🎨 Estilo del reel', `<select id="st-estilo-reel" class="${selCls}"><option value="auto">✨ Auto (Claude decide)</option><option value="america_style">🇺🇸 America Style (diálogo + desglose, latam-USA)</option><option value="default">📝 Default (formato actual)</option></select>`)}
+          ${fld('🎨 Estilo del reel', `<select id="st-estilo-reel" class="${selCls}"><option value="auto">${osIcon('sparkles')} Auto (Claude decide)</option><option value="america_style">🇺🇸 America Style (diálogo + desglose, latam-USA)</option><option value="default">${osIcon('pencil-line')} Default (formato actual)</option></select>`)}
         </div>
       </div>
       <div class="grid md:grid-cols-[400px_1fr] gap-6">
@@ -873,11 +873,11 @@ function renderStudio() {
           ${fld('🎯 Dolor del avatar', `<div class="flex gap-2"><select id="st-dolor" class="${selCls} flex-1"><option value="">— cargando… —</option></select><button onclick="studioRandomDolor()" class="mt-1 px-3 rounded-lg bg-accent/15 text-accent text-sm shrink-0">🎲</button></div>`)}
           ${fld('👹 Enemigo a atacar', `<select id="st-enemigo" class="${selCls}">${enemigoOpts}</select>`)}
           ${fld('🧠 Táctica psicológica', `<select id="st-tactica" class="${selCls}">${tacticaOpts}</select>`)}
-          ${fld('📅 Fase del mes', `<select id="st-fase" class="${selCls}"><option value="auto">⚙️ Auto (según fecha)</option><option value="siembra">Siembra (valor)</option><option value="cosecha">Cosecha (venta)</option></select>`)}
+          ${fld('📅 Fase del mes', `<select id="st-fase" class="${selCls}"><option value="auto">${osIcon('settings')} Auto (según fecha)</option><option value="siembra">Siembra (valor)</option><option value="cosecha">Cosecha (venta)</option></select>`)}
           ${fld('✍️ Tema / ángulo libre (opcional)', `<textarea id="st-tema" rows="2" placeholder="Ej: cómo financiar el primer flip con ITIN" class="${selCls} resize-none"></textarea>`)}
           </div>
           <details class="text-sm">
-            <summary class="cursor-pointer text-xs font-semibold text-accent">⚙️ Configuración avanzada</summary>
+            <summary class="cursor-pointer text-xs font-semibold text-accent">${osIcon('settings')} Configuración avanzada</summary>
             <div class="space-y-2 mt-2">
               <div id="st-formato-row">${fld('Formato (reel)', `<select id="st-formato" class="${selCls}"><option value="">Automático</option><option>Manita</option><option>Doble</option><option>Ranking</option><option>Sketch</option><option>Mano arriba</option><option>Entrevista en calle</option></select>`)}</div>
               ${fld('Variantes', `<select id="st-variantes" class="${selCls}"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>`)}
@@ -885,11 +885,11 @@ function renderStudio() {
               ${fld('Modelo IA', `<input id="st-model" placeholder="auto (el de Ajustes)" class="${selCls}">`)}
             </div>
           </details>
-          <button id="st-generate" onclick="studioGenerate(this)" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-3 rounded-lg glow text-base">⚡ Generar contenido potenciado</button>
+          <button id="st-generate" onclick="studioGenerate(this)" class="w-full bg-accent text-primary hover:opacity-90 font-semibold py-3 rounded-lg glow text-base">${osIcon('zap')} Generar contenido potenciado</button>
         </div>
         <div>
           <div id="st-context" class="mb-4"></div>
-          <div id="st-output" class="min-h-[200px]"><div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-16"><div><div class="text-4xl mb-2">🎯</div><p class="text-sm">Elegí tipo + config y dale a Generar.<br>Toda tu marca se inyecta automáticamente.</p></div></div></div>
+          <div id="st-output" class="min-h-[200px]"><div class="h-full flex items-center justify-center text-center text-zinc-600 border border-dashed border-zinc-800 rounded-xl py-16"><div><div class="text-4xl mb-2">${osIcon('target')}</div><p class="text-sm">Elegí tipo + config y dale a Generar.<br>Toda tu marca se inyecta automáticamente.</p></div></div></div>
         </div>
       </div>`;
     fillStudioDolores();
@@ -931,7 +931,7 @@ function studioContextPanel(ctx, estTokens) {
     <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold text-accent uppercase tracking-wide">Contexto inyectado (transparente)</div>
     <span class="text-[10px] text-zinc-500">~${estTokens} tokens</span></div>
     ${ctx.tipo ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">Tipo:</span><span class="text-accent font-semibold uppercase">${E(ctx.tipo)}</span>${ctx.estilo ? `<span class="text-zinc-400">· Estilo:</span><span class="text-orange-400 font-semibold">${E(ctx.estilo)}</span>` : ''}</div>` : ''}
-    ${ctx.rag ? `<div class="flex gap-2 text-xs py-0.5 text-emerald-300"><span>📈</span><span>Inspirado en ${ctx.rag.count} ${ctx.tipo || 'pieza'}s exitosos similares (avg ${NUM(ctx.rag.avgViews)} views)</span></div>` : (ctx.ragInsuficiente ? `<div class="flex gap-2 text-xs py-0.5 text-zinc-500"><span>📭</span><span>Sin historial suficiente — generá más piezas para activar RAG.</span></div>` : '')}
+    ${ctx.rag ? `<div class="flex gap-2 text-xs py-0.5 text-emerald-300"><span>${osIcon('trending-up')}</span><span>Inspirado en ${ctx.rag.count} ${ctx.tipo || 'pieza'}s exitosos similares (avg ${NUM(ctx.rag.avgViews)} views)</span></div>` : (ctx.ragInsuficiente ? `<div class="flex gap-2 text-xs py-0.5 text-zinc-500"><span>${osIcon('inbox')}</span><span>Sin historial suficiente — generá más piezas para activar RAG.</span></div>` : '')}
     ${row('Eslogan', ctx.eslogan)}${row('Framework', ctx.framework)}${row('Tagline', ctx.tagline)}${row('Arquetipo', ctx.arquetipo)}
     ${row('Enemigo (' + ctx.enemigoTipo + ')', ctx.enemigo)}${row('Táctica', ctx.tactica)}${row('Avatar', ctx.avatar)}${row('Dolor', ctx.dolor)}${row('Fase', ctx.fase)}
     <div class="flex gap-2 text-xs py-0.5"><span class="text-emerald-400">✓</span><span class="text-zinc-200">${ctx.prohibidasCount} palabras prohibidas bloqueadas · ${ctx.marcaCount} de marca priorizadas · validador activo</span></div>
@@ -987,7 +987,7 @@ function autoDecisionsBlock(dec) {
   const r = studioResolveAuto(dec); if (!r) return '';
   const row = (k, v) => v ? `<div class="flex gap-2 text-xs py-0.5"><span class="text-accent">▸</span><span class="text-zinc-400">${k}:</span><span class="text-zinc-100">${E(v)}</span></div>` : '';
   return `<div class="bg-accent/10 border border-accent/30 rounded-xl p-4 mb-2">
-    <div class="text-xs font-bold text-accent uppercase tracking-wide mb-2">🤖 Decisiones automáticas</div>
+    <div class="text-xs font-bold text-accent uppercase tracking-wide mb-2">${osIcon('bot')} Decisiones automáticas</div>
     ${row('Avatar', r.avatar)}${row('Dolor', r.dolor)}${row('Enemigo', r.enemigo)}${row('Táctica', r.tactica)}${row('Fase', r.fase)}
     ${r.razon ? `<div class="text-[11px] text-zinc-500 mt-1 italic">${E(r.razon)}</div>` : ''}
   </div>`;
@@ -1010,10 +1010,10 @@ async function studioGenerate(btn) {
   } catch (e) { document.getElementById('st-output').innerHTML = `<p class="text-sm text-red-400">${E(e.message)}</p>`; return; }
   build.contexto.ragInsuficiente = !!(window.Memory && window.Memory.enabled() && (ragExamples || []).length < 3);
   const estTokens = Math.round((build.system.length + build.userPrompt.length) / 4);
-  document.getElementById('st-context').innerHTML = (mode === 'libre' ? '<div class="text-[11px] text-zinc-500 mb-2">🤖 Modo Libre: la IA decide avatar/dolor/enemigo/táctica/fase. Lo verás acá tras generar.</div>' : '') + studioContextPanel(build.contexto, estTokens);
+  document.getElementById('st-context').innerHTML = (mode === 'libre' ? '<div class="text-[11px] text-zinc-500 mb-2">' + osIcon('bot') + ' Modo Libre: la IA decide avatar/dolor/enemigo/táctica/fase. Lo verás acá tras generar.</div>' : '') + studioContextPanel(build.contexto, estTokens);
   const pre = document.getElementById('st-rawprompt'); if (pre) pre.textContent = build.system + '\n\n----- USER -----\n' + build.userPrompt;
   const out = document.getElementById('st-output');
-  out.innerHTML = `<div class="border border-zinc-800 rounded-xl py-16 flex flex-col items-center text-zinc-500"><div class="typing text-3xl mb-3"><span>●</span><span>●</span><span>●</span></div><p id="st-status" class="text-sm">Generando con tu marca inyectada…</p><p class="text-[11px] text-zinc-600 mt-1">⏱ <span id="st-timer">0</span>s · cada variante tarda ~20-40s; si valida, reintenta hasta 3×</p></div>`;
+  out.innerHTML = `<div class="border border-zinc-800 rounded-xl py-16 flex flex-col items-center text-zinc-500"><div class="typing text-3xl mb-3"><span>●</span><span>●</span><span>●</span></div><p id="st-status" class="text-sm">Generando con tu marca inyectada…</p><p class="text-[11px] text-zinc-600 mt-1">${osIcon('clock')} <span id="st-timer">0</span>s · cada variante tarda ~20-40s; si valida, reintenta hasta 3×</p></div>`;
   btn.disabled = true; btn.classList.add('opacity-50', 'pointer-events-none');
   const t0 = Date.now();
   const timer = setInterval(() => { const el = document.getElementById('st-timer'); if (el) el.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
@@ -1090,9 +1090,9 @@ function studioCard(v, i, tipo) {
     const titulo = s.titulo || s.headline_top || s.texto || '';
     const body = s.instruccion || s.subtitulo || (Array.isArray(s.bullets) ? s.bullets.map(b => '• ' + b).join('\n') : '') || s.boton || s.headline_bottom || '';
     const meta = s.screenshot || s.visual || s.foto_autor || '';
-    return `<div class="shrink-0 w-44 bg-dark border border-zinc-800 rounded-lg p-2"><div class="text-[9px] uppercase text-accent">slide ${E(String(s.n ?? ''))} · ${E(s.tipo || '')}</div>${badge}<div class="text-xs mt-1 font-semibold ${s.palabra_naranja ? 'text-light' : ''}">${E(titulo)}</div>${body ? `<div class="text-[10px] text-zinc-400 mt-1 whitespace-pre-line">${E(body)}</div>` : ''}${meta ? `<div class="text-[9px] text-zinc-600 mt-1">📷 ${E(meta)}</div>` : ''}</div>`;
+    return `<div class="shrink-0 w-44 bg-dark border border-zinc-800 rounded-lg p-2"><div class="text-[9px] uppercase text-accent">slide ${E(String(s.n ?? ''))} · ${E(s.tipo || '')}</div>${badge}<div class="text-xs mt-1 font-semibold ${s.palabra_naranja ? 'text-light' : ''}">${E(titulo)}</div>${body ? `<div class="text-[10px] text-zinc-400 mt-1 whitespace-pre-line">${E(body)}</div>` : ''}${meta ? `<div class="text-[9px] text-zinc-600 mt-1">${osIcon('camera')} ${E(meta)}</div>` : ''}</div>`;
   }).join('')}</div>`;
-  if (Array.isArray(v.frames)) extra = v.frames.map(fr => `<div class="border-l-2 border-accent/40 pl-2 mb-1.5"><span class="text-[10px] uppercase text-accent">${E(fr.fase || '')}</span><div class="text-sm">${E(fr.texto_en_pantalla)}</div>${fr.voz ? `<div class="text-xs text-zinc-400">${E(fr.voz)}</div>` : ''}${fr.sticker && fr.sticker !== 'ninguno' ? `<div class="text-[10px] text-purple-300">🎯 ${E(fr.sticker)}</div>` : ''}</div>`).join('');
+  if (Array.isArray(v.frames)) extra = v.frames.map(fr => `<div class="border-l-2 border-accent/40 pl-2 mb-1.5"><span class="text-[10px] uppercase text-accent">${E(fr.fase || '')}</span><div class="text-sm">${E(fr.texto_en_pantalla)}</div>${fr.voz ? `<div class="text-xs text-zinc-400">${E(fr.voz)}</div>` : ''}${fr.sticker && fr.sticker !== 'ninguno' ? `<div class="text-[10px] text-purple-300">${osIcon('target')} ${E(fr.sticker)}</div>` : ''}</div>`).join('');
   if (Array.isArray(v.titulos)) extra += `<div class="mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-1">Títulos</div>${v.titulos.map(t => `<div class="text-xs"><span class="text-accent">[${E(t.palanca || '')}]</span> ${E(t.texto)}</div>`).join('')}</div>`;
   if (Array.isArray(v.miniaturas)) extra += `<div class="grid grid-cols-3 gap-1 mb-2">${v.miniaturas.map(m => `<div class="bg-dark rounded p-2 text-[10px]"><b class="text-accent">${E(m.variante || '')}</b> "${E(m.texto_en_miniatura)}"<div class="text-zinc-500">${E(m.composicion || '')}</div></div>`).join('')}</div>`;
   if (Array.isArray(v.lineas)) extra = `<div class="bg-dark rounded-lg p-3 mb-2">${v.lineas.map(l => `<div class="font-display text-base text-light">${E(l)}</div>`).join('')}</div>`;
@@ -1100,22 +1100,22 @@ function studioCard(v, i, tipo) {
     <div class="flex items-start justify-between gap-2 mb-2">
       <div class="min-w-0"><div class="text-[10px] uppercase text-accent/70">${E(tipo)} · variante ${i + 1}</div><div class="font-display font-bold text-light">${E(v.thumbnail_text || '')}</div></div>
       <div class="flex gap-1 shrink-0">
-        <button onclick="studioCopy(${i},this)" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📋</button>
-        <button onclick="studioSave(${i},this)" class="text-xs px-2 py-1 rounded bg-accent/15 text-accent hover:bg-accent/25">💾</button>
-        <button onclick="studioExport(${i})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">📥</button>
+        <button onclick="studioCopy(${i},this)" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">${osIcon('clipboard')}</button>
+        <button onclick="studioSave(${i},this)" class="text-xs px-2 py-1 rounded bg-accent/15 text-accent hover:bg-accent/25">${osIcon('save')}</button>
+        <button onclick="studioExport(${i})" class="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">${osIcon('inbox')}</button>
       </div>
     </div>
-    ${f('🎣 Hook', v.hook, 'text-accent')}${f('🗣️ Chisme', v.chisme)}${f('🎬 Desarrollo', v.desarrollo)}${extra}${f('💎 Valor oculto', v.valor_oculto, 'text-emerald-400')}${f('📣 CTA', v.cta, 'text-purple-300')}${v.duracion_estimada_seg ? `<div class="text-[10px] text-zinc-600 mb-1">⏱ ${E(String(v.duracion_estimada_seg))}s${v.patron ? ' · ' + E(v.patron) : ''}</div>` : ''}
-    ${v.caption ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-0.5">📝 Caption</div><div class="text-sm text-zinc-300">${E(v.caption)}</div></div>` : ''}
+    ${f('🎣 Hook', v.hook, 'text-accent')}${f('🗣️ Chisme', v.chisme)}${f('🎬 Desarrollo', v.desarrollo)}${extra}${f('💎 Valor oculto', v.valor_oculto, 'text-emerald-400')}${f('📣 CTA', v.cta, 'text-purple-300')}${v.duracion_estimada_seg ? `<div class="text-[10px] text-zinc-600 mb-1">${osIcon('clock')} ${E(String(v.duracion_estimada_seg))}s${v.patron ? ' · ' + E(v.patron) : ''}</div>` : ''}
+    ${v.caption ? `<div class="bg-dark rounded-lg p-2.5 mb-2"><div class="text-[10px] uppercase text-zinc-500 font-semibold mb-0.5">${osIcon('pencil-line')} Caption</div><div class="text-sm text-zinc-300">${E(v.caption)}</div></div>` : ''}
     ${v.caption_larga ? `<details class="mb-2"><summary class="cursor-pointer text-[11px] text-zinc-500">caption larga</summary><div class="text-sm text-zinc-300 mt-1">${E(v.caption_larga)}</div></details>` : ''}
     <div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-zinc-600 mr-1">${E(v.mecanica_aplicada || '')}</span>${badge(val.errores.length === 0, 'reglas')}${STUDIO_LAST_ESTILO ? badge(valStyle.ok, 'estilo') : ''}${badge(val.palabrasDeMarcaUsadas.length >= 3, val.palabrasDeMarcaUsadas.length + ' marca')}${badge(val.frasesUsadas.length >= 1, 'frase')}</div>
-    ${(val.errores.length || valStyle.errores.length) ? `<div class="text-[11px] text-red-400 mt-1">⚠ ${E([].concat(val.errores, valStyle.errores).join(' · '))}</div>` : ''}
+    ${(val.errores.length || valStyle.errores.length) ? `<div class="text-[11px] text-red-400 mt-1">${osIcon('alert')} ${E([].concat(val.errores, valStyle.errores).join(' · '))}</div>` : ''}
   </div>`;
 }
 function renderStudioCards(variantes, tipo, exhausted) {
   const out = document.getElementById('st-output');
-  const warn = exhausted ? `<div class="bg-amber-950/30 border border-amber-900/40 rounded-lg p-2 text-[11px] text-amber-200 mb-3">⚠ Tras 3 intentos quedaron observaciones de validación. Te muestro el mejor resultado — revisá o regenerá.</div>` : '';
-  out.innerHTML = warn + `<div class="flex justify-end mb-2"><button onclick="studioGenerate(document.getElementById('st-generate'))" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">🔄 Regenerar todo</button></div>` +
+  const warn = exhausted ? `<div class="bg-amber-950/30 border border-amber-900/40 rounded-lg p-2 text-[11px] text-amber-200 mb-3">${osIcon('alert')} Tras 3 intentos quedaron observaciones de validación. Te muestro el mejor resultado — revisá o regenerá.</div>` : '';
+  out.innerHTML = warn + `<div class="flex justify-end mb-2"><button onclick="studioGenerate(document.getElementById('st-generate'))" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">${osIcon('refresh')} Regenerar todo</button></div>` +
     variantes.map((v, i) => studioCard(v, i, tipo)).join('');
 }
 function studioPlainText(v) {
@@ -1127,8 +1127,8 @@ function studioPlainText(v) {
   if (v.caption_larga) t += '\nCAPTION: ' + v.caption_larga;
   return t;
 }
-function studioCopy(i, btn) { const v = STUDIO_LAST[i]; if (!v) return; navigator.clipboard.writeText(studioPlainText(v)); if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋', 1200); } }
-function studioSave(i, btn) { const v = STUDIO_LAST[i]; if (!v || !window.operaSave) return; window.operaSave(STUDIO.tipo, Object.assign({ thumbnail: v.thumbnail_text }, v)); if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '💾', 1200); } }
+function studioCopy(i, btn) { const v = STUDIO_LAST[i]; if (!v) return; navigator.clipboard.writeText(studioPlainText(v)); if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = osIcon('clipboard'), 1200); } }
+function studioSave(i, btn) { const v = STUDIO_LAST[i]; if (!v || !window.operaSave) return; window.operaSave(STUDIO.tipo, Object.assign({ thumbnail: v.thumbnail_text }, v)); if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = osIcon('save'), 1200); } }
 function studioExport(i) {
   const v = STUDIO_LAST[i]; if (!v) return;
   const blob = new Blob([studioPlainText(v)], { type: 'text/plain' });

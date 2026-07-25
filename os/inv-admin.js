@@ -51,14 +51,14 @@ async function iaCrearAcceso() {
   if (!invId || !email) return alert('Elegí inversionista y email');
   const { error } = await sb.from('inv_access').insert({ investor_airtable_id: invId, email, estado: 'invitado' });
   if (error) return alert('Error: ' + error.message);
-  if (window.toast) toast('✓ Acceso creado. Mandale el link con "✉️ Invitar".', 'success');
+  if (window.toast) toast('✓ Acceso creado. Mandale el link con "Invitar".', 'success');
   await iaLoad(true);
 }
 window.iaCrearAcceso = iaCrearAcceso;
 async function iaEnviarLink(email) {
   const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + '/inversionista', shouldCreateUser: true } });
   if (error) return alert('Error enviando el link: ' + error.message);
-  if (window.toast) toast('✉️ Link de acceso enviado a ' + email, 'success');
+  if (window.toast) toast('Link de acceso enviado a ' + email, 'success');
 }
 window.iaEnviarLink = iaEnviarLink;
 async function iaRevocar(id, on) {
@@ -114,11 +114,11 @@ const IA_PNL_SI = ['ingreso', 'operativo', 'tax'];
 function iaPnl(cat) { return IA_PNL_SI.includes(String(cat || '').toLowerCase()); }
 const IA_PNL_TIP = 'P&L = ¿entra al Estado de Resultados (afecta la utilidad)? SÍ: ingreso, operativo, tax. NO: inversión y financiero (son capital/financiamiento, no ganancia).';
 const IA_CAT_GUIA = [
-  ['ingreso', '💵 Ingreso', 'renta recibida, otros ingresos'],
-  ['operativo', '🧾 Operativo', 'utilities, mantenimiento, property mgmt, HOA, seguro, limpieza'],
-  ['inversion', '🏗 Inversión', 'compra de propiedad, CapEx mayor, venta de propiedad'],
-  ['financiero', '🏦 Financiero', 'DRAW del HML (no es ingreso), aporte de capital, cash-out del refi, intereses/principal HML-refi, distribuciones'],
-  ['tax', '🏛 Tax', 'impuesto predial, impuesto de renta'],
+  ['ingreso', 'Ingreso', 'renta recibida, otros ingresos'],
+  ['operativo', 'Operativo', 'utilities, mantenimiento, property mgmt, HOA, seguro, limpieza'],
+  ['inversion', 'Inversión', 'compra de propiedad, CapEx mayor, venta de propiedad'],
+  ['financiero', 'Financiero', 'DRAW del HML (no es ingreso), aporte de capital, cash-out del refi, intereses/principal HML-refi, distribuciones'],
+  ['tax', 'Tax', 'impuesto predial, impuesto de renta'],
 ];
 // sugerencia automática de categoría según la descripción (editable siempre)
 function iaSugerirCat(txt) {
@@ -250,7 +250,7 @@ async function iaGuardarCache() {
     const { error } = await sb.from('inv_projection').upsert({ property_id: IA.casa, escenario: t, data, params_hash: String(JSON.stringify(iaBaseParams()).length), computed_at: new Date().toISOString(), active: true, archived_at: null }, { onConflict: 'property_id,escenario' });
     if (error) return alert('Error guardando ' + t + ': ' + error.message);
   }
-  if (window.toast) toast('💾 Proyección cacheada (4 escenarios) en inv_projection', 'success');
+  if (window.toast) toast('Proyección cacheada (4 escenarios) en inv_projection', 'success');
 }
 window.iaGuardarCache = iaGuardarCache;
 
@@ -258,7 +258,7 @@ function iaTabEscenarios() {
   const casas = [...new Set(IA.holdings.map(h => h.property_id))];
   const casaSel = '<select class="osa-in" onchange="iaSetCasa(this.value)">' + casas.map(c => '<option value="' + c + '" ' + (c === IA.casa ? 'selected' : '') + '>' + OS_E(iaCasaName(c)) + '</option>').join('') + '</select>';
   if (!IA.params.length) return '<div class="empty">Esta casa no tiene parámetros del modelo.</div>';
-  const tipos = [['estimado', '📋 Estimado', 'underwriting original'], ['proyectado', '🎯 Proyectado', 'premisas confirmadas + supuestos'], ['realizado', '✅ Realizado', IA.cashflow.length + ' movimientos reales'], ['simulado', '🧪 Simulado', 'sensibilidad del simulador']];
+  const tipos = [['estimado', 'Estimado', 'underwriting original'], ['proyectado', 'Proyectado', 'premisas confirmadas + supuestos'], ['realizado', 'Realizado', IA.cashflow.length + ' movimientos reales'], ['simulado', 'Simulado', 'sensibilidad del simulador']];
   const runs = {}; tipos.forEach(t => { try { runs[t[0]] = iaRunEscenario(t[0]); } catch (e) { runs[t[0]] = null; } });
   const base = iaBaseParams();
   const fila = (lab, fn, fmt) => '<tr><td>' + lab + '</td>' + tipos.map(t => { const x = runs[t[0]]; return '<td style="text-align:right">' + (x ? (fmt || (v => v))(fn(x)) : '—') + '</td>'; }).join('') + '</tr>';
@@ -282,7 +282,7 @@ function iaTabEscenarios() {
   const simRun = runs.simulado, proyRun = runs.proyectado;
   const dTir = simRun && proyRun && simRun.r.indicadores.tir31PostRefi != null && proyRun.r.indicadores.tir31PostRefi != null ? (simRun.r.indicadores.tir31PostRefi - proyRun.r.indicadores.tir31PostRefi) : null;
   const dVpn = simRun && proyRun ? simRun.r.indicadores.vpn31PostRefi - proyRun.r.indicadores.vpn31PostRefi : null;
-  const sim = '<div class="card"><div class="chart-h"><div class="t">🧪 Simulador — sensibilidad ARV / ocupación / compra / arriendo / tasa</div><div class="k"><button class="ct-btn" onclick="iaSimReset()">↺ Reset</button> <button class="ct-btn" onclick="iaGuardarCache()">💾 Guardar proyección (4 escenarios)</button></div></div>'
+  const sim = '<div class="card"><div class="chart-h"><div class="t">' + osIcon('flask') + ' Simulador — sensibilidad ARV / ocupación / compra / arriendo / tasa</div><div class="k"><button class="ct-btn" onclick="iaSimReset()">↺ Reset</button> <button class="ct-btn" onclick="iaGuardarCache()">' + osIcon('save') + ' Guardar proyección (4 escenarios)</button></div></div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
     + simDef.map(([k, lab, cur, unit]) => '<div><div class="lab" style="margin-bottom:4px">' + lab + '</div><div style="display:flex;align-items:center;gap:5px"><input class="osa-in" style="flex:1;width:100%" type="number" step="any" value="' + (IA.sim[k] != null ? IA.sim[k] : (cur != null ? cur : '')) + '" onchange="iaSimSet(\'' + k + '\', this.value)">' + (unit ? '<span style="color:var(--mut2);font-size:11px;font-weight:700" title="fracción: 0.5 = 50%">' + unit + '</span>' : '') + '</div></div>').join('')
     + '</div>'
@@ -320,10 +320,10 @@ async function iaDelDoc(id) {
 }
 window.iaDelDoc = iaDelDoc;
 function iaTabDocs() {
-  const invOpts = '<option value="">🏠 Todos los inversionistas de la casa</option>' + IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const invOpts = '<option value="">' + osIcon('house') + ' Todos los inversionistas de la casa</option>' + IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
   const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
   const docs = IA.docsAll || [];
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Subir documento al portal</div><div class="k">contrato · fiscal (K-1) · legal · otro — URL de Drive/Storage</div></div>'
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Subir documento al portal</div><div class="k">contrato · fiscal (K-1) · legal · otro — URL de Drive/Storage</div></div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
     + '<select id="ia-doc-casa" class="osa-in">' + casaOpts + '</select>'
     + '<select id="ia-doc-inv" class="osa-in">' + invOpts + '</select>'
@@ -335,9 +335,9 @@ function iaTabDocs() {
     + '<div class="card"><div class="chart-h"><div class="t">Documentos (' + docs.length + ')</div></div>'
     + '<table class="ptable"><thead><tr><th>Documento</th><th>Casa</th><th>Para</th><th>Tipo</th><th>Vistas</th><th style="text-align:right"></th></tr></thead><tbody>'
     + (docs.map(d => '<tr><td><a href="' + OS_E(d.url) + '" target="_blank" style="color:var(--a2)">' + OS_E(d.nombre) + ' ↗</a></td><td>' + OS_E(iaCasaName(d.property_id)) + '</td>'
-      + '<td>' + (d.investor_airtable_id ? OS_E(iaInvName(d.investor_airtable_id)) : '🏠 todos') + '</td><td>' + OS_E(d.tipo || '—') + '</td>'
+      + '<td>' + (d.investor_airtable_id ? OS_E(iaInvName(d.investor_airtable_id)) : 'todos') + '</td><td>' + OS_E(d.tipo || '—') + '</td>'
       + '<td>' + ((d.audit || []).length || 0) + '</td>'
-      + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDoc(\'' + d.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Sin documentos.</td></tr>')
+      + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDoc(\'' + d.id + '\')">' + osIcon('pause') + '</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Sin documentos.</td></tr>')
     + '</tbody></table></div>';
 }
 async function iaCrearDist() {
@@ -384,7 +384,7 @@ async function iaEnviarMsgAdmin() {
   else row.investor_airtable_id = dest;
   const { error } = await sb.from('inv_messages').insert(row);
   if (error) return alert('Error: ' + error.message);
-  if (window.toast) toast('✉️ Mensaje enviado', 'success');
+  if (window.toast) toast('Mensaje enviado', 'success');
   await iaLoadProducto(); osRender();
 }
 window.iaEnviarMsgAdmin = iaEnviarMsgAdmin;
@@ -401,9 +401,9 @@ function iaTabDist() {
       + '<input id="ia-de-monto" type="number" class="osa-in" value="' + OS_E(d.monto) + '">'
       + '<input id="ia-de-comp" class="osa-in" placeholder="URL comprobante de pago (Drive)" value="' + OS_E(d.comprobante_url || '') + '" style="grid-column:span 2">'
       + '<input id="ia-de-k1" class="osa-in" placeholder="URL del K-1" value="' + OS_E(d.k1_url || '') + '">'
-      + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveDist(\'' + d.id + '\')">💾 Guardar</button><button class="ct-btn" onclick="IA.distEdit=null;osRender()">Cancelar</button></div></td></tr>';
+      + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveDist(\'' + d.id + '\')">' + osIcon('save') + ' Guardar</button><button class="ct-btn" onclick="IA.distEdit=null;osRender()">Cancelar</button></div></td></tr>';
   };
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Nueva distribución</div><div class="k">comprobante de pago (soporte) ≠ K-1 (fiscal) — ambos se guardan y se VEN como links</div></div>'
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Nueva distribución</div><div class="k">comprobante de pago (soporte) ≠ K-1 (fiscal) — ambos se guardan y se VEN como links</div></div>'
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
     + '<select id="ia-d-inv" class="osa-in">' + invOpts + '</select>'
     + '<select id="ia-d-casa" class="osa-in">' + casaOpts + '</select>'
@@ -414,24 +414,24 @@ function iaTabDist() {
     + '<input id="ia-d-comp" class="osa-in" placeholder="URL comprobante de pago (recomendado)" style="grid-column:span 2">'
     + '<input id="ia-d-k1" class="osa-in" placeholder="URL del K-1 (opcional)" style="grid-column:span 2">'
     + '</div><button class="cbtn" style="margin-top:10px" onclick="iaCrearDist()">Crear</button></div>'
-    + '<div class="card overx"><div class="chart-h"><div class="t">Distribuciones (' + (IA.dists || []).length + ')</div><div class="k">✎ editar (queda en el audit) · ⏸ soft-delete</div></div>'
+    + '<div class="card overx"><div class="chart-h"><div class="t">Distribuciones (' + (IA.dists || []).length + ')</div><div class="k">' + osIcon('pencil') + ' editar (queda en el audit) · ' + osIcon('pause') + ' soft-delete</div></div>'
     + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Casa</th><th>Fecha</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Links</th><th>Estado</th><th style="text-align:right"></th></tr></thead><tbody>'
     + ((IA.dists || []).map(d => editRow(d) + '<tr><td>' + OS_E(iaInvName(d.investor_airtable_id)) + '</td><td>' + OS_E(iaCasaName(d.property_id)) + '</td><td style="white-space:nowrap">' + OS_E(d.fecha) + '</td><td>' + OS_E(d.tipo) + '</td>'
       + '<td style="text-align:right">' + iaMoney(d.monto) + '</td>'
-      + '<td style="font-size:11px">' + linkTag(d.comprobante_url, '📎 pago') + ' · ' + linkTag(d.k1_url, '📄 K-1') + '</td>'
+      + '<td style="font-size:11px">' + linkTag(d.comprobante_url, 'pago') + ' · ' + linkTag(d.k1_url, 'K-1') + '</td>'
       + '<td>' + (d.estado === 'pagada' ? '<span class="badge b-ok">pagada</span>' : '<span class="badge b-warn">programada</span> <button class="ct-btn" style="padding:2px 7px;font-size:9px" onclick="iaDistEstado(\'' + d.id + '\',\'pagada\')">✓ pagar</button>') + '</td>'
-      + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" style="padding:2px 7px" onclick="iaEditDist(\'' + d.id + '\')">✎</button><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDist(\'' + d.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="8" class="empty">Sin distribuciones.</td></tr>')
+      + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" style="padding:2px 7px" onclick="iaEditDist(\'' + d.id + '\')">' + osIcon('pencil') + '</button><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDist(\'' + d.id + '\')">' + osIcon('pause') + '</button></td></tr>').join('') || '<tr><td colspan="8" class="empty">Sin distribuciones.</td></tr>')
     + '</tbody></table></div>';
 }
 function iaTabMsgs() {
-  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">👤 ' + OS_E(i.name || i.airtable_id) + '</option>').join('');
-  const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="casa:' + c + '">🏠 Todos los de ' + OS_E(iaCasaName(c)) + '</option>').join('');
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">✉️ Enviar mensaje</div><div class="k">a un inversionista o fan-out a todos los holders de una casa</div></div>'
+  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="casa:' + c + '">Todos los de ' + OS_E(iaCasaName(c)) + '</option>').join('');
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('mail') + ' Enviar mensaje</div><div class="k">a un inversionista o fan-out a todos los holders de una casa</div></div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><select id="ia-mm-dest" class="osa-in">' + casaOpts + invOpts + '</select>'
     + '<input id="ia-mm-asunto" class="osa-in" style="flex:1;min-width:220px" placeholder="Asunto"></div>'
     + '<textarea id="ia-mm-cuerpo" rows="3" class="osa-in" style="width:100%" placeholder="Mensaje…"></textarea>'
     + '<button class="cbtn" style="margin-top:8px" onclick="iaEnviarMsgAdmin()">Enviar</button></div>'
-    + ((IA.msgs || []).map(m => '<div class="card" style="margin-bottom:8px"><div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 → ' + (m.investor_airtable_id ? OS_E(iaInvName(m.investor_airtable_id)) : '🏠 ' + OS_E(iaCasaName(m.property_id))) : '👤 ' + OS_E(iaInvName(m.investor_airtable_id))) + ' · ' + OS_E((m.created_at || '').slice(0, 10)) + '</span><b class="meta">leído por: ' + ((m.read_by || []).length ? OS_E((m.read_by || []).join(', ')) : '—') + '</b></div>'
+    + ((IA.msgs || []).map(m => '<div class="card" style="margin-bottom:8px"><div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 → ' + (m.investor_airtable_id ? OS_E(iaInvName(m.investor_airtable_id)) : osIcon('house') + OS_E(iaCasaName(m.property_id))) : osIcon('user') + OS_E(iaInvName(m.investor_airtable_id))) + ' · ' + OS_E((m.created_at || '').slice(0, 10)) + '</span><b class="meta">leído por: ' + ((m.read_by || []).length ? OS_E((m.read_by || []).join(', ')) : '—') + '</b></div>'
       + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:3px 0">' + OS_E(m.asunto) + '</div>' : '')
       + '<div class="meta" style="white-space:pre-wrap">' + OS_E(m.cuerpo) + '</div></div>').join('') || '<div class="empty">Sin mensajes.</div>');
 }
@@ -484,7 +484,7 @@ async function iaRevertirCierre(id) {
 window.iaRevertirCierre = iaRevertirCierre;
 function iaCopiarLink(linkId) {
   const url = location.origin + '/propuesta?link=' + linkId;
-  navigator.clipboard.writeText(url).then(() => { if (window.toast) toast('🔗 Link público copiado: ' + url, 'success'); }).catch(() => prompt('Link público:', url));
+  navigator.clipboard.writeText(url).then(() => { if (window.toast) toast('Link público copiado: ' + url, 'success'); }).catch(() => prompt('Link público:', url));
 }
 window.iaCopiarLink = iaCopiarLink;
 
@@ -504,10 +504,10 @@ function iaDealCard(d) {
     + '<div class="kv"><span>Markup empresa <span class="ff-dqx" style="font-size:8px">SOLO ADMIN</span></span><b class="warn">' + iaMoney(pr.markup_empresa) + '</b></div>'
     + (coc != null ? '<div class="kv"><span>CoC anual / Recuperado</span><b>' + (coc * 100).toFixed(1) + '% · ' + (rec * 100).toFixed(0) + '%</b></div>' : '')
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
-    + '<button class="ct-btn" onclick="iaCopiarLink(\'' + d.public_link_id + '\')">🔗 Link público</button>'
+    + '<button class="ct-btn" onclick="iaCopiarLink(\'' + d.public_link_id + '\')">' + osIcon('link') + ' Link público</button>'
     + (d.etapa === 'preventa' ? '<button class="ct-btn" onclick="iaDealEtapa(\'' + d.id + '\',\'gestion\')">→ Gestión</button>' : '')
     + (d.etapa === 'gestion' ? '<button class="ct-btn" onclick="iaDealEtapa(\'' + d.id + '\',\'salida\')">→ Salida</button>' : '')
-    + (d.etapa === 'salida' && !cerrado ? ['rentando', 'refi', 'vendida'].map(b => '<button class="ct-btn" onclick="iaCerrarDeal(\'' + d.id + '\',\'' + b + '\')">🏁 ' + b + '</button>').join('') : '')
+    + (d.etapa === 'salida' && !cerrado ? ['rentando', 'refi', 'vendida'].map(b => '<button class="ct-btn" onclick="iaCerrarDeal(\'' + d.id + '\',\'' + b + '\')">' + b + '</button>').join('') : '')
     + (cerrado && rev ? '<button class="ct-btn" style="color:var(--neg)" onclick="iaRevertirCierre(\'' + d.id + '\')">↩︎ Revertir (48h)</button>' : '')
     + '</div></div>';
 }
@@ -516,7 +516,7 @@ function iaTabPipeline() {
   const casaOpts = IA.deals.filter(x => x.property_id).map(x => '<option value="' + x.property_id + '">' + OS_E((x.address || '').split(',')[0]) + '</option>').join('');
   const col = (etapa, titulo) => '<div><div class="lab" style="margin-bottom:8px">' + titulo + ' (' + deals.filter(x => x.etapa === etapa).length + ')</div>'
     + (deals.filter(x => x.etapa === etapa).map(iaDealCard).join('') || '<div class="meta">—</div>') + '</div>';
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">🧮 Calculadora de propuesta</div><div class="k">el MARKUP solo se ve acá — el link público sale sanitizado (verificado)</div></div>'
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('calculator') + ' Calculadora de propuesta</div><div class="k">el MARKUP solo se ve acá — el link público sale sanitizado (verificado)</div></div>'
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
     + '<select id="ia-pl-casa" class="osa-in" onchange="iaSetCasa(this.value)">' + casaOpts + '</select>'
     + '<select id="ia-pl-modelo" class="osa-in"><option value="brrrr">BRRRR</option><option value="fixflip">Fix & Flip</option><option value="fixhold">Fix & Hold</option></select>'
@@ -529,7 +529,7 @@ function iaTabPipeline() {
     + '<input id="ia-pl-arv" type="number" class="osa-in" placeholder="ARV $">'
     + '<input id="ia-pl-renta" type="number" class="osa-in" placeholder="Renta proyectada $/mes">'
     + '<input id="ia-pl-pct" type="number" class="osa-in" placeholder="% inversionista (50)">'
-    + '<button class="cbtn" onclick="iaGuardarDeal()">💾 Guardar propuesta</button>'
+    + '<button class="cbtn" onclick="iaGuardarDeal()">' + osIcon('save') + ' Guardar propuesta</button>'
     + '</div><div class="meta" style="margin-top:8px">precio al inversionista = adquisición + remodelación + holding + intereses + costos de venta + markup · escenarios ARV ±10% automáticos · retornos públicos = TIR/VPN del escenario proyectado si la casa tiene modelo</div></div>'
     + '<div class="grid k3">' + col('preventa', '1 · PRE-VENTA') + col('gestion', '2 · GESTIÓN') + col('salida', '3 · SALIDA') + '</div>';
 }
@@ -545,10 +545,10 @@ function iaTabGlobal() {
   const tirs = projs.map(p => p.data && p.data.indicadores && p.data.indicadores.tir31PostRefi).filter(x => x != null);
   const vpns = projs.map(p => p.data && p.data.indicadores && p.data.indicadores.vpn31PostRefi).filter(x => x != null);
   const alertas = [];
-  (IA.access || []).filter(a => a.estado === 'invitado').forEach(a => alertas.push('🔑 Acceso sin reclamar: ' + iaInvName(a.investor_airtable_id) + ' (' + a.email + ')'));
+  (IA.access || []).filter(a => a.estado === 'invitado').forEach(a => alertas.push('Acceso sin reclamar: ' + iaInvName(a.investor_airtable_id) + ' (' + a.email + ')'));
   const hoy = new Date().toISOString().slice(0, 10);
-  (IA.dists || []).filter(d => d.estado === 'programada' && d.fecha >= hoy && (new Date(d.fecha) - Date.now()) < 14 * 86400000).forEach(d => alertas.push('💸 Distribución en <14 días: ' + iaInvName(d.investor_airtable_id) + ' · ' + iaMoney(d.monto) + ' el ' + d.fecha));
-  [...new Set(IA.holdings.map(h => h.property_id))].filter(pid => !projs.some(p => p.property_id === pid)).forEach(pid => alertas.push('📐 Casa con capital SIN modelo/proyección: ' + iaCasaName(pid) + ' — cargar params y guardar cache'));
+  (IA.dists || []).filter(d => d.estado === 'programada' && d.fecha >= hoy && (new Date(d.fecha) - Date.now()) < 14 * 86400000).forEach(d => alertas.push('' + osIcon('banknote') + ' Distribución en <14 días: ' + iaInvName(d.investor_airtable_id) + ' · ' + iaMoney(d.monto) + ' el ' + d.fecha));
+  [...new Set(IA.holdings.map(h => h.property_id))].filter(pid => !projs.some(p => p.property_id === pid)).forEach(pid => alertas.push('Casa con capital SIN modelo/proyección: ' + iaCasaName(pid) + ' — cargar params y guardar cache'));
   const cerradas = (IA.deals2 || []).filter(d => d.closure);
   const kpi = (lab, val, meta) => '<div class="card"><div class="lab">' + lab + '</div><div class="big">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
   return '<div class="grid k4">'
@@ -565,7 +565,7 @@ function iaTabGlobal() {
     + (cerradas.length ? '<div class="lab" style="margin-top:12px">Participaciones cerradas</div>' + cerradas.map(d => '<div class="kv"><span>' + OS_E(iaCasaName(d.property_id)) + '</span><b>' + OS_E(d.closure.bucket) + ' · ' + OS_E((d.closure.cerrado_at || '').slice(0, 10)) + '</b></div>').join('') : '')
     + '</div>'
     + '<div class="card"><div class="chart-h"><div class="t">Alertas</div></div>'
-    + (alertas.length ? alertas.map(a => '<div class="kv"><span>' + OS_E(a) + '</span></div>').join('') : '<div class="empty" style="padding:20px">🎯 Todo al día.</div>')
+    + (alertas.length ? alertas.map(a => '<div class="kv"><span>' + OS_E(a) + '</span></div>').join('') : '<div class="empty" style="padding:20px">' + osIcon('target') + ' Todo al día.</div>')
     + '</div></div>';
 }
 
@@ -581,7 +581,7 @@ function iaTabLedger() {
   if (!casas.includes(IA.casa)) IA.casa = casas[0];
   const casaSel = "<select class=\"osa-in\" onchange=\"iaSetCasa(this.value)\">" + casas.map(c => "<option value=\"" + c + "\" " + (c === IA.casa ? "selected" : "") + ">" + OS_E(iaCasaName(c)) + "</option>").join("") + "</select>";
   const led = IA.ledgerCache[IA.casa];
-  if (led === undefined) { iaLoadLedger(IA.casa); return casaSel + "<div class=\"empty\">⏳ Armando el ledger…</div>"; }
+  if (led === undefined) { iaLoadLedger(IA.casa); return casaSel + "<div class=\"empty\">" + osIcon('loader') + " Armando el ledger…</div>"; }
   if (led.err) return casaSel + (window.kitError ? kitError(led.err, "delete IA.ledgerCache[IA.casa];osRender()") : "<div class=\"empty down\">" + OS_E(led.err) + "</div>");
   if (!led.length) return casaSel + "<div class=\"empty\">Sin movimientos para esta casa.</div>";
   let acum = 0;
@@ -589,12 +589,12 @@ function iaTabLedger() {
   const cats = {};
   led.forEach(m => { const k = m.tipo + ":" + m.categoria; cats[k] = (cats[k] || 0) + +m.monto; });
   const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span>" + OS_E(k.replace(":", " · ")) + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
-  return "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap\">" + casaSel + "<span class=\"meta\">" + led.length + " movimientos · saldo final <b style=\"color:" + (acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(acum) + "</b> · <b>vista de SOLO LECTURA</b> de Movimientos (manuales + auto-importados, misma RPC del portal) — se edita en 📐 Modelo & movimientos</span></div>"
+  return "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap\">" + casaSel + "<span class=\"meta\">" + led.length + " movimientos · saldo final <b style=\"color:" + (acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(acum) + "</b> · <b>vista de SOLO LECTURA</b> de Movimientos (manuales + auto-importados, misma RPC del portal) — se edita en " + osIcon('ruler') + " Modelo & movimientos</span></div>"
     + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div></div>" + subt + "</div>"
     + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
     + Object.entries(led.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
     + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th>Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\">Saldo</th><th>Fuente</th></tr></thead><tbody>"
-    + full.slice().reverse().map(m => "<tr><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
+    + full.slice().reverse().map(m => "<tr><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">" + osIcon('paperclip') + "</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
       + "<td style=\"text-align:right\" class=\"" + (m.tipo === "ingreso" ? "up" : "down") + "\">" + (m.tipo === "ingreso" ? "+" : "−") + iaMoney(m.monto) + "</td>"
       + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>").join("")
     + "</tbody></table></div>";
@@ -602,15 +602,15 @@ function iaTabLedger() {
 
 // ── B: parámetros en los 9 BLOQUES de Juan (colapsables; mayoría auto-llenada con su fuente) ──
 const IA_BLOQUES = [
-  ['b1', '🏠 1 · Identificación', /^(direccion|nombre_corto|tipo|num_hab|banos|sqft|ano)$/],
-  ['b2', '🎯 2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|es_ejemplo)$/],
-  ['b3', '💰 3 · Financieros de compra', /^(compra|remodel_real|cierre_compra|arv|est_arv|est_remodel_total|est_cierre_pct|cash_atrapado_real)$/],
-  ['b4', '🏦 4 · Financiamiento HML', /^(hm_inicial|hm_tasa|hm_plazo|draw_m\d+|otros_inv_m\d+)$/],
-  ['b5', '🏛️ 5 · Refinanciación', /^(refi_|cierre_refi|cashout_real)/],
-  ['b6', '👥 6 · Inversionistas y equity', /^(reparto_inv)$/],
-  ['b7', '📊 7 · Operación mensual', /^(arriendo_hab|rampa|ocupacion_estable|piso_servicios|vacancy|servicios_mes|mantenimiento_mes|hoa_mes|seguro_mes|padsplit_pct|comision_pct|imp_propiedad_pct|imp_renta_pct)$/],
-  ['b8', '📈 8 · Supuestos (manual)', /^(valorizacion|inflacion|retorno_esperado|anios|ciclo_meses|postrefi_perfil|util_anual_postrefi|anio0_postrefi)$/],
-  ['b9', '🎯 9 · Metas del deal (manual)', /^(tir_objetivo|cap_objetivo|fecha_breakeven|fecha_recuperacion)$/],
+  ['b1', '1 · Identificación', /^(direccion|nombre_corto|tipo|num_hab|banos|sqft|ano)$/],
+  ['b2', '2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|es_ejemplo)$/],
+  ['b3', '3 · Financieros de compra', /^(compra|remodel_real|cierre_compra|arv|est_arv|est_remodel_total|est_cierre_pct|cash_atrapado_real)$/],
+  ['b4', '4 · Financiamiento HML', /^(hm_inicial|hm_tasa|hm_plazo|draw_m\d+|otros_inv_m\d+)$/],
+  ['b5', '5 · Refinanciación', /^(refi_|cierre_refi|cashout_real)/],
+  ['b6', '6 · Inversionistas y equity', /^(reparto_inv)$/],
+  ['b7', '7 · Operación mensual', /^(arriendo_hab|rampa|ocupacion_estable|piso_servicios|vacancy|servicios_mes|mantenimiento_mes|hoa_mes|seguro_mes|padsplit_pct|comision_pct|imp_propiedad_pct|imp_renta_pct)$/],
+  ['b8', '8 · Supuestos (manual)', /^(valorizacion|inflacion|retorno_esperado|anios|ciclo_meses|postrefi_perfil|util_anual_postrefi|anio0_postrefi)$/],
+  ['b9', '9 · Metas del deal (manual)', /^(tir_objetivo|cap_objetivo|fecha_breakeven|fecha_recuperacion)$/],
 ];
 const IA_METAS_KEYS = ['tir_objetivo', 'cap_objetivo', 'fecha_breakeven', 'fecha_recuperacion'];
 function iaTogglePB(id) { IA.pOpen = IA.pOpen || { b1: true }; IA.pOpen[id] = !IA.pOpen[id]; osRender(); }
@@ -660,7 +660,7 @@ function iaParamsBloques() {
   });
   if (otros.length) {
     const open = !!IA.pOpen.b0;
-    html += '<div onclick="iaTogglePB(\'b0\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700"><span>' + (open ? '▾' : '▸') + ' 🧩 Otros</span><span class="meta" style="font-weight:500">' + otros.length + '</span></div>';
+    html += '<div onclick="iaTogglePB(\'b0\')" style="display:flex;justify-content:space-between;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:9px;background:var(--glass);margin-top:8px;font-size:12.5px;font-weight:700"><span>' + (open ? '▾' : '▸') + ' ' + osIcon('package') + ' Otros</span><span class="meta" style="font-weight:500">' + otros.length + '</span></div>';
     if (open) html += otros.map(iaParamRow).join('');
   }
   return html + '</div>';
@@ -680,9 +680,9 @@ function iaMovsCard() {
       + '<input id="ia-me-valor" type="number" class="osa-in" style="padding:6px" value="' + OS_E(m.valor) + '">'
       + '<input id="ia-me-conc" class="osa-in" style="padding:6px;grid-column:span 2" placeholder="concepto" value="' + OS_E(m.concepto || m.item || '') + '">'
       + '<input id="ia-me-fact" class="osa-in" style="padding:6px" placeholder="URL factura (Drive)" value="' + OS_E(m.factura_url || '') + '">'
-      + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveMov(\'' + m.id + '\')">💾 Guardar</button><button class="ct-btn" onclick="IA.movEdit=null;osRender()">Cancelar</button></div></div>';
+      + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveMov(\'' + m.id + '\')">' + osIcon('save') + ' Guardar</button><button class="ct-btn" onclick="IA.movEdit=null;osRender()">Cancelar</button></div></div>';
   };
-  return '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Movimientos (una sola fuente)</div><div class="k"><a style="cursor:pointer;color:var(--a2)" onclick="iaToggleGuia()">❓ guía de clasificación</a></div></div>'
+  return '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Movimientos (una sola fuente)</div><div class="k"><a style="cursor:pointer;color:var(--a2)" onclick="iaToggleGuia()">' + osIcon('help') + ' guía de clasificación</a></div></div>'
     + iaGuiaCat()
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:4px">'
     + '<input id="ia-m-fecha" type="date" class="osa-in" style="padding:6px" title="se guarda la fecha completa; la vista muestra Año-Mes">'
@@ -694,28 +694,28 @@ function iaMovsCard() {
     + '</div><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span id="ia-m-pnl">' + iaPnlBadge('operativo') + '</span><span class="meta" style="font-size:10.5px" title="' + IA_PNL_TIP + '">ⓘ P&L se deriva solo de la categoría</span></div>'
     + '<button class="cbtn" style="width:100%" onclick="iaAddMov()">＋ Cargar movimiento manual</button>'
     + '<div class="lab" style="margin-top:12px">✍️ Manuales (' + IA.cashflow.length + ') — editables</div>'
-    + (IA.cashflow.map(m => editRow(m) + '<div class="kv"><span title="' + OS_E(m.fecha) + '">' + OS_E(String(m.fecha || '').slice(0, 7)) + ' · ' + OS_E(m.concepto || m.item || m.linea) + ' <span class="badge b-warn" style="font-size:8px">manual</span> ' + iaPnlBadge(m.categoria) + (m.factura_url ? ' <a href="' + OS_E(m.factura_url) + '" target="_blank" style="color:var(--a2);font-size:10px">📄 Ver factura</a>' : (m.id_factura ? ' · #' + OS_E(m.id_factura) : '')) + '</span>'
+    + (IA.cashflow.map(m => editRow(m) + '<div class="kv"><span title="' + OS_E(m.fecha) + '">' + OS_E(String(m.fecha || '').slice(0, 7)) + ' · ' + OS_E(m.concepto || m.item || m.linea) + ' <span class="badge b-warn" style="font-size:8px">manual</span> ' + iaPnlBadge(m.categoria) + (m.factura_url ? ' <a href="' + OS_E(m.factura_url) + '" target="_blank" style="color:var(--a2);font-size:10px">' + osIcon('file') + ' Ver factura</a>' : (m.id_factura ? ' · #' + OS_E(m.id_factura) : '')) + '</span>'
       + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.valor : -m.valor)
-      + ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" onclick="iaEditMov(\'' + m.id + '\')">✎</button><button class="ct-btn" style="padding:1px 6px;font-size:9px;color:var(--neg)" onclick="iaDelMov(\'' + m.id + '\')">🗑</button></b></div>').join('') || '<div class="meta" style="padding:6px 2px">Sin movimientos manuales.</div>')
-    + '<div class="lab" style="margin-top:12px">⚙️ Auto-importados (' + (autos ? autos.length : '⏳') + ') — de FF/Rentas, con su linaje, no se re-teclean</div>'
-    + (autos === null ? '<div class="meta">⏳ cargando…</div>'
-      : autos.slice(-40).reverse().map(m => '<div class="kv"><span title="' + OS_E(m.fecha) + ' · ' + OS_E(m.fuente) + '">' + OS_E(String(m.fecha || '').slice(0, 7)) + ' · ' + OS_E(m.concepto) + ' <span class="badge b-ok" style="font-size:8px">auto · ' + OS_E(String(m.fuente || '').split(':')[0]) + '</span> ' + iaPnlBadge(m.categoria === 'renta' ? 'ingreso' : m.categoria) + (m.comprobante ? ' <a href="' + OS_E(m.comprobante) + '" target="_blank" style="color:var(--a2);font-size:10px">📎</a>' : '') + '</span>'
+      + ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" onclick="iaEditMov(\'' + m.id + '\')">' + osIcon('pencil') + '</button><button class="ct-btn" style="padding:1px 6px;font-size:9px;color:var(--neg)" onclick="iaDelMov(\'' + m.id + '\')">' + osIcon('trash') + '</button></b></div>').join('') || '<div class="meta" style="padding:6px 2px">Sin movimientos manuales.</div>')
+    + '<div class="lab" style="margin-top:12px">' + osIcon('settings') + ' Auto-importados (' + (autos ? autos.length : osIcon('loader')) + ') — de FF/Rentas, con su linaje, no se re-teclean</div>'
+    + (autos === null ? '<div class="meta">' + osIcon('loader') + ' cargando…</div>'
+      : autos.slice(-40).reverse().map(m => '<div class="kv"><span title="' + OS_E(m.fecha) + ' · ' + OS_E(m.fuente) + '">' + OS_E(String(m.fecha || '').slice(0, 7)) + ' · ' + OS_E(m.concepto) + ' <span class="badge b-ok" style="font-size:8px">auto · ' + OS_E(String(m.fuente || '').split(':')[0]) + '</span> ' + iaPnlBadge(m.categoria === 'renta' ? 'ingreso' : m.categoria) + (m.comprobante ? ' <a href="' + OS_E(m.comprobante) + '" target="_blank" style="color:var(--a2);font-size:10px">' + osIcon('paperclip') + '</a>' : '') + '</span>'
         + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.monto : -m.monto) + '</b></div>').join(''))
-    + '<div class="meta" style="margin-top:8px;font-size:10.5px">El 💰 Ledger es la vista de SOLO LECTURA de estos mismos movimientos (manuales + auto) agrupados por categoría — cero doble digitación. Para corregir un auto: cargá un movimiento manual de ajuste (queda auditado).</div>'
+    + '<div class="meta" style="margin-top:8px;font-size:10.5px">El ' + osIcon('dollar') + ' Ledger es la vista de SOLO LECTURA de estos mismos movimientos (manuales + auto) agrupados por categoría — cero doble digitación. Para corregir un auto: cargá un movimiento manual de ajuste (queda auditado).</div>'
     + '</div>';
 }
 
 function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
-  if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
+  if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">' + osIcon('loader') + ' Cargando inversionistas…</div>'; }
   if (IA.err) return window.kitError ? kitError(IA.err, 'iaLoad(true)') : '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['global', '📊 Global'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger']];
+  const tabs = [['global', 'Global'], ['pipeline', 'Pipeline'], ['accesos', 'Accesos'], ['holdings', 'Casas & reparto'], ['modelo', 'Modelo & movimientos'], ['escenarios', 'Escenarios & simulador'], ['dist', 'Distribuciones'], ['docs2', 'Documentos'], ['msgs', 'Mensajes'], ['ledger', 'Ledger']];
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="IA.tab=\'' + t[0] + '\';osRender()">' + t[1] + '</button>').join(' ');
   let body = '';
 
   if (IA.tab === 'accesos') {
     const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
-    body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Crear acceso al portal</div><div class="k">el inversionista entra en /inversionista con magic link (sin contraseña)</div></div>'
+    body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Crear acceso al portal</div><div class="k">el inversionista entra en /inversionista con magic link (sin contraseña)</div></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
       + iaLbl('Inversionista', '<select id="ia-acc-inv" class="osa-in" onchange="var i=IA.investors.find(x=>x.airtable_id===this.value); if(i&&i.email) document.getElementById(\'ia-acc-email\').value=i.email">' + invOpts + '</select>')
       + iaLbl('Email del portal', '<input id="ia-acc-email" class="osa-in" style="max-width:280px" placeholder="email del inversionista">')
@@ -725,8 +725,8 @@ function invAdminView() {
       + (IA.access.map(a => '<tr><td>' + OS_E(iaInvName(a.investor_airtable_id)) + '</td><td>' + OS_E(a.email) + '</td>'
         + '<td><span class="badge ' + (a.estado === 'activo' ? 'b-ok' : a.estado === 'revocado' ? 'b-red' : 'b-warn') + '">' + a.estado + '</span></td>'
         + '<td>' + (a.claimed_at ? new Date(a.claimed_at).toLocaleDateString('es-MX') : '—') + '</td>'
-        + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" onclick="iaEnviarLink(\'' + OS_E(a.email) + '\')">✉️ Invitar</button> '
-        + (a.estado === 'revocado' ? '<button class="ct-btn" onclick="iaRevocar(\'' + a.id + '\', true)">↩︎ Rehabilitar</button>' : '<button class="ct-btn" style="color:var(--neg)" onclick="iaRevocar(\'' + a.id + '\', false)">⏸ Revocar</button>')
+        + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" onclick="iaEnviarLink(\'' + OS_E(a.email) + '\')">' + osIcon('mail') + ' Invitar</button> '
+        + (a.estado === 'revocado' ? '<button class="ct-btn" onclick="iaRevocar(\'' + a.id + '\', true)">↩︎ Rehabilitar</button>' : '<button class="ct-btn" style="color:var(--neg)" onclick="iaRevocar(\'' + a.id + '\', false)">' + osIcon('pause') + ' Revocar</button>')
         + '</td></tr>').join('') || '<tr><td colspan="5" class="empty">Sin accesos.</td></tr>')
       + '</tbody></table></div>';
   }
@@ -734,7 +734,7 @@ function invAdminView() {
   if (IA.tab === 'holdings') {
     const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
     const casaOpts = IA.deals.filter(d => d.property_id).map(d => '<option value="' + d.property_id + '">' + OS_E((d.address || '').split(',')[0]) + '</option>').join('');
-    body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Vincular inversionista a casa</div><div class="k">reparto configurable por casa · default 50/50</div></div>'
+    body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Vincular inversionista a casa</div><div class="k">reparto configurable por casa · default 50/50</div></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
       + iaLbl('Inversionista', '<select id="ia-h-inv" class="osa-in">' + invOpts + '</select>')
       + iaLbl('Casa', '<select id="ia-h-casa" class="osa-in">' + casaOpts + '</select>')
@@ -750,14 +750,14 @@ function invAdminView() {
           : sort === 'monto' ? (+b.inversion_aportada || 0) - (+a.inversion_aportada || 0)
           : iaCasaName(a.property_id).localeCompare(iaCasaName(b.property_id)));
         return '<div class="card overx"><div class="chart-h"><div class="t">Holdings (' + rows.length + '/' + IA.holdings.length + ')</div><div class="k" style="display:flex;gap:6px;flex-wrap:wrap">'
-          + '<input id="ia-h-q" class="osa-in" style="padding:6px 10px;max-width:220px" placeholder="🔍 casa o inversionista…" value="' + OS_E(IA.hQ || '') + '" oninput="IA.hQ=this.value;osRender();var e=document.getElementById(\'ia-h-q\');e.focus();e.setSelectionRange(e.value.length,e.value.length)">'
+          + '<input id="ia-h-q" class="osa-in" style="padding:6px 10px;max-width:220px" placeholder="casa o inversionista…" value="' + OS_E(IA.hQ || '') + '" oninput="IA.hQ=this.value;osRender();var e=document.getElementById(\'ia-h-q\');e.focus();e.setSelectionRange(e.value.length,e.value.length)">'
           + '<select class="osa-in" style="padding:6px" onchange="IA.hSort=this.value;osRender()">' + [['casa', 'A-Z casa'], ['inv', 'A-Z inversionista'], ['monto', 'Mayor inversión']].map(o => '<option value="' + o[0] + '"' + ((IA.hSort || 'casa') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
           + '</div></div>'
           + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Casa</th><th style="text-align:right">Inversión</th><th style="text-align:right">Su %</th><th>Entrada</th><th style="text-align:right"></th></tr></thead><tbody>'
           + (rows.map(h => '<tr><td>' + OS_E(iaInvName(h.investor_airtable_id)) + '</td><td>' + OS_E(iaCasaName(h.property_id)) + '</td>'
             + '<td style="text-align:right">' + iaMoney(h.inversion_aportada) + '</td><td style="text-align:right">' + Math.round(h.reparto_pct * 100) + '%</td>'
             + '<td>' + (h.fecha_entrada || '—') + '</td>'
-            + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg)" onclick="iaSoftDeleteHolding(\'' + h.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Nada coincide.</td></tr>')
+            + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg)" onclick="iaSoftDeleteHolding(\'' + h.id + '\')">' + osIcon('pause') + '</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Nada coincide.</td></tr>')
           + '</tbody></table></div>';
       })();
   }
@@ -779,10 +779,10 @@ function invAdminView() {
     }
     const esEjemplo = IA.params.some(p => p.key === 'es_ejemplo' && p.value === 'true');
     body = '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">' + casaSel
-      + (esEjemplo ? '<span class="badge b-warn" title="Casa de ejemplo del Excel Modelo financiero - Renta VF">🧪 ejemplo del Excel</span>' : '')
+      + (esEjemplo ? '<span class="badge b-warn" title="Casa de ejemplo del Excel Modelo financiero - Renta VF">' + osIcon('flask') + ' ejemplo del Excel</span>' : '')
       + '<span class="meta">el portal del inversionista muestra EXACTAMENTE esto (motor compartido)</span></div>'
       + preview
-      + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">➕ Agregar parámetro</div><div class="k">todo "sin dato" del portal se carga acá (ej: estrategia, plan_salida, refi_lender, cashout_real)</div></div>'
+      + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Agregar parámetro</div><div class="k">todo "sin dato" del portal se carga acá (ej: estrategia, plan_salida, refi_lender, cashout_real)</div></div>'
       + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
       + '<input id="ia-np-key" class="osa-in" placeholder="key (ej: refi_lender)">'
       + '<input id="ia-np-val" class="osa-in" placeholder="valor">'
@@ -797,7 +797,7 @@ function invAdminView() {
 
   if (IA.tab === 'escenarios') body = iaTabEscenarios();
   const needsProd = ['dist', 'msgs', 'pipeline', 'global', 'docs2'].includes(IA.tab);
-  if (needsProd && !IA.dists) { iaLoadProducto().then(osRender); body = '<div class="empty">⏳</div>'; }
+  if (needsProd && !IA.dists) { iaLoadProducto().then(osRender); body = '<div class="empty">' + osIcon('loader') + '</div>'; }
   else if (IA.tab === 'dist') body = iaTabDist();
   else if (IA.tab === 'docs2') body = iaTabDocs();
   else if (IA.tab === 'msgs') body = iaTabMsgs();
@@ -805,7 +805,7 @@ function invAdminView() {
   else if (IA.tab === 'global') body = iaTabGlobal();
   else if (IA.tab === 'ledger') body = iaTabLedger();
 
-  return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
+  return '<h1>' + osIcon('gem') + ' Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'
     + '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' + tabBtns + '<button class="ibtn" style="margin-left:auto" onclick="iaLoad(true)">↻</button></div>'
     + body;

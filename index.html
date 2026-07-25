@@ -40,7 +40,7 @@
 <div id="auth-screen" class="fixed inset-0 bg-slate-900 flex items-center justify-center p-4 z-50">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
     <div class="text-center mb-6">
-      <div class="text-4xl mb-2">🏢</div>
+      <div class="mb-2"><svg class="icn" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg></div>
       <h1 class="text-2xl font-bold">Empresa OS</h1>
       <p class="text-sm text-slate-500 mt-1">Fix & Flip Holding</p>
     </div>
@@ -53,12 +53,12 @@
         <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
         <div class="relative">
           <input id="auth-password" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2 pr-10 text-sm" />
-          <button id="auth-eye" type="button" tabindex="-1" title="Mostrar/ocultar contraseña" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-base">👁</button>
+          <button id="auth-eye" type="button" tabindex="-1" title="Mostrar/ocultar contraseña" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-base"><svg class="icn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg></button>
         </div>
       </div>
       <div id="auth-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2"></div>
       <button id="auth-login-btn" class="w-full bg-slate-900 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-slate-700 mt-1">Iniciar sesión</button>
-      <button id="auth-magic-btn" class="w-full bg-slate-100 text-slate-800 text-sm font-medium py-2.5 rounded-lg hover:bg-slate-200">✉️ Entrar con link al email (sin contraseña)</button>
+      <button id="auth-magic-btn" class="w-full bg-slate-100 text-slate-800 text-sm font-medium py-2.5 rounded-lg hover:bg-slate-200"><svg class="icn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></svg> Entrar con link al email (sin contraseña)</button>
       <button id="auth-forgot-btn" class="w-full text-xs text-blue-600 hover:text-blue-800 mt-1 underline">¿Olvidaste tu contraseña?</button>
       <p class="text-xs text-slate-400 text-center mt-3">Tu sesión queda guardada en este dispositivo.<br/>¿No tenés cuenta? Pedile a un admin que te invite desde el Panel de Admin.</p>
     </div>
@@ -76,14 +76,14 @@
     <nav id="sidebar-nav" class="flex-1 px-2 py-3 space-y-1 overflow-y-auto scrollbar-thin"></nav>
     <div class="px-3 py-3 border-t border-slate-800 space-y-1">
       <button id="add-area-btn" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">+ Agregar área</button>
-      <button onclick="openTeamMgmt()" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">👥 Gestionar equipo</button>
-      <button onclick="openAuditLog()" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left">📜 Auditoría</button>
+      <button onclick="openTeamMgmt()" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left"><svg class="icn" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></svg> Gestionar equipo</button>
+      <button onclick="openAuditLog()" class="admin-only w-full text-xs text-slate-400 hover:text-white px-2 py-2 rounded hover:bg-slate-800 text-left"><svg class="icn" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h.01" /> <path d="M3 12h.01" /> <path d="M3 19h.01" /> <path d="M8 5h13" /> <path d="M8 12h13" /> <path d="M8 19h13" /></svg> Auditoría</button>
       <div class="px-2 pt-2 border-t border-slate-800">
         <button onclick="openMyProfile()" class="w-full text-left text-xs text-slate-400 hover:text-white truncate" id="user-email"></button>
         <div class="flex items-center justify-between mt-1">
           <span id="user-role" class="text-[10px] font-bold uppercase tracking-wide"></span>
           <div class="flex items-center gap-2">
-            <button onclick="openMyProfile()" class="text-xs text-slate-400 hover:text-white" title="Mi perfil">⚙️</button>
+            <button onclick="openMyProfile()" class="text-xs text-slate-400 hover:text-white" title="Mi perfil"><svg class="icn" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg></button>
             <button id="logout-btn" class="text-xs text-slate-400 hover:text-white">Salir</button>
           </div>
         </div>

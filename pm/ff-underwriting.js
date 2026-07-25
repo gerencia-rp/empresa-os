@@ -17,20 +17,20 @@ function UWct(k, def) { const v = (UW.cfgTxt || {})[k]; return v != null && v !=
 window.UWct = UWct;
 
 const UW_NAV = [
-  ['negocio', '💵', 'Del Negocio', 'Draw + Cash to Close'],
-  ['arv', '🏷️', 'ARV', 'comparables + appraisals'],
-  ['cashout', '💰', 'Cash-Out', 'refi capital recuperado'],
-  ['intereses', '📉', 'Intereses', 'Harmony + DSCR'],
-  ['ingreso', '🏠', 'Ingreso Mensual', 'renta por modelo de negocio'],
-  ['unificada', '🎯', 'Vista Unificada', 'one-pager GO/NO-GO'],
+  ['negocio', osIcon('banknote'), 'Del Negocio', 'Draw + Cash to Close'],
+  ['arv', osIcon('clipboard'), 'ARV', 'comparables + appraisals'],
+  ['cashout', osIcon('dollar'), 'Cash-Out', 'refi capital recuperado'],
+  ['intereses', osIcon('trending-down'), 'Intereses', 'Harmony + DSCR'],
+  ['ingreso', osIcon('house'), 'Ingreso Mensual', 'renta por modelo de negocio'],
+  ['unificada', osIcon('target'), 'Vista Unificada', 'one-pager GO/NO-GO'],
 ];
 // MODO VENTA (flip): el ARV es el precio de salida, no hay refi/renta → nav distinto
 const UW_NAV_VENTA = [
-  ['negocio', '💵', 'Del Negocio', 'Compra + obra'],
-  ['arv', '🏷️', 'ARV', 'precio de venta'],
-  ['venta', '🏦', 'Venta', 'Net Wire + utilidad + ROI'],
-  ['intereses', '📉', 'Intereses', 'HML durante la obra'],
-  ['unificada', '🎯', 'Vista Unificada', 'one-pager GO/NO-GO'],
+  ['negocio', osIcon('banknote'), 'Del Negocio', 'Compra + obra'],
+  ['arv', osIcon('clipboard'), 'ARV', 'precio de venta'],
+  ['venta', osIcon('landmark'), 'Venta', 'Net Wire + utilidad + ROI'],
+  ['intereses', osIcon('trending-down'), 'Intereses', 'HML durante la obra'],
+  ['unificada', osIcon('target'), 'Vista Unificada', 'one-pager GO/NO-GO'],
 ];
 function ffUwEstrategia() { return (UW.a && UW.a.inputs && UW.a.inputs.estrategia === 'venta') ? 'venta' : 'hold'; }
 function ffUwNav() { return ffUwEstrategia() === 'venta' ? UW_NAV_VENTA : UW_NAV; }
@@ -222,7 +222,7 @@ async function ffUwGuardar() {
   if (a.id) ({ error } = await sb.from('ff_underwriting_analyses').update(row).eq('id', a.id));
   else { ({ data: res, error } = await sb.from('ff_underwriting_analyses').insert(row).select('id').single()); if (res) a.id = res.id; }
   if (error) { alert('No se pudo guardar: ' + error.message); return; }
-  await ffUwLoad(); alert('✅ Análisis guardado.'); ffUwRender();
+  await ffUwLoad(); alert('Análisis guardado.'); ffUwRender();
 }
 window.ffUwNuevo = ffUwNuevo; window.ffUwCargarCasa = ffUwCargarCasa; window.ffUwAbrir = ffUwAbrir; window.ffUwGuardar = ffUwGuardar;
 // FIX guardado (CEO 14-jul): el re-render inmediato del onchange DESTRUÍA el botón 💾 entre
@@ -563,18 +563,18 @@ function ffUwShell() {
   const sel = `<select onchange="if(this.value==='__new')ffUwNuevo(false);else if(this.value==='__hyp')ffUwNuevo(true);else if(this.value.startsWith('deal:'))ffUwCargarCasa(this.value.slice(5));else if(this.value.startsWith('an:'))ffUwAbrir(this.value.slice(3));this.value='__keep'" style="background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:8px 11px;color:inherit;font-size:13px;min-width:230px">
     <option value="__keep">${a ? UW_E(a.nombre) + (a.es_hipotetica ? ' (hipotética)' : '') : '— Elegí un análisis —'}</option>
     <option value="__new">＋ Nuevo análisis</option>
-    <option value="__hyp">🧪 Casa hipotética</option>
+    <option value="__hyp">${osIcon('flask')} Casa hipotética</option>
     <optgroup label="Cargar casa real (${UW.deals.length})">${UW.deals.map(d => `<option value="deal:${d.id}">${UW_E((d.address || '').split(',')[0])}</option>`).join('')}</optgroup>
     <optgroup label="Análisis guardados (${UW.analyses.length})">${UW.analyses.map(x => `<option value="an:${x.id}">${UW_E(x.nombre)}${x.veredicto ? ' · ' + x.veredicto : ''}</option>`).join('')}</optgroup>
   </select>`;
   // toggle de estrategia (genera el flujo): venta = vender · hold = refinanciar y quedársela
   const estr = ffUwEstrategia();
   const estToggle = a ? `<div style="display:inline-flex;background:var(--glass,rgba(255,255,255,.06));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:11px;padding:3px;gap:2px" title="La estrategia genera las entradas y salidas del análisis">
-    ${[['venta', '🏷️ Vender (flip)', 'salida = vender al ARV'], ['hold', '🏠 Rentar (hold)', 'salida = refinanciar y quedársela']].map(([k, lbl, tip]) => `<button onclick="ffUwSetEstrategia('${k}')" title="${tip}" style="border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:${estr === k ? '700' : '500'};cursor:pointer;background:${estr === k ? 'linear-gradient(135deg,var(--a1,#12b5a0),var(--a2,#2f6ef0))' : 'transparent'};color:${estr === k ? '#fff' : 'inherit'}">${lbl}</button>`).join('')}
+    ${[['venta', 'Vender (flip)', 'salida = vender al ARV'], ['hold', 'Rentar (hold)', 'salida = refinanciar y quedársela']].map(([k, lbl, tip]) => `<button onclick="ffUwSetEstrategia('${k}')" title="${tip}" style="border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:${estr === k ? '700' : '500'};cursor:pointer;background:${estr === k ? 'linear-gradient(135deg,var(--a1,#6fbf95),var(--a2,#2f6ef0))' : 'transparent'};color:${estr === k ? '#fff' : 'inherit'}">${lbl}</button>`).join('')}
   </div>` : '';
-  const nav = a ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0">${estToggle}<div style="display:flex;gap:4px;flex-wrap:wrap">${ffUwNav().map(([k, i, n]) => `<button onclick="ffUwSub('${k}')" style="padding:8px 13px;border-radius:9px;border:1px solid ${UW.sub === k ? 'var(--a1,#12b5a0)' : 'var(--line,rgba(255,255,255,.12))'};background:${UW.sub === k ? 'rgba(18,181,160,.12)' : 'transparent'};color:inherit;cursor:pointer;font-size:12px;font-weight:${UW.sub === k ? '700' : '500'}">${i} ${n}</button>`).join('')}</div></div>` : '';
-  const body = a ? ffUwSubBody() : `<div class="card" style="text-align:center;padding:40px"><div style="font-size:42px;margin-bottom:10px">📊</div><h2 style="margin-bottom:8px">Suite de Underwriting</h2><p style="color:var(--txt3,#9fb0c9);font-size:13px;margin-bottom:16px">Elegí la estrategia y el análisis genera su flujo · calibrada con ${UW.deals.length} casas reales</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="repbtn" onclick="ffUwNuevo(false,'venta')">🏷️ Nuevo · Vender (flip)</button><button class="repbtn" onclick="ffUwNuevo(false,'hold')">🏠 Nuevo · Rentar (hold)</button><button class="repbtn ghost" onclick="ffUwNuevo(true,'venta')">🧪 Hipotética</button></div></div>`;
-  return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sel}${a ? `<input value="${UW_E(a.nombre)}" onchange="UW.a.nombre=this.value" style="background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:8px 11px;color:inherit;font-size:13px" placeholder="nombre del análisis"><button class="repbtn" data-uw-guardar="1">💾 Guardar</button><span style="font-size:11px;opacity:.6">${a.ff_deal_id ? '📎 casa real' : a.es_hipotetica ? '🧪 hipotética' : ''} · calibrado con ${UW.deals.length} casas</span>` : ''}</div>${nav}${body}`;
+  const nav = a ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0">${estToggle}<div style="display:flex;gap:4px;flex-wrap:wrap">${ffUwNav().map(([k, i, n]) => `<button onclick="ffUwSub('${k}')" style="padding:8px 13px;border-radius:9px;border:1px solid ${UW.sub === k ? 'var(--a1,#6fbf95)' : 'var(--line,rgba(255,255,255,.12))'};background:${UW.sub === k ? 'rgba(18,181,160,.12)' : 'transparent'};color:inherit;cursor:pointer;font-size:12px;font-weight:${UW.sub === k ? '700' : '500'}">${i} ${n}</button>`).join('')}</div></div>` : '';
+  const body = a ? ffUwSubBody() : `<div class="card" style="text-align:center;padding:40px"><div style="font-size:42px;margin-bottom:10px">${osIcon('chart')}</div><h2 style="margin-bottom:8px">Suite de Underwriting</h2><p style="color:var(--txt3,#a69d8c);font-size:13px;margin-bottom:16px">Elegí la estrategia y el análisis genera su flujo · calibrada con ${UW.deals.length} casas reales</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="repbtn" onclick="ffUwNuevo(false,'venta')">${osIcon('clipboard')} Nuevo · Vender (flip)</button><button class="repbtn" onclick="ffUwNuevo(false,'hold')">${osIcon('house')} Nuevo · Rentar (hold)</button><button class="repbtn ghost" onclick="ffUwNuevo(true,'venta')">${osIcon('flask')} Hipotética</button></div></div>`;
+  return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${sel}${a ? `<input value="${UW_E(a.nombre)}" onchange="UW.a.nombre=this.value" style="background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:8px 11px;color:inherit;font-size:13px" placeholder="nombre del análisis"><button class="repbtn" data-uw-guardar="1">${osIcon('save')} Guardar</button><span style="font-size:11px;opacity:.6">${a.ff_deal_id ? 'casa real' : a.es_hipotetica ? 'hipotética' : ''} · calibrado con ${UW.deals.length} casas</span>` : ''}</div>${nav}${body}`;
 }
 function ffUwSubBody() {
   // guard: si la estrategia no incluye este tab (p.ej. venir de hold con sub='ingreso' a venta), volvé a Negocio
@@ -591,40 +591,40 @@ function UW_IN(lab, k, val, opts) {
   const pre = tipo === 'money' ? UW_DLR : '', suf = tipo === 'pct' ? '%' : '';
   const ph = opts.ph != null ? opts.ph : '0';
   const shown = UW_FMT(val, tipo);
-  return '<div style="margin-bottom:10px"><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);font-weight:600;margin-bottom:3px">' + lab + (opts.help ? '<span title="' + UW_E(opts.help) + '" style="opacity:.45;margin-left:5px;cursor:help;font-size:11px">&#9432;</span>' : '') + '</div><div style="display:flex;align-items:center;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:0 10px">' + (pre ? '<span style="opacity:.5;font-size:13px">' + pre + '</span>' : '') + '<input value="' + shown + '" placeholder="' + ph + '" onchange="ffUwSet(&quot;' + k + '&quot;,this.value.replace(/[,%\\s' + UW_DLR + ']/g,&quot;&quot;))" style="flex:1;background:none;border:none;padding:8px 6px;color:inherit;font-size:14px;font-weight:600;outline:none">' + (suf ? '<span style="opacity:.5;font-size:13px">' + suf + '</span>' : '') + '</div>' + (opts.hint ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:2px">' + opts.hint + '</div>' : '') + '</div>';
+  return '<div style="margin-bottom:10px"><div style="font-size:11.5px;color:var(--txt2,#d9d1c2);font-weight:600;margin-bottom:3px">' + lab + (opts.help ? '<span title="' + UW_E(opts.help) + '" style="opacity:.45;margin-left:5px;cursor:help;font-size:11px">&#9432;</span>' : '') + '</div><div style="display:flex;align-items:center;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px;padding:0 10px">' + (pre ? '<span style="opacity:.5;font-size:13px">' + pre + '</span>' : '') + '<input value="' + shown + '" placeholder="' + ph + '" onchange="ffUwSet(&quot;' + k + '&quot;,this.value.replace(/[,%\\s' + UW_DLR + ']/g,&quot;&quot;))" style="flex:1;background:none;border:none;padding:8px 6px;color:inherit;font-size:14px;font-weight:600;outline:none">' + (suf ? '<span style="opacity:.5;font-size:13px">' + suf + '</span>' : '') + '</div>' + (opts.hint ? '<div style="font-size:10px;color:var(--txt3,#a69d8c);margin-top:2px">' + opts.hint + '</div>' : '') + '</div>';
 }
 function UW_HERO(titulo, valor, sub, color) {
-  const c = color || 'var(--a1,#12b5a0)';
-  return '<div style="background:linear-gradient(135deg,' + c + '22,transparent);border:1px solid ' + c + '55;border-radius:14px;padding:18px 22px;margin-bottom:16px"><div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + titulo + '</div><div style="font-size:40px;font-weight:800;color:' + c + ';line-height:1.1;margin:4px 0">' + valor + '</div>' + (sub ? '<div style="font-size:12px;color:var(--txt3,#9fb0c9)">' + sub + '</div>' : '') + '</div>';
+  const c = color || 'var(--a1,#6fbf95)';
+  return '<div style="background:linear-gradient(135deg,' + c + '22,transparent);border:1px solid ' + c + '55;border-radius:14px;padding:18px 22px;margin-bottom:16px"><div style="font-size:12px;color:var(--txt2,#d9d1c2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + titulo + '</div><div style="font-size:40px;font-weight:800;color:' + c + ';line-height:1.1;margin:4px 0">' + valor + '</div>' + (sub ? '<div style="font-size:12px;color:var(--txt3,#a69d8c)">' + sub + '</div>' : '') + '</div>';
 }
 function UW_BLOCK(subtitulo, inner) {
-  return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--a1,#12b5a0);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--line,rgba(255,255,255,.08))">' + subtitulo + '</div>' + inner + '</div>';
+  return '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--a1,#6fbf95);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--line,rgba(255,255,255,.08))">' + subtitulo + '</div>' + inner + '</div>';
 }
 function UW_ROW(l, v, cls) {
-  return '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px' + (cls === 'tot' ? ';font-weight:700;border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:8px' : '') + '"><span style="color:var(--txt2,#c9d5ea)">' + l + '</span><b class="' + (cls && cls !== 'tot' ? cls : '') + '">' + UW_M(v) + '</b></div>';
+  return '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px' + (cls === 'tot' ? ';font-weight:700;border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:6px;padding-top:8px' : '') + '"><span style="color:var(--txt2,#d9d1c2)">' + l + '</span><b class="' + (cls && cls !== 'tot' ? cls : '') + '">' + UW_M(v) + '</b></div>';
 }
 function UW_CARD(titulo, proposito, inner) {
-  return '<div class="card" style="padding:20px"><div style="margin-bottom:14px"><div style="font-size:17px;font-weight:700">' + titulo + '</div><div style="font-size:12px;color:var(--txt3,#9fb0c9);margin-top:2px">' + proposito + '</div></div>' + inner + '</div>';
+  return '<div class="card" style="padding:20px"><div style="margin-bottom:14px"><div style="font-size:17px;font-weight:700">' + titulo + '</div><div style="font-size:12px;color:var(--txt3,#a69d8c);margin-top:2px">' + proposito + '</div></div>' + inner + '</div>';
 }
 // ─── Calc 1 · UI patrón Cash-Out (ola 1, 12-jul): hero + 4 inputs + ajustes colapsados. Lógica intacta en ffUwCalcNegocio. ───
 function ffUwViewNegocio() {
   const inp = UW.a.inputs, r = ffUwCalcNegocio(inp);
   const estToggle = '<div style="display:flex;gap:6px;margin-bottom:10px"><button class="repbtn ' + (inp.usar_estimador ? 'ghost' : '') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'usar_estimador\',false)">Costo real (Remodelación)</button><button class="repbtn ' + (inp.usar_estimador ? '' : 'ghost') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'usar_estimador\',true)">Estimador rápido $/sqft</button></div>';
   const estBox = inp.usar_estimador
-    ? '<div style="background:color-mix(in srgb, var(--a1) 7%, transparent);border-radius:10px;padding:12px;margin-bottom:16px">' + kitInput('Superficie (sqft)', 'pies cuadrados a remodelar', inp.est_sqft, "ffUwSet('est_sqft',VAL)", { plain: true }) + '<div style="display:flex;gap:5px;margin-bottom:6px">' + ['suave', 'media', 'pesada'].map(t => '<button class="repbtn ' + (inp.est_tipo === t ? '' : 'ghost') + '" style="flex:1;padding:6px;font-size:11px;text-transform:capitalize" onclick="ffUwSet(\'est_tipo\',\'' + t + '\')">' + t + ' $' + ffUwPsf(t) + '</button>').join('') + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9)">' + (+inp.est_sqft || 0) + ' sqft &times; $' + ffUwPsf(inp.est_tipo) + '/sqft = <b>' + UW_M(r.remod) + '</b> &middot; afuera costaría ' + UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0))
-      + (() => { const afuera = UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0); const sug = Math.round((r.remod + afuera) / 2); return (r.remod > 0 && afuera > 0) ? ' &middot; <b style="color:var(--a1,#12b5a0)">sugerido (media): ' + UW_M(sug) + '</b> <button class="repbtn ghost" style="padding:2px 8px;font-size:10px" onclick="ffUwSet(\'remod_directo\',' + sug + ');ffUwSet(\'usar_estimador\',false)">→ usar</button>' : ''; })() + '</div></div>'
-    : kitInput('Costo de remodelación', 'real de la empresa de Remodelación', inp.remod_directo, "ffUwSet('remod_directo',VAL)", { foot: r.remod === 0 ? '⚠ sin costo real cargado — usá el estimador rápido' : 'del histórico de Remodelación' });
+    ? '<div style="background:color-mix(in srgb, var(--a1) 7%, transparent);border-radius:10px;padding:12px;margin-bottom:16px">' + kitInput('Superficie (sqft)', 'pies cuadrados a remodelar', inp.est_sqft, "ffUwSet('est_sqft',VAL)", { plain: true }) + '<div style="display:flex;gap:5px;margin-bottom:6px">' + ['suave', 'media', 'pesada'].map(t => '<button class="repbtn ' + (inp.est_tipo === t ? '' : 'ghost') + '" style="flex:1;padding:6px;font-size:11px;text-transform:capitalize" onclick="ffUwSet(\'est_tipo\',\'' + t + '\')">' + t + ' $' + ffUwPsf(t) + '</button>').join('') + '</div><div style="font-size:11px;color:var(--txt3,#a69d8c)">' + (+inp.est_sqft || 0) + ' sqft &times; $' + ffUwPsf(inp.est_tipo) + '/sqft = <b>' + UW_M(r.remod) + '</b> &middot; afuera costaría ' + UW_M(UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0))
+      + (() => { const afuera = UWc('psf_mercado_externo', 110) * (+inp.est_sqft || 0); const sug = Math.round((r.remod + afuera) / 2); return (r.remod > 0 && afuera > 0) ? ' &middot; <b style="color:var(--a1,#6fbf95)">sugerido (media): ' + UW_M(sug) + '</b> <button class="repbtn ghost" style="padding:2px 8px;font-size:10px" onclick="ffUwSet(\'remod_directo\',' + sug + ');ffUwSet(\'usar_estimador\',false)">→ usar</button>' : ''; })() + '</div></div>'
+    : kitInput('Costo de remodelación', 'real de la empresa de Remodelación', inp.remod_directo, "ffUwSet('remod_directo',VAL)", { foot: r.remod === 0 ? 'sin costo real cargado — usá el estimador rápido' : 'del histórico de Remodelación' });
   const alerta = r.deficitRiesgo ? '<div class="ui-error" style="margin-top:8px">&#9888; Riesgo de déficit: el remod del draw es $' + r.psfDraw + '/sqft, por debajo del calibrado ($' + r.psfAlerta + '/sqft). El draw puede no cubrir la obra real.</div>' : '';
   // O7 (auditoría 13-jul): supuestos desde la HISTORIA real — visibles, aplicación a 1 clic (humano)
   const cal = UW.calib;
   const supuestosO7 = cal ? '<div style="background:rgba(18,181,160,.07);border:1px solid rgba(18,181,160,.28);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:11.5px">'
-    + '⚙️ <b>Historia real</b>: obra <b>$' + (cal.psf_real || '—') + '/sqft</b> (' + cal.psf_n + ' finalizadas) · duración <b>' + (cal.obra_meses_prom || '—') + ' m</b> · holding hasta rentar <b>' + (cal.holding_meses_prom || '—') + ' m</b>. Hoy: $/sqft media <b>$' + ffUwPsf('media') + '</b> · hold <b>' + r.mesesHold + ' m</b> (default = obra calibrada).'
+    + '' + osIcon('settings') + ' <b>Historia real</b>: obra <b>$' + (cal.psf_real || '—') + '/sqft</b> (' + cal.psf_n + ' finalizadas) · duración <b>' + (cal.obra_meses_prom || '—') + ' m</b> · holding hasta rentar <b>' + (cal.holding_meses_prom || '—') + ' m</b>. Hoy: $/sqft media <b>$' + ffUwPsf('media') + '</b> · hold <b>' + r.mesesHold + ' m</b> (default = obra calibrada).'
     + (cal.psf_real && Math.abs(cal.psf_real - ffUwPsf('media')) > 3 && window.apCfgSet ? ' <button class="repbtn" style="padding:3px 10px;font-size:10.5px" onclick="apCfgSet(\'psf_media\',' + cal.psf_real + ')">aplicar $' + cal.psf_real + '/sqft</button>' : '')
     + (cal.holding_meses_prom && Math.abs(Math.round(cal.holding_meses_prom) - UWc('default_meses_hold', 6)) >= 1 && window.apCfgSet ? ' <button class="repbtn ghost" style="padding:3px 10px;font-size:10.5px" onclick="apCfgSet(\'default_meses_hold\',' + Math.round(cal.holding_meses_prom) + ')">aplicar hold ' + Math.round(cal.holding_meses_prom) + ' m</button>' : '')
     + '</div>' : '';
   // hero protagonista: lo que pone el inversionista (+ draw como dato hermano)
   const hero = kitHero('El inversionista pone', UW_M2(r.cashToClose),
-    'down + gastos de cierre &minus; créditos (HUD) · Draw al Harmony: <b>' + UW_M(r.draw) + '</b>' + (r.ctcReal ? ' · 🎯 real Airtable ' + UW_M(r.ctcReal) + ' (Δ ' + UW_M(r.cashToClose - r.ctcReal) + ')' : ''), 'var(--a2,#2f6ef0)');
+    'down + gastos de cierre &minus; créditos (HUD) · Draw al Harmony: <b>' + UW_M(r.draw) + '</b>' + (r.ctcReal ? ' · real Airtable ' + UW_M(r.ctcReal) + ' (Δ ' + UW_M(r.cashToClose - r.ctcReal) + ')' : ''), 'var(--a2,#2f6ef0)');
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
     + kitInput('Precio de compra', 'lo que se paga por la casa', inp.purchase, "ffUwSet('purchase',VAL)")
     + estToggle + estBox
@@ -632,17 +632,17 @@ function ffUwViewNegocio() {
     + kitInputSm('% de la COMPRA que presta', r.pctCompra, "ffUwSet('hml_pct_compra',VAL)", { pct: true })
     + kitInputSm('% de la REMODELACIÓN que presta', r.pctRemo, "ffUwSet('hml_pct_remo',VAL)", { pct: true })
     + '</div>'
-    + '<div style="font-size:11px;color:var(--txt3,#9fb0c9);margin:-4px 0 10px">típico Harmony: <b>90%</b> de la compra · <b>100%</b> de la remo — préstamo = ' + r.pctCompra + '%×compra + ' + r.pctRemo + '%×' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + '</div>'
+    + '<div style="font-size:11px;color:var(--txt3,#a69d8c);margin:-4px 0 10px">típico Harmony: <b>90%</b> de la compra · <b>100%</b> de la remo — préstamo = ' + r.pctCompra + '%×compra + ' + r.pctRemo + '%×' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + kitInputSm('Meses de OBRA (remodelación)', r.mesesObra, "ffUwSet('meses_obra',VAL)")
     + kitInputSm('Meses HASTA RENTAR O VENDER (después de la obra)', r.mesesRenta, "ffUwSet('meses_renta',VAL)")
     + '</div>'
-    + '<div style="font-size:11px;color:var(--txt3,#9fb0c9);margin:-4px 0 10px">⏱ obra ' + r.mesesObra + ' m + hasta rentar/vender ' + r.mesesRenta + ' m = <b>holding ' + r.mesesHold + ' m</b> — sobre ESA suma corren intereses, utilities e insurance (lo real que se paga y sale de los draws) · obra calibrada: ' + ((UW.calib && UW.calib.obra_meses_prom) || '—') + ' m</div>'
+    + '<div style="font-size:11px;color:var(--txt3,#a69d8c);margin:-4px 0 10px">' + osIcon('clock') + ' obra ' + r.mesesObra + ' m + hasta rentar/vender ' + r.mesesRenta + ' m = <b>holding ' + r.mesesHold + ' m</b> — sobre ESA suma corren intereses, utilities e insurance (lo real que se paga y sale de los draws) · obra calibrada: ' + ((UW.calib && UW.calib.obra_meses_prom) || '—') + ' m</div>'
     + '</div>';
   const adv = '<details ' + (UW.negAdv ? 'open' : '') + ' ontoggle="UW.negAdv=this.open" style="background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:18px;padding:4px 22px;margin-bottom:16px">'
-    + '<summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--txt3,#9fb0c9);padding:14px 0;list-style:none">⚙︎ Ajustes (opcional) — draw y cierre HUD, ya calibrados</summary>'
+    + '<summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--txt3,#a69d8c);padding:14px 0;list-style:none">' + osIcon('settings') + '︎ Ajustes (opcional) — draw y cierre HUD, ya calibrados</summary>'
     + '<div style="padding-bottom:16px">'
-    + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--a1,#12b5a0);margin:4px 0 8px">Del draw</div>'
+    + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--a1,#6fbf95);margin:4px 0 8px">Del draw</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + kitInputSm('Utilities / mes', inp.utilities_mes, "ffUwSet('utilities_mes',VAL)")
     + kitInputSm('Insurance de la casa / mes', inp.insurance_mes, "ffUwSet('insurance_mes',VAL)")
@@ -672,26 +672,26 @@ function ffUwViewNegocio() {
     + kitInputSm('Courier', inp.cc_courier, "ffUwSet('cc_courier',VAL)")
     + kitInputSm('Guaranty', inp.cc_guaranty, "ffUwSet('cc_guaranty',VAL)")
     + '</div>'
-    + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--pos,#34d399);margin:16px 0 8px">Créditos al cierre (ya pagados, se acreditan)</div>'
+    + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--pos,#63c08e);margin:16px 0 8px">Créditos al cierre (ya pagados, se acreditan)</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + kitInputSm('Earnest money', inp.earnest, "ffUwSet('earnest',VAL)")
     + kitInputSm('Option fee', inp.option_fee, "ffUwSet('option_fee',VAL)")
     + kitInputSm('Proración de impuestos', inp.prorata_impuestos, "ffUwSet('prorata_impuestos',VAL)")
     + '</div>'
-    + '<div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="repbtn ' + (inp.wholesale ? '' : 'ghost') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'wholesale\',' + (inp.wholesale ? 'false' : 'true') + ')">' + (inp.wholesale ? '☑' : '☐') + ' Deal por wholesaler</button>'
-    + (inp.wholesale ? '<div style="flex:1">' + kitInputSm('Assignment fee', inp.cc_assignment, "ffUwSet('cc_assignment',VAL)") + '</div>' : '<span style="font-size:10px;color:var(--txt3,#9fb0c9)">assignment fee al cierre (Bethune: $40,000)</span>') + '</div>'
+    + '<div style="margin-top:14px;display:flex;gap:8px;align-items:center"><button class="repbtn ' + (inp.wholesale ? '' : 'ghost') + '" style="padding:5px 11px;font-size:11px" onclick="ffUwSet(\'wholesale\',' + (inp.wholesale ? 'false' : 'true') + ')">' + (inp.wholesale ? osIcon('check-circle') : '☐') + ' Deal por wholesaler</button>'
+    + (inp.wholesale ? '<div style="flex:1">' + kitInputSm('Assignment fee', inp.cc_assignment, "ffUwSet('cc_assignment',VAL)") + '</div>' : '<span style="font-size:10px;color:var(--txt3,#a69d8c)">assignment fee al cierre (Bethune: $40,000)</span>') + '</div>'
     + '</div></details>';
   const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
-    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">Draw al Harmony</div>'
-    + kitRow('Remodelación', r.remod) + kitRow(+inp.intereses_override > 0 ? 'Intereses HML (MANUAL — <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'intereses_override\',0)">↩ volver al calculado</a>)' : 'Intereses HML (' + r.mesesHold + 'm de HOLDING @ ' + r.tasaHml + '%/año · solo interés · sobre el préstamo bruto)', r.intereses) + kitRow('Utilities (' + r.mesesHold + 'm de holding)', r.utilities)
+    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c);margin-bottom:4px">Draw al Harmony</div>'
+    + kitRow('Remodelación', r.remod) + kitRow(+inp.intereses_override > 0 ? 'Intereses HML (MANUAL — <a style="cursor:pointer;color:var(--a1,#6fbf95)" onclick="ffUwSet(\'intereses_override\',0)">↩ volver al calculado</a>)' : 'Intereses HML (' + r.mesesHold + 'm de HOLDING @ ' + r.tasaHml + '%/año · solo interés · sobre el préstamo bruto)', r.intereses) + kitRow('Utilities (' + r.mesesHold + 'm de holding)', r.utilities)
     + (r.insurance > 0 ? kitRow('Insurance de la casa (' + r.mesesHold + 'm)', r.insurance) : '')
     + kitRow('Muebles + appraisal + permisos + dumpster + AC', (+inp.muebles) + (+inp.appraisal_cost) + (+inp.permisos) + (+inp.dumpster) + (+inp.ac))
     + (+inp.cashout_en_draw > 0 ? kitRow('Cash-out incluido', +inp.cashout_en_draw) : '')
     + kitRow('Contingencia (' + (+inp.contingencia_fija > 0 ? 'FIJA' : inp.contingencia_pct + '%') + ')', r.contingencia)
-    + kitRow('<b>= Draw total</b>', r.draw, { big: true, color: 'var(--a1,#12b5a0)' })
-    + (+inp._draw_real > 0 ? '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:4px">⛓ Draw real del deal (Airtable): ' + UW_M(+inp._draw_real) + ' &middot; &Delta; modelo ' + UW_M(r.draw - inp._draw_real) + '</div>' : '')
+    + kitRow('<b>= Draw total</b>', r.draw, { big: true, color: 'var(--a1,#6fbf95)' })
+    + (+inp._draw_real > 0 ? '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:4px">⛓ Draw real del deal (Airtable): ' + UW_M(+inp._draw_real) + ' &middot; &Delta; modelo ' + UW_M(r.draw - inp._draw_real) + '</div>' : '')
     + alerta + supuestosO7
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">El inversionista pone (HUD)</div>'
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c)">El inversionista pone (HUD)</div>'
     + kitRow(r.baseModo === 'rehab' ? 'Base (compra ' + UW_M(+inp.purchase) + ' + rehab ' + UW_M(r.remod) + ')' : 'Base (compra ' + UW_M(+inp.purchase) + ' + DRAW TOTAL ' + UW_M(r.draw) + ')', r.baseHud)
     + kitRow('&minus; Préstamo (' + r.pctCompra + '% compra + ' + r.pctRemo + '% ' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + ')', r.prestamo, { neg: true })
     + kitRow('= Down payment', r.downPayment)
@@ -700,22 +700,22 @@ function ffUwViewNegocio() {
     + (inp.wholesale ? kitRow('+ Assignment fee (wholesaler)', r.assignment) : '')
     + kitRow('&minus; Créditos (earnest + option + proración)', r.creditos, { neg: true })
     + kitRow('<b>= EL INVERSIONISTA PONE</b>', null, { big: true, txt: UW_M2(r.cashToClose), color: 'var(--a2,#2f6ef0)', last: true })
-    + '<div style="font-size:11px;color:var(--txt2,#c9d5ea);margin-top:8px;background:color-mix(in srgb, var(--a2) 8%, transparent);border-radius:8px;padding:8px 10px">Ya pagado como earnest/option: <b>' + UW_M2(r.yaPagado) + '</b> (acreditado) &middot; falta al cierre: <b>' + UW_M2(r.cashToClose) + '</b></div>'
-    + (r.closingReal ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">Gastos de cierre reales (Airtable): ' + UW_M(r.closingReal) + ' &middot; &Delta; ' + UW_M(r.closing - r.closingReal) + '</div>' : '')
+    + '<div style="font-size:11px;color:var(--txt2,#d9d1c2);margin-top:8px;background:color-mix(in srgb, var(--a2) 8%, transparent);border-radius:8px;padding:8px 10px">Ya pagado como earnest/option: <b>' + UW_M2(r.yaPagado) + '</b> (acreditado) &middot; falta al cierre: <b>' + UW_M2(r.cashToClose) + '</b></div>'
+    + (r.closingReal ? '<div style="font-size:10px;color:var(--txt3,#a69d8c);margin-top:6px">Gastos de cierre reales (Airtable): ' + UW_M(r.closingReal) + ' &middot; &Delta; ' + UW_M(r.closing - r.closingReal) + '</div>' : '')
     // 1C · lo que RECIBE el negocio vs lo que DEBE al refinanciar — dos números distintos (punto 1)
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">El hard money te presta (desembolso neto)</div>'
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c)">El hard money te presta (desembolso neto)</div>'
     + kitRow('Préstamo bruto (' + r.pctCompra + '% compra + ' + r.pctRemo + '% ' + (r.baseModo === 'rehab' ? 'rehab' : 'draw') + ')', r.prestamo)
     + kitRow('&minus; Puntos/originación (' + (+inp.cc_origination_pct || 0) + '%)', r.origination, { neg: true })
     + kitRow('&minus; Fees de cierre del lender (doc + draw + uw)', r.feesLenderCierre, { neg: true })
-    + kitRow('<b>= Desembolso neto al negocio</b>', null, { big: true, txt: UW_M2(r.desembolsoNeto), color: 'var(--pos,#34d399)' })
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Payoff del HML al refinanciar</div>'
+    + kitRow('<b>= Desembolso neto al negocio</b>', null, { big: true, txt: UW_M2(r.desembolsoNeto), color: 'var(--pos,#63c08e)' })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:12px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c)">Payoff del HML al refinanciar</div>'
     + kitRow('Principal del HML', r.prestamo)
     + kitRow('+ Interés/fees que se capitalizan (term sheet)', r.capitaliza || 0)
-    + kitRow('<b>= Lo que le pagás al refinanciar</b>', null, { big: true, txt: UW_M2(r.payoffHml), color: 'var(--amber,#e7b65e)', last: true })
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:6px">⛓ Este payoff alimenta SOLO la Calc 3 (Cash-Out) — no lo re-tecleás. Recibís ' + UW_M2(r.desembolsoNeto) + ' pero debés ' + UW_M2(r.payoffHml) + ': no son lo mismo.</div>'
+    + kitRow('<b>= Lo que le pagás al refinanciar</b>', null, { big: true, txt: UW_M2(r.payoffHml), color: 'var(--amber,#dca94f)', last: true })
+    + '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:6px">⛓ Este payoff alimenta SOLO la Calc 3 (Cash-Out) — no lo re-tecleás. Recibís ' + UW_M2(r.desembolsoNeto) + ' pero debés ' + UW_M2(r.payoffHml) + ': no son lo mismo.</div>'
     + '</div>';
   return '<div style="max-width:560px;margin:0 auto">'
-    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Del Negocio</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Compra + obra: cuánto desembolsa el prestamista y cuánto pone el inversionista.</div></div>'
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Del Negocio</div><div style="font-size:13px;color:var(--txt3,#a69d8c)">Compra + obra: cuánto desembolsa el prestamista y cuánto pone el inversionista.</div></div>'
     + hero + inputs + adv + desglose + '</div>';
 }
 function ffUwRender() {
@@ -729,12 +729,12 @@ function ffUwViewArv() {
   // El ARV de Airtable sigue siendo la fuente de verdad de MAO/cash-out; el motor produce el estimado profesional.
   if (window.ffArvProView) return ffArvProView();
   const inp = UW.a.inputs, o = ffUwComputeAll(), a = o.arv;
-  const hero = UW_HERO('ARV (valor de reventa)', UW_M(a.probable), a.esAirtable ? 'de Airtable (fuente de verdad) &middot; confianza ' + a.confianza : 'estimado por comps &middot; confianza ' + a.confianza, a.esAirtable ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
+  const hero = UW_HERO('ARV (valor de reventa)', UW_M(a.probable), a.esAirtable ? 'de Airtable (fuente de verdad) &middot; confianza ' + a.confianza : 'estimado por comps &middot; confianza ' + a.confianza, a.esAirtable ? 'var(--pos,#63c08e)' : 'var(--amber,#dca94f)');
   const izq = UW_CARD('2 &middot; ARV', 'El valor de la casa remodelada. La fuente de verdad es el ARV de Airtable.',
     UW_BLOCK('Fuente de verdad', UW_IN('ARV de Airtable', 'arv', inp.arv, { help: 'Propiedades.ARV — alimenta MAO, cash-out y margen en toda la app' }) + UW_IN('Appraisal real (ancla)', 'appraisal', inp.appraisal, { help: 'Valor de tasación cuando exista' })) +
-    UW_BLOCK('Referencia por comparables', UW_IN('Superficie (sqft)', 'est_sqft', inp.est_sqft, { tipo: 'num' }) + '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">$/sqft de la zona: $' + a.psfZona + ' &rarr; comps = ' + UW_M(a.arvComps) + ' <b>(referencia)</b></div>' + ffUwRcCompsBox()) +
-    '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:6px">&#128268; Mercado en vivo (PropStream/HAR): pendiente de enganche.</div>');
-  const der = hero + '<div class="card" style="padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:8px">Rango de valor</div>' + UW_ROW('&#128317; Conservador', a.conservador) + UW_ROW('&#127919; Probable', a.probable, 'tot') + UW_ROW('&#128316; Optimista', a.optimista) + '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:8px">Comps (referencia): ' + UW_M(a.arvComps) + (a.appraisal > 0 ? ' &middot; appraisal: ' + UW_M(a.appraisal) : '') + '</div></div>';
+    UW_BLOCK('Referencia por comparables', UW_IN('Superficie (sqft)', 'est_sqft', inp.est_sqft, { tipo: 'num' }) + '<div style="font-size:11px;color:var(--txt3,#a69d8c)">$/sqft de la zona: $' + a.psfZona + ' &rarr; comps = ' + UW_M(a.arvComps) + ' <b>(referencia)</b></div>' + ffUwRcCompsBox()) +
+    '<div style="font-size:10px;color:var(--txt3,#a69d8c);margin-top:6px">&#128268; Mercado en vivo (PropStream/HAR): pendiente de enganche.</div>');
+  const der = hero + '<div class="card" style="padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#a69d8c);margin-bottom:8px">Rango de valor</div>' + UW_ROW('&#128317; Conservador', a.conservador) + UW_ROW('&#127919; Probable', a.probable, 'tot') + UW_ROW('&#128316; Optimista', a.optimista) + '<div style="font-size:10px;color:var(--txt3,#a69d8c);margin-top:8px">Comps (referencia): ' + UW_M(a.arvComps) + (a.appraisal > 0 ? ' &middot; appraisal: ' + UW_M(a.appraisal) : '') + '</div></div>';
   return '<div class="grid k2" style="gap:16px;align-items:start"><div>' + izq + '</div><div>' + der + '</div></div>';
 }
 // ─── Calc 3 · UI rediseñada (12-jul, mockup CEO): 3 inputs protagonistas + hero + ajustes colapsados.
@@ -743,34 +743,34 @@ function ffUwViewCashout() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), c = o.cashout;
   const infinito = c.recuperaPct != null && c.recuperaPct >= 100;
   const pos = c.cashOut >= 0;
-  const heroCol = pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)';
+  const heroCol = pos ? 'var(--pos,#63c08e)' : 'var(--neg,#e4756a)';
   // input grande (mockup): label + hint, caja redondeada, número a la derecha
   const IN3 = (lab, hint, k, val, opts) => {
     opts = opts || {}; const pct = !!opts.pct;
-    return '<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">' + lab + (hint ? ' <span style="color:var(--txt3,#9fb0c9);font-weight:400;font-size:12px">— ' + hint + '</span>' : '') + '</div>'
+    return '<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">' + lab + (hint ? ' <span style="color:var(--txt3,#a69d8c);font-weight:400;font-size:12px">— ' + hint + '</span>' : '') + '</div>'
       + '<div style="display:flex;align-items:center;border:1.5px solid var(--line,rgba(255,255,255,.14));border-radius:12px;padding:0 12px;background:var(--card,rgba(255,255,255,.04))">'
-      + (pct ? '' : '<span style="color:var(--txt3,#9fb0c9);font-size:15px">' + UW_DLR + '</span>')
+      + (pct ? '' : '<span style="color:var(--txt3,#a69d8c);font-size:15px">' + UW_DLR + '</span>')
       + '<input value="' + UW_FMT(val, pct ? 'pct' : 'money') + '" placeholder="0" onchange="ffUwSet(&quot;' + k + '&quot;,this.value.replace(/[,%\\s' + UW_DLR + ']/g,&quot;&quot;))" style="border:0;outline:0;width:100%;padding:12px 8px;font-size:17px;font-weight:600;color:inherit;background:transparent;text-align:right">'
-      + (pct ? '<span style="color:var(--txt3,#9fb0c9);font-size:15px">%</span>' : '') + '</div>'
-      + (opts.foot ? '<div style="font-size:11px;color:var(--txt3,#9fb0c9);margin-top:4px">' + opts.foot + '</div>' : '') + '</div>';
+      + (pct ? '<span style="color:var(--txt3,#a69d8c);font-size:15px">%</span>' : '') + '</div>'
+      + (opts.foot ? '<div style="font-size:11px;color:var(--txt3,#a69d8c);margin-top:4px">' + opts.foot + '</div>' : '') + '</div>';
   };
   const IN3s = (lab, k, val, opts) => { // versión compacta para "Ajustes" (grilla 2 col)
     opts = opts || {}; const pct = !!opts.pct, plain = !!opts.plain;
-    return '<div><div style="font-size:12px;font-weight:600;margin-bottom:5px;color:var(--txt2,#c9d5ea)">' + lab + '</div>'
+    return '<div><div style="font-size:12px;font-weight:600;margin-bottom:5px;color:var(--txt2,#d9d1c2)">' + lab + '</div>'
       + '<div style="display:flex;align-items:center;border:1.5px solid var(--line,rgba(255,255,255,.12));border-radius:10px;padding:0 10px;background:var(--card,rgba(255,255,255,.04))">'
-      + (pct || plain ? '' : '<span style="color:var(--txt3,#9fb0c9);font-size:13px">' + UW_DLR + '</span>')
+      + (pct || plain ? '' : '<span style="color:var(--txt3,#a69d8c);font-size:13px">' + UW_DLR + '</span>')
       + '<input value="' + UW_FMT(val, pct ? 'pct' : plain ? 'num' : 'money') + '" placeholder="0" onchange="ffUwSet(&quot;' + k + '&quot;,this.value.replace(/[,%\\s' + UW_DLR + ']/g,&quot;&quot;))" style="border:0;outline:0;width:100%;padding:9px 6px;font-size:14px;font-weight:600;color:inherit;background:transparent;text-align:right">'
-      + (pct ? '<span style="color:var(--txt3,#9fb0c9);font-size:13px">%</span>' : '') + '</div></div>';
+      + (pct ? '<span style="color:var(--txt3,#a69d8c);font-size:13px">%</span>' : '') + '</div></div>';
   };
   const ROW3 = (l, v, opts) => {
     opts = opts || {};
-    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;' + (opts.last ? '' : 'border-bottom:1px dashed var(--line,rgba(255,255,255,.1));') + (opts.big ? 'font-size:15px;' : 'font-size:13px;') + 'color:var(--txt2,#c9d5ea)"><span>' + l + '</span><b style="color:' + (opts.neg ? 'var(--neg,#f87171)' : opts.color || 'inherit') + ';font-weight:700;white-space:nowrap">' + (opts.txt != null ? opts.txt : UW_M2(v)) + '</b></div>';
+    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;' + (opts.last ? '' : 'border-bottom:1px dashed var(--line,rgba(255,255,255,.1));') + (opts.big ? 'font-size:15px;' : 'font-size:13px;') + 'color:var(--txt2,#d9d1c2)"><span>' + l + '</span><b style="color:' + (opts.neg ? 'var(--neg,#e4756a)' : opts.color || 'inherit') + ';font-weight:700;white-space:nowrap">' + (opts.txt != null ? opts.txt : UW_M2(v)) + '</b></div>';
   };
   // ── HERO: un solo número protagonista ──
   const heroNote = c.topeDscr != null && c.limitante === 'dscr'
-    ? '⚠ el préstamo lo limita el DSCR (renta baja): tope ' + UW_M(c.topeDscr) + ' &lt; LTV ' + UW_M(c.prestamoLtv)
+    ? 'el préstamo lo limita el DSCR (renta baja): tope ' + UW_M(c.topeDscr) + ' &lt; LTV ' + UW_M(c.prestamoLtv)
     : 'plata que sale del refi, después de pagar el HML y los costos';
-  const heroReal = c.cashoutReal != null ? '<div style="font-size:12px;margin-top:8px;opacity:.85;color:' + heroCol + '">🎯 real (Airtable): <b>' + UW_M2(c.cashoutReal) + '</b> · Δ modelo ' + UW_M2(c.cashOut - c.cashoutReal) + '</div>' : '';
+  const heroReal = c.cashoutReal != null ? '<div style="font-size:12px;margin-top:8px;opacity:.85;color:' + heroCol + '">' + osIcon('target') + ' real (Airtable): <b>' + UW_M2(c.cashoutReal) + '</b> · Δ modelo ' + UW_M2(c.cashOut - c.cashoutReal) + '</div>' : '';
   const recupera = c.recuperaPct != null ? '<div style="font-size:12px;margin-top:4px;opacity:.85;color:' + heroCol + '">' + (infinito ? '♾️ <b>retorno infinito</b> — recuperás el ' + c.recuperaPct + '% de lo que pusiste (' + UW_M2(c.ctc) + ')' : 'recuperás el <b>' + c.recuperaPct + '%</b> de lo que pusiste (' + UW_M2(c.ctc) + ')') + '</div>' : '';
   const hero = '<div style="background:color-mix(in srgb, ' + heroCol + ' 10%, transparent);border:1px solid color-mix(in srgb, ' + heroCol + ' 35%, transparent);border-radius:20px;padding:22px 24px;margin-bottom:18px">'
     + '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:' + heroCol + ';font-weight:700">Cash-out estimado</div>'
@@ -783,12 +783,12 @@ function ffUwViewCashout() {
     + IN3('Renta mensual', 'para el tope DSCR', 'renta_mensual', inp.renta_mensual, { foot: c.topeDscr != null ? 'tope DSCR (' + c.dscrObj + 'x): ' + UW_M(c.topeDscr) + ' · tope LTV: ' + UW_M(c.prestamoLtv) : 'sin renta, el tope DSCR no se evalúa (solo LTV)' })
     + IN3('Payoff del HML', 'saldo a pagar al refinanciar — ⛓ se llena solo desde Del Negocio', 'payoff', c.payoffOverride ? inp.payoff : c.payoff, {
       foot: 'fuente: ' + c.payoffFuente
-        + (c.payoffOverride && c.payoffCalc > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'payoff\',0)">↩ volver al calculado (' + UW_M2(c.payoffCalc) + ')</a>' : '')
+        + (c.payoffOverride && c.payoffCalc > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#6fbf95)" onclick="ffUwSet(\'payoff\',0)">↩ volver al calculado (' + UW_M2(c.payoffCalc) + ')</a>' : '')
         + (!c.payoffOverride ? ' · escribí un valor para override manual' : '') })
     + '</div>';
   // ── AJUSTES colapsados (defaults calibrados de ff_uw_config) ──
   const adv = '<details ' + (UW.cashoutAdv ? 'open' : '') + ' ontoggle="UW.cashoutAdv=this.open" style="background:var(--card,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:18px;padding:4px 22px;margin-bottom:16px">'
-    + '<summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--txt3,#9fb0c9);padding:14px 0;list-style:none">⚙︎ Ajustes (opcional) — ya vienen con tus valores calibrados</summary>'
+    + '<summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--txt3,#a69d8c);padding:14px 0;list-style:none">' + osIcon('settings') + '︎ Ajustes (opcional) — ya vienen con tus valores calibrados</summary>'
     + '<div style="padding-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + IN3s('LTV del refi (%)', 'ltv_pct', inp.ltv_pct, { pct: true })
     + IN3s('DSCR objetivo (x)', 'refi_dscr_obj', inp.refi_dscr_obj, { plain: true })
@@ -804,7 +804,7 @@ function ffUwViewCashout() {
     + IN3s('Impound impuestos (meses)', 'refi_imp_imp_m', inp.refi_imp_imp_m, { plain: true })
     + IN3s('Préstamo real (override)', 'refi_prestamo_real', inp.refi_prestamo_real)
     + IN3s('Otros (ajuste vs HUD)', 'refi_otros', inp.refi_otros)
-    + '</div><div style="font-size:11px;color:var(--txt3,#9fb0c9);margin-top:12px">Tasa DSCR ' + c.tasaAnual + '% · 30 años (Champions, reverseada de tus refis — editable en config)' + (c.prestamoReal > 0 ? ' · usando el préstamo REAL de Airtable ' + UW_M(c.prestamoReal) : '') + '</div></div></details>';
+    + '</div><div style="font-size:11px;color:var(--txt3,#a69d8c);margin-top:12px">Tasa DSCR ' + c.tasaAnual + '% · 30 años (Champions, reverseada de tus refis — editable en config)' + (c.prestamoReal > 0 ? ' · usando el préstamo REAL de Airtable ' + UW_M(c.prestamoReal) : '') + '</div></div></details>';
   // ── MINI DESGLOSE (préstamo − payoff − costos) + detalle ──
   const origYEscala = c.origination + (c.titulo - Math.min(c.titulo, +inp.refi_titulo || 0));
   const desglose = '<div class="card" style="padding:20px 22px;border-radius:18px">'
@@ -812,7 +812,7 @@ function ffUwViewCashout() {
     + ROW3('&minus; Payoff del HML', c.payoff, { neg: true })
     + ROW3('&minus; Costos del refi', c.costos, { neg: true })
     + ROW3('<b>= Cash-out</b>', c.cashOut, { big: true, color: heroCol })
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:8px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Detalle de costos</div>'
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:8px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c)">Detalle de costos</div>'
     + ROW3('Underwriting + Processing', (+inp.refi_uw_fee || 0) + (+inp.refi_proc_fee || 0))
     + ROW3('Título / registro', c.titulo)
     + ROW3('Interés prepagado (' + inp.refi_dias_prepagado + ' días @ ' + c.tasaAnual + '%)', c.prepagado)
@@ -820,11 +820,11 @@ function ffUwViewCashout() {
     + ROW3('Impuestos (1 año + ' + inp.refi_imp_imp_m + 'm escrow)', c.impuestos)
     + (c.origination > 0 ? ROW3('Originación (' + inp.refi_orig_pct + '%)', c.origination) : '')
     + (c.otros ? ROW3('Otros (ajuste HUD)', c.otros) : '')
-    + '<div style="background:rgba(47,110,240,.07);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:12px;color:var(--txt2,#c9d5ea);line-height:1.5">💡 De los costos, <b>' + UW_M2(c.escrows) + '</b> son escrows (impuestos + seguro): <b>tu propia plata guardada</b>, no un gasto perdido. Capital recuperado neto: <b style="color:var(--pos,#34d399)">' + UW_M2(c.recuperadoNeto) + '</b></div>'
-    + (c.pagadoReal > 0 ? '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">Pagado al HML con la refi (Airtable, incluye costos): ' + UW_M2(c.pagadoReal) + ' · modelo payoff+costos: ' + UW_M2(c.payoff + c.costos) + '</div>' : '')
+    + '<div style="background:rgba(47,110,240,.07);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:12px;color:var(--txt2,#d9d1c2);line-height:1.5">' + osIcon('lightbulb') + ' De los costos, <b>' + UW_M2(c.escrows) + '</b> son escrows (impuestos + seguro): <b>tu propia plata guardada</b>, no un gasto perdido. Capital recuperado neto: <b style="color:var(--pos,#63c08e)">' + UW_M2(c.recuperadoNeto) + '</b></div>'
+    + (c.pagadoReal > 0 ? '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:8px">Pagado al HML con la refi (Airtable, incluye costos): ' + UW_M2(c.pagadoReal) + ' · modelo payoff+costos: ' + UW_M2(c.payoff + c.costos) + '</div>' : '')
     + '</div>';
   return '<div style="max-width:560px;margin:0 auto">'
-    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Refi Cash-Out</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Meté 3 datos y te da el cash-out. Lo demás ya está calibrado con tus refis reales.</div></div>'
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Refi Cash-Out</div><div style="font-size:13px;color:var(--txt3,#a69d8c)">Meté 3 datos y te da el cash-out. Lo demás ya está calibrado con tus refis reales.</div></div>'
     + hero + inputs + adv + desglose + '</div>';
 }
 // ─── Calc 4 · DOS MODELITOS SEPARADOS (CEO 13-jul): dos préstamos, dos bases, dos fórmulas — nunca una sola tarjeta ───
@@ -834,10 +834,10 @@ function ffUwViewCashout() {
 function ffUwViewIntereses() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), i = o.intereses, co = o.cashout;
   const refReal = inp._ref30_real;
-  const amber = 'var(--amber,#e7b65e)', azul = 'var(--a2,#2f6ef0)';
+  const amber = 'var(--amber,#dca94f)', azul = 'var(--a2,#2f6ef0)';
   const esVenta = ffUwEstrategia() === 'venta';   // en venta NO hay refi/DSCR: solo el carry del HML hasta vender
   // ═ MODELITO 1 · HARMONY (HML) — SOLO INTERÉS, durante la obra/hold ═
-  const heroHml = kitHero('🔨 Pago mensual al Harmony', UW_M2(i.intMensualHarmony) + '/mes',
+  const heroHml = kitHero('Pago mensual al Harmony', UW_M2(i.intMensualHarmony) + '/mes',
     'HML · ' + i.tasaHarmony + '%/año · solo interés · durante la obra/hold — <b>el pago mensual no depende de los meses</b>', amber);
   const cardHml = '<div class="card" style="padding:18px 22px;border-radius:18px;margin-bottom:22px">'
     + kitRow('Préstamo bruto del HML (⛓ Del Negocio: ' + o.negocio.pctCompra + '% compra + ' + o.negocio.pctRemo + '% draw)', i.prestamoBruto)
@@ -848,20 +848,20 @@ function ffUwViewIntereses() {
     + kitInputSm('Meses de OBRA', i.mesesObra, "ffUwSet('meses_obra',VAL)")
     + kitInputSm('Meses HASTA RENTAR O VENDER', i.mesesRenta, "ffUwSet('meses_renta',VAL)")
     + '</div>'
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">Holding = obra + hasta rentar/vender (los meses solo mueven el <b>total</b>, no el pago mensual). ⛓ Propaga: el pago mensual al flujo durante el hold (Calc 5) y al carry del déficit; el total a la reserva de interés del draw (Calc 1).</div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:8px">Holding = obra + hasta rentar/vender (los meses solo mueven el <b>total</b>, no el pago mensual). ⛓ Propaga: el pago mensual al flujo durante el hold (Calc 5) y al carry del déficit; el total a la reserva de interés del draw (Calc 1).</div>'
     + '</div>';
   // ═ MODELITO 2 · REFI (DSCR) — AMORTIZADO, después del refi ═
   const baseTxt = co.prestamoReal > 0 ? 'préstamo real del refi (Airtable/override)' : (co.limitante === 'dscr' ? 'tope DSCR — la renta manda' : co.ltv + '% × ' + (co.usaAppraisal ? 'tasación del refi' : 'ARV'));
-  const heroRefi = kitHero('🏦 Pago mensual TOTAL de la refi (PITI)', UW_M2(i.pitiTotal) + '/mes',
+  const heroRefi = kitHero('Pago mensual TOTAL de la refi (PITI)', UW_M2(i.pitiTotal) + '/mes',
     'P&amp;I ' + UW_M(i.pagoDscr) + ' + property tax ' + UW_M2(i.taxMes) + ' + insurance ' + UW_M2(i.seguroMes) + ' — sobre ' + UW_M(i.dscrPrincipal) + ' (' + baseTxt + ') a ' + i.plazoDscr + ' años @ ' + i.tasaDscr + '%'
-    + (refReal ? ' · 🎯 real Airtable ' + UW_M2(refReal) + ' (Δ ' + UW_M2(i.pitiTotal - refReal) + ')' : ''), azul);
+    + (refReal ? ' · real Airtable ' + UW_M2(refReal) + ' (Δ ' + UW_M2(i.pitiTotal - refReal) + ')' : ''), azul);
   const cardRefi = '<div class="card" style="padding:18px 22px;border-radius:18px;margin-bottom:16px">'
     + kitRow('Préstamo del refi (⛓ Cash-Out: ' + baseTxt + ')', i.dscrPrincipal)
     + kitRow('Cuota amortizada P&amp;I (' + (i.plazoDscr * 12) + ' cuotas @ ' + i.tasaDscr + '%/año)', i.pagoDscr)
     + kitRow('+ Property tax mensual (' + i.taxPct + '%/año del valor tasado ' + UW_M(i.valorTasado) + ' ÷ 12)', i.taxMes, { money2: true })
     + kitRow('+ Insurance / impound mensual (prima anual ÷ 12)', i.seguroMes, { money2: true })
     + kitRow('<b>= TOTAL PAYMENT (PITI)</b>', i.pitiTotal, { money2: true, big: true, color: azul, last: !refReal })
-    + (refReal ? kitRow('🎯 PITI real (Airtable) · Δ modelo ' + UW_M2(i.pitiTotal - refReal), null, { txt: UW_M2(refReal), last: true }) : '')
+    + (refReal ? kitRow('PITI real (Airtable) · Δ modelo ' + UW_M2(i.pitiTotal - refReal), null, { txt: UW_M2(refReal), last: true }) : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">'
     + kitInputSm('Tasa DSCR (%/año)', i.tasaDscr, "ffUwSet('dscr_tasa_anual',VAL)", { pct: true })
     + kitInputSm('Plazo (años)', i.plazoDscr, "ffUwSet('dscr_plazo_anos',VAL)")
@@ -869,9 +869,9 @@ function ffUwViewIntereses() {
     + kitInputSm('Property tax (%/año del valor)', i.taxPct, "ffUwSet('refi_tax_pct',VAL)", { pct: true })
     + kitInputSm('Insurance (prima anual)', inp.refi_seguro_anual, "ffUwSet('refi_seguro_anual',VAL)")
     + '</div>'
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">La base NO tiene nada que ver con la compra ni con el HML: nace en el Cash-Out (LTV × valor tasado, con tope DSCR). Override vacío = ⛓ calculado. ⛓ Propaga: la cuota al flujo después del refi (Calc 5) y a Analítica; el préstamo al cash-out (Calc 3: refi − payoff − costos).</div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:8px">La base NO tiene nada que ver con la compra ni con el HML: nace en el Cash-Out (LTV × valor tasado, con tope DSCR). Override vacío = ⛓ calculado. ⛓ Propaga: la cuota al flujo después del refi (Calc 5) y a Analítica; el préstamo al cash-out (Calc 3: refi − payoff − costos).</div>'
     + '</div>';
-  const porQue = '<div style="font-size:11px;color:var(--txt3,#9fb0c9);line-height:1.6;padding:0 4px">Son <b>dos préstamos, dos bases y dos fórmulas</b>: el HML es solo-interés sobre compra + draw (pago = préstamo × tasa ÷ 12); la refi es amortizada sobre el valor tasado (cuota a 30 años). Cambiar el ARV mueve la refi sin tocar el HML; cambiar el draw mueve el HML sin tocar la refi.</div>';
+  const porQue = '<div style="font-size:11px;color:var(--txt3,#a69d8c);line-height:1.6;padding:0 4px">Son <b>dos préstamos, dos bases y dos fórmulas</b>: el HML es solo-interés sobre compra + draw (pago = préstamo × tasa ÷ 12); la refi es amortizada sobre el valor tasado (cuota a 30 años). Cambiar el ARV mueve la refi sin tocar el HML; cambiar el draw mueve el HML sin tocar la refi.</div>';
   // ── MODO VENTA: solo el HML (no hay refi). El carry total = interés mensual × meses hasta vender, se come la utilidad. ──
   if (esVenta) {
     const v = o.venta;
@@ -883,14 +883,14 @@ function ffUwViewIntereses() {
       + kitInputSm('Tasa HML (%/año)', i.tasaHarmony, "ffUwSet('hml_tasa_anual',VAL)", { pct: true })
       + kitInputSm('Meses hasta vender', v.meses != null ? v.meses : '', "ffUwSet('venta_meses',VAL)")
       + '</div>'
-      + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:8px">⛓ Este <b>' + UW_M2(v.interesHmlTotal) + '</b> entra como COSTO en la calc de Venta (se come la utilidad). Al vender, el HML se cancela con el <b>payoff</b> en el cierre — no hay refinanciación.</div>'
+      + '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:8px">⛓ Este <b>' + UW_M2(v.interesHmlTotal) + '</b> entra como COSTO en la calc de Venta (se come la utilidad). Al vender, el HML se cancela con el <b>payoff</b> en el cierre — no hay refinanciación.</div>'
       + '</div>';
     return '<div style="max-width:560px;margin:0 auto">'
-      + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses (venta)</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">En un flip solo pagás el <b>hard money</b> durante el holding hasta vender. Nada de DSCR/refi.</div></div>'
+      + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses (venta)</div><div style="font-size:13px;color:var(--txt3,#a69d8c)">En un flip solo pagás el <b>hard money</b> durante el holding hasta vender. Nada de DSCR/refi.</div></div>'
       + heroHml + cardHml + carryVenta + '</div>';
   }
   return '<div style="max-width:560px;margin:0 auto">'
-    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Dos préstamos distintos, cada uno con su pago mensual: el hard money durante la obra/hold y el DSCR después del refi.</div></div>'
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Intereses</div><div style="font-size:13px;color:var(--txt3,#a69d8c)">Dos préstamos distintos, cada uno con su pago mensual: el hard money durante la obra/hold y el DSCR después del refi.</div></div>'
     + heroHml + cardHml + heroRefi + cardRefi + porQue + '</div>';
 }
 // ─── Calc 5 · UI patrón Cash-Out (ola 1): hero flujo + 1 input + desglose. Lógica intacta. ───
@@ -901,7 +901,7 @@ function ffUwViewIngreso() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), g = o.ingreso;
   const pos = g.flujo >= 0;
   const hero = kitHero('Flujo mensual', UW_M(g.flujo) + '/mes',
-    (pos ? '' : '⚠ <b>flujo negativo</b> — la renta no cubre los gastos · ') + (g.cashOnCash != null ? 'cash-on-cash ' + g.cashOnCash + '% sobre ' + UW_M(g.cashLeft) + ' que quedan invertidos' : (g.renta === 0 ? 'cargá la renta para ver el flujo real' : '')), pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)');
+    (pos ? '' : '' + osIcon('alert') + ' <b>flujo negativo</b> — la renta no cubre los gastos · ') + (g.cashOnCash != null ? 'cash-on-cash ' + g.cashOnCash + '% sobre ' + UW_M(g.cashLeft) + ' que quedan invertidos' : (g.renta === 0 ? 'cargá la renta para ver el flujo real' : '')), pos ? 'var(--pos,#63c08e)' : 'var(--neg,#e4756a)');
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
     + kitInput('Renta mensual proyectada', 'de Rentas real por modelo', inp.renta_mensual, "ffUwSet('renta_mensual',VAL)", { foot: 'Gastos calibrados (config): PM ' + UWc('pm_fee_pct', 8) + '% · vacancy ' + UWc('vacancy_pct', 5) + '% · mantenimiento ' + UWc('mantenimiento_pct', 5) + '% · impuestos ' + UWc('impuestos_pct_arv', 2.2) + '% ARV/año · seguro ' + UW_M(UWc('seguro_mensual', 120)) + '/mes' })
     + ffUwRcRentBox()
@@ -914,35 +914,35 @@ function ffUwViewIngreso() {
     + kitRow('&minus; Property management (' + UWc('pm_fee_pct', 8) + '%)', g.pmFee, { neg: true })
     + kitRow('&minus; Vacancy (' + UWc('vacancy_pct', 5) + '%)', g.vacancy, { neg: true })
     + kitRow('&minus; Mantenimiento (' + UWc('mantenimiento_pct', 5) + '%)', g.mantenimiento, { neg: true })
-    + kitRow('<b>= Flujo mensual</b>', g.flujo, { big: true, color: pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)', last: true })
+    + kitRow('<b>= Flujo mensual</b>', g.flujo, { big: true, color: pos ? 'var(--pos,#63c08e)' : 'var(--neg,#e4756a)', last: true })
     + '</div>'
     // ⛓ pago HML de la Calc 4: antes del refi el flujo paga el hard money, no la cuota DSCR
-    + (o.intereses.intMensualHarmony > 0 ? '<div class="card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--txt3,#9fb0c9)">⏳ <b>Durante el hold</b> (antes del refi, si ya renta): pagando el HML ' + UW_M(o.intereses.intMensualHarmony) + '/mes (⛓ Calc 4) en vez de la cuota DSCR → <b style="color:' + (g.flujo + g.pagoDscr - o.intereses.intMensualHarmony >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)') + '">' + UW_M(g.flujo + g.pagoDscr - o.intereses.intMensualHarmony) + '/mes</b></div>' : '');
+    + (o.intereses.intMensualHarmony > 0 ? '<div class="card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--txt3,#a69d8c)">' + osIcon('loader') + ' <b>Durante el hold</b> (antes del refi, si ya renta): pagando el HML ' + UW_M(o.intereses.intMensualHarmony) + '/mes (⛓ Calc 4) en vez de la cuota DSCR → <b style="color:' + (g.flujo + g.pagoDscr - o.intereses.intMensualHarmony >= 0 ? 'var(--pos,#63c08e)' : 'var(--neg,#e4756a)') + '">' + UW_M(g.flujo + g.pagoDscr - o.intereses.intMensualHarmony) + '/mes</b></div>' : '');
   return '<div style="max-width:560px;margin:0 auto">'
-    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Ingreso Mensual</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">El flujo que deja la casa rentada, después de TODOS los gastos.</div></div>'
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Ingreso Mensual</div><div style="font-size:13px;color:var(--txt3,#a69d8c)">El flujo que deja la casa rentada, después de TODOS los gastos.</div></div>'
     + hero + inputs + desglose + '</div>';
 }
 // ─── VENTA (MODO A · fix & flip) — cascada de experto + métricas del flip ───
 function ffUwViewVenta() {
   const inp = UW.a.inputs, o = ffUwComputeAll(), v = o.venta;
   const pos = v.utilidad >= 0;
-  const col = pos ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)';
+  const col = pos ? 'var(--pos,#63c08e)' : 'var(--neg,#e4756a)';
   // hero: utilidad neta + margen sobre venta
   const hero = kitHero('Utilidad neta del flip', UW_M2(v.utilidad),
     (v.margen != null ? '<b>margen ' + v.margen + '%</b> sobre la venta · ' : '') + 'reparto <b>' + UW_M(v.parteInv) + '</b> inversionista (' + v.splitInvPct + '%) / <b>' + UW_M(v.parteOp) + '</b> operador', col);
   // semáforo del deal (regla 70% + utilidad + velocidad)
-  const semColor = v.regla70 === false ? 'var(--neg,#f87171)' : (v.regla70 && pos ? 'var(--pos,#34d399)' : 'var(--amber,#e7b65e)');
-  const semTxt = v.regla70 === false ? '🔴 all-in por encima del MAO (' + UW_M(v.maoVenta) + ') — margen apretado'
-    : (v.regla70 && pos ? '🟢 dentro de la regla 70/75% y con utilidad' : '🟡 revisá: ' + (!pos ? 'utilidad negativa' : 'MAO al límite'));
-  const semaforo = v.maoVenta != null ? '<div style="font-size:12px;color:var(--txt2,#c9d5ea);margin:-4px 0 16px;background:color-mix(in srgb, ' + semColor + ' 10%, transparent);border:1px solid color-mix(in srgb, ' + semColor + ' 35%, transparent);border-radius:10px;padding:9px 13px">' + semTxt + ' · all-in ' + UW_M(v.allIn) + ' vs MAO ' + UW_M(v.maoVenta) + ' (' + v.maoPct + '%×ARV − costos venta) · ' + (v.meses != null ? v.meses + ' meses hasta vender' : 'meses sin cargar') + '</div>' : '';
+  const semColor = v.regla70 === false ? 'var(--neg,#e4756a)' : (v.regla70 && pos ? 'var(--pos,#63c08e)' : 'var(--amber,#dca94f)');
+  const semTxt = v.regla70 === false ? 'all-in por encima del MAO (' + UW_M(v.maoVenta) + ') — margen apretado'
+    : (v.regla70 && pos ? 'dentro de la regla 70/75% y con utilidad' : 'revisá: ' + (!pos ? 'utilidad negativa' : 'MAO al límite'));
+  const semaforo = v.maoVenta != null ? '<div style="font-size:12px;color:var(--txt2,#d9d1c2);margin:-4px 0 16px;background:color-mix(in srgb, ' + semColor + ' 10%, transparent);border:1px solid color-mix(in srgb, ' + semColor + ' 35%, transparent);border-radius:10px;padding:9px 13px">' + semTxt + ' · all-in ' + UW_M(v.allIn) + ' vs MAO ' + UW_M(v.maoVenta) + ' (' + v.maoPct + '%×ARV − costos venta) · ' + (v.meses != null ? v.meses + ' meses hasta vender' : 'meses sin cargar') + '</div>' : '';
   const inputs = '<div class="card" style="padding:20px 22px;margin-bottom:16px;border-radius:18px">'
-    + kitInput('Precio de venta', 'por default = ARV oficial (Calc 2); escribí el precio real de listado/oferta', inp.venta_precio, "ffUwSet('venta_precio',VAL)", { foot: v.esArv ? '↩ usando el ARV oficial ' + UW_M(v.precio) + ' — al escribir acá lo fijás manual' : '<a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'venta_precio\',0)">↩ volver al ARV (' + UW_M(o.arv.probable) + ')</a>' })
+    + kitInput('Precio de venta', 'por default = ARV oficial (Calc 2); escribí el precio real de listado/oferta', inp.venta_precio, "ffUwSet('venta_precio',VAL)", { foot: v.esArv ? '↩ usando el ARV oficial ' + UW_M(v.precio) + ' — al escribir acá lo fijás manual' : '<a style="cursor:pointer;color:var(--a1,#6fbf95)" onclick="ffUwSet(\'venta_precio\',0)">↩ volver al ARV (' + UW_M(o.arv.probable) + ')</a>' })
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
     + kitInputSm('Comisión de venta (%)', inp.venta_comision_pct, "ffUwSet('venta_comision_pct',VAL)", { pct: true })
     + kitInputSm('Cierre vendedor (%)', inp.venta_cierre_pct, "ffUwSet('venta_cierre_pct',VAL)", { pct: true, foot: 'title, escrow, transfer tax' })
     + kitInputSm('Concesiones al comprador (%)', inp.venta_concesiones_pct, "ffUwSet('venta_concesiones_pct',VAL)", { pct: true })
     + kitInputSm('Meses hasta vender', v.meses != null ? v.meses : '', "ffUwSet('venta_meses',VAL)", { plain: true, foot: v.mesesEstimado ? 'estimado del hold (obra+venta)' : 'del proyecto' })
-    + kitInputSm('Payoff del HML ($)', v.payoff, "ffUwSet('venta_payoff',VAL)", { foot: 'fuente: ' + v.payoffFuente + (+inp.venta_payoff > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#12b5a0)" onclick="ffUwSet(\'venta_payoff\',0)">↩ auto</a>' : '') })
+    + kitInputSm('Payoff del HML ($)', v.payoff, "ffUwSet('venta_payoff',VAL)", { foot: 'fuente: ' + v.payoffFuente + (+inp.venta_payoff > 0 ? ' · <a style="cursor:pointer;color:var(--a1,#6fbf95)" onclick="ffUwSet(\'venta_payoff\',0)">↩ auto</a>' : '') })
     + kitInputSm('Capital invertido ($)', v.capital, "ffUwSet('venta_capital',VAL)", { foot: v.capitalEsCtc ? '⛓ down + cierre compra (Calc 1)' : 'override manual' })
     + kitInputSm('Holding $/mes', v.holdingMes, "ffUwSet('venta_holding_mes',VAL)", { foot: v.holdingMesEsCalc ? '⛓ utilities + seguro + predial' : 'override manual' })
     + kitInputSm('Staging / preparación ($)', inp.venta_staging, "ffUwSet('venta_staging',VAL)")
@@ -951,7 +951,7 @@ function ffUwViewVenta() {
     + '</div></div>';
   // CASCADA de utilidad del proyecto (el modelo de decisión)
   const cascada = '<div class="card" style="padding:20px 22px;border-radius:18px">'
-    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">Utilidad del proyecto (para decidir)</div>'
+    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c);margin-bottom:4px">Utilidad del proyecto (para decidir)</div>'
     + kitRow('Precio de venta' + (v.esArv ? ' (= ARV)' : ''), v.precio)
     + kitRow('&minus; Comisión de venta (' + inp.venta_comision_pct + '%)', v.comision, { neg: true })
     + kitRow('&minus; Cierre vendedor (' + inp.venta_cierre_pct + '%)', v.cierre, { neg: true })
@@ -962,24 +962,24 @@ function ffUwViewVenta() {
     + (v.staging > 0 ? kitRow('&minus; Staging / preparación', v.staging, { neg: true }) : '')
     + (v.impuesto > 0 ? kitRow('<b>= Utilidad antes de impuestos</b>', v.utilidadAntesImp, { color: col }) + kitRow('&minus; Impuesto estimado (' + v.impuestoPct + '%)', v.impuesto, { neg: true }) : '')
     + kitRow('<b>= Utilidad neta</b>', null, { big: true, txt: UW_M2(v.utilidad), color: col, last: true })
-    + '<div style="font-size:10.5px;color:var(--txt3,#9fb0c9);margin-top:6px">El <b>payoff del HML</b> no entra acá: el préstamo es financiación del all-in. La utilidad usa los costos reales del proyecto.</div>'
+    + '<div style="font-size:10.5px;color:var(--txt3,#a69d8c);margin-top:6px">El <b>payoff del HML</b> no entra acá: el préstamo es financiación del all-in. La utilidad usa los costos reales del proyecto.</div>'
     + '</div>';
   // NET WIRE (cash en la mesa de cierre) + MÉTRICAS + REPARTO
   const metricas = '<div class="card" style="padding:20px 22px;border-radius:18px;margin-top:14px">'
-    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9);margin-bottom:4px">En la mesa de cierre (Net Wire)</div>'
-    + kitRow('Precio ' + UW_M(v.precio) + ' &minus; costos de venta ' + UW_M(v.costosVenta) + ' &minus; payoff HML ' + UW_M(v.payoff), null, { txt: UW_M2(v.netWire), color: v.netWire >= 0 ? 'var(--pos,#34d399)' : 'var(--neg,#f87171)' })
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Métricas del flip</div>'
+    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c);margin-bottom:4px">En la mesa de cierre (Net Wire)</div>'
+    + kitRow('Precio ' + UW_M(v.precio) + ' &minus; costos de venta ' + UW_M(v.costosVenta) + ' &minus; payoff HML ' + UW_M(v.payoff), null, { txt: UW_M2(v.netWire), color: v.netWire >= 0 ? 'var(--pos,#63c08e)' : 'var(--neg,#e4756a)' })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c)">Métricas del flip</div>'
     + kitRow('Margen sobre venta', null, { txt: v.margen != null ? v.margen + '%' : '—' })
     + kitRow('ROI (cash-on-cash · utilidad ÷ capital ' + UW_M(v.capital) + ')', null, { txt: v.roi != null ? v.roi + '%' : '—', color: col })
     + kitRow('★ ROI ANUALIZADO' + (v.meses ? ' (× 12 ÷ ' + v.meses + ' m)' : ''), null, { txt: v.roiAnual != null ? v.roiAnual + '%' : '—', color: col, big: true })
-    + kitRow('Check regla 70/75% (all-in ≤ MAO)', null, { txt: v.regla70 == null ? '—' : (v.regla70 ? '✓ cumple' : '✗ no cumple'), color: v.regla70 === false ? 'var(--neg,#f87171)' : v.regla70 ? 'var(--pos,#34d399)' : 'inherit', last: true })
-    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#9fb0c9)">Reparto (devolver capital + split equity)</div>'
+    + kitRow('Check regla 70/75% (all-in ≤ MAO)', null, { txt: v.regla70 == null ? '—' : (v.regla70 ? '✓ cumple' : '✗ no cumple'), color: v.regla70 === false ? 'var(--neg,#e4756a)' : v.regla70 ? 'var(--pos,#63c08e)' : 'inherit', last: true })
+    + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.12));margin-top:10px;padding-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#a69d8c)">Reparto (devolver capital + split equity)</div>'
     + kitRow('↩ Capital devuelto a inversionistas', v.capital)
     + kitRow('Inversionista (' + v.splitInvPct + '%)', v.parteInv, { color: 'var(--a2,#2f6ef0)' })
     + kitRow('Operador (' + (100 - v.splitInvPct) + '%)', v.parteOp, { last: true })
     + '</div>';
   return '<div style="max-width:560px;margin:0 auto">'
-    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Venta (fix &amp; flip)</div><div style="font-size:13px;color:var(--txt3,#9fb0c9)">Vendés al ARV: la utilidad real del proyecto (costos, no el préstamo), el ROI anualizado y el reparto.</div></div>'
+    + '<div style="margin-bottom:16px"><div style="font-size:19px;font-weight:700">Venta (fix &amp; flip)</div><div style="font-size:13px;color:var(--txt3,#a69d8c)">Vendés al ARV: la utilidad real del proyecto (costos, no el préstamo), el ROI anualizado y el reparto.</div></div>'
     + hero + semaforo + inputs + cascada + metricas + '</div>';
 }
 window.ffUwViewVenta = ffUwViewVenta;
@@ -988,12 +988,12 @@ function ffUwViewUnificada() {
   if (window.ffUnificadaView) return ffUnificadaView();
   const o = ffUwComputeAll(), u = o.unificada;
   const chip = (ok, l) => '<span class="badge ' + (ok ? 'b-ok' : 'b-warn') + '" style="font-size:10px">' + (ok ? '&#10003;' : '&#9888;') + ' ' + l + '</span>';
-  const verColor = u.veredicto === 'GO' ? 'var(--pos,#34d399)' : u.veredicto === 'NO-GO' ? 'var(--neg,#f87171)' : 'var(--amber,#e7b65e)';
+  const verColor = u.veredicto === 'GO' ? 'var(--pos,#63c08e)' : u.veredicto === 'NO-GO' ? 'var(--neg,#e4756a)' : 'var(--amber,#dca94f)';
   const kpi = (l, v, sub) => '<div class="card kpi" style="padding:16px"><div class="lab">' + l + '</div><div class="big">' + v + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
-  return '<div class="card" style="text-align:center;padding:24px;border:2px solid ' + verColor + '"><div style="font-size:12px;color:var(--txt2,#c9d5ea);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Veredicto del deal</div><div style="font-size:46px;font-weight:800;color:' + verColor + '">' + u.veredicto + '</div><div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">' + chip(u.gAllIn, 'all-in &le;' + u.allInMax + '% ARV') + chip(u.gDeficit, 'sin riesgo déficit') + chip(u.gFlujo, 'flujo +') + '</div><button class="repbtn" style="margin-top:16px" onclick="ffUwPresentacion()">&#128196; Generar presentación de negocio</button></div>' +
+  return '<div class="card" style="text-align:center;padding:24px;border:2px solid ' + verColor + '"><div style="font-size:12px;color:var(--txt2,#d9d1c2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Veredicto del deal</div><div style="font-size:46px;font-weight:800;color:' + verColor + '">' + u.veredicto + '</div><div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">' + chip(u.gAllIn, 'all-in &le;' + u.allInMax + '% ARV') + chip(u.gDeficit, 'sin riesgo déficit') + chip(u.gFlujo, 'flujo +') + '</div><button class="repbtn" style="margin-top:16px" onclick="ffUwPresentacion()">&#128196; Generar presentación de negocio</button></div>' +
     '<div class="grid k4" style="margin-top:16px">' + kpi('All-in', UW_M(u.allIn), u.allInPct != null ? u.allInPct + '% del ARV (máx ' + u.allInMax + '%)' : '') + kpi('MAO (oferta máxima)', UW_M(u.mao), 'compra máxima al guardrail') + kpi('El inversionista pone', UW_M2(u.cashToClose), 'HUD: down + cierre &minus; créditos') + kpi('Cash-out / recupera', UW_M(u.cashOut), u.recuperaPct != null ? (u.recuperaPct >= 100 ? '♾️ retorno infinito (' + u.recuperaPct + '%)' : u.recuperaPct + '% recuperado') + ' · escrows ' + UW_M(o.cashout.escrows) : '') + '</div>' +
     '<div class="grid k3" style="margin-top:14px">' + kpi('Cash left in', UW_M(u.cashLeftIn), 'capital que queda invertido') + kpi('Flujo mensual', UW_M(u.flujo) + '/mes', '') + kpi('ROI (cash-on-cash)', u.roi != null ? u.roi + '%' : '—', 'flujo anual &divide; cash left in') + '</div>' +
-    '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#9fb0c9);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#c9d5ea);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; el inversionista pone ' + UW_M2(o.negocio.cashToClose) + ' (HUD) &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
+    '<div class="card" style="margin-top:16px;padding:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt3,#a69d8c);margin-bottom:6px">Cadena del deal</div><div style="font-size:11.5px;color:var(--txt2,#d9d1c2);line-height:1.6">ARV ' + UW_M(o.arv.probable) + ' &rarr; remod ' + UW_M(o.negocio.remod) + ' + draw ' + UW_M(o.negocio.draw) + ' &rarr; el inversionista pone ' + UW_M2(o.negocio.cashToClose) + ' (HUD) &rarr; cash-out ' + UW_M(o.cashout.cashOut) + ' &rarr; Harmony ' + UW_M(o.intereses.intMensualHarmony) + '/mes &middot; DSCR ' + UW_M(o.intereses.pagoDscr) + '/mes &rarr; flujo ' + UW_M(o.ingreso.flujo) + '/mes. Guardrails: all-in &le;' + u.allInMax + '% ARV, regla de déficit. ' + (u.veredicto === 'GO' ? '&#9989; pasa.' : u.veredicto === 'NO-GO' ? '&#10060; no pasa.' : '&#9888; revisar.') + '</div></div>';
 }
 function ffUwPresentacion() {
   if (window.ffUnificadaOnePager) return ffUnificadaOnePager();   // one-pager pro (fallback: el viejo)
@@ -1003,15 +1003,15 @@ function ffUwPresentacion() {
   const w = window.open('', '_blank', 'width=800,height=1000');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Análisis ${UW_E(a.nombre)}</title><style>
     body{font-family:-apple-system,Segoe UI,sans-serif;color:#111;margin:0;padding:36px;max-width:720px}
-    .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #2563eb;padding-bottom:14px}
-    .logo{font-size:22px;font-weight:800;color:#2563eb}.logo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
+    .h{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #2f6b4f;padding-bottom:14px}
+    .logo{font-size:22px;font-weight:800;color:#2f6b4f}.logo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
     .ver{font-size:34px;font-weight:800;color:${u.veredicto === 'GO' ? '#16a34a' : u.veredicto === 'NO-GO' ? '#dc2626' : '#d97706'}}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
     .kpi{border:1px solid #e5e7eb;border-radius:8px;padding:10px}.kpi .l{font-size:10px;text-transform:uppercase;color:#666}.kpi .v{font-size:20px;font-weight:800}
-    .chain{font-size:12px;color:#444;line-height:1.6;margin-top:16px;background:#f8fafc;padding:12px;border-radius:8px}
-    .btn{position:fixed;top:10px;right:10px;padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
+    .chain{font-size:12px;color:#444;line-height:1.6;margin-top:16px;background:#faf8f4;padding:12px;border-radius:8px}
+    .btn{position:fixed;top:10px;right:10px;padding:8px 16px;background:#2f6b4f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
     @media print{.btn{display:none}}</style></head><body>
-    <button class="btn" onclick="window.print()">🖨 PDF</button>
+    <button class="btn" onclick="window.print()">${osIcon('printer')} PDF</button>
     <div class="h"><div class="logo">FLIPPING RENTALS <span>ANÁLISIS DE INVERSIÓN</span></div><div style="text-align:right"><div class="ver">${u.veredicto}</div><div style="font-size:11px;color:#666">${UW_E(a.direccion || a.nombre)}</div></div></div>
     <div class="grid">
       <div class="kpi"><div class="l">ARV</div><div class="v">${M(o.arv.probable)}</div></div>
@@ -1062,15 +1062,15 @@ window.ffUwRentcast = ffUwRentcast; window.ffUwRcSlot = ffUwRcSlot;
 // referencia de comps de RentCast (pestaña ARV)
 function ffUwRcCompsBox() {
   const s = ffUwRcSlot('value');
-  if (s === 'loading') return '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">⏳ consultando mercado en vivo…</div>';
-  if (!s) return '<button class="repbtn ghost" style="padding:5px 11px;font-size:11px" onclick="ffUwRentcast(\'value\')">🔌 Traer mercado en vivo (RentCast)</button>';
-  if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#e7b65e)">⚠ Mercado en vivo no disponible' + (s.error ? ' (' + UW_E(String(s.error).slice(0, 60)) + ')' : '') + ' — se usa el $/sqft por zona.</div>';
+  if (s === 'loading') return '<div style="font-size:11px;color:var(--txt3,#a69d8c)">' + osIcon('loader') + ' consultando mercado en vivo…</div>';
+  if (!s) return '<button class="repbtn ghost" style="padding:5px 11px;font-size:11px" onclick="ffUwRentcast(\'value\')">' + osIcon('link') + ' Traer mercado en vivo (RentCast)</button>';
+  if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#dca94f)">' + osIcon('alert') + ' Mercado en vivo no disponible' + (s.error ? ' (' + UW_E(String(s.error).slice(0, 60)) + ')' : '') + ' — se usa el $/sqft por zona.</div>';
   const comps = (s.payload && s.payload.comparables) || [];
   const fecha = s.fetched_at ? String(s.fetched_at).slice(0, 10) : '';
-  return '<div style="background:color-mix(in srgb, var(--a2,#2563eb) 7%, transparent);border-radius:9px;padding:10px;margin-top:6px">'
+  return '<div style="background:color-mix(in srgb, var(--a2,#2f6b4f) 7%, transparent);border-radius:9px;padding:10px;margin-top:6px">'
     + '<div style="font-size:11px;font-weight:700;color:var(--a2,#2f6ef0)">Mercado en vivo (RentCast) · referencia, NO alimenta cálculos ' + (s.cached ? '· cache' : '') + '</div>'
     + '<div style="font-size:20px;font-weight:800;margin:4px 0">' + UW_M(s.value) + ' <span style="font-size:11px;font-weight:400;opacity:.6">valor estimado RentCast</span></div>'
-    + '<div style="font-size:10px;color:var(--txt3,#9fb0c9)">' + comps.length + ' comparables' + (fecha ? ' · ' + fecha : '') + '</div>'
+    + '<div style="font-size:10px;color:var(--txt3,#a69d8c)">' + comps.length + ' comparables' + (fecha ? ' · ' + fecha : '') + '</div>'
     + (comps.length ? '<div style="margin-top:6px;max-height:120px;overflow:auto">' + comps.slice(0, 5).map(c => '<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-top:1px solid var(--line,rgba(255,255,255,.06))"><span style="opacity:.75">' + UW_E((c.formattedAddress || c.address || '').slice(0, 32)) + '</span><b>' + UW_M(c.price) + (c.squareFootage ? ' · ' + Math.round((c.price || 0) / c.squareFootage) + '/sqft' : '') + '</b></div>').join('') + '</div>' : '')
     + '<button class="repbtn ghost" style="padding:3px 9px;font-size:10px;margin-top:6px" onclick="ffUwRentcast(\'value\',true)">↻ Actualizar mercado</button>'
     + (s.llamadas != null ? '<span style="font-size:9px;opacity:.5;margin-left:8px">' + s.llamadas + '/50 llamadas usadas</span>' : '') + '</div>';
@@ -1078,10 +1078,10 @@ function ffUwRcCompsBox() {
 // sugerencia de renta de RentCast (pestaña Ingreso)
 function ffUwRcRentBox() {
   const s = ffUwRcSlot('rent');
-  if (s === 'loading') return '<div style="font-size:11px;color:var(--txt3,#9fb0c9)">⏳ consultando renta de mercado…</div>';
-  if (!s) return '<button class="repbtn ghost" style="padding:5px 11px;font-size:11px" onclick="ffUwRentcast(\'rent\')">🔌 Sugerir renta (RentCast)</button>';
-  if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#e7b65e)">⚠ Renta de mercado no disponible — usá tu proyección.</div>';
-  return '<div style="background:rgba(52,211,153,.06);border-radius:9px;padding:10px;margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--pos,#34d399)">Renta de mercado (RentCast) · sugerencia</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><div style="font-size:22px;font-weight:800">' + UW_M(s.value) + '/mes</div><button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="ffUwSet(\'renta_mensual\',' + (+s.value || 0) + ')">Usar esta renta</button></div>' + ((s.payload && s.payload.comparables) ? '<div style="font-size:10px;color:var(--txt3,#9fb0c9);margin-top:4px">' + s.payload.comparables.length + ' comparables de renta</div>' : '') + '<button class="repbtn ghost" style="padding:3px 9px;font-size:10px;margin-top:6px" onclick="ffUwRentcast(\'rent\',true)">↻ Actualizar</button></div>';
+  if (s === 'loading') return '<div style="font-size:11px;color:var(--txt3,#a69d8c)">' + osIcon('loader') + ' consultando renta de mercado…</div>';
+  if (!s) return '<button class="repbtn ghost" style="padding:5px 11px;font-size:11px" onclick="ffUwRentcast(\'rent\')">' + osIcon('link') + ' Sugerir renta (RentCast)</button>';
+  if (s.disponible === false) return '<div style="font-size:11px;color:var(--amber,#dca94f)">' + osIcon('alert') + ' Renta de mercado no disponible — usá tu proyección.</div>';
+  return '<div style="background:rgba(52,211,153,.06);border-radius:9px;padding:10px;margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--pos,#63c08e)">Renta de mercado (RentCast) · sugerencia</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><div style="font-size:22px;font-weight:800">' + UW_M(s.value) + '/mes</div><button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="ffUwSet(\'renta_mensual\',' + (+s.value || 0) + ')">Usar esta renta</button></div>' + ((s.payload && s.payload.comparables) ? '<div style="font-size:10px;color:var(--txt3,#a69d8c);margin-top:4px">' + s.payload.comparables.length + ' comparables de renta</div>' : '') + '<button class="repbtn ghost" style="padding:3px 9px;font-size:10px;margin-top:6px" onclick="ffUwRentcast(\'rent\',true)">↻ Actualizar</button></div>';
 }
 
 window.UW = UW; window.ffUwLoad = ffUwLoad; window.ffUwShell = ffUwShell; window.ffUwRender = ffUwRender; window.ffUwComputeAll = ffUwComputeAll;

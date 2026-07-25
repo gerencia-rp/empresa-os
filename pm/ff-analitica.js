@@ -36,21 +36,21 @@
     #ff-overlay .an-t tr:last-child td{border-bottom:none}
     #ff-overlay .an-t .r{text-align:right}
     #ff-overlay .an-wrap{overflow-x:auto}
-    #ff-overlay .an-pos{color:var(--pos,#0f9d6b);font-weight:700}
+    #ff-overlay .an-pos{color:var(--pos,#1f7a4d);font-weight:700}
     #ff-overlay .an-neg{color:var(--neg,#dc2626);font-weight:700}
-    #ff-overlay .an-amb{color:var(--amber,#b45309);font-weight:700}
+    #ff-overlay .an-amb{color:var(--amber,#8a6400);font-weight:700}
     #ff-overlay .an-mut{color:var(--mut)}
     #ff-overlay .an-bar{height:10px;border-radius:6px;background:rgba(128,140,160,.18);overflow:hidden;min-width:90px}
-    #ff-overlay .an-bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#12b5a0,#2f6ef0)}
+    #ff-overlay .an-bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#6fbf95,#2f6ef0)}
     #ff-overlay .an-bar.rojo>i{background:var(--neg,#dc2626)}
     #ff-overlay .an-chart{position:relative;height:240px;width:100%;overflow:hidden}
     #ff-overlay .an-bucket{cursor:pointer;transition:.15s;border:1px solid rgba(128,140,160,.25);border-radius:12px;padding:12px 14px;background:transparent}
-    #ff-overlay .an-bucket:hover{border-color:var(--a2,#2563eb)}
-    #ff-overlay .an-bucket.on{border-color:var(--a2,#2563eb);box-shadow:0 0 0 1px var(--a2,#2563eb)}
+    #ff-overlay .an-bucket:hover{border-color:var(--a2,#2f6b4f)}
+    #ff-overlay .an-bucket.on{border-color:var(--a2,#2f6b4f);box-shadow:0 0 0 1px var(--a2,#2f6b4f)}
     #ff-overlay .an-bucket .n{font-size:22px;font-weight:800;color:var(--ink)}
     #ff-overlay .an-bucket .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
     #ff-overlay .an-slider{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 10px;color:var(--ink);font-size:12px}
-    #ff-overlay .an-slider input[type=range]{flex:1;min-width:160px;accent-color:var(--a2,#2563eb)}
+    #ff-overlay .an-slider input[type=range]{flex:1;min-width:160px;accent-color:var(--a2,#2f6b4f)}
     #ff-overlay .an-note{font-size:10.5px;color:var(--mut);margin-top:6px}
     `;
     document.head.appendChild(st);
@@ -207,7 +207,7 @@
     const roiProm = m.vConDatos.length ? m.vConDatos.reduce((s, v) => s + (+v.roi || 0), 0) / m.vConDatos.length * 100 : null;
     const filas = m.vendidas.map(v => v.conDatos
       ? `<tr><td>${ESC(casaCorta(v.d.address))}</td><td class="r">${M(v.venta)}</td><td class="r">${M(v.bruta)}</td><td class="r ${(+v.neta || 0) >= 0 ? 'an-pos' : 'an-neg'}">${M(v.neta)}</td><td class="r">${PCT(v.roi * 100)}</td></tr>`
-      : `<tr><td>${ESC(casaCorta(v.d.address))}</td><td class="r an-amb" colspan="4">🟡 faltan datos de venta en Airtable ("Datos por casa") → cargarlos</td></tr>`).join('');
+      : `<tr><td>${ESC(casaCorta(v.d.address))}</td><td class="r an-amb" colspan="4">${kitStatusDot('warn')} faltan datos de venta en Airtable ("Datos por casa") → cargarlos</td></tr>`).join('');
     const tabla = `<div class="an-wrap"><table class="an-t"><tr><th>Casa</th><th class="r">Venta</th><th class="r">Utilidad bruta</th><th class="r">Utilidad NETA</th><th class="r">ROI</th></tr>${filas}</table></div>`;
     // lectura honesta (dinámica, con los números reales)
     const lectura = m.vConDatos.length
@@ -261,7 +261,7 @@
       ${FF.portKpi && FF.portKpi.deuda_portafolio != null ? `<tr><td class="an-mut">Por casa, solo propias (v_ff_portafolio: HML si no refi, refi si refi)</td><td class="r an-mut">${M(FF.portKpi.deuda_portafolio)}</td></tr>` : ''}</table>
       <div class="an-note">Manda QBO (los libros). La diferencia OS↔QBO la audita el Sabueso (C1).</div>`;
     return sec('4 · Patrimonio', 'Lo que vale el portafolio, lo que se debe, y cuánto equity generó cada dólar de capital.', `
-      ${typeof kitHero === 'function' ? kitHero('Multiplicador de capital 🏆', m.mult != null ? m.mult.toFixed(1) + '×' : '—', `cada $1 de capital desplegado (${M(m.capital)}) generó ${m.mult != null ? '$' + m.mult.toFixed(2) : '—'} de equity`) : ''}
+      ${typeof kitHero === 'function' ? kitHero('Multiplicador de capital ', m.mult != null ? m.mult.toFixed(1) + '×' : '—', `cada $1 de capital desplegado (${M(m.capital)}) generó ${m.mult != null ? '$' + m.mult.toFixed(2) : '—'} de equity`) : ''}
       <div class="an-grid">
         ${kpi({ label: 'Valor del portafolio (en papel)', term: 'arv', valor: m.valorPortafolio ? M(m.valorPortafolio) : null, falta: m.valorPortafolio ? null : 'sin ARVs cargados', sub: `Σ ARV de las ${m.propias.length} casas propias`, fuente: 'Airtable', drill: { titulo: `ARV por casa (${m.propias.length} propias)`, html: drillValor } })}
         ${kpi({ label: 'Deuda del portafolio', valor: m.deudaQbo != null ? M(m.deudaQbo) : null, falta: m.deudaQbo == null ? 'sin espejo QBO' : null, sub: `HML ${M(m.deudaHmlQbo)} + refi ${M(m.deudaRefiQbo)}`, fuente: 'QBO', drill: { titulo: 'Deuda reconciliada', html: drillDeuda } })}
@@ -291,10 +291,10 @@
     return `<div class="an-wrap"><table class="an-t"><tr><th>Horizonte</th><th class="r">Valor del portafolio</th><th class="r">Deuda proyectada</th><th class="r">EQUITY proyectado</th></tr>
       <tr><td>Hoy</td><td class="r">${M(m.valorPortafolio)}</td><td class="r">${M(m.deudaQbo)}</td><td class="r an-pos">${M(m.equity)}</td></tr>
       ${rows.map(r => `<tr><td>${r.a} años</td><td class="r">${M(r.valor)}</td><td class="r">${M(r.deuda)}</td><td class="r an-pos"><b>${M(r.equity)}</b></td></tr>`).join('')}</table></div>
-      <div class="an-note">📐 <b>Proyección, no hecho</b> — supuesto ${tasa}%/año compuesto sobre el ARV de hoy. El equity crece más rápido que el valor: apreciación + amortización de la deuda DSCR (${(+FF.cfg?.dscr_tasa_anual || 7.125)}% · 30 años); el HML se asume constante (interés-solo) — conservador: cada refi lo convierte en deuda que amortiza.</div>`;
+      <div class="an-note">${osIcon('ruler')} <b>Proyección, no hecho</b> — supuesto ${tasa}%/año compuesto sobre el ARV de hoy. El equity crece más rápido que el valor: apreciación + amortización de la deuda DSCR (${(+FF.cfg?.dscr_tasa_anual || 7.125)}% · 30 años); el HML se asume constante (interés-solo) — conservador: cada refi lo convierte en deuda que amortiza.</div>`;
   }
   function anS5(m) {
-    if (!m.valorPortafolio) return sec('5 · Proyección de valorización', 'Configurable.', kitEmpty ? kitEmpty('📐', 'Sin ARVs cargados no hay base para proyectar.') : '');
+    if (!m.valorPortafolio) return sec('5 · Proyección de valorización', 'Configurable.', kitEmpty ? kitEmpty(osIcon('ruler'), 'Sin ARVs cargados no hay base para proyectar.') : '');
     return sec('5 · Proyección de valorización', 'A 5/10/15/20 años, con la tasa que vos elijas — rotulado como supuesto, no como hecho.', `
       <div class="an-slider">Apreciación anual: <input type="range" min="2" max="6" step="0.25" value="${AN.tasa}" oninput="anProySet(this.value)"> <b id="an-tasa-lbl" style="min-width:52px">${AN.tasa}%/año</b> <span class="an-mut">(default ${(+FF.cfg?.an_apreciacion_pct || 4)}% Austin — editable en ff_uw_config.an_apreciacion_pct)</span></div>
       <div id="an-proy-body">${anProyBody(m)}</div>
@@ -319,14 +319,14 @@
   function anS7(m) {
     // 7.1 pipeline de refi
     const filas = m.pipeline.map(p => {
-      const semaforo = p.gap == null ? `<span class="an-amb">🟡 faltan datos (${p.arv ? 'saldo HML' : 'ARV'})</span>`
-        : p.lista ? '<span class="an-pos">🟢 lista para refi</span>'
-        : `<span class="an-neg">🔴 falta ${M(-p.gap)} de valor</span>`;
+      const semaforo = p.gap == null ? `<span class="an-amb">${kitStatusDot('warn')} faltan datos (${p.arv ? 'saldo HML' : 'ARV'})</span>`
+        : p.lista ? '<span class="an-pos">' + kitStatusDot('ok') + ' lista para refi</span>'
+        : `<span class="an-neg">${kitStatusDot('bad')} falta ${M(-p.gap)} de valor</span>`;
       const next = p.gap == null ? 'completar datos en Airtable' : p.lista ? 'pedir cotización DSCR ya' : `re-tasar o esperar apreciación (${M(-p.gap)})`;
       return `<tr><td>${ESC(p.casa)}</td><td class="r">${typeof noZeroAsReal === 'function' ? noZeroAsReal(p.arv) : M(p.arv)}</td><td class="r">${typeof noZeroAsReal === 'function' ? noZeroAsReal(p.saldo) : M(p.saldo)}</td><td class="r">${M(p.tope)}</td><td>${semaforo}</td><td class="an-mut">→ ${next}</td></tr>`;
     }).join('');
     const listas = m.pipeline.filter(p => p.lista);
-    const pipelineHtml = `<div class="an-wrap"><table class="an-t"><tr><th>Casa</th><th class="r">ARV</th><th class="r">Saldo HML</th><th class="r">Tope ${m.ltvPct}%×ARV</th><th>Semáforo</th><th>Próximo paso</th></tr>${filas || '<tr><td colspan="6" class="an-mut">No queda ninguna casa rentada en HML 🎉</td></tr>'}</table></div>`;
+    const pipelineHtml = `<div class="an-wrap"><table class="an-t"><tr><th>Casa</th><th class="r">ARV</th><th class="r">Saldo HML</th><th class="r">Tope ${m.ltvPct}%×ARV</th><th>Semáforo</th><th>Próximo paso</th></tr>${filas || '<tr><td colspan="6" class="an-mut">No queda ninguna casa rentada en HML ' + osIcon('party') + '</td></tr>'}</table></div>`;
 
     // 7.2 concentración
     const concHtml = `<div class="an-wrap"><table class="an-t"><tr><th>Inversionista</th><th class="r">Capital</th><th class="r">Casas</th><th style="width:40%">% del capital de co-inversión (${M(m.coTotal)})</th></tr>
@@ -343,15 +343,15 @@
       <div style="font-weight:700;font-size:12.5px;color:var(--ink);margin:8px 0 4px">7.1 · Pipeline de refinanciación — ${listas.length} de ${m.pipeline.length} listas ${typeof kitBadge === 'function' ? kitBadge(`ahorro potencial: cada refi baja el carry del 12% interés-solo`, listas.length ? 'ok' : 'warn') : ''}</div>
       ${pipelineHtml}
       ${typeof kitNext === 'function' ? kitNext(`${m.pipeline.length} casas rentadas siguen pagando HML al 12% interés-solo — esta lista ES el plan para dar vuelta el flujo post-deuda (${M(m.postDeudaMes * 12)}/año)`, listas.length ? `Arrancar la refi de ${listas.slice(0, 3).map(p => p.casa).join(', ')}${listas.length > 3 ? ` (+${listas.length - 3} más)` : ''}` : 'Re-tasar las casas con ARV corto y completar datos faltantes', 'Nico') : ''}
-      <div style="font-weight:700;font-size:12.5px;color:var(--ink);margin:18px 0 4px">7.2 · Concentración por inversionista ${concentrados.length ? `<span class="an-neg">— ⚠ ${concentrados.map(c => ESC(c.name.split('(')[0].trim()) + ' ' + PCT(c.share)).join(', ')} supera el umbral ${m.umbralConc}%</span>` : `<span class="an-pos">— ninguno supera el ${m.umbralConc}%</span>`}</div>
+      <div style="font-weight:700;font-size:12.5px;color:var(--ink);margin:18px 0 4px">7.2 · Concentración por inversionista ${concentrados.length ? `<span class="an-neg">— ${osIcon('alert')} ${concentrados.map(c => ESC(c.name.split('(')[0].trim()) + ' ' + PCT(c.share)).join(', ')} supera el umbral ${m.umbralConc}%</span>` : `<span class="an-pos">— ninguno supera el ${m.umbralConc}%</span>`}</div>
       ${concHtml}
       ${concentrados.length && typeof kitNext === 'function' ? kitNext(`Si ${ESC(concentrados[0].name.split('(')[0].trim())} sale, se va el ${PCT(concentrados[0].share)} del capital de co-inversión`, 'Diversificar los próximos deals con inversionistas nuevos o menores', 'Nico') : ''}
       <div style="font-weight:700;font-size:12.5px;color:var(--ink);margin:18px 0 4px">7.3 · Salud de cartera <span class="an-mut" style="font-weight:400">(flujo mensual post-deuda por casa — déficit corregido, jamás desde draws vacíos; clic en un grupo p/ ver las casas)</span></div>
       <div class="an-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-        ${b('sanas', '🟢', 'Sanas (flujo ≥ 0)', m.salud.sanas, 'an-pos')}
-        ${b('deficit', '🔴', 'En déficit', m.salud.deficit, 'an-neg')}
-        ${b('sinDatos', '🟡', 'Sin datos de renta', m.salud.sinDatos, 'an-amb')}
-        ${b('noAplica', '🏗', 'Aún sin flujo (obra)', m.salud.noAplica, 'an-mut')}
+        ${b('sanas', kitStatusDot('ok'), 'Sanas (flujo ≥ 0)', m.salud.sanas, 'an-pos')}
+        ${b('deficit', kitStatusDot('bad'), 'En déficit', m.salud.deficit, 'an-neg')}
+        ${b('sinDatos', kitStatusDot('warn'), 'Sin datos de renta', m.salud.sinDatos, 'an-amb')}
+        ${b('noAplica', osIcon('construction'), 'Aún sin flujo (obra)', m.salud.noAplica, 'an-mut')}
       </div>
       ${abierto}`);
   }
@@ -365,7 +365,7 @@
       cfg.options = Object.assign({ responsive: true, maintainAspectRatio: false, resizeDelay: 200 }, cfg.options || {});
       (FF._charts = FF._charts || []).push(new Chart(el, cfg));
     };
-    const mut = getComputedStyle(document.getElementById('ff-overlay') || document.body).getPropertyValue('--mut').trim() || '#64748b';
+    const mut = getComputedStyle(document.getElementById('ff-overlay') || document.body).getPropertyValue('--mut').trim() || '#756c5c';
     const grid = 'rgba(128,140,160,.15)';
     const meses = Object.keys(m.porMes).sort().slice(-14);
     mk('an-ritmo', { type: 'bar', data: { labels: meses, datasets: [{ data: meses.map(k => m.porMes[k]), backgroundColor: 'rgba(47,110,240,.55)', borderRadius: 4 }] },
@@ -374,7 +374,7 @@
     const labels = ['Hoy', ...proy.map(r => r.a + 'a')];
     mk('an-proy', { type: 'line', data: { labels, datasets: [
       { label: 'Valor', data: [m.valorPortafolio, ...proy.map(r => r.valor)], borderColor: '#2f6ef0', backgroundColor: 'rgba(47,110,240,.08)', fill: true, tension: .3 },
-      { label: 'Equity', data: [m.equity, ...proy.map(r => r.equity)], borderColor: '#12b5a0', backgroundColor: 'rgba(18,181,160,.10)', fill: true, tension: .3 },
+      { label: 'Equity', data: [m.equity, ...proy.map(r => r.equity)], borderColor: '#6fbf95', backgroundColor: 'rgba(18,181,160,.10)', fill: true, tension: .3 },
     ] }, options: { plugins: { legend: { labels: { color: mut, font: { size: 10 } } }, title: { display: true, text: `Proyección al ${AN.tasa}%/año (supuesto)`, color: mut, font: { size: 11 } } }, scales: { x: { grid: { display: false }, ticks: { color: mut } }, y: { grid: { color: grid }, ticks: { color: mut, callback: v => '$' + (v / 1e6).toFixed(1) + 'M' } } } } });
   }
 
@@ -402,9 +402,9 @@
     setTimeout(() => anMountCharts(m), 60);
     const head = (typeof ffHeader === 'function') ? ffHeader('Analítica', 'KPIs que importan', 'Volumen · rentabilidad realizada · renta · patrimonio · proyección · velocidad · riesgo — todo con "de dónde sale" (⌕) y próximo paso') : '';
     const acciones = `<div class="no-print" style="display:flex;gap:8px;margin:4px 0 6px;flex-wrap:wrap">
-      <button class="chip" onclick="window.print()">🖨 PDF</button>
+      <button class="chip" onclick="window.print()">${osIcon('printer')} PDF</button>
       ${typeof ffExportExcelFF === 'function' ? '<button class="chip" onclick="ffExportExcelFF()">⬇ Excel</button>' : ''}
-      ${typeof ffCopyResumenFF === 'function' ? '<button class="chip" onclick="ffCopyResumenFF()">📋 Copiar resumen</button>' : ''}
+      ${typeof ffCopyResumenFF === 'function' ? '<button class="chip" onclick="ffCopyResumenFF()">' + osIcon('clipboard') + ' Copiar resumen</button>' : ''}
     </div>`;
     return head + acciones + anS1(m) + anS2(m) + anS3(m) + anS4(m) + anS5(m) + anS6(m) + anS7(m);
   };

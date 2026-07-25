@@ -87,7 +87,7 @@ function caPDF() {
 window.caPDF = caPDF;
 
 function osCarteraView() {
-  if (!CA.rows && !CA.err) { caLoad(); return '<div class="empty">⏳ Calculando la cartera…</div>'; }
+  if (!CA.rows && !CA.err) { caLoad(); return '<div class="empty">' + osIcon('loader') + ' Calculando la cartera…</div>'; }
   if (CA.err) return '<div class="empty down">' + OS_E(CA.err) + ' <button class="cbtn" onclick="caLoad(true)">Reintentar</button></div>';
   const rows = CA.rows || [];
   const t = caTotals(rows);
@@ -99,19 +99,19 @@ function osCarteraView() {
   rows.forEach(r => { if (r.aging && +r.vencido_neto > 0) aging[r.aging] += +r.vencido_neto; });
   const kpi = (lab, val, meta, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div><div class="meta">' + meta + '</div></div>';
   const agB = a => a === '60+' ? 'style="color:var(--neg);font-weight:700"' : a === '30-60' ? 'style="color:var(--amber);font-weight:700"' : 'style="color:var(--pos);font-weight:700"';
-  return '<h1>📋 Informe de Cartera <span>· Rentas</span></h1>'
+  return '<h1>' + osIcon('clipboard') + ' Informe de Cartera <span>· Rentas</span></h1>'
     + '<div class="sub">UNA definición, tres números separados — la deuda vencida NO incluye el mes en curso (el informe manual los mezclaba y daba +195%). Neteado por inquilino. Fuente: espejo Airtable (Renta pactada + Deuda), validado al centavo.</div>'
     + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 14px">'
     + '<span class="meta">Mes del informe</span><input type="month" class="ibtn" value="' + OS_E(CA.mes) + '" onchange="caSet(\'mes\', this.value)">'
     + '<span class="meta">vencidos desde</span><select class="ibtn" onchange="caSet(\'desde\', this.value || null)">'
     + [[caShift(CA.mes, -1), 'mes anterior (como el informe manual)'], [caShift(CA.mes, -3), '3 meses'], [caShift(CA.mes, -6), '6 meses'], ['', 'todo el historial']]
       .map(o => '<option value="' + o[0] + '"' + ((CA.desde || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
-    + '<span style="margin-left:auto;display:flex;gap:6px"><button class="ibtn" onclick="caCSV()">⬇ CSV</button><button class="cbtn" style="padding:8px 14px" onclick="caPDF()">🖨 Informe PDF</button></span></div>'
+    + '<span style="margin-left:auto;display:flex;gap:6px"><button class="ibtn" onclick="caCSV()">⬇ CSV</button><button class="cbtn" style="padding:8px 14px" onclick="caPDF()">' + osIcon('printer') + ' Informe PDF</button></span></div>'
     + '<div class="grid k4">'
     + kpi('Deuda VENCIDA (neta)' + LIN('Deuda vencida'), caM(t.vencido_neto), 'bruta ' + caM(t.vencido) + ' · meses cerrados sin pagar — la mora REAL', t.vencido_neto > 0 ? 'down' : 'up')
     + kpi('Por cobrar del MES' + LIN('Por cobrar del mes'), caM(t.por_cobrar), 'mes en curso aún no cobrado — <b>NO es mora</b>', 'warn')
     + kpi('Saldo A FAVOR' + LIN('Saldo a favor'), caM(t.a_favor), 'pagos por adelantado — netean por inquilino antes de clasificar', 'up')
-    + kpi('Pendiente NETO' + LIN('Pendiente neto total'), caM(t.neto), t.casos + ' inquilinos · variación vs mes anterior: ' + (varPct == null ? 'sin base' : '<b style="color:' + (varBig ? 'var(--amber)' : 'var(--mut)') + '">' + (varPct >= 0 ? '+' : '') + Math.round(varPct * 100) + '%</b>' + (varBig ? ' ⚠ verificar si es real o carga de registros nuevos' : '')), '')
+    + kpi('Pendiente NETO' + LIN('Pendiente neto total'), caM(t.neto), t.casos + ' inquilinos · variación vs mes anterior: ' + (varPct == null ? 'sin base' : '<b style="color:' + (varBig ? 'var(--amber)' : 'var(--mut)') + '">' + (varPct >= 0 ? '+' : '') + Math.round(varPct * 100) + '%</b>' + (varBig ? ' verificar si es real o carga de registros nuevos' : '')), '')
     + '</div>'
     + '<div class="grid k3" style="margin-top:12px">'
     + kpi('Aging 0-30', caM(aging['0-30']), 'vencido neto con mora ≤ 30 días', aging['0-30'] > 0 ? 'warn' : 'up')

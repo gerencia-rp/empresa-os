@@ -14,7 +14,7 @@
 const IG_M = n => (n == null || isNaN(n)) ? '—' : (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
 const IG_E = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const IG_ZONAS = [['sur', 'Austin Sur'], ['norte', 'Austin Norte'], ['rr', 'Round Rock'], ['marlin', 'Marlin']];
-const IG_MODELOS = [['casa', '🏠 Casa Completa'], ['hab', '🚪 Por Habitaciones'], ['unidades', '🏢 Por Unidades'], ['mixta', '🧩 Mixta']];
+const IG_MODELOS = [['casa', 'Casa Completa', 'house'], ['hab', 'Por Habitaciones', 'door'], ['unidades', 'Por Unidades', 'building'], ['mixta', 'Mixta', 'layout']];
 
 function igState() {
   if (!UW.a) return null;
@@ -105,7 +105,7 @@ window.igUsarMix = igUsarMix;
 
 // ─── UI (tokens del tema FF: --ink/--mut; reusa .ap-* de ff-arv-pro) ───
 function igIn(lab, val, onchange, w) {
-  return '<div><div style="font-size:10.5px;color:var(--mut,#9fb0c9);font-weight:700;margin-bottom:2px">' + lab + '</div>'
+  return '<div><div style="font-size:10.5px;color:var(--mut,#a69d8c);font-weight:700;margin-bottom:2px">' + lab + '</div>'
     + '<input value="' + (val == null || val === '' ? '' : IG_E(val)) + '" placeholder="0" onchange="' + onchange + '" style="width:' + (w || '84px') + ';background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--glassb,rgba(255,255,255,.12));border-radius:8px;padding:6px 9px;color:var(--ink,#eaf0ff);font-size:13px;font-weight:700;outline:none"></div>';
 }
 function igCfgIn(lab, key, def) {
@@ -130,13 +130,14 @@ function ffIngresoView() {
   const zonaSel = '<select onchange="igSet(\'zona\',this.value)" style="background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--glassb,rgba(255,255,255,.12));border-radius:9px;padding:7px 10px;color:var(--ink,#eaf0ff);font-size:12.5px;font-weight:700">'
     + IG_ZONAS.map(([k, l]) => '<option value="' + k + '" ' + (zona === k ? 'selected' : '') + '>' + l + (k === igZonaAuto() ? ' (auto)' : '') + '</option>').join('') + '</select>';
   const head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
-    + '<div style="display:flex;align-items:center;gap:10px"><b style="font-size:18px">🏠 Ingreso · ¿cómo conviene rentarla?</b><span class="ap-pill">tarifas calibradas con Rentas real</span></div>'
-    + '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--mut,#9fb0c9)">Zona</span>' + zonaSel + '</div></div>';
+    + '<div style="display:flex;align-items:center;gap:10px"><b style="font-size:18px">' + osIcon('house', { size: 18 }) + ' Ingreso · ¿cómo conviene rentarla?</b><span class="ap-pill">tarifas calibradas con Rentas real</span></div>'
+    + '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--mut,#a69d8c)">Zona</span>' + zonaSel + '</div></div>';
 
   // COMPARADOR: los 4 modelos lado a lado, el mejor resaltado
-  const lblM = Object.fromEntries(IG_MODELOS);
+  const lblM = Object.fromEntries(IG_MODELOS.map(([k, l]) => [k, l]));
+  const icoM = Object.fromEntries(IG_MODELOS.map(([k, l, i]) => [k, i]));
   const casaBase = mm.casa.bruta;
-  const cards = IG_MODELOS.map(([m, lbl]) => {
+  const cards = IG_MODELOS.map(([m, lbl, ico]) => {
     const x = mm[m];
     const esMejor = m === r.mejor && x.bruta > 0;
     const sel = m === modeloSel;
@@ -144,26 +145,26 @@ function ffIngresoView() {
       : m === 'hab' ? r.habN + ' hab × ' + IG_M(igRate('hab', 800))
       : m === 'unidades' ? r.estN + ' est × ' + IG_M(igRate('estudio', 1100)) + ' + ' + r.aptoN + ' apto × ' + IG_M(igRate('apto', 2000))
       : (+st.mx_hab || 0) + 'h + ' + (+st.mx_est || 0) + 'e + ' + (+st.mx_apto || 0) + 'a';
-    return '<div class="ap-card" onclick="igSet(\'modelo\',\'' + m + '\')" style="padding:16px;cursor:pointer;position:relative;' + (esMejor ? 'border-color:var(--pos,#34d399);box-shadow:0 0 0 2px var(--pos,#34d399),0 6px 22px rgba(23,43,77,.08);' : '') + (sel && !esMejor ? 'border-color:var(--a2,#2f6ef0);' : '') + '">'
-      + (esMejor ? '<span style="position:absolute;top:-9px;left:12px;background:var(--pos,#34d399);color:#fff;font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px">💰 GENERA MÁS</span>' : '')
-      + '<div class="ap-lab">' + lbl + '</div>'
-      + '<div style="font-size:26px;font-weight:800;margin:6px 0 1px;color:' + (esMejor ? 'var(--pos,#34d399)' : 'var(--ink,#eaf0ff)') + '">' + IG_M(x.bruta) + '<span style="font-size:12px;font-weight:600;color:var(--mut,#9fb0c9)">/mes</span></div>'
-      + '<div style="font-size:10.5px;color:var(--mut,#9fb0c9)">' + IG_E(detalle) + '</div>'
-      + '<div style="border-top:1px solid var(--glassb,rgba(255,255,255,.08));margin-top:9px;padding-top:8px;font-size:11.5px;display:flex;justify-content:space-between"><span style="color:var(--mut,#9fb0c9)">flujo neto</span><b class="' + (x.flujo >= 0 ? 'ap-pos' : 'ap-neg') + '">' + IG_M(x.flujo) + '/mes</b></div>'
-      + '<div style="font-size:11.5px;display:flex;justify-content:space-between"><span style="color:var(--mut,#9fb0c9)">cash-on-cash</span><b>' + (x.coc != null ? x.coc + '%' : '—') + '</b></div>'
-      + '<div style="font-size:11.5px;display:flex;justify-content:space-between"><span style="color:var(--mut,#9fb0c9)">vacancy</span><span style="color:var(--mut,#9fb0c9)">' + x.vacPct + '%</span></div>'
+    return '<div class="ap-card" onclick="igSet(\'modelo\',\'' + m + '\')" style="padding:16px;cursor:pointer;position:relative;' + (esMejor ? 'border-color:var(--pos,#63c08e);box-shadow:0 0 0 2px var(--pos,#63c08e),0 6px 22px rgba(23,43,77,.08);' : '') + (sel && !esMejor ? 'border-color:var(--a2,#2f6ef0);' : '') + '">'
+      + (esMejor ? '<span style="position:absolute;top:-9px;left:12px;background:var(--pos,#63c08e);color:#fff;font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px">' + osIcon('dollar', { size: 10 }) + ' GENERA MÁS</span>' : '')
+      + '<div class="ap-lab">' + osIcon(ico, { size: 12 }) + ' ' + lbl + '</div>'
+      + '<div style="font-size:26px;font-weight:800;margin:6px 0 1px;color:' + (esMejor ? 'var(--pos,#63c08e)' : 'var(--ink,#eaf0ff)') + '">' + IG_M(x.bruta) + '<span style="font-size:12px;font-weight:600;color:var(--mut,#a69d8c)">/mes</span></div>'
+      + '<div style="font-size:10.5px;color:var(--mut,#a69d8c)">' + IG_E(detalle) + '</div>'
+      + '<div style="border-top:1px solid var(--glassb,rgba(255,255,255,.08));margin-top:9px;padding-top:8px;font-size:11.5px;display:flex;justify-content:space-between"><span style="color:var(--mut,#a69d8c)">flujo neto</span><b class="' + (x.flujo >= 0 ? 'ap-pos' : 'ap-neg') + '">' + IG_M(x.flujo) + '/mes</b></div>'
+      + '<div style="font-size:11.5px;display:flex;justify-content:space-between"><span style="color:var(--mut,#a69d8c)">cash-on-cash</span><b>' + (x.coc != null ? x.coc + '%' : '—') + '</b></div>'
+      + '<div style="font-size:11.5px;display:flex;justify-content:space-between"><span style="color:var(--mut,#a69d8c)">vacancy</span><span style="color:var(--mut,#a69d8c)">' + x.vacPct + '%</span></div>'
       + '<button class="ap-btn' + (sel ? '' : ' ghost') + '" style="width:100%;margin-top:9px;padding:7px;font-size:11.5px" onclick="event.stopPropagation();igUsarRenta(' + x.bruta + ',\'' + m + '\')">→ Usar como renta</button>'
       + '</div>';
   }).join('');
   const mejorTxt = r.mejor !== 'casa' && mm[r.mejor].bruta > casaBase
-    ? '<div style="background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.3);border-radius:11px;padding:10px 14px;margin:12px 0;font-size:13px">💡 Con <b>' + lblM[r.mejor] + '</b> generás <b>' + IG_M(mm[r.mejor].bruta) + '</b> vs <b>' + IG_M(casaBase) + '</b> como Casa Completa — <b class="ap-pos">' + IG_M(mm[r.mejor].bruta - casaBase) + ' más por mes</b> (' + IG_M((mm[r.mejor].bruta - casaBase) * 12) + '/año), con vacancy ' + mm[r.mejor].vacPct + '% vs ' + mm.casa.vacPct + '%.</div>'
+    ? '<div style="background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.3);border-radius:11px;padding:10px 14px;margin:12px 0;font-size:13px">' + osIcon('lightbulb', { size: 13 }) + ' Con <b>' + lblM[r.mejor] + '</b> generás <b>' + IG_M(mm[r.mejor].bruta) + '</b> vs <b>' + IG_M(casaBase) + '</b> como Casa Completa — <b class="ap-pos">' + IG_M(mm[r.mejor].bruta - casaBase) + ' más por mes</b> (' + IG_M((mm[r.mejor].bruta - casaBase) * 12) + '/año), con vacancy ' + mm[r.mejor].vacPct + '% vs ' + mm.casa.vacPct + '%.</div>'
     : '';
 
   // CONFIGURAR la mezcla del modelo seleccionado
-  const mixChip = r.mixReal ? '<button class="ap-btn ghost" style="font-size:11px;padding:5px 11px" onclick="igUsarMix()">📥 Usar mezcla real de Rentas: ' + (r.mixReal.habitacion ? r.mixReal.habitacion + ' hab · ' : '') + (r.mixReal.estudio ? r.mixReal.estudio + ' estudios · ' : '') + (r.mixReal.apartamento ? r.mixReal.apartamento + ' aptos' : '') + '</button>' : '';
+  const mixChip = r.mixReal ? '<button class="ap-btn ghost" style="font-size:11px;padding:5px 11px" onclick="igUsarMix()">' + osIcon('download', { size: 11 }) + ' Usar mezcla real de Rentas: ' + (r.mixReal.habitacion ? r.mixReal.habitacion + ' hab · ' : '') + (r.mixReal.estudio ? r.mixReal.estudio + ' estudios · ' : '') + (r.mixReal.apartamento ? r.mixReal.apartamento + ' aptos' : '') + '</button>' : '';
   let cfg = '';
   if (modeloSel === 'casa') cfg = '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">' + igIn('Renta manual (pisa la tarifa)', st.casa_manual, "igSet('casa_manual',this.value)", '130px')
-    + (r.rcRent ? '<span class="ap-pill" style="align-self:center">RentCast sugiere ' + IG_M(r.rcRent) + '/mes</span>' : '<button class="ap-btn ghost" style="font-size:11px" onclick="ffUwRentcast(\'rent\')">🔌 Sugerir renta (RentCast)</button>') + '</div>';
+    + (r.rcRent ? '<span class="ap-pill" style="align-self:center">RentCast sugiere ' + IG_M(r.rcRent) + '/mes</span>' : '<button class="ap-btn ghost" style="font-size:11px" onclick="ffUwRentcast(\'rent\')">' + osIcon('zap', { size: 11 }) + ' Sugerir renta (RentCast)</button>') + '</div>';
   else if (modeloSel === 'hab') cfg = '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">' + igIn('# Habitaciones', r.habN, "igSet('hab_n',this.value)")
     + '<span class="ap-pill" style="align-self:center">' + (st.hab_n != null && st.hab_n !== '' ? 'manual' : 'de RentCast/Rentas') + ' · ' + IG_M(igRate('hab', 800)) + '/hab (zona)</span>' + mixChip + '</div>';
   else if (modeloSel === 'unidades') cfg = '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">' + igIn('# Estudios', r.estN, "igSet('est_n',this.value)") + igIn('# Apartamentos', r.aptoN, "igSet('apto_n',this.value)") + mixChip + '</div>';
@@ -179,25 +180,25 @@ function ffIngresoView() {
     + fila('− Impuestos (' + UWc('impuestos_pct_arv', 2.2) + '% ARV/año)', '−' + IG_M(ctx.impuestos), 'ap-neg')
     + fila('− Seguro', '−' + IG_M(ctx.seguro), 'ap-neg')
     + fila('− Property mgmt (' + UWc('pm_fee_pct', 8) + '%)', '−' + IG_M(x.pmFee), 'ap-neg')
-    + fila('− Vacancy (' + x.vacPct + '% · modelo ' + lblM[modeloSel].replace(/^\S+ /, '') + ')', '−' + IG_M(x.vacancy), 'ap-neg')
+    + fila('− Vacancy (' + x.vacPct + '% · modelo ' + lblM[modeloSel] + ')', '−' + IG_M(x.vacancy), 'ap-neg')
     + fila('− Mantenimiento (' + UWc('mantenimiento_pct', 5) + '%)', '−' + IG_M(x.mant), 'ap-neg')
     + '<div class="ap-mrow" style="border-top:2px solid var(--glassb,rgba(255,255,255,.15))"><span style="font-weight:800;color:var(--ink,#eaf0ff)">= Flujo neto</span><b class="' + (x.flujo >= 0 ? 'ap-pos' : 'ap-neg') + '" style="font-size:16px">' + IG_M(x.flujo) + '/mes</b></div>'
     + '<div class="ap-mrow" style="border-top:none"><span>Cash-on-cash (flujo anual ÷ ' + IG_M(ctx.cashLeft) + ' invertidos)</span><b>' + (x.coc != null ? x.coc + '%' : '—') + '</b></div>'
     + '</div>'
     // ⛓ pago HML de la Calc 4: el flujo ANTES del refi paga el hard money, no la cuota DSCR
-    + (ctx.pagoHml > 0 ? '<div class="ap-card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--mut,#9fb0c9)">⏳ <b style="color:var(--ink,#eaf0ff)">Durante el hold</b> (antes del refi, si ya renta): mismo flujo pero pagando el HML ' + IG_M(Math.round(ctx.pagoHml)) + '/mes (⛓ Calc 4) en vez de la cuota DSCR → <b class="' + (x.flujo + ctx.pagoDscr - ctx.pagoHml >= 0 ? 'ap-pos' : 'ap-neg') + '">' + IG_M(Math.round(x.flujo + ctx.pagoDscr - ctx.pagoHml)) + '/mes</b></div>' : '');
+    + (ctx.pagoHml > 0 ? '<div class="ap-card" style="padding:11px 16px;margin-top:10px;font-size:12px;color:var(--mut,#a69d8c)">' + osIcon('hourglass', { size: 12 }) + ' <b style="color:var(--ink,#eaf0ff)">Durante el hold</b> (antes del refi, si ya renta): mismo flujo pero pagando el HML ' + IG_M(Math.round(ctx.pagoHml)) + '/mes (' + osIcon('link', { size: 11 }) + ' Calc 4) en vez de la cuota DSCR → <b class="' + (x.flujo + ctx.pagoDscr - ctx.pagoHml >= 0 ? 'ap-pos' : 'ap-neg') + '">' + IG_M(Math.round(x.flujo + ctx.pagoDscr - ctx.pagoHml)) + '/mes</b></div>' : '');
 
   // TARIFAS de la zona + vacancy por modelo + gastos — editables de verdad (ff_uw_config)
-  const tarifas = '<details class="ap-card" style="padding:14px;margin-top:14px"><summary style="cursor:pointer" class="ap-lab">⚙️ Tarifas de la zona ' + (IG_ZONAS.find(z => z[0] === zona) || [])[1] + ' + vacancy por modelo + gastos (editables — ff_uw_config)</summary>'
+  const tarifas = '<details class="ap-card" style="padding:14px;margin-top:14px"><summary style="cursor:pointer" class="ap-lab">' + osIcon('settings', { size: 12 }) + ' Tarifas de la zona ' + (IG_ZONAS.find(z => z[0] === zona) || [])[1] + ' + vacancy por modelo + gastos (editables — ff_uw_config)</summary>'
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px">'
     + igCfgIn('$/Habitación', 'ing_hab', 800) + igCfgIn('$/Estudio', 'ing_estudio', 1100) + igCfgIn('$/Apartamento', 'ing_apto', 2000) + igCfgIn('$ Casa completa', 'ing_casa', 3100)
     + igIn('Vacancy % Casa', igVac('casa'), "apCfgSet('ing_vac_casa',this.value)", '100%') + igIn('Vacancy % Habitaciones', igVac('hab'), "apCfgSet('ing_vac_hab',this.value)", '100%')
     + igIn('Vacancy % Unidades', igVac('unidades'), "apCfgSet('ing_vac_unidades',this.value)", '100%') + igIn('Vacancy % Mixta', igVac('mixta'), "apCfgSet('ing_vac_mixta',this.value)", '100%')
     + igIn('PM fee %', UWc('pm_fee_pct', 8), "apCfgSet('pm_fee_pct',this.value)", '100%') + igIn('Mantenimiento %', UWc('mantenimiento_pct', 5), "apCfgSet('mantenimiento_pct',this.value)", '100%')
     + igIn('Impuestos % ARV/año', UWc('impuestos_pct_arv', 2.2), "apCfgSet('impuestos_pct_arv',this.value)", '100%') + igIn('Seguro $/mes', UWc('seguro_mensual', 120), "apCfgSet('seguro_mensual',this.value)", '100%')
-    + '</div><div style="font-size:10px;color:var(--mut,#9fb0c9);margin-top:6px">La tarifa se guarda para la zona elegida (ing_&lt;tipo&gt;_' + zona + '); si no existe, cae a la base Austin. Calibración real: hab $780–880 · estudio $1,000–1,150 · apto $1,600–2,200 · casa $2,600–3,700 (Marlin $1,000–1,400).</div></details>';
+    + '</div><div style="font-size:10px;color:var(--mut,#a69d8c);margin-top:6px">La tarifa se guarda para la zona elegida (ing_&lt;tipo&gt;_' + zona + '); si no existe, cae a la base Austin. Calibración real: hab $780–880 · estudio $1,000–1,150 · apto $1,600–2,200 · casa $2,600–3,700 (Marlin $1,000–1,400).</div></details>';
 
-  const nota = inp.renta_mensual ? '<div style="font-size:11px;color:var(--mut,#9fb0c9);margin-top:10px">Renta del análisis (alimenta la Vista Unificada): <b style="color:var(--ink,#eaf0ff)">' + IG_M(inp.renta_mensual) + '/mes</b>' + (st.modelo ? ' · modelo ' + lblM[st.modelo] : ' · del deal real (Airtable)') + '</div>' : '';
+  const nota = inp.renta_mensual ? '<div style="font-size:11px;color:var(--mut,#a69d8c);margin-top:10px">Renta del análisis (alimenta la Vista Unificada): <b style="color:var(--ink,#eaf0ff)">' + IG_M(inp.renta_mensual) + '/mes</b>' + (st.modelo ? ' · modelo ' + lblM[st.modelo] : ' · del deal real (Airtable)') + '</div>' : '';
 
   return head + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;align-items:stretch;margin-top:4px">' + cards + '</div>' + mejorTxt + config + flujoCard + tarifas + nota;
 }

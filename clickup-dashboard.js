@@ -21,7 +21,7 @@ const CU_AGENT_URL = `${window.SUPABASE_URL}/functions/v1/clickup-ai-agent`;
 
 async function openClickupDashboard(sys) {
   cuState.sys = sys;
-  openModal(`📋 ${sys.name}`, '<div id="cu-root">Cargando...</div>');
+  openModal(sys.name, '<div id="cu-root">' + kitLoading('Cargando…') + '</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await cuLoadAll();
@@ -79,13 +79,13 @@ function cuRender() {
       <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 flex-wrap gap-2">
         <div class="flex items-center gap-1.5 flex-wrap">
           ${[
-            ['portfolio','📊 Portfolio'],
-            ['personas','👥 Personas'],
-            ['casas','🏠 Casas'],
-            ['recurrentes','🔁 Recurrentes'],
-            ['alertas','🚨 Alertas'],
-            ['automatizaciones','⚙️ Automatizaciones'],
-            ['agente','🧠 Agente IA']
+            ['portfolio', osIcon('chart') + ' Portfolio'],
+            ['personas', osIcon('users') + ' Personas'],
+            ['casas', osIcon('house') + ' Casas'],
+            ['recurrentes', osIcon('refresh') + ' Recurrentes'],
+            ['alertas', osIcon('alert') + ' Alertas'],
+            ['automatizaciones', osIcon('settings') + ' Automatizaciones'],
+            ['agente', osIcon('brain') + ' Agente IA']
           ].map(([k,l]) => `
             <button onclick="cuSetTab('${k}')" class="px-2.5 py-1.5 rounded text-xs font-bold ${cuState.tab===k?'bg-slate-900 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
               ${l}
@@ -95,9 +95,9 @@ function cuRender() {
           `).join('')}
         </div>
         <div class="flex items-center gap-2">
-          ${lastSync ? `<span class="text-[10px] text-slate-500">Sync: ${lastSyncAgo < 1 ? 'ahora' : lastSyncAgo < 60 ? lastSyncAgo+'min' : Math.floor(lastSyncAgo/60)+'h'} · ${cuState.syncLog.tasks_synced || 0} tareas</span>` : '<span class="text-[10px] text-amber-700">Sin sync. Click 🔄</span>'}
+          ${lastSync ? `<span class="text-[10px] text-slate-500">Sync: ${lastSyncAgo < 1 ? 'ahora' : lastSyncAgo < 60 ? lastSyncAgo+'min' : Math.floor(lastSyncAgo/60)+'h'} · ${cuState.syncLog.tasks_synced || 0} tareas</span>` : '<span class="text-[10px] text-amber-700">Sin sync. Click ' + osIcon('refresh', {size:12}) + ' Sync</span>'}
           <button onclick="cuSync()" ${cuState.loading?'disabled':''} class="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded font-bold">
-            ${cuState.loading ? '⏳ Sincronizando...' : '🔄 Sync'}
+            ${cuState.loading ? osIcon('loader', {spin:true}) + ' Sincronizando...' : osIcon('refresh') + ' Sync'}
           </button>
         </div>
       </div>
@@ -121,9 +121,9 @@ function cuSetTab(t) { cuState.tab = t; cuRender(); }
 function cuRenderEmpty() {
   return `
     <div class="text-center py-16">
-      <div class="text-5xl mb-4">📋</div>
+      <div class="mb-4">${osIcon('clipboard', {size:48})}</div>
       <h3 class="text-lg font-bold text-slate-700">Sin datos todavía</h3>
-      <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Click <strong>🔄 Sync</strong> arriba para traer las tareas del space "Empresa Remodelación" desde ClickUp.</p>
+      <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Click <strong>${osIcon('refresh', {size:12})} Sync</strong> arriba para traer las tareas del space "Empresa Remodelación" desde ClickUp.</p>
       <p class="text-[11px] text-slate-400 mt-3 max-w-md mx-auto">Si es tu primera vez: configurá <code>CLICKUP_TOKEN</code> en Supabase Secrets (lo conseguís en ClickUp → Settings → Apps → Generate).</p>
     </div>
   `;
@@ -302,7 +302,7 @@ function cuRenderPortfolio() {
 
       ${criticalAlerts.length ? `
         <div class="bg-red-50 border border-red-300 rounded-xl p-3">
-          <div class="text-xs font-bold text-red-900 uppercase mb-2">🚨 ${criticalAlerts.length} alertas críticas</div>
+          <div class="text-xs font-bold text-red-900 uppercase mb-2">${osIcon('alert', {size:13})} ${criticalAlerts.length} alertas críticas</div>
           ${criticalAlerts.slice(0,4).map(a => `
             <div class="bg-white border border-red-200 rounded p-2 mb-1 text-xs">
               <div class="font-bold">${a.title}</div>
@@ -319,11 +319,11 @@ function cuRenderPortfolio() {
       <!-- Top sobrecargados -->
       <div class="grid md:grid-cols-2 gap-3">
         <div class="border border-slate-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-2">👥 Top carga abierta</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">${osIcon('users', {size:13})} Top carga abierta</div>
           ${cuRenderAssigneeList(5)}
         </div>
         <div class="border border-slate-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-2">🏠 Casas activas (avance)</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">${osIcon('house', {size:13})} Casas activas (avance)</div>
           ${cuRenderCasasList(5)}
         </div>
       </div>
@@ -342,7 +342,7 @@ function cuRenderInsightsOperativos() {
 
   return `
     <div class="border-2 border-violet-300 bg-violet-50/30 rounded-xl p-4 space-y-3">
-      <div class="text-sm font-bold uppercase text-violet-900">🧠 Insights operativos — análisis profundo</div>
+      <div class="text-sm font-bold uppercase text-violet-900">${osIcon('brain')} Insights operativos — análisis profundo</div>
 
       <!-- Findings (cuellos de botella) -->
       ${findings.length ? `
@@ -351,28 +351,28 @@ function cuRenderInsightsOperativos() {
             const cls = f.sev === 'critical' ? 'bg-red-50 border-red-300' : f.sev === 'warning' ? 'bg-amber-50 border-amber-300' : 'bg-blue-50 border-blue-300';
             return `
               <div class="${cls} border rounded p-2.5">
-                <div class="text-xs font-bold">${f.sev === 'critical' ? '🚨' : f.sev === 'warning' ? '⚠️' : 'ℹ️'} ${f.titulo}</div>
+                <div class="text-xs font-bold">${f.sev === 'critical' || f.sev === 'warning' ? osIcon('alert', {size:12}) : osIcon('info', {size:12})} ${f.titulo}</div>
                 <div class="text-[11px] text-slate-700 mt-1">${f.detalle}</div>
                 <div class="text-[11px] text-slate-900 mt-1.5 font-semibold">→ Acción: ${f.accion}</div>
               </div>
             `;
           }).join('')}
         </div>
-      ` : '<div class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2">✅ Sin cuellos de botella críticos detectados.</div>'}
+      ` : '<div class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2">' + osIcon('check-circle', {size:13}) + ' Sin cuellos de botella críticos detectados.</div>'}
 
       <!-- Re-balanceo recomendado -->
       ${balance && balance.overloaded.length && balance.underloaded.length ? `
         <div class="bg-white border border-violet-200 rounded p-3">
-          <div class="text-xs font-bold mb-2">⚖️ Recomendación de re-balanceo</div>
+          <div class="text-xs font-bold mb-2">${osIcon('scale', {size:13})} Recomendación de re-balanceo</div>
           <div class="text-[11px] text-slate-600 mb-2">Promedio de carga: <strong>${balance.avg} tareas/persona</strong> (${balance.n} personas activas, ${balance.total} tareas totales).</div>
           <div class="grid md:grid-cols-2 gap-2">
             <div>
               <div class="text-[10px] font-bold uppercase text-red-700">Sobrecargados</div>
-              ${balance.overloaded.map(([n,v]) => `<div class="text-xs">⤵️ <strong>${n}</strong> · ${v.open} tareas (×${(v.open/balance.avg).toFixed(1)} promedio)</div>`).join('')}
+              ${balance.overloaded.map(([n,v]) => `<div class="text-xs">${osIcon('trending-down', {size:12})} <strong>${n}</strong> · ${v.open} tareas (×${(v.open/balance.avg).toFixed(1)} promedio)</div>`).join('')}
             </div>
             <div>
               <div class="text-[10px] font-bold uppercase text-emerald-700">Subutilizados</div>
-              ${balance.underloaded.map(([n,v]) => `<div class="text-xs">⤴️ <strong>${n}</strong> · ${v.open} tareas (×${(v.open/balance.avg).toFixed(1)} promedio)</div>`).join('')}
+              ${balance.underloaded.map(([n,v]) => `<div class="text-xs">${osIcon('trending-up', {size:12})} <strong>${n}</strong> · ${v.open} tareas (×${(v.open/balance.avg).toFixed(1)} promedio)</div>`).join('')}
             </div>
           </div>
           <div class="text-[11px] text-slate-900 mt-2 italic">→ Mover ~${Math.max(...balance.overloaded.map(([_,v]) => v.open - balance.avg))} tareas de los sobrecargados hacia los subutilizados acercaría todos al promedio.</div>
@@ -383,7 +383,7 @@ function cuRenderInsightsOperativos() {
       ${autoCandidates.length ? `
         <div class="bg-white border border-emerald-300 rounded p-3">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-xs font-bold">🤖 Candidatas a automatización (${autoCandidates.length})</div>
+            <div class="text-xs font-bold">${osIcon('bot', {size:13})} Candidatas a automatización (${autoCandidates.length})</div>
             <div class="text-xs text-emerald-700 font-bold">Ahorro potencial: ~${totalAhorroH}h/año</div>
           </div>
           <table class="w-full text-xs">
@@ -459,7 +459,7 @@ function cuRenderNarrativeSummary(snap, autos, balance, findings) {
 
   return `
     <div class="bg-slate-900 text-white rounded-xl p-3">
-      <div class="text-xs font-bold uppercase text-slate-300 mb-2">📝 Resumen narrativo</div>
+      <div class="text-xs font-bold uppercase text-slate-300 mb-2">${osIcon('pencil-line', {size:13})} Resumen narrativo</div>
       ${bullets.length ? `<ul class="text-xs space-y-1 list-disc list-inside">${bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : '<div class="text-xs text-slate-300">Sin findings críticos. Operación estable.</div>'}
       <div class="text-xs mt-3 pt-2 border-t border-slate-700">${recomendacion}</div>
     </div>
@@ -483,7 +483,7 @@ function cuRenderAssigneeList(limit = 999) {
         </div>
         <div class="text-right text-[10px] whitespace-nowrap">
           <span class="${overloadCls}">${v_.open}</span> abiertas
-          ${v_.overdue ? ` · <span class="text-red-700">${v_.overdue}⏰</span>` : ''}
+          ${v_.overdue ? ` · <span class="text-red-700">${v_.overdue} ${osIcon('clock', {size:11})}</span>` : ''}
           · <span class="text-emerald-700">${v_.closed_week||0}✓7d</span>
         </div>
       </div>`;
@@ -546,7 +546,7 @@ function cuRenderPersonas() {
                 <td class="p-2 text-right ${v_.overdue?'text-red-700 font-bold':''}">${v_.overdue || 0}</td>
                 <td class="p-2 text-right text-emerald-700">${v_.closed_week || 0}</td>
                 <td class="p-2 text-right">${v_.p50_age_days != null ? v_.p50_age_days+'d' : '—'}</td>
-                <td class="p-2 text-center text-[10px]">${isOver?'🚨 Sobrecargado':v_.open<5?'🟢 OK':'🟡 Normal'}</td>
+                <td class="p-2 text-center text-[10px]">${isOver ? kitStatusDot('bad', 'Sobrecargado') : v_.open<5 ? kitStatusDot('ok', 'OK') : kitStatusDot('warn', 'Normal')}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -605,7 +605,7 @@ function cuRenderRecurrentes() {
   return `
     <div class="space-y-3">
       <div class="text-xs text-slate-600 bg-violet-50 border border-violet-200 rounded p-2">
-        🔁 Tareas recurrentes (de la lista "Tareas recurrentes"). <strong>Las que tienen baja completitud son candidatas a automatización.</strong>
+        ${osIcon('refresh', {size:13})} Tareas recurrentes (de la lista "Tareas recurrentes"). <strong>Las que tienen baja completitud son candidatas a automatización.</strong>
       </div>
       <div class="border border-slate-200 rounded-xl overflow-hidden">
         <table class="w-full text-xs">
@@ -628,7 +628,7 @@ function cuRenderRecurrentes() {
                 <td class="p-2 text-right">${v.total}</td>
                 <td class="p-2 text-right">${v.completed}</td>
                 <td class="p-2 text-right ${rateCls}">${rate}%</td>
-                <td class="p-2 text-center"><button class="text-[10px] text-violet-700 hover:bg-violet-50 px-2 py-0.5 rounded" onclick="cuSuggestAutomation('${safeName}')">🤖 Automatizar</button></td>
+                <td class="p-2 text-center"><button class="text-[10px] text-violet-700 hover:bg-violet-50 px-2 py-0.5 rounded" onclick="cuSuggestAutomation('${safeName}')">${osIcon('bot', {size:12})} Automatizar</button></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -651,7 +651,7 @@ async function cuSuggestAutomation(name) {
 // ─── ALERTAS ───
 function cuRenderAlertas() {
   if (!cuState.alerts.length) {
-    return '<div class="text-center py-16 text-emerald-600"><div class="text-5xl mb-3">✅</div><div class="font-bold">Sin alertas activas</div></div>';
+    return '<div class="text-center py-16 text-emerald-600"><div class="mb-3">' + osIcon('check-circle', {size:48}) + '</div><div class="font-bold">Sin alertas activas</div></div>';
   }
   const byType = {};
   cuState.alerts.forEach(a => { (byType[a.severity] = byType[a.severity] || []).push(a); });
@@ -661,7 +661,7 @@ function cuRenderAlertas() {
         const items = byType[sev] || [];
         if (!items.length) return '';
         const bg = sev === 'critical' ? 'bg-red-50 border-red-300' : sev === 'warning' ? 'bg-amber-50 border-amber-300' : 'bg-blue-50 border-blue-300';
-        const label = sev === 'critical' ? '🚨 Críticas' : sev === 'warning' ? '⚠️ Advertencias' : 'ℹ️ Info';
+        const label = sev === 'critical' ? osIcon('alert', {size:12}) + ' Críticas' : sev === 'warning' ? osIcon('alert', {size:12}) + ' Advertencias' : osIcon('info', {size:12}) + ' Info';
         return `
           <div class="${bg} border rounded-xl p-3">
             <div class="text-xs font-bold uppercase mb-2">${label} (${items.length})</div>
@@ -697,7 +697,7 @@ function cuRenderAutomatizaciones() {
   return `
     <div class="space-y-3">
       <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-900">
-        ⚙️ <strong>Automatizaciones</strong>: triggers programados que ejecutan acciones contra ClickUp.
+        ${osIcon('settings', {size:13})} <strong>Automatizaciones</strong>: triggers programados que ejecutan acciones contra ClickUp.
         Los seeds vienen pre-creados pero <strong>desactivados</strong> — actívalos uno por uno cuando confirmes que el flujo te conviene.
         Cada ejecución queda registrada en <code>clickup_action_log</code>.
       </div>
@@ -721,7 +721,7 @@ function cuRenderAutomatizaciones() {
                 <td class="p-2 text-[10px] font-mono">${a.trigger_type}<div class="text-slate-500">${(a.trigger_config?.cron) || '—'}</div></td>
                 <td class="p-2 text-[10px]"><span class="bg-slate-100 px-1.5 py-0.5 rounded">${a.action_type}</span></td>
                 <td class="p-2 text-right">${a.run_count || 0}</td>
-                <td class="p-2 text-center"><span class="text-[10px] ${a.active?'bg-emerald-100 text-emerald-800':'bg-slate-200 text-slate-600'} px-2 py-0.5 rounded">${a.active?'🟢 Activa':'⏸ Pausada'}</span></td>
+                <td class="p-2 text-center"><span class="text-[10px] ${a.active?'bg-emerald-100 text-emerald-800':'bg-slate-200 text-slate-600'} px-2 py-0.5 rounded">${a.active ? kitStatusDot('ok', 'Activa') : kitStatusDot('off', 'Pausada')}</span></td>
                 <td class="p-2 text-center">
                   <button onclick="cuToggleAutomation('${a.id}', ${a.active})" class="text-[10px] bg-${a.active?'amber':'emerald'}-100 hover:bg-${a.active?'amber':'emerald'}-200 text-${a.active?'amber':'emerald'}-700 px-2 py-1 rounded font-bold">${a.active?'Pausar':'Activar'}</button>
                 </td>
@@ -737,22 +737,22 @@ function cuRenderAutomatizaciones() {
           <input id="cu-auto-name" placeholder="Nombre (ej. 'Auto-close vencidas')" class="border border-slate-300 rounded px-3 py-2 text-sm" />
           <input id="cu-auto-desc" placeholder="Descripción corta" class="border border-slate-300 rounded px-3 py-2 text-sm" />
           <select id="cu-auto-trigger" class="border border-slate-300 rounded px-3 py-2 text-sm">
-            <option value="on_schedule">⏰ Programado (cron)</option>
-            <option value="task_status_change">📍 Cambio de status</option>
-            <option value="task_created">➕ Task creada</option>
-            <option value="recurring_due">🔁 Recurrente vence</option>
+            <option value="on_schedule">Programado (cron)</option>
+            <option value="task_status_change">Cambio de status</option>
+            <option value="task_created">Task creada</option>
+            <option value="recurring_due">Recurrente vence</option>
           </select>
           <select id="cu-auto-action" class="border border-slate-300 rounded px-3 py-2 text-sm">
             <option value="close_task">✓ Cerrar task</option>
-            <option value="comment">💬 Comentar</option>
-            <option value="assign">👤 Re-asignar</option>
-            <option value="create_subtask">➕ Crear subtask</option>
-            <option value="add_tag">🏷 Agregar tag</option>
-            <option value="run_ai_template">🤖 Run AI template</option>
+            <option value="comment">Comentar</option>
+            <option value="assign">Re-asignar</option>
+            <option value="create_subtask">Crear subtask</option>
+            <option value="add_tag">Agregar tag</option>
+            <option value="run_ai_template">Run AI template</option>
           </select>
           <input id="cu-auto-cron" placeholder="Cron (ej. 0 9 * * MON)" value="0 9 * * MON" class="border border-slate-300 rounded px-3 py-2 text-sm font-mono col-span-2" />
         </div>
-        <button onclick="cuCreateAutomation()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Crear automatización (pausada)</button>
+        <button onclick="cuCreateAutomation()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">${osIcon('save')} Crear automatización (pausada)</button>
       </div>
     </div>
   `;
@@ -786,7 +786,7 @@ async function cuCreateAutomation() {
 async function cuRunAgentNow() {
   if (!confirm('Correr Claude ahora sobre tu snapshot actual?\n\nGenera hasta 5 propuestas accionables.\nCosto aproximado: ~$0.02 (Sonnet).')) return;
   const btn = document.getElementById('cu-agent-run');
-  if (btn) { btn.disabled = true; btn.innerText = '⏳ Pensando...'; }
+  if (btn) { btn.disabled = true; btn.innerText = 'Pensando...'; }
   try {
     const res = await fetch(CU_AGENT_URL, {
       method: 'POST',
@@ -795,12 +795,12 @@ async function cuRunAgentNow() {
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'Falló');
-    alert(`✅ ${r.proposals_generated} propuestas generadas.`);
+    toastSuccess(`${r.proposals_generated} propuestas generadas.`);
     await cuLoadAll();
     cuRender();
   } catch (e) {
     alert('Error: ' + e.message + '\n\nVerificá ANTHROPIC_API_KEY y que clickup-ai-agent esté deployada.');
-    if (btn) { btn.disabled = false; btn.innerText = '🧠 Correr agente ahora'; }
+    if (btn) { btn.disabled = false; btn.innerText = 'Correr agente ahora'; }
   }
 }
 
@@ -811,16 +811,16 @@ function cuRenderAgente() {
       <div class="bg-violet-50 border border-violet-300 rounded-xl p-3">
         <div class="flex justify-between items-start gap-2 flex-wrap">
           <div>
-            <div class="text-sm font-bold text-violet-900">🧠 Agente IA — propuestas accionables</div>
+            <div class="text-sm font-bold text-violet-900">${osIcon('brain')} Agente IA — propuestas accionables</div>
             <div class="text-xs text-violet-800 mt-1">Claude analiza tu snapshot + tasks y propone acciones concretas (close, reassign, automate). Vos aprobás → se ejecuta contra ClickUp API.</div>
           </div>
-          <button id="cu-agent-run" onclick="cuRunAgentNow()" class="text-xs bg-violet-700 hover:bg-violet-800 text-white px-4 py-2 rounded font-bold">🧠 Correr agente ahora</button>
+          <button id="cu-agent-run" onclick="cuRunAgentNow()" class="text-xs bg-violet-700 hover:bg-violet-800 text-white px-4 py-2 rounded font-bold">${osIcon('brain')} Correr agente ahora</button>
         </div>
       </div>
 
       <div>
         <div class="text-xs font-bold uppercase text-slate-600 mb-2">Propuestas pendientes (${props.length})</div>
-        ${props.length === 0 ? '<div class="text-center text-slate-400 text-xs py-8">Sin propuestas. Click "🧠 Correr agente ahora" para generar.</div>' : props.map(p => `
+        ${props.length === 0 ? '<div class="text-center text-slate-400 text-xs py-8">Sin propuestas. Click "Correr agente ahora" para generar.</div>' : props.map(p => `
           <div class="border border-slate-200 rounded-xl p-3 mb-2">
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
@@ -834,7 +834,7 @@ function cuRenderAgente() {
               </div>
               <div class="flex flex-col gap-1">
                 ${(p.proposal_type==='close' || p.proposal_type==='reassign' || p.proposal_type==='notify') && p.action_payload?.target_task_id ? `
-                  <button onclick="cuExecuteProposal('${p.id}')" class="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded font-bold">⚡ Ejecutar</button>
+                  <button onclick="cuExecuteProposal('${p.id}')" class="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded font-bold">${osIcon('zap', {size:12})} Ejecutar</button>
                 ` : ''}
                 <button onclick="cuApproveProposal('${p.id}')" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded font-bold">✓ Aprobar</button>
                 <button onclick="cuRejectProposal('${p.id}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded">✕ Rechazar</button>
@@ -882,7 +882,7 @@ async function cuExecuteProposal(id) {
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || JSON.stringify(r.result || {}));
-    alert('✅ Ejecutada contra ClickUp.');
+    toastSuccess('Ejecutada contra ClickUp.');
     await cuLoadAll();
     cuRender();
   } catch (e) {

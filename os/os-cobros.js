@@ -127,7 +127,7 @@ function cbTotales() {
 }
 
 function osCobrosView() {
-  if (!CB.est && !CB.err) { cbLoad(); return '<div class="empty">⏳ Calculando la cobranza…</div>'; }
+  if (!CB.est && !CB.err) { cbLoad(); return '<div class="empty">' + osIcon('loader') + ' Calculando la cobranza…</div>'; }
   if (CB.err) return '<div class="empty down">' + OS_E(CB.err) + ' <button class="cbtn" onclick="cbLoad(true)">Reintentar</button></div>';
   const t = cbTotales();
   const rows = cbRows();
@@ -146,14 +146,14 @@ function osCobrosView() {
   // dry-run panel
   const dry = CB.dry ? (CB.dry.error
     ? '<div class="card" style="margin-top:10px;border-color:var(--neg)"><div class="meta">Dry-run: ' + OS_E(CB.dry.error) + '</div></div>'
-    : '<div class="card" style="margin-top:10px;border-color:var(--a2)"><div class="chart-h"><div class="t">▶ Dry-run del motor · hoy ' + OS_E(CB.dry.fecha) + ' · modo ' + OS_E(CB.dry.modo) + '</div><div class="k"><button class="ibtn" onclick="CB.dry=null;osRender()">✕</button></div></div>'
+    : '<div class="card" style="margin-top:10px;border-color:var(--a2)"><div class="chart-h"><div class="t">' + osIcon('play') + ' Dry-run del motor · hoy ' + OS_E(CB.dry.fecha) + ' · modo ' + OS_E(CB.dry.modo) + '</div><div class="k"><button class="ibtn" onclick="CB.dry=null;osRender()">✕</button></div></div>'
       + '<div class="meta">' + (CB.dry.decisiones || []).length + ' mensajes candidatos hoy · ' + OS_E(JSON.stringify(CB.dry.resumen || {})) + ' — NADA se envió (dry-run)</div>'
       + ((CB.dry.decisiones || []).slice(0, 8).map(d => '<div class="kv"><span>' + OS_E(d.inquilino) + ' · ' + OS_E(d.tipo) + ' · ' + OS_E(d.canal.toUpperCase()) + '</span><b><span class="src' + (/skip/.test(d.estado) ? ' sup' : '') + '">' + OS_E(d.estado) + (d.motivo ? ' · ' + OS_E(d.motivo) : '') + '</span></b></div>').join(''))
       + '</div>') : '';
 
-  return '<h1>📣 Cobranza <span>· Rentas</span></h1>'
+  return '<h1>' + osIcon('megaphone') + ' Cobranza <span>· Rentas</span></h1>'
     + '<div class="sub">Cuatro números SEPARADOS con neteo por inquilino — el mes en curso jamás se suma como mora. Motor de recordatorios en modo <b>' + OS_E(modo) + '</b>' + (modo !== 'live' ? ' (registra sin enviar — A2P 10DLC en trámite)' : '') + '.</div>'
-    + '<div class="card" style="margin:10px 0;border-color:' + (modo === 'live' ? 'var(--pos)' : 'var(--amber)') + '"><div class="chart-h"><div class="t">🔌 Checklist de encendido</div><div class="k"><button class="ibtn" ' + (CB.dryLoading ? 'disabled' : '') + ' onclick="cbDryRun()">' + (CB.dryLoading ? '⏳…' : '▶ Dry-run del motor (no envía)') + '</button></div></div>'
+    + '<div class="card" style="margin:10px 0;border-color:' + (modo === 'live' ? 'var(--pos)' : 'var(--amber)') + '"><div class="chart-h"><div class="t">' + osIcon('link') + ' Checklist de encendido</div><div class="k"><button class="ibtn" ' + (CB.dryLoading ? 'disabled' : '') + ' onclick="cbDryRun()">' + (CB.dryLoading ? '…' : 'Dry-run del motor (no envía)') + '</button></div></div>'
     + '<div class="grid k4">'
     + kpi('Sin consentimiento SMS', sinConsent, 'TCPA: sin esto NO se textea — cargarlo abajo con fecha y origen', sinConsent ? 'warn' : 'up')
     + kpi('Sin teléfono', sinTel, 'de los activos con pendiente', sinTel ? 'warn' : 'up')
@@ -174,10 +174,10 @@ function osCobrosView() {
     + kpi('Aging 60+', cbM(aging['60+']), 'prioridad de gestión', aging['60+'] ? 'down' : 'up')
     + '</div>'
     + '<div class="card overx" style="margin-top:14px"><div class="chart-h"><div class="t">Inquilinos · ' + rows.length + '</div><div class="k" style="display:flex;gap:6px;flex-wrap:wrap">'
-    + '<input id="cb-q" class="ibtn" style="min-width:180px" placeholder="🔍 inquilino o casa…" value="' + OS_E(CB.q) + '" oninput="cbSet(\'q\', this.value)">'
+    + '<input id="cb-q" class="ibtn" style="min-width:180px" placeholder="inquilino o casa…" value="' + OS_E(CB.q) + '" oninput="cbSet(\'q\', this.value)">'
     + '<select class="ibtn" onchange="cbSet(\'fCasa\', this.value)"><option value="todos">Todas las casas</option>' + casas.map(c => '<option value="' + OS_E(c) + '"' + (CB.fCasa === c ? ' selected' : '') + '>' + OS_E(String(c).split(',')[0]) + '</option>').join('') + '</select>'
-    + '<select class="ibtn" onchange="cbSet(\'fEstado\', this.value)">' + [['todos', 'Todos'], ['vencido', '🔴 Vencidos'], ['mes_en_curso', '🟡 Mes en curso'], ['current', '🟢 Current']].map(o => '<option value="' + o[0] + '"' + (CB.fEstado === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
-    + '<button class="ibtn" onclick="cbCSV()">⬇ CSV</button><button class="ibtn" onclick="cbPDF()">🖨 PDF</button></div></div>'
+    + '<select class="ibtn" onchange="cbSet(\'fEstado\', this.value)">' + [['todos', 'Todos'], ['vencido', 'Vencidos'], ['mes_en_curso', 'Mes en curso'], ['current', 'Current']].map(o => '<option value="' + o[0] + '"' + (CB.fEstado === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>'
+    + '<button class="ibtn" onclick="cbCSV()">⬇ CSV</button><button class="ibtn" onclick="cbPDF()">' + osIcon('printer') + ' PDF</button></div></div>'
     + '<table><thead><tr><th>Inquilino</th><th>Casa</th><th style="text-align:right;padding-left:14px">Vencido</th><th style="text-align:right;padding-left:14px">Mes</th><th style="text-align:right;padding-left:14px">A favor</th><th style="padding-left:14px">Aging</th><th>Último recordatorio</th><th>Config</th></tr></thead><tbody>'
     + rows.map(r => {
       const open = CB.open[r.tenant_id];
@@ -205,8 +205,8 @@ window.osCobrosView = osCobrosView;
 function cbDetalle(r, recs) {
   const det = CB.det[r.tenant_id] || [];
   const tl = []
-    .concat(det.map(d => ({ f: d.mes + '-01', txt: '💵 ' + d.mes + ': pactado ' + cbM(d.pactada) + ' · pagado ' + cbM(d.pagado) + ' · deuda <b class="' + (+d.deuda > 0 ? 'down' : +d.deuda < 0 ? 'up' : '') + '">' + cbM(d.deuda) + '</b>' })))
-    .concat(recs.map(x => ({ f: String(x.created_at).slice(0, 10), txt: '📨 ' + String(x.created_at).slice(0, 10) + ' · ' + OS_E(x.tipo) + ' · ' + OS_E(x.canal) + ' → <b>' + OS_E(x.provider_status || x.estado) + '</b>' + (x.destinatario ? ' <span class="meta">(' + OS_E(x.destinatario) + ')</span>' : '') })))
+    .concat(det.map(d => ({ f: d.mes + '-01', txt: osIcon('banknote') + d.mes + ': pactado ' + cbM(d.pactada) + ' · pagado ' + cbM(d.pagado) + ' · deuda <b class="' + (+d.deuda > 0 ? 'down' : +d.deuda < 0 ? 'up' : '') + '">' + cbM(d.deuda) + '</b>' })))
+    .concat(recs.map(x => ({ f: String(x.created_at).slice(0, 10), txt: osIcon('mail') + String(x.created_at).slice(0, 10) + ' · ' + OS_E(x.tipo) + ' · ' + OS_E(x.canal) + ' → <b>' + OS_E(x.provider_status || x.estado) + '</b>' + (x.destinatario ? ' <span class="meta">(' + OS_E(x.destinatario) + ')</span>' : '') })))
     .sort((a, b) => String(b.f).localeCompare(String(a.f)));
   return '<div class="grid k2" style="align-items:start">'
     + '<div><div class="lab" style="margin-bottom:6px">Línea de tiempo (pagos + recordatorios con entrega)</div>'
@@ -221,7 +221,7 @@ function cbDetalle(r, recs) {
     + '<input id="cb-c-email" class="ibtn" placeholder="email" value="' + OS_E(r.email || '') + '">'
     + '<input id="cb-c-dia" class="ibtn" type="number" min="1" max="28" placeholder="día de pago" value="' + OS_E(r.dia_pago || '') + '">'
     + '<input id="cb-c-link" class="ibtn" placeholder="link de pago QBO" value="' + OS_E(r.payment_link || '') + '" style="grid-column:span 2">'
-    + '<button class="cbtn" style="padding:7px 14px" onclick="cbSaveCfg(\'' + r.tenant_id + '\')">💾 Guardar config</button>'
-    + (r.opt_out ? '<div class="meta" style="color:var(--neg)">⛔ STOP recibido el ' + OS_E(String(r.opt_out_fecha || '').slice(0, 10)) + ' — no se textea más a este número.</div>' : '')
+    + '<button class="cbtn" style="padding:7px 14px" onclick="cbSaveCfg(\'' + r.tenant_id + '\')">' + osIcon('save') + ' Guardar config</button>'
+    + (r.opt_out ? '<div class="meta" style="color:var(--neg)">' + osIcon('ban') + ' STOP recibido el ' + OS_E(String(r.opt_out_fecha || '').slice(0, 10)) + ' — no se textea más a este número.</div>' : '')
     + '</div></div></div>';
 }

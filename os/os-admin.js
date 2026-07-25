@@ -14,13 +14,13 @@ window.OSA = OSA;
 // 'pm' quedó como slug legado (Project Management del panel clásico): se muestra si un
 // usuario ya lo tiene, pero no se ofrece para asignar.
 const OSA_AREAS = [
-  { k: 'fix-flip', name: 'Fix & Flip', icon: '🏗️' },
-  { k: 'remodelacion', name: 'Remodelación', icon: '🔨' },
-  { k: 'rentas', name: 'Rentas', icon: '🏠' },
-  { k: 'operacion', name: 'Operación', icon: '⚙️' },
-  { k: 'contable', name: 'Contable', icon: '📒' },
-  { k: 'education', name: 'Educación', icon: '🎓' },
-  { k: 'ia', name: 'IA (gestor de bandeja)', icon: '🤖' }, // Pedir/Galería son para todos; esta área da la Bandeja a no-admins
+  { k: 'fix-flip', name: 'Fix & Flip', icon: osIcon('construction') },
+  { k: 'remodelacion', name: 'Remodelación', icon: osIcon('hammer') },
+  { k: 'rentas', name: 'Rentas', icon: osIcon('house') },
+  { k: 'operacion', name: 'Operación', icon: osIcon('settings') },
+  { k: 'contable', name: 'Contable', icon: osIcon('notebook') },
+  { k: 'education', name: 'Educación', icon: osIcon('graduation-cap') },
+  { k: 'ia', name: 'IA (gestor de bandeja)', icon: osIcon('bot') }, // Pedir/Galería son para todos; esta área da la Bandeja a no-admins
 ];
 const OSA_ROLES = [
   { k: 'admin', name: 'admin', desc: 've todo + gestiona usuarios' },
@@ -75,17 +75,17 @@ window.osaLoad = osaLoad;
 function osAdminView() {
   osaCSS();
   if (osaRole() !== 'admin') {
-    return '<div class="empty"><div style="font-size:40px">🛡</div><div style="margin-top:10px">Solo los administradores pueden ver este panel.</div></div>';
+    return '<div class="empty"><div style="font-size:40px">' + osIcon('shield') + '</div><div style="margin-top:10px">Solo los administradores pueden ver este panel.</div></div>';
   }
-  if (!OSA.loaded && !OSA.err) { osaLoad(); return '<div class="empty">⏳ Cargando usuarios…</div>'; }
+  if (!OSA.loaded && !OSA.err) { osaLoad(); return '<div class="empty">' + osIcon('loader') + ' Cargando usuarios…</div>'; }
   if (OSA.err) {
-    return '<div class="empty"><div style="font-size:40px">⚠️</div><div class="down" style="margin-top:10px">' + OS_E(OSA.err) + '</div><button class="cbtn" style="margin-top:14px" onclick="osaLoad(true)">Reintentar</button></div>';
+    return '<div class="empty"><div style="font-size:40px">' + osIcon('alert') + '</div><div class="down" style="margin-top:10px">' + OS_E(OSA.err) + '</div><button class="cbtn" style="margin-top:14px" onclick="osaLoad(true)">Reintentar</button></div>';
   }
   const us = OSA.users;
   const act = us.filter(u => u.active !== false);
   const admins = act.filter(u => u.role === 'admin');
   const kpi = (lab, val, meta) => '<div class="card"><div class="lab">' + lab + '</div><div class="big">' + val + '</div><div class="meta">' + meta + '</div></div>';
-  return '<h1>🛡 Panel de <span>Admin</span></h1><div class="sub">Usuarios, roles y áreas permitidas del OS. Desactivar es reversible (soft-delete) — acá no se borra nada.</div>'
+  return '<h1>' + osIcon('shield') + ' Panel de <span>Admin</span></h1><div class="sub">Usuarios, roles y áreas permitidas del OS. Desactivar es reversible (soft-delete) — acá no se borra nada.</div>'
     + '<div class="grid k4">'
     + kpi('Usuarios', us.length, 'en el sistema')
     + kpi('Activos', act.length, 'pueden entrar')
@@ -102,14 +102,14 @@ function osaInviteCard() {
   const boxes = OSA_AREAS.map(a =>
     '<label class="osa-arealab"><input type="checkbox" id="osa-inv-' + a.k + '" value="' + a.k + '"> ' + a.icon + ' ' + a.name + '</label>'
   ).join('');
-  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">➕ Invitar usuario</div><div class="k">Supabase Auth manda el email de invitación</div></div>'
+  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Invitar usuario</div><div class="k">Supabase Auth manda el email de invitación</div></div>'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'
     + '<input id="osa-inv-email" type="email" placeholder="email@ejemplo.com" class="osa-in" style="max-width:280px">'
     + '<select id="osa-inv-role" class="osa-in">' + roleOpts + '</select>'
     + '</div>'
     + '<div class="lab" style="margin-bottom:6px">Áreas visibles (no aplica a admin)</div>'
     + '<div>' + boxes + '</div>'
-    + '<div style="margin-top:12px;display:flex;gap:10px;align-items:center"><button class="cbtn" onclick="osaInvite(event)">📧 Enviar invitación</button><span class="meta" id="osa-inv-msg"></span></div>'
+    + '<div style="margin-top:12px;display:flex;gap:10px;align-items:center"><button class="cbtn" onclick="osaInvite(event)">' + osIcon('mail') + ' Enviar invitación</button><span class="meta" id="osa-inv-msg"></span></div>'
     + '</div>';
 }
 
@@ -146,10 +146,10 @@ function osaUserRow(u) {
     ? '<span class="badge b-red">inactivo</span>'
     : '<span class="badge b-ok">activo</span>';
   const acts = [];
-  acts.push('<button class="osa-ghost" onclick="osaEdit(\'' + u.id + '\')">' + (OSA.editId === u.id ? 'Cerrar' : '✏️ Editar') + '</button>');
+  acts.push('<button class="osa-ghost" onclick="osaEdit(\'' + u.id + '\')">' + (OSA.editId === u.id ? 'Cerrar' : 'Editar') + '</button>');
   if (!me) {
     if (inactive) acts.push('<button class="osa-ghost" onclick="osaReactivate(\'' + u.id + '\')">↩︎ Reactivar</button>');
-    else acts.push('<button class="osa-danger" onclick="osaDeactivate(\'' + u.id + '\',\'' + OS_E(u.email) + '\')">⏸ Desactivar</button>');
+    else acts.push('<button class="osa-danger" onclick="osaDeactivate(\'' + u.id + '\',\'' + OS_E(u.email) + '\')">' + osIcon('pause') + ' Desactivar</button>');
   }
   const who = '<div style="font-weight:640">' + OS_E(u.full_name || '—') + (me ? ' <span style="color:var(--mut2);font-size:10px">(vos)</span>' : '') + '</div>'
     + '<div style="color:var(--mut);font-size:11px">' + OS_E(u.email) + '</div>';
@@ -161,7 +161,7 @@ function osaUserRow(u) {
 
 function osaUsersCard(us) {
   const rows = us.map(osaUserRow).join('');
-  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">👥 Usuarios (' + us.length + ')</div><div class="k">roles: admin · pm · editor · viewer</div></div>'
+  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">' + osIcon('users') + ' Usuarios (' + us.length + ')</div><div class="k">roles: admin · pm · editor · viewer</div></div>'
     + '<div style="overflow-x:auto"><table class="ptable"><thead><tr><th>Usuario</th><th>Rol</th><th>Áreas permitidas</th><th>Estado</th><th>Último acceso</th><th style="text-align:right">Acciones</th></tr></thead><tbody>'
     + rows + '</tbody></table></div></div>';
 }
@@ -177,7 +177,7 @@ function osaEditor(u) {
     const edit = lv[a.k] === 'edit';
     return '<span style="display:inline-flex;align-items:center;gap:4px;margin:3px 8px 3px 0">'
       + '<label class="osa-arealab" style="margin:0"><input type="checkbox" id="osa-ed-' + a.k + '" value="' + a.k + '" ' + (on ? 'checked' : '') + '> ' + a.icon + ' ' + OS_E(a.name) + '</label>'
-      + '<button class="osa-lvl' + (edit ? ' on' : '') + '" id="osa-lv-' + a.k + '" data-lvl="' + (edit ? 'edit' : 'view') + '" onclick="osaLvlToggle(\'' + a.k + '\')" title="Nivel de acceso en esta área">' + (edit ? '✏️ edita' : '👁 ve') + '</button>'
+      + '<button class="osa-lvl' + (edit ? ' on' : '') + '" id="osa-lv-' + a.k + '" data-lvl="' + (edit ? 'edit' : 'view') + '" onclick="osaLvlToggle(\'' + a.k + '\')" title="Nivel de acceso en esta área">' + (edit ? 'edita' : 've') + '</button>'
       + '</span>';
   }).join('');
   const roleSel = me
@@ -185,9 +185,9 @@ function osaEditor(u) {
     : '<select id="osa-ed-role" class="osa-in">' + roleOpts + '</select>';
   return '<div style="padding:6px 2px">'
     + '<div class="lab" style="margin-bottom:6px">Rol</div><div style="margin-bottom:12px">' + roleSel + '</div>'
-    + '<div class="lab" style="margin-bottom:6px">Áreas permitidas + nivel (👁 ve / ✏️ edita) — no aplica si es admin</div>'
+    + '<div class="lab" style="margin-bottom:6px">Áreas permitidas + nivel (' + osIcon('eye') + ' ve / ' + osIcon('pencil') + ' edita) — no aplica si es admin</div>'
     + '<div style="margin-bottom:12px">' + boxes + '</div>'
-    + '<div style="display:flex;gap:10px;align-items:center"><button class="cbtn" onclick="osaSave(\'' + u.id + '\')">💾 Guardar cambios</button><span class="meta" id="osa-ed-msg"></span></div>'
+    + '<div style="display:flex;gap:10px;align-items:center"><button class="cbtn" onclick="osaSave(\'' + u.id + '\')">' + osIcon('save') + ' Guardar cambios</button><span class="meta" id="osa-ed-msg"></span></div>'
     + '</div>';
 }
 
@@ -199,7 +199,7 @@ function osaLvlToggle(k) {
   const b = document.getElementById('osa-lv-' + k); if (!b) return;
   const nxt = b.dataset.lvl === 'edit' ? 'view' : 'edit';
   b.dataset.lvl = nxt; b.classList.toggle('on', nxt === 'edit');
-  b.innerHTML = nxt === 'edit' ? '✏️ edita' : '👁 ve';
+  b.innerHTML = nxt === 'edit' ? 'edita' : 've';
 }
 window.osaLvlToggle = osaLvlToggle;
 
@@ -225,7 +225,7 @@ async function osaSave(id) {
       if (b && b.dataset.lvl === 'edit') levels[k] = 'edit';
     }
   });
-  osaMsg('osa-ed-msg', '⏳ guardando…');
+  osaMsg('osa-ed-msg', 'guardando…');
   const { error } = await sb.from('profiles').update({ role, allowed_areas: areas, area_levels: levels }).eq('id', id);
   if (error) return osaMsg('osa-ed-msg', 'Error: ' + error.message, true);
   OSA.editId = null;
@@ -254,7 +254,7 @@ async function osaInvite(event) {
   const role = document.getElementById('osa-inv-role').value;
   const areas = OSA_AREAS.filter(a => { const cb = document.getElementById('osa-inv-' + a.k); return cb && cb.checked; }).map(a => a.k);
   const btn = event && event.target;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
   try {
     const session = await sb.auth.getSession();
     const token = (session.data.session && session.data.session.access_token) || window.SUPABASE_ANON_KEY;
@@ -270,6 +270,6 @@ async function osaInvite(event) {
   } catch (e) {
     osaMsg('osa-inv-msg', 'Error: ' + e.message, true);
   }
-  if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar invitación'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Enviar invitación'; }
 }
 window.osaInvite = osaInvite;

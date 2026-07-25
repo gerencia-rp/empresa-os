@@ -88,18 +88,18 @@ const FM_CREDIT_QUESTIONS = [
   { id:'inmigracion', bloque:'A · Tu score',
     pregunta:'¿Cuál es tu status migratorio? (define qué bancos te aceptan)',
     opciones:[
-      { val:'ciudadano',  label:'🇺🇸 Ciudadano' },
-      { val:'residente',  label:'🟢 Residente permanente (Green Card)' },
-      { val:'work_visa',  label:'📄 Visa de trabajo (H1B/L1/E2/TN)' },
-      { val:'itin',       label:'🆔 ITIN (sin SSN)' },
-      { val:'sin_status', label:'❓ Sin status definido' }
+      { val:'ciudadano',  label:'Ciudadano' },
+      { val:'residente',  label:'Residente permanente (Green Card)' },
+      { val:'work_visa',  label:'Visa de trabajo (H1B/L1/E2/TN)' },
+      { val:'itin',       label:'ITIN (sin SSN)' },
+      { val:'sin_status', label:'Sin status definido' }
     ] },
   { id:'monitoring', bloque:'A · Tu score',
     pregunta:'¿Estás monitoreando tu crédito HOY? (lección 2.1)',
     opciones:[
       { val:'experian',  label:'Sí — Experian / MyFICO (pago, FICO real)' },
       { val:'gratis',    label:'Sí — Credit Karma / Capital One / Chase (gratis, VantageScore)' },
-      { val:'nada',      label:'❌ No tengo monitoreo activo' }
+      { val:'nada',      label:'No — no tengo monitoreo activo' }
     ] },
 
   // ── BLOQUE B · COMPOSICIÓN (3 preguntas) ──────────────
@@ -128,11 +128,11 @@ const FM_CREDIT_QUESTIONS = [
     pregunta:'Además de tarjetas, ¿qué otros créditos activos tenés? (lección 4.6 · Credit Mix)',
     multiSelect:true,
     opciones:[
-      { val:'auto',       label:'🚗 Auto loan' },
-      { val:'student',    label:'🎓 Student loan' },
-      { val:'mortgage',   label:'🏠 Hipoteca' },
-      { val:'personal',   label:'💵 Personal loan' },
-      { val:'business',   label:'🏢 Business credit' },
+      { val:'auto',       label:'Auto loan' },
+      { val:'student',    label:'Student loan' },
+      { val:'mortgage',   label:'Hipoteca' },
+      { val:'personal',   label:'Personal loan' },
+      { val:'business',   label:'Business credit' },
       { val:'ninguno',    label:'Ninguno — solo tarjetas' }
     ] },
 
@@ -149,12 +149,12 @@ const FM_CREDIT_QUESTIONS = [
     pregunta:'¿Qué derogatorios tenés HOY en tu reporte? (lección 3.0 · Identificar)',
     multiSelect:true,
     opciones:[
-      { val:'collection',  label:'🚨 Cuenta en colección' },
-      { val:'charge_off',  label:'🚨 Charge-off' },
-      { val:'judgment',    label:'⚖️ Judgment / lien' },
-      { val:'bankruptcy',  label:'💥 Bankruptcy (Cap 7 o 13)' },
-      { val:'foreclosure', label:'🏚️ Foreclosure / short sale' },
-      { val:'ninguno',     label:'✅ Ninguno — limpio' }
+      { val:'collection',  label:'Cuenta en colección' },
+      { val:'charge_off',  label:'Charge-off' },
+      { val:'judgment',    label:'Judgment / lien' },
+      { val:'bankruptcy',  label:'Bankruptcy (Cap 7 o 13)' },
+      { val:'foreclosure', label:'Foreclosure / short sale' },
+      { val:'ninguno',     label:'Ninguno — limpio' }
     ] },
 
   // ── BLOQUE D · META (2 preguntas) ──────────────────────
@@ -168,13 +168,13 @@ const FM_CREDIT_QUESTIONS = [
   { id:'meta_uso', bloque:'D · Tu meta',
     pregunta:'¿Para qué querés el crédito en los próximos 6 meses? (define tu plan de acción)',
     opciones:[
-      { val:'hml',         label:'💰 Hard Money Lender para flips' },
-      { val:'mortgage',    label:'🏠 Mortgage convencional (Fix & Hold)' },
-      { val:'dscr',        label:'📊 DSCR loan (rental)' },
-      { val:'heloc',       label:'🏚️ HELOC sobre vivienda' },
-      { val:'business',    label:'🏢 Business credit / líneas de empresa' },
-      { val:'cash',        label:'💵 Convertir tarjetas en cash (lección 6.5)' },
-      { val:'mejorar',     label:'📈 Solo mejorar score (sin meta inmediata)' }
+      { val:'hml',         label:'Hard Money Lender para flips' },
+      { val:'mortgage',    label:'Mortgage convencional (Fix & Hold)' },
+      { val:'dscr',        label:'DSCR loan (rental)' },
+      { val:'heloc',       label:'HELOC sobre vivienda' },
+      { val:'business',    label:'Business credit / líneas de empresa' },
+      { val:'cash',        label:'Convertir tarjetas en cash (lección 6.5)' },
+      { val:'mejorar',     label:'Solo mejorar score (sin meta inmediata)' }
     ] }
 ];
 
@@ -330,10 +330,10 @@ function fmCalcularPerfilCredito(a) {
   // Texto del tier
   const tierLabel = {
     sin_historial:{ emoji:'🆕', nombre:'Sin historial', color:'slate', resumen:'Construyendo crédito desde cero. Foco: abrir 1-2 secured cards + pagos a tiempo + 6 meses de tradeline.' },
-    reconstruir:  { emoji:'🛠️', nombre:'Reconstruir', color:'red',     resumen:'Score bajo con negativos. Plan: limpiar derogatorios + utilization + pagos a tiempo. 6-12 meses al objetivo.' },
-    limitado:     { emoji:'⚠️', nombre:'Limitado',    color:'amber',   resumen:'Aprobás algunos productos pero con tasas malas. Plan: bajar utilization + extender historial + mix. 3-6 meses al objetivo.' },
-    bueno:        { emoji:'✅', nombre:'Bueno',       color:'blue',    resumen:'Calificás HML estándar y mortgages no-prime. Plan: empujar a >740 para mejores tasas.' },
-    excelente:    { emoji:'⭐', nombre:'Excelente',   color:'emerald', resumen:'Top tier. Plan: mantener + abrir líneas de business + maximizar puntos.' }
+    reconstruir:  { emoji:osIcon('wrench'), nombre:'Reconstruir', color:'red',     resumen:'Score bajo con negativos. Plan: limpiar derogatorios + utilization + pagos a tiempo. 6-12 meses al objetivo.' },
+    limitado:     { emoji:osIcon('alert'), nombre:'Limitado',    color:'amber',   resumen:'Aprobás algunos productos pero con tasas malas. Plan: bajar utilization + extender historial + mix. 3-6 meses al objetivo.' },
+    bueno:        { emoji:osIcon('check-circle'), nombre:'Bueno',       color:'blue',    resumen:'Calificás HML estándar y mortgages no-prime. Plan: empujar a >740 para mejores tasas.' },
+    excelente:    { emoji:osIcon('star'), nombre:'Excelente',   color:'emerald', resumen:'Top tier. Plan: mantener + abrir líneas de business + maximizar puntos.' }
   }[tier];
 
   return {
@@ -975,13 +975,13 @@ function fmRenderCredito() {
     <div class="h-full overflow-y-auto bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       <div class="max-w-3xl mx-auto px-6 py-8">
         <div class="bg-white rounded-xl border border-emerald-200 p-5 mb-4 shadow-sm">
-          <h3 class="font-bold text-slate-900 mb-1">💳 Diagnóstico de Crédito</h3>
+          <h3 class="font-bold text-slate-900 mb-1">${osIcon('credit-card',{size:15})} Diagnóstico de Crédito</h3>
           <p class="text-sm text-slate-600">${total} preguntas en 6 bloques. Al final recibís perfil + plan de acción a 90 días con FICO estimado.</p>
         </div>
 
         <div class="bg-white border border-emerald-300 rounded-xl p-3 mb-4">
           <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <div class="text-xs font-bold uppercase text-emerald-800">👤 Diagnóstico para estudiante</div>
+            <div class="text-xs font-bold uppercase text-emerald-800">${osIcon('user',{size:13})} Diagnóstico para estudiante</div>
             ${selStudent ? `<button onclick="fmCreditSelectStudent(null)" class="text-[10px] text-slate-500 hover:text-red-700">✕ Limpiar</button>` : ''}
           </div>
           ${selStudent ? `
@@ -991,7 +991,7 @@ function fmRenderCredito() {
             </div>
           ` : `
             <div class="text-[11px] text-slate-600 mb-2">Elegí un estudiante para vincular el resultado al CRM (opcional).</div>
-            <input id="fm-credit-student-search" type="text" placeholder="🔍 Buscar..." value="${(c.studentSearch||'').replace(/"/g,'&quot;')}"
+            <input id="fm-credit-student-search" type="text" placeholder="Buscar..." value="${(c.studentSearch||'').replace(/"/g,'&quot;')}"
               oninput="fmCreditSetStudentSearch(this.value)" class="w-full border border-slate-300 rounded px-3 py-1.5 text-xs mb-2"/>
             <div class="max-h-40 overflow-y-auto scrollbar-thin border border-slate-200 rounded">
               ${filtered.length === 0 ? `
@@ -1037,7 +1037,7 @@ function fmRenderCredito() {
         <div class="flex items-center justify-between mt-6">
           <button onclick="fmCreditBack()" ${step === 0 ? 'disabled' : ''} class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 disabled:opacity-30">← Atrás</button>
           ${q.tipo === 'text' || q.tipo === 'number' || q.multiSelect ? `<button onclick="fmCreditNext()" class="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600">Siguiente →</button>` : ''}
-          <button onclick="fmCreditReset()" class="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">🔄 Reiniciar</button>
+          <button onclick="fmCreditReset()" class="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">${osIcon('refresh',{size:12})} Reiniciar</button>
         </div>
       </div>
     </div>
@@ -1094,15 +1094,15 @@ function fmRenderCreditoPlan() {
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
               <div class="text-xs font-bold opacity-90 tracking-wider mb-2">DIAGNÓSTICO DE CRÉDITO · PERFIL ${tl.nombre.toUpperCase()}</div>
-              <h1 class="text-3xl font-bold mb-2">${tl.emoji} ${tl.nombre}</h1>
+              <h1 class="text-3xl font-bold mb-2">${osIcon({sin_historial:'sparkles',reconstruir:'hammer',limitado:'alert',bueno:'check-circle',excelente:'star'}[r.tier]||'circle-dot',{size:26})} ${tl.nombre}</h1>
               <p class="text-sm opacity-90">${tl.resumen}</p>
             </div>
             <div class="flex flex-col gap-2">
               ${selStudent
-                ? `<button onclick="fmCreditSavePlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-bold">💾 Guardar plan para ${(selStudent.full_name||'estudiante').replace(/</g,'&lt;')}</button>`
-                : `<button onclick="alert('Seleccioná un estudiante antes de guardar.\\n\\nO podés copiar el plan manualmente.')" class="px-4 py-2 bg-white/20 text-white rounded-lg text-sm font-bold cursor-help">💾 (Sin estudiante)</button>`
+                ? `<button onclick="fmCreditSavePlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-bold">${osIcon('save',{size:13})} Guardar plan para ${(selStudent.full_name||'estudiante').replace(/</g,'&lt;')}</button>`
+                : `<button onclick="alert('Seleccioná un estudiante antes de guardar.\\n\\nO podés copiar el plan manualmente.')" class="px-4 py-2 bg-white/20 text-white rounded-lg text-sm font-bold cursor-help">${osIcon('save',{size:13})} (Sin estudiante)</button>`
               }
-              <button onclick="fmCreditReset()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm">🔄 Repetir</button>
+              <button onclick="fmCreditReset()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm">${osIcon('refresh',{size:13})} Repetir</button>
             </div>
           </div>
           <div class="mt-6 grid grid-cols-3 gap-3">
@@ -1116,18 +1116,18 @@ function fmRenderCreditoPlan() {
       <div class="max-w-5xl mx-auto px-8 py-6">
         <!-- Objetivo 90 días -->
         <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-5 mb-6">
-          <div class="text-xs font-bold uppercase text-emerald-700 tracking-wider mb-2">🎯 Objetivo 90 días</div>
+          <div class="text-xs font-bold uppercase text-emerald-700 tracking-wider mb-2">${osIcon('target',{size:13})} Objetivo 90 días</div>
           <p class="text-sm text-slate-900 font-medium">${r.objetivo_90d}</p>
         </div>
 
         <!-- Fortalezas + gaps -->
         <div class="grid md:grid-cols-2 gap-4 mb-6">
           <div class="bg-white border border-slate-200 rounded-xl p-4">
-            <h3 class="font-bold text-sm text-slate-900 mb-3">✅ Fortalezas (${r.strengths.length})</h3>
+            <h3 class="font-bold text-sm text-slate-900 mb-3">${osIcon('check-circle',{size:14})} Fortalezas (${r.strengths.length})</h3>
             ${r.strengths.length ? r.strengths.map(s => `<div class="text-xs text-emerald-700 mb-1.5">✓ ${s}</div>`).join('') : '<div class="text-xs text-slate-400 italic">Sin fortalezas identificadas todavía.</div>'}
           </div>
           <div class="bg-white border border-slate-200 rounded-xl p-4">
-            <h3 class="font-bold text-sm text-slate-900 mb-3">⚠️ Áreas a mejorar (${r.gaps.length})</h3>
+            <h3 class="font-bold text-sm text-slate-900 mb-3">${osIcon('alert',{size:14})} Áreas a mejorar (${r.gaps.length})</h3>
             ${r.gaps.length ? r.gaps.map(g => {
               const colors = { 'crítica':'red', 'alta':'red', 'media':'amber', 'baja':'slate' };
               const col = colors[g.gravedad] || 'slate';
@@ -1140,7 +1140,7 @@ function fmRenderCreditoPlan() {
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
           <div class="bg-slate-900 text-white px-5 py-4">
             <div class="flex items-center justify-between flex-wrap gap-2">
-              <h3 class="font-bold text-base">📋 Plan PROFUNDO · ${r.acciones.length} acciones · 12 fases</h3>
+              <h3 class="font-bold text-base">${osIcon('clipboard',{size:15})} Plan PROFUNDO · ${r.acciones.length} acciones · 12 fases</h3>
               <div class="text-[10px] opacity-80">Ataca los 5 factores FICO + 7 vías de capital</div>
             </div>
             <div class="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px]">
@@ -1151,18 +1151,18 @@ function fmRenderCreditoPlan() {
               <div class="bg-white/15 rounded px-2 py-1.5"><div class="font-bold">10%</div><div class="opacity-80">Credit Mix</div></div>
             </div>
           </div>
-          ${fmRenderFaseCredito(r.acciones,  1, '🛡️ FASE 1 · Defensa & Monitoreo',           'Semana 1',  'sky')}
-          ${fmRenderFaseCredito(r.acciones,  2, '🔍 FASE 2 · Diagnóstico Profundo',          'Semana 1-2','indigo')}
-          ${fmRenderFaseCredito(r.acciones,  3, '💳 FASE 3 · Payment History (35% del FICO)', 'Mes 1',     'rose')}
-          ${fmRenderFaseCredito(r.acciones,  4, '🧹 FASE 4 · Limpieza de Negativos',          'Semana 2-6','red')}
-          ${fmRenderFaseCredito(r.acciones,  5, '⚡ FASE 5 · Utilization (30% del FICO)',     'Mes 1-2',   'amber')}
-          ${fmRenderFaseCredito(r.acciones,  6, '⏳ FASE 6 · Length of History (15%)',         'Mes 2',     'violet')}
-          ${fmRenderFaseCredito(r.acciones,  7, '🔗 FASE 7 · Credit Mix (10%)',                'Mes 2-3',   'fuchsia')}
-          ${fmRenderFaseCredito(r.acciones,  8, '🎯 FASE 8 · New Credit & Inquiries (10%)',   'Mes 2-3',   'orange')}
-          ${fmRenderFaseCredito(r.acciones,  9, '🏦 FASE 9 · Construcción Bancaria',          'Mes 2-3',   'cyan')}
-          ${fmRenderFaseCredito(r.acciones, 10, '💎 FASE 10 · Aplicación Estratégica Cards',  'Mes 3+',    'teal')}
-          ${fmRenderFaseCredito(r.acciones, 11, '🏢 FASE 11 · Business Credit Build',          'Mes 4-12',  'blue')}
-          ${fmRenderFaseCredito(r.acciones, 12, '💰 FASE 12 · Acceso a Capital (7 vías)',     'Mes 4+',    'emerald')}
+          ${fmRenderFaseCredito(r.acciones,  1, osIcon('shield',{size:13}) + ' FASE 1 · Defensa & Monitoreo',           'Semana 1',  'sky')}
+          ${fmRenderFaseCredito(r.acciones,  2, osIcon('search',{size:13}) + ' FASE 2 · Diagnóstico Profundo',          'Semana 1-2','indigo')}
+          ${fmRenderFaseCredito(r.acciones,  3, osIcon('credit-card',{size:13}) + ' FASE 3 · Payment History (35% del FICO)', 'Mes 1',     'rose')}
+          ${fmRenderFaseCredito(r.acciones,  4, osIcon('trash',{size:13}) + ' FASE 4 · Limpieza de Negativos',          'Semana 2-6','red')}
+          ${fmRenderFaseCredito(r.acciones,  5, osIcon('zap',{size:13}) + ' FASE 5 · Utilization (30% del FICO)',     'Mes 1-2',   'amber')}
+          ${fmRenderFaseCredito(r.acciones,  6, osIcon('hourglass',{size:13}) + ' FASE 6 · Length of History (15%)',         'Mes 2',     'violet')}
+          ${fmRenderFaseCredito(r.acciones,  7, osIcon('link',{size:13}) + ' FASE 7 · Credit Mix (10%)',                'Mes 2-3',   'fuchsia')}
+          ${fmRenderFaseCredito(r.acciones,  8, osIcon('target',{size:13}) + ' FASE 8 · New Credit & Inquiries (10%)',   'Mes 2-3',   'orange')}
+          ${fmRenderFaseCredito(r.acciones,  9, osIcon('landmark',{size:13}) + ' FASE 9 · Construcción Bancaria',          'Mes 2-3',   'cyan')}
+          ${fmRenderFaseCredito(r.acciones, 10, osIcon('gem',{size:13}) + ' FASE 10 · Aplicación Estratégica Cards',  'Mes 3+',    'teal')}
+          ${fmRenderFaseCredito(r.acciones, 11, osIcon('building',{size:13}) + ' FASE 11 · Business Credit Build',          'Mes 4-12',  'blue')}
+          ${fmRenderFaseCredito(r.acciones, 12, osIcon('dollar',{size:13}) + ' FASE 12 · Acceso a Capital (7 vías)',     'Mes 4+',    'emerald')}
         </div>
 
         <div class="text-[10px] text-slate-500 italic">Plan PROFUNDO mapeado al programa de 42 lecciones · ataca cada factor FICO sistemáticamente · estrategias básica→pro→elite · 7 vías de capital. Validá con broker/lender antes de aplicar. FICO real solo via MyFICO.</div>
@@ -1220,11 +1220,11 @@ function fmRenderAccionCredito(a, color) {
 
   // Badge de nivel (básico → elite)
   const nivelMap = {
-    basico:     '<span class="text-[9px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase">🟢 Básico</span>',
-    intermedio: '<span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded uppercase">🔵 Intermedio</span>',
-    avanzado:   '<span class="text-[9px] font-bold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded uppercase">🟣 Avanzado</span>',
-    pro:        '<span class="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded uppercase">🟠 Pro</span>',
-    elite:      '<span class="text-[9px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded uppercase">🔴 Elite</span>'
+    basico:     '<span class="text-[9px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase">Básico</span>',
+    intermedio: '<span class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded uppercase">Intermedio</span>',
+    avanzado:   '<span class="text-[9px] font-bold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded uppercase">Avanzado</span>',
+    pro:        '<span class="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded uppercase">Pro</span>',
+    elite:      '<span class="text-[9px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded uppercase">Elite</span>'
   };
   const nivelBadge = nivelMap[a.nivel || 'basico'] || '';
 
@@ -1235,10 +1235,10 @@ function fmRenderAccionCredito(a, color) {
   }[a.prioridad] || '';
 
   const costoBadge = a.costo ? {
-    gratis: '<span class="text-[9px] text-emerald-700 font-bold">💚 Gratis</span>',
-    bajo:   '<span class="text-[9px] text-slate-600 font-bold">💵 Bajo costo</span>',
-    medio:  '<span class="text-[9px] text-amber-700 font-bold">💰 Costo medio</span>',
-    alto:   '<span class="text-[9px] text-red-700 font-bold">💸 Costo alto</span>'
+    gratis: '<span class="text-[9px] text-emerald-700 font-bold">' + osIcon('check-circle',{size:10}) + ' Gratis</span>',
+    bajo:   '<span class="text-[9px] text-slate-600 font-bold">' + osIcon('banknote',{size:10}) + ' Bajo costo</span>',
+    medio:  '<span class="text-[9px] text-amber-700 font-bold">' + osIcon('dollar',{size:10}) + ' Costo medio</span>',
+    alto:   '<span class="text-[9px] text-red-700 font-bold">' + osIcon('coins',{size:10}) + ' Costo alto</span>'
   }[a.costo] || '' : '';
 
   return `
@@ -1248,21 +1248,21 @@ function fmRenderAccionCredito(a, color) {
         <div class="flex items-center gap-1 flex-wrap">${nivelBadge}${prioBadge}</div>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[11px] mb-2">
-        <div class="text-emerald-700"><strong>🎯 Meta:</strong> ${a.meta}</div>
-        <div class="text-slate-600"><strong>⏱</strong> ${a.plazo_dias} días · ${costoBadge}</div>
-        ${a.puntos_estimados ? `<div class="text-blue-700"><strong>📈 Score:</strong> ${a.puntos_estimados}</div>` : ''}
+        <div class="text-emerald-700"><strong>${osIcon('target',{size:11})} Meta:</strong> ${a.meta}</div>
+        <div class="text-slate-600"><strong>${osIcon('clock',{size:11})}</strong> ${a.plazo_dias} días · ${costoBadge}</div>
+        ${a.puntos_estimados ? `<div class="text-blue-700"><strong>${osIcon('trending-up',{size:11})} Score:</strong> ${a.puntos_estimados}</div>` : ''}
       </div>
       ${a.por_que ? `<div class="bg-slate-50 border-l-2 ${c.accent.replace('bg-','border-')} rounded-r px-3 py-2 text-[11px] text-slate-700 italic mb-2">
         <strong class="not-italic ${c.text}">¿Por qué?</strong> ${a.por_que}
       </div>` : ''}
       ${pasos.length ? `<details class="mb-2">
-        <summary class="text-[10px] text-slate-600 font-bold cursor-pointer hover:text-slate-900">📝 Ver pasos detallados (${pasos.length})</summary>
+        <summary class="text-[10px] text-slate-600 font-bold cursor-pointer hover:text-slate-900">${osIcon('pencil-line',{size:11})} Ver pasos detallados (${pasos.length})</summary>
         <ol class="mt-2 ml-4 space-y-1 list-decimal text-[11px] text-slate-700">
           ${pasos.map(p => `<li>${p.replace(/</g,'&lt;')}</li>`).join('')}
         </ol>
       </details>` : ''}
       ${lecciones.length ? `<div class="flex items-center gap-1 flex-wrap mt-1.5">
-        <span class="text-[10px] text-slate-500 font-bold mr-1">📚 Estudiar:</span>
+        <span class="text-[10px] text-slate-500 font-bold mr-1">${osIcon('book',{size:11})} Estudiar:</span>
         ${lecciones.map(L => {
           const titulo = (typeof FM_CREDIT_LESSONS !== 'undefined' && FM_CREDIT_LESSONS[L]) || L;
           return `<span class="inline-flex items-center text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded" title="${titulo.replace(/</g,'&lt;')}">${L}</span>`;
@@ -1309,7 +1309,7 @@ async function fmCreditSavePlan() {
     }));
     if (tasks.length) await sb.from('edu_credit_plan_tasks').insert(tasks);
 
-    alert(`✅ Diagnóstico crédito guardado para ${student?.full_name || 'estudiante'}\n\nFICO actual: ${c.result.ficoActual || '—'} → meta ${c.result.ficoMeta}\n${tasks.length} acción(es) en el plan\n\nVer en Mentorías Manager.`);
+    alert(`Diagnóstico crédito guardado para ${student?.full_name || 'estudiante'}\n\nFICO actual: ${c.result.ficoActual || '—'} → meta ${c.result.ficoMeta}\n${tasks.length} acción(es) en el plan\n\nVer en Mentorías Manager.`);
     c.saving = false;
   } catch (e) {
     c.saving = false;

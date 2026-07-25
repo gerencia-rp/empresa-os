@@ -71,7 +71,7 @@ window.kitDrillOpen = kitDrillOpen;
 // ─── NEXTACTION: cada rojo trae "🔍 Qué revisar" + acción + dueño (patrón EVM) ───
 function kitNext(porQue, queHacer, quien) {
   return '<div class="kit-next">'
-    + '<div style="font-size:11px;font-weight:800;color:var(--amber);margin-bottom:3px">🔍 Qué revisar</div>'
+    + '<div style="font-size:11px;font-weight:800;color:var(--amber);margin-bottom:3px">' + osIcon('search', { size: 13 }) + ' Qué revisar</div>'
     + '<div style="font-size:12px;color:var(--txt2, var(--ink))">' + porQue + '</div>'
     + (queHacer ? '<div style="font-size:12px;color:var(--ink);margin-top:5px">→ <b>' + queHacer + '</b>' + (quien ? ' <span style="color:var(--mut)">· ' + kitEsc(quien) + '</span>' : '') + '</div>' : '')
     + '</div>';
@@ -84,7 +84,7 @@ function kitKpi(opts) {
   const o = opts || {};
   if (o.falta) return '<div class="card kit-kpi" style="border-style:dashed"><div class="kit-kpi-lab">' + (o.term ? kitTerm(o.term, o.label) : o.label) + '</div>'
     + '<div style="font-size:20px;font-weight:700;color:var(--mut)">—</div>'
-    + '<div style="font-size:11px;color:var(--amber)">🟡 ' + o.falta + '</div></div>';
+    + '<div style="font-size:11px;color:var(--amber)">' + kitStatusDot('warn', o.falta) + '</div></div>';
   const color = o.estado === 'ok' ? 'var(--pos)' : o.estado === 'neg' ? 'var(--neg)' : o.estado === 'warn' ? 'var(--amber)' : 'var(--ink)';
   const val = o.drill ? kitDrill('<b style="font-size:26px;font-weight:800;color:' + color + '">' + o.valor + '</b>', o.drill.titulo || o.label, o.drill.html, o.fuente)
     : '<b style="font-size:26px;font-weight:800;color:' + color + '">' + o.valor + '</b>';
@@ -109,17 +109,17 @@ function kitSkeleton(n, alto) {
   if (typeof document === 'undefined' || document.getElementById('kit-decision-css')) return;
   const st = document.createElement('style'); st.id = 'kit-decision-css';
   st.textContent = [
-    '.kit-term{border-bottom:1.5px dotted var(--mut,#8ea0c4);cursor:help;position:relative}',
-    '.kit-term .kit-term-tip{display:none;position:absolute;left:0;bottom:130%;z-index:1000;width:270px;background:var(--card,#151d31);color:var(--ink,#eaf0ff);border:1px solid var(--line,rgba(128,144,176,.3));border-radius:10px;padding:10px 12px;font-size:11.5px;font-weight:400;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,0,.25);text-transform:none;letter-spacing:0}',
+    '.kit-term{border-bottom:1.5px dotted var(--mut,#a89f8f);cursor:help;position:relative}',
+    '.kit-term .kit-term-tip{display:none;position:absolute;left:0;bottom:130%;z-index:1000;width:270px;background:var(--card,#1d1913);color:var(--ink,#efe9de);border:1px solid var(--line,rgba(128,144,176,.3));border-radius:10px;padding:10px 12px;font-size:11.5px;font-weight:400;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,0,.25);text-transform:none;letter-spacing:0}',
     '.kit-term:hover .kit-term-tip,.kit-term:focus .kit-term-tip{display:block}',
     '.kit-drill{cursor:pointer;border-radius:6px}',
-    '.kit-drill:hover{background:color-mix(in srgb, var(--a2,#3b74ff) 10%, transparent)}',
-    '.kit-drill-ico{font-size:11px;color:var(--mut,#8ea0c4);margin-left:4px;vertical-align:super}',
+    '.kit-drill:hover{background:color-mix(in srgb, var(--a2,#4e9b72) 10%, transparent)}',
+    '.kit-drill-ico{font-size:11px;color:var(--mut,#a89f8f);margin-left:4px;vertical-align:super}',
     '#kit-drill-ov{position:fixed;inset:0;background:rgba(5,10,20,.55);z-index:1300;display:flex;align-items:center;justify-content:center;padding:20px}',
-    '.kit-drill-panel{background:var(--bg,#0e1526);color:var(--ink,#eaf0ff);border:1px solid var(--line,rgba(128,144,176,.3));border-radius:16px;padding:18px 20px;max-width:640px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)}',
-    '.kit-next{margin-top:9px;background:color-mix(in srgb, var(--amber,#f5b544) 9%, transparent);border:1px solid color-mix(in srgb, var(--amber,#f5b544) 30%, transparent);border-radius:10px;padding:9px 12px}',
+    '.kit-drill-panel{background:var(--bg,#171410);color:var(--ink,#efe9de);border:1px solid var(--line,rgba(128,144,176,.3));border-radius:16px;padding:18px 20px;max-width:640px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)}',
+    '.kit-next{margin-top:9px;background:color-mix(in srgb, var(--amber,#dca94f) 9%, transparent);border:1px solid color-mix(in srgb, var(--amber,#dca94f) 30%, transparent);border-radius:10px;padding:9px 12px}',
     '.kit-kpi{padding:15px 17px}',
-    '.kit-kpi-lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--mut,#8ea0c4);font-weight:800}',
+    '.kit-kpi-lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--mut,#a89f8f);font-weight:800}',
     '.kit-skel{border-radius:6px;background:linear-gradient(90deg,var(--card,rgba(255,255,255,.05)) 25%,color-mix(in srgb, var(--ink,#fff) 9%, transparent) 50%,var(--card,rgba(255,255,255,.05)) 75%);background-size:200% 100%;animation:kitShimmer 1.3s infinite}',
     '@keyframes kitShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}',
     '@media (prefers-reduced-motion: reduce){.kit-skel{animation:none}}',
@@ -140,7 +140,7 @@ function reconcileLE(parte, total, etiqueta) {
   const ok = parte == null || total == null || +parte <= +total;
   return {
     ok,
-    html: ok ? '' : '<div style="background:color-mix(in srgb, var(--neg) 10%, transparent);border:1px solid color-mix(in srgb, var(--neg) 35%, transparent);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--neg);font-weight:700">⛔ Motor en error: ' + kitEsc(etiqueta || '') + ' — la cifra calculada (' + kitMoney(parte) + ') supera el total posible (' + kitMoney(total) + '). No se muestra como dato real.</div>',
+    html: ok ? '' : '<div style="background:color-mix(in srgb, var(--neg) 10%, transparent);border:1px solid color-mix(in srgb, var(--neg) 35%, transparent);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--neg);font-weight:700">' + osIcon('ban', { size: 13 }) + ' Motor en error: ' + kitEsc(etiqueta || '') + ' — la cifra calculada (' + kitMoney(parte) + ') supera el total posible (' + kitMoney(total) + '). No se muestra como dato real.</div>',
   };
 }
 // emptyState: estado vacío estándar (alias semántico del kitEmpty del design system)

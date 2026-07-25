@@ -150,7 +150,7 @@ function wpInjectTheme() {
   #modal:has(#wp-root) > div{max-width:none !important;width:calc(100vw - 20px);height:calc(100vh - 20px);max-height:calc(100vh - 20px) !important;border-radius:16px;border:1px solid rgba(15,23,42,.08);box-shadow:0 40px 90px -40px rgba(2,6,23,.5)}
   #modal:has(#wp-root) > div > div:first-child{padding:8px 18px}
   #modal:has(#wp-root) #modal-body{padding:10px 14px 12px;overflow:hidden;display:flex;flex-direction:column}
-  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;flex:1;min-height:0;display:flex;flex-direction:column;--wa1:#12b5a0;--wa2:#2f6ef0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#0f1c2e;--wmut:#64748b;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
+  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;flex:1;min-height:0;display:flex;flex-direction:column;--wa1:#6fbf95;--wa2:#2f6ef0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#211e17;--wmut:#756c5c;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
   #wp-root .wp-shell{flex:1;min-height:0}
   /* Topbar compacta siempre visible + bloque KPIs/filtros colapsable */
   #wp-root .wp-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--wbord)}
@@ -204,7 +204,7 @@ function wpInjectTheme() {
   #wp-root .wp-acard[data-stage*="inter"]{border-left-color:#8b5cf6}
   #wp-root .wp-acard[data-stage*="exter"]{border-left-color:#0ea5e9}
   #wp-root .wp-acard[data-stage*="estruct"]{border-left-color:#f59e0b}
-  #wp-root .wp-acard[data-stage*="limpi"]{border-left-color:#10b981}
+  #wp-root .wp-acard[data-stage*="limpi"]{border-left-color:#1f7a4d}
   #wp-root .wp-acard[data-stage*="pintur"]{border-left-color:#ec4899}
   #wp-root .wp-acard[data-stage*="demol"]{border-left-color:#78716c}
   #wp-root .wp-acard[data-st="late"],#wp-root .wp-acard[data-st="critical"]{border-left-color:var(--wneg) !important}
@@ -221,11 +221,11 @@ function wpInjectTheme() {
   #wp-root.wp-clean .wp-ac-meta{margin-top:3px}
   #wp-root.wp-clean .wp-ac-tags{margin-top:3px}
   /* A1: panel lateral de alertas */
-  #wp-alert-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:var(--wpanel,#fff);border-left:1px solid var(--wbord,#e2e8f0);box-shadow:-12px 0 40px -18px rgba(2,6,23,.35);z-index:9500;overflow:auto;padding:16px}
+  #wp-alert-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:var(--wpanel,#fff);border-left:1px solid var(--wbord,#e8e3d9);box-shadow:-12px 0 40px -18px rgba(2,6,23,.35);z-index:9500;overflow:auto;padding:16px}
   #wp-alert-drawer h3{font-size:13px;font-weight:800;margin:0 0 4px}
-  #wp-alert-drawer .wd-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;color:var(--wmut,#64748b)}
-  #wp-alert-drawer .wd-item{font-size:11.5px;padding:7px 9px;border:1px solid var(--wbord,#e2e8f0);border-radius:8px;margin-bottom:5px;line-height:1.4;cursor:pointer}
-  #wp-alert-drawer .wd-item:hover{border-color:#94a3b8}
+  #wp-alert-drawer .wd-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;color:var(--wmut,#756c5c)}
+  #wp-alert-drawer .wd-item{font-size:11.5px;padding:7px 9px;border:1px solid var(--wbord,#e8e3d9);border-radius:8px;margin-bottom:5px;line-height:1.4;cursor:pointer}
+  #wp-alert-drawer .wd-item:hover{border-color:#a89f8f}
   #wp-alert-drawer .wd-item b{font-weight:700}
   #wp-root .wp-acard[data-st="done"] .wp-ac-st{background:rgba(14,163,113,.13);color:var(--wpos)}
   #wp-root .wp-acard[data-st="late"] .wp-ac-st,#wp-root .wp-acard[data-st="critical"] .wp-ac-st,#wp-root .wp-acard[data-st="conflict"] .wp-ac-st{background:rgba(224,69,95,.13);color:var(--wneg)}
@@ -251,16 +251,16 @@ function wpInjectTheme() {
   html[data-osreskin="dark"] #wp-root .wp-chip.est{background:rgba(138,123,255,.2);color:#b9aeff}
   html[data-osreskin="dark"] #wp-root .wp-crew{background:rgba(255,255,255,.08) !important;color:#c5cede !important}
   html[data-osreskin="dark"] #wp-root .wp-filters .bg-white{background:rgba(255,255,255,.06) !important}
-  html[data-osreskin="dark"] #modal:has(#wp-root) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;border-color:rgba(255,255,255,.08) !important;color:#e7ecf5}
-  html[data-osreskin="dark"] #wp-root{--wink:#e7ecf5;--wmut:#8792a5;--wsurf:rgba(255,255,255,.05);--wglass:rgba(255,255,255,.04);--wbord:rgba(255,255,255,.09);color:#e7ecf5}
-  html[data-osreskin="dark"] #wp-root .text-slate-900,html[data-osreskin="dark"] #wp-root .font-bold{color:#e7ecf5 !important}
+  html[data-osreskin="dark"] #modal:has(#wp-root) > div{background:linear-gradient(180deg,#0b0f18,#16130d) !important;border-color:rgba(255,255,255,.08) !important;color:#efe9de}
+  html[data-osreskin="dark"] #wp-root{--wink:#efe9de;--wmut:#8792a5;--wsurf:rgba(255,255,255,.05);--wglass:rgba(255,255,255,.04);--wbord:rgba(255,255,255,.09);color:#efe9de}
+  html[data-osreskin="dark"] #wp-root .text-slate-900,html[data-osreskin="dark"] #wp-root .font-bold{color:#efe9de !important}
   html[data-osreskin="dark"] #wp-root .text-slate-700,html[data-osreskin="dark"] #wp-root .text-slate-600{color:#c5cede !important}
   html[data-osreskin="dark"] #wp-root .text-slate-500,html[data-osreskin="dark"] #wp-root .text-slate-400{color:#8792a5 !important}
-  html[data-osreskin="dark"] #wp-root .bg-white{background:rgba(255,255,255,.045) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root .bg-white{background:rgba(255,255,255,.045) !important;color:#efe9de}
   html[data-osreskin="dark"] #wp-root .bg-slate-50,html[data-osreskin="dark"] #wp-root .bg-slate-100{background:rgba(255,255,255,.06) !important;color:#c5cede}
   html[data-osreskin="dark"] #wp-root .border-slate-200,html[data-osreskin="dark"] #wp-root .border-slate-300,html[data-osreskin="dark"] #wp-root .border-b,html[data-osreskin="dark"] #wp-root .border-r{border-color:rgba(255,255,255,.09) !important}
   html[data-osreskin="dark"] #wp-root td:hover{background:rgba(79,141,255,.07)}
-  html[data-osreskin="dark"] #wp-root .bg-slate-900{background:linear-gradient(135deg,#1b2436,#141b29) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root .bg-slate-900{background:linear-gradient(135deg,#1b2436,#141b29) !important;color:#efe9de}
   html[data-osreskin="dark"] #wp-root .bg-emerald-50{background:rgba(72,214,156,.13) !important;border-color:rgba(72,214,156,.34) !important}
   html[data-osreskin="dark"] #wp-root .bg-emerald-50 .text-slate-900,html[data-osreskin="dark"] #wp-root .bg-emerald-50 *{color:#c9f3e2}
   html[data-osreskin="dark"] #wp-root .bg-blue-50{background:rgba(79,141,255,.14) !important;border-color:rgba(79,141,255,.36) !important}
@@ -270,10 +270,10 @@ function wpInjectTheme() {
   html[data-osreskin="dark"] #wp-root .bg-violet-50,html[data-osreskin="dark"] #wp-root .bg-violet-100{background:rgba(138,123,255,.16) !important}html[data-osreskin="dark"] #wp-root .text-violet-700{color:#b9aeff !important}
   html[data-osreskin="dark"] #wp-root .bg-blue-50.border-blue-300,html[data-osreskin="dark"] #wp-root .text-blue-800,html[data-osreskin="dark"] #wp-root .text-blue-700{color:#8fb4ff !important}
   html[data-osreskin="dark"] #wp-root .bg-emerald-50.text-emerald-700,html[data-osreskin="dark"] #wp-root .text-emerald-700{color:#5fe0b8 !important}
-  html[data-osreskin="dark"] #wp-root input,html[data-osreskin="dark"] #wp-root select{background:rgba(255,255,255,.06) !important;color:#e7ecf5 !important;border-color:rgba(255,255,255,.12) !important}
-  html[data-osreskin="dark"] #wp-root select option{background:#141b29;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-root input,html[data-osreskin="dark"] #wp-root select{background:rgba(255,255,255,.06) !important;color:#efe9de !important;border-color:rgba(255,255,255,.12) !important}
+  html[data-osreskin="dark"] #wp-root select option{background:#141b29;color:#efe9de}
   /* ===== Vista Desviación (Plan vs Real) — premium claro/oscuro ===== */
-  #wp-dev{--dink:#0f1c2e;--dmut:#64748b;--dbord:rgba(15,23,42,.09);--dglass:#fff;--dpos:#0ea371;--dneg:#e0455f;--damb:#c07d16;--dblue:#2f6ef0;color:var(--dink);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+  #wp-dev{--dink:#211e17;--dmut:#756c5c;--dbord:rgba(15,23,42,.09);--dglass:#fff;--dpos:#0ea371;--dneg:#e0455f;--damb:#c07d16;--dblue:#2f6ef0;color:var(--dink);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
   #wp-dev .dv-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
   #wp-dev .dv-card{background:var(--dglass);border:1px solid var(--dbord);border-radius:14px;padding:16px}
   #wp-dev .dv-lab{font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--dmut);font-weight:700}
@@ -294,29 +294,29 @@ function wpInjectTheme() {
   #wp-dev .dv-ins{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid var(--dbord);font-size:12.5px;line-height:1.5}#wp-dev .dv-ins:last-child{border:none}
   #wp-dev .dv-back{background:none;border:1px solid var(--dbord);color:var(--dmut);border-radius:9px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer}#wp-dev .dv-back:hover{color:var(--dink)}
   @media (max-width:820px){#wp-dev .dv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
-  html[data-osreskin="dark"] #wp-dev{--dink:#e7ecf5;--dmut:#8792a5;--dbord:rgba(255,255,255,.09);--dglass:rgba(255,255,255,.04)}
-  html[data-osreskin="dark"] #modal:has(#wp-dev) > div{background:linear-gradient(180deg,#0b0f18,#070a11) !important;color:#e7ecf5}
+  html[data-osreskin="dark"] #wp-dev{--dink:#efe9de;--dmut:#8792a5;--dbord:rgba(255,255,255,.09);--dglass:rgba(255,255,255,.04)}
+  html[data-osreskin="dark"] #modal:has(#wp-dev) > div{background:linear-gradient(180deg,#0b0f18,#16130d) !important;color:#efe9de}
   html[data-osreskin="dark"] #wp-dev .dv-track{background:rgba(255,255,255,.06)}
   /* 1.4 Reporte PDF (papel blanco imprimible) */
   #wp-report .wr-tab{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid var(--wbord);background:var(--wglass);color:var(--wmut);cursor:pointer;font-weight:600}
-  #wp-report .wr-tab.on{background:#0f1c2e;color:#fff;border-color:#0f1c2e}
+  #wp-report .wr-tab.on{background:#211e17;color:#fff;border-color:#211e17}
   html[data-osreskin="dark"] #wp-report .wr-tab.on{background:var(--wa2);border-color:var(--wa2)}
-  #wp-report .wr-print{font-size:12px;padding:7px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#12b5a0,#2f6ef0);color:#fff;font-weight:700;cursor:pointer}
+  #wp-report .wr-print{font-size:12px;padding:7px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#6fbf95,#2f6ef0);color:#fff;font-weight:700;cursor:pointer}
   #wp-report .wr-doc{background:#fff;color:#1a2436;border-radius:12px;padding:24px;border:1px solid #e5e9f0}
-  #wp-report .wr-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f1c2e;padding-bottom:12px;margin-bottom:14px}
-  #wp-report .wr-title{font-size:17px;font-weight:800;color:#0f1c2e}
-  #wp-report .wr-sub{font-size:12px;color:#64748b;margin-top:2px}
-  #wp-report .wr-brand{font-size:11px;font-weight:700;color:#12b5a0;text-align:right}
+  #wp-report .wr-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #211e17;padding-bottom:12px;margin-bottom:14px}
+  #wp-report .wr-title{font-size:17px;font-weight:800;color:#211e17}
+  #wp-report .wr-sub{font-size:12px;color:#756c5c;margin-top:2px}
+  #wp-report .wr-brand{font-size:11px;font-weight:700;color:#6fbf95;text-align:right}
   #wp-report .wr-kpis{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   #wp-report .wr-k{flex:1;min-width:88px;background:#f6f8fc;border:1px solid #e5e9f0;border-radius:9px;padding:10px 12px;text-align:center}
-  #wp-report .wr-kn{font-size:22px;font-weight:800;color:#0f1c2e}#wp-report .wr-kl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:700;margin-top:2px}
+  #wp-report .wr-kn{font-size:22px;font-weight:800;color:#211e17}#wp-report .wr-kl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#756c5c;font-weight:700;margin-top:2px}
   #wp-report .wr-home{margin-bottom:14px}
-  #wp-report .wr-hh{font-size:13px;font-weight:800;color:#0f1c2e;background:#eef2f8;padding:6px 10px;border-radius:7px;display:flex;justify-content:space-between}
-  #wp-report .wr-hc{color:#64748b;font-weight:700}
+  #wp-report .wr-hh{font-size:13px;font-weight:800;color:#211e17;background:#efe9de;padding:6px 10px;border-radius:7px;display:flex;justify-content:space-between}
+  #wp-report .wr-hc{color:#756c5c;font-weight:700}
   #wp-report .wr-t{width:100%;border-collapse:collapse;font-size:12px}
-  #wp-report .wr-t td{padding:6px 10px;border-bottom:1px solid #eef2f8;color:#1a2436}
-  #wp-report .wr-d{color:#64748b;white-space:nowrap;width:120px;text-transform:capitalize}
-  #wp-report .wr-st{color:#94a3b8;font-size:10px}
+  #wp-report .wr-t td{padding:6px 10px;border-bottom:1px solid #efe9de;color:#1a2436}
+  #wp-report .wr-d{color:#756c5c;white-space:nowrap;width:120px;text-transform:capitalize}
+  #wp-report .wr-st{color:#a89f8f;font-size:10px}
   #wp-report .wr-bd{text-align:right;white-space:nowrap}
   #wp-report .wr-b{font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px}
   #wp-report .wr-done{background:#d1fae5;color:#0ea371}#wp-report .wr-late{background:#fee2e2;color:#e0455f}#wp-report .wr-inc{background:#fef3c7;color:#c07d16}
@@ -350,7 +350,7 @@ async function openWeeklyPlanner(sys) {
       wpBackToPlanner();
     };
   }
-  openModal(`📅 ${sys.name}`, '<div id="wp-root"></div>');
+  openModal(`${sys.name}`, '<div id="wp-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   wpRender();
@@ -366,7 +366,7 @@ function wpBackToPlanner(opts) {
   if (!wpState.sys) return closeModal();
   if (opts.reload) {
     // recargar DB en background y re-render
-    openModal(`📅 ${wpState.sys.name}`, '<div id="wp-root"></div>');
+    openModal(`${wpState.sys.name}`, '<div id="wp-root"></div>');
     const inner = document.querySelector('#modal > div');
     if (inner) {
       ['max-w-sm','max-w-md','max-w-lg','max-w-xl','max-w-2xl','max-w-3xl','max-w-4xl','max-w-5xl','max-w-6xl'].forEach(c => inner.classList.remove(c));
@@ -376,7 +376,7 @@ function wpBackToPlanner(opts) {
     wpLoadAll().then(wpRender);
     return;
   }
-  openModal(`📅 ${wpState.sys.name}`, '<div id="wp-root"></div>');
+  openModal(`${wpState.sys.name}`, '<div id="wp-root"></div>');
   const inner = document.querySelector('#modal > div');
   if (inner) {
     ['max-w-sm','max-w-md','max-w-lg','max-w-xl','max-w-2xl','max-w-3xl','max-w-4xl','max-w-5xl','max-w-6xl'].forEach(c => inner.classList.remove(c));
@@ -447,10 +447,10 @@ function wpRender() {
   const criticasAtrasadas = overdueAll.filter(a => a.priority === 'critical' || a.priority === 'urgent');
   const tomorrowIso = wpDateOnly(wpAddDays(new Date(), 1));
   const criticasBanner = criticasAtrasadas.length ? `
-    <button onclick="wpToggleAlertPanel()" class="w-full text-left bg-rose-50 border border-rose-300 text-rose-800 rounded-lg px-3 py-1.5 mb-2 text-xs font-bold hover:bg-rose-100">⚠️ ${criticasAtrasadas.length} de ruta crítica atrasada${criticasAtrasadas.length>1?'s':''} · ${[...new Set(criticasAtrasadas.map(a => a.property_name||a.project_id))].length} casa(s) → abrir panel de alertas</button>` : '';
+    <button onclick="wpToggleAlertPanel()" class="w-full text-left bg-rose-50 border border-rose-300 text-rose-800 rounded-lg px-3 py-1.5 mb-2 text-xs font-bold hover:bg-rose-100">${osIcon('alert')} ${criticasAtrasadas.length} de ruta crítica atrasada${criticasAtrasadas.length>1?'s':''} · ${[...new Set(criticasAtrasadas.map(a => a.property_name||a.project_id))].length} casa(s) → abrir panel de alertas</button>` : '';
   const overdueBanner = overdueCount ? `
     <div class="bg-red-50 border border-red-300 rounded-lg px-3 py-2 mb-2 flex items-start gap-2">
-      <div class="text-xl">⚠️</div>
+      <div class="text-xl">${osIcon('alert')}</div>
       <div class="flex-1">
         <div class="flex items-center justify-between flex-wrap gap-1">
           <div class="text-xs font-bold text-red-800">${overdueCount} actividad(es) atrasada(s) sin completar</div>
@@ -482,9 +482,9 @@ function wpRender() {
 
   // Mini-header protagonista (ADN premium): obras activas + avance de la semana, con datos que la vista ya computa.
   const wpHero = (typeof kitHero === 'function')
-    ? kitHero('Planner semanal · ' + weekLabel + ' 🏗',
+    ? kitHero('Planner semanal · ' + weekLabel + osIcon('construction'),
       allHomes.length + ' obra' + (allHomes.length === 1 ? '' : 's'),
-      doneThisWeek + '/' + totalThisWeek + ' actividades hechas esta semana (' + progressPct + '%)' + (overdueCount ? ' · <b>⏰ ' + overdueCount + ' atrasada(s)</b>' : ' · ✓ al día'))
+      doneThisWeek + '/' + totalThisWeek + ' actividades hechas esta semana (' + progressPct + '%)' + (overdueCount ? ' · <b>' + osIcon('clock') + ' ' + overdueCount + ' atrasada(s)</b>' : ' · ✓ al día'))
     : '';
   // Obs #20: KPIs + filtros colapsables (default: abiertos solo en pantallas anchas; persistido en localStorage wp_kpis_open)
   const kpisOpen = wpKpisOpen();
@@ -492,15 +492,15 @@ function wpRender() {
       <div class="wp-filters flex items-center gap-2 flex-wrap mb-2">
         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Filtros</span>
         <select onchange="wpSetLiderFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por crew/líder">
-          <option value="all">👷 Todos los crews</option>
+          <option value="all">${osIcon('hard-hat')} Todos los crews</option>
           ${wpAllCrews.map(c => `<option value="${(c || '').replace(/"/g, '&quot;')}" ${wpState.liderFilter === c ? 'selected' : ''}>${(c || '').replace(/</g, '&lt;')}</option>`).join('')}
         </select>
         <select onchange="wpSetStageFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold" title="Filtrar por etapa">
-          <option value="all">🧱 Todas las etapas</option>
+          <option value="all">${osIcon('brick')} Todas las etapas</option>
           ${wpAllStages.map(s => `<option value="${(s || '').replace(/"/g, '&quot;')}" ${wpState.stageFilter === s ? 'selected' : ''}>${(s || '').replace(/</g, '&lt;')}</option>`).join('')}
         </select>
-        <button onclick="wpToggleOnlyLate()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border ${wpState.onlyLate ? 'wp-fon bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">⏰ Solo atrasadas</button>
-        <button onclick="wpToggleHideEmpty()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border bg-white text-slate-600 border-slate-300 hover:bg-slate-50" title="Mostrar u ocultar casas sin tareas esta semana">${wpState.hideEmpty ? '📦 Ocultar vacías: ON' : '👁 Ocultar vacías: OFF'}</button>
+        <button onclick="wpToggleOnlyLate()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border ${wpState.onlyLate ? 'wp-fon bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">${osIcon('clock')} Solo atrasadas</button>
+        <button onclick="wpToggleHideEmpty()" class="wp-fbtn text-xs px-2.5 py-1 rounded-lg font-semibold border bg-white text-slate-600 border-slate-300 hover:bg-slate-50" title="Mostrar u ocultar casas sin tareas esta semana">${wpState.hideEmpty ? 'Ocultar vacías: ON' : 'Ocultar vacías: OFF'}</button>
         ${(wpAnyFilter) ? `<button onclick="wpState.liderFilter='all';wpState.stageFilter='all';wpState.onlyLate=false;wpRender()" class="text-xs px-2 py-1 text-slate-400 hover:text-slate-700 underline">limpiar</button>` : ''}
         <span class="text-[10px] text-slate-400 ml-auto">${filteredHomes.length} casa(s) visible(s)</span>
       </div>`;
@@ -515,34 +515,34 @@ function wpRender() {
           <div class="font-bold text-sm">${weekLabel}</div>
           <button onclick="wpNavWeek(1)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-sm">→</button>
           <button onclick="wpNavWeek(0)" class="px-3 py-1.5 bg-slate-900 text-white rounded text-xs ml-2">Hoy</button>
-          <button onclick="wpToggleKpis()" class="wp-kpitoggle" title="Mostrar/ocultar KPIs y filtros">📊 KPIs y filtros ${kpisOpen ? '▴' : '▾'}${!kpisOpen && wpAnyFilter ? ' <span class="text-rose-600">•</span>' : ''}</button>
+          <button onclick="wpToggleKpis()" class="wp-kpitoggle" title="Mostrar/ocultar KPIs y filtros">${osIcon('chart')} KPIs y filtros ${kpisOpen ? '▴' : '▾'}${!kpisOpen && wpAnyFilter ? ' <span class="text-rose-600">•</span>' : ''}</button>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-xs bg-slate-900 text-white px-2 py-1 rounded font-bold" title="Progreso de la semana">📊 ${doneThisWeek}/${totalThisWeek} (${progressPct}%)</span>
-          <button onclick="wpToggleAlertPanel()" class="text-xs ${overdueCount ? 'bg-red-600 text-white' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded font-bold" title="Abrir panel de alertas">${overdueCount ? '⏰ ' + overdueCount + ' atrasadas' : '✓ al día'}</button>
-          <button onclick="wpToggleAlertPanel()" class="text-xs ${conflicts.length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded font-bold" title="Abrir panel de alertas">${conflicts.length ? '⚠️ ' + conflicts.length + ' conflictos' : '✓ sin conflictos'}</button>
-          <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold">👷 Hoy</button>
-          <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold">📊 Reporte</button>
-          <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold">📉 Desviación</button>
-          <button onclick="wpOpenReport('semana')" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold">📄 PDF</button>
+          <span class="text-xs bg-slate-900 text-white px-2 py-1 rounded font-bold" title="Progreso de la semana">${osIcon('chart')} ${doneThisWeek}/${totalThisWeek} (${progressPct}%)</span>
+          <button onclick="wpToggleAlertPanel()" class="text-xs ${overdueCount ? 'bg-red-600 text-white' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded font-bold" title="Abrir panel de alertas">${overdueCount ? osIcon('clock') + overdueCount + ' atrasadas' : '✓ al día'}</button>
+          <button onclick="wpToggleAlertPanel()" class="text-xs ${conflicts.length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded font-bold" title="Abrir panel de alertas">${conflicts.length ? osIcon('alert') + conflicts.length + ' conflictos' : '✓ sin conflictos'}</button>
+          <button onclick="wpOpenCrewByHour('${wpDateOnly(new Date())}')" class="text-xs bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 px-3 py-1.5 rounded font-bold">${osIcon('hard-hat')} Hoy</button>
+          <button onclick="wpOpenAnalytics()" class="text-xs bg-violet-50 hover:bg-violet-100 border border-violet-300 text-violet-700 px-3 py-1.5 rounded font-bold">${osIcon('chart')} Reporte</button>
+          <button onclick="wpOpenDeviation()" class="text-xs bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded font-bold">${osIcon('trending-down')} Desviación</button>
+          <button onclick="wpOpenReport('semana')" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 px-3 py-1.5 rounded font-bold">${osIcon('file')} PDF</button>
           <select onchange="wpSetHouseFilter(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1.5 font-bold max-w-[180px]" title="Filtrar por casa">
-            <option value="all" ${wpState.houseFilter==='all'?'selected':''}>🏘️ Todas (${allHomes.length})</option>
-            ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>🏠 ${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
+            <option value="all" ${wpState.houseFilter==='all'?'selected':''}>Todas (${allHomes.length})</option>
+            ${allHomes.map(h => `<option value="${h.id.replace(/"/g,'&quot;')}" ${wpState.houseFilter===h.id?'selected':''}>${(h.name||'').replace(/</g,'&lt;')}</option>`).join('')}
           </select>
-          <button onclick="wpToggleClean()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold" title="Alternar tarjetas minimalistas / con todo el detalle">${wpState.cleanView === false ? '🔍 Detallada' : '✨ Limpia'}</button>
+          <button onclick="wpToggleClean()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold" title="Alternar tarjetas minimalistas / con todo el detalle">${wpState.cleanView === false ? 'Detallada' : 'Limpia'}</button>
           <details class="relative inline-block">
             <summary class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold cursor-pointer list-none select-none">⋯ Más</summary>
             <div class="absolute right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-[9000] p-1 w-52 flex flex-col">
-              ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📁 ${completedCount} terminadas</button>` : ''}
-              <button onclick="wpOpenCrewPay()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">💵 Pago crew</button>
-              <button onclick="wpOpenImportExcel()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📥 Importar Excel</button>
-              <button onclick="wpOpenMonthView()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📅 Vista mensual</button>
-              <button onclick="wpOpenIcsExport()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📥 Exportar calendario</button>
-              <button onclick="wpOpenWorkerMobile()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📱 Vista obrero</button>
-              <button onclick="wpOpenBitacora()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">📔 Bitácora</button>
-              <button onclick="wpOpenPrintPicker()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">🖨️ Imprimir día</button>
+              ${completedCount ? `<button onclick="wpOpenCompletedHouses()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('folder')} ${completedCount} terminadas</button>` : ''}
+              <button onclick="wpOpenCrewPay()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('banknote')} Pago crew</button>
+              <button onclick="wpOpenImportExcel()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('inbox')} Importar Excel</button>
+              <button onclick="wpOpenMonthView()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('calendar')} Vista mensual</button>
+              <button onclick="wpOpenIcsExport()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('inbox')} Exportar calendario</button>
+              <button onclick="wpOpenWorkerMobile()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('phone')} Vista obrero</button>
+              <button onclick="wpOpenBitacora()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('notebook')} Bitácora</button>
+              <button onclick="wpOpenPrintPicker()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${osIcon('printer')} Imprimir día</button>
               <button onclick="wpToggleResourceForm()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">+ Recurso</button>
-              <button onclick="wpToggleSidebar()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${wpState.sidebarHidden?'📂 Mostrar actividades':'📁 Ocultar actividades'}</button>
+              <button onclick="wpToggleSidebar()" class="text-left text-xs px-3 py-2 hover:bg-slate-100 rounded">${wpState.sidebarHidden?'Mostrar actividades':'Ocultar actividades'}</button>
             </div>
           </details>
         </div>
@@ -551,15 +551,15 @@ function wpRender() {
       <!-- BODY: Sidebar tabbed + Grid calendario -->
       <div class="flex gap-3 flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
         <!-- SIDEBAR con tabs (Recursos | Backlog | Catálogo | Plantillas | Recurrentes) — colapsable con ✕ / pestaña Actividades -->
-        ${wpState.sidebarHidden ? `<button onclick="wpToggleSidebar()" class="wp-sbtab flex-shrink-0" title="Abrir el panel de actividades (recursos, backlog, tareas)">📥 Actividades</button>` : ''}
+        ${wpState.sidebarHidden ? `<button onclick="wpToggleSidebar()" class="wp-sbtab flex-shrink-0" title="Abrir el panel de actividades (recursos, backlog, tareas)">${osIcon('inbox')} Actividades</button>` : ''}
         <div class="${wpState.sidebarHidden?'hidden':'flex'} w-full lg:w-72 flex-shrink-0 border border-slate-200 rounded-lg overflow-hidden lg:flex-col max-h-[40vh] lg:max-h-none">
           <!-- Tabs -->
           <div class="flex border-b border-slate-200 bg-slate-50 text-[10px] font-bold">
-            <button onclick="wpSetSideTab('resources')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='resources'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">👷 Recursos</button>
-            <button onclick="wpSetSideTab('backlog')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='backlog'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">📥 Backlog <span class="bg-slate-900 text-white px-1 rounded">${(wpState.backlog||[]).length}</span></button>
-            <button onclick="wpSetSideTab('templates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">📚 Tareas</button>
-            <button onclick="wpSetSideTab('daytemplates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='daytemplates'?'bg-white border-b-2 border-blue-600':'text-slate-500 hover:bg-slate-100'}">🗂️ Días <span class="bg-blue-600 text-white px-1 rounded">${(wpState.dayTemplates||[]).length}</span></button>
-            <button onclick="wpSetSideTab('recurring')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='recurring'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">🔁 Recur <span class="bg-violet-600 text-white px-1 rounded">${(wpState.recurring||[]).length}</span></button>
+            <button onclick="wpSetSideTab('resources')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='resources'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">${osIcon('hard-hat')} Recursos</button>
+            <button onclick="wpSetSideTab('backlog')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='backlog'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">${osIcon('inbox')} Backlog <span class="bg-slate-900 text-white px-1 rounded">${(wpState.backlog||[]).length}</span></button>
+            <button onclick="wpSetSideTab('templates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='templates'?'bg-white border-b-2 border-slate-900':'text-slate-500 hover:bg-slate-100'}">${osIcon('book')} Tareas</button>
+            <button onclick="wpSetSideTab('daytemplates')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='daytemplates'?'bg-white border-b-2 border-blue-600':'text-slate-500 hover:bg-slate-100'}">${osIcon('folder-open')} Días <span class="bg-blue-600 text-white px-1 rounded">${(wpState.dayTemplates||[]).length}</span></button>
+            <button onclick="wpSetSideTab('recurring')" class="flex-1 px-1 py-2 ${wpState.sidePanelTab==='recurring'?'bg-white border-b-2 border-violet-600':'text-slate-500 hover:bg-slate-100'}">${osIcon('refresh')} Recur <span class="bg-violet-600 text-white px-1 rounded">${(wpState.recurring||[]).length}</span></button>
             <button onclick="wpToggleSidebar()" class="wp-sbclose px-2 py-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Cerrar el panel de actividades">✕</button>
           </div>
           <div class="flex-1 overflow-y-auto">
@@ -606,12 +606,12 @@ function wpRender() {
                       <div class="font-bold text-xs">${home.name} <span class="text-[9px] text-slate-400">▤</span></div>
                       ${home.address ? `<div class="text-[10px] text-slate-500 truncate">${home.address}</div>` : ''}
                       ${homeActs.length ? `<div class="mt-1"><div class="bg-slate-100 rounded-full h-1.5 overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${homePct}%"></div></div><div class="text-[9px] text-slate-500 mt-0.5">${homeDone}/${homeActs.length} (${homePct}%)</div></div>` : ''}
-                      ${homeActs.length ? `<div class="wp-hmeta text-[9px] mt-1 flex flex-wrap items-center gap-1">${hCrews.slice(0, 2).map(c => `<span class="wp-crew bg-slate-100 text-slate-600 px-1 rounded">👷 ${(c || '').replace('Crew ', '').replace(/</g, '&lt;')}</span>`).join('')}${Number.isFinite(hPlanDays) && Number.isFinite(hRealDays) ? `<span class="wp-days text-slate-500" title="Días plan (baseline) → real">📅 ${hPlanDays}→${hRealDays}d${hSlip > 0 ? ` <b class="text-rose-600">+${hSlip}</b>` : hSlip < 0 ? ` <b class="text-emerald-600">${hSlip}</b>` : ''}</span>` : ''}</div>` : ''}
+                      ${homeActs.length ? `<div class="wp-hmeta text-[9px] mt-1 flex flex-wrap items-center gap-1">${hCrews.slice(0, 2).map(c => `<span class="wp-crew bg-slate-100 text-slate-600 px-1 rounded">${osIcon('hard-hat')} ${(c || '').replace('Crew ', '').replace(/</g, '&lt;')}</span>`).join('')}${Number.isFinite(hPlanDays) && Number.isFinite(hRealDays) ? `<span class="wp-days text-slate-500" title="Días plan (baseline) → real">${osIcon('calendar')} ${hPlanDays}→${hRealDays}d${hSlip > 0 ? ` <b class="text-rose-600">+${hSlip}</b>` : hSlip < 0 ? ` <b class="text-emerald-600">${hSlip}</b>` : ''}</span>` : ''}</div>` : ''}
                     </div>
                     <div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-100 opacity-50 group-hover:opacity-100 transition-opacity">
-                      <button onclick="event.stopPropagation(); wpCompleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="flex-1 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="Marcar casa como terminada y enviar tiempos al Estimador Pro">✅ Terminar</button>
-                      <button onclick="event.stopPropagation(); wpOpenReschedule('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold" title="Reprogramar obra: mover TODO el calendario N días hábiles (preview + deshacer)">📆</button>
-                      <button onclick="event.stopPropagation(); wpDeleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 py-0.5 rounded" title="Eliminar casa y todas sus actividades (no recuperable)">🗑️</button>
+                      <button onclick="event.stopPropagation(); wpCompleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="flex-1 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title="Marcar casa como terminada y enviar tiempos al Estimador Pro">${osIcon('check-circle')} Terminar</button>
+                      <button onclick="event.stopPropagation(); wpOpenReschedule('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold" title="Reprogramar obra: mover TODO el calendario N días hábiles (preview + deshacer)">${osIcon('calendar')}</button>
+                      <button onclick="event.stopPropagation(); wpDeleteHouse('${home.id}','${home.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 py-0.5 rounded" title="Eliminar casa y todas sus actividades (no recuperable)">${osIcon('trash')}</button>
                     </div>
                   </td>
                   ${days.map(d => wpRenderCell(home, d, conflicts)).join('')}
@@ -662,7 +662,7 @@ function wpRenderCell(home, date, conflicts) {
         ondragover="event.preventDefault(); this.classList.add('bg-blue-50')"
         ondragleave="this.classList.remove('bg-blue-50')"
         ondrop="this.classList.remove('bg-blue-50'); wpDropOnCell('${home.id}','${home.name.replace(/'/g, "\\'")}','${dateStr}', event)">
-      ${cellActs.length > 0 ? `<button onclick="wpOpenCellView('${home.id}','${home.name.replace(/'/g, "\\'")}','${dateStr}')" class="absolute top-0.5 right-0.5 text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 z-10" title="Ver detalle de este día">🔍 ${cellDone}/${cellActs.length}</button>` : ''}
+      ${cellActs.length > 0 ? `<button onclick="wpOpenCellView('${home.id}','${home.name.replace(/'/g, "\\'")}','${dateStr}')" class="absolute top-0.5 right-0.5 text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 z-10" title="Ver detalle de este día">${cellDone}/${cellActs.length}</button>` : ''}
       <div class="space-y-1 min-h-[50px]">
         ${cellActs.map(a => {
           const acts = (a.resource_ids || []).map(rid => wpState.resources.find(r => r.id === rid)).filter(Boolean);
@@ -678,7 +678,7 @@ function wpRenderCell(home, date, conflicts) {
           const isLate = a.status !== 'done' && a.status !== 'cancelled' && new Date(a.date) < new Date(wpDateOnly(new Date()));
           // A) estado primario → borde/punto sutil (mismo lenguaje que la vista Desviación)
           const st = a.status === 'done' ? 'done' : a.status === 'cancelled' ? 'cancelled' : isLate ? 'late' : (isCritical ? 'critical' : (isPostponed ? 'postponed' : (hasConflict ? 'conflict' : (hasDepIssue ? 'dep' : (a.status === 'in_progress' ? 'progress' : 'normal')))));
-          const stLabel = { done: '✓', late: '⏰ atrasada', critical: '⚠ crítica', postponed: '⏸ aplazada', conflict: '', dep: '', progress: '● en curso', normal: '' }[st];
+          const stLabel = { done: '✓', late: 'atrasada', critical: 'crítica', postponed: 'aplazada', conflict: '', dep: '', progress: '● en curso', normal: '' }[st];
           // extraer "(día X/Y)" del nombre para mostrarlo como chip limpio
           const dayM = (a.activity_name || '').match(/\(d[ií]a\s*\d+\s*\/\s*\d+\)/i);
           const cleanName = dayM ? a.activity_name.replace(dayM[0], '').trim() : a.activity_name;
@@ -691,19 +691,19 @@ function wpRenderCell(home, date, conflicts) {
               <div class="wp-ac-top">
                 <input type="checkbox" ${a.status==='done'?'checked':''} onclick="event.stopPropagation(); wpQuickToggleDone('${a.id}', event)" class="wp-ac-chk" title="Marcar como done" />
                 <div class="wp-ac-body" onclick="wpEditActivity('${a.id}')">
-                  <div class="wp-ac-name ${a.status==='done'?'wp-done':''}"><span class="wp-dot"></span>${cleanName}${hasConflict ? ' <span class="wp-warn-ic" title="Conflicto de recurso: la misma persona está asignada en 2+ casas este día. Reasigná o mové la tarea.">⚠️</span>' : ''}${hasDepIssue ? ' <span class="wp-warn-ic" title="Dependencias no listas: ' + depCheck.blockers.map(b=>b.code).join(', ') + '">🔗</span>' : ''}</div>
+                  <div class="wp-ac-name ${a.status==='done'?'wp-done':''}"><span class="wp-dot"></span>${cleanName}${hasConflict ? ' <span class="wp-warn-ic" title="Conflicto de recurso: la misma persona está asignada en 2+ casas este día. Reasigná o mové la tarea.">' + osIcon('alert') + '</span>' : ''}${hasDepIssue ? ' <span class="wp-warn-ic" title="Dependencias no listas: ' + depCheck.blockers.map(b=>b.code).join(', ') + '">' + osIcon('link') + '</span>' : ''}</div>
                   <div class="wp-ac-meta">
                     ${a.stage ? `<span class="wp-ac-stage">${a.stage}</span>` : ''}
                     ${dayChip ? `<span class="wp-ac-day">${dayChip}</span>` : ''}
                     ${stLabel ? `<span class="wp-ac-st" title="${st==='critical'?'Ruta crítica':st==='postponed'?'Tarea aplazada':st==='dep'?'Dependencias no listas: '+depCheck.blockers.map(b=>b.code).join(', '):''}">${stLabel}</span>` : ''}
                   </div>
                   <div class="wp-ac-tags">
-                    ${a.is_critical ? '<span class="wp-chip crit" title="Ruta crítica — un atraso mueve la entrega">🎯 CRÍTICA</span>' : ''}${(a.notes||'').startsWith('[Estimador]') ? '<span class="wp-chip est" title="Viene del Estimador">📐 EST</span>' : ''}
-                    ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip ok" title="Checklist + materiales">✅ ${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip" title="Agregar checklist + materiales">+ ✅</button>`}
-                    ${(a.materials||[]).length > 0 ? `<span class="wp-chip" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">📦 ${(a.materials||[]).length}</span>` : ''}
+                    ${a.is_critical ? '<span class="wp-chip crit" title="Ruta crítica — un atraso mueve la entrega">' + osIcon('target') + ' CRÍTICA</span>' : ''}${(a.notes||'').startsWith('[Estimador]') ? '<span class="wp-chip est" title="Viene del Estimador">' + osIcon('ruler') + ' EST</span>' : ''}
+                    ${(a.checklist||[]).length > 0 ? `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip ok" title="Checklist + materiales">${(a.checklist||[]).filter(c=>c.done).length}/${(a.checklist||[]).length}</button>` : `<button onclick="event.stopPropagation(); wpOpenChecklist('${a.id}')" class="wp-chip" title="Agregar checklist + materiales">+ ${osIcon('check-circle')}</button>`}
+                    ${(a.materials||[]).length > 0 ? `<span class="wp-chip" title="${(a.materials||[]).map(m=>m.nombre+' x'+m.cantidad).join(', ').replace(/"/g,'&quot;')}">${(a.materials||[]).length}</span>` : ''}
                     ${acts.map(r => `<span class="wp-res" title="${r.name}">${r.emoji}${r.type==='crew'?' '+r.name.replace('Crew ',''):''}</span>`).join('')}
                   </div>
-                  ${hasDepIssue && depCheck.minDate ? `<div class="wp-ac-sug">📅 Sugerido: ${depCheck.minDate}</div>` : ''}
+                  ${hasDepIssue && depCheck.minDate ? `<div class="wp-ac-sug">${osIcon('calendar')} Sugerido: ${depCheck.minDate}</div>` : ''}
                 </div>
               </div>
             </div>
@@ -758,14 +758,14 @@ function wpTeamOf(houseId) {
 function wpRenderTeamPanel(homes) {
   const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   return `
-    <div class="p-2 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">👷 Equipo de la obra</div>
+    <div class="p-2 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">${osIcon('hard-hat')} Equipo de la obra</div>
     <div class="p-2 space-y-2">
       ${homes.length ? homes.map(h => {
         const team = wpTeamOf(h.id);
         return `<div class="wp-team border border-slate-200 rounded-lg p-2">
           <div class="flex items-center justify-between gap-1">
             <div class="font-bold text-[11px] truncate">${esc(h.name)}</div>
-            <button onclick="wpOpenEditTeam('${h.id.replace(/'/g, "\\'")}','${h.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-0.5 font-bold whitespace-nowrap">✏️ Editar equipo</button>
+            <button onclick="wpOpenEditTeam('${h.id.replace(/'/g, "\\'")}','${h.name.replace(/'/g, "\\'")}')" class="text-[9px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-0.5 font-bold whitespace-nowrap">${osIcon('pencil')} Editar equipo</button>
           </div>
           ${team.length ? `<div class="flex flex-wrap gap-1 mt-1.5">${team.map(r => `<span class="wp-res">${r.emoji || '•'} ${esc((r.name || '').replace('Crew ', ''))}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic mt-1">Sin equipo asignado.</div>'}
         </div>`;
@@ -775,7 +775,7 @@ function wpRenderTeamPanel(homes) {
 function wpOpenEditTeam(houseId, houseName) {
   const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const assigned = new Set(wpTeamOf(houseId).map(r => r.id));
-  const groups = [['crew', '👷 Equipos / Crews'], ['specialist', '👨‍🔧 Especialistas'], ['tool', '🔧 Herramientas'], ['vehicle', '🚚 Vehículos'], ['other', '📦 Otros']];
+  const groups = [['crew', 'Equipos / Crews'], ['specialist', '‍Especialistas'], ['tool', 'Herramientas'], ['vehicle', 'Vehículos'], ['other', 'Otros']];
   const html = `<div id="wp-team-edit" class="space-y-3">
     <div class="text-xs text-slate-500">Marcá los recursos asignados a <b>${esc(houseName)}</b> (equipo fijo de la obra, no por día). Reversible.</div>
     ${groups.map(([type, label]) => {
@@ -787,7 +787,7 @@ function wpOpenEditTeam(houseId, houseName) {
     ${!(wpState.resources || []).length ? '<div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">No hay recursos cargados todavía. Cerrá y usá "+ Recurso" para crearlos.</div>' : ''}
     <div class="pt-2"><button onclick="wpBackToPlanner({reload:true})" class="bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-lg">✓ Listo</button></div>
   </div>`;
-  openModal(`👷 Editar equipo — ${houseName}`, html);
+  openModal(`Editar equipo — ${houseName}`, html);
 }
 window.wpOpenEditTeam = wpOpenEditTeam;
 async function wpToggleTeamResource(houseId, resourceId, btn) {
@@ -844,12 +844,12 @@ function wpRenderResourceForm() {
       <input id="wp-res-name" placeholder="Nombre" class="w-full border border-slate-300 rounded px-2 py-1 text-xs mb-1" />
       <div class="grid grid-cols-2 gap-1 mb-1">
         <select id="wp-res-type" class="border border-slate-300 rounded px-1 py-1 text-xs">
-          <option value="crew">👷 Crew</option>
-          <option value="specialist">👨‍🔧 Specialist</option>
-          <option value="tool">🔧 Tool</option>
-          <option value="vehicle">🚚 Vehicle</option>
+          <option value="crew">${osIcon('hard-hat')} Crew</option>
+          <option value="specialist">‍${osIcon('wrench')} Specialist</option>
+          <option value="tool">${osIcon('wrench')} Tool</option>
+          <option value="vehicle">${osIcon('truck')} Vehicle</option>
         </select>
-        <input id="wp-res-emoji" placeholder="🔧" maxlength="3" value="🔧" class="border border-slate-300 rounded px-2 py-1 text-xs text-center" />
+        <input id="wp-res-emoji" placeholder="" maxlength="3" value="" class="border border-slate-300 rounded px-2 py-1 text-xs text-center" />
       </div>
       <input id="wp-res-cost" type="number" placeholder="$/día" class="w-full border border-slate-300 rounded px-2 py-1 text-xs mb-1" />
       <button onclick="wpCreateResource()" class="w-full bg-slate-900 text-white text-xs py-1.5 rounded">+ Crear</button>
@@ -922,7 +922,7 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
     const movedAct = { ...a, date: dateStr };
     const depCheck = wpCheckDeps(movedAct, newHomeActs);
     if (!depCheck.satisfied) {
-      const msg = `⚠️ Esta actividad depende de: ${depCheck.blockers.map(b => b.code + ' (' + (b.status || 'no existe') + ')').join(', ')}\n\nSugerencia: mover después del ${depCheck.minDate || '?'}\n\n¿Mover igual?`;
+      const msg = `Esta actividad depende de: ${depCheck.blockers.map(b => b.code + ' (' + (b.status || 'no existe') + ')').join(', ')}\n\nSugerencia: mover después del ${depCheck.minDate || '?'}\n\n¿Mover igual?`;
       if (!confirm(msg)) return;
     }
     const { error } = await sb.from('weekly_activities').update({
@@ -934,7 +934,7 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
     if (error) return alert('Error moviendo: ' + error.message);
     await wpLoadAll();
     wpRender();
-    if (window.toast) toast('✅ Actividad reprogramada', 'success');
+    if (window.toast) toast('Actividad reprogramada', 'success');
     return;
   }
 
@@ -989,13 +989,13 @@ function wpNewActivity(homeId, homeName, dateStr) {
       <label class="flex items-center gap-1"><input type="radio" name="wp-na-mode" value="rango" onchange="wpNAMode('rango')" /> Rango de días</label>
       <label class="flex items-center gap-1"><input type="radio" name="wp-na-mode" value="varios" onchange="wpNAMode('varios')" /> Varios días</label>
     </div>
-    <div id="wp-na-dia" class="text-xs text-slate-600">📅 ${dl(dateStr)}</div>
+    <div id="wp-na-dia" class="text-xs text-slate-600">${osIcon('calendar')} ${dl(dateStr)}</div>
     <div id="wp-na-rango" class="grid-cols-2 gap-2 text-xs" style="display:none"><label class="block">Desde<input id="wp-na-from" type="date" value="${dateStr}" class="w-full border border-slate-300 rounded px-2 py-1" /></label><label class="block">Hasta<input id="wp-na-to" type="date" value="${dateStr}" class="w-full border border-slate-300 rounded px-2 py-1" /></label></div>
     <div id="wp-na-varios" class="flex-wrap gap-1.5 text-xs" style="display:none">${weekDays.map(d => `<label class="flex items-center gap-1 border border-slate-300 rounded px-2 py-1"><input type="checkbox" class="wp-na-day" value="${d}" ${d === dateStr ? 'checked' : ''} /> ${dl(d)}</label>`).join('')}</div>
     <div class="text-[10px] text-slate-400">Multi-día = una sola actividad enlazada (una entrada por día, con "día X/Y").</div>
     <button onclick="wpCreateActivity()" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg">✓ Crear actividad</button>
   </div>`;
-  openModal(`➕ Nueva actividad — ${homeName}`, html);
+  openModal(`Nueva actividad — ${homeName}`, html);
 }
 window.wpNewActivity = wpNewActivity;
 function wpNAMode(m) {
@@ -1052,7 +1052,7 @@ function wpEditActivity(id) {
       <div class="bg-gradient-to-br ${isDone?'from-emerald-700 to-emerald-900':'from-slate-800 to-slate-900'} text-white rounded-xl p-4">
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-70 font-bold">🏠 ${(proj?.name || a.property_name || 'Sin casa').replace(/</g,'&lt;')}${a.activity_code?` · ${a.activity_code}`:''}</div>
+            <div class="text-[10px] uppercase tracking-wider opacity-70 font-bold">${osIcon('house')} ${(proj?.name || a.property_name || 'Sin casa').replace(/</g,'&lt;')}${a.activity_code?` · ${a.activity_code}`:''}</div>
             <div class="text-lg font-bold leading-tight ${isDone?'line-through opacity-75':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
             <div class="text-xs opacity-80 mt-1">${a.stage||'—'} · ${a.date} · ${a.start_hour||7}:00–${a.end_hour||17}:00${a.duration_days>1?` · ${a.duration_days}d`:''}</div>
           </div>
@@ -1063,8 +1063,8 @@ function wpEditActivity(id) {
         </div>
         <!-- Tabs Desglose vs Editar -->
         <div class="flex gap-1 mt-3">
-          <button onclick="document.getElementById('wpe-tab-detail').classList.remove('hidden'); document.getElementById('wpe-tab-edit').classList.add('hidden'); this.classList.add('bg-white/20'); document.getElementById('wpe-btn-edit').classList.remove('bg-white/20')" id="wpe-btn-detail" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-3 py-1 rounded">📋 Desglose</button>
-          <button onclick="document.getElementById('wpe-tab-edit').classList.remove('hidden'); document.getElementById('wpe-tab-detail').classList.add('hidden'); this.classList.add('bg-white/20'); document.getElementById('wpe-btn-detail').classList.remove('bg-white/20')" id="wpe-btn-edit" class="hover:bg-white/20 text-xs font-bold px-3 py-1 rounded">✏️ Editar</button>
+          <button onclick="document.getElementById('wpe-tab-detail').classList.remove('hidden'); document.getElementById('wpe-tab-edit').classList.add('hidden'); this.classList.add('bg-white/20'); document.getElementById('wpe-btn-edit').classList.remove('bg-white/20')" id="wpe-btn-detail" class="bg-white/20 hover:bg-white/30 text-xs font-bold px-3 py-1 rounded">${osIcon('clipboard')} Desglose</button>
+          <button onclick="document.getElementById('wpe-tab-edit').classList.remove('hidden'); document.getElementById('wpe-tab-detail').classList.add('hidden'); this.classList.add('bg-white/20'); document.getElementById('wpe-btn-detail').classList.remove('bg-white/20')" id="wpe-btn-edit" class="hover:bg-white/20 text-xs font-bold px-3 py-1 rounded">${osIcon('pencil')} Editar</button>
         </div>
       </div>
 
@@ -1072,7 +1072,7 @@ function wpEditActivity(id) {
       <div id="wpe-tab-detail" class="space-y-3">
         <!-- Equipo asignado -->
         <div class="border border-slate-200 rounded-xl p-3">
-          <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">👷 Equipo asignado (${crews.length})</div>
+          <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">${osIcon('hard-hat')} Equipo asignado (${crews.length})</div>
           ${crews.length === 0
             ? '<div class="text-xs text-slate-400 italic">Sin equipo asignado · arrastrá un crew o specialist desde el panel lateral.</div>'
             : `<div class="flex flex-wrap gap-2">${crews.map(r => `
@@ -1088,7 +1088,7 @@ function wpEditActivity(id) {
 
         <!-- Herramientas / activos -->
         <div class="border border-slate-200 rounded-xl p-3">
-          <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">🔧 Herramientas y activos (${tools.length})</div>
+          <div class="text-[10px] font-bold uppercase text-slate-600 mb-2">${osIcon('wrench')} Herramientas y activos (${tools.length})</div>
           ${tools.length === 0
             ? '<div class="text-xs text-slate-400 italic">Sin herramientas asignadas.</div>'
             : `<div class="flex flex-wrap gap-2">${tools.map(r => `<span class="bg-amber-50 border border-amber-300 rounded px-2 py-1 text-xs font-medium" title="${r.category||''}">${r.emoji} ${r.name}</span>`).join('')}</div>`
@@ -1098,7 +1098,7 @@ function wpEditActivity(id) {
         <!-- Materiales necesarios -->
         <div class="border border-slate-200 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-[10px] font-bold uppercase text-slate-600">📦 Materiales (${materials.length})</div>
+            <div class="text-[10px] font-bold uppercase text-slate-600">${osIcon('package')} Materiales (${materials.length})</div>
             <button onclick="wpOpenChecklist('${id}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
           </div>
           ${materials.length === 0
@@ -1114,30 +1114,30 @@ function wpEditActivity(id) {
         <!-- Checklist -->
         <div class="border border-slate-200 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-[10px] font-bold uppercase text-slate-600">✅ Checklist (${checklistDone}/${checklist.length})</div>
+            <div class="text-[10px] font-bold uppercase text-slate-600">${osIcon('check-circle')} Checklist (${checklistDone}/${checklist.length})</div>
             <button onclick="wpOpenChecklist('${id}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">+ Editar</button>
           </div>
           ${checklist.length === 0
             ? '<div class="text-xs text-slate-400 italic">Sin checklist.</div>'
-            : `<ul class="space-y-0.5 text-xs">${checklist.map(c => `<li class="${c.done?'line-through text-slate-400':'text-slate-700'}">${c.done?'☑':'☐'} ${(c.item||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
+            : `<ul class="space-y-0.5 text-xs">${checklist.map(c => `<li class="${c.done?'line-through text-slate-400':'text-slate-700'}">${c.done?osIcon('check-circle'):'☐'} ${(c.item||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>`
           }
         </div>
 
         <!-- Importantes (notas) -->
         ${a.notes ? `
         <div class="border-l-4 border-amber-500 bg-amber-50 p-3 rounded-r-xl">
-          <div class="text-[10px] font-bold uppercase text-amber-800 mb-1">📌 Importante / Notas</div>
+          <div class="text-[10px] font-bold uppercase text-amber-800 mb-1">${osIcon('map-pin')} Importante / Notas</div>
           <div class="text-xs text-slate-800 whitespace-pre-wrap">${a.notes.replace(/</g,'&lt;')}</div>
         </div>` : ''}
 
         <!-- Acciones rápidas -->
         <div class="flex gap-2 pt-2 border-t border-slate-200 flex-wrap">
           ${!isDone ? `<button onclick="wpMarkActivityDone('${id}', true).then(()=>wpBackToPlanner({reload:true})).catch(e=>alert(e.message))" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Marcar como hecha</button>` : `<button onclick="wpMarkActivityDone('${id}', false).then(()=>wpBackToPlanner({reload:true})).catch(e=>alert(e.message))" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold py-2 rounded">↺ Desmarcar</button>`}
-          <button onclick="wpOpenPostpone('${id}')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded" title="Aplazar con motivo">🟡 Aplazar con motivo</button>
+          <button onclick="wpOpenPostpone('${id}')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded" title="Aplazar con motivo">${kitStatusDot('warn')} Aplazar con motivo</button>
         </div>
         ${a.notes && a.notes.includes('[APLAZADA') ? `
         <div class="border-l-4 border-amber-500 bg-amber-50 p-2 rounded-r text-[11px]">
-          <div class="font-bold text-amber-900">🟡 Esta tarea fue aplazada</div>
+          <div class="font-bold text-amber-900">${kitStatusDot('warn')} Esta tarea fue aplazada</div>
           <div class="text-amber-800 mt-0.5">${(a.notes.match(/\[APLAZADA[^\]]*\]/g)||[]).slice(-1)[0]||''}</div>
         </div>` : ''}
       </div>
@@ -1206,15 +1206,15 @@ function wpEditActivity(id) {
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="wpeDelete('${id}')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 rounded">🗑️ Eliminar</button>
+        <button onclick="wpeDelete('${id}')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 rounded">${osIcon('trash')} Eliminar</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="wpeSave('${id}')" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+        <button onclick="wpeSave('${id}')" class="flex-1 bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">${osIcon('save')} Guardar</button>
       </div>
       </div><!-- /wpe-tab-edit -->
     </div>
   `;
   window._wpEditingId = id;
-  openModal(`📋 Actividad`, html);
+  openModal(`Actividad`, html);
 }
 
 async function wpeAddRes(rid) {
@@ -1312,7 +1312,7 @@ function wpOpenPostpone(id) {
   const a = wpState.activities.find(x => x.id === id);
   if (!a) return;
   const tomorrowIso = wpDateOnly(wpAddDays(new Date(a.date+'T00:00:00'), 1));
-  openModal('🟡 Aplazar tarea — motivo obligatorio', `
+  openModal('Aplazar tarea — motivo obligatorio', `
     <div class="space-y-3">
       <div class="bg-amber-50 border border-amber-300 rounded p-2 text-xs text-amber-900">
         <strong>Tarea:</strong> ${(a.activity_name||'').replace(/</g,'&lt;')}<br>
@@ -1329,7 +1329,7 @@ function wpOpenPostpone(id) {
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="wpConfirmPostpone('${id}')" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded">🟡 Confirmar aplazamiento</button>
+        <button onclick="wpConfirmPostpone('${id}')" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded">${kitStatusDot('warn')} Confirmar aplazamiento</button>
       </div>
     </div>
   `);
@@ -1355,7 +1355,7 @@ async function wpConfirmPostpone(id) {
   if (error) return alert('Error: ' + error.message);
   await wpLoadAll();
   wpBackToPlanner();
-  if (window.toast) toast('✅ Actividad reprogramada', 'success');
+  if (window.toast) toast('Actividad reprogramada', 'success');
 }
 
 // Reprograma una actividad a nuevo día
@@ -1368,7 +1368,7 @@ async function wpReprogramTask(id, newDate) {
   }).eq('id', id);
   await wpLoadAll();
   wpRender();
-  if (window.toast) toast('✅ Actividad reprogramada', 'success');
+  if (window.toast) toast('Actividad reprogramada', 'success');
   if (prev && prev.is_critical && oldDate) { const delta = Math.round((new Date(newDate) - new Date(oldDate)) / 86400000); if (delta) await wpCascadeReschedule(prev, delta); }
 }
 // Bloque 4.1 — cascada: al mover una actividad crítica, recorre sus sucesores dependientes (depends_on del catálogo).
@@ -1406,7 +1406,7 @@ async function wpReprogramAllOverdue(newDate) {
   }).in('id', ids);
   await wpLoadAll();
   wpRender();
-  if (window.toast) toast('✅ ' + ids.length + ' actividad(es) reprogramada(s)', 'success');
+  if (window.toast) toast(osIcon('check-circle') + ids.length + ' actividad(es) reprogramada(s)', 'success');
 }
 
 function wpToggleCriticasDetails() {
@@ -1428,7 +1428,7 @@ async function wpReprogramListToDate(ids, newDate) {
   if (error) return alert('Error reprogramando: ' + error.message);
   await wpLoadAll();
   wpBackToPlanner();
-  if (window.toast) toast('✅ ' + ids.length + ' tarea(s) reprogramada(s)', 'success');
+  if (window.toast) toast(osIcon('check-circle') + ids.length + ' tarea(s) reprogramada(s)', 'success');
 }
 
 function wpNavWeek(delta) {
@@ -1471,9 +1471,9 @@ function wpOpenDayView(dateStr, homeFilter) {
   const extra = new Set();
   wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
   const houseOpts = [
-    `<option value="all" ${homeFilter==='all'?'selected':''}>🏘️ Todas las casas</option>`,
-    ...activeProj.map(p => `<option value="${p.id}" ${homeFilter===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
-    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${homeFilter==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+    `<option value="all" ${homeFilter==='all'?'selected':''}>${osIcon('building')} Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${homeFilter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${homeFilter==='name:'+n?'selected':''}>${n.replace(/</g,'&lt;')}</option>`)
   ].join('');
   // Pendientes del día (para reagendar al final del día)
   const pendientes = dayActs.filter(a => a.status !== 'done' && a.status !== 'cancelled');
@@ -1505,13 +1505,13 @@ function wpOpenDayView(dateStr, homeFilter) {
           </div>
           <div class="flex gap-2 items-center">
             <select onchange="wpOpenDayView('${dateStr}', this.value)" class="bg-white text-slate-900 text-xs rounded px-2 py-1.5 font-bold">${houseOpts}</select>
-            <button onclick="wpShareWhatsApp('${dateStr}', '${homeFilter}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded" title="Enviar día por WhatsApp">💬 WhatsApp</button>
-            <button onclick="wpOpenPrintView('${dateStr}','${homeFilter}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🖨️ Imprimir</button>
+            <button onclick="wpShareWhatsApp('${dateStr}', '${homeFilter}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded" title="Enviar día por WhatsApp">${osIcon('message')} WhatsApp</button>
+            <button onclick="wpOpenPrintView('${dateStr}','${homeFilter}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('printer')} Imprimir</button>
           </div>
         </div>
         ${pendientes.length > 0 ? `
           <div class="mt-3 bg-amber-500/20 border border-amber-400/40 rounded-lg p-2 flex items-center justify-between gap-2 flex-wrap">
-            <div class="text-xs">⚠️ <strong>${pendientes.length}</strong> tarea(s) sin completar al cerrar el día.</div>
+            <div class="text-xs">${osIcon('alert')} <strong>${pendientes.length}</strong> tarea(s) sin completar al cerrar el día.</div>
             <div class="flex gap-1">
               <button onclick="wpReprogramListToDate(${JSON.stringify(pendientes.map(p=>p.id)).replace(/"/g,'&quot;')}, '${tomorrowIso}')" class="bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold px-2 py-1 rounded">→ Mañana</button>
               <input type="date" id="wp-day-reprog-date" value="${tomorrowIso}" class="bg-white text-slate-900 rounded px-1.5 py-1 text-[10px]"/>
@@ -1526,7 +1526,7 @@ function wpOpenDayView(dateStr, homeFilter) {
         ${Object.entries(byHome).map(([key, home]) => `
           <div class="bg-white border border-slate-200 rounded-xl p-3">
             <div class="font-bold text-sm mb-2 pb-2 border-b border-slate-100">
-              🏠 ${home.name}
+              ${osIcon('house')} ${home.name}
               ${home.address ? `<div class="text-[10px] text-slate-500 font-normal">${home.address}</div>` : ''}
             </div>
             <div class="space-y-2">
@@ -1538,7 +1538,7 @@ function wpOpenDayView(dateStr, homeFilter) {
                     <div class="font-bold">${a.activity_name}</div>
                     <div class="text-[10px] text-slate-500">${a.stage || '—'} · ${a.start_hour||7}:00-${a.end_hour||17}:00 · ${a.status}</div>
                     ${acts.length ? `<div class="flex flex-wrap gap-1 mt-1">${acts.map(r => `<span class="text-[10px] bg-white border border-slate-300 px-1.5 py-0.5 rounded" title="${r.name}">${r.emoji} ${r.name}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic">Sin recursos asignados</div>'}
-                    ${a.notes ? `<div class="text-[10px] text-slate-600 mt-1 italic">📝 ${a.notes}</div>` : ''}
+                    ${a.notes ? `<div class="text-[10px] text-slate-600 mt-1 italic">${osIcon('pencil-line')} ${a.notes}</div>` : ''}
                   </div>
                 `;
               }).join('')}
@@ -1550,13 +1550,13 @@ function wpOpenDayView(dateStr, homeFilter) {
       <!-- Recursos del día -->
       <div class="grid md:grid-cols-2 gap-3">
         <div class="bg-red-50 border border-red-200 rounded-xl p-3">
-          <div class="text-xs font-bold text-red-900 uppercase mb-2">🔴 Ocupados (${busyRes.length})</div>
+          <div class="text-xs font-bold text-red-900 uppercase mb-2">${kitStatusDot('bad')} Ocupados (${busyRes.length})</div>
           <div class="flex flex-wrap gap-1">
-            ${busyRes.map(r => `<span class="bg-white border-2 border-red-300 rounded px-2 py-1 text-xs" title="${r.name}">${r.emoji} ${r.name}${usedRes[r.id] > 1 ? ` <span class="text-red-700 font-bold">(${usedRes[r.id]}x ⚠️)</span>`:''}</span>`).join('') || '<span class="text-xs text-slate-500">Ninguno ocupado</span>'}
+            ${busyRes.map(r => `<span class="bg-white border-2 border-red-300 rounded px-2 py-1 text-xs" title="${r.name}">${r.emoji} ${r.name}${usedRes[r.id] > 1 ? ` <span class="text-red-700 font-bold">(${usedRes[r.id]}x ${osIcon('alert')})</span>`:''}</span>`).join('') || '<span class="text-xs text-slate-500">Ninguno ocupado</span>'}
           </div>
         </div>
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-          <div class="text-xs font-bold text-emerald-900 uppercase mb-2">🟢 Disponibles (${freeRes.length})</div>
+          <div class="text-xs font-bold text-emerald-900 uppercase mb-2">${kitStatusDot('ok')} Disponibles (${freeRes.length})</div>
           <div class="flex flex-wrap gap-1">
             ${freeRes.map(r => `<span class="bg-white border-2 border-emerald-300 rounded px-2 py-1 text-xs" title="${r.name}">${r.emoji} ${r.name}</span>`).join('') || '<span class="text-xs text-slate-500">Todos ocupados</span>'}
           </div>
@@ -1566,7 +1566,7 @@ function wpOpenDayView(dateStr, homeFilter) {
       <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg">← Volver al calendario semanal</button>
     </div>
   `;
-  openModal(`📅 Día completo: ${wpFmtDate(d)}`, html);
+  openModal(`Día completo: ${wpFmtDate(d)}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-5xl');
 }
@@ -1625,7 +1625,7 @@ async function wpOpenCrewByHour(dateStr) {
     <div class="space-y-3">
       <div class="bg-slate-900 text-white rounded-xl p-4">
         <div class="text-xs text-slate-400 uppercase font-bold">Cobertura humana · ${wpFmtDate(d)}</div>
-        <div class="text-2xl font-bold">👷 Crew × Hora</div>
+        <div class="text-2xl font-bold">${osIcon('hard-hat')} Crew × Hora</div>
         <div class="text-xs text-slate-400 mt-1">${workers.length} workers · ${acts.length} actividades · solo crews y specialists</div>
       </div>
 
@@ -1659,11 +1659,11 @@ async function wpOpenCrewByHour(dateStr) {
                     const title = activeHere.map(a => `${a.activity_name} (${wpState.projects.find(p => p.id === a.project_id)?.name || a.property_name || '?'})`).join('\n');
                     return `<td class="border-r border-slate-100 p-0 align-middle">
                       <div class="${color} ${isOver?'ring-2 ring-red-500':''} h-7 flex items-center justify-center text-[9px] font-bold cursor-pointer" title="${title.replace(/"/g,'&quot;')}">
-                        ${activeHere.length > 1 ? `<span class="text-red-700">⚠️${activeHere.length}</span>` : '●'}
+                        ${activeHere.length > 1 ? `<span class="text-red-700">${osIcon('alert')}${activeHere.length}</span>` : '●'}
                       </div>
                     </td>`;
                   }).join('')}
-                  <td class="p-1.5 text-center font-bold ${overbook.length?'text-red-700':'text-slate-700'}">${totalHours}h${overbook.length?' ⚠️':''}</td>
+                  <td class="p-1.5 text-center font-bold ${overbook.length?'text-red-700':'text-slate-700'}">${totalHours}h${overbook.length?osIcon('alert'):''}</td>
                 </tr>
               `;
             }).join('')}
@@ -1673,7 +1673,7 @@ async function wpOpenCrewByHour(dateStr) {
       </div>
 
       <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] text-slate-700">
-        <strong>💡 Cómo leer:</strong> Cada fila es un worker. Cada celda es 1 hora. Color = casa donde trabaja. <strong class="text-red-700">⚠️ borde rojo</strong> = overbooking (mismo worker en 2+ casas a la misma hora). Hover para detalle. La idea es ver el día completo en una sola pantalla y detectar conflictos antes de que pasen.
+        <strong>${osIcon('lightbulb')} Cómo leer:</strong> Cada fila es un worker. Cada celda es 1 hora. Color = casa donde trabaja. <strong class="text-red-700">${osIcon('alert')} borde rojo</strong> = overbooking (mismo worker en 2+ casas a la misma hora). Hover para detalle. La idea es ver el día completo en una sola pantalla y detectar conflictos antes de que pasen.
       </div>
 
       <div class="flex gap-2">
@@ -1683,7 +1683,7 @@ async function wpOpenCrewByHour(dateStr) {
       </div>
     </div>
   `;
-  openModal(`👷 Crew × Hora · ${wpFmtDate(d)}`, html);
+  openModal(`Crew × Hora · ${wpFmtDate(d)}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
 }
@@ -1707,7 +1707,7 @@ function wpOpenCellView(homeId, homeName, dateStr) {
       <!-- Header con resumen -->
       <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl p-4">
         <div class="text-xs text-slate-400 uppercase font-bold">${wpFmtDate(d)}</div>
-        <div class="text-lg font-bold">🏠 ${homeName}</div>
+        <div class="text-lg font-bold">${osIcon('house')} ${homeName}</div>
         <div class="mt-3 grid grid-cols-3 gap-2">
           <div class="bg-slate-700/50 rounded p-2">
             <div class="text-[10px] text-slate-400 uppercase">Avance</div>
@@ -1740,16 +1740,16 @@ function wpOpenCellView(homeId, homeName, dateStr) {
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
                     <div class="font-bold text-sm ${isDone?'line-through opacity-60':''}">${a.activity_name}</div>
-                    ${fromEst ? '<span class="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">📐 EST</span>' : ''}
-                    ${isLate ? '<span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">⏰ ATRASADA</span>' : ''}
+                    ${fromEst ? '<span class="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">' + osIcon('ruler') + ' EST</span>' : ''}
+                    ${isLate ? '<span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">' + osIcon('clock') + ' ATRASADA</span>' : ''}
                   </div>
                   <div class="text-[11px] text-slate-500 mt-0.5">
                     ${a.stage ? `Etapa: <strong>${a.stage}</strong> · ` : ''}${a.start_hour||7}:00 - ${a.end_hour||17}:00 · Status: <strong>${a.status}</strong>
                   </div>
                   ${aRes.length ? `<div class="flex flex-wrap gap-1 mt-2">${aRes.map(r => `<span class="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs">${r.emoji} ${r.name}</span>`).join('')}</div>` : '<div class="text-[10px] text-slate-400 italic mt-1">Sin recursos asignados</div>'}
-                  ${a.notes ? `<div class="text-[10px] text-slate-600 mt-2 italic">📝 ${a.notes}</div>` : ''}
+                  ${a.notes ? `<div class="text-[10px] text-slate-600 mt-2 italic">${osIcon('pencil-line')} ${a.notes}</div>` : ''}
                 </div>
-                <button onclick="wpEditActivity('${a.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">✏️ Editar</button>
+                <button onclick="wpEditActivity('${a.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">${osIcon('pencil')} Editar</button>
               </div>
             </div>
           `;
@@ -1759,7 +1759,7 @@ function wpOpenCellView(homeId, homeName, dateStr) {
       <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
     </div>
   `;
-  openModal(`🏠 ${homeName} — ${wpFmtDate(d)}`, html);
+  openModal(`${homeName} — ${wpFmtDate(d)}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-4xl');
 }
@@ -1839,7 +1839,7 @@ async function wpOpenHouseView(homeId, homeName) {
         </div>
         <div class="bg-${onTrack?'emerald':'red'}-50 border border-${onTrack?'emerald':'red'}-200 rounded p-3">
           <div class="text-[10px] text-${onTrack?'emerald':'red'}-700 uppercase font-bold">Status del plan</div>
-          <div class="text-lg font-bold text-${onTrack?'emerald':'red'}-700">${onTrack ? '✓ En tiempo' : '⚠️ Atrasado'}</div>
+          <div class="text-lg font-bold text-${onTrack?'emerald':'red'}-700">${onTrack ? '✓ En tiempo' : 'Atrasado'}</div>
           <div class="text-[10px] text-slate-500">${pct}% avance vs ${totalDaysPlanned?Math.round(daysElapsed/totalDaysPlanned*100):0}% tiempo</div>
         </div>
       </div>
@@ -1849,7 +1849,7 @@ async function wpOpenHouseView(homeId, homeName) {
       <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-xs font-bold text-violet-900 uppercase">📐 Sincronizado con Estimador Pro</div>
+            <div class="text-xs font-bold text-violet-900 uppercase">${osIcon('ruler')} Sincronizado con Estimador Pro</div>
             <div class="text-xs text-violet-800 mt-1">
               Plan original: <strong>${estimatedActs.length} actividades</strong> · ${fromEstCount} sincronizadas al planner ·
               Presupuesto: <strong>$${Math.round(project.budget_total||0).toLocaleString()}</strong> ·
@@ -1862,7 +1862,7 @@ async function wpOpenHouseView(homeId, homeName) {
 
       <!-- Timeline día por día -->
       <div class="border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📅 Cronograma día a día</div>
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('calendar')} Cronograma día a día</div>
         <div class="max-h-96 overflow-y-auto">
           ${sortedDates.length === 0 ? '<div class="p-6 text-center text-slate-400">Sin actividades planeadas</div>' : sortedDates.map(date => {
             const acts = byDate[date];
@@ -1885,10 +1885,10 @@ async function wpOpenHouseView(homeId, homeName) {
                       <div class="flex items-start gap-2 text-xs ${isDone?'opacity-60':''}">
                         <input type="checkbox" ${isDone?'checked':''} onclick="wpHouseToggleDone('${a.id}','${homeId}','${homeName.replace(/'/g,"\\'")}', event)" class="mt-0.5 cursor-pointer" />
                         <div class="flex-1">
-                          <div class="${isDone?'line-through':''} font-semibold">${a.activity_name}${isLate?' <span class="text-red-600 font-bold">⏰</span>':''}</div>
+                          <div class="${isDone?'line-through':''} font-semibold">${a.activity_name}${isLate?' <span class="text-red-600 font-bold">' + osIcon('clock') + '</span>':''}</div>
                           ${aRes.length ? `<div class="flex gap-1 flex-wrap mt-0.5">${aRes.map(r => `<span class="text-[10px] bg-slate-100 px-1 rounded">${r.emoji}</span>`).join('')}</div>` : ''}
                         </div>
-                        <button onclick="wpEditActivity('${a.id}')" class="text-[10px] text-slate-500 hover:text-slate-900">✏️</button>
+                        <button onclick="wpEditActivity('${a.id}')" class="text-[10px] text-slate-500 hover:text-slate-900">${osIcon('pencil')}</button>
                       </div>
                     `;
                   }).join('')}
@@ -1902,7 +1902,7 @@ async function wpOpenHouseView(homeId, homeName) {
       <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
     </div>
   `;
-  openModal(`🏠 ${homeName} — Vista completa`, html);
+  openModal(`${homeName} — Vista completa`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-5xl');
 }
@@ -1923,7 +1923,7 @@ async function wpCreateResource() {
   const name = document.getElementById('wp-res-name').value.trim();
   if (!name) return alert('Pon un nombre');
   const type = document.getElementById('wp-res-type').value;
-  const emoji = document.getElementById('wp-res-emoji').value || '🔧';
+  const emoji = document.getElementById('wp-res-emoji').value || osIcon('wrench');
   const cost = +document.getElementById('wp-res-cost').value || 0;
   await sb.from('resources').insert({ name, type, emoji, cost_per_day: cost });
   wpState.showResourceForm = false;
@@ -1936,7 +1936,7 @@ async function wpCreateResource() {
 // ════════════════════════════════════════════════════════════
 async function wpDeleteHouse(homeId, homeName) {
   const isNameOnly = homeId.startsWith('name:');
-  const msg = `¿Eliminar "${homeName}" del planner?\n\n⚠️ Esto borra TODAS las actividades de esta casa (no se puede deshacer).\n\nSi querés conservar el historial usá "✅ Terminar" — eso mueve la casa al archivo y alimenta el Estimador Pro con los tiempos reales.`;
+  const msg = `¿Eliminar "${homeName}" del planner?\n\nEsto borra TODAS las actividades de esta casa (no se puede deshacer).\n\nSi querés conservar el historial usá "Terminar" — eso mueve la casa al archivo y alimenta el Estimador Pro con los tiempos reales.`;
   if (!confirm(msg)) return;
 
   if (isNameOnly) {
@@ -1980,13 +1980,13 @@ async function wpCompleteHouse(homeId, homeName) {
     });
   }
 
-  if (!allActs.length) return alert('Esta casa no tiene actividades. Eliminala con 🗑️ si querés sacarla del planner.');
+  if (!allActs.length) return alert('Esta casa no tiene actividades. Eliminala con si querés sacarla del planner.');
 
   const total = allActs.length;
   const done = allActs.filter(a => a.status === 'done').length;
   const pending = allActs.filter(a => a.status !== 'done' && a.status !== 'cancelled').length;
 
-  const msg = `Marcar "${homeName}" como TERMINADA?\n\n✅ ${done} actividades hechas\n⏳ ${pending} pendientes (se cerrarán automáticamente)\n\nEsto:\n• Mueve la casa a "Casas terminadas" (no aparecerá más en el calendario)\n• Conserva TODO el histórico\n• Envía los tiempos reales al Estimador Pro para calibrar las próximas estimaciones`;
+  const msg = `Marcar "${homeName}" como TERMINADA?\n\n${done} actividades hechas\n${pending} pendientes (se cerrarán automáticamente)\n\nEsto:\n• Mueve la casa a "Casas terminadas" (no aparecerá más en el calendario)\n• Conserva TODO el histórico\n• Envía los tiempos reales al Estimador Pro para calibrar las próximas estimaciones`;
   if (!confirm(msg)) return;
 
   // Cerrar pendientes
@@ -2030,7 +2030,7 @@ async function wpCompleteHouse(homeId, homeName) {
 
   await wpLoadAll();
   wpBackToPlanner();
-  alert(`✅ "${homeName}" terminada.\n\n• ${pending} actividades cerradas\n• ${created} etapas enviadas al Estimador Pro\n\nLos tiempos reales ya están calibrando las próximas estimaciones (ver "📁 Terminadas" para ver el análisis).`);
+  alert(`"${homeName}" terminada.\n\n• ${pending} actividades cerradas\n• ${created} etapas enviadas al Estimador Pro\n\nLos tiempos reales ya están calibrando las próximas estimaciones (ver "Terminadas" para ver el análisis).`);
 }
 
 // Agrega filas a remodel_actuals agrupando por etapa para alimentar benchmarks
@@ -2110,16 +2110,16 @@ async function wpOpenCompletedHouses() {
   const html = `
     <div class="space-y-3">
       <div class="text-xs text-slate-600 bg-emerald-50 border border-emerald-200 rounded p-2">
-        🏆 <strong>${completed.length} casas terminadas.</strong> Todo el histórico está guardado y los tiempos reales alimentan los benchmarks del Estimador Pro para mejorar las próximas estimaciones.
+        ${osIcon('trophy')} <strong>${completed.length} casas terminadas.</strong> Todo el histórico está guardado y los tiempos reales alimentan los benchmarks del Estimador Pro para mejorar las próximas estimaciones.
       </div>
-      ${completed.length === 0 ? '<div class="text-center text-slate-400 py-8">No hay casas terminadas todavía. Marcá una casa como ✅ Terminada desde el planner.</div>' : completed.map(p => {
+      ${completed.length === 0 ? '<div class="text-center text-slate-400 py-8">No hay casas terminadas todavía. Marcá una casa como ' + osIcon('check-circle') + ' Terminada desde el planner.</div>' : completed.map(p => {
         const a = actsByProject[p.id] || { total: 0, done: 0 };
         const completedDate = p.completed_at ? new Date(p.completed_at).toLocaleDateString() : '—';
         return `
           <div class="border border-slate-200 rounded-lg p-3 hover:border-slate-400 bg-white">
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
-                <div class="font-bold text-sm">🏆 ${p.name}</div>
+                <div class="font-bold text-sm">${osIcon('trophy')} ${p.name}</div>
                 ${p.address ? `<div class="text-xs text-slate-500">${p.address}</div>` : ''}
                 <div class="text-[11px] text-slate-600 mt-1">
                   ${a.total} actividades · Inicio ${p.start_date || '—'} · Cerrada ${completedDate}
@@ -2128,9 +2128,9 @@ async function wpOpenCompletedHouses() {
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <button onclick="wpHouseAnalysis('${p.id}','${(p.name||'').replace(/'/g, "\\'")}')" class="text-[10px] bg-violet-50 hover:bg-violet-100 text-violet-700 px-2 py-1 rounded font-bold whitespace-nowrap">📊 Análisis</button>
+                <button onclick="wpHouseAnalysis('${p.id}','${(p.name||'').replace(/'/g, "\\'")}')" class="text-[10px] bg-violet-50 hover:bg-violet-100 text-violet-700 px-2 py-1 rounded font-bold whitespace-nowrap">${osIcon('chart')} Análisis</button>
                 <button onclick="wpRestoreHouse('${p.id}','${(p.name||'').replace(/'/g, "\\'")}')" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded whitespace-nowrap">↩️ Restaurar</button>
-                <button onclick="wpDeleteCompletedHouse('${p.id}','${(p.name||'').replace(/'/g, "\\'")}')" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded whitespace-nowrap">🗑️ Borrar</button>
+                <button onclick="wpDeleteCompletedHouse('${p.id}','${(p.name||'').replace(/'/g, "\\'")}')" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded whitespace-nowrap">${osIcon('trash')} Borrar</button>
               </div>
             </div>
           </div>
@@ -2140,7 +2140,7 @@ async function wpOpenCompletedHouses() {
       <button onclick="wpBackToPlanner({reload:true})" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver al calendario</button>
     </div>
   `;
-  openModal(`📁 Casas terminadas (${completed.length})`, html);
+  openModal(`Casas terminadas (${completed.length})`, html);
   document.querySelector('#modal > div').classList.remove('max-w-7xl','max-w-5xl');
   document.querySelector('#modal > div').classList.add('max-w-3xl');
 }
@@ -2181,7 +2181,7 @@ async function wpHouseAnalysis(projectId, name) {
     <div class="space-y-3">
       <div class="bg-slate-900 text-white rounded-xl p-4">
         <div class="text-xs text-slate-400 uppercase font-bold">Análisis post-mortem</div>
-        <div class="text-xl font-bold">🏆 ${name}</div>
+        <div class="text-xl font-bold">${osIcon('trophy')} ${name}</div>
         <div class="text-xs text-slate-300 mt-1">${project?.address || ''} ${project?.sqft ? '· '+project.sqft+' sqft' : ''} · Cerrada ${project?.completed_at ? new Date(project.completed_at).toLocaleDateString() : '—'}</div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
           <div class="bg-slate-700/50 rounded p-2">
@@ -2206,7 +2206,7 @@ async function wpHouseAnalysis(projectId, name) {
       </div>
 
       <div class="border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Desglose por etapa — alimenta los benchmarks del Estimador Pro</div>
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('chart')} Desglose por etapa — alimenta los benchmarks del Estimador Pro</div>
         <table class="w-full text-xs">
           <thead class="bg-slate-50">
             <tr>
@@ -2235,13 +2235,13 @@ async function wpHouseAnalysis(projectId, name) {
       </div>
 
       <div class="text-[11px] text-slate-500 bg-slate-50 rounded p-2">
-        ℹ️ Estos datos están en la tabla <code>remodel_actuals</code> y se promedian con los de otras casas en la vista <code>remodel_dynamic_benchmarks</code> que usa el Estimador Pro para sus cálculos.
+        ${osIcon('info')} Estos datos están en la tabla <code>remodel_actuals</code> y se promedian con los de otras casas en la vista <code>remodel_dynamic_benchmarks</code> que usa el Estimador Pro para sus cálculos.
       </div>
 
       <button onclick="wpOpenCompletedHouses()" class="w-full bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">← Volver a Terminadas</button>
     </div>
   `;
-  openModal(`📊 ${name}`, html);
+  openModal(`${name}`, html);
   document.querySelector('#modal > div').classList.remove('max-w-3xl','max-w-7xl');
   document.querySelector('#modal > div').classList.add('max-w-5xl');
 }
@@ -2258,7 +2258,7 @@ function wpOpenImportExcel() {
   const html = `
     <div class="space-y-4">
       <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-800">
-        📥 Sube el Excel del cronograma (generado por el Estimador Pro). Leemos la hoja
+        ${osIcon('inbox')} Sube el Excel del cronograma (generado por el Estimador Pro). Leemos la hoja
         <code class="bg-white px-1 rounded">CRONOGRAMA</code> y creamos cada actividad como
         una entrada en este calendario, asignada al proyecto que elijas.
       </div>
@@ -2268,13 +2268,13 @@ function wpOpenImportExcel() {
         <select id="wp-imp-proj" onchange="wpImpOnProjChange(this.value)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
           <option value="">— Selecciona —</option>
           ${projOpts}
-          <option value="__new__" class="font-bold text-emerald-700">➕ Crear casa nueva...</option>
+          <option value="__new__" class="font-bold text-emerald-700">${osIcon('plus')} Crear casa nueva...</option>
         </select>
       </div>
 
       <!-- Form inline para crear casa nueva (oculto por default) -->
       <div id="wp-imp-newcasa" class="hidden bg-emerald-50 border-2 border-emerald-300 rounded-lg p-3 space-y-2">
-        <div class="text-xs font-bold uppercase text-emerald-800">➕ Nueva casa / proyecto</div>
+        <div class="text-xs font-bold uppercase text-emerald-800">${osIcon('plus')} Nueva casa / proyecto</div>
         <div>
           <label class="block text-[10px] font-bold text-slate-600 mb-0.5">Nombre / alias *</label>
           <input id="wp-newcasa-name" type="text" placeholder="Ej. Wellington · Neans · 1133 Denfield" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
@@ -2298,7 +2298,7 @@ function wpOpenImportExcel() {
           <input id="wp-newcasa-budget" type="number" min="0" placeholder="125000" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
         </div>
         <div class="flex gap-2">
-          <button onclick="wpImpCreateNewCasa()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded">💾 Crear y seleccionar</button>
+          <button onclick="wpImpCreateNewCasa()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded">${osIcon('save')} Crear y seleccionar</button>
           <button onclick="wpImpCancelNewCasa()" class="bg-slate-100 hover:bg-slate-200 text-xs py-2 px-3 rounded">Cancelar</button>
         </div>
       </div>
@@ -2318,12 +2318,12 @@ function wpOpenImportExcel() {
       <div id="wp-imp-preview" class="hidden bg-white border border-slate-200 rounded p-3 max-h-64 overflow-y-auto"></div>
 
       <div class="flex gap-2">
-        <button onclick="wpDoImportExcel()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2.5 rounded-lg">📥 Importar</button>
+        <button onclick="wpDoImportExcel()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('inbox')} Importar</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `;
-  openModal('📥 Importar cronograma desde Excel', html);
+  openModal('Importar cronograma desde Excel', html);
 }
 
 // Parser robusto: lee la hoja CRONOGRAMA con XLSX, devuelve { rows, projectStart }
@@ -2449,14 +2449,14 @@ function wpRenderImportPreview() {
   const html = `
     <div class="space-y-3">
       <div class="bg-amber-50 border-2 border-amber-300 rounded p-3 text-xs">
-        <div class="font-bold text-amber-900 mb-1">👀 Vista previa antes de publicar</div>
+        <div class="font-bold text-amber-900 mb-1">Vista previa antes de publicar</div>
         <div class="text-amber-800">Detecté <strong>${total}</strong> actividad(es) en <code>${p.fileName.replace(/</g,'&lt;')}</code>. Revisá, ajustá fechas si necesitás y desmarcá las que NO querés publicar. Al final hacé click en <strong>Aprobar y publicar</strong>.</div>
         <div class="mt-2 flex items-center gap-3 text-amber-900">
           <span><strong>Proyecto destino:</strong> ${(p.propertyName||'').replace(/</g,'&lt;')}</span>
           <span class="bg-amber-200 px-2 py-0.5 rounded font-bold">${included} de ${total} marcadas</span>
-          ${conFecha < total ? `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">⚠️ ${total - conFecha} sin fecha</span>` : ''}
-          ${p.clear ? `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">🗑️ Borrará actividades existentes</span>` : ''}
-          ${p.expand ? `<span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded font-bold">📅 Expandir N días → N filas</span>` : ''}
+          ${conFecha < total ? `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">${osIcon('alert')} ${total - conFecha} sin fecha</span>` : ''}
+          ${p.clear ? `<span class="bg-red-200 text-red-800 px-2 py-0.5 rounded font-bold">${osIcon('trash')} Borrará actividades existentes</span>` : ''}
+          ${p.expand ? `<span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded font-bold">${osIcon('calendar')} Expandir N días → N filas</span>` : ''}
         </div>
       </div>
 
@@ -2466,13 +2466,13 @@ function wpRenderImportPreview() {
         <button onclick="wpImportPreviewToggleEtapa('Externo')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded" title="Toggle solo las de etapa Externo">Toggle Externo</button>
         <button onclick="wpImportPreviewToggleEtapa('Interno')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Toggle Interno</button>
         <div class="h-5 border-l border-slate-300"></div>
-        <button onclick="wpImportPreviewMarkAllCritical()" class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-bold" title="Sugerir críticas: marca como Ruta Crítica las actividades estructurales (Cimentación, Estructura, Eléctrico, Plomería)">🎯 Sugerir ruta crítica</button>
+        <button onclick="wpImportPreviewMarkAllCritical()" class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-bold" title="Sugerir críticas: marca como Ruta Crítica las actividades estructurales (Cimentación, Estructura, Eléctrico, Plomería)">${osIcon('target')} Sugerir ruta crítica</button>
         <button onclick="wpImportPreviewClearCritical()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Quitar críticas</button>
         <span class="text-[10px] text-rose-700 font-bold">${p.items.filter(it=>it.is_critical).length} marcadas críticas</span>
       </div>
 
       <div class="bg-rose-50 border border-rose-200 rounded p-2 text-[11px] text-rose-900">
-        <strong>🎯 Ruta crítica:</strong> Marcá las actividades que NO pueden retrasarse sin afectar la fecha de entrega. Si una crítica se atrasa 1 día, se alertará automáticamente. Si se adelanta, se resaltará en verde como ganancia. Las críticas tienen borde rojo grueso en el calendario.
+        <strong>${osIcon('target')} Ruta crítica:</strong> Marcá las actividades que NO pueden retrasarse sin afectar la fecha de entrega. Si una crítica se atrasa 1 día, se alertará automáticamente. Si se adelanta, se resaltará en verde como ganancia. Las críticas tienen borde rojo grueso en el calendario.
       </div>
 
       <div class="border border-slate-200 rounded-lg max-h-[55vh] overflow-y-auto">
@@ -2482,7 +2482,7 @@ function wpRenderImportPreview() {
             <table class="w-full text-xs">
               <thead><tr class="text-[10px] uppercase text-slate-500 bg-slate-50">
                 <th class="p-1 w-8" title="Incluir en publicación">✓</th>
-                <th class="p-1 w-8" title="Ruta crítica">⚠️</th>
+                <th class="p-1 w-8" title="Ruta crítica">${osIcon('alert')}</th>
                 <th class="text-left p-1 w-16">Código</th>
                 <th class="text-left p-1">Actividad</th>
                 <th class="text-left p-1 w-32">Fecha inicio</th>
@@ -2498,7 +2498,7 @@ function wpRenderImportPreview() {
                       <input type="checkbox" ${it.is_critical?'checked':''} onchange="wpImportPreviewToggleCritical('${it.id}')" class="cursor-pointer accent-rose-600" title="Marcar como ruta crítica"/>
                     </td>
                     <td class="p-1 font-mono text-slate-600">${(it.code||'—').replace(/</g,'&lt;')}</td>
-                    <td class="p-1">${it.is_critical?'<span class="text-rose-700 font-bold">⚠️ </span>':''}${(it.activity_name||'?').replace(/</g,'&lt;')}</td>
+                    <td class="p-1">${it.is_critical?'<span class="text-rose-700 font-bold">' + osIcon('alert') + ' </span>':''}${(it.activity_name||'?').replace(/</g,'&lt;')}</td>
                     <td class="p-1">
                       <input type="date" value="${it.date||''}" onchange="wpImportPreviewSetDate('${it.id}', this.value)" class="border border-slate-300 rounded px-1 py-0.5 text-[11px]"/>
                     </td>
@@ -2523,7 +2523,7 @@ function wpRenderImportPreview() {
   const body = document.getElementById('modal-body');
   if (body) body.innerHTML = html;
   const title = document.getElementById('modal-title');
-  if (title) title.innerHTML = '👀 Revisá las actividades antes de publicar';
+  if (title) title.innerHTML = 'Revisá las actividades antes de publicar';
 }
 
 function wpImportPreviewToggle(id) {
@@ -2601,7 +2601,7 @@ async function wpApproveImport() {
   if (!p) return;
   const aprobadas = p.items.filter(x => x.include && x.date);
   if (!aprobadas.length) { alert('Ninguna actividad marcada con fecha válida.'); return; }
-  if (!confirm(`¿Publicar ${aprobadas.length} actividad(es) al proyecto "${p.propertyName}"?\n\nEsto las creará en el calendario semanal.${p.clear?'\n\n⚠️ Las actividades existentes del proyecto se BORRARÁN primero.':''}`)) return;
+  if (!confirm(`¿Publicar ${aprobadas.length} actividad(es) al proyecto "${p.propertyName}"?\n\nEsto las creará en el calendario semanal.${p.clear?'\n\nLas actividades existentes del proyecto se BORRARÁN primero.':''}`)) return;
 
   const importBatch = 'imp_' + Date.now();
 
@@ -2660,7 +2660,7 @@ async function wpApproveImport() {
   wpState.importPreview = null;
   await wpLoadAll();
   wpBackToPlanner();
-  alert(`✅ Importadas ${rows.length} actividad(es) (${aprobadas.length} bloque(s) aprobado(s)).`);
+  alert(`Importadas ${rows.length} actividad(es) (${aprobadas.length} bloque(s) aprobado(s)).`);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2676,7 +2676,7 @@ function wpRenderBacklogPanel() {
   const bl = wpState.backlog || [];
   return `
     <div class="p-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">
-      📥 Backlog · ${bl.length} sin fecha · arrastra a un día
+      ${osIcon('inbox')} Backlog · ${bl.length} sin fecha · arrastra a un día
     </div>
     ${bl.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin actividades en backlog. Las que no tengan fecha aparecen acá.</div>` : `
       <div class="p-2 space-y-1.5">
@@ -2701,7 +2701,7 @@ function wpRenderTaskTemplatesPanel() {
   tt.forEach(t => { const k = t.category || '(otros)'; if (!byCat[k]) byCat[k] = []; byCat[k].push(t); });
   return `
     <div class="p-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-600">
-      📚 Catálogo · ${tt.length} tareas · arrastra a un día
+      ${osIcon('book')} Catálogo · ${tt.length} tareas · arrastra a un día
     </div>
     ${tt.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin plantillas. Corré weekly-planner-advanced-schema.sql para semilla.</div>` : `
       <div class="p-2 space-y-2">
@@ -2712,7 +2712,7 @@ function wpRenderTaskTemplatesPanel() {
               ${items.map(t => `
                 <div draggable="true" ondragstart="wpTaskTemplateDragStart('${t.id}')"
                      class="bg-white border border-emerald-200 hover:border-emerald-500 rounded p-1.5 cursor-move text-[11px]">
-                  <span class="font-bold">${t.emoji||'🔨'} ${(t.name||'?').replace(/</g,'&lt;')}</span>
+                  <span class="font-bold">${t.emoji||osIcon('hammer')} ${(t.name||'?').replace(/</g,'&lt;')}</span>
                   <span class="text-[9px] text-slate-500 ml-1">${t.default_duration_days}d</span>
                 </div>
               `).join('')}
@@ -2729,8 +2729,8 @@ function wpRenderDayTemplatesPanel() {
   const dt = wpState.dayTemplates || [];
   return `
     <div class="p-2 bg-slate-50 border-b border-slate-200">
-      <div class="text-[10px] font-bold uppercase text-slate-600">🗂️ Plantillas de día · ${dt.length}</div>
-      <button onclick="wpSaveCurrentDayAsTemplate()" class="text-[10px] mt-1 w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-1 rounded">💾 Guardar día actual como plantilla</button>
+      <div class="text-[10px] font-bold uppercase text-slate-600">${osIcon('folder-open')} Plantillas de día · ${dt.length}</div>
+      <button onclick="wpSaveCurrentDayAsTemplate()" class="text-[10px] mt-1 w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-1 rounded">${osIcon('save')} Guardar día actual como plantilla</button>
     </div>
     ${dt.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin plantillas. Guardá un día con tareas como plantilla reusable.</div>` : `
       <div class="p-2 space-y-1.5">
@@ -2739,8 +2739,8 @@ function wpRenderDayTemplatesPanel() {
             <div class="font-bold text-[11px] text-slate-900 truncate">${(d.name||'?').replace(/</g,'&lt;')}</div>
             <div class="text-[9px] text-slate-500">${(d.tasks||[]).length} tareas</div>
             <div class="flex gap-1 mt-1">
-              <button onclick="wpApplyDayTemplate('${d.id}')" class="flex-1 text-[10px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-0.5 rounded">📋 Aplicar</button>
-              <button onclick="wpDeleteDayTemplate('${d.id}')" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 rounded" title="Eliminar">🗑️</button>
+              <button onclick="wpApplyDayTemplate('${d.id}')" class="flex-1 text-[10px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-0.5 rounded">${osIcon('clipboard')} Aplicar</button>
+              <button onclick="wpDeleteDayTemplate('${d.id}')" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 rounded" title="Eliminar">${osIcon('trash')}</button>
             </div>
           </div>
         `).join('')}
@@ -2754,7 +2754,7 @@ function wpRenderRecurringPanel() {
   const rc = wpState.recurring || [];
   return `
     <div class="p-2 bg-slate-50 border-b border-slate-200">
-      <div class="text-[10px] font-bold uppercase text-slate-600">🔁 Recurrentes · ${rc.length}</div>
+      <div class="text-[10px] font-bold uppercase text-slate-600">${osIcon('refresh')} Recurrentes · ${rc.length}</div>
       <button onclick="wpOpenNewRecurring()" class="text-[10px] mt-1 w-full bg-violet-100 hover:bg-violet-200 text-violet-800 font-bold py-1 rounded">+ Nueva recurrente</button>
     </div>
     ${rc.length === 0 ? `<div class="p-3 text-[11px] text-slate-400 italic text-center">Sin recurrentes. Ej: "Limpieza diaria cada 1d", "Inspección semanal".</div>` : `
@@ -2842,7 +2842,7 @@ function wpSaveCurrentDayAsTemplate() {
     else alert(`Sin actividades en ${targetDate}. Agregá actividades primero.`);
     return;
   }
-  openModal('💾 Guardar día como plantilla', `
+  openModal('Guardar día como plantilla', `
     <div class="space-y-3">
       <div class="text-xs text-slate-600">Se guardarán las <strong>${acts.length}</strong> actividad(es) del ${targetDate} como plantilla reusable.</div>
       <div>
@@ -2854,7 +2854,7 @@ function wpSaveCurrentDayAsTemplate() {
         <textarea id="wp-dt-desc" rows="2" placeholder="Cuándo usar esta plantilla..." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
       </div>
       <div class="flex gap-2">
-        <button onclick="wpConfirmSaveDayTemplate('${targetDate}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar plantilla</button>
+        <button onclick="wpConfirmSaveDayTemplate('${targetDate}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('save')} Guardar plantilla</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
@@ -2892,7 +2892,7 @@ function wpApplyDayTemplate(templateId) {
     (window.toast?toast:alert)('Sin proyectos. Creá uno primero.', 'warning');
     return;
   }
-  openModal(`📋 Aplicar "${(window.esc?esc(t.name):t.name)}"`, `
+  openModal(`Aplicar "${(window.esc?esc(t.name):t.name)}"`, `
     <div class="space-y-3">
       <div class="text-xs text-slate-600">Se crearán <strong>${(t.tasks||[]).length}</strong> actividad(es) en la casa y fecha que elijas.</div>
       <div>
@@ -2907,7 +2907,7 @@ function wpApplyDayTemplate(templateId) {
         <input id="wp-at-date" type="date" value="${wpDateOnly(wpState.weekStart)}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
       </div>
       <div class="flex gap-2">
-        <button onclick="wpConfirmApplyDayTemplate('${templateId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">📋 Aplicar plantilla</button>
+        <button onclick="wpConfirmApplyDayTemplate('${templateId}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('clipboard')} Aplicar plantilla</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
@@ -2974,7 +2974,7 @@ function wpOpenNewRecurring() {
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tarea base *</label>
         <select id="wp-rec-tt" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
           <option value="">— Elegí una plantilla —</option>
-          ${tt.map(t => `<option value="${t.id}">${t.emoji||'🔨'} ${t.name} (${t.default_duration_days}d)</option>`).join('')}
+          ${tt.map(t => `<option value="${t.id}">${t.emoji||osIcon('hammer')} ${t.name} (${t.default_duration_days}d)</option>`).join('')}
         </select>
       </div>
       <div>
@@ -2999,12 +2999,12 @@ function wpOpenNewRecurring() {
         <input id="wp-rec-name" type="text" placeholder="Ej. Limpieza diaria Wellington" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
       </div>
       <div class="flex gap-2">
-        <button onclick="wpSaveRecurring()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 rounded">💾 Crear recurrente</button>
+        <button onclick="wpSaveRecurring()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 rounded">${osIcon('save')} Crear recurrente</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded">Cancelar</button>
       </div>
     </div>
   `;
-  openModal('🔁 Nueva tarea recurrente', html);
+  openModal('Nueva tarea recurrente', html);
 }
 
 async function wpSaveRecurring() {
@@ -3087,7 +3087,7 @@ function wpOpenChecklist(activityId) {
   const a = (wpState.activities||[]).find(x => x.id === activityId);
   if (!a) return;
   wpState.showChecklistFor = activityId;
-  openModal(`✅ ${a.activity_name}`, `<div id="wp-checklist-body">${wpRenderChecklistBody(a)}</div>`);
+  openModal(`${a.activity_name}`, `<div id="wp-checklist-body">${wpRenderChecklistBody(a)}</div>`);
 }
 
 // Re-renderiza SOLO el body del modal de checklist sin reabrir todo.
@@ -3121,7 +3121,7 @@ function wpRenderChecklistBody(a) {
   return `
     <div class="space-y-4">
       <div>
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">✅ Checklist de pasos</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('check-circle')} Checklist de pasos</div>
         <ul class="space-y-1 mb-2">
           ${checklist.map((item, idx) => `
             <li class="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5">
@@ -3138,7 +3138,7 @@ function wpRenderChecklistBody(a) {
       </div>
 
       <div>
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📦 Materiales</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('package')} Materiales</div>
         <ul class="space-y-1 mb-2">
           ${materials.map((m, idx) => `
             <li class="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs">
@@ -3153,7 +3153,7 @@ function wpRenderChecklistBody(a) {
       </div>
 
       <div>
-        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">📝 Notas</label>
+        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">${osIcon('pencil-line')} Notas</label>
         <textarea data-wp-id="notes" rows="2" onchange="wpUpdateNotes('${activityId}', this.value)" class="w-full border border-slate-300 rounded px-2 py-1 text-xs">${e(a.notes)}</textarea>
       </div>
 
@@ -3245,12 +3245,12 @@ function wpOpenPrintPicker() {
     if (!a.project_id && a.property_name) extraNames.add(a.property_name);
   });
   const houseOpts = [
-    `<option value="all">🏘️ Todas las casas</option>`,
-    ...activeProjects.map(p => `<option value="${p.id}">🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
-    ...Array.from(extraNames).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}">🏠 ${n.replace(/</g,'&lt;')}</option>`)
+    `<option value="all">${osIcon('building')} Todas las casas</option>`,
+    ...activeProjects.map(p => `<option value="${p.id}">${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extraNames).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}">${n.replace(/</g,'&lt;')}</option>`)
   ].join('');
 
-  openModal('🖨️ Imprimir entregable', `
+  openModal('Imprimir entregable', `
     <div class="space-y-3">
       <div class="text-xs text-slate-600">Generá un PDF para imprimir o enviar al equipo. Elegí el alcance.</div>
 
@@ -3259,11 +3259,11 @@ function wpOpenPrintPicker() {
         <div class="grid grid-cols-2 gap-2">
           <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center gap-2">
             <input type="radio" name="wp-print-scope" value="day" checked onchange="document.getElementById('wp-print-range').classList.add('hidden'); document.getElementById('wp-print-day').classList.remove('hidden')"/>
-            <div><div class="font-bold text-sm">📅 Un día</div><div class="text-[10px] text-slate-500">Entregable diario para el crew</div></div>
+            <div><div class="font-bold text-sm">${osIcon('calendar')} Un día</div><div class="text-[10px] text-slate-500">Entregable diario para el crew</div></div>
           </label>
           <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center gap-2">
             <input type="radio" name="wp-print-scope" value="range" onchange="document.getElementById('wp-print-day').classList.add('hidden'); document.getElementById('wp-print-range').classList.remove('hidden')"/>
-            <div><div class="font-bold text-sm">📆 Rango / Semana</div><div class="text-[10px] text-slate-500">Plan completo de la casa</div></div>
+            <div><div class="font-bold text-sm">${osIcon('calendar')} Rango / Semana</div><div class="text-[10px] text-slate-500">Plan completo de la casa</div></div>
           </label>
         </div>
       </div>
@@ -3295,18 +3295,18 @@ function wpOpenPrintPicker() {
         <div class="grid grid-cols-2 gap-2">
           <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-start gap-2">
             <input type="radio" name="wp-print-format" value="worker" checked class="mt-0.5"/>
-            <div><div class="font-bold text-sm">👷 Para obreros</div><div class="text-[10px] text-slate-500">Tipografía grande, checkboxes enormes, sin tecnicismos</div></div>
+            <div><div class="font-bold text-sm">${osIcon('hard-hat')} Para obreros</div><div class="text-[10px] text-slate-500">Tipografía grande, checkboxes enormes, sin tecnicismos</div></div>
           </label>
           <label class="border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-start gap-2">
             <input type="radio" name="wp-print-format" value="tech" class="mt-0.5"/>
-            <div><div class="font-bold text-sm">📋 Ejecutivo</div><div class="text-[10px] text-slate-500">Compacto, con detalle técnico</div></div>
+            <div><div class="font-bold text-sm">${osIcon('clipboard')} Ejecutivo</div><div class="text-[10px] text-slate-500">Compacto, con detalle técnico</div></div>
           </label>
         </div>
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
-        <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">🖨️ Generar PDF</button>
-        <button onclick="wpDoWAFromPicker()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg">💬 Enviar WhatsApp</button>
+        <button onclick="wpDoPrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('printer')} Generar PDF</button>
+        <button onclick="wpDoWAFromPicker()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('message')} Enviar WhatsApp</button>
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
@@ -3371,8 +3371,8 @@ function wpRenderPrePrintEditor(days, byDay) {
   const html = `
     <div class="space-y-3">
       <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
-        <strong>📝 Revisá y editá antes de imprimir.</strong> Agregá o quitá herramientas y materiales en cada tarea.
-        Los cambios se guardan automáticamente — cuando termines, clic en <strong>🖨️ Generar impresión</strong>.
+        <strong>${osIcon('pencil-line')} Revisá y editá antes de imprimir.</strong> Agregá o quitá herramientas y materiales en cada tarea.
+        Los cambios se guardan automáticamente — cuando termines, clic en <strong>${osIcon('printer')} Generar impresión</strong>.
       </div>
 
       <div class="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
@@ -3380,7 +3380,7 @@ function wpRenderPrePrintEditor(days, byDay) {
           const dLbl = new Date(d+'T00:00:00').toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
           return `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-slate-900 text-white px-3 py-2 text-sm font-bold capitalize">📅 ${dLbl}</div>
+            <div class="bg-slate-900 text-white px-3 py-2 text-sm font-bold capitalize">${osIcon('calendar')} ${dLbl}</div>
             <div class="divide-y divide-slate-100">
               ${byDay[d].map(a => `
                 <div class="p-3" data-act-id="${a.id}">
@@ -3389,13 +3389,13 @@ function wpRenderPrePrintEditor(days, byDay) {
                       <div class="font-bold text-sm">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
                       <div class="text-[10px] text-slate-500">${a.property_name||''} ${a.stage?'· '+a.stage:''}</div>
                     </div>
-                    <button onclick="wpEditActivity('${a.id}')" class="text-[10px] text-slate-500 hover:text-slate-900">✏️ Editar tarea completa</button>
+                    <button onclick="wpEditActivity('${a.id}')" class="text-[10px] text-slate-500 hover:text-slate-900">${osIcon('pencil')} Editar tarea completa</button>
                   </div>
 
                   <!-- Materiales -->
                   <div class="bg-amber-50 border border-amber-200 rounded p-2 mb-1.5">
                     <div class="flex items-center justify-between mb-1">
-                      <div class="text-[10px] font-bold uppercase text-amber-800">📦 Materiales (${(a.materials||[]).length})</div>
+                      <div class="text-[10px] font-bold uppercase text-amber-800">${osIcon('package')} Materiales (${(a.materials||[]).length})</div>
                       <button onclick="wpPrePrintAddMaterial('${a.id}')" class="text-[10px] bg-white border border-amber-300 hover:bg-amber-100 px-1.5 py-0.5 rounded font-bold">+ Agregar</button>
                     </div>
                     ${(a.materials||[]).length === 0 ? '<div class="text-[10px] text-slate-400 italic">Sin materiales</div>' :
@@ -3413,7 +3413,7 @@ function wpRenderPrePrintEditor(days, byDay) {
                   <!-- Herramientas (recursos tipo tool/vehicle/other) -->
                   <div class="bg-blue-50 border border-blue-200 rounded p-2">
                     <div class="flex items-center justify-between mb-1">
-                      <div class="text-[10px] font-bold uppercase text-blue-800">🔧 Herramientas / Equipos</div>
+                      <div class="text-[10px] font-bold uppercase text-blue-800">${osIcon('wrench')} Herramientas / Equipos</div>
                       <select onchange="if(this.value){wpPrePrintAddTool('${a.id}', this.value); this.value='';}" class="text-[10px] border border-blue-300 rounded px-1 py-0.5">
                         <option value="">+ Agregar herramienta...</option>
                         ${wpState.resources.filter(r => ['tool','vehicle','other'].includes(r.type) && !(a.resource_ids||[]).includes(r.id)).map(r => `<option value="${r.id}">${r.emoji} ${r.name}</option>`).join('')}
@@ -3435,11 +3435,11 @@ function wpRenderPrePrintEditor(days, byDay) {
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="wpFinishPrePrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">🖨️ Generar impresión</button>
+        <button onclick="wpFinishPrePrint()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">${osIcon('printer')} Generar impresión</button>
       </div>
     </div>
   `;
-  openModal('📝 Revisar herramientas y materiales antes de imprimir', html);
+  openModal('Revisar herramientas y materiales antes de imprimir', html);
 }
 
 function wpFinishPrePrint() {
@@ -3486,7 +3486,7 @@ async function wpPrePrintAddMaterial(actId) {
     wpOpenPrePrintEditor(wpPrePrint.ctx);
     return;
   }
-  openModal('📦 Agregar material', `
+  openModal('Agregar material', `
     <div class="space-y-3 max-h-[60vh] overflow-y-auto">
       <div class="text-xs text-slate-600">Elegí del catálogo (materiales más usados) o creá uno nuevo.</div>
       <div class="grid grid-cols-2 gap-1.5">
@@ -3587,7 +3587,7 @@ function wpOpenPrintViewWorker(dateStr, homeFilter) {
     </style>
     </head><body class="p-6 bg-white">
       <div class="no-print mb-4 flex gap-2 sticky top-0 bg-white z-10 py-2">
-        <button onclick="window.print()" class="bg-blue-600 text-white font-bold text-lg px-6 py-3 rounded-lg">🖨️ Imprimir</button>
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold text-lg px-6 py-3 rounded-lg">${osIcon('printer')} Imprimir</button>
         <button onclick="window.close()" class="bg-slate-100 text-lg px-6 py-3 rounded-lg">✕ Cerrar</button>
       </div>
 
@@ -3600,7 +3600,7 @@ function wpOpenPrintViewWorker(dateStr, homeFilter) {
 
       ${Object.entries(byHome).map(([key, h]) => `
         <div class="mb-8">
-          <div class="bg-slate-900 text-white text-3xl font-bold px-5 py-3 rounded-t-2xl">🏠 ${h.name.replace(/</g,'&lt;')}</div>
+          <div class="bg-slate-900 text-white text-3xl font-bold px-5 py-3 rounded-t-2xl">${osIcon('house')} ${h.name.replace(/</g,'&lt;')}</div>
           <div class="space-y-3 mt-3">
             ${h.acts.map((a, idx) => {
               const isDone = a.status === 'done';
@@ -3627,17 +3627,17 @@ function wpOpenPrintViewWorker(dateStr, homeFilter) {
                     <!-- Número de tarea -->
                     <div class="flex items-center gap-3 flex-wrap mb-1">
                       <div class="bg-slate-900 text-white text-xl font-bold px-3 py-1 rounded-full">${idx+1}</div>
-                      ${isCritical && !isDone ? '<div class="bg-rose-700 text-white text-lg font-bold px-3 py-1 rounded">⚠️ IMPORTANTE</div>' : ''}
-                      ${isPostponed ? '<div class="bg-amber-500 text-white text-lg font-bold px-3 py-1 rounded">🟡 APLAZADA</div>' : ''}
+                      ${isCritical && !isDone ? '<div class="bg-rose-700 text-white text-lg font-bold px-3 py-1 rounded">' + osIcon('alert') + ' IMPORTANTE</div>' : ''}
+                      ${isPostponed ? '<div class="bg-amber-500 text-white text-lg font-bold px-3 py-1 rounded">' + kitStatusDot('warn') + ' APLAZADA</div>' : ''}
                     </div>
                     <!-- Título XL -->
                     <div class="text-3xl font-bold ${isDone?'line-through text-slate-500':'text-slate-900'} leading-tight">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
-                    ${a.stage ? `<div class="text-xl text-slate-600 mt-1">📂 ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
-                    ${a.start_hour || a.end_hour ? `<div class="text-xl text-slate-700 mt-1">⏰ ${a.start_hour||7}:00 a ${a.end_hour||17}:00</div>` : ''}
+                    ${a.stage ? `<div class="text-xl text-slate-600 mt-1">${osIcon('folder-open')} ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
+                    ${a.start_hour || a.end_hour ? `<div class="text-xl text-slate-700 mt-1">${osIcon('clock')} ${a.start_hour||7}:00 a ${a.end_hour||17}:00</div>` : ''}
 
                     ${(a.materials||[]).length > 0 ? `
                       <div class="mt-3 bg-amber-100 border-2 border-amber-400 rounded-xl p-3">
-                        <div class="text-lg font-bold text-amber-900">📦 MATERIALES QUE NECESITAS</div>
+                        <div class="text-lg font-bold text-amber-900">${osIcon('package')} MATERIALES QUE NECESITAS</div>
                         <ul class="mt-1 text-xl space-y-0.5">
                           ${a.materials.map(m => `<li>• <strong>${(m.nombre||'').replace(/</g,'&lt;')}</strong>: ${m.cantidad||1} ${(m.unidad||'unidades').replace(/</g,'&lt;')}</li>`).join('')}
                         </ul>
@@ -3645,7 +3645,7 @@ function wpOpenPrintViewWorker(dateStr, homeFilter) {
 
                     ${(a.checklist||[]).length > 0 ? `
                       <div class="mt-3">
-                        <div class="text-lg font-bold text-slate-700">✅ PASOS A SEGUIR</div>
+                        <div class="text-lg font-bold text-slate-700">${osIcon('check-circle')} PASOS A SEGUIR</div>
                         <ul class="text-xl space-y-1.5 mt-1">
                           ${a.checklist.map(it => `
                             <li class="flex items-start gap-2 ${it.done?'line-through text-slate-400':''}">
@@ -3657,7 +3657,7 @@ function wpOpenPrintViewWorker(dateStr, homeFilter) {
 
                     ${a.notes ? `
                       <div class="mt-3 bg-yellow-100 border-l-8 border-yellow-500 p-3 rounded-r-xl">
-                        <div class="text-lg font-bold text-yellow-900">📝 INSTRUCCIONES IMPORTANTES</div>
+                        <div class="text-lg font-bold text-yellow-900">${osIcon('pencil-line')} INSTRUCCIONES IMPORTANTES</div>
                         <div class="text-xl text-slate-900 mt-1 whitespace-pre-wrap">${a.notes.replace(/</g,'&lt;')}</div>
                       </div>` : ''}
                   </div>
@@ -3711,7 +3711,7 @@ function wpOpenPrintRangeWorker(fromStr, toStr, homeFilter) {
     </style>
     </head><body class="p-6 bg-white">
       <div class="no-print mb-4 flex gap-2 sticky top-0 bg-white z-10 py-2">
-        <button onclick="window.print()" class="bg-blue-600 text-white font-bold text-lg px-6 py-3 rounded-lg">🖨️ Imprimir</button>
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold text-lg px-6 py-3 rounded-lg">${osIcon('printer')} Imprimir</button>
         <button onclick="window.close()" class="bg-slate-100 text-lg px-6 py-3 rounded-lg">✕ Cerrar</button>
       </div>
 
@@ -3740,7 +3740,7 @@ function wpOpenPrintRangeWorker(fromStr, toStr, homeFilter) {
           </div>
           ${Object.entries(byHome).map(([home, hActs]) => `
             <div class="mt-3">
-              <div class="text-2xl font-bold border-b-2 border-slate-300 pb-1 mb-2">🏠 ${(home||'').replace(/</g,'&lt;')}</div>
+              <div class="text-2xl font-bold border-b-2 border-slate-300 pb-1 mb-2">${osIcon('house')} ${(home||'').replace(/</g,'&lt;')}</div>
               <div class="space-y-2">
                 ${hActs.map((a, i) => {
                   const isDone = a.status === 'done';
@@ -3751,10 +3751,10 @@ function wpOpenPrintRangeWorker(fromStr, toStr, homeFilter) {
                     <div class="flex-shrink-0 w-10 h-10 border-4 border-slate-900 rounded ${isDone?'bg-slate-900 text-white':''} text-2xl text-center leading-8">${isDone?'✓':''}</div>
                     <div class="flex-1">
                       <div class="text-xl font-bold ${isDone?'line-through text-slate-500':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
-                      ${isCritical && !isDone ? '<span class="bg-rose-700 text-white text-sm font-bold px-2 py-0.5 rounded">⚠️ IMPORTANTE</span>' : ''}
-                      ${isPostponed ? '<span class="bg-amber-500 text-white text-sm font-bold px-2 py-0.5 rounded">🟡 APLAZADA</span>' : ''}
-                      ${a.stage ? `<div class="text-base text-slate-600">📂 ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
-                      ${(a.materials||[]).length > 0 ? `<div class="text-sm text-slate-700 mt-1">📦 ${a.materials.map(m=>`${m.nombre} (${m.cantidad} ${m.unidad||'ud'})`).join(', ').replace(/</g,'&lt;')}</div>` : ''}
+                      ${isCritical && !isDone ? '<span class="bg-rose-700 text-white text-sm font-bold px-2 py-0.5 rounded">' + osIcon('alert') + ' IMPORTANTE</span>' : ''}
+                      ${isPostponed ? '<span class="bg-amber-500 text-white text-sm font-bold px-2 py-0.5 rounded">' + kitStatusDot('warn') + ' APLAZADA</span>' : ''}
+                      ${a.stage ? `<div class="text-base text-slate-600">${osIcon('folder-open')} ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
+                      ${(a.materials||[]).length > 0 ? `<div class="text-sm text-slate-700 mt-1">${osIcon('package')} ${a.materials.map(m=>`${m.nombre} (${m.cantidad} ${m.unidad||'ud'})`).join(', ').replace(/</g,'&lt;')}</div>` : ''}
                       ${a.notes ? `<div class="text-sm mt-1 bg-yellow-100 border-l-4 border-yellow-500 p-2 rounded-r whitespace-pre-wrap">${a.notes.replace(/</g,'&lt;')}</div>` : ''}
                     </div>
                   </div>`;
@@ -3803,7 +3803,7 @@ function wpOpenPrintView(dateStr, homeFilter) {
     <style>@media print { .no-print{display:none!important;} body{font-size:11pt;margin:1cm;} }</style>
     </head><body class="p-6 bg-white">
       <div class="no-print mb-4 flex gap-2">
-        <button onclick="window.print()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded">🖨️ Imprimir</button>
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded">${osIcon('printer')} Imprimir</button>
         <button onclick="window.close()" class="bg-slate-100 px-4 py-2 rounded">Cerrar</button>
       </div>
       <div class="border-b-2 border-slate-900 pb-3 mb-4">
@@ -3812,7 +3812,7 @@ function wpOpenPrintView(dateStr, homeFilter) {
       </div>
       ${Object.entries(byHome).map(([key, h]) => `
         <div class="mb-6 break-inside-avoid">
-          <h2 class="text-lg font-bold border-b border-slate-300 mb-2">🏠 ${h.name.replace(/</g,'&lt;')}</h2>
+          <h2 class="text-lg font-bold border-b border-slate-300 mb-2">${osIcon('house')} ${h.name.replace(/</g,'&lt;')}</h2>
           ${h.acts.map(a => `
             <div class="mb-3 pl-4 border-l-2 ${a.status==='done'?'border-emerald-500':'border-blue-400'}">
               <div class="flex items-center gap-2">
@@ -3822,7 +3822,7 @@ function wpOpenPrintView(dateStr, homeFilter) {
               </div>
               ${(a.checklist||[]).length > 0 ? `
                 <ul class="mt-1 text-sm">
-                  ${a.checklist.map(it => `<li class="${it.done?'line-through text-slate-400':''}">${it.done?'☑':'☐'} ${(it.item||'').replace(/</g,'&lt;')}</li>`).join('')}
+                  ${a.checklist.map(it => `<li class="${it.done?'line-through text-slate-400':''}">${it.done?osIcon('check-circle'):'☐'} ${(it.item||'').replace(/</g,'&lt;')}</li>`).join('')}
                 </ul>
               ` : ''}
               ${(a.materials||[]).length > 0 ? `
@@ -3830,8 +3830,8 @@ function wpOpenPrintView(dateStr, homeFilter) {
                   <strong>Materiales:</strong> ${a.materials.map(m => `${m.nombre} (${m.cantidad} ${m.unidad||''})`).join(', ').replace(/</g,'&lt;')}
                 </div>
               ` : ''}
-              ${a.notes ? `<div class="mt-1 text-xs italic text-slate-600">📝 ${a.notes.replace(/</g,'&lt;')}</div>` : ''}
-              ${a.assignee ? `<div class="mt-1 text-xs">👤 ${a.assignee.replace(/</g,'&lt;')}</div>` : ''}
+              ${a.notes ? `<div class="mt-1 text-xs italic text-slate-600">${osIcon('pencil-line')} ${a.notes.replace(/</g,'&lt;')}</div>` : ''}
+              ${a.assignee ? `<div class="mt-1 text-xs">${osIcon('user')} ${a.assignee.replace(/</g,'&lt;')}</div>` : ''}
             </div>
           `).join('')}
         </div>
@@ -3871,11 +3871,11 @@ function wpOpenPrintRange(fromStr, toStr, homeFilter) {
     <style>@media print { .no-print{display:none!important;} body{font-size:10pt;margin:1cm;} .break-page{page-break-after:always;} }</style>
     </head><body class="p-6 bg-white">
       <div class="no-print mb-4 flex gap-2">
-        <button onclick="window.print()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded">🖨️ Imprimir</button>
+        <button onclick="window.print()" class="bg-blue-600 text-white font-bold px-4 py-2 rounded">${osIcon('printer')} Imprimir</button>
         <button onclick="window.close()" class="bg-slate-100 px-4 py-2 rounded">Cerrar</button>
       </div>
       <div class="border-b-2 border-slate-900 pb-3 mb-4">
-        <h1 class="text-2xl font-bold">📅 Plan de obra · ${fromStr} → ${toStr}</h1>
+        <h1 class="text-2xl font-bold">${osIcon('calendar')} Plan de obra · ${fromStr} → ${toStr}</h1>
         <div class="text-sm text-slate-600">${Object.keys(byHome).length} casa(s) · ${acts.length} actividad(es) · ${totalDone} ejecutadas (${totalPct}%)</div>
       </div>
       ${Object.entries(byHome).map(([key, h], idx) => {
@@ -3886,7 +3886,7 @@ function wpOpenPrintRange(fromStr, toStr, homeFilter) {
         return `
           <div class="${idx>0?'break-page':''} mb-6">
             <div class="bg-slate-900 text-white px-3 py-2 rounded-t-lg">
-              <h2 class="text-xl font-bold">🏠 ${h.name.replace(/</g,'&lt;')}</h2>
+              <h2 class="text-xl font-bold">${osIcon('house')} ${h.name.replace(/</g,'&lt;')}</h2>
               ${h.address ? `<div class="text-xs opacity-80">${h.address.replace(/</g,'&lt;')}</div>` : ''}
               <div class="text-xs opacity-90 mt-1">${homeActs.length} actividades · ${homeDone} ejecutadas (${homePct}%)</div>
             </div>
@@ -3900,14 +3900,14 @@ function wpOpenPrintRange(fromStr, toStr, homeFilter) {
                     ${dActs.map(a => `
                       <div class="mb-2 ${a.status==='done'?'opacity-60':''}">
                         <div class="flex items-center gap-2">
-                          <span class="text-base">${a.status==='done'?'☑':'☐'}</span>
+                          <span class="text-base">${a.status==='done'?osIcon('check-circle'):'☐'}</span>
                           <div class="font-semibold ${a.status==='done'?'line-through':''}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
                           ${a.stage ? `<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${a.stage.replace(/</g,'&lt;')}</span>` : ''}
                           ${a.activity_code ? `<span class="text-[10px] text-slate-500 font-mono">${a.activity_code}</span>` : ''}
                         </div>
-                        ${(a.checklist||[]).length > 0 ? `<ul class="text-xs ml-6 mt-0.5">${a.checklist.map(it => `<li class="${it.done?'line-through text-slate-400':''}">${it.done?'☑':'☐'} ${(it.item||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>` : ''}
-                        ${(a.materials||[]).length > 0 ? `<div class="text-[10px] ml-6 text-slate-600">📦 ${a.materials.map(m => `${m.nombre} (${m.cantidad} ${m.unidad||''})`).join(', ').replace(/</g,'&lt;')}</div>` : ''}
-                        ${a.notes ? `<div class="text-[10px] ml-6 italic text-slate-600">📝 ${a.notes.replace(/</g,'&lt;')}</div>` : ''}
+                        ${(a.checklist||[]).length > 0 ? `<ul class="text-xs ml-6 mt-0.5">${a.checklist.map(it => `<li class="${it.done?'line-through text-slate-400':''}">${it.done?osIcon('check-circle'):'☐'} ${(it.item||'').replace(/</g,'&lt;')}</li>`).join('')}</ul>` : ''}
+                        ${(a.materials||[]).length > 0 ? `<div class="text-[10px] ml-6 text-slate-600">${osIcon('package')} ${a.materials.map(m => `${m.nombre} (${m.cantidad} ${m.unidad||''})`).join(', ').replace(/</g,'&lt;')}</div>` : ''}
+                        ${a.notes ? `<div class="text-[10px] ml-6 italic text-slate-600">${osIcon('pencil-line')} ${a.notes.replace(/</g,'&lt;')}</div>` : ''}
                       </div>
                     `).join('')}
                   </div>
@@ -3984,7 +3984,7 @@ async function wpImpCreateNewCasa() {
     // Re-agregar la opción de crear
     const optNew = document.createElement('option');
     optNew.value = '__new__';
-    optNew.textContent = '➕ Crear casa nueva...';
+    optNew.textContent = 'Crear casa nueva...';
     optNew.className = 'font-bold text-emerald-700';
     sel.appendChild(optNew);
     sel.value = data.id;
@@ -4164,13 +4164,13 @@ function wpCalcAnalytics(fromIso, toIso, houseFilter) {
       // Categorizar por palabras clave
       let cat = motivo.trim().slice(0, 50);
       const lc = key.toLowerCase();
-      if (/material|cemento|drywall|pintura|insumo/.test(lc)) cat = '📦 Falta de material';
-      else if (/lluvia|clima|tiempo/.test(lc)) cat = '🌧️ Clima';
-      else if (/mano|obrero|equipo|crew|cuadrill|personal/.test(lc)) cat = '👷 Falta de personal';
-      else if (/prioridad|cambio|orden/.test(lc)) cat = '🔄 Cambio de prioridad';
-      else if (/dinero|pago|presup/.test(lc)) cat = '💰 Falta de presupuesto';
-      else if (/permiso|inspecci|aprob/.test(lc)) cat = '📋 Permisos / aprobación';
-      else if (/cliente|propietari/.test(lc)) cat = '🤝 Espera del cliente';
+      if (/material|cemento|drywall|pintura|insumo/.test(lc)) cat = 'Falta de material';
+      else if (/lluvia|clima|tiempo/.test(lc)) cat = 'Clima';
+      else if (/mano|obrero|equipo|crew|cuadrill|personal/.test(lc)) cat = 'Falta de personal';
+      else if (/prioridad|cambio|orden/.test(lc)) cat = 'Cambio de prioridad';
+      else if (/dinero|pago|presup/.test(lc)) cat = 'Falta de presupuesto';
+      else if (/permiso|inspecci|aprob/.test(lc)) cat = 'Permisos / aprobación';
+      else if (/cliente|propietari/.test(lc)) cat = 'Espera del cliente';
       motivosMap[cat] = (motivosMap[cat] || 0) + 1;
     });
   });
@@ -4198,9 +4198,9 @@ function wpRenderAnalytics() {
   const extra = new Set();
   wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
   const houseOpts = [
-    `<option value="all" ${wpAnState.house==='all'?'selected':''}>🏘️ Todas las casas</option>`,
-    ...activeProj.map(p => `<option value="${p.id}" ${wpAnState.house===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
-    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${wpAnState.house==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+    `<option value="all" ${wpAnState.house==='all'?'selected':''}>${osIcon('building')} Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${wpAnState.house===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${wpAnState.house==='name:'+n?'selected':''}>${n.replace(/</g,'&lt;')}</option>`)
   ].join('');
 
   // Color del KPI principal según cumplimiento
@@ -4211,31 +4211,31 @@ function wpRenderAnalytics() {
 
   // Insights automáticos en lenguaje natural
   const insights = [];
-  if (m.total === 0) insights.push({ icon: 'ℹ️', text: 'No hay actividades planeadas en este rango. Probá un período más amplio o cambiá la casa.' });
+  if (m.total === 0) insights.push({ icon: '', text: 'No hay actividades planeadas en este rango. Probá un período más amplio o cambiá la casa.' });
   else {
-    if (m.pctCumplimiento >= 80) insights.push({ icon: '✅', text: `Excelente cumplimiento: ${m.pctCumplimiento}% de las tareas se completaron.`, color:'emerald' });
-    else if (m.pctCumplimiento >= 60) insights.push({ icon: '🟡', text: `Cumplimiento medio (${m.pctCumplimiento}%). Hay margen para optimizar.`, color:'amber' });
-    else insights.push({ icon: '🔴', text: `Cumplimiento bajo (${m.pctCumplimiento}%). Revisá causas de los atrasos.`, color:'red' });
+    if (m.pctCumplimiento >= 80) insights.push({ icon: osIcon('check-circle'), text: `Excelente cumplimiento: ${m.pctCumplimiento}% de las tareas se completaron.`, color:'emerald' });
+    else if (m.pctCumplimiento >= 60) insights.push({ icon: kitStatusDot('warn'), text: `Cumplimiento medio (${m.pctCumplimiento}%). Hay margen para optimizar.`, color:'amber' });
+    else insights.push({ icon: kitStatusDot('bad'), text: `Cumplimiento bajo (${m.pctCumplimiento}%). Revisá causas de los atrasos.`, color:'red' });
 
-    if (m.overdueCount > 0) insights.push({ icon:'⏰', text:`${m.overdueCount} tarea${m.overdueCount>1?'s':''} atrasada${m.overdueCount>1?'s':''} sin completar. Considerá reagendar o reasignar recursos.`, color:'red' });
-    if (m.movidasCount > 0) insights.push({ icon:'🔄', text:`${m.movidasCount} tarea${m.movidasCount>1?'s fueron':' fue'} reagendada${m.movidasCount>1?'s':''} durante el período. Patrón a investigar si es alto.`, color:'amber' });
-    if (m.velocityDay > 0) insights.push({ icon:'⚡', text:`Velocidad promedio: ${m.velocityDay} tarea${m.velocityDay!==1?'s':''} ejecutada${m.velocityDay!==1?'s':''} por día.` });
-    if (m.avgCompletionDays != null) insights.push({ icon:'⏳', text:`Tiempo promedio entre crear y completar una tarea: ${m.avgCompletionDays} día${m.avgCompletionDays!==1?'s':''}.` });
+    if (m.overdueCount > 0) insights.push({ icon:osIcon('clock'), text:`${m.overdueCount} tarea${m.overdueCount>1?'s':''} atrasada${m.overdueCount>1?'s':''} sin completar. Considerá reagendar o reasignar recursos.`, color:'red' });
+    if (m.movidasCount > 0) insights.push({ icon:osIcon('refresh'), text:`${m.movidasCount} tarea${m.movidasCount>1?'s fueron':' fue'} reagendada${m.movidasCount>1?'s':''} durante el período. Patrón a investigar si es alto.`, color:'amber' });
+    if (m.velocityDay > 0) insights.push({ icon:osIcon('zap'), text:`Velocidad promedio: ${m.velocityDay} tarea${m.velocityDay!==1?'s':''} ejecutada${m.velocityDay!==1?'s':''} por día.` });
+    if (m.avgCompletionDays != null) insights.push({ icon:osIcon('loader'), text:`Tiempo promedio entre crear y completar una tarea: ${m.avgCompletionDays} día${m.avgCompletionDays!==1?'s':''}.` });
 
     // Casa con peor cumplimiento
     const peorCasa = m.houseList.slice().sort((a,b)=>a.pct-b.pct)[0];
     if (peorCasa && m.houseList.length > 1 && peorCasa.pct < 60) {
-      insights.push({ icon:'🏠', text:`Casa que más atrás va: "${peorCasa.name}" (${peorCasa.pct}% completadas, ${peorCasa.overdue} atrasadas).`, color:'red' });
+      insights.push({ icon:osIcon('house'), text:`Casa que más atrás va: "${peorCasa.name}" (${peorCasa.pct}% completadas, ${peorCasa.overdue} atrasadas).`, color:'red' });
     }
     // Etapa más lenta
     const peorStage = m.stageList[0];
     if (peorStage && peorStage.total >= 3 && peorStage.pct < 50) {
-      insights.push({ icon:'🔧', text:`Etapa más lenta: "${peorStage.name}" con ${peorStage.pct}% de cumplimiento. Cuello de botella probable.`, color:'amber' });
+      insights.push({ icon:osIcon('wrench'), text:`Etapa más lenta: "${peorStage.name}" con ${peorStage.pct}% de cumplimiento. Cuello de botella probable.`, color:'amber' });
     }
     // Mejor día de la semana
     const mejorDow = m.dowSorted.slice().filter(d=>d.total>0).sort((a,b)=>b.pct-a.pct)[0];
     if (mejorDow && mejorDow.total >= 3) {
-      insights.push({ icon:'📅', text:`Día más productivo: ${mejorDow.dow} con ${mejorDow.pct}% de cumplimiento.` });
+      insights.push({ icon:osIcon('calendar'), text:`Día más productivo: ${mejorDow.dow} con ${mejorDow.pct}% de cumplimiento.` });
     }
   }
 
@@ -4272,8 +4272,8 @@ function wpRenderAnalytics() {
             <select onchange="wpAnSetHouse(this.value)" class="text-xs bg-white border border-slate-300 rounded px-2 py-1 font-bold">${houseOpts}</select>
           </div>
           <div class="flex-1"></div>
-          <button onclick="wpAnalyticsAI()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white border border-violet-700 px-3 py-1.5 rounded font-bold" title="Claude analiza las métricas y sugiere acciones priorizadas">🤖 Análisis IA</button>
-          <button onclick="wpPrintAnalytics()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold">🖨️ Imprimir reporte</button>
+          <button onclick="wpAnalyticsAI()" class="text-xs bg-violet-600 hover:bg-violet-700 text-white border border-violet-700 px-3 py-1.5 rounded font-bold" title="Claude analiza las métricas y sugiere acciones priorizadas">${osIcon('bot')} Análisis IA</button>
+          <button onclick="wpPrintAnalytics()" class="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded font-bold">${osIcon('printer')} Imprimir reporte</button>
         </div>
       </div>
 
@@ -4287,19 +4287,19 @@ function wpRenderAnalytics() {
           </div>
           <div class="grid grid-cols-2 gap-2 min-w-[260px]">
             <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
-              <div class="text-[10px] uppercase opacity-80 font-bold">⚡ Velocidad</div>
+              <div class="text-[10px] uppercase opacity-80 font-bold">${osIcon('zap')} Velocidad</div>
               <div class="text-xl font-bold">${m.velocityDay}<span class="text-xs opacity-80"> /día</span></div>
             </div>
             <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
-              <div class="text-[10px] uppercase opacity-80 font-bold">⏳ Lead time</div>
+              <div class="text-[10px] uppercase opacity-80 font-bold">${osIcon('loader')} Lead time</div>
               <div class="text-xl font-bold">${m.avgCompletionDays!=null?m.avgCompletionDays+' d':'—'}</div>
             </div>
             <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
-              <div class="text-[10px] uppercase opacity-80 font-bold">⏰ Atrasadas</div>
+              <div class="text-[10px] uppercase opacity-80 font-bold">${osIcon('clock')} Atrasadas</div>
               <div class="text-xl font-bold">${m.overdueCount}</div>
             </div>
             <div class="bg-white/15 backdrop-blur rounded-lg p-2.5 border border-white/20">
-              <div class="text-[10px] uppercase opacity-80 font-bold">🔄 Movidas</div>
+              <div class="text-[10px] uppercase opacity-80 font-bold">${osIcon('refresh')} Movidas</div>
               <div class="text-xl font-bold">${m.movidasCount}</div>
             </div>
           </div>
@@ -4317,16 +4317,16 @@ function wpRenderAnalytics() {
           ${m.total === 0 ? '<div class="bg-slate-100 w-full flex items-center justify-center text-slate-400 text-xs">Sin actividades</div>' : ''}
         </div>
         <div class="flex flex-wrap gap-3 mt-2 text-[11px]">
-          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-500 rounded-sm"></span> ✅ Hechas: <strong>${m.done}</strong></span>
-          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-sm"></span> 🔵 En curso: <strong>${m.inProgress}</strong></span>
-          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-400 rounded-sm"></span> 🟠 Planeadas: <strong>${m.planned}</strong></span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-500 rounded-sm"></span> ${osIcon('check-circle')} Hechas: <strong>${m.done}</strong></span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-sm"></span> En curso: <strong>${m.inProgress}</strong></span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-400 rounded-sm"></span> ${kitStatusDot('warn')} Planeadas: <strong>${m.planned}</strong></span>
           <span class="flex items-center gap-1"><span class="w-3 h-3 bg-slate-400 rounded-sm"></span> ⚫ Canceladas: <strong>${m.cancelled}</strong></span>
         </div>
       </div>
 
       <!-- Insights automáticos -->
       <div class="bg-violet-50 border border-violet-200 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-violet-900 mb-2">💡 Insights para tomar decisiones</div>
+        <div class="text-xs font-bold uppercase text-violet-900 mb-2">${osIcon('lightbulb')} Insights para tomar decisiones</div>
         <div class="space-y-1.5">
           ${insights.map(i => `
             <div class="flex items-start gap-2 text-sm ${i.color==='red'?'text-red-800':i.color==='amber'?'text-amber-800':i.color==='emerald'?'text-emerald-800':'text-slate-700'}">
@@ -4340,7 +4340,7 @@ function wpRenderAnalytics() {
       <div class="grid md:grid-cols-2 gap-3">
         <!-- Heatmap día de la semana -->
         <div class="bg-white border border-slate-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-2">📅 Cumplimiento por día de la semana</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">${osIcon('calendar')} Cumplimiento por día de la semana</div>
           <div class="grid grid-cols-7 gap-1">
             ${m.dowSorted.map(d => `
               <div class="rounded ${heatColor(d.pct)} p-2 text-center">
@@ -4354,14 +4354,14 @@ function wpRenderAnalytics() {
 
         <!-- Top etapas más lentas -->
         <div class="bg-white border border-slate-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-2">🔧 Etapas — más lentas arriba</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-2">${osIcon('wrench')} Etapas — más lentas arriba</div>
           ${m.stageList.length === 0 ? '<div class="text-xs text-slate-400 italic py-4 text-center">Sin etapas registradas</div>' : `
             <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
               ${m.stageList.slice(0, 8).map(s => `
                 <div>
                   <div class="flex items-center justify-between text-[11px]">
                     <span class="font-semibold truncate">${(s.name||'').replace(/</g,'&lt;')}</span>
-                    <span class="text-slate-600 whitespace-nowrap">${s.done}/${s.total} (${s.pct}%) ${s.overdue?`<span class="text-red-700 font-bold">· ⏰${s.overdue}</span>`:''}</span>
+                    <span class="text-slate-600 whitespace-nowrap">${s.done}/${s.total} (${s.pct}%) ${s.overdue?`<span class="text-red-700 font-bold">· ${osIcon('clock')}${s.overdue}</span>`:''}</span>
                   </div>
                   <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div class="${s.pct>=80?'bg-emerald-500':s.pct>=60?'bg-amber-500':'bg-red-500'} h-full" style="width:${s.pct}%"></div>
@@ -4376,7 +4376,7 @@ function wpRenderAnalytics() {
       <!-- Cumplimiento por casa -->
       ${m.houseList.length > 1 ? `
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-50 px-3 py-2 text-xs font-bold uppercase text-slate-600">🏠 Cumplimiento por casa</div>
+        <div class="bg-slate-50 px-3 py-2 text-xs font-bold uppercase text-slate-600">${osIcon('house')} Cumplimiento por casa</div>
         <table class="w-full text-xs">
           <thead class="bg-slate-50">
             <tr class="border-b border-slate-200">
@@ -4408,29 +4408,29 @@ function wpRenderAnalytics() {
         </table>
       </div>` : ''}
 
-      <!-- ⚠️ RUTA CRÍTICA + 🟡 APLAZADAS -->
+      <!-- RUTA CRÍTICA + APLAZADAS -->
       ${m.criticasCount > 0 || m.aplazadasCount > 0 ? `
       <div class="grid md:grid-cols-2 gap-3">
         <!-- Ruta crítica -->
         <div class="bg-white border-2 ${m.criticasAtrasadasCount > 0 ? 'border-rose-400' : 'border-rose-200'} rounded-xl overflow-hidden">
           <div class="${m.criticasAtrasadasCount > 0 ? 'bg-rose-100' : 'bg-rose-50'} px-3 py-2 text-xs font-bold uppercase text-rose-800 flex justify-between items-center">
-            <span>⚠️ Ruta crítica (${m.criticasCount})</span>
+            <span>${osIcon('alert')} Ruta crítica (${m.criticasCount})</span>
             <span class="text-[10px] font-normal">${m.criticasDone}/${m.criticasCount} hechas · ${m.criticasAtrasadasCount} atrasadas</span>
           </div>
-          ${m.criticasAtrasadasCount === 0 && m.criticasCount > 0 ? `<div class="p-3 text-xs text-emerald-700 bg-emerald-50 border-b border-emerald-100"><strong>✅ Sin atrasos críticos.</strong> La ruta crítica está bajo control.</div>` : ''}
+          ${m.criticasAtrasadasCount === 0 && m.criticasCount > 0 ? `<div class="p-3 text-xs text-emerald-700 bg-emerald-50 border-b border-emerald-100"><strong>${osIcon('check-circle')} Sin atrasos críticos.</strong> La ruta crítica está bajo control.</div>` : ''}
           ${m.criticasAtrasadasCount > 0 ? `
             <div class="p-3 text-xs bg-rose-50 border-b border-rose-100">
-              <strong class="text-rose-900">🚨 ${m.criticasAtrasadasCount} crítica${m.criticasAtrasadasCount>1?'s':''} atrasada${m.criticasAtrasadasCount>1?'s':''}</strong> — Cada día perdido en ruta crítica empuja la fecha de entrega final.
+              <strong class="text-rose-900">${osIcon('alert')} ${m.criticasAtrasadasCount} crítica${m.criticasAtrasadasCount>1?'s':''} atrasada${m.criticasAtrasadasCount>1?'s':''}</strong> — Cada día perdido en ruta crítica empuja la fecha de entrega final.
             </div>
             <div class="divide-y divide-slate-100 max-h-48 overflow-y-auto">
               ${m.criticasAtrasadasTop.map(a => `
                 <div class="px-3 py-2 hover:bg-slate-50 cursor-pointer" onclick="wpEditActivity('${a.id}')">
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
-                      <div class="text-xs font-semibold truncate text-rose-900">⚠️ ${(a.activity_name||'').replace(/</g,'&lt;')}</div>
-                      <div class="text-[10px] text-slate-500 truncate">🏠 ${(a.houseName||'').replace(/</g,'&lt;')}${a.stage?` · ${a.stage}`:''}</div>
+                      <div class="text-xs font-semibold truncate text-rose-900">${osIcon('alert')} ${(a.activity_name||'').replace(/</g,'&lt;')}</div>
+                      <div class="text-[10px] text-slate-500 truncate">${osIcon('house')} ${(a.houseName||'').replace(/</g,'&lt;')}${a.stage?` · ${a.stage}`:''}</div>
                     </div>
-                    <div class="text-[11px] bg-rose-700 text-white font-bold px-2 py-0.5 rounded whitespace-nowrap">⏰ ${a.daysLate}d</div>
+                    <div class="text-[11px] bg-rose-700 text-white font-bold px-2 py-0.5 rounded whitespace-nowrap">${osIcon('clock')} ${a.daysLate}d</div>
                   </div>
                 </div>
               `).join('')}
@@ -4441,10 +4441,10 @@ function wpRenderAnalytics() {
         <!-- Aplazadas — motivos más frecuentes -->
         <div class="bg-white border-2 border-amber-200 rounded-xl overflow-hidden">
           <div class="bg-amber-50 px-3 py-2 text-xs font-bold uppercase text-amber-800 flex justify-between items-center">
-            <span>🟡 Aplazadas en período (${m.aplazadasCount})</span>
+            <span>${kitStatusDot('warn')} Aplazadas en período (${m.aplazadasCount})</span>
             <span class="text-[10px] font-normal">motivos analizados</span>
           </div>
-          ${m.aplazadasCount === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin aplazamientos registrados 🎉</div>' : `
+          ${m.aplazadasCount === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin aplazamientos registrados ' + osIcon('party') + '</div>' : `
             <div class="p-3 space-y-2">
               ${m.motivosTop.length > 0 ? `
                 <div class="text-[11px] font-bold text-slate-700 mb-1">Motivos más frecuentes:</div>
@@ -4455,7 +4455,7 @@ function wpRenderAnalytics() {
                   </div>
                 `).join('')}
               ` : '<div class="text-xs text-slate-500 italic">Aplazadas sin motivo categorizable. Revisar formato de notas.</div>'}
-              ${m.motivosTop[0] && m.motivosTop[0][1] >= 3 ? `<div class="text-[11px] text-amber-900 bg-amber-100 border-l-4 border-amber-500 p-2 mt-2 rounded-r"><strong>💡 Acción:</strong> "${m.motivosTop[0][0]}" se repite ${m.motivosTop[0][1]} veces — atacarlo de raíz reduce aplazamientos futuros.</div>` : ''}
+              ${m.motivosTop[0] && m.motivosTop[0][1] >= 3 ? `<div class="text-[11px] text-amber-900 bg-amber-100 border-l-4 border-amber-500 p-2 mt-2 rounded-r"><strong>${osIcon('lightbulb')} Acción:</strong> "${m.motivosTop[0][0]}" se repite ${m.motivosTop[0][1]} veces — atacarlo de raíz reduce aplazamientos futuros.</div>` : ''}
             </div>
           `}
         </div>
@@ -4465,17 +4465,17 @@ function wpRenderAnalytics() {
       <div class="grid md:grid-cols-2 gap-3">
         <!-- Top atrasadas críticas -->
         <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
-          <div class="bg-red-50 px-3 py-2 text-xs font-bold uppercase text-red-800">⏰ Atrasadas críticas (${m.overdueCount})</div>
-          ${m.overdueTop.length === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin tareas atrasadas en este rango 🎉</div>' : `
+          <div class="bg-red-50 px-3 py-2 text-xs font-bold uppercase text-red-800">${osIcon('clock')} Atrasadas críticas (${m.overdueCount})</div>
+          ${m.overdueTop.length === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin tareas atrasadas en este rango ' + osIcon('party') + '</div>' : `
             <div class="divide-y divide-slate-100 max-h-64 overflow-y-auto">
               ${m.overdueTop.map(a => `
                 <div class="px-3 py-2 hover:bg-slate-50 cursor-pointer" onclick="wpEditActivity('${a.id}')">
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
                       <div class="text-xs font-semibold truncate">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
-                      <div class="text-[10px] text-slate-500 truncate">🏠 ${(a.houseName||'').replace(/</g,'&lt;')}${a.stage?` · ${a.stage}`:''}</div>
+                      <div class="text-[10px] text-slate-500 truncate">${osIcon('house')} ${(a.houseName||'').replace(/</g,'&lt;')}${a.stage?` · ${a.stage}`:''}</div>
                     </div>
-                    <div class="text-[11px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">⏰ ${a.daysLate}d</div>
+                    <div class="text-[11px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">${osIcon('clock')} ${a.daysLate}d</div>
                   </div>
                 </div>
               `).join('')}
@@ -4485,7 +4485,7 @@ function wpRenderAnalytics() {
 
         <!-- Movidas / reagendadas -->
         <div class="bg-white border border-amber-200 rounded-xl overflow-hidden">
-          <div class="bg-amber-50 px-3 py-2 text-xs font-bold uppercase text-amber-800">🔄 Reagendadas recientes (${m.movidasCount})</div>
+          <div class="bg-amber-50 px-3 py-2 text-xs font-bold uppercase text-amber-800">${osIcon('refresh')} Reagendadas recientes (${m.movidasCount})</div>
           ${m.movidasTop.length === 0 ? '<div class="p-4 text-xs text-slate-400 italic text-center">Sin reagendamientos en este rango</div>' : `
             <div class="divide-y divide-slate-100 max-h-64 overflow-y-auto">
               ${m.movidasTop.map(a => `
@@ -4493,7 +4493,7 @@ function wpRenderAnalytics() {
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
                       <div class="text-xs font-semibold truncate">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
-                      <div class="text-[10px] text-slate-500 truncate">🏠 ${(a.houseName||'').replace(/</g,'&lt;')} · ahora ${a.date}</div>
+                      <div class="text-[10px] text-slate-500 truncate">${osIcon('house')} ${(a.houseName||'').replace(/</g,'&lt;')} · ahora ${a.date}</div>
                     </div>
                     <div class="text-[11px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">+${a.diffDays}d</div>
                   </div>
@@ -4509,7 +4509,7 @@ function wpRenderAnalytics() {
       </div>
     </div>
   `;
-  openModal(`📊 Reporte del planner · ${wpAnState.rangeLabel}`, html);
+  openModal(`Reporte del planner · ${wpAnState.rangeLabel}`, html);
   const inner = document.querySelector('#modal > div');
   if (inner) {
     ['max-w-3xl','max-w-5xl'].forEach(c => inner.classList.remove(c));
@@ -4526,7 +4526,7 @@ async function wpAnalyticsAI() {
     : (wpState.projects.find(p => p.id === wpAnState.house)?.name) || (wpAnState.house.startsWith('name:') ? wpAnState.house.slice(5) : wpAnState.house);
 
   const btn = document.querySelector('[onclick="wpAnalyticsAI()"]');
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Analizando...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Analizando...'; }
 
   // Construir prompt compacto con los datos clave
   const summary = {
@@ -4606,16 +4606,16 @@ ${JSON.stringify(summary, null, 2)}`;
   } catch (e) {
     alert('Error IA: ' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '🤖 Análisis IA'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Análisis IA'; }
   }
 }
 
 function wpShowAIAnalysis(a) {
   const colorMap = { verde: 'from-emerald-600 to-emerald-800', amarillo: 'from-amber-500 to-orange-700', rojo: 'from-red-600 to-red-800' };
-  const trendIcon = { mejorando: '📈', estable: '➡️', empeorando: '📉' };
+  const trendIcon = { mejorando: osIcon('trending-up'), estable: '➡️', empeorando: osIcon('trending-down') };
   const impactoColor = { alto: 'bg-red-100 text-red-800 border-red-300', medio: 'bg-amber-100 text-amber-800 border-amber-300', bajo: 'bg-slate-100 text-slate-700 border-slate-300' };
   const color = colorMap[a.estado_general] || 'from-slate-700 to-slate-900';
-  openModal('🤖 Análisis IA del período', `
+  openModal('Análisis IA del período', `
     <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
       <div class="bg-gradient-to-br ${color} text-white rounded-2xl p-4 shadow-lg">
         <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -4627,7 +4627,7 @@ function wpShowAIAnalysis(a) {
 
       ${(a.fortalezas||[]).length > 0 ? `
       <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-emerald-900 mb-2">✅ Fortalezas</div>
+        <div class="text-xs font-bold uppercase text-emerald-900 mb-2">${osIcon('check-circle')} Fortalezas</div>
         <ul class="space-y-1 text-sm text-emerald-900">
           ${a.fortalezas.map(f => `<li>• ${f.replace(/</g,'&lt;')}</li>`).join('')}
         </ul>
@@ -4635,7 +4635,7 @@ function wpShowAIAnalysis(a) {
 
       ${(a.alertas||[]).length > 0 ? `
       <div class="bg-red-50 border border-red-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-red-900 mb-2">🚨 Alertas</div>
+        <div class="text-xs font-bold uppercase text-red-900 mb-2">${osIcon('alert')} Alertas</div>
         <ul class="space-y-1 text-sm text-red-900">
           ${a.alertas.map(x => `<li>• ${x.replace(/</g,'&lt;')}</li>`).join('')}
         </ul>
@@ -4643,7 +4643,7 @@ function wpShowAIAnalysis(a) {
 
       ${(a.acciones_priorizadas||[]).length > 0 ? `
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">🎯 Acciones priorizadas</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('target')} Acciones priorizadas</div>
         <div class="space-y-2">
           ${a.acciones_priorizadas.map((acc, i) => `
             <div class="border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
@@ -4662,13 +4662,13 @@ function wpShowAIAnalysis(a) {
 
       ${a.foco_proxima_semana ? `
       <div class="bg-violet-50 border-l-4 border-violet-600 rounded-r-xl p-3">
-        <div class="text-xs font-bold uppercase text-violet-900 mb-1">🎯 Foco próxima semana</div>
+        <div class="text-xs font-bold uppercase text-violet-900 mb-1">${osIcon('target')} Foco próxima semana</div>
         <div class="text-sm text-violet-900">${a.foco_proxima_semana.replace(/</g,'&lt;')}</div>
       </div>` : ''}
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
-        <button onclick="wpAnalyticsAI()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">🔄 Re-analizar</button>
+        <button onclick="wpAnalyticsAI()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">${osIcon('refresh')} Re-analizar</button>
       </div>
     </div>
   `);
@@ -4693,17 +4693,17 @@ function wpShareWhatsApp(dateStr, homeFilter) {
   });
 
   // Mensaje WhatsApp con emojis y formato compacto
-  let msg = `📅 *PLAN DE OBRA · ${dateLbl.toUpperCase()}*\n\n`;
+  let msg = `*PLAN DE OBRA · ${dateLbl.toUpperCase()}*\n\n`;
   Object.entries(byHome).forEach(([home, hActs]) => {
-    msg += `🏠 *${home}*\n`;
+    msg += `*${home}*\n`;
     hActs.forEach((a, i) => {
       const isDone = a.status === 'done';
       const isCritical = a.priority === 'critical' || a.priority === 'urgent';
       const isPostponed = (a.notes||'').includes('[APLAZADA');
-      const checkbox = isDone ? '✅' : '☐';
+      const checkbox = isDone ? osIcon('check-circle') : '☐';
       const tags = [];
-      if (isCritical && !isDone) tags.push('⚠️ IMPORTANTE');
-      if (isPostponed) tags.push('🟡 APLAZADA');
+      if (isCritical && !isDone) tags.push('IMPORTANTE');
+      if (isPostponed) tags.push('APLAZADA');
       msg += `${checkbox} ${a.activity_name}${tags.length?' '+tags.join(' '):''}`;
       if (a.start_hour || a.end_hour) msg += ` (${a.start_hour||7}h-${a.end_hour||17}h)`;
       msg += '\n';
@@ -4719,18 +4719,18 @@ function wpShareWhatsApp(dateStr, homeFilter) {
   msg += `_Generado por Empresa OS · ${new Date().toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})}_`;
 
   // Modal de preview con editor + botón enviar
-  openModal('💬 Enviar plan del día por WhatsApp', `
+  openModal('Enviar plan del día por WhatsApp', `
     <div class="space-y-3">
       <div class="text-xs text-slate-600">Revisá el mensaje. Podés editarlo antes de enviarlo. Al hacer clic en enviar, WhatsApp Web/App se abrirá con el mensaje listo.</div>
       <textarea id="wp-wa-msg" rows="14" class="w-full border border-emerald-300 rounded p-3 text-xs font-mono">${msg.replace(/</g,'&lt;')}</textarea>
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional · con código país, sin +)</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('phone')} Número (opcional · con código país, sin +)</label>
         <input id="wp-wa-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
         <div class="text-[10px] text-slate-500 mt-0.5">Si dejás vacío, WhatsApp pedirá elegir contacto.</div>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="wpDoWhatsAppShare()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Abrir WhatsApp</button>
+        <button onclick="wpDoWhatsAppShare()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('message')} Abrir WhatsApp</button>
       </div>
     </div>
   `);
@@ -4755,7 +4755,7 @@ function wpPrintAnalytics() {
     <style>@media print { button { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>
     </head><body class="p-6 bg-white">
       <div class="mb-4 border-b-2 border-slate-900 pb-2">
-        <div class="text-xl font-bold">📊 Reporte semanal del planner</div>
+        <div class="text-xl font-bold">${osIcon('chart')} Reporte semanal del planner</div>
         <div class="text-xs text-slate-600">${wpAnState.rangeLabel} · ${new Date().toLocaleString('es')}</div>
       </div>
       ${root.innerHTML}
@@ -4799,9 +4799,9 @@ function wpRenderWorkerMobile() {
   const extra = new Set();
   wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
   const houseOpts = [
-    `<option value="all" ${house==='all'?'selected':''}>🏘️ Todas las casas</option>`,
-    ...activeProj.map(p => `<option value="${p.id}" ${house===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
-    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${house==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+    `<option value="all" ${house==='all'?'selected':''}>${osIcon('building')} Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${house===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${house==='name:'+n?'selected':''}>${n.replace(/</g,'&lt;')}</option>`)
   ].join('');
 
   // Agrupar por casa
@@ -4836,7 +4836,7 @@ function wpRenderWorkerMobile() {
             <div class="text-[10px] uppercase opacity-75 font-bold tracking-wider">Vista obrero</div>
             <div class="text-base font-bold capitalize leading-tight">${dateLbl}</div>
           </div>
-          <button onclick="wpWorkerShare()" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-bold">📤</button>
+          <button onclick="wpWorkerShare()" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-bold">${osIcon('upload')}</button>
         </div>
         <!-- Filtro casa y navegación día -->
         <div class="flex items-center gap-1.5">
@@ -4863,13 +4863,13 @@ function wpRenderWorkerMobile() {
       <div class="flex-1 p-3 space-y-3 max-w-2xl mx-auto w-full">
         ${acts.length === 0 ? `
           <div class="bg-white rounded-2xl p-8 text-center text-slate-400 border border-slate-200">
-            <div class="text-5xl mb-2">📭</div>
+            <div class="text-5xl mb-2">${osIcon('inbox')}</div>
             <div class="text-base font-semibold">Sin tareas hoy</div>
             <div class="text-xs mt-1">Probá otro día o casa</div>
           </div>
         ` : Object.entries(byHome).map(([home, hActs]) => `
           <div>
-            <div class="text-xs uppercase tracking-wider font-bold text-slate-500 px-1 mb-1.5">🏠 ${home.replace(/</g,'&lt;')}</div>
+            <div class="text-xs uppercase tracking-wider font-bold text-slate-500 px-1 mb-1.5">${osIcon('house')} ${home.replace(/</g,'&lt;')}</div>
             <div class="space-y-2">
               ${hActs.map(a => {
                 const isDone = a.status === 'done';
@@ -4888,16 +4888,16 @@ function wpRenderWorkerMobile() {
                       </button>
                       <div class="flex-1 min-w-0">
                         <div class="flex flex-wrap gap-1 mb-1">
-                          ${isCritical && !isDone ? '<span class="bg-rose-700 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">⚠️ Importante</span>' : ''}
-                          ${isPostponed ? '<span class="bg-amber-500 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">🟡 Aplazada</span>' : ''}
+                          ${isCritical && !isDone ? '<span class="bg-rose-700 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">' + osIcon('alert') + ' Importante</span>' : ''}
+                          ${isPostponed ? '<span class="bg-amber-500 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">' + kitStatusDot('warn') + ' Aplazada</span>' : ''}
                         </div>
                         <div class="text-base font-bold leading-snug ${isDone?'line-through text-slate-500':'text-slate-900'}">${(a.activity_name||'').replace(/</g,'&lt;')}</div>
-                        ${a.stage ? `<div class="text-xs text-slate-500 mt-0.5">📂 ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
-                        ${a.start_hour || a.end_hour ? `<div class="text-xs text-slate-500 mt-0.5">⏰ ${a.start_hour||7}h - ${a.end_hour||17}h</div>` : ''}
+                        ${a.stage ? `<div class="text-xs text-slate-500 mt-0.5">${osIcon('folder-open')} ${a.stage.replace(/</g,'&lt;')}</div>` : ''}
+                        ${a.start_hour || a.end_hour ? `<div class="text-xs text-slate-500 mt-0.5">${osIcon('clock')} ${a.start_hour||7}h - ${a.end_hour||17}h</div>` : ''}
 
                         ${(a.materials||[]).length > 0 ? `
                           <div class="mt-2 bg-amber-100 rounded-lg p-2">
-                            <div class="text-[10px] font-bold uppercase text-amber-900">📦 Materiales</div>
+                            <div class="text-[10px] font-bold uppercase text-amber-900">${osIcon('package')} Materiales</div>
                             <ul class="text-sm text-amber-900 mt-0.5">
                               ${a.materials.map(m => `<li>• <strong>${(m.nombre||'').replace(/</g,'&lt;')}</strong> ${m.cantidad||1} ${(m.unidad||'').replace(/</g,'&lt;')}</li>`).join('')}
                             </ul>
@@ -4905,13 +4905,13 @@ function wpRenderWorkerMobile() {
 
                         ${a.notes && !a.notes.includes('[APLAZADA') ? `
                           <div class="mt-2 bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg p-2">
-                            <div class="text-[10px] font-bold uppercase text-yellow-900">📝 Notas</div>
+                            <div class="text-[10px] font-bold uppercase text-yellow-900">${osIcon('pencil-line')} Notas</div>
                             <div class="text-sm text-slate-900 whitespace-pre-wrap mt-0.5">${a.notes.split('\n').filter(l=>!l.includes('[APLAZADA')).join('\n').replace(/</g,'&lt;')}</div>
                           </div>` : ''}
 
                         ${(a.checklist||[]).length > 0 ? `
                           <div class="mt-2">
-                            <div class="text-[10px] font-bold uppercase text-slate-600">✅ Pasos (${(a.checklist||[]).filter(c=>c.done).length}/${a.checklist.length})</div>
+                            <div class="text-[10px] font-bold uppercase text-slate-600">${osIcon('check-circle')} Pasos (${(a.checklist||[]).filter(c=>c.done).length}/${a.checklist.length})</div>
                             <ul class="text-sm mt-0.5 space-y-1">
                               ${a.checklist.map((it, idx) => `
                                 <li class="flex items-start gap-2 ${it.done?'line-through text-slate-400':'text-slate-800'}">
@@ -4931,7 +4931,7 @@ function wpRenderWorkerMobile() {
 
       <!-- Footer sticky con acciones -->
       <div class="sticky bottom-0 bg-white border-t-2 border-slate-200 p-3 grid grid-cols-2 gap-2 shadow-lg">
-        <button onclick="wpWorkerShare()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">📤 Compartir</button>
+        <button onclick="wpWorkerShare()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl">${osIcon('upload')} Compartir</button>
         <button onclick="wpCloseWorkerMobile()" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-3 rounded-xl">✕ Cerrar</button>
       </div>
     </div>
@@ -4985,36 +4985,36 @@ function wpWorkerShare() {
     byHome[key].push(a);
   });
 
-  let msg = `📅 *PLAN DEL DÍA · ${dateLbl.toUpperCase()}*\n\n`;
+  let msg = `*PLAN DEL DÍA · ${dateLbl.toUpperCase()}*\n\n`;
   Object.entries(byHome).forEach(([home, hActs]) => {
-    msg += `🏠 *${home}*\n`;
+    msg += `*${home}*\n`;
     hActs.forEach(a => {
       const isDone = a.status === 'done';
-      const tag = a.priority==='critical' || a.priority==='urgent' ? ' ⚠️' : (a.notes||'').includes('[APLAZADA') ? ' 🟡' : '';
-      msg += `${isDone?'✅':'☐'} ${a.activity_name}${tag}\n`;
+      const tag = a.priority==='critical' || a.priority==='urgent' ? osIcon('alert') : (a.notes||'').includes('[APLAZADA') ? kitStatusDot('warn') : '';
+      msg += `${isDone?osIcon('check-circle'):'☐'} ${a.activity_name}${tag}\n`;
     });
     msg += '\n';
   });
-  msg += `📱 *Ver en celular y marcar tareas:*\n${url}\n\n_Tap el link y vas a la vista táctil del día._`;
+  msg += `*Ver en celular y marcar tareas:*\n${url}\n\n_Tap el link y vas a la vista táctil del día._`;
 
-  openModal('📤 Compartir vista del día', `
+  openModal('Compartir vista del día', `
     <div class="space-y-3">
       <div class="bg-emerald-50 border border-emerald-300 rounded p-3 text-xs">
         <strong>Link al día (vista obrero):</strong>
         <div class="mt-1 bg-white border border-slate-200 rounded p-2 text-[11px] font-mono break-all">${url}</div>
-        <button onclick="navigator.clipboard.writeText('${url}'); this.textContent='✓ Copiado'" class="mt-2 bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded">📋 Copiar link</button>
+        <button onclick="navigator.clipboard.writeText('${url}'); this.textContent='✓ Copiado'" class="mt-2 bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('clipboard')} Copiar link</button>
       </div>
       <div>
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Mensaje WhatsApp (editable)</label>
         <textarea id="wp-worker-share-msg" rows="10" class="w-full border border-emerald-300 rounded p-2 text-xs font-mono">${msg.replace(/</g,'&lt;')}</textarea>
       </div>
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional, con código país sin +)</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('phone')} Número (opcional, con código país sin +)</label>
         <input id="wp-worker-share-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="(()=>{ const m=document.getElementById('wp-worker-share-msg').value; const p=(document.getElementById('wp-worker-share-phone').value||'').replace(/[^0-9]/g,''); const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`; window.open(u,'_blank'); closeModal(); })()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Enviar WhatsApp</button>
+        <button onclick="(()=>{ const m=document.getElementById('wp-worker-share-msg').value; const p=(document.getElementById('wp-worker-share-phone').value||'').replace(/[^0-9]/g,''); const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`; window.open(u,'_blank'); closeModal(); })()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('message')} Enviar WhatsApp</button>
       </div>
     </div>
   `);
@@ -5096,9 +5096,9 @@ function wpReschedRenderModal() {
   const html = `
     <div class="space-y-3" id="wp-resched">
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
-        <span>🏠 <b class="text-slate-900">${(S.homeName || '').replace(/</g, '&lt;')}</b></span>
-        <span>📋 <b>${S.acts.length}</b> actividades pendientes (${rango})</span>
-        <span>🚩 inicio actual: <b>${wpReschedFmt(S.prevStart)}</b></span>
+        <span>${osIcon('house')} <b class="text-slate-900">${(S.homeName || '').replace(/</g, '&lt;')}</b></span>
+        <span>${osIcon('clipboard')} <b>${S.acts.length}</b> actividades pendientes (${rango})</span>
+        <span>inicio actual: <b>${wpReschedFmt(S.prevStart)}</b></span>
         ${S.skipped ? `<span class="text-amber-700">✋ ${S.skipped} hechas/canceladas NO se mueven (historial)</span>` : ''}
       </div>
 
@@ -5139,8 +5139,8 @@ function wpReschedRenderModal() {
       <div id="wp-rs-prev"></div>
 
       <div class="flex gap-2 flex-wrap">
-        <button onclick="wpReschedPreview()" class="flex-1 bg-slate-900 text-white text-sm font-bold py-2.5 px-4 rounded-lg hover:opacity-90">👁 Ver preview (no escribe nada)</button>
-        <button id="wp-rs-apply" onclick="wpReschedApply()" disabled class="flex-1 bg-emerald-600 text-white text-sm font-bold py-2.5 px-4 rounded-lg disabled:opacity-40 hover:bg-emerald-700">✅ Confirmar y aplicar</button>
+        <button onclick="wpReschedPreview()" class="flex-1 bg-slate-900 text-white text-sm font-bold py-2.5 px-4 rounded-lg hover:opacity-90">${osIcon('eye')} Ver preview (no escribe nada)</button>
+        <button id="wp-rs-apply" onclick="wpReschedApply()" disabled class="flex-1 bg-emerald-600 text-white text-sm font-bold py-2.5 px-4 rounded-lg disabled:opacity-40 hover:bg-emerald-700">${osIcon('check-circle')} Confirmar y aplicar</button>
       </div>
 
       ${S.last ? `
@@ -5149,7 +5149,7 @@ function wpReschedRenderModal() {
         <button onclick="wpReschedUndo()" class="bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-700">Deshacer</button>
       </div>` : ''}
     </div>`;
-  openModal(`📆 Reprogramar obra · ${S.homeName}`, html);
+  openModal(`Reprogramar obra · ${S.homeName}`, html);
 }
 function wpReschedClearPrev() { wpReschedState.preview = null; const p = document.getElementById('wp-rs-prev'); if (p) p.innerHTML = ''; const b = document.getElementById('wp-rs-apply'); if (b) b.disabled = true; }
 
@@ -5193,7 +5193,7 @@ function wpReschedPreview() {
   if (box) box.innerHTML = `
     <div class="bg-white border border-slate-200 rounded-xl p-3">
       <div class="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-2">Preview — ${n > 0 ? '+' : ''}${n} días hábiles · ${rebase ? 're-plan (baseline se mueve)' : 'atraso (baseline queda)'} · nada escrito aún</div>
-      ${shift.note ? `<div class="text-[11px] text-amber-700 mb-2">⚠ ${shift.note}</div>` : ''}
+      ${shift.note ? `<div class="text-[11px] text-amber-700 mb-2">${osIcon('alert')} ${shift.note}</div>` : ''}
       <div class="overx" style="overflow-x:auto">
       <table class="w-full text-[11px]">
         <thead><tr class="text-left text-slate-500"><th class="py-1 pr-2">Etapa</th><th class="py-1 pr-2 text-right">Act</th><th class="py-1 pr-2">Antes</th><th class="py-1">Después</th></tr></thead>
@@ -5209,8 +5209,8 @@ function wpReschedPreview() {
       </table>
       </div>
       <div class="mt-2 pt-2 border-t border-slate-200 text-xs flex flex-wrap gap-x-4 gap-y-1">
-        <span>🚩 Inicio: <b>${wpReschedFmt(S.prevStart)} → ${wpReschedFmt(newStart)}</b></span>
-        <span>📦 Entrega: <b>${wpReschedFmt(oldEnd)} → ${wpReschedFmt(newEnd)}</b></span>
+        <span>Inicio: <b>${wpReschedFmt(S.prevStart)} → ${wpReschedFmt(newStart)}</b></span>
+        <span>${osIcon('package')} Entrega: <b>${wpReschedFmt(oldEnd)} → ${wpReschedFmt(newEnd)}</b></span>
         <span class="text-emerald-700">✓ 0 en domingo · duración/orden/etapas intactas</span>
       </div>
     </div>`;
@@ -5232,7 +5232,7 @@ async function wpReschedApply() {
     const payload = { date: grp[0].nue, updated_at: ts };
     if (rebase) payload.baseline_date = grp[0].nue;
     const { data, error } = await sb.from('weekly_activities').update(payload).in('id', grp.map(r => r.id)).select('id');
-    if (error) { if (window.toast) toast(`⚠ Corrimiento PARCIAL (${moved}/${rows.length}): ${error.message}. Reabrí y revisá antes de reintentar.`, 'error'); return; }
+    if (error) { if (window.toast) toast(`Corrimiento PARCIAL (${moved}/${rows.length}): ${error.message}. Reabrí y revisá antes de reintentar.`, 'error'); return; }
     moved += (data || []).length;
   }
   // ancla del proyecto (si es proyecto real)
@@ -5277,7 +5277,7 @@ async function wpReschedUndo() {
     const payload = { date: nue, updated_at: ts };
     if (rec.rebase) payload.baseline_date = nue;
     const { data: d2, error: e2 } = await sb.from('weekly_activities').update(payload).in('id', byOld[old]).select('id');
-    if (e2) { if (window.toast) toast(`⚠ Deshacer PARCIAL (${moved}): ${e2.message}`, 'error'); return; }
+    if (e2) { if (window.toast) toast(`Deshacer PARCIAL (${moved}): ${e2.message}`, 'error'); return; }
     moved += (d2 || []).length;
   }
   if (!S.homeId.startsWith('name:') && rec.prev_start) {
@@ -5375,9 +5375,9 @@ function wpRenderMonthView() {
   const extra = new Set();
   wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
   const houseOpts = [
-    `<option value="all" ${houseFilter==='all'?'selected':''}>🏘️ Todas</option>`,
-    ...activeProj.map(p => `<option value="${p.id}" ${houseFilter===p.id?'selected':''}>🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
-    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${houseFilter==='name:'+n?'selected':''}>🏠 ${n.replace(/</g,'&lt;')}</option>`)
+    `<option value="all" ${houseFilter==='all'?'selected':''}>${osIcon('building')} Todas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}" ${houseFilter===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}" ${houseFilter==='name:'+n?'selected':''}>${n.replace(/</g,'&lt;')}</option>`)
   ].join('');
 
   const html = `
@@ -5415,13 +5415,13 @@ function wpRenderMonthView() {
               <button onclick="wpOpenDayView('${c.iso}', '${houseFilter}')" class="border-t border-r border-slate-100 last:border-r-0 ${bg} ${isWeekend?'opacity-70':''} text-left p-1.5 min-h-[80px] flex flex-col">
                 <div class="flex items-center justify-between">
                   <div class="text-xs font-bold ${c.isToday?'bg-amber-600 text-white px-1.5 rounded':'text-slate-700'}">${c.day}</div>
-                  ${info?.criticas>0 ? `<span class="text-[9px] bg-rose-700 text-white font-bold px-1 rounded">⚠️${info.criticas}</span>` : ''}
+                  ${info?.criticas>0 ? `<span class="text-[9px] bg-rose-700 text-white font-bold px-1 rounded">${osIcon('alert')}${info.criticas}</span>` : ''}
                 </div>
                 ${info ? `
                   <div class="mt-1 flex-1">
                     <div class="text-[11px] font-bold ${info.done===info.total?'text-emerald-700':info.atrasadas>0?'text-red-700':'text-slate-700'}">${info.done}/${info.total}</div>
-                    ${info.atrasadas > 0 ? `<div class="text-[9px] text-red-700">⏰ ${info.atrasadas} atras.</div>` : ''}
-                    ${info.aplazadas > 0 ? `<div class="text-[9px] text-amber-700">🟡 ${info.aplazadas}</div>` : ''}
+                    ${info.atrasadas > 0 ? `<div class="text-[9px] text-red-700">${osIcon('clock')} ${info.atrasadas} atras.</div>` : ''}
+                    ${info.aplazadas > 0 ? `<div class="text-[9px] text-amber-700">${kitStatusDot('warn')} ${info.aplazadas}</div>` : ''}
                     ${Object.keys(info.byHouse).length === 1 ? `<div class="text-[9px] text-slate-500 truncate">${Object.keys(info.byHouse)[0]}</div>` : Object.keys(info.byHouse).length > 1 ? `<div class="text-[9px] text-slate-500">${Object.keys(info.byHouse).length} casas</div>` : ''}
                   </div>
                 ` : ''}
@@ -5436,8 +5436,8 @@ function wpRenderMonthView() {
         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-100 border border-amber-300 rounded"></span> Hoy</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-rose-50 border border-rose-300 rounded"></span> Críticas pendientes</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-50 border border-red-300 rounded"></span> Atrasadas</span>
-        <span class="flex items-center gap-1">⚠️ Críticas del día · 🟡 Aplazadas · ⏰ Atrasadas</span>
-        ${sundayActs.length ? `<span class="flex items-center gap-1 text-amber-700 font-semibold">🛌 ${sundayActs.length} actividad(es) caen en domingo (no laboral, no se muestra la columna) — ${[...new Set(sundayActs.map(a => a.date))].sort().map(d => `<button onclick="wpOpenDayView('${d}', '${houseFilter}')" class="underline hover:text-amber-900">${new Date(d + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' })}</button>`).join(' · ')}</span>` : ''}
+        <span class="flex items-center gap-1">${osIcon('alert')} Críticas del día · ${kitStatusDot('warn')} Aplazadas · ${osIcon('clock')} Atrasadas</span>
+        ${sundayActs.length ? `<span class="flex items-center gap-1 text-amber-700 font-semibold">${sundayActs.length} actividad(es) caen en domingo (no laboral, no se muestra la columna) — ${[...new Set(sundayActs.map(a => a.date))].sort().map(d => `<button onclick="wpOpenDayView('${d}', '${houseFilter}')" class="underline hover:text-amber-900">${new Date(d + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' })}</button>`).join(' · ')}</span>` : ''}
       </div>
 
       <div class="flex gap-2">
@@ -5445,7 +5445,7 @@ function wpRenderMonthView() {
       </div>
     </div>
   `;
-  openModal(`📅 Vista mensual · ${monthLabel}`, html);
+  openModal(`Vista mensual · ${monthLabel}`, html);
   const inner = document.querySelector('#modal > div');
   if (inner) { ['max-w-3xl','max-w-5xl'].forEach(c => inner.classList.remove(c)); inner.classList.add('max-w-6xl'); }
 }
@@ -5464,12 +5464,12 @@ function wpOpenIcsExport() {
   const extra = new Set();
   wpState.activities.forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
   const houseOpts = [
-    `<option value="all">🏘️ Todas las casas</option>`,
-    ...activeProj.map(p => `<option value="${p.id}">🏠 ${(p.name||'').replace(/</g,'&lt;')}</option>`),
-    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}">🏠 ${n.replace(/</g,'&lt;')}</option>`)
+    `<option value="all">${osIcon('building')} Todas las casas</option>`,
+    ...activeProj.map(p => `<option value="${p.id}">${(p.name||'').replace(/</g,'&lt;')}</option>`),
+    ...Array.from(extra).map(n => `<option value="name:${n.replace(/"/g,'&quot;')}">${n.replace(/</g,'&lt;')}</option>`)
   ].join('');
 
-  openModal('📥 Exportar a calendario (.ics)', `
+  openModal('Exportar a calendario (.ics)', `
     <div class="space-y-3">
       <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-900">
         Descargá un archivo <code>.ics</code> con las tareas. Al abrirlo, tu calendario nativo
@@ -5501,7 +5501,7 @@ function wpOpenIcsExport() {
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="wpBackToPlanner()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="wpDoIcsExport()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">📥 Descargar .ics</button>
+        <button onclick="wpDoIcsExport()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded">${osIcon('inbox')} Descargar .ics</button>
       </div>
     </div>
   `);
@@ -5540,12 +5540,12 @@ function wpDoIcsExport() {
     const title = a.activity_name || 'Tarea';
     const home = a.property_name || '—';
     const stage = a.stage ? ` · ${a.stage}` : '';
-    const critical = (a.priority === 'critical' || a.priority === 'urgent') ? ' ⚠️' : '';
-    const done = a.status === 'done' ? ' ✅' : '';
+    const critical = (a.priority === 'critical' || a.priority === 'urgent') ? osIcon('alert') : '';
+    const done = a.status === 'done' ? osIcon('check-circle') : '';
     const summary = `${critical}${done} ${title} (${home})${stage}`.trim();
 
     const materials = (a.materials||[]).map(m => `• ${m.nombre||''} ${m.cantidad||1} ${m.unidad||''}`).join('\n');
-    const checklist = (a.checklist||[]).map(c => `${c.done?'☑':'☐'} ${c.item||''}`).join('\n');
+    const checklist = (a.checklist||[]).map(c => `${c.done?osIcon('check-circle'):'☐'} ${c.item||''}`).join('\n');
     let desc = `Casa: ${home}\n${stage?`Etapa: ${a.stage}\n`:''}Estado: ${a.status||'planned'}`;
     if (materials) desc += `\n\nMateriales:\n${materials}`;
     if (checklist) desc += `\n\nChecklist:\n${checklist}`;
@@ -5640,7 +5640,7 @@ function wpRenderDeviation() {
   // opciones de casa
   const activeProj = (wpState.projects || []).filter(p => p.status !== 'completed' && p.status !== 'cancelled');
   const extra = new Set(); (wpState.activities || []).forEach(a => { if (!a.project_id && a.property_name) extra.add(a.property_name); });
-  const houseOpts = [`<option value="all">🏘️ Todas las casas</option>`, ...activeProj.map(p => `<option value="${esc(p.id)}" ${wpDevState.house === p.id ? 'selected' : ''}>🏠 ${esc(p.name)}</option>`), ...[...extra].map(n => `<option value="name:${esc(n)}" ${wpDevState.house === 'name:' + n ? 'selected' : ''}>🏠 ${esc(n)}</option>`)].join('');
+  const houseOpts = [`<option value="all">${osIcon('building')} Todas las casas</option>`, ...activeProj.map(p => `<option value="${esc(p.id)}" ${wpDevState.house === p.id ? 'selected' : ''}>${esc(p.name)}</option>`), ...[...extra].map(n => `<option value="name:${esc(n)}" ${wpDevState.house === 'name:' + n ? 'selected' : ''}>${esc(n)}</option>`)].join('');
   // timeline global
   const allD = c.byHouse.flatMap(h => [h.planMin, h.planMax, h.realMin, h.realMax]).filter(Boolean).sort();
   const gMin = allD[0], gMax = allD[allD.length - 1];
@@ -5671,17 +5671,17 @@ function wpRenderDeviation() {
       <div class="dv-card"><div class="dv-lab">Atraso promedio</div><div class="dv-big ${c.avgSlip > 0 ? 'dv-neg' : 'dv-pos'}">${c.avgSlip > 0 ? '+' : ''}${c.avgSlip.toFixed(1)}d</div><div class="dv-meta">plan → real por tarea</div></div>
       <div class="dv-card"><div class="dv-lab">A tiempo</div><div class="dv-big ${c.onTimePct >= 80 ? 'dv-pos' : c.onTimePct >= 60 ? 'dv-amb' : 'dv-neg'}">${c.onTimePct}%</div><div class="dv-meta">tareas en su día planeado</div></div>
     </div>
-    <div class="dv-sec"><h3>📊 Plan inicial vs Real — por casa</h3>
+    <div class="dv-sec"><h3>${osIcon('chart')} Plan inicial vs Real — por casa</h3>
       <div style="display:flex;gap:14px;font-size:10px;color:var(--dmut);margin-bottom:10px"><span><span style="display:inline-block;width:10px;height:8px;background:rgba(47,110,240,.5);border-radius:3px"></span> Plan</span><span><span style="display:inline-block;width:10px;height:8px;background:linear-gradient(90deg,#c07d16,#e0455f);border-radius:3px"></span> Real</span></div>
       ${c.byHouse.length ? c.byHouse.map(h => `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><b>${esc(h.house)}</b><span>${slipChip(Math.round(h.avg))} · ${h.pct}% movidas · plan ${fmt(h.planMin)}–${fmt(h.planMax)} → real ${fmt(h.realMin)}–${fmt(h.realMax)}</span></div><div class="dv-track"><div class="dv-bar plan" style="left:${pos(h.planMin)}%;width:${Math.max(2, pos(h.planMax) - pos(h.planMin))}%"></div><div class="dv-bar real" style="left:${pos(h.realMin)}%;width:${Math.max(2, pos(h.realMax) - pos(h.realMin))}%"></div></div></div>`).join('') : '<div style="color:var(--dmut);padding:10px">Sin casas con baseline.</div>'}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div class="dv-sec"><h3>🧱 Desviación por etapa</h3>${tbl(c.byStage, 'Etapa')}</div>
-      <div class="dv-sec"><h3>🏠 Desviación por casa</h3>${tbl(c.byHouse.map(h => ({ ...h, key: h.house })), 'Casa')}</div>
+      <div class="dv-sec"><h3>${osIcon('brick')} Desviación por etapa</h3>${tbl(c.byStage, 'Etapa')}</div>
+      <div class="dv-sec"><h3>${osIcon('house')} Desviación por casa</h3>${tbl(c.byHouse.map(h => ({ ...h, key: h.house })), 'Casa')}</div>
     </div>
-    <div class="dv-sec dv-brain"><h3>🧠 Cerebro de planeación</h3>${insights.map(i => `<div class="dv-ins"><span style="color:var(--dblue)">●</span><div>${i}</div></div>`).join('')}</div>
+    <div class="dv-sec dv-brain"><h3>${osIcon('brain')} Cerebro de planeación</h3>${insights.map(i => `<div class="dv-ins"><span style="color:var(--dblue)">●</span><div>${i}</div></div>`).join('')}</div>
   </div>`;
-  openModal('📉 Plan inicial vs Real — Desviación', html);
+  openModal('Plan inicial vs Real — Desviación', html);
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-6xl'); }
 }
 window.wpRenderDeviation = wpRenderDeviation;
@@ -5693,7 +5693,7 @@ function wpOpenCrewPay(casaNorm) {
   const money = n => '$' + Math.round(+n || 0).toLocaleString('en-US');
   const pay = wpState.workerPay || [];
   const casas = [...new Set(pay.map(p => p.casa_norm))].map(cn => ({ cn, name: (pay.find(p => p.casa_norm === cn) || {}).casa || cn })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  if (!pay.length) { openModal('💵 Pago crew', '<div id="wp-dev"><div class="dv-sec" style="text-align:center;color:var(--dmut);padding:30px">Sin datos de pago todavía. Corré el sync de trabajadores (Airtable → Supabase).</div></div>'); return; }
+  if (!pay.length) { openModal('Pago crew', '<div id="wp-dev"><div class="dv-sec" style="text-align:center;color:var(--dmut);padding:30px">Sin datos de pago todavía. Corré el sync de trabajadores (Airtable → Supabase).</div></div>'); return; }
   if (!casaNorm) {
     const hf = wpState.houseFilter;
     if (hf && hf !== 'all') {
@@ -5713,21 +5713,21 @@ function wpOpenCrewPay(casaNorm) {
   const html = `<div id="wp-dev">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <div style="font-size:12px;color:var(--dmut)">Cuánto gana cada persona en la obra (horas y total). Fuente: <b>Airtable — Horas trabajadas / Cuadrillas</b>.</div>
-      <select onchange="wpOpenCrewPay(this.value)" style="font-size:12px;padding:7px 10px;border-radius:9px;border:1px solid var(--dbord);background:var(--dglass);color:var(--dink)">${casas.map(c => `<option value="${esc(c.cn)}" ${c.cn === casaNorm ? 'selected' : ''}>🏠 ${esc(c.name)}</option>`).join('')}</select>
+      <select onchange="wpOpenCrewPay(this.value)" style="font-size:12px;padding:7px 10px;border-radius:9px;border:1px solid var(--dbord);background:var(--dglass);color:var(--dink)">${casas.map(c => `<option value="${esc(c.cn)}" ${c.cn === casaNorm ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
     </div>
     <div class="dv-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
       <div class="dv-card"><div class="dv-lab">Pago total (obra)</div><div class="dv-big">${money(totalPago)}</div><div class="dv-meta">${rows.length} persona(s)</div></div>
       <div class="dv-card"><div class="dv-lab">Horas totales</div><div class="dv-big">${Math.round(totalHoras).toLocaleString('en-US')}</div><div class="dv-meta">acumuladas</div></div>
       <div class="dv-card"><div class="dv-lab">$/hora promedio</div><div class="dv-big">$${avgH.toFixed(1)}</div><div class="dv-meta">ponderado</div></div>
     </div>
-    <div class="dv-sec"><h3>👷 Pago por persona — ${esc(casaName)}</h3>
+    <div class="dv-sec"><h3>${osIcon('hard-hat')} Pago por persona — ${esc(casaName)}</h3>
       <table><thead><tr><th>Persona</th><th>Semanas</th><th>Horas</th><th>$/hora</th><th>Pago total</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td><b>${esc(r.worker)}</b></td><td>${r.semanas || '—'}</td><td>${(+r.horas || 0).toFixed(1)}</td><td>$${(+r.x_hora || 0).toFixed(1)}</td><td><b>${money(r.pago)}</b></td></tr>`).join('')}
       </tbody></table>
     </div>
     <div style="margin-top:12px"><button class="dv-back" onclick="wpBackToPlanner()">← Volver al Planner</button></div>
   </div>`;
-  openModal(`💵 Pago crew — ${casaName}`, html);
+  openModal(`Pago crew — ${casaName}`, html);
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
 }
 window.wpOpenCrewPay = wpOpenCrewPay;
@@ -5757,7 +5757,7 @@ function wpOpenReport(range) {
   const html = `<div id="wp-report">
     <div class="wr-controls no-print" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       ${tab('dia', 'Día')}${tab('semana', 'Semana')}${tab('mes', 'Mes')}
-      <button onclick="window.print()" class="wr-print" style="margin-left:auto">🖨️ Imprimir / Guardar PDF</button>
+      <button onclick="window.print()" class="wr-print" style="margin-left:auto">${osIcon('printer')} Imprimir / Guardar PDF</button>
     </div>
     <div class="wr-doc">
       <div class="wr-head"><div><div class="wr-title">Reporte de obra — Planner Semanal</div><div class="wr-sub">${esc(label)}${wpState.houseFilter && wpState.houseFilter !== 'all' ? ' · casa filtrada' : ' · todas las casas'}</div></div><div class="wr-brand">Ever Home · Remodelación</div></div>
@@ -5771,7 +5771,7 @@ function wpOpenReport(range) {
       ${homesHtml}
     </div>
   </div>`;
-  openModal('📄 Reporte del Planner', html);
+  openModal('Reporte del Planner', html);
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-3xl', 'max-w-4xl', 'max-w-5xl', 'max-w-6xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
 }
 window.wpOpenReport = wpOpenReport;
@@ -5783,12 +5783,12 @@ function wpCheckCriticalLate() {
   if (!late.length) return;
   const esc = x => String(x == null ? '' : x).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const rows = late.map(a => ({ casa: a.property_name || '—', name: (a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''), dias: Math.round((new Date(today) - new Date(a.date)) / 86400000), date: a.date })).sort((a, b) => b.dias - a.dias);
-  const html = `<div id="wp-cl"><div style="font-size:12px;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:12px"><b>⚠ ${late.length} actividad(es) de RUTA CRÍTICA atrasadas.</b> Cada día perdido empuja la fecha de entrega. Reprogramá o completá con prioridad.</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:6px;color:#64748b;font-size:10px;text-transform:uppercase">Casa</th><th style="text-align:left;padding:6px;color:#64748b;font-size:10px;text-transform:uppercase">Actividad</th><th style="text-align:right;padding:6px;color:#64748b;font-size:10px;text-transform:uppercase">Atraso</th></tr></thead><tbody>
-    ${rows.map(r => `<tr style="border-top:1px solid #eef2f8"><td style="padding:7px 6px;font-weight:600">${esc(r.casa)}</td><td style="padding:7px 6px">${esc(r.name)} <span style="color:#94a3b8;font-size:10px">· ${r.date}</span></td><td style="padding:7px 6px;text-align:right;color:#e0455f;font-weight:700">${r.dias}d</td></tr>`).join('')}
+  const html = `<div id="wp-cl"><div style="font-size:12px;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:12px"><b>${osIcon('alert')} ${late.length} actividad(es) de RUTA CRÍTICA atrasadas.</b> Cada día perdido empuja la fecha de entrega. Reprogramá o completá con prioridad.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:6px;color:#756c5c;font-size:10px;text-transform:uppercase">Casa</th><th style="text-align:left;padding:6px;color:#756c5c;font-size:10px;text-transform:uppercase">Actividad</th><th style="text-align:right;padding:6px;color:#756c5c;font-size:10px;text-transform:uppercase">Atraso</th></tr></thead><tbody>
+    ${rows.map(r => `<tr style="border-top:1px solid #efe9de"><td style="padding:7px 6px;font-weight:600">${esc(r.casa)}</td><td style="padding:7px 6px">${esc(r.name)} <span style="color:#a89f8f;font-size:10px">· ${r.date}</span></td><td style="padding:7px 6px;text-align:right;color:#e0455f;font-weight:700">${r.dias}d</td></tr>`).join('')}
     </tbody></table>
-    <div style="margin-top:14px;text-align:right"><button onclick="wpBackToPlanner()" style="background:#0f1c2e;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">Ir al Planner →</button></div></div>`;
-  openModal('🚨 Ruta crítica atrasada', html);
+    <div style="margin-top:14px;text-align:right"><button onclick="wpBackToPlanner()" style="background:#211e17;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">Ir al Planner →</button></div></div>`;
+  openModal('Ruta crítica atrasada', html);
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-7xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-2xl'); }
 }
 window.wpCheckCriticalLate = wpCheckCriticalLate;
@@ -5810,7 +5810,7 @@ async function wpOpenBitacora(houseId) {
   const esc = x => String(x == null ? '' : x).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fdate = d => new Date(d + 'T00:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
   const dias = Object.keys(byDate).sort().reverse().map(d => {
-    const items = byDate[d].map(a => `<tr><td class="wr-d"></td><td>✔ ${esc((a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''))}${a.stage ? ` <span class="wr-st">· ${esc(a.stage)}</span>` : ''}${a.is_critical ? ' 🎯' : ''}</td><td class="wr-bd"><span class="wr-b wr-done">HECHA</span></td></tr>`).join('');
+    const items = byDate[d].map(a => `<tr><td class="wr-d"></td><td>${osIcon('check')} ${esc((a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''))}${a.stage ? ` <span class="wr-st">· ${esc(a.stage)}</span>` : ''}${a.is_critical ? osIcon('target') : ''}</td><td class="wr-bd"><span class="wr-b wr-done">HECHA</span></td></tr>`).join('');
     return `<div class="wr-home"><div class="wr-hh">${fdate(d)} <span class="wr-hc">${byDate[d].length} actividad(es)</span></div><table class="wr-t"><tbody>${items}</tbody></table></div>`;
   }).join('') || '<div style="padding:16px;color:#888">Sin actividades completadas registradas todavía.</div>';
   const movesHtml = moves.length ? `<div class="wr-home"><div class="wr-hh">Reprogramaciones <span class="wr-hc">${moves.length}</span></div><table class="wr-t"><tbody>${moves.map(mv => `<tr><td class="wr-d">${esc(mv.to_date)}</td><td>↷ ${esc((mv.activity_name || '').replace(/\s*\(d[ií]a.*/, ''))} · de ${esc(mv.from_date)} a ${esc(mv.to_date)}${mv.reason ? ` · <i>${esc(mv.reason)}</i>` : ''}</td><td class="wr-bd"><span class="wr-b ${mv.slip_days > 0 ? 'wr-late' : 'wr-done'}">${mv.slip_days > 0 ? '+' : ''}${mv.slip_days}d</span></td></tr>`).join('')}</tbody></table></div>` : '';
@@ -5818,7 +5818,7 @@ async function wpOpenBitacora(houseId) {
   const html = `<div id="wp-report">
     <div class="no-print" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <select onchange="wpOpenBitacora(this.value)" class="rp-sel" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--wbord,#ccc)">${sel}</select>
-      <button onclick="window.print()" class="wr-print" style="margin-left:auto">🖨️ Imprimir / PDF</button>
+      <button onclick="window.print()" class="wr-print" style="margin-left:auto">${osIcon('printer')} Imprimir / PDF</button>
     </div>
     <div class="wr-doc">
       <div class="wr-head"><div><div class="wr-title">Bitácora de obra — ${esc(casa.name)}</div><div class="wr-sub">Auto-generada del Planner · ${new Date().toLocaleDateString('es')}</div></div><div class="wr-brand">Ever Home · Remodelación</div></div>
@@ -5830,7 +5830,7 @@ async function wpOpenBitacora(houseId) {
       </div>
       ${dias}${movesHtml}
     </div></div>`;
-  openModal('📔 Bitácora de obra', html);
+  openModal('Bitácora de obra', html);
   const inner = document.querySelector('#modal > div'); if (inner) { ['max-w-3xl', 'max-w-7xl'].forEach(x => inner.classList.remove(x)); inner.classList.add('max-w-4xl'); }
 }
 window.wpOpenBitacora = wpOpenBitacora;
@@ -5854,13 +5854,13 @@ function wpAlertDrawerHtml(overdueAll, conflicts) {
   const item = (a, extra) => `<div class="wd-item" onclick="wpEditActivity('${a.id}')"><b>${E((a.activity_name || '').replace(/\s*\(d[ií]a.*/, '').slice(0, 46))}</b><br><span style="opacity:.65">${casaDe(a)}${a.stage ? ' · ' + E(a.stage) : ''}${extra || ''}</span></div>`;
   const atrasos = (wpState.vivoAtrasos || []);
   return `<div id="wp-alert-drawer">
-    <div style="display:flex;justify-content:space-between;align-items:center"><h3>🔔 Alertas</h3><button onclick="wpToggleAlertPanel()" style="border:none;background:none;font-size:16px;cursor:pointer">✕</button></div>
-    ${atrasos.length ? `<div class="wd-sec">📉 Obras atrasadas vs cronograma (${atrasos.length})</div>` + atrasos.map(o => `<div class="wd-item" style="border-color:#fda4af"><b>${E(String(o.address || '').split(',')[0])}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado → <b>${o.atraso_pts} pts atrás</b>, ~${o.atraso_dias} día(s) de retraso</div>`).join('') : ''}
-    <div class="wd-sec">⏰ Atrasadas (${overdueAll.length})</div>
-    ${overdueAll.slice(0, 25).map(a => item(a, ` · <b style="color:#e11d48">${dd(a.date)}d tarde</b>${a.is_critical || a.priority === 'critical' || a.priority === 'urgent' ? ' · 🎯 crítica' : ''}`)).join('') || '<div class="wd-item">Ninguna ✓</div>'}
-    <div class="wd-sec">⚠️ Conflictos de recurso (${conflicts.length})</div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3>${osIcon('bell')} Alertas</h3><button onclick="wpToggleAlertPanel()" style="border:none;background:none;font-size:16px;cursor:pointer">✕</button></div>
+    ${atrasos.length ? `<div class="wd-sec">${osIcon('trending-down')} Obras atrasadas vs cronograma (${atrasos.length})</div>` + atrasos.map(o => `<div class="wd-item" style="border-color:#fda4af"><b>${E(String(o.address || '').split(',')[0])}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado → <b>${o.atraso_pts} pts atrás</b>, ~${o.atraso_dias} día(s) de retraso</div>`).join('') : ''}
+    <div class="wd-sec">${osIcon('clock')} Atrasadas (${overdueAll.length})</div>
+    ${overdueAll.slice(0, 25).map(a => item(a, ` · <b style="color:#e11d48">${dd(a.date)}d tarde</b>${a.is_critical || a.priority === 'critical' || a.priority === 'urgent' ? ' · crítica' : ''}`)).join('') || '<div class="wd-item">Ninguna ✓</div>'}
+    <div class="wd-sec">${osIcon('alert')} Conflictos de recurso (${conflicts.length})</div>
     ${conflicts.slice(0, 15).map(c => { const r = wpState.resources.find(x => x.id === c.resourceId); return `<div class="wd-item"><b>${E(r ? r.name : c.resourceId)}</b> asignado en ${c.count || 2}+ casas el ${c.date}</div>`; }).join('') || '<div class="wd-item">Ninguno ✓</div>'}
-    <div class="wd-sec">👤 Sin recurso asignado (${sinRec.length})</div>
+    <div class="wd-sec">${osIcon('user')} Sin recurso asignado (${sinRec.length})</div>
     ${sinRec.slice(0, 15).map(a => item(a, ' · sin dueño')).join('') || '<div class="wd-item">Ninguna ✓</div>'}
   </div>`;
 }

@@ -249,13 +249,13 @@ function lmCSS() {
 // ─── vista principal ───
 function osLineageView() {
   lmCSS();
-  if (!LM.rows && !LM.err) { lmLoad(); return '<div class="empty">⏳ Cargando el mapa de conexiones…</div>'; }
+  if (!LM.rows && !LM.err) { lmLoad(); return '<div class="empty">' + osIcon('loader') + ' Cargando el mapa de conexiones…</div>'; }
   if (LM.err) return '<div class="empty down">' + LM_E(LM.err) + ' <button class="cbtn" onclick="lmLoad(true)">Reintentar</button></div>';
   const tree = lmTreeData();
   const qn = (LM.qn || '').trim().toLowerCase();
   const stDot = s => '<span class="lm-sd" style="background:' + (s === 'ok' ? 'var(--pos)' : s === 'warn' ? 'var(--amber)' : s === 'bug' ? 'var(--neg)' : 'var(--mut2)') + '"></span>';
   const treeHtml = '<div class="card lm-tree" style="padding:12px">'
-    + '<div style="font-weight:800;font-size:14px;margin:2px 6px 2px">🔎 Conexiones al detalle</div>'
+    + '<div style="font-weight:800;font-size:14px;margin:2px 6px 2px">' + osIcon('search') + ' Conexiones al detalle</div>'
     + '<div class="meta" style="margin:0 6px 8px">Elegí un número → ves de dónde viene y qué alimenta.</div>'
     + '<input id="lm-qn" class="lm-in" style="margin:0 4px 10px;width:calc(100% - 8px)" placeholder="Buscar número…" value="' + LM_E(LM.qn) + '" oninput="lmSetQn(this.value)">'
     + Object.keys(tree).map(emp => {
@@ -284,20 +284,20 @@ function osLineageView() {
     const rows = lmRowsSel();
     const bugs = (LM.rows || []).filter(x => x.estado === 'bug'), warns = (LM.rows || []).filter(x => x.estado === 'warn');
     main = '<div class="card">'
-      + '<h1 style="font-size:19px">🗺️ Mapa de Conexiones <span>· de dónde sale cada número</span></h1>'
+      + '<h1 style="font-size:19px">' + osIcon('map') + ' Mapa de Conexiones <span>· de dónde sale cada número</span></h1>'
       + '<div class="sub">' + (LM.rows || []).length + ' números trazados en ' + Object.keys(tree).length + ' empresas · <b style="color:var(--pos)">' + ((LM.rows || []).length - bugs.length - warns.length) + ' OK</b> · <b style="color:var(--amber)">' + warns.length + ' a revisar</b> · <b style="color:var(--neg)">' + bugs.length + ' bug</b></div>'
-      + '<div class="lm-key">🔑 <b>La llave que une las bases:</b> la casa (<b>property_id</b> ↔ Dirección). La misma casa vive en Fix & Flip, Rentas y Remodelación — si la dirección está escrita distinto, el property_id la cruza igual (por eso la Ficha se arregló resolviendo por property_id).</div>'
+      + '<div class="lm-key">' + osIcon('key') + ' <b>La llave que une las bases:</b> la casa (<b>property_id</b> ↔ Dirección). La misma casa vive en Fix & Flip, Rentas y Remodelación — si la dirección está escrita distinto, el property_id la cruza igual (por eso la Ficha se arregló resolviendo por property_id).</div>'
       + (() => {
         const sinF = (LM.rows || []).filter(r => r.origen === 'crawler' && r.estado === 'pend').length;
         const tot = (LM.rows || []).length;
         const cov = LM.cov;
-        return '<div class="kv" style="margin-top:10px"><span>📈 <b>Cobertura de linaje</b> (gate de CI: ningún número visible sin registro)</span><b>'
+        return '<div class="kv" style="margin-top:10px"><span>' + osIcon('trending-up') + ' <b>Cobertura de linaje</b> (gate de CI: ningún número visible sin registro)</span><b>'
           + (cov ? (cov.sin_linaje === 0 ? '<span style="color:var(--pos)">✓ ' + cov.con_linaje + '/' + cov.numeros_vistos + ' números vistos con registro</span>' : '<span style="color:var(--neg)">' + cov.sin_linaje + ' sin registro de ' + cov.numeros_vistos + '</span>') + ' <span class="meta">(' + String(cov.run_at || '').slice(0, 10) + ' · ' + cov.pantallas + ' pantallas)</span>' : '<span class="meta">sin corrida del crawler todavía (npm run gate:lineage)</span>')
           + '</b></div>'
           + '<div class="kv"><span>Fuente exacta definida</span><b>' + (tot - sinF) + '/' + tot + ' registrados' + (sinF ? ' · <span style="color:var(--amber)">' + sinF + ' descubiertos por el crawler esperando curación</span>' : ' <span style="color:var(--pos)">✓</span>') + '</b></div>';
       })()
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="ibtn" onclick="lmJSON(true)">⬇ JSON completo</button><button class="ibtn" onclick="lmCSV(true)">⬇ CSV completo</button></div>'
-      + ((warns.length || bugs.length) ? '<div class="lab" style="margin-top:16px">⚠ Casos marcados (dual-source / cálculo sobre vacío / a revisar)</div>'
+      + ((warns.length || bugs.length) ? '<div class="lab" style="margin-top:16px">' + osIcon('alert') + ' Casos marcados (dual-source / cálculo sobre vacío / a revisar)</div>'
         + bugs.concat(warns).slice(0, 12).map(r => '<div class="kv" style="cursor:pointer" onclick="lmGo(\'' + LM_E(r.empresa) + '\',\'' + LM_E(r.sistema).replace(/'/g, "\\'") + '\')"><span><span class="lm-pill ' + r.estado + '">' + LM_PILL[r.estado] + '</span> ' + LM_E(r.empresa) + ' › ' + LM_E(r.sistema) + ' › <b>' + LM_E(r.dato) + '</b></span><b class="meta" style="max-width:45%;text-align:right;font-weight:500">' + LM_E(r.nota || r.formula || '') + '</b></div>').join('') : '')
       + '<div class="empty" style="padding:22px">Elegí un sistema en el árbol para ver sus números, editarlos o abrir el diagrama.</div>'
       + '</div>';
@@ -310,11 +310,11 @@ function osLineageView() {
       + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h1 style="font-size:19px;margin:0">' + LM_E(LM.sys) + '</h1>'
       + '<span class="meta">' + all.length + ' números · <b style="color:var(--pos)">' + (all.length - bugs - warns) + ' OK</b> · <b style="color:var(--amber)">' + warns + ' revisar</b> · <b style="color:var(--neg)">' + bugs + ' bug</b></span>'
       + '<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">'
-      + '<button class="ibtn" style="' + (LM.mode === 'lista' ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="lmMode(\'lista\')">📋 Lista</button>'
-      + '<button class="ibtn" style="' + (LM.mode === 'diagrama' ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="lmMode(\'diagrama\')">🕸 Diagrama</button>'
+      + '<button class="ibtn" style="' + (LM.mode === 'lista' ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="lmMode(\'lista\')">' + osIcon('clipboard') + ' Lista</button>'
+      + '<button class="ibtn" style="' + (LM.mode === 'diagrama' ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="lmMode(\'diagrama\')">' + osIcon('network') + ' Diagrama</button>'
       + '<button class="ibtn" onclick="lmAdd()">＋ Agregar dato</button>'
       + '<button class="ibtn" onclick="lmJSON(false)">⬇ JSON</button><button class="ibtn" onclick="lmCSV(false)">⬇ CSV</button></span></div>'
-      + '<input id="lm-q" class="lm-in" style="max-width:340px;margin-top:10px" placeholder="🔍 Buscar número, tabla o columna…" value="' + LM_E(LM.q) + '" oninput="lmSetQ(this.value)">'
+      + '<input id="lm-q" class="lm-in" style="max-width:340px;margin-top:10px" placeholder="Buscar número, tabla o columna…" value="' + LM_E(LM.q) + '" oninput="lmSetQ(this.value)">'
       + '</div>';
     main = head + (LM.mode === 'diagrama' ? lmDiagrama(rows) : lmLista(rows));
   }
@@ -342,18 +342,18 @@ function lmFlujo(r) {
   return '<div class="card">'
     + '<div class="meta">' + LM_E(r.empresa) + ' › ' + LM_E(r.sistema) + (r.grupo ? ' › ' + LM_E(r.grupo) : '') + '</div>'
     + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:2px 0 4px"><h1 style="font-size:21px;margin:0">' + LM_E(r.dato) + '</h1><span class="lm-pill ' + r.estado + '">' + LM_PILL[r.estado] + '</span>'
-    + '<span style="margin-left:auto;display:flex;gap:6px"><button class="ibtn" onclick="LM.sel=null;LM.mode=\'lista\';lmEdit(\'' + r.id + '\')">✎ Cambiar fuente</button>'
-    + '<button class="ibtn" onclick="LM.sel=null;LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">🕸 Ver en el diagrama</button></span></div>'
+    + '<span style="margin-left:auto;display:flex;gap:6px"><button class="ibtn" onclick="LM.sel=null;LM.mode=\'lista\';lmEdit(\'' + r.id + '\')">' + osIcon('pencil') + ' Cambiar fuente</button>'
+    + '<button class="ibtn" onclick="LM.sel=null;LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">' + osIcon('network') + ' Ver en el diagrama</button></span></div>'
     + '<div class="meta" style="margin-bottom:16px">De dónde viene y qué alimenta.</div>'
     + '<div class="lab" style="margin-bottom:10px">① De dónde viene (Airtable/QBO → app)</div>'
     + '<div class="lm-flow">' + flow + '</div>'
     + (r.formula ? '<div class="lm-formula">ƒ &nbsp; ' + LM_E(r.formula) + '</div>' : '')
-    + (r.nota ? '<div style="color:var(--amber);font-size:12.5px;margin-top:8px">⚠ ' + LM_E(r.nota) + '</div>' : '')
-    + (vc ? '<div class="meta" style="margin-top:8px">🧬 La vista <b>' + LM_E(vc.view) + '</b> lee de: ' + vc.deps.map(d => '<span class="lm-mono">' + LM_E(d.t) + '</span> (' + d.c.length + ' col)').join(' · ') + ' <span style="opacity:.7">(metadata generada de Postgres)</span></div>' : '')
+    + (r.nota ? '<div style="color:var(--amber);font-size:12.5px;margin-top:8px">' + osIcon('alert') + ' ' + LM_E(r.nota) + '</div>' : '')
+    + (vc ? '<div class="meta" style="margin-top:8px">' + osIcon('dna') + ' La vista <b>' + LM_E(vc.view) + '</b> lee de: ' + vc.deps.map(d => '<span class="lm-mono">' + LM_E(d.t) + '</span> (' + d.c.length + ' col)').join(' · ') + ' <span style="opacity:.7">(metadata generada de Postgres)</span></div>' : '')
     + (upInv.length ? '<div class="lab" style="margin-top:18px;margin-bottom:8px">⬅ Se alimenta también de</div><div class="lm-feeds">' + upInv.map(x => '<div class="lm-feed" onclick="lmSel(\'' + LM_E(x.metric_key) + '\')">' + LM_E(x.dato) + '<span class="w">en ' + LM_E(x.empresa) + ' · ' + LM_E(x.sistema) + '</span></div>').join('') + '</div>' : '')
     + '<div class="lab" style="margin-top:18px;margin-bottom:8px">② Qué alimenta (este número → otros)</div>'
     + '<div class="lm-feeds">' + (feeds.length ? feeds.map(feedCard).join('') : '<span class="meta">— dato final (no alimenta otros números registrados)</span>') + '</div>'
-    + '<div class="lm-key" style="margin-top:20px">🔑 La misma casa se une entre bases por la <b>Dirección (property_id)</b>. Clic en una tarjeta de "alimenta" para saltar a ese número y seguir la cadena.</div>'
+    + '<div class="lm-key" style="margin-top:20px">' + osIcon('key') + ' La misma casa se une entre bases por la <b>Dirección (property_id)</b>. Clic en una tarjeta de "alimenta" para saltar a ese número y seguir la cadena.</div>'
     + '<div class="meta" style="margin-top:8px;font-size:10.5px">Editado por ' + LM_E(r.editado_por || '—') + ' · ' + LM_E(String(r.updated_at || '').slice(0, 16).replace('T', ' ')) + ' · origen del registro: ' + LM_E(r.origen || 'curado') + '</div>'
     + '</div>';
 }
@@ -374,7 +374,7 @@ function lmLista(rows) {
           + '<div><div class="lab">Columna / campo</div><input id="lm-e-columna" class="lm-in" value="' + LM_E(r.columna) + '"></div>'
           + '<div style="grid-column:span 2"><div class="lab">Fórmula (si es derivado)</div><input id="lm-e-formula" class="lm-in" value="' + LM_E(r.formula || '') + '"></div>'
           + '<div><div class="lab">Nota</div><input id="lm-e-nota" class="lm-in" value="' + LM_E(r.nota || '') + '"></div>'
-          + '</div><div style="display:flex;gap:8px"><button class="cbtn" style="padding:7px 14px" onclick="lmSaveEdit(\'' + r.id + '\')">💾 Guardar (queda auditado)</button><button class="ibtn" onclick="LM.edit=null;osRender()">Cancelar</button>'
+          + '</div><div style="display:flex;gap:8px"><button class="cbtn" style="padding:7px 14px" onclick="lmSaveEdit(\'' + r.id + '\')">' + osIcon('save') + ' Guardar (queda auditado)</button><button class="ibtn" onclick="LM.edit=null;osRender()">Cancelar</button>'
           + '<span class="meta" style="align-self:center">Reasignar la fuente de una cifra contable la deja PENDIENTE hasta reconciliar con QBO.</span></div>'
           + '</td></tr>';
       }
@@ -385,7 +385,7 @@ function lmLista(rows) {
         + '<td class="lm-mono">' + LM_E(r.columna) + '</td>'
         + '<td class="lm-mono" style="max-width:220px">' + LM_E(r.formula || '—') + '</td>'
         + '<td>' + estadoSel(r) + '</td>'
-        + '<td style="white-space:nowrap"><span class="lm-act" title="ver en el diagrama" onclick="LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">🔗</span><span class="lm-act" title="cambiar fuente" onclick="lmEdit(\'' + r.id + '\')">✎</span><span class="lm-act" title="quitar" onclick="lmArchive(\'' + r.id + '\')">✕</span></td>'
+        + '<td style="white-space:nowrap"><span class="lm-act" title="ver en el diagrama" onclick="LM.mode=\'diagrama\';lmFocus(\'' + r.id + '\')">' + osIcon('link') + '</span><span class="lm-act" title="cambiar fuente" onclick="lmEdit(\'' + r.id + '\')">' + osIcon('pencil') + '</span><span class="lm-act" title="quitar" onclick="lmArchive(\'' + r.id + '\')">✕</span></td>'
         + '</tr>';
     }).join('')
     + '</tbody></table></div>';
@@ -417,7 +417,7 @@ function lmDiagrama(rows) {
   const f = rows.find(r => r.id === LM.focus);
   const vc = f ? lmViewChain(f.tabla) : null;
   const detail = f ? '<div class="lm-detail">'
-    + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>' + LM_E(f.dato) + '</b><span style="display:flex;gap:6px"><button class="ibtn" onclick="LM.mode=\'lista\';lmEdit(\'' + f.id + '\')">✎ Cambiar fuente</button><button class="ibtn" onclick="lmFocus(\'' + f.id + '\')">✕</button></span></div>'
+    + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>' + LM_E(f.dato) + '</b><span style="display:flex;gap:6px"><button class="ibtn" onclick="LM.mode=\'lista\';lmEdit(\'' + f.id + '\')">' + osIcon('pencil') + ' Cambiar fuente</button><button class="ibtn" onclick="lmFocus(\'' + f.id + '\')">✕</button></span></div>'
     + '<div class="kv"><span>Base</span><b><span class="lm-btag" style="background:' + lmColor(f.base) + '22;color:' + lmColor(f.base) + '">' + LM_E(f.base) + '</span></b></div>'
     + '<div class="kv"><span>Tabla</span><b class="lm-mono">' + LM_E(f.tabla) + '</b></div>'
     + '<div class="kv"><span>Columna</span><b class="lm-mono">' + LM_E(f.columna) + '</b></div>'
@@ -491,8 +491,8 @@ async function osLineageInfo(empresa, sistema, dato) {
         + (r.formula ? kv('Fórmula', LM_E(r.formula)) : '') + (r.nota ? kv('Nota', '<span style="font-weight:500;font-size:11px">' + LM_E(r.nota) + '</span>') : '')
         + kv('Estado', '<span class="lm-pill ' + r.estado + '">' + LM_PILL[r.estado] + '</span>')
         + (vc ? kv('La vista lee de', '<span style="font-size:10px">' + vc.deps.map(d => LM_E(d.t)).join(' · ') + '</span>') : '')
-        + '<div style="margin-top:12px;display:flex;gap:8px"><button class="cbtn" style="padding:8px 14px" onclick="document.getElementById(\'lm-info-ov\').remove();osNav(\'/mapa\');LM.emp=\'' + LM_E(empresa) + '\';LM.sys=\'' + LM_E(sistema).replace(/'/g, "\\'") + '\';osRender()">🗺️ Abrir en el mapa (y reasignar fuente)</button></div>'
-      : '<div style="padding:16px 0;color:var(--mut,#9aa0b8);font-size:12.5px">Este número todavía no está trazado en el mapa. Agregalo desde 🗺️ /mapa → ' + LM_E(empresa) + ' → ' + LM_E(sistema) + ' → ＋ Agregar dato.</div>')
+        + '<div style="margin-top:12px;display:flex;gap:8px"><button class="cbtn" style="padding:8px 14px" onclick="document.getElementById(\'lm-info-ov\').remove();osNav(\'/mapa\');LM.emp=\'' + LM_E(empresa) + '\';LM.sys=\'' + LM_E(sistema).replace(/'/g, "\\'") + '\';osRender()">' + osIcon('map') + ' Abrir en el mapa (y reasignar fuente)</button></div>'
+      : '<div style="padding:16px 0;color:var(--mut,#9aa0b8);font-size:12.5px">Este número todavía no está trazado en el mapa. Agregalo desde ' + osIcon('map') + ' /mapa → ' + LM_E(empresa) + ' → ' + LM_E(sistema) + ' → ＋ Agregar dato.</div>')
     + '</div>';
   document.body.appendChild(ov);
 }

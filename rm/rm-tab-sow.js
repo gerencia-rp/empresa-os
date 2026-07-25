@@ -206,12 +206,12 @@ function rmRenderSow(body) {
       <div class="bg-white rounded-xl p-4 border border-slate-200">
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2 class="text-lg font-bold">📋 Scope of Work — ${rmState.editName || 'Sin nombre'}</h2>
+            <h2 class="text-lg font-bold">${osIcon('clipboard')} Scope of Work — ${rmState.editName || 'Sin nombre'}</h2>
             <p class="text-xs text-slate-500">Generado automáticamente desde el presupuesto. Edita lo que necesites antes de exportar.</p>
           </div>
           <div class="flex gap-2">
-            <button onclick="rmDistributeAutoDraws()" class="bg-slate-100 hover:bg-slate-200 text-xs font-bold px-3 py-2 rounded">⚡ Auto-distribuir Draws</button>
-            <button onclick="rmExportSowCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded">⬇️ Exportar CSV (Lender)</button>
+            <button onclick="rmDistributeAutoDraws()" class="bg-slate-100 hover:bg-slate-200 text-xs font-bold px-3 py-2 rounded">${osIcon('zap')} Auto-distribuir Draws</button>
+            <button onclick="rmExportSowCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('download')} Exportar CSV (Lender)</button>
           </div>
         </div>
       </div>
@@ -276,12 +276,12 @@ function rmRenderSow(body) {
       </div>
 
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-950">
-        <strong>💡 Cómo funciona:</strong>
+        <strong>${osIcon('lightbulb')} Cómo funciona:</strong>
         <ul class="mt-1 ml-4 list-disc space-y-0.5">
           <li>Los <strong>montos auto-calculados</strong> vienen de las actividades de tu proyecto (mapeo de 60+ códigos del catálogo a categorías SOW del lender)</li>
           <li>Puedes <strong>editar cualquier valor</strong>: monto, descripción, distribución de draws</li>
-          <li>Click <strong>"⚡ Auto-distribuir Draws"</strong> para llenar automáticamente Draw #1 (demo+rough), #2 (interior), #3 (finishes+exterior)</li>
-          <li>Click <strong>"⬇️ Exportar CSV"</strong> genera archivo en formato LRC standard que puedes copiar/pegar al template del lender</li>
+          <li>Click <strong>"Auto-distribuir Draws"</strong> para llenar automáticamente Draw #1 (demo+rough), #2 (interior), #3 (finishes+exterior)</li>
+          <li>Click <strong>"Exportar CSV"</strong> genera archivo en formato LRC standard que puedes copiar/pegar al template del lender</li>
           <li>Soporta formatos: LRC Generic, STX Capital, 04 Rehab Budget</li>
         </ul>
       </div>
