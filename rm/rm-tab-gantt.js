@@ -42,7 +42,7 @@ function rmRenderGantt(body) {
     </div>
     ${cpmOn && cpmErr ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 mb-3">${osIcon('alert')} ${cpmErr}. Revisá las dependencias en el tab Catálogo (probablemente hay un ciclo).</div>` : ''}
     ${cpmOn && !cpmErr ? `
-      <div class="bg-purple-50 border border-purple-200 rounded p-2 text-xs text-purple-950 mb-3">
+      <div class="bg-stone-100 border border-stone-300 rounded p-2 text-xs text-stone-800 mb-3">
         <strong>Modo CPM activo.</strong> El sistema calcula el cronograma respetando dependencias (depends_on). Actividades en ruta crítica (rojo) no tienen slack — atrasos acá atrasan todo el proyecto. Editá dependencias en el tab Catálogo.
       </div>
     ` : ''}
@@ -111,9 +111,9 @@ function rmRenderGantt(body) {
     </div>` : ''}
 
     <!-- CRITICAL PATH NOTES -->
-    <div class="bg-purple-50 border border-purple-200 rounded-xl p-4">
-      <h3 class="text-xs font-bold uppercase text-purple-900 mb-2">${osIcon('ruler')} Notas de ingeniería (CPM)</h3>
-      <ul class="text-xs text-purple-950 space-y-1 list-disc ml-4">
+    <div class="bg-stone-100 border border-stone-300 rounded-xl p-4">
+      <h3 class="text-xs font-bold uppercase text-stone-800 mb-2">${osIcon('ruler')} Notas de ingeniería (CPM)</h3>
+      <ul class="text-xs text-stone-800 space-y-1 list-disc ml-4">
         <li><strong>Ruta crítica:</strong> Demo → Cimentación → Estructura → Rough-in → Inspección → Drywall → Pisos → Cabinets → Countertops (wait 1 sem) → Tile → Trim → Paint → Fixtures → Inspección final</li>
         <li><strong>Exterior</strong> puede correr en paralelo con interior si crew ≥ 4 personas. Tu crew: ${rmState.crewSize}</li>
         <li><strong>Countertops</strong> necesitan template + fabricación (~7-10 días). Programar después de cabinets instalados.</li>
