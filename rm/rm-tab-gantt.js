@@ -37,7 +37,7 @@ function rmRenderGantt(body) {
           <button onclick="rmState.cpmMode=false; rmRenderTab()" class="px-3 py-1.5 font-semibold ${!cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">${osIcon('chart')} Lineal por fase</button>
           <button onclick="rmState.cpmMode=true; rmRenderTab()" class="px-3 py-1.5 font-semibold ${cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">${osIcon('network')} CPM avanzado</button>
         </div>
-        ${rmState.currentProject ? `<button onclick="rmSyncToPlanner()" class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Genera las actividades día a día en el Planner Semanal según estas etapas y días">${osIcon('calendar')} Enviar al Planner →</button>` : ''}
+        ${rmState.currentProject ? `<button onclick="rmSyncToPlanner()" class="bg-gradient-to-r from-emerald-700 to-emerald-900 hover:opacity-90 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Genera las actividades día a día en el Planner Semanal según estas etapas y días">${osIcon('calendar')} Enviar al Planner →</button>` : ''}
       </div>
     </div>
     ${cpmOn && cpmErr ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 mb-3">${osIcon('alert')} ${cpmErr}. Revisá las dependencias en el tab Catálogo (probablemente hay un ciclo).</div>` : ''}

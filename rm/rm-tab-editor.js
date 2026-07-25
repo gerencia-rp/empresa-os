@@ -517,7 +517,7 @@ function rmRenderEditor(body) {
         <button onclick="withLoading(this, rmSaveProject)" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">${rmState.currentProject?osIcon('save')+' Guardar cambios':osIcon('save')+' Crear proyecto'}</button>
 
         ${rmState.currentProject ? `
-        <button onclick="rmSyncToPlanner()" class="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
+        <button onclick="rmSyncToPlanner()" class="w-full bg-gradient-to-r from-emerald-700 to-emerald-900 hover:opacity-90 text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
           ${osIcon('calendar')} Enviar al Planner Semanal →
         </button>
         <p class="text-[10px] text-slate-500 text-center">Crea actividades en cada día según el cronograma. Editable después.</p>
