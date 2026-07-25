@@ -18,6 +18,7 @@ const DIST = path.join(ROOT, "dist");
 //             deal-rules antes que loan-calculator y property-analyzer.
 const BUNDLE_FILES = [
   "ui-toolkit.js",
+  "ui/icons.js",         // 🧩 iconos Lucide inline + StatusDot + loaders (jul-2026)
   "ui/kit.js",           // 🎨 UI kit del sistema de diseño (kitMoney/kitHero/… — Fase 0)
   "ui/kit-decision.js",  // 🧭 O4: TermTooltip + DrillDown + NextAction + Tarjeta-KPI (auditoría 13-jul)
   "ui/report-engine.js", // 📄 O6: motor de reportes PDF (auditoría 13-jul)
@@ -81,6 +82,7 @@ const BUNDLE_FILES = [
 // Archivos que se copian tal cual (no van al bundle)
 const STATIC_COPY = [
   "ui/tokens.css",       // 🎨 tokens canónicos (index.html los linkea)
+  "ui/icons.js",         // 🧩 iconos para las páginas standalone (viral/diag/mi-plan/…)
   "propuesta.html",
   "inversionista.html",
   "os/inv-engine.js",

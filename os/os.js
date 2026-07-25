@@ -9,7 +9,7 @@ window.OS = OS;
 const OS_M = n => posMoney(n);              // #10: formato único (exacto con separador)
 const OS_K = n => posMoneyK(n);             // #10: formato único (compacto $X.XXM / $XXXk)
 const OS_E = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-function osAx() { return posGetTheme() === 'light' ? '#64748b' : '#5b6780'; }
+function osAx() { return posGetTheme() === 'light' ? '#756c5c' : '#7c7365'; }
 
 // ─── Empresas / áreas del holding ───
 const OS_EMPRESAS = {
@@ -62,35 +62,37 @@ function osInjectCSS() {
   const st = document.createElement('style'); st.id = 'os-styles';
   st.textContent = `
   #os-root{position:fixed;inset:0;z-index:900;overflow:auto;
-    --bg:#06080d;--ink:#eef2f8;--mut:#93a0b6;--mut2:#5b6780;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
-    --a1:#45e3c6;--a2:#4f8dff;--a3:#8a7bff;--pos:#48d69c;--neg:#f0687a;--amber:#e7b65e;
-    --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#070a11,#05070c);
-    color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  /* LIGHT canon CEO 12-jul — ESPEJO de ui/tokens.css (mantener sincronizado) */
-  #os-root[data-theme="light"]{--bg:#eef1f7;--ink:#0f172a;--mut:#475569;--mut2:#64748b;--glass:#ffffff;--glassb:#e2e8f0;
-    --a1:#2563eb;--a2:#1d4ed8;--a3:#6b5bef;--pos:#0f9d6b;--neg:#dc2626;--amber:#b45309;
-    --mesh1:rgba(37,99,235,.06);--mesh2:rgba(29,78,216,.05);--mesh3:rgba(107,91,239,.05);--bggrad:linear-gradient(180deg,#f3f5fa,#e9edf5)}
+    --bg:#14110c;--ink:#efe9de;--mut:#a89f8f;--mut2:#7c7365;--glass:rgba(255,246,230,.05);--glassb:rgba(255,246,230,.11);
+    --a1:#6fbf95;--a2:#4e9b72;--a3:#c9a85c;--pos:#63c08e;--neg:#e4756a;--amber:#dca94f;
+    --accent:#2f6b4f;--accent-ink:#ffffff;--grad:linear-gradient(135deg,#45936c,#2f6b4f);
+    --mesh1:rgba(111,191,149,.11);--mesh2:rgba(78,155,114,.10);--mesh3:rgba(201,168,92,.08);--bggrad:linear-gradient(180deg,#16130d,#100e08);
+    color:var(--ink);background:var(--bg);font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  /* LIGHT canon jul-2026 (papel cálido) — ESPEJO de ui/tokens.css (mantener sincronizado) */
+  #os-root[data-theme="light"]{--bg:#f7f5f0;--ink:#211e17;--mut:#5f594c;--mut2:#756c5c;--glass:#ffffff;--glassb:#e8e3d9;
+    --a1:#2f6b4f;--a2:#275c43;--a3:#8a6a2f;--pos:#1f7a4d;--neg:#b3372f;--amber:#8a6400;
+    --grad:linear-gradient(135deg,#377c5c,#2f6b4f);
+    --mesh1:rgba(47,107,79,.05);--mesh2:rgba(39,92,67,.04);--mesh3:rgba(138,106,47,.04);--bggrad:linear-gradient(180deg,#f9f7f2,#f2efe8)}
   #os-root *{box-sizing:border-box;margin:0;padding:0}
   #os-root .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(760px 520px at 8% -6%,var(--mesh1),transparent 58%),radial-gradient(820px 560px at 100% 4%,var(--mesh2),transparent 56%),radial-gradient(700px 620px at 70% 118%,var(--mesh3),transparent 60%),var(--bggrad)}
   #os-root .wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:22px 30px 60px}
   #os-root .bar{display:flex;align-items:center;gap:14px;margin-bottom:24px}
-  #os-root .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6)}
+  #os-root .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;color:var(--accent-ink);font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(47,107,79,.55)}
   #os-root .brandt b{font-size:16px;font-weight:760}#os-root .brandt span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.4px;margin-top:1px}
   #os-root .crumbs{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);margin-left:8px}
   #os-root .crumbs a{color:var(--mut);cursor:pointer;text-decoration:none}#os-root .crumbs a:hover{color:var(--ink)}#os-root .crumbs .sep{color:var(--mut2)}#os-root .crumbs b{color:var(--ink)}
   #os-root .barr{margin-left:auto;display:flex;gap:8px;align-items:center}
   #os-root .ibtn{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);height:34px;padding:0 12px;border-radius:10px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px)}
   #os-root .ibtn:hover{color:var(--ink);border-color:var(--a2)}
-  #os-root h1{font-size:25px;font-weight:770;letter-spacing:-.4px}#os-root h1 span{background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #os-root h1{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:640;letter-spacing:-.3px}#os-root h1 span{color:var(--a1)}
   #os-root .sub{color:var(--mut);font-size:13px;margin:5px 0 20px}
   #os-root .grid{display:grid;gap:16px}#os-root .k4{grid-template-columns:repeat(4,minmax(0,1fr))}#os-root .k3{grid-template-columns:repeat(3,minmax(0,1fr))}#os-root .k2{grid-template-columns:repeat(2,minmax(0,1fr))}
   #os-root .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:16px;padding:19px;backdrop-filter:blur(18px);box-shadow:0 26px 60px -34px rgba(0,0,0,.9);transition:.2s;overflow:hidden}
-  #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
-  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#fef3c7;color:#b45309;border-color:#fcd34d}
+  #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(64,54,32,.05),0 6px 16px rgba(64,54,32,.06)}
+  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#f6eed6;color:#8a6400;border-color:#e3d5a8}
   #os-root .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
-  #os-root[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(15,23,42,.1),transparent)}
+  #os-root[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(64,54,32,.12),transparent)}
   #os-root .lab{font-size:10px;letter-spacing:1.4px;color:var(--mut2);text-transform:uppercase;font-weight:700}
-  #os-root .big{font-size:29px;font-weight:780;margin-top:8px;letter-spacing:-.6px}#os-root .glow{text-shadow:0 0 22px rgba(69,227,198,.35)}#os-root[data-theme="light"] .glow{text-shadow:none}
+  #os-root .big{font-size:29px;font-weight:780;margin-top:8px;letter-spacing:-.6px;font-variant-numeric:tabular-nums}#os-root .glow{text-shadow:0 0 22px rgba(111,191,149,.3)}#os-root[data-theme="light"] .glow{text-shadow:none}
   #os-root .meta{font-size:11.5px;color:var(--mut);margin-top:6px;line-height:1.5}
   #os-root .osbadge{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 9px;border-radius:20px;margin-top:7px;letter-spacing:.2px}
   #os-root .osbadge.warn{background:rgba(231,182,94,.16);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
@@ -102,19 +104,19 @@ function osInjectCSS() {
   #os-root .unit .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-top:1px solid var(--glassb);margin-top:10px}#os-root .unit .kv b{color:var(--ink)}
   #os-root .card:not(.unit) .kv{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--glassb)}#os-root .card:not(.unit) .kv:first-of-type{border-top:none}#os-root .card:not(.unit) .kv span{color:var(--mut)}#os-root .card:not(.unit) .kv b{color:var(--ink);text-align:right}
   #os-root .go{font-size:11px;color:var(--a2);margin-top:12px;font-weight:600}
-  #os-root .brain{background:linear-gradient(180deg,rgba(30,28,58,.5),rgba(14,16,32,.5));border:1px solid rgba(138,123,255,.28)}
-  #os-root[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,123,255,.1),rgba(79,141,255,.05))}
+  #os-root .brain{background:linear-gradient(180deg,rgba(42,52,38,.5),rgba(22,26,18,.5));border:1px solid rgba(201,168,92,.28)}
+  #os-root[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,106,47,.08),rgba(47,107,79,.05))}
   #os-root .bh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-  #os-root .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#a9f5e6,#45e3c6 30%,#4f8dff 70%,#2a2f66);box-shadow:0 0 22px rgba(79,141,255,.5)}
+  #os-root .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#6fbf95 30%,#2f6b4f 70%,#1c3327);box-shadow:0 0 22px rgba(47,107,79,.5)}
   #os-root .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:osspin 6s linear infinite;opacity:.7}@keyframes osspin{to{transform:rotate(360deg)}}
   #os-root .bh b{font-size:14px}#os-root .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.4px;margin-top:2px}
   #os-root .insight{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--glassb)}#os-root .insight:last-of-type{border-bottom:none}
   #os-root .insight .ic{font-size:8px;margin-top:6px}#os-root .ic.r{color:var(--neg)}#os-root .ic.y{color:var(--amber)}#os-root .ic.g{color:var(--pos)}#os-root .ic.b{color:var(--a2)}
   #os-root .insight .tx{font-size:12px;line-height:1.5}#os-root .insight .tx b{font-weight:650}#os-root .insight .tag{font-size:9px;color:var(--mut2);font-weight:700;letter-spacing:.6px;margin-top:4px;display:block}
   #os-root .app-card{cursor:pointer;display:flex;align-items:center;gap:13px}#os-root .app-card:hover{transform:translateY(-2px);border-color:var(--a2)}
-  #os-root .app-card .ai{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.1));display:grid;place-items:center;font-size:17px;flex-shrink:0}
+  #os-root .app-card .ai{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,rgba(111,191,149,.16),rgba(47,107,79,.1));display:grid;place-items:center;font-size:17px;flex-shrink:0}
   #os-root .app-card .an{font-size:13.5px;font-weight:640}#os-root .app-card .at{font-size:10.5px;color:var(--mut2);margin-top:2px}
-  #os-root .soon{font-size:8.5px;font-weight:700;color:var(--a2);background:rgba(79,141,255,.12);padding:2px 7px;border-radius:10px;margin-left:auto}
+  #os-root .soon{font-size:8.5px;font-weight:700;color:var(--a2);background:rgba(78,155,114,.12);padding:2px 7px;border-radius:10px;margin-left:auto}
   #os-root .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #os-root .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--glassb);font-weight:700}
   #os-root .ptable td{padding:10px 8px;border-bottom:1px solid var(--glassb)}#os-root .ptable tr:hover td{background:var(--glass)}
@@ -122,41 +124,41 @@ function osInjectCSS() {
   #os-root .chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}#os-root .chart-h .t{font-size:13.5px;font-weight:640}#os-root .chart-h .k{font-size:11px;color:var(--mut2)}
   #os-root .op-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--glassb);font-size:12px}#os-root .op-time{color:var(--mut2);width:46px;font-variant-numeric:tabular-nums}
   #os-root .zpill{margin-left:auto;font-size:9.5px;padding:2px 9px;border-radius:20px;background:var(--glass);color:var(--mut)}
-  #os-root .cbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:700;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:11px}
+  #os-root .cbtn{background:var(--grad);border:none;color:var(--accent-ink);font-weight:700;padding:6px 12px;border-radius:9px;cursor:pointer;font-size:11px}
   #os-root .empty{padding:50px;text-align:center;color:var(--mut2)}
   #os-root .card,#os-root .wrap{animation:osfade .35s ease}@keyframes osfade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
   #os-root .cc-chat{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;margin-top:6px}#os-root .cc-chat:empty{display:none}
   #os-root .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
-  #os-root .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3)}
+  #os-root .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(111,191,149,.16),rgba(78,155,114,.14));border:1px solid rgba(78,155,114,.3)}
   #os-root .cbub.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)}#os-root .cbub.err{border-color:rgba(240,104,122,.4);color:var(--neg)}#os-root .cbub.think{color:var(--mut2);font-style:italic}
-  #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--glass);border:1px solid rgba(138,123,255,.3);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}
-  #os-root .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
+  #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--glass);border:1px solid rgba(201,168,92,.3);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}
+  #os-root .ask button{background:var(--grad);border:none;color:var(--accent-ink);font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   @media (max-width:900px){#os-root .wrap{padding:16px 14px 40px}#os-root .k4,#os-root .k3,#os-root .k2{grid-template-columns:minmax(0,1fr)}#os-root .k4.units{grid-template-columns:repeat(2,minmax(0,1fr))}}
   /* ── TOPBAR del OS sobre los sistemas en PÁGINA COMPLETA (marco de empresa) ── */
   #os-return-bar{position:fixed;top:0;left:0;right:0;z-index:2147483000;display:flex;align-items:center;gap:14px;height:54px;padding:0 20px;
-    font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:rgba(8,11,18,.72);border-bottom:1px solid rgba(255,255,255,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.82);border-bottom-color:rgba(15,23,42,.08)}
-  #os-return-bar .osrb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#45e3c6,#4f8dff);display:grid;place-items:center;color:#fff;font-weight:900;font-size:12px;cursor:pointer;flex-shrink:0}
-  #os-return-bar .osrb-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:#93a0b6;min-width:0}
-  #os-return-bar .osrb-crumb a{color:#93a0b6;cursor:pointer;text-decoration:none;white-space:nowrap}#os-return-bar .osrb-crumb a:hover{color:#eef2f8}
-  #os-return-bar .osrb-crumb b{color:#eef2f8;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#5b6780}
-  #os-return-bar[data-theme="light"] .osrb-crumb,#os-return-bar[data-theme="light"] .osrb-crumb a{color:#48566e}#os-return-bar[data-theme="light"] .osrb-crumb b{color:#0f1c2e}
-  #os-return-bar .osrb-back{margin-left:auto;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#eef2f8;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0}
-  #os-return-bar .osrb-back:hover{border-color:#4f8dff}
-  #os-return-bar[data-theme="light"] .osrb-back{background:rgba(15,23,42,.05);border-color:rgba(15,23,42,.12);color:#0f1c2e}
-  #os-return-bar .osrb-theme{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#93a0b6;font-size:13px;padding:8px 11px;border-radius:9px;cursor:pointer;flex-shrink:0}
-  #os-return-bar[data-theme="light"] .osrb-theme{background:rgba(15,23,42,.05);border-color:rgba(15,23,42,.12);color:#48566e}
+    font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:rgba(18,15,10,.72);border-bottom:1px solid rgba(255,246,230,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.82);border-bottom-color:rgba(64,54,32,.08)}
+  #os-return-bar .osrb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#45936c,#2f6b4f);display:grid;place-items:center;color:#fff;font-weight:900;font-size:12px;cursor:pointer;flex-shrink:0}
+  #os-return-bar .osrb-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:#a89f8f;min-width:0}
+  #os-return-bar .osrb-crumb a{color:#a89f8f;cursor:pointer;text-decoration:none;white-space:nowrap}#os-return-bar .osrb-crumb a:hover{color:#efe9de}
+  #os-return-bar .osrb-crumb b{color:#efe9de;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#7c7365}
+  #os-return-bar[data-theme="light"] .osrb-crumb,#os-return-bar[data-theme="light"] .osrb-crumb a{color:#5f594c}#os-return-bar[data-theme="light"] .osrb-crumb b{color:#211e17}
+  #os-return-bar .osrb-back{margin-left:auto;background:rgba(255,246,230,.07);border:1px solid rgba(255,246,230,.13);color:#efe9de;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  #os-return-bar .osrb-back:hover{border-color:#4e9b72}
+  #os-return-bar[data-theme="light"] .osrb-back{background:rgba(64,54,32,.05);border-color:rgba(64,54,32,.12);color:#211e17}
+  #os-return-bar .osrb-theme{background:rgba(255,246,230,.07);border:1px solid rgba(255,246,230,.13);color:#a89f8f;font-size:13px;padding:8px 11px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  #os-return-bar[data-theme="light"] .osrb-theme{background:rgba(64,54,32,.05);border-color:rgba(64,54,32,.12);color:#5f594c}
   /* ── #modal como PÁGINA COMPLETA (no modal flotante): ocupa todo, mesh de fondo, sin backdrop ── */
   #modal.os-syspage{padding:0 !important;display:block !important;overflow-y:auto;background:transparent}
   html[data-osreskin="dark"] #modal.os-syspage{background:
-    radial-gradient(760px 520px at 6% -6%,rgba(69,227,198,.13),transparent 58%),
-    radial-gradient(820px 560px at 100% 2%,rgba(79,141,255,.14),transparent 56%),
-    radial-gradient(700px 620px at 74% 120%,rgba(138,123,255,.1),transparent 60%),
-    linear-gradient(180deg,#070a11,#05070c) !important}
+    radial-gradient(760px 520px at 6% -6%,rgba(111,191,149,.10),transparent 58%),
+    radial-gradient(820px 560px at 100% 2%,rgba(78,155,114,.10),transparent 56%),
+    radial-gradient(700px 620px at 74% 120%,rgba(201,168,92,.07),transparent 60%),
+    linear-gradient(180deg,#16130d,#100e08) !important}
   html[data-osreskin="light"] #modal.os-syspage{background:
-    radial-gradient(760px 520px at 6% -6%,rgba(37,99,235,.06),transparent 58%),
-    radial-gradient(820px 560px at 100% 2%,rgba(29,78,216,.05),transparent 56%),
-    linear-gradient(180deg,#f3f5fa,#e9edf5) !important}
+    radial-gradient(760px 520px at 6% -6%,rgba(47,107,79,.05),transparent 58%),
+    radial-gradient(820px 560px at 100% 2%,rgba(39,92,67,.04),transparent 56%),
+    linear-gradient(180deg,#f9f7f2,#f2efe8) !important}
   #modal.os-syspage > div.bg-white{max-width:1520px !important;width:calc(100% - 40px) !important;margin:72px auto 28px !important;min-height:calc(100vh - 100px);max-height:none !important;height:auto !important;background:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;backdrop-filter:none !important;overflow:visible !important}
   #modal.os-syspage #modal-body{max-height:none !important;overflow:visible !important;padding:0 !important}
   /* ocultar el header propio del modal (título+×): el topbar del OS ya da contexto y "Volver" */
@@ -179,33 +181,33 @@ function osInjectReskin() {
   /* chrome del modal (ambos temas): más redondeado + tipografía del sistema nuevo */
   html[data-osreskin] #modal{transition:none}
   html[data-osreskin] #modal > div{border-radius:18px !important}
-  ${L} #modal > div{box-shadow:0 24px 70px -26px rgba(15,23,42,.42) !important}
+  ${L} #modal > div{box-shadow:0 24px 70px -26px rgba(64,54,32,.34) !important}
   /* ───────── DARK ───────── */
-  ${D} #modal{background:rgba(4,7,12,.66) !important}
-  ${D} #modal > div{background:#0f151e !important;color:#e7ecf5 !important;border:1px solid rgba(255,255,255,.1) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
-  ${D} #modal .bg-white,${D} #modal .bg-slate-50,${D} #modal .bg-slate-100,${D} #modal .bg-gray-50,${D} #modal .bg-gray-100,${D} #modal .bg-neutral-50,${D} #modal .bg-neutral-100{background-color:#151d28 !important}
-  ${D} #modal .bg-slate-800,${D} #modal .bg-slate-900,${D} #modal .bg-gray-800,${D} #modal .bg-gray-900{background-color:#1b2634 !important}
-  ${D} #modal .text-slate-900,${D} #modal .text-slate-800,${D} #modal .text-slate-700,${D} #modal .text-slate-600,${D} #modal .text-gray-900,${D} #modal .text-gray-800,${D} #modal .text-gray-700,${D} #modal .text-black{color:#e7ecf5 !important}
-  ${D} #modal .text-slate-500,${D} #modal .text-slate-400,${D} #modal .text-gray-500,${D} #modal .text-gray-400{color:#93a0b6 !important}
-  ${D} #modal .border,${D} #modal .border-b,${D} #modal .border-t,${D} #modal .border-slate-200,${D} #modal .border-slate-100,${D} #modal .border-slate-300,${D} #modal .border-gray-200,${D} #modal .border-gray-100,${D} #modal .border-gray-300{border-color:rgba(255,255,255,.1) !important}
-  ${D} #modal .divide-slate-200 > *+*,${D} #modal .divide-gray-200 > *+*,${D} #modal .divide-slate-100 > *+*{border-color:rgba(255,255,255,.08) !important}
-  ${D} #modal input,${D} #modal select,${D} #modal textarea{background-color:#0b1119 !important;color:#e7ecf5 !important;border-color:rgba(255,255,255,.14) !important}
-  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#5b6780 !important}
-  ${D} #modal table th{color:#93a0b6 !important}
-  ${D} #modal tr:hover td{background:rgba(255,255,255,.03) !important}
+  ${D} #modal{background:rgba(10,8,5,.66) !important}
+  ${D} #modal > div{background:#171410 !important;color:#efe9de !important;border:1px solid rgba(255,246,230,.1) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
+  ${D} #modal .bg-white,${D} #modal .bg-slate-50,${D} #modal .bg-slate-100,${D} #modal .bg-gray-50,${D} #modal .bg-gray-100,${D} #modal .bg-neutral-50,${D} #modal .bg-neutral-100{background-color:#1d1913 !important}
+  ${D} #modal .bg-slate-800,${D} #modal .bg-slate-900,${D} #modal .bg-gray-800,${D} #modal .bg-gray-900{background-color:#252017 !important}
+  ${D} #modal .text-slate-900,${D} #modal .text-slate-800,${D} #modal .text-slate-700,${D} #modal .text-slate-600,${D} #modal .text-gray-900,${D} #modal .text-gray-800,${D} #modal .text-gray-700,${D} #modal .text-black{color:#efe9de !important}
+  ${D} #modal .text-slate-500,${D} #modal .text-slate-400,${D} #modal .text-gray-500,${D} #modal .text-gray-400{color:#a89f8f !important}
+  ${D} #modal .border,${D} #modal .border-b,${D} #modal .border-t,${D} #modal .border-slate-200,${D} #modal .border-slate-100,${D} #modal .border-slate-300,${D} #modal .border-gray-200,${D} #modal .border-gray-100,${D} #modal .border-gray-300{border-color:rgba(255,246,230,.1) !important}
+  ${D} #modal .divide-slate-200 > *+*,${D} #modal .divide-gray-200 > *+*,${D} #modal .divide-slate-100 > *+*{border-color:rgba(255,246,230,.08) !important}
+  ${D} #modal input,${D} #modal select,${D} #modal textarea{background-color:#120f0a !important;color:#efe9de !important;border-color:rgba(255,246,230,.14) !important}
+  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#7c7365 !important}
+  ${D} #modal table th{color:#a89f8f !important}
+  ${D} #modal tr:hover td{background:rgba(255,246,230,.03) !important}
   ${D} #modal .shadow,${D} #modal .shadow-sm,${D} #modal .shadow-md,${D} #modal .shadow-lg{box-shadow:none !important}
   ${D} #modal .hover\\:bg-slate-50:hover,${D} #modal .hover\\:bg-slate-100:hover,${D} #modal .hover\\:bg-gray-50:hover,${D} #modal .hover\\:bg-gray-100:hover{background-color:rgba(255,255,255,.05) !important}
   /* bg-slate-900 lo maneja el sistema de diseño compartido (superficie oscura elevada, no gradiente,
      para no romper las cards de acento con sublabels muted). */
   /* Property Manager tiene su tema COMPLETO propio (pmInjectTheme en pm-main.js). */
   /* ───────── OLA 3 (12-jul): red de seguridad para ESTILOS INLINE de los clásicos en dark ───────── */
-  ${D} #modal [style*="background:#fff"],${D} #modal [style*="background: #fff"],${D} #modal [style*="background:white"],${D} #modal [style*="background-color:#fff"]{background-color:#151d28 !important}
-  ${D} #modal [style*="background:#fafafa"],${D} #modal [style*="background:#f8fafc"],${D} #modal [style*="background:#f9fafb"],${D} #modal [style*="background:#f1f5f9"]{background-color:#131a24 !important}
-  ${D} #modal [style*="color:#000"],${D} #modal [style*="color: #000"],${D} #modal [style*="color:black"],${D} #modal [style*="color:#111"],${D} #modal [style*="color:#1e293b"],${D} #modal [style*="color:#0f172a"]{color:#e7ecf5 !important}
+  ${D} #modal [style*="background:#fff"],${D} #modal [style*="background: #fff"],${D} #modal [style*="background:white"],${D} #modal [style*="background-color:#fff"]{background-color:#1d1913 !important}
+  ${D} #modal [style*="background:#fafafa"],${D} #modal [style*="background:#f8fafc"],${D} #modal [style*="background:#f9fafb"],${D} #modal [style*="background:#f1f5f9"]{background-color:#1a1610 !important}
+  ${D} #modal [style*="color:#000"],${D} #modal [style*="color: #000"],${D} #modal [style*="color:black"],${D} #modal [style*="color:#111"],${D} #modal [style*="color:#1e293b"],${D} #modal [style*="color:#0f172a"]{color:#efe9de !important}
   /* ───────── OLA 3: pulido LIGHT canon (tarjetas con sombra + contraste mínimo --mut2) ───────── */
-  ${L} #modal .bg-white.rounded-xl,${L} #modal .bg-white.rounded-lg,${L} #modal .bg-white.rounded-2xl{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06) !important;border-color:#e2e8f0 !important}
-  ${L} #modal .text-slate-500,${L} #modal .text-gray-500{color:#475569 !important}
-  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#64748b !important}
+  ${L} #modal .bg-white.rounded-xl,${L} #modal .bg-white.rounded-lg,${L} #modal .bg-white.rounded-2xl{box-shadow:0 1px 2px rgba(64,54,32,.05),0 6px 16px rgba(64,54,32,.06) !important;border-color:#e8e3d9 !important}
+  ${L} #modal .text-slate-500,${L} #modal .text-gray-500{color:#5f594c !important}
+  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#756c5c !important}
   /* ───────── OLA 3: tablas de los clásicos scrollean en celular (no rompen la página) ───────── */
   @media (max-width:768px){ html[data-osreskin] #modal-body table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch} }
   `;
@@ -272,7 +274,7 @@ function osMount() {
   let root = document.getElementById('os-root');
   if (!root) { root = document.createElement('div'); root.id = 'os-root'; document.body.appendChild(root); }
   posApplyTheme(root);
-  root.innerHTML = '<div class="bgfx"></div><div class="wrap"><div style="padding:60px;color:#5b6780">⏳ Cargando Flipping Rentals OS…</div></div>';
+  root.innerHTML = '<div class="bgfx"></div><div class="wrap"><div class="ui-loading" style="padding:60px"><div class="ui-spinner"></div><div class="ui-brand">Flipping Rentals OS</div><div style="margin-top:6px">Cargando…</div></div></div>';
 }
 function osToggleTheme() { posToggleTheme(); osApplyReskin(); osRender(); }
 window.osToggleTheme = osToggleTheme;
@@ -504,7 +506,7 @@ function osRender() {
   const root = document.getElementById('os-root'); if (!root) return;
   posApplyTheme(root); osDestroyCharts();
   if (OS.loadErr) { root.innerHTML = osShell(`<div class="empty"><div style="font-size:40px">⚠️</div><div class="down" style="margin-top:10px">${OS_E(OS.loadErr)}</div></div>`); return; }
-  if (!OS.loaded) { root.innerHTML = osShell('<div class="empty">⏳ Cargando datos del holding…</div>'); return; }
+  if (!OS.loaded) { root.innerHTML = osShell('<div class="ui-loading"><div class="ui-spinner"></div><div>Cargando datos del holding…</div></div>'); return; }
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
