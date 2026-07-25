@@ -29,18 +29,18 @@ const eduCallsState = {
 // Catálogo cargado en eduLoadAll (si no, default)
 const EDU_CALL_MOTIVOS_DEFAULT = [
   { id:'bienvenida', label:'Bienvenida / Onboarding', emoji:'👋' },
-  { id:'diagnostico', label:'Diagnóstico inicial', emoji:osIcon('target') },
-  { id:'plan_review', label:'Revisión Plan de Acción', emoji:osIcon('clipboard') },
-  { id:'coaching', label:'Coaching 1-on-1', emoji:osIcon('message') },
-  { id:'credito', label:'Diagnóstico / Coaching crédito', emoji:osIcon('credit-card') },
-  { id:'buybox', label:'Buy Box / Análisis mercado', emoji:osIcon('building') },
-  { id:'deal_review', label:'Revisión de deal específico', emoji:osIcon('search') },
-  { id:'cierre', label:'Cierre / Celebración deal', emoji:osIcon('party') },
-  { id:'crisis', label:'Crisis / Bloqueo', emoji:osIcon('alert') },
-  { id:'renovacion', label:'Renovación / Renewal', emoji:osIcon('refresh') },
+  { id:'diagnostico', label:'Diagnóstico inicial', emoji:'🎯' },
+  { id:'plan_review', label:'Revisión Plan de Acción', emoji:'📋' },
+  { id:'coaching', label:'Coaching 1-on-1', emoji:'💬' },
+  { id:'credito', label:'Diagnóstico / Coaching crédito', emoji:'💳' },
+  { id:'buybox', label:'Buy Box / Análisis mercado', emoji:'🏘️' },
+  { id:'deal_review', label:'Revisión de deal específico', emoji:'🔍' },
+  { id:'cierre', label:'Cierre / Celebración deal', emoji:'🎉' },
+  { id:'crisis', label:'Crisis / Bloqueo', emoji:'🚨' },
+  { id:'renovacion', label:'Renovación / Renewal', emoji:'🔄' },
   { id:'exit', label:'Exit / Despedida', emoji:'👋' },
-  { id:'grupal', label:'Sesión grupal', emoji:osIcon('users') },
-  { id:'otro', label:'Otro', emoji:osIcon('map-pin') }
+  { id:'grupal', label:'Sesión grupal', emoji:'👥' },
+  { id:'otro', label:'Otro', emoji:'📌' }
 ];
 function eduGetMotivos() {
   return (eduState.callMotivos && eduState.callMotivos.length) ? eduState.callMotivos : EDU_CALL_MOTIVOS_DEFAULT;

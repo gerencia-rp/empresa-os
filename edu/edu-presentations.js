@@ -1630,7 +1630,7 @@ function renderChartSpotlight(slide, s, c) {
   }
 
   // Panel derecho con 3 insights
-  const insights = s.insights || (s.bullets || []).slice(0, 3).map(b => ({ title: osIcon('lightbulb'), body: b }));
+  const insights = s.insights || (s.bullets || []).slice(0, 3).map(b => ({ title: '', body: b }));
   const xI = 8.85, wI = 4.05;
   insights.slice(0, 3).forEach((ins, i) => {
     const y = 1.4 + i * 1.8;

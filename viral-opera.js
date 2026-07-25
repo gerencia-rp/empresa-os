@@ -670,7 +670,7 @@ function renderBiblioteca() {
       oHero('Biblioteca de contenido', '15 reels base + lo que generaste (memoria)') +
       `<div id="biblio-memory" class="mb-6"></div>` +
       `<h3 class="font-display text-lg font-bold text-accent mb-2">${osIcon('clipboard')} Reels base (semilla)</h3>` +
-      `<input id="biblio-search" value="${E(BIBLIO_SEARCH || '')}" oninput="operaSearchBiblio(this.value)" placeholder="${osIcon('search')} Buscar por tema, hook, palabra…" class="w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none mb-3">
+      `<input id="biblio-search" value="${E(BIBLIO_SEARCH || '')}" oninput="operaSearchBiblio(this.value)" placeholder="Buscar por tema, hook, palabra…" class="w-full bg-dark border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:border-accent outline-none mb-3">
       <div class="flex flex-wrap gap-2 mb-5">${filtros}</div>` +
       `<div class="grid sm:grid-cols-2 gap-3">${cards}</div>` + savedSec;
     const si = document.getElementById('biblio-search'); if (si && q) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }

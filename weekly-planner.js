@@ -1406,7 +1406,7 @@ async function wpReprogramAllOverdue(newDate) {
   }).in('id', ids);
   await wpLoadAll();
   wpRender();
-  if (window.toast) toast(osIcon('check-circle') + ids.length + ' actividad(es) reprogramada(s)', 'success');
+  if (window.toast) toast(ids.length + ' actividad(es) reprogramada(s)', 'success');
 }
 
 function wpToggleCriticasDetails() {
@@ -1428,7 +1428,7 @@ async function wpReprogramListToDate(ids, newDate) {
   if (error) return alert('Error reprogramando: ' + error.message);
   await wpLoadAll();
   wpBackToPlanner();
-  if (window.toast) toast(osIcon('check-circle') + ids.length + ' tarea(s) reprogramada(s)', 'success');
+  if (window.toast) toast(ids.length + ' tarea(s) reprogramada(s)', 'success');
 }
 
 function wpNavWeek(delta) {
@@ -2375,24 +2375,38 @@ function wpParseCronogramaSheet(workbook) {
   return { items, projectStart };
 }
 
-// Convierte celda de fecha de Excel (puede venir como Date, string DD/MM/YYYY, o serial number)
+// Meses en letras: español e inglés (3–4 letras). Se normaliza sin acentos.
+// Fix 20-jul: el cronograma real (Seguimiento_Arthur_Stiles_Rd) trae Inicio/Fin como
+// "08-Jul"/"16-Jul" (mes en LETRAS, sin año) → el parser viejo devolvía null en TODAS
+// las filas (59 actividades, 0 con fecha). El año lo fija wpDoImportExcel con el
+// start_date del proyecto (el cronograma no trae año).
+const WP_MESES = { ene: 0, jan: 0, feb: 1, mar: 2, abr: 3, apr: 3, may: 4, jun: 5, jul: 6,
+  ago: 7, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dic: 11, dec: 11 };
+let wpImportBaseYear = new Date().getFullYear(); // lo fija wpDoImportExcel con el año del proyecto
+
+// Convierte celda de fecha: Date, serial de Excel, ISO, "DD-Mmm[-YYYY]" (mes en letras) o "DD/MM/YYYY".
 function wpParseExcelDate(v) {
-  if (!v) return null;
+  if (!(v === 0 || v)) return null;
   if (v instanceof Date) return v;
-  if (typeof v === 'number') {
-    // Excel serial date (días desde 1900-01-01)
-    return new Date(Math.round((v - 25569) * 86400 * 1000));
-  }
+  if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400 * 1000));
   const s = String(v).trim();
+  if (!s) return null;
   // ISO YYYY-MM-DD
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
-  // DD/MM/YYYY o DD-MM-YYYY
-  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  // DD-Mmm-YYYY / DD Mmm / DD-Mmm  (mes en LETRAS, año opcional)
+  m = s.match(/^(\d{1,2})[\/\-\s]?([A-Za-zÁÉÍÓÚáéíóú]{3,})[\/\-\s]?(\d{2,4})?$/);
   if (m) {
-    const y = +m[3]; const yyyy = y < 100 ? 2000+y : y;
-    return new Date(yyyy, +m[2]-1, +m[1]);
+    const key = m[2].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 4);
+    let mes = WP_MESES[key]; if (mes == null) mes = WP_MESES[key.slice(0, 3)];
+    if (mes != null) {
+      const y = m[3] ? (+m[3] < 100 ? 2000 + (+m[3]) : +m[3]) : wpImportBaseYear;
+      return new Date(y, mes, +m[1]);
+    }
   }
+  // DD/MM/YYYY o DD-MM-YYYY (mes numérico)
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) { const y = +m[3]; const yyyy = y < 100 ? 2000 + y : y; return new Date(yyyy, +m[2] - 1, +m[1]); }
   return null;
 }
 
@@ -2404,6 +2418,12 @@ async function wpDoImportExcel() {
   const expand = document.getElementById('wp-imp-expand').checked;
   if (!projId) { alert('Selecciona un proyecto destino.'); return; }
   if (!fileInp.files || !fileInp.files[0]) { alert('Sube un archivo .xlsx'); return; }
+
+  // el cronograma trae "08-Jul" SIN año → interpretar con el año de inicio del proyecto
+  const _projBY = wpState.projects.find(p => p.id === projId);
+  wpImportBaseYear = (_projBY && _projBY.start_date)
+    ? new Date(_projBY.start_date).getFullYear()
+    : new Date().getFullYear();
 
   const file = fileInp.files[0];
   const buf = await file.arrayBuffer();

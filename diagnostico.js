@@ -76,7 +76,7 @@ function dBuildSteps(w) {
   ['acceso_externo', 'techo', 'estructura', 'muros'].forEach(k => { const d = D.divisiones.find(x => x.key === k); if (d) steps.push({ tipo: 'division', division: k, titulo: d.nombre, emoji: d.emoji, seccion: secDe[k] }); });
   steps.push({ tipo: 'pisos', titulo: '¿Cuántos pisos?', seccion: 'Estructura' });
   if ((w.numero_pisos || 1) >= 2) {
-    steps.push({ tipo: 'division', division: 'placa', titulo: 'Placa de entrepiso', emoji: osIcon('construction'), seccion: 'Placa & Escaleras', subgrupo: 'placa_entrepiso' });
+    steps.push({ tipo: 'division', division: 'placa', titulo: 'Placa de entrepiso', emoji: '🏗️', seccion: 'Placa & Escaleras', subgrupo: 'placa_entrepiso' });
     steps.push({ tipo: 'division', division: 'placa', titulo: 'Escaleras', emoji: '🪜', seccion: 'Placa & Escaleras', subgrupo: 'escaleras' });
   }
   ['piso', 'carpinteria', 'redes'].forEach(k => { const d = D.divisiones.find(x => x.key === k); if (d) steps.push({ tipo: k === 'redes' ? 'redes' : k === 'carpinteria' ? 'carpinteria' : 'division', division: k, titulo: d.nombre, emoji: d.emoji, seccion: 'Interno' }); });

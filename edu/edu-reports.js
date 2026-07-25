@@ -210,7 +210,7 @@ async function eduAbrirAnalisisProfundoFM(studentId) {
       result = fmCalcularPerfil(answers);
     } else {
       // Fallback: usar el perfil del plan tal cual
-      result = plan.perfil || { answers, perfil: { num:1, nombre:'Plan', emoji:osIcon('target') } };
+      result = plan.perfil || { answers, perfil: { num:1, nombre:'Plan', emoji:'🎯' } };
     }
     result.answers = answers;
   } catch (e) {

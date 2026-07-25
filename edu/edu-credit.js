@@ -330,10 +330,10 @@ function fmCalcularPerfilCredito(a) {
   // Texto del tier
   const tierLabel = {
     sin_historial:{ emoji:'🆕', nombre:'Sin historial', color:'slate', resumen:'Construyendo crédito desde cero. Foco: abrir 1-2 secured cards + pagos a tiempo + 6 meses de tradeline.' },
-    reconstruir:  { emoji:osIcon('wrench'), nombre:'Reconstruir', color:'red',     resumen:'Score bajo con negativos. Plan: limpiar derogatorios + utilization + pagos a tiempo. 6-12 meses al objetivo.' },
-    limitado:     { emoji:osIcon('alert'), nombre:'Limitado',    color:'amber',   resumen:'Aprobás algunos productos pero con tasas malas. Plan: bajar utilization + extender historial + mix. 3-6 meses al objetivo.' },
-    bueno:        { emoji:osIcon('check-circle'), nombre:'Bueno',       color:'blue',    resumen:'Calificás HML estándar y mortgages no-prime. Plan: empujar a >740 para mejores tasas.' },
-    excelente:    { emoji:osIcon('star'), nombre:'Excelente',   color:'emerald', resumen:'Top tier. Plan: mantener + abrir líneas de business + maximizar puntos.' }
+    reconstruir:  { emoji:'🛠️', nombre:'Reconstruir', color:'red',     resumen:'Score bajo con negativos. Plan: limpiar derogatorios + utilization + pagos a tiempo. 6-12 meses al objetivo.' },
+    limitado:     { emoji:'⚠️', nombre:'Limitado',    color:'amber',   resumen:'Aprobás algunos productos pero con tasas malas. Plan: bajar utilization + extender historial + mix. 3-6 meses al objetivo.' },
+    bueno:        { emoji:'✅', nombre:'Bueno',       color:'blue',    resumen:'Calificás HML estándar y mortgages no-prime. Plan: empujar a >740 para mejores tasas.' },
+    excelente:    { emoji:'⭐', nombre:'Excelente',   color:'emerald', resumen:'Top tier. Plan: mantener + abrir líneas de business + maximizar puntos.' }
   }[tier];
 
   return {

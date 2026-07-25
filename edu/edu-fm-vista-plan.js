@@ -226,7 +226,7 @@ function fmRenderDiagPlan() {
 const FM_ETAPA_MAP = {
   'PRE-E0': {
     nombre: 'Pre-Fundación · Reconstrucción de Crédito',
-    icono: '🪜',
+    icono: osIcon('construction'),
     proposito: 'Antes de poder formar LLC y pedir HML, necesitás el crédito en orden. Esto es un track paralelo que no bloquea avanzar con el resto.',
     aprenderas: 'Cómo leer un reporte de crédito, identificar qué baja el score, reconstruirlo con secured cards + utilización < 30% + on-time pagos, y monitorear progreso mensual.',
     despues: 'E0 — Fundación legal y mental'

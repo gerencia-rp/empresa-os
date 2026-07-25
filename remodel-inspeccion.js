@@ -121,7 +121,7 @@ function inBuildSteps(w) {
   steps.push({ id: 'pisos', tipo: 'pisos', titulo: '¿Cuántos pisos?', seccion: 'Estructura' });
   // Placa & Escaleras solo si 2+
   if ((w.numero_pisos || 1) >= 2) {
-    steps.push({ id: 'placa', tipo: 'division', division: 'placa', titulo: 'Placa de entrepiso', emoji: osIcon('construction'), seccion: 'Placa & Escaleras', subgrupo: 'placa_entrepiso' });
+    steps.push({ id: 'placa', tipo: 'division', division: 'placa', titulo: 'Placa de entrepiso', emoji: '🏗️', seccion: 'Placa & Escaleras', subgrupo: 'placa_entrepiso' });
     steps.push({ id: 'escaleras', tipo: 'division', division: 'placa', titulo: 'Escaleras', emoji: '🪜', seccion: 'Placa & Escaleras', subgrupo: 'escaleras' });
   }
   ['piso', 'carpinteria', 'redes'].forEach(k => { const d = IN.divisiones.find(x => x.key === k); if (d) steps.push({ id: k, tipo: k === 'redes' ? 'redes' : k === 'carpinteria' ? 'carpinteria' : 'division', division: k, titulo: d.nombre, emoji: d.emoji, seccion: 'Interno' }); });

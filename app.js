@@ -753,7 +753,7 @@ async function deleteUser(userId, email) {
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');
-    if (r.warning) alert(osIcon('alert') + r.warning);
+    if (r.warning) alert(r.warning);
     else alert('✓ Usuario eliminado completamente. Podés re-invitar el email cuando quieras.');
     closeModal(); setTimeout(openTeamMgmt, 200);
   } catch (e) {
@@ -1228,7 +1228,7 @@ function openSystemForm(areaId, sys) {
       <div class="grid grid-cols-[80px_1fr] gap-3">
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">Ícono</label>
-          <input id="f-icon" value="${data.icon}" placeholder="${osIcon('house')}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-center text-xl" />
+          <input id="f-icon" value="${data.icon}" placeholder="🏠" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-center text-xl" />
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">Nombre</label>

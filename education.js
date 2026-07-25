@@ -3230,23 +3230,23 @@ function fmAnalizarPerfilCompleto(a) {
 
   // Perfil 8: Lender pasivo
   if (a.objetivo === 'lender') {
-    perfil = { num: 8, nombre: 'Lender Pasivo (Private Money)', emoji: osIcon('dollar'), color: 'emerald' };
+    perfil = { num: 8, nombre: 'Lender Pasivo (Private Money)', emoji: '💰', color: 'emerald' };
     etapa = 'E5';
     cronograma = 'Inmediato — no opera el negocio';
   }
   // Perfil 4: Escalar (ya cerró deals)
   else if (a.deals_cerrados === '5_mas' || a.objetivo === 'escalar') {
-    perfil = { num: 4, nombre: 'Cerró deals y quiere escalar', emoji: osIcon('rocket'), color: 'rose' };
+    perfil = { num: 4, nombre: 'Cerró deals y quiere escalar', emoji: '🚀', color: 'rose' };
     etapa = 'E5';
     cronograma = 'Continuo — sistemas, equipo, expansión';
   }
   else if (a.deals_cerrados === '2_4') {
-    perfil = { num: 4, nombre: 'Cerró 1+ deals y quiere escalar', emoji: osIcon('rocket'), color: 'rose' };
+    perfil = { num: 4, nombre: 'Cerró 1+ deals y quiere escalar', emoji: '🚀', color: 'rose' };
     etapa = 'E5';
     cronograma = '3-6 meses para infraestructura de escala';
   }
   else if (a.deals_cerrados === '1') {
-    perfil = { num: 4, nombre: 'Primer deal cerrado, post-mortem pendiente', emoji: osIcon('chart'), color: 'purple' };
+    perfil = { num: 4, nombre: 'Primer deal cerrado, post-mortem pendiente', emoji: '📊', color: 'purple' };
     // FIX: FM_ETAPAS solo tiene E0-E5. 'E5.1' nunca matcheaba en el render
     // y los bloques quedaban invisibles. Asignar a E5 con la subetapa
     // específica codificada en el cronograma.
@@ -3261,13 +3261,13 @@ function fmAnalizarPerfilCompleto(a) {
   }
   // Perfil 5: Fix & Hold
   else if (a.objetivo === 'hold') {
-    perfil = { num: 5, nombre: 'Fix & Hold (rentas long-term)', emoji: osIcon('building'), color: 'teal' };
+    perfil = { num: 5, nombre: 'Fix & Hold (rentas long-term)', emoji: '🏘️', color: 'teal' };
     etapa = 'E0';
     cronograma = '9-15 meses al primer deal rentado';
   }
   // Perfil 2: Capital pero sin crédito
   else if (a.credit === 'menos_600' || a.credit === '600_660' || a.credit === 'sin_historial') {
-    perfil = { num: 2, nombre: 'Capital pero sin crédito sólido', emoji: osIcon('construction'), color: 'amber' };
+    perfil = { num: 2, nombre: 'Capital pero sin crédito sólido', emoji: '🏗️', color: 'amber' };
     etapa = 'E0';
     cronograma = '6-12 meses (track paralelo: reconstruir crédito + LLC)';
   }
@@ -3279,7 +3279,7 @@ function fmAnalizarPerfilCompleto(a) {
   }
   // Perfil 3: Atascado en evaluación
   else if ((a.llc === 'si_mismo' || a.llc === 'si_otro') && a.deals_cerrados === '0') {
-    perfil = { num: 3, nombre: 'Atascado en evaluación', emoji: osIcon('refresh'), color: 'orange' };
+    perfil = { num: 3, nombre: 'Atascado en evaluación', emoji: '🔄', color: 'orange' };
     etapa = 'E1+E2';
     cronograma = '30 días breakthrough (forzar volumen de ofertas)';
   }

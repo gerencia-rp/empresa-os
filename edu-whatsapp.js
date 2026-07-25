@@ -29,7 +29,7 @@ const wpsState = {
 
 async function openEduWhatsappSystem(sys) {
   wpsState.sys = sys;
-  openModal(osIcon('message') + (sys.name || 'WhatsApp Masivo IA'), '<div id="wps-root">Cargando...</div>');
+  openModal((sys.name || 'WhatsApp Masivo IA'), '<div id="wps-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await wpsLoad();
