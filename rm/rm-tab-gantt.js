@@ -49,7 +49,7 @@ function rmRenderGantt(body) {
     <div class="grid grid-cols-4 gap-3 mb-4">
       <div class="bg-slate-50 rounded p-2"><div class="text-[10px] text-slate-500 uppercase font-bold">Sin inspecciones</div><div class="text-lg font-bold">${baseDays} días</div>${cpmOn?`<div class="text-[9px] text-slate-500">CPM (vs ${e.totalDays}d lineal)</div>`:''}</div>
       <div class="bg-amber-50 rounded p-2"><div class="text-[10px] text-amber-700 uppercase font-bold">+ Inspecciones</div><div class="text-lg font-bold text-amber-700">+${Math.ceil(inspectionDays)} días</div></div>
-      <div class="bg-blue-50 rounded p-2"><div class="text-[10px] text-blue-700 uppercase font-bold">+ Lead times max</div><div class="text-lg font-bold text-blue-700">+${Math.max(0, ...leadTimeAlerts.map(l=>l.lead_days))} días</div><div class="text-[9px] text-slate-500">en paralelo a obra</div></div>
+      <div class="bg-blue-50 rounded p-2"><div class="text-[10px] text-blue-700 uppercase font-bold">+ Lead times max</div><div class="text-lg font-bold text-blue-700">+${Math.max(0, ...leadTimeAlerts.map(l=>l.lead_days))} días</div><div class="text-[9px] text-blue-600">en paralelo a obra</div></div>
       <div class="bg-emerald-50 rounded p-2"><div class="text-[10px] text-emerald-700 uppercase font-bold">Realista total</div><div class="text-lg font-bold text-emerald-700">${realisticTotal} días</div><div class="text-[9px]">${rmFmtDate(rmAddDays(new Date(rmState.editStartDate), realisticTotal))}</div></div>
     </div>
 
