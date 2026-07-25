@@ -10,48 +10,50 @@ const OS_M = n => posMoney(n);              // #10: formato único (exacto con s
 const OS_K = n => posMoneyK(n);             // #10: formato único (compacto $X.XXM / $XXXk)
 const OS_E = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function osAx() { return posGetTheme() === 'light' ? '#756c5c' : '#7c7365'; }
+// Icono de empresa/app/área: nombre Lucide → SVG (osIcon); glifo tipográfico (◧ ▦ ∑ ⌂ …) → tal cual.
+function osIco(val, opts) { return (window.OS_ICONS && OS_ICONS[val]) ? osIcon(val, opts) : (val || ''); }
 
 // ─── Empresas / áreas del holding ───
 const OS_EMPRESAS = {
-  'fix-and-flip': { key: 'fix-flip', name: 'Fix & Flip', icon: '🏗️', tag: 'Compra · remodela · vende/refi', apps: [
+  'fix-and-flip': { key: 'fix-flip', name: 'Fix & Flip', icon: 'construction', tag: 'Compra · remodela · vende/refi', apps: [
     { k: 'command-center', name: 'Command Center', icon: '◧', fn: "osOpenApp('fix-and-flip','command-center')" },
     { k: 'deals', name: 'Deals & Pipeline', icon: '▦', fn: "osOpenApp('fix-and-flip','deals')" },
     { k: 'underwriting', name: 'Underwriting', icon: '∑', fn: "osOpenApp('fix-and-flip','underwriting')" },
     { k: 'inversionistas', name: 'Inversionistas', icon: '◍', fn: "osOpenApp('fix-and-flip','inversionistas')" },
-    { k: 'portal-inv', name: 'Portal Inversionistas', icon: '💎', fn: "osNav('/inversionistas')" },
+    { k: 'portal-inv', name: 'Portal Inversionistas', icon: 'gem', fn: "osNav('/inversionistas')" },
     { k: 'finanzas', name: 'Finanzas · QuickBooks', icon: '$', fn: "osOpenApp('fix-and-flip','finanzas')" },
   ] },
-  'rentas': { key: 'rentas', name: 'Rentas', icon: '🏠', tag: 'Property management · ocupación · cobros', apps: [
+  'rentas': { key: 'rentas', name: 'Rentas', icon: 'house', tag: 'Property management · ocupación · cobros', apps: [
     { k: 'property-manager', name: 'Property Manager', icon: '⌂', fn: "osOpenApp('rentas','property-manager')" },
-    { k: 'cronograma', name: 'Cronograma', icon: '📅', fn: "osOpenApp('rentas','cronograma')" },
-    { k: 'cartera', name: 'Informe de Cartera', icon: '📋', fn: "osNav('/cartera')" },
-    { k: 'cobros', name: 'Cobranza (recordatorios)', icon: '📣', fn: "osNav('/cobros')" },
+    { k: 'cronograma', name: 'Cronograma', icon: 'calendar', fn: "osOpenApp('rentas','cronograma')" },
+    { k: 'cartera', name: 'Informe de Cartera', icon: 'clipboard', fn: "osNav('/cartera')" },
+    { k: 'cobros', name: 'Cobranza (recordatorios)', icon: 'megaphone', fn: "osNav('/cobros')" },
   ] },
-  'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: '🔨', tag: 'Obras · estimación · pipeline', apps: [
+  'remodelacion': { key: 'remodelacion', name: 'Remodelación', icon: 'hammer', tag: 'Obras · estimación · pipeline', apps: [
     { k: 'remodel-pro', name: 'Estimador Pro', icon: '∑', fn: "osOpenApp('remodelacion','remodel-pro')" },
     { k: 'command-center', name: 'Command Center', icon: '◆', fn: "osOpenApp('remodelacion','command-center')" },
-    { k: 'planner', name: 'Planner Semanal', icon: '🗓', fn: "osOpenApp('remodelacion','planner')" },
-    { k: 'diagnostico', name: 'Diagnóstico de Vivienda', icon: '🏥', ext: true, fn: "window.open('/diagnostico','_blank')" },
-    { k: 'airtable', name: 'Airtable Remodelación', icon: '🗂', ext: true, fn: "osOpenLink('Airtable Remodelacion')" },
-    { k: 'drive', name: 'Drive · Structure One', icon: '📁', ext: true, fn: "osOpenLink('Drive Compartida')" },
+    { k: 'planner', name: 'Planner Semanal', icon: 'calendar-days', fn: "osOpenApp('remodelacion','planner')" },
+    { k: 'diagnostico', name: 'Diagnóstico de Vivienda', icon: 'stethoscope', ext: true, fn: "window.open('/diagnostico','_blank')" },
+    { k: 'airtable', name: 'Airtable Remodelación', icon: 'folder-open', ext: true, fn: "osOpenLink('Airtable Remodelacion')" },
+    { k: 'drive', name: 'Drive · Structure One', icon: 'folder', ext: true, fn: "osOpenLink('Drive Compartida')" },
     // Fuera del panel (código intacto, se retoman después): Dashboard de Obras (→ Command Center), Cronograma (queda en Rentas), ClickUp Análisis.
   ] },
-  'educacion': { key: 'education', name: 'Educación', icon: '🎓', tag: 'Universidad de Real Estate', apps: [
+  'educacion': { key: 'education', name: 'Educación', icon: 'graduation-cap', tag: 'Universidad de Real Estate', apps: [
     { k: 'manager', name: 'Mentorías Manager', icon: '◍', fn: "osOpenApp('educacion','manager')" },
     { k: 'reportes', name: 'Informes Ejecutivos', icon: '▤', fn: "osOpenApp('educacion','reportes')" },
   ] },
   // Departamento IA v2 (fábrica): Crear/Galería abiertos a todo usuario logueado;
   // Pendientes gateado adentro del módulo (os/os-ia.js) por has_area('ia')/admin.
   // Edge function ia-builder (Claude) + Supabase ia_sessions/ia_artifacts/ia_specs.
-  'ia': { key: 'ia', name: 'IA', icon: '🏭', tag: 'Fábrica de herramientas · IA en vivo', apps: [
-    { k: 'crear', name: 'Crear herramienta', icon: '🏭', fn: "osiaGo('crear')" },
-    { k: 'galeria', name: 'Galería', icon: '🖼', fn: "osiaGo('galeria')" },
-    { k: 'pendientes', name: 'Pendientes de OK', icon: '📥', fn: "osiaGo('pendientes')" },
+  'ia': { key: 'ia', name: 'IA', icon: 'factory', tag: 'Fábrica de herramientas · IA en vivo', apps: [
+    { k: 'crear', name: 'Crear herramienta', icon: 'factory', fn: "osiaGo('crear')" },
+    { k: 'galeria', name: 'Galería', icon: 'image', fn: "osiaGo('galeria')" },
+    { k: 'pendientes', name: 'Pendientes de OK', icon: 'inbox', fn: "osiaGo('pendientes')" },
   ] },
 };
 const OS_AREAS = {
-  operacion: { name: 'Operación', icon: '⚙️', tag: 'Cronograma + cobranza · cruza todas las empresas' },
-  contable: { name: 'Contable', icon: '📒', tag: 'QuickBooks · conciliación · cap table' },
+  operacion: { name: 'Operación', icon: 'settings', tag: 'Cronograma + cobranza · cruza todas las empresas' },
+  contable: { name: 'Contable', icon: 'notebook', tag: 'QuickBooks · conciliación · cap table' },
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -495,7 +497,7 @@ function osRouteGuard(r) {
 }
 function osNoAccess(what) {
   const lbl = what === 'admin' ? 'el Panel de Admin (solo administradores)' : 'esta sección';
-  return `<div class="empty"><div style="font-size:40px">🔒</div><div style="margin-top:10px">No tenés acceso a ${OS_E(lbl)}.</div><div class="meta" style="margin-top:6px">Pedile a un admin que te asigne el área en el Panel de Admin.</div><button class="cbtn" style="margin-top:14px" data-osnav="/">← Volver al inicio</button></div>`;
+  return `<div class="empty"><div style="font-size:40px">${osIcon('lock')}</div><div style="margin-top:10px">No tenés acceso a ${OS_E(lbl)}.</div><div class="meta" style="margin-top:6px">Pedile a un admin que te asigne el área en el Panel de Admin.</div><button class="cbtn" style="margin-top:14px" data-osnav="/">← Volver al inicio</button></div>`;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -505,7 +507,7 @@ function osDestroyCharts() { OS._charts.forEach(c => { try { c.destroy(); } catc
 function osRender() {
   const root = document.getElementById('os-root'); if (!root) return;
   posApplyTheme(root); osDestroyCharts();
-  if (OS.loadErr) { root.innerHTML = osShell(`<div class="empty"><div style="font-size:40px">⚠️</div><div class="down" style="margin-top:10px">${OS_E(OS.loadErr)}</div></div>`); return; }
+  if (OS.loadErr) { root.innerHTML = osShell(`<div class="empty"><div style="font-size:40px">${osIcon('alert')}</div><div class="down" style="margin-top:10px">${OS_E(OS.loadErr)}</div></div>`); return; }
   if (!OS.loaded) { root.innerHTML = osShell('<div class="ui-loading"><div class="ui-spinner"></div><div>Cargando datos del holding…</div></div>'); return; }
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
@@ -517,17 +519,17 @@ function osRender() {
 window.osRender = osRender;
 function osCrumbs() {
   const r = OS.route; const parts = [`<a data-osnav="/">Global</a>`];
-  if (r.view === 'operacion') parts.push('<span class="sep">/</span><b>⚙️ Operación</b>');
-  else if (r.view === 'contable') parts.push('<span class="sep">/</span><b>📒 Contable</b>');
-  else if (r.view === 'admin') parts.push('<span class="sep">/</span><b>🛡 Admin</b>');
-  else if (r.empresa) { const e = OS_EMPRESAS[r.empresa]; parts.push(`<span class="sep">/</span>${r.view === 'empresa' ? `<b>${e.icon} ${e.name}</b>` : `<a data-osnav="/${r.empresa}">${e.icon} ${e.name}</a>`}`); if (r.app) parts.push(`<span class="sep">/</span><b>${OS_E(r.app)}</b>`); }
+  if (r.view === 'operacion') parts.push('<span class="sep">/</span><b>' + osIcon('settings') + ' Operación</b>');
+  else if (r.view === 'contable') parts.push('<span class="sep">/</span><b>' + osIcon('notebook') + ' Contable</b>');
+  else if (r.view === 'admin') parts.push('<span class="sep">/</span><b>' + osIcon('shield') + ' Admin</b>');
+  else if (r.empresa) { const e = OS_EMPRESAS[r.empresa]; const eico = osIco(e.icon, { size: 14 }); parts.push(`<span class="sep">/</span>${r.view === 'empresa' ? `<b style="display:inline-flex;align-items:center;gap:5px">${eico} ${e.name}</b>` : `<a data-osnav="/${r.empresa}" style="display:inline-flex;align-items:center;gap:5px">${eico} ${e.name}</a>`}`); if (r.app) parts.push(`<span class="sep">/</span><b>${OS_E(r.app)}</b>`); }
   return parts.join(' ');
 }
 function osShell(inner) {
   return `<div class="bgfx"></div><div class="wrap">
     <div class="bar"><div class="logo" data-osnav="/" style="cursor:pointer">FR</div><div class="brandt"><b>Flipping Rentals OS</b><span>RENTAL PROFITSS · HOLDING</span></div>
       <div class="crumbs">${osCrumbs()}</div>
-      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">🛡 Admin</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
+      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">' + osIcon('shield') + ' Admin</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
     </div>${inner}</div>`;
 }
 function osOpenAdmin() { const root = document.getElementById('os-root'); if (root) root.style.display = 'none'; if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 }); }
@@ -537,7 +539,7 @@ window.osOpenAdmin = osOpenAdmin;
 function osGlobal(comp) {
   const insights = osInsights(comp); const h = comp.holding;
   const isAdm = osRole() === 'admin';
-  const unitCard = (slug, e, extra) => osCanArea(e.key) ? `<div class="card unit" data-osnav="/${slug}"><div class="ico">${e.icon}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>` : '';
+  const unitCard = (slug, e, extra) => osCanArea(e.key) ? `<div class="card unit" data-osnav="/${slug}"><div class="ico">${osIco(e.icon, { size: 26 })}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>` : '';
   // KPIs macro por área: cada tarjeta solo si el usuario tiene el área (admin ve todo)
   const kpis = [
     osCanArea('fix-flip') ? `<div class="card"><div class="lab">Capital del holding (F&F)</div><div class="big glow">${OS.capital ? OS_M(+OS.capital.equity_comprometido_airtable) : OS_M(h.capital)}</div><div class="meta">${OS.capital ? `equity aportado [Airtable] + deuda HML ${OS_K(+(OS.capital.deuda_hml_qbo != null ? OS.capital.deuda_hml_qbo : OS.capital.deuda_hml_os_activa))} [QBO] — la deuda no es capital` : 'v_capital_deployed sin datos'} · ${comp.ff.activos} deals · ARV ${OS_K(comp.ff.arv)}</div></div>` : '',
@@ -546,9 +548,9 @@ function osGlobal(comp) {
     (osCanArea('operacion') || osCanArea('rentas')) ? `<div class="card"><div class="lab">Cobranza operativa</div><div class="big down">${OS_M(h.deudaCobranza)}</div><div class="meta">contrato − plata real · ${comp.cobranza.rows.length} casas · A/R contable [QBO]: ${(() => { const ar = (OS.qbCache || []).find(x => x.report === 'balance' && x.label === 'Total Accounts Receivable'); return ar ? OS_M(+ar.value) : 'sin libros'; })()}</div></div>` : '',
   ].join('');
   const areaCards = [
-    osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">⚙️</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
-    osCanArea('contable') ? `<div class="card unit" data-osnav="/contable"><div class="ico">📒</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>` : '',
-    `<div class="card unit" data-osnav="/mapa"><div class="ico">🗺️</div><div class="un">Mapa de Conexiones</div><div class="ut">DE DÓNDE SALE CADA NÚMERO</div><div class="kv"><span>Linaje de datos</span><b>viene → número → alimenta</b></div><div class="go">Abrir →</div></div>`,
+    osCanArea('operacion') ? `<div class="card unit" data-osnav="/operacion"><div class="ico">${osIcon('settings')}</div><div class="un">Operación</div><div class="ut">${OS_AREAS.operacion.tag}</div><div class="kv"><span>Deuda cobranza</span><b class="down">${OS_K(h.deudaCobranza)}</b></div><div class="go">Abrir →</div></div>` : '',
+    osCanArea('contable') ? `<div class="card unit" data-osnav="/contable"><div class="ico">${osIcon('notebook', { size: 26 })}</div><div class="un">Contable</div><div class="ut">${OS_AREAS.contable.tag}</div><div class="kv"><span>Overhead FF real</span><b class="warn">${OS_M(OS.ffOverhead || 0)}</b></div><div class="go">Abrir →</div></div>` : '',
+    `<div class="card unit" data-osnav="/mapa"><div class="ico">${osIcon('map')}</div><div class="un">Mapa de Conexiones</div><div class="ut">DE DÓNDE SALE CADA NÚMERO</div><div class="kv"><span>Linaje de datos</span><b>viene → número → alimenta</b></div><div class="go">Abrir →</div></div>`,
   ].join('');
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
   const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
@@ -564,7 +566,7 @@ function osGlobal(comp) {
         ${unitCard('rentas', OS_EMPRESAS['rentas'], `<div class="kv"><span>Ocupación</span><b>${comp.rentas.occPct}%</b></div><div class="kv"><span>Ingresos/mes</span><b>${OS_K(comp.rentas.ingresos)}</b></div>`)}
         ${unitCard('remodelacion', OS_EMPRESAS['remodelacion'], `<div class="kv"><span>Obras activas</span><b>${comp.remodel.activas}</b></div><div class="kv"><span>Avance prom.</span><b>${comp.remodel.avance}%</b></div>`)}
         ${unitCard('educacion', OS_EMPRESAS['educacion'], `<div class="kv"><span>Alumnos activos</span><b>${comp.educacion ? comp.educacion.activos : '—'}</b></div><div class="kv"><span>Nuevos (30d)</span><b>${comp.educacion ? comp.educacion.nuevos : '—'}</b></div>`)}
-        <div class="card unit" data-osnav="/ia"><div class="ico">🏭</div><div class="un">IA</div><div class="ut">Fábrica de herramientas · IA en vivo</div><div class="kv"><span>Contá una tarea</span><b>y sale una herramienta</b></div><div class="kv"><span>Publicadas</span><b>Galería</b></div><div class="go">Abrir IA →</div></div>
+        <div class="card unit" data-osnav="/ia"><div class="ico">${osIcon('factory')}</div><div class="un">IA</div><div class="ut">Fábrica de herramientas · IA en vivo</div><div class="kv"><span>Contá una tarea</span><b>y sale una herramienta</b></div><div class="kv"><span>Publicadas</span><b>Galería</b></div><div class="go">Abrir IA →</div></div>
       </div>
       <div class="grid k2" style="margin-top:16px">${areaCards}</div></div>
       ${brain}
@@ -581,10 +583,10 @@ function osEmpresa(comp) {
     : isRemo ? [['Obras activas', comp.remodel.activas, `de ${comp.remodel.obras} totales`], ['Avance promedio', comp.remodel.avance + '%', 'de las obras'], ['Utilidad finalizadas', OS_M(comp.remodel.gananciaFinal), 'realizada (obras terminadas)'], ['En curso (proyectado)', OS_M(comp.remodel.gananciaEnCurso), `${comp.remodel.enCursoN} obras · NO final`]]
     : isEdu ? (comp.educacion ? [['Alumnos activos', comp.educacion.activos, `${comp.educacion.conPlan} con plan`], ['Nuevos (30d)', comp.educacion.nuevos, ''], ['Antigüedad prom.', comp.educacion.antiguedad + 'd', 'en el programa'], ['Con plan activo', comp.educacion.conPlan, `de ${comp.educacion.activos}`]] : [['Sin datos', '—', 'no hay snapshot de educación cargado']])
     : [['—', '—', 'datos próximamente']];
-  return `<h1>${e.icon} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag} · <a style="cursor:pointer;color:var(--a2)" data-osnav="/mapa">🗺️ Mapa de Conexiones (de dónde sale cada número) →</a></div>
+  return `<h1 style="display:flex;align-items:center;gap:9px">${osIco(e.icon, { size: 24 })} ${e.name} <span>· Empresa</span></h1><div class="sub">${e.tag} · <a style="cursor:pointer;color:var(--a2)" data-osnav="/mapa">${osIcon('map', { size: 13 })} Mapa de Conexiones (de dónde sale cada número) →</a></div>
     <div class="grid k4">${kpis.map(k => `<div class="card" title="${k[0]}"><div class="lab">${k[0]}</div><div class="big">${k[1]}</div><div class="meta">${k[2]}</div></div>`).join('')}</div>
     <div class="chart-h" style="margin:24px 4px 12px"><div class="t">Apps de ${e.name}</div><div class="k">clic para abrir</div></div>
-    <div class="grid k3">${e.apps.map(a => `<div class="card app-card" ${a.soon ? '' : `onclick="${a.fn}"`}><div class="ai">${a.icon}</div><div style="flex:1;min-width:0"><div class="an" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</div><div class="at">${a.soon ? 'Fase 2' : 'Abrir app'}</div></div>${a.soon ? '<span class="soon">pronto</span>' : ''}</div>`).join('')}</div>`;
+    <div class="grid k3">${e.apps.map(a => `<div class="card app-card" ${a.soon ? '' : `onclick="${a.fn}"`}><div class="ai">${osIco(a.icon, { size: 19 })}</div><div style="flex:1;min-width:0"><div class="an" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</div><div class="at">${a.soon ? 'Fase 2' : 'Abrir app'}</div></div>${a.soon ? '<span class="soon">pronto</span>' : ''}</div>`).join('')}</div>`;
 }
 
 // ─── ÁREA · OPERACIÓN ───
@@ -605,7 +607,7 @@ function osContable(comp) {
       ? kitVerdict('revisar', ab.length + (ab.length === 1 ? ' descuadre abierto' : ' descuadres abiertos') + (monto ? ' · ' + kitMoney(monto) + ' sin conciliar' : ''), 'Revisá el Sabueso Contable (abajo), ordenado por impacto en plata — el norte es cero.')
       : kitVerdict('go', 'Libros cuadrando', 'Sin descuadres abiertos del Sabueso — norte de cero sostenido.');
   }
-  return `<h1>📒 Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
+  return `<h1 style="display:flex;align-items:center;gap:9px">${osIcon('notebook', { size: 24 })} Contable <span>· QuickBooks + Conciliación</span></h1><div class="sub">P&L / balance / cashflow de QuickBooks, conciliación Airtable↔QuickBooks y cap table de inversionistas.</div>
     ${veredicto}
     ${window.ctSabuesoBlock ? ctSabuesoBlock(comp) : ''}
     <div class="grid k4">
@@ -617,7 +619,7 @@ function osContable(comp) {
     <div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">P&L del holding (v_holding_pnl)</div><div class="k">una definición por métrica · fuente: espejos verificados</div></div>
       <div class="overx"><table class="ptable"><thead><tr><th>Empresa</th><th style="text-align:right">Ingreso</th><th style="text-align:right">Costo real</th><th style="text-align:right">Overhead</th><th style="text-align:right">Utilidad bruta</th><th style="text-align:right">EBITDA</th><th style="text-align:right">FF realizado / inyectado</th></tr></thead><tbody>
       ${(OS.pnl || []).map(r => {
-        const nm = { remodelacion: '🔨 Remodelación', fix_flip: '🏚 Fix & Flip', rentas: '🏠 Rentas', educacion: '🎓 Educación', consolidado: '🏛 CONSOLIDADO' }[r.empresa] || r.empresa;
+        const nm = { remodelacion: 'Remodelación', fix_flip: 'Fix & Flip', rentas: 'Rentas', educacion: 'Educación', consolidado: 'CONSOLIDADO' }[r.empresa] || r.empresa;
         const v = x => x == null ? '—' : OS_M(+x);
         const cls = x => x == null ? '' : (+x >= 0 ? 'up' : 'down');
         const ffx = (r.realizado == null && r.inyectado == null) ? '—' : (v(r.realizado) + ' / ' + v(r.inyectado));
@@ -716,7 +718,7 @@ function osCasaMatch(slug, comp) {
   // objetivo ocupadas). Reasignar en /mapa cambia esto sin tocar código; reversible + auditado.
   const linRenta = (typeof osLineageRow === 'function') ? osLineageRow('Fix & Flip', 'Ficha de Casa', 'Renta mensual actual') : null;
   const rentaViva = (linRenta && linRenta.base === 'Rentas')
-    ? { v: (rentas && rentas.detalle && rentas.occRent > 0) ? rentas.occRent : null, chip: 'Rentas·Unidades ⚡mapa' }
+    ? { v: (rentas && rentas.detalle && rentas.occRent > 0) ? rentas.occRent : null, chip: 'Rentas·Unidades mapa' }
     : { v: ffRenta, chip: 'FF·Propiedades' };
   if (ffRenta != null || flujoMes != null || rentaViva.v != null) rentas = Object.assign(rentas || { detalle: false }, { renta: rentaViva.v, rentaChip: rentaViva.chip, ffRenta, ffGastos, flujoMes, pagoDeuda: (port && port.pago_deuda_mes != null) ? +port.pago_deuda_mes : null });
   return { key, slug, addr, ff, remodel, prop, rentas, p360, port };
@@ -757,12 +759,12 @@ function osCasa(comp) {
   const fn = osFichaNums(m);   // UNA cadena de lectura: tarjeta y fila espejo muestran LO MISMO
   const kv = (l, v, cls) => `<div class="kv"><span>${l}</span><b class="${cls || ''}">${v}</b></div>`;
   if (!m.ff && !m.remodel && !m.rentas) {
-    return `<div class="empty" style="padding:80px 40px"><div style="font-size:48px">🏚️</div><h1 style="margin-top:12px">Casa no encontrada</h1><div class="sub">No hay datos para <b>${OS_E(OS.route.slug)}</b> en Fix & Flip, Remodelación ni Rentas.</div><button class="cbtn" style="padding:10px 18px" data-osnav="/">← Volver al Panel Global</button></div>`;
+    return `<div class="empty" style="padding:80px 40px"><div>${osIcon('house', { size: 48, color: 'var(--mut2)' })}</div><h1 style="margin-top:12px">Casa no encontrada</h1><div class="sub">No hay datos para <b>${OS_E(OS.route.slug)}</b> en Fix & Flip, Remodelación ni Rentas.</div><button class="cbtn" style="padding:10px 18px" data-osnav="/">← Volver al Panel Global</button></div>`;
   }
   const stageK = m.ff ? m.ff.stage : (m.remodel && m.remodel.proceso === 'Finalizado' ? 'refinanciada' : (m.remodel ? 'en_rehab' : (m.rentas ? 'rentada' : null)));
   const stageLbl = m.ff ? (OS_STAGE_LBL[m.ff.stage] || m.ff.stage) : (m.remodel ? m.remodel.proceso : (m.rentas ? 'Rentada' : '—'));
   const strat = m.ff ? (m.ff.strategy === 'flip' ? 'FLIP' : m.ff.strategy === 'hold' ? 'HOLD' : '') : '';
-  const dqBadge = (m.ff && m.ff.dq && m.ff.dq.revisar) ? `<span class="ff-dqx">⚠ dato a revisar</span>` : '';
+  const dqBadge = (m.ff && m.ff.dq && m.ff.dq.revisar) ? `<span class="ff-dqx">${osIcon('alert')} dato a revisar</span>` : '';
   const insights = osCasaInsights(m);
   const esRentada = m.ff ? /rentada|refinanciada/.test(m.ff.stage || '') : !!(m.rentas && m.rentas.detalle);
   const faltaDato = `<span style="color:var(--amber)">faltan datos</span>`;
@@ -789,24 +791,24 @@ function osCasa(comp) {
   const fichaPid = (m.p360 && m.p360.property_id) || (m.prop && m.prop.property_id) || (m.ff && m.ff.property_id) || null;
   // ⓘ "de dónde sale": abre la cadena base·tabla·columna del Mapa de Conexiones (data_lineage_map)
   const LIN = d => window.osLinI ? ' ' + osLinI('Fix & Flip', 'Ficha de Casa', d) : '';
-  return `<h1>🏠 ${OS_E(ffShortAddr(m.addr))} <span>· Ficha de casa</span></h1>
-    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).${fichaPid && window.reportCasa ? ` <button class="cbtn" style="margin-left:8px" onclick="reportCasa('${fichaPid}')">📄 Reporte PDF de la casa</button>` : ''}</div>
+  return `<h1>${osIcon('house')} ${OS_E(ffShortAddr(m.addr))} <span>· Ficha de casa</span></h1>
+    <div class="sub">${OS_E(m.addr)} — ciclo de vida de la casa a través de las empresas (Fuente: Airtable en vivo).${fichaPid && window.reportCasa ? ` <button class="cbtn" style="margin-left:8px" onclick="reportCasa('${fichaPid}')">${osIcon('file')} Reporte PDF de la casa</button>` : ''}</div>
     <div class="grid k4">
       <div class="card"><div class="lab">Etapa actual${LIN('Etapa actual')}</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
       <div class="card"><div class="lab">All-in (compra + draws)${LIN('All-in')}</div><div class="big">${fn.allIn != null ? OS_M(fn.allIn) : '—'}</div><div class="meta">${fn.allInSub || (m.ff ? 'sin datos de compra' : 'sin deal F&F')}</div></div>
       <div class="card"><div class="lab">ARV${LIN('ARV')}</div><div class="big">${fn.arv != null ? OS_M(fn.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
-      <div class="card"><div class="lab">Equity incorporado${LIN('Equity incorporado')}</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">⚠ con datos incompletos</span>' : ''}${m.port && !m.port.faltan_draws && m.port.deficit < 0 ? ` · cash en hold ${OS_M(+m.port.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
+      <div class="card"><div class="lab">Equity incorporado${LIN('Equity incorporado')}</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">' + osIcon('alert') + ' con datos incompletos</span>' : ''}${m.port && !m.port.faltan_draws && m.port.deficit < 0 ? ` · cash en hold ${OS_M(+m.port.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
     </div>
     <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
     <div class="grid k2" style="margin-top:12px">
-      <div class="card"><div class="chart-h"><div class="t">🏗️ Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
-        <div class="overx">${m.ff ? `${kv('Compra' + LIN('Compra'), fn.compra != null ? OS_M(fn.compra) : '—')}${kv('Remodelación' + LIN('Remodelación (draws)'), fn.rehabMostrar ? OS_M(fn.rehabMostrar.v) + ` <span style="font-size:10px;color:var(--mut2)">${fn.rehabMostrar.lbl}</span>` : '—')}${kv('Holding (draws)', m.ff.dr ? OS_M(m.ff.holding) : '—')}${kv('All-in', fn.allIn != null ? OS_M(fn.allIn) + (fn.faltan ? ' <span style="font-size:10px;color:var(--amber)">⚠ faltan draws</span>' : '') : '—', m.ff.dq.revisar ? 'down' : '')}${kv('ARV', fn.arv != null ? OS_M(fn.arv) : '—')}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', fn.arv != null ? OS_M(fn.arv * 0.75 - (fn.rehabMostrar ? fn.rehabMostrar.v : 0) - (m.ff.dr ? m.ff.holding : 0)) : '—')}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">⚠ all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
-      <div class="card"><div class="chart-h"><div class="t">🔨 Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
-        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">⏳ obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : ((m.ff && (/rentada|refinanciada|vendida|en_venta/.test(m.ff.stage || '') || fn.rehabReal != null || fn.draws != null)) ? `<div style="padding:14px 4px">${kv('Estado', '✔ Obra finalizada', 'up')}${fn.rehabReal != null ? kv('Costo de remodelación (real)', OS_M(fn.rehabReal)) : (fn.rehabEst != null ? kv('Remodelación (estimada)', OS_M(fn.rehabEst) + ' <span style="font-size:10px;color:var(--amber)">estimada</span>') : '')}${fn.draws != null ? kv('Draws desembolsados', OS_M(fn.draws)) : ''}<div class="meta" style="margin-top:8px">La casa ya pasó la etapa de obra (${OS_E(stageLbl)}). No hay registro de esta obra en la base de Remodelación — el resumen sale de Fix & Flip.</div></div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`)}</div></div>
+      <div class="card"><div class="chart-h"><div class="t">${osIcon('construction')} Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
+        <div class="overx">${m.ff ? `${kv('Compra' + LIN('Compra'), fn.compra != null ? OS_M(fn.compra) : '—')}${kv('Remodelación' + LIN('Remodelación (draws)'), fn.rehabMostrar ? OS_M(fn.rehabMostrar.v) + ` <span style="font-size:10px;color:var(--mut2)">${fn.rehabMostrar.lbl}</span>` : '—')}${kv('Holding (draws)', m.ff.dr ? OS_M(m.ff.holding) : '—')}${kv('All-in', fn.allIn != null ? OS_M(fn.allIn) + (fn.faltan ? ' <span style="font-size:10px;color:var(--amber)">' + osIcon('alert') + ' faltan draws</span>' : '') : '—', m.ff.dq.revisar ? 'down' : '')}${kv('ARV', fn.arv != null ? OS_M(fn.arv) : '—')}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', fn.arv != null ? OS_M(fn.arv * 0.75 - (fn.rehabMostrar ? fn.rehabMostrar.v : 0) - (m.ff.dr ? m.ff.holding : 0)) : '—')}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">${osIcon('alert')} all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
+      <div class="card"><div class="chart-h"><div class="t">${osIcon('hammer')} Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
+        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">${osIcon('loader')} obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : ((m.ff && (/rentada|refinanciada|vendida|en_venta/.test(m.ff.stage || '') || fn.rehabReal != null || fn.draws != null)) ? `<div style="padding:14px 4px">${kv('Estado', 'Obra finalizada', 'up')}${fn.rehabReal != null ? kv('Costo de remodelación (real)', OS_M(fn.rehabReal)) : (fn.rehabEst != null ? kv('Remodelación (estimada)', OS_M(fn.rehabEst) + ' <span style="font-size:10px;color:var(--amber)">estimada</span>') : '')}${fn.draws != null ? kv('Draws desembolsados', OS_M(fn.draws)) : ''}<div class="meta" style="margin-top:8px">La casa ya pasó la etapa de obra (${OS_E(stageLbl)}). No hay registro de esta obra en la base de Remodelación — el resumen sale de Fix & Flip.</div></div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`)}</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
-      <div class="card"><div class="chart-h"><div class="t">🏠 Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
-        <div class="overx">${m.rentas ? `${m.rentas.renta != null ? kv('Renta mensual actual' + LIN('Renta mensual actual'), OS_M(m.rentas.renta) + ` <span style="font-size:10px;color:var(--mut2)">${OS_E(m.rentas.rentaChip)}</span>`) : (esRentada ? kv('Renta mensual actual' + LIN('Renta mensual actual'), faltaDato) : '')}${m.rentas.ffGastos != null ? kv('Gastos mensuales' + LIN('Gastos mensuales'), OS_M(m.rentas.ffGastos)) : (esRentada ? kv('Gastos mensuales', faltaDato) : '')}${m.rentas.flujoMes != null ? kv('Flujo mensual' + LIN('Flujo mensual'), OS_M(m.rentas.flujoMes), m.rentas.flujoMes >= 0 ? 'up' : 'down') : (esRentada ? kv('Flujo mensual', faltaDato) : '')}${m.rentas.pagoDeuda != null ? kv('Pago de deuda /mes', OS_M(m.rentas.pagoDeuda)) : ''}${m.rentas.detalle ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="meta" style="margin-top:8px">Sin espejo en la base de Rentas (detalle de unidades/cobranza no disponible) — los mensuales salen de FF·Propiedades.</div>`}` : (esRentada ? `<div class="empty" style="padding:26px;color:var(--amber)">⚠ La etapa dice <b>${OS_E(stageLbl)}</b> pero faltan los datos de renta en Airtable (FF·Propiedades: Renta mensual actual / Gastos mensuales) — es un dato FALTANTE, no "sin rentas".</div>` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`)}</div></div>
+      <div class="card"><div class="chart-h"><div class="t">${osIcon('house')} Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
+        <div class="overx">${m.rentas ? `${m.rentas.renta != null ? kv('Renta mensual actual' + LIN('Renta mensual actual'), OS_M(m.rentas.renta) + ` <span style="font-size:10px;color:var(--mut2)">${OS_E(m.rentas.rentaChip)}</span>`) : (esRentada ? kv('Renta mensual actual' + LIN('Renta mensual actual'), faltaDato) : '')}${m.rentas.ffGastos != null ? kv('Gastos mensuales' + LIN('Gastos mensuales'), OS_M(m.rentas.ffGastos)) : (esRentada ? kv('Gastos mensuales', faltaDato) : '')}${m.rentas.flujoMes != null ? kv('Flujo mensual' + LIN('Flujo mensual'), OS_M(m.rentas.flujoMes), m.rentas.flujoMes >= 0 ? 'up' : 'down') : (esRentada ? kv('Flujo mensual', faltaDato) : '')}${m.rentas.pagoDeuda != null ? kv('Pago de deuda /mes', OS_M(m.rentas.pagoDeuda)) : ''}${m.rentas.detalle ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="meta" style="margin-top:8px">Sin espejo en la base de Rentas (detalle de unidades/cobranza no disponible) — los mensuales salen de FF·Propiedades.</div>`}` : (esRentada ? `<div class="empty" style="padding:26px;color:var(--amber)">${osIcon('alert')} La etapa dice <b>${OS_E(stageLbl)}</b> pero faltan los datos de renta en Airtable (FF·Propiedades: Renta mensual actual / Gastos mensuales) — es un dato FALTANTE, no "sin rentas".</div>` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`)}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
         ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}${i.s === 'r' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
         ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
@@ -864,7 +866,7 @@ function osOpenSystem(sysType, empresaSlug) {
   }
   if (!found || !window.openSystem) { if (window.toast) toast('No encontré ese sistema en tu cuenta todavía.', 'error'); return; }
   const e = OS_EMPRESAS[empresaSlug];
-  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), (e ? `${e.icon} ${e.name}` : 'Panel'), found.name || 'Sistema');
+  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), (e ? `${osIco(e.icon, { size: 15 })} ${e.name}` : 'Panel'), found.name || 'Sistema');
   openSystem(areaId, found.id); // lógica intacta (abre su modal)
   // convertir el modal en PÁGINA COMPLETA (sin backdrop, ocupa todo el marco del OS)
   const m = document.getElementById('modal'); if (m) m.classList.add('os-syspage');
@@ -910,7 +912,7 @@ function osReturnBarTheme() { if (window.posToggleTheme) posToggleTheme(); const
 window.osReturnBarTheme = osReturnBarTheme;
 
 function os404() {
-  return `<div class="empty" style="padding:90px 40px"><div style="font-size:54px">🧭</div><h1 style="margin-top:14px">Página no encontrada</h1><div class="sub">La ruta <b>${OS_E(OS.route.path || location.pathname)}</b> no existe en Flipping Rentals OS.</div><button class="cbtn" style="padding:10px 18px;margin-top:8px" data-osnav="/">← Volver al Panel Global</button></div>`;
+  return `<div class="empty" style="padding:90px 40px"><div style="font-size:54px">${osIcon('compass')}</div><h1 style="margin-top:14px">Página no encontrada</h1><div class="sub">La ruta <b>${OS_E(OS.route.path || location.pathname)}</b> no existe en Flipping Rentals OS.</div><button class="cbtn" style="padding:10px 18px;margin-top:8px" data-osnav="/">← Volver al Panel Global</button></div>`;
 }
 
 // ─── Cerebro (chat holding) ───
@@ -975,7 +977,7 @@ function osConcilRow(lab, vOS, vQB, nota) {
   const delta = (vOS != null && vQB != null) ? vOS - vQB : null;
   const base = Math.max(Math.abs(vOS || 0), Math.abs(vQB || 0), 1);
   const mal = delta != null && Math.abs(delta) / base > warn;
-  const chip = delta == null ? '' : (mal ? ' <span class="badge b-warn">⚠ descuadre</span>' : ' <span class="badge b-ok">✓</span>');
+  const chip = delta == null ? '' : (mal ? ' <span class="badge b-warn">' + osIcon('alert') + ' descuadre</span>' : ' <span class="badge b-ok">✓</span>');
   return `<tr><td>${lab}${nota ? `<div style="font-size:9px;opacity:.55">${nota}</div>` : ''}</td><td style="text-align:right">${vOS != null ? OS_M(vOS) : '—'}</td><td style="text-align:right">${vQB != null ? OS_M(vQB) : '—'}</td><td style="text-align:right" class="${delta > 0 ? 'warn' : delta < 0 ? 'down' : ''}">${delta != null ? OS_M(delta) : '—'}${chip}</td></tr>`;
 }
 function osConcilBlock(comp) {
@@ -996,15 +998,15 @@ function osConcilBlock(comp) {
       ${osConcilRow('Deuda de préstamos (HML+refi)', ff.deudaOS, ff.deudaQB, 'ff_hml_loans vs Loan Payable')}
       ${osConcilRow('Resultado realizado', ff.realizadoOS, ff.netQBall, 'ciclos cerrados (draws) vs Net Income histórico QBO')}
       </tbody></table>
-      <div class="meta" style="margin-top:8px">🏦 <b>Capitalización (no mezclar con P&L):</b> QBO capitaliza las casas como ACTIVO — ${ff.capQB != null ? OS_M(ff.capQB) : '—'} en Fixed Assets + Inventory (cada casa = cuenta "Rental Property"). Por eso el neto contable (${ff.netQBall != null ? OS_M(ff.netQBall) : '—'}) difiere del operativo (${OS_M(ff.realizadoOS)}): el costo de las casas vivas está en el balance, no en el P&L. El Δ restante es la conciliación pendiente.</div></div>
+      <div class="meta" style="margin-top:8px">${osIcon('landmark')} <b>Capitalización (no mezclar con P&L):</b> QBO capitaliza las casas como ACTIVO — ${ff.capQB != null ? OS_M(ff.capQB) : '—'} en Fixed Assets + Inventory (cada casa = cuenta "Rental Property"). Por eso el neto contable (${ff.netQBall != null ? OS_M(ff.netQBall) : '—'}) difiere del operativo (${OS_M(ff.realizadoOS)}): el costo de las casas vivas está en el balance, no en el P&L. El Δ restante es la conciliación pendiente.</div></div>
     <div class="card"><div class="chart-h"><div class="t">Capa contable del holding</div><div class="k">EBITDA operativo vs Net Income QBO · umbral ${OS.concilWarn != null ? OS.concilWarn : 10}%</div></div>
       <table class="ptable"><thead><tr><th>Empresa</th><th style="text-align:right">EBITDA operativo</th><th style="text-align:right">QBO Net YTD</th><th style="text-align:right">QBO Net histórico</th></tr></thead><tbody>
-      ${pnlRow('fix_flip', '🏚 Fix & Flip')}${pnlRow('remodelacion', '🔨 Remodelación')}${pnlRow('rentas', '🏠 Rentas')}${pnlRow('educacion', '🎓 Educación')}
+      ${pnlRow('fix_flip', 'Fix & Flip')}${pnlRow('remodelacion', 'Remodelación')}${pnlRow('rentas', 'Rentas')}${pnlRow('educacion', 'Educación')}
       </tbody></table>
       <table class="ptable" style="margin-top:10px"><thead><tr><th>Remodelación: ingreso</th><th style="text-align:right">OPERATIVO</th><th style="text-align:right">QBO</th><th style="text-align:right">Δ</th></tr></thead><tbody>
       ${osConcilRow('Ingreso (draws vs libros)', remOSIngreso, remQBIncomeAll, 'monto_real finalizadas vs Total Income Structure One')}
       </tbody></table>
-      <div class="meta" style="margin-top:8px">Rentas (EverHome, ⚠ configurada en COP) y Educación: libros sin movimientos — todo lo operativo está "fuera de libros" hasta que se carguen. Fuente: qb_report_cache (sync on-demand /qb-oauth/sync).</div></div>
+      <div class="meta" style="margin-top:8px">Rentas (EverHome, ${osIcon('alert')} configurada en COP) y Educación: libros sin movimientos — todo lo operativo está "fuera de libros" hasta que se carguen. Fuente: qb_report_cache (sync on-demand /qb-oauth/sync).</div></div>
   </div>`;
 }
 
@@ -1093,7 +1095,7 @@ function opsSetF(k, v) { OS.opsF = OS.opsF || { emp: '', persona: '', tipo: '', 
 function opsSort(col) { const f = OS.opsF || {}; if (f.sort === col) f.dir = -f.dir; else { f.sort = col; f.dir = 1; } OS.opsF = f; osRender(); }
 window.opsGo = opsGo; window.opsSetF = opsSetF; window.opsSort = opsSort;
 
-function opsSemChip(sem) { return sem === 'rojo' ? '🔴' : sem === 'amarillo' ? '🟡' : '🟢'; }
+function opsSemChip(sem) { return kitStatusDot(sem === 'rojo' ? 'bad' : sem === 'amarillo' ? 'warn' : 'ok'); }
 function opsCeoView(o) {
   const kpi = (lab, val, meta, sub, good) => `<div class="card"><div class="lab">${lab}</div><div class="big ${good == null ? '' : good ? 'up' : 'down'}">${val}</div><div class="meta">${meta}${sub ? ' · ' + sub : ''}</div></div>`;
   const kpis = `<div class="grid k4">
@@ -1126,21 +1128,21 @@ function opsCeoView(o) {
   if (OS.huerfanas === undefined) { OS.huerfanas = null; sb.from('v_huerfanas_resumen').select('*').order('huerfanas', { ascending: false }).then(r => { OS.huerfanas = r.data || []; osRender(); }).catch(() => { OS.huerfanas = []; }); }
   const hTot = (OS.huerfanas || []).reduce((s, x) => s + (+x.huerfanas || 0), 0);
   const hCub = (OS.huerfanas || []).reduce((s, x) => s + (x.dueno_sugerido ? +x.huerfanas : 0), 0);
-  const huerfCard = (OS.huerfanas && OS.huerfanas.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧹 Tareas huérfanas (sin fecha/dueño) · plantilla N7 activa</div>
+  const huerfCard = (OS.huerfanas && OS.huerfanas.length) ? `<div class="card" style="margin-top:14px"><div class="lab">${osIcon('inbox')} Tareas huérfanas (sin fecha/dueño) · plantilla N7 activa</div>
     <div class="meta" style="margin-bottom:4px"><b>${hTot.toLocaleString()}</b> huérfanas · <b>${hTot ? Math.floor(100 * hCub / hTot) : 0}%</b> ya tienen dueño y vencimiento SUGERIDOS por la plantilla (asignado real más frecuente por lista) — se aplican por el flujo propuesta → OK humano → ClickUp</div>
     ${OS.huerfanas.slice(0, 8).map(x => `<div class="krow" style="padding:5px 0"><span>${OS_E(x.list_name)} <span style="opacity:.5">· ${x.huerfanas}</span></span><b>${x.dueno_sugerido ? '→ ' + OS_E(x.dueno_sugerido) + ' · ' + x.dias_para_vencer + 'd' : '<span class="warn">sin plantilla</span>'}</b></div>`).join('')}
     ${(OS.huerfanas.some(x => !x.dueno_sugerido)) ? `<div class="meta" style="margin-top:6px">Sin cubrir: ${OS.huerfanas.filter(x => !x.dueno_sugerido).map(x => OS_E(x.list_name) + ' (' + x.huerfanas + ')').join(' · ')} — lista sin nombre real, corregir en ClickUp</div>` : ''}</div>` : '';
-  const discCard = (OS.disciplina && OS.disciplina.length) ? `<div class="card" style="margin-top:14px"><div class="lab">🧭 Índice de disciplina por persona (ClickUp)</div><div class="meta" style="margin-bottom:4px">higiene (fecha+dueño) 50% · al día 30% · movimiento 7d 20% — accountability, no castigo</div>
+  const discCard = (OS.disciplina && OS.disciplina.length) ? `<div class="card" style="margin-top:14px"><div class="lab">${osIcon('compass')} Índice de disciplina por persona (ClickUp)</div><div class="meta" style="margin-bottom:4px">higiene (fecha+dueño) 50% · al día 30% · movimiento 7d 20% — accountability, no castigo</div>
     ${OS.disciplina.slice(0, 8).map(p => `<div class="krow" style="padding:5px 0"><span>${OS_E(p.persona)} <span style="opacity:.5">· ${p.tareas} tareas</span></span><b class="${p.disciplina >= 60 ? 'up' : p.disciplina >= 30 ? 'warn' : 'down'}">${p.disciplina}</b></div>`).join('')}</div>` : '';
   return `${kpis}
     <div class="grid k3" style="margin-top:14px">${empCards}</div>
     ${discCard}
     ${huerfCard}
     <div class="grid k2" style="margin-top:14px">
-      <div class="card"><div class="lab">🎯 Las 3 decisiones de la semana</div><div class="meta" style="margin-bottom:4px">rankeadas por impacto ($/inversionista primero)</div>${decHtml}</div>
-      <div class="card"><div class="lab">Tendencia de vencidas · ${tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:54px;margin:12px 0 4px">${spark || '<span class="meta">sin snapshots</span>'}</div><div class="meta">${tend.length ? tend[0].d + ' → ' + tend[tend.length - 1].d : ''}</div><div class="krow" style="cursor:pointer;margin-top:8px" onclick="opsGo('sabueso')"><span>🐕 <b>${(OS.sabueso || []).length} anomalías</b> del Sabueso</span><b style="opacity:.5">ver →</b></div></div>
+      <div class="card"><div class="lab">${osIcon('target')} Las 3 decisiones de la semana</div><div class="meta" style="margin-bottom:4px">rankeadas por impacto ($/inversionista primero)</div>${decHtml}</div>
+      <div class="card"><div class="lab">Tendencia de vencidas · ${tend.length} días</div><div style="display:flex;align-items:flex-end;gap:3px;height:54px;margin:12px 0 4px">${spark || '<span class="meta">sin snapshots</span>'}</div><div class="meta">${tend.length ? tend[0].d + ' → ' + tend[tend.length - 1].d : ''}</div><div class="krow" style="cursor:pointer;margin-top:8px" onclick="opsGo('sabueso')"><span>${osIcon('dog')} <b>${(OS.sabueso || []).length} anomalías</b> del Sabueso</span><b style="opacity:.5">ver →</b></div></div>
     </div>
-    <div class="meta" style="margin-top:10px">Salud por FLUJO+HIGIENE (no %vencidas — engaña con tablero sin fechas). Filtro de ruido: plantillas/recurrentes/refis fuera. Bruto: ${o.totalBruto} tareas → ${o.act.length} operativas. ⚠ dependencies no está en el espejo (P2) → higiene mide fecha+dueño.</div>`;
+    <div class="meta" style="margin-top:10px">Salud por FLUJO+HIGIENE (no %vencidas — engaña con tablero sin fechas). Filtro de ruido: plantillas/recurrentes/refis fuera. Bruto: ${o.totalBruto} tareas → ${o.act.length} operativas. ${osIcon('alert')} dependencies no está en el espejo (P2) → higiene mide fecha+dueño.</div>`;
 }
 function opsPmView(o) {
   const f = OS.opsF = OS.opsF || { emp: '', persona: '', tipo: '', q: '', sort: 'due', dir: 1 };
@@ -1166,7 +1168,7 @@ function opsPmView(o) {
   const th = (col, lbl, al) => `<th style="cursor:pointer;${al ? 'text-align:' + al : ''}" onclick="opsSort('${col}')">${lbl}${f.sort === col ? (dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
   const chip = (tipo, lbl, n) => `<button class="repbtn ${f.tipo === tipo ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="opsSetF('tipo','${f.tipo === tipo ? '' : tipo}')">${lbl} (${n})</button>`;
   const personasSel = ['', '(sin dueño)', ...o.personas.filter(x => x.p !== '(sin dueño)').map(x => x.p)];
-  const fila = t => { const v = opsVencida(t) && !opsEsGestion(t) && !opsEsLongterm(t); const urg = OPS_URG.includes((t.priority || '').toLowerCase()); const tags = (opsEsGestion(t) ? ` <span class="badge b-ok" style="font-size:8px">GESTIÓN — ${OS_E((t.folder_name || 'casa').slice(0, 18))}</span>` : '') + (opsEsLongterm(t) && !opsEsGestion(t) ? ' <span class="badge b-ok" style="font-size:8px">LONG-TERM</span>' : ''); return `<tr${v ? ' style="background:rgba(248,113,113,.06)"' : ''}><td><span class="badge ${v ? 'b-warn' : 'b-ok'}" style="font-size:9px">${OS_E(OPS_EMP[t.space_id] || '?')}</span></td><td><a href="${OS_E(t.url || '#')}" target="_blank" style="color:inherit;text-decoration:none"><b>${OS_E((t.name || '').slice(0, 60))}</b> ↗</a>${tags}</td><td style="font-size:11px;opacity:.75">${OS_E((t.list_name || t.folder_name || '—').slice(0, 26))}</td><td>${OS_E(t.primary_assignee || '—')}</td><td class="${v ? 'down' : ''}">${t.due_date ? String(t.due_date).slice(0, 10) : '—'}</td><td>${urg ? '<b class="warn">' + OS_E(t.priority) + '</b>' : OS_E(t.priority || '—')}</td><td style="font-size:11px">${OS_E(t.status || '—')}${f.tipo === 'por_configurar' ? `<div style="display:flex;gap:4px;margin-top:3px">${!t.due_date ? `<button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','fecha')">📅 fecha</button>` : ''}${!(t.primary_assignee || '').trim() ? `<button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','dueno')">👤 dueño</button>` : ''}</div>` : ''}${f.tipo === 'vencidas' ? `<div style="margin-top:3px"><button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','fecha')">📅 re-fechar</button></div>` : ''}${f.tipo === 'casa_cerrada' || f.tipo === 'duplicadas' ? `<div style="margin-top:3px"><button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','archivar')">📦 archivar</button></div>` : ''}</td></tr>`; };
+  const fila = t => { const v = opsVencida(t) && !opsEsGestion(t) && !opsEsLongterm(t); const urg = OPS_URG.includes((t.priority || '').toLowerCase()); const tags = (opsEsGestion(t) ? ` <span class="badge b-ok" style="font-size:8px">GESTIÓN — ${OS_E((t.folder_name || 'casa').slice(0, 18))}</span>` : '') + (opsEsLongterm(t) && !opsEsGestion(t) ? ' <span class="badge b-ok" style="font-size:8px">LONG-TERM</span>' : ''); return `<tr${v ? ' style="background:rgba(248,113,113,.06)"' : ''}><td><span class="badge ${v ? 'b-warn' : 'b-ok'}" style="font-size:9px">${OS_E(OPS_EMP[t.space_id] || '?')}</span></td><td><a href="${OS_E(t.url || '#')}" target="_blank" style="color:inherit;text-decoration:none"><b>${OS_E((t.name || '').slice(0, 60))}</b> ↗</a>${tags}</td><td style="font-size:11px;opacity:.75">${OS_E((t.list_name || t.folder_name || '—').slice(0, 26))}</td><td>${OS_E(t.primary_assignee || '—')}</td><td class="${v ? 'down' : ''}">${t.due_date ? String(t.due_date).slice(0, 10) : '—'}</td><td>${urg ? '<b class="warn">' + OS_E(t.priority) + '</b>' : OS_E(t.priority || '—')}</td><td style="font-size:11px">${OS_E(t.status || '—')}${f.tipo === 'por_configurar' ? `<div style="display:flex;gap:4px;margin-top:3px">${!t.due_date ? `<button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','fecha')">${osIcon('calendar')} fecha</button>` : ''}${!(t.primary_assignee || '').trim() ? `<button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','dueno')">${osIcon('user')} dueño</button>` : ''}</div>` : ''}${f.tipo === 'vencidas' ? `<div style="margin-top:3px"><button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','fecha')">${osIcon('calendar')} re-fechar</button></div>` : ''}${f.tipo === 'casa_cerrada' || f.tipo === 'duplicadas' ? `<div style="margin-top:3px"><button class="repbtn ghost" style="padding:2px 7px;font-size:9px" onclick="opsProponer('${t.id}','archivar')">${osIcon('package')} archivar</button></div>` : ''}</td></tr>`; };
   const propBlock = (f.tipo === 'propuestas' || o.propuestas.length) ? opsPropCard(o) : '';
   const diarioBlock = f.tipo === 'hoy' ? opsDiarioCard(o) + opsCierreCard(o) : '';
   return `<div class="grid k4">
@@ -1180,8 +1182,8 @@ function opsPmView(o) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
         <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('emp',this.value)">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas las empresas'}</option>`).join('')}</select>
         <select class="repbtn ghost" style="padding:5px 8px" onchange="opsSetF('persona',this.value)">${personasSel.map(p => `<option value="${OS_E(p)}" ${f.persona === p ? 'selected' : ''}>${p || 'Todas las personas'}</option>`).join('')}</select>
-        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}${chip('por_configurar', '⚡ Por configurar', o.porConfig.length)}${chip('gestion', 'Gestión rec.', o.gestion.length)}${chip('longterm', 'Long-term', o.longterm.length)}${chip('duplicadas', 'Duplicadas', o.dupIds.size)}${chip('casa_cerrada', 'Casa cerrada', o.casaCerrada.length)}
-        <button class="repbtn ${OS.opsGroupCasa ? '' : 'ghost'}" style="padding:5px 10px;font-size:11px" onclick="OS.opsGroupCasa=!OS.opsGroupCasa;osRender()">🏠 Por casa</button>
+        ${chip('vencidas', 'Vencidas', o.venc.length)}${chip('sin_dueno', 'Sin dueño', o.sinD.length)}${chip('sin_fecha', 'Sin fecha', o.sinF.length)}${chip('urgentes', 'Urgentes', o.urg.length)}${chip('hoy', 'Hoy', o.hoy.length)}${chip('por_configurar', 'Por configurar', o.porConfig.length)}${chip('gestion', 'Gestión rec.', o.gestion.length)}${chip('longterm', 'Long-term', o.longterm.length)}${chip('duplicadas', 'Duplicadas', o.dupIds.size)}${chip('casa_cerrada', 'Casa cerrada', o.casaCerrada.length)}
+        <button class="repbtn ${OS.opsGroupCasa ? '' : 'ghost'}" style="padding:5px 10px;font-size:11px" onclick="OS.opsGroupCasa=!OS.opsGroupCasa;osRender()">${osIcon('house')} Por casa</button>
         <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
       </div>
       ${OS.opsGroupCasa ? opsPorCasaView(o, rows, fila) : `<div class="overx"><table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
@@ -1191,8 +1193,8 @@ function opsPmView(o) {
 }
 
 // ─── VISTA SABUESO (scrum-master automático) ───
-const SAB_SEV = { critica: { e: '🔴', o: 3, l: 'Crítica' }, alta: { e: '🟠', o: 2, l: 'Alta' }, media: { e: '🟡', o: 1, l: 'Media' }, baja: { e: '⚪', o: 0, l: 'Baja' } };
-const SAB_CAT = { higiene: '🧼 Higiene', flujo: '🌊 Flujo', proceso: '⚙️ Proceso', sla: '💰 SLA plata', datos: '🗃 Datos' };
+const SAB_SEV = { critica: { e: 'bad', o: 3, l: 'Crítica' }, alta: { e: 'bad', o: 2, l: 'Alta' }, media: { e: 'warn', o: 1, l: 'Media' }, baja: { e: 'off', o: 0, l: 'Baja' } };
+const SAB_CAT = { higiene: 'Higiene', flujo: 'Flujo', proceso: 'Proceso', sla: 'SLA plata', datos: 'Datos' };
 function opsSabuesoView(o) {
   const all = (OS.sabueso || []).filter(x => x.active !== false);
   const f = OS.sabF = OS.sabF || { cat: '', emp: '', persona: '' };
@@ -1205,7 +1207,7 @@ function opsSabuesoView(o) {
     grupos[k].n++; if (x.severidad === 'critica') grupos[k].crit++;
   });
   const gList = Object.values(grupos).sort((a, b) => (b.cat === 'sla' ? 1 : 0) - (a.cat === 'sla' ? 1 : 0) || b.crit - a.crit || b.n - a.n);
-  const colapso = `<div class="card" style="margin-bottom:12px"><div class="lab">🧠 Colapso semántico — ${all.length.toLocaleString()} anomalías → ${gList.length} grupos accionables</div>
+  const colapso = `<div class="card" style="margin-bottom:12px"><div class="lab">${osIcon('brain')} Colapso semántico — ${all.length.toLocaleString()} anomalías → ${gList.length} grupos accionables</div>
     <div class="meta" style="margin-bottom:6px">un problema = una fila (no 3,000); prioridad: $/inversionista (sla) → críticas → volumen. La causa raíz del ruido se cura en origen (auto-scheduler N7).</div>
     ${gList.slice(0, 12).map(g => `<div class="krow" style="cursor:pointer;padding:7px 0" onclick='OS.sabF={cat:${JSON.stringify(g.cat || '')},emp:"",persona:""};osRender()'><span><b>${OS_E(g.check + (g.cat ? ' · ' + g.cat : ''))}</b> ${g.emp ? '· ' + OS_E(g.emp) : ''} — ${g.n.toLocaleString()} caso(s)${g.crit ? ` · <b class="down">${g.crit} críticas</b>` : ''}${g.accion ? `<div class="meta">→ ${OS_E(g.accion)}${g.dueno ? ' · ' + OS_E(g.dueno) : ''}</div>` : ''}</span><b style="opacity:.5">filtrar →</b></div>`).join('')}
   </div>`;
@@ -1222,9 +1224,9 @@ function opsSabuesoView(o) {
   // salud graduada: 50% higiene (fecha+dueño) + 50% flujo (movido 7d) — así los procesos se distinguen entre sí
   const procesos = Object.values(byLista).filter(x => x.n >= 4).map(x => ({ ...x, higiene: Math.round(100 * x.conFyD / x.n), flujo: Math.round(100 * x.movido / x.n), salud: Math.round(100 * (0.5 * x.conFyD / x.n + 0.5 * x.movido / x.n)) })).sort((a, b) => a.salud - b.salud).slice(0, 12);
   const catChip = (k, l, n) => `<button class="repbtn ${f.cat === k ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="OS.sabF=Object.assign(OS.sabF||{},{cat:'${f.cat === k ? '' : k}'});osRender()">${l} (${n})</button>`;
-  const fila = x => `<tr><td>${SAB_SEV[x.severidad]?.e || '⚪'}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: '📅 fecha', asignar_dueno: '👤 dueño', refechar: '📅 re-fechar', archivar: '📦 archivar', escalar: '⚠ escalar', asignar_lista: '🗂 lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
+  const fila = x => `<tr><td>${kitStatusDot(SAB_SEV[x.severidad]?.e || 'off')}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: 'fecha', asignar_dueno: 'dueño', refechar: 're-fechar', archivar: 'archivar', escalar: 'escalar', asignar_lista: 'lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
   return `${colapso}<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
-      <div class="lab">🐕 El Sabueso olfateó</div>
+      <div class="lab">${osIcon('dog')} El Sabueso olfateó</div>
       <div style="font-size:52px;font-weight:800;color:${all.length ? '#f87171' : '#34d399'}">${all.length}</div>
       <div class="meta">anomalías activas · ${bySev.critica || 0} críticas · ${bySev.alta || 0} altas · ${bySev.media || 0} medias · <b>norte: 0 = todo perfecto</b></div></div>
     <div style="display:flex;gap:5px;margin:12px 0;flex-wrap:wrap">${Object.entries(SAB_CAT).map(([k, l]) => byCat[k] ? catChip(k, l, byCat[k]) : '').join('')}
@@ -1245,7 +1247,7 @@ async function opsSabAccion(id, accion) {
   if (tipo === 'archivar_tarea') payload.status_cierre = 'complete';
   const { error } = await sb.from('agent_proposals').insert({ agent_id: agId, tipo_accion: tipo, estado: 'propuesta', evidencia: finding.detalle, payload });
   if (error) { alert('No se pudo proponer: ' + error.message); return; }
-  alert('✅ Propuesta creada (dry-run) — aprobala en la Vista PM → propuestas.');
+  alert('Propuesta creada (dry-run) — aprobala en la Vista PM → propuestas.');
 }
 window.opsSabAccion = opsSabAccion;
 
@@ -1255,8 +1257,8 @@ function opsPanel(comp) {
   const tog = (id, lbl) => `<button class="repbtn ${v === id ? '' : 'ghost'}" style="padding:6px 16px;font-weight:700" onclick="opsGo('${id}')">${lbl}</button>`;
   const fresh = (OS.ckTasks || []).length ? String((OS.ckTasks.map(t => t.last_synced_at).sort().pop() || '')).slice(0, 16).replace('T', ' ') : '—';
   const hero = window.kitHero ? kitHero('Deuda de cobranza del holding', kitMoney(comp.holding.deudaCobranza), 'contrato − plata real · ' + comp.cobranza.rows.length + ' casas con deuda este mes') : '';
-  return `<h1>⚙️ Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
-    <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', '👔 Vista CEO')}${tog('pm', '🛠 Vista PM')}${tog('sabueso', '🐕 Sabueso' + ((OS.sabueso||[]).length ? ' · '+(OS.sabueso||[]).length : ''))}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
+  return `<h1>${osIcon('settings')} Panel de Operaciones <span>· ClickUp en vivo · 3 empresas</span></h1>
+    <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tog('ceo', 'Vista CEO')}${tog('pm', 'Vista PM')}${tog('sabueso', 'Sabueso' + ((OS.sabueso||[]).length ? ' · '+(OS.sabueso||[]).length : ''))}<span style="margin-left:auto;font-size:11px;opacity:.6">último sync: ${fresh} UTC · paridad 3/3</span></div>
     ${hero}
     ${v === 'ceo' ? opsCeoView(o) : v === 'sabueso' ? opsSabuesoView(o) : opsPmView(o)}`;
 }
@@ -1302,18 +1304,18 @@ function opsPropCard(o) {
   // agrupar en 3 lotes por tipo con aprobar-en-lote (no 43 tarjetas sueltas)
   const grupos = {};
   o.propuestas.forEach(p => { const t = p.tipo_accion || 'otro'; (grupos[t] = grupos[t] || []).push(p); });
-  const LOTE = { refechar_tarea: { e: '📅', l: 'Re-fechar' }, archivar_tarea: { e: '📦', l: 'Archivar' }, reasignar_tarea: { e: '👤', l: 'Reasignar' }, informe: { e: '📋', l: 'Informes' } };
+  const LOTE = { refechar_tarea: { e: 'calendar', l: 'Re-fechar' }, archivar_tarea: { e: 'package', l: 'Archivar' }, reasignar_tarea: { e: 'user', l: 'Reasignar' }, informe: { e: 'clipboard', l: 'Informes' } };
   const open = OS._propOpen || {};
   const bloque = (tipo, arr) => {
-    const info = LOTE[tipo] || { e: '•', l: tipo };
+    const info = LOTE[tipo] || { e: 'circle-dot', l: tipo };
     const detalle = open[tipo] ? `<div style="margin-top:6px">${arr.slice(0, 30).map(p => `<div class="krow" data-prop="${p.id}" style="padding:6px 0;font-size:11px;border-top:1px solid rgba(255,255,255,.05)"><span style="flex:1">${OS_E((p.payload || {}).titulo || p.evidencia || '')}${(p.payload || {}).task_url ? ` <a href="${OS_E(p.payload.task_url)}" target="_blank">↗</a>` : ''}</span><span style="display:flex;gap:5px"><button class="repbtn" style="padding:2px 8px;font-size:10px" onclick="opsDecide('${p.id}','aprobar')">✓</button><button class="repbtn ghost" style="padding:2px 7px;font-size:10px" onclick="opsDecide('${p.id}','rechazar')">✗</button></span></div>`).join('')}</div>` : '';
     return `<div style="border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">${info.e}</span><div style="flex:1"><b>${info.l}</b> <span style="opacity:.6">· ${arr.length} propuesta(s) del Ops Brain</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span style="display:inline-flex">${osIcon(info.e, { size: 18 })}</span><div style="flex:1"><b>${info.l}</b> <span style="opacity:.6">· ${arr.length} propuesta(s) del Ops Brain</span></div>
         <button class="repbtn ghost" style="padding:4px 9px;font-size:11px" onclick="OS._propOpen=Object.assign(OS._propOpen||{},{'${tipo}':!(OS._propOpen||{})['${tipo}']});osRender()">${open[tipo] ? 'ocultar' : 'ver'}</button>
         <button class="repbtn" style="padding:4px 12px;font-size:11px" onclick="opsAprobarLote('${tipo}')">✓ Aprobar los ${arr.length}</button></div>${detalle}</div>`;
   };
   const bloques = Object.entries(grupos).map(([t, arr]) => bloque(t, arr)).join('');
-  return `<div class="card" style="margin-top:14px"><div class="lab">🤖 Ops Brain — ${o.propuestas.length} propuestas en ${Object.keys(grupos).length} lote(s)</div>
+  return `<div class="card" style="margin-top:14px"><div class="lab">${osIcon('bot')} Ops Brain — ${o.propuestas.length} propuestas en ${Object.keys(grupos).length} lote(s)</div>
     <div class="meta" style="margin-bottom:8px">Aprobá por lote (no de a una). Cada acción se aplica en ClickUp vía edge function; nada se borra.</div>
     ${bloques || '<div class="meta" style="padding:8px 0">Sin propuestas pendientes ✓</div>'}</div>`;
 }
@@ -1323,7 +1325,7 @@ async function opsAprobarLote(tipo) {
   if (!confirm(`¿Aprobar y aplicar las ${arr.length} propuestas de "${tipo}"? Se ejecutan en ClickUp (nada se borra).`)) return;
   let ok = 0;
   for (const p of arr) { const r = await opsDecideRaw(p.id, 'aprobar'); if (r) ok++; }
-  alert(`✅ ${ok}/${arr.length} aplicadas.`);
+  alert(`${ok}/${arr.length} aplicadas.`);
   const { data } = await sb.from('agent_proposals').select('*').is('deleted_at', null).eq('estado', 'propuesta').order('created_at', { ascending: false }).limit(60);
   OS.agProps = data || OS.agProps; osRender();
 }
@@ -1344,10 +1346,10 @@ function opsDiarioCard(o) {
   const done7 = (OS.ckTasks || []).filter(t => t.date_done && (Date.now() - new Date(t.date_done).getTime()) / 86400000 <= 7 && t.date_created);
   const tProm = done7.length ? Math.round(done7.reduce((s, t) => s + (new Date(t.date_done) - new Date(t.date_created)) / 86400000, 0) / done7.length) : null;
   const rows = Object.values(P).sort((a, b) => b.plan - a.plan).map(x => {
-    const sem = x.hechas >= x.plan && x.plan > 0 ? '🟢' : x.hechas > 0 ? '🟡' : x.plan > 0 ? '🔴' : '⚪';
+    const sem = kitStatusDot(x.hechas >= x.plan && x.plan > 0 ? 'ok' : x.hechas > 0 ? 'warn' : x.plan > 0 ? 'bad' : 'off');
     return `<tr><td>${OS_E(x.p)}</td><td style="text-align:right">${x.plan}</td><td style="text-align:right" class="up">${x.hechas}</td><td style="text-align:right">${Math.max(0, x.plan - x.hechas)}</td><td style="text-align:right">${sem}</td></tr>`;
   }).join('');
-  return `<div class="card" style="margin-top:14px"><div class="lab">📅 Seguimiento diario · ${hoyIso}</div>
+  return `<div class="card" style="margin-top:14px"><div class="lab">${osIcon('calendar')} Seguimiento diario · ${hoyIso}</div>
     <div class="grid k3" style="margin:10px 0"><div class="card kpi"><div class="lab">Plan de hoy</div><div class="big">${o.hoy.length}</div></div>
     <div class="card kpi"><div class="lab">Cerradas hoy</div><div class="big up">${doneHoy.length}</div></div>
     <div class="card kpi"><div class="lab">Entrega promedio (7d)</div><div class="big">${tProm != null ? tProm + 'd' : '—'}</div><div class="meta">creación→cierre · ${done7.length} cerradas</div></div></div>
@@ -1399,10 +1401,10 @@ function opsPorCasaView(o, rows, fila) {
     const emp = OPS_EMP[ts[0].space_id] || '';
     return `<div style="border:1px solid rgba(255,255,255,.07);border-radius:10px;margin-bottom:8px;overflow:hidden">
       <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer;background:rgba(255,255,255,.03)" onclick="opsToggleCasa('${OS_E(casa).replace(/'/g, '')}')">
-        <b style="flex:1">🏠 ${OS_E(casa)}</b><span class="badge b-ok" style="font-size:9px">${OS_E(emp)}</span>
+        <b style="flex:1">${osIcon('house')} ${OS_E(casa)}</b><span class="badge b-ok" style="font-size:9px">${OS_E(emp)}</span>
         <span style="font-size:11px;opacity:.75">${ts.length} tareas</span>
         ${venc ? `<span class="badge b-warn" style="font-size:9px">${venc} venc.</span>` : ''}
-        ${sinCfg ? `<span style="font-size:10px;color:#e7b65e">⚡ ${sinCfg} por config.</span>` : ''}
+        ${sinCfg ? `<span style="font-size:10px;color:#e7b65e">${osIcon('zap')} ${sinCfg} por config.</span>` : ''}
         <span style="opacity:.5">${open ? '▾' : '▸'}</span></div>
       ${open ? `<table class="ptable" style="margin:0"><tbody>${ts.slice(0, 40).map(fila).join('')}</tbody></table>` : ''}</div>`;
   }).join('') || '<div class="meta" style="padding:14px">Sin tareas con estos filtros.</div>';
@@ -1417,14 +1419,14 @@ function opsCierreCard(o) {
   const rows = doneHoy.slice(0, 30).map(t => {
     const due = t.due_date ? String(t.due_date).slice(0, 10) : null;
     const delta = due ? Math.round((new Date(hoyIso) - new Date(due)) / 86400000) : null;
-    const sem = delta == null ? '⚪ sin fecha' : delta <= 0 ? '🟢 a tiempo' : `🔴 +${delta}d tarde`;
+    const sem = delta == null ? (kitStatusDot('off') + ' sin fecha') : delta <= 0 ? 'a tiempo' : `+${delta}d tarde`;
     const est = t.time_estimate ? Math.round(t.time_estimate / 3600000) : null;
     const real = t.time_spent ? Math.round(t.time_spent / 3600000) : null;
     return `<tr><td><b>${OS_E((t.name || '').slice(0, 50))}</b><div style="font-size:9px;opacity:.55">${OS_E(t.folder_name || '')}</div></td><td>${OS_E(t.primary_assignee || '—')}</td><td style="text-align:right">${due || '—'}</td><td style="text-align:right">${sem}</td><td style="text-align:right;font-size:11px">${est != null || real != null ? `${est != null ? est + 'h est' : '—'} / ${real != null ? real + 'h real' : '—'}` : '—'}</td></tr>`;
   }).join('');
   const conFecha = doneHoy.filter(t => t.due_date);
   const aT = conFecha.filter(t => hoyIso <= String(t.due_date).slice(0, 10)).length;
-  return `<div class="card" style="margin-top:14px"><div class="lab">✅ Cierre del día — ${doneHoy.length} cerradas hoy ${conFecha.length ? `· ${aT}/${conFecha.length} a tiempo` : ''}</div>
+  return `<div class="card" style="margin-top:14px"><div class="lab">${osIcon('check-circle')} Cierre del día — ${doneHoy.length} cerradas hoy ${conFecha.length ? `· ${aT}/${conFecha.length} a tiempo` : ''}</div>
     <table class="ptable"><thead><tr><th>Tarea</th><th>Quién</th><th style="text-align:right">Planeada</th><th style="text-align:right">Entrega</th><th style="text-align:right">Est/Real</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;opacity:.6">Aún sin cierres hoy.</td></tr>'}</tbody></table>
     <div class="meta" style="margin-top:8px">Calidad con evidencia (adjuntos/comentarios): no espejada de ClickUp todavía — P2 del sync. Las no-hechas de ayer: el Coordinador las propone re-fechadas a hoy (marcadas atrasadas) en cada sync.</div></div>`;
 }
