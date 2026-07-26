@@ -32,17 +32,17 @@ function osiaCSS() {
   #os-root .osia-tabs{display:flex;gap:8px;margin:6px 0 18px;flex-wrap:wrap}
   #os-root .osia-tab{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);padding:8px 16px;border-radius:11px;cursor:pointer;font-size:12.5px;font-weight:600}
   #os-root .osia-tab:hover{color:var(--ink);border-color:var(--a2)}
-  #os-root .osia-tab.on{color:var(--ink);border-color:var(--a2);background:linear-gradient(135deg,rgba(69,227,198,.12),rgba(79,141,255,.1))}
+  #os-root .osia-tab.on{color:var(--ink);border-color:var(--a2);background:linear-gradient(135deg,rgba(92,121,240,.12),rgba(58,91,224,.1))}
   #os-root .osia-prog{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
   #os-root .osia-step{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--mut2);background:var(--glass);border:1px solid var(--glassb);border-radius:14px;padding:3px 9px}
-  #os-root .osia-step.ok{color:var(--pos);border-color:rgba(72,214,156,.4)}
+  #os-root .osia-step.ok{color:var(--pos);border-color:rgba(74,222,158,.4)}
   #os-root .osia-chat{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow-y:auto;padding:4px 2px}
   #os-root .osia-b{max-width:88%;padding:11px 14px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
-  #os-root .osia-b.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3)}
+  #os-root .osia-b.u{align-self:flex-end;background:linear-gradient(135deg,rgba(92,121,240,.16),rgba(58,91,224,.14));border:1px solid rgba(58,91,224,.3)}
   #os-root .osia-b.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)}
   #os-root .osia-blbl{font-size:10px;color:var(--mut2);font-weight:700;letter-spacing:.4px;margin-bottom:4px}
   #os-root .osia-b.think{color:var(--mut2);font-style:italic;align-self:flex-start}
-  #os-root .osia-b.err{align-self:flex-start;border:1px solid rgba(240,104,122,.4);color:var(--neg);background:var(--glass)}
+  #os-root .osia-b.err{align-self:flex-start;border:1px solid rgba(255,107,107,.4);color:var(--neg);background:var(--glass)}
   #os-root .osia-ask{display:flex;gap:8px;margin-top:12px}
   #os-root .osia-ask textarea{flex:1;background:var(--glass);border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:13px;outline:none;font-family:inherit;resize:none;min-height:44px;max-height:120px;line-height:1.4}
   #os-root .osia-ask textarea:focus{border-color:var(--a2)}
@@ -59,10 +59,10 @@ function osiaCSS() {
   #os-root .osia-in{background:var(--glass);border:1px solid var(--glassb);border-radius:8px;padding:6px 9px;color:var(--ink);font-size:11.5px;outline:none;font-family:inherit;max-width:100%}
   #os-root .osia-frame-wrap{position:fixed;inset:0;z-index:1200;background:rgba(4,6,10,.72);display:flex;align-items:center;justify-content:center;padding:26px}
   #os-root .osia-frame-box{background:#fff;border-radius:14px;width:min(1080px,96vw);height:min(760px,92vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 40px 90px -30px rgba(0,0,0,.8)}
-  #os-root .osia-frame-hd{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#f1f5fb;border-bottom:1px solid #dfe6f0;color:#211e17;font-size:13px;font-weight:700}
-  #os-root .osia-frame-hd .x{margin-left:auto;cursor:pointer;border:none;background:#e3e9f3;border-radius:8px;padding:5px 12px;font-size:12px;color:#211e17}
+  #os-root .osia-frame-hd{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#f1f5fb;border-bottom:1px solid #dfe6f0;color:#0e1420;font-size:13px;font-weight:700}
+  #os-root .osia-frame-hd .x{margin-left:auto;cursor:pointer;border:none;background:#e3e9f3;border-radius:8px;padding:5px 12px;font-size:12px;color:#0e1420}
   #os-root .osia-frame-box iframe{flex:1;border:none;width:100%;background:#fff}
-  #os-root .osia-frame-box .osia-doc{flex:1;overflow-y:auto;padding:22px 26px;color:#211e17;font-size:13.5px;line-height:1.65;white-space:pre-wrap}
+  #os-root .osia-frame-box .osia-doc{flex:1;overflow-y:auto;padding:22px 26px;color:#0e1420;font-size:13.5px;line-height:1.65;white-space:pre-wrap}
   #os-root .osia-spec-pre{background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;max-height:220px;overflow-y:auto;color:var(--mut)}`;
   document.head.appendChild(st);
 }

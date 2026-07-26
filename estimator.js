@@ -163,7 +163,7 @@ const estState = {
 
 // ─── FASES CONSTRUCTIVAS (orden CPM profesional residencial) ───
 const EST_PHASES = {
-  preconstruction:{order:1,  name:'Pre-construcción',         color:'#756c5c', emoji:'📋', desc:'Permits, planning, dumpster, kickoff'},
+  preconstruction:{order:1,  name:'Pre-construcción',         color:'#98a0ae', emoji:'📋', desc:'Permits, planning, dumpster, kickoff'},
   demo:           {order:2,  name:'Demolición',               color:'#dc2626', emoji:'⛏️', desc:'Tumbar, sacar escombros, preparar sitio'},
   structural:     {order:3,  name:'Estructural',              color:'#ea580c', emoji:'🏗️', desc:'Foundation, framing, modificaciones estructurales'},
   rough:          {order:4,  name:'Rough-in (instalaciones)', color:'#d97706', emoji:'🔌', desc:'Plumbing, electrical, HVAC dentro de paredes'},
@@ -172,9 +172,9 @@ const EST_PHASES = {
   drywall:        {order:7,  name:'Drywall',                  color:'#65a30d', emoji:'⬜', desc:'Instalar, tape, mud, sand, texturizar'},
   flooring:       {order:8,  name:'Pisos',                    color:'#16a34a', emoji:'🪵', desc:'LVP, tile, carpet — primero baños luego resto'},
   cabinets:       {order:9,  name:'Gabinetes cocina/baños',   color:'#0d9488', emoji:'🪟', desc:'Instalación de gabinetes'},
-  countertops:    {order:10, name:'Encimeras',                color:'#2f6b4f', emoji:'🪨', desc:'Template + fabricación + instalación (1 sem espera)'},
+  countertops:    {order:10, name:'Encimeras',                color:'#3a5be0', emoji:'🪨', desc:'Template + fabricación + instalación (1 sem espera)'},
   tile:           {order:11, name:'Tile (showers/backsplash)',color:'#0284c7', emoji:'▦', desc:'Showers, bathroom floors, kitchen backsplash'},
-  trim:           {order:12, name:'Trim, puertas y molduras', color:'#2f6b4f', emoji:'🚪', desc:'Baseboards, door frames, crown molding'},
+  trim:           {order:12, name:'Trim, puertas y molduras', color:'#3a5be0', emoji:'🚪', desc:'Baseboards, door frames, crown molding'},
   paint:          {order:13, name:'Pintura final',            color:'#4f46e5', emoji:'🖌️', desc:'Primer + 2 capas, touch-ups'},
   fixtures:       {order:14, name:'Fixtures finales',         color:'#7c3aed', emoji:'💧', desc:'Plumbing fixtures, electrical fixtures, HVAC trim'},
   appliances:     {order:15, name:'Appliances',               color:'#9333ea', emoji:'🍳', desc:'Conectar stove, fridge, dishwasher, microwave'},

@@ -646,7 +646,7 @@ function iaTabPipeline() {
     + '<input id="ia-pl-hold" type="number" class="osa-in" placeholder="Holding $">'
     + '<input id="ia-pl-int" type="number" class="osa-in" placeholder="Intereses HML $">'
     + '<input id="ia-pl-cv" type="number" class="osa-in" placeholder="Costos de venta $">'
-    + '<input id="ia-pl-mk" type="number" class="osa-in" placeholder="MARKUP empresa $" style="border-color:rgba(231,182,94,.5)">'
+    + '<input id="ia-pl-mk" type="number" class="osa-in" placeholder="MARKUP empresa $" style="border-color:rgba(251,191,36,.5)">'
     + '<input id="ia-pl-arv" type="number" class="osa-in" placeholder="ARV $">'
     + '<input id="ia-pl-renta" type="number" class="osa-in" placeholder="Renta proyectada $/mes">'
     + '<input id="ia-pl-pct" type="number" class="osa-in" placeholder="% inversionista (50)">'
@@ -1023,7 +1023,7 @@ function iaIndResumen(pid, forPrint) {
   const fila = (clave, lab, val, estado) => {
     const g = iaGlosDe(clave);
     return '<div style="padding:8px 0;border-top:1px solid ' + (forPrint ? '#ddd' : 'var(--glassb)') + '"><b>' + lab + ': ' + val + '</b>'
-      + (estado ? '<div style="font-size:11px;color:#8a6400">' + estado + '</div>' : '')
+      + (estado ? '<div style="font-size:11px;color:#b45309">' + estado + '</div>' : '')
       + (g.que_es ? '<div style="font-size:11.5px;opacity:.75;margin-top:2px">' + OS_E(g.que_es) + (g.para_que ? ' ➜ ' + OS_E(g.para_que) : '') + '</div>' : '') + '</div>';
   };
   return '<div style="font-size:12.5px">'
@@ -1212,10 +1212,10 @@ function iaHojaInversionista(inv) {
     const e = invEsc.escenarios(c, cfg, [3, 5, 8]);
     cuerpo += '<h2 style="font-size:15px;margin:18px 0 4px">' + OS_E(c.casa) + '</h2>'
       + '<p style="font-size:12px;margin:2px 0">Pusiste <b>' + $(c.aporte) + '</b> (' + p1(c.pct) + ' de la casa). Hoy la casa vale <b>' + $(c.arv) + '</b> en papel (' + OS_E(c.arv_fuente || '') + ') y debe <b>' + (c.deuda_saldo != null ? $(c.deuda_saldo) : 'por completar') + '</b>.</p>'
-      + (e.porCompletar ? '<p style="font-size:12px;color:#8a6400">Escenarios por completar: falta registrar ' + (!(+ind.renta_anual > 0) ? 'la renta' : 'la deuda') + ' de esta casa.</p>'
+      + (e.porCompletar ? '<p style="font-size:12px;color:#b45309">Escenarios por completar: falta registrar ' + (!(+ind.renta_anual > 0) ? 'la renta' : 'la deuda') + ' de esta casa.</p>'
         : '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px"><tr style="text-align:left"><th style="border-bottom:1px solid #ccc;padding:4px">Si vendemos en…</th><th style="border-bottom:1px solid #ccc;padding:4px">Te tocaría de la venta</th><th style="border-bottom:1px solid #ccc;padding:4px">Tu TIR (neta)</th><th style="border-bottom:1px solid #ccc;padding:4px">Tu múltiplo</th></tr>'
         + e.filas.map(f => '<tr><td style="padding:4px;border-bottom:1px solid #eee">' + f.n + ' años</td><td style="padding:4px;border-bottom:1px solid #eee">' + $(f.reparto) + '</td><td style="padding:4px;border-bottom:1px solid #eee">' + p1(f.irrNeta) + '</td><td style="padding:4px;border-bottom:1px solid #eee">' + x2(f.multNeto) + '</td></tr>').join('') + '</table>'
-        + (e.flujoNegativo ? '<p style="font-size:11px;color:#8a6400">Hoy la casa no cubre su cuota con la renta — el plan contempla salida por refinanciación o venta.</p>' : ''));
+        + (e.flujoNegativo ? '<p style="font-size:11px;color:#b45309">Hoy la casa no cubre su cuota con la renta — el plan contempla salida por refinanciación o venta.</p>' : ''));
   }
   const w = window.open('', '_blank');
   if (!w) return alert('Permití pop-ups');

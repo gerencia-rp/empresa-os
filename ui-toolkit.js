@@ -19,22 +19,22 @@
       display: flex; gap: 10px; align-items: flex-start;
       background: white; border-radius: 10px; padding: 12px 14px;
       box-shadow: 0 8px 24px rgba(0,0,0,.12);
-      border-left: 4px solid #756c5c;
+      border-left: 4px solid #98a0ae;
       pointer-events: auto;
       animation: ui-toast-in 0.18s ease-out;
       max-width: 100%;
     }
-    .ui-toast.ui-success { border-left-color: #1f7a4d; }
-    .ui-toast.ui-error { border-left-color: #b3372f; }
-    .ui-toast.ui-warning { border-left-color: #8a6400; }
-    .ui-toast.ui-info { border-left-color: #2f6b4f; }
+    .ui-toast.ui-success { border-left-color: #059669; }
+    .ui-toast.ui-error { border-left-color: #dc2626; }
+    .ui-toast.ui-warning { border-left-color: #b45309; }
+    .ui-toast.ui-info { border-left-color: #3a5be0; }
     .ui-toast.ui-leaving { animation: ui-toast-out 0.18s ease-in forwards; }
     .ui-toast-icon { font-size: 18px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
     .ui-toast-body { flex: 1; min-width: 0; }
-    .ui-toast-title { font-weight: 700; font-size: 13px; color: #211e17; }
-    .ui-toast-msg { font-size: 12px; color: #5f594c; margin-top: 2px; word-break: break-word; white-space: pre-wrap; }
-    .ui-toast-close { background: transparent; border: 0; color: #a89f8f; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
-    .ui-toast-close:hover { color: #211e17; }
+    .ui-toast-title { font-weight: 700; font-size: 13px; color: #0e1420; }
+    .ui-toast-msg { font-size: 12px; color: #5a6270; margin-top: 2px; word-break: break-word; white-space: pre-wrap; }
+    .ui-toast-close { background: transparent; border: 0; color: #8b93a1; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+    .ui-toast-close:hover { color: #0e1420; }
     @keyframes ui-toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
     @keyframes ui-toast-out { to { opacity: 0; transform: translateX(20px); } }
 
@@ -52,17 +52,17 @@
     }
     @keyframes ui-dialog-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
     .ui-dialog-header { padding: 16px 18px 8px; }
-    .ui-dialog-title { font-weight: 700; font-size: 15px; color: #211e17; }
-    .ui-dialog-body { padding: 4px 18px 16px; font-size: 13px; color: #5f594c; white-space: pre-wrap; line-height: 1.45; }
+    .ui-dialog-title { font-weight: 700; font-size: 15px; color: #0e1420; }
+    .ui-dialog-body { padding: 4px 18px 16px; font-size: 13px; color: #5a6270; white-space: pre-wrap; line-height: 1.45; }
     .ui-dialog-input { width: 100%; border: 1px solid #d8d2c6; border-radius: 6px; padding: 8px 10px; font-size: 13px; margin-top: 8px; }
-    .ui-dialog-input:focus { outline: 2px solid #211e17; outline-offset: -1px; border-color: #211e17; }
+    .ui-dialog-input:focus { outline: 2px solid #0e1420; outline-offset: -1px; border-color: #0e1420; }
     .ui-dialog-actions { display: flex; gap: 8px; padding: 12px 18px 16px; background: #faf8f4; }
     .ui-btn { flex: 1; border: 0; border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .12s; }
-    .ui-btn-secondary { background: #e8e3d9; color: #4a4437; }
+    .ui-btn-secondary { background: #dfe4ec; color: #4a4437; }
     .ui-btn-secondary:hover { background: #d8d2c6; }
-    .ui-btn-primary { background: #211e17; color: white; }
+    .ui-btn-primary { background: #0e1420; color: white; }
     .ui-btn-primary:hover { background: #4a4437; }
-    .ui-btn-danger { background: #b3372f; color: white; }
+    .ui-btn-danger { background: #dc2626; color: white; }
     .ui-btn-danger:hover { background: #942d26; }
 
     /* Loading state para botones */
@@ -76,8 +76,8 @@
     @keyframes ui-spin { to { transform: rotate(360deg); } }
 
     /* Form validation */
-    .ui-field-error { border-color: #b3372f !important; box-shadow: 0 0 0 2px rgba(179,55,47,.18); }
-    .ui-error-msg { color: #b3372f; font-size: 11px; margin-top: 4px; }
+    .ui-field-error { border-color: #dc2626 !important; box-shadow: 0 0 0 2px rgba(179,55,47,.18); }
+    .ui-error-msg { color: #dc2626; font-size: 11px; margin-top: 4px; }
   `;
   document.head.appendChild(style);
 
@@ -98,7 +98,7 @@
     const container = ensureToastContainer();
     const el = document.createElement('div');
     el.className = `ui-toast ui-${type}`;
-    const icons = { success: osIcon('check-circle', { size: 18, color: '#1f7a4d' }), error: osIcon('x-circle', { size: 18, color: '#b3372f' }), warning: osIcon('alert', { size: 18, color: '#8a6400' }), info: osIcon('info', { size: 18, color: '#2f6b4f' }) };
+    const icons = { success: osIcon('check-circle', { size: 18, color: '#059669' }), error: osIcon('x-circle', { size: 18, color: '#dc2626' }), warning: osIcon('alert', { size: 18, color: '#b45309' }), info: osIcon('info', { size: 18, color: '#3a5be0' }) };
     const titles = { success: 'Listo', error: 'Error', warning: 'Atención', info: 'Aviso' };
     const message = String(msg || '');
     // Detectar título si vino con \n\n o si el primer línea termina con :

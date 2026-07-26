@@ -27,7 +27,7 @@ function rpMedian(arr) {
   if (!a.length) return 0;
   return a.length % 2 ? a[(a.length - 1) / 2] : Math.round((a[a.length / 2 - 1] + a[a.length / 2]) / 2);
 }
-function rpSem(ok) { return ok == null ? '#a89f8f' : ok ? '#63c08e' : '#e4756a'; }
+function rpSem(ok) { return ok == null ? '#8b93a1' : ok ? '#4ade9e' : '#ff6b6b'; }
 // Formateador defensivo para celdas: null/NaN/Infinity → '—' (regla "sin dato ≠ $0")
 function rpM(v) { return (v == null || !isFinite(v)) ? '—' : RC_M(v); }
 
@@ -111,36 +111,36 @@ function rpInjectCSS() {
   st.textContent = `
   #rc-overlay .rp-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px}
   #rc-overlay .rp-tabs{display:flex;gap:6px;flex-wrap:wrap}
-  #rc-overlay .rp-tab{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;border:1px solid var(--line,rgba(255,255,255,.1));background:var(--glass,rgba(255,255,255,.04));color:var(--txt2,#a69d8c);cursor:pointer}
-  #rc-overlay .rp-tab.on{background:linear-gradient(135deg,#6fbf95,#2f6ef0);color:#fff;border-color:transparent}
+  #rc-overlay .rp-tab{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;border:1px solid var(--line,rgba(255,255,255,.1));background:var(--glass,rgba(255,255,255,.04));color:var(--txt2,#8b93a1);cursor:pointer}
+  #rc-overlay .rp-tab.on{background:linear-gradient(135deg,#5c79f0,#3a5be0);color:#fff;border-color:transparent}
   #rc-overlay .rp-exports{display:flex;gap:6px}
   #rc-overlay .rp-x{font-size:12px;font-weight:700;padding:7px 12px;border-radius:9px;border:1px solid var(--line,rgba(255,255,255,.1));background:var(--glass,rgba(255,255,255,.04));color:var(--txt,#e8eefc);cursor:pointer}
-  #rc-overlay .rp-x:hover{border-color:#6fbf95}
+  #rc-overlay .rp-x:hover{border-color:#5c79f0}
   #rc-overlay .rp-filters{background:var(--glass,rgba(255,255,255,.03));border:1px solid var(--line,rgba(255,255,255,.08));border-radius:12px;padding:10px 12px;margin-bottom:14px}
-  #rc-overlay details.rp-filters > summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2,#a69d8c);user-select:none;list-style:none}
+  #rc-overlay details.rp-filters > summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2,#8b93a1);user-select:none;list-style:none}
   #rc-overlay details.rp-filters > summary::-webkit-details-marker{display:none}
   #rc-overlay details.rp-filters > summary::after{content:'▸';margin-left:6px;opacity:.6;display:inline-block;transition:transform .15s}
   #rc-overlay details.rp-filters[open] > summary::after{transform:rotate(90deg)}
   #rc-overlay details.rp-filters[open] > summary{margin-bottom:8px}
   #rc-overlay .rp-frow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-  #rc-overlay .rp-flab{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#756c5c);font-weight:700}
-  #rc-overlay .rp-chip{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--line,rgba(255,255,255,.1));background:transparent;color:var(--txt2,#a69d8c);cursor:pointer}
-  #rc-overlay .rp-chip.on{background:#6fbf95;color:#fff;border-color:#6fbf95}
+  #rc-overlay .rp-flab{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#98a0ae);font-weight:700}
+  #rc-overlay .rp-chip{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--line,rgba(255,255,255,.1));background:transparent;color:var(--txt2,#8b93a1);cursor:pointer}
+  #rc-overlay .rp-chip.on{background:#5c79f0;color:#fff;border-color:#5c79f0}
   #rc-overlay .rp-sel,#rc-overlay .rp-date{font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.12));background:var(--glass,rgba(255,255,255,.04));color:var(--txt,#e8eefc)}
-  #rc-overlay .rp-note{font-size:11px;color:var(--txt3,#756c5c);margin-top:4px}
+  #rc-overlay .rp-note{font-size:11px;color:var(--txt3,#98a0ae);margin-top:4px}
   #rc-overlay .rp-okrbar{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
   #rc-overlay .rp-okr{font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;border:1px solid}
   #rc-overlay .rp-dec{font-size:12.5px;line-height:1.5;padding:8px 4px;border-bottom:1px solid var(--line,rgba(255,255,255,.06));color:var(--txt,#e8eefc)}
   #rc-overlay .rp-canvas{height:230px;position:relative;padding:6px;overflow:hidden}
   #rc-overlay table.rp-t{width:100%;border-collapse:collapse;font-size:12px}
-  #rc-overlay table.rp-t th{text-align:left;padding:6px 8px;color:var(--txt3,#756c5c);font-size:10px;text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line,rgba(255,255,255,.1))}
+  #rc-overlay table.rp-t th{text-align:left;padding:6px 8px;color:var(--txt3,#98a0ae);font-size:10px;text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line,rgba(255,255,255,.1))}
   #rc-overlay table.rp-t td{padding:6px 8px;border-bottom:1px solid var(--line,rgba(255,255,255,.05));color:var(--txt,#e8eefc)}
   #rc-overlay table.rp-t td.r,#rc-overlay table.rp-t th.r{text-align:right}
   #rc-overlay table.rp-t tr.rp-total td{font-weight:800;border-top:1px solid var(--line,rgba(255,255,255,.18));background:var(--glass,rgba(255,255,255,.03))}
   #rc-overlay .rp-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
-  #rc-overlay .rp-sh{color:#dca94f;font-size:11px}
-  #rc-overlay .rp-modenote{font-size:11.5px;color:var(--txt2,#a69d8c);background:var(--glass,rgba(255,255,255,.03));border:1px solid var(--line,rgba(255,255,255,.08));border-radius:8px;padding:8px 10px;margin-bottom:12px}
-  #rc-overlay .up{color:#63c08e}#rc-overlay .down{color:#e4756a}
+  #rc-overlay .rp-sh{color:#fbbf24;font-size:11px}
+  #rc-overlay .rp-modenote{font-size:11.5px;color:var(--txt2,#8b93a1);background:var(--glass,rgba(255,255,255,.03));border:1px solid var(--line,rgba(255,255,255,.08));border-radius:8px;padding:8px 10px;margin-bottom:12px}
+  #rc-overlay .up{color:#4ade9e}#rc-overlay .down{color:#ff6b6b}
   @media print { body > *:not(#rc-overlay){display:none!important} #rc-overlay{position:static!important;background:#fff!important;color:#111!important} #rc-overlay .rc-sidebar,#rc-overlay .rc-header,.no-print{display:none!important} #rc-overlay .rp-canvas{height:200px} #rc-overlay table.rp-t td,#rc-overlay table.rp-t th{color:#111!important} }
   `;
   document.head.appendChild(st);
@@ -183,7 +183,7 @@ function rcSecReportes(c) {
           <option value="ambos" ${RP.liderMode === 'ambos' ? 'selected' : ''}>Ambos (100%)</option>
         </select>
       </div>
-      <div class="rp-note">${obras.length} obras en el filtro · período <b>${RP.period}</b>${!c.okrsConfigured ? ' · <span style="color:#dca94f">' + osIcon('alert') + ' metas no configuradas (usando defaults) — cargalas en la tabla “OKRs / Metas” de Airtable</span>' : ''}</div>
+      <div class="rp-note">${obras.length} obras en el filtro · período <b>${RP.period}</b>${!c.okrsConfigured ? ' · <span style="color:#fbbf24">' + osIcon('alert') + ' metas no configuradas (usando defaults) — cargalas en la tabla “OKRs / Metas” de Airtable</span>' : ''}</div>
     </details>
     <div id="rp-report">${body(c, obras)}</div>`;
 }
@@ -352,11 +352,11 @@ function rpDrawCharts() {
   RP.charts = [];
   const theme = (typeof posGetTheme === 'function' && posGetTheme() === 'light');
   const grid = theme ? 'rgba(15,28,46,.08)' : 'rgba(255,255,255,.06)';
-  const tick = theme ? '#5f594c' : '#a69d8c';
+  const tick = theme ? '#5a6270' : '#8b93a1';
   const ds = rpFilter(rcObraDataset());
   const m = rpMetrics(ds);
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; cfg.options = cfg.options || {}; cfg.options.responsive = true; cfg.options.maintainAspectRatio = false; cfg.options.resizeDelay = 200; cfg.options.plugins = Object.assign({ legend: { display: false } }, cfg.options.plugins || {}); cfg.options.scales = cfg.options.scales || {}; ['x', 'y', 'r'].forEach(ax => { if (cfg.options.scales[ax]) { cfg.options.scales[ax].grid = { color: grid }; cfg.options.scales[ax].ticks = Object.assign({ color: tick }, cfg.options.scales[ax].ticks || {}); if (cfg.options.scales[ax].pointLabels) cfg.options.scales[ax].pointLabels.color = tick; } }); try { RP.charts.push(new Chart(el, cfg)); } catch (e) {} };
-  const teal = '#6fbf95', blue = '#2f6ef0', red = '#e4756a', amber = '#dca94f';
+  const teal = '#5c79f0', blue = '#3a5be0', red = '#ff6b6b', amber = '#fbbf24';
   if (RP.tipo === 'r1') {
     const top = [...m.fin].sort((a, b) => b.utilidad - a.utilidad).slice(0, 8);
     mk('rp-c1', { type: 'bar', data: { labels: top.map(o => rcShort(o.address)), datasets: [{ data: top.map(o => Math.round(o.utilidad)), backgroundColor: top.map(o => o.utilidad >= 0 ? teal : red) }] }, options: { scales: { x: { ticks: { maxRotation: 60, minRotation: 45, font: { size: 9 } } }, y: {} } } });
@@ -369,7 +369,7 @@ function rpDrawCharts() {
     mk('rp-c3', { type: 'bar', data: { labels: lid.map(l => l.lider), datasets: [{ data: lid.map(l => Math.round(l.ganancia)), backgroundColor: teal }] }, options: { indexAxis: 'y', scales: { x: {}, y: { ticks: { font: { size: 10 } } } } } });
   } else if (RP.tipo === 'r4') {
     const okr = (c && c.okrRows) || [];
-    mk('rp-c4', { type: 'radar', data: { labels: okr.map(o => o.metrica), datasets: [{ data: okr.map(o => o.cumple == null ? 0 : o.cumple ? 100 : 40), backgroundColor: 'rgba(18,181,160,.2)', borderColor: teal, pointBackgroundColor: okr.map(o => rpSem(o.cumple)) }] }, options: { scales: { r: { min: 0, max: 100, pointLabels: { font: { size: 9 } }, ticks: { display: false } } } } });
+    mk('rp-c4', { type: 'radar', data: { labels: okr.map(o => o.metrica), datasets: [{ data: okr.map(o => o.cumple == null ? 0 : o.cumple ? 100 : 40), backgroundColor: 'rgba(92,121,240,.2)', borderColor: teal, pointBackgroundColor: okr.map(o => rpSem(o.cumple)) }] }, options: { scales: { r: { min: 0, max: 100, pointLabels: { font: { size: 9 } }, ticks: { display: false } } } } });
   } else if (RP.tipo === 'r5') {
     const withSq = m.fin.filter(o => o.sqft > 0).map(o => ({ a: rcShort(o.address), v: Math.round(o.costo_real / o.sqft) })).sort((a, b) => b.v - a.v).slice(0, 12);
     mk('rp-c5', { type: 'bar', data: { labels: withSq.map(o => o.a), datasets: [{ data: withSq.map(o => o.v), backgroundColor: withSq.map(o => o.v <= 50 ? teal : red) }] }, options: { scales: { x: { ticks: { maxRotation: 60, minRotation: 45, font: { size: 8 } } }, y: {} } } });

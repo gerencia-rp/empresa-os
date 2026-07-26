@@ -54,7 +54,7 @@ function ffDQBar(comp) {
   const revNames = k.revisarList.map(d => `${FF_ESC(ffShort(d.address))} (${Math.round(d.allInPct * 100)}%)`).join(', ');
   return `<div class="ff-dqbar"><div><div class="t">${osIcon('alert')} ${flagged} deal(s) con datos a revisar</div><div class="d">${k.revisar} imposibles (all-in > 100% ARV) · ${k.sinDatos} sin datos · ${k.preliminar} preliminares (obra en curso). <b>Excluidos de promedios/márgenes.</b></div></div>${revNames ? `<div class="lst">${revNames}</div>` : ''}</div>`;
 }
-function ffAx() { return posGetTheme() === 'light' ? '#756c5c' : '#7c7365'; }
+function ffAx() { return posGetTheme() === 'light' ? '#98a0ae' : '#565e6b'; }
 function ffGridC() { return posGetTheme() === 'light' ? 'rgba(15,23,42,.06)' : 'rgba(255,255,255,.05)'; }
 
 // ─── CSS (mismo look del ecosistema, scoped bajo #ff-overlay, con tema claro) ───
@@ -63,16 +63,18 @@ function ffInjectCSS() {
   const st = document.createElement('style'); st.id = 'ff-styles';
   st.textContent = `
   #ff-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
-    --bg:#14110c;--ink:#efe9de;--mut:#a89f8f;--mut2:#7c7365;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
-    --a1:#6fbf95;--a2:#4e9b72;--a3:#c9a85c;--pos:#63c08e;--neg:#e4756a;--amber:#dca94f;
-    --mesh1:rgba(69,227,198,.14);--mesh2:rgba(79,141,255,.15);--mesh3:rgba(138,123,255,.12);--bggrad:linear-gradient(180deg,#16130d,#100e08);
+    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#565e6b;--glass:#131519;--glassb:rgba(255,255,255,.07);
+    --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
+    --accent:#3a5be0;--accent-2:#5c79f0;--accent-soft:rgba(58,91,224,.18);--glow:rgba(58,91,224,.5);--grad:linear-gradient(120deg,#3a5be0,#5c79f0);--surface-2:#191c22;--surface-solid:#161a20;--radius:20px;
+    --mesh1:rgba(58,91,224,.5);--mesh2:rgba(92,121,240,.16);--mesh3:rgba(58,91,224,.10);--bggrad:#08090c;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
-  /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
+  /* LIGHT canon royal — espejo de ui/tokens.css */
   #ff-overlay[data-theme="light"]{
-    --bg:#f7f5f0;--ink:#211e17;--mut:#5f594c;--mut2:#756c5c;--glass:#ffffff;--glassb:#e8e3d9;
-    --a1:#2f6b4f;--a2:#275c43;--a3:#8a6a2f;--pos:#1f7a4d;--neg:#dc2626;--amber:#8a6400;
-    --mesh1:rgba(37,99,235,.06);--mesh2:rgba(29,78,216,.05);--mesh3:rgba(107,91,239,.05);--bggrad:linear-gradient(180deg,#f9f7f2,#f2efe8)}
-  #ff-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
+    --bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#98a0ae;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
+    --a1:#3e5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309;
+    --accent:#2b44c6;--accent-2:#3e5be0;--accent-soft:rgba(43,68,198,.12);--glow:rgba(43,68,198,.24);--grad:linear-gradient(120deg,#2b44c6,#3e5be0);--surface-2:#f1f4f8;--surface-solid:#ffffff;
+    --mesh1:rgba(43,68,198,.24);--mesh2:rgba(62,91,224,.08);--mesh3:rgba(43,68,198,.05);--bggrad:#eef1f6}
+  #ff-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(16,20,28,.04),0 18px 40px -28px rgba(16,20,28,.4)}
   #ff-overlay *{box-sizing:border-box;margin:0;padding:0}
   #ff-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
     radial-gradient(760px 520px at 8% -6%,var(--mesh1),transparent 58%),
@@ -85,14 +87,14 @@ function ffInjectCSS() {
   #ff-overlay .side{padding:22px 15px;position:sticky;top:0;height:100vh;background:linear-gradient(180deg,rgba(12,16,26,.72),rgba(7,10,17,.72));border-right:1px solid var(--glassb);backdrop-filter:blur(16px);display:flex;flex-direction:column}
   #ff-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
   #ff-overlay .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
-  #ff-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
+  #ff-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(58,91,224,.6),inset 0 1px 0 rgba(255,255,255,.4)}
   #ff-overlay .brand b{font-size:15px;font-weight:750}#ff-overlay .brand span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.4px;margin-top:2px}
   #ff-overlay .navlbl{font-size:9px;letter-spacing:1.8px;color:var(--mut2);text-transform:uppercase;padding:12px 12px 7px;font-weight:700}
   #ff-overlay .nav{display:flex;flex-direction:column;gap:2px}
   #ff-overlay .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:500;transition:.16s;position:relative;cursor:pointer}
   #ff-overlay .nav a .i{width:16px;text-align:center;opacity:.85;font-size:13px}
   #ff-overlay .nav a:hover{background:var(--glass);color:var(--ink)}
-  #ff-overlay .nav a.on{color:var(--ink);background:linear-gradient(90deg,rgba(69,227,198,.16),rgba(79,141,255,.06));box-shadow:inset 0 0 0 1px var(--glassb)}
+  #ff-overlay .nav a.on{color:var(--ink);background:linear-gradient(90deg,rgba(92,121,240,.16),rgba(58,91,224,.06));box-shadow:inset 0 0 0 1px var(--glassb)}
   #ff-overlay .nav a.on::before{content:"";position:absolute;left:-15px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--a1),var(--a2));box-shadow:0 0 10px var(--a1)}
   #ff-overlay .nav a .b{margin-left:auto;font-size:10px;color:var(--mut2)}
   #ff-overlay .side .foot{margin-top:auto;font-size:10.5px;color:var(--mut2);line-height:1.7;border-top:1px solid var(--glassb);padding-top:12px}
@@ -105,7 +107,7 @@ function ffInjectCSS() {
   #ff-overlay .pills{margin-left:auto;display:flex;gap:9px;align-items:center}
   #ff-overlay .pill{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:8px 13px;border-radius:22px;backdrop-filter:blur(10px)}
   #ff-overlay .cdot{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1);animation:ffpulse 2s infinite}@keyframes ffpulse{0%,100%{opacity:1}50%{opacity:.35}}
-  #ff-overlay .pill.ai{background:linear-gradient(90deg,rgba(138,123,255,.22),rgba(79,141,255,.14));border-color:rgba(138,123,255,.4);color:var(--ink);cursor:pointer}
+  #ff-overlay .pill.ai{background:linear-gradient(90deg,rgba(58,91,224,.22),rgba(58,91,224,.14));border-color:rgba(58,91,224,.4);color:var(--ink);cursor:pointer}
   #ff-overlay .shimmer{background:linear-gradient(90deg,var(--a3) 30%,var(--a2) 50%,var(--a3) 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ffsh 3s linear infinite}@keyframes ffsh{to{background-position:-200% 0}}
   #ff-overlay .ffclose,#ff-overlay .pos-theme-btn{position:fixed;top:16px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
   #ff-overlay .ffclose{right:20px}#ff-overlay .pos-theme-btn{right:62px}
@@ -119,7 +121,7 @@ function ffInjectCSS() {
   #ff-overlay .lab{font-size:10px;letter-spacing:1.5px;color:var(--mut2);text-transform:uppercase;font-weight:700}
   #ff-overlay .kpi .big{font-size:31px;font-weight:780;margin-top:9px;letter-spacing:-.8px}
   #ff-overlay .kpi .meta{font-size:11.5px;color:var(--mut);margin-top:7px;line-height:1.5}
-  #ff-overlay .glow{text-shadow:0 0 22px rgba(69,227,198,.4)}
+  #ff-overlay .glow{text-shadow:0 0 22px rgba(92,121,240,.4)}
   #ff-overlay[data-theme="light"] .glow{text-shadow:none}
   #ff-overlay .up{color:var(--pos)}#ff-overlay .down{color:var(--neg)}#ff-overlay .warn{color:var(--amber)}
   #ff-overlay .row2{grid-template-columns:1.6fr minmax(0,1fr);margin-top:16px;align-items:start}#ff-overlay .row3{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px;align-items:start}
@@ -127,10 +129,10 @@ function ffInjectCSS() {
   #ff-overlay .chart-h .t{font-size:13.5px;font-weight:640}#ff-overlay .chart-h .k{font-size:11px;color:var(--mut2)}
   #ff-overlay .legend{display:flex;gap:14px;font-size:11px;color:var(--mut)}#ff-overlay .legend b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
   #ff-overlay canvas{max-width:100%}
-  #ff-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(138,123,255,.28)}
-  #ff-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,123,255,.10),rgba(79,141,255,.05))}
+  #ff-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(58,91,224,.28)}
+  #ff-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(58,91,224,.10),rgba(58,91,224,.05))}
   #ff-overlay .bh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-  #ff-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#6fbf95 30%,#4e9b72 70%,#1c3327);box-shadow:0 0 22px rgba(79,141,255,.55)}
+  #ff-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#5c79f0 30%,#3a5be0 70%,#1c3327);box-shadow:0 0 22px rgba(58,91,224,.55)}
   #ff-overlay .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ffspin 6s linear infinite;opacity:.7}@keyframes ffspin{to{transform:rotate(360deg)}}
   #ff-overlay .bh b{font-size:14px}#ff-overlay .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.5px;margin-top:2px}
   #ff-overlay .insight{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--glassb)}#ff-overlay .insight:last-of-type{border-bottom:none}
@@ -140,17 +142,17 @@ function ffInjectCSS() {
   #ff-overlay .tag{display:inline-block;font-size:9px;letter-spacing:.7px;color:var(--mut2);margin-top:5px;font-weight:700}
   #ff-overlay .chip{font-size:11px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}#ff-overlay .chip:hover{color:var(--ink);border-color:var(--a2)}
   #ff-overlay .ask{display:flex;gap:8px;margin-top:14px}
-  #ff-overlay .ask input{flex:1;background:var(--glass);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
+  #ff-overlay .ask input{flex:1;background:var(--glass);border:1px solid rgba(58,91,224,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
   #ff-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   #ff-overlay .cc-chat{display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto}#ff-overlay .cc-chat:empty{display:none}
   #ff-overlay .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
-  #ff-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3);color:var(--ink)}
+  #ff-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(92,121,240,.16),rgba(58,91,224,.14));border:1px solid rgba(58,91,224,.3);color:var(--ink)}
   #ff-overlay .cbub.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb);color:var(--ink)}
-  #ff-overlay .cbub.err{border-color:rgba(240,104,122,.4);color:var(--neg)}#ff-overlay .cbub.think{color:var(--mut2);font-style:italic}
+  #ff-overlay .cbub.err{border-color:rgba(255,107,107,.4);color:var(--neg)}#ff-overlay .cbub.think{color:var(--mut2);font-style:italic}
   #ff-overlay .cbub p{margin:0 0 6px}#ff-overlay .cbub p:last-child{margin:0}#ff-overlay .cbub ul,#ff-overlay .cbub ol{margin:4px 0 6px 18px}#ff-overlay .cbub li{margin:3px 0}
   @keyframes ffblink{0%,100%{opacity:.35}50%{opacity:1}}#ff-overlay .cbub.think::after{content:"▋";animation:ffblink 1s infinite}
   #ff-overlay .ff-zsel td{background:var(--glass)}
-#ff-um-modelos .pullbtn.on{background:linear-gradient(135deg,#4e9b72,#6fbf95);color:#fff;border-color:transparent}
+#ff-um-modelos .pullbtn.on{background:linear-gradient(135deg,#3a5be0,#5c79f0);color:#fff;border-color:transparent}
 .uwbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   #ff-overlay .uwbar label{font-size:12px;color:var(--mut)}#ff-overlay .uwtag{font-size:11px;color:var(--a1)}
   #ff-overlay .uwrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -173,26 +175,26 @@ function ffInjectCSS() {
   #ff-overlay .kcard .addr{font-size:12.5px;font-weight:640;color:var(--ink);margin-bottom:3px}
   #ff-overlay .kcard .meta{font-size:10.5px;color:var(--mut2);margin-bottom:9px}
   #ff-overlay .kstrat{font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px}
-  #ff-overlay .kstrat.flip{background:rgba(79,141,255,.15);color:var(--a2)}#ff-overlay .kstrat.hold{background:rgba(69,227,198,.14);color:var(--a1)}
+  #ff-overlay .kstrat.flip{background:rgba(58,91,224,.15);color:var(--a2)}#ff-overlay .kstrat.hold{background:rgba(92,121,240,.14);color:var(--a1)}
   #ff-overlay .krow{display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--mut)}#ff-overlay .krow b{color:var(--ink);font-weight:600}
   #ff-overlay .kbar{height:4px;border-radius:4px;background:var(--glassb);overflow:hidden;margin-top:8px}#ff-overlay .kbar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
   #ff-overlay .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}
   #ff-overlay .ff-dq{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.2px}
-  #ff-overlay .ff-dq-rev{background:rgba(240,104,122,.16);color:var(--neg);border:1px solid rgba(240,104,122,.35)}
+  #ff-overlay .ff-dq-rev{background:rgba(255,107,107,.16);color:var(--neg);border:1px solid rgba(255,107,107,.35)}
   #ff-overlay .ff-dq-nd{background:var(--glass);color:var(--mut);border:1px solid var(--glassb)}
-  #ff-overlay .ff-dq-pre{background:rgba(231,182,94,.15);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
+  #ff-overlay .ff-dq-pre{background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.32)}
   #ff-overlay .kficha{margin-top:8px;font-size:10px;font-weight:600;color:var(--a2);cursor:pointer;border-top:1px solid var(--glassb);padding-top:7px}#ff-overlay .kficha:hover{color:var(--a1)}
-  #ff-overlay .ff-dqbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 16px;border-radius:13px;background:rgba(240,104,122,.08);border:1px solid rgba(240,104,122,.22)}
-  #ff-overlay .ff-dqbar.clean{background:rgba(72,214,156,.08);border-color:rgba(72,214,156,.22)}
+  #ff-overlay .ff-dqbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 16px;border-radius:13px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.22)}
+  #ff-overlay .ff-dqbar.clean{background:rgba(74,222,158,.08);border-color:rgba(74,222,158,.22)}
   #ff-overlay .ff-dqbar .t{font-size:12.5px;font-weight:700}#ff-overlay .ff-dqbar .d{font-size:11px;color:var(--mut)}
   #ff-overlay .ff-dqbar .lst{font-size:11px;color:var(--mut);margin-left:auto;text-align:right;max-width:60%}
-  #ff-overlay .b-ok{background:rgba(72,214,156,.13);color:var(--pos)}#ff-overlay .b-red{background:rgba(240,104,122,.13);color:var(--neg)}#ff-overlay .b-warn{background:rgba(231,182,94,.13);color:var(--amber)}
+  #ff-overlay .b-ok{background:rgba(74,222,158,.13);color:var(--pos)}#ff-overlay .b-red{background:rgba(255,107,107,.13);color:var(--neg)}#ff-overlay .b-warn{background:rgba(251,191,36,.13);color:var(--amber)}
   #ff-overlay .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #ff-overlay .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--glassb);font-weight:700}
   #ff-overlay .ptable td{padding:11px 8px;border-bottom:1px solid var(--glassb)}
   #ff-overlay .ptable tr:hover td{background:var(--glass)}
   #ff-overlay .empty-sec{padding:56px;text-align:center;color:var(--mut2)}
-  #ff-overlay .soon{display:inline-block;font-size:9px;font-weight:700;color:var(--a2);background:rgba(79,141,255,.12);padding:2px 8px;border-radius:12px;margin-left:8px}
+  #ff-overlay .soon{display:inline-block;font-size:9px;font-weight:700;color:var(--a2);background:rgba(58,91,224,.12);padding:2px 8px;border-radius:12px;margin-left:8px}
   #ff-overlay .card,#ff-overlay .main{animation:fffade .35s ease}@keyframes fffade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   @media (max-width:960px){
     #ff-overlay{overflow-x:hidden}#ff-overlay .app{grid-template-columns:minmax(0,1fr)}
@@ -220,7 +222,7 @@ async function openFFCommandCenter(sys) {
   let ov = document.getElementById('ff-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'ff-overlay'; document.body.appendChild(ov); }
   posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#7c7365">' + osIcon('loader') + ' Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#565e6b">' + osIcon('loader') + ' Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ffLoadAll();
   ffRender();
@@ -552,7 +554,7 @@ function ffSecDeals(comp) {
 }
 function ffKanCard(d) {
   const capturePct = d.arv ? Math.min(100, Math.round(d.allInPct * 100)) : 0;
-  return `<div class="kcard"${d.dq.revisar ? ' style="border-color:rgba(240,104,122,.4)"' : ''}>
+  return `<div class="kcard"${d.dq.revisar ? ' style="border-color:rgba(255,107,107,.4)"' : ''}>
     <div style="display:flex;justify-content:space-between;align-items:start;gap:6px"><div class="addr">${FF_ESC(ffShort(d.address))}</div>${ffStratBadge(d)}</div>
     ${d.dq.flags.length ? `<div style="margin:5px 0 2px">${ffDQBadge(d.dq)}</div>` : ''}
     ${(d.semAllin || d.semHml || d.semBudget) ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px">${d.semAllin ? `<span class="ff-dq ff-dq-rev" title="all-in supera el máximo configurado del ARV">${kitStatusDot('bad')} all-in ${Math.round(d.allInPct * 100)}%</span>` : ''}${d.semHml ? `<span class="ff-dq ff-dq-rev" title="vencimiento del préstamo HML">${osIcon('clock')} HML ${d.hmlDueDays < 0 ? 'VENCIDO ' + Math.abs(d.hmlDueDays) + 'd' : 'vence ' + d.hmlDueDays + 'd'}</span>` : ''}${d.semBudget ? `<span class="ff-dq ff-dq-pre" title="desvío del presupuesto de remodelación (real vs estimado)">${osIcon('trending-up')} presup +${d.budgetDevPct}%</span>` : ''}</div>` : ''}
@@ -1311,14 +1313,14 @@ function ffMountCharts(comp) {
   const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 10 } } }, y: ax } };
   // capital por etapa
   const byStage = FF_STAGES.map(([k, lbl]) => ({ lbl, v: comp.deals.filter(d => d.stage === k).reduce((s, d) => s + d.allIn, 0) / 1000 }));
-  mk('ff-stage', { type: 'bar', data: { labels: byStage.map(x => x.lbl), datasets: [{ data: byStage.map(x => x.v), borderRadius: 5, backgroundColor: '#4e9b72' }] }, options: gext });
+  mk('ff-stage', { type: 'bar', data: { labels: byStage.map(x => x.lbl), datasets: [{ data: byStage.map(x => x.v), borderRadius: 5, backgroundColor: '#3a5be0' }] }, options: gext });
   // margen/déficit por deal
   const md = comp.deals.filter(d => d.arv > 0).map(d => ({ n: ffShort(d.address).slice(0, 16), v: (d.deficit < 0 ? d.deficit : d.margin) })).sort((a, b) => a.v - b.v).slice(0, 14);
-  mk('ff-margin', { type: 'bar', data: { labels: md.map(x => x.n), datasets: [{ data: md.map(x => Math.round(x.v / 1000)), borderRadius: 4, backgroundColor: md.map(x => x.v >= 0 ? '#63c08e' : '#e4756a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 9 } } } } } });
+  mk('ff-margin', { type: 'bar', data: { labels: md.map(x => x.n), datasets: [{ data: md.map(x => Math.round(x.v / 1000)), borderRadius: 4, backgroundColor: md.map(x => x.v >= 0 ? '#4ade9e' : '#ff6b6b') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 9 } } } } } });
   // deals por etapa (donut)
   const dc = FF_STAGES.map(([k, lbl]) => ({ lbl, n: comp.deals.filter(d => d.stage === k).length })).filter(x => x.n);
-  mk('ff-donut', { type: 'doughnut', data: { labels: dc.map(x => x.lbl), datasets: [{ data: dc.map(x => x.n), backgroundColor: ['#4e9b72', '#6fbf95', '#dca94f', '#c9a85c', '#63c08e', '#a89f8f'], borderColor: posGetTheme() === 'light' ? '#fff' : '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } });
+  mk('ff-donut', { type: 'doughnut', data: { labels: dc.map(x => x.lbl), datasets: [{ data: dc.map(x => x.n), backgroundColor: ['#3a5be0', '#5c79f0', '#fbbf24', '#93b0e2', '#4ade9e', '#8b93a1'], borderColor: posGetTheme() === 'light' ? '#fff' : '#131519', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } });
   // Finanzas: gastos por tipo
   if (document.getElementById('ff-fin-donut')) { const gt = ffGastosPorTipo(); const gl = Object.keys(gt.g), gv = Object.values(gt.g).map(v => Math.round(v / 1000));
-    mk('ff-fin-donut', { type: 'doughnut', data: { labels: gl, datasets: [{ data: gv, backgroundColor: ['#e4756a', '#4e9b72', '#6fbf95', '#dca94f', '#c9a85c'], borderColor: posGetTheme() === 'light' ? '#fff' : '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } }); }
+    mk('ff-fin-donut', { type: 'doughnut', data: { labels: gl, datasets: [{ data: gv, backgroundColor: ['#ff6b6b', '#3a5be0', '#5c79f0', '#fbbf24', '#93b0e2'], borderColor: posGetTheme() === 'light' ? '#fff' : '#131519', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: ffAx(), font: { size: 10 }, boxWidth: 8, padding: 8 } } } } }); }
 }

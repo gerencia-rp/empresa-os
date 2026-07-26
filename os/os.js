@@ -99,7 +99,7 @@ function osInjectCSS() {
   #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(16,20,28,.04),0 18px 40px -28px rgba(16,20,28,.4)}
   /* Barra de acento superior en KPIs (design-ref .kpi::after) */
   #os-root .grid.k4>.card::after,#os-root .card.kpi::after{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad);opacity:.45}
-  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#f6eed6;color:#8a6400;border-color:#e3d5a8}
+  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#e7edf9;color:#b45309;border-color:#c9d4ea}
   #os-root .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
   #os-root[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(16,20,28,.12),transparent)}
   #os-root .lab{font-size:10px;letter-spacing:1.4px;color:var(--mut2);text-transform:uppercase;font-weight:700}
@@ -202,7 +202,7 @@ function osInjectReskin() {
   html[data-osreskin] #modal > div{border-radius:18px !important}
   ${L} #modal > div{box-shadow:0 24px 70px -26px rgba(16,20,28,.34) !important}
   /* ───────── DARK ───────── */
-  ${D} #modal{background:rgba(10,8,5,.66) !important}
+  ${D} #modal{background:rgba(6,7,10,.66) !important}
   ${D} #modal > div{background:#12141a !important;color:#f1f3f7 !important;border:1px solid rgba(255,255,255,.1) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
   ${D} #modal .bg-white,${D} #modal .bg-slate-50,${D} #modal .bg-slate-100,${D} #modal .bg-gray-50,${D} #modal .bg-gray-100,${D} #modal .bg-neutral-50,${D} #modal .bg-neutral-100{background-color:#161a20 !important}
   ${D} #modal .bg-slate-800,${D} #modal .bg-slate-900,${D} #modal .bg-gray-800,${D} #modal .bg-gray-900{background-color:#1e2430 !important}
@@ -1143,7 +1143,7 @@ function opsCeoView(o) {
   // mini-tendencia congeladas/vencidas (snapshots)
   const tend = o.tend.slice(-10);
   const maxO = Math.max(...tend.map(x => x.overdue), 1);
-  const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#e4756a,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
+  const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#ff6b6b,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
   // N12 (auditoría 13-jul): índice de disciplina por persona (fecha+dueño 50% · al día 30% · movimiento 20%)
   if (OS.disciplina === undefined) { OS.disciplina = null; sb.from('v_disciplina_clickup').select('*').order('disciplina', { ascending: false }).then(r => { OS.disciplina = r.data || []; osRender(); }).catch(() => { OS.disciplina = []; }); }
   // N7 (plantilla llenada 13-jul): huérfanas con dueño/fecha SUGERIDOS por lista — cura de origen del ruido
@@ -1209,7 +1209,7 @@ function opsPmView(o) {
         <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
       </div>
       ${OS.opsGroupCasa ? opsPorCasaView(o, rows, fila) : `<div class="overx"><table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
-      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#63c08e">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table></div>`}
+      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#4ade9e">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table></div>`}
       <div class="meta" style="margin-top:8px">Mostrando ${Math.min(150, rows.length)} de ${rows.length} · fuente: clickup_tasks_mirror (paridad 3/3 con ClickUp, sync diario). Acciones con aprobación (reasignar/re-fechar/archivar): fase siguiente.</div>
     </div>`;
 }
@@ -1249,12 +1249,12 @@ function opsSabuesoView(o) {
   const fila = x => `<tr><td>${kitStatusDot(SAB_SEV[x.severidad]?.e || 'off')}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: 'fecha', asignar_dueno: 'dueño', refechar: 're-fechar', archivar: 'archivar', escalar: 'escalar', asignar_lista: 'lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
   return `${colapso}<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
       <div class="lab">${osIcon('dog')} El Sabueso olfateó</div>
-      <div style="font-size:52px;font-weight:800;color:${all.length ? '#e4756a' : '#63c08e'}">${all.length}</div>
+      <div style="font-size:52px;font-weight:800;color:${all.length ? '#ff6b6b' : '#4ade9e'}">${all.length}</div>
       <div class="meta">anomalías activas · ${bySev.critica || 0} críticas · ${bySev.alta || 0} altas · ${bySev.media || 0} medias · <b>norte: 0 = todo perfecto</b></div></div>
     <div style="display:flex;gap:5px;margin:12px 0;flex-wrap:wrap">${Object.entries(SAB_CAT).map(([k, l]) => byCat[k] ? catChip(k, l, byCat[k]) : '').join('')}
       <select class="repbtn ghost" style="padding:4px 8px" onchange="OS.sabF=Object.assign(OS.sabF||{},{emp:this.value});osRender()">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas'}</option>`).join('')}</select></div>
     <div class="grid k2">
-      <div class="card"><div class="lab">Anomalías (por severidad)</div><div class="overx"><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#63c08e">Nada que olfatear ✓</td></tr>'}</tbody></table></div><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
+      <div class="card"><div class="lab">Anomalías (por severidad)</div><div class="overx"><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#4ade9e">Nada que olfatear ✓</td></tr>'}</tbody></table></div><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
       <div class="card"><div class="lab">Health score por proceso/lista</div><div class="overx"><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 28))}<div style="font-size:9px;opacity:.5">higiene ${p.higiene}% · movido ${p.flujo}%</div></td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table></div><div class="meta" style="margin-top:6px">Salud = 50% higiene (fecha+dueño) + 50% flujo (movido 7d). Peores primero.</div></div>
     </div>`;
 }
@@ -1426,7 +1426,7 @@ function opsPorCasaView(o, rows, fila) {
         <b style="flex:1">${osIcon('house')} ${OS_E(casa)}</b><span class="badge b-ok" style="font-size:9px">${OS_E(emp)}</span>
         <span style="font-size:11px;opacity:.75">${ts.length} tareas</span>
         ${venc ? `<span class="badge b-warn" style="font-size:9px">${venc} venc.</span>` : ''}
-        ${sinCfg ? `<span style="font-size:10px;color:#dca94f">${osIcon('zap')} ${sinCfg} por config.</span>` : ''}
+        ${sinCfg ? `<span style="font-size:10px;color:#fbbf24">${osIcon('zap')} ${sinCfg} por config.</span>` : ''}
         <span style="opacity:.5">${open ? '▾' : '▸'}</span></div>
       ${open ? `<table class="ptable" style="margin:0"><tbody>${ts.slice(0, 40).map(fila).join('')}</tbody></table>` : ''}</div>`;
   }).join('') || '<div class="meta" style="padding:14px">Sin tareas con estos filtros.</div>';

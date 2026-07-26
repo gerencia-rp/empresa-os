@@ -170,10 +170,10 @@ function inRenderWizard() {
   const pct = Math.round(100 * (w.idx) / (total - 1));
   const res = inWizardCompute();
   // panel lateral en vivo
-  const barra = (pct2, label, val, emoji) => `<div style="margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>${emoji || ''} ${IN_E(label)}</span><b>${val != null ? val + '%' : '—'}</b></div><div style="height:6px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, val || 0)}%;background:${(val || 0) >= 60 ? '#e4756a' : (val || 0) >= 40 ? '#dca94f' : '#63c08e'}"></i></div></div>`;
+  const barra = (pct2, label, val, emoji) => `<div style="margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>${emoji || ''} ${IN_E(label)}</span><b>${val != null ? val + '%' : '—'}</b></div><div style="height:6px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, val || 0)}%;background:${(val || 0) >= 60 ? '#ff6b6b' : (val || 0) >= 40 ? '#fbbf24' : '#4ade9e'}"></i></div></div>`;
   const panel = `<div class="card" style="align-self:flex-start;position:sticky;top:10px">
     <div style="text-align:center;padding:8px 0"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;opacity:.6">Daño Global Estimado</div>
-      <div style="font-size:38px;font-weight:800;color:${(res.global || 0) >= 60 ? '#e4756a' : (res.global || 0) >= 40 ? '#dca94f' : '#63c08e'}">${res.global != null ? res.global + '%' : '—'}</div>
+      <div style="font-size:38px;font-weight:800;color:${(res.global || 0) >= 60 ? '#ff6b6b' : (res.global || 0) >= 40 ? '#fbbf24' : '#4ade9e'}">${res.global != null ? res.global + '%' : '—'}</div>
       <div style="font-size:11px;opacity:.7">${IN_E(inVeredicto(res.global))}</div></div>
     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px;opacity:.6">Divisiones Técnicas</div>
     ${IN.divisiones.map(d => barra(null, d.nombre, res.divisiones[d.key], d.emoji)).join('')}
@@ -181,7 +181,7 @@ function inRenderWizard() {
     ${IN.patologias.map(p => barra(null, p.nombre, res.patologias[p.key], p.emoji)).join('')}
   </div>`;
   // avisos
-  const avisosHtml = (w.avisos || []).length ? `<div class="card" style="border:1px solid rgba(231,182,94,.4);margin-bottom:10px"><div class="lab" style="color:#dca94f">${osIcon('alert', {size:12})} Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin:3px 0">• ${IN_E(a)}</div>`).join('')}</div>` : '';
+  const avisosHtml = (w.avisos || []).length ? `<div class="card" style="border:1px solid rgba(251,191,36,.4);margin-bottom:10px"><div class="lab" style="color:#fbbf24">${osIcon('alert', {size:12})} Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin:3px 0">• ${IN_E(a)}</div>`).join('')}</div>` : '';
   let body = '';
   if (step.tipo === 'datos') {
     body = `<div class="card"><div class="chart-h"><div class="t">Datos básicos</div></div>
@@ -221,10 +221,10 @@ function inRenderWizard() {
   } else if (step.tipo === 'reporte') {
     const etapas = res.etapas;
     body = `<div class="card"><div class="chart-h"><div class="t">${osIcon('chart', {size:14})} Reporte de diagnóstico</div><div class="k">${IN_E(w.nombre_ref)} · ${IN_E(inVeredicto(res.global))}</div></div>
-      <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${(res.global || 0) >= 60 ? '#e4756a' : '#63c08e'}">${res.global != null ? res.global + '%' : '—'}</div><div style="opacity:.7">Daño Global Estimado</div></div>
+      <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${(res.global || 0) >= 60 ? '#ff6b6b' : '#4ade9e'}">${res.global != null ? res.global + '%' : '—'}</div><div style="opacity:.7">Daño Global Estimado</div></div>
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:8px 0 4px">Daño por etapa de renovación</div>
       <table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right"><b class="${(etapas[e.etapa] || 0) >= 50 ? 'down' : ''}">${etapas[e.etapa] != null ? etapas[e.etapa] + '%' : '—'}</b></td></tr>`).join('')}</tbody></table>
-      ${(() => { try { const rh = inRehabEstimado({ property_id: w.property_id, dano_etapas: res.etapas }); return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:12px 0 4px">${osIcon('banknote', {size:12})} Rehab estimado (daño × $/sqft calibrado)</div><div style="padding:8px 10px;border-radius:8px;background:rgba(52,211,153,.08);margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px" class="up">${IN_M(rh.total)}</b><span style="font-size:10px;opacity:.7">${rh.sqft} sqft × ${rh.calibPsf}/sqft ${rh.n ? '<span style=\'background:rgba(18,181,160,.18);color:#6fbf95;padding:1px 6px;border-radius:8px;font-size:8px;font-weight:800\'>calibrado con ' + rh.n + ' obras</span>' : ''}</span></div></div><table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right">${IN_M(rh.porEtapa[e.etapa] || 0)}</td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:4px">Este total = candidato a \'Valor Remodelación\' → alimenta el MAO/underwriting de Fix & Flip por property_id.</div>`; } catch (e) { return ''; } })()}
+      ${(() => { try { const rh = inRehabEstimado({ property_id: w.property_id, dano_etapas: res.etapas }); return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:12px 0 4px">${osIcon('banknote', {size:12})} Rehab estimado (daño × $/sqft calibrado)</div><div style="padding:8px 10px;border-radius:8px;background:rgba(52,211,153,.08);margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px" class="up">${IN_M(rh.total)}</b><span style="font-size:10px;opacity:.7">${rh.sqft} sqft × ${rh.calibPsf}/sqft ${rh.n ? '<span style=\'background:rgba(92,121,240,.18);color:#5c79f0;padding:1px 6px;border-radius:8px;font-size:8px;font-weight:800\'>calibrado con ' + rh.n + ' obras</span>' : ''}</span></div></div><table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right">${IN_M(rh.porEtapa[e.etapa] || 0)}</td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:4px">Este total = candidato a \'Valor Remodelación\' → alimenta el MAO/underwriting de Fix & Flip por property_id.</div>`; } catch (e) { return ''; } })()}
       <div class="meta" style="margin-top:8px">Al guardar: se registra por property_id (Ficha de Casa) con TODAS las respuestas crudas + exportables JSON/XLS. Botón "→ Estimador" pre-llena el pronóstico con este daño por etapa.</div>
       <div style="display:flex;gap:8px;margin-top:10px"><button class="repbtn" onclick="inSaveWizard()">${osIcon('save', {size:12})} Guardar inspección</button></div></div>`;
   }
@@ -233,7 +233,7 @@ function inRenderWizard() {
     <span style="font-size:11px;opacity:.6;align-self:center">Paso ${w.idx + 1} de ${total} · ${step.seccion} · ${pct}%</span>
     ${w.idx < total - 1 ? `<button class="repbtn" onclick="inNav(1)">Siguiente →</button>` : '<span></span>'}</div>`;
   const html = `<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start">
-    <div>${avisosHtml}<div style="height:5px;border-radius:3px;background:rgba(255,255,255,.08);margin-bottom:12px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#6fbf95,#2f6ef0)"></i></div>${body}${nav}</div>
+    <div>${avisosHtml}<div style="height:5px;border-radius:3px;background:rgba(255,255,255,.08);margin-bottom:12px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#5c79f0,#3a5be0)"></i></div>${body}${nav}</div>
     ${panel}</div>`;
   const ov = document.getElementById('in-wizard-body');
   if (ov) ov.innerHTML = html;

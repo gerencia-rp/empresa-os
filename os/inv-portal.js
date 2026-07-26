@@ -721,8 +721,8 @@ function drawCasaChart(r, inv) {
   const light = ipTheme() === 'light';
   const A = r.anios.filter(x => x.a >= 1);
   IP.charts.push(new Chart(el, { type: 'line', data: { labels: A.map(x => 'año ' + x.a), datasets: [
-    { label: 'Tu riqueza (patrimonio)', data: A.map(x => Math.round(x.patrimonioInv)), borderColor: '#4e9b72', pointRadius: 0, fill: true, backgroundColor: 'rgba(79,141,255,.10)' },
-  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#5f594c' : '#a89f8f', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#756c5c' : '#7c7365', font: { size: 9 } } }, y: { ticks: { color: light ? '#756c5c' : '#7c7365', font: { size: 9 } } } } } }));
+    { label: 'Tu riqueza (patrimonio)', data: A.map(x => Math.round(x.patrimonioInv)), borderColor: '#3a5be0', pointRadius: 0, fill: true, backgroundColor: 'rgba(58,91,224,.10)' },
+  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#5a6270' : '#8b93a1', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#98a0ae' : '#565e6b', font: { size: 9 } } }, y: { ticks: { color: light ? '#98a0ae' : '#565e6b', font: { size: 9 } } } } } }));
 }
 
 // ─── evento de refinanciación ───
@@ -1003,7 +1003,7 @@ function renderIA() {
   return '<div class="card"><div class="chart-h"><div class="t">' + osIcon('bot') + ' Investor Assistant</div><div class="k">responde SOLO con los datos de TU inversión · números concretos · honesto sobre riesgos</div></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + sugeridos.map(s => '<button class="ibtn" onclick="ipAsk(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</button>').join('') + '</div>'
     + '<div id="ip-chat" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;margin-bottom:10px">'
-    + (IP.chat || []).map(m => '<div style="max-width:85%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;' + (m.role === 'user' ? 'align-self:flex-end;background:rgba(79,141,255,.16);border:1px solid rgba(79,141,255,.3)' : 'align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)') + '">' + esc(m.content) + '</div>').join('')
+    + (IP.chat || []).map(m => '<div style="max-width:85%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;' + (m.role === 'user' ? 'align-self:flex-end;background:rgba(58,91,224,.16);border:1px solid rgba(58,91,224,.3)' : 'align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)') + '">' + esc(m.content) + '</div>').join('')
     + '</div>'
     + '<div style="display:flex;gap:8px"><input id="ip-ia-q" placeholder="Preguntá sobre tu inversión…" onkeydown="if(event.key===\'Enter\')ipAsk()" style="flex:1;background:var(--glass);border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:13px;outline:none"><button class="cbtn" onclick="ipAsk()">Enviar</button></div>'
     + '</div>';
@@ -1043,32 +1043,32 @@ async function ipReloadProducto() {
 // ─── gráficas (theme-aware; canvas SIEMPRE en wrapper fijo con overflow hidden) ───
 function drawCharts(r, inv) {
   const light = ipTheme() === 'light';
-  const tick = light ? '#756c5c' : '#7c7365', leg = light ? '#5f594c' : '#a89f8f', grid = light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.05)';
+  const tick = light ? '#98a0ae' : '#565e6b', leg = light ? '#5a6270' : '#8b93a1', grid = light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.05)';
   const A = r.anios.filter(x => x.a >= 1);
   const labels = A.map(x => 'a' + x.a);
   const C = (id, cfg) => { const el = document.getElementById(id); if (!el || !window.Chart) return; cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); IP.charts.push(new Chart(el, cfg)); };
   const gopt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: leg, boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: tick, font: { size: 9 } }, grid: { color: grid } }, y: { ticks: { color: tick, font: { size: 9 } }, grid: { color: grid } } } };
   C('ch1', { type: 'bar', data: { labels, datasets: [
-    { label: 'Amortización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.amortizacion * inv), backgroundColor: '#4e9b72' },
-    { label: 'Rentabilidad', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.rentabilidad * inv), backgroundColor: '#63c08e' },
-    { label: 'Valorización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.valorizacion * inv), backgroundColor: '#6fbf95' },
+    { label: 'Amortización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.amortizacion * inv), backgroundColor: '#3a5be0' },
+    { label: 'Rentabilidad', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.rentabilidad * inv), backgroundColor: '#4ade9e' },
+    { label: 'Valorización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.valorizacion * inv), backgroundColor: '#5c79f0' },
   ] }, options: { ...gopt, scales: { ...gopt.scales, x: { ...gopt.scales.x, stacked: true }, y: { ...gopt.scales.y, stacked: true } } } });
   C('ch2', { type: 'line', data: { labels, datasets: [
-    { label: 'Valor de la casa', data: A.map(x => x.valor), borderColor: '#6fbf95', pointRadius: 0 },
-    { label: 'Deuda', data: A.map(x => x.saldo), borderColor: '#e4756a', pointRadius: 0 },
-    { label: 'Tu patrimonio', data: A.map(x => x.patrimonioInv), borderColor: '#4e9b72', pointRadius: 0, fill: true, backgroundColor: 'rgba(79,141,255,.08)' },
+    { label: 'Valor de la casa', data: A.map(x => x.valor), borderColor: '#5c79f0', pointRadius: 0 },
+    { label: 'Deuda', data: A.map(x => x.saldo), borderColor: '#ff6b6b', pointRadius: 0 },
+    { label: 'Tu patrimonio', data: A.map(x => x.patrimonioInv), borderColor: '#3a5be0', pointRadius: 0, fill: true, backgroundColor: 'rgba(58,91,224,.08)' },
   ] }, options: gopt });
   C('ch3', { type: 'bar', data: { labels, datasets: [
-    { label: 'Ingreso anual', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.ingreso), backgroundColor: '#63c08e' },
-    { label: 'Cuota deuda (fija)', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.deuda), backgroundColor: '#e4756a' },
+    { label: 'Ingreso anual', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.ingreso), backgroundColor: '#4ade9e' },
+    { label: 'Cuota deuda (fija)', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.deuda), backgroundColor: '#ff6b6b' },
   ] }, options: gopt });
   C('ch4', { type: 'line', data: { labels, datasets: [
-    { label: 'Utilidad acumulada (tu parte)', data: r.series.utilidadAcum.filter(x => x.a >= 1).map(x => x.acum * inv), borderColor: '#dca94f', pointRadius: 0, fill: true, backgroundColor: 'rgba(231,182,94,.08)' },
+    { label: 'Utilidad acumulada (tu parte)', data: r.series.utilidadAcum.filter(x => x.a >= 1).map(x => x.acum * inv), borderColor: '#fbbf24', pointRadius: 0, fill: true, backgroundColor: 'rgba(251,191,36,.08)' },
   ] }, options: gopt });
   C('ch5', { type: 'bar', data: { labels, datasets: [
-    { label: 'Operativos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.operativos), backgroundColor: '#4e9b72' },
-    { label: 'Impuestos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.impuestos), backgroundColor: '#dca94f' },
-    { label: 'Financieros (cuota)', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.financieros), backgroundColor: '#e4756a' },
+    { label: 'Operativos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.operativos), backgroundColor: '#3a5be0' },
+    { label: 'Impuestos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.impuestos), backgroundColor: '#fbbf24' },
+    { label: 'Financieros (cuota)', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.financieros), backgroundColor: '#ff6b6b' },
   ] }, options: { ...gopt, scales: { ...gopt.scales, x: { ...gopt.scales.x, stacked: true }, y: { ...gopt.scales.y, stacked: true } } } });
 }
 window.render = render;

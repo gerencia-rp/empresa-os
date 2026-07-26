@@ -36,21 +36,21 @@
     #ff-overlay .an-t tr:last-child td{border-bottom:none}
     #ff-overlay .an-t .r{text-align:right}
     #ff-overlay .an-wrap{overflow-x:auto}
-    #ff-overlay .an-pos{color:var(--pos,#1f7a4d);font-weight:700}
+    #ff-overlay .an-pos{color:var(--pos,#059669);font-weight:700}
     #ff-overlay .an-neg{color:var(--neg,#dc2626);font-weight:700}
-    #ff-overlay .an-amb{color:var(--amber,#8a6400);font-weight:700}
+    #ff-overlay .an-amb{color:var(--amber,#b45309);font-weight:700}
     #ff-overlay .an-mut{color:var(--mut)}
     #ff-overlay .an-bar{height:10px;border-radius:6px;background:rgba(128,140,160,.18);overflow:hidden;min-width:90px}
-    #ff-overlay .an-bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#6fbf95,#2f6ef0)}
+    #ff-overlay .an-bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#5c79f0,#3a5be0)}
     #ff-overlay .an-bar.rojo>i{background:var(--neg,#dc2626)}
     #ff-overlay .an-chart{position:relative;height:240px;width:100%;overflow:hidden}
     #ff-overlay .an-bucket{cursor:pointer;transition:.15s;border:1px solid rgba(128,140,160,.25);border-radius:12px;padding:12px 14px;background:transparent}
-    #ff-overlay .an-bucket:hover{border-color:var(--a2,#2f6b4f)}
-    #ff-overlay .an-bucket.on{border-color:var(--a2,#2f6b4f);box-shadow:0 0 0 1px var(--a2,#2f6b4f)}
+    #ff-overlay .an-bucket:hover{border-color:var(--a2,#3a5be0)}
+    #ff-overlay .an-bucket.on{border-color:var(--a2,#3a5be0);box-shadow:0 0 0 1px var(--a2,#3a5be0)}
     #ff-overlay .an-bucket .n{font-size:22px;font-weight:800;color:var(--ink)}
     #ff-overlay .an-bucket .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
     #ff-overlay .an-slider{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 10px;color:var(--ink);font-size:12px}
-    #ff-overlay .an-slider input[type=range]{flex:1;min-width:160px;accent-color:var(--a2,#2f6b4f)}
+    #ff-overlay .an-slider input[type=range]{flex:1;min-width:160px;accent-color:var(--a2,#3a5be0)}
     #ff-overlay .an-note{font-size:10.5px;color:var(--mut);margin-top:6px}
     `;
     document.head.appendChild(st);
@@ -365,16 +365,16 @@
       cfg.options = Object.assign({ responsive: true, maintainAspectRatio: false, resizeDelay: 200 }, cfg.options || {});
       (FF._charts = FF._charts || []).push(new Chart(el, cfg));
     };
-    const mut = getComputedStyle(document.getElementById('ff-overlay') || document.body).getPropertyValue('--mut').trim() || '#756c5c';
+    const mut = getComputedStyle(document.getElementById('ff-overlay') || document.body).getPropertyValue('--mut').trim() || '#98a0ae';
     const grid = 'rgba(128,140,160,.15)';
     const meses = Object.keys(m.porMes).sort().slice(-14);
-    mk('an-ritmo', { type: 'bar', data: { labels: meses, datasets: [{ data: meses.map(k => m.porMes[k]), backgroundColor: 'rgba(47,110,240,.55)', borderRadius: 4 }] },
+    mk('an-ritmo', { type: 'bar', data: { labels: meses, datasets: [{ data: meses.map(k => m.porMes[k]), backgroundColor: 'rgba(58,91,224,.55)', borderRadius: 4 }] },
       options: { plugins: { legend: { display: false }, title: { display: true, text: 'Casas cerradas por mes', color: mut, font: { size: 11 } } }, scales: { x: { grid: { display: false }, ticks: { color: mut, font: { size: 9 } } }, y: { grid: { color: grid }, ticks: { color: mut, precision: 0 } } } } });
     const proy = anProyCalc(m, AN.tasa);
     const labels = ['Hoy', ...proy.map(r => r.a + 'a')];
     mk('an-proy', { type: 'line', data: { labels, datasets: [
-      { label: 'Valor', data: [m.valorPortafolio, ...proy.map(r => r.valor)], borderColor: '#2f6ef0', backgroundColor: 'rgba(47,110,240,.08)', fill: true, tension: .3 },
-      { label: 'Equity', data: [m.equity, ...proy.map(r => r.equity)], borderColor: '#6fbf95', backgroundColor: 'rgba(18,181,160,.10)', fill: true, tension: .3 },
+      { label: 'Valor', data: [m.valorPortafolio, ...proy.map(r => r.valor)], borderColor: '#3a5be0', backgroundColor: 'rgba(58,91,224,.08)', fill: true, tension: .3 },
+      { label: 'Equity', data: [m.equity, ...proy.map(r => r.equity)], borderColor: '#5c79f0', backgroundColor: 'rgba(92,121,240,.10)', fill: true, tension: .3 },
     ] }, options: { plugins: { legend: { labels: { color: mut, font: { size: 10 } } }, title: { display: true, text: `Proyección al ${AN.tasa}%/año (supuesto)`, color: mut, font: { size: 11 } } }, scales: { x: { grid: { display: false }, ticks: { color: mut } }, y: { grid: { color: grid }, ticks: { color: mut, callback: v => '$' + (v / 1e6).toFixed(1) + 'M' } } } } });
   }
 
