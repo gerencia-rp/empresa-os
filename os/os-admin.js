@@ -38,7 +38,7 @@ function osaCSS() {
   const st = document.createElement('style'); st.id = 'osa-styles';
   st.textContent = [
     '#os-root .osa-chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:3px 9px;border-radius:20px;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);margin:2px 3px 2px 0;white-space:nowrap}',
-    '#os-root .osa-chip.lvl-edit{border-color:rgba(72,214,156,.4);color:var(--pos)}',
+    '#os-root .osa-chip.lvl-edit{border-color:rgba(74,222,158,.4);color:var(--pos)}',
     '#os-root .osa-off{opacity:.45}',
     '#os-root .osa-in{background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:12.5px;outline:none;width:100%}',
     '#os-root .osa-in:focus{border-color:var(--a2)}',
@@ -46,11 +46,11 @@ function osaCSS() {
     '#os-root .osa-arealab{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;background:var(--glass);border:1px solid var(--glassb);padding:6px 10px;border-radius:10px;cursor:pointer;margin:3px 5px 3px 0;user-select:none}',
     '#os-root .osa-arealab input{cursor:pointer}',
     '#os-root .osa-lvl{font-size:9.5px;border:1px solid var(--glassb);background:transparent;color:var(--mut2);border-radius:7px;padding:2px 7px;cursor:pointer}',
-    '#os-root .osa-lvl.on{color:var(--pos);border-color:rgba(72,214,156,.45)}',
-    '#os-root .osa-danger{background:transparent;border:1px solid rgba(240,104,122,.4);color:var(--neg);font-size:11px;padding:6px 11px;border-radius:9px;cursor:pointer}',
+    '#os-root .osa-lvl.on{color:var(--pos);border-color:rgba(74,222,158,.45)}',
+    '#os-root .osa-danger{background:transparent;border:1px solid rgba(255,107,107,.4);color:var(--neg);font-size:11px;padding:6px 11px;border-radius:9px;cursor:pointer}',
     '#os-root .osa-ghost{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);font-size:11px;padding:6px 11px;border-radius:9px;cursor:pointer}',
     '#os-root .osa-ghost:hover,#os-root .osa-danger:hover{border-color:var(--a2);color:var(--ink)}',
-    '#os-root .osa-edit-row td{background:rgba(79,141,255,.05)}',
+    '#os-root .osa-edit-row td{background:rgba(58,91,224,.05)}',
   ].join('\n');
   document.head.appendChild(st);
 }

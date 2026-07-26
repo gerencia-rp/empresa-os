@@ -213,8 +213,8 @@ function dhViewFF() {
   if (D.deficit > 0) decs.push({ t: 'Bajar el déficit acumulado', d: 'Hoy ' + dhM(D.deficit) + ' de plata propia tapando huecos (Harmony+rentas). Priorizar refis con cash-out.', imp: D.deficit, dueno: 'Juan / CEO' });
   setTimeout(() => {
     dhDrawChart('dh-ff-t', { type: 'bar', data: { labels: D.trend.map(t => t.corte.slice(2, 7)), datasets: [
-      { type: 'line', label: 'TIR all-in al corte', yAxisID: 'y1', data: D.trend.map(t => t.tir != null ? +(t.tir * 100).toFixed(1) : null), borderColor: '#63c08e', pointRadius: 2 },
-      { label: 'Capital desplegado acum.', yAxisID: 'y', data: D.trend.map(t => Math.round(t.cap)), backgroundColor: 'rgba(79,141,255,.5)' },
+      { type: 'line', label: 'TIR all-in al corte', yAxisID: 'y1', data: D.trend.map(t => t.tir != null ? +(t.tir * 100).toFixed(1) : null), borderColor: '#4ade9e', pointRadius: 2 },
+      { label: 'Capital desplegado acum.', yAxisID: 'y', data: D.trend.map(t => Math.round(t.cap)), backgroundColor: 'rgba(58,91,224,.5)' },
     ] }, options: { scales: { y: { ticks: { font: { size: 9 } } }, y1: { position: 'right', ticks: { callback: v => v + '%', font: { size: 9 } }, grid: { drawOnChartArea: false } }, x: { ticks: { font: { size: 9 } } } }, plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } } } });
   }, 80);
   return DH_BANNER_PAPEL + big
@@ -289,8 +289,8 @@ function dhViewRM() {
   if (backlog > 0 && act.length) decs.push({ t: 'Convertir el backlog', d: dhM(backlog) + ' contratados por ejecutar en ' + act.length + ' obras — cada semana de retraso posterga ese ingreso.', imp: backlog, accion: "osOpenApp('remodelacion','command-center')", accionLbl: 'Abrir Command Center' });
   setTimeout(() => {
     dhDrawChart('dh-rm-t', { type: 'bar', data: { labels: ms.map(m => invEngineSafeMes(m)), datasets: [
-      { label: 'Utilidad limpia/mes', data: ms.map(m => Math.round(porMes[m].u)), backgroundColor: 'rgba(72,214,156,.6)' },
-      { label: 'Valor cliente/mes', data: ms.map(m => Math.round(porMes[m].vc)), backgroundColor: 'rgba(79,141,255,.4)' },
+      { label: 'Utilidad limpia/mes', data: ms.map(m => Math.round(porMes[m].u)), backgroundColor: 'rgba(74,222,158,.6)' },
+      { label: 'Valor cliente/mes', data: ms.map(m => Math.round(porMes[m].vc)), backgroundColor: 'rgba(58,91,224,.4)' },
     ] }, options: { plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } } });
   }, 80);
   return big
@@ -374,9 +374,9 @@ function dhViewRE() {
   if (D.oc && +D.oc.disponibles > 0) decs.push({ t: 'Llenar ' + D.oc.disponibles + ' unidades disponibles', d: 'Cada unidad vacía es renta que no entra — priorizar publicación y showing.', imp: null, dueno: 'Carlos' });
   setTimeout(() => {
     dhDrawChart('dh-re-t', { type: 'line', data: { labels: serie.map(s => s.m.slice(2)), datasets: [
-      { label: 'Renta cobrada', data: serie.map(s => Math.round(s.r)), borderColor: '#63c08e', pointRadius: 2 },
-      { label: 'NOI', data: serie.map(s => Math.round(s.noi)), borderColor: '#4e9b72', pointRadius: 2 },
-      { label: 'Post-deuda', data: serie.map(s => Math.round(s.cf)), borderColor: '#e4756a', pointRadius: 2 },
+      { label: 'Renta cobrada', data: serie.map(s => Math.round(s.r)), borderColor: '#4ade9e', pointRadius: 2 },
+      { label: 'NOI', data: serie.map(s => Math.round(s.noi)), borderColor: '#3a5be0', pointRadius: 2 },
+      { label: 'Post-deuda', data: serie.map(s => Math.round(s.cf)), borderColor: '#ff6b6b', pointRadius: 2 },
     ] }, options: { plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } } });
   }, 80);
   return big
@@ -480,7 +480,7 @@ function dhViewHO() {
   ];
   setTimeout(() => {
     const emps = ['fix_flip', 'remodelacion', 'rentas'];
-    dhDrawChart('dh-ho-t', { type: 'bar', data: { labels: emps, datasets: [{ label: 'EBITDA (v_holding_pnl)', data: emps.map(e => { const r = D.pnl.find(x => x.empresa === e) || {}; return r.ebitda != null ? Math.round(+r.ebitda) : null; }), backgroundColor: ['rgba(240,104,122,.6)', 'rgba(72,214,156,.6)', 'rgba(79,141,255,.6)'] }] }, options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 9 } } } } } });
+    dhDrawChart('dh-ho-t', { type: 'bar', data: { labels: emps, datasets: [{ label: 'EBITDA (v_holding_pnl)', data: emps.map(e => { const r = D.pnl.find(x => x.empresa === e) || {}; return r.ebitda != null ? Math.round(+r.ebitda) : null; }), backgroundColor: ['rgba(255,107,107,.6)', 'rgba(74,222,158,.6)', 'rgba(58,91,224,.6)'] }] }, options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 9 } } } } } });
   }, 80);
   return DH_BANNER_PAPEL + big
     + dhSecTitle('2', 'Tendencia', '(EBITDA por empresa — QBO espejo sin snapshots mensuales: serie pendiente de dato, declarado)') + dhChartBox('dh-ho-t', 220)

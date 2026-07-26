@@ -574,15 +574,15 @@ function pmInjectTheme() {
   st.textContent = `
   /* #13 sidebar (sub-nav vertical) — patrón unificado con Fix & Flip */
   #pm-root .pm-nav{width:190px;position:sticky;top:0}
-  #pm-root .pm-navitem-active{background:rgba(37,99,235,.1);color:#2f6b4f !important;box-shadow:inset 3px 0 0 #2f6b4f} /* light canon 12-jul */
-  html[data-osreskin="dark"] #pm-root .pm-navitem-active{background:rgba(69,227,198,.14);color:#6fbf95 !important;box-shadow:inset 3px 0 0 #6fbf95}
-  html[data-osreskin="dark"] #pm-root .pm-navitem:hover{background:rgba(255,255,255,.05) !important;color:#efe9de !important}
+  #pm-root .pm-navitem-active{background:rgba(37,99,235,.1);color:#3a5be0 !important;box-shadow:inset 3px 0 0 #3a5be0} /* light canon 12-jul */
+  html[data-osreskin="dark"] #pm-root .pm-navitem-active{background:rgba(92,121,240,.14);color:#5c79f0 !important;box-shadow:inset 3px 0 0 #5c79f0}
+  html[data-osreskin="dark"] #pm-root .pm-navitem:hover{background:rgba(255,255,255,.05) !important;color:#f1f3f7 !important}
   @media (max-width:820px){#pm-root .pm-shell{flex-direction:column}#pm-root .pm-nav{width:100% !important;flex-direction:row !important;overflow-x:auto;position:static}}
   /* Solo lo específico de PM que el diseño compartido no cubre: clases propias + calendario inline */
-  ${D} .pm-filter-select,${D} .pm-filter-select:hover{background:rgba(255,255,255,.05) !important;border-color:rgba(255,255,255,.14) !important;color:#efe9de !important}
+  ${D} .pm-filter-select,${D} .pm-filter-select:hover{background:rgba(255,255,255,.05) !important;border-color:rgba(255,255,255,.14) !important;color:#f1f3f7 !important}
   ${D} .pm-filter-select.has-value{background:rgba(212,175,55,.16) !important;border-color:#d4af37 !important;color:#ecd28f !important}
-  ${D} .pm-filter-dropdown label{color:#a89f8f !important}
-  ${D} .pm-clear-filters{border-color:rgba(255,255,255,.14) !important;color:#a89f8f !important}
+  ${D} .pm-filter-dropdown label{color:#8b93a1 !important}
+  ${D} .pm-clear-filters{border-color:rgba(255,255,255,.14) !important;color:#8b93a1 !important}
   ${D} .pm-resize-handle{border-color:rgba(255,255,255,.1) !important}
   ${D} .pm-split-sidebar{background:rgba(255,255,255,.03) !important}
   /* calendario: estilos inline por atributo (celdas/bordes/labels) */
@@ -590,9 +590,9 @@ function pmInjectTheme() {
   ${D} [style*="background:#fff"],${D} [style*="background: #fff"],${D} [style*="background:#ffffff"]{background:rgba(255,255,255,.045) !important}
   ${D} [style*="solid #f1f5f9"]{border-color:rgba(255,255,255,.07) !important}
   ${D} [style*="solid #e2e8f0"],${D} [style*="solid #cbd5e1"]{border-color:rgba(255,255,255,.1) !important}
-  ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#efe9de !important}
-  ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#a89f8f !important}
-  ${D} [style*="color:#000"],${D} [style*="color: #000"],${D} [style*="color:black"],${D} [style*="color:#111"],${D} [style*="color:#020617"]{color:#efe9de !important} /* ola 3: texto negro sobre vidrio */
+  ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#f1f3f7 !important}
+  ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#8b93a1 !important}
+  ${D} [style*="color:#000"],${D} [style*="color: #000"],${D} [style*="color:black"],${D} [style*="color:#111"],${D} [style*="color:#020617"]{color:#f1f3f7 !important} /* ola 3: texto negro sobre vidrio */
   ${D} [style*="background:white"],${D} [style*="background-color:#fff"],${D} [style*="background-color: #fff"]{background:rgba(255,255,255,.045) !important}
   /* barras de reserva (gradientes por tipo) y marcador HOY se conservan tal cual */
   html[data-osreskin="light"] #pm-root .pm-filter-select.has-value{background:#fdf8e7 !important}
@@ -771,18 +771,18 @@ function pmEnsureResizerInfra() {
     .pm-split{display:flex;align-items:stretch}
     .pm-split-sidebar{min-width:240px;max-width:600px;overflow-x:hidden}
     .pm-split-main{flex:1;min-width:0;overflow-x:auto}
-    .pm-resize-handle{width:6px;cursor:col-resize;background:transparent;border-left:1px solid #e8e3d9;transition:background .15s;user-select:none;flex-shrink:0}
+    .pm-resize-handle{width:6px;cursor:col-resize;background:transparent;border-left:1px solid #dfe4ec;transition:background .15s;user-select:none;flex-shrink:0}
     .pm-resize-handle:hover,.pm-resize-handle.is-dragging{background:#d4af37;border-color:#d4af37}
     .pm-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .pm-clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25}
     .pm-clamp1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
     .pm-filters-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
     .pm-filter-dropdown{display:flex;flex-direction:column;gap:3px;min-width:148px}
-    .pm-filter-dropdown label{font-size:10px;text-transform:uppercase;color:#a89f8f;font-weight:700;letter-spacing:.04em}
-    .pm-filter-select{padding:7px 10px;background:#fff;border:1px solid #d8d2c6;border-radius:6px;color:#454034;font-size:13px;cursor:pointer;transition:all .15s;max-width:220px}
+    .pm-filter-dropdown label{font-size:10px;text-transform:uppercase;color:#8b93a1;font-weight:700;letter-spacing:.04em}
+    .pm-filter-select{padding:7px 10px;background:#fff;border:1px solid #d8d2c6;border-radius:6px;color:#3a4250;font-size:13px;cursor:pointer;transition:all .15s;max-width:220px}
     .pm-filter-select:hover,.pm-filter-select:focus{border-color:#d4af37;outline:none}
     .pm-filter-select.has-value{background:#fdf8e7;border-color:#d4af37;color:#92710f;font-weight:600}
-    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #d8d2c6;border-radius:6px;color:#756c5c;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
+    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #d8d2c6;border-radius:6px;color:#6f7785;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
     .pm-clear-filters:hover{color:#92710f;border-color:#d4af37}
     @media (max-width:767px){
       .pm-split{flex-direction:column}
@@ -936,7 +936,7 @@ function pmRenderCeoDetailOverlay(key) {
   return `
     <div onclick="pmaState.ceoDetailKey=null;pmRender()" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px" class="pm-fade">
       <div onclick="event.stopPropagation()" class="bg-white rounded-xl shadow-2xl w-full" style="max-width:760px;max-height:82vh;display:flex;flex-direction:column">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200" style="background:#252017">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200" style="background:#1e2430">
           <span class="text-sm font-bold text-white">${title}</span>
           <button onclick="pmaState.ceoDetailKey=null;pmRender()" class="text-slate-300 hover:text-white text-xl leading-none">&times;</button>
         </div>
@@ -1053,7 +1053,7 @@ function pmTrendSvg(trend){
     <path d="${area('income')}" fill="rgba(5,150,105,.07)"/><path d="${area('gastos')}" fill="rgba(220,38,38,.05)"/>
     <path d="${path('income')}" fill="none" stroke="#059669" stroke-width="2"/><path d="${path('gastos')}" fill="none" stroke="#dc2626" stroke-width="2"/>
     ${dots('income','#059669')}${dots('gastos','#dc2626')}
-    ${trend.map((t,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#a89f8f" text-anchor="middle">${t.label}</text>`).join('')}
+    ${trend.map((t,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#8b93a1" text-anchor="middle">${t.label}</text>`).join('')}
   </svg>`;
 }
 
@@ -1246,11 +1246,11 @@ function pmUnitState(u) {
 // Paleta ÚNICA y coherente en toda la app (ficha, disponibilidad, tiles):
 // Ocupada=verde (rinde) · Reservada=azul (próxima) · Disponible=ámbar (a colocar) · Mant=gris.
 const PM_UNIT_STATE = {
-  ocupada:      { label: 'Ocupada',       dot: kitStatusDot('ok'), bg: 'bg-emerald-50 border-emerald-300', txt: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-800', border: 'border-l-emerald-500', dotc: 'bg-emerald-500', hex: '#1f7a4d' },
-  reservada:    { label: 'Reservada',     dot: kitStatusDot('off'), bg: 'bg-blue-50 border-blue-300',       txt: 'text-blue-700',    chip: 'bg-blue-100 text-blue-800',       border: 'border-l-blue-500',    dotc: 'bg-blue-500',    hex: '#2f6b4f' },
+  ocupada:      { label: 'Ocupada',       dot: kitStatusDot('ok'), bg: 'bg-emerald-50 border-emerald-300', txt: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-800', border: 'border-l-emerald-500', dotc: 'bg-emerald-500', hex: '#059669' },
+  reservada:    { label: 'Reservada',     dot: kitStatusDot('off'), bg: 'bg-blue-50 border-blue-300',       txt: 'text-blue-700',    chip: 'bg-blue-100 text-blue-800',       border: 'border-l-blue-500',    dotc: 'bg-blue-500',    hex: '#3a5be0' },
   libre:        { label: 'Disponible',    dot: kitStatusDot('warn'), bg: 'bg-amber-50 border-amber-300',     txt: 'text-amber-700',   chip: 'bg-amber-100 text-amber-800',     border: 'border-l-amber-500',   dotc: 'bg-amber-500',   hex: '#f59e0b' },
-  mantenimiento:{ label: 'Mantenimiento', dot: kitStatusDot('off'), bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600',   chip: 'bg-slate-200 text-slate-700',     border: 'border-l-slate-500',   dotc: 'bg-slate-500',   hex: '#756c5c' },
-  inactiva:     { label: 'Inactiva',      dot: kitStatusDot('off'), bg: 'bg-slate-50 border-slate-200',      txt: 'text-slate-400',   chip: 'bg-slate-100 text-slate-500',     border: 'border-l-slate-300',   dotc: 'bg-slate-400',   hex: '#a89f8f' },
+  mantenimiento:{ label: 'Mantenimiento', dot: kitStatusDot('off'), bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600',   chip: 'bg-slate-200 text-slate-700',     border: 'border-l-slate-500',   dotc: 'bg-slate-500',   hex: '#6f7785' },
+  inactiva:     { label: 'Inactiva',      dot: kitStatusDot('off'), bg: 'bg-slate-50 border-slate-200',      txt: 'text-slate-400',   chip: 'bg-slate-100 text-slate-500',     border: 'border-l-slate-300',   dotc: 'bg-slate-400',   hex: '#8b93a1' },
 };
 function pmLastBookingOf(unitId) {
   return pmaState.bookings.filter(b => b.unit_id===unitId && b.end_date).sort((a,b)=>(b.end_date||'').localeCompare(a.end_date||''))[0] || null;
@@ -1366,10 +1366,10 @@ function pmRenderAvailability() {
       <!-- Filtros -->
       <div class="flex flex-wrap items-center gap-1.5">
         ${chip(!stF,"pmaState.availFilterState=null;pmRender()",'Todas')}
-        ${chip(stF==='ocupada',"pmaState.availFilterState='ocupada';pmRender()",'Ocupadas',counts.ocupada,'#1f7a4d')}
-        ${chip(stF==='reservada',"pmaState.availFilterState='reservada';pmRender()",'Reservadas',counts.reservada,'#2f6b4f')}
+        ${chip(stF==='ocupada',"pmaState.availFilterState='ocupada';pmRender()",'Ocupadas',counts.ocupada,'#059669')}
+        ${chip(stF==='reservada',"pmaState.availFilterState='reservada';pmRender()",'Reservadas',counts.reservada,'#3a5be0')}
         ${chip(stF==='libre',"pmaState.availFilterState='libre';pmRender()",'Disponibles',counts.libre,'#f59e0b')}
-        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'Mant.',counts.mantenimiento,'#756c5c')}
+        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'Mant.',counts.mantenimiento,'#6f7785')}
         <select onchange="pmaState.availFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs ml-1"><option value="">${osIcon('house')} Todas</option>${activeProps.map(p=>`<option value="${p.id}" ${propF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
         <select onchange="pmaState.availFilterType=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Tipo</option>${['casa_completa','apartamento','estudio','habitacion'].map(t=>`<option value="${t}" ${typeF===t?'selected':''}>${pmUnitTypeLabel(t)}</option>`).join('')}</select>
       </div>
@@ -1951,11 +1951,11 @@ function pmRenderTimelineForUnits(units, year) {
     <div class="overflow-x-auto">
       <div style="min-width:1000px;">
         <!-- Header con columnas: UNIDAD | % | meses -->
-        <div class="flex items-center border-b border-slate-200 bg-slate-100" style="font-size:10px;font-weight:bold;color:#5f594c;text-transform:uppercase;">
+        <div class="flex items-center border-b border-slate-200 bg-slate-100" style="font-size:10px;font-weight:bold;color:#5a6270;text-transform:uppercase;">
           <div style="width:220px;padding:6px 8px;">Unidad</div>
           <div style="width:50px;text-align:center;padding:6px 0;">%</div>
           <div class="flex flex-1">
-            ${months.map(m => `<div style="flex:1;border-right:1px solid #e8e3d9;text-align:center;padding:6px 0;">${m}</div>`).join('')}
+            ${months.map(m => `<div style="flex:1;border-right:1px solid #dfe4ec;text-align:center;padding:6px 0;">${m}</div>`).join('')}
           </div>
         </div>
         ${rows.map(({unit, occPct, totalEmpty, lostRevenue, gaps, bookings}) => {
@@ -1970,7 +1970,7 @@ function pmRenderTimelineForUnits(units, year) {
                 </div>
               </div>
               <div style="width:50px;text-align:center;" class="${colorPct} font-bold text-sm">${occPct}%</div>
-              <div class="relative flex-1" style="height:34px;background:#fafafa;border-left:1px solid #e8e3d9;">
+              <div class="relative flex-1" style="height:34px;background:#fafafa;border-left:1px solid #dfe4ec;">
                 <!-- Background: bloques de huecos en rojo claro -->
                 ${gaps.map(g => {
                   const left = 100 * Math.floor((g.start - yearStart) / 86400000) / totalDays;
@@ -1989,14 +1989,14 @@ function pmRenderTimelineForUnits(units, year) {
                   const left = 100 * Math.floor((start - yearStart) / 86400000) / totalDays;
                   const width = Math.max(0.5, 100 * Math.floor((end - start) / 86400000) / totalDays);
                   const colorByType = {
-                    contrato_directo: 'background:linear-gradient(135deg,#1f7a4d,#059669);',
+                    contrato_directo: 'background:linear-gradient(135deg,#059669,#059669);',
                     airbnb:            'background:linear-gradient(135deg,#ec4899,#db2777);',
-                    booking:           'background:linear-gradient(135deg,#2f6b4f,#2f6b4f);',
+                    booking:           'background:linear-gradient(135deg,#3a5be0,#3a5be0);',
                     vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
                     padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
                     reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                    otro:              'background:linear-gradient(135deg,#756c5c,#5f594c);'
+                    otro:              'background:linear-gradient(135deg,#6f7785,#5a6270);'
                   };
                   const bg = colorByType[b.booking_type] || colorByType.otro;
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
@@ -2019,9 +2019,9 @@ function pmRenderTimelineForUnits(units, year) {
         <!-- Leyenda -->
         <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50">
           <span class="font-bold uppercase text-slate-500">Referencias:</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#1f7a4d,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>${osIcon('user')} Contrato directo</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#059669,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>${osIcon('user')} Contrato directo</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>${osIcon('globe')} Airbnb</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#2f6b4f,#2f6b4f);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3a5be0,#3a5be0);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:rgba(254,202,202,0.6);border:1px dashed #fca5a5;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Hueco (sin ocupar)</span>
           <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
@@ -2192,8 +2192,8 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
     const active = pmMergedActiveBooking(u);
     const tenant = active ? pmTenantName(active.tenant_id) : null;
     const icon = u.unit_type==='casa_completa'?osIcon('house') : u.unit_type==='estudio'?osIcon('palette') : u.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
-    const platformColors = {contrato_directo:'#1f7a4d',airbnb:'#ec4899',booking:'#2f6b4f',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
-    const dotColor = active ? (platformColors[active.booking_type] || '#1f7a4d') : '#d8d2c6';
+    const platformColors = {contrato_directo:'#059669',airbnb:'#ec4899',booking:'#3a5be0',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
+    const dotColor = active ? (platformColors[active.booking_type] || '#059669') : '#d8d2c6';
     const statusLabel = active ? tenant : 'Libre';
     const statusClass = active ? 'text-emerald-700' : 'text-slate-400';
     const displayName = (u.name||u.code||'') + (u._displaySuffix || '');
@@ -2377,14 +2377,14 @@ window.pmCalTimelineToday = pmCalTimelineToday;
 const PM_CAL_VENCE_DIAS = 30;   // umbral "por vencer"
 function pmBookingCalState(b, lateSet) {
   const today = new Date().toISOString().slice(0,10);
-  if (b.end_date && b.end_date < today) return { key:'finalizado', label:'Finalizado', color:'#a89f8f' };
-  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#2f6b4f' };
+  if (b.end_date && b.end_date < today) return { key:'finalizado', label:'Finalizado', color:'#8b93a1' };
+  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#3a5be0' };
   if (lateSet && lateSet.has(b.id)) return { key:'atrasado', label:'Atrasado', color:'#ef4444' };
   if (b.end_date) {
     const days = Math.floor((new Date(b.end_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
     if (days <= PM_CAL_VENCE_DIAS) return { key:'por_vencer', label:`Por vencer (${days}d)`, color:'#f97316', days };
   }
-  return { key:'activo', label:'Activo', color:'#1f7a4d' };
+  return { key:'activo', label:'Activo', color:'#059669' };
 }
 // Iniciales para el avatar circular del inquilino.
 function pmAvatarInitials(name) {
@@ -2471,33 +2471,33 @@ function pmRenderTimelineGrid(units) {
   const totalW = labelW + gridW;
   const totalH = 60 + units.length * rowH;
   const platformLegend = [
-    {key:'contrato_directo', label:'Contrato directo', color:'#1f7a4d'},
+    {key:'contrato_directo', label:'Contrato directo', color:'#059669'},
     {key:'airbnb', label:'Airbnb', color:'#ec4899'},
-    {key:'booking', label:'Booking', color:'#2f6b4f'},
+    {key:'booking', label:'Booking', color:'#3a5be0'},
     {key:'vrbo', label:'VRBO', color:'#8b5cf6'},
     {key:'hospitable', label:'Hospitable', color:'#0ea5e9'},
     {key:'padsplit', label:'Padsplit', color:'#a855f7'},
     {key:'reserva_corta', label:'Reserva corta', color:'#f59e0b'},
-    {key:'otro', label:'Otro', color:'#756c5c'}
+    {key:'otro', label:'Otro', color:'#6f7785'}
   ];
 
   return `
     <div style="position:relative;min-width:${totalW}px;">
       <!-- HEADER fila de fechas + label "Anuncio" izquierda -->
       <div class="flex sticky top-0 bg-white border-b-2 border-slate-200 z-20" style="height:60px;">
-        <div style="width:${labelW}px;flex-shrink:0;padding:8px 12px;border-right:1px solid #e8e3d9;background:white;position:sticky;left:0;z-index:21;">
-          <div style="font-size:9px;color:#a89f8f;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Anuncio</div>
-          <div style="font-size:11px;color:#5f594c;font-weight:bold;margin-top:2px;">${units.length} ${units.length===1?'unidad':'unidades'}</div>
+        <div style="width:${labelW}px;flex-shrink:0;padding:8px 12px;border-right:1px solid #dfe4ec;background:white;position:sticky;left:0;z-index:21;">
+          <div style="font-size:9px;color:#8b93a1;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Anuncio</div>
+          <div style="font-size:11px;color:#5a6270;font-weight:bold;margin-top:2px;">${units.length} ${units.length===1?'unidad':'unidades'}</div>
         </div>
         <div class="flex">
           ${days.map((d, i) => {
             const isToday = i === todayIdx;
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
             const showMonth = i === 0 || d.getDate() === 1;
-            return `<div style="width:${colW}px;border-right:1px solid #f2efe8;${isWeekend?'background:#fafafa;':''}${isToday?'background:#fee2e2;':''};padding:6px 0;text-align:center;">
-              ${showMonth ? `<div style="font-size:9px;color:#756c5c;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
-              <div style="font-size:10px;color:#a89f8f;">${dows[d.getDay()]}</div>
-              <div style="font-size:13px;${isToday?'color:#dc2626;font-weight:bold;':'color:#454034;'}">${d.getDate()}</div>
+            return `<div style="width:${colW}px;border-right:1px solid #eef1f6;${isWeekend?'background:#fafafa;':''}${isToday?'background:#fee2e2;':''};padding:6px 0;text-align:center;">
+              ${showMonth ? `<div style="font-size:9px;color:#6f7785;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
+              <div style="font-size:10px;color:#8b93a1;">${dows[d.getDay()]}</div>
+              <div style="font-size:13px;${isToday?'color:#dc2626;font-weight:bold;':'color:#3a4250;'}">${d.getDate()}</div>
             </div>`;
           }).join('')}
         </div>
@@ -2522,20 +2522,20 @@ function pmRenderTimelineGrid(units) {
         const icon = unit.unit_type==='casa_completa'?osIcon('house') : unit.unit_type==='estudio'?osIcon('palette') : unit.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
         const fullName = (unit.code||unit.name||'') + (unit._displaySuffix || '');
         const addrLine = (p?.name||'—') + (unit.target_rent ? ` · $${Number(unit.target_rent).toLocaleString()}` : '');
-        return `<div class="flex relative hover:bg-slate-50 transition group" style="border-bottom:1px solid #e8e3d9;height:${rowH}px;align-items:center;">
+        return `<div class="flex relative hover:bg-slate-50 transition group" style="border-bottom:1px solid #dfe4ec;height:${rowH}px;align-items:center;">
           <!-- Columna fija izquierda (nombre en 2 líneas) -->
-          <div onclick="pmaState.calendarSelectedUnitId='${unit.id}';pmRender()" title="${(fullName + ' — ' + (p?.name||'')).replace(/"/g,'&quot;')}" style="width:${labelW}px;flex-shrink:0;height:100%;padding:10px 12px;border-right:1px solid #e8e3d9;background:white;position:sticky;left:0;z-index:6;cursor:pointer;display:flex;align-items:center;gap:8px;" class="hover:bg-slate-50">
+          <div onclick="pmaState.calendarSelectedUnitId='${unit.id}';pmRender()" title="${(fullName + ' — ' + (p?.name||'')).replace(/"/g,'&quot;')}" style="width:${labelW}px;flex-shrink:0;height:100%;padding:10px 12px;border-right:1px solid #dfe4ec;background:white;position:sticky;left:0;z-index:6;cursor:pointer;display:flex;align-items:center;gap:8px;" class="hover:bg-slate-50">
             <div style="font-size:18px;flex-shrink:0;">${icon}</div>
             <div style="min-width:0;flex:1;">
-              <div class="pm-clamp2" style="font-size:13px;font-weight:600;color:#252017;">${fullName.replace(/</g,'&lt;')}</div>
-              <div class="pm-clamp1" style="font-size:11px;color:#a89f8f;opacity:0.85;margin-top:1px;">${addrLine.replace(/</g,'&lt;')}</div>
+              <div class="pm-clamp2" style="font-size:13px;font-weight:600;color:#1e2430;">${fullName.replace(/</g,'&lt;')}</div>
+              <div class="pm-clamp1" style="font-size:11px;color:#8b93a1;opacity:0.85;margin-top:1px;">${addrLine.replace(/</g,'&lt;')}</div>
             </div>
           </div>
           <!-- Celdas -->
           ${days.map((d, i) => {
             const isToday = i === todayIdx;
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-            return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})" style="width:${colW}px;border-right:1px solid #f2efe8;${isWeekend?'background:#fafbfc;':''}${isToday?'background:rgba(254,226,226,0.4);':''};cursor:pointer;background-image:linear-gradient(135deg,transparent 49.5%,#e8e3d9 49.5%,#e8e3d9 50.5%,transparent 50.5%);"></div>`;
+            return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})" style="width:${colW}px;border-right:1px solid #eef1f6;${isWeekend?'background:#fafbfc;':''}${isToday?'background:rgba(254,226,226,0.4);':''};cursor:pointer;background-image:linear-gradient(135deg,transparent 49.5%,#dfe4ec 49.5%,#dfe4ec 50.5%,transparent 50.5%);"></div>`;
           }).join('')}
           ${!hasBookings ? `<div style="position:absolute;left:${labelW + 12}px;top:50%;transform:translateY(-50%);font-size:10px;color:#d8d2c6;font-style:italic;pointer-events:none;">Sin reservas en este período</div>` : ''}
           ${bks.map(b => {
@@ -2545,7 +2545,7 @@ function pmRenderTimelineGrid(units) {
             const endIdx = Math.min(daysCount - 1, Math.floor((e - days[0]) / 86400000));
             const leftPx = labelW + startIdx * colW + 2;
             const widthPx = (endIdx - startIdx + 1) * colW - 4;
-            const colorByType = {contrato_directo:'#1f7a4d',airbnb:'#ec4899',booking:'#2f6b4f',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#756c5c'};
+            const colorByType = {contrato_directo:'#059669',airbnb:'#ec4899',booking:'#3a5be0',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#6f7785'};
             const stState = pmBookingCalState(b, lateSet);
             const bg = colorBy === 'estado' ? stState.color : (colorByType[b.booking_type] || colorByType.otro);
             const opacity = stState.key === 'finalizado' ? 0.7 : 1;
@@ -2843,7 +2843,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
     <div class="overflow-x-auto" style="background:white;">
       <div style="min-width:${280 + totalDays * colWidth}px;">
         <!-- Header con días -->
-        <div class="flex items-center border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style="font-size:10px;font-weight:bold;color:#5f594c;">
+        <div class="flex items-center border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style="font-size:10px;font-weight:bold;color:#5a6270;">
           <div style="width:240px;padding:8px 10px;">Unidad</div>
           <div style="width:40px;text-align:center;padding:8px 0;">%</div>
           <div class="flex">
@@ -2852,9 +2852,9 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
               const dow = ['D','L','M','M','J','V','S'][dt.getDay()];
               const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
               const isToday = d === todayDay;
-              return `<div style="width:${colWidth}px;text-align:center;padding:6px 0;${isWeekend?'background:#faf8f4;':''}${isToday?'background:#fee2e2;color:#991b1b;font-weight:bold;':''};border-right:1px solid #f2efe8;">
-                <div style="font-size:9px;color:#a89f8f;">${dow}</div>
-                <div style="font-size:11px;${isToday?'color:#991b1b;':'color:#454034;'}">${d}</div>
+              return `<div style="width:${colWidth}px;text-align:center;padding:6px 0;${isWeekend?'background:#faf8f4;':''}${isToday?'background:#fee2e2;color:#991b1b;font-weight:bold;':''};border-right:1px solid #eef1f6;">
+                <div style="font-size:9px;color:#8b93a1;">${dow}</div>
+                <div style="font-size:11px;${isToday?'color:#991b1b;':'color:#3a4250;'}">${d}</div>
               </div>`;
             }).join('')}
           </div>
@@ -2894,7 +2894,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
                   const dt = new Date(year, month, d);
                   const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                   const isToday = d === todayDay;
-                  return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" style="width:${colWidth}px;border-right:1px solid #f2efe8;${isWeekend?'background:#faf8f4;':''}${isToday?'border-left:2px solid #ef4444;border-right:2px solid #ef4444;':''}cursor:pointer;" title="${dt.toLocaleDateString('es')} — click para nueva reserva"></div>`;
+                  return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" style="width:${colWidth}px;border-right:1px solid #eef1f6;${isWeekend?'background:#faf8f4;':''}${isToday?'border-left:2px solid #ef4444;border-right:2px solid #ef4444;':''}cursor:pointer;" title="${dt.toLocaleDateString('es')} — click para nueva reserva"></div>`;
                 }).join('')}
                 <!-- Bookings encima -->
                 ${allBks.map(b => {
@@ -2905,14 +2905,14 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
                   const leftPx = startCol * colWidth + 2;
                   const widthPx = (endCol - startCol) * colWidth - 4;
                   const colorByType = {
-                    contrato_directo: 'background:linear-gradient(135deg,#1f7a4d,#059669);',
+                    contrato_directo: 'background:linear-gradient(135deg,#059669,#059669);',
                     airbnb:            'background:linear-gradient(135deg,#ec4899,#db2777);',
-                    booking:           'background:linear-gradient(135deg,#2f6b4f,#2f6b4f);',
+                    booking:           'background:linear-gradient(135deg,#3a5be0,#3a5be0);',
                     vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
                     padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
                     reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                    otro:              'background:linear-gradient(135deg,#756c5c,#5f594c);'
+                    otro:              'background:linear-gradient(135deg,#6f7785,#5a6270);'
                   };
                   const bg = colorByType[b.booking_type] || colorByType.otro;
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
@@ -2928,9 +2928,9 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
         <!-- Leyenda -->
         <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50 sticky bottom-0">
           <span class="font-bold uppercase text-slate-500">Click reserva → detalles · Click día vacío → nueva reserva</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#1f7a4d,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Directo</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#059669,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Directo</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Airbnb</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#2f6b4f,#2f6b4f);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3a5be0,#3a5be0);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
           <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
         </div>
@@ -3644,7 +3644,7 @@ function pmRenderTenantCard({ tenant, booking }) {
     : (booking ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">indefinido</span>` : '');
 
   return `
-    <div class="bg-white border border-slate-200 border-l-4 rounded-lg p-3 hover:shadow-sm transition" style="border-left-color:${st.key==='late'?'#ef4444':st.key==='expiring'?'#f59e0b':st.key==='aldia'?'#1f7a4d':'#a89f8f'}">
+    <div class="bg-white border border-slate-200 border-l-4 rounded-lg p-3 hover:shadow-sm transition" style="border-left-color:${st.key==='late'?'#ef4444':st.key==='expiring'?'#f59e0b':st.key==='aldia'?'#059669':'#8b93a1'}">
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div class="flex-1 min-w-0 cursor-pointer" onclick="pmOpenTenantDetail('${t.id}')">
           <div class="flex items-center gap-2 flex-wrap">
@@ -4455,7 +4455,7 @@ function pmRenderExpenses() {
 // Gráfico de torta SVG por categoría
 function pmPieChart(entries, size = 150) {
   const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
-  const colors = ['#d4af37','#1f7a4d','#2f6b4f','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#756c5c','#a855f7','#14b8a6'];
+  const colors = ['#d4af37','#059669','#3a5be0','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#6f7785','#a855f7','#14b8a6'];
   let acc = 0; const cx = size/2, cy = size/2, r = size/2 - 2;
   const arcs = entries.map(([cat, val], i) => {
     const a0 = acc/total*2*Math.PI - Math.PI/2; acc += val; const a1 = acc/total*2*Math.PI - Math.PI/2;
@@ -4685,7 +4685,7 @@ function pmLineChart(series) {
   return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:160px">
     <path d="${area}" fill="rgba(212,175,55,.08)"/>
     <path d="${path}" fill="none" stroke="#d4af37" stroke-width="2"/>${dots}
-    ${series.map((s,i)=>`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9" fill="#a89f8f" text-anchor="middle">${s.label}</text>`).join('')}
+    ${series.map((s,i)=>`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9" fill="#8b93a1" text-anchor="middle">${s.label}</text>`).join('')}
   </svg>`;
 }
 
@@ -4823,7 +4823,7 @@ function pmRenderPayrollTab() {
           const paid = !!row?.paid;
           const initial = name.trim().charAt(0).toUpperCase();
           return `<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0" style="background:#252017;border:2px solid #d4af37">${initial}</div>
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0" style="background:#1e2430;border:2px solid #d4af37">${initial}</div>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-bold text-slate-900 truncate">${name.replace(/</g,'&lt;')}</div>
               <div class="text-[11px] text-slate-500">${salary?pmMoney(salary)+'/mes':'sin salario'}</div>
@@ -5184,7 +5184,7 @@ function pmMultiLineChart(labels, series) {
   const path = vals => vals.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:210px">
     ${series.map(s=>`<path d="${path(s.values)}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join('')}
-    ${labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#a89f8f" text-anchor="middle">${l}</text>`).join('')}
+    ${labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#8b93a1" text-anchor="middle">${l}</text>`).join('')}
   </svg>
   <div class="flex gap-3 justify-center text-[11px] mt-1">${series.map(s=>`<span style="color:${s.color}" class="font-bold">● ${s.label}</span>`).join('')}</div>`;
 }
@@ -5392,7 +5392,7 @@ function pmRenderFinance() {
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-4">
         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Casas por ingresos (todas)</div>
-        ${pmBarChart([...agg.props].sort((a,b)=>b.income-a.income).slice(0,18).map(x=>[x.property.name, x.income]), '#1f7a4d')}
+        ${pmBarChart([...agg.props].sort((a,b)=>b.income-a.income).slice(0,18).map(x=>[x.property.name, x.income]), '#059669')}
       </div>
     </div>
 
@@ -5418,7 +5418,7 @@ function pmRenderFinance() {
     <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div class="text-sm font-bold text-slate-800 mb-1">Tendencia 12 meses · Ingresos / Gastos / NOI</div>
       ${pmMultiLineChart(trend.map(t=>t.label), [
-        { label:'Ingresos', color:'#1f7a4d', values: trend.map(t=>t.income) },
+        { label:'Ingresos', color:'#059669', values: trend.map(t=>t.income) },
         { label:'Gastos', color:'#ef4444', values: trend.map(t=>t.gastos) },
         { label:'Cash flow neto', color:'#8b5cf6', values: trend.map(t=>t.net) }
       ])}
@@ -5427,7 +5427,7 @@ function pmRenderFinance() {
 
     <!-- B · P&L por casa -->
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      <div class="px-4 py-2 flex items-center justify-between" style="background:#252017">
+      <div class="px-4 py-2 flex items-center justify-between" style="background:#1e2430">
         <span class="text-xs font-bold uppercase tracking-wider text-white">P&L por casa</span>
         <span class="text-[10px] font-bold" style="color:#d4af37">nómina prorrateada entre ${agg.activePropsCount} casas</span>
       </div>
@@ -5545,19 +5545,19 @@ function pmOpenPrintReport(title, bodyHtml) {
   if (!w) return alert('Habilitá pop-ups para generar el reporte.');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
-      *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#252017;margin:32px;font-size:12px}
+      *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#1e2430;margin:32px;font-size:12px}
       h1{font-size:20px;margin:0 0 4px} h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #d4af37;padding-bottom:3px;margin:22px 0 10px}
-      .sub{color:#756c5c;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
-      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #e8e3d9} th{background:#f2efe8;text-transform:uppercase;font-size:10px;color:#756c5c}
+      .sub{color:#6f7785;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
+      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #dfe4ec} th{background:#eef1f6;text-transform:uppercase;font-size:10px;color:#6f7785}
       th:first-child,td:first-child{text-align:left} .kpis{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0}
-      .kpi{border:1px solid #e8e3d9;border-radius:8px;padding:10px 14px;min-width:130px} .kpi .l{font-size:9px;text-transform:uppercase;color:#a89f8f;font-weight:bold}
+      .kpi{border:1px solid #dfe4ec;border-radius:8px;padding:10px 14px;min-width:130px} .kpi .l{font-size:9px;text-transform:uppercase;color:#8b93a1;font-weight:bold}
       .kpi .v{font-size:18px;font-weight:800;margin-top:2px} .pos{color:#047857} .neg{color:#dc2626}
-      .foot{margin-top:30px;color:#a89f8f;font-size:10px;border-top:1px solid #e8e3d9;padding-top:8px}
+      .foot{margin-top:30px;color:#8b93a1;font-size:10px;border-top:1px solid #dfe4ec;padding-top:8px}
       @media print{body{margin:14px}button{display:none}}
     </style></head><body>
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div><h1>Rental Profits</h1><div class="sub">${title}</div></div>
-      <button onclick="window.print()" style="background:#252017;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer">${osIcon('printer')} Imprimir / PDF</button>
+      <button onclick="window.print()" style="background:#1e2430;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer">${osIcon('printer')} Imprimir / PDF</button>
     </div>
     ${bodyHtml}
     <div class="foot">Generado por Empresa OS · Property Management — ${new Date().toLocaleString()}</div>
@@ -5587,7 +5587,7 @@ function pmFinReport(kind) {
   if (kind === 'investor') {
     const body = `<h2>Reporte por inversionista · ${r.label}</h2>${kpiRow}
       <h2>Rendimiento por propiedad</h2>${pnlTable(sorted)}
-      <p style="margin-top:14px;color:#756c5c">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
+      <p style="margin-top:14px;color:#6f7785">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
     return pmOpenPrintReport('Reporte por inversionista', body);
   }
   if (kind === 'fiscal') {
@@ -5606,7 +5606,7 @@ function pmFinReport(kind) {
       <table><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr></thead>
       <tbody>${months.map(m=>`<tr><td>${m.label}</td><td>${pmMoney(m.income)}</td><td>${pmMoney(m.gastos)}</td><td class="${m.net>=0?'pos':'neg'}">${pmMoney(m.net)}</td></tr>`).join('')}</tbody></table>
       <h2>P&L por propiedad ${year}</h2>${pnlTable([...a.props].sort((x,y)=>y.net-x.net))}
-      <p style="margin-top:10px;color:#a89f8f">Para Excel: usá el botón «Tendencias 12 meses (CSV)» y abrilo en tu hoja de cálculo.</p>`;
+      <p style="margin-top:10px;color:#8b93a1">Para Excel: usá el botón «Tendencias 12 meses (CSV)» y abrilo en tu hoja de cálculo.</p>`;
     return pmOpenPrintReport(`Reporte fiscal ${year}`, body);
   }
   // monthly (default)
@@ -6053,7 +6053,7 @@ function pmRenderAlertsBar() {
       </button>
       ${open ? `
         <div class="absolute right-0 top-full mt-1 w-[340px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100" style="background:#252017">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100" style="background:#1e2430">
             <span class="text-xs font-bold text-white">Alertas recientes</span>
             <button onclick="pmAlertMarkAllRead()" class="text-[10px] font-bold" style="color:#d4af37">Marcar todas leídas</button>
           </div>
@@ -6136,17 +6136,17 @@ window.pmAlertAssign = pmAlertAssign;
 // TAB · OPERACIÓN (3 sub-tabs + panel de alertas)
 // ════════════════════════════════════════════════════════════════
 const PM_TASK_TYPES = {
-  cleaning:             { label: 'Limpieza',  color: '#2f6b4f', chip: 'bg-blue-100 text-blue-800' },
+  cleaning:             { label: 'Limpieza',  color: '#3a5be0', chip: 'bg-blue-100 text-blue-800' },
   recepcion:            { label: 'Recepción', color: '#0ea5e9', chip: 'bg-sky-100 text-sky-800' },
-  aseo:                 { label: 'Aseo',      color: '#2f6b4f', chip: 'bg-blue-100 text-blue-800' },
+  aseo:                 { label: 'Aseo',      color: '#3a5be0', chip: 'bg-blue-100 text-blue-800' },
   mantenimiento:        { label: 'Manten.',   color: '#f97316', chip: 'bg-orange-100 text-orange-800' },
-  podada:               { label: 'Podada',    color: '#1f7a4d', chip: 'bg-emerald-100 text-emerald-800' },
-  cesped:               { label: 'Césped',    color: '#1f7a4d', chip: 'bg-emerald-100 text-emerald-800' },
+  podada:               { label: 'Podada',    color: '#059669', chip: 'bg-emerald-100 text-emerald-800' },
+  cesped:               { label: 'Césped',    color: '#059669', chip: 'bg-emerald-100 text-emerald-800' },
   plagas:               { label: 'Plagas',    color: '#a855f7', chip: 'bg-purple-100 text-purple-800' },
   inspeccion:           { label: 'Inspección',color: '#f59e0b', chip: 'bg-amber-100 text-amber-800' },
   renovacion_contrato:  { label: 'Renovación',color: '#ef4444', chip: 'bg-red-100 text-red-800' }
 };
-function pmTaskMeta(t) { return PM_TASK_TYPES[t] || { label: 'Tarea', color: '#a89f8f', chip: 'bg-slate-100 text-slate-700' }; }
+function pmTaskMeta(t) { return PM_TASK_TYPES[t] || { label: 'Tarea', color: '#8b93a1', chip: 'bg-slate-100 text-slate-700' }; }
 function pmTaskDate(t) { return t.scheduled_date || (t.start_at ? String(t.start_at).slice(0,10) : null); }
 
 function pmOpsTaskOpen(t) { return !['completado','cancelado'].includes(t.status); }
@@ -6288,7 +6288,7 @@ function pmRenderTasksByAssignee() {
     const week = ts.filter(t => { const d=pmTaskDate(t); if(!d||!pmOpsTaskOpen(t))return false; const in7=new Date();in7.setDate(in7.getDate()+7); return d>=today && d<=in7.toISOString().slice(0,10); });
     return `<div class="bg-white border border-slate-200 rounded-xl p-3">
       <div class="flex items-center gap-2 mb-2">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm" style="background:#252017;border:2px solid #d4af37">${name.charAt(0).toUpperCase()}</div>
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm" style="background:#1e2430;border:2px solid #d4af37">${name.charAt(0).toUpperCase()}</div>
         <div class="font-bold text-sm text-slate-800">${name.replace(/</g,'&lt;')}</div>
       </div>
       <div class="flex gap-2 text-[11px] mb-2">
@@ -6805,7 +6805,7 @@ function pmRenderComms() {
   <div class="grid lg:grid-cols-3 gap-3">
     <!-- Plantillas -->
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="px-3 py-2 flex items-center justify-between" style="background:#252017">
+      <div class="px-3 py-2 flex items-center justify-between" style="background:#1e2430">
         <span class="text-xs font-bold text-white">Plantillas</span>
         <button onclick="pmEditTemplate(null)" class="text-[10px] font-bold" style="color:#d4af37">+ Nueva</button>
       </div>

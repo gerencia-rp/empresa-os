@@ -590,7 +590,7 @@ function ctReconciliador() {
     const comp = f.os != null && f.qbo != null ? f.os : (f.air != null && f.qbo != null ? f.air : null);
     const delta = comp != null && f.qbo != null ? comp - f.qbo : null;
     const rojo = delta != null && Math.abs(delta) / Math.max(Math.abs(f.qbo || 0), 1) * 100 > warnPct;
-    return '<tr' + (rojo ? ' style="background:rgba(240,104,122,.07)"' : '') + '><td>' + f.c + '<div style="font-size:9px;opacity:.5">' + f.nota + '</div></td>'
+    return '<tr' + (rojo ? ' style="background:rgba(255,107,107,.07)"' : '') + '><td>' + f.c + '<div style="font-size:9px;opacity:.5">' + f.nota + '</div></td>'
       + '<td style="text-align:right">' + cell(f.os) + '</td><td style="text-align:right;font-weight:700">' + cell(f.qbo) + '</td><td style="text-align:right">' + cell(f.air) + '</td>'
       + '<td style="text-align:right" class="' + (rojo ? 'down' : 'up') + '">' + (delta != null ? OS_M(delta) + (rojo ? osIcon('alert') : ' ✓') : '—') + '</td></tr>';
   }).join('');
@@ -643,8 +643,8 @@ function ctSabuesoBlock(comp) {
     + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px' + (CT.modo === 'cierre' ? ';color:var(--ink);border-color:var(--a2)' : '') + '" onclick="CT.modo=\'cierre\';osRender()">' + osIcon('calendar-days') + ' Cierre del mes</button>'
     + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctDocOpen()">' + osIcon('file') + ' Statement/Factura</button>'
     + ' <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctLoad(true)">↻ Re-correr</button> <button class="ct-btn" style="padding:3px 8px;font-size:10px" onclick="ctCierre()">' + osIcon('clipboard') + ' Cierre p/ contadora</button></div></div>';
-  if (CT.modo === 'cierre') return '<div class="card" style="margin-top:16px;border-color:rgba(231,182,94,.3)">' + hdr + ctDocxBlock() + ctCierreMes() + '</div>';
-  return '<div class="card" style="margin-top:16px;border-color:rgba(231,182,94,.3)">'
+  if (CT.modo === 'cierre') return '<div class="card" style="margin-top:16px;border-color:rgba(251,191,36,.3)">' + hdr + ctDocxBlock() + ctCierreMes() + '</div>';
+  return '<div class="card" style="margin-top:16px;border-color:rgba(251,191,36,.3)">'
     + hdr + ctDocxBlock()
     + '<div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;margin:2px 0 12px">'
     + (motorErr ? '<div style="flex-basis:100%">' + (typeof reconcileLE === 'function' ? reconcileLE(total, assetsHolding, 'Σ descuadres vs Total Assets del holding').html : '<div class="down">' + osIcon('ban') + ' motor en error: Σ descuadres supera el balance</div>') + '</div>' : '')

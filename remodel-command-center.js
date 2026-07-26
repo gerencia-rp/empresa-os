@@ -40,7 +40,7 @@ async function openRemodelCommandCenter(sys) {
   let ov = document.getElementById('rc-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'rc-overlay'; document.body.appendChild(ov); }
   if (typeof posApplyTheme === 'function') posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#7c7365">' + osIcon('loader') + ' Conectando con Airtable Remodelación…</div></main></div><button class="pos-theme-btn" onclick="rcToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeRemodelCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#757d8b">' + osIcon('loader') + ' Conectando con Airtable Remodelación…</div></main></div><button class="pos-theme-btn" onclick="rcToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeRemodelCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await rcLoadAll();
   rcRender();
@@ -345,15 +345,15 @@ function rcHeader(title, sub) {
 
 function rcSecCommand(c) {
   const atrasadas = (RC.avanceVivo || []).filter(x => x.atrasada_cronograma && x.proceso === 'En construcción');
-  const bannerAtraso = atrasadas.length ? `<div class="card" style="border:1px solid rgba(248,113,113,.5);margin-bottom:12px"><div class="lab" style="color:#e4756a">${osIcon('trending-down')} ${atrasadas.length} OBRA(S) ATRASADA(S) SEGÚN CRONOGRAMA</div>${atrasadas.map(o => `<div class="krow"><span><b>${RC_E(rcShort(o.address))}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado</span><b class="down">${o.atraso_pts} pts · ~${o.atraso_dias}d</b></div>`).join('')}</div>` : '';
+  const bannerAtraso = atrasadas.length ? `<div class="card" style="border:1px solid rgba(248,113,113,.5);margin-bottom:12px"><div class="lab" style="color:#ff6b6b">${osIcon('trending-down')} ${atrasadas.length} OBRA(S) ATRASADA(S) SEGÚN CRONOGRAMA</div>${atrasadas.map(o => `<div class="krow"><span><b>${RC_E(rcShort(o.address))}</b>: ${o.pct_tareas}% real vs ${o.pct_esperado}% esperado</span><b class="down">${o.atraso_pts} pts · ~${o.atraso_dias}d</b></div>`).join('')}</div>` : '';
   const ins = rcInsights(c);
   const parN = RC.parity ? RC.parity.airtable_count : c.obras.length;
   const paritySync = RC.parity ? (RC.parity.in_sync !== false && (RC.parity.airtable_count == null || RC.parity.airtable_count === c.obras.length)) : true;
   const parityNote = paritySync
-    ? `Última verificación de paridad: <b style="color:var(--pos,#63c08e)">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
-    : `Última verificación de paridad: <b style="color:#e4756a">ALERTA</b> · app ${c.obras.length} vs Airtable ${parN} — sync desincronizado`;
-  const parityBg = paritySync ? 'color-mix(in srgb, var(--pos,#63c08e) 10%, transparent)' : 'color-mix(in srgb, var(--neg,#e4756a) 12%, transparent)';
-  const parityBd = paritySync ? 'color-mix(in srgb, var(--pos,#63c08e) 25%, transparent)' : 'color-mix(in srgb, var(--neg,#e4756a) 35%, transparent)';
+    ? `Última verificación de paridad: <b style="color:var(--pos,#4ade9e)">OK</b> · ${c.obras.length}/${parN} obras activas (Airtable)`
+    : `Última verificación de paridad: <b style="color:#ff6b6b">ALERTA</b> · app ${c.obras.length} vs Airtable ${parN} — sync desincronizado`;
+  const parityBg = paritySync ? 'color-mix(in srgb, var(--pos,#4ade9e) 10%, transparent)' : 'color-mix(in srgb, var(--neg,#ff6b6b) 12%, transparent)';
+  const parityBd = paritySync ? 'color-mix(in srgb, var(--pos,#4ade9e) 25%, transparent)' : 'color-mix(in srgb, var(--neg,#ff6b6b) 35%, transparent)';
   return rcHeader('Command Center', `${c.obras.length} obras · ${c.fin.length} finalizadas · ${c.activas.length} en curso — capital, ganancia realizada y pipeline.`) + `
     <div style="font-size:11px;padding:6px 12px;margin-bottom:10px;border-radius:8px;background:${parityBg};border:1px solid ${parityBd};color:var(--txt2)">${parityNote}</div>
     <div class="grid kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -405,7 +405,7 @@ function rcObraCard(o) {
   let _psfStr = '—';
   if (_psf != null) _psfStr = `${_psf} <span style="opacity:.55;font-weight:400">(mat ${_matPsf} · MO ${_labPsf})</span>`;
   const _comp = rcCompletitud(o);
-  const _cc = _comp.n >= 5 ? 'var(--pos,#63c08e)' : _comp.n >= 3 ? 'var(--amber,#dca94f)' : 'var(--neg,#e4756a)';
+  const _cc = _comp.n >= 5 ? 'var(--pos,#4ade9e)' : _comp.n >= 3 ? 'var(--amber,#fbbf24)' : 'var(--neg,#ff6b6b)';
   return `<div class="kcard"><!-- fix 12-jul: ${'$'}{bannerAtraso} era fuera de scope (vive en rcSecCommand) → crasheaba la sección Obras -->
     <div class="addr">${RC_E(rcShort(o.address))} ${badge} <span class="ff-dq" style="background:${_cc}22;color:${_cc};border-color:${_cc}44" title="Campos clave: presupuesto, gasto trab, gasto mat, fecha inicio, fecha estimada">${_comp.n}/${_comp.total} campos</span></div>
     <div class="meta">${RC_E(o.lider || '—')} · ${RC_E(o.proceso || 's/estado')}${o.sqft ? ' · ' + o.sqft + ' sqft' : ''}</div>
@@ -615,10 +615,10 @@ function rcSecGestion(c) {
         <table class="ptable"><thead><tr><th>Casa</th><th class="r" style="text-align:right">Presup.</th><th style="text-align:right">Material</th><th style="text-align:right">MO (horas)</th><th style="text-align:right">Total real</th><th style="text-align:right">%</th></tr></thead><tbody>
         ${(RC.presupCasa || []).filter(x => x.proceso === 'En construcción' || x.sobrecosto).sort((a2, b2) => (b2.pct_gastado || 0) - (a2.pct_gastado || 0)).map(x => `<tr${x.sobrecosto ? ' style="background:rgba(248,113,113,.08)"' : ''}><td><b>${RC_E(rcShort(x.address))}</b>${x.sobrecosto ? ' <span class="ff-dq ff-dq-rev">' + osIcon('alert') + ' SOBRECOSTO</span>' : ''}</td><td style="text-align:right">${x.presupuesto ? RC_M(+x.presupuesto) : '—'}</td><td style="text-align:right">${RC_M(+x.mat_real || 0)}</td><td style="text-align:right">${RC_M(+x.mo_real || 0)}${x.horas ? ` <span style="opacity:.5;font-size:10px">(${Math.round(+x.horas)}h)</span>` : ''}</td><td style="text-align:right"><b>${RC_M(+x.total_real || 0)}</b></td><td style="text-align:right" class="${x.pct_gastado > 100 ? 'down' : ''}">${x.pct_gastado != null ? x.pct_gastado + '%' : '<span class="warn">s/presup</span>'}</td></tr>`).join('')}
         </tbody></table>
-        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#756c5c);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rcPagoQuincenal()">${osIcon('banknote')} Generar pago quincenal</button></div>
+        <div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#6f7785);text-transform:uppercase;letter-spacing:.5px">Ledger de nómina de campo — a quién le debemos <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rcPagoQuincenal()">${osIcon('banknote')} Generar pago quincenal</button></div>
         ${(() => { const tot = (RC.ledger || []).length; const sin = (RC.ledger || []).filter(x => x.rate_conocido === false).length; return sin ? `<div class="meta" style="margin-bottom:6px">${osIcon('alert')} Cobertura parcial: ${sin} de ${tot} filas del ledger sin rate conocido (nombre no matchea Personal en Campo) — su devengado no se computa. Corregir nombres en Airtable para cobertura total.</div>` : ''; })()}
         ${(() => { const map = {}; (RC.ledger || []).forEach(r => { if (!map[r.worker]) map[r.worker] = { w: r.worker, horas: 0, dev: 0, pag: 0, deuda: 0, casas: [] }; const m2 = map[r.worker]; m2.horas += +r.horas || 0; m2.dev += +r.devengado || 0; m2.pag += +r.pagado || 0; m2.deuda += +r.deuda || 0; if (+r.deuda > 100) m2.casas.push(rcShort(r.casa) + ' ' + RC_M(+r.deuda)); }); const tot = Object.values(map).filter(x => Math.abs(x.deuda) > 100).sort((x, y) => y.deuda - x.deuda); const deudaTotal = tot.reduce((s2, x) => s2 + Math.max(0, x.deuda), 0); return `<div class="krow"><span><b>DEUDA TOTAL</b></span><b class="down">${RC_M(deudaTotal)}</b></div>` + tot.slice(0, 8).map(x => `<div class="krow"><span>${RC_E(x.w)} <span style="opacity:.5;font-size:10px">(${Math.round(x.horas)}h · ${x.casas.slice(0, 2).join(', ')})</span></span><b class="${x.deuda > 0 ? 'down' : 'up'}">${RC_M(x.deuda)}</b></div>`).join(''); })()}
-        ${(RC.receipts || []).length ? `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#756c5c);text-transform:uppercase;letter-spacing:.5px">Recibos quincenales registrados</div>` + (RC.receipts || []).slice(0, 6).map(rc2 => `<div class="krow"><span>${rc2.fecha_pago} · <b>${RC_E(rc2.lider || '—')}</b> · ${RC_E((rc2.casa || '').slice(0, 22))} <span style="opacity:.5;font-size:10px">(${rc2.periodo_ini}→${rc2.periodo_fin})</span></span><span><b>${RC_M(+rc2.total || 0)}</b> <span class="badge ${rc2.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:8px">${RC_E(rc2.estado)}</span>${rc2.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px">↗AT pend.</span>' : ''}</span></div>`).join('') : ''}
+        ${(RC.receipts || []).length ? `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:12px 0 6px;padding-top:10px;font-size:10px;color:var(--txt3,#6f7785);text-transform:uppercase;letter-spacing:.5px">Recibos quincenales registrados</div>` + (RC.receipts || []).slice(0, 6).map(rc2 => `<div class="krow"><span>${rc2.fecha_pago} · <b>${RC_E(rc2.lider || '—')}</b> · ${RC_E((rc2.casa || '').slice(0, 22))} <span style="opacity:.5;font-size:10px">(${rc2.periodo_ini}→${rc2.periodo_fin})</span></span><span><b>${RC_M(+rc2.total || 0)}</b> <span class="badge ${rc2.estado === 'realizado' ? 'b-ok' : 'b-warn'}" style="font-size:8px">${RC_E(rc2.estado)}</span>${rc2.airtable_writeback === 'pendiente' ? ' <span style="opacity:.5;font-size:9px">↗AT pend.</span>' : ''}</span></div>`).join('') : ''}
         <div class="meta" style="margin-top:8px">Fuente: remodel_material_payments (${(RC.presupCasa || []).length ? 'espejo Pago de Materiales' : '—'}) + remodel_worker_pay_summary. Muestra en-construcción + cualquier sobrecosto.</div>
       </div>
     </div>
@@ -629,7 +629,7 @@ function rcSecGestion(c) {
         <div class="krow"><span>Desviación de costo prom</span><b class="${c.desvCostoProm > 0 ? 'down' : 'up'}">${c.desvCostoProm > 0 ? '+' : ''}${c.desvCostoProm}%</b></div>
         <div class="krow"><span>Desviación de días prom</span><b>${c.desvDiasProm > 0 ? '+' : ''}${c.desvDiasProm}d</b></div>
         <div class="krow"><span>Ratio material histórico</span><b>${c.matPctHist}%</b></div>
-        ${(() => { const h = (RC.calibCostos || []).find(x => x.ventana === 'historico') || {}; const u = (RC.calibCostos || []).find(x => x.ventana === 'ultimas_5') || {}; const et = (RC.calibEtapas || []).filter(x => x.aplicable); const converge = (u.desv_costo_pct != null && h.desv_costo_pct != null) ? (Math.abs(+u.desv_costo_pct) <= Math.abs(+h.desv_costo_pct)) : null; const etRows = et.map(x => `<div class="krow"><span>factor días · ${RC_E(x.etapa)} (n=${x.n_tareas})</span><b class="${+x.factor_dias > 1.05 ? 'down' : 'up'}">×${(+x.factor_dias).toFixed(3)}</b></div>`).join(''); return `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:10px 0 6px;padding-top:8px;font-size:10px;color:var(--txt3,#756c5c);text-transform:uppercase;letter-spacing:.5px">Tendencia (se afina con cada obra cerrada)</div><div class="krow"><span>Desv. costo — histórico (${h.n || 0})</span><b>${h.desv_costo_pct > 0 ? '+' : ''}${h.desv_costo_pct}%</b></div><div class="krow"><span>Desv. costo — últimas 5</span><b class="${converge === false ? 'down' : 'up'}">${u.desv_costo_pct > 0 ? '+' : ''}${u.desv_costo_pct}%${converge === false ? ' empeorando' : converge === true ? ' ✓ converge' : ''}</b></div><div class="krow"><span>$/sqft real — hist → últimas 5</span><b>${h.psf_real} → ${u.psf_real}</b></div>${etRows}`; })()}
+        ${(() => { const h = (RC.calibCostos || []).find(x => x.ventana === 'historico') || {}; const u = (RC.calibCostos || []).find(x => x.ventana === 'ultimas_5') || {}; const et = (RC.calibEtapas || []).filter(x => x.aplicable); const converge = (u.desv_costo_pct != null && h.desv_costo_pct != null) ? (Math.abs(+u.desv_costo_pct) <= Math.abs(+h.desv_costo_pct)) : null; const etRows = et.map(x => `<div class="krow"><span>factor días · ${RC_E(x.etapa)} (n=${x.n_tareas})</span><b class="${+x.factor_dias > 1.05 ? 'down' : 'up'}">×${(+x.factor_dias).toFixed(3)}</b></div>`).join(''); return `<div style="border-top:1px solid var(--line,rgba(255,255,255,.1));margin:10px 0 6px;padding-top:8px;font-size:10px;color:var(--txt3,#6f7785);text-transform:uppercase;letter-spacing:.5px">Tendencia (se afina con cada obra cerrada)</div><div class="krow"><span>Desv. costo — histórico (${h.n || 0})</span><b>${h.desv_costo_pct > 0 ? '+' : ''}${h.desv_costo_pct}%</b></div><div class="krow"><span>Desv. costo — últimas 5</span><b class="${converge === false ? 'down' : 'up'}">${u.desv_costo_pct > 0 ? '+' : ''}${u.desv_costo_pct}%${converge === false ? ' empeorando' : converge === true ? ' ✓ converge' : ''}</b></div><div class="krow"><span>$/sqft real — hist → últimas 5</span><b>${h.psf_real} → ${u.psf_real}</b></div>${etRows}`; })()}
         <div class="meta" style="margin-top:12px"><b>LOOP ACTIVO</b>: los factores de días por etapa (real del Planner) y el $/sqft real YA se aplican a la generación del cronograma y al pronosticador (rmAutoGenPlanner · remodel_forecast_params). Se recalibra solo con cada obra cerrada.</div>
       </div>
     </div>`;
@@ -648,14 +648,14 @@ window.rcSetCobro = rcSetCobro;
 function rcVivoGanancia(o) {
   const M = n => DLR + Math.abs(+n || 0).toLocaleString('en-US');
   const neg = +o.ganancia_proyectada < 0;
-  const bg = o.sem_ganancia === 'rojo' ? 'color-mix(in srgb, var(--neg,#e4756a) 10%, transparent)' : 'color-mix(in srgb, var(--pos,#63c08e) 8%, transparent)';
-  const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#e4756a;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
-  const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(231,182,94,.18);color:#dca94f;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
+  const bg = o.sem_ganancia === 'rojo' ? 'color-mix(in srgb, var(--neg,#ff6b6b) 10%, transparent)' : 'color-mix(in srgb, var(--pos,#4ade9e) 8%, transparent)';
+  const precioTent = o.precio_tentativo ? ' <span style="background:rgba(248,113,113,.15);color:#ff6b6b;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El Valor Remodelación de esta obra todavía es la fórmula costo×1.05 — cargar el precio fijo real en Airtable para que la ganancia sea firme">PRECIO TENTATIVO</span>' : '';
+  const tentativo = o.metodo === 'conteo' ? ' <span style="background:rgba(251,191,36,.18);color:#fbbf24;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px" title="El avance por CONTEO puede inflar el % técnico → el costo proyectado @100% puede estar subestimado. Para ponderación exacta, el cronograma se sube DESDE el Estimador.">TENTATIVO</span>' : '';
   const modoSel = '<select onchange="rcSetCobro(&quot;' + o.property_id + '&quot;, this.value)" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:inherit;font-size:9px;padding:1px 4px" title="Cómo cobra Structure One esta obra">'
     + '<option value="fijo"' + (o.modo_cobro !== 'costplus' ? ' selected' : '') + '>PRECIO FIJO (real)</option>'
     + '<option value="costplus"' + (o.modo_cobro === 'costplus' ? ' selected' : '') + '>COST-PLUS ×1.05 (what-if)</option></select>';
   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:8px;padding:7px 9px;border-radius:8px;background:' + bg + '">'
-    + '<span style="font-size:10px;color:var(--txt3,#756c5c)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? 'PÉRDIDA' : kitStatusDot('ok')) + tentativo + precioTent + '</span>' + modoSel
+    + '<span style="font-size:10px;color:var(--txt3,#6f7785)">GANANCIA PROYECTADA ' + (o.sem_ganancia === 'rojo' ? 'PÉRDIDA' : kitStatusDot('ok')) + tentativo + precioTent + '</span>' + modoSel
     + '<b class="' + (neg ? 'down' : 'up') + '">' + (neg ? '-' : '') + M(o.ganancia_proyectada) + '</b>'
     + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
     + '<div class="meta" style="margin-top:3px;font-size:9px">cobra proy. ' + M(o.valor_cobro_proyectado != null ? o.valor_cobro_proyectado : o.valor_remodelacion) + ' (' + (o.modo_cobro === 'costplus' ? 'what-if cost-plus' : 'Valor Remodelación') + ') · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
@@ -674,14 +674,14 @@ function rcVivoCard() {
     if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
     return `<div class="card" style="min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b>${RC_E(rcShort(o.address))}</b><span style="font-size:11px;opacity:.7">${o.done || 0}/${o.total || 0} tareas</span></div>
-      <div style="font-size:10px;color:var(--txt3,#756c5c);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado_actividad' ? '$ por actividad' : o.metodo === 'ponderado_etapa' ? 'por etapa' : '(conteo)'} · ${o.pct_tecnico || 0}%${o.tareas_sin_map > 0 && o.metodo === 'conteo' ? ` <span style="color:#dca94f" title="Tareas del Planner que no cruzan con actividades del Estimador (planner manual o pronóstico sin guardar) — no ponderan hasta mapear">· ${o.tareas_sin_map} sin mapear</span>` : ''}</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#6fbf95,#2f6ef0)')}
-      <div style="font-size:10px;color:var(--txt3,#756c5c)">AVANCE FINANCIERO${o.fuente_presupuesto === 'pronostico' ? ' (presup. del pronóstico)' : ''} · ${o.pct_financiero != null ? o.pct_financiero + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_financiero, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#dca94f,#e4756a)' : 'linear-gradient(90deg,#63c08e,#6fbf95)')}
-      <div style="font-size:10px;color:var(--txt3,#756c5c)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#756c5c,#a89f8f)')}
+      <div style="font-size:10px;color:var(--txt3,#6f7785);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado_actividad' ? '$ por actividad' : o.metodo === 'ponderado_etapa' ? 'por etapa' : '(conteo)'} · ${o.pct_tecnico || 0}%${o.tareas_sin_map > 0 && o.metodo === 'conteo' ? ` <span style="color:#fbbf24" title="Tareas del Planner que no cruzan con actividades del Estimador (planner manual o pronóstico sin guardar) — no ponderan hasta mapear">· ${o.tareas_sin_map} sin mapear</span>` : ''}</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#5c79f0,#3a5be0)')}
+      <div style="font-size:10px;color:var(--txt3,#6f7785)">AVANCE FINANCIERO${o.fuente_presupuesto === 'pronostico' ? ' (presup. del pronóstico)' : ''} · ${o.pct_financiero != null ? o.pct_financiero + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_financiero, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#fbbf24,#ff6b6b)' : 'linear-gradient(90deg,#4ade9e,#5c79f0)')}
+      <div style="font-size:10px;color:var(--txt3,#6f7785)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#6f7785,#8b93a1)')}
       ${(o.valor_remodelacion > 0 || o.modo_cobro === 'costplus') ? rcVivoGanancia(o) : ''}
       <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
         <span>${SEM[o.sem_costo] || '⚪'} costo ${o.costo_proyectado ? `<span style="opacity:.6">(proy. a hoy $${(+o.costo_proyectado).toLocaleString('en-US')})</span>` : ''}</span>
         <span>${SEM[o.sem_tiempo] || '⚪'} tiempo <span style="opacity:.6">(${o.pct_dias != null ? o.pct_dias + '% días' : 's/cronograma'})</span></span></div>
-      ${revisar.length ? `<div class="meta" style="margin-top:8px;color:var(--amber,#dca94f)">${osIcon('search')} Qué revisar: ${RC_E(revisar.join(' · '))}</div>` : '<div class="meta" style="margin-top:8px;color:#63c08e">En plan ✓</div>'}
+      ${revisar.length ? `<div class="meta" style="margin-top:8px;color:var(--amber,#fbbf24)">${osIcon('search')} Qué revisar: ${RC_E(revisar.join(' · '))}</div>` : '<div class="meta" style="margin-top:8px;color:#4ade9e">En plan ✓</div>'}
     </div>`;
   };
   return `<div class="card"><div class="chart-h"><div class="t">Avance de obra EN VIVO</div><div class="k">tareas (Planner) vs plata (pagos+horas) · desviación contra cronograma · ${obras.length} en construcción</div></div>
@@ -826,8 +826,8 @@ function rcReciboOverlay(r) {
   el.innerHTML = `<style>
     #rc-recibo-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99998;overflow:auto;padding:20px}
     #rc-recibo-doc{background:#fff;color:#111;max-width:720px;margin:0 auto;padding:34px;border-radius:12px;font-family:-apple-system,Segoe UI,sans-serif}
-    #rc-recibo-doc .rrh{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #8a6400;padding-bottom:12px}
-    #rc-recibo-doc .rrlogo{font-size:21px;font-weight:800;color:#8a6400}#rc-recibo-doc .rrlogo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
+    #rc-recibo-doc .rrh{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #b45309;padding-bottom:12px}
+    #rc-recibo-doc .rrlogo{font-size:21px;font-weight:800;color:#b45309}#rc-recibo-doc .rrlogo span{display:block;font-size:10px;letter-spacing:2px;color:#666}
     #rc-recibo-doc table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
     #rc-recibo-doc th{text-align:left;font-size:10px;text-transform:uppercase;color:#666;border-bottom:1px solid #ccc;padding:6px 4px}
     #rc-recibo-doc th:nth-child(n+2),#rc-recibo-doc td:nth-child(n+2){text-align:right}
@@ -852,7 +852,7 @@ function rcReciboOverlay(r) {
     <div class="rrbtns">
       <button class="rrbtn" style="background:#e5e7eb" onclick="document.getElementById('rc-recibo-ov').remove()">Cerrar</button>
       <button class="rrbtn" style="background:#374151;color:#fff" onclick="window.print()">${osIcon('printer')} Imprimir / PDF</button>
-      <button class="rrbtn" style="background:#8a6400;color:#fff" onclick="rcReciboGuardar()">✍️ Firmar y registrar pago</button>
+      <button class="rrbtn" style="background:#b45309;color:#fff" onclick="rcReciboGuardar()">✍️ Firmar y registrar pago</button>
     </div>`;
   (document.getElementById('rc-overlay') || document.body).appendChild(el);
   const cv = document.getElementById('rc-firma-canvas');
@@ -957,7 +957,7 @@ function rcSecNomina(c) {
     <div class="grid row2" style="margin-top:14px">
       <div class="card"><div class="chart-h"><div class="t">Deuda por trabajador</div><div class="k">click para detalle por casa · grano: trabajador×casa×día</div></div>
         <table class="ptable"><thead><tr><th>Trabajador</th><th style="text-align:right">Horas</th><th style="text-align:right">Devengado</th><th style="text-align:right">Pagado</th><th style="text-align:right">Deuda</th></tr></thead><tbody>
-        ${workers.filter(x => Math.abs(x.deuda) > 100).map(filaW).join('') || '<tr><td colspan="5" style="padding:12px;color:#63c08e">Sin deudas ✓</td></tr>'}</tbody></table></div>
+        ${workers.filter(x => Math.abs(x.deuda) > 100).map(filaW).join('') || '<tr><td colspan="5" style="padding:12px;color:#4ade9e">Sin deudas ✓</td></tr>'}</tbody></table></div>
       <div class="card"><div class="chart-h"><div class="t">Historial de pagos quincenales</div><div class="k">recibos firmados (firma guardada en el registro)</div></div>
         <table class="ptable"><thead><tr><th>Pago</th><th>Líder</th><th>Casa</th><th>Período</th><th style="text-align:right">Total</th><th style="text-align:right">Estado</th></tr></thead><tbody>
         ${recibos || '<tr><td colspan="6" style="padding:12px;opacity:.6">Aún sin recibos — generá el primero con el botón ' + osIcon('banknote') + '.</td></tr>'}</tbody></table>

@@ -36,15 +36,15 @@ function ccInjectCSS() {
   const st = document.createElement('style'); st.id = 'cc-styles';
   st.textContent = `
   #cc-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
-    --bg:#14110c;--ink:#efe9de;--mut:#a89f8f;--mut2:#7c7365;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
-    --a1:#6fbf95;--a2:#4e9b72;--a3:#c9a85c;--pos:#63c08e;--neg:#e4756a;--amber:#dca94f;
+    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
+    --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
   /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
   #cc-overlay[data-theme="light"]{
-    --bg:#f7f5f0;--ink:#211e17;--mut:#5f594c;--mut2:#756c5c;--glass:#ffffff;--glassb:#e8e3d9;
-    --a1:#2f6b4f;--a2:#275c43;--a3:#8a6a2f;--pos:#1f7a4d;--neg:#dc2626;--amber:#8a6400}
+    --bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:#ffffff;--glassb:#dfe4ec;
+    --a1:#3a5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309}
   #cc-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
-  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(37,99,235,.06),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(29,78,216,.05),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.05),transparent 60%),linear-gradient(180deg,#f9f7f2,#f2efe8)}
+  #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(37,99,235,.06),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(29,78,216,.05),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.05),transparent 60%),linear-gradient(180deg,#f6f8fb,#eef1f6)}
   #cc-overlay[data-theme="light"] .side{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(240,244,250,.85))}
   #cc-overlay[data-theme="light"] .card{box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
   #cc-overlay[data-theme="light"] .glow{text-shadow:none}#cc-overlay[data-theme="light"] .ring i{background:#f6f8fc}
@@ -53,7 +53,7 @@ function ccInjectCSS() {
   #cc-overlay .pos-theme-btn{position:fixed;top:16px;right:62px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
   #cc-overlay .pos-theme-btn:hover{color:var(--ink);border-color:var(--a2)}
   /* ── QA modo claro: emparejar texto/paneles hardcodeados dark-first (contraste AA) ── */
-  #cc-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(107,91,239,.1),rgba(47,110,240,.05))}
+  #cc-overlay[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(107,91,239,.1),rgba(58,91,224,.05))}
   #cc-overlay[data-theme="light"] .daytxt,#cc-overlay[data-theme="light"] .daytxt b,#cc-overlay[data-theme="light"] .daytxt strong{color:var(--ink)}
   #cc-overlay[data-theme="light"] .insight .tx,#cc-overlay[data-theme="light"] .insight .tx b{color:var(--ink)}
   #cc-overlay[data-theme="light"] .cbub.u,#cc-overlay[data-theme="light"] .cbub.a,#cc-overlay[data-theme="light"] .cbub.a b,#cc-overlay[data-theme="light"] .cbub.a strong{color:var(--ink)}
@@ -67,23 +67,23 @@ function ccInjectCSS() {
   #cc-overlay .kpi .meta{padding-right:96px}
   #cc-overlay *{box-sizing:border-box;margin:0;padding:0}
   #cc-overlay .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:
-    radial-gradient(760px 520px at 8% -6%,rgba(69,227,198,.14),transparent 58%),
-    radial-gradient(820px 560px at 100% 4%,rgba(79,141,255,.15),transparent 56%),
-    radial-gradient(700px 620px at 70% 118%,rgba(138,123,255,.12),transparent 60%),linear-gradient(180deg,#16130d,#100e08)}
+    radial-gradient(760px 520px at 8% -6%,rgba(92,121,240,.14),transparent 58%),
+    radial-gradient(820px 560px at 100% 4%,rgba(58,91,224,.15),transparent 56%),
+    radial-gradient(700px 620px at 70% 118%,rgba(58,91,224,.12),transparent 60%),linear-gradient(180deg,#131519,#0e1016)}
   #cc-overlay .gridfx{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
     background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
     background-size:44px 44px;-webkit-mask:radial-gradient(circle at 50% 30%,#000,transparent 78%);mask:radial-gradient(circle at 50% 30%,#000,transparent 78%)}
   #cc-overlay .app{position:relative;z-index:1;display:grid;grid-template-columns:244px 1fr;min-height:100vh}
   #cc-overlay .side{padding:22px 15px;position:sticky;top:0;height:100vh;background:linear-gradient(180deg,rgba(12,16,26,.72),rgba(7,10,17,.72));border-right:1px solid rgba(255,255,255,.05);backdrop-filter:blur(16px);display:flex;flex-direction:column}
   #cc-overlay .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px}
-  #cc-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:16px;box-shadow:0 6px 20px -6px rgba(79,141,255,.6),inset 0 1px 0 rgba(255,255,255,.4)}
+  #cc-overlay .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--a1),var(--a2));display:grid;place-items:center;color:#fff;font-weight:900;font-size:16px;box-shadow:0 6px 20px -6px rgba(58,91,224,.6),inset 0 1px 0 rgba(255,255,255,.4)}
   #cc-overlay .brand b{font-size:15px;font-weight:750}#cc-overlay .brand span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.6px;margin-top:2px}
   #cc-overlay .navlbl{font-size:9px;letter-spacing:1.8px;color:var(--mut2);text-transform:uppercase;padding:12px 12px 7px;font-weight:700}
   #cc-overlay .nav{display:flex;flex-direction:column;gap:2px}
   #cc-overlay .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:500;transition:.16s;position:relative;cursor:pointer}
   #cc-overlay .nav a .i{width:16px;text-align:center;opacity:.85;font-size:13px}
   #cc-overlay .nav a:hover{background:rgba(255,255,255,.04);color:var(--ink)}
-  #cc-overlay .nav a.on{color:#fff;background:linear-gradient(90deg,rgba(69,227,198,.16),rgba(79,141,255,.06));box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  #cc-overlay .nav a.on{color:#fff;background:linear-gradient(90deg,rgba(92,121,240,.16),rgba(58,91,224,.06));box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
   #cc-overlay .nav a.on::before{content:"";position:absolute;left:-15px;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--a1),var(--a2));box-shadow:0 0 10px var(--a1)}
   #cc-overlay .nav a .b{margin-left:auto;font-size:10px;color:var(--mut2)}
   #cc-overlay .side .foot{margin-top:auto;font-size:10.5px;color:var(--mut2);line-height:1.7;border-top:1px solid rgba(255,255,255,.05);padding-top:12px}
@@ -97,7 +97,7 @@ function ccInjectCSS() {
   #cc-overlay .pill{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut);background:var(--glass);border:1px solid var(--glassb);padding:8px 13px;border-radius:22px;backdrop-filter:blur(10px)}
   #cc-overlay .cdot{width:7px;height:7px;border-radius:50%;background:var(--a1);box-shadow:0 0 10px var(--a1)}
   #cc-overlay .cdot.live{animation:ccpulse 2s infinite}@keyframes ccpulse{0%,100%{opacity:1}50%{opacity:.35}}
-  #cc-overlay .pill.ai{background:linear-gradient(90deg,rgba(138,123,255,.22),rgba(79,141,255,.14));border-color:rgba(138,123,255,.4);color:#eaeaff;cursor:pointer}
+  #cc-overlay .pill.ai{background:linear-gradient(90deg,rgba(58,91,224,.22),rgba(58,91,224,.14));border-color:rgba(58,91,224,.4);color:#eaeaff;cursor:pointer}
   #cc-overlay .shimmer{background:linear-gradient(90deg,#c9bfa8 30%,#f3ede0 50%,#c9bfa8 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ccsh 3s linear infinite}
   @keyframes ccsh{to{background-position:-200% 0}}
   #cc-overlay .ccclose{position:fixed;top:16px;right:20px;z-index:5;background:var(--glass);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px;backdrop-filter:blur(10px)}
@@ -109,20 +109,20 @@ function ccInjectCSS() {
   #cc-overlay .lab{font-size:10px;letter-spacing:1.5px;color:var(--mut2);text-transform:uppercase;font-weight:700}
   #cc-overlay .kpi .big{font-size:33px;font-weight:780;margin-top:9px;letter-spacing:-.8px}
   #cc-overlay .kpi .meta{font-size:11.5px;color:var(--mut);margin-top:7px;line-height:1.5}
-  #cc-overlay .glow{text-shadow:0 0 22px rgba(69,227,198,.4)}
+  #cc-overlay .glow{text-shadow:0 0 22px rgba(92,121,240,.4)}
   #cc-overlay .up{color:var(--pos)}#cc-overlay .down{color:var(--neg)}#cc-overlay .warn{color:var(--amber)}
   #cc-overlay .spark{position:absolute;right:14px;bottom:12px;width:88px;height:34px;z-index:1;opacity:.7;pointer-events:none}
-  #cc-overlay .ring{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 24px -4px rgba(69,227,198,.35)}
-  #cc-overlay .ring i{width:50px;height:50px;border-radius:50%;background:#17140f;display:grid;place-items:center;font-style:normal;font-weight:760;font-size:15px}
+  #cc-overlay .ring{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 24px -4px rgba(92,121,240,.35)}
+  #cc-overlay .ring i{width:50px;height:50px;border-radius:50%;background:#131519;display:grid;place-items:center;font-style:normal;font-weight:760;font-size:15px}
   #cc-overlay .kpi.occ{display:flex;gap:15px;align-items:center}
   #cc-overlay .row2{grid-template-columns:1.6fr 1fr;margin-top:16px}#cc-overlay .row3{grid-template-columns:1fr 1fr 1fr;margin-top:16px}
   #cc-overlay .chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
   #cc-overlay .chart-h .t{font-size:13.5px;font-weight:640}#cc-overlay .chart-h .k{font-size:11px;color:var(--mut2)}
   #cc-overlay .legend{display:flex;gap:14px;font-size:11px;color:var(--mut)}#cc-overlay .legend b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
   #cc-overlay canvas{max-width:100%}
-  #cc-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(138,123,255,.28);box-shadow:0 26px 70px -34px rgba(90,70,230,.5),0 1px 0 rgba(255,255,255,.06) inset}
+  #cc-overlay .brain{background:linear-gradient(180deg,rgba(30,28,58,.55),rgba(14,16,32,.55));border:1px solid rgba(58,91,224,.28);box-shadow:0 26px 70px -34px rgba(90,70,230,.5),0 1px 0 rgba(255,255,255,.06) inset}
   #cc-overlay .bh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-  #cc-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#6fbf95 30%,#4e9b72 70%,#1c3327);box-shadow:0 0 22px rgba(79,141,255,.55)}
+  #cc-overlay .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#5c79f0 30%,#3a5be0 70%,#1c3327);box-shadow:0 0 22px rgba(58,91,224,.55)}
   #cc-overlay .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ccspin 6s linear infinite;opacity:.7}
   @keyframes ccspin{to{transform:rotate(360deg)}}
   #cc-overlay .bh b{font-size:14px}#cc-overlay .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.5px;margin-top:2px}
@@ -133,32 +133,32 @@ function ccInjectCSS() {
   #cc-overlay .tag{display:inline-block;font-size:9px;letter-spacing:.7px;color:var(--mut2);margin-top:5px;font-weight:700}
   #cc-overlay .iaction{font-size:11px;color:var(--a1);margin-top:5px;font-weight:500;opacity:.92}
   #cc-overlay .daybanner{display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px 18px;border-radius:14px;
-    background:linear-gradient(90deg,rgba(138,123,255,.12),rgba(79,141,255,.06));border:1px solid rgba(138,123,255,.24);backdrop-filter:blur(12px)}
-  #cc-overlay .daytxt{font-size:13px;line-height:1.55;color:#efe9de}#cc-overlay .daytxt b,#cc-overlay .daytxt strong{color:#fff}
+    background:linear-gradient(90deg,rgba(58,91,224,.12),rgba(58,91,224,.06));border:1px solid rgba(58,91,224,.24);backdrop-filter:blur(12px)}
+  #cc-overlay .daytxt{font-size:13px;line-height:1.55;color:#f1f3f7}#cc-overlay .daytxt b,#cc-overlay .daytxt strong{color:#fff}
   #cc-overlay .daytxt p{margin:0 0 4px}#cc-overlay .daytxt p:last-child{margin:0}
   #cc-overlay .dayre{flex-shrink:0;background:rgba(255,255,255,.06);border:1px solid var(--glassb);color:var(--mut);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px}
-  #cc-overlay .dayre:hover{color:#fff;border-color:rgba(138,123,255,.5)}#cc-overlay .dayre:disabled{opacity:.5;cursor:default}
+  #cc-overlay .dayre:hover{color:#fff;border-color:rgba(58,91,224,.5)}#cc-overlay .dayre:disabled{opacity:.5;cursor:default}
   #cc-overlay .ask{display:flex;gap:8px;margin-top:14px}
-  #cc-overlay .ask input{flex:1;background:rgba(6,9,16,.72);border:1px solid rgba(138,123,255,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
+  #cc-overlay .ask input{flex:1;background:rgba(6,9,16,.72);border:1px solid rgba(58,91,224,.32);border-radius:11px;padding:12px 14px;color:var(--ink);font-size:12px;outline:none}
   #cc-overlay .ask input::placeholder{color:var(--mut2)}
-  #cc-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px;box-shadow:0 8px 20px -8px rgba(79,141,255,.7)}
+  #cc-overlay .ask button{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px;box-shadow:0 8px 20px -8px rgba(58,91,224,.7)}
   #cc-overlay .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
   #cc-overlay .chip{font-size:11px;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid var(--glassb);padding:6px 11px;border-radius:18px;cursor:pointer}
-  #cc-overlay .chip:hover{color:#fff;border-color:rgba(138,123,255,.45)}
+  #cc-overlay .chip:hover{color:#fff;border-color:rgba(58,91,224,.45)}
   #cc-overlay .cc-chat{margin-top:14px;display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto;padding-right:4px}
   #cc-overlay .cc-chat:empty{display:none}
   #cc-overlay .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
-  #cc-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(69,227,198,.16),rgba(79,141,255,.14));border:1px solid rgba(79,141,255,.3);color:#eaf2ff}
+  #cc-overlay .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(92,121,240,.16),rgba(58,91,224,.14));border:1px solid rgba(58,91,224,.3);color:#eaf2ff}
   #cc-overlay .cbub.a{align-self:flex-start;background:rgba(255,255,255,.04);border:1px solid var(--glassb);color:#d6ddec}
   #cc-overlay .cbub.a b{color:#fff}#cc-overlay .cbub.a strong{color:#fff}
-  #cc-overlay .cbub.err{border-color:rgba(240,104,122,.4);color:#f7b9c2}
+  #cc-overlay .cbub.err{border-color:rgba(255,107,107,.4);color:#f7b9c2}
   #cc-overlay .cbub.think{color:var(--mut2);font-style:italic}
   #cc-overlay .cbub p{margin:0 0 6px}#cc-overlay .cbub p:last-child{margin:0}
   #cc-overlay .cbub ul{margin:4px 0 6px 18px;list-style:disc}#cc-overlay .cbub ol{margin:4px 0 6px 20px;list-style:decimal}
   #cc-overlay .cbub li{margin:3px 0;padding-left:2px}#cc-overlay .cbub li p{display:inline;margin:0}
   @keyframes ccblink{0%,100%{opacity:.35}50%{opacity:1}}#cc-overlay .cbub.think::after{content:"▋";animation:ccblink 1s infinite}
-  #cc-overlay .cbub .memsave{display:block;margin-top:8px;background:rgba(138,123,255,.14);border:1px solid rgba(138,123,255,.3);color:#c9c2ff;font-size:10px;padding:3px 9px;border-radius:7px;cursor:pointer}
-  #cc-overlay .cbub .memsave:hover{background:rgba(138,123,255,.25);color:#fff}
+  #cc-overlay .cbub .memsave{display:block;margin-top:8px;background:rgba(58,91,224,.14);border:1px solid rgba(58,91,224,.3);color:#c9c2ff;font-size:10px;padding:3px 9px;border-radius:7px;cursor:pointer}
+  #cc-overlay .cbub .memsave:hover{background:rgba(58,91,224,.25);color:#fff}
   #cc-overlay .memadd{display:flex;gap:8px;margin:6px 0 14px;flex-wrap:wrap}
   #cc-overlay .memadd select{background:rgba(6,9,16,.72);border:1px solid var(--glassb);border-radius:10px;color:var(--ink);font-size:12px;padding:9px 10px;outline:none}
   #cc-overlay .memadd input{flex:1;min-width:220px;background:rgba(6,9,16,.72);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:12px;outline:none}
@@ -167,8 +167,8 @@ function ccInjectCSS() {
   #cc-overlay .memrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
   #cc-overlay .memrow.off{opacity:.42}
   #cc-overlay .memtipo{flex-shrink:0;font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.05);color:var(--mut);white-space:nowrap;margin-top:1px}
-  #cc-overlay .memtipo.t-hecho{background:rgba(79,141,255,.14);color:#8fb6ff}#cc-overlay .memtipo.t-dec{background:rgba(69,227,198,.14);color:var(--a1)}
-  #cc-overlay .memtipo.t-aprendizaje{background:rgba(231,182,94,.14);color:var(--amber)}#cc-overlay .memtipo.t-nota{background:rgba(255,255,255,.06);color:var(--mut)}
+  #cc-overlay .memtipo.t-hecho{background:rgba(58,91,224,.14);color:#8fb6ff}#cc-overlay .memtipo.t-dec{background:rgba(92,121,240,.14);color:var(--a1)}
+  #cc-overlay .memtipo.t-aprendizaje{background:rgba(251,191,36,.14);color:var(--amber)}#cc-overlay .memtipo.t-nota{background:rgba(255,255,255,.06);color:var(--mut)}
   #cc-overlay .memtxt{flex:1;font-size:12.5px;line-height:1.55;color:#d6ddec}
   #cc-overlay .memmeta{font-size:10px;color:var(--mut2);margin-top:4px}
   #cc-overlay .memacts{display:flex;gap:5px;flex-shrink:0}
@@ -179,26 +179,26 @@ function ccInjectCSS() {
   #cc-overlay .ptable td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
   #cc-overlay .ptable tr:hover td{background:rgba(255,255,255,.025)}
   #cc-overlay .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}
-  #cc-overlay .b-ok{background:rgba(72,214,156,.13);color:var(--pos)}#cc-overlay .b-red{background:rgba(240,104,122,.13);color:var(--neg)}#cc-overlay .b-warn{background:rgba(231,182,94,.13);color:var(--amber)}
+  #cc-overlay .b-ok{background:rgba(74,222,158,.13);color:var(--pos)}#cc-overlay .b-red{background:rgba(255,107,107,.13);color:var(--neg)}#cc-overlay .b-warn{background:rgba(251,191,36,.13);color:var(--amber)}
   #cc-overlay .mini-bar{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;width:74px;display:inline-block;vertical-align:middle;margin-right:7px}
   #cc-overlay .mini-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a1),var(--a2))}
   #cc-overlay .op-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px}
   #cc-overlay .op-time{color:var(--mut2);font-variant-numeric:tabular-nums;width:46px;font-size:11.5px}
   #cc-overlay .op-zone{margin-left:auto;font-size:9.5px;padding:2px 9px;border-radius:20px;color:var(--mut)}
-  #cc-overlay .z-n{background:rgba(69,227,198,.12)}#cc-overlay .z-s{background:rgba(255,255,255,.05)}
-  #cc-overlay .op-eq{font-size:9.5px;color:var(--a2);background:rgba(79,141,255,.12);padding:1px 7px;border-radius:12px;margin-left:6px}
+  #cc-overlay .z-n{background:rgba(92,121,240,.12)}#cc-overlay .z-s{background:rgba(255,255,255,.05)}
+  #cc-overlay .op-eq{font-size:9.5px;color:var(--a2);background:rgba(58,91,224,.12);padding:1px 7px;border-radius:12px;margin-left:6px}
   #cc-overlay .tbtn{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--mut);width:28px;height:26px;border-radius:7px;cursor:pointer;font-size:12px}
-  #cc-overlay .tbtn:hover{color:#fff;border-color:rgba(69,227,198,.5)}
+  #cc-overlay .tbtn:hover{color:#fff;border-color:rgba(92,121,240,.5)}
   #cc-overlay .reptools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glassb)}
-  #cc-overlay .reptitle{font-size:12px;font-weight:650;color:#efe9de}
+  #cc-overlay .reptitle{font-size:12px;font-weight:650;color:#f1f3f7}
   #cc-overlay .repbtn{background:linear-gradient(135deg,var(--a1),var(--a2));border:none;color:#fff;font-weight:700;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:11.5px}
   #cc-overlay .repbtn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--glassb);color:var(--ink)}
   #cc-overlay .repbtn:hover{filter:brightness(1.08)}#cc-overlay .rephint{font-size:10.5px;color:var(--mut2);margin-left:auto}
-  #cc-overlay .rtask{font-size:9.5px;padding:2px 8px;border-radius:12px;background:rgba(69,227,198,.12);color:var(--a1)}
+  #cc-overlay .rtask{font-size:9.5px;padding:2px 8px;border-radius:12px;background:rgba(92,121,240,.12);color:var(--a1)}
   #cc-overlay .empty-sec{padding:60px;text-align:center;color:var(--mut2)}
   #cc-overlay .dqcat{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}#cc-overlay .dqcat:last-child{border-bottom:none}
-  #cc-overlay .dqhead{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:640;color:#efe9de;margin-bottom:7px}
-  #cc-overlay .dqcount{font-size:10px;font-weight:700;background:rgba(240,104,122,.14);color:var(--neg);padding:2px 9px;border-radius:20px}
+  #cc-overlay .dqhead{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:640;color:#f1f3f7;margin-bottom:7px}
+  #cc-overlay .dqcount{font-size:10px;font-weight:700;background:rgba(255,107,107,.14);color:var(--neg);padding:2px 9px;border-radius:20px}
   #cc-overlay .dqrow{display:flex;gap:12px;font-size:11.5px;padding:3px 0 3px 22px;color:var(--mut)}
   #cc-overlay .dqitem{color:#cdd6e6;min-width:150px;font-weight:500}#cc-overlay .dqdetail{color:var(--mut2)}
   #cc-overlay .dqmore{font-size:11px;color:var(--mut2);padding:3px 0 3px 22px}
@@ -239,7 +239,7 @@ async function openCommandCenter(sys) {
   let ov = document.getElementById('cc-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'cc-overlay'; document.body.appendChild(ov); }
   if (window.posApplyTheme) posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#7c7365">' + osIcon('loader') + ' Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#757d8b">' + osIcon('loader') + ' Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ccLoadAll();
   if (!CC.chatLoaded) { try { await ccLoadChat(); } catch (e) {} }
@@ -444,7 +444,7 @@ function ccDataQualityCard(comp) {
       ${c.items.slice(0, 6).map(it => `<div class="dqrow"><span class="dqitem">${it.item}</span><span class="dqdetail">${it.detail}</span></div>`).join('')}
       ${c.items.length > 6 ? `<div class="dqmore">+ ${c.items.length - 6} más…</div>` : ''}
       <div class="dqnote">➜ ${notaTabla(c.tabla)}</div>
-    </div>`).join('') : '<div style="color:#63c08e;font-size:12.5px;padding:12px 0">No se detectaron inconsistencias de datos. ' + osIcon('party') + '</div>'}
+    </div>`).join('') : '<div style="color:#4ade9e;font-size:12.5px;padding:12px 0">No se detectaron inconsistencias de datos. ' + osIcon('party') + '</div>'}
   </div></div>`;
 }
 
@@ -465,7 +465,7 @@ const CC_NAV = [
 function ccRender() {
   const ov = document.getElementById('cc-overlay'); if (!ov) return;
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
-  if (CC.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">${osIcon('alert')}</div><div style="color:#e4756a;margin-top:10px">${CC_ESC(CC.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ccReload()">Reintentar</button></div>`; return; }
+  if (CC.loadError) { main.innerHTML = `<div class="empty-sec"><div style="font-size:40px">${osIcon('alert')}</div><div style="color:#ff6b6b;margin-top:10px">${CC_ESC(CC.loadError)}</div><button class="chip" style="margin-top:14px" onclick="ccReload()">Reintentar</button></div>`; return; }
   const comp = ccCompute();
   side.innerHTML = ccSidebar();
   ccDestroyCharts();
@@ -546,7 +546,7 @@ function ccSecCommand(comp) {
       <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;overflow:hidden;height:280px;width:100%"><canvas id="cc-house"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Operación de hoy</div><div class="k">cronograma real · ${todayTasks.length} tareas</div></div>
-        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#7c7365;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
+        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#757d8b;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
         <div style="margin-top:13px;font-size:11px;color:var(--mut)"><span class="chip" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</span></div></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card">
@@ -685,9 +685,9 @@ function ccMemCardHTML() {
   </div></div>`;
 }
 function ccMemListHTML() {
-  if (!CC.memLoaded) return '<div style="color:#7c7365;font-size:12px;padding:14px 0">' + osIcon('loader') + ' Cargando memoria…</div>';
-  if (CC._memErr) return `<div style="color:#e4756a;font-size:12px;padding:14px 0">${CC_ESC(CC._memErr)}</div>`;
-  if (!CC.memories.length) return '<div style="color:#7c7365;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
+  if (!CC.memLoaded) return '<div style="color:#757d8b;font-size:12px;padding:14px 0">' + osIcon('loader') + ' Cargando memoria…</div>';
+  if (CC._memErr) return `<div style="color:#ff6b6b;font-size:12px;padding:14px 0">${CC_ESC(CC._memErr)}</div>`;
+  if (!CC.memories.length) return '<div style="color:#757d8b;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
   return CC.memories.map(m => `<div class="memrow${m.activo ? '' : ' off'}">
     <span class="memtipo t-${m.tipo === 'decisión' ? 'dec' : m.tipo}">${CC_MEM_TIPO[m.tipo] || m.tipo}</span>
     <div class="memtxt">${CC_ESC(m.texto)}<div class="memmeta">${m.fuente || 'manual'} · ${(m.fecha || '').slice(0, 10)}${m.has_embedding ? ' · vectorizada' : ''}</div></div>
@@ -736,7 +736,7 @@ function ccDailyHTML() {
   const inner = d.loading
     ? '<span class="daytxt shimmer">El Cerebro está leyendo tus números…</span>'
     : d.error
-      ? `<span class="daytxt" style="color:#e4756a">${CC_ESC(d.error)}</span>`
+      ? `<span class="daytxt" style="color:#ff6b6b">${CC_ESC(d.error)}</span>`
       : d.text
         ? `<span class="daytxt">${ccMdSafe(d.text)}</span>`
         : '<span class="daytxt" style="color:var(--mut2)">El Cerebro puede resumirte el día. Tocá ⟳ para generarlo.</span>';
@@ -808,7 +808,7 @@ function ccSecFinanzas(comp) {
     ${(() => { const hs = houses.filter(h => h.total > 0 || h.hipoFija > 0).sort((x, y) => x.flujoEstructural - y.flujoEstructural); const fila = h => `<tr><td>${CC_ESC((h.name || '').split(',')[0])}<div style="font-size:9px;opacity:.55">${CC_ESC(h.loanType || '')}</div></td><td style="text-align:right" class="up">${CC_MONEY(h.inc)}</td><td style="text-align:right">${CC_MONEY(h.exp)}</td><td style="text-align:right">${h.hipoFija ? CC_MONEY(h.hipoFija) : '—'}<div style="font-size:9px;opacity:.55">${h.hipo ? 'pagada ' + CC_MONEY(h.hipo) : 'sin pago reg.'}</div></td><td style="text-align:right" class="${h.net >= 0 ? 'up' : 'down'}">${CC_MONEY(h.net)}</td><td style="text-align:right" class="${h.flujoEstructural >= 0 ? 'up' : 'down'}"><b>${CC_MONEY(h.flujoEstructural)}</b> ${h.flujoEstructural >= 0 ? kitStatusDot('ok') : kitStatusDot('bad')}</td></tr>`; const okN = hs.filter(h => h.flujoEstructural >= 0).length; return `<div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">P&L por casa — flujo estructural</div><div class="k">renta objetivo ocupada − hipoteca FIJA · regla del Cerebro: déficit OK si flujo+ · ${okN}/${hs.length} en verde</div></div><table class="ptable"><thead><tr><th>Casa</th><th style="text-align:right">Ingreso mes</th><th style="text-align:right">Gastos mes</th><th style="text-align:right">Hipoteca fija</th><th style="text-align:right">Flujo real</th><th style="text-align:right">Flujo estructural</th></tr></thead><tbody>${hs.map(fila).join('')}</tbody></table><div class="meta" style="margin-top:8px">Hipoteca FIJA = obligación mensual (espejo de Casas.Hipoteca mensual, 19 casas). "Flujo real" = ingreso − gastos del mes (depende de lo registrado); "flujo estructural" = capacidad de la casa a ocupación actual.</div></div></div>`; })()}
     <div class="grid row2"><div class="card"><div class="chart-h"><div class="t">Casas en pérdida (${rojo.length})</div><div class="k">peor primero</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Ingreso</th><th>Hipoteca</th><th>Gasto</th><th>Neto</th></tr></thead><tbody>
-      ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#63c08e">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
+      ${rojo.slice(0, 10).map(h => `<tr><td>${CC_ESC(h.name).slice(0, 26)}</td><td>${CC_MONEY(h.inc)}</td><td>${CC_MONEY(h.hipo)}</td><td>${CC_MONEY(h.exp)}</td><td class="down">${CC_MONEY(h.net)}</td></tr>`).join('') || '<tr><td colspan="5" style="color:#4ade9e">Ninguna en pérdida ✓</td></tr>'}</tbody></table></div>
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div></div>`;
 }
 // ─── SECCIÓN: RESERVAS ───
@@ -819,7 +819,7 @@ function ccSecReservas(comp) {
   const pName = id => CC.props.find(p => p.id === id)?.name || '—';
   // Cadena viva: cada reserva puede tener su tarea de turnover/recepción (auto-generada en el sync).
   const relTask = b => CC.tasks.find(t => t.property_id === b.property_id && ['cleaning', 'recepcion'].includes(t.task_type) && !['completado', 'cancelado'].includes(t.status));
-  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#7c7365">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? 'turnover' : 'recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
+  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#757d8b">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? 'turnover' : 'recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
   return `${ccHeader('Reservas', 'Calendario', `${CC.book.length} reservas · ${activas.length} activas · cadena reserva → turnover → gasto → KPI`)}
     <div class="grid"><div class="card"><div class="chart-h"><div class="t">Reservas activas</div><div class="k">reserva → tarea de operación</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Inquilino</th><th>Entrada</th><th>Salida</th><th>Estado</th><th>Operación</th></tr></thead><tbody>
@@ -839,7 +839,7 @@ function ccSecOperacion(comp) {
     </div>
     <div class="grid" style="margin-top:16px"><div class="card empty-sec">
       <div class="orb" style="margin:0 auto 14px"></div>
-      <div style="color:#efe9de;font-size:15px;font-weight:600">Cronograma unificado</div>
+      <div style="color:#f1f3f7;font-size:15px;font-weight:600">Cronograma unificado</div>
       <div style="margin-top:6px;max-width:440px;margin-inline:auto">El motor de operación (Armar día por zona, turnover automático desde check-outs, WhatsApp al equipo) ya vive en el módulo <b>Cronograma</b>.</div>
       <button class="chip" style="margin-top:16px;padding:10px 18px" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</button>
     </div></div>`;
@@ -969,8 +969,8 @@ function ccExpTypeSeries(n = 6) {
 }
 function ccMountCharts(comp) {
   if (!window.Chart) return;
-  const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#7c7365', font: { size: 10 } } };
-  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#7c7365', font: { size: 10 } } }, y: ax } };
+  const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#757d8b', font: { size: 10 } } };
+  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#757d8b', font: { size: 10 } } }, y: ax } };
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); CC._charts.push(new Chart(el, cfg)); };
   const grad = (ctx, c1, c2) => { const g = ctx.createLinearGradient(0, 0, 0, 150); g.addColorStop(0, c1); g.addColorStop(1, c2); return g; };
   // sparklines
@@ -978,32 +978,32 @@ function ccMountCharts(comp) {
   const tr = ccTrend6();
   // ingresos vs gastos
   const cfEl = document.getElementById('cc-cf');
-  if (cfEl) { const ctx = cfEl.getContext('2d'); mk('cc-cf', { type: 'line', data: { labels: tr.labels, datasets: [{ label: 'Ingresos', data: tr.inc, borderColor: '#63c08e', backgroundColor: grad(ctx, 'rgba(72,214,156,.20)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }, { label: 'Gastos', data: tr.exp, borderColor: '#e4756a', backgroundColor: grad(ctx, 'rgba(240,104,122,.14)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }] }, options: gext }); }
+  if (cfEl) { const ctx = cfEl.getContext('2d'); mk('cc-cf', { type: 'line', data: { labels: tr.labels, datasets: [{ label: 'Ingresos', data: tr.inc, borderColor: '#4ade9e', backgroundColor: grad(ctx, 'rgba(74,222,158,.20)', 'rgba(74,222,158,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }, { label: 'Gastos', data: tr.exp, borderColor: '#ff6b6b', backgroundColor: grad(ctx, 'rgba(255,107,107,.14)', 'rgba(255,107,107,0)'), fill: true, tension: .4, pointRadius: 2.5, borderWidth: 2.2 }] }, options: gext }); }
   // cashflow por casa
   const hs = [...comp.houses].filter(h => h.inc > 0 || h.exp > 0).sort((a, b) => b.net - a.net).slice(0, 10);
-  mk('cc-house', { type: 'bar', data: { labels: hs.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hs.map(h => h.net), borderRadius: 5, backgroundColor: hs.map(h => h.net >= 0 ? '#63c08e' : '#e4756a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#a89f8f', font: { size: 10 } } } } } });
+  mk('cc-house', { type: 'bar', data: { labels: hs.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hs.map(h => h.net), borderRadius: 5, backgroundColor: hs.map(h => h.net >= 0 ? '#4ade9e' : '#ff6b6b') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#8b93a1', font: { size: 10 } } } } } });
   // donut gastos por tipo
   const mb = comp.mb; const inM = d => d && d >= mb.from && d <= mb.to;
   const bucket = e => { const s = (e.subcategory || '').toLowerCase(); if (/hipotec/.test(s)) return 'Hipoteca'; if (/servicio|públic|publico/.test(s)) return 'Servicios'; if (/nómina|nomina|equipo/.test(s)) return 'Nómina'; if (/plataforma/.test(s)) return 'Plataforma'; if (/aseo|podada|mantenim/.test(s)) return 'Mantenimiento'; return 'Otros'; };
   const byB = {}; CC.exp.filter(e => inM(e.expense_date)).forEach(e => byB[bucket(e)] = (byB[bucket(e)] || 0) + Number(e.amount || 0));
   const bl = Object.keys(byB), bv = Object.values(byB);
-  mk('cc-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4e9b72', '#6fbf95', '#c9a85c', '#3a6f74', '#4a5568', '#dca94f'], borderColor: '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: '#a89f8f', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
+  mk('cc-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#3a5be0', '#5c79f0', '#93b0e2', '#3a6f74', '#4a5568', '#fbbf24'], borderColor: '#131519', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
 
   // ─── Charts de ANALÍTICA (solo si la sección está activa) ───
   if (document.getElementById('cc-an-ie')) {
     const s12 = ccMonthsSeries(12); const inc12 = s12.inc.map(v => v / 1000), exp12 = s12.exp.map(v => v / 1000), cf12 = s12.cf.map(v => v / 1000);
     const ieEl = document.getElementById('cc-an-ie'); const ictx = ieEl.getContext('2d');
     mk('cc-an-ie', { type: 'line', data: { labels: s12.labels, datasets: [
-      { label: 'Ingresos', data: inc12, borderColor: '#63c08e', backgroundColor: grad(ictx, 'rgba(72,214,156,.18)', 'rgba(72,214,156,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
-      { label: 'Gastos', data: exp12, borderColor: '#e4756a', backgroundColor: grad(ictx, 'rgba(240,104,122,.12)', 'rgba(240,104,122,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: gext });
-    mk('cc-an-cf', { type: 'bar', data: { labels: s12.labels, datasets: [{ data: cf12, borderRadius: 4, backgroundColor: cf12.map(v => v >= 0 ? '#63c08e' : '#e4756a') }] }, options: gext });
+      { label: 'Ingresos', data: inc12, borderColor: '#4ade9e', backgroundColor: grad(ictx, 'rgba(74,222,158,.18)', 'rgba(74,222,158,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
+      { label: 'Gastos', data: exp12, borderColor: '#ff6b6b', backgroundColor: grad(ictx, 'rgba(255,107,107,.12)', 'rgba(255,107,107,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: gext });
+    mk('cc-an-cf', { type: 'bar', data: { labels: s12.labels, datasets: [{ data: cf12, borderRadius: 4, backgroundColor: cf12.map(v => v >= 0 ? '#4ade9e' : '#ff6b6b') }] }, options: gext });
     const occ = ccOccSeries(12);
-    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#4e9b72', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(79,141,255,.18)', 'rgba(79,141,255,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#7c7365', font: { size: 10 }, callback: v => v + '%' } } } } });
+    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#3a5be0', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(58,91,224,.18)', 'rgba(58,91,224,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#757d8b', font: { size: 10 }, callback: v => v + '%' } } } } });
     const hn = [...comp.houses].filter(h => h.inc > 0 || h.exp > 0).sort((a, b) => b.net - a.net);
-    mk('cc-an-noibar', { type: 'bar', data: { labels: hn.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hn.map(h => h.net), borderRadius: 4, backgroundColor: hn.map(h => h.net >= 0 ? '#63c08e' : '#e4756a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#a89f8f', font: { size: 9 } } } } } });
-    mk('cc-an-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#4e9b72', '#6fbf95', '#c9a85c', '#3a6f74', '#4a5568', '#dca94f'], borderColor: '#17140f', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: '#a89f8f', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
-    const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#e4756a', 'Servicios': '#4e9b72', 'Mantenim.': '#6fbf95', 'Nómina': '#c9a85c', 'Plataforma': '#dca94f', 'Otros': '#4a5568' };
-    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#a89f8f', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#7c7365', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
+    mk('cc-an-noibar', { type: 'bar', data: { labels: hn.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hn.map(h => h.net), borderRadius: 4, backgroundColor: hn.map(h => h.net >= 0 ? '#4ade9e' : '#ff6b6b') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#8b93a1', font: { size: 9 } } } } } });
+    mk('cc-an-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#3a5be0', '#5c79f0', '#93b0e2', '#3a6f74', '#4a5568', '#fbbf24'], borderColor: '#131519', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
+    const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#ff6b6b', 'Servicios': '#3a5be0', 'Mantenim.': '#5c79f0', 'Nómina': '#93b0e2', 'Plataforma': '#fbbf24', 'Otros': '#4a5568' };
+    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#757d8b', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
   }
 }
 
@@ -1075,7 +1075,7 @@ function ccCobranzaPanel() {
     </div>
     <div class="grid" style="margin-top:14px"><div class="card"><div class="chart-h"><div class="t">Cobranza · aging por inquilino</div><div class="k">últimos 3 meses · draft de cobro con un click</div></div>
       <table class="ptable"><thead><tr><th>Inquilino</th><th style="text-align:right">Renta/mes</th><th style="text-align:right">${ag.meses[0].label}</th><th style="text-align:right">${ag.meses[1].label}</th><th style="text-align:right">${ag.meses[2].label}</th><th style="text-align:right">Deuda</th><th></th></tr></thead><tbody>
-      ${ag.rows.map(fila).join('') || '<tr><td colspan="7" style="color:#63c08e;padding:14px">Sin deuda de cobranza ✓</td></tr>'}</tbody></table>
+      ${ag.rows.map(fila).join('') || '<tr><td colspan="7" style="color:#4ade9e;padding:14px">Sin deuda de cobranza ✓</td></tr>'}</tbody></table>
       <div class="meta" style="margin-top:8px">"n/a" = el inquilino aún no vivía ese mes. El draft se copia al portapapeles y abre WhatsApp si hay teléfono (no se envía solo — lo aprobás vos).</div></div></div>`;
 }
 
@@ -1091,7 +1091,7 @@ function ccContratosPanel() {
   return `<div class="grid row2" style="margin-top:14px">
     <div class="card"><div class="chart-h"><div class="t">Contratos por vencer (60 días)</div><div class="k">${porVencer.length} de ${activos.length} activos</div></div>
       <table class="ptable"><thead><tr><th>Inquilino</th><th>Fin de contrato</th><th style="text-align:right">Vence en</th><th style="text-align:right">Renta</th><th style="text-align:right">Depósito</th></tr></thead><tbody>
-      ${porVencer.map(fila).join('') || '<tr><td colspan="5" style="color:#63c08e;padding:12px">Ningún contrato vence en 60 días ✓</td></tr>'}</tbody></table></div>
+      ${porVencer.map(fila).join('') || '<tr><td colspan="5" style="color:#4ade9e;padding:12px">Ningún contrato vence en 60 días ✓</td></tr>'}</tbody></table></div>
     <div class="card"><div class="chart-h"><div class="t">Depósitos en custodia</div><div class="k">regla del Cerebro: los depósitos NO son renta</div></div>
       <div class="grid kpis" style="grid-template-columns:1fr 1fr"><div class="card kpi"><div class="lab">Total en custodia</div><div class="big warn">${CC_MONEY(depTotal)}</div><div class="meta">${depositos.length} inquilino(s) activos con depósito</div></div>
       <div class="card kpi"><div class="lab">Pasivo</div><div class="big" style="font-size:13px;line-height:1.4">devolver al salir (o aplicar a daños)</div><div class="meta">fuente: Inquilinos.Depósito</div></div></div>

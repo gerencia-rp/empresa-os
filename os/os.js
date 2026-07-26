@@ -9,7 +9,7 @@ window.OS = OS;
 const OS_M = n => posMoney(n);              // #10: formato único (exacto con separador)
 const OS_K = n => posMoneyK(n);             // #10: formato único (compacto $X.XXM / $XXXk)
 const OS_E = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-function osAx() { return posGetTheme() === 'light' ? '#756c5c' : '#7c7365'; }
+function osAx() { return posGetTheme() === 'light' ? '#6f7785' : '#757d8b'; }
 // Icono de empresa/app/área: nombre Lucide → SVG (osIcon); glifo tipográfico (◧ ▦ ∑ ⌂ …) → tal cual.
 function osIco(val, opts) { return (window.OS_ICONS && OS_ICONS[val]) ? osIcon(val, opts) : (val || ''); }
 
@@ -68,61 +68,66 @@ function osInjectCSS() {
   const st = document.createElement('style'); st.id = 'os-styles';
   st.textContent = `
   #os-root{position:fixed;inset:0;z-index:900;overflow:auto;
-    --bg:#14110c;--ink:#efe9de;--mut:#a89f8f;--mut2:#7c7365;--glass:rgba(255,246,230,.05);--glassb:rgba(255,246,230,.11);
-    --a1:#6fbf95;--a2:#4e9b72;--a3:#c9a85c;--pos:#63c08e;--neg:#e4756a;--amber:#dca94f;
-    --accent:#2f6b4f;--accent-ink:#ffffff;--grad:linear-gradient(135deg,#45936c,#2f6b4f);
-    --mesh1:rgba(111,191,149,.11);--mesh2:rgba(78,155,114,.10);--mesh3:rgba(201,168,92,.08);--bggrad:linear-gradient(180deg,#16130d,#100e08);
+    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:#131519;--glassb:rgba(255,255,255,.07);
+    --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
+    --accent:#3a5be0;--accent-ink:#ffffff;--accent-2:#5c79f0;--accent-soft:rgba(58,91,224,.18);--glow:rgba(58,91,224,.5);--grad:linear-gradient(120deg,#3a5be0,#5c79f0);
+    --card:#131519;--line:rgba(255,255,255,.07);--txt2:#c7cdd8;--txt3:#8b93a1;--surface-2:#191c22;--surface-solid:#161a20;--radius:20px;
+    --mesh1:rgba(58,91,224,.5);--mesh2:rgba(92,121,240,.16);--mesh3:rgba(58,91,224,.10);--bggrad:#08090c;
     color:var(--ink);background:var(--bg);font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  /* LIGHT canon jul-2026 (papel cálido) — ESPEJO de ui/tokens.css (mantener sincronizado) */
-  #os-root[data-theme="light"]{--bg:#f7f5f0;--ink:#211e17;--mut:#5f594c;--mut2:#756c5c;--glass:#ffffff;--glassb:#e8e3d9;
-    --a1:#2f6b4f;--a2:#275c43;--a3:#8a6a2f;--pos:#1f7a4d;--neg:#b3372f;--amber:#8a6400;
-    --grad:linear-gradient(135deg,#377c5c,#2f6b4f);
-    --mesh1:rgba(47,107,79,.05);--mesh2:rgba(39,92,67,.04);--mesh3:rgba(138,106,47,.04);--bggrad:linear-gradient(180deg,#f9f7f2,#f2efe8)}
+  /* LIGHT canon royal — ESPEJO de ui/tokens.css (mantener sincronizado) */
+  #os-root[data-theme="light"]{--bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
+    --a1:#3e5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309;
+    --accent:#2b44c6;--accent-2:#3e5be0;--accent-soft:rgba(43,68,198,.12);--glow:rgba(43,68,198,.24);--grad:linear-gradient(120deg,#2b44c6,#3e5be0);
+    --card:#ffffff;--line:rgba(14,20,32,.09);--txt2:#3a4250;--txt3:#5a6270;--surface-2:#f1f4f8;--surface-solid:#ffffff;
+    --mesh1:rgba(43,68,198,.24);--mesh2:rgba(62,91,224,.08);--mesh3:rgba(43,68,198,.05);--bggrad:#eef1f6}
   #os-root *{box-sizing:border-box;margin:0;padding:0}
-  #os-root .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(760px 520px at 8% -6%,var(--mesh1),transparent 58%),radial-gradient(820px 560px at 100% 4%,var(--mesh2),transparent 56%),radial-gradient(700px 620px at 70% 118%,var(--mesh3),transparent 60%),var(--bggrad)}
+  #os-root .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(1100px 560px at 78% -12%,var(--mesh1),transparent 62%),radial-gradient(760px 520px at 8% 2%,var(--mesh2),transparent 58%),radial-gradient(700px 620px at 20% 120%,var(--mesh3),transparent 60%),var(--bggrad)}
+  #os-root .bgfx::after{content:"";position:absolute;inset:0;opacity:.11;background-image:linear-gradient(var(--glassb) 1px,transparent 1px),linear-gradient(90deg,var(--glassb) 1px,transparent 1px);background-size:52px 52px;-webkit-mask-image:radial-gradient(circle at 60% 0%,#000,transparent 75%);mask-image:radial-gradient(circle at 60% 0%,#000,transparent 75%)}
   #os-root .wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:22px 30px 60px}
   #os-root .bar{display:flex;align-items:center;gap:14px;margin-bottom:24px}
-  #os-root .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;color:var(--accent-ink);font-weight:900;font-size:15px;box-shadow:0 6px 20px -6px rgba(47,107,79,.55)}
+  #os-root .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;color:var(--accent-ink);font-weight:900;font-size:15px;box-shadow:0 0 18px var(--glow)}
   #os-root .brandt b{font-size:16px;font-weight:760}#os-root .brandt span{display:block;font-size:9px;color:var(--mut2);letter-spacing:2.4px;margin-top:1px}
   #os-root .crumbs{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);margin-left:8px}
   #os-root .crumbs a{color:var(--mut);cursor:pointer;text-decoration:none}#os-root .crumbs a:hover{color:var(--ink)}#os-root .crumbs .sep{color:var(--mut2)}#os-root .crumbs b{color:var(--ink)}
   #os-root .barr{margin-left:auto;display:flex;gap:8px;align-items:center}
   #os-root .ibtn{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);height:34px;padding:0 12px;border-radius:10px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px)}
   #os-root .ibtn:hover{color:var(--ink);border-color:var(--a2)}
-  #os-root h1{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:640;letter-spacing:-.3px}#os-root h1 span{color:var(--a1)}
+  #os-root h1{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:640;letter-spacing:-.3px}#os-root h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   #os-root .sub{color:var(--mut);font-size:13px;margin:5px 0 20px}
   #os-root .grid{display:grid;gap:16px}#os-root .k4{grid-template-columns:repeat(4,minmax(0,1fr))}#os-root .k3{grid-template-columns:repeat(3,minmax(0,1fr))}#os-root .k2{grid-template-columns:repeat(2,minmax(0,1fr))}
-  #os-root .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:16px;padding:19px;backdrop-filter:blur(18px);box-shadow:0 26px 60px -34px rgba(0,0,0,.9);transition:.2s;overflow:hidden}
-  #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(64,54,32,.05),0 6px 16px rgba(64,54,32,.06)}
-  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#f6eed6;color:#8a6400;border-color:#e3d5a8}
+  #os-root .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:var(--radius);padding:19px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 22px 44px -28px rgba(0,0,0,.85);transition:.2s;overflow:hidden}
+  #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(16,20,28,.04),0 18px 40px -28px rgba(16,20,28,.4)}
+  /* Barra de acento superior en KPIs (design-ref .kpi::after) */
+  #os-root .grid.k4>.card::after,#os-root .card.kpi::after{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad);opacity:.45}
+  #os-root[data-theme="light"] .osbadge.warn,#os-root[data-theme="light"] .badge.b-warn{background:#e7edf9;color:#b45309;border-color:#c9d4ea}
   #os-root .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
-  #os-root[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(64,54,32,.12),transparent)}
+  #os-root[data-theme="light"] .card::before{background:linear-gradient(90deg,transparent,rgba(16,20,28,.12),transparent)}
   #os-root .lab{font-size:10px;letter-spacing:1.4px;color:var(--mut2);text-transform:uppercase;font-weight:700}
-  #os-root .big{font-size:29px;font-weight:780;margin-top:8px;letter-spacing:-.6px;font-variant-numeric:tabular-nums}#os-root .glow{text-shadow:0 0 22px rgba(111,191,149,.3)}#os-root[data-theme="light"] .glow{text-shadow:none}
+  #os-root .big{font-size:29px;font-weight:780;margin-top:8px;letter-spacing:-.6px;font-variant-numeric:tabular-nums}#os-root .glow{text-shadow:0 0 24px var(--glow)}#os-root[data-theme="light"] .glow{text-shadow:none}
   #os-root .meta{font-size:11.5px;color:var(--mut);margin-top:6px;line-height:1.5}
   #os-root .osbadge{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 9px;border-radius:20px;margin-top:7px;letter-spacing:.2px}
-  #os-root .osbadge.warn{background:rgba(231,182,94,.16);color:var(--amber);border:1px solid rgba(231,182,94,.32)}
-  #os-root .osbadge.ok{background:rgba(72,214,156,.14);color:var(--pos);border:1px solid rgba(72,214,156,.3)}
-  #os-root .ff-dqx{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(240,104,122,.16);color:var(--neg);border:1px solid rgba(240,104,122,.35);white-space:nowrap}
+  #os-root .osbadge.warn{background:var(--amber-bg,color-mix(in srgb,var(--amber) 16%,transparent));color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 32%,transparent)}
+  #os-root .osbadge.ok{background:color-mix(in srgb,var(--pos) 14%,transparent);color:var(--pos);border:1px solid color-mix(in srgb,var(--pos) 30%,transparent)}
+  #os-root .ff-dqx{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:color-mix(in srgb,var(--neg) 16%,transparent);color:var(--neg);border:1px solid color-mix(in srgb,var(--neg) 35%,transparent);white-space:nowrap}
   #os-root .up{color:var(--pos)}#os-root .down{color:var(--neg)}#os-root .warn{color:var(--amber)}
   #os-root .unit{cursor:pointer}#os-root .unit:hover{transform:translateY(-3px);border-color:var(--a2)}
   #os-root .unit .ico{font-size:26px}#os-root .unit .un{font-size:16px;font-weight:700;margin-top:9px}#os-root .unit .ut{font-size:11.5px;color:var(--mut2);margin-top:3px;min-height:30px}
   #os-root .unit .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-top:1px solid var(--glassb);margin-top:10px}#os-root .unit .kv b{color:var(--ink)}
   #os-root .card:not(.unit) .kv{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--glassb)}#os-root .card:not(.unit) .kv:first-of-type{border-top:none}#os-root .card:not(.unit) .kv span{color:var(--mut)}#os-root .card:not(.unit) .kv b{color:var(--ink);text-align:right}
   #os-root .go{font-size:11px;color:var(--a2);margin-top:12px;font-weight:600}
-  #os-root .brain{background:linear-gradient(180deg,rgba(42,52,38,.5),rgba(22,26,18,.5));border:1px solid rgba(201,168,92,.28)}
-  #os-root[data-theme="light"] .brain{background:linear-gradient(180deg,rgba(138,106,47,.08),rgba(47,107,79,.05))}
+  #os-root .brain{border:1px solid transparent;background:linear-gradient(var(--surface-solid),var(--surface-solid)) padding-box,var(--grad) border-box;box-shadow:0 0 40px -20px var(--glow)}
+  #os-root[data-theme="light"] .brain{background:linear-gradient(#ffffff,#ffffff) padding-box,var(--grad) border-box}
   #os-root .bh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-  #os-root .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 30%,#b8e6cd,#6fbf95 30%,#2f6b4f 70%,#1c3327);box-shadow:0 0 22px rgba(47,107,79,.5)}
+  #os-root .orb{width:32px;height:32px;border-radius:50%;position:relative;background:radial-gradient(circle at 34% 26%,rgba(255,255,255,.85),transparent 32%),radial-gradient(circle at 30% 34%,var(--accent-2),transparent 58%),radial-gradient(circle at 70% 74%,var(--accent),#060814 92%);box-shadow:0 0 16px var(--glow),inset 0 -4px 10px rgba(0,0,0,.5)}
   #os-root .orb::after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a3),var(--a1)) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:osspin 6s linear infinite;opacity:.7}@keyframes osspin{to{transform:rotate(360deg)}}
   #os-root .bh b{font-size:14px}#os-root .bh span{font-size:9px;color:var(--mut2);display:block;letter-spacing:1.4px;margin-top:2px}
   #os-root .insight{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--glassb)}#os-root .insight:last-of-type{border-bottom:none}
   #os-root .insight .ic{font-size:8px;margin-top:6px}#os-root .ic.r{color:var(--neg)}#os-root .ic.y{color:var(--amber)}#os-root .ic.g{color:var(--pos)}#os-root .ic.b{color:var(--a2)}
   #os-root .insight .tx{font-size:12px;line-height:1.5}#os-root .insight .tx b{font-weight:650}#os-root .insight .tag{font-size:9px;color:var(--mut2);font-weight:700;letter-spacing:.6px;margin-top:4px;display:block}
   #os-root .app-card{cursor:pointer;display:flex;align-items:center;gap:13px}#os-root .app-card:hover{transform:translateY(-2px);border-color:var(--a2)}
-  #os-root .app-card .ai{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,rgba(111,191,149,.16),rgba(47,107,79,.1));display:grid;place-items:center;font-size:17px;flex-shrink:0}
+  #os-root .app-card .ai{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,rgba(92,121,240,.16),rgba(58,91,224,.1));display:grid;place-items:center;font-size:17px;flex-shrink:0}
   #os-root .app-card .an{font-size:13.5px;font-weight:640}#os-root .app-card .at{font-size:10.5px;color:var(--mut2);margin-top:2px}
-  #os-root .soon{font-size:8.5px;font-weight:700;color:var(--a2);background:rgba(78,155,114,.12);padding:2px 7px;border-radius:10px;margin-left:auto}
+  #os-root .soon{font-size:8.5px;font-weight:700;color:var(--a2);background:var(--accent-soft);padding:2px 7px;border-radius:10px;margin-left:auto}
   #os-root .ptable{width:100%;border-collapse:collapse;font-size:12.5px}
   #os-root .ptable th{text-align:left;color:var(--mut2);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 8px;border-bottom:1px solid var(--glassb);font-weight:700}
   #os-root .ptable td{padding:10px 8px;border-bottom:1px solid var(--glassb)}#os-root .ptable tr:hover td{background:var(--glass)}
@@ -134,7 +139,7 @@ function osInjectCSS() {
   #os-root .cbtable tbody tr:not(.cb-detail):nth-child(4n-1){background:color-mix(in srgb,var(--glass) 45%,transparent)}
   #os-root .cbtable tbody tr:not(.cb-detail):hover td{background:var(--glass)}
   #os-root .cbtable tr.cb-detail td{background:var(--glass)}
-  #os-root .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}#os-root .b-red{background:rgba(240,104,122,.13);color:var(--neg)}#os-root .b-warn{background:rgba(231,182,94,.13);color:var(--amber)}#os-root .b-ok{background:rgba(72,214,156,.13);color:var(--pos)}
+  #os-root .badge{font-size:10px;padding:3px 9px;border-radius:7px;font-weight:600}#os-root .b-red{background:color-mix(in srgb,var(--neg) 13%,transparent);color:var(--neg)}#os-root .b-warn{background:var(--amber-bg,color-mix(in srgb,var(--amber) 13%,transparent));color:var(--amber)}#os-root .b-ok{background:color-mix(in srgb,var(--pos) 13%,transparent);color:var(--pos)}
   #os-root .chart-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}#os-root .chart-h .t{font-size:13.5px;font-weight:640}#os-root .chart-h .k{font-size:11px;color:var(--mut2)}
   #os-root .op-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--glassb);font-size:12px}#os-root .op-time{color:var(--mut2);width:46px;font-variant-numeric:tabular-nums}
   #os-root .zpill{margin-left:auto;font-size:9.5px;padding:2px 9px;border-radius:20px;background:var(--glass);color:var(--mut)}
@@ -143,36 +148,36 @@ function osInjectCSS() {
   #os-root .card,#os-root .wrap{animation:osfade .35s ease}@keyframes osfade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
   #os-root .cc-chat{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;margin-top:6px}#os-root .cc-chat:empty{display:none}
   #os-root .cbub{max-width:82%;padding:10px 13px;border-radius:13px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
-  #os-root .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(111,191,149,.16),rgba(78,155,114,.14));border:1px solid rgba(78,155,114,.3)}
-  #os-root .cbub.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)}#os-root .cbub.err{border-color:rgba(240,104,122,.4);color:var(--neg)}#os-root .cbub.think{color:var(--mut2);font-style:italic}
-  #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--glass);border:1px solid rgba(201,168,92,.3);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}
+  #os-root .cbub.u{align-self:flex-end;background:linear-gradient(135deg,rgba(92,121,240,.18),rgba(58,91,224,.16));border:1px solid rgba(58,91,224,.35)}
+  #os-root .cbub.a{align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)}#os-root .cbub.err{border-color:color-mix(in srgb,var(--neg) 40%,transparent);color:var(--neg)}#os-root .cbub.think{color:var(--mut2);font-style:italic}
+  #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--surface-2);border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}#os-root .ask input:focus{border-color:var(--accent)}
   #os-root .ask button{background:var(--grad);border:none;color:var(--accent-ink);font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   @media (max-width:900px){#os-root .wrap{padding:16px 14px 40px}#os-root .k4,#os-root .k3,#os-root .k2{grid-template-columns:minmax(0,1fr)}#os-root .k4.units{grid-template-columns:repeat(2,minmax(0,1fr))}}
   /* ── TOPBAR del OS sobre los sistemas en PÁGINA COMPLETA (marco de empresa) ── */
   #os-return-bar{position:fixed;top:0;left:0;right:0;z-index:2147483000;display:flex;align-items:center;gap:14px;height:54px;padding:0 20px;
-    font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:rgba(18,15,10,.72);border-bottom:1px solid rgba(255,246,230,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.82);border-bottom-color:rgba(64,54,32,.08)}
-  #os-return-bar .osrb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#45936c,#2f6b4f);display:grid;place-items:center;color:#fff;font-weight:900;font-size:12px;cursor:pointer;flex-shrink:0}
-  #os-return-bar .osrb-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:#a89f8f;min-width:0}
-  #os-return-bar .osrb-crumb a{color:#a89f8f;cursor:pointer;text-decoration:none;white-space:nowrap}#os-return-bar .osrb-crumb a:hover{color:#efe9de}
-  #os-return-bar .osrb-crumb b{color:#efe9de;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#7c7365}
-  #os-return-bar[data-theme="light"] .osrb-crumb,#os-return-bar[data-theme="light"] .osrb-crumb a{color:#5f594c}#os-return-bar[data-theme="light"] .osrb-crumb b{color:#211e17}
-  #os-return-bar .osrb-back{margin-left:auto;background:rgba(255,246,230,.07);border:1px solid rgba(255,246,230,.13);color:#efe9de;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0}
-  #os-return-bar .osrb-back:hover{border-color:#4e9b72}
-  #os-return-bar[data-theme="light"] .osrb-back{background:rgba(64,54,32,.05);border-color:rgba(64,54,32,.12);color:#211e17}
-  #os-return-bar .osrb-theme{background:rgba(255,246,230,.07);border:1px solid rgba(255,246,230,.13);color:#a89f8f;font-size:13px;padding:8px 11px;border-radius:9px;cursor:pointer;flex-shrink:0}
-  #os-return-bar[data-theme="light"] .osrb-theme{background:rgba(64,54,32,.05);border-color:rgba(64,54,32,.12);color:#5f594c}
+    font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:rgba(8,9,12,.72);border-bottom:1px solid rgba(255,255,255,.07);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  #os-return-bar[data-theme="light"]{background:rgba(255,255,255,.82);border-bottom-color:rgba(14,20,32,.09)}
+  #os-return-bar .osrb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(120deg,#3a5be0,#5c79f0);display:grid;place-items:center;color:#fff;font-weight:900;font-size:12px;cursor:pointer;flex-shrink:0;box-shadow:0 0 14px rgba(58,91,224,.5)}
+  #os-return-bar .osrb-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:#8b93a1;min-width:0}
+  #os-return-bar .osrb-crumb a{color:#8b93a1;cursor:pointer;text-decoration:none;white-space:nowrap}#os-return-bar .osrb-crumb a:hover{color:#f1f3f7}
+  #os-return-bar .osrb-crumb b{color:#f1f3f7;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#757d8b}
+  #os-return-bar[data-theme="light"] .osrb-crumb,#os-return-bar[data-theme="light"] .osrb-crumb a{color:#5a6270}#os-return-bar[data-theme="light"] .osrb-crumb b{color:#0e1420}
+  #os-return-bar .osrb-back{margin-left:auto;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#f1f3f7;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  #os-return-bar .osrb-back:hover{border-color:#3a5be0}
+  #os-return-bar[data-theme="light"] .osrb-back{background:rgba(14,20,32,.05);border-color:rgba(14,20,32,.12);color:#0e1420}
+  #os-return-bar .osrb-theme{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#8b93a1;font-size:13px;padding:8px 11px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  #os-return-bar[data-theme="light"] .osrb-theme{background:rgba(14,20,32,.05);border-color:rgba(14,20,32,.12);color:#5a6270}
   /* ── #modal como PÁGINA COMPLETA (no modal flotante): ocupa todo, mesh de fondo, sin backdrop ── */
   #modal.os-syspage{padding:0 !important;display:block !important;overflow-y:auto;background:transparent}
   html[data-osreskin="dark"] #modal.os-syspage{background:
-    radial-gradient(760px 520px at 6% -6%,rgba(111,191,149,.10),transparent 58%),
-    radial-gradient(820px 560px at 100% 2%,rgba(78,155,114,.10),transparent 56%),
-    radial-gradient(700px 620px at 74% 120%,rgba(201,168,92,.07),transparent 60%),
-    linear-gradient(180deg,#16130d,#100e08) !important}
+    radial-gradient(1100px 560px at 78% -12%,rgba(58,91,224,.28),transparent 62%),
+    radial-gradient(760px 520px at 8% 2%,rgba(92,121,240,.10),transparent 58%),
+    radial-gradient(700px 620px at 20% 120%,rgba(58,91,224,.07),transparent 60%),
+    #08090c !important}
   html[data-osreskin="light"] #modal.os-syspage{background:
-    radial-gradient(760px 520px at 6% -6%,rgba(47,107,79,.05),transparent 58%),
-    radial-gradient(820px 560px at 100% 2%,rgba(39,92,67,.04),transparent 56%),
-    linear-gradient(180deg,#f9f7f2,#f2efe8) !important}
+    radial-gradient(1100px 560px at 78% -12%,rgba(43,68,198,.16),transparent 62%),
+    radial-gradient(760px 520px at 8% 2%,rgba(62,91,224,.05),transparent 58%),
+    #eef1f6 !important}
   #modal.os-syspage > div.bg-white{max-width:1520px !important;width:calc(100% - 40px) !important;margin:72px auto 28px !important;min-height:calc(100vh - 100px);max-height:none !important;height:auto !important;background:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;backdrop-filter:none !important;overflow:visible !important}
   #modal.os-syspage #modal-body{max-height:none !important;overflow:visible !important;padding:0 !important}
   /* ocultar el header propio del modal (título+×): el topbar del OS ya da contexto y "Volver" */
@@ -195,33 +200,33 @@ function osInjectReskin() {
   /* chrome del modal (ambos temas): más redondeado + tipografía del sistema nuevo */
   html[data-osreskin] #modal{transition:none}
   html[data-osreskin] #modal > div{border-radius:18px !important}
-  ${L} #modal > div{box-shadow:0 24px 70px -26px rgba(64,54,32,.34) !important}
+  ${L} #modal > div{box-shadow:0 24px 70px -26px rgba(16,20,28,.34) !important}
   /* ───────── DARK ───────── */
-  ${D} #modal{background:rgba(10,8,5,.66) !important}
-  ${D} #modal > div{background:#171410 !important;color:#efe9de !important;border:1px solid rgba(255,246,230,.1) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
-  ${D} #modal .bg-white,${D} #modal .bg-slate-50,${D} #modal .bg-slate-100,${D} #modal .bg-gray-50,${D} #modal .bg-gray-100,${D} #modal .bg-neutral-50,${D} #modal .bg-neutral-100{background-color:#1d1913 !important}
-  ${D} #modal .bg-slate-800,${D} #modal .bg-slate-900,${D} #modal .bg-gray-800,${D} #modal .bg-gray-900{background-color:#252017 !important}
-  ${D} #modal .text-slate-900,${D} #modal .text-slate-800,${D} #modal .text-slate-700,${D} #modal .text-slate-600,${D} #modal .text-gray-900,${D} #modal .text-gray-800,${D} #modal .text-gray-700,${D} #modal .text-black{color:#efe9de !important}
-  ${D} #modal .text-slate-500,${D} #modal .text-slate-400,${D} #modal .text-gray-500,${D} #modal .text-gray-400{color:#a89f8f !important}
-  ${D} #modal .border,${D} #modal .border-b,${D} #modal .border-t,${D} #modal .border-slate-200,${D} #modal .border-slate-100,${D} #modal .border-slate-300,${D} #modal .border-gray-200,${D} #modal .border-gray-100,${D} #modal .border-gray-300{border-color:rgba(255,246,230,.1) !important}
-  ${D} #modal .divide-slate-200 > *+*,${D} #modal .divide-gray-200 > *+*,${D} #modal .divide-slate-100 > *+*{border-color:rgba(255,246,230,.08) !important}
-  ${D} #modal input,${D} #modal select,${D} #modal textarea{background-color:#120f0a !important;color:#efe9de !important;border-color:rgba(255,246,230,.14) !important}
-  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#7c7365 !important}
-  ${D} #modal table th{color:#a89f8f !important}
-  ${D} #modal tr:hover td{background:rgba(255,246,230,.03) !important}
+  ${D} #modal{background:rgba(6,7,10,.66) !important}
+  ${D} #modal > div{background:#12141a !important;color:#f1f3f7 !important;border:1px solid rgba(255,255,255,.1) !important;box-shadow:0 34px 90px -32px rgba(0,0,0,.92) !important}
+  ${D} #modal .bg-white,${D} #modal .bg-slate-50,${D} #modal .bg-slate-100,${D} #modal .bg-gray-50,${D} #modal .bg-gray-100,${D} #modal .bg-neutral-50,${D} #modal .bg-neutral-100{background-color:#161a20 !important}
+  ${D} #modal .bg-slate-800,${D} #modal .bg-slate-900,${D} #modal .bg-gray-800,${D} #modal .bg-gray-900{background-color:#1e2430 !important}
+  ${D} #modal .text-slate-900,${D} #modal .text-slate-800,${D} #modal .text-slate-700,${D} #modal .text-slate-600,${D} #modal .text-gray-900,${D} #modal .text-gray-800,${D} #modal .text-gray-700,${D} #modal .text-black{color:#f1f3f7 !important}
+  ${D} #modal .text-slate-500,${D} #modal .text-slate-400,${D} #modal .text-gray-500,${D} #modal .text-gray-400{color:#8b93a1 !important}
+  ${D} #modal .border,${D} #modal .border-b,${D} #modal .border-t,${D} #modal .border-slate-200,${D} #modal .border-slate-100,${D} #modal .border-slate-300,${D} #modal .border-gray-200,${D} #modal .border-gray-100,${D} #modal .border-gray-300{border-color:rgba(255,255,255,.1) !important}
+  ${D} #modal .divide-slate-200 > *+*,${D} #modal .divide-gray-200 > *+*,${D} #modal .divide-slate-100 > *+*{border-color:rgba(255,255,255,.08) !important}
+  ${D} #modal input,${D} #modal select,${D} #modal textarea{background-color:#0e1016 !important;color:#f1f3f7 !important;border-color:rgba(255,255,255,.14) !important}
+  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#757d8b !important}
+  ${D} #modal table th{color:#8b93a1 !important}
+  ${D} #modal tr:hover td{background:rgba(255,255,255,.03) !important}
   ${D} #modal .shadow,${D} #modal .shadow-sm,${D} #modal .shadow-md,${D} #modal .shadow-lg{box-shadow:none !important}
   ${D} #modal .hover\\:bg-slate-50:hover,${D} #modal .hover\\:bg-slate-100:hover,${D} #modal .hover\\:bg-gray-50:hover,${D} #modal .hover\\:bg-gray-100:hover{background-color:rgba(255,255,255,.05) !important}
   /* bg-slate-900 lo maneja el sistema de diseño compartido (superficie oscura elevada, no gradiente,
      para no romper las cards de acento con sublabels muted). */
   /* Property Manager tiene su tema COMPLETO propio (pmInjectTheme en pm-main.js). */
   /* ───────── OLA 3 (12-jul): red de seguridad para ESTILOS INLINE de los clásicos en dark ───────── */
-  ${D} #modal [style*="background:#fff"],${D} #modal [style*="background: #fff"],${D} #modal [style*="background:white"],${D} #modal [style*="background-color:#fff"]{background-color:#1d1913 !important}
-  ${D} #modal [style*="background:#fafafa"],${D} #modal [style*="background:#f8fafc"],${D} #modal [style*="background:#f9fafb"],${D} #modal [style*="background:#f1f5f9"]{background-color:#1a1610 !important}
-  ${D} #modal [style*="color:#000"],${D} #modal [style*="color: #000"],${D} #modal [style*="color:black"],${D} #modal [style*="color:#111"],${D} #modal [style*="color:#1e293b"],${D} #modal [style*="color:#0f172a"]{color:#efe9de !important}
+  ${D} #modal [style*="background:#fff"],${D} #modal [style*="background: #fff"],${D} #modal [style*="background:white"],${D} #modal [style*="background-color:#fff"]{background-color:#161a20 !important}
+  ${D} #modal [style*="background:#fafafa"],${D} #modal [style*="background:#f8fafc"],${D} #modal [style*="background:#f9fafb"],${D} #modal [style*="background:#f1f5f9"]{background-color:#12141a !important}
+  ${D} #modal [style*="color:#000"],${D} #modal [style*="color: #000"],${D} #modal [style*="color:black"],${D} #modal [style*="color:#111"],${D} #modal [style*="color:#1e293b"],${D} #modal [style*="color:#0f172a"]{color:#f1f3f7 !important}
   /* ───────── OLA 3: pulido LIGHT canon (tarjetas con sombra + contraste mínimo --mut2) ───────── */
-  ${L} #modal .bg-white.rounded-xl,${L} #modal .bg-white.rounded-lg,${L} #modal .bg-white.rounded-2xl{box-shadow:0 1px 2px rgba(64,54,32,.05),0 6px 16px rgba(64,54,32,.06) !important;border-color:#e8e3d9 !important}
-  ${L} #modal .text-slate-500,${L} #modal .text-gray-500{color:#5f594c !important}
-  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#756c5c !important}
+  ${L} #modal .bg-white.rounded-xl,${L} #modal .bg-white.rounded-lg,${L} #modal .bg-white.rounded-2xl{box-shadow:0 1px 2px rgba(16,20,28,.05),0 6px 16px rgba(16,20,28,.06) !important;border-color:#dfe4ec !important}
+  ${L} #modal .text-slate-500,${L} #modal .text-gray-500{color:#5a6270 !important}
+  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#6f7785 !important}
   /* ───────── OLA 3: tablas de los clásicos scrollean en celular (no rompen la página) ───────── */
   @media (max-width:768px){ html[data-osreskin] #modal-body table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch} }
   `;
@@ -821,7 +826,7 @@ function osCasa(comp) {
       <div class="card"><div class="chart-h"><div class="t">${osIcon('construction')} Fix & Flip</div>${m.ff ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('fix-and-flip','deals')">Abrir Deals →</a>` : ''}</div>
         <div class="overx">${m.ff ? `${kv('Compra' + LIN('Compra'), fn.compra != null ? OS_M(fn.compra) : '—')}${kv('Remodelación' + LIN('Remodelación (draws)'), fn.rehabMostrar ? OS_M(fn.rehabMostrar.v) + ` <span style="font-size:10px;color:var(--mut2)">${fn.rehabMostrar.lbl}</span>` : '—')}${kv('Holding (draws)', m.ff.dr ? OS_M(m.ff.holding) : '—')}${kv('All-in', fn.allIn != null ? OS_M(fn.allIn) + (fn.faltan ? ' <span style="font-size:10px;color:var(--amber)">' + osIcon('alert') + ' faltan draws</span>' : '') : '—', m.ff.dq.revisar ? 'down' : '')}${kv('ARV', fn.arv != null ? OS_M(fn.arv) : '—')}${kv('Appraisal', m.ff.appraisal ? OS_M(m.ff.appraisal) : '—')}${kv('MAO (ARV×75% − costos)', fn.arv != null ? OS_M(fn.arv * 0.75 - (fn.rehabMostrar ? fn.rehabMostrar.v : 0) - (m.ff.dr ? m.ff.holding : 0)) : '—')}${kv('Cash-out', m.ff.cashout ? OS_M(m.ff.cashout) : '—')}${kv('HML (pago)', m.ff.hml_payment ? OS_M(m.ff.hml_payment) : '—')}${m.ff.dq.revisar ? `<div class="meta" style="margin-top:8px;color:var(--neg)">${osIcon('alert')} all-in > 100% del ARV — dato a revisar en Airtable (probable error de carga).</div>` : ''}` : `<div class="empty" style="padding:26px">Sin deal en Fix & Flip.</div>`}</div></div>
       <div class="card"><div class="chart-h"><div class="t">${osIcon('hammer')} Ficha de obra</div>${m.remodel ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('remodelacion','remodel-pro')">Abrir Estimador →</a>` : ''}</div>
-        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:rgba(231,182,94,.15);color:var(--amber);border-color:rgba(231,182,94,.32)">${osIcon('loader')} obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : ((m.ff && (/rentada|refinanciada|vendida|en_venta/.test(m.ff.stage || '') || fn.rehabReal != null || fn.draws != null)) ? `<div style="padding:14px 4px">${kv('Estado', 'Obra finalizada', 'up')}${fn.rehabReal != null ? kv('Costo de remodelación (real)', OS_M(fn.rehabReal)) : (fn.rehabEst != null ? kv('Remodelación (estimada)', OS_M(fn.rehabEst) + ' <span style="font-size:10px;color:var(--amber)">estimada</span>') : '')}${fn.draws != null ? kv('Draws desembolsados', OS_M(fn.draws)) : ''}<div class="meta" style="margin-top:8px">La casa ya pasó la etapa de obra (${OS_E(stageLbl)}). No hay registro de esta obra en la base de Remodelación — el resumen sale de Fix & Flip.</div></div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`)}</div></div>
+        <div class="overx">${m.remodel ? `${remoEnCurso ? `<div class="meta" style="margin-bottom:8px"><span class="ff-dqx" style="background:var(--amber-bg);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 32%,transparent)">${osIcon('loader')} obra en curso · estimado/utilidad preliminar (no final)</span></div>` : ''}${kv('Estado · Avance', `${OS_E(remoR.proceso || '—')} · ${Math.round(Number(remoR.avance_pct || 0))}%`)}${kv('Líder', OS_E((m.p360 && m.p360.lider) || remoR.lider || '—'))}${kv('Inicio → estimada → real', `${OS_E(remoR.fecha_inicio || 's/f')} → ${OS_E(remoR.fecha_estimada_fin || 's/f')} → ${OS_E(remoR.fecha_real_fin || 'en curso')}`)}${kv('Retraso', remoRetraso != null ? `${remoRetraso} días${remoR.desviacion_label ? ' · ' + OS_E(remoR.desviacion_label) : ' · sin nota'}` : (remoEnCurso ? 'en curso' : '—'), remoRetraso > 0 ? 'down' : '')}${kv('Draws Ingreso (inversionista)', OS_M(remoDraws))}<div class="kv"><span>Material (est aprox → real)</span><b>${OS_M(estMat)} → ${OS_M(remoMat)}${devBadge(estMat, remoMat)}</b></div><div class="kv"><span>Trabajadores (est aprox → real)</span><b>${OS_M(estLab)} → ${OS_M(remoLab)}${devBadge(estLab, remoLab)}</b></div>${kv('Presupuesto · % gastado', `${OS_M(remoPresup)} · ${remoPctGast}%`)}${kv('Por gastar', remoR.monto_por_gastar != null ? OS_M(remoR.monto_por_gastar) : '—')}${kv(remoEnCurso ? 'Utilidad (preliminar)' : 'Utilidad', OS_M(remoUtil) + (remoRent != null ? ` · ${remoRent.toFixed(1)}%` : ''), remoEnCurso ? 'warn' : (remoUtil >= 0 ? 'up' : 'down'))}<div class="meta" style="margin-top:8px;font-size:10px">Estimado material/MO = aprox (presupuesto × ratio real ${Math.round(matRatio*100)}%/${Math.round((1-matRatio)*100)}%). Real y desvío alimentan la calibración del Estimador.</div>` : ((m.ff && (/rentada|refinanciada|vendida|en_venta/.test(m.ff.stage || '') || fn.rehabReal != null || fn.draws != null)) ? `<div style="padding:14px 4px">${kv('Estado', 'Obra finalizada', 'up')}${fn.rehabReal != null ? kv('Costo de remodelación (real)', OS_M(fn.rehabReal)) : (fn.rehabEst != null ? kv('Remodelación (estimada)', OS_M(fn.rehabEst) + ' <span style="font-size:10px;color:var(--amber)">estimada</span>') : '')}${fn.draws != null ? kv('Draws desembolsados', OS_M(fn.draws)) : ''}<div class="meta" style="margin-top:8px">La casa ya pasó la etapa de obra (${OS_E(stageLbl)}). No hay registro de esta obra en la base de Remodelación — el resumen sale de Fix & Flip.</div></div>` : `<div class="empty" style="padding:26px">Sin obra en Remodelación.</div>`)}</div></div>
     </div>
     <div class="grid k2" style="margin-top:16px">
       <div class="card"><div class="chart-h"><div class="t">${osIcon('house')} Rentas</div>${m.rentas ? `<a class="go" style="cursor:pointer" onclick="osOpenApp('rentas','property-manager')">Abrir Property Manager →</a>` : ''}</div>
@@ -1138,7 +1143,7 @@ function opsCeoView(o) {
   // mini-tendencia congeladas/vencidas (snapshots)
   const tend = o.tend.slice(-10);
   const maxO = Math.max(...tend.map(x => x.overdue), 1);
-  const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#e4756a,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
+  const spark = tend.map(x => `<div title="${x.d}: ${x.overdue} vencidas" style="flex:1;background:linear-gradient(180deg,#ff6b6b,#b91c1c);height:${Math.max(4, Math.round(50 * x.overdue / maxO))}px;border-radius:3px 3px 0 0;opacity:.85"></div>`).join('');
   // N12 (auditoría 13-jul): índice de disciplina por persona (fecha+dueño 50% · al día 30% · movimiento 20%)
   if (OS.disciplina === undefined) { OS.disciplina = null; sb.from('v_disciplina_clickup').select('*').order('disciplina', { ascending: false }).then(r => { OS.disciplina = r.data || []; osRender(); }).catch(() => { OS.disciplina = []; }); }
   // N7 (plantilla llenada 13-jul): huérfanas con dueño/fecha SUGERIDOS por lista — cura de origen del ruido
@@ -1204,7 +1209,7 @@ function opsPmView(o) {
         <input placeholder="buscar tarea / casa / lista…" value="${OS_E(f.q || '')}" onchange="opsSetF('q',this.value)" style="flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:12px">
       </div>
       ${OS.opsGroupCasa ? opsPorCasaView(o, rows, fila) : `<div class="overx"><table class="ptable"><thead><tr>${th('emp', 'Emp.')}${th('tarea', 'Tarea')}${th('lista', 'Casa / Lista')}${th('dueno', 'Dueño')}${th('due', 'Fecha')}${th('prio', 'Prioridad')}${th('estado', 'Estado')}</tr></thead><tbody>
-      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#63c08e">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table></div>`}
+      ${rows.slice(0, 150).map(fila).join('') || '<tr><td colspan="7" style="padding:14px;color:#4ade9e">Sin tareas con estos filtros ✓</td></tr>'}</tbody></table></div>`}
       <div class="meta" style="margin-top:8px">Mostrando ${Math.min(150, rows.length)} de ${rows.length} · fuente: clickup_tasks_mirror (paridad 3/3 con ClickUp, sync diario). Acciones con aprobación (reasignar/re-fechar/archivar): fase siguiente.</div>
     </div>`;
 }
@@ -1244,12 +1249,12 @@ function opsSabuesoView(o) {
   const fila = x => `<tr><td>${kitStatusDot(SAB_SEV[x.severidad]?.e || 'off')}</td><td><b>${OS_E((x.task_name || x.detalle || '').slice(0, 54))}</b>${x.task_url ? ` <a href="${OS_E(x.task_url)}" target="_blank">↗</a>` : ''}<div style="font-size:10px;opacity:.6">${OS_E(x.detalle || '')}</div></td><td style="font-size:11px">${OS_E(x.empresa || '—')}</td><td style="font-size:11px">${OS_E(x.dueno_sugerido || '—')}</td><td>${x.task_id ? `<button class="repbtn ghost" style="padding:3px 8px;font-size:10px" onclick="opsSabAccion('${x.id}','${x.accion}')">${({ poner_fecha: 'fecha', asignar_dueno: 'dueño', refechar: 're-fechar', archivar: 'archivar', escalar: 'escalar', asignar_lista: 'lista', redistribuir: '⇄ redistribuir' })[x.accion] || x.accion}</button>` : ''}</td></tr>`;
   return `${colapso}<div class="card" style="text-align:center;padding:20px;border:1px solid ${all.length ? 'rgba(248,113,113,.4)' : 'rgba(52,211,153,.4)'}">
       <div class="lab">${osIcon('dog')} El Sabueso olfateó</div>
-      <div style="font-size:52px;font-weight:800;color:${all.length ? '#e4756a' : '#63c08e'}">${all.length}</div>
+      <div style="font-size:52px;font-weight:800;color:${all.length ? '#ff6b6b' : '#4ade9e'}">${all.length}</div>
       <div class="meta">anomalías activas · ${bySev.critica || 0} críticas · ${bySev.alta || 0} altas · ${bySev.media || 0} medias · <b>norte: 0 = todo perfecto</b></div></div>
     <div style="display:flex;gap:5px;margin:12px 0;flex-wrap:wrap">${Object.entries(SAB_CAT).map(([k, l]) => byCat[k] ? catChip(k, l, byCat[k]) : '').join('')}
       <select class="repbtn ghost" style="padding:4px 8px" onchange="OS.sabF=Object.assign(OS.sabF||{},{emp:this.value});osRender()">${['', ...Object.keys(OPS_EMP)].map(sid => `<option value="${sid}" ${f.emp === sid ? 'selected' : ''}>${sid ? OPS_EMP[sid] : 'Todas'}</option>`).join('')}</select></div>
     <div class="grid k2">
-      <div class="card"><div class="lab">Anomalías (por severidad)</div><div class="overx"><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#63c08e">Nada que olfatear ✓</td></tr>'}</tbody></table></div><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
+      <div class="card"><div class="lab">Anomalías (por severidad)</div><div class="overx"><table class="ptable"><thead><tr><th>Sev</th><th>Qué huele mal</th><th>Emp.</th><th>Dueño sug.</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map(fila).join('') || '<tr><td colspan="5" style="padding:14px;color:#4ade9e">Nada que olfatear ✓</td></tr>'}</tbody></table></div><div class="meta" style="margin-top:6px">Mostrando ${Math.min(120, rows.length)} de ${rows.length}. Cada acción es una PROPUESTA (dry-run) — se aplica con tu OK.</div></div>
       <div class="card"><div class="lab">Health score por proceso/lista</div><div class="overx"><table class="ptable"><thead><tr><th>Proceso / lista</th><th style="text-align:right">Tareas</th><th style="text-align:right">Salud</th></tr></thead><tbody>${procesos.map(p => `<tr><td>${OS_E(String(p.lista).replace(/^\d+[.)]\s*/, '').slice(0, 28))}<div style="font-size:9px;opacity:.5">higiene ${p.higiene}% · movido ${p.flujo}%</div></td><td style="text-align:right">${p.n}</td><td style="text-align:right"><b class="${p.salud < 40 ? 'down' : p.salud < 70 ? 'warn' : 'up'}">${p.salud}%</b></td></tr>`).join('')}</tbody></table></div><div class="meta" style="margin-top:6px">Salud = 50% higiene (fecha+dueño) + 50% flujo (movido 7d). Peores primero.</div></div>
     </div>`;
 }
@@ -1421,7 +1426,7 @@ function opsPorCasaView(o, rows, fila) {
         <b style="flex:1">${osIcon('house')} ${OS_E(casa)}</b><span class="badge b-ok" style="font-size:9px">${OS_E(emp)}</span>
         <span style="font-size:11px;opacity:.75">${ts.length} tareas</span>
         ${venc ? `<span class="badge b-warn" style="font-size:9px">${venc} venc.</span>` : ''}
-        ${sinCfg ? `<span style="font-size:10px;color:#dca94f">${osIcon('zap')} ${sinCfg} por config.</span>` : ''}
+        ${sinCfg ? `<span style="font-size:10px;color:#fbbf24">${osIcon('zap')} ${sinCfg} por config.</span>` : ''}
         <span style="opacity:.5">${open ? '▾' : '▸'}</span></div>
       ${open ? `<table class="ptable" style="margin:0"><tbody>${ts.slice(0, 40).map(fila).join('')}</tbody></table>` : ''}</div>`;
   }).join('') || '<div class="meta" style="padding:14px">Sin tareas con estos filtros.</div>';

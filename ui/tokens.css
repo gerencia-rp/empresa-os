@@ -1,12 +1,14 @@
 /* ════════════════════════════════════════════════════════════════
-   🎨 EMPRESA OS · TOKENS CANÓNICOS (sistema cálido + verde bosque, jul-2026)
-   Fuente de verdad de la paleta. El shell (os/os.js osInjectCSS) mantiene
-   un ESPEJO de estas variables scoped a #os-root — si cambiás acá, sincronizá allá.
+   EMPRESA OS · TOKENS CANÓNICOS (sistema ROYAL · negro azabache + cobalto, jul-2026)
+   Fuente de verdad de la paleta (basada en design-ref.html). El shell
+   (os/os.js osInjectCSS) mantiene un ESPEJO de estas variables scoped a #os-root
+   — si cambiás acá, sincronizá allá.
    Dos familias unificadas por alias:
      shell:  --bg --ink --mut --mut2 --glass --glassb --a1 --a2 --a3 --pos --neg --amber
      FF/UW:  --card --line --txt2 --txt3  (alias — NO definir de nuevo en módulos)
-   Nuevos (jul-2026): --paper (alias de --bg) · --accent (#2F6B4F, verde bosque de marca)
-     · --accent-ink (texto sobre acento) · --font-display (serif editorial) · --font-body.
+   Marca: --accent (#3A5BE0 cobalto) · --accent-2 (#5C79F0) · --grad · --glow · --accent-soft.
+   Alias design-ref: --surface/--surface-2/--surface-solid/--border/--dim/--text/--muted.
+   Tipografía: --font-display (Fraunces) · --font-body (Inter) · --font-mono (JetBrains Mono, números).
    REGLAS (gobernanza): toda superficie nueva importa este archivo + ui/kit.js + ui/icons.js.
    Prohibido: Tailwind nuevo, :root propios por módulo, hex/rgba de paleta inline,
    EMOJIS como iconos o estados (usar osIcon()/kitStatusDot de ui/icons.js).
@@ -17,65 +19,96 @@
   /* ── Tipografía ── */
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif; /* titulares editoriales */
   --font-body: 'Inter', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; /* números/data */
 
-  /* ── DARK (default del OS): carbón cálido + verde bosque ── */
-  --bg: #14110c;
-  --ink: #efe9de;
-  --mut: #a89f8f;
-  --mut2: #7c7365;
-  --glass: rgba(255, 246, 230, .05);
-  --glassb: rgba(255, 246, 230, .11);
-  --a1: #6fbf95;
-  --a2: #4e9b72;
-  --a3: #c9a85c;
-  --pos: #63c08e;
-  --neg: #e4756a;
-  --amber: #dca94f;
-  --bggrad: linear-gradient(180deg, #16130d, #100e08);
+  /* ── DARK (default del OS): royal · negro azabache + cobalto ──
+     (design-ref.html · data-accent="cobalto") */
+  --bg: #08090c;
+  --ink: #f1f3f7;            /* text */
+  --mut: #8b93a1;            /* muted */
+  --mut2: #757d8b;           /* dim/caption — piso de contraste */
+  --glass: #131519;          /* surface (SÓLIDA, ya no translúcida) */
+  --glassb: rgba(255, 255, 255, .07);  /* border */
+  --a1: #5c79f0;             /* accent-2 (azul claro) — hero-num/highlights */
+  --a2: #3a5be0;             /* accent (cobalto) */
+  --a3: #93b0e2;             /* azul suave (reemplaza el dorado) */
+  --pos: #4ade9e;            /* success */
+  --neg: #ff6b6b;            /* danger */
+  --amber: #fbbf24;          /* warning */
+  --bggrad: radial-gradient(1100px 520px at 78% -12%, var(--glow), transparent 62%), var(--bg);
   /* alias familia FF/UW */
-  --card: rgba(255, 246, 230, .05);
-  --line: rgba(255, 246, 230, .13);
-  --txt2: #d9d1c2;
-  --txt3: #a69d8c;
+  --card: #131519;
+  --line: rgba(255, 255, 255, .07);
+  --txt2: #c7cdd8;
+  --txt3: #8b93a1;
   /* superficies */
-  --radius: 18px;
-  --shadow: 0 26px 60px -34px rgba(0, 0, 0, .9);
-  --amber-bg: rgba(220, 169, 79, .14);
-  /* marca: acento verde bosque (fijo en ambos temas) + degradé */
-  --accent: #2f6b4f;
+  --radius: 20px;
+  --shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 22px 44px -28px rgba(0, 0, 0, .85);
+  --amber-bg: rgba(251, 191, 36, .14);
+  /* marca: acento cobalto + degradé + resplandor */
+  --accent: #3a5be0;
   --accent-ink: #ffffff;
-  --grad: linear-gradient(135deg, #45936c, #2f6b4f);
+  --accent-2: #5c79f0;
+  --accent-soft: rgba(58, 91, 224, .18);
+  --glow: rgba(58, 91, 224, .5);
+  --grad: linear-gradient(120deg, var(--accent), var(--accent-2));
   --paper: var(--bg);
+  /* alias design-ref (para que las clases del ref funcionen sin redefinir) */
+  --surface: var(--glass);
+  --surface-2: #191c22;
+  --surface-solid: #161a20;
+  --border: var(--line);
+  --dim: var(--mut2);
+  --text: var(--ink);
+  --muted: var(--mut);
+  --success: var(--pos);
+  --danger: var(--neg);
+  --warning: var(--amber);
+  --card-sh: var(--shadow);
 }
 
-/* ── LIGHT canon (jul-2026): papel cálido + tarjetas blancas planas ── */
+/* ── LIGHT canon royal: gris azulado + cobalto profundo ──
+     (design-ref.html · [data-theme="light"][data-accent="cobalto"]) */
 [data-theme="light"] {
-  --bg: #f7f5f0;              /* --paper: hueso cálido, NO blanco puro */
-  --ink: #211e17;
-  --mut: #5f594c;
-  --mut2: #756c5c;            /* caption — MÍNIMO permitido de contraste */
-  --glass: #ffffff;           /* tarjetas blancas */
-  --glassb: #e8e3d9;
-  --a1: #2f6b4f;
-  --a2: #275c43;
-  --a3: #8a6a2f;
-  --pos: #1f7a4d;
-  --neg: #b3372f;
-  --amber: #8a6400;           /* texto sólido, nunca rgba tenue */
-  --bggrad: linear-gradient(180deg, #f9f7f2, #f2efe8);
+  --bg: #eef1f6;             /* gris azulado, NO blanco puro */
+  --ink: #0e1420;
+  --mut: #5a6270;
+  --mut2: #6f7785;           /* dim */
+  --glass: #ffffff;          /* tarjetas blancas */
+  --glassb: rgba(14, 20, 32, .09);
+  --a1: #3e5be0;
+  --a2: #2b44c6;
+  --a3: #5a78b4;
+  --pos: #059669;
+  --neg: #dc2626;
+  --amber: #b45309;          /* texto sólido legible (ref deja #FBBF24, ilegible en blanco) */
+  --bggrad: radial-gradient(1100px 520px at 78% -12%, var(--glow), transparent 62%), var(--bg);
   --card: #ffffff;
-  --line: #e8e3d9;
-  --txt2: #454034;
-  --txt3: #756c5c;
-  --shadow: 0 1px 2px rgba(64, 54, 32, .05), 0 6px 18px rgba(64, 54, 32, .06);
+  --line: rgba(14, 20, 32, .09);
+  --txt2: #3a4250;
+  --txt3: #5a6270;
+  --radius: 20px;
+  --shadow: 0 1px 2px rgba(16, 20, 28, .04), 0 18px 40px -28px rgba(16, 20, 28, .4);
   --amber-bg: #f6eed6;
-  --grad: linear-gradient(135deg, #377c5c, #2f6b4f);
+  --accent: #2b44c6;
+  --accent-2: #3e5be0;
+  --accent-soft: rgba(43, 68, 198, .12);
+  --glow: rgba(43, 68, 198, .24);
+  --grad: linear-gradient(120deg, var(--accent), var(--accent-2));
+  --surface: var(--glass);
+  --surface-2: #f1f4f8;
+  --surface-solid: #ffffff;
+  --dim: var(--mut2);
+  --card-sh: var(--shadow);
 }
 
 /* ════════ TIPOGRAFÍA GLOBAL ════════ */
 /* Titulares = serif editorial; números SIEMPRE tabulares (KPIs, tablas, inputs) */
 body { font-variant-numeric: tabular-nums; }
 h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; letter-spacing: -.02em; }
+/* Helpers de números (design-ref): .mono = JetBrains Mono · .tabnum = cifras tabulares */
+.mono { font-family: var(--font-mono); }
+.tabnum { font-variant-numeric: tabular-nums; }
 
 /* ════════ COMPONENTES BASE (baja especificidad: los módulos pueden refinar) ════════ */
 

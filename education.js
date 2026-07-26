@@ -4168,14 +4168,14 @@ function eduDescargarPlan(format) {
   if (format === 'pdf') {
     // Imprimir como PDF — abrir ventana con HTML formateado
     const html = `<!DOCTYPE html><html><head><title>Plan ${student.full_name}</title><style>
-      body{font-family:system-ui;max-width:780px;margin:2rem auto;padding:1rem;color:#211e17;line-height:1.5}
-      h1{font-size:1.8rem;color:#211e17;border-bottom:2px solid #D97706;padding-bottom:0.5rem}
-      h2{font-size:1.2rem;color:#252017;margin-top:1.5rem;background:#f2efe8;padding:0.5rem 0.75rem;border-left:4px solid #D97706}
-      em{color:#756c5c;font-size:0.85rem}
+      body{font-family:system-ui;max-width:780px;margin:2rem auto;padding:1rem;color:#0e1420;line-height:1.5}
+      h1{font-size:1.8rem;color:#0e1420;border-bottom:2px solid #D97706;padding-bottom:0.5rem}
+      h2{font-size:1.2rem;color:#1e2430;margin-top:1.5rem;background:#eef1f6;padding:0.5rem 0.75rem;border-left:4px solid #D97706}
+      em{color:#6f7785;font-size:0.85rem}
       ul{list-style:none;padding-left:0.5rem}
-      li{padding:0.25rem 0;border-bottom:1px solid #f2efe8}
-      hr{border:none;border-top:1px solid #e8e3d9;margin:1rem 0}
-      strong{color:#211e17}
+      li{padding:0.25rem 0;border-bottom:1px solid #eef1f6}
+      hr{border:none;border-top:1px solid #dfe4ec;margin:1rem 0}
+      strong{color:#0e1420}
     </style></head><body>${md.replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^_(.+)_$/gm,'<em>$1</em>').replace(/^- \[x\] (.+)$/gm,'<li>' + osIcon('check-circle') + ' <s>$1</s></li>').replace(/^- \[ \] (.+)$/gm,'<li>☐ $1</li>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/^---$/gm,'<hr/>').replace(/\n/g,'<br>')}<script>window.onload=()=>window.print()</script></body></html>`;
     const w = window.open('', '_blank');
     w.document.write(html); w.document.close();
@@ -5641,8 +5641,8 @@ function eduGenerateCertificate(studentId) {
   @page { size: landscape; margin: 0; }
   @media print { body { margin: 0; } .no-print { display: none !important; } }
   body { font-family: 'Georgia', serif; background: #faf8f4; }
-  .border-deco { border: 12px double #211e17; }
-  .border-deco-inner { border: 2px solid #a89f8f; }
+  .border-deco { border: 12px double #0e1420; }
+  .border-deco-inner { border: 2px solid #8b93a1; }
   .seal { background: radial-gradient(circle at center, #fbbf24 0%, #f59e0b 60%, #d97706 100%); }
 </style>
 </head>

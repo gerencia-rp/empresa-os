@@ -9,7 +9,7 @@ const RM_PHASES = {
   '2': { name: 'Cimentación', icon: osIcon('construction'), color: '#ea580c' },
   '3': { name: 'Externo',     icon: osIcon('house'), color: '#d97706' },
   '4': { name: 'Estructura', icon: osIcon('ruler'), color: '#65a30d' },
-  '5': { name: 'Interno',    icon: osIcon('bed'), color: '#2f6b4f' },
+  '5': { name: 'Interno',    icon: osIcon('bed'), color: '#3a5be0' },
   '6': { name: 'Limpieza',   icon: osIcon('sparkles'), color: '#7c3aed' }
 };
 
@@ -1463,31 +1463,31 @@ function rmNavHtml() {
   let steps = '';
   RM_GROUPS.forEach(function (g, i) {
     const on = g.id === activeGroup;
-    if (i) steps += '<span style="color:var(--mut,#a89f8f);font-size:13px;flex:none">→</span>';
+    if (i) steps += '<span style="color:var(--mut,#8b93a1);font-size:13px;flex:none">→</span>';
     steps += '<button onclick="rmSetGroup(\'' + g.id + '\')" style="flex:none;display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;'
       + (on
-        ? 'border:1px solid var(--a1,#2f6b4f);background:var(--a1,#2f6b4f);color:#fff'
-        : 'border:1px solid var(--glassb,#e8e3d9);background:var(--glass,rgba(148,163,184,.08));color:var(--ink,#211e17)')
+        ? 'border:1px solid var(--a1,#3a5be0);background:var(--a1,#3a5be0);color:#fff'
+        : 'border:1px solid var(--glassb,#dfe4ec);background:var(--glass,rgba(148,163,184,.08));color:var(--ink,#0e1420)')
       + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;'
-      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#e8e3d9);color:var(--mut,#756c5c)')
+      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#dfe4ec);color:var(--mut,#6f7785)')
       + '">' + g.num + '</span>' + g.name + '</button>';
   });
   // Chip del proyecto activo (compartido entre todos los pasos)
   let chip = '';
   if (rmState.currentProject) {
-    chip = '<span style="flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--glassb,#e8e3d9);background:var(--glass,rgba(148,163,184,.08));color:var(--mut,#5f594c)" title="Proyecto activo: todos los pasos abren con esta casa">' + osIcon('map-pin') + ' '
+    chip = '<span style="flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--glassb,#dfe4ec);background:var(--glass,rgba(148,163,184,.08));color:var(--mut,#5a6270)" title="Proyecto activo: todos los pasos abren con esta casa">' + osIcon('map-pin') + ' '
       + rmNavEsc(rmState.currentProject.address || rmState.currentProject.name || '')
-      + ' <a onclick="rmSetTab(\'projects\')" style="cursor:pointer;text-decoration:underline;color:var(--a1,#2f6b4f)">cambiar</a></span>';
+      + ' <a onclick="rmSetTab(\'projects\')" style="cursor:pointer;text-decoration:underline;color:var(--a1,#3a5be0)">cambiar</a></span>';
   }
   let subs = '';
   grp.tabs.forEach(function (t) {
     const on = rmState.tab === t;
     subs += '<button onclick="rmSetTab(\'' + t + '\')" style="flex:none;padding:8px 12px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;background:none;border:none;border-bottom:2px solid '
-      + (on ? 'var(--a1,#2f6b4f);color:var(--ink,#211e17)' : 'transparent;color:var(--mut,#756c5c)')
+      + (on ? 'var(--a1,#3a5be0);color:var(--ink,#0e1420)' : 'transparent;color:var(--mut,#6f7785)')
       + '">' + (labels[t] || t) + '</button>';
   });
   return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">' + steps + chip + '</div>'
-    + '<div style="display:flex;gap:2px;margin:0 -24px 16px;padding:0 24px;overflow-x:auto;border-bottom:1px solid var(--glassb,#e8e3d9)">' + subs + '</div>';
+    + '<div style="display:flex;gap:2px;margin:0 -24px 16px;padding:0 24px;overflow-x:auto;border-bottom:1px solid var(--glassb,#dfe4ec)">' + subs + '</div>';
 }
 
 function rmRender() {
@@ -2261,9 +2261,9 @@ function rmRenderCharts(e) {
     data: {
       labels: groups.map(g => g.name),
       datasets: [
-        { label: 'Material', data: groups.map(g => Math.round(g.material)), backgroundColor: '#2f6b4f' },
+        { label: 'Material', data: groups.map(g => Math.round(g.material)), backgroundColor: '#3a5be0' },
         { label: 'Mano de obra', data: groups.map(g => Math.round(g.labor)), backgroundColor: '#a855f7' },
-        { label: 'Equipo', data: groups.map(g => Math.round(g.equipment)), backgroundColor: '#756c5c' }
+        { label: 'Equipo', data: groups.map(g => Math.round(g.equipment)), backgroundColor: '#6f7785' }
       ]
     },
     options: {
@@ -2895,10 +2895,10 @@ function rmGenerateProposalPDF() {
     const acts = (e.byPhase[p]?.activities) || [];
     if (!acts.length) return '';
     return `
-      <tr class="phase-header"><td colspan="5" style="background:#211e17;color:white;font-weight:bold;padding:8px 12px;">${info.icon} ${p}. ${info.name}</td></tr>
+      <tr class="phase-header"><td colspan="5" style="background:#0e1420;color:white;font-weight:bold;padding:8px 12px;">${info.icon} ${p}. ${info.name}</td></tr>
       ${acts.map(a => `
         <tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:10px;color:#756c5c;">${a.code}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:10px;color:#6f7785;">${a.code}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${a.desc}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${a.qty} ${a.unit}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">$${(+a.vu).toFixed(2)}</td>
@@ -2916,24 +2916,24 @@ function rmGenerateProposalPDF() {
 <title>Propuesta — ${proj.name}</title>
 <style>
   @page { size: letter; margin: 0.6in; }
-  body { font-family: -apple-system, 'Segoe UI', sans-serif; color:#211e17; margin:0; line-height:1.45; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; color:#0e1420; margin:0; line-height:1.45; }
   .watermark { position:fixed; top:40%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:140px; font-weight:900; color:rgba(15,23,42,0.04); z-index:-1; pointer-events:none; letter-spacing:8px; }
-  header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:16px; border-bottom:3px solid #211e17; margin-bottom:24px; }
+  header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:16px; border-bottom:3px solid #0e1420; margin-bottom:24px; }
   .brand { font-size:26px; font-weight:900; letter-spacing:-0.5px; }
-  .brand-sub { color:#756c5c; font-size:11px; margin-top:2px; }
-  .meta { text-align:right; font-size:11px; color:#756c5c; }
+  .brand-sub { color:#6f7785; font-size:11px; margin-top:2px; }
+  .meta { text-align:right; font-size:11px; color:#6f7785; }
   h1 { font-size:22px; margin:0 0 4px; }
-  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#5f594c; margin:24px 0 8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#5a6270; margin:24px 0 8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
   .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:12px; margin-bottom:16px; }
-  .info-grid div strong { display:block; color:#756c5c; font-size:9px; text-transform:uppercase; margin-bottom:2px; }
+  .info-grid div strong { display:block; color:#6f7785; font-size:9px; text-transform:uppercase; margin-bottom:2px; }
   table { width:100%; border-collapse:collapse; font-size:11px; }
-  .pricing-box { background:#f2efe8; border-radius:8px; padding:16px; margin-top:16px; }
-  .pricing-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #e8e3d9; font-size:12px; }
-  .pricing-row:last-child { border-bottom:none; font-size:18px; font-weight:900; padding-top:12px; margin-top:4px; border-top:2px solid #211e17; }
-  .terms { font-size:10px; color:#5f594c; margin-top:24px; }
+  .pricing-box { background:#eef1f6; border-radius:8px; padding:16px; margin-top:16px; }
+  .pricing-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #dfe4ec; font-size:12px; }
+  .pricing-row:last-child { border-bottom:none; font-size:18px; font-weight:900; padding-top:12px; margin-top:4px; border-top:2px solid #0e1420; }
+  .terms { font-size:10px; color:#5a6270; margin-top:24px; }
   .signature { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:48px; font-size:11px; }
-  .signature div { border-top:1px solid #211e17; padding-top:6px; }
-  .print-button { position:fixed; top:12px; right:12px; background:#211e17; color:white; padding:10px 16px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+  .signature div { border-top:1px solid #0e1420; padding-top:6px; }
+  .print-button { position:fixed; top:12px; right:12px; background:#0e1420; color:white; padding:10px 16px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
   @media print { .print-button { display:none; } }
 </style>
 </head>
@@ -2954,7 +2954,7 @@ function rmGenerateProposalPDF() {
 </header>
 
 <h1>${proj.name}</h1>
-<div style="font-size:12px;color:#756c5c;margin-bottom:24px;">${proj.address || ''}</div>
+<div style="font-size:12px;color:#6f7785;margin-bottom:24px;">${proj.address || ''}</div>
 
 <div class="info-grid">
   <div><strong>Superficie</strong>${e.sqft || '—'} ft²</div>
@@ -2967,11 +2967,11 @@ function rmGenerateProposalPDF() {
 <table>
   <thead>
     <tr style="background:#faf8f4;">
-      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#5f594c;">Code</th>
-      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#5f594c;">Actividad</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5f594c;">Cant.</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5f594c;">$/u</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5f594c;">Total</th>
+      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a6270;">Code</th>
+      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a6270;">Actividad</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a6270;">Cant.</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a6270;">$/u</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a6270;">Total</th>
     </tr>
   </thead>
   <tbody>${phaseRows}</tbody>
@@ -2987,7 +2987,7 @@ function rmGenerateProposalPDF() {
   <div class="pricing-row"><span>Inversión total</span><span>${rmFmt(e.pricing.clientPrice)}</span></div>
 </div>
 
-<div style="font-size:11px;color:#5f594c;margin-top:8px;">${e.sqft ? '<strong>$' + (e.pricing.clientPrice/e.sqft).toFixed(0) + '/ft²</strong> sobre ' + e.sqft + ' ft² de área a remodelar.' : ''}</div>
+<div style="font-size:11px;color:#5a6270;margin-top:8px;">${e.sqft ? '<strong>$' + (e.pricing.clientPrice/e.sqft).toFixed(0) + '/ft²</strong> sobre ' + e.sqft + ' ft² de área a remodelar.' : ''}</div>
 
 <h2>Términos</h2>
 <div class="terms">
@@ -3069,8 +3069,8 @@ async function rmShowPhotoGallery(activityCode) {
             <div style="background:#1F2937;border-radius:8px;overflow:hidden;">
               <img src="${urls[i]}" style="width:100%;height:200px;object-fit:cover;" />
               <div style="padding:8px;font-size:11px;">
-                <div style="font-weight:bold;text-transform:uppercase;color:${p.before_after==='antes'?'#FBBF24':p.before_after==='despues'?'#63c08e':'#a89f8f'};">${p.before_after || 'proceso'}</div>
-                <div style="color:#a89f8f;">${rmFmtDate(p.taken_at)}</div>
+                <div style="font-weight:bold;text-transform:uppercase;color:${p.before_after==='antes'?'#FBBF24':p.before_after==='despues'?'#4ade9e':'#8b93a1'};">${p.before_after || 'proceso'}</div>
+                <div style="color:#8b93a1;">${rmFmtDate(p.taken_at)}</div>
                 ${p.note ? `<div style="color:#E5E7EB;margin-top:4px;">${p.note}</div>` : ''}
               </div>
             </div>
@@ -3657,7 +3657,7 @@ async function rmAutoGenPlanner(projectId, projectName) {
     const days = Math.max(1, Math.round((cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)))) * fCal));
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = rmAddWorkDays(activityStart, i);
-      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#756c5c' };
+      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#6f7785' };
       inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', is_critical: !!(e.cpm && e.cpm.criticalPath && e.cpm.criticalPath.includes(code)), created_by: state.user.id });
     }
   });
