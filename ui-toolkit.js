@@ -19,7 +19,7 @@
       display: flex; gap: 10px; align-items: flex-start;
       background: white; border-radius: 10px; padding: 12px 14px;
       box-shadow: 0 8px 24px rgba(0,0,0,.12);
-      border-left: 4px solid #98a0ae;
+      border-left: 4px solid #6f7785;
       pointer-events: auto;
       animation: ui-toast-in 0.18s ease-out;
       max-width: 100%;

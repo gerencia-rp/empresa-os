@@ -163,7 +163,7 @@ const estState = {
 
 // ─── FASES CONSTRUCTIVAS (orden CPM profesional residencial) ───
 const EST_PHASES = {
-  preconstruction:{order:1,  name:'Pre-construcción',         color:'#98a0ae', emoji:'📋', desc:'Permits, planning, dumpster, kickoff'},
+  preconstruction:{order:1,  name:'Pre-construcción',         color:'#6f7785', emoji:'📋', desc:'Permits, planning, dumpster, kickoff'},
   demo:           {order:2,  name:'Demolición',               color:'#dc2626', emoji:'⛏️', desc:'Tumbar, sacar escombros, preparar sitio'},
   structural:     {order:3,  name:'Estructural',              color:'#ea580c', emoji:'🏗️', desc:'Foundation, framing, modificaciones estructurales'},
   rough:          {order:4,  name:'Rough-in (instalaciones)', color:'#d97706', emoji:'🔌', desc:'Plumbing, electrical, HVAC dentro de paredes'},

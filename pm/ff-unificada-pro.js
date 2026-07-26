@@ -173,13 +173,13 @@ function ffUnificadaOnePager() {
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + E(a.direccion || a.nombre) + ' · Rental Profits</title><style>'
     + 'body{font-family:-apple-system,"Segoe UI",Inter,sans-serif;color:#12203a;margin:0;padding:34px;max-width:760px;margin:0 auto;line-height:1.4;background:#fff}'
     + '.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #5c79f0;padding-bottom:14px}'
-    + '.logo{font-size:21px;font-weight:800;letter-spacing:.5px;color:#0f766e}.logo em{font-style:normal;color:#3a5be0}.logo span{display:block;font-size:9.5px;letter-spacing:2.4px;color:#98a0ae;font-weight:700;margin-top:2px}'
-    + '.addr{font-size:22px;font-weight:800;margin:16px 0 2px}.meta{font-size:11.5px;color:#98a0ae}'
+    + '.logo{font-size:21px;font-weight:800;letter-spacing:.5px;color:#0f766e}.logo em{font-style:normal;color:#3a5be0}.logo span{display:block;font-size:9.5px;letter-spacing:2.4px;color:#6f7785;font-weight:700;margin-top:2px}'
+    + '.addr{font-size:22px;font-weight:800;margin:16px 0 2px}.meta{font-size:11.5px;color:#6f7785}'
     + '.ver{display:inline-block;font-size:15px;font-weight:800;color:#fff;background:' + verColor + ';padding:5px 16px;border-radius:22px;margin-top:8px}'
     + '.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 4px}'
     + '.k{border:1px solid #dfe4ec;border-radius:11px;padding:11px 13px;background:#faf8f4}'
-    + '.k .l{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#98a0ae;font-weight:800}'
-    + '.k .v{font-size:19px;font-weight:800;margin-top:3px}.k .s{font-size:10px;color:#98a0ae;margin-top:1px}'
+    + '.k .l{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#6f7785;font-weight:800}'
+    + '.k .v{font-size:19px;font-weight:800;margin-top:3px}.k .s{font-size:10px;color:#6f7785;margin-top:1px}'
     + '.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}'
     + '.sec{margin-top:16px;border:1px solid #dfe4ec;border-radius:12px;padding:14px 16px;page-break-inside:avoid}'
     + '.st{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;font-weight:800;color:#0f766e;margin-bottom:8px}'
@@ -193,7 +193,7 @@ function ffUnificadaOnePager() {
     + '</style></head><body>'
     + '<button class="btn" onclick="window.print()">' + osIcon('printer') + ' Imprimir / PDF</button>'
     + '<div class="top"><div class="logo">RENTAL <em>PROFITS</em><span>ANÁLISIS DE INVERSIÓN INMOBILIARIA</span></div>'
-    + '<div style="text-align:right;font-size:11px;color:#98a0ae">' + fecha + '<br>Austin, TX</div></div>'
+    + '<div style="text-align:right;font-size:11px;color:#6f7785">' + fecha + '<br>Austin, TX</div></div>'
     + '<div class="addr">' + E((a.direccion || a.nombre || '').split(',')[0]) + '</div>'
     + '<div class="meta">' + E(a.direccion || '') + (inp.est_sqft ? ' · ' + (+inp.est_sqft).toLocaleString() + ' sqft' : '') + '</div>'
     + '<span class="ver">' + (u.veredicto === 'GO' ? '✓ RECOMENDADO — GO' : u.veredicto === 'NO-GO' ? '✗ NO-GO' : 'REVISAR') + '</span>'
@@ -240,7 +240,7 @@ function ffUnificadaOnePager() {
           + fila('= Flujo neto', '<b style="color:' + (o.ingreso.flujo >= 0 ? '#0ea371' : '#dc2626') + '">' + M(o.ingreso.flujo) + '/mes</b>')))
     + '</div>'
     + sec(esVenta ? 'De compra a utilidad' : 'Recuperación del capital', '<div class="tl">' + pasos.map(p => '<div><div class="ic">' + p[0] + '</div>' + p[1] + '</div>').join('') + '</div>'
-      + '<div style="font-size:11px;color:#98a0ae;margin-top:8px">' + (esVenta
+      + '<div style="font-size:11px;color:#6f7785;margin-top:8px">' + (esVenta
         ? (o.venta.utilidad != null ? 'Al vender, el proyecto deja ' + M(o.venta.utilidad) + ' de utilidad neta (una sola vez, margen ' + (o.venta.margen != null ? o.venta.margen + '%' : '—') + '), repartida ' + o.venta.splitInvPct + '/' + (100 - o.venta.splitInvPct) + ' entre inversionista y operador — ROI ' + (o.venta.roi != null ? o.venta.roi + '%' : '—') + (o.venta.roiAnual != null ? ' (' + o.venta.roiAnual + '% anualizado)' : '') + '.' : 'Cargá precio de venta y capital para ver la utilidad.')
         : (u.recuperaPct != null && u.recuperaPct >= 100
           ? 'Al refinanciar, el inversionista recupera el 100% de su capital y conserva la propiedad rentando — el retorno se vuelve infinito.'

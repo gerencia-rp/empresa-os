@@ -123,17 +123,17 @@ function rpInjectCSS() {
   #rc-overlay details.rp-filters[open] > summary::after{transform:rotate(90deg)}
   #rc-overlay details.rp-filters[open] > summary{margin-bottom:8px}
   #rc-overlay .rp-frow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-  #rc-overlay .rp-flab{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#98a0ae);font-weight:700}
+  #rc-overlay .rp-flab{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3,#6f7785);font-weight:700}
   #rc-overlay .rp-chip{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--line,rgba(255,255,255,.1));background:transparent;color:var(--txt2,#8b93a1);cursor:pointer}
   #rc-overlay .rp-chip.on{background:#5c79f0;color:#fff;border-color:#5c79f0}
   #rc-overlay .rp-sel,#rc-overlay .rp-date{font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.12));background:var(--glass,rgba(255,255,255,.04));color:var(--txt,#e8eefc)}
-  #rc-overlay .rp-note{font-size:11px;color:var(--txt3,#98a0ae);margin-top:4px}
+  #rc-overlay .rp-note{font-size:11px;color:var(--txt3,#6f7785);margin-top:4px}
   #rc-overlay .rp-okrbar{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
   #rc-overlay .rp-okr{font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;border:1px solid}
   #rc-overlay .rp-dec{font-size:12.5px;line-height:1.5;padding:8px 4px;border-bottom:1px solid var(--line,rgba(255,255,255,.06));color:var(--txt,#e8eefc)}
   #rc-overlay .rp-canvas{height:230px;position:relative;padding:6px;overflow:hidden}
   #rc-overlay table.rp-t{width:100%;border-collapse:collapse;font-size:12px}
-  #rc-overlay table.rp-t th{text-align:left;padding:6px 8px;color:var(--txt3,#98a0ae);font-size:10px;text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line,rgba(255,255,255,.1))}
+  #rc-overlay table.rp-t th{text-align:left;padding:6px 8px;color:var(--txt3,#6f7785);font-size:10px;text-transform:uppercase;font-weight:700;border-bottom:1px solid var(--line,rgba(255,255,255,.1))}
   #rc-overlay table.rp-t td{padding:6px 8px;border-bottom:1px solid var(--line,rgba(255,255,255,.05));color:var(--txt,#e8eefc)}
   #rc-overlay table.rp-t td.r,#rc-overlay table.rp-t th.r{text-align:right}
   #rc-overlay table.rp-t tr.rp-total td{font-weight:800;border-top:1px solid var(--line,rgba(255,255,255,.18));background:var(--glass,rgba(255,255,255,.03))}

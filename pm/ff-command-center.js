@@ -54,7 +54,7 @@ function ffDQBar(comp) {
   const revNames = k.revisarList.map(d => `${FF_ESC(ffShort(d.address))} (${Math.round(d.allInPct * 100)}%)`).join(', ');
   return `<div class="ff-dqbar"><div><div class="t">${osIcon('alert')} ${flagged} deal(s) con datos a revisar</div><div class="d">${k.revisar} imposibles (all-in > 100% ARV) · ${k.sinDatos} sin datos · ${k.preliminar} preliminares (obra en curso). <b>Excluidos de promedios/márgenes.</b></div></div>${revNames ? `<div class="lst">${revNames}</div>` : ''}</div>`;
 }
-function ffAx() { return posGetTheme() === 'light' ? '#98a0ae' : '#565e6b'; }
+function ffAx() { return posGetTheme() === 'light' ? '#6f7785' : '#757d8b'; }
 function ffGridC() { return posGetTheme() === 'light' ? 'rgba(15,23,42,.06)' : 'rgba(255,255,255,.05)'; }
 
 // ─── CSS (mismo look del ecosistema, scoped bajo #ff-overlay, con tema claro) ───
@@ -63,14 +63,14 @@ function ffInjectCSS() {
   const st = document.createElement('style'); st.id = 'ff-styles';
   st.textContent = `
   #ff-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
-    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#565e6b;--glass:#131519;--glassb:rgba(255,255,255,.07);
+    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:#131519;--glassb:rgba(255,255,255,.07);
     --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
     --accent:#3a5be0;--accent-2:#5c79f0;--accent-soft:rgba(58,91,224,.18);--glow:rgba(58,91,224,.5);--grad:linear-gradient(120deg,#3a5be0,#5c79f0);--surface-2:#191c22;--surface-solid:#161a20;--radius:20px;
     --mesh1:rgba(58,91,224,.5);--mesh2:rgba(92,121,240,.16);--mesh3:rgba(58,91,224,.10);--bggrad:#08090c;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
   /* LIGHT canon royal — espejo de ui/tokens.css */
   #ff-overlay[data-theme="light"]{
-    --bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#98a0ae;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
+    --bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
     --a1:#3e5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309;
     --accent:#2b44c6;--accent-2:#3e5be0;--accent-soft:rgba(43,68,198,.12);--glow:rgba(43,68,198,.24);--grad:linear-gradient(120deg,#2b44c6,#3e5be0);--surface-2:#f1f4f8;--surface-solid:#ffffff;
     --mesh1:rgba(43,68,198,.24);--mesh2:rgba(62,91,224,.08);--mesh3:rgba(43,68,198,.05);--bggrad:#eef1f6}
@@ -222,7 +222,7 @@ async function openFFCommandCenter(sys) {
   let ov = document.getElementById('ff-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'ff-overlay'; document.body.appendChild(ov); }
   posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#565e6b">' + osIcon('loader') + ' Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#757d8b">' + osIcon('loader') + ' Conectando con Airtable Flipping…</div></main></div><button class="pos-theme-btn" onclick="ffToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ffclose" onclick="closeFFCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ffLoadAll();
   ffRender();

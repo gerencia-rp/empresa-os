@@ -100,8 +100,8 @@ window.posInjectDesignSystem = function () {
   const D = 'html[data-osreskin="dark"] #modal', L = 'html[data-osreskin="light"] #modal';
   st.textContent = `
   /* ── tokens del OS en el scope del modal ── */
-  html[data-osreskin="dark"] #modal{--ink:#f1f3f7;--mut:#8b93a1;--mut2:#565e6b;--glass:rgba(255,255,255,.05);--glassb:rgba(255,255,255,.1);--card:rgba(255,255,255,.045);--a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24}
-  html[data-osreskin="light"] #modal{--ink:#0e1420;--mut:#5a6270;--mut2:#98a0ae;--glass:rgba(255,255,255,.7);--glassb:rgba(33,30,23,.09);--card:rgba(255,255,255,.92);--a1:#3a5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309}
+  html[data-osreskin="dark"] #modal{--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:rgba(255,255,255,.05);--glassb:rgba(255,255,255,.1);--card:rgba(255,255,255,.045);--a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24}
+  html[data-osreskin="light"] #modal{--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:rgba(255,255,255,.7);--glassb:rgba(33,30,23,.09);--card:rgba(255,255,255,.92);--a1:#3a5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309}
   html[data-osreskin] #modal *{font-family:'Inter',system-ui,-apple-system,sans-serif}
   /* ── panel: mesh gradient + glass (como el OS shell) ── */
   html[data-osreskin] #modal > div{border-radius:20px !important;overflow:hidden;color:var(--ink)}

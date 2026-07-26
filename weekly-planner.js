@@ -150,7 +150,7 @@ function wpInjectTheme() {
   #modal:has(#wp-root) > div{max-width:none !important;width:calc(100vw - 20px);height:calc(100vh - 20px);max-height:calc(100vh - 20px) !important;border-radius:16px;border:1px solid rgba(15,23,42,.08);box-shadow:0 40px 90px -40px rgba(2,6,23,.5)}
   #modal:has(#wp-root) > div > div:first-child{padding:8px 18px}
   #modal:has(#wp-root) #modal-body{padding:10px 14px 12px;overflow:hidden;display:flex;flex-direction:column}
-  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;flex:1;min-height:0;display:flex;flex-direction:column;--wa1:#5c79f0;--wa2:#3a5be0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#0e1420;--wmut:#98a0ae;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
+  #wp-root{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;flex:1;min-height:0;display:flex;flex-direction:column;--wa1:#5c79f0;--wa2:#3a5be0;--wpos:#0ea371;--wneg:#e0455f;--wamb:#c07d16;--wink:#0e1420;--wmut:#6f7785;--wsurf:#f6f8fc;--wglass:#fff;--wbord:rgba(15,23,42,.09)}
   #wp-root .wp-shell{flex:1;min-height:0}
   /* Topbar compacta siempre visible + bloque KPIs/filtros colapsable */
   #wp-root .wp-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--wbord)}
@@ -223,7 +223,7 @@ function wpInjectTheme() {
   /* A1: panel lateral de alertas */
   #wp-alert-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:var(--wpanel,#fff);border-left:1px solid var(--wbord,#dfe4ec);box-shadow:-12px 0 40px -18px rgba(2,6,23,.35);z-index:9500;overflow:auto;padding:16px}
   #wp-alert-drawer h3{font-size:13px;font-weight:800;margin:0 0 4px}
-  #wp-alert-drawer .wd-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;color:var(--wmut,#98a0ae)}
+  #wp-alert-drawer .wd-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;color:var(--wmut,#6f7785)}
   #wp-alert-drawer .wd-item{font-size:11.5px;padding:7px 9px;border:1px solid var(--wbord,#dfe4ec);border-radius:8px;margin-bottom:5px;line-height:1.4;cursor:pointer}
   #wp-alert-drawer .wd-item:hover{border-color:#8b93a1}
   #wp-alert-drawer .wd-item b{font-weight:700}
@@ -273,7 +273,7 @@ function wpInjectTheme() {
   html[data-osreskin="dark"] #wp-root input,html[data-osreskin="dark"] #wp-root select{background:rgba(255,255,255,.06) !important;color:#f1f3f7 !important;border-color:rgba(255,255,255,.12) !important}
   html[data-osreskin="dark"] #wp-root select option{background:#141b29;color:#f1f3f7}
   /* ===== Vista Desviación (Plan vs Real) — premium claro/oscuro ===== */
-  #wp-dev{--dink:#0e1420;--dmut:#98a0ae;--dbord:rgba(15,23,42,.09);--dglass:#fff;--dpos:#0ea371;--dneg:#e0455f;--damb:#c07d16;--dblue:#3a5be0;color:var(--dink);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+  #wp-dev{--dink:#0e1420;--dmut:#6f7785;--dbord:rgba(15,23,42,.09);--dglass:#fff;--dpos:#0ea371;--dneg:#e0455f;--damb:#c07d16;--dblue:#3a5be0;color:var(--dink);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
   #wp-dev .dv-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
   #wp-dev .dv-card{background:var(--dglass);border:1px solid var(--dbord);border-radius:14px;padding:16px}
   #wp-dev .dv-lab{font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--dmut);font-weight:700}
@@ -305,17 +305,17 @@ function wpInjectTheme() {
   #wp-report .wr-doc{background:#fff;color:#1a2436;border-radius:12px;padding:24px;border:1px solid #e5e9f0}
   #wp-report .wr-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0e1420;padding-bottom:12px;margin-bottom:14px}
   #wp-report .wr-title{font-size:17px;font-weight:800;color:#0e1420}
-  #wp-report .wr-sub{font-size:12px;color:#98a0ae;margin-top:2px}
+  #wp-report .wr-sub{font-size:12px;color:#6f7785;margin-top:2px}
   #wp-report .wr-brand{font-size:11px;font-weight:700;color:#5c79f0;text-align:right}
   #wp-report .wr-kpis{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   #wp-report .wr-k{flex:1;min-width:88px;background:#f6f8fc;border:1px solid #e5e9f0;border-radius:9px;padding:10px 12px;text-align:center}
-  #wp-report .wr-kn{font-size:22px;font-weight:800;color:#0e1420}#wp-report .wr-kl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#98a0ae;font-weight:700;margin-top:2px}
+  #wp-report .wr-kn{font-size:22px;font-weight:800;color:#0e1420}#wp-report .wr-kl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#6f7785;font-weight:700;margin-top:2px}
   #wp-report .wr-home{margin-bottom:14px}
   #wp-report .wr-hh{font-size:13px;font-weight:800;color:#0e1420;background:#f1f3f7;padding:6px 10px;border-radius:7px;display:flex;justify-content:space-between}
-  #wp-report .wr-hc{color:#98a0ae;font-weight:700}
+  #wp-report .wr-hc{color:#6f7785;font-weight:700}
   #wp-report .wr-t{width:100%;border-collapse:collapse;font-size:12px}
   #wp-report .wr-t td{padding:6px 10px;border-bottom:1px solid #f1f3f7;color:#1a2436}
-  #wp-report .wr-d{color:#98a0ae;white-space:nowrap;width:120px;text-transform:capitalize}
+  #wp-report .wr-d{color:#6f7785;white-space:nowrap;width:120px;text-transform:capitalize}
   #wp-report .wr-st{color:#8b93a1;font-size:10px}
   #wp-report .wr-bd{text-align:right;white-space:nowrap}
   #wp-report .wr-b{font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px}
@@ -5804,7 +5804,7 @@ function wpCheckCriticalLate() {
   const esc = x => String(x == null ? '' : x).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const rows = late.map(a => ({ casa: a.property_name || '—', name: (a.activity_name || '').replace(/\s*\(d[ií]a.*/, ''), dias: Math.round((new Date(today) - new Date(a.date)) / 86400000), date: a.date })).sort((a, b) => b.dias - a.dias);
   const html = `<div id="wp-cl"><div style="font-size:12px;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:12px"><b>${osIcon('alert')} ${late.length} actividad(es) de RUTA CRÍTICA atrasadas.</b> Cada día perdido empuja la fecha de entrega. Reprogramá o completá con prioridad.</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:6px;color:#98a0ae;font-size:10px;text-transform:uppercase">Casa</th><th style="text-align:left;padding:6px;color:#98a0ae;font-size:10px;text-transform:uppercase">Actividad</th><th style="text-align:right;padding:6px;color:#98a0ae;font-size:10px;text-transform:uppercase">Atraso</th></tr></thead><tbody>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:6px;color:#6f7785;font-size:10px;text-transform:uppercase">Casa</th><th style="text-align:left;padding:6px;color:#6f7785;font-size:10px;text-transform:uppercase">Actividad</th><th style="text-align:right;padding:6px;color:#6f7785;font-size:10px;text-transform:uppercase">Atraso</th></tr></thead><tbody>
     ${rows.map(r => `<tr style="border-top:1px solid #f1f3f7"><td style="padding:7px 6px;font-weight:600">${esc(r.casa)}</td><td style="padding:7px 6px">${esc(r.name)} <span style="color:#8b93a1;font-size:10px">· ${r.date}</span></td><td style="padding:7px 6px;text-align:right;color:#e0455f;font-weight:700">${r.dias}d</td></tr>`).join('')}
     </tbody></table>
     <div style="margin-top:14px;text-align:right"><button onclick="wpBackToPlanner()" style="background:#0e1420;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">Ir al Planner →</button></div></div>`;

@@ -722,7 +722,7 @@ function drawCasaChart(r, inv) {
   const A = r.anios.filter(x => x.a >= 1);
   IP.charts.push(new Chart(el, { type: 'line', data: { labels: A.map(x => 'año ' + x.a), datasets: [
     { label: 'Tu riqueza (patrimonio)', data: A.map(x => Math.round(x.patrimonioInv)), borderColor: '#3a5be0', pointRadius: 0, fill: true, backgroundColor: 'rgba(58,91,224,.10)' },
-  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#5a6270' : '#8b93a1', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#98a0ae' : '#565e6b', font: { size: 9 } } }, y: { ticks: { color: light ? '#98a0ae' : '#565e6b', font: { size: 9 } } } } } }));
+  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#5a6270' : '#8b93a1', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#6f7785' : '#757d8b', font: { size: 9 } } }, y: { ticks: { color: light ? '#6f7785' : '#757d8b', font: { size: 9 } } } } } }));
 }
 
 // ─── evento de refinanciación ───
@@ -1043,7 +1043,7 @@ async function ipReloadProducto() {
 // ─── gráficas (theme-aware; canvas SIEMPRE en wrapper fijo con overflow hidden) ───
 function drawCharts(r, inv) {
   const light = ipTheme() === 'light';
-  const tick = light ? '#98a0ae' : '#565e6b', leg = light ? '#5a6270' : '#8b93a1', grid = light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.05)';
+  const tick = light ? '#6f7785' : '#757d8b', leg = light ? '#5a6270' : '#8b93a1', grid = light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.05)';
   const A = r.anios.filter(x => x.a >= 1);
   const labels = A.map(x => 'a' + x.a);
   const C = (id, cfg) => { const el = document.getElementById(id); if (!el || !window.Chart) return; cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); IP.charts.push(new Chart(el, cfg)); };

@@ -782,7 +782,7 @@ function pmEnsureResizerInfra() {
     .pm-filter-select{padding:7px 10px;background:#fff;border:1px solid #d8d2c6;border-radius:6px;color:#3a4250;font-size:13px;cursor:pointer;transition:all .15s;max-width:220px}
     .pm-filter-select:hover,.pm-filter-select:focus{border-color:#d4af37;outline:none}
     .pm-filter-select.has-value{background:#fdf8e7;border-color:#d4af37;color:#92710f;font-weight:600}
-    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #d8d2c6;border-radius:6px;color:#98a0ae;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
+    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #d8d2c6;border-radius:6px;color:#6f7785;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
     .pm-clear-filters:hover{color:#92710f;border-color:#d4af37}
     @media (max-width:767px){
       .pm-split{flex-direction:column}
@@ -1249,7 +1249,7 @@ const PM_UNIT_STATE = {
   ocupada:      { label: 'Ocupada',       dot: kitStatusDot('ok'), bg: 'bg-emerald-50 border-emerald-300', txt: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-800', border: 'border-l-emerald-500', dotc: 'bg-emerald-500', hex: '#059669' },
   reservada:    { label: 'Reservada',     dot: kitStatusDot('off'), bg: 'bg-blue-50 border-blue-300',       txt: 'text-blue-700',    chip: 'bg-blue-100 text-blue-800',       border: 'border-l-blue-500',    dotc: 'bg-blue-500',    hex: '#3a5be0' },
   libre:        { label: 'Disponible',    dot: kitStatusDot('warn'), bg: 'bg-amber-50 border-amber-300',     txt: 'text-amber-700',   chip: 'bg-amber-100 text-amber-800',     border: 'border-l-amber-500',   dotc: 'bg-amber-500',   hex: '#f59e0b' },
-  mantenimiento:{ label: 'Mantenimiento', dot: kitStatusDot('off'), bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600',   chip: 'bg-slate-200 text-slate-700',     border: 'border-l-slate-500',   dotc: 'bg-slate-500',   hex: '#98a0ae' },
+  mantenimiento:{ label: 'Mantenimiento', dot: kitStatusDot('off'), bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600',   chip: 'bg-slate-200 text-slate-700',     border: 'border-l-slate-500',   dotc: 'bg-slate-500',   hex: '#6f7785' },
   inactiva:     { label: 'Inactiva',      dot: kitStatusDot('off'), bg: 'bg-slate-50 border-slate-200',      txt: 'text-slate-400',   chip: 'bg-slate-100 text-slate-500',     border: 'border-l-slate-300',   dotc: 'bg-slate-400',   hex: '#8b93a1' },
 };
 function pmLastBookingOf(unitId) {
@@ -1369,7 +1369,7 @@ function pmRenderAvailability() {
         ${chip(stF==='ocupada',"pmaState.availFilterState='ocupada';pmRender()",'Ocupadas',counts.ocupada,'#059669')}
         ${chip(stF==='reservada',"pmaState.availFilterState='reservada';pmRender()",'Reservadas',counts.reservada,'#3a5be0')}
         ${chip(stF==='libre',"pmaState.availFilterState='libre';pmRender()",'Disponibles',counts.libre,'#f59e0b')}
-        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'Mant.',counts.mantenimiento,'#98a0ae')}
+        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'Mant.',counts.mantenimiento,'#6f7785')}
         <select onchange="pmaState.availFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs ml-1"><option value="">${osIcon('house')} Todas</option>${activeProps.map(p=>`<option value="${p.id}" ${propF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
         <select onchange="pmaState.availFilterType=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Tipo</option>${['casa_completa','apartamento','estudio','habitacion'].map(t=>`<option value="${t}" ${typeF===t?'selected':''}>${pmUnitTypeLabel(t)}</option>`).join('')}</select>
       </div>
@@ -1996,7 +1996,7 @@ function pmRenderTimelineForUnits(units, year) {
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
                     padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
                     reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                    otro:              'background:linear-gradient(135deg,#98a0ae,#5a6270);'
+                    otro:              'background:linear-gradient(135deg,#6f7785,#5a6270);'
                   };
                   const bg = colorByType[b.booking_type] || colorByType.otro;
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
@@ -2478,7 +2478,7 @@ function pmRenderTimelineGrid(units) {
     {key:'hospitable', label:'Hospitable', color:'#0ea5e9'},
     {key:'padsplit', label:'Padsplit', color:'#a855f7'},
     {key:'reserva_corta', label:'Reserva corta', color:'#f59e0b'},
-    {key:'otro', label:'Otro', color:'#98a0ae'}
+    {key:'otro', label:'Otro', color:'#6f7785'}
   ];
 
   return `
@@ -2495,7 +2495,7 @@ function pmRenderTimelineGrid(units) {
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
             const showMonth = i === 0 || d.getDate() === 1;
             return `<div style="width:${colW}px;border-right:1px solid #eef1f6;${isWeekend?'background:#fafafa;':''}${isToday?'background:#fee2e2;':''};padding:6px 0;text-align:center;">
-              ${showMonth ? `<div style="font-size:9px;color:#98a0ae;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
+              ${showMonth ? `<div style="font-size:9px;color:#6f7785;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
               <div style="font-size:10px;color:#8b93a1;">${dows[d.getDay()]}</div>
               <div style="font-size:13px;${isToday?'color:#dc2626;font-weight:bold;':'color:#3a4250;'}">${d.getDate()}</div>
             </div>`;
@@ -2545,7 +2545,7 @@ function pmRenderTimelineGrid(units) {
             const endIdx = Math.min(daysCount - 1, Math.floor((e - days[0]) / 86400000));
             const leftPx = labelW + startIdx * colW + 2;
             const widthPx = (endIdx - startIdx + 1) * colW - 4;
-            const colorByType = {contrato_directo:'#059669',airbnb:'#ec4899',booking:'#3a5be0',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#98a0ae'};
+            const colorByType = {contrato_directo:'#059669',airbnb:'#ec4899',booking:'#3a5be0',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#6f7785'};
             const stState = pmBookingCalState(b, lateSet);
             const bg = colorBy === 'estado' ? stState.color : (colorByType[b.booking_type] || colorByType.otro);
             const opacity = stState.key === 'finalizado' ? 0.7 : 1;
@@ -2912,7 +2912,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
                     padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
                     reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                    otro:              'background:linear-gradient(135deg,#98a0ae,#5a6270);'
+                    otro:              'background:linear-gradient(135deg,#6f7785,#5a6270);'
                   };
                   const bg = colorByType[b.booking_type] || colorByType.otro;
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
@@ -4455,7 +4455,7 @@ function pmRenderExpenses() {
 // Gráfico de torta SVG por categoría
 function pmPieChart(entries, size = 150) {
   const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
-  const colors = ['#d4af37','#059669','#3a5be0','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#98a0ae','#a855f7','#14b8a6'];
+  const colors = ['#d4af37','#059669','#3a5be0','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#6f7785','#a855f7','#14b8a6'];
   let acc = 0; const cx = size/2, cy = size/2, r = size/2 - 2;
   const arcs = entries.map(([cat, val], i) => {
     const a0 = acc/total*2*Math.PI - Math.PI/2; acc += val; const a1 = acc/total*2*Math.PI - Math.PI/2;
@@ -5547,8 +5547,8 @@ function pmOpenPrintReport(title, bodyHtml) {
     <style>
       *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#1e2430;margin:32px;font-size:12px}
       h1{font-size:20px;margin:0 0 4px} h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #d4af37;padding-bottom:3px;margin:22px 0 10px}
-      .sub{color:#98a0ae;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
-      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #dfe4ec} th{background:#eef1f6;text-transform:uppercase;font-size:10px;color:#98a0ae}
+      .sub{color:#6f7785;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
+      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #dfe4ec} th{background:#eef1f6;text-transform:uppercase;font-size:10px;color:#6f7785}
       th:first-child,td:first-child{text-align:left} .kpis{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0}
       .kpi{border:1px solid #dfe4ec;border-radius:8px;padding:10px 14px;min-width:130px} .kpi .l{font-size:9px;text-transform:uppercase;color:#8b93a1;font-weight:bold}
       .kpi .v{font-size:18px;font-weight:800;margin-top:2px} .pos{color:#047857} .neg{color:#dc2626}
@@ -5587,7 +5587,7 @@ function pmFinReport(kind) {
   if (kind === 'investor') {
     const body = `<h2>Reporte por inversionista · ${r.label}</h2>${kpiRow}
       <h2>Rendimiento por propiedad</h2>${pnlTable(sorted)}
-      <p style="margin-top:14px;color:#98a0ae">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
+      <p style="margin-top:14px;color:#6f7785">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
     return pmOpenPrintReport('Reporte por inversionista', body);
   }
   if (kind === 'fiscal') {

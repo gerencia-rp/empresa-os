@@ -9,7 +9,7 @@ window.OS = OS;
 const OS_M = n => posMoney(n);              // #10: formato único (exacto con separador)
 const OS_K = n => posMoneyK(n);             // #10: formato único (compacto $X.XXM / $XXXk)
 const OS_E = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-function osAx() { return posGetTheme() === 'light' ? '#98a0ae' : '#565e6b'; }
+function osAx() { return posGetTheme() === 'light' ? '#6f7785' : '#757d8b'; }
 // Icono de empresa/app/área: nombre Lucide → SVG (osIcon); glifo tipográfico (◧ ▦ ∑ ⌂ …) → tal cual.
 function osIco(val, opts) { return (window.OS_ICONS && OS_ICONS[val]) ? osIcon(val, opts) : (val || ''); }
 
@@ -68,14 +68,14 @@ function osInjectCSS() {
   const st = document.createElement('style'); st.id = 'os-styles';
   st.textContent = `
   #os-root{position:fixed;inset:0;z-index:900;overflow:auto;
-    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#565e6b;--glass:#131519;--glassb:rgba(255,255,255,.07);
+    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:#131519;--glassb:rgba(255,255,255,.07);
     --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
     --accent:#3a5be0;--accent-ink:#ffffff;--accent-2:#5c79f0;--accent-soft:rgba(58,91,224,.18);--glow:rgba(58,91,224,.5);--grad:linear-gradient(120deg,#3a5be0,#5c79f0);
     --card:#131519;--line:rgba(255,255,255,.07);--txt2:#c7cdd8;--txt3:#8b93a1;--surface-2:#191c22;--surface-solid:#161a20;--radius:20px;
     --mesh1:rgba(58,91,224,.5);--mesh2:rgba(92,121,240,.16);--mesh3:rgba(58,91,224,.10);--bggrad:#08090c;
     color:var(--ink);background:var(--bg);font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
   /* LIGHT canon royal — ESPEJO de ui/tokens.css (mantener sincronizado) */
-  #os-root[data-theme="light"]{--bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#98a0ae;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
+  #os-root[data-theme="light"]{--bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
     --a1:#3e5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309;
     --accent:#2b44c6;--accent-2:#3e5be0;--accent-soft:rgba(43,68,198,.12);--glow:rgba(43,68,198,.24);--grad:linear-gradient(120deg,#2b44c6,#3e5be0);
     --card:#ffffff;--line:rgba(14,20,32,.09);--txt2:#3a4250;--txt3:#5a6270;--surface-2:#f1f4f8;--surface-solid:#ffffff;
@@ -160,7 +160,7 @@ function osInjectCSS() {
   #os-return-bar .osrb-logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(120deg,#3a5be0,#5c79f0);display:grid;place-items:center;color:#fff;font-weight:900;font-size:12px;cursor:pointer;flex-shrink:0;box-shadow:0 0 14px rgba(58,91,224,.5)}
   #os-return-bar .osrb-crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:#8b93a1;min-width:0}
   #os-return-bar .osrb-crumb a{color:#8b93a1;cursor:pointer;text-decoration:none;white-space:nowrap}#os-return-bar .osrb-crumb a:hover{color:#f1f3f7}
-  #os-return-bar .osrb-crumb b{color:#f1f3f7;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#565e6b}
+  #os-return-bar .osrb-crumb b{color:#f1f3f7;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-return-bar .osrb-crumb .sep{color:#757d8b}
   #os-return-bar[data-theme="light"] .osrb-crumb,#os-return-bar[data-theme="light"] .osrb-crumb a{color:#5a6270}#os-return-bar[data-theme="light"] .osrb-crumb b{color:#0e1420}
   #os-return-bar .osrb-back{margin-left:auto;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#f1f3f7;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:9px;cursor:pointer;flex-shrink:0}
   #os-return-bar .osrb-back:hover{border-color:#3a5be0}
@@ -211,7 +211,7 @@ function osInjectReskin() {
   ${D} #modal .border,${D} #modal .border-b,${D} #modal .border-t,${D} #modal .border-slate-200,${D} #modal .border-slate-100,${D} #modal .border-slate-300,${D} #modal .border-gray-200,${D} #modal .border-gray-100,${D} #modal .border-gray-300{border-color:rgba(255,255,255,.1) !important}
   ${D} #modal .divide-slate-200 > *+*,${D} #modal .divide-gray-200 > *+*,${D} #modal .divide-slate-100 > *+*{border-color:rgba(255,255,255,.08) !important}
   ${D} #modal input,${D} #modal select,${D} #modal textarea{background-color:#0e1016 !important;color:#f1f3f7 !important;border-color:rgba(255,255,255,.14) !important}
-  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#565e6b !important}
+  ${D} #modal input::placeholder,${D} #modal textarea::placeholder{color:#757d8b !important}
   ${D} #modal table th{color:#8b93a1 !important}
   ${D} #modal tr:hover td{background:rgba(255,255,255,.03) !important}
   ${D} #modal .shadow,${D} #modal .shadow-sm,${D} #modal .shadow-md,${D} #modal .shadow-lg{box-shadow:none !important}
@@ -226,7 +226,7 @@ function osInjectReskin() {
   /* ───────── OLA 3: pulido LIGHT canon (tarjetas con sombra + contraste mínimo --mut2) ───────── */
   ${L} #modal .bg-white.rounded-xl,${L} #modal .bg-white.rounded-lg,${L} #modal .bg-white.rounded-2xl{box-shadow:0 1px 2px rgba(16,20,28,.05),0 6px 16px rgba(16,20,28,.06) !important;border-color:#dfe4ec !important}
   ${L} #modal .text-slate-500,${L} #modal .text-gray-500{color:#5a6270 !important}
-  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#98a0ae !important}
+  ${L} #modal .text-slate-400,${L} #modal .text-gray-400{color:#6f7785 !important}
   /* ───────── OLA 3: tablas de los clásicos scrollean en celular (no rompen la página) ───────── */
   @media (max-width:768px){ html[data-osreskin] #modal-body table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch} }
   `;

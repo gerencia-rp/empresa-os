@@ -1469,7 +1469,7 @@ function rmNavHtml() {
         ? 'border:1px solid var(--a1,#3a5be0);background:var(--a1,#3a5be0);color:#fff'
         : 'border:1px solid var(--glassb,#dfe4ec);background:var(--glass,rgba(148,163,184,.08));color:var(--ink,#0e1420)')
       + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;'
-      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#dfe4ec);color:var(--mut,#98a0ae)')
+      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#dfe4ec);color:var(--mut,#6f7785)')
       + '">' + g.num + '</span>' + g.name + '</button>';
   });
   // Chip del proyecto activo (compartido entre todos los pasos)
@@ -1483,7 +1483,7 @@ function rmNavHtml() {
   grp.tabs.forEach(function (t) {
     const on = rmState.tab === t;
     subs += '<button onclick="rmSetTab(\'' + t + '\')" style="flex:none;padding:8px 12px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;background:none;border:none;border-bottom:2px solid '
-      + (on ? 'var(--a1,#3a5be0);color:var(--ink,#0e1420)' : 'transparent;color:var(--mut,#98a0ae)')
+      + (on ? 'var(--a1,#3a5be0);color:var(--ink,#0e1420)' : 'transparent;color:var(--mut,#6f7785)')
       + '">' + (labels[t] || t) + '</button>';
   });
   return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">' + steps + chip + '</div>'
@@ -2263,7 +2263,7 @@ function rmRenderCharts(e) {
       datasets: [
         { label: 'Material', data: groups.map(g => Math.round(g.material)), backgroundColor: '#3a5be0' },
         { label: 'Mano de obra', data: groups.map(g => Math.round(g.labor)), backgroundColor: '#a855f7' },
-        { label: 'Equipo', data: groups.map(g => Math.round(g.equipment)), backgroundColor: '#98a0ae' }
+        { label: 'Equipo', data: groups.map(g => Math.round(g.equipment)), backgroundColor: '#6f7785' }
       ]
     },
     options: {
@@ -2898,7 +2898,7 @@ function rmGenerateProposalPDF() {
       <tr class="phase-header"><td colspan="5" style="background:#0e1420;color:white;font-weight:bold;padding:8px 12px;">${info.icon} ${p}. ${info.name}</td></tr>
       ${acts.map(a => `
         <tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:10px;color:#98a0ae;">${a.code}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:10px;color:#6f7785;">${a.code}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${a.desc}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${a.qty} ${a.unit}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">$${(+a.vu).toFixed(2)}</td>
@@ -2920,12 +2920,12 @@ function rmGenerateProposalPDF() {
   .watermark { position:fixed; top:40%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:140px; font-weight:900; color:rgba(15,23,42,0.04); z-index:-1; pointer-events:none; letter-spacing:8px; }
   header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:16px; border-bottom:3px solid #0e1420; margin-bottom:24px; }
   .brand { font-size:26px; font-weight:900; letter-spacing:-0.5px; }
-  .brand-sub { color:#98a0ae; font-size:11px; margin-top:2px; }
-  .meta { text-align:right; font-size:11px; color:#98a0ae; }
+  .brand-sub { color:#6f7785; font-size:11px; margin-top:2px; }
+  .meta { text-align:right; font-size:11px; color:#6f7785; }
   h1 { font-size:22px; margin:0 0 4px; }
   h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#5a6270; margin:24px 0 8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
   .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:12px; margin-bottom:16px; }
-  .info-grid div strong { display:block; color:#98a0ae; font-size:9px; text-transform:uppercase; margin-bottom:2px; }
+  .info-grid div strong { display:block; color:#6f7785; font-size:9px; text-transform:uppercase; margin-bottom:2px; }
   table { width:100%; border-collapse:collapse; font-size:11px; }
   .pricing-box { background:#eef1f6; border-radius:8px; padding:16px; margin-top:16px; }
   .pricing-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #dfe4ec; font-size:12px; }
@@ -2954,7 +2954,7 @@ function rmGenerateProposalPDF() {
 </header>
 
 <h1>${proj.name}</h1>
-<div style="font-size:12px;color:#98a0ae;margin-bottom:24px;">${proj.address || ''}</div>
+<div style="font-size:12px;color:#6f7785;margin-bottom:24px;">${proj.address || ''}</div>
 
 <div class="info-grid">
   <div><strong>Superficie</strong>${e.sqft || '—'} ft²</div>
@@ -3657,7 +3657,7 @@ async function rmAutoGenPlanner(projectId, projectName) {
     const days = Math.max(1, Math.round((cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)))) * fCal));
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = rmAddWorkDays(activityStart, i);
-      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#98a0ae' };
+      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#6f7785' };
       inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', is_critical: !!(e.cpm && e.cpm.criticalPath && e.cpm.criticalPath.includes(code)), created_by: state.user.id });
     }
   });

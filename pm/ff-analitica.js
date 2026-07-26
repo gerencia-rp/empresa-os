@@ -365,7 +365,7 @@
       cfg.options = Object.assign({ responsive: true, maintainAspectRatio: false, resizeDelay: 200 }, cfg.options || {});
       (FF._charts = FF._charts || []).push(new Chart(el, cfg));
     };
-    const mut = getComputedStyle(document.getElementById('ff-overlay') || document.body).getPropertyValue('--mut').trim() || '#98a0ae';
+    const mut = getComputedStyle(document.getElementById('ff-overlay') || document.body).getPropertyValue('--mut').trim() || '#6f7785';
     const grid = 'rgba(128,140,160,.15)';
     const meses = Object.keys(m.porMes).sort().slice(-14);
     mk('an-ritmo', { type: 'bar', data: { labels: meses, datasets: [{ data: meses.map(k => m.porMes[k]), backgroundColor: 'rgba(58,91,224,.55)', borderRadius: 4 }] },

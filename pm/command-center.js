@@ -36,12 +36,12 @@ function ccInjectCSS() {
   const st = document.createElement('style'); st.id = 'cc-styles';
   st.textContent = `
   #cc-overlay{position:fixed;inset:0;z-index:9998;overflow:auto;
-    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#565e6b;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
+    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:rgba(255,255,255,.045);--glassb:rgba(255,255,255,.09);
     --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
     color:var(--ink);background:var(--bg);font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
   /* LIGHT canon CEO 12-jul — espejo de ui/tokens.css */
   #cc-overlay[data-theme="light"]{
-    --bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#98a0ae;--glass:#ffffff;--glassb:#dfe4ec;
+    --bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:#ffffff;--glassb:#dfe4ec;
     --a1:#3a5be0;--a2:#2b44c6;--a3:#5a78b4;--pos:#059669;--neg:#dc2626;--amber:#b45309}
   #cc-overlay[data-theme="light"] .card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px rgba(15,23,42,.06)}
   #cc-overlay[data-theme="light"] .bgfx{background:radial-gradient(760px 520px at 8% -6%,rgba(37,99,235,.06),transparent 58%),radial-gradient(820px 560px at 100% 4%,rgba(29,78,216,.05),transparent 56%),radial-gradient(700px 620px at 70% 118%,rgba(107,91,239,.05),transparent 60%),linear-gradient(180deg,#f6f8fb,#eef1f6)}
@@ -239,7 +239,7 @@ async function openCommandCenter(sys) {
   let ov = document.getElementById('cc-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id = 'cc-overlay'; document.body.appendChild(ov); }
   if (window.posApplyTheme) posApplyTheme(ov);
-  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#565e6b">' + osIcon('loader') + ' Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
+  ov.innerHTML = '<div class="bgfx"></div><div class="gridfx"></div><div class="app"><aside class="side"></aside><main class="main"><div style="padding:60px;color:#757d8b">' + osIcon('loader') + ' Conectando con Airtable…</div></main></div><button class="pos-theme-btn" onclick="ccToggleTheme()" title="Tema claro/oscuro">◐</button><button class="ccclose" onclick="closeCommandCenter()" title="Cerrar">✕</button>';
   document.body.style.overflow = 'hidden';
   await ccLoadAll();
   if (!CC.chatLoaded) { try { await ccLoadChat(); } catch (e) {} }
@@ -546,7 +546,7 @@ function ccSecCommand(comp) {
       <div class="card"><div class="chart-h"><div class="t">Cashflow por casa</div><div class="k">rojo = pérdida</div></div><div style="position:relative;overflow:hidden;height:280px;width:100%"><canvas id="cc-house"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Gastos por tipo · mes</div><div class="k">${CC_K(kpi.expT)}</div></div><div style="position:relative;overflow:hidden;height:260px;width:100%"><canvas id="cc-donut"></canvas></div></div>
       <div class="card"><div class="chart-h"><div class="t">Operación de hoy</div><div class="k">cronograma real · ${todayTasks.length} tareas</div></div>
-        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#565e6b;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
+        ${todayTasks.length ? todayTasks.map(t => { const z = t.zone; const eq = t.assignee || (t.task_type === 'cleaning' ? 'Limpieza' : ''); return `<div class="op-item"><span class="op-time">${t.start_at ? String(t.start_at).slice(11, 16) : '—'}</span> <span style="flex:1">${CC_ESC((t.title || '').replace(/^[^A-Za-z0-9]+/, '')).slice(0, 28)}${eq ? ` <span class="op-eq">${CC_ESC(eq)}</span>` : ''}</span> <span class="op-zone ${z === 'norte' ? 'z-n' : 'z-s'}">${ccZoneLabel(z)}</span></div>`; }).join('') : '<div style="color:#757d8b;font-size:12px;padding:14px 0">Sin tareas hoy. Andá a Operación → Armar día.</div>'}
         <div style="margin-top:13px;font-size:11px;color:var(--mut)"><span class="chip" onclick="closeCommandCenter();setTimeout(()=>openCronograma({name:'Cronograma'}),150)">◆ Abrir Cronograma</span></div></div>
     </div>
     <div class="grid" style="margin-top:16px"><div class="card">
@@ -685,9 +685,9 @@ function ccMemCardHTML() {
   </div></div>`;
 }
 function ccMemListHTML() {
-  if (!CC.memLoaded) return '<div style="color:#565e6b;font-size:12px;padding:14px 0">' + osIcon('loader') + ' Cargando memoria…</div>';
+  if (!CC.memLoaded) return '<div style="color:#757d8b;font-size:12px;padding:14px 0">' + osIcon('loader') + ' Cargando memoria…</div>';
   if (CC._memErr) return `<div style="color:#ff6b6b;font-size:12px;padding:14px 0">${CC_ESC(CC._memErr)}</div>`;
-  if (!CC.memories.length) return '<div style="color:#565e6b;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
+  if (!CC.memories.length) return '<div style="color:#757d8b;font-size:12px;padding:14px 0">Sin memorias todavía. Agregá la primera arriba.</div>';
   return CC.memories.map(m => `<div class="memrow${m.activo ? '' : ' off'}">
     <span class="memtipo t-${m.tipo === 'decisión' ? 'dec' : m.tipo}">${CC_MEM_TIPO[m.tipo] || m.tipo}</span>
     <div class="memtxt">${CC_ESC(m.texto)}<div class="memmeta">${m.fuente || 'manual'} · ${(m.fecha || '').slice(0, 10)}${m.has_embedding ? ' · vectorizada' : ''}</div></div>
@@ -819,7 +819,7 @@ function ccSecReservas(comp) {
   const pName = id => CC.props.find(p => p.id === id)?.name || '—';
   // Cadena viva: cada reserva puede tener su tarea de turnover/recepción (auto-generada en el sync).
   const relTask = b => CC.tasks.find(t => t.property_id === b.property_id && ['cleaning', 'recepcion'].includes(t.task_type) && !['completado', 'cancelado'].includes(t.status));
-  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#565e6b">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? 'turnover' : 'recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
+  const taskChip = b => { const t = relTask(b); if (!t) return '<span style="color:#757d8b">—</span>'; return `<span class="rtask">${t.task_type === 'cleaning' ? 'turnover' : 'recepción'}${t.scheduled_date ? ' · ' + t.scheduled_date.slice(5) : ''}</span>`; };
   return `${ccHeader('Reservas', 'Calendario', `${CC.book.length} reservas · ${activas.length} activas · cadena reserva → turnover → gasto → KPI`)}
     <div class="grid"><div class="card"><div class="chart-h"><div class="t">Reservas activas</div><div class="k">reserva → tarea de operación</div></div>
       <table class="ptable"><thead><tr><th>Casa</th><th>Inquilino</th><th>Entrada</th><th>Salida</th><th>Estado</th><th>Operación</th></tr></thead><tbody>
@@ -969,8 +969,8 @@ function ccExpTypeSeries(n = 6) {
 }
 function ccMountCharts(comp) {
   if (!window.Chart) return;
-  const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#565e6b', font: { size: 10 } } };
-  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#565e6b', font: { size: 10 } } }, y: ax } };
+  const ax = { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#757d8b', font: { size: 10 } } };
+  const gext = { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { color: '#757d8b', font: { size: 10 } } }, y: ax } };
   const mk = (id, cfg) => { const el = document.getElementById(id); if (!el) return; try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {} cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); CC._charts.push(new Chart(el, cfg)); };
   const grad = (ctx, c1, c2) => { const g = ctx.createLinearGradient(0, 0, 0, 150); g.addColorStop(0, c1); g.addColorStop(1, c2); return g; };
   // sparklines
@@ -998,12 +998,12 @@ function ccMountCharts(comp) {
       { label: 'Gastos', data: exp12, borderColor: '#ff6b6b', backgroundColor: grad(ictx, 'rgba(255,107,107,.12)', 'rgba(255,107,107,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: gext });
     mk('cc-an-cf', { type: 'bar', data: { labels: s12.labels, datasets: [{ data: cf12, borderRadius: 4, backgroundColor: cf12.map(v => v >= 0 ? '#4ade9e' : '#ff6b6b') }] }, options: gext });
     const occ = ccOccSeries(12);
-    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#3a5be0', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(58,91,224,.18)', 'rgba(58,91,224,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#565e6b', font: { size: 10 }, callback: v => v + '%' } } } } });
+    mk('cc-an-occ', { type: 'line', data: { labels: occ.labels, datasets: [{ data: occ.pct, borderColor: '#3a5be0', backgroundColor: grad(document.getElementById('cc-an-occ').getContext('2d'), 'rgba(58,91,224,.18)', 'rgba(58,91,224,0)'), fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }] }, options: { ...gext, scales: { x: gext.scales.x, y: { ...ax, min: 0, max: 100, ticks: { color: '#757d8b', font: { size: 10 }, callback: v => v + '%' } } } } });
     const hn = [...comp.houses].filter(h => h.inc > 0 || h.exp > 0).sort((a, b) => b.net - a.net);
     mk('cc-an-noibar', { type: 'bar', data: { labels: hn.map(h => h.name.split(',')[0].slice(0, 16)), datasets: [{ data: hn.map(h => h.net), borderRadius: 4, backgroundColor: hn.map(h => h.net >= 0 ? '#4ade9e' : '#ff6b6b') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: '#8b93a1', font: { size: 9 } } } } } });
     mk('cc-an-donut', { type: 'doughnut', data: { labels: bl, datasets: [{ data: bv, backgroundColor: ['#3a5be0', '#5c79f0', '#93b0e2', '#3a6f74', '#4a5568', '#fbbf24'], borderColor: '#131519', borderWidth: 3 }] }, options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 8, padding: 9 } } } } });
     const et = ccExpTypeSeries(6); const cols = { 'Hipoteca': '#ff6b6b', 'Servicios': '#3a5be0', 'Mantenim.': '#5c79f0', 'Nómina': '#93b0e2', 'Plataforma': '#fbbf24', 'Otros': '#4a5568' };
-    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#565e6b', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
+    mk('cc-an-exptrend', { type: 'bar', data: { labels: et.labels, datasets: et.tipos.map((tp, i) => ({ label: tp, data: et.series[i], backgroundColor: cols[tp], borderRadius: 3 })) }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 8, padding: 8 } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { color: '#757d8b', font: { size: 10 } } }, y: { stacked: true, ...ax } } } });
   }
 }
 

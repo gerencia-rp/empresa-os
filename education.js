@@ -4171,7 +4171,7 @@ function eduDescargarPlan(format) {
       body{font-family:system-ui;max-width:780px;margin:2rem auto;padding:1rem;color:#0e1420;line-height:1.5}
       h1{font-size:1.8rem;color:#0e1420;border-bottom:2px solid #D97706;padding-bottom:0.5rem}
       h2{font-size:1.2rem;color:#1e2430;margin-top:1.5rem;background:#eef1f6;padding:0.5rem 0.75rem;border-left:4px solid #D97706}
-      em{color:#98a0ae;font-size:0.85rem}
+      em{color:#6f7785;font-size:0.85rem}
       ul{list-style:none;padding-left:0.5rem}
       li{padding:0.25rem 0;border-bottom:1px solid #eef1f6}
       hr{border:none;border-top:1px solid #dfe4ec;margin:1rem 0}
