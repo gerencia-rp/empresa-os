@@ -299,7 +299,7 @@ function rcEVMPortfolio(rows) {
       ${kpi('BAC total', RC_K(BAC), 'off', 'presupuesto a completar')}
       ${kpi('EAC total', RC_K(agg.EAC || 0), (agg.VAC || 0) < 0 ? 'bad' : 'ok', `proyección a cierre · VAC ${agg.VAC != null ? RC_M(agg.VAC) : '—'}`)}
     </div>
-    <div class="card"><div class="chart-h"><div class="t">Cartera en obra · EVM</div><div class="k">${rows.length} obras · clic para ver detalle <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rmPCOpenImport()">${osIcon('inbox') || '📥'} Importar costos por fase</button></div></div>
+    <div class="card"><div class="chart-h"><div class="t">Cartera en obra · EVM</div><div class="k">${rows.length} obras · clic para ver detalle <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rmPCOpenImport()">${osIcon('inbox') || '📥'} Importar costos por fase</button><button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:6px" onclick="if(window.rmSqftOpenPanel)rmSqftOpenPanel()">📐 Recalcular $/ft²</button></div></div>
       <table class="ptable"><thead><tr><th>Obra</th><th style="text-align:right">BAC</th><th style="text-align:right">% avance</th><th style="text-align:right">AC (real)</th><th style="text-align:right">CPI</th><th style="text-align:right">SPI</th><th style="text-align:right">EAC</th><th style="text-align:right">VAC</th></tr></thead>
       <tbody>${rowHtml}</tbody></table>
       <div class="meta" style="margin-top:8px">CPI/SPI: ${kitStatusDot('ok')} ≥1.00 · ${kitStatusDot('warn')} 0.90–0.99 · ${kitStatusDot('bad')} &lt;0.90. VAC &lt;0 = sobrecosto proyectado.</div>

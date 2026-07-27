@@ -68,6 +68,7 @@ const BUNDLE_FILES = [
   "remodel-command-center.js",
   "rm-evm.js",
   "rm-phase-costs.js",
+  "rm-sqft-calib.js",
   "remodel-reportes.js",
   "clickup-dashboard.js",
   "pm-dashboard.js",
