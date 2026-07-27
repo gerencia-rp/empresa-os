@@ -2120,6 +2120,7 @@ function rmRenderProjects(body) {
       <h2 class="text-lg font-bold">Proyectos de remodelación</h2>
       <div class="flex gap-2">
         ${rmState.projects.length ? '<button onclick="rmExportAllExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-4 py-2 rounded">' + osIcon('inbox') + ' Excel masivo</button>' : ''}
+        <button onclick="if(window.rmPCOpenImport)rmPCOpenImport()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded" title="Importar costos por fase desde el Excel del Estimado">${osIcon('inbox')} Importar costos/fase</button>
         <button onclick="rmNewProject()" class="bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded">+ Nuevo proyecto</button>
       </div>
     </div>

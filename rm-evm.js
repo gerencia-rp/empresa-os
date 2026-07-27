@@ -115,7 +115,7 @@ async function rcEVMLoad() {
   try {
     const propIds = (RC.obras || []).map(o => o.property_id).filter(Boolean);
     const atIds = (RC.obras || []).map(o => o.airtable_id).filter(Boolean);
-    const [proj, wa, snaps, weights] = await Promise.all([
+    const [proj, wa, snaps, weights, phaseCosts] = await Promise.all([
       sb.from('remodel_projects').select('id, property_id, address, activities, start_date, end_date_estimated, budget_total, budget_material, budget_labor, progress_real').is('archived_at', null).then(r => r.data || []).catch(() => []),
       propIds.length
         ? sb.from('weekly_activities').select('property_id, stage, status, activity_code, date, baseline_date, is_critical').in('property_id', propIds).then(r => r.data || []).catch(() => [])
@@ -123,12 +123,15 @@ async function rcEVMLoad() {
       atIds.length
         ? sb.from('remodel_snapshots').select('airtable_id, snapshot_date, avance_pct, gasto_total, presupuesto, gasto_materiales, gasto_trabajadores').in('airtable_id', atIds).order('snapshot_date', { ascending: true }).then(r => r.data || []).catch(() => [])
         : Promise.resolve([]),
-      sb.from('remodel_stage_weights').select('property_id, etapa, peso_pct').eq('active', true).then(r => r.data || []).catch(() => [])
+      sb.from('remodel_stage_weights').select('property_id, etapa, peso_pct').eq('active', true).then(r => r.data || []).catch(() => []),
+      sb.from('remodel_phase_costs').select('property_id, fase, costo_materiales, costo_mano_obra, costo_equipo, total').then(r => r.data || []).catch(() => [])
     ]);
     const projByProp = {}; (proj || []).forEach(p => { if (p.property_id) projByProp[p.property_id] = p; });
     const waByProp = {}; (wa || []).forEach(a => { if (!a.property_id) return; (waByProp[a.property_id] = waByProp[a.property_id] || []).push(a); });
     const snapsByAt = {}; (snaps || []).forEach(s => { if (!s.airtable_id) return; (snapsByAt[s.airtable_id] = snapsByAt[s.airtable_id] || []).push(s); });
     const weightByProp = {}; (weights || []).forEach(w => { if (!w.property_id) return; (weightByProp[w.property_id] = weightByProp[w.property_id] || {})[w.etapa] = +w.peso_pct || 0; });
+    const phaseCostsByProp = {}; (phaseCosts || []).forEach(pc => { if (!pc.property_id) return; (phaseCostsByProp[pc.property_id] = phaseCostsByProp[pc.property_id] || {})[String(pc.fase)] = pc; });
+    RC.evm.phaseCostsByProp = phaseCostsByProp;
     RC.evm.projByProp = projByProp;
     RC.evm.waByProp = waByProp;
     RC.evm.snapsByAt = snapsByAt;
@@ -159,13 +162,21 @@ function rcEVMObra(o) {
   const proj = (evm.projByProp || {})[o.property_id] || null;
   const acts = (proj && Array.isArray(proj.activities)) ? proj.activities : [];
 
-  // BAC por fase desde activities
+  // BAC por fase — prioridad: costos importados (C.2) > activities del Estimador.
   const bacPhase = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0 };
-  let bacFromActs = 0;
-  acts.forEach(a => { const p = rmEvmPhaseOf(a.phase); const t = +a.total || 0; bacFromActs += t; if (p) bacPhase[p] += t; });
-  const BAC = bacFromActs > 0 ? bacFromActs : (+o.presupuesto_interno || 0);
-  // Si el presupuesto por fase no cubre el BAC (sin proyecto), no hay desglose fiable.
-  const tienePresupFase = bacFromActs > 0;
+  const pcImport = (evm.phaseCostsByProp || {})[o.property_id] || null;
+  let bacFromActs = 0, fuenteBAC = null;
+  if (pcImport) {
+    for (const p of ['1', '2', '3', '4', '5', '6']) { if (pcImport[p]) bacPhase[p] = +pcImport[p].total || 0; }
+    fuenteBAC = 'importado';
+  } else {
+    acts.forEach(a => { const p = rmEvmPhaseOf(a.phase); const t = +a.total || 0; bacFromActs += t; if (p) bacPhase[p] += t; });
+    if (bacFromActs > 0) fuenteBAC = 'estimador';
+  }
+  const bacPhaseSum = Object.values(bacPhase).reduce((a, x) => a + (+x || 0), 0);
+  const BAC = bacPhaseSum > 0 ? bacPhaseSum : (+o.presupuesto_interno || 0);
+  // ¿Hay desglose de presupuesto por fase fiable?
+  const tienePresupFase = bacPhaseSum > 0;
 
   // Avance físico por fase desde weekly_activities (done/total), con override manual.
   const wa = (evm.waByProp || {})[o.property_id] || [];
@@ -218,7 +229,7 @@ function rcEVMObra(o) {
   const PV = rmEvmPlannedValueAt(Date.now(), bacPhase, ranges, fallback);
 
   const metrics = rmEvmMetrics({ BAC, PV: PV || 0, EV, AC });
-  return { o, proj, BAC, PV, EV, AC, evPhase, hayFase, tienePresupFase, ranges, bacPhase, fallback, metrics };
+  return { o, proj, BAC, PV, EV, AC, evPhase, hayFase, tienePresupFase, fuenteBAC, ranges, bacPhase, fallback, metrics };
 }
 
 // Rangos de fechas planeadas por fase (baseline_date, fallback date) → {fase:{min,max}} en ms.
@@ -288,7 +299,7 @@ function rcEVMPortfolio(rows) {
       ${kpi('BAC total', RC_K(BAC), 'off', 'presupuesto a completar')}
       ${kpi('EAC total', RC_K(agg.EAC || 0), (agg.VAC || 0) < 0 ? 'bad' : 'ok', `proyección a cierre · VAC ${agg.VAC != null ? RC_M(agg.VAC) : '—'}`)}
     </div>
-    <div class="card"><div class="chart-h"><div class="t">Cartera en obra · EVM</div><div class="k">${rows.length} obras · clic para ver detalle</div></div>
+    <div class="card"><div class="chart-h"><div class="t">Cartera en obra · EVM</div><div class="k">${rows.length} obras · clic para ver detalle <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rmPCOpenImport()">${osIcon('inbox') || '📥'} Importar costos por fase</button></div></div>
       <table class="ptable"><thead><tr><th>Obra</th><th style="text-align:right">BAC</th><th style="text-align:right">% avance</th><th style="text-align:right">AC (real)</th><th style="text-align:right">CPI</th><th style="text-align:right">SPI</th><th style="text-align:right">EAC</th><th style="text-align:right">VAC</th></tr></thead>
       <tbody>${rowHtml}</tbody></table>
       <div class="meta" style="margin-top:8px">CPI/SPI: ${kitStatusDot('ok')} ≥1.00 · ${kitStatusDot('warn')} 0.90–0.99 · ${kitStatusDot('bad')} &lt;0.90. VAC &lt;0 = sobrecosto proyectado.</div>
@@ -330,7 +341,7 @@ function rcEVMDetalle(r, rows) {
         <div class="card kpi"><div class="lab">% avance (EV/BAC)</div><div class="big">${m.pctAvance != null ? Math.round(m.pctAvance * 100) + '%' : '—'}</div><div class="meta">${money(m.EV)} de ${money(m.BAC)}</div></div>
         <div class="card kpi"><div class="lab">Proyección (EAC)</div><div class="big ${(m.VAC || 0) < 0 ? 'down' : 'up'}">${money(m.EAC)}</div><div class="meta">VAC ${money(m.VAC)}</div></div>
       </div>
-      <div class="krow" style="border-top:1px solid var(--glassb);padding-top:8px">${fila('BAC — presupuesto', money(m.BAC), '', r.tienePresupFase ? 'Estimador (por fase)' : 'presupuesto_interno')}</div>
+      <div class="krow" style="border-top:1px solid var(--glassb);padding-top:8px">${fila('BAC — presupuesto', money(m.BAC), '', r.fuenteBAC === 'importado' ? 'costos importados (C.2)' : r.fuenteBAC === 'estimador' ? 'Estimador (por fase)' : 'presupuesto_interno')}</div>
       ${fila('PV — valor planeado', money(m.PV), '', 'cronograma baseline')}
       ${fila('EV — valor ganado', money(m.EV), '', r.hayFase ? 'avance por fase' : 'avance del Planner (casa)')}
       ${fila('AC — costo real', money(m.AC), '', 'pagos material + horas×rate')}
