@@ -66,6 +66,7 @@ const BUNDLE_FILES = [
   "os/inv-admin.js",
   "os/os-ia.js",
   "remodel-command-center.js",
+  "rm-evm.js",
   "remodel-reportes.js",
   "clickup-dashboard.js",
   "pm-dashboard.js",
