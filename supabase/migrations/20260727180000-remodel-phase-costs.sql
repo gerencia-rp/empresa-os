@@ -18,14 +18,15 @@ CREATE TABLE IF NOT EXISTS public.remodel_phase_costs (
 
 ALTER TABLE public.remodel_phase_costs ENABLE ROW LEVEL SECURITY;
 
+-- Regla dura RLS (06-jul): jamás `to anon` ni authenticated using(true) — área remodelacion.
 DROP POLICY IF EXISTS rpc_read ON public.remodel_phase_costs;
 CREATE POLICY rpc_read ON public.remodel_phase_costs
-  FOR SELECT TO anon, authenticated USING (true);
+  FOR SELECT TO authenticated USING (has_area('remodelacion'));
 
 DROP POLICY IF EXISTS rpc_write ON public.remodel_phase_costs;
 CREATE POLICY rpc_write ON public.remodel_phase_costs
   FOR ALL TO authenticated
-  USING (auth.role() = 'authenticated')
-  WITH CHECK (auth.role() = 'authenticated');
+  USING (has_area('remodelacion'))
+  WITH CHECK (has_area('remodelacion'));
 
 CREATE INDEX IF NOT EXISTS idx_rpc_prop ON public.remodel_phase_costs(property_id);
