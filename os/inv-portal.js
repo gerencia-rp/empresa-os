@@ -881,7 +881,7 @@ function renderFlujo(pid, inv) {
       + '<div onclick="ipToggleAnio(\'' + y + '\')" style="display:flex;justify-content:space-between;gap:10px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:10px;background:var(--glass)">'
       + '<b>' + (open ? '▾' : '▸') + ' ' + y + '</b><span style="font-variant-numeric:tabular-nums">ingresos <b class="up">' + $money(ti) + '</b> · gastos <b class="down">−' + $money(tg) + '</b> · neto <b class="' + (ti - tg >= 0 ? 'up' : 'down') + '">' + $money(ti - tg) + '</b></span></div>'
       + (open ? '<div class="overx"><table style="margin-top:4px"><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Flujo neto</th></tr></thead><tbody>'
-        + meses.map(ym => { const o = porMes[ym]; const n = o.ing - o.gas; return '<tr><td>' + ym + '</td><td class="up">' + $money(o.ing) + '</td><td class="down">−' + $money(o.gas) + '</td><td class="' + (n >= 0 ? 'up' : 'down') + '">' + $money(n) + '</td></tr>'; }).join('')
+        + meses.map(ym => { const o = porMes[ym]; const n = o.ing - o.gas; return '<tr><td>' + esc(invEngine.mesEs(ym)) + '</td><td class="up">' + $money(o.ing) + '</td><td class="down">−' + $money(o.gas) + '</td><td class="' + (n >= 0 ? 'up' : 'down') + '">' + $money(n) + '</td></tr>'; }).join('')
         + '</tbody></table></div>' : '')
       + '</div>';
   }).join('');

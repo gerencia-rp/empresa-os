@@ -3,6 +3,22 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 29-jul · 💵 SALDO OPERATIVO (P&L SÍ/NO) — re-verificación contra data viva + pulido de meses legibles
+
+**Contexto (hallazgo honesto):** la tarea pedía corregir el saldo del Ledger (admin) y del Flujo Mensual (portal) para que SOLO cuente movimientos P&L SÍ, más el filtro de meses en "Julio 2026". **El núcleo ya estaba implementado en el mega-build E1** (commit `1fa602f`, 21-jul), presente en la rama actual. Se re-verificó contra la data en prod y se aplicó el pulido de meses que faltaba.
+
+**Regla ÚNICA (confirmada, `os/inv-engine.js:pnlSi`):** P&L SÍ = categoría en `renta/ingreso/operativo/tax`; P&L NO = `inversion/inversión/financiero/distribucion` (todo lo demás → false). El saldo/balance operativo acumula SOLO P&L SÍ; los P&L NO se muestran en tenue (opacity .55) + badge "P&L NO" repitiendo el saldo anterior. Deriva de la columna `categoria` de `inv_cashflow_real` (no hay booleano guardado) — como pide la corrección de arquitectura.
+
+**ANTES → DESPUÉS (verificado contra prod, 101 Starbright Dr `e4bb81f8-…`):**
+- Ledger admin (`iaTabLedger`, inv-admin.js:744) y Flujo portal (`renderFlujo`, inv-portal.js:828): saldo YA se computa con `invEngine.pnlSi` (líneas 756/762 admin, 842-851/891 portal). Título "Saldo operativo (P&L): $X", subtotales por categoría intactos, tag P&L NO en tenue, filtro de meses con `invEngine.mesEs("2026-07")→"Julio 2026"`.
+- **Data viva Starbright:** los 2 draws migrados + "Draw 1" + "Invoice 1" son `categoria=financiero` → **P&L NO, no mueven el saldo** (ya recategorizados en E1; el "Draw 1 · ingreso −427k" del ticket ya no existe). Entradas de prueba `TEST-E1 renta $3,000` (ingreso, P&L SÍ) y `TEST-E1 utilities $200` (operativo, P&L SÍ) → **saldo operativo = $2,800**, exactamente lo que pide la sección PRUEBAS del ticket. El `inv_ledger` RPC categoriza en fuente: compra/draws→`inversion`, HML/cash-out/cuotas→`financiero`, renta→`renta`, gastos Rentas→`operativo`, distribuciones→`distribucion`.
+- **Pulido aplicado (único gap real, alineado con Problema 2 / Parte C — "fechas técnicas 2026-07 confunden"):**
+  - `os/inv-portal.js` — detalle **año→mes** de Flujo Mensual: columna "Mes" `"2026-07"` → `invEngine.mesEs(ym)` = **"Julio 2026"**.
+  - `os/inv-admin.js` — tab **Modelo & Movimientos**, prefijo de fecha en las listas ✍️ Manuales y ⚙️ Auto: `slice(0,7)="2026-07"` → `invEngine.mesEs(...)` = **"Julio 2026"** (la fecha exacta sigue en el `title`).
+  - Los filtros de mes (selector "Todos los meses") en Ledger y Flujo ya usaban `mesEs`; Distribuciones muestra fecha exacta por fila (correcto — una distribución tiene fecha, no mes).
+- **Nota A.4 (decisión de diseño):** se etiqueta SOLO el P&L NO (excepción visible); los P&L SÍ quedan sin badge para no meter ruido en cada fila de renta/gasto — el header + título ya declaran que solo P&L SÍ mueve el saldo. Coherente con el diseño E1.
+- **Lineaje/gate:** re-corrida `lineage:register` contra prod (202/202 trazados); el crawler descubrió "Rentas › Pagos › Total atrasado" ($20,825) sin registro → curado a `pm_payments.deuda` (Balance de pago, regla pmPayBalance). **`ci:gate` 15/15 verde.** node --check OK en los 3 archivos.
+
 ## 20-jul · 📋 RESERVAS: botón "📄 Guía" por tarjeta + fix reserva duplicada en "Pasadas"
 Dos reemplazos puntuales en `pm/pm-main.js` (pedido exacto del CEO):
 - ✅ **Botón "📄 Guía" en cada tarjeta de reserva** (no finalizada/cancelada): llama `pmGenerateWelcomeGuide(property_id, unit_id?)` — la guía de bienvenida por unidad ya existente, ahora accesible directo desde la reserva sin pasar por la ficha de la casa.
