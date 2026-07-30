@@ -391,7 +391,7 @@ function render() {
       }).join('') + '</select>' : '';
 
   const noLeidos = (IP.msgs || []).filter(m => m.de === 'admin' && !(m.read_by || []).includes(IP.email.toLowerCase())).length;
-  const TABS = [['port', '🏠 Mi Portafolio'], ['casa', '🏡 Mi Casa'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
+  const TABS = [['port', '🏠 Mi Portafolio'], ['rend', '📈 Rendimiento'], ['casa', '🏡 Mi Casa'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
   const head = ipVerBar()
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector
@@ -400,7 +400,8 @@ function render() {
     + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' + TABS.map(t => '<button class="ibtn tabb' + (IP.tab === t[0] ? ' on' : '') + '" onclick="IP.tab=\'' + t[0] + '\';render()">' + t[1] + '</button>').join('') + '</div>';
 
   let body = '';
-  if (IP.tab === 'casa') body = renderCasaDash(pid, P, holding, p, r, dir);
+  if (IP.tab === 'rend') body = renderRendimiento();
+  else if (IP.tab === 'casa') body = renderCasaDash(pid, P, holding, p, r, dir);
   else if (IP.tab === 'flujo') body = renderFlujo(pid, p.repartoInv);
   else if (IP.tab === 'dist') body = renderDist(pid, p.repartoInv);
   else if (IP.tab === 'msgs') body = renderMsgs(pid);
@@ -411,6 +412,7 @@ function render() {
 
   app().innerHTML = head + body;
   if (IP.tab === 'port' || !IP.tab) drawCharts(r, p.repartoInv);
+  if (IP.tab === 'rend') drawRendChart();
   if (IP.tab === 'casa') drawCasaChart(r, p.repartoInv);
   const met = ipMetrics(pid, p, r, holding);
   IP.lastSnapshot = { casa: dir, escenario, inversion: met.cap || 0, reparto: met.inv, tir31: r.indicadores.tir31PostRefi, vpn31: r.indicadores.vpn31PostRefi, vpn31_inv: r.indicadores.vpn31PostRefi * met.inv, cap: r.indicadores.capValor, dscr: r.indicadores.dscr, equilibrio: r.indicadores.puntoEquilibrio, riqueza_hoy: met.riquezaHoy, coc_anual: met.cocAnualPct, equity_multiple: met.em, roi_anualizado: met.roiAnu, fases: r.indicadores.fases, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
@@ -629,6 +631,89 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
 
 // ─── 🏡 MI CASA: mini-dashboard simple por casa (misma estructura de 5 secciones
 // que los ejecutivos, en versión entendible; ⓘ del glosario en todo) ───
+// ─── 📈 PARTE 1: Panel de Rendimiento (Robinhood) — números REALES, proyecciones etiquetadas ───
+function ipSetHor(n) { IP.rendHor = n; render(); }
+window.ipSetHor = ipSetHor;
+function ipRendPaneles() {
+  if (!window.invRend || !window.invEsc) return [];
+  invRend.setEsc(invEsc);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const N = IP.rendHor || 6;
+  return (IP.holdings || []).map(h => {
+    const ind = (IP.indData || []).find(x => x.property_id === h.property_id);
+    if (!ind) return null;
+    const Pnest = IP.params[h.property_id] || {};
+    const Pv = {}; Object.keys(Pnest).forEach(k => Pv[k] = Pnest[k].value);
+    const dists = (IP.dists || []).filter(d => d.property_id === h.property_id && d.estado === 'pagada').map(d => ({ fecha: d.fecha, monto: +d.monto }));
+    return invRend.panel({ ind, Pv, holding: h, distribuciones: dists, hoy }, IP.escCfg || {}, N);
+  }).filter(Boolean);
+}
+function ipRendCard(pnl) {
+  const N = pnl.horizonte.anios, x2 = v => v == null ? '—' : v.toFixed(2) + 'x';
+  const proyBadge = pnl.esProyeccion
+    ? '<span class="src sup" title="no hay avalúo cargado — valor proyectado a tasa supuesta">proyección</span>'
+    : '<span class="src" title="valor de avalúo/ARV real">' + esc(pnl.valorFuente || 'avalúo') + '</span>';
+  const fuente = (ic, lab, val, sub, tipTxt, cls) => '<div class="kv"><span title="' + esc(tipTxt) + '" style="cursor:help">' + ic + ' ' + lab + (sub ? ' <span class="meta">' + sub + '</span>' : '') + '</span><b class="' + (cls || '') + '">' + val + '</b></div>';
+  const flows = pnl.horizonte.flows.map(f => '<div class="kv" style="font-size:11px;padding:2px 0"><span>' + esc(f.fecha) + '</span><b class="' + (f.monto >= 0 ? 'up' : 'down') + '">' + (f.monto >= 0 ? '+' : '') + $money(f.monto) + '</b></div>').join('');
+  const spGana = pnl.horizonte.multiplo != null && pnl.horizonte.multiplo > pnl.sp500.multiplo;
+  return '<div class="card" style="margin-bottom:12px">'
+    + '<div class="chart-h"><div class="t">' + esc(pnl.casa || '') + '</div><div class="k">tu inversión ' + $money(pnl.capital) + ' · ' + $pct(pnl.pct) + ' de la casa · valor hoy ' + $money(pnl.valorActual) + ' ' + proyBadge + '</div></div>'
+    + '<div class="grid k2">'
+    + '<div><div class="lab" style="margin-bottom:4px">Tus 4 fuentes de ganancia</div>'
+    + fuente('💵', 'Flujo cobrado', $money(pnl.fuentes.flujo), null, 'Distribuciones que ya te pagaron (real).', 'up')
+    + fuente('📈', 'Apreciación', $money(pnl.fuentes.apreciacion), pnl.fuentes.apreciacionCAGR != null ? $pct(pnl.fuentes.apreciacionCAGR) + '/año' : '', 'Cuánto subió el valor de tu parte desde la compra' + (pnl.esProyeccion ? ' (proyectado)' : ' (avalúo real)') + '.', 'up')
+    + fuente('🏦', 'Amortización', $money(pnl.fuentes.amortizacion), '"se paga sola"', 'Capital del préstamo que se paga con la renta — tu parte.', 'up')
+    + fuente('💸', 'Cash-out del refi', pnl.fuentes.cashout != null ? $money(pnl.fuentes.cashout) : '—', pnl.fuentes.cashout == null ? 'por completar' : '', 'Capital que te devolvió el refinanciamiento (baja tu plata en riesgo).', '')
+    + '<div class="kv" style="border-top:2px solid var(--glassb)"><span><b>Retorno total</b></span><b class="' + (pnl.retornoTotal >= 0 ? 'up' : 'down') + '">' + $money(pnl.retornoTotal) + ' <span class="meta">(' + $pct(pnl.retornoTotalPct) + ')</span></b></div>'
+    + '<div class="kv"><span title="flujo cobrado ÷ tu capital, anualizado" style="cursor:help">Cash-on-cash</span><b>' + $pct(pnl.cocAnual) + '/año <span class="meta">· ' + $pct(pnl.cocMensual) + '/mes</span></b></div>'
+    + '</div>'
+    + '<div><div class="lab" style="margin-bottom:4px">Si vendés en ' + N + ' años <span class="src sup">supuesto</span></div>'
+    + '<div class="kv"><span>Precio de venta estimado</span><b>' + $money(pnl.horizonte.precioVenta) + '</b></div>'
+    + '<div class="kv"><span>− costo de venta + payoff deuda</span><b class="down">−' + $money((pnl.horizonte.costoVenta || 0) + (pnl.horizonte.payoff || 0)) + '</b></div>'
+    + '<div class="kv"><span><b>Neto para vos</b></span><b class="up">' + $money(pnl.horizonte.netoInv) + '</b></div>'
+    + '<div class="kv"><span title="cuánto rinde tu plata al año, contando cuándo entra y sale" style="cursor:help">TIR (' + N + ' años)</span><b class="up">' + $pct(pnl.horizonte.tir) + '</b></div>'
+    + '<div class="kv"><span title="por cada $1 que pusiste, cuánto vuelve" style="cursor:help">Múltiplo</span><b>' + x2(pnl.horizonte.multiplo) + '</b></div>'
+    + '<div class="kv"><span>vs S&amp;P 500 <span class="meta">(' + $pct(pnl.sp500.tasa) + ', ilustración)</span></span><b class="' + (spGana ? 'up' : '') + '">' + x2(pnl.sp500.multiplo) + (spGana ? ' · tu casa rinde más' : '') + '</b></div>'
+    + '</div></div>'
+    + '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--a2)">ver los flujos que alimentan la TIR</summary><div style="margin-top:6px">' + (flows || '<div class="meta">sin flujos aún</div>') + '<div class="meta" style="font-size:10px;margin-top:4px">−tu capital al comprar · +distribuciones reales fechadas · +neto de venta al horizonte (supuesto)</div></div></details>'
+    + (pnl.esProyeccion ? '<div class="meta" style="margin-top:6px;font-size:10.5px;color:var(--amber)">⚠ Sin avalúo cargado: la apreciación es proyección a ' + $pct(pnl.supuestos.apreciacion) + '/año (editable por administración).</div>' : '')
+    + (pnl.yrsHeld != null && pnl.yrsHeld < 1 ? '<div class="meta" style="font-size:10.5px">ℹ La TIR realizada anualiza menos de un año — puede verse extrema; leé el escenario de venta a ' + N + ' años para una lectura estable.</div>' : '')
+    + '</div>';
+}
+function renderRendimiento() {
+  if (!window.invRend || !window.invEsc || !IP.escCfg) return '<div class="empty">Cargando el panel de rendimiento…</div>';
+  const N = IP.rendHor || 6;
+  const paneles = ipRendPaneles();
+  if (!paneles.length) return '<div class="empty">Todavía no hay datos de rendimiento para tus casas.</div>';
+  const agg = invRend.portafolio(paneles, new Date().toISOString().slice(0, 10));
+  const horSel = [4, 6, 8].map(n => '<button class="ibtn' + (N === n ? ' on' : '') + '" onclick="ipSetHor(' + n + ')">' + n + ' años</button>').join('');
+  const tip = t => ' <span class="src" title="' + esc(t) + '" style="cursor:help">ⓘ</span>';
+  const banner = '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:12px">📈 <b>Realizado</b> = distribuciones ya pagadas + avalúo real. <b>Proyectado</b> (venta futura, apreciación, S&amp;P 500) = <b>supuestos editables</b>, no promesas. Apreciación ' + $pct(IP.escCfg.apreciacion_anual) + '/año · costo de venta ' + $pct(IP.escCfg.costo_venta) + ' · S&amp;P ' + $pct(IP.escCfg.sp500_anual) + '.</div>';
+  const kpi = (lab, val, sub, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
+  const resumen = '<div class="grid k4">'
+    + kpi('Total invertido' + tip('la plata que pusiste en total'), $money(agg.capitalT), agg.n + ' casas', '')
+    + kpi('Tu equity hoy' + tip('valor actual de tu parte, menos la deuda pendiente'), $money(agg.equityT), 'realizado', 'up')
+    + kpi('Retorno total' + tip('flujo cobrado + apreciación + amortización'), $money(agg.retornoT), $pct(agg.retornoPct), agg.retornoT >= 0 ? 'up' : 'down')
+    + kpi('TIR de tu cartera' + tip('cuánto rinde tu plata al año, contando cuándo entra y sale cada flujo'), $pct(agg.tir), 'múltiplo ' + (agg.multiplo != null ? agg.multiplo.toFixed(2) + 'x' : '—'), 'up')
+    + '</div>';
+  const hasDists = (IP.dists || []).some(d => d.estado === 'pagada' && (IP.holdings || []).some(h => h.property_id === d.property_id));
+  const chart = hasDists
+    ? '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Flujo real que te pagaron (acumulado)</div><div class="k">solo distribuciones pagadas — 100% real</div></div><div style="position:relative;height:240px;width:100%;overflow:hidden"><canvas id="chRend"></canvas></div></div>'
+    : '<div class="card" style="margin-top:14px"><div class="meta">Cuando empiecen a pagarte distribuciones, acá vas a ver tu flujo real acumulado en el tiempo.</div></div>';
+  return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><b style="font-size:15px">📈 Tu rendimiento</b><span class="meta">horizonte de venta:</span>' + horSel + '</div>'
+    + banner + resumen + chart
+    + '<div class="lab" style="margin:18px 0 8px">Por propiedad · las 4 fuentes de ganancia + escenario de venta a ' + N + ' años</div>'
+    + paneles.map(ipRendCard).join('');
+}
+function drawRendChart() {
+  const el = document.getElementById('chRend'); if (!el || !window.Chart) return;
+  const light = ipTheme() === 'light';
+  const all = (IP.dists || []).filter(d => d.estado === 'pagada' && (IP.holdings || []).some(h => h.property_id === d.property_id))
+    .map(d => ({ fecha: String(d.fecha).slice(0, 10), monto: +d.monto })).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  let acc = 0; const labels = [], data = [];
+  all.forEach(d => { acc += d.monto; labels.push(d.fecha); data.push(Math.round(acc)); });
+  IP.charts.push(new Chart(el, { type: 'line', data: { labels, datasets: [{ label: 'Flujo acumulado (real)', data, borderColor: '#4f8dff', pointRadius: 3, fill: true, backgroundColor: 'rgba(79,141,255,.10)', stepped: true }] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#475569' : '#93a0b6', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#64748b' : '#5b6780', font: { size: 9 } } }, y: { ticks: { color: light ? '#64748b' : '#5b6780', font: { size: 9 } } } } } }));
+}
 function renderCasaDash(pid, P, holding, p, r, dir) {
   if (IP.ledger[pid] === undefined) ipLoadLedger(pid, true);
   const met = ipMetrics(pid, p, r, holding);

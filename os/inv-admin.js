@@ -1289,6 +1289,18 @@ async function iaLoadAnalizador() {
   ovr.forEach(o => { (P[o.property_id] = P[o.property_id] || {})[o.key] = o.valor; });
   IA.escData = { P, cfg: invEsc.cfgDesde(cfg) };
 }
+// Supuestos globales editables (Parte 1): apreciación, costo de venta, S&P 500 → ff_uw_config esc_*
+async function iaSaveEscCfg() {
+  const g = id => (document.getElementById(id) || {}).value;
+  const rows = [['esc_apreciacion_anual', g('ia-cfg-aprec')], ['esc_costo_venta', g('ia-cfg-cventa')], ['esc_sp500_anual', g('ia-cfg-sp500')]]
+    .filter(([, v]) => v != null && String(v).trim() !== '' && isFinite(+v))
+    .map(([key, v]) => ({ key, value: String(+v) }));
+  if (!rows.length) return alert('Cargá al menos un supuesto numérico válido (ej. 0.04).');
+  for (const r of rows) { const { error } = await sb.from('ff_uw_config').upsert(r, { onConflict: 'key' }); if (error) return alert('Error: ' + error.message); }
+  if (window.toast) toast('✓ Supuestos globales guardados — el portal del inversor los toma al refrescar', 'success');
+  await iaLoadAnalizador(); osRender();
+}
+window.iaSaveEscCfg = iaSaveEscCfg;
 function iaEscCasas() {
   const D = IA.escData;
   const porCasa = {};
@@ -1329,7 +1341,14 @@ function iaTabAnalizador() {
   const $=v=>v==null?'—':(v<0?'−$':'$')+Math.abs(Math.round(v)).toLocaleString('en-US');
   const p1=v=>v==null?'n/a':(v*100).toFixed(1)+'%';
   const x2=v=>v==null?'—':v.toFixed(2)+'x';
-  const sup = '<div class="card" style="margin-bottom:12px;border-color:rgba(245,178,61,.4)"><div style="font-size:11.5px;color:var(--amber)">📐 <b>Supuestos (editables en ff_uw_config esc_* · override por casa en params)</b>: vacancia ' + p1(cfg.vacancia) + ' · apreciación ' + p1(cfg.apreciacion_anual) + '/año · renta +' + p1(cfg.crec_renta_anual) + '/año · costo de venta ' + p1(cfg.costo_venta) + ' · benchmark TIR value-add <b>' + p1(cfg.benchmark_tir) + '</b> (objetivo mínimo 15–16%) · preferred ' + (cfg.preferred_on ? p1(cfg.preferred_pct) : 'OFF') + '. Escenarios en papel — no son promesas. Deuda: refinanciada = amortizada 30a · HML = solo interés · sin registrar = por completar (jamás se inventa).</div></div>';
+  const cfgIn = (id, val) => '<input id="' + id + '" class="osa-in" style="width:78px;padding:3px 6px;font-size:11px;text-align:right" value="' + (val != null ? val : '') + '">';
+  const sup = '<div class="card" style="margin-bottom:12px;border-color:rgba(245,178,61,.4)"><div style="font-size:11.5px;color:var(--amber)">📐 <b>Supuestos globales (ff_uw_config esc_* · override por casa en params)</b>: vacancia ' + p1(cfg.vacancia) + ' · renta +' + p1(cfg.crec_renta_anual) + '/año · benchmark TIR value-add <b>' + p1(cfg.benchmark_tir) + '</b> (mínimo 15–16%) · preferred ' + (cfg.preferred_on ? p1(cfg.preferred_pct) : 'OFF') + '. Escenarios en papel — no son promesas.</div>'
+    + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:11px">'
+    + '<span title="apreciación anual del valor (0.04 = 4%) — la usa el Panel de Rendimiento del inversor y los escenarios">Apreciación /año ' + cfgIn('ia-cfg-aprec', cfg.apreciacion_anual) + '</span>'
+    + '<span title="costo total de vender: comisión + cierre (0.07 = 7%)">Costo de venta ' + cfgIn('ia-cfg-cventa', cfg.costo_venta) + '</span>'
+    + '<span title="tasa histórica del S&P 500 para la comparación ilustrativa (0.10 = 10%)">S&amp;P 500 /año ' + cfgIn('ia-cfg-sp500', cfg.sp500_anual) + '</span>'
+    + '<button class="cbtn" style="padding:5px 12px" onclick="iaSaveEscCfg()">💾 Guardar supuestos</button>'
+    + '<span class="meta" style="font-size:10px">se reflejan de inmediato en el portal del inversor (Rendimiento)</span></div></div>';
   const estado = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Estado actual por casa</div><div class="k">fuentes: ff_deals (renta/gastos) · inv_indicadores_data (papel/deuda) · inv_holdings (aporte)</div></div>'
     + '<table class="ptable"><thead><tr><th>Casa</th><th class="dh-num" style="text-align:right">Aporte</th><th style="text-align:right">NOI</th><th style="text-align:right">Cap impl.</th><th style="text-align:right">Flujo/mes</th><th style="text-align:right">CoC</th><th style="text-align:right">Equity</th><th style="text-align:right">DSCR</th></tr></thead><tbody>'
     + escs.map(({c, e}) => '<tr' + (e.porCompletar ? ' style="opacity:.55"' : '') + '><td>' + OS_E(c.casa) + (e.porCompletar ? ' <span class="badge b-warn" style="font-size:8px">por completar</span>' : '') + '</td>'

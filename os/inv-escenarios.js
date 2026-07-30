@@ -169,7 +169,7 @@
   }
   // defaults de config desde ff_uw_config (filas esc_*) — editable, cero hardcode
   function cfgDesde(rows) {
-    const cfg = { vacancia: 0.05, apreciacion_anual: 0.04, crec_renta_anual: 0.08, costo_venta: 0.07, costos_cierre_default: 8000, preferred_on: false, preferred_pct: 0.08, benchmark_tir: 0.15 };
+    const cfg = { vacancia: 0.05, apreciacion_anual: 0.04, crec_renta_anual: 0.08, costo_venta: 0.07, costos_cierre_default: 8000, preferred_on: false, preferred_pct: 0.08, benchmark_tir: 0.15, sp500_anual: 0.10 };
     (rows || []).forEach(r => {
       const k = String(r.key || '').replace(/^esc_/, '');
       if (k === 'preferred_on') cfg.preferred_on = +r.value > 0;

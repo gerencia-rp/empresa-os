@@ -3,6 +3,26 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 30-jul · 📈 PARTE 1 — Panel de Rendimiento del inversionista (Robinhood, números REALES)
+
+**Qué:** nueva pestaña **📈 Rendimiento** en el portal del inversor — indicadores estándar de real estate sobre datos REALES de Supabase, con las proyecciones etiquetadas "supuesto" y editables (nunca como hecho). Regla de credibilidad del CEO respetada.
+
+**Módulo nuevo `os/inv-rendimiento.js`** (PURO, browser+node; reusa `invEsc.desdeDatos`/`saldoTras` — cero redefinición):
+- `panel({ind, Pv, holding, distribuciones, hoy}, cfg, horizonte)` → capital, valor actual (avalúo REAL `paper_value` o proyección declarada), **4 fuentes de ganancia** (flujo cobrado = distribuciones pagadas · apreciación = (valor−compra)×% con CAGR · amortización "se paga sola" = principal pagado del refi × % · cash-out × %), equity actual, retorno total $/%, CoC mensual/anual, **TIR realizada** (XIRR de flujos REALES fechados: −capital@compra + distribuciones + equity hoy), **escenario de venta** (precio×(1+aprec)^N − costo venta − payoff amortizado → neto×% → TIR y múltiplo por horizonte), **vs S&P 500** (capital compuesto a tasa supuesta). XIRR propia (bisección base 365). `porCompletar` honesto (jamás inventa).
+- `portafolio(paneles)` → XIRR de TODOS los flujos reales + agregados.
+
+**Fuentes (todo Supabase, ya sincronizado):** `inv_holdings` (capital/%), `inv_distributions` (flujos pagados fechados), `inv_indicadores_data` RPC (compra/close_date/paper_value/deuda/refinanciada), params (refi_tasa/plazo/mes, cashout_real, apreciacion/costo_venta override). **Ningún dato inventado**: la apreciación sale del avalúo real (ff_deals.appraisal/arv); sin avalúo → proyección a tasa supuesta VISIBLE.
+
+**Portal `os/inv-portal.js`:** pestaña 📈 Rendimiento = resumen cartera (total invertido · equity hoy · retorno total $/% · TIR cartera) + **gráfica de flujo real acumulado** (solo distribuciones pagadas) + **card por casa** con las 4 fuentes + **selector de horizonte 4/6/8** (recalcula TIR/múltiplo/S&P) + `<details>` con la **línea de flujos que alimenta la TIR** (credibilidad) + tooltips de una línea por término + avisos (proyección sin avalúo · TIR <1 año volátil). Solo lectura.
+
+**Config (admin `os/inv-admin.js`):** `apreciacion_anual_default`/`costo_venta_pct`/**`sp500_anual`** (nueva key `esc_sp500_anual`=0.10 en ff_uw_config; `cfgDesde` la mapea) ahora **editables** en el tab 🔮 Analizador (inputs + 💾 Guardar → `iaSaveEscCfg` upsert a ff_uw_config); se reflejan en el portal al refrescar.
+
+**VERIFICADO:**
+- Node (motor, datos reales Echo Lane): capital $38,000 · valor $467,000 (appraisal real) · 4 fuentes (flujo $38,000 · aprec $237,000 · amort $854) · **TIR horizonte 4/6/8 = 67.5% / 52.7% / 44.1% · múltiplo 5.70x / 6.92x / 8.27x · vs S&P 1.46x/1.77x/2.14x**.
+- **Headless (UI real, investor Dove Springs, refinanciada):** cartera TIR **58.8%** · equity hoy $44,406 · retorno $93,906; card TIR **17.7% (6a) → 16.4% (8a)** al togglear horizonte · vs S&P "tu casa rinde más" · 4 fuentes visibles · **0 pageerrors**. Números cuadran con inv_holdings/ff_deals/ff_hml_loans.
+
+**Registro:** módulo en index.html + inversionista.html + BUNDLE_FILES + STATIC_COPY. `ci:gate` 15/15.
+
 ## 30-jul · 🧹 PARTE 2 — 4 campos derivados del motor → SOLO LECTURA en el admin
 
 **Contexto:** en Modelo & Movimientos / Parámetros, cuatro campos que son **cálculos del motor** (no inputs de negocio) aparecían como `<input>` editables → el admin podía pisarlos por error.
