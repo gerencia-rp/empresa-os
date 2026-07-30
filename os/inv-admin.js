@@ -1044,7 +1044,15 @@ const IA_PARAM_OPCIONES = {
   estrategia: ['Fix & Flip', 'Fix & Hold', 'BRRRR', 'Wholesale', 'Otro'],
   plan_salida: ['Venta', 'Refinanciación', 'Renta a largo plazo (Hold)', 'Sin definir aún']
 };
+// Campos DERIVADOS del motor (cálculo, no input de negocio) → solo lectura, no editables a mano.
+// El admin no debe pisarlos por error; los calibra/computa el motor.
+const IA_PARAM_CALCULADO = ['util_anual_postrefi', 'anio0_postrefi', 'postrefi_perfil', 'cash_atrapado_real'];
 function iaParamControl(p, bid) {
+  if (IA_PARAM_CALCULADO.includes(p.key)) {
+    // sin <input> → iaSaveBloque lo saltea (getElementById nulo); se muestra el valor con badge "calculado"
+    return '<span style="display:inline-flex;align-items:center;gap:6px"><b style="font-variant-numeric:tabular-nums">' + (p.value == null || String(p.value).trim() === '' ? '<span class="meta">—</span>' : OS_E(p.value)) + '</b>'
+      + '<span class="badge b-ok" style="font-size:8px" title="derivado del motor — no editable a mano (se calcula/calibra, no se teclea)">🔒 calculado</span></span>';
+  }
   const opciones = IA_PARAM_OPCIONES[p.key];
   if (opciones) {
     const cur = p.value == null ? '' : String(p.value);

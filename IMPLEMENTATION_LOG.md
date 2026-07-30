@@ -3,6 +3,12 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 30-jul · 🧹 PARTE 2 — 4 campos derivados del motor → SOLO LECTURA en el admin
+
+**Contexto:** en Modelo & Movimientos / Parámetros, cuatro campos que son **cálculos del motor** (no inputs de negocio) aparecían como `<input>` editables → el admin podía pisarlos por error.
+- **ANTES:** `util_anual_postrefi`, `anio0_postrefi`, `postrefi_perfil`, `cash_atrapado_real` renderizaban como input de texto libre (editables + guardables).
+- **DESPUÉS:** `IA_PARAM_CALCULADO` en `iaParamControl` → esos 4 se muestran como **valor + badge "🔒 calculado"** (sin `<input>`). Como no hay `id="ia-p-<key>"`, `iaSaveBloque` los saltea (`getElementById` nulo → `continue`) → imposible pisarlos a mano. **No se borró ningún dato**; solo cambió el control a solo-lectura. El resto de parámetros sigue editable igual (harness 4/4: los 4 calculados read-only, `compra` sigue input).
+
 ## 30-jul · 💸 DISTRIBUCIONES AUTOMÁTICAS — cálculo mensual por inversionista (100% desde Supabase)
 
 **Qué:** la pestaña Distribuciones (admin → Inversionistas → 💸) sumó una **modalidad "Cálculo automático"** junto a la Manual (que queda igual). Calcula el monto mensual por inversionista leyendo SOLO Supabase (Airtable = linaje; el sync ya trae todo). El monto calculado es **editable** antes de confirmar.
