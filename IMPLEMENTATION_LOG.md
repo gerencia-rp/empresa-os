@@ -3,6 +3,17 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 30-jul · 🔧 BLOQUE B — obs de Juan: hm_tasa (B1), override de compra (B3), confirmaciones (B2)
+
+**B1 — formato de la tasa del HML** (`os/inv-admin.js` + `os/inv-portal.js`). Wellington tenía `hm_tasa="0.10.24"` (roto → se leía 10.0%).
+- ANTES: el input de tasas se escribía en fracción (0.1024) y roto quedaba sin validar.
+- DESPUÉS: el input de **hm_tasa se escribe en % directo** ("10.24" = 10.24%), se guarda como fracción (0.1024), con sufijo "%" y **validación que rechaza dos puntos** ("0.10.24" → error) o no-numéricos. Todo el sistema sigue usando la fracción (0.1024) en los cálculos. Nuevo `$pct2` (2 decimales) → **Info del Deal muestra "@ 10.24%"**. Dato de Wellington corregido en prod: `hm_tasa 0.10.24 → 0.1024`. Verificado (node): input 10.24→0.1024, "0.10.24"→REJECT, display 0.1024→"10.24", round-trip estable, Info del Deal "@ 10.24%".
+
+**B2 — hm_compra/hm_rehab (solo confirmar):** Wellington efectivos = **hm_compra $159,375 · hm_rehab $160,000** (el rehab vive como override manual en `inv_param_overrides`, base 0) · HML total $319,375. La UI usa el efectivo (override ?? base), así que muestra $160,000. Valores NO tocados. ✓
+
+**B3 — override manual del precio de compra** (`os/inv-portal.js`). El mecanismo de override (`inv_param_overrides`, patrón "real·Airtable / manual·override" reversible con ↩) YA funcionaba en el admin (compra es param auto → editarlo crea override; Wellington ya tenía uno = $190,000). El hueco real: los **displays del inversor ignoraban el override** y usaban `ind.compra` (Airtable).
+- DESPUÉS: `ipRendPaneles` (Panel de Rendimiento) y `renderIndicadores` (E4, apreciación) **prefieren el override de `compra`** cuando existe. Info del Deal ya lo usaba (params merged). Reversible sin borrar el de Airtable.
+
 ## 30-jul · 📈 BLOQUE A — credibilidad del Panel de Rendimiento (ajustes finos)
 
 **A1 — NO anualizar TIR en holds < 1 año** (`os/inv-indicadores.js` + `os/inv-rendimiento.js` + `os/inv-portal.js`).

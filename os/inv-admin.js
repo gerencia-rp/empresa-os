@@ -82,7 +82,11 @@ async function iaSaveBloque(bid) {
   for (const p of rows) {
     const el = document.getElementById('ia-p-' + p.key);
     if (!el) continue;
-    const val = el.value.trim();
+    let val = el.value.trim();
+    if (p.key === 'hm_tasa') {                                   // B1: input en %, se guarda como fracción
+      if ((val.match(/\./g) || []).length > 1 || !/^\d+(\.\d+)?$/.test(val)) { errs.push('hm_tasa: escribí un solo número, ej. 10.24 (= 10.24%)'); continue; }
+      val = String(+val / 100);
+    }
     if (val === String(p.value)) continue;
     const error = await iaPersistParam(p, val);
     if (error) errs.push(p.key + ': ' + error.message); else n++;
@@ -1048,6 +1052,13 @@ const IA_PARAM_OPCIONES = {
 // El admin no debe pisarlos por error; los calibra/computa el motor.
 const IA_PARAM_CALCULADO = ['util_anual_postrefi', 'anio0_postrefi', 'postrefi_perfil', 'cash_atrapado_real'];
 function iaParamControl(p, bid) {
+  // B1 (obs Juan): hm_tasa se ESCRIBE en % ("10.24" = 10.24%) y se guarda como fracción (0.1024).
+  // Rechaza strings con dos puntos ("0.10.24"). El resto del sistema usa la fracción tal cual.
+  if (p.key === 'hm_tasa') {
+    const raw = p.value;
+    const disp = (raw == null || String(raw).trim() === '') ? '' : (isFinite(+raw) ? +(+raw * 100).toFixed(4) : raw);
+    return '<span style="display:inline-flex;align-items:center;gap:3px"><input id="ia-p-hm_tasa" class="osa-in" style="width:90px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(disp) + '" placeholder="10.24" oninput="iaDirty(\'' + bid + '\')" onkeydown="if(event.key===\'Enter\')iaSaveBloque(\'' + bid + '\')" title="porcentaje anual directo — ej. 10.24 = 10.24%"><span style="color:var(--mut2);font-size:11px;font-weight:700">%</span></span>';
+  }
   if (IA_PARAM_CALCULADO.includes(p.key)) {
     // sin <input> → iaSaveBloque lo saltea (getElementById nulo); se muestra el valor con badge "calculado"
     return '<span style="display:inline-flex;align-items:center;gap:6px"><b style="font-variant-numeric:tabular-nums">' + (p.value == null || String(p.value).trim() === '' ? '<span class="meta">—</span>' : OS_E(p.value)) + '</b>'

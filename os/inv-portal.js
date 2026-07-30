@@ -16,6 +16,7 @@ window.IP = IP;
 
 const $money = v => (v == null || isNaN(+v)) ? '—' : (+v < 0 ? '−$' : '$') + Math.abs(Math.round(+v)).toLocaleString('en-US');
 const $pct = v => (v == null || isNaN(+v)) ? '—' : (v * 100).toFixed(1) + '%';
+const $pct2 = v => (v == null || isNaN(+v)) ? '—' : (+(v * 100).toFixed(2)) + '%';   // tasas con 2 decimales (ej. hm_tasa 10.24%)
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const SD = '<span class="warn" title="este dato todavía no está cargado — se carga desde administración">sin dato</span>';
 const sd = v => (v == null || v === '' || (typeof v === 'number' && isNaN(v))) ? SD : esc(v);
@@ -283,7 +284,11 @@ window.ipGlos = ipGlos;
 function renderIndicadores(pid, met) {
   if (!window.invInd || !(IP.indData || []).length) return '';
   const hoy = new Date().toISOString().slice(0, 10);
-  const cAll = (IP.indData || []).map(r => invInd.casa(r, hoy));
+  // B3: el override manual del precio de compra (si existe) prevalece sobre Airtable
+  const cAll = (IP.indData || []).map(r => {
+    const ov = ((IP.params[r.property_id] || {}).compra || {}).value;
+    return invInd.casa(ov != null && isFinite(+ov) ? { ...r, compra: +ov } : r, hoy);
+  });
   const c = cAll.find(x => x.property_id === pid);
   const $x = v => v == null ? '—' : v.toFixed(2) + 'x';
   // por inversionista (todas sus casas): DPI/RVPI/TVPI + TIR combinada
@@ -532,11 +537,11 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
   let hmLineas;
   if (hmC == null && hmR == null) {
     hmLineas = p.hmInicial
-      ? '<div class="kv"><span>Hard Money' + srcChip(P, 'hm_inicial') + '</span><b>' + $money(p.hmInicial) + (p.hmTasa ? ' @ ' + $pct(p.hmTasa) : '') + '</b></div>'
+      ? '<div class="kv"><span>Hard Money' + srcChip(P, 'hm_inicial') + '</span><b>' + $money(p.hmInicial) + (p.hmTasa ? ' @ ' + $pct2(p.hmTasa) : '') + '</b></div>'
       : '<div class="kv"><span>Hard Money</span><b><span class="warn">Pendiente</span></b></div>';
   } else {
     hmLineas = '<div class="kv"><span>HML para compra' + srcChip(P, 'hm_compra') + '</span><b>'
-      + (hmC == null ? '<span class="warn">Pendiente</span>' : (hmC === 0 ? 'Compra: cash <span class="meta">(sin HML en la compra)</span>' : $money(hmC) + (p.hmTasa ? ' @ ' + $pct(p.hmTasa) : ''))) + '</b></div>'
+      + (hmC == null ? '<span class="warn">Pendiente</span>' : (hmC === 0 ? 'Compra: cash <span class="meta">(sin HML en la compra)</span>' : $money(hmC) + (p.hmTasa ? ' @ ' + $pct2(p.hmTasa) : ''))) + '</b></div>'
       + '<div class="kv"><span>HML para rehab (escrow)' + srcChip(P, 'hm_rehab') + '</span><b>'
       + (hmR == null ? '<span class="warn">Pendiente</span>' : $money(hmR)) + '</b></div>';
   }
@@ -640,10 +645,12 @@ function ipRendPaneles() {
   const hoy = new Date().toISOString().slice(0, 10);
   const N = IP.rendHor || 6;
   return (IP.holdings || []).map(h => {
-    const ind = (IP.indData || []).find(x => x.property_id === h.property_id);
+    let ind = (IP.indData || []).find(x => x.property_id === h.property_id);
     if (!ind) return null;
     const Pnest = IP.params[h.property_id] || {};
     const Pv = {}; Object.keys(Pnest).forEach(k => Pv[k] = Pnest[k].value);
+    // B3: si hay override manual del precio de compra (inv_param_overrides), prevalece sobre Airtable
+    if (Pv.compra != null && isFinite(+Pv.compra)) ind = { ...ind, compra: +Pv.compra };
     const dists = (IP.dists || []).filter(d => d.property_id === h.property_id && d.estado === 'pagada').map(d => ({ fecha: d.fecha, monto: +d.monto }));
     return invRend.panel({ ind, Pv, holding: h, distribuciones: dists, hoy }, IP.escCfg || {}, N);
   }).filter(Boolean);
