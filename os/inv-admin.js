@@ -214,6 +214,16 @@ async function iaAddParam() {
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaAddParam = iaAddParam;
+// Alta directa de un campo de lista cerrada (estrategia/plan_salida): crea la fila vacía
+// para que aparezca el <select> listo para elegir — sin obligar a teclear texto libre.
+async function iaAddSelectParam(key, desc) {
+  const row = { property_id: IA.casa, key, value: '', fuente: 'manual', descripcion: desc || null };
+  const { error } = await sb.from('inv_model_params').upsert(row, { onConflict: 'property_id,key' });
+  if (error) return alert('Error: ' + error.message);
+  if (!IA.pOpen) IA.pOpen = {}; IA.pOpen.b2 = true;
+  await iaLoadCasa(IA.casa); osRender();
+}
+window.iaAddSelectParam = iaAddSelectParam;
 // ── Movimientos v2 (ajustes Juan 15-jul) ──
 // P&L derivado de la categoría (NO se elige a mano): ingreso/operativo/tax entran al Estado
 // de Resultados (afectan utilidad); inversión/financiero son capital/financiamiento.
@@ -895,15 +905,34 @@ function iaParamInfo(key) {
   document.body.appendChild(ov);
 }
 window.iaParamInfo = iaParamInfo;
-function iaParamRow(p, bid) {
+// Campos con lista cerrada de opciones (manuales) — evita el caos de texto libre
+// (ej. estrategia hoy escrita "Fix & Hold" / "Fix and hold" / "Fix And Hold").
+const IA_PARAM_OPCIONES = {
+  estrategia: ['Fix & Flip', 'Fix & Hold', 'BRRRR', 'Wholesale', 'Otro'],
+  plan_salida: ['Venta', 'Refinanciación', 'Renta a largo plazo (Hold)', 'Sin definir aún']
+};
+function iaParamControl(p, bid) {
+  const opciones = IA_PARAM_OPCIONES[p.key];
+  if (opciones) {
+    const cur = p.value == null ? '' : String(p.value);
+    const lista = opciones.slice();
+    if (cur && !lista.includes(cur)) lista.unshift(cur); // preserva el valor legacy sin perderlo
+    return '<select id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:210px;padding:4px 8px;font-size:11px" onchange="iaDirty(\'' + bid + '\')">'
+      + '<option value="">— sin definir —</option>'
+      + lista.map(o => '<option value="' + OS_E(o) + '"' + (o === cur ? ' selected' : '') + '>' + OS_E(o) + '</option>').join('')
+      + '</select>';
+  }
   const frac = /(_pct$|tasa|reparto|ocupacion|valorizacion|inflacion|retorno|piso_servicios)/.test(p.key);
+  return '<input id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:150px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(p.value) + '" oninput="iaDirty(\'' + bid + '\')" onkeydown="if(event.key===\'Enter\')iaSaveBloque(\'' + bid + '\')">'
+    + (frac ? '<span style="color:var(--mut2);font-size:10px;font-weight:700" title="fracción: 0.5 = 50%">×</span>' : '');
+}
+function iaParamRow(p, bid) {
   return '<div class="kv"><span title="' + OS_E(p.descripcion || '') + '">'
     + '<span class="lm-act" style="padding:0 4px;cursor:pointer;font-size:11px" title="¿qué es y de dónde sale?" onclick="iaParamInfo(\'' + OS_E(p.key) + '\')">ⓘ</span> '
     + OS_E(p.key) + ' ' + iaOrigenBadge(p)
     + (p._ov ? ' <a style="cursor:pointer;color:var(--a2);font-size:9.5px" title="volver al valor de origen (' + OS_E(p._base != null ? p._base : '—') + ')" onclick="iaRevertOverride(\'' + OS_E(p.key) + '\')">↩ origen</a>' : '')
     + '</span>'
-    + '<b style="display:inline-flex;align-items:center;gap:4px"><input id="ia-p-' + OS_E(p.key) + '" class="osa-in" style="width:150px;padding:4px 8px;font-size:11px;text-align:right" value="' + OS_E(p.value) + '" oninput="iaDirty(\'' + bid + '\')" onkeydown="if(event.key===\'Enter\')iaSaveBloque(\'' + bid + '\')">'
-    + (frac ? '<span style="color:var(--mut2);font-size:10px;font-weight:700" title="fracción: 0.5 = 50%">×</span>' : '') + '</b></div>';
+    + '<b style="display:inline-flex;align-items:center;gap:4px">' + iaParamControl(p, bid) + '</b></div>';
 }
 function iaParamsBloques() {
   IA.pOpen = IA.pOpen || { b1: true };
@@ -931,7 +960,9 @@ function iaParamsBloques() {
       if (id === 'b2') {
         // E2D: claves nuevas del deal, cargables con un clic si faltan
         const faltan2 = [['estrategia', 'Fix & Flip / Fix & Hold / BRRRR / Wholesale / Otro'], ['plan_salida', 'Venta / Refinanciación / Renta a largo plazo / Sin definir aún'], ['fecha_exit_proyectada', 'fecha estimada de salida (estimado·supuesto)']].filter(x => !rows.some(p2 => p2.key === x[0]));
-        if (faltan2.length) html += '<div class="meta" style="padding:6px 2px">Faltan: ' + faltan2.map(x => '<a style="cursor:pointer;color:var(--a2)" title="' + x[1] + '" onclick="document.getElementById(\'ia-np-key\').value=\'' + x[0] + '\';document.getElementById(\'ia-np-desc\').value=\'' + x[1] + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + x[0] + '</a>').join(' · ') + '</div>';
+        if (faltan2.length) html += '<div class="meta" style="padding:6px 2px">Faltan: ' + faltan2.map(x => IA_PARAM_OPCIONES[x[0]]
+          ? '<a style="cursor:pointer;color:var(--a2)" title="' + x[1] + ' — se agrega como lista para elegir" onclick="iaAddSelectParam(\'' + x[0] + '\',\'' + x[1] + '\')">＋ ' + x[0] + '</a>'
+          : '<a style="cursor:pointer;color:var(--a2)" title="' + x[1] + '" onclick="document.getElementById(\'ia-np-key\').value=\'' + x[0] + '\';document.getElementById(\'ia-np-desc\').value=\'' + x[1] + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + x[0] + '</a>').join(' · ') + '</div>';
       }
       if (id === 'b4') {
         // E2A/C: hm_inicial = hm_compra + hm_rehab (calculado, no editable) + guardia de draws

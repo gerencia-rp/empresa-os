@@ -3,6 +3,29 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 29-jul · 🏷 INFO DEL DEAL + HML estructurado — auditoría E2/E3 + estrategia/plan_salida como SELECT
+
+**Contexto (hallazgo honesto):** casi todo lo que pedía el ticket YA estaba implementado en los mega-builds **E2** (HML desglosado, draws migrados, hm_inicial calculado) y **E3** (tarjeta "Info del deal" con HML en 3 líneas). Auditado contra la data viva y el código; se completó el ÚNICO hueco real y se reportan las incoherencias de datos (Parte D).
+
+**Data layer (confirmado en prod, `inv_model_params`):** `hm_compra`/`hm_rehab`/`hm_tasa` = 23 casas c/u · `estrategia`/`plan_salida` = 3 casas · `hm_inicial`/`draw_m1`/`draw_m2` = **0 filas** (ya no existen, como decía la corrección). No se reconstruyó el Bloque 4 ni se re-migraron draws.
+
+**Ya estaba (verificado, sin tocar):**
+- **Portal `os/inv-portal.js` — tarjeta "Info del deal"** (líneas 525-553): Estrategia y Plan de salida con `pend()` → "Pendiente de definir" (nunca "sin dato"); HML en 3 líneas SIN duplicar — `Compra` (kv propia) + `HML para compra` (hm_compra @ hm_tasa) + `HML para rehab (escrow)` (hm_rehab); casos borde: hm_compra=0 → "Compra: cash", hm_rehab=0 → "$0", null → "Pendiente". Estado/Tu %/ARV/Refi también cableados. Parte B = OK.
+- **Admin `os/inv-admin.js` — Bloque 4** (`b4`, línea 785): regex `hm_compra|hm_rehab|hm_tasa|hm_plazo|hm_fecha_inicio|hm_puntos|otros_inv_m\d+` — **sin draw_***; `hm_inicial (HML total)` mostrado CALCULADO = hm_compra+hm_rehab, no editable; **advertencia amarilla** cuando Σ draws "(construcción)" > hm_rehab (línea ~948). Bloque 2 (`b2`) captura estrategia/plan_salida/fecha_exit_proyectada. Objetivos 1 = OK.
+- **Conectividad (Parte C):** admin escribe manual→UPDATE directo a `inv_model_params`, auto→`inv_param_overrides`; el portal (`ipLoad`, líneas 116-131) mergea overrides (valor efectivo = override). Edición del admin → visible en el inversor al refrescar. OK.
+
+**Hueco real corregido (ANTES → DESPUÉS) — Objetivo 2:**
+- **ANTES:** `iaParamRow` renderizaba TODO parámetro como `<input>` de texto libre → `estrategia`/`plan_salida` a mano. Efecto real en la data: la misma estrategia escrita 3 formas distintas — **"Fix & Hold" / "Fix and hold" / "Fix And Hold"** — y `plan_salida` con descripciones largas inconsistentes ("Híbrido por Unidades…", "Hold a 31 años: refinanciación…", "Refinanciación").
+- **DESPUÉS:** nuevo `IA_PARAM_OPCIONES` + `iaParamControl(p,bid)` → `estrategia` y `plan_salida` renderizan **`<select>`** con las opciones canónicas del ticket (estrategia: Fix & Flip / Fix & Hold / BRRRR / Wholesale / Otro · plan_salida: Venta / Refinanciación / Renta a largo plazo (Hold) / Sin definir aún). **Preserva el valor legacy** (lo antepone como opción si no está en la lista → cero pérdida de datos) y ofrece la canónica al lado. Mismo `id="ia-p-<key>"` → `iaSaveBloque` guarda sin cambios de contrato. Nuevo `iaAddSelectParam(key,desc)` + los links "＋ estrategia/＋ plan_salida" del Bloque 2 crean la fila vacía y muestran el select listo para elegir (sin obligar a teclear). Verificado con harness node: 6/6 (canónica selected, legacy preservado, vacío→sin definir, input normal intacto, id contract).
+
+**PARTE D — INCOHERENCIAS (solo reporte, NO tocado):**
+- **`hm_tasa` corrupta en Wellington = "0.10.24"** → `parseFloat` la lee como 0.1 (10%). Es la única casa con tasa malformada (las otras 22: 0.099–0.1299 válidas). No la corregí porque no sé la tasa real (¿10.24%?). **Acción humana:** corregir el valor en el Bloque 4 de Wellington.
+- **`estrategia` con 3 grafías** para el mismo valor (ver arriba) — el select ya lo canoniza a futuro; las 3 casas existentes conservan su valor legacy hasta que un humano re-elija la opción canónica.
+- **Campos DERIVADOS cargados como input manual** (deberían ser calculados/no-editables): `util_anual_postrefi` (17), `anio0_postrefi` (22), `postrefi_perfil` (17), `cash_atrapado_real` (22) — son calibración del motor (fuente excel(calibrado)/derivado), no inputs de negocio. Editables hoy en los bloques del admin. Sugerido: marcarlos no-editables o moverlos a una sección "calibración del motor".
+- **`compra` de Wellington = $200,000** en el snapshot `inv_model_params` vs **$205,000** del espejo vivo (nota E4 "espejo vivo gana sobre snapshot"). El ticket esperaba $205,000 en la tarjeta. La tarjeta usa `p.compra` (snapshot). Coherencia de snapshot vs espejo — decisión de producto, no tocada.
+
+**Cierre:** node --check OK (portal+admin) · build OK · `ci:gate` **15/15 verde**.
+
 ## 29-jul · 💵 SALDO OPERATIVO (P&L SÍ/NO) — re-verificación contra data viva + pulido de meses legibles
 
 **Contexto (hallazgo honesto):** la tarea pedía corregir el saldo del Ledger (admin) y del Flujo Mensual (portal) para que SOLO cuente movimientos P&L SÍ, más el filtro de meses en "Julio 2026". **El núcleo ya estaba implementado en el mega-build E1** (commit `1fa602f`, 21-jul), presente en la rama actual. Se re-verificó contra la data en prod y se aplicó el pulido de meses que faltaba.
