@@ -315,6 +315,7 @@ const RC_NAV = [
   ['inspeccion', osIcon('search'), 'Inspección'],
   ['nomina', osIcon('banknote'), 'Nómina y Pagos'],
   ['gestion', '◎', 'Gestión (EVM)'],
+  ['evm', '∿', 'Valor Ganado (EVM)'],
   ['reportes', osIcon('file'), 'Reportes CEO'],
   ['cerebro', '✦', 'Cerebro de obra'],
 ];
@@ -324,7 +325,7 @@ function rcRender() {
   const c = rcCompute();
   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
   if (side) side.innerHTML = rcSidebar(c);
-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">${osIcon('stethoscope')}</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">${osIcon('search')} Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, evm: (window.rcSecEVM || rcSecGestion), nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">${osIcon('stethoscope')}</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">${osIcon('search')} Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
   if (main) main.innerHTML = sec(c);
 }
 window.rcRender = rcRender;
@@ -590,6 +591,68 @@ function rcEVM(o) {
   if (presup > 0 && cost > 0 && avance > 0) cpi = (presup * avance / 100) / cost;
   return { avance, timePct, spi, cpi };
 }
+// ─── Planeado vs Real (obra en ejecución) — usa v_remodel_avance_vivo (RC.avanceVivo) ───
+function rcPlaneadoVsReal() {
+  const sem = s => s === 'verde' ? 'up' : s === 'rojo' ? 'down' : 'warn';
+  const obras = (RC.avanceVivo || [])
+    .filter(x => x.proceso === 'En construcción')
+    .map(v => {
+      const real   = +v.pct_tareas || +v.pct_tecnico || 0;   // % real (tareas hechas del Planner)
+      const plan   = +v.pct_esperado || 0;                   // % planeado a la fecha (cronograma+presup)
+      const presup = +v.presupuesto || 0;
+      const gasto  = +v.gasto_real || 0;
+      const ev     = presup * real / 100;                    // valor ganado (EV)
+      const spi    = plan > 0 ? real / plan : null;          // cronograma (>1 adelantado)
+      const cpi    = gasto > 0 ? ev / gasto : null;          // costo (>1 bajo presupuesto)
+      return {
+        addr: rcShort(v.address), real, plan, dSched: real - plan,
+        presup, gasto, pctPlata: +v.pct_financiero || 0, spi, cpi,
+        atraso: +v.atraso_dias || 0, semC: v.sem_costo, semT: v.sem_tiempo
+      };
+    })
+    .sort((a, b) => a.dSched - b.dSched);                     // primero las más atrasadas
+
+  if (!obras.length) return '';
+
+  // Barra: relleno = avance real; marca "|" = planeado
+  const bar = (real, plan) => {
+    const r = Math.max(0, Math.min(100, real)), p = Math.max(0, Math.min(100, plan));
+    const color = real >= plan ? '#22c55e' : '#f87171';
+    return `<div style="position:relative;height:12px;border-radius:6px;background:rgba(148,163,184,.18)">
+      <div style="height:100%;width:${r}%;border-radius:6px;background:${color}"></div>
+      <div title="Planeado ${Math.round(p)}%" style="position:absolute;top:-3px;left:${p}%;width:2px;height:18px;background:#e5e7eb"></div>
+    </div>`;
+  };
+
+  return `<div class="card">
+    <div class="chart-h"><div class="t">Planeado vs Real (obra en ejecución)</div><div class="k">${obras.length} obras · corte HOY</div></div>
+    <table class="ptable">
+      <thead><tr>
+        <th>Casa</th><th>Real %</th><th>Planeado %</th><th>Δ avance</th>
+        <th style="min-width:130px">Progreso (real vs |planeado)</th>
+        <th style="text-align:right">Presup.</th><th style="text-align:right">Gasto real</th>
+        <th>SPI</th><th>CPI</th><th>Atraso</th>
+      </tr></thead>
+      <tbody>
+      ${obras.map(o => `<tr>
+        <td><b>${RC_E(o.addr)}</b></td>
+        <td>${Math.round(o.real)}%</td>
+        <td>${Math.round(o.plan)}%</td>
+        <td class="${o.dSched >= 0 ? 'up' : 'down'}">${o.dSched >= 0 ? '+' : ''}${Math.round(o.dSched)} pts</td>
+        <td>${bar(o.real, o.plan)}</td>
+        <td style="text-align:right">${RC_M(o.presup)}</td>
+        <td style="text-align:right">${RC_M(o.gasto)} <span style="opacity:.5;font-size:10px">(${Math.round(o.pctPlata)}%)</span></td>
+        <td class="${sem(o.semT)}">${o.spi != null ? o.spi.toFixed(2) : '—'}</td>
+        <td class="${sem(o.semC)}">${o.cpi != null ? o.cpi.toFixed(2) : '—'}</td>
+        <td class="${o.atraso > 0 ? 'down' : ''}">${o.atraso > 0 ? '+' + o.atraso + 'd' : 'a tiempo'}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="meta" style="margin-top:8px">Fuente en vivo: <code>v_remodel_avance_vivo</code> · Real = tareas hechas del Planner · Planeado = % esperado según cronograma + presupuesto · SPI = real/planeado · CPI = valor ganado/gasto real. La barra muestra el avance real y la marca “|” el planeado.</div>
+  </div>`;
+}
+window.rcPlaneadoVsReal = rcPlaneadoVsReal;
+
 function rcSecGestion(c) {
   const rows = c.activas.map(o => ({ o, ...rcEVM(o) })).filter(x => x.spi != null || x.cpi != null);
   const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
@@ -605,6 +668,7 @@ function rcSecGestion(c) {
       <div class="card kpi"><div class="lab">% a tiempo</div><div class="big">${c.aTiempoPct}%</div><div class="meta">finalizadas</div></div>
       <div class="card kpi"><div class="lab">% en presupuesto</div><div class="big">${c.enPresupPct}%</div><div class="meta">finalizadas</div></div>
     </div>
+    ${rcPlaneadoVsReal()}
     <div class="grid row2">
       <div class="card"><div class="chart-h"><div class="t">EVM por casa (en curso)</div><div class="k">${rows.length} obras</div></div>
         <table class="ptable"><thead><tr><th>Casa</th><th>Físico %</th><th>Planeado %</th><th>SPI</th><th>CPI</th></tr></thead><tbody>
