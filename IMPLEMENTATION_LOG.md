@@ -3,6 +3,14 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 30-jul · 🚨 BLOQUE B5 (CRÍTICO) — el % del inversionista se sincronizaba de la columna EQUIVOCADA
+
+**El bug:** `inv_holdings.reparto_pct` (de él dependen distribuciones y TIR) venía de `ff_deals.ownership_pct`, que el sync mapea de Airtable Propiedades → **"Porcentaje de Owner Ship"** (`flddh8bS7oP34ak1M` = % de la EMPRESA). El correcto es **"Porcentaje del Inversionista"** (`fldS7Jx6LgM19BXcY`). Son distintos y a menudo COMPLEMENTARIOS → el portal mostraba el % del operador como si fuera el del inversionista.
+- **ANTES (17 casas mal):** Stonleigh 60%→40 · Idlewood 65%→35 · Barkbridge 60%→40 · Capitol 60%→40 · Michelle/Picnic/Nesting 60%→40 · Arcadia/Ramble 65%→35 · Meadow 40%→50 · Echo/Denfield/Childress/Virginia/Bartlett/Capps/Dove 100%(o 50)→0.
+- **Fix (`20260730110000_inv_reparto_from_matriz.sql`):** `ff_deals` += `investor_pct` (columna nueva) + RPC `inv_reparto_from_deals()` que espeja `investor_pct` → `inv_holdings.reparto_pct` + param `reparto_inv`. Sync `sync-ff-airtable` corregido (mapea `fldS7Jx6LgM19BXcY` → `investor_pct` y llama la RPC al final) — **deployado + re-sincronizado**.
+- **DESPUÉS (verificado contra Airtable):** Stonleigh 0.4 ✓ · Idlewood 0.35 ✓ · Barkbridge 0.4 ✓ · Capitol 0.4 ✓ · Wellington 0.5 ✓ · Bramble 0.5 ✓ · **0 discrepancias** en las 28 casas, y **0 tras un resync completo** (self-healing: cada sync re-deriva de Airtable).
+- **⚠ FLAG para Juan (7 casas con capital aportado > 0 pero % = 0 en Airtable):** Denfield $46k · Virginia $45k · Childress $45k · Echo $38k · Dove $25.4k · Bartlett/Capps $11.5k. El % ahora respeta Airtable (0%); si esos inversionistas SÍ tienen participación, cargar "Porcentaje del Inversionista" en la Matriz y el próximo sync lo corrige solo. (Dove es la casa 🧪 demo del QA — ahora 0% por Airtable.)
+
 ## 30-jul · 🔧 BLOQUE B — obs de Juan: hm_tasa (B1), override de compra (B3), confirmaciones (B2)
 
 **B1 — formato de la tasa del HML** (`os/inv-admin.js` + `os/inv-portal.js`). Wellington tenía `hm_tasa="0.10.24"` (roto → se leía 10.0%).

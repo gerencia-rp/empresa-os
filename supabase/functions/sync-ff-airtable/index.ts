@@ -21,7 +21,7 @@ const T = {
 };
 
 const F = {
-  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", modeloNegocio: "flddjD6WsvC98sM1k", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M", apprLink: "fldOg97WmkVIQ0k0o" },
+  deals: { dir: "fldaDd6TuMkEKILyn", estado: "fldzXun3iR1Bqucs9", modeloNegocio: "flddjD6WsvC98sM1k", ciudad: "fldupd1Y33ciLAHjj", compra: "fldeJFg5lD5L69Hio", remodelEst: "fldsRWMQJ4Lv86GOU", remodelReal: "fld9VNYFBzFI3tRdc", arv: "fldPmfjmdVv7PRxjK", appraisal: "fldLz4tIq3KMkS22h", cierre: "fldG2SABUD5Ptcuj8", estrategia: "fldyijwnFRD2yFrx5", hmlPago: "fldMglNT8uPBvBZat", ref30: "fldaFJSXqjV7VXiCI", sqft: "fldZtdnJytZnfMYxI", cashout: "fldqIlx3P6eWXh6Pn", adq: "fldQ03XEnRDfow20c", invLink: "fld8O5pRBbbKy8eHf", capInv: "fld2aby0lrH7iQNWw", capAportado: "fldrePoqg3C3caiZ5", rentProm: "fld9aN2wuYOIQs8fI", utilEntregada: "fldi8gnI3G1qw3s0P", deficitTotal: "fldyglRho5ubMH0WU", rentaMes: "fldj3xoSM5amtrBOQ", gastosMes: "fldnid53AmifS7kK1", ownership: "flddh8bS7oP34ak1M", investorPct: "fldS7Jx6LgM19BXcY", apprLink: "fldOg97WmkVIQ0k0o" },
   draws: { dir: "fldEU8dXcmwovZP16", drawsMenosDef: "fldL4iMolqEibENFj", total: "fld208iuposxA20W0", meses: "fldEVC4tKVI5gnvrm", intHml: "fldf3D0KEwJv8CLZA", utilHml: "fldXsh3w2phWLiAmE", intRent: "fldH5ARDkRu1QL3Ny", utilRent: "fldpmyUxjat9b1s2d", muebles: "fldXwCW30iscTn3iL", appraisal: "fldSB6YjUmMZku28J", otros: "fld7D7gN3GuhTMzaU", rent: "fldOezTNcwnaWW7bD", refi: "fldEYY25oThUoOOIb", remodelRealLk: "fldr4DfeUx99NYC5R" },
   inv: { nombre: "fldI09roeZswP65PK", etiqueta: "fldaSlCHNfi5dqKDi", email: "fldoixuufPLltt6ZF", tel: "fldZKnOD3pu8CP3WS", ciudad: "fldSvCPZsP5J1Mhf4", estado: "fldQukBRQ8bhCrffa", rangos: "fldnguKQ6cgTiBNBR", w9: "fldyLYGF9RuHQw2si", socio: "fldB0k2KTsR4rvZHJ", socioNombre: "fld5rdexk6h7iJ1UZ", propLink: "fldJZcAtnPeC8EN1c", capLookup: "fldXMQGQDauo5HnnV", capPagado: "fld0oPQaFZK8Drv3h" },
   eq: { name: "fldSsNBs1zQ6YZPxm", salario: "fldRIzVjmccCPyslQ", mes: "fldwdnqHKkr4Pvl9y", nombre: "fldckFo7H81jAMaBY" },
@@ -121,10 +121,13 @@ Deno.serve(async (req) => {
         rentabilidad_prometida: num(f[F.deals.rentProm]), utilidad_entregada: num(f[F.deals.utilEntregada]),
         deficit_total: num(f[F.deals.deficitTotal]), renta_mensual: num(f[F.deals.rentaMes]),
         gastos_mensuales: num(f[F.deals.gastosMes]), ownership_pct: num(f[F.deals.ownership]),
+        investor_pct: num(f[F.deals.investorPct]),   // B5: "Porcentaje del Inversionista" (correcto) ≠ ownership ("Owner Ship")
         acquisition: sel(f[F.deals.adq]), active: true, archived_at: null, last_synced_at: now(),
       };
     }).filter((r) => r.address);
     await upsert(sb, "ff_deals", dealRows);
+    // B5: espeja el % del inversionista (Matriz) a inv_holdings.reparto_pct — Airtable = fuente de verdad
+    try { await sb.rpc("inv_reparto_from_deals"); } catch (_e) { /* no romper el sync si la RPC falla */ }
 
     // 2) DRAWS (Desglose Draws) — address resuelta por el link a Propiedades
     const drawsRecs = await fetchAll(T.draws);
