@@ -22,6 +22,7 @@ const BUNDLE_FILES = [
   "ui/kit.js",           // 🎨 UI kit del sistema de diseño (kitMoney/kitHero/… — Fase 0)
   "ui/kit-decision.js",  // 🧭 O4: TermTooltip + DrillDown + NextAction + Tarjeta-KPI (auditoría 13-jul)
   "ui/report-engine.js", // 📄 O6: motor de reportes PDF (auditoría 13-jul)
+  "ui/informe-render.js", // 📊 render multi-página de los 3 informes de Rentas (29-jul)
   "lib/deal-rules.js",
   "app.js",
   "estimator.js",
@@ -57,6 +58,7 @@ const BUNDLE_FILES = [
   "os/os-dash.js",
   "os/os-cartera.js",
   "os/os-cobros.js",
+  "os/os-informes.js",
   "os/os-admin.js",
   "os/os-cierre-engine.js",
   "os/os-ct-sabueso.js",
