@@ -3,6 +3,16 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 30-jul · 📈 BLOQUE A — credibilidad del Panel de Rendimiento (ajustes finos)
+
+**A1 — NO anualizar TIR en holds < 1 año** (`os/inv-indicadores.js` + `os/inv-rendimiento.js` + `os/inv-portal.js`).
+- ANTES: `casa()` marcaba `tirNA` solo si `dias < 30` → una casa de pocos meses con el ARV ya subido anualizaba a TIR extrema (Echo ~387%, Dove cartera 58.8%) no representativa.
+- DESPUÉS: umbral **< 365 días** para `tirNA`/`tirActivo`/`aprecAnual`. `inv-rendimiento.panel` suprime `realizado.tir` (→ null, flag `tirCorto`) y agrega `dpi/rvpi/tvpi`; `portafolio()` suprime la TIR anualizada si el hold ponderado por capital < 1 año (`tirCorto`) y expone DPI/RVPI/TVPI. UI muestra el **múltiplo + nota** "En fase de valorización — la TIR anualizada aún no es representativa (hold < 1 año)". Verificado Echo (node): realizado.tir=null, DPI 1.00 / RVPI 3.43 / TVPI 4.43, horizonte 6a TIR 52.7% (multi-año, intacta), cartera tir=null.
+
+**A2 — supuesto de crecimiento de renta 8%→4%** (`ff_uw_config`): `update esc_crec_renta_anual '0.08'→'0.04'` (aplicado en prod). Resto conservador: apreciación 0.04 · costo_venta 0.07 · vacancia 0.05 · sp500 0.10 — todos etiquetados "supuesto" y editables en el Analizador.
+
+**A3 — el titular lidera con lo REALIZADO** (`renderRendimiento`): el resumen de la pestaña 📈 Rendimiento ahora encabeza con **Capital invertido · Distribuciones recibidas (DPI) · Tu equity hoy en papel (RVPI) · TVPI** (antes lideraba "TIR de tu cartera", que era casi toda proyección). La TIR anualizada quedó **secundaria** y solo se muestra si el hold ponderado ≥ 1 año; si no, "📊 En fase de valorización — el número que importa hoy es el TVPI". Por casa: el escenario de venta 4/6/8 quedó rotulado **"proyección · supuesto"** (TIR proyectada / múltiplo proyectado), y las casas sin distribuciones muestran "🏗 En fase de rehab/estabilización — retornos aún no realizados". Banner realizado-vs-proyectado ya visible.
+
 ## 30-jul · 📈 PARTE 1 — Panel de Rendimiento del inversionista (Robinhood, números REALES)
 
 **Qué:** nueva pestaña **📈 Rendimiento** en el portal del inversor — indicadores estándar de real estate sobre datos REALES de Supabase, con las proyecciones etiquetadas "supuesto" y editables (nunca como hecho). Regla de credibilidad del CEO respetada.

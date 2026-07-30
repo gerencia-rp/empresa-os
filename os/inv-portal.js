@@ -301,12 +301,12 @@ function renderIndicadores(pid, met) {
     mult_equity: !c ? '—' : (c.porCompletar ? 'por completar (falta registrar el HML: ' + $money(c.all_in) + ' invertidos)' : (c.equityLeq0 ? 'equity ≤ 0: la deuda (' + $money(c.deuda_vigente) + ') financió toda la inversión (' + $money(c.all_in) + ') — tu retorno sale de la valorización' : $x(c.multEquity))),
     mult_allin: c ? $x(c.multAllIn) : '—', yield: c ? $pct(c.yieldOnCost) : '—', aprec: c ? $pct(c.aprecAnual) : '—',
     paper: c ? $money(c.paper_value) : '—', paper_fuente: c ? String(c.paper_fuente || '') : '—' };
-  const valsCasa = c ? { ...vals, tir: c.tirNA ? 'n/a (muy reciente para anualizar)' : $pct(c.tirActivo) } : vals;
+  const valsCasa = c ? { ...vals, tir: c.tirNA ? 'aún no representativa (hold < 1 año)' : $pct(c.tirActivo) } : vals;
   const card = (lab, clave, val, linea, cls) => '<div class="card"><div class="lab">' + lab + gI(clave, vals) + '</div><div class="big ' + (cls || '') + '">' + val + '</div><div class="meta">' + linea + '</div></div>';
   let casaCards = '';
   if (c) {
-    const tirVal = c.tirNA ? 'n/a' : $pct(c.tirActivo);
-    const tirLinea = c.tirNA ? 'muy reciente para anualizar — mirá el múltiplo' : 'tu inversión crece a este ritmo anual, en papel';
+    const tirVal = c.tirNA ? (c.multAllIn != null ? $x(c.multAllIn) : 'n/a') : $pct(c.tirActivo);
+    const tirLinea = c.tirNA ? 'En fase de valorización — la TIR anualizada aún no es representativa (hold < 1 año). Te mostramos el múltiplo (valor ÷ costo).' : 'tu inversión crece a este ritmo anual, en papel';
     const eqVal = c.porCompletar ? 'por completar' : (c.equityLeq0 ? 'equity ≤ 0' : $x(c.multEquity));
     const eqLinea = c.porCompletar ? 'sin HML registrado — el equipo está completando la deuda' : (c.equityLeq0 ? 'la deuda financió todo — tu retorno sale de la valorización' : 'cuántas veces se multiplicó la plata propia');
     const ltvDot = c.ltvSem ? '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:' + (c.ltvSem === 'verde' ? 'var(--pos)' : c.ltvSem === 'ambar' ? 'var(--amber)' : 'var(--neg)') + '"></span>' : '';
@@ -318,7 +318,7 @@ function renderIndicadores(pid, met) {
       + '</div><div class="grid k3" style="margin-top:10px">'
       + card('LTV actual', 'ltv', ltvDot + $pct(c.ltv), ltvLinea, '')
       + card('Yield on cost', 'yield_on_cost', $pct(c.yieldOnCost), c.yieldOnCost != null ? 'renta anual ÷ inversión total' : 'sin renta registrada todavía', '')
-      + card('Apreciación anualizada', 'apreciacion', $pct(c.aprecAnual), 'cuánto sube el valor por año desde la compra', c.aprecAnual > 0 ? 'up' : '')
+      + card('Apreciación anualizada', 'apreciacion', c.tirNA ? '—' : $pct(c.aprecAnual), c.tirNA ? 'hold < 1 año — aún no se anualiza (mirá el múltiplo)' : 'cuánto sube el valor por año desde la compra', c.aprecAnual > 0 ? 'up' : '')
       + '</div>'
       + '<div class="meta" style="margin-top:6px">Valor en papel: <b>' + $money(c.paper_value) + '</b> <span class="src' + (/venta real|appraisal/.test(c.paper_fuente || '') ? '' : ' sup') + '">' + esc(c.paper_fuente || '') + '</span>' + gI('paper_value', vals) + ' · corte: ' + hoy + '</div>';
   }
@@ -667,14 +667,15 @@ function ipRendCard(pnl) {
     + '<div class="kv" style="border-top:2px solid var(--glassb)"><span><b>Retorno total</b></span><b class="' + (pnl.retornoTotal >= 0 ? 'up' : 'down') + '">' + $money(pnl.retornoTotal) + ' <span class="meta">(' + $pct(pnl.retornoTotalPct) + ')</span></b></div>'
     + '<div class="kv"><span title="flujo cobrado ÷ tu capital, anualizado" style="cursor:help">Cash-on-cash</span><b>' + $pct(pnl.cocAnual) + '/año <span class="meta">· ' + $pct(pnl.cocMensual) + '/mes</span></b></div>'
     + '</div>'
-    + '<div><div class="lab" style="margin-bottom:4px">Si vendés en ' + N + ' años <span class="src sup">supuesto</span></div>'
+    + '<div><div class="lab" style="margin-bottom:4px">Si vendés en ' + N + ' años <span class="src sup">proyección · supuesto</span></div>'
     + '<div class="kv"><span>Precio de venta estimado</span><b>' + $money(pnl.horizonte.precioVenta) + '</b></div>'
     + '<div class="kv"><span>− costo de venta + payoff deuda</span><b class="down">−' + $money((pnl.horizonte.costoVenta || 0) + (pnl.horizonte.payoff || 0)) + '</b></div>'
     + '<div class="kv"><span><b>Neto para vos</b></span><b class="up">' + $money(pnl.horizonte.netoInv) + '</b></div>'
-    + '<div class="kv"><span title="cuánto rinde tu plata al año, contando cuándo entra y sale" style="cursor:help">TIR (' + N + ' años)</span><b class="up">' + $pct(pnl.horizonte.tir) + '</b></div>'
-    + '<div class="kv"><span title="por cada $1 que pusiste, cuánto vuelve" style="cursor:help">Múltiplo</span><b>' + x2(pnl.horizonte.multiplo) + '</b></div>'
+    + '<div class="kv"><span title="cuánto rendiría tu plata al año SI se vende en ' + N + ' años (supuesto, no promesa)" style="cursor:help">TIR proyectada (' + N + ' años) <span class="src sup">supuesto</span></span><b>' + $pct(pnl.horizonte.tir) + '</b></div>'
+    + '<div class="kv"><span title="por cada $1 que pusiste, cuánto volvería con la venta" style="cursor:help">Múltiplo proyectado</span><b>' + x2(pnl.horizonte.multiplo) + '</b></div>'
     + '<div class="kv"><span>vs S&amp;P 500 <span class="meta">(' + $pct(pnl.sp500.tasa) + ', ilustración)</span></span><b class="' + (spGana ? 'up' : '') + '">' + x2(pnl.sp500.multiplo) + (spGana ? ' · tu casa rinde más' : '') + '</b></div>'
     + '</div></div>'
+    + (pnl.realizado.distAcum === 0 ? '<div class="meta" style="margin-top:8px;padding:7px 10px;border:1px solid var(--glassb);border-radius:8px">🏗 <b>En fase de rehab/estabilización</b> — todavía no recibiste distribuciones. Lo realizado hoy es tu equity en papel (RVPI ' + x2(pnl.rvpi) + '); los números de venta de arriba son <b>proyección</b>, no promesa.</div>' : '')
     + '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:var(--a2)">ver los flujos que alimentan la TIR</summary><div style="margin-top:6px">' + (flows || '<div class="meta">sin flujos aún</div>') + '<div class="meta" style="font-size:10px;margin-top:4px">−tu capital al comprar · +distribuciones reales fechadas · +neto de venta al horizonte (supuesto)</div></div></details>'
     + (pnl.esProyeccion ? '<div class="meta" style="margin-top:6px;font-size:10.5px;color:var(--amber)">⚠ Sin avalúo cargado: la apreciación es proyección a ' + $pct(pnl.supuestos.apreciacion) + '/año (editable por administración).</div>' : '')
     + (pnl.yrsHeld != null && pnl.yrsHeld < 1 ? '<div class="meta" style="font-size:10.5px">ℹ La TIR realizada anualiza menos de un año — puede verse extrema; leé el escenario de venta a ' + N + ' años para una lectura estable.</div>' : '')
@@ -690,12 +691,19 @@ function renderRendimiento() {
   const tip = t => ' <span class="src" title="' + esc(t) + '" style="cursor:help">ⓘ</span>';
   const banner = '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:12px">📈 <b>Realizado</b> = distribuciones ya pagadas + avalúo real. <b>Proyectado</b> (venta futura, apreciación, S&amp;P 500) = <b>supuestos editables</b>, no promesas. Apreciación ' + $pct(IP.escCfg.apreciacion_anual) + '/año · costo de venta ' + $pct(IP.escCfg.costo_venta) + ' · S&amp;P ' + $pct(IP.escCfg.sp500_anual) + '.</div>';
   const kpi = (lab, val, sub, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
+  const x2 = v => v == null ? '—' : v.toFixed(2) + 'x';
+  // A3: el TITULAR lidera con lo REALIZADO — capital, distribuciones (DPI), equity en papel (RVPI), TVPI.
   const resumen = '<div class="grid k4">'
-    + kpi('Total invertido' + tip('la plata que pusiste en total'), $money(agg.capitalT), agg.n + ' casas', '')
-    + kpi('Tu equity hoy' + tip('valor actual de tu parte, menos la deuda pendiente'), $money(agg.equityT), 'realizado', 'up')
-    + kpi('Retorno total' + tip('flujo cobrado + apreciación + amortización'), $money(agg.retornoT), $pct(agg.retornoPct), agg.retornoT >= 0 ? 'up' : 'down')
-    + kpi('TIR de tu cartera' + tip('cuánto rinde tu plata al año, contando cuándo entra y sale cada flujo'), $pct(agg.tir), 'múltiplo ' + (agg.multiplo != null ? agg.multiplo.toFixed(2) + 'x' : '—'), 'up')
-    + '</div>';
+    + kpi('Capital invertido' + tip('la plata que pusiste en total'), $money(agg.capitalT), agg.n + ' casas', '')
+    + kpi('Distribuciones recibidas' + tip('lo que ya te pagaron (realizado). DPI = por cada $1 que pusiste'), $money(agg.distT), 'DPI ' + x2(agg.dpi), agg.distT > 0 ? 'up' : '')
+    + kpi('Tu equity hoy (en papel)' + tip('valor actual de tu parte menos la deuda. RVPI = por cada $1'), $money(agg.equityT), 'RVPI ' + x2(agg.rvpi), 'up')
+    + kpi('TVPI' + tip('DPI + RVPI: por cada $1 que pusiste, cuánto vale hoy tu inversión (recibido + papel)'), x2(agg.tvpi), 'recibido + papel', agg.tvpi != null && agg.tvpi >= 1 ? 'up' : '')
+    + '</div>'
+    // TIR anualizada de la cartera: secundaria y SOLO si el hold es representativo (≥1 año)
+    + '<div class="card" style="margin-top:12px"><div class="kv" style="border:none;padding:0"><span>' + (agg.tirCorto
+        ? '📊 <b>En fase de valorización</b> — la TIR anualizada de tu cartera <b>aún no es representativa</b> (hold promedio < 1 año). El número que importa hoy es el <b>TVPI (' + x2(agg.tvpi) + ')</b>: por cada $1 que pusiste, tenés eso en recibido + papel.'
+        : 'TIR anualizada de tu cartera (realizada, con flujos reales fechados)') + '</span>'
+      + (agg.tirCorto ? '' : '<b class="up" style="font-size:16px">' + $pct(agg.tir) + '</b>') + '</div></div>';
   const hasDists = (IP.dists || []).some(d => d.estado === 'pagada' && (IP.holdings || []).some(h => h.property_id === d.property_id));
   const chart = hasDists
     ? '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Flujo real que te pagaron (acumulado)</div><div class="k">solo distribuciones pagadas — 100% real</div></div><div style="position:relative;height:240px;width:100%;overflow:hidden"><canvas id="chRend"></canvas></div></div>'

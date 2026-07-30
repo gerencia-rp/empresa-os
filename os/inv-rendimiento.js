@@ -87,10 +87,12 @@
     const cocAnual = (capital > 0 && yrsHeld > 0) ? (distAcum / yrsHeld) / capital : null;
     const cocMensual = cocAnual != null ? cocAnual / 12 : null;
 
-    // ── TIR REALIZADA (a hoy): −capital@compra + distribuciones fechadas + equity hoy (terminal, no realizado) ──
+    // ── TIR REALIZADA (a hoy): −capital@compra + distribuciones fechadas + equity hoy (terminal) ──
+    // A1: NO anualizar en holds < 1 año (da TIR extrema no representativa) → se muestra el múltiplo.
+    const holdCorto = yrsHeld != null && yrsHeld < 1;
     const flowsReal = (closeDate && capital) ? [{ fecha: closeDate, monto: -capital }].concat(dists)
       .concat(equityActual != null ? [{ fecha: hoy, monto: equityActual }] : []) : [];
-    const tirReal = xirr(flowsReal);
+    const tirReal = holdCorto ? null : xirr(flowsReal);
     const multReal = (capital > 0 && equityActual != null) ? (distAcum + equityActual) / capital : null;
 
     // ── ESCENARIO DE VENTA a N años (supuesto editable) ──
@@ -120,7 +122,11 @@
       currentBalance, deudaOriginal: principal,
       fuentes: { flujo: flujoInv, apreciacion: aprecInv, apreciacionCAGR: aprecCAGR, amortizacion: amortInv, cashout: cashoutInv, cashoutTot },
       equityActual, retornoTotal, retornoTotalPct, cocAnual, cocMensual,
-      realizado: { tir: tirReal, multiplo: multReal, distAcum, flows: flowsReal, equityActual },
+      realizado: { tir: tirReal, tirCorto: holdCorto, multiplo: multReal, distAcum, flows: flowsReal, equityActual },
+      // DPI/RVPI/TVPI del fondo (realizado) — para liderar el titular (A3)
+      dpi: (capital > 0) ? distAcum / capital : null,
+      rvpi: (capital > 0 && equityActual != null) ? Math.max(0, equityActual) / capital : null,
+      tvpi: (capital > 0 && equityActual != null) ? (distAcum + Math.max(0, equityActual)) / capital : null,
       horizonte: { anios: N, precioVenta, costoVenta: costoVentaMonto, payoff, netoInv, tir: tirHor, multiplo: multHor, flows: flowsHor, ventaFecha },
       sp500: { tasa: sp500, valorFinal: spValorFinal, multiplo: spMult },
       supuestos: { apreciacion: apre, costoVenta: costoVenta, sp500: sp500, apreOrigen: c.apreciacion_anual != null ? 'manual' : 'config' },
@@ -140,11 +146,19 @@
     let flows = [];
     ok.forEach(p => { if (p.closeDate) flows.push({ fecha: p.closeDate, monto: -p.capital }); flows = flows.concat(p.realizado.flows.filter(f => f.monto > 0 && f.fecha !== hoy)); });
     if (equityT) flows.push({ fecha: hoy, monto: equityT });
-    const tir = xirr(flows);
+    // A1: si el hold ponderado por capital es < 1 año, la TIR anualizada no es representativa
+    const capYrs = ok.reduce((s, p) => s + (p.capital * (p.yrsHeld || 0)), 0);
+    const holdPond = capitalT > 0 ? capYrs / capitalT : 0;
+    const cortoPond = holdPond < 1;
+    const tir = cortoPond ? null : xirr(flows);
     return {
       capitalT, equityT, distT, retornoT,
       retornoPct: capitalT > 0 ? retornoT / capitalT : null,
-      tir, multiplo: capitalT > 0 ? (distT + equityT) / capitalT : null, n: ok.length
+      tir, tirCorto: cortoPond, holdPond,
+      dpi: capitalT > 0 ? distT / capitalT : null,
+      rvpi: capitalT > 0 ? Math.max(0, equityT) / capitalT : null,
+      tvpi: capitalT > 0 ? (distT + Math.max(0, equityT)) / capitalT : null,
+      multiplo: capitalT > 0 ? (distT + equityT) / capitalT : null, n: ok.length
     };
   }
 

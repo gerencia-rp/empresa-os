@@ -42,8 +42,10 @@
     const V = c.paper_value != null ? +c.paper_value : null;
     const o = Object.assign({}, c, { dias });
     o.multAllIn = (C > 0 && V != null) ? V / C : null;                       // múltiplo all-in
-    o.tirNA = dias != null && dias < 30;                                     // muy reciente para anualizar
-    o.tirActivo = (o.multAllIn != null && dias != null && dias >= 30) ? Math.pow(V / C, 365 / dias) - 1 : null;
+    // A1 (credibilidad): NO anualizar TIR en holds < 1 año (la plusvalía del rehab anualizada
+    // sobre pocos meses da TIR extrema, no representativa). < 365 días → solo múltiplo.
+    o.tirNA = dias != null && dias < 365;
+    o.tirActivo = (o.multAllIn != null && dias != null && dias >= 365) ? Math.pow(V / C, 365 / dias) - 1 : null;
     const deuda = c.deuda_vigente != null ? +c.deuda_vigente : null;
     const hml = c.hml_original != null ? +c.hml_original : null;
     o.porCompletar = (deuda == null || hml == null) && !c.vendida;           // sin HML registrado → checklist
@@ -54,7 +56,7 @@
     o.ltv = (deuda != null && V > 0) ? deuda / V : null;
     o.ltvSem = o.ltv == null ? null : (o.ltv < 0.70 ? 'verde' : (o.ltv <= 0.85 ? 'ambar' : 'rojo'));
     o.yieldOnCost = (C > 0 && c.renta_anual != null && +c.renta_anual > 0) ? +c.renta_anual / C : null;
-    o.aprecAnual = (dias != null && dias >= 30 && +c.compra > 0 && V != null) ? Math.pow(V / +c.compra, 365 / dias) - 1 : null;
+    o.aprecAnual = (dias != null && dias >= 365 && +c.compra > 0 && V != null) ? Math.pow(V / +c.compra, 365 / dias) - 1 : null;
     return o;
   }
 
