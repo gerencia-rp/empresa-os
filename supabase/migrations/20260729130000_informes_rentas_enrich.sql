@@ -24,7 +24,7 @@ declare
   v_contratos   jsonb := '[]'::jsonb; v_mov jsonb := '{}'::jsonb; v_discr jsonb := '[]'::jsonb;
   v_delta       jsonb := null;
   v_ingreso numeric := 0; v_potencial numeric := 0; v_activas int := 0; v_prev_ingreso numeric;
-  v_ocup_detalle int := 0;
+  v_ocup_detalle int := 0; v_props_ocup int := 0;
   v_payload jsonb; v_titulo text; v_row pm_informes;
 begin
   -- ══════════ CARTERA (balance + combinado) ══════════
@@ -58,7 +58,7 @@ begin
     returning id into v_snap_id;
 
     select coalesce(jsonb_agg(to_jsonb(s) order by s.corte), '[]'::jsonb) into v_serie from (
-      select corte, total_bruto, total_neto, casos, propiedades
+      select distinct on (corte) corte, total_bruto, total_neto, casos, propiedades
       from pm_cartera_snapshots where archived_at is null and corte <= p_corte order by corte desc, created_at desc limit 4) s;
 
     if v_afav > 0 then
@@ -79,7 +79,7 @@ begin
            count(*) filter (where status <> 'mantenimiento'),
            count(distinct casa), count(distinct city),
            count(*) filter (where status = 'ocupada')
-      into v_ingreso, v_potencial, v_activas, v_props, v_ciudades, v_ocup_detalle
+      into v_ingreso, v_potencial, v_activas, v_props_ocup, v_ciudades, v_ocup_detalle
     from v_rentas_unidades;
 
     v_ocupd := jsonb_build_object(
@@ -87,7 +87,7 @@ begin
       'ocup_activas_pct', case when v_activas > 0 then round(100.0 * (v_ocup->>'ocupadas')::numeric / v_activas, 1) else 0 end,
       'ocup_efectiva_pct', case when (v_ocup->>'unidades_rentables')::numeric > 0
           then round(100.0 * ((v_ocup->>'ocupadas')::numeric + (v_ocup->>'reservadas')::numeric) / (v_ocup->>'unidades_rentables')::numeric, 1) else 0 end,
-      'propiedades', v_props, 'ciudades', v_ciudades,
+      'propiedades', v_props_ocup, 'ciudades', v_ciudades,
       'ingreso_contratado', round(v_ingreso, 2), 'potencial_no_capturado', round(v_potencial, 2));
 
     -- movimientos de la semana
