@@ -3,6 +3,33 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 30-jul · 💸 DISTRIBUCIONES AUTOMÁTICAS — cálculo mensual por inversionista (100% desde Supabase)
+
+**Qué:** la pestaña Distribuciones (admin → Inversionistas → 💸) sumó una **modalidad "Cálculo automático"** junto a la Manual (que queda igual). Calcula el monto mensual por inversionista leyendo SOLO Supabase (Airtable = linaje; el sync ya trae todo). El monto calculado es **editable** antes de confirmar.
+
+**Migración `20260730100000_inv_dist_automatica.sql` (aplicada en prod):**
+- `inv_distributions` += `origen` ('manual'|'automatica', default 'manual') + `calc_meta` (jsonb, snapshot de trazabilidad).
+- RPC `inv_refinanced_props()` (SECURITY DEFINER, guard `has_area('fix-flip')`): elegibilidad = `ff_hml_loans.fecha_refi` NO nulo **O** `ff_deals.stage ilike '%refinanciada%'`. Verificado: **4 refinanciadas de 28**.
+- RPC `inv_dist_calc(property_id, investor, billing_ym)` (SECURITY DEFINER, guard fix-flip): recalcula fresco en cada llamada.
+  - ingresos ← `pm_payments` (type='ingreso', billing_ym) · **cruce por `pm_properties.id`** (el property_id canónico vive en pm_properties; pm_payments/pm_expenses apuntan a pm_properties.id — mismo patrón que `inv_ledger`).
+  - gastos ← `pm_expenses` (category='house', billing_ym) **excluyendo hipoteca**.
+  - ref30 ← `ff_hml_payments.ref30` por `to_char(coalesce(fecha_ref30,fecha))=mes`, cruzado por address_norm.
+  - pm_fee = ingresos×4% (calculado, no está en Airtable) · reparto_pct ← `inv_holdings` del (investor+property) → **por inversionista y por casa, resuelve multi-inversionista**.
+  - `ganancia_neta = ingresos − gastos − pm_fee − ref30` · `distribucion = ganancia_neta × reparto_pct`.
+
+**🐛 De-dup de la hipoteca (decisión de correctitud, ANTES→DESPUÉS):** la fórmula literal del spec (gastos = pm_expenses category='house') **duplicaba la hipoteca**: en Echo jun-2026 el gasto 'house' $3,084.34 == ref30 $3,084.34 al centavo (la cuota está booked en pm_expenses Y en ff_hml_payments) → neta salía −$6,168.68 (2× cuota). Adopté el mismo de-dup que la vista `inv_ledger` ("la hipoteca ya entra por ff_hml_payments"): se excluye `~*'hipoteca'` de gastos. **DESPUÉS**: Echo may-2026 = ingresos 3,600 − 0 − 144 − 0 = neta **3,456** × 100% = **$3,456.00**; jun-2026 = 0 − 0 − 0 − 3,084.34 = **−$3,084.34** (una sola cuota). Verificado E2E con JWT admin real (guard pasa; no-admin → 0 filas / "no autorizado").
+
+**Frontend `os/inv-admin.js`:**
+- Toggle de modalidad (✍️ Manual / ⚙️ Cálculo automático). Manual = sin cambios (ahora graba `origen:'manual'`).
+- Auto: inversionista + casa (**solo refinanciadas**, de `IA.refi`) + selector de MES ("Junio 2026", `iaMesesRecientes`+`invEngine.mesEs`) + "Calcular monto automáticamente".
+- **Parte D — desglose visible** bajo el monto: Ingresos · (−)Gastos operativos (sin hipoteca) · (−)PM(4%) · (−)Ref30 · (=)Ganancia neta · % del inversionista · (=)Distribución.
+- **Parte E — override**: "Monto calculado" editable; al editar → 📝 + tooltip "valor automático: $X" + "🔄 volver al automático".
+- **Parte F — casos**: F1 ingresos=$0 → bloquea con aviso; F2 neta<0 → confirm "¿continuar?"; F3 falta link Rentas/holding → aviso ⚠ inline permitiendo cargar manual; F5 duplicado inv+casa+mes (auto por billing_ym o manual por fecha) → confirm. Elegibilidad: casa no refinanciada nunca aparece en el dropdown + guard en `iaDistCalcular`.
+- **Parte G — trazabilidad**: `calc_meta` guarda ingresos/gastos/pm_fee/ref30/reparto_pct/neta + monto_calculado + monto_final + editado + calc_at.
+- **Parte H — listado**: nueva columna **ORIGEN** (✍️ Manual / ⚙️ Automática, con 📝 si editado) + tooltip con el desglose completo del snapshot.
+
+**Cierre:** node --check OK · build OK · `ci:gate` **15/15 verde**. ⚠ Nota verificación: Echo jun-2026 real = $0 ingresos → muestra el aviso F1 (honesto); el mes con datos reales es may-2026 ($3,456).
+
 ## 29-jul · 🏷 INFO DEL DEAL + HML estructurado — auditoría E2/E3 + estrategia/plan_salida como SELECT
 
 **Contexto (hallazgo honesto):** casi todo lo que pedía el ticket YA estaba implementado en los mega-builds **E2** (HML desglosado, draws migrados, hm_inicial calculado) y **E3** (tarjeta "Info del deal" con HML en 3 líneas). Auditado contra la data viva y el código; se completó el ÚNICO hueco real y se reportan las incoherencias de datos (Parte D).

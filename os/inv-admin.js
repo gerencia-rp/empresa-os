@@ -421,7 +421,7 @@ function iaTabEscenarios() {
 
 // ─── F1 producto: distribuciones + mensajes (admin) ───
 async function iaLoadProducto() {
-  const [d, m, dl, pj, dc, ind, gl] = await Promise.all([
+  const [d, m, dl, pj, dc, ind, gl, rp] = await Promise.all([
     sb.from('inv_distributions').select('*').eq('active', true).order('fecha', { ascending: false }),
     sb.from('inv_messages').select('*').eq('active', true).order('created_at', { ascending: false }).limit(100),
     sb.from('inv_deals').select('*').eq('active', true),
@@ -429,9 +429,11 @@ async function iaLoadProducto() {
     sb.from('inv_documents').select('*').eq('active', true).order('created_at', { ascending: false }),
     sb.rpc('inv_indicadores_data').then(r => r.data || []).catch(() => []),
     sb.from('glosario_terminos').select('*').eq('active', true).then(r => r.data || []).catch(() => []),
+    sb.rpc('inv_refinanced_props').then(r => r.data || []).catch(() => []),
   ]);
   IA.dists = d.data || []; IA.msgs = m.data || []; IA.deals2 = dl.data || []; IA.proj = pj.data || []; IA.docsAll = dc.data || [];
   IA.indData = ind || []; IA.glos = gl || [];
+  IA.refi = {}; (rp || []).forEach(r => { IA.refi[r.property_id] = r; });
 }
 // ─── 📄 documentos del inversionista (el portal los lista con buscador + audit) ───
 async function iaAddDoc() {
@@ -473,7 +475,7 @@ function iaTabDocs() {
 }
 async function iaCrearDist() {
   const g = id => (document.getElementById(id) || {}).value || '';
-  const row = { investor_airtable_id: g('ia-d-inv'), property_id: g('ia-d-casa'), fecha: g('ia-d-fecha'), tipo: g('ia-d-tipo') || 'utilidad', monto: parseFloat(g('ia-d-monto')) || 0, estado: g('ia-d-estado') || 'programada', comprobante_url: g('ia-d-comp') || null, k1_url: g('ia-d-k1') || null };
+  const row = { investor_airtable_id: g('ia-d-inv'), property_id: g('ia-d-casa'), fecha: g('ia-d-fecha'), tipo: g('ia-d-tipo') || 'utilidad', monto: parseFloat(g('ia-d-monto')) || 0, estado: g('ia-d-estado') || 'programada', comprobante_url: g('ia-d-comp') || null, k1_url: g('ia-d-k1') || null, origen: 'manual' };
   if (!row.investor_airtable_id || !row.property_id || !row.fecha || !row.monto) return alert('Inversionista, casa, fecha y monto son obligatorios');
   const { error } = await sb.from('inv_distributions').insert(row);
   if (error) return alert('Error: ' + error.message);
@@ -481,6 +483,78 @@ async function iaCrearDist() {
   await iaLoadProducto(); osRender();
 }
 window.iaCrearDist = iaCrearDist;
+
+// ─── Distribución AUTOMÁTICA (calculada desde Supabase, ver mapa de datos) ───
+function iaDistMode(m) { IA.distMode = m; IA.distCalc = null; osRender(); }
+window.iaDistMode = iaDistMode;
+// meses recientes 'YYYY-MM' (24 atrás) — el select los muestra "Junio 2026"
+function iaMesesRecientes() {
+  const out = []; const d = new Date(); d.setDate(1);
+  for (let i = 0; i < 24; i++) { const y = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'); out.push(y + '-' + mm); d.setMonth(d.getMonth() - 1); }
+  return out;
+}
+function iaMesLabel(ym) { return (window.invEngine && invEngine.mesEs) ? invEngine.mesEs(ym) : ym; }
+async function iaDistCalcular() {
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const inv = g('ia-da-inv'), casa = g('ia-da-casa'), mes = g('ia-da-mes');
+  if (!inv || !casa || !mes) return alert('Elegí inversionista, casa y mes');
+  const { data, error } = await sb.rpc('inv_dist_calc', { p_property_id: casa, p_investor: inv, p_billing_ym: mes });
+  if (error) return alert('Error calculando: ' + error.message);
+  if (!data.refinanciada) return alert('Esta propiedad aún no está refinanciada. Solo aplica distribución manual por ahora.');
+  IA.distCalc = { ...data, inv, casa, mes, edited: false };
+  osRender();
+  // dejá el foco/valor en el input del monto tras el re-render
+}
+window.iaDistCalcular = iaDistCalcular;
+function iaDistMontoInput(el) {
+  if (!IA.distCalc) return;
+  const v = parseFloat(el.value);
+  IA.distCalc.edited = !(Number.isFinite(v) && Math.abs(v - (+IA.distCalc.distribucion || 0)) < 0.005);
+  const badge = document.getElementById('ia-da-editbadge');
+  if (badge) badge.style.display = IA.distCalc.edited ? 'inline-flex' : 'none';
+}
+window.iaDistMontoInput = iaDistMontoInput;
+function iaDistRevertAuto() {
+  if (!IA.distCalc) return;
+  const el = document.getElementById('ia-da-monto'); if (el) el.value = (+IA.distCalc.distribucion || 0).toFixed(2);
+  IA.distCalc.edited = false;
+  const badge = document.getElementById('ia-da-editbadge'); if (badge) badge.style.display = 'none';
+}
+window.iaDistRevertAuto = iaDistRevertAuto;
+async function iaCrearDistAuto() {
+  const c = IA.distCalc; if (!c) return alert('Primero calculá el monto');
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const montoEl = document.getElementById('ia-da-monto');
+  const monto = parseFloat(montoEl ? montoEl.value : c.distribucion);
+  const auto = +c.distribucion || 0;
+  const edited = !(Math.abs(monto - auto) < 0.005);
+  // F1: sin ingresos y monto automático en $0 → no crear
+  if ((+c.ingresos || 0) === 0 && !edited) return alert('No se encontraron ingresos para esta casa en el mes. Verificá o elegí otro mes (o cargá el monto a mano).');
+  if (!Number.isFinite(monto) || monto === 0) return alert('El monto quedó en $0. Editá el monto o cambiá a manual.');
+  // F2: ganancia neta negativa
+  if ((+c.ganancia_neta || 0) < 0 && !edited) {
+    if (!confirm('⚠️ La ganancia neta del mes es negativa (' + iaMoney(c.ganancia_neta) + '). No hay utilidad para distribuir. ¿Continuar igual con este monto?')) return;
+  }
+  // F5: ya existe distribución para ese inversionista+casa+mes (auto por billing_ym o manual por la fecha)
+  const dup = (IA.dists || []).some(d => d.investor_airtable_id === c.inv && d.property_id === c.casa
+    && (String((d.calc_meta || {}).billing_ym || '') === c.mes || String(d.fecha || '').slice(0, 7) === c.mes));
+  if (dup && !confirm('⚠️ Ya existe una distribución para este inversionista en esta casa este mes. ¿Crear otra igual?')) return;
+  const row = {
+    investor_airtable_id: c.inv, property_id: c.casa,
+    fecha: g('ia-da-fecha') || (c.mes + '-01'),
+    tipo: g('ia-da-tipo') || 'utilidad', monto,
+    estado: g('ia-da-estado') || 'programada',
+    comprobante_url: g('ia-da-comp') || null, k1_url: g('ia-da-k1') || null,
+    origen: 'automatica',
+    calc_meta: { billing_ym: c.mes, ingresos: +c.ingresos, gastos: +c.gastos, pm_fee: +c.pm_fee, ref30: +c.ref30, ganancia_neta: +c.ganancia_neta, reparto_pct: +c.reparto_pct, monto_calculado: auto, monto_final: monto, editado: edited, calc_at: c.calc_at, refinanciada: !!c.refinanciada }
+  };
+  const { error } = await sb.from('inv_distributions').insert(row);
+  if (error) return alert('Error: ' + error.message);
+  if (window.toast) toast('✓ Distribución automática creada — el desglose queda en la traza', 'success');
+  IA.distCalc = null;
+  await iaLoadProducto(); osRender();
+}
+window.iaCrearDistAuto = iaCrearDistAuto;
 function iaEditDist(id) { IA.distEdit = id; osRender(); }
 window.iaEditDist = iaEditDist;
 async function iaSaveDist(id) {
@@ -526,7 +600,7 @@ function iaTabDist() {
   const linkTag = (url, lbl) => url ? '<a href="' + OS_E(url) + '" target="_blank" style="color:var(--a2);white-space:nowrap">' + lbl + ' ↗</a>' : '<span class="meta">—</span>';
   const editRow = d => {
     if (IA.distEdit !== d.id) return '';
-    return '<tr><td colspan="8" style="background:var(--glass)"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'
+    return '<tr><td colspan="9" style="background:var(--glass)"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'
       + '<input id="ia-de-fecha" type="date" class="osa-in" value="' + OS_E(d.fecha) + '">'
       + '<select id="ia-de-tipo" class="osa-in">' + ['utilidad', 'refi', 'venta', 'devolucion_capital'].map(t => '<option' + (d.tipo === t ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>'
       + '<input id="ia-de-monto" type="number" class="osa-in" value="' + OS_E(d.monto) + '">'
@@ -534,8 +608,10 @@ function iaTabDist() {
       + '<input id="ia-de-k1" class="osa-in" placeholder="URL del K-1" value="' + OS_E(d.k1_url || '') + '">'
       + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveDist(\'' + d.id + '\')">💾 Guardar</button><button class="ct-btn" onclick="IA.distEdit=null;osRender()">Cancelar</button></div></td></tr>';
   };
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Nueva distribución</div><div class="k">comprobante de pago (soporte) ≠ K-1 (fiscal) — ambos se guardan y se VEN como links</div></div>'
-    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+  const mode = IA.distMode || 'manual';
+  const tabBtn = (m, lbl) => '<button class="ct-btn" style="padding:7px 15px;font-weight:700;border-radius:9px' + (mode === m ? ';background:var(--a1);color:#fff;border-color:var(--a1)' : '') + '" onclick="iaDistMode(\'' + m + '\')">' + lbl + '</button>';
+  // ── modalidad MANUAL (existente) ──
+  const manualForm = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
     + '<select id="ia-d-inv" class="osa-in">' + invOpts + '</select>'
     + '<select id="ia-d-casa" class="osa-in">' + casaOpts + '</select>'
     + '<input id="ia-d-fecha" type="date" class="osa-in">'
@@ -544,14 +620,71 @@ function iaTabDist() {
     + '<select id="ia-d-estado" class="osa-in"><option>programada</option><option>pagada</option></select>'
     + '<input id="ia-d-comp" class="osa-in" placeholder="URL comprobante de pago (recomendado)" style="grid-column:span 2">'
     + '<input id="ia-d-k1" class="osa-in" placeholder="URL del K-1 (opcional)" style="grid-column:span 2">'
-    + '</div><button class="cbtn" style="margin-top:10px" onclick="iaCrearDist()">Crear</button></div>'
+    + '</div><button class="cbtn" style="margin-top:10px" onclick="iaCrearDist()">Crear</button>';
+  // ── modalidad AUTOMÁTICA (nueva) ──
+  const refiCasas = [...new Set(IA.holdings.map(h => h.property_id))].filter(c => ((IA.refi || {})[c] || {}).refinanciada);
+  const casaAutoOpts = refiCasas.map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
+  const mesOpts = iaMesesRecientes().map((ym, i) => '<option value="' + ym + '"' + (i === 1 ? ' selected' : '') + '>' + OS_E(iaMesLabel(ym)) + '</option>').join('');
+  let autoForm;
+  if (!refiCasas.length) {
+    autoForm = '<div class="empty" style="padding:16px">Ninguna de tus casas con inversionistas está refinanciada todavía. El cálculo automático solo aplica a casas refinanciadas (ff_hml_loans.fecha_refi o etapa refinanciada) — por ahora usá la distribución <b>Manual</b>.</div>';
+  } else {
+    const c = (IA.distCalc && refiCasas.includes(IA.distCalc.casa)) ? IA.distCalc : null;
+    const row = (lab, val, cls) => '<div class="kv"><span>' + lab + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + val + '</b></div>';
+    let breakdown = '';
+    if (c) {
+      const avisos = [];
+      if (!c.casa_en_rentas) avisos.push('La casa no está linkeada al espejo de Rentas → ingresos/gastos leídos = $0. Verificá el link o cargá el monto a mano.');
+      if (!c.reparto_encontrado) avisos.push('No se encontró el % de este inversionista en esta casa (inv_holdings) → se usó 0%. Cargalo en 🏠 Casas & reparto, o editá el monto.');
+      breakdown = '<div class="card" style="margin-top:10px;background:var(--glass)"><div class="lab" style="margin-bottom:6px">🔎 Desglose · ' + OS_E(iaMesLabel(c.mes)) + ' <span class="meta">(recalculado desde Supabase)</span></div>'
+        + row('Ingresos del mes', iaMoney(c.ingresos), 'up')
+        + row('(−) Gastos operativos <span class="meta" title="la cuota del banco no cuenta acá — se resta aparte como Ref30 para no duplicar">(sin hipoteca)</span>', '−' + iaMoney(c.gastos), 'down')
+        + row('(−) Property Management (4%)', '−' + iaMoney(c.pm_fee), 'down')
+        + row('(−) Pago hipoteca (Ref30)', '−' + iaMoney(c.ref30), 'down')
+        + row('(=) Ganancia neta', iaMoney(c.ganancia_neta), (+c.ganancia_neta >= 0 ? 'up' : 'down'))
+        + row('% del inversionista', Math.round((+c.reparto_pct || 0) * 1000) / 10 + '%')
+        + '<div class="kv" style="border-top:2px solid var(--glassb)"><span><b>(=) Distribución</b></span><b class="' + (+c.distribucion >= 0 ? 'up' : 'down') + '">' + iaMoney(c.distribucion) + '</b></div>'
+        + (avisos.length ? avisos.map(a => '<div style="margin-top:6px;padding:7px 10px;border:1px solid rgba(245,178,61,.5);background:rgba(245,178,61,.1);border-radius:8px;color:var(--amber);font-size:11px">⚠️ ' + a + '</div>').join('') : '')
+        + '</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">'
+        + '<span class="lab">Monto calculado</span>'
+        + '<input id="ia-da-monto" type="number" step="0.01" class="osa-in" style="width:150px" value="' + (+c.distribucion || 0).toFixed(2) + '" oninput="iaDistMontoInput(this)">'
+        + '<span id="ia-da-editbadge" style="display:' + (c.edited ? 'inline-flex' : 'none') + ';align-items:center;gap:5px;font-size:11px;color:var(--amber)" title="Monto editado manualmente. Valor calculado automático: ' + iaMoney(c.distribucion) + '">📝 editado <a style="cursor:pointer;color:var(--a2)" onclick="iaDistRevertAuto()">🔄 volver al automático (' + iaMoney(c.distribucion) + ')</a></span>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px">'
+        + '<input id="ia-da-fecha" type="date" class="osa-in" value="' + OS_E(c.mes + '-01') + '" title="fecha de la distribución">'
+        + '<select id="ia-da-tipo" class="osa-in"><option>utilidad</option><option>refi</option><option>venta</option><option>devolucion_capital</option></select>'
+        + '<select id="ia-da-estado" class="osa-in"><option>programada</option><option>pagada</option></select>'
+        + '<span></span>'
+        + '<input id="ia-da-comp" class="osa-in" placeholder="URL comprobante de pago" style="grid-column:span 2">'
+        + '<input id="ia-da-k1" class="osa-in" placeholder="URL del K-1 (opcional)" style="grid-column:span 2">'
+        + '</div>'
+        + '<button class="cbtn" style="margin-top:10px" onclick="iaCrearDistAuto()">Crear distribución automática</button>';
+    }
+    autoForm = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+      + '<select id="ia-da-inv" class="osa-in">' + invOpts + '</select>'
+      + '<select id="ia-da-casa" class="osa-in">' + casaAutoOpts + '</select>'
+      + '<select id="ia-da-mes" class="osa-in">' + mesOpts + '</select>'
+      + '<button class="cbtn" onclick="iaDistCalcular()">Calcular monto automáticamente</button>'
+      + '</div>'
+      + '<div class="meta" style="margin-top:6px">Solo aparecen casas refinanciadas. Ganancia neta = ingresos − gastos − PM(4%) − Ref30 · Distribución = ganancia × tu %. Todo se lee de Supabase en cada cálculo.</div>'
+      + breakdown;
+  }
+  const form = mode === 'auto' ? autoForm : manualForm;
+  const origenTag = d => d.origen === 'automatica'
+    ? '<span class="badge b-ok" style="cursor:help" title="' + (d.calc_meta ? OS_E('Ingresos ' + iaMoney(d.calc_meta.ingresos) + ' − Gastos ' + iaMoney(d.calc_meta.gastos) + ' − PM(4%) ' + iaMoney(d.calc_meta.pm_fee) + ' − Ref30 ' + iaMoney(d.calc_meta.ref30) + ' = Neta ' + iaMoney(d.calc_meta.ganancia_neta) + ' × ' + Math.round((d.calc_meta.reparto_pct || 0) * 1000) / 10 + '% = ' + iaMoney(d.calc_meta.monto_calculado) + (d.calc_meta.editado ? ' · editado a ' + iaMoney(d.calc_meta.monto_final) : '')) : 'calculada') + '">⚙️ Automática' + (d.calc_meta && d.calc_meta.editado ? ' 📝' : '') + '</span>'
+    : '<span class="badge b-warn">✍️ Manual</span>';
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Nueva distribución</div><div class="k">comprobante de pago (soporte) ≠ K-1 (fiscal) — ambos se guardan y se VEN como links</div></div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px">' + tabBtn('manual', '✍️ Manual') + tabBtn('auto', '⚙️ Cálculo automático') + '</div>'
+    + form + '</div>'
     + '<div class="card overx"><div class="chart-h"><div class="t">Distribuciones (' + (IA.dists || []).length + ')</div><div class="k">✎ editar (queda en el audit) · ⏸ soft-delete</div></div>'
-    + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Casa</th><th>Fecha</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Links</th><th>Estado</th><th style="text-align:right"></th></tr></thead><tbody>'
+    + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Casa</th><th>Fecha</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Origen</th><th>Links</th><th>Estado</th><th style="text-align:right"></th></tr></thead><tbody>'
     + ((IA.dists || []).map(d => editRow(d) + '<tr><td>' + OS_E(iaInvName(d.investor_airtable_id)) + '</td><td>' + OS_E(iaCasaName(d.property_id)) + '</td><td style="white-space:nowrap">' + OS_E(d.fecha) + '</td><td>' + OS_E(d.tipo) + '</td>'
       + '<td style="text-align:right">' + iaMoney(d.monto) + '</td>'
+      + '<td>' + origenTag(d) + '</td>'
       + '<td style="font-size:11px">' + linkTag(d.comprobante_url, '📎 pago') + ' · ' + linkTag(d.k1_url, '📄 K-1') + '</td>'
       + '<td>' + (d.estado === 'pagada' ? '<span class="badge b-ok">pagada</span>' : '<span class="badge b-warn">programada</span> <button class="ct-btn" style="padding:2px 7px;font-size:9px" onclick="iaDistEstado(\'' + d.id + '\',\'pagada\')">✓ pagar</button>') + '</td>'
-      + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" style="padding:2px 7px" onclick="iaEditDist(\'' + d.id + '\')">✎</button><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDist(\'' + d.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="8" class="empty">Sin distribuciones.</td></tr>')
+      + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" style="padding:2px 7px" onclick="iaEditDist(\'' + d.id + '\')">✎</button><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDist(\'' + d.id + '\')">⏸</button></td></tr>').join('') || '<tr><td colspan="9" class="empty">Sin distribuciones.</td></tr>')
     + '</tbody></table></div>';
 }
 function iaTabMsgs() {
