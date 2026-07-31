@@ -2,6 +2,7 @@
 // /diagnostico — shell propio de 4 pestañas. Reusa las tablas insp_* y remodel_inspecciones.
 // Motor de daño IDÉNTICO al verificado (Starbright 67.2%, Interno 75.5) — no modificar.
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, { auth: { persistSession: true } });
+if (typeof window.osIcon !== 'function') window.osIcon = () => ''; // si /ui/icons.js no cargó, la app degrada sin iconos en vez de colgarse
 const $ = h => { document.getElementById('app').innerHTML = h; };
 const M = n => n == null ? '—' : '$' + Math.round(+n).toLocaleString('en-US');
 const E = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -24,11 +25,16 @@ function dVerColor(g) { return g == null ? 'var(--mut2)' : g >= 60 ? 'var(--neg)
 
 // ─── AUTH + CARGA ───
 async function dInit() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session && !window.__diagTest) { location.href = '/?next=/diagnostico'; return; }
-  if (!session && window.__diagTest) return; // test: no redirige, la data se inyecta
-  D.theme = (localStorage.getItem('diag_theme') || 'dark'); document.documentElement.dataset.theme = D.theme;
-  await dLoad(); dRender();
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session && !window.__diagTest) { location.href = '/?next=/diagnostico'; return; }
+    if (!session && window.__diagTest) return; // test: no redirige, la data se inyecta
+    D.theme = (localStorage.getItem('diag_theme') || 'dark'); document.documentElement.dataset.theme = D.theme;
+    await dLoad(); dRender();
+  } catch (e) { // nunca dejar el "Cargando…" colgado: error visible + reintentar
+    console.error('dInit', e);
+    $(`<div class="login card"><h1 class="down">No se pudo cargar</h1><div style="font-size:12px;color:var(--mut);margin:10px 0">${E(e && e.message || e)}</div><button class="btn" onclick="location.reload()">↻ Reintentar</button></div>`);
+  }
 }
 async function dLoad() {
   try {
