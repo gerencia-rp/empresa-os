@@ -75,6 +75,61 @@ function dRender() {
     <div class="aibubble" onclick="dOpenAI()" title="Asistente de obra IA">${osIcon('bot')}</div>`);
 }
 
+// ─── TAKE-OFF: catálogo de cantidades por división ───
+// Derivado 1:1 de insp_divisiones + insp_checklist_items. NO altera el scoring:
+// las cantidades se guardan aparte (insp_cantidades) y no entran en dCompute.
+// DESACOPLADO del daño (decisión CEO 31-jul): ningún ítem toca dSetCarp ni w.scores.
+// En Carpintería el conteo del take-off es dato independiente del "dañadas N de M"
+// de la pregunta de patología, que sigue siendo la ÚNICA que puntúa.
+const D_CANT = {
+  acceso_externo: [['Puerta / portón de acceso', 'u'], ['Cerramiento / muro perimetral', 'ft'], ['Patio / jardín / andenes', 'ft2']],
+  techo: [['Cubierta / tejado (exterior)', 'ft2'], ['Cielorraso / techo interior', 'ft2'], ['Estructura de techo (correas)', 'u']],
+  estructura: [['Zapatas y cimientos', 'u'], ['Muros de contención', 'ft2'], ['Vigas de carga', 'u'], ['Viguetas de entrepiso', 'u'], ['Columnas / pilares', 'u'], ['Losa de contrapiso', 'ft2']],
+  muros: [['Muros interiores', 'ft2'], ['Revoques / estuco interior', 'ft2'], ['Muros exteriores (fachada)', 'ft2'], ['Impermeabilización de muros', 'ft2']],
+  piso: [['Piso interior (acabado)', 'ft2'], ['Zócalos / guardaescobas', 'ft'], ['Contrapiso / base de piso', 'ft2']],
+  placa: [['Placa de entrepiso', 'ft2'], ['Escaleras (tramos)', 'u'], ['Barandas', 'ft']],
+  carpinteria: [['Ventanería', 'u'], ['Puertas interiores', 'u'], ['Gabinetes (cocina/baños)', 'u'], ['Closets', 'u']],
+  redes: [['Puntos hidráulicos / plomería', 'u'], ['Puntos de gas', 'u'], ['Puntos eléctricos (tomas/salidas)', 'u'], ['Baños', 'u'], ['Cocinas', 'u'], ['Equipos HVAC', 'u']],
+};
+const D_UNI = { u: 'u', ft2: 'ft²', ft: 'ft lin.' };
+function dCantKey(div, item) { return div + '|' + item; }
+function dCantGet(div, item) {
+  const w = D.wizard; if (!w) return '';
+  const v = (w.cant || {})[dCantKey(div, item)];
+  return v == null ? '' : v;
+}
+function dSetCant(div, item, val) { // solo escribe w.cant — jamás w.scores ni w.raw
+  const w = D.wizard; if (!w) return;
+  w.cant = w.cant || {};
+  const n = val === '' || val == null ? null : +val;
+  if (n == null || isNaN(n)) delete w.cant[dCantKey(div, item)]; else w.cant[dCantKey(div, item)] = n;
+}
+window.dSetCant = dSetCant;
+function dCantBlock(div) { // bloque de take-off que se agrega DEBAJO de las preguntas actuales
+  const items = D_CANT[div]; if (!items || !items.length) return '';
+  const filas = items.map(([item, uni]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;gap:10px">
+      <span style="font-size:12px">${E(item)}</span>
+      <span style="white-space:nowrap"><input type="number" min="0" step="any" value="${dCantGet(div, item)}" onchange="dSetCant('${div}','${E(item).replace(/'/g, '&#39;')}',this.value)" style="width:76px;text-align:right;padding:3px"> <span style="font-size:10px;color:var(--mut2);display:inline-block;min-width:34px">${D_UNI[uni] || uni}</span></span>
+    </div>`).join('');
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><b style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut2)">📐 Cantidades (take-off)</b><span style="font-size:10px;color:var(--mut2)">opcional · cuántos hay · no afecta el puntaje</span></div>
+    ${filas}</div>`;
+}
+function dCantResumen() { // tabla de repaso en el paso Reporte
+  const w = D.wizard; if (!w) return '';
+  const divs = (w.steps || []).filter(s => D_CANT[s.division]).map(s => s.division);
+  const uniq = [...new Set(divs)];
+  const filas = [];
+  uniq.forEach(div => (D_CANT[div] || []).forEach(([item, uni]) => {
+    const v = dCantGet(div, item);
+    if (v === '' || v == null) return;
+    const d = D.divisiones.find(x => x.key === div) || {};
+    filas.push(`<tr><td style="font-size:11px">${d.emoji || ''} ${E(d.nombre || div)}</td><td style="font-size:11px">${E(item)}</td><td style="text-align:right"><b>${v}</b> <span style="font-size:10px;color:var(--mut2)">${D_UNI[uni] || uni}</span></td></tr>`);
+  }));
+  if (!filas.length) return `<div style="font-size:11px;color:var(--mut2);margin-top:10px">📐 Sin cantidades cargadas (opcional).</div>`;
+  return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--mut2);margin:14px 0 4px">📐 Cantidades (take-off) · ${filas.length} ítems</div><table><tbody>${filas.join('')}</tbody></table>`;
+}
+
 // ═══ PESTAÑA 1 · EVALUAR (wizard) ═══
 function dBuildSteps(w) {
   const steps = [{ tipo: 'datos', titulo: 'Datos básicos', seccion: 'Inicio' }];
@@ -91,9 +146,16 @@ function dBuildSteps(w) {
   steps.push({ tipo: 'reporte', titulo: 'Reporte', seccion: 'Reporte' });
   return steps;
 }
-function dStartWizard(inspId) {
+async function dStartWizard(inspId) {
   const base = inspId ? D.inspecciones.find(x => x.id === inspId) : null;
-  D.wizard = { id: base ? base.id : null, nombre_ref: base ? base.nombre_ref : '', direccion: base ? base.direccion : '', uso: base ? base.uso : 'compra', property_id: base ? base.property_id : null, numero_pisos: base ? (base.numero_pisos || 1) : 1, scores: base ? JSON.parse(JSON.stringify(base.scores || {})) : {}, raw: base ? JSON.parse(JSON.stringify(base.raw_answers || {})) : {}, limpieza: base ? (base.limpieza_items || []) : [], subScores: {}, idx: 0, avisos: [] };
+  let cant = {}; // take-off ya guardado (solo al editar una inspección existente)
+  if (base && base.id) {
+    try {
+      const { data } = await sb.from('insp_cantidades').select('division,item,cantidad').eq('inspeccion_id', base.id);
+      (data || []).forEach(r => { if (r.cantidad != null) cant[dCantKey(r.division, r.item)] = +r.cantidad; });
+    } catch (e) { console.warn('cantidades', e); }
+  }
+  D.wizard = { cant, id: base ? base.id : null, nombre_ref: base ? base.nombre_ref : '', direccion: base ? base.direccion : '', uso: base ? base.uso : 'compra', property_id: base ? base.property_id : null, numero_pisos: base ? (base.numero_pisos || 1) : 1, scores: base ? JSON.parse(JSON.stringify(base.scores || {})) : {}, raw: base ? JSON.parse(JSON.stringify(base.raw_answers || {})) : {}, limpieza: base ? (base.limpieza_items || []) : [], subScores: {}, idx: 0, avisos: [] };
   D.wizard.steps = dBuildSteps(D.wizard);
   D.wizard.maxIdx = base ? D.wizard.steps.length - 1 : 0; // editar una existente = todos los pasos ya recorridos (minimapa clickeable)
   D.tab = 'evaluar'; dRender();
@@ -140,8 +202,8 @@ function dStepBody(step, w, res) {
     <div style="font-size:11px;color:var(--mut);margin-bottom:3px">Casa (Ficha por property_id)</div><select id="d-pid" style="width:100%;margin-bottom:10px"><option value="">(sin casa)</option>${D.props.map(p => `<option value="${p.property_id}" ${w.property_id === p.property_id ? 'selected' : ''}>${E((p.address || '').split(',')[0])}</option>`).join('')}</select>
     <div style="font-size:11px;color:var(--mut);margin-bottom:4px">¿Compra o Renta?</div><div style="display:flex;gap:8px">${['compra', 'renta'].map(u => `<button class="btn ${w.uso === u ? '' : 'ghost'}" onclick="D.wizard.uso='${u}';dRender()">${u === 'compra' ? 'Compra' : 'Renta'}</button>`).join('')}</div></div>`;
   if (step.tipo === 'pisos') return `<div class="card"><h3 style="margin-bottom:6px">¿Cuántos pisos tiene?</h3><p style="font-size:12px;color:var(--mut);margin-bottom:10px">2+ agrega Placa de entrepiso y Escaleras.</p><div style="display:flex;gap:10px">${[[1, '1 Piso'], [2, '2 o más pisos']].map(([n, l]) => `<button class="btn ${(w.numero_pisos >= 2 ? 2 : 1) === n ? '' : 'ghost'}" style="flex:1;padding:14px" onclick="dSetPisos(${n})">${l}</button>`).join('')}</div></div>`;
-  if (step.tipo === 'redes') { const raw = w.raw.redes = w.raw.redes || {}; return `<div class="card"><h3>${osIcon('link')} Redes</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Cada red pesa ${Dcfg('red_peso_pct', 33.33)}% · solo cuenta "No funciona".</p>${['plomeria', 'gas', 'electricidad'].map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><b style="text-transform:capitalize">${r}</b><div style="display:flex;gap:6px">${[['funciona', 'Funciona'], ['no_funciona', 'No funciona']].map(([v, l]) => `<button class="btn ${raw[r] === v ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="dSetRed('${r}','${v}')">${l}</button>`).join('')}</div></div>`).join('')}</div>`; }
-  if (step.tipo === 'carpinteria') { const raw = w.raw.carpinteria = w.raw.carpinteria || {}; return `<div class="card"><h3>Carpintería</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Ratio de unidades dañadas → score (no afecta otras patologías).</p>${[['ventanas', 'Ventanas'], ['puertas_int', 'Puertas interiores'], ['gabinetes', 'Gabinetes']].map(([k, l]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0"><span>${l}</span><span style="font-size:11px">dañadas <input type="number" min="0" value="${raw[k + '_mal'] || 0}" onchange="dSetCarp('${k}_mal',this.value)" style="width:52px;text-align:right;padding:3px"> de <input type="number" min="0" value="${raw[k + '_tot'] || 0}" onchange="dSetCarp('${k}_tot',this.value)" style="width:52px;text-align:right;padding:3px"></span></div>`).join('')}</div>`; }
+  if (step.tipo === 'redes') { const raw = w.raw.redes = w.raw.redes || {}; return `<div class="card"><h3>${osIcon('link')} Redes</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Cada red pesa ${Dcfg('red_peso_pct', 33.33)}% · solo cuenta "No funciona".</p>${['plomeria', 'gas', 'electricidad'].map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><b style="text-transform:capitalize">${r}</b><div style="display:flex;gap:6px">${[['funciona', 'Funciona'], ['no_funciona', 'No funciona']].map(([v, l]) => `<button class="btn ${raw[r] === v ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="dSetRed('${r}','${v}')">${l}</button>`).join('')}</div></div>`).join('')}${dCantBlock('redes')}</div>`; }
+  if (step.tipo === 'carpinteria') { const raw = w.raw.carpinteria = w.raw.carpinteria || {}; return `<div class="card"><h3>Carpintería</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Ratio de unidades dañadas → score (no afecta otras patologías).</p>${[['ventanas', 'Ventanas'], ['puertas_int', 'Puertas interiores'], ['gabinetes', 'Gabinetes']].map(([k, l]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0"><span>${l}</span><span style="font-size:11px">dañadas <input type="number" min="0" value="${raw[k + '_mal'] || 0}" onchange="dSetCarp('${k}_mal',this.value)" style="width:52px;text-align:right;padding:3px"> de <input type="number" min="0" value="${raw[k + '_tot'] || 0}" onchange="dSetCarp('${k}_tot',this.value)" style="width:52px;text-align:right;padding:3px"></span></div>`).join('')}${dCantBlock('carpinteria')}</div>`; }
   if (step.tipo === 'patio') { const raw = w.raw.patio = w.raw.patio || {}; return `<div class="card"><h3>Patio trasero</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">¿Cuenta con pérgola, hangar o depósito? Solo "Malo" suma (tope ${Dcfg('pergola_max_pct', 2)}% del total).</p><div style="display:flex;gap:8px">${[['no', 'No tiene'], ['bueno', 'Bueno'], ['regular', 'Regular'], ['malo', 'Malo']].map(([v, l]) => `<button class="btn ${raw.estado === v ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="D.wizard.raw.patio={estado:'${v}'};dRender()">${l}</button>`).join('')}</div></div>`; }
   if (step.tipo === 'limpieza') { const items = ['Retiro de escombros', 'Limpieza profunda interior', 'Limpieza de fachada', 'Retiro de basura/enseres', 'Limpieza de patio/jardín']; return `<div class="card"><h3>Limpieza</h3><p style="font-size:12px;color:var(--mut);margin:4px 0 10px">NO pondera el daño — solo BD y entregable.</p>${items.map(it => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px"><input type="checkbox" ${(w.limpieza || []).includes(it) ? 'checked' : ''} onchange="dToggleLimpieza('${E(it).replace(/'/g, '')}')"> ${it}</label>`).join('')}</div>`; }
   if (step.tipo === 'reporte') return dReporte(w, res);
@@ -149,13 +211,14 @@ function dStepBody(step, w, res) {
   const cur = step.subgrupo ? (w.subScores[step.subgrupo] || {}) : (w.scores[step.division] || {});
   const cubierta = step.division === 'techo' ? `<div style="background:rgba(251,191,36,.12);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--amber);margin-bottom:10px">${osIcon('alert')} Debe buscar la forma de subir a la cubierta y verificar el estado de la estructura antes de continuar. La cubierta (exterior) y el interior del techo pesan ambos en esta división.</div>` : '';
   return `<div class="card"><h3>${step.emoji} ${E(step.titulo)}</h3>${cubierta}<p style="font-size:12px;color:var(--mut);margin:4px 0 10px">Respondé solo lo que aplique · escala 1 (sin daño) a 5 (crítico).</p>
-    ${D.patologias.map(p => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:12px;margin-bottom:5px">${p.emoji} <b>${E(p.nombre)}</b> <span style="color:var(--mut);font-size:10px">${E(p.pregunta)}</span></div><div style="display:flex;gap:5px">${[1, 2, 3, 4, 5].map(s => `<button class="btn ${cur[p.key] === s ? '' : 'ghost'}" style="flex:1;padding:5px;font-size:11px" onclick="dSetScore('${step.subgrupo || step.division}','${p.key}',${s},${step.subgrupo ? 'true' : 'false'})">${s}</button>`).join('')}</div></div>`).join('')}</div>`;
+    ${D.patologias.map(p => `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:12px;margin-bottom:5px">${p.emoji} <b>${E(p.nombre)}</b> <span style="color:var(--mut);font-size:10px">${E(p.pregunta)}</span></div><div style="display:flex;gap:5px">${[1, 2, 3, 4, 5].map(s => `<button class="btn ${cur[p.key] === s ? '' : 'ghost'}" style="flex:1;padding:5px;font-size:11px" onclick="dSetScore('${step.subgrupo || step.division}','${p.key}',${s},${step.subgrupo ? 'true' : 'false'})">${s}</button>`).join('')}</div></div>`).join('')}${dCantBlock(step.division)}</div>`;
 }
 function dReporte(w, res) {
   return `<div class="card"><h3>${osIcon('chart')} Reporte — ${E(w.nombre_ref || 'Sin nombre')}</h3>
     <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${dVerColor(res.global)}">${res.global != null ? res.global + '%' : '—'}</div><div style="color:var(--mut)">${E(dVeredicto(res.global))}</div></div>
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--mut2);margin:8px 0 4px">Daño por etapa de renovación</div>
     <table><tbody>${D.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${E(e.etapa)}</td><td style="text-align:right"><b class="${(res.etapas[e.etapa] || 0) >= 50 ? 'down' : ''}">${res.etapas[e.etapa] != null ? res.etapas[e.etapa] + '%' : '—'}</b></td></tr>`).join('')}</tbody></table>
+    ${dCantResumen()}
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" onclick="dSaveWizard()">${osIcon('save')} Guardar</button><button class="btn ghost" onclick="dPrellenar()">→ Estimador</button></div></div>`;
 }
 function dNav(dir) { const w = D.wizard; if (dir > 0 && w.idx === 0) { w.nombre_ref = (document.getElementById('d-nom') || {}).value || w.nombre_ref; w.direccion = (document.getElementById('d-dir') || {}).value || ''; w.property_id = (document.getElementById('d-pid') || {}).value || null; if (!w.nombre_ref.trim()) { alert('El Nombre / Referencia es obligatorio.'); return; } } w.idx = Math.max(0, Math.min(w.steps.length - 1, w.idx + dir)); w.maxIdx = Math.max(w.maxIdx || 0, w.idx); dRender(); }
@@ -192,10 +255,39 @@ async function dSaveWizard() {
   dToast('Guardando…', 6000);
   const row = { property_id: w.property_id || null, nombre_ref: w.nombre_ref, direccion: w.direccion || null, uso: w.uso || null, numero_pisos: w.numero_pisos || 1, scores: w.scores, raw_answers: w.raw, limpieza_items: w.limpieza || [], dano_global_pct: res.global, dano_divisiones: res.divisiones, dano_patologias: res.patologias, dano_etapas: res.etapas, veredicto: dVeredicto(res.global), estado: 'completa', updated_at: new Date().toISOString() };
   const { data: { session } } = await sb.auth.getSession(); row.created_by = (session && session.user && session.user.email) || 'diagnostico';
-  let error; if (w.id) ({ error } = await sb.from('remodel_inspecciones').update(row).eq('id', w.id)); else ({ error } = await sb.from('remodel_inspecciones').insert(row));
+  let error, inspId = w.id;
+  if (w.id) ({ error } = await sb.from('remodel_inspecciones').update(row).eq('id', w.id));
+  else { const r = await sb.from('remodel_inspecciones').insert(row).select('id').single(); error = r.error; inspId = r.data && r.data.id; }
   if (error) { alert('No se pudo guardar: ' + error.message); return; }
-  dToast('Inspección guardada' + (res.global != null ? ' — daño global ' + res.global + '%' : ''));
+  // Take-off aparte: la inspección ya quedó guardada, así que un fallo acá NO la pierde (se avisa y sigue).
+  const cantMsg = await dSaveCantidades(inspId, w);
+  dToast('Inspección guardada' + (res.global != null ? ' — daño global ' + res.global + '%' : '') + cantMsg);
   D.wizard = null; await dLoad(); D.tab = 'db'; dRender();
+}
+async function dSaveCantidades(inspId, w) { // upsert idempotente por (inspeccion_id, division, item)
+  if (!inspId) return '';
+  const divs = [...new Set((w.steps || []).filter(s => D_CANT[s.division]).map(s => s.division))];
+  const filas = [], vacios = [];
+  divs.forEach(div => (D_CANT[div] || []).forEach(([item, uni]) => {
+    const v = dCantGet(div, item);
+    if (v === '' || v == null || isNaN(+v)) { vacios.push({ div, item }); return; }
+    filas.push({ inspeccion_id: inspId, property_id: w.property_id || null, division: div, item, cantidad: +v, unidad: uni, updated_at: new Date().toISOString() });
+  }));
+  try {
+    if (filas.length) {
+      const { error } = await sb.from('insp_cantidades').upsert(filas, { onConflict: 'inspeccion_id,division,item' });
+      if (error) throw error;
+    }
+    // un ítem que se dejó en blanco tras haber tenido valor debe DESAPARECER, no quedar viejo
+    if (vacios.length) {
+      for (const v of vacios) await sb.from('insp_cantidades').delete().eq('inspeccion_id', inspId).eq('division', v.div).eq('item', v.item);
+    }
+    return filas.length ? ` · ${filas.length} cantidades` : '';
+  } catch (e) {
+    console.warn('insp_cantidades', e);
+    dToast('⚠ La inspección se guardó, pero las cantidades no: ' + (e.message || e), 5000);
+    return '';
+  }
 }
 function dPrellenar() { const w = D.wizard, res = dWizardCompute(); try { localStorage.setItem('rm_insp_handoff', JSON.stringify({ property_id: w.property_id, nombre: w.nombre_ref, direccion: w.direccion, uso: w.uso, afectacion_por_etapa: res.etapas, dano_global: res.global })); } catch (e) {} alert(`Handoff listo para el Estimador Pro (${w.nombre_ref}).\nAbrí Remodelación → Estimador: arranca con estas afectaciones por etapa.`); }
 window.dSaveWizard = dSaveWizard; window.dPrellenar = dPrellenar;
