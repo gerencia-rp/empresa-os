@@ -123,7 +123,19 @@ function rmToggleActivity(code) {
   }
   rmRenderTab();
 }
-function rmSetQty(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].qty = +v; rmRenderTab(); }
+function rmSetQty(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].qty = +v; rmState.selectedActivities[code].src = 'manual'; rmRenderTab(); }
+
+// Trae las cantidades del diagnóstico (insp_cantidades) al Editor. No pisa nada cargado.
+async function rmTraerTakeoff() {
+  const res = await rmLoadTakeoff();
+  if (res.error) { alert(res.error); return; }
+  const rep = rmApplyTakeoff(res.cant);
+  rep._insp = res.insp;
+  rmState.takeoffRep = rep;
+  rmRenderTab();
+}
+function rmCerrarTakeoffBanner() { rmState.takeoffRep = null; rmRenderTab(); }
+window.rmTraerTakeoff = rmTraerTakeoff; window.rmCerrarTakeoffBanner = rmCerrarTakeoffBanner;
 function rmSetVu(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].vu = +v; rmRenderTab(); }
 function rmSetDays(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].days = +v; rmRenderTab(); }
 

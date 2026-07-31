@@ -154,6 +154,8 @@ const rmState = {
   currentProject: null,
   // Editor state
   editName: '', editAddress: '', editSqft: 1500, editStartDate: new Date().toISOString().split('T')[0],
+  editPropertyId: null,        // casa del proyecto — cruza con el diagnóstico (insp_cantidades)
+  takeoffRep: null,            // último reporte de take-off aplicado (banner del Editor)
   selectedActivities: {},
   customActivities: {},  // items custom agregados por etapa: { code: { phase, subcat, desc, unit, qty, vu, days, mat_pct } }
   // Pricing (estándar industria)
@@ -238,6 +240,113 @@ const RM_STAGE_BENCHMARKS = [
 const RM_PORTFOLIO_TOTAL_PSF = 49.17;
 const RM_MARKET_AUSTIN_MIN = 65;
 const RM_MARKET_AUSTIN_MAX = 90;
+
+// ═══ TAKE-OFF DEL DIAGNÓSTICO → CANTIDADES DEL EDITOR ═══
+// Puente insp_cantidades (por division/item con unidad) → selectedActivities[code].qty.
+// Filosofía v1 (CEO 31-jul): SOLO se pre-llena lo que mapea limpio y con la MISMA unidad.
+// Nada de suponer materiales, prorratear vu ni crear códigos nuevos: lo que no calza
+// se muestra como referencia en el banner para que lo cargue una persona.
+// 'auto'  → códigos con unidad idéntica al ítem del take-off.
+// 'cond'  → ambiguo entre varios códigos: solo se llena si ESE código ya está en el
+//           proyecto y sin cantidad (el usuario ya eligió el material).
+// 'ref'   → existe código pero en otra unidad (casa/proyecto/techo) → referencia.
+// 'none'  → no hay código en el catálogo → "sin destino".
+const RM_TAKEOFF_MAP = {
+  // ── auto (unidad coincide) ──
+  'acceso_externo|Cerramiento / muro perimetral': { modo: 'auto', codes: ['3.14.1'] },
+  'acceso_externo|Patio / jardín / andenes':      { modo: 'auto', codes: ['3.6.1'] },
+  'estructura|Vigas de carga':                    { modo: 'auto', codes: ['4.1.3'] },
+  'estructura|Columnas / pilares':                { modo: 'auto', codes: ['3.16.1'] },
+  'muros|Muros exteriores (fachada)':             { modo: 'auto', codes: ['3.4.1'] },
+  'piso|Zócalos / guardaescobas':                 { modo: 'auto', codes: ['5.6.3'] },
+  'piso|Contrapiso / base de piso':               { modo: 'auto', codes: ['4.1.5'] },
+  'carpinteria|Puertas interiores':               { modo: 'auto', codes: ['5.8.1'] },
+  'carpinteria|Closets':                          { modo: 'auto', codes: ['5.8.2'] },
+  'redes|Equipos HVAC':                           { modo: 'auto', codes: ['5.5.2h'] },
+  // fan-out SOLO a los códigos seguros (1 por baño / por cocina). Ducha, cerramiento,
+  // accesorios e isla no siempre aplican → los agrega el usuario.
+  'redes|Baños':   { modo: 'auto', codes: ['1.1.4', '5.3.6', '5.3.5'] },
+  'redes|Cocinas': { modo: 'auto', codes: ['1.1.3', '5.4.4', '5.4.6'] },
+  // ── condicional (el material lo elige el usuario; alfombra nunca se llena sola) ──
+  'piso|Piso interior (acabado)': { modo: 'cond', codes: ['5.6.1', '5.6.2'], nota: 'elegí el material de piso' },
+  'muros|Muros interiores':       { modo: 'cond', codes: ['5.1.1', '5.1.2', '5.1.3'], nota: 'drywall / pintura / aislamiento' },
+  // ── referencia (hay código, pero se cotiza por casa/proyecto/techo) ──
+  'carpinteria|Ventanería':                  { modo: 'ref', nota: '3.7.1 cotiza TODAS las ventanas por casa' },
+  'carpinteria|Gabinetes (cocina/baños)':    { modo: 'ref', nota: '5.4.1 se cotiza en ft lineales' },
+  'redes|Puntos eléctricos (tomas/salidas)': { modo: 'ref', nota: '5.1.4 se cotiza por casa' },
+  'redes|Puntos hidráulicos / plomería':     { modo: 'ref', nota: '5.2.1p / 5.2.4p se cotizan por casa' },
+  'acceso_externo|Puerta / portón de acceso': { modo: 'ref', nota: '3.5.1 principal vs 3.5.2 secundarias' },
+  'techo|Cubierta / tejado (exterior)':       { modo: 'ref', nota: '3.1.1 / 3.1.2 se cotizan por techo entero' },
+  'techo|Estructura de techo (correas)':      { modo: 'ref', nota: '4.1.4 se cotiza en ft²' },
+  'techo|Cielorraso / techo interior':        { modo: 'ref', nota: 'no hay código de cielorraso' },
+  'muros|Revoques / estuco interior':         { modo: 'ref', nota: 'no hay código propio de revoque' },
+  'muros|Impermeabilización de muros':        { modo: 'ref', nota: '2.2.9 es de cimentación, por proyecto' },
+  'estructura|Zapatas y cimientos':           { modo: 'ref', nota: 'cimentación se cotiza por proyecto' },
+  'estructura|Losa de contrapiso':            { modo: 'ref', nota: '2.2.6 es por unidad' },
+  'placa|Placa de entrepiso':                 { modo: 'ref', nota: 'colisiona con Contrapiso (4.1.5)' },
+  // ── sin destino (no existe el código en el catálogo) ──
+  'redes|Puntos de gas':          { modo: 'none' },
+  'placa|Escaleras (tramos)':     { modo: 'none' },
+  'placa|Barandas':               { modo: 'none' },
+  'estructura|Muros de contención': { modo: 'none' },
+  'estructura|Viguetas de entrepiso': { modo: 'none' },
+};
+const RM_UNI_LBL = { u: 'u', ft2: 'ft²', ft: 'ft lin.' };
+
+// Trae el take-off de la inspección más reciente de la propiedad del proyecto activo.
+async function rmLoadTakeoff() {
+  const pid = rmState.editPropertyId;
+  if (!pid) return { error: 'El proyecto no tiene property_id: abrilo desde una casa para poder cruzarlo con el diagnóstico.' };
+  try {
+    const { data: insps, error: e1 } = await sb.from('remodel_inspecciones')
+      .select('id, nombre_ref, fecha_evaluacion').eq('property_id', pid).eq('active', true)
+      .order('fecha_evaluacion', { ascending: false }).limit(1);
+    if (e1) throw e1;
+    if (!insps || !insps.length) return { error: 'No hay inspecciones guardadas para esta casa.' };
+    const insp = insps[0];
+    const { data: cant, error: e2 } = await sb.from('insp_cantidades')
+      .select('division, item, cantidad, unidad').eq('inspeccion_id', insp.id);
+    if (e2) throw e2;
+    if (!cant || !cant.length) return { error: `La inspección "${insp.nombre_ref}" no tiene cantidades cargadas.`, insp };
+    return { insp, cant };
+  } catch (e) { return { error: 'No se pudo leer el diagnóstico: ' + (e.message || e) }; }
+}
+
+// Aplica el take-off. REGLA DURA: nunca pisa una cantidad existente (solo llena
+// códigos ausentes o con qty vacía). Devuelve el detalle para el banner.
+function rmApplyTakeoff(cant) {
+  const cat = rmGetCatalog();
+  const rep = { lleno: [], respetado: [], referencia: [], sinDestino: [], sinMapa: [] };
+  const vacio = c => { const s = rmState.selectedActivities[c]; return !s || s.qty == null || s.qty === '' || +s.qty === 0; };
+  (cant || []).forEach(r => {
+    const qty = +r.cantidad;
+    if (!(qty > 0)) return;
+    const uni = RM_UNI_LBL[r.unidad] || r.unidad || '';
+    const meta = { item: r.item, division: r.division, qty, uni };
+    const m = RM_TAKEOFF_MAP[r.division + '|' + r.item];
+    if (!m) { rep.sinMapa.push(meta); return; }
+    if (m.modo === 'none') { rep.sinDestino.push(meta); return; }
+    if (m.modo === 'ref') { rep.referencia.push({ ...meta, nota: m.nota }); return; }
+    const objetivo = m.modo === 'cond'
+      ? (m.codes || []).filter(c => rmState.selectedActivities[c])   // solo los que el usuario ya eligió
+      : (m.codes || []);
+    if (!objetivo.length) { rep.referencia.push({ ...meta, nota: m.nota || 'ningún código de este tipo está en el proyecto todavía' }); return; }
+    objetivo.forEach(code => {
+      const ci = cat.find(c => c.code === code);
+      if (!ci) { rep.referencia.push({ ...meta, nota: `el código ${code} no está en el catálogo activo` }); return; }
+      if (!vacio(code)) { rep.respetado.push({ ...meta, code, desc: ci.desc, qtyActual: rmState.selectedActivities[code].qty }); return; }
+      const prev = rmState.selectedActivities[code] || {};
+      rmState.selectedActivities[code] = {
+        qty, vu: prev.vu != null ? prev.vu : ci.vu,
+        days: Math.max(1, Math.ceil(qty * (ci.days_per_qty || 0))),
+        start_offset: prev.start_offset || 0,
+        src: 'takeoff',
+      };
+      rep.lleno.push({ ...meta, code, desc: ci.desc, unitCat: ci.unit });
+    });
+  });
+  return rep;
+}
 
 // ─── S2-G4: Catálogo dinámico (DB con fallback al hardcoded RM_CATALOG) ───
 // rmActiveCatalog se setea desde DB en rmLoadCatalog(). Si null → usar RM_CATALOG hardcodeado.
@@ -1290,6 +1399,7 @@ async function rmLoadProject(p) {
     rmLoadInvoices(p.id)
   ]);
   rmState.editName = p.name;
+  rmState.editPropertyId = p.property_id || null;
   rmState.editAddress = p.address || '';
   rmState.editSqft = p.sqft || 1500;
   rmState.editStartDate = p.start_date || new Date().toISOString().split('T')[0];

@@ -232,6 +232,9 @@ function rmRenderEditor(body) {
         <!-- Activos del proyecto: Matterport + scope + audio + planos -->
         ${rmRenderAssets()}
 
+        <!-- TAKE-OFF DEL DIAGNÓSTICO -->
+        ${rmRenderTakeoff()}
+
         <!-- AUTO-LLENADO INTELIGENTE -->
         <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-3">
           <div class="flex justify-between items-start gap-2 flex-wrap mb-2">
@@ -531,4 +534,41 @@ function rmRenderEditor(body) {
     if (el && ai?.analysis) el.innerHTML = aiResultGenericHtml(ai.analysis);
     rmRenderCharts(e);
   }, 60);
+}
+
+// ─── Banner del take-off: qué entró como cantidad y qué quedó como referencia ───
+function rmRenderTakeoff() {
+  const rep = rmState.takeoffRep;
+  const btn = `<button onclick="rmTraerTakeoff()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-2 rounded-lg">${osIcon('ruler')} Traer cantidades del diagnóstico</button>`;
+  if (!rep) {
+    return `<div class="bg-sky-50 border-2 border-sky-200 rounded-xl p-3 flex justify-between items-center gap-3 flex-wrap">
+      <div>
+        <div class="text-sm font-bold text-sky-900">${osIcon('ruler')} Take-off de la Visita Previa</div>
+        <div class="text-[11px] text-sky-800 mt-0.5">Trae el conteo real (puertas, closets, baños, ft² de fachada…) desde la inspección de esta casa. <strong>No pisa ninguna cantidad ya cargada.</strong></div>
+      </div>${btn}</div>`;
+  }
+  const li = (arr, fn) => arr.map(fn).join('');
+  // todo lo interpolado sale de la DB (nombre_ref, item, division) → escapar siempre
+  const q = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nombre = (rep._insp && rep._insp.nombre_ref) || 'la inspección';
+  const bloque = (titulo, color, items, render) => items.length ? `
+    <div class="mt-2">
+      <div class="text-[10px] font-bold uppercase tracking-wide text-${color}-800 mb-1">${titulo} (${items.length})</div>
+      <div class="flex flex-wrap gap-1">${li(items, render)}</div>
+    </div>` : '';
+  const chip = (bg, txt, title) => `<span class="text-[10px] bg-${bg}-100 text-${bg}-800 border border-${bg}-200 rounded px-1.5 py-0.5" title="${q(title)}">${txt}</span>`;
+  return `<div class="bg-sky-50 border-2 border-sky-300 rounded-xl p-3">
+    <div class="flex justify-between items-start gap-3 flex-wrap">
+      <div>
+        <div class="text-sm font-bold text-sky-900">${osIcon('ruler')} Take-off aplicado desde ${q(nombre)}</div>
+        <div class="text-[11px] text-sky-800 mt-0.5">${rep.lleno.length} cantidad${rep.lleno.length === 1 ? '' : 'es'} pre-llenada${rep.lleno.length === 1 ? '' : 's'} como sugerencia — ajustá lo que haga falta. El resto queda de referencia: cargalo a mano si aplica.</div>
+      </div>
+      <div class="flex gap-1.5">${btn}<button onclick="rmCerrarTakeoffBanner()" class="text-xs text-slate-600 hover:text-slate-900 border border-slate-300 rounded px-2 py-2">Cerrar</button></div>
+    </div>
+    ${bloque('✓ Entró como cantidad', 'emerald', rep.lleno, x => chip('emerald', `${q(x.code)} · ${q(x.item)}: <b>${x.qty}</b> ${q(x.uni)}`, `${x.desc} — ${x.qty} ${x.unitCat}`))}
+    ${bloque('Respetado (ya tenía cantidad, no se pisó)', 'amber', rep.respetado, x => chip('amber', `${q(x.code)} · ${q(x.item)}: queda <b>${x.qtyActual}</b> (diagnóstico dice ${x.qty} ${q(x.uni)})`, 'Regla: nunca se pisa una cantidad existente'))}
+    ${bloque('Referencia del diagnóstico (cargalo a mano)', 'slate', rep.referencia, x => chip('slate', `${q(x.item)}: <b>${x.qty}</b> ${q(x.uni)}`, x.nota || ''))}
+    ${bloque('Sin destino en el catálogo', 'rose', rep.sinDestino, x => chip('rose', `${q(x.item)}: <b>${x.qty}</b> ${q(x.uni)}`, 'No existe un código para esto en el catálogo'))}
+    ${bloque('Sin mapeo definido', 'rose', rep.sinMapa, x => chip('rose', `${q(x.division)} · ${q(x.item)}: <b>${x.qty}</b> ${q(x.uni)}`, 'Ítem del take-off que no está en RM_TAKEOFF_MAP'))}
+  </div>`;
 }
