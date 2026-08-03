@@ -15,6 +15,16 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🎯 Estado (3 Ago 2026 — 🗓 Planner: mover UNA actividad corre TODOS sus días) · EN VIVO (commit `d8366e4`, QA en prod)
+
+- 🐛 **CAUSA RAÍZ** (fix que "no quedaba"): una actividad multi-día se guarda como UNA fila por día en `weekly_activities` con sufijo en el nombre — `activity_name: "X (día k/n)"` (`weekly-planner.js:1027` y `:2643`) → **comparar por `activity_name` exacto NUNCA engancha los otros días** (cada día tiene nombre distinto). La cascada vieja además se había perdido sin commitear.
+- 🔧 **Helpers nuevos** (weekly-planner.js): `wpBaseActivityName(name)` quita el sufijo `(día k/n)` · `wpShiftFollowersSameActivity(movedAct, oldDate, newDate, opts)` corre los días POSTERIORES de la MISMA actividad (mismo `project_id` + nombre BASE) por el mismo delta, salta domingos, excluye `status='done'`, nota `[CORRIDA …]` vía `safeUpdate`, idempotente (delta 0 = no-op). NO toca `wpCascadeReschedule` (ruta crítica) ni `wpResched*` (reprogramar obra).
+- 🔀 **Integrado en las 3 vías que mueven una actividad**: `wpConfirmPostpone` (aplazar con motivo — el motivo viaja a la nota), `wpReprogramTask` (input de fecha rápido; ganó chequeo de error que no tenía) y `wpDropOnCell` (arrastre). Toast con conteo de días corridos.
+- ✅ QA en prod (BD real, datos QA borrados): mover día 2 de 5 → posteriores +3 con salto de domingo, `done` y días anteriores intactos, repetir = 0 corridos.
+- 📏 **REGLA DE ORO (la razón por la que antes "no quedaba")**: todo fix va `node scripts/build.mjs` → grep de la lógica nueva en `dist/` → commit → **PUSH a main** → **verificar en la URL desplegada** (empresa-os.vercel.app sirviendo el hash nuevo del bundle, recarga dura por caché). Un fix sin push + verificación en prod NO existe.
+
+---
+
 ## 🎯 Estado (29 Jul 2026 — 📊 INFORMES AUTOMÁTICOS DE RENTAS: los 3 informes manuales, vivos) · EN VIVO (deployado, merge SHA `d6b85da` → prod `5f140b2`; ci:gate 15/15; QA prod 0 errores)
 
 - 📊 **Reemplazo de los 3 informes que el equipo armaba a mano** (spec de los PDFs 24/29-jul; ruta `/informes` en Rentas, guard rentas/operacion/contable): **① Semanal de Ocupación y Gestión** (marca RENTAL PROFITSS · PM, 7 secciones) · **② Balance de Rentas** (marca EVERHOME, cartera + matriz de antigüedad) · **③ Combinado** (EVERHOME, cartera con días de mora + plan de acción + estado del portafolio + anexo de unidades). Flujo: elegir tipo + corte → **borrador editable** (Carlos ajusta textos) → PDF (Guardar como PDF del navegador). **Cada emisión congela un snapshot INMUTABLE** → la franja "avance entre cortes" + badges NUEVO/RESUELTO/RENTA AUMENTADA comparan snapshots reales.
