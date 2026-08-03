@@ -1249,10 +1249,19 @@ async function wpeSave(id) {
     notes: document.getElementById('wpe-notes').value || null,
     updated_at: new Date().toISOString()
   };
+  const prev = (wpState.activities || []).find(x => x.id === id);
+  const oldDate = prev && prev.date;
   const { error } = await sb.from('weekly_activities').update(payload).eq('id', id);
   if (error) return alert(error.message);
+  // Si cambió la fecha, correr los demás días de la misma actividad (nombre base VIEJO:
+  // si además renombró, los seguidores todavía llevan el nombre anterior)
+  let corridos = 0;
+  if (prev && oldDate && payload.date && payload.date !== oldDate) {
+    corridos = await wpShiftFollowersSameActivity(prev, oldDate, payload.date);
+  }
   await wpLoadAll();
   wpBackToPlanner();
+  if (corridos > 0 && window.toast) toast(`✅ Guardado (y ${corridos} día(s) de la misma actividad corridos)`, 'success');
 }
 async function wpeDelete(id) {
   if (!confirm('¿Eliminar esta actividad permanentemente?')) return;
@@ -1317,16 +1326,26 @@ function wpBaseActivityName(name) {
 // Corre los días POSTERIORES de la MISMA actividad por el mismo desfase.
 // Agrupa por project_id + nombre BASE (sin el sufijo "(día k/n)").
 async function wpShiftFollowersSameActivity(movedAct, oldDate, newDate, opts = {}) {
+  if (!oldDate || !newDate) return 0;
   const delta = Math.round((new Date(newDate + 'T00:00:00') - new Date(oldDate + 'T00:00:00')) / 86400000);
   if (!delta) return 0;
   const base = wpBaseActivityName(movedAct.activity_name);
+  if (!base) return 0;
   const skipSunday = ds => { const x = new Date(ds + 'T00:00:00'); if (x.getDay() === 0) x.setDate(x.getDate() + 1); return wpDateOnly(x); };
-  const followers = (wpState.activities || []).filter(x =>
+  // Seguidores DESDE LA DB (wpState.activities es la vista cargada y PostgREST corta
+  // en 1000 filas — con >1000 actividades la cascada en memoria da 0 seguidores).
+  // Ancla a la CASA: project_id si lo hay, si no property_name (el mismo nombre base
+  // existe en varias casas — jamás agrupar por nombre solo).
+  let q = sb.from('weekly_activities').select('id,date,notes,status,activity_name,project_id')
+    .gt('date', oldDate).neq('status', 'done').order('date');
+  if (movedAct.project_id) q = q.eq('project_id', movedAct.project_id);
+  else if (movedAct.property_name) q = q.eq('property_name', movedAct.property_name);
+  else return 0;
+  const { data, error: qErr } = await q;
+  if (qErr) return 0;
+  const followers = (data || []).filter(x =>
     x.id !== movedAct.id &&
-    x.project_id === movedAct.project_id &&
-    wpBaseActivityName(x.activity_name) === base &&   // MISMA actividad por nombre base
-    x.status !== 'done' &&                            // no tocar las ya hechas
-    x.date > oldDate                                  // solo días POSTERIORES al que moviste
+    wpBaseActivityName(x.activity_name) === base      // MISMA actividad por nombre base
   );
   const today = wpDateOnly(new Date());
   let n = 0;
@@ -2858,11 +2877,17 @@ if (typeof wpDropOnCell === 'function' && !wpDropOnCell._wrapped) {
     if (wpState.draggedBacklogId) {
       const id = wpState.draggedBacklogId;
       wpState.draggedBacklogId = null;
+      const a = (wpState.backlog || []).find(x => x.id === id) || (wpState.activities || []).find(x => x.id === id);
+      const oldDate = a && a.date; // backlog puro = date null → sin cascada (no hay delta)
       const updates = { date: dateStr, status: 'planned', updated_at: new Date().toISOString() };
       if (!homeId.startsWith('name:')) updates.project_id = homeId;
       if (homeName) updates.property_name = homeName;
-      await sb.from('weekly_activities').update(updates).eq('id', id);
+      const { error } = await sb.from('weekly_activities').update(updates).eq('id', id);
+      if (error) { alert('Error moviendo: ' + error.message); return; }
+      let corridos = 0;
+      if (a && oldDate) corridos = await wpShiftFollowersSameActivity({ ...a, project_id: updates.project_id || a.project_id }, oldDate, dateStr);
       await wpLoadAll(); wpRender();
+      if (corridos > 0 && window.toast) toast(`✅ Actividad reprogramada (y ${corridos} día(s) de la misma actividad corridos)`, 'success');
       return;
     }
     // Task template → crear nueva actividad
