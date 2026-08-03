@@ -925,6 +925,7 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
       const msg = `Esta actividad depende de: ${depCheck.blockers.map(b => b.code + ' (' + (b.status || 'no existe') + ')').join(', ')}\n\nSugerencia: mover después del ${depCheck.minDate || '?'}\n\n¿Mover igual?`;
       if (!confirm(msg)) return;
     }
+    const oldDate = a.date; // antes del update
     const { error } = await sb.from('weekly_activities').update({
       date: dateStr,
       project_id: newProjectId,
@@ -932,9 +933,10 @@ async function wpDropOnCell(homeId, homeName, dateStr, event) {
       updated_at: new Date().toISOString()
     }).eq('id', actId);
     if (error) return alert('Error moviendo: ' + error.message);
+    const corridos = await wpShiftFollowersSameActivity({ ...a, project_id: newProjectId }, oldDate, dateStr);
     await wpLoadAll();
     wpRender();
-    if (window.toast) toast('Actividad reprogramada', 'success');
+    if (window.toast) toast(corridos > 0 ? `✅ Actividad reprogramada (y ${corridos} día(s) de la misma actividad corridos)` : '✅ Actividad reprogramada', 'success');
     return;
   }
 
@@ -1307,6 +1309,41 @@ async function wpMarkActivityDone(id, isDone) {
   if (error) throw new Error(error.message || 'Error guardando');
 }
 
+// ─── Actividad multi-día: una fila por día con sufijo "(día k/n)" en activity_name ───
+// Nombre base sin el sufijo, para agrupar los días de la MISMA actividad.
+function wpBaseActivityName(name) {
+  return String(name || '').replace(/\s*\(d[ií]a\s*\d+\s*\/\s*\d+\)\s*$/i, '').trim();
+}
+// Corre los días POSTERIORES de la MISMA actividad por el mismo desfase.
+// Agrupa por project_id + nombre BASE (sin el sufijo "(día k/n)").
+async function wpShiftFollowersSameActivity(movedAct, oldDate, newDate, opts = {}) {
+  const delta = Math.round((new Date(newDate + 'T00:00:00') - new Date(oldDate + 'T00:00:00')) / 86400000);
+  if (!delta) return 0;
+  const base = wpBaseActivityName(movedAct.activity_name);
+  const skipSunday = ds => { const x = new Date(ds + 'T00:00:00'); if (x.getDay() === 0) x.setDate(x.getDate() + 1); return wpDateOnly(x); };
+  const followers = (wpState.activities || []).filter(x =>
+    x.id !== movedAct.id &&
+    x.project_id === movedAct.project_id &&
+    wpBaseActivityName(x.activity_name) === base &&   // MISMA actividad por nombre base
+    x.status !== 'done' &&                            // no tocar las ya hechas
+    x.date > oldDate                                  // solo días POSTERIORES al que moviste
+  );
+  const today = wpDateOnly(new Date());
+  let n = 0;
+  for (const f of followers) {
+    const nd = skipSunday(wpDateOnly(wpAddDays(new Date(f.date + 'T00:00:00'), delta)));
+    if (nd === f.date) continue;                      // idempotente
+    const fPrev = (f.notes || '').trim();
+    const fTag = `[CORRIDA ${today} de ${f.date} → ${nd}: arrastrada al mover "${base}"${opts.reason ? ' · ' + opts.reason : ''}]`;
+    const { error } = await window.safeUpdate(
+      p => sb.from('weekly_activities').update(p).eq('id', f.id),
+      { date: nd, notes: fPrev ? fPrev + '\n' + fTag : fTag, updated_at: new Date().toISOString() }
+    );
+    if (!error) n++;
+  }
+  return n;
+}
+
 // ─── APLAZAR con motivo obligatorio ───
 function wpOpenPostpone(id) {
   const a = wpState.activities.find(x => x.id === id);
@@ -1347,15 +1384,17 @@ async function wpConfirmPostpone(id) {
   const tag = `[APLAZADA ${today} de ${a.date} → ${newDate}: ${reason}]`;
   const prevNotes = (a.notes || '').trim();
   const newNotes = prevNotes ? prevNotes + '\n' + tag : tag;
+  const oldDate = a.date; // antes del update: la fila movida cambia de fecha
 
   const { error } = await window.safeUpdate(
     p => sb.from('weekly_activities').update(p).eq('id', id),
     { date: newDate, status: 'planned', priority: 'high', notes: newNotes, updated_at: new Date().toISOString() }
   );
   if (error) return alert('Error: ' + error.message);
+  const corridos = await wpShiftFollowersSameActivity(a, oldDate, newDate, { reason });
   await wpLoadAll();
   wpBackToPlanner();
-  if (window.toast) toast('Actividad reprogramada', 'success');
+  if (window.toast) toast(corridos > 0 ? `✅ Actividad reprogramada (y ${corridos} día(s) de la misma actividad corridos)` : '✅ Actividad reprogramada', 'success');
 }
 
 // Reprograma una actividad a nuevo día
@@ -1363,12 +1402,14 @@ async function wpReprogramTask(id, newDate) {
   if (!newDate) return;
   const prev = (wpState.activities || []).find(a => a.id === id);
   const oldDate = prev && prev.date;
-  await sb.from('weekly_activities').update({
+  const { error } = await sb.from('weekly_activities').update({
     date: newDate, status: 'planned', updated_at: new Date().toISOString()
   }).eq('id', id);
+  if (error) return alert('Error: ' + error.message);
+  const corridos = (prev && oldDate) ? await wpShiftFollowersSameActivity(prev, oldDate, newDate) : 0;
   await wpLoadAll();
   wpRender();
-  if (window.toast) toast('Actividad reprogramada', 'success');
+  if (window.toast) toast(corridos > 0 ? `✅ Actividad reprogramada (y ${corridos} día(s) de la misma actividad corridos)` : '✅ Actividad reprogramada', 'success');
   if (prev && prev.is_critical && oldDate) { const delta = Math.round((new Date(newDate) - new Date(oldDate)) / 86400000); if (delta) await wpCascadeReschedule(prev, delta); }
 }
 // Bloque 4.1 — cascada: al mover una actividad crítica, recorre sus sucesores dependientes (depends_on del catálogo).
