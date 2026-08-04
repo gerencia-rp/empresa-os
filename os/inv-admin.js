@@ -927,7 +927,7 @@ function iaTabLedger() {
 // ── B: parámetros en los 9 BLOQUES de Juan (colapsables; mayoría auto-llenada con su fuente) ──
 const IA_BLOQUES = [
   ['b1', '🏠 1 · Identificación', /^(direccion|nombre_corto|tipo|num_hab|banos|sqft|ano)$/],
-  ['b2', '🎯 2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|fecha_exit_proyectada|es_ejemplo)$/],
+  ['b2', '🎯 2 · Estrategia y estado', /^(estrategia|estado_casa|plan_salida|modelo_operativo|fecha_cierre|fecha_exit|fecha_exit_proyectada|es_ejemplo|tipo_contrato)$/],
   ['b3', '💰 3 · Financieros de compra', /^(compra|remodel_real|cierre_compra|arv|est_arv|est_remodel_total|est_cierre_pct|cash_atrapado_real)$/],
   ['b4', '🏦 4 · Financiamiento HML', /^(hm_compra|hm_rehab|hm_tasa|hm_plazo|hm_fecha_inicio|hm_puntos|otros_inv_m\d+)$/],
   ['b5', '🏛️ 5 · Refinanciación', /^(refi_|cierre_refi|cashout_real)/],
@@ -976,6 +976,7 @@ const IA_PINFO = {
   hm_puntos: ['Puntos de originación del Hard Money (% del préstamo cobrado al cierre).'],
   hm_fecha_inicio: ['Fecha de inicio del préstamo Hard Money.'],
   fecha_exit_proyectada: ['Fecha ESTIMADA de salida del deal (venta o refi) — supuesto, no compromiso.'],
+  tipo_contrato: ['Tipo de contrato de arrendamiento (triple/doble/simple neto).', 'NNN: el inquilino paga impuestos + seguro + mantenimiento (mayor NOI para el dueño). NN/N: el dueño asume más gastos. NO cambia el cálculo del NOI (ya sale de los gastos reales); explica por qué el NOI es alto o bajo.'],
   hm_tasa: ['Tasa anual del Hard Money (solo interés).', 'interés mensual = préstamo × tasa ÷ 12'],
   hm_plazo: ['Plazo del Hard Money en meses.'],
   refi_mes: ['Mes del ciclo en que la casa se refinancia (entra el banco a 30 años y se paga el HML).'],
@@ -1046,7 +1047,8 @@ window.iaParamInfo = iaParamInfo;
 // (ej. estrategia hoy escrita "Fix & Hold" / "Fix and hold" / "Fix And Hold").
 const IA_PARAM_OPCIONES = {
   estrategia: ['Fix & Flip', 'Fix & Hold', 'BRRRR', 'Wholesale', 'Otro'],
-  plan_salida: ['Venta', 'Refinanciación', 'Renta a largo plazo (Hold)', 'Sin definir aún']
+  plan_salida: ['Venta', 'Refinanciación', 'Renta a largo plazo (Hold)', 'Sin definir aún'],
+  tipo_contrato: ['NNN', 'NN', 'N', 'N/D']
 };
 // Campos DERIVADOS del motor (cálculo, no input de negocio) → solo lectura, no editables a mano.
 // El admin no debe pisarlos por error; los calibra/computa el motor.
@@ -1111,7 +1113,7 @@ function iaParamsBloques() {
       html += rows.map(p => iaParamRow(p, id)).join('') || '';
       if (id === 'b2') {
         // E2D: claves nuevas del deal, cargables con un clic si faltan
-        const faltan2 = [['estrategia', 'Fix & Flip / Fix & Hold / BRRRR / Wholesale / Otro'], ['plan_salida', 'Venta / Refinanciación / Renta a largo plazo / Sin definir aún'], ['fecha_exit_proyectada', 'fecha estimada de salida (estimado·supuesto)']].filter(x => !rows.some(p2 => p2.key === x[0]));
+        const faltan2 = [['estrategia', 'Fix & Flip / Fix & Hold / BRRRR / Wholesale / Otro'], ['plan_salida', 'Venta / Refinanciación / Renta a largo plazo / Sin definir aún'], ['tipo_contrato', 'NNN / NN / N / N/D — cambia el NOI real (quién paga impuestos/seguro/mantenimiento)'], ['fecha_exit_proyectada', 'fecha estimada de salida (estimado·supuesto)']].filter(x => !rows.some(p2 => p2.key === x[0]));
         if (faltan2.length) html += '<div class="meta" style="padding:6px 2px">Faltan: ' + faltan2.map(x => IA_PARAM_OPCIONES[x[0]]
           ? '<a style="cursor:pointer;color:var(--a2)" title="' + x[1] + ' — se agrega como lista para elegir" onclick="iaAddSelectParam(\'' + x[0] + '\',\'' + x[1] + '\')">＋ ' + x[0] + '</a>'
           : '<a style="cursor:pointer;color:var(--a2)" title="' + x[1] + '" onclick="document.getElementById(\'ia-np-key\').value=\'' + x[0] + '\';document.getElementById(\'ia-np-desc\').value=\'' + x[1] + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + x[0] + '</a>').join(' · ') + '</div>';
@@ -1303,7 +1305,7 @@ async function iaLoadAnalizador() {
 // Supuestos globales editables (Parte 1): apreciación, costo de venta, S&P 500 → ff_uw_config esc_*
 async function iaSaveEscCfg() {
   const g = id => (document.getElementById(id) || {}).value;
-  const rows = [['esc_apreciacion_anual', g('ia-cfg-aprec')], ['esc_costo_venta', g('ia-cfg-cventa')], ['esc_sp500_anual', g('ia-cfg-sp500')]]
+  const rows = [['esc_apreciacion_anual', g('ia-cfg-aprec')], ['esc_costo_venta', g('ia-cfg-cventa')], ['esc_sp500_anual', g('ia-cfg-sp500')], ['esc_cap_mercado_pct', g('ia-cfg-capmkt')]]
     .filter(([, v]) => v != null && String(v).trim() !== '' && isFinite(+v))
     .map(([key, v]) => ({ key, value: String(+v) }));
   if (!rows.length) return alert('Cargá al menos un supuesto numérico válido (ej. 0.04).');
@@ -1341,6 +1343,85 @@ function iaRecomendar(e, bench) {
     : '🟢 Vender a ' + mejor.n + ' años: equilibrio TIR ' + (mejor.irrBruta * 100).toFixed(1) + '% / múltiplo ' + mejor.multBruto.toFixed(2) + 'x' + (f3 && f3.irrBruta > mejor.irrBruta ? ' (a 3 años la TIR es mayor, ' + (f3.irrBruta * 100).toFixed(1) + '%, pero el múltiplo cae a ' + f3.multBruto.toFixed(2) + 'x)' : '');
   return { txt, riesgos };
 }
+// ─── Bloque 2: tabla "Portafolio — indicadores" (valor forzado / cap comprimido / NAV) ───
+// Una fila por casa. NAV = equityActual del Panel de Rendimiento (invRend) — UN solo número,
+// cuadra con el portal. NOI/costo/valor/deuda REUSADOS del motor (invEsc.valorCreado).
+function iaIndicadores() {
+  const cfg = IA.escData.cfg;
+  const porCasa = {};
+  IA.holdings.forEach(h => { const o = porCasa[h.property_id] = porCasa[h.property_id] || { aporte: 0, pct: 0 }; o.aporte += +h.inversion_aportada || 0; o.pct += +h.reparto_pct || 0; });
+  const hoy = new Date().toISOString().slice(0, 10);
+  const canRend = window.invRend && window.invEngine;
+  if (canRend) { invRend.setEsc(invEsc); invEsc.setEngine(invEngine); }
+  return (IA.indData || []).filter(i => !i.vendida && porCasa[i.property_id]).map(i => {
+    const agg = { inversion_aportada: porCasa[i.property_id].aporte, reparto_pct: Math.min(1, porCasa[i.property_id].pct) };
+    const Pv = (IA.escData.P || {})[i.property_id] || {};
+    const c = invEsc.desdeDatos(i, Pv, agg);
+    // NAV = equityActual del panel (amortiza la deuda igual que el portal) → un solo número
+    let navEquity = null, deudaPend = c.deuda_saldo;
+    if (canRend) {
+      try { const pnl = invRend.panel({ ind: i, Pv, holding: agg, distribuciones: [], hoy }, cfg, IA.rendHor || 6); navEquity = pnl.equityActual; if (pnl.currentBalance != null) deudaPend = pnl.currentBalance; } catch (e) {}
+    }
+    const vc = invEsc.valorCreado(c, cfg, navEquity);
+    return { c, vc, deudaPend, etapa: i.etapa, refin: !!i.refinanciada };
+  });
+}
+function iaIndSort(key) { IA.indSort = IA.indSort || { key: 'spread', dir: 'desc' }; if (IA.indSort.key === key) IA.indSort.dir = IA.indSort.dir === 'desc' ? 'asc' : 'desc'; else { IA.indSort.key = key; IA.indSort.dir = 'desc'; } osRender(); }
+window.iaIndSort = iaIndSort;
+function iaTblIndicadores() {
+  const cfg = IA.escData.cfg;
+  const rows = iaIndicadores();
+  const $=v=>v==null?'—':(v<0?'−$':'$')+Math.abs(Math.round(v)).toLocaleString('en-US');
+  const p2=v=>v==null?'—':(v*100).toFixed(2)+'%';
+  const pp=v=>v==null?'—':((v>=0?'+':'−')+Math.abs(v*100).toFixed(2)+'pp');
+  IA.indSort = IA.indSort || { key: 'spread', dir: 'desc' };
+  const skey = IA.indSort.key, sdir = IA.indSort.dir;
+  const val = (r, k) => k === 'casa' ? (r.c.casa || '') : (r.vc[k] != null ? r.vc[k] : (k === 'deuda' ? r.deudaPend : -Infinity));
+  const ord = rows.slice().sort((a, b) => { const va = val(a, skey), vb = val(b, skey); if (skey === 'casa') return sdir === 'desc' ? String(vb).localeCompare(String(va)) : String(va).localeCompare(String(vb)); return sdir === 'desc' ? (vb - va) : (va - vb); });
+  const car = k => skey === k ? (sdir === 'desc' ? ' ▾' : ' ▴') : '';
+  const th = (k, lab, tip, right) => '<th' + (right ? ' style="text-align:right"' : '') + '><span style="cursor:pointer" title="' + OS_E(tip) + '" onclick="iaIndSort(\'' + k + '\')">' + lab + car(k) + '</span></th>';
+  // totales / promedios ponderados (por costo y por casa, solo casas con datos)
+  const ok = rows.filter(r => !r.vc.porCompletar);
+  const navT = rows.reduce((s, r) => s + (r.vc.nav || 0), 0);
+  const costoT = ok.reduce((s, r) => s + (r.vc.costoTotal || 0), 0);
+  const noiT = ok.reduce((s, r) => s + (r.vc.noi || 0), 0);
+  const forzadoT = ok.reduce((s, r) => s + (r.vc.valorForzado || 0), 0);
+  const yocPond = costoT > 0 ? noiT / costoT : null;                          // Σnoi/Σcosto = YoC ponderado
+  const spreadPond = yocPond != null ? yocPond - cfg.cap_mercado_pct : null;
+  const badgeSup = '<span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff" title="cap de mercado — supuesto editable arriba">supuesto</span>';
+  return '<div class="card overx" style="margin-top:12px"><div class="chart-h"><div class="t">Portafolio — indicadores <span class="meta" style="font-weight:500">(valor forzado · cap comprimido · NAV)</span></div><div class="k">NOI/costo/valor/deuda del motor (cero doble fuente) · NAV = equity del Panel de Rendimiento · clic en encabezado para ordenar</div></div>'
+    + '<table class="ptable"><thead><tr>'
+    + th('casa', 'Casa', 'dirección de la casa', false)
+    + th('costoTotal', 'Costo total', 'compra + remodelación (= all-in del motor)', true)
+    + th('noi', 'NOI anual', 'renta operativa − gastos de operación, sin deuda (del motor)', true)
+    + '<th style="text-align:right"><span title="cap de mercado supuesto al que se valoran casas comparables">Cap mkt ' + badgeSup + '</span></th>'
+    + th('yieldOnCost', 'Yield on Cost', 'NOI ÷ costo total: el cap sobre lo que invertimos (comprar+remodelar)', true)
+    + th('spread', 'Spread', 'Yield on Cost − cap de mercado, en puntos %: el valor forzado que creó la operación BRRRR', true)
+    + th('valorForzado', 'Valor forzado $', 'NOI ÷ cap de mercado − costo total: valuación de mercado del NOI menos lo que costó (aprox.)', true)
+    + th('valorActual', 'Valor actual', 'avalúo real (appraisal) o ARV (paper_value del motor)', true)
+    + th('deuda', 'Deuda', 'deuda pendiente que usa el motor/panel', true)
+    + th('nav', 'NAV total', '(valor − deuda) × participación de los inversionistas: cuánto vale su parte hoy', true)
+    + '<th>Estrategia</th><th title="NNN: inquilino paga impuestos/seguro/mantenimiento (mayor NOI). N/NN: el dueño asume más gastos.">Contrato</th>'
+    + '</tr></thead><tbody>'
+    + ord.map(r => { const v = r.vc, pc = v.porCompletar; return '<tr' + (pc ? ' style="opacity:.55"' : '') + '><td>' + OS_E(v.casa) + (pc ? ' <span class="badge b-warn" style="font-size:8px">por completar</span>' : '') + '</td>'
+      + '<td style="text-align:right">' + $(v.costoTotal) + '</td>'
+      + '<td style="text-align:right" class="' + (v.noi != null ? (v.noi >= 0 ? 'up' : 'down') : '') + '">' + (pc ? '—' : $(v.noi)) + '</td>'
+      + '<td style="text-align:right">' + p2(v.capMercado) + '</td>'
+      + '<td style="text-align:right">' + (pc ? '—' : p2(v.yieldOnCost)) + '</td>'
+      + '<td style="text-align:right" class="' + (v.spread != null ? (v.spread >= 0 ? 'up' : 'down') : '') + '">' + (pc ? '—' : pp(v.spread)) + '</td>'
+      + '<td style="text-align:right" class="' + (v.valorForzado != null ? (v.valorForzado >= 0 ? 'up' : 'down') : '') + '">' + (pc ? '—' : $(v.valorForzado)) + '</td>'
+      + '<td style="text-align:right">' + $(v.valorActual) + '</td>'
+      + '<td style="text-align:right">' + (r.deudaPend != null ? $(r.deudaPend) : '<span class="meta">en registro</span>') + '</td>'
+      + '<td style="text-align:right"><b>' + (v.nav != null ? $(v.nav) : '—') + '</b>' + (r.deudaPend == null ? ' <span class="badge b-warn" style="font-size:7px" title="deuda en registro — NAV preliminar">prelim</span>' : '') + '</td>'
+      + '<td class="meta">' + OS_E(iaText(r.c.property_id, 'estrategia') || '—') + '</td><td>' + OS_E(v.tipoContrato) + '</td></tr>'; }).join('')
+    + '</tbody><tfoot><tr style="border-top:2px solid var(--glassb);font-weight:700"><td>Portafolio (' + ok.length + '/' + rows.length + ' con datos)</td>'
+    + '<td style="text-align:right">' + $(costoT) + '</td><td style="text-align:right">' + $(noiT) + '</td><td style="text-align:right">' + p2(cfg.cap_mercado_pct) + '</td>'
+    + '<td style="text-align:right" title="Σ NOI ÷ Σ costo (ponderado)">' + p2(yocPond) + '</td>'
+    + '<td style="text-align:right" class="' + (spreadPond >= 0 ? 'up' : 'down') + '">' + pp(spreadPond) + '</td>'
+    + '<td style="text-align:right">' + $(forzadoT) + '</td><td></td><td></td><td style="text-align:right"><b>' + $(navT) + '</b></td><td colspan="2" class="meta">NAV total del portafolio · YoC/Spread ponderados por costo</td></tr></tfoot></table>'
+    + '<div class="meta" style="margin-top:6px;font-size:10px">Spread &gt; 0 = creamos valor con la remodelación (compramos a Yield on Cost, el mercado valora a cap de mercado). Cap de mercado es un <b>supuesto</b> editable arriba. NAV = equity del inversor del Panel de Rendimiento (mismo número que ve en su portal).</div></div>';
+}
+function iaText(pid, key) { const P = (IA.escData && IA.escData.P || {})[pid] || {}; return P[key] != null ? P[key] : null; }
 function iaTabAnalizador() {
   if (!window.invEsc || !window.invEngine) return '<div class="empty">Falta el motor de escenarios.</div>';
   if (!IA.escData) { iaLoadAnalizador().then(osRender); return '<div class="empty">⏳ Armando escenarios…</div>'; }
@@ -1358,6 +1439,7 @@ function iaTabAnalizador() {
     + '<span title="apreciación anual del valor (0.04 = 4%) — la usa el Panel de Rendimiento del inversor y los escenarios">Apreciación /año ' + cfgIn('ia-cfg-aprec', cfg.apreciacion_anual) + '</span>'
     + '<span title="costo total de vender: comisión + cierre (0.07 = 7%)">Costo de venta ' + cfgIn('ia-cfg-cventa', cfg.costo_venta) + '</span>'
     + '<span title="tasa histórica del S&P 500 para la comparación ilustrativa (0.10 = 10%)">S&amp;P 500 /año ' + cfgIn('ia-cfg-sp500', cfg.sp500_anual) + '</span>'
+    + '<span title="SUPUESTO — cap de mercado al que se valoran casas comparables (0.07 = 7%). Se usa para el spread/valor forzado. Override por casa: param cap_mercado_pct.">Cap de mercado /año <span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff">supuesto</span> ' + cfgIn('ia-cfg-capmkt', cfg.cap_mercado_pct) + '</span>'
     + '<button class="cbtn" style="padding:5px 12px" onclick="iaSaveEscCfg()">💾 Guardar supuestos</button>'
     + '<span class="meta" style="font-size:10px">se reflejan de inmediato en el portal del inversor (Rendimiento)</span></div></div>';
   const estado = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Estado actual por casa</div><div class="k">fuentes: ff_deals (renta/gastos) · inv_indicadores_data (papel/deuda) · inv_holdings (aporte)</div></div>'
@@ -1396,7 +1478,7 @@ function iaTabAnalizador() {
   const hoja = '<div class="card" style="margin-top:12px"><div class="chart-h"><div class="t">🖨 Hoja de 1 página por inversionista</div><div class="k">imprimible / compartible — lenguaje simple, TIR neta, disclaimer</div></div>'
     + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="ia-hoja-inv" class="osa-in">' + iaInvOptions() + '</select>'
     + '<button class="cbtn" onclick="iaHojaInversionista(document.getElementById(\'ia-hoja-inv\').value)">🖨 Generar hoja</button></div></div>';
-  return sup + estado + venta + cons + desc + reco + hoja;
+  return sup + estado + iaTblIndicadores() + venta + cons + desc + reco + hoja;
 }
 function iaHojaInversionista(inv) {
   invEsc.setEngine(invEngine);
