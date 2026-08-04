@@ -807,14 +807,53 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
         + '</div>';
     }
   }
+  // ── 🏗 Cómo se crea valor en esta casa (NAV + valor forzado, estilo simple) ──
+  let secValor = '';
+  if (window.invEsc && window.invRend && IP.escCfg) {
+    invEsc.setEngine(window.invEngine); invRend.setEsc(invEsc);
+    const indRow = (IP.indData || []).find(x => x.property_id === pid);
+    const h = IP.holdings.find(x => x.property_id === pid);
+    if (indRow && h) {
+      const Pv = {}; Object.keys(P).forEach(k => Pv[k] = P[k].value);
+      let navEquity = null;
+      try { const pnl = invRend.panel({ ind: indRow, Pv, holding: h, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, monto: d.monto })), hoy }, IP.escCfg, IP.rendHor || 6); navEquity = pnl.equityActual; } catch (e) {}
+      const vc = invEsc.valorCreado(invEsc.desdeDatos(indRow, Pv, h), IP.escCfg, navEquity);
+      const deudaEnRegistro = c && c.deuda_vigente == null && !(c && c.vendida);
+      const tt = t => ' <span class="src" title="' + esc(t) + '" style="cursor:help">ⓘ</span>';
+      const capPct = $pct(vc.capMercado);
+      const navHtml = (vc.nav != null && !deudaEnRegistro)
+        ? '<div class="big up" style="font-size:26px">' + $money(vc.nav) + '</div>'
+        : (deudaEnRegistro ? '<div class="warn" style="font-size:13px;font-weight:600">en registro — se calcula al cerrar el préstamo</div>' : '<div class="warn">' + SD + '</div>');
+      const contratoBadge = vc.tipoContrato && vc.tipoContrato !== 'N/D'
+        ? '<span class="src" title="NNN: el inquilino paga impuestos/seguro/mantenimiento (mayor NOI para el dueño). N/NN: el dueño asume más gastos." style="cursor:help">contrato ' + esc(vc.tipoContrato) + '</span>' : '';
+      let cuerpoValor;
+      if (vc.porCompletar) {
+        cuerpoValor = '<div class="meta" style="padding:10px 12px;border:1px solid var(--glassb);border-radius:9px">🏗 Esta casa todavía no tiene renta registrada (está en obra o estabilizándose). El <b>valor creado</b> se calcula cuando empiece a producir — no inventamos un número.</div>';
+      } else {
+        cuerpoValor = '<div class="grid k2">'
+          + '<div><div class="lab" style="margin-bottom:4px">NAV — valor de tu parte hoy' + tt('Cuánto vale tu parte hoy: valor de la casa menos la deuda, por tu porcentaje.') + '</div>'
+          + navHtml
+          + '<div class="meta" style="font-size:10.5px">(' + $money(vc.valorActual) + ' valor − ' + (vc.deuda != null ? $money(vc.deuda) : 'deuda en registro') + ' deuda) × ' + $pct(vc.pct) + ' tuyo · <b>en papel</b></div></div>'
+          + '<div><div class="lab" style="margin-bottom:4px">Valor que creamos con la remodelación' + tt('El valor extra que se creó porque compramos y mejoramos por debajo del mercado.') + '</div>'
+          + '<div class="big ' + (vc.spread >= 0 ? 'up' : 'down') + '" style="font-size:22px">' + (vc.spread >= 0 ? '+' : '−') + Math.abs(vc.spread * 100).toFixed(2) + ' pp</div>'
+          + '<div class="meta" style="font-size:10.5px">≈ ' + $money(vc.valorForzado) + ' <span class="src sup">aprox., supuesto de cap de mercado ' + capPct + '</span></div></div></div>'
+          + '<div style="margin-top:10px;padding:9px 12px;border:1px solid var(--glassb);border-radius:9px;font-size:12px;line-height:1.55;color:var(--mut)">Compramos y remodelamos a un rendimiento de <b>' + $pct(vc.yieldOnCost) + '</b>' + tt('El rendimiento sobre lo que costó comprar y remodelar (NOI ÷ costo total).') + ', mientras el mercado valora casas así a <b>' + capPct + '</b>' + tt('A qué rendimiento el mercado valora casas parecidas (supuesto, editable).') + '. Esa diferencia es <b>valor que se creó</b>.</div>'
+          + '<div class="kv" style="margin-top:8px"><span>NOI — lo que renta después de gastos de operación, sin deuda' + tt('Lo que renta la casa después de gastos de operación, sin contar la deuda.') + '</span><b class="' + (vc.noi >= 0 ? 'up' : 'down') + '">' + $money(vc.noi) + '/año</b></div>';
+      }
+      secValor = '<div class="card" style="margin:0">'
+        + '<div class="chart-h"><div class="t">Cómo se crea valor en esta casa</div><div class="k">' + contratoBadge + (contratoBadge ? ' · ' : '') + 'valores en papel · el cap de mercado es un supuesto editable</div></div>'
+        + cuerpoValor + '</div>';
+    }
+  }
   const lab = t => '<div class="lab" style="margin:16px 0 8px">' + t + '</div>';
   return '<h1 style="font-size:18px">' + esc(dir.split(',')[0]) + ' <span>· tu casa de un vistazo</span></h1>'
     + lab('1 · Los 5 números de tu casa') + sec1
     + lab('2 · Tu riqueza en el tiempo') + '<div class="card" style="margin:0"><div style="position:relative;height:260px;width:100%;overflow:hidden"><canvas id="chCasa"></canvas></div><div class="meta" style="margin-top:6px;font-size:10.5px">tu parte año a año: amortización + rentabilidad + valorización (modelo)' + gI('valorizacion', vals) + '</div></div>'
     + lab('3 · Tu casa en números simples') + sec3
-    + lab('4 · Riesgos') + sec4
-    + lab('5 · Qué sigue') + sec5
-    + lab('6 · ¿Y si vendemos?') + secVender;
+    + (secValor ? lab('4 · Cómo se crea valor') + secValor : '')
+    + lab('5 · Riesgos') + sec4
+    + lab('6 · Qué sigue') + sec5
+    + lab('7 · ¿Y si vendemos?') + secVender;
 }
 function drawCasaChart(r, inv) {
   const el = document.getElementById('chCasa'); if (!el || !window.Chart) return;
