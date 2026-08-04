@@ -408,10 +408,18 @@ function iaTabEscenarios() {
   const hz = x => (x && x.r.indicadores.porHorizonte) ? x.r.indicadores.porHorizonte[N] : null;
   const supTip = ' <span class="src sup" title="proyección con supuestos — no es promesa; lo REALIZADO (movimientos reales) es lo que manda">supuesto</span>';
   const horSel = [4, 6, 8].map(n => '<button class="ibtn" style="' + (N === n ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaSetEscHor(' + n + ')">' + n + ' años</button>').join(' ');
-  // ¿por qué columnas iguales? sin movimientos reales → Realizado = Proyectado; sin simular → Simulado = Proyectado
+  // ¿por qué columnas iguales? se COMPARAN los valores reales al horizonte y se explica cada coincidencia.
   const hayMovs = (IA.cashflow || []).length > 0, haySim = Object.keys(IA.sim || {}).length > 0;
-  const notaIguales = (!hayMovs || !haySim)
-    ? '<div class="meta" style="margin-top:6px;font-size:11px;color:var(--amber)">ℹ Algunas columnas dan lo MISMO porque aún no hay data que las separe: ' + (!hayMovs ? '<b>Realizado = Proyectado</b> (esta casa no tiene movimientos reales cargados en "Modelo &amp; movimientos")' : '') + (!hayMovs && !haySim ? ' · ' : '') + (!haySim ? '<b>Simulado = Proyectado</b> (no moviste ningún supuesto en el simulador de abajo)' : '') + '. No es un bug: misma data → mismo resultado.</div>'
+  const tirKey = k => { const h = hz(runs[k]); return h && h.tir != null ? Math.round(h.tir * 1e4) : null; };
+  const pT = tirKey('proyectado');
+  const explic = [];
+  if (pT != null) {
+    if (tirKey('realizado') === pT) explic.push('<b>Realizado = Proyectado</b> (' + (hayMovs ? 'los ' + IA.cashflow.length + ' movimientos reales cargados no cambian la proyección post-refi al horizonte' : 'esta casa no tiene movimientos reales cargados en "Modelo &amp; movimientos"') + ')');
+    if (tirKey('simulado') === pT) explic.push('<b>Simulado = Proyectado</b> (' + (haySim ? 'los supuestos que moviste no alteran el resultado' : 'no moviste ningún supuesto en el simulador de abajo') + ')');
+    if (tirKey('estimado') === pT) explic.push('<b>Estimado = Proyectado</b> (el underwriting original coincide con los supuestos de hoy)');
+  }
+  const notaIguales = explic.length
+    ? '<div class="meta" style="margin-top:6px;font-size:11px;color:var(--amber)">ℹ Columnas que dan lo MISMO: ' + explic.join(' · ') + '. <b>No es un bug</b>: misma data efectiva → mismo resultado. Se separan cuando cargás movimientos reales (Realizado) o movés supuestos (Simulado).</div>'
     : '';
   const comp = '<div class="card overx" style="margin-bottom:14px"><div class="chart-h"><div class="t">Comparativa de escenarios · ' + OS_E(iaCasaName(IA.casa)) + '</div><div class="k">mismo motor (inv-engine), distintos inputs · reparto inversionista ' + Math.round(inv * 100) + '% · horizonte de venta al año ' + N + '</div></div>'
     + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><span class="meta">Horizonte de venta (mismo set que el portal del inversor):</span>' + horSel + '</div>'
