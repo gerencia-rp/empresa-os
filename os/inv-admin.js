@@ -1121,13 +1121,18 @@ function iaParamRow(p, bid) {
     + '<b style="display:inline-flex;align-items:center;gap:4px">' + iaParamControl(p, bid) + '</b></div>';
 }
 // ── BLOQUE 2 (03-ago): claridad de "Modelo & movimientos" ──
+// Tooltips de UNA LÍNEA de los 3 tipos de dato — una sola definición, usada en el
+// encabezado de ayuda y en la leyenda de "Parámetros del modelo" (04-ago).
+const IA_TIP_REAL = 'viene de la base (Airtable/Rentas), no se teclea; editar = override reversible, la fuente no se pisa';
+const IA_TIP_EST = 'lo calcula el modelo a partir de los otros parámetros';
+const IA_TIP_MAN = 'lo cargás vos a mano — no existe en ninguna fuente automática';
 // Encabezado de ayuda: qué es la pantalla y el flujo real/estimado/manual.
 function iaModeloAyuda() {
   return '<div class="card" style="margin-bottom:12px;border-color:var(--a2)">'
     + '<div style="font-size:12.5px;line-height:1.6;color:var(--ink)"><b>📐 Qué es esta pantalla.</b> Acá cargás y ajustás los datos de cada casa que alimentan el portal del inversor. <b>Elegí la casa arriba.</b> Los datos vienen de 3 tipos: '
-    + '<span class="badge b-ok" style="font-size:8px">real</span> = ya viene de Airtable/Rentas (no lo teclees) · '
-    + '<span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff">estimado</span> = lo calcula el modelo · '
-    + '<span class="badge" style="font-size:8px;background:rgba(192,132,252,.16);color:#c084fc">manual</span> = lo cargás vos. '
+    + '<span class="badge b-ok" style="font-size:8px;cursor:help" title="' + OS_E(IA_TIP_REAL) + '">real</span> = ya viene de Airtable/Rentas (no lo teclees) · '
+    + '<span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff;cursor:help" title="' + OS_E(IA_TIP_EST) + '">estimado</span> = lo calcula el modelo · '
+    + '<span class="badge" style="font-size:8px;background:rgba(192,132,252,.16);color:#c084fc;cursor:help" title="' + OS_E(IA_TIP_MAN) + '">manual</span> = lo cargás vos. '
     + 'Para dejar una casa <b>lista</b>, revisá los bloques 1 a 9 y completá lo que diga "sin dato" (ver el checklist de abajo).</div></div>';
 }
 // Checklist "qué falta para esta casa": claves de negocio que el portal necesita.
@@ -1167,7 +1172,7 @@ function iaParamsBloques() {
     return '<span id="ia-bst-' + id + '"></span>';
   };
   const saveBtn = id => '<button class="ct-btn" style="padding:2px 9px;font-size:10px" onclick="event.stopPropagation();iaSaveBloque(\'' + id + '\')">💾 Guardar</button>';
-  let html = '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">9 bloques con 💾 por bloque · <span class="badge b-ok" style="font-size:8px">real</span> de la base · <span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff">estimado</span> lo calcula el modelo · <span class="badge" style="font-size:8px;background:rgba(192,132,252,.16);color:#c084fc">manual</span> lo cargás vos (editar un real = override reversible, la fuente no se pisa)</div></div>';
+  let html = '<div class="card" style="max-height:640px;overflow-y:auto"><div class="chart-h"><div class="t">Parámetros del modelo (' + IA.params.length + ')</div><div class="k">9 bloques con 💾 por bloque · <span class="badge b-ok" style="font-size:8px;cursor:help" title="' + OS_E(IA_TIP_REAL) + '">real</span> de la base · <span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff;cursor:help" title="' + OS_E(IA_TIP_EST) + '">estimado</span> lo calcula el modelo · <span class="badge" style="font-size:8px;background:rgba(192,132,252,.16);color:#c084fc;cursor:help" title="' + OS_E(IA_TIP_MAN) + '">manual</span> lo cargás vos (editar un real = override reversible, la fuente no se pisa)</div></div>';
   IA_BLOQUES.forEach(([id, titulo]) => {
     const rows = grupos[id] || [];
     const open = !!IA.pOpen[id];
