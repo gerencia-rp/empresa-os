@@ -213,6 +213,20 @@
     const tir31PostRefi = IRR(fclPostRefi);
     const fclPostRefiVenta = fclPostRefi.slice(); fclPostRefiVenta[ANIOS] += terminal;
     const vpn31PostRefi = fclPostRefiVenta[0] + NPV(tasaDesc, fclPostRefiVenta.slice(1));
+    // ── HORIZONTE CORTO 4/6/8 (03-ago, aditivo): TIR/VPN si se VENDE al año N, con el MISMO
+    // flujo post-refi (fclPostRefi) y el terminal del año N (valor_N − saldo_N). Un solo set
+    // 4/6/8 en todo el sistema (igual que el panel del inversor). No altera tir31/vpn31.
+    function horizMetrics(N) {
+      if (!anios[N]) return null;
+      const term = anios[N].valor - anios[N].saldo;                       // venta al año N (deal)
+      const fclV = fclPostRefi.slice(0, N + 1); fclV[N] = (fclV[N] || 0) + term;
+      return {
+        n: N, terminal: term, tir: IRR(fclV), vpn: fclV[0] + NPV(tasaDesc, fclV.slice(1)),
+        patrimonioInv: anios[N].patrimonioInv,
+        utilidadAcum: fclPostRefi.slice(1, N + 1).reduce((s, v) => s + v, 0),  // Σ ops años 1..N
+      };
+    }
+    const porHorizonte = {}; [4, 6, 8].forEach(N => { const m = horizMetrics(N); if (m) porHorizonte[N] = m; });
     // ── ANÁLISIS DE 3 FASES (por casa y para el inversionista) ──
     // Fase 0: déficit inicial del ciclo (mes y monto del punto más profundo del FCL acumulado)
     // Fase 1: cuándo la operación cubre el déficit post-refi (Σ utilidades ≥ |año 0|)
@@ -255,6 +269,7 @@
         vpnMensual, tirCiclo: tirMensualPeriodo != null ? Math.pow(1 + tirMensualPeriodo, 12) - 1 : null,
         tir31, tir31ConVenta, vpn31, terminal, profit: porParte(profit), roi,
         anio0PostRefi: anio0Oficial, tir31PostRefi, vpn31PostRefi,   // ← base OFICIAL (Excel)
+        porHorizonte,                                                // ← 4/6/8 años (venta al horizonte)
         fases,
         cashInvertido, utilidadAnualEstable: porParte(est.uodi - est.cuota - (p.seguroMes || 0) * 12),
         vpn31Parte: porParte(vpn31),

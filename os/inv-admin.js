@@ -370,6 +370,8 @@ function iaSimSet(k, v) { const n = parseFloat(v); if (isNaN(n)) delete IA.sim[k
 window.iaSimSet = iaSimSet;
 function iaSimReset() { IA.sim = {}; osRender(); }
 window.iaSimReset = iaSimReset;
+function iaSetEscHor(n) { IA.escHor = n; osRender(); }
+window.iaSetEscHor = iaSetEscHor;
 async function iaGuardarCache() {
   const tipos = ['estimado', 'proyectado', 'realizado', 'simulado'];
   for (const t of tipos) {
@@ -390,31 +392,50 @@ function iaTabEscenarios() {
   const casas = [...new Set(IA.holdings.map(h => h.property_id))];
   const casaSel = '<select class="osa-in" onchange="iaSetCasa(this.value)">' + casas.map(c => '<option value="' + c + '" ' + (c === IA.casa ? 'selected' : '') + '>' + OS_E(iaCasaName(c)) + '</option>').join('') + '</select>';
   if (!IA.params.length) return '<div class="empty">Esta casa no tiene parámetros del modelo.</div>';
-  const tipos = [['estimado', '📋 Estimado', 'underwriting original'], ['proyectado', '🎯 Proyectado', 'premisas confirmadas + supuestos'], ['realizado', '✅ Realizado', IA.cashflow.length + ' movimientos reales'], ['simulado', '🧪 Simulado', 'sensibilidad del simulador']];
+  // BLOQUE 3 (03-ago): horizonte 4/6/8 (default 6) — MISMO set que el panel del inversor.
+  const N = [4, 6, 8].includes(IA.escHor) ? IA.escHor : 6;
+  const tipos = [
+    ['estimado', '📋 Estimado', 'el underwriting original (lo que se proyectó al comprar).'],
+    ['proyectado', '🎯 Proyectado', 'el modelo actual con los supuestos de hoy.'],
+    ['realizado', '✅ Realizado', 'usa los movimientos reales cargados; si no hay, cae a proyectado.'],
+    ['simulado', '🧪 Simulado', 'lo que da si movés los supuestos en el simulador.'],
+  ];
   const runs = {}; tipos.forEach(t => { try { runs[t[0]] = iaRunEscenario(t[0]); } catch (e) { runs[t[0]] = null; } });
   const base = iaBaseParams();
   const fila = (lab, fn, fmt) => '<tr><td>' + lab + '</td>' + tipos.map(t => { const x = runs[t[0]]; return '<td style="text-align:right">' + (x ? (fmt || (v => v))(fn(x)) : '—') + '</td>'; }).join('') + '</tr>';
   const pct1 = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
   const inv = base.repartoInv;
-  const comp = '<div class="card overx" style="margin-bottom:14px"><div class="chart-h"><div class="t">Comparativa de escenarios · ' + OS_E(iaCasaName(IA.casa)) + '</div><div class="k">mismo motor, distintos inputs · reparto inversionista ' + Math.round(inv * 100) + '%</div></div>'
-    + '<table class="ptable"><thead><tr><th>Indicador</th>' + tipos.map(t => '<th style="text-align:right" title="' + t[2] + '">' + t[1] + '</th>').join('') + '</tr></thead><tbody>'
-    + fila('TIR 31 años (post-refi)', x => x.r.indicadores.tir31PostRefi, pct1)
-    + fila('VPN 31 años · casa', x => x.r.indicadores.vpn31PostRefi, iaMoney)
-    + fila('VPN 31 años · inversionista', x => x.r.indicadores.vpn31PostRefi * inv, iaMoney)
+  const hz = x => (x && x.r.indicadores.porHorizonte) ? x.r.indicadores.porHorizonte[N] : null;
+  const supTip = ' <span class="src sup" title="proyección con supuestos — no es promesa; lo REALIZADO (movimientos reales) es lo que manda">supuesto</span>';
+  const horSel = [4, 6, 8].map(n => '<button class="ibtn" style="' + (N === n ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaSetEscHor(' + n + ')">' + n + ' años</button>').join(' ');
+  // ¿por qué columnas iguales? sin movimientos reales → Realizado = Proyectado; sin simular → Simulado = Proyectado
+  const hayMovs = (IA.cashflow || []).length > 0, haySim = Object.keys(IA.sim || {}).length > 0;
+  const notaIguales = (!hayMovs || !haySim)
+    ? '<div class="meta" style="margin-top:6px;font-size:11px;color:var(--amber)">ℹ Algunas columnas dan lo MISMO porque aún no hay data que las separe: ' + (!hayMovs ? '<b>Realizado = Proyectado</b> (esta casa no tiene movimientos reales cargados en "Modelo &amp; movimientos")' : '') + (!hayMovs && !haySim ? ' · ' : '') + (!haySim ? '<b>Simulado = Proyectado</b> (no moviste ningún supuesto en el simulador de abajo)' : '') + '. No es un bug: misma data → mismo resultado.</div>'
+    : '';
+  const comp = '<div class="card overx" style="margin-bottom:14px"><div class="chart-h"><div class="t">Comparativa de escenarios · ' + OS_E(iaCasaName(IA.casa)) + '</div><div class="k">mismo motor (inv-engine), distintos inputs · reparto inversionista ' + Math.round(inv * 100) + '% · horizonte de venta al año ' + N + '</div></div>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><span class="meta">Horizonte de venta (mismo set que el portal del inversor):</span>' + horSel + '</div>'
+    + '<table class="ptable"><thead><tr><th>Indicador</th>' + tipos.map(t => '<th style="text-align:right;cursor:help" title="' + OS_E(t[2]) + '">' + t[1] + '</th>').join('') + '</tr></thead><tbody>'
+    + fila('TIR a ' + N + ' años (venta)' + supTip, x => { const h = hz(x); return h ? h.tir : null; }, pct1)
+    + fila('VPN a ' + N + ' años · casa' + supTip, x => { const h = hz(x); return h ? h.vpn : null; }, iaMoney)
+    + fila('VPN a ' + N + ' años · inversionista', x => { const h = hz(x); return h ? h.vpn * inv : null; }, iaMoney)
+    + fila('Patrimonio del inversionista al año ' + N, x => { const h = hz(x); return h ? h.patrimonioInv : null; }, iaMoney)
+    + fila('Utilidad acumulada a ' + N + ' años (casa)', x => { const h = hz(x); return h ? h.utilidadAcum : null; }, iaMoney)
+    + '<tr><td colspan="5" class="meta" style="padding-top:8px;font-size:10.5px">↓ estables (no dependen del horizonte)</td></tr>'
     + fila('CAP rate (valor)', x => x.r.indicadores.capValor, pct1)
     + fila('DSCR', x => x.r.indicadores.dscr, v => v.toFixed(2))
-    + fila('Punto de equilibrio', x => x.r.indicadores.puntoEquilibrio, pct1)
+    + fila('Punto de equilibrio (ocupación mín.)', x => x.r.indicadores.puntoEquilibrio, pct1)
     + fila('Cash del ciclo (FCL negativos)', x => -x.r.indicadores.cashInvertido, iaMoney)
-    + fila('Utilidad año 2 (casa)', x => x.r.anios[2] ? x.r.anios[2].fclNegocio : null, iaMoney)
-    + fila('Patrimonio inversionista año 10', x => x.r.anios[10] ? x.r.anios[10].patrimonioInv : null, iaMoney)
     + '</tbody></table>'
-    + '<div class="meta" style="margin-top:8px">Realizado usa el SUMIF de los movimientos reales por mes (reemplazan la línea calculada); sin movimientos = proyectado. Estimado reconstruye el underwriting (remodelación ' + iaMoney(iaEstOpts().remodelTotal || 0) + ' estimada, originación ' + pct1(iaEstOpts().cierrePct) + ').</div></div>';
+    + notaIguales
+    + '<div class="meta" style="margin-top:8px">Las filas de TIR/VPN/patrimonio/utilidad se recalculan al horizonte elegido (venta al año ' + N + ') con el MISMO motor. <b>Realizado</b> manda cuando hay movimientos reales; lo <b>proyectado/estimado</b> son supuestos. Estimado reconstruye el underwriting (remodelación ' + iaMoney(iaEstOpts().remodelTotal || 0) + ' estimada, originación ' + pct1(iaEstOpts().cierrePct) + ').</div></div>';
 
   const simDef = [['arv', 'ARV / avalúo', base.arv, ''], ['compra', 'Precio de compra', base.compra, ''], ['arriendoHab', 'Arriendo por habitación', base.arriendoHab, ''], ['ocupacionEstable', 'Ocupación estable (0-1)', base.ocupacionEstable, '×'], ['refiTasa', 'Tasa refi (0-1)', base.refiTasa, '×'], ['valorizacion', 'Valorización anual (0-1)', base.valorizacion, '×']];
   const simRun = runs.simulado, proyRun = runs.proyectado;
-  const dTir = simRun && proyRun && simRun.r.indicadores.tir31PostRefi != null && proyRun.r.indicadores.tir31PostRefi != null ? (simRun.r.indicadores.tir31PostRefi - proyRun.r.indicadores.tir31PostRefi) : null;
-  const dVpn = simRun && proyRun ? simRun.r.indicadores.vpn31PostRefi - proyRun.r.indicadores.vpn31PostRefi : null;
-  const sim = '<div class="card"><div class="chart-h"><div class="t">🧪 Simulador — sensibilidad ARV / ocupación / compra / arriendo / tasa</div><div class="k"><button class="ct-btn" onclick="iaSimReset()">↺ Reset</button> <button class="ct-btn" onclick="iaGuardarCache()">💾 Guardar proyección (4 escenarios)</button></div></div>'
+  const hSim = hz(simRun), hProy = hz(proyRun);
+  const dTir = hSim && hProy && hSim.tir != null && hProy.tir != null ? (hSim.tir - hProy.tir) : null;
+  const dVpn = hSim && hProy ? hSim.vpn - hProy.vpn : null;
+  const sim = '<div class="card"><div class="chart-h"><div class="t">🧪 Simulador — sensibilidad ARV / ocupación / compra / arriendo / tasa</div><div class="k">Δ vs Proyectado al horizonte ' + N + ' años · <button class="ct-btn" onclick="iaSimReset()">↺ Reset</button> <button class="ct-btn" onclick="iaGuardarCache()">💾 Guardar proyección (4 escenarios)</button></div></div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
     + simDef.map(([k, lab, cur, unit]) => '<div><div class="lab" style="margin-bottom:4px">' + lab + '</div><div style="display:flex;align-items:center;gap:5px"><input class="osa-in" style="flex:1;width:100%" type="number" step="any" value="' + (IA.sim[k] != null ? IA.sim[k] : (cur != null ? cur : '')) + '" onchange="iaSimSet(\'' + k + '\', this.value)">' + (unit ? '<span style="color:var(--mut2);font-size:11px;font-weight:700" title="fracción: 0.5 = 50%">' + unit + '</span>' : '') + '</div></div>').join('')
     + '</div>'
