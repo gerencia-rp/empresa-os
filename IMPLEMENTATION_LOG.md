@@ -3,6 +3,25 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 03-ago · 💎 INDICADORES INSTITUCIONALES — valor forzado + compresión de cap + NAV (rama feat/portal-inversionista-v2) ✅ EN PROD
+
+**Qué:** 4 indicadores NUEVOS que se SUMAN sobre el motor (NO se rehace ni recalcula nada): Yield on Cost + spread vs cap de mercado (valor forzado BRRRR), compresión de cap, NAV del inversionista y tipo de contrato (NNN/NN/N) por casa. Regla de oro respetada — **un dato, una fuente**: NOI/costo/valor/deuda REUSADOS del motor.
+
+- **BLOQUE 1 (`os/inv-escenarios.js`):** `valorCreado(c,cfg,navEquity)` — reusa `base().noi` (renta operativa − gastos, del motor) y `ind.all_in` (= compra + remodelación, la MISMA def del motor para costo). YoC = NOI/costo · spread = YoC − cap_mercado (pp) · valor forzado = NOI/cap_mercado − costo · NAV = navEquity (= `equityActual` del Panel de Rendimiento, **un solo número**; fallback = base.equity×pct). `desdeDatos` += `costo_total`/`cap_mercado`(override por casa)/`tipo_contrato`. `cfgDesde` += `cap_mercado_pct:0.07`.
+- **CONFIG:** `esc_cap_mercado_pct=0.07` (SUPUESTO editable) en `ff_uw_config` (migr `20260803100000`) → fluye al portal por `inv_esc_config()` (que ya devuelve todo `esc_*`) y al motor por `cfgDesde`.
+- **BLOQUE 2 (`os/inv-admin.js`, Analizador):** tabla **"Portafolio — indicadores"** — 1 fila/casa (costo, NOI, cap mkt supuesto, YoC, spread pp, valor forzado $, valor, deuda, NAV total, estrategia, contrato), **ordenable** (clic en encabezado, default por spread ▾), **totales/ponderados** al pie (NAV total, Σnoi/Σcosto = YoC ponderado, spread ponderado), **tooltip por encabezado**. Config `cap de mercado` editable junto a apreciación/costo venta/sp500.
+- **BLOQUE 3 (`os/inv-portal.js`, Mi Casa):** tarjeta **"Cómo se crea valor en esta casa"** — NAV grande (valor de tu parte hoy) + valor creado (spread pp + valor forzado $, "aprox., supuesto cap mercado X%") + frase simple YoC vs cap + NOI, **tooltips de una línea** por término. Rehab/sin renta → estado honesto (sin spread/NAV inflado); deuda en registro → sin NAV confiado.
+- **BLOQUE 4:** `tipo_contrato` (NNN/NN/N/N/D) como **select** del Bloque 2 de params + ⓘ (no cambia el NOI; explica por qué es alto/bajo) + columna en la tabla admin + etiqueta en la tarjeta del inversor.
+
+**ANTES:** ninguno de los 4 indicadores era explícito; el admin no veía YoC/spread/valor forzado/NAV por casa; el inversor no tenía un "cómo se crea valor" simple; cap de mercado no existía como supuesto editable; tipo de contrato no se capturaba.
+
+**DESPUÉS (verificado en prod `empresa-os-admin.vercel.app`, 0 pageerrors):**
+- **NAV = equity del panel (DoD crítico):** Capitol `panel.equityActual $106,500 === valorCreado.nav $106,500` ✅; con deuda amortizada también (Dove pct0.5 demo: panel $44,412 = nav $44,412, usa el saldo amortizado $281,175, no el crudo $282,000) → **un solo número, cero doble fuente**.
+- **Tabla admin (prod):** Capitol → costo $285,000 · NOI $20,340 · cap mkt 7.00% · **YoC 7.14% · spread +0.14pp · valor forzado $5,571** · valor $500,000 · deuda $233,750 · **NAV $106,500**. Footer: **NAV total $790,139** · YoC ponderado 3.02% · spread ponderado −3.98pp.
+- **Honestidad:** Dove NOI −$240 → spread −7.09pp / valor forzado −$261,429 (negativo REAL: su cuota refi > renta, coincide con su déficit conocido), NAV $0 (pct 0 por Airtable/B5). **Wellington (rehab sin datos): "por completar" — sin spread/valor forzado, deuda y NAV = "en registro", NO suma al NAV total** (fix: se detecta por `deuda_vigente==null`, no por el panel que colapsa null→0). Echo: por completar (sin renta en ff_deals).
+- **Tarjeta inversor (prod, Dove):** renderiza simple con **5 tooltips**, NAV con desglose ($370k − $282k)×0% en papel, valor creado etiquetado supuesto, NOI con ⓘ.
+- ci:gate **15/15** verde. Migración idempotente (solo seed de config, sin DDL destructivo).
+
 ## 30-jul · 🚨 BLOQUE B5 (CRÍTICO) — el % del inversionista se sincronizaba de la columna EQUIVOCADA
 
 **El bug:** `inv_holdings.reparto_pct` (de él dependen distribuciones y TIR) venía de `ff_deals.ownership_pct`, que el sync mapea de Airtable Propiedades → **"Porcentaje de Owner Ship"** (`flddh8bS7oP34ak1M` = % de la EMPRESA). El correcto es **"Porcentaje del Inversionista"** (`fldS7Jx6LgM19BXcY`). Son distintos y a menudo COMPLEMENTARIOS → el portal mostraba el % del operador como si fuera el del inversionista.
