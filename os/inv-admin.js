@@ -953,7 +953,7 @@ function iaOrigen(p) {
   if (/^(supuesto|modelo|estructura|default|seed|real:calc)/.test(f)) return { st: 'background:rgba(58,160,255,.14);color:#3aa0ff', lab: 'estimado · ' + (f === 'supuesto' ? 'supuesto' : 'calculado'), tip: 'premisa del modelo (no hay dato real todavía) [' + f + ']' };
   if (/^excel/.test(f)) return { st: '', cls: 'b-ok', lab: 'real · Excel calibrado', tip: 'calibrado contra el Excel "Renta VF" [' + f + ']' };
   const m = f.match(/^real:([a-z_]+)/);
-  if (m) return { st: '', cls: 'b-ok', lab: 'real · ' + (IA_FTAB[m[1]] || m[1]), tip: 'dato REAL traído de la base [' + f + ']' };
+  if (m) return { st: '', cls: 'b-ok', lab: 'real · ' + (IA_FTAB[m[1]] || m[1]), tip: 'viene de la base, no se teclea; editar = override reversible [' + f + ']' };
   return { st: 'background:rgba(58,160,255,.14);color:#3aa0ff', lab: 'estimado', tip: f || 'sin fuente declarada' };
 }
 function iaOrigenBadge(p) {
@@ -1087,6 +1087,40 @@ function iaParamRow(p, bid) {
     + (p._ov ? ' <a style="cursor:pointer;color:var(--a2);font-size:9.5px" title="volver al valor de origen (' + OS_E(p._base != null ? p._base : '—') + ')" onclick="iaRevertOverride(\'' + OS_E(p.key) + '\')">↩ origen</a>' : '')
     + '</span>'
     + '<b style="display:inline-flex;align-items:center;gap:4px">' + iaParamControl(p, bid) + '</b></div>';
+}
+// ── BLOQUE 2 (03-ago): claridad de "Modelo & movimientos" ──
+// Encabezado de ayuda: qué es la pantalla y el flujo real/estimado/manual.
+function iaModeloAyuda() {
+  return '<div class="card" style="margin-bottom:12px;border-color:var(--a2)">'
+    + '<div style="font-size:12.5px;line-height:1.6;color:var(--ink)"><b>📐 Qué es esta pantalla.</b> Acá cargás y ajustás los datos de cada casa que alimentan el portal del inversor. <b>Elegí la casa arriba.</b> Los datos vienen de 3 tipos: '
+    + '<span class="badge b-ok" style="font-size:8px">real</span> = ya viene de Airtable/Rentas (no lo teclees) · '
+    + '<span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff">estimado</span> = lo calcula el modelo · '
+    + '<span class="badge" style="font-size:8px;background:rgba(192,132,252,.16);color:#c084fc">manual</span> = lo cargás vos. '
+    + 'Para dejar una casa <b>lista</b>, revisá los bloques 1 a 9 y completá lo que diga "sin dato" (ver el checklist de abajo).</div></div>';
+}
+// Checklist "qué falta para esta casa": claves de negocio que el portal necesita.
+const IA_CLAVE_PARAMS = [
+  ['estrategia', 'cómo se sale del deal (Fix&Flip / Hold / BRRRR / Wholesale)'],
+  ['plan_salida', 'Venta / Refinanciación / Renta a largo plazo'],
+  ['tipo_contrato', 'NNN / NN / N — quién paga impuestos/seguro/mantenimiento'],
+  ['hm_tasa', 'tasa anual del Hard Money'],
+  ['refi_lender', 'banco del refi a 30 años'],
+  ['cashout_real', 'cash-out real que entró con el refi'],
+];
+function iaModeloChecklist() {
+  const has = k => IA.params.some(p => p.key === k && p.value != null && String(p.value).trim() !== '');
+  const faltan = IA_CLAVE_PARAMS.filter(([k]) => !has(k));
+  const listos = IA_CLAVE_PARAMS.length - faltan.length;
+  const linkFor = (k, desc) => IA_PARAM_OPCIONES[k]
+    ? '<a style="cursor:pointer;color:var(--a2)" title="' + OS_E(desc) + ' — se agrega como lista para elegir" onclick="iaAddSelectParam(\'' + k + '\',\'' + OS_E(desc) + '\')">＋ ' + k + '</a>'
+    : '<a style="cursor:pointer;color:var(--a2)" title="' + OS_E(desc) + '" onclick="document.getElementById(\'ia-np-key\').value=\'' + k + '\';document.getElementById(\'ia-np-desc\').value=\'' + OS_E(desc) + '\';document.getElementById(\'ia-np-key\').scrollIntoView({block:\'center\'});document.getElementById(\'ia-np-val\').focus()">＋ ' + k + '</a>';
+  const barra = '<span class="meta">' + listos + '/' + IA_CLAVE_PARAMS.length + ' datos clave listos</span>';
+  return '<div class="card" style="margin-bottom:12px">'
+    + '<div class="chart-h"><div class="t">✅ Qué falta para esta casa</div><div class="k">' + barra + ' · al completar un dato, desaparece de esta lista</div></div>'
+    + (faltan.length
+      ? '<div style="font-size:12px;line-height:1.9">' + faltan.map(([k, d]) => '<div>🔲 <b>' + k + '</b> <span class="meta">— ' + OS_E(d) + '</span> · ' + linkFor(k, d) + '</div>').join('') + '</div>'
+      : '<div class="meta" style="color:var(--pos)">✓ Datos clave completos — esta casa está lista para el portal.</div>')
+    + '</div>';
 }
 function iaParamsBloques() {
   IA.pOpen = IA.pOpen || { b1: true };
@@ -1251,6 +1285,7 @@ function iaGuiaPantalla(pid) {
   w.document.write('<html><head><title>Guía · ' + OS_E(iaCasaName(pid)) + '</title><style>body{font-family:system-ui;margin:32px;color:#111;max-width:720px}h1{font-size:20px}b{font-weight:700}</style></head><body>'
     + '<h1>Guía de indicadores · ' + OS_E(iaCasaName(pid)) + '</h1>'
     + '<p style="font-size:12px;color:#555">Para leer con el inversionista — cada indicador con su explicación y sus números. Generado ' + new Date().toISOString().slice(0, 10) + '.</p>'
+    + '<div style="border:1px solid #ddd;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:12px;line-height:1.6;background:#f8fafc"><b>Cómo se usa la pantalla "Modelo &amp; movimientos":</b> se elige la casa arriba y se completan sus datos, que alimentan el portal del inversor (motor compartido). Cada dato es <b>real</b> (viene de Airtable/Rentas, no se teclea; editarlo crea un override reversible), <b>estimado</b> (lo calcula el modelo) o <b>manual</b> (lo cargás vos). Para dejar la casa lista, se revisan los bloques 1 a 9 y se completa lo que diga "sin dato" (el checklist "Qué falta" lo lista).</div>'
     + iaIndResumen(pid, true)
     + '</body></html>');
   w.document.close();
@@ -1608,11 +1643,12 @@ function invAdminView() {
       const h = IA.holdings.find(x => x.property_id === IA.casa);
       const r = invEngine.run(iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null, IA.cashflow));
       const i = r.indicadores;
+      const kt = t => ' <span class="src" title="' + OS_E(t) + '" style="cursor:help">ⓘ</span>';
       preview = '<div class="grid k4">'
-        + '<div class="card"><div class="lab">TIR 31a (post-refi)</div><div class="big up">' + (i.tir31PostRefi != null ? (i.tir31PostRefi * 100).toFixed(1) + '%' : '—') + '</div></div>'
-        + '<div class="card"><div class="lab">VPN 31a</div><div class="big up">' + iaMoney(i.vpn31PostRefi) + '</div></div>'
-        + '<div class="card"><div class="lab">CAP / DSCR</div><div class="big">' + (i.capValor * 100).toFixed(1) + '% · ' + i.dscr.toFixed(2) + '</div></div>'
-        + '<div class="card"><div class="lab">Equilibrio</div><div class="big warn">' + (i.puntoEquilibrio * 100).toFixed(0) + '%</div><div class="meta">ocupación mínima</div></div>'
+        + '<div class="card"><div class="lab">TIR 31a (post-refi)' + kt('Tasa Interna de Retorno del inversor a 31 años tomando el flujo post-refinanciación: el rendimiento anualizado de su plata.') + '</div><div class="big up">' + (i.tir31PostRefi != null ? (i.tir31PostRefi * 100).toFixed(1) + '%' : '—') + '</div></div>'
+        + '<div class="card"><div class="lab">VPN 31a' + kt('Valor Presente Neto: cuánto valen hoy todos los flujos futuros descontados. Positivo = el deal crea valor.') + '</div><div class="big up">' + iaMoney(i.vpn31PostRefi) + '</div></div>'
+        + '<div class="card"><div class="lab">CAP / DSCR' + kt('CAP = rendimiento de la casa como negocio (NOI ÷ valor). DSCR = cobertura de la deuda (NOI ÷ cuota); >1.20 es sano.') + '</div><div class="big">' + (i.capValor * 100).toFixed(1) + '% · ' + i.dscr.toFixed(2) + '</div></div>'
+        + '<div class="card"><div class="lab">Equilibrio' + kt('Ocupación mínima para no perder plata: por debajo de este %, la renta no cubre los gastos + la cuota.') + '</div><div class="big warn">' + (i.puntoEquilibrio * 100).toFixed(0) + '%</div><div class="meta">ocupación mínima</div></div>'
         + '</div>';
     }
     const esEjemplo = IA.params.some(p => p.key === 'es_ejemplo' && p.value === 'true');
@@ -1621,7 +1657,9 @@ function invAdminView() {
       + '<button class="ibtn" onclick="iaVerComoInversor(IA.casa)">👁 Ver como inversionista</button>'
       + '<button class="ibtn" onclick="iaGuiaPantalla(IA.casa)">🖨 Guía de esta pantalla</button>'
       + '<span class="meta">el portal del inversionista muestra EXACTAMENTE esto (motor compartido)</span></div>'
+      + iaModeloAyuda()
       + preview
+      + iaModeloChecklist()
       + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">➕ Agregar parámetro</div><div class="k">todo "sin dato" del portal se carga acá (ej: estrategia, plan_salida, refi_lender, cashout_real)</div></div>'
       + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
       + '<input id="ia-np-key" class="osa-in" placeholder="key (ej: refi_lender)">'
