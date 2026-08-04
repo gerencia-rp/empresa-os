@@ -1521,7 +1521,13 @@ function invAdminView() {
   if (typeof osaCSS === 'function') osaCSS();
   if (!IA.loaded && !IA.err) { iaLoad(); return '<div class="empty">⏳ Cargando inversionistas…</div>'; }
   if (IA.err) return window.kitError ? kitError(IA.err, 'iaLoad(true)') : '<div class="empty down">' + OS_E(IA.err) + ' <button class="cbtn" onclick="iaLoad(true)">Reintentar</button></div>';
-  const tabs = [['global', '📊 Global'], ['analizador', '🔮 Analizador'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger'], ['glosario', '📚 Glosario']];
+  // BLOQUE 1 (03-ago): 'docs2' (Documentos) y 'msgs' (Mensajes) OCULTOS de la barra del admin
+  // (código y datos intactos; iaTabDocs/iaTabMsgs siguen existiendo y los tabs se renderizan si se
+  // navega directo). PARA REACTIVAR: agregá ['docs2','📄 Documentos'] y ['msgs','💬 Mensajes'] de
+  // vuelta a IA_TABS_OCULTOS→sacalos, o simplemente moverlos al array `tabs` de abajo.
+  const IA_TABS_OCULTOS = ['docs2', 'msgs'];
+  const tabsAll = [['global', '📊 Global'], ['analizador', '🔮 Analizador'], ['pipeline', '🏗 Pipeline'], ['accesos', '🔑 Accesos'], ['holdings', '🏠 Casas & reparto'], ['modelo', '📐 Modelo & movimientos'], ['escenarios', '🎛 Escenarios & simulador'], ['dist', '💸 Distribuciones'], ['docs2', '📄 Documentos'], ['msgs', '💬 Mensajes'], ['ledger', '💰 Ledger'], ['glosario', '📚 Glosario']];
+  const tabs = tabsAll.filter(t => !IA_TABS_OCULTOS.includes(t[0]));
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaGoTab(\'' + t[0] + '\')">' + t[1] + '</button>').join(' ');
   let body = '';
 
