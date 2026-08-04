@@ -144,6 +144,46 @@
     return { renta: f.rentasAcum, amortizacion: (+c.deuda_saldo || 0) - (f.saldoN || 0), plusvalia: f.valorVenta - +c.arv, costoVenta: f.valorVenta * (e.supuestos.costo_venta) };
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // INDICADORES INSTITUCIONALES — valor forzado + compresión de cap + NAV.
+  // MÉTRICAS NUEVAS que se SUMAN sobre el motor: reusa base() (NOI/equity) — NO
+  // recalcula NOI/valor/deuda con otra fórmula. Regla de un dato/una fuente:
+  //   • NOI = base(c,cfg).noi (renta operativa − gastos operativos, del motor)
+  //   • costo total = c.costo_total = ind.all_in (compra + remodelación, del motor)
+  //   • valor = c.arv (paper_value) · deuda = c.deuda_saldo (deuda_vigente del motor)
+  //   • NAV = navEquity (= equityActual del Panel de Rendimiento, UN solo número).
+  //     Si no se pasa navEquity, fallback = base.equity × pct (misma cadena).
+  // Cap de mercado = SUPUESTO (cfg.cap_mercado_pct o override por casa), etiquetado.
+  // ═══════════════════════════════════════════════════════════════
+  function valorCreado(c, cfg, navEquity) {
+    cfg = cfg || {};
+    const b = base(c, cfg);
+    const noi = b.noi;
+    const costoTotal = (c.costo_total != null && +c.costo_total > 0) ? +c.costo_total : null;
+    const capMercado = (c.cap_mercado != null ? +c.cap_mercado : (cfg.cap_mercado_pct != null ? +cfg.cap_mercado_pct : 0.07));
+    // válido solo si hay renta operativa registrada (sin renta → NOI no es representativo)
+    const noiValido = costoTotal != null && noi != null && +c.renta_mensual > 0;
+    const yieldOnCost = noiValido ? noi / costoTotal : null;               // cap sobre lo que invertimos
+    const spread = yieldOnCost != null ? yieldOnCost - capMercado : null;  // valor forzado en puntos %
+    // valor de mercado del NOI (NOI/cap) menos lo que nos costó = valor creado aprox.
+    const valorForzado = (noiValido && capMercado > 0) ? (noi / capMercado - costoTotal) : null;
+    const pct = +c.pct || 0;
+    // NAV = equity del Panel de Rendimiento (un solo número) · fallback = equity base × pct
+    const nav = (navEquity != null && isFinite(+navEquity)) ? +navEquity
+      : ((b.equity != null) ? b.equity * pct : null);
+    return {
+      casa: c.casa, property_id: c.property_id,
+      noi, costoTotal, capMercado, yieldOnCost, spread, valorForzado,
+      valorActual: c.arv != null ? +c.arv : null,
+      deuda: c.deuda_saldo != null ? +c.deuda_saldo : null,
+      pct, nav, aporte: c.aporte != null ? +c.aporte : null,
+      capMercadoOrigen: (c.cap_mercado != null ? 'manual' : 'supuesto'),
+      tipoContrato: c.tipo_contrato || 'N/D',
+      // honestidad: sin renta/costo → por completar; nunca un spread/valor forzado inflado
+      porCompletar: !noiValido || c.porCompletar,
+    };
+  }
+
   // ─── mapeo ÚNICO datos→casa (admin y portal usan EXACTAMENTE este) ───
   // ind = fila de inv_indicadores_data · P = params efectivos {key: value} · holding = inv_holdings
   function desdeDatos(ind, P, holding) {
@@ -164,12 +204,17 @@
       deuda_plazo: refin ? Math.round((nz(P.refi_plazo_m) || 360) / 12) : 30,
       vacancia: nz(P.vacancia), apreciacion_anual: nz(P.apreciacion_anual),
       crec_renta_anual: nz(P.crec_renta_anual), costo_venta: nz(P.costo_venta),
+      // ── indicadores institucionales (valor forzado / cap comprimido / NAV) ──
+      // costo total = compra + remodelación = ind.all_in (LA MISMA definición del motor, cero doble fuente)
+      costo_total: ind.all_in != null ? +ind.all_in : null,
+      cap_mercado: nz(P.cap_mercado_pct),                       // override por casa (opcional) del cap de mercado
+      tipo_contrato: (P.tipo_contrato && String(P.tipo_contrato).trim()) ? String(P.tipo_contrato).trim() : 'N/D',
       porCompletar: (ind.deuda_vigente == null && !ind.vendida) || !(+ind.renta_anual > 0),
     };
   }
   // defaults de config desde ff_uw_config (filas esc_*) — editable, cero hardcode
   function cfgDesde(rows) {
-    const cfg = { vacancia: 0.05, apreciacion_anual: 0.04, crec_renta_anual: 0.08, costo_venta: 0.07, costos_cierre_default: 8000, preferred_on: false, preferred_pct: 0.08, benchmark_tir: 0.15, sp500_anual: 0.10 };
+    const cfg = { vacancia: 0.05, apreciacion_anual: 0.04, crec_renta_anual: 0.08, costo_venta: 0.07, costos_cierre_default: 8000, preferred_on: false, preferred_pct: 0.08, benchmark_tir: 0.15, sp500_anual: 0.10, cap_mercado_pct: 0.07 };
     (rows || []).forEach(r => {
       const k = String(r.key || '').replace(/^esc_/, '');
       if (k === 'preferred_on') cfg.preferred_on = +r.value > 0;
@@ -177,5 +222,5 @@
     });
     return cfg;
   }
-  return { setEngine, pmtMensual, saldoTras, base, repartoVenta, escenarios, agregado, descomposicion, desdeDatos, cfgDesde };
+  return { setEngine, pmtMensual, saldoTras, base, repartoVenta, escenarios, agregado, descomposicion, valorCreado, desdeDatos, cfgDesde };
 });
