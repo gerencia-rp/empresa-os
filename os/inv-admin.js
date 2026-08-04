@@ -1363,7 +1363,9 @@ function iaIndicadores() {
       try { const pnl = invRend.panel({ ind: i, Pv, holding: agg, distribuciones: [], hoy }, cfg, IA.rendHor || 6); navEquity = pnl.equityActual; if (pnl.currentBalance != null) deudaPend = pnl.currentBalance; } catch (e) {}
     }
     const vc = invEsc.valorCreado(c, cfg, navEquity);
-    return { c, vc, deudaPend, etapa: i.etapa, refin: !!i.refinanciada };
+    // deuda EN REGISTRO = no hay HML/refi registrado (el panel colapsa null→0, por eso miramos el indicador)
+    const enRegistro = i.deuda_vigente == null && !i.vendida;
+    return { c, vc, deudaPend: enRegistro ? null : deudaPend, enRegistro, etapa: i.etapa, refin: !!i.refinanciada };
   });
 }
 function iaIndSort(key) { IA.indSort = IA.indSort || { key: 'spread', dir: 'desc' }; if (IA.indSort.key === key) IA.indSort.dir = IA.indSort.dir === 'desc' ? 'asc' : 'desc'; else { IA.indSort.key = key; IA.indSort.dir = 'desc'; } osRender(); }
