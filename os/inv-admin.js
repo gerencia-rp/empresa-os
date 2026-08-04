@@ -1382,7 +1382,8 @@ function iaTblIndicadores() {
   const th = (k, lab, tip, right) => '<th' + (right ? ' style="text-align:right"' : '') + '><span style="cursor:pointer" title="' + OS_E(tip) + '" onclick="iaIndSort(\'' + k + '\')">' + lab + car(k) + '</span></th>';
   // totales / promedios ponderados (por costo y por casa, solo casas con datos)
   const ok = rows.filter(r => !r.vc.porCompletar);
-  const navT = rows.reduce((s, r) => s + (r.vc.nav || 0), 0);
+  // NAV total: SOLO casas con deuda registrada (deuda en registro → NAV preliminar, no infla el total)
+  const navT = rows.reduce((s, r) => s + (r.deudaPend != null ? (r.vc.nav || 0) : 0), 0);
   const costoT = ok.reduce((s, r) => s + (r.vc.costoTotal || 0), 0);
   const noiT = ok.reduce((s, r) => s + (r.vc.noi || 0), 0);
   const forzadoT = ok.reduce((s, r) => s + (r.vc.valorForzado || 0), 0);
@@ -1412,7 +1413,7 @@ function iaTblIndicadores() {
       + '<td style="text-align:right" class="' + (v.valorForzado != null ? (v.valorForzado >= 0 ? 'up' : 'down') : '') + '">' + (pc ? '—' : $(v.valorForzado)) + '</td>'
       + '<td style="text-align:right">' + $(v.valorActual) + '</td>'
       + '<td style="text-align:right">' + (r.deudaPend != null ? $(r.deudaPend) : '<span class="meta">en registro</span>') + '</td>'
-      + '<td style="text-align:right"><b>' + (v.nav != null ? $(v.nav) : '—') + '</b>' + (r.deudaPend == null ? ' <span class="badge b-warn" style="font-size:7px" title="deuda en registro — NAV preliminar">prelim</span>' : '') + '</td>'
+      + '<td style="text-align:right">' + (r.deudaPend == null ? '<span class="meta" title="deuda en registro — el NAV se calcula al cerrar el préstamo; no inflamos el total">en registro</span>' : '<b>' + (v.nav != null ? $(v.nav) : '—') + '</b>') + '</td>'
       + '<td class="meta">' + OS_E(iaText(r.c.property_id, 'estrategia') || '—') + '</td><td>' + OS_E(v.tipoContrato) + '</td></tr>'; }).join('')
     + '</tbody><tfoot><tr style="border-top:2px solid var(--glassb);font-weight:700"><td>Portafolio (' + ok.length + '/' + rows.length + ' con datos)</td>'
     + '<td style="text-align:right">' + $(costoT) + '</td><td style="text-align:right">' + $(noiT) + '</td><td style="text-align:right">' + p2(cfg.cap_mercado_pct) + '</td>'
