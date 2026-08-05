@@ -27,3 +27,4 @@ supabase/.branches/
 *.tmp
 *.log
 .vercel
+.env*
