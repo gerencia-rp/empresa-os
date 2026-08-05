@@ -256,6 +256,34 @@
     const dscr = (noiAnual / 12) / banco.cuota;
     const gastoTotalMes = (est.operativos + est.impuestos) / 12 + banco.cuota + (p.seguroMes || 0);
     const puntoEquilibrio = gastoTotalMes / (arriendoPleno * (1 + inf));
+    // ── BLOQUE 3B (04-ago): ESTADO OPERATIVO HONESTO — casa en rehab / sin renta todavía ──
+    // Con NOI ≤ 0 (la casa aún no cobra renta) estas fórmulas se van a negativo o a infinito:
+    // dscr = (NOI/12) ÷ cuota con cuota 0 → ±Infinity · equilibrio = gasto ÷ arriendo con
+    // arriendo 0 → Infinity · cap = NOI ÷ valor → negativo. No es un error de cálculo: el
+    // indicador TODAVÍA NO APLICA. Se declara el estado y esos 4 salen null (los renderers
+    // muestran el estado honesto). Vuelven SOLOS a mostrar valores en cuanto NOI > 0.
+    const finito = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+    const sinRenta = !(arriendoPleno > 0) || !(noiAnual > 0);
+    const sinDeuda = !(banco.cuota > 0);
+    const txtRehab = 'En fase de rehab — sin renta todavía; este indicador aún no aplica.';
+    const txtSinDeuda = 'Esta casa no tiene cuota de deuda (compra en cash o todavía sin refi): el DSCR no aplica.';
+    const estadoOperativo = {
+      enRehab: sinRenta, sinRenta, sinDeuda, noiAnual, arriendoPleno,
+      motivo: sinRenta ? (arriendoPleno > 0 ? 'la casa aún no genera utilidad operativa (NOI ≤ 0)' : 'la casa todavía no cobra renta') : null,
+      texto: sinRenta ? txtRehab : null,
+      // RAZÓN POR INDICADOR: una casa RENTADA sin deuda (cash / pre-refi) tiene DSCR null
+      // pero NO está en rehab — decirle "todavía no cobra renta" sería mentira. Cada
+      // renderer muestra la razón del indicador que está tapando, nunca una genérica.
+      razonCap: sinRenta ? txtRehab : null,
+      razonDscr: sinRenta ? txtRehab : (sinDeuda ? txtSinDeuda : null),
+      razonEquilibrio: sinRenta ? txtRehab : null,
+    };
+    // en rehab NO se publican los indicadores de rendimiento operativo; fuera de rehab se
+    // publican salvo que sean no-finitos (ej. compra en cash rentada → dscr sin cuota = ∞).
+    const capValorOut = sinRenta ? null : finito(capValor);
+    const capCostoOut = sinRenta ? null : finito(capCosto);
+    const dscrOut = sinRenta ? null : finito(dscr);
+    const equilibrioOut = sinRenta ? null : finito(puntoEquilibrio);
     const profit = anios.reduce((s, x) => s + (x.a >= 1 ? x.fclNegocio : 0), 0) + terminal + anios[0].fclNegocio;
     const cashInvertido = -meses.reduce((s, x) => s + Math.min(0, x.fclNegocio), 0);
     const roi = profit / Math.max(cashInvertido, 1);
@@ -265,7 +293,9 @@
     return {
       meses, anios, banco,
       indicadores: {
-        arriendoPleno, noiAnual, capValor, capCosto, dscr, puntoEquilibrio,
+        arriendoPleno, noiAnual,
+        capValor: capValorOut, capCosto: capCostoOut, dscr: dscrOut, puntoEquilibrio: equilibrioOut,
+        estadoOperativo,                                             // ← 3B: rehab/sin renta declarado
         vpnMensual, tirCiclo: tirMensualPeriodo != null ? Math.pow(1 + tirMensualPeriodo, 12) - 1 : null,
         tir31, tir31ConVenta, vpn31, terminal, profit: porParte(profit), roi,
         anio0PostRefi: anio0Oficial, tir31PostRefi, vpn31PostRefi,   // ← base OFICIAL (Excel)

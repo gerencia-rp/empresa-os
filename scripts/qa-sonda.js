@@ -39,8 +39,9 @@ window.__qaRoot = (nombre, rootSel) => {
     }
     if (!grad && bg != null && Math.abs(col - bg) < 45) { iss.push('CONTRASTE "' + txt.slice(0, 22) + '"'); if (iss.length > 16) break; }
   }
-  // 3) valores mudos
-  const bad = (root.innerText.match(/\bNaN\b|\bundefined\b|🟡/g) || []);
+  // 3) valores mudos — incluye Infinity/null: así se autodetecta el bug 3B (una casa en
+  // rehab mostraba "DSCR -Infinity" / "Equilibrio Infinity%" y la sonda no lo veía).
+  const bad = (root.innerText.match(/\bNaN\b|\bundefined\b|-?\bInfinity\b|\bnull\b|🟡/g) || []);
   if (bad.length) iss.push('VALORES: ' + [...new Set(bad)].join(','));
   return (nombre || location.pathname) + ': ' + (iss.length ? iss.slice(0, 10).join(' | ') : '✓ OK');
 };

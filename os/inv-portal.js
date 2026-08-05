@@ -19,6 +19,14 @@ const $pct = v => (v == null || isNaN(+v)) ? '—' : (v * 100).toFixed(1) + '%';
 const $pct2 = v => (v == null || isNaN(+v)) ? '—' : (+(v * 100).toFixed(2)) + '%';   // tasas con 2 decimales (ej. hm_tasa 10.24%)
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const SD = '<span class="warn" title="este dato todavía no está cargado — se carga desde administración">sin dato</span>';
+// BLOQUE 3B (04-ago): casa en rehab / sin renta. El motor (inv-engine) declara
+// indicadores.estadoOperativo y devuelve null en CAP/DSCR/equilibrio en vez de
+// -Infinity / Infinity% / cap negativo. Acá se traduce a lenguaje del inversor.
+// "aún no aplica" ≠ "sin dato": el dato está, el indicador todavía no tiene sentido.
+// razon = 'razonCap' | 'razonDscr' | 'razonEquilibrio' — se explica el indicador que se
+// está tapando, nunca un motivo genérico (una casa rentada SIN cuota no está en rehab).
+const ipRehabTxt = (i, razon) => ((i && i.estadoOperativo && (i.estadoOperativo[razon || ''] || i.estadoOperativo.texto)) || 'Aún no aplica todavía.');
+const ipEnRehab = i => !!(i && i.estadoOperativo && i.estadoOperativo.enRehab);
 const sd = v => (v == null || v === '' || (typeof v === 'number' && isNaN(v))) ? SD : esc(v);
 const app = () => document.getElementById('app');
 
@@ -420,7 +428,11 @@ function render() {
   if (IP.tab === 'rend') drawRendChart();
   if (IP.tab === 'casa') drawCasaChart(r, p.repartoInv);
   const met = ipMetrics(pid, p, r, holding);
-  IP.lastSnapshot = { casa: dir, escenario, inversion: met.cap || 0, reparto: met.inv, tir31: r.indicadores.tir31PostRefi, vpn31: r.indicadores.vpn31PostRefi, vpn31_inv: r.indicadores.vpn31PostRefi * met.inv, cap: r.indicadores.capValor, dscr: r.indicadores.dscr, equilibrio: r.indicadores.puntoEquilibrio, riqueza_hoy: met.riquezaHoy, coc_anual: met.cocAnualPct, equity_multiple: met.em, roi_anualizado: met.roiAnu, fases: r.indicadores.fases, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
+  IP.lastSnapshot = { casa: dir, escenario, inversion: met.cap || 0, reparto: met.inv, tir31: r.indicadores.tir31PostRefi, vpn31: r.indicadores.vpn31PostRefi, vpn31_inv: r.indicadores.vpn31PostRefi * met.inv, cap: r.indicadores.capValor, dscr: r.indicadores.dscr, equilibrio: r.indicadores.puntoEquilibrio,
+    // 3B: si la casa está en rehab, cap/dscr/equilibrio van null A PROPÓSITO — el asistente
+    // debe decir "aún no aplica", nunca "sin dato" ni inventar un número.
+    estado_operativo: r.indicadores.estadoOperativo,
+    riqueza_hoy: met.riquezaHoy, coc_anual: met.cocAnualPct, equity_multiple: met.em, roi_anualizado: met.roiAnu, fases: r.indicadores.fases, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
 }
 
 // ─── 🏠 MI PORTAFOLIO ───
@@ -490,11 +502,14 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     dscr: { t: 'DSCR — cobertura de la deuda', c: 'Cuántas veces la operación de la casa cubre la cuota del banco. Arriba de 1.20× el banco está tranquilo y sobra plata; abajo de 1.0× la renta no alcanza para la cuota.', f: fx([
       'NOI anual (renta − gastos operativos, año estabilizado del modelo) = <b>' + $money(i.noiAnual) + '</b>',
       'Cuota mensual del banco = <b>' + $money(r.banco.cuota) + '</b>',
-      'DSCR = (NOI ÷ 12) ÷ cuota = <b>' + i.dscr.toFixed(2) + '×</b>']) },
+      // 3B: en rehab (NOI ≤ 0 / sin cuota) el DSCR no aplica — antes salía "-Infinity"
+      i.dscr != null ? 'DSCR = (NOI ÷ 12) ÷ cuota = <b>' + i.dscr.toFixed(2) + '×</b>'
+        : '<b>Aún no aplica</b> — ' + esc(ipRehabTxt(i, 'razonDscr'))]) },
     cap: { t: 'CAP rate', c: 'El rendimiento de la casa como negocio puro, sin deuda: utilidad operativa anual dividida por el valor de la propiedad. Sirve para comparar contra otras propiedades del mercado.', f: fx([
       'NOI anual = <b>' + $money(i.noiAnual) + '</b>',
-      'CAP sobre valor = NOI ÷ valor (' + $money(p.arv * (1 + p.valorizacion)) + ') = <b>' + $pct(i.capValor) + '</b>',
-      'CAP sobre costo (all-in) = <b>' + $pct(i.capCosto) + '</b>']) },
+      i.capValor != null ? 'CAP sobre valor = NOI ÷ valor (' + $money(p.arv * (1 + p.valorizacion)) + ') = <b>' + $pct(i.capValor) + '</b>'
+        : '<b>Aún no aplica</b> — ' + esc(ipRehabTxt(i, 'razonCap')),
+      i.capCosto != null ? 'CAP sobre costo (all-in) = <b>' + $pct(i.capCosto) + '</b>' : '']) },
     vpn: { t: 'VPN a 31 años', c: 'Cuánto vale HOY todo el flujo futuro del negocio (31 años de operación + venta al final), descontado al ' + $pct(p.retornoEsperado) + ' anual (tu retorno esperado). Positivo = el negocio le gana a tu alternativa.', f: fx([
       'Base oficial post-refi (como el Excel): año 0 = cash atrapado real, años 1–31 = operación',
       'VPN de la casa = <b>' + $money(i.vpn31PostRefi) + '</b> · tu parte (' + $pct(met.inv) + ') = <b>' + $money(i.vpn31PostRefi * met.inv) + '</b>']) },
@@ -518,13 +533,20 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     + '<div class="grid k4" style="margin-top:14px">'
     + kpiI('Cash-on-Cash', $pct(met.cocAnualPct), (met.cocMensual != null ? $money(met.cocMensual) + ' /mes en tu bolsillo · ' : '') + (met.cocBase === 'real' ? 'con la operación real' : 'según el modelo (aún sin rentas)'), met.cocAnualPct != null && met.cocAnualPct > 0 ? 'up' : '', 'coc')
     + kpiI('ROI anualizado', $pct(met.roiAnu), met.roiAnu == null ? 'se calcula con 3+ meses de historia' : 'crecimiento anual compuesto desde tu entrada', met.roiAnu != null && met.roiAnu > 0 ? 'up' : '', 'roi')
-    + kpiI('DSCR', i.dscr ? i.dscr.toFixed(2) + '×' : '—', 'la renta cubre la deuda · equilibrio: ' + $pct(i.puntoEquilibrio) + ' de ocupación', i.dscr >= 1.2 ? 'up' : 'warn', 'dscr')
-    + kpiI('CAP rate', $pct(i.capValor), 'NOI ' + $money(i.noiAnual) + ' ÷ valor · sobre costo ' + $pct(i.capCosto), '', 'cap')
+    // 3B: casa en rehab / sin renta → estado honesto (antes: DSCR "-Infinity", equilibrio "Infinity%")
+    + kpiI('DSCR', i.dscr != null ? i.dscr.toFixed(2) + '×' : '—',
+      i.dscr != null ? 'la renta cubre la deuda' + (i.puntoEquilibrio != null ? ' · equilibrio: ' + $pct(i.puntoEquilibrio) + ' de ocupación' : '') : '🔨 ' + ipRehabTxt(i, 'razonDscr'),
+      i.dscr != null && i.dscr >= 1.2 ? 'up' : 'warn', 'dscr')
+    + kpiI('CAP rate', i.capValor != null ? $pct(i.capValor) : '—',
+      i.capValor != null ? 'NOI ' + $money(i.noiAnual) + ' ÷ valor · sobre costo ' + $pct(i.capCosto) : '🔨 ' + ipRehabTxt(i, 'razonCap'),
+      '', 'cap')
     + '</div>'
     + '<div class="grid k4" style="margin-top:14px">'
     + kpiI('Tu VPN a 31 años', $money(i.vpn31PostRefi * met.inv), 'casa completa ' + $money(i.vpn31PostRefi) + ' · descuento ' + $pct(p.retornoEsperado), 'up', 'vpn')
     + kpiI('Tu Profit (hold 31a)', $money(i.profit.inversionista), 'utilidad total proyectada del plan completo, con venta al final', 'up', 'profit')
-    + kpiI('TIR a 31 años', $pct(i.tir31PostRefi), 'retorno anual del hold completo (base post-refi del Excel)', 'up', null)
+    // 3B item 5 (coherente con A1): en rehab no se muestra TIR anualizada — no hay operación que la sostenga
+    + kpiI('TIR a 31 años', ipEnRehab(i) ? '—' : $pct(i.tir31PostRefi),
+      ipEnRehab(i) ? '🔨 ' + ipRehabTxt(i) : 'retorno anual del hold completo (base post-refi del Excel)', ipEnRehab(i) ? 'warn' : 'up', null)
     + kpiI('Escenario', escenario === 'realizado' ? '✅ Real' : '🎯 Proyectado', escenario === 'realizado' ? movsCasa.length + ' movimientos reales cargados' : 'premisas del modelo — lo real se carga desde administración', '', null)
     + '</div>';
 
@@ -630,8 +652,16 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
 
   const disclaimer = '<div class="meta" style="margin-top:16px;opacity:.75">Proyección del modelo financiero (valorización ' + $pct(p.valorizacion) + '/año · inflación ' + $pct(p.inflacion) + ' · descuento ' + $pct(p.retornoEsperado) + ') — no constituye garantía de retorno. <span class="src">real</span> = dato de la operación · <span class="src sup">supuesto</span> = premisa en calibración. Los faltantes dicen "sin dato" y se cargan desde administración — este portal nunca inventa números.</div>';
 
+  // 3B: aviso honesto arriba de todo cuando la casa todavía no cobra renta
+  const rehabBanner = ipEnRehab(i)
+    ? '<div class="card" style="margin-top:10px;border-color:var(--amber)"><div style="font-size:12.5px;line-height:1.6">'
+      + '<b>🔨 Esta casa está en fase de rehab.</b> Todavía no cobra renta, así que los indicadores que se calculan sobre la renta '
+      + '(<b>DSCR</b>, <b>CAP rate</b>, punto de equilibrio y la TIR anualizada) <b>aún no aplican</b> — no son malos números, es que todavía no hay operación que medir. '
+      + 'Aparecen solos en cuanto la casa empiece a rentar. Mientras tanto lo que vale es tu <b>capital invertido</b>, el <b>costo total</b> y el <b>valor en papel</b>.'
+      + '</div></div>'
+    : '';
   return saludo + resumenCards + '<h1 style="font-size:18px;margin-top:6px">' + esc(dir.split(',')[0]) + ' <span>· tu inversión en detalle</span></h1>'
-    + hero + renderIndicadores(pid, met) + dealInfo + tl + pnl + tesis + charts + escTable + gastosCard + disclaimer;
+    + rehabBanner + hero + renderIndicadores(pid, met) + dealInfo + tl + pnl + tesis + charts + escTable + gastosCard + disclaimer;
 }
 
 // ─── 🏡 MI CASA: mini-dashboard simple por casa (misma estructura de 5 secciones
@@ -932,7 +962,22 @@ function renderEscenarios(pid, P, base, movsCasa) {
     } catch (e) { runs[d[0]] = null; }
   });
   const simCache = (IP.proj || []).find(x => x.property_id === pid && x.escenario === 'simulado');
-  const simInd = simCache && simCache.data && simCache.data.indicadores;
+  let simInd = simCache && simCache.data && simCache.data.indicadores;
+  // 3B: el Simulado sale de inv_projection (JSON CACHEADO, puede ser anterior al fix).
+  // En el cache viejo el cap de una casa en rehab quedó como número negativo real (-1.1%)
+  // mientras que dscr/equilibrio eran ±Infinity → JSON los volvió null. Resultado: la fila
+  // mostraba "— · — · — · -1.1%", dos respuestas contradictorias. Se aplica la MISMA regla
+  // del motor sobre el cache: si la casa está en rehab hoy, el Simulado tampoco aplica.
+  if (simInd) {
+    const finito = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+    const eoLive = (runs.proyectado && runs.proyectado.indicadores.estadoOperativo) || {};
+    const tapar = !!(simInd.estadoOperativo ? simInd.estadoOperativo.enRehab : eoLive.enRehab);
+    simInd = { ...simInd,
+      capValor: tapar ? null : finito(simInd.capValor),
+      capCosto: tapar ? null : finito(simInd.capCosto),
+      dscr: tapar ? null : finito(simInd.dscr),
+      puntoEquilibrio: tapar ? null : finito(simInd.puntoEquilibrio) };
+  }
   const inv = base.repartoInv;
   const cell = v => '<td style="text-align:right">' + v + '</td>';
   const fila = (lab, fn, fmt, simFn) => '<tr><td>' + lab + '</td>'
@@ -943,7 +988,7 @@ function renderEscenarios(pid, P, base, movsCasa) {
     + fila('TIR 31 años', x => x.indicadores.tir31PostRefi, $pct, s => s.tir31PostRefi)
     + fila('VPN 31 años · casa', x => x.indicadores.vpn31PostRefi, $money, s => s.vpn31PostRefi)
     + fila('VPN · tu parte (' + $pct(inv) + ')', x => x.indicadores.vpn31PostRefi * inv, $money, s => s.vpn31PostRefi * inv)
-    + fila('CAP rate', x => x.indicadores.capValor, $pct, s => s.capValor)
+    + fila('CAP rate', x => x.indicadores.capValor, v => v == null ? '—' : $pct(v), s => s.capValor)
     + fila('DSCR', x => x.indicadores.dscr, v => v == null ? '—' : v.toFixed(2) + '×', s => s.dscr)
     + fila('Utilidad año 2 (casa)', x => x.anios[2] ? x.anios[2].fclNegocio : null, $money, null)
     + '</tbody></table>'

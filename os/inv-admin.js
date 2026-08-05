@@ -402,8 +402,14 @@ function iaTabEscenarios() {
   ];
   const runs = {}; tipos.forEach(t => { try { runs[t[0]] = iaRunEscenario(t[0]); } catch (e) { runs[t[0]] = null; } });
   const base = iaBaseParams();
-  const fila = (lab, fn, fmt) => '<tr><td>' + lab + '</td>' + tipos.map(t => { const x = runs[t[0]]; return '<td style="text-align:right">' + (x ? (fmt || (v => v))(fn(x)) : '—') + '</td>'; }).join('') + '</tr>';
+  // fmt recibe (valor, run) — el 2º arg deja que la celda explique POR QUÉ no aplica (3B)
+  const fila = (lab, fn, fmt) => '<tr><td>' + lab + '</td>' + tipos.map(t => { const x = runs[t[0]]; return '<td style="text-align:right">' + (x ? (fmt || (v => v))(fn(x), x) : '—') + '</td>'; }).join('') + '</tr>';
   const pct1 = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
+  // 3B: "aún no aplica" (rehab / sin cuota) ≠ "sin dato" — se rotula distinto y con la
+  // razón REAL del escenario que se está mostrando (no un texto fijo).
+  const naTxt = razon => '<span class="meta" title="' + OS_E(razon || 'este indicador aún no aplica') + '" style="cursor:help">n/a 🔨</span>';
+  const eoDe = x => (x && x.r && x.r.indicadores && x.r.indicadores.estadoOperativo) || {};
+  const naPct = (v, razon) => v == null ? naTxt(razon) : (v * 100).toFixed(1) + '%';
   const inv = base.repartoInv;
   const hz = x => (x && x.r.indicadores.porHorizonte) ? x.r.indicadores.porHorizonte[N] : null;
   const supTip = ' <span class="src sup" title="proyección con supuestos — no es promesa; lo REALIZADO (movimientos reales) es lo que manda">supuesto</span>';
@@ -430,9 +436,10 @@ function iaTabEscenarios() {
     + fila('Patrimonio del inversionista al año ' + N, x => { const h = hz(x); return h ? h.patrimonioInv : null; }, iaMoney)
     + fila('Utilidad acumulada a ' + N + ' años (casa)', x => { const h = hz(x); return h ? h.utilidadAcum : null; }, iaMoney)
     + '<tr><td colspan="5" class="meta" style="padding-top:8px;font-size:10.5px">↓ estables (no dependen del horizonte)</td></tr>'
-    + fila('CAP rate (valor)', x => x.r.indicadores.capValor, pct1)
-    + fila('DSCR', x => x.r.indicadores.dscr, v => v.toFixed(2))
-    + fila('Punto de equilibrio (ocupación mín.)', x => x.r.indicadores.puntoEquilibrio, pct1)
+    // 3B: en rehab / sin renta el motor devuelve null (antes: -Infinity / Infinity%) → "aún no aplica"
+    + fila('CAP rate (valor)', x => x.r.indicadores.capValor, (v, x) => naPct(v, eoDe(x).razonCap))
+    + fila('DSCR', x => x.r.indicadores.dscr, (v, x) => v == null ? naTxt(eoDe(x).razonDscr) : v.toFixed(2))
+    + fila('Punto de equilibrio (ocupación mín.)', x => x.r.indicadores.puntoEquilibrio, (v, x) => naPct(v, eoDe(x).razonEquilibrio))
     + fila('Cash del ciclo (FCL negativos)', x => -x.r.indicadores.cashInvertido, iaMoney)
     + '</tbody></table>'
     + notaIguales
@@ -1681,11 +1688,27 @@ function invAdminView() {
       const r = invEngine.run(iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null, IA.cashflow));
       const i = r.indicadores;
       const kt = t => ' <span class="src" title="' + OS_E(t) + '" style="cursor:help">ⓘ</span>';
-      preview = '<div class="grid k4">'
-        + '<div class="card"><div class="lab">TIR 31a (post-refi)' + kt('Tasa Interna de Retorno del inversor a 31 años tomando el flujo post-refinanciación: el rendimiento anualizado de su plata.') + '</div><div class="big up">' + (i.tir31PostRefi != null ? (i.tir31PostRefi * 100).toFixed(1) + '%' : '—') + '</div></div>'
-        + '<div class="card"><div class="lab">VPN 31a' + kt('Valor Presente Neto: cuánto valen hoy todos los flujos futuros descontados. Positivo = el deal crea valor.') + '</div><div class="big up">' + iaMoney(i.vpn31PostRefi) + '</div></div>'
-        + '<div class="card"><div class="lab">CAP / DSCR' + kt('CAP = rendimiento de la casa como negocio (NOI ÷ valor). DSCR = cobertura de la deuda (NOI ÷ cuota); >1.20 es sano.') + '</div><div class="big">' + (i.capValor * 100).toFixed(1) + '% · ' + i.dscr.toFixed(2) + '</div></div>'
-        + '<div class="card"><div class="lab">Equilibrio' + kt('Ocupación mínima para no perder plata: por debajo de este %, la renta no cubre los gastos + la cuota.') + '</div><div class="big warn">' + (i.puntoEquilibrio * 100).toFixed(0) + '%</div><div class="meta">ocupación mínima</div></div>'
+      // BLOQUE 3B (04-ago): casa en rehab / sin renta → el indicador AÚN NO APLICA.
+      // Antes salía "CAP -1.1% · DSCR -Infinity" y "Equilibrio Infinity%" (Wellington):
+      // se veía roto. El motor ya devuelve null + estadoOperativo; acá se muestra honesto.
+      const eo = i.estadoOperativo || {}, rehab = !!eo.enRehab;
+      // el motivo se toma POR INDICADOR (una casa rentada sin cuota no está en rehab)
+      const na = razon => '<div class="big" style="color:var(--mut)">—</div><div class="meta" style="color:var(--amber)">🔨 ' + OS_E(razon || eo.texto || 'aún no aplica') + '</div>';
+      const p1 = v => v == null ? null : (v * 100).toFixed(1) + '%';
+      preview = (rehab ? '<div class="card" style="margin-bottom:10px;border-color:var(--amber)"><div style="font-size:12.5px;line-height:1.6;color:var(--ink)"><b>🔨 Esta casa está en fase de rehab.</b> ' + OS_E(eo.motivo || '') + ', así que CAP, DSCR y punto de equilibrio <b>todavía no aplican</b> (se calculan sobre la renta). Se muestran solos apenas la casa empiece a cobrar. Lo que sí vale hoy: capital invertido, costo total y el valor en papel del Analizador.</div></div>' : '')
+        + '<div class="grid k4">'
+        + '<div class="card"><div class="lab">TIR 31a (post-refi)' + kt('Tasa Interna de Retorno del inversor a 31 años tomando el flujo post-refinanciación: el rendimiento anualizado de su plata.' + (rehab ? ' En rehab no se muestra: no hay operación todavía que la sostenga.' : '')) + '</div>'
+        + (rehab ? na(eo.texto) : '<div class="big up">' + (i.tir31PostRefi != null ? (i.tir31PostRefi * 100).toFixed(1) + '%' : '—') + '</div>') + '</div>'
+        + '<div class="card"><div class="lab">VPN 31a' + kt('Valor Presente Neto: cuánto valen hoy todos los flujos futuros descontados. Positivo = el deal crea valor.' + (rehab ? ' Con la casa en rehab es una PROYECCIÓN del plan completo, no un resultado.' : '')) + '</div><div class="big up">' + iaMoney(i.vpn31PostRefi) + '</div>' + (rehab ? '<div class="meta" style="color:var(--amber)">proyección del plan — la casa aún no opera</div>' : '') + '</div>'
+        // CAP y DSCR se tapan por SEPARADO: una casa rentada sin cuota (cash/pre-refi) tiene
+        // CAP válido y DSCR n/a — colapsar la tarjeta entera escondería un número bueno.
+        + '<div class="card"><div class="lab">CAP / DSCR' + kt('CAP = rendimiento de la casa como negocio (NOI ÷ valor). DSCR = cobertura de la deuda (NOI ÷ cuota); >1.20 es sano.') + '</div>'
+        + (i.capValor == null && i.dscr == null ? na(eo.razonCap || eo.razonDscr)
+          : '<div class="big">' + (i.capValor != null ? p1(i.capValor) : '—') + ' · ' + (i.dscr != null ? i.dscr.toFixed(2) : '—') + '</div>'
+            + (i.capValor == null ? '<div class="meta" style="color:var(--amber)">🔨 CAP: ' + OS_E(eo.razonCap || '') + '</div>' : '')
+            + (i.dscr == null ? '<div class="meta" style="color:var(--amber)">🔨 DSCR: ' + OS_E(eo.razonDscr || '') + '</div>' : '')) + '</div>'
+        + '<div class="card"><div class="lab">Equilibrio' + kt('Ocupación mínima para no perder plata: por debajo de este %, la renta no cubre los gastos + la cuota.') + '</div>'
+        + (i.puntoEquilibrio == null ? na(eo.razonEquilibrio) : '<div class="big warn">' + (i.puntoEquilibrio * 100).toFixed(0) + '%</div><div class="meta">ocupación mínima</div>') + '</div>'
         + '</div>';
     }
     const esEjemplo = IA.params.some(p => p.key === 'es_ejemplo' && p.value === 'true');
