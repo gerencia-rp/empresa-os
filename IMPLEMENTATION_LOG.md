@@ -3,6 +3,41 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 04-ago · 🔨 BLOQUE 3B — ESTADO HONESTO en casas EN REHAB (mueren "-Infinity / Infinity% / cap negativo") ✅
+
+**El síntoma (5320 Wellington Dr):** en el admin "Modelo & movimientos" y en el portal del inversor las tarjetas KPI se veían **rotas**: `CAP -1.1%` · `DSCR -Infinity` · `EQUILIBRIO Infinity%` · VPN negativo. Reproducido con los params REALES de prod antes de tocar nada.
+
+**La causa (no era un error de cálculo):** la casa está en rehab y **todavía no cobra renta** (`arriendo_hab = 0` → arriendo pleno $0/mes → NOI **−$5,974**/año). Con eso las fórmulas se van a negativo o a infinito: `dscr = (NOI/12) ÷ cuota` con cuota 0 → **±Infinity** · `equilibrio = gasto ÷ arriendo` con arriendo 0 → **Infinity** · `cap = NOI ÷ valor` → negativo. El número no es "malo": el indicador **TODAVÍA NO APLICA**. Pero se leía como un sistema roto.
+
+**El arreglo — una sola definición en el motor (`os/inv-engine.js`), la misma para admin y portal:**
+- `indicadores.estadoOperativo = {enRehab, sinRenta, sinDeuda, noiAnual, arriendoPleno, motivo, texto, razonCap, razonDscr, razonEquilibrio}`.
+- `capValor` / `capCosto` / `dscr` / `puntoEquilibrio` salen **null** en rehab; fuera de rehab se **sanean los no-finitos**. Vuelven SOLOS a mostrar valores en cuanto NOI > 0 (item 4 del DoD — no hay flag manual que tocar).
+- **RAZÓN POR INDICADOR** (bug que casi se cuela): una casa **RENTADA sin cuota de deuda** (compra en cash o pre-refi) también da DSCR no-finito, pero **NO está en rehab** — decirle "todavía no cobra renta" sería mentira. Cada tarjeta explica el indicador que está tapando.
+- **NO se tocó** `tir31/vpn31/porHorizonte/profit/fases/series` — siguen siendo la proyección del plan.
+
+**ANTES → DESPUÉS (params reales de prod, corridos por el mapeo real del admin `iaEngineParamsFromRows`):**
+
+| Casa | Indicador | ANTES | DESPUÉS |
+|---|---|---|---|
+| **5320 Wellington** (rehab, NOI −$5,974) | CAP | `-1.1%` | `n/a 🔨` + "En fase de rehab — sin renta todavía; este indicador aún no aplica." |
+| | DSCR | **`-Infinity`** | `n/a 🔨` + misma razón |
+| | Equilibrio | **`Infinity%`** | `n/a 🔨` + misma razón |
+| | TIR 31a | (anualizada sin operación) | `n/a 🔨` (coherente con la regla A1 de holds < 1 año) |
+| | VPN 31a | `-$11,412` mudo | `-$11,412` **rotulado "proyección del plan — la casa aún no opera"** |
+| **7105 Bethune** (RENTADA, NOI $90,253, sin cuota) | CAP | 14.3% | **14.3%** (se sigue mostrando — es válido) |
+| | DSCR | **`Infinity`** | `n/a 🔨` + "**no tiene cuota de deuda** (compra en cash o todavía sin refi)" ← razón correcta, NO "rehab" |
+| | Equilibrio | 23.9% | **23.9%** (se sigue mostrando) |
+
+- **ADMIN:** banner "🔨 esta casa está en fase de rehab" arriba de los KPIs + las 4 tarjetas con estado honesto. **CAP y DSCR se tapan por SEPARADO** — colapsar la tarjeta entera escondería un CAP válido (caso Bethune). La comparativa de Escenarios muestra `n/a 🔨` con la razón **del escenario**, no un texto fijo.
+- **PORTAL DEL INVERSOR:** mismo banner en Mi Casa, tiles DSCR/CAP/TIR con el estado, ⓘ explicado. **Columna 🧪 Simulado corregida:** sale de `inv_projection` (JSON **cacheado**, anterior al fix) donde el cap de una casa en rehab quedó como número negativo real mientras `dscr`/`equilibrio` (±Infinity) los volvió `null` el JSON → la fila leía `— · — · — · -1.1%`, **dos respuestas contradictorias**. Ahora el cache pasa por la MISMA regla.
+- **Asistente del inversor** (`api/brain-chat.mjs`): recibe `estado_operativo` y tiene regla explícita — decir "aún no aplica", **nunca "null" ni "no tengo el dato"**, y jamás rellenar con un número de otro lado.
+- **Sonda de QA** (`scripts/qa-sonda.js`): ahora detecta `Infinity`/`null` además de NaN/undefined — **este bug era invisible para la sonda**.
+- **Golden nuevo `scripts/test-inv-rehab.mjs` → 24/24**, con **control de NO regresión**: una casa rentando sigue dando **CAP 9.63% · DSCR 1.97 · equilibrio 92%**, idénticos a antes del cambio.
+
+**DoD 3B:** Wellington ya no muestra -Infinity/Infinity%/cap negativo, muestra el estado honesto ✓ · aplica en admin y en el portal (mismo motor) ✓ · los indicadores que sí valen en rehab (capital invertido, costo total, valor en papel) se siguen mostrando ✓ · vuelven solos al cobrar renta ✓ · sin TIR anualizada en rehab ✓.
+
+**BLOQUE 2 (fino):** los 3 chips `real`/`estimado`/`manual` del encabezado de ayuda y de la leyenda "Parámetros del modelo (N)" no tenían `title=` (se explicaban solo por el texto adyacente). Ahora llevan tooltip de una línea con **una definición compartida** (`IA_TIP_REAL/EST/MAN`) para que encabezado y leyenda no se desincronicen.
+
 ## 03-ago · 🧭 CLARIDAD + LIMPIEZA del ADMIN del portal de inversionistas (rama feat/portal-inversionista-v2) ✅ EN PROD
 
 Mejoras de UX/claridad (sin tocar el motor de cálculo inv-indicadores/inv-escenarios; inv-engine solo aditivo). Verificado en prod `empresa-os-admin.vercel.app`, 0 pageerrors, ci:gate 15/15.
