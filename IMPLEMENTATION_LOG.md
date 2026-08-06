@@ -3,6 +3,58 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 06-ago · ⚙️ PARTE 2 — DISTRIBUCIÓN AUTOMÁTICA calculada DESDE EL LEDGER ✅
+
+**Lo que había (y por qué no servía):** ya existía un modo "Cálculo automático" (`inv_dist_calc`, 30-jul) que **recalculaba en paralelo** con otra lógica: `ingresos − gastos − PM(4%) − ref30`, **por un solo inversionista**, y **solo para casas refinanciadas**. Tres problemas: (1) violaba la regla de oro — segunda consulta, segunda definición; (2) **no restaba el interés del HML** (solo la cuota ref30), así que en las casas todavía en Hard Money la deuda no se descontaba; (3) restaba un **PM fee del 4% MODELADO** que no es un gasto real de `pm_expenses` — un número inventado dentro de un cálculo que se presenta como "leído de la fuente".
+
+**Lo nuevo (`inv_dist_auto(property_id, mes)`, migr `20260806110000`):** el cálculo **lee la RPC `inv_ledger`** — literalmente los mismos movimientos que el admin ve en la pestaña 💰 Ledger — filtrados al mes, y suma con los flags del motor:
+
+```
+Neto distribuible = Renta (categoria='renta')
+                  − Gastos operativos (categoria='operativo')
+                  − Servicio de deuda (subcategoria='servicio_deuda' ← Parte 1)
+Monto por inversionista = Neto × reparto_pct   (inv_holdings, "Casas & reparto")
+```
+
+**🗓 Sub-hallazgo — el mes contable (regla dura de CLAUDE.md):** el ledger fecha las rentas con `coalesce(paid_at, billing_ym-01)`, así que agrupar por `fecha` habría usado la **fecha de cobro**, justo lo que la regla dura de Rentas prohíbe ("el mes del dinero es el MES DE RENTA, nunca la fecha de cobro"). **No es teórico: en 2315 Dove Springs 3 de 27 pagos caen en un mes distinto al que corresponden.** Por eso `inv_ledger` ganó la columna **`mes`** = mes CONTABLE (`billing_ym` en `pm_payments`/`pm_expenses`; mes de la fecha en el resto) y tanto el Ledger como la distribución agrupan por ahí → **son el mismo conjunto, por definición**.
+
+**ANTES → DESPUÉS:**
+
+| | ANTES (`inv_dist_calc`) | DESPUÉS (`inv_dist_auto`) |
+|---|---|---|
+| Fuente | consulta paralela a `pm_payments`/`pm_expenses`/`ff_hml_payments` | **la RPC `inv_ledger`** (los mismos movimientos del 💰 Ledger) |
+| Fórmula | ingresos − gastos − **PM 4% modelado** − ref30 | renta − operativos − **servicio de deuda (interés HML + refi 30a)** |
+| Interés del HML | **no se restaba** | se resta (subcategoria `servicio_deuda`) |
+| Mes | `billing_ym` en unas fuentes, fecha en otras | **mes contable único** (`mes` del ledger) |
+| Alcance | 1 inversionista por vez · **solo casas refinanciadas** | **todos los inversionistas de la casa** · cualquier casa con reparto |
+| Reparto en 0% | creaba distribuciones de **$0** en silencio | avisa "no tiene reparto configurado" y **no crea nada** |
+
+**Ejemplo COMPLETO verificado en prod — 5003 Michelle Ct, Junio 2026:**
+
+| Concepto | Movimientos del Ledger (mes 2026-06) | Monto |
+|---|---|---|
+| Renta cobrada | 1 mov · `Renta cobrada · 2026-06 · Junio 2026` [Rentas:pm_payments] | **$3,700.00** |
+| (−) Gastos operativos | 0 mov | **$0.00** |
+| (−) Servicio de deuda | 1 mov · `Pago interés HML` 03-jun [FF:ff_hml_payments] | **−$2,116.13** |
+| **(=) Neto distribuible** | | **$1,583.87** |
+| Reparto (1 inversionista, 40%) | $1,583.87 × 0.40 | **$633.55** |
+
+El Ledger de esa casa filtrado a Junio 2026 devuelve **exactamente esos 2 movimientos** — el desglose no es un cálculo aparte, es la suma de lo que se ve en pantalla. Insert verificado bajo RLS como admin (probado con `begin/rollback`: 0 filas dejadas).
+
+**Casos borde verificados en prod:**
+- **Neto ≤ 0** — 7105 Bethune, jul-2026: renta $2,800 − oper $913.77 − deuda $2,874.21 = **−$987.98** → "Sin distribución este mes — el neto quedó en cero o negativo". **No crea nada.**
+- **Sin reparto** — 2315 Dove Springs: tiene 1 inversionista pero con `reparto_pct = 0` (7 de 26 holdings están así) → "Esta casa tiene inversionistas cargados pero **todos en 0%**". **No crea distribuciones de $0.**
+- **Duplicados** — si ya hay automáticas para esa casa+mes, avisa con el conteo y pide confirmación antes de sumar otras.
+- **Reversible** — se anulan con ⏸ (soft-delete) como cualquier manual.
+
+- **La MANUAL no se tocó** (mismos campos, mismo insert, misma tabla). El badge ⚙️ Automática ahora muestra la traza correcta: las nuevas con `renta/operativos/deuda/neto`, las viejas con su fórmula "anterior a 06-ago" — **sin reescribir la historia**.
+- **`inv_dist_calc` queda DEPRECADA** (no se dropea: las distribuciones creadas antes referencian su `calc_meta`; el comment en DB explica las diferencias). `inv_refinanced_props` ya no se consulta al cargar el admin.
+- **No mueve dinero:** solo calcula y REGISTRA (informativo/contable). El envío real lo hace una persona por fuera — dicho en la UI.
+
+**DoD Parte 2:** elijo casa + mes → veo el desglose (renta − operativos − deuda = neto) y el monto por inversionista ✓ · al confirmar se crean las distribuciones en `inv_distributions`, reversibles ✓ · la manual sigue igual ✓ · verificado en una casa con renta y deuda (Michelle jun-26: neto y % cuadran al centavo con el Ledger de ese mes) ✓.
+
+**⚠ Pendiente declarado:** el **Flujo Mensual del portal** sigue agrupando por `fecha` (filtro por AÑO, donde la diferencia es inmaterial); si se quiere el mes contable también ahí, ya está disponible en `m.mes` — no se cambió para no mover números que el CEO ya validó en QA.
+
 ## 06-ago · 💸 PARTE 1 — El LEDGER contabiliza el SERVICIO DE DEUDA (interés HML + refi 30a) ✅
 
 **El pedido:** "el Ledger trae rentas y gastos operativos pero NO muestra el pago mensual del HML ni el de la refi a 30 años, aunque el dato ya existe en `ff_hml_payments`".
