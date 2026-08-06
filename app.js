@@ -714,7 +714,8 @@ async function inviteUser(event) {
     const res = await fetch(`${window.SUPABASE_URL}/functions/v1/invite-user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify({ email, role, allowed_areas: areas })
+      // redirect_origin: el invitado vuelve al MISMO dominio desde el que lo invitaste
+      body: JSON.stringify({ email, role, allowed_areas: areas, redirect_origin: location.origin })
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');

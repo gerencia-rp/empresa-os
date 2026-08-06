@@ -3,6 +3,49 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 06-ago · 🔑 LINK MÁGICO siempre volvía a empresa-os.vercel.app — es la ALLOWLIST de Auth, no el código ✅ (falta 1 paso humano)
+
+**Lo que YA estaba bien (verificado, no se tocó):** los 4 lugares que piden link mágico/recovery **ya usaban el origin actual** — `app.js:129` (login ✉️) y `app.js:229` (recovery) con `window.location.origin + '/'`, `inv-portal.js:55` e `inv-admin.js:168` con `location.origin + '/inversionista'`.
+
+**Prueba de que el cliente manda lo correcto** (headless, interceptando el request — abortado para NO mandar mails):
+
+| Página desde donde se pide | `redirect_to` que sale en `/auth/v1/otp` |
+|---|---|
+| `empresa-os-admin.vercel.app` | **`https://empresa-os-admin.vercel.app/`** ✓ |
+| `empresa-os.vercel.app` | `https://empresa-os.vercel.app/` ✓ |
+
+**LA CAUSA — GoTrue descarta el destino y cae al Site URL.** Si `redirect_to` no está en las **Redirect URLs** de Auth, GoTrue **lo ignora en silencio** (no hay error) y usa el **Site URL**. Probado contra el endpoint `verify`, que expone el comportamiento:
+
+```
+redirect_to=https://empresa-os-admin.vercel.app/ → Location: https://empresa-os.vercel.app/#error=...   ❌ descartado
+redirect_to=https://empresa-os.vercel.app/       → Location: https://empresa-os.vercel.app/#error=...   ✓ permitido
+redirect_to=https://evil-example.com/            → Location: https://empresa-os.vercel.app/#error=...   ✓ (bien rechazado)
+```
+
+`empresa-os-admin.vercel.app` se comporta **igual que un dominio ajeno** → NO está en la allowlist. **Site URL = `https://empresa-os.vercel.app`.**
+
+**🙋 PASO HUMANO (único pendiente, no lo puedo hacer sin acceso al dashboard):** Supabase → Authentication → URL Configuration → **Redirect URLs** → agregar:
+
+```
+https://empresa-os-admin.vercel.app/**
+```
+
+(el `/**` cubre `/` y `/inversionista` en un solo patrón; si preferís explícito: `https://empresa-os-admin.vercel.app/` y `https://empresa-os-admin.vercel.app/inversionista`). **NO hace falta cambiar el Site URL** — dejalo en `empresa-os.vercel.app` para no romper los links viejos.
+
+**Re-verificar en 5 s después de agregarlo** (tiene que devolver `Location: https://empresa-os-admin...`):
+```bash
+curl -s -o /dev/null -D - "https://nezbaljfhhyznhltpjnk.supabase.co/auth/v1/verify?token=x&type=magiclink&redirect_to=https://empresa-os-admin.vercel.app/" | grep -i location
+```
+
+**🐛 DOS BUGS REALES encontrados de paso en el dominio admin (arreglados y deployados):**
+
+1. **CORS: 15 edge functions bloqueadas desde `empresa-os-admin`.** `_shared/cors.ts` no tenía ese dominio en `ALLOWED_ORIGINS` → devolvía `Allow-Origin: https://empresa-os.vercel.app` y el navegador **descartaba la respuesta**. Afecta a las 15 que usan el CORS compartido; la única que el front llama hoy es **`ia-data`** (módulo IA). Agregado el dominio + soporte de secret `EXTRA_ALLOWED_ORIGINS` (coma-separado) para no tocar código la próxima vez. **Verificado tras el deploy:** admin → `empresa-os-admin` ✓ · empresa-os → `empresa-os` ✓ · `evil-example.com` → cae al primero ✓ (sigue restrictivo).
+2. **`invite-user` mandaba a los invitados SIEMPRE a `APP_URL`** (hardcodeado a `empresa-os.vercel.app`), sin importar desde qué dominio invitaras. Ahora el front manda `redirect_origin: location.origin` (`app.js` + `os/os-admin.js`) y la función lo respeta **validado contra whitelist** (`safeRedirect()`), con fallback a `APP_URL` — nadie puede redirigir una invitación a un sitio ajeno.
+
+**Deploy:** edge functions `ia-data` (v3) e `invite-user` (v37) por MCP · front `bundle.06546640daad` en `empresa-os-admin` (READY, target production).
+
+**⚠ Lo que NO pude verificar de punta a punta:** que el mail llegue y la sesión quede activa — el paso que falta es la allowlist (config del dashboard) y no tengo acceso a leer el correo. Todo lo demás de la cadena está probado: el cliente pide el dominio correcto ✓, GoTrue lo aceptará en cuanto esté en la lista ✓ (probado con los 3 casos de arriba), y la app ya sabe levantar la sesión del hash en ese dominio (es el mismo código que funciona hoy en empresa-os).
+
 ## 06-ago · 🎯 CAUSA REAL de "no se ve la carga automática": **el dominio equivocado** (no era el código) ✅
 
 **⚠ Corrección de la entrada anterior.** Ahí escribí que la causa raíz era `.ct-btn` sin definir. **Eso era un problema real de estilos, pero NO era por qué el CEO no veía el control.** Lo diagnostiqué con un harness que **forzaba `window.osInit()` y stubbeaba `IA`** — nunca reprodujo la carga real, así que "verificó" algo que el usuario nunca ejecuta. Reemplazado por `scripts/qa-dist-real.mjs`, que hace **login por el formulario** y navega como el usuario, **sin un solo stub**.

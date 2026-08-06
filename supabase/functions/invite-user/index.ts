@@ -7,6 +7,20 @@ import { requireAuth } from "../_shared/auth.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL = Deno.env.get("APP_URL") || "https://empresa-os.vercel.app";
+// 06-ago: el invitado volvía SIEMPRE a APP_URL, aunque el admin estuviera trabajando en otro
+// dominio (empresa-os-admin.vercel.app). Ahora el front manda su origin y se respeta —
+// validado contra una whitelist para que nadie pueda redirigir la invitación a un sitio ajeno.
+// (Recordá: el destino igual tiene que estar en las Redirect URLs de Auth, si no GoTrue
+//  lo descarta en silencio y cae al Site URL.)
+const REDIRECT_WHITELIST = [
+  "https://empresa-os.vercel.app",
+  "https://empresa-os-admin.vercel.app",
+  ...(Deno.env.get("EXTRA_ALLOWED_ORIGINS") || "").split(",").map((s) => s.trim()).filter(Boolean),
+];
+function safeRedirect(origin: unknown): string {
+  const o = String(origin || "").replace(/\/+$/, "");
+  return REDIRECT_WHITELIST.includes(o) ? o : APP_URL;
+}
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +47,8 @@ Deno.serve(async (req) => {
     .filter((a: string) => AREAS.includes(a));
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ ok: false, error: "Email inválido" }, 400);
+  // dominio al que debe volver el invitado: el que usa el admin ahora (validado)
+  const appUrl = safeRedirect(body.redirect_origin || req.headers.get("Origin"));
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -61,7 +77,7 @@ Deno.serve(async (req) => {
     const { error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email,
-      options: { redirectTo: `${APP_URL}/` }
+      options: { redirectTo: `${appUrl}/` }
     });
     if (linkErr) {
       // No es bloqueante — el profile ya existe. Solo avisamos
@@ -72,7 +88,7 @@ Deno.serve(async (req) => {
   }
 
   // Invitar al usuario nuevo (Supabase envía email con link de signup)
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${APP_URL}/` });
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl}/` });
   if (error) return json({ ok: false, error: error.message }, 400);
 
   const userId = data.user?.id;
