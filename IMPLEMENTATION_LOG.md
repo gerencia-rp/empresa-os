@@ -3,6 +3,48 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 06-ago · 🔍 "El Ledger no muestra el servicio de deuda" — en empresa-os-admin SÍ lo muestra (verificado 4 veces) ✅
+
+Los 3 chequeos pedidos, con evidencia:
+
+**(1) ¿El bundle de prod es el HEAD de la rama?** **Sí.** `npm run build` sobre HEAD (`759c1ad`) genera **`bundle.06546640daad.js`** y eso es exactamente lo que sirve `empresa-os-admin.vercel.app`. No estaba atrasado.
+
+**(2) Redeploy limpio:** hecho igual con `vercel --prod --force` (rebuild completo, sin caché) para eliminar la variable. Resultado: **mismo hash** `06546640daad` → confirma que no había nada viejo cacheado.
+
+**(3) ¿`iaTabLedger` renderiza las filas y el total?** **Sí**, verificado en **carga real logueada** (login por formulario + `osNav` + click en la pestaña + selección de casa por el `<select>`, **sin stubs ni `osInit()` forzado**) con `scripts/qa-ledger-real.mjs`:
+
+| Casa | Filas RPC | Filas `servicio_deuda` | Renderizadas en la tabla | Total del encabezado | ¿Cuadra? |
+|---|---|---|---|---|---|
+| **5003 Michelle Ct** | 29 | 11 | **11 de 29** | **$24,194** | rpc 24,193.56 ✓ |
+| **2315 Dove Springs** | 94 | 13 | **13 de 94** | **$37,529** | rpc 37,529.00 ✓ |
+| 7105 Bethune (la que abre por defecto) | 19 | 1 | 1 | $2,874 | ✓ |
+
+Filas concretas renderizadas en Michelle — **son los números exactos del reporte**:
+```
+2026-07-03 | Pago refi 30 años (banco)  [P&L NO] [servicio de deuda] | financiero | −$3,032
+2026-06-03 | Pago interés HML           [P&L NO] [servicio de deuda] | financiero | −$2,116
+2026-05-04 | Pago interés HML           [P&L NO] [servicio de deuda] | financiero | −$2,116
+```
+**11 OK · 0 FALLAS · 0 pageerrors.** También verifiqué la RPC **por PostgREST** (el camino real del front, no SQL directo): 29 filas, columnas `fecha, mes, concepto, tipo, categoria, subcategoria, monto, fuente, comprobante`, 11 con `servicio_deuda` — descarta un caché de esquema de PostgREST tras el `drop function`.
+
+**La diferencia está, otra vez, en el DOMINIO — y esta vez es sutil.** Corrí el MISMO script contra `empresa-os.vercel.app`:
+
+| | `empresa-os-admin` | `empresa-os` |
+|---|---|---|
+| Filas de deuda en la tabla | **11 ✓** | **11 ✓** (¡también aparecen!) |
+| Badge `servicio de deuda` | **✓** | **✗** |
+| Total "Servicio de deuda" en el encabezado | **$24,194 ✓** | **✗ (no existe)** |
+
+En el dominio viejo **las filas SÍ salen** (los conceptos "Pago interés HML"/"Pago refi 30 años" vienen de la RPC, que es compartida y ya está actualizada), pero **falta el badge y falta el total** — porque esos dos son del front nuevo, que ahí no está deployado. Visualmente: hay líneas de deuda sueltas entre las demás, **sin sección ni total identificable** — que es justo la sensación de "no muestra el servicio de deuda".
+
+**No hubo cambio de código**: nada estaba roto en el dominio acordado. Se suma `scripts/qa-ledger-real.mjs` para que esto se pueda comprobar en 1 comando y no vuelva a costar una vuelta:
+```bash
+QA_PASS=… QA_CASA=Michelle node scripts/qa-ledger-real.mjs          # empresa-os-admin
+QA_BASE=https://empresa-os.vercel.app QA_PASS=… node scripts/qa-ledger-real.mjs
+```
+
+**Nota menor (no es bug):** los montos del Ledger se muestran redondeados (`iaMoney`): `−$3,032` en vez de `$3,032.26`. Es el formato único de todo el admin; el total del encabezado sí cuadra al centavo contra la RPC ($24,194 vs $24,193.56). Si se quiere centavos en el Ledger, es un cambio de `iaMoney` en esa vista — decisión de diseño, no se tocó.
+
 ## 06-ago · 🔑 LINK MÁGICO siempre volvía a empresa-os.vercel.app — es la ALLOWLIST de Auth, no el código ✅ (falta 1 paso humano)
 
 **Lo que YA estaba bien (verificado, no se tocó):** los 4 lugares que piden link mágico/recovery **ya usaban el origin actual** — `app.js:129` (login ✉️) y `app.js:229` (recovery) con `window.location.origin + '/'`, `inv-portal.js:55` e `inv-admin.js:168` con `location.origin + '/inversionista'`.
