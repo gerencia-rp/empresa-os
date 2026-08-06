@@ -3,6 +3,31 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 06-ago · 🐛 FIX — el toggle Manual/Automática de Distribuciones no se veía (`.ct-btn` nunca estuvo definida) ✅
+
+**El reporte:** "en Distribuciones sigue apareciendo solo el formulario manual; el modo Automática no está visible".
+
+**Lo primero que descarté:** que la lógica no estuviera renderizada. **Sí lo estaba** — `iaTabDist` emitía los dos botones desde el 30-jul y el bundle de prod contenía `iaDistMode`, `tabBtn` y el form automático completo. El problema no era el "si se dibuja", era el **"se lee como control"**.
+
+**Causa raíz (bug de estilos, no de lógica):** `inv-admin.js` usa la clase **`.ct-btn` en 21 botones** (incluido el toggle de modo), pero esa clase **solo la define `os-ct-sabueso.js`** dentro de su propio `<style>` inyectado, que se monta **al entrar a `/contable`**. En `/inversionistas` **nunca existió** → los botones caían al render **nativo del navegador**. El toggle quedaba como dos botoncitos grises del sistema pegados arriba del formulario: parecía un artefacto de la página, no un selector de modo. `inv-admin.js` **no inyectaba ningún estilo propio** (verificado: 0 `createElement('style')` en el módulo).
+
+**Segundo hallazgo (importante para el CEO):** existen **dos proyectos Vercel** con builds distintos. `empresa-os.vercel.app` (el de la URL "principal" de este CLAUDE.md) sirve un bundle **viejo, sin `inv_dist_auto` NI `inv_dist_calc`** — o sea **sin ningún modo automático**. El proyecto correcto es **`empresa-os-admin.vercel.app`**. Si se mira el dominio viejo, el modo automático no aparece por más que esté deployado.
+
+| | ANTES | DESPUÉS |
+|---|---|---|
+| `.ct-btn` en /inversionistas | **sin definir** → 21 botones nativos del navegador | `iaInjectCSS()` inyecta la MISMA regla scopeada a `#os-root` |
+| Toggle de modo | 2 botones nativos sueltos, sin etiqueta | **segmented control** con label **"Modo de carga"**, activo en teal (`--a1`), + línea que explica qué hace cada modo |
+| Dependencia de estilos | 100% de una clase externa | estilos **inline de respaldo**: se ve aunque el `<style>` no llegue a montarse |
+| Etiqueta | "⚙️ Cálculo automático" | **"⚙️ Automática"** (par simétrico de "✍️ Manual") |
+
+**VERIFICADO EN PANTALLA en prod** (`scripts/qa-dist-toggle.mjs`, nuevo — renderiza `invAdminView()` con `IA` stubbeado y mide **estilos computados**, no solo presencia en el DOM): **15/15 · 0 pageerrors**.
+- 2 botones en el DOM: `["✍️ Manual","⚙️ Automática"]` · tamaños reales **101×37 y 125×37 px** · `display:flex · visibility:visible · opacity:1` (ninguno oculto) · el activo con fondo **`rgb(69,227,198)`** (= `--a1`).
+- **Click real** en "Automática" → `IA.distMode === 'auto'` ✓ → aparecen selector de **casa**, selector de **mes**, botón **"Calcular desde el Ledger"** y la fórmula "renta − gastos operativos − servicio de deuda"; el form manual **desaparece** ✓.
+- `#os-styles` presente y el botón primario `.cbtn` con su gradiente ✓ (el harness fuerza `window.osInit()`: sin eso el screenshot mentía, mostrando todo sin estilos).
+- ⚠ gotcha reconfirmado: `.lab` lleva `text-transform:uppercase` y `innerText` lo respeta → el check de "Modo de carga" compara **case-insensitive**.
+
+**No se tocó** la lógica de cálculo, ni la RPC, ni el modo manual.
+
 ## 06-ago · ⚙️ PARTE 2 — DISTRIBUCIÓN AUTOMÁTICA calculada DESDE EL LEDGER ✅
 
 **Lo que había (y por qué no servía):** ya existía un modo "Cálculo automático" (`inv_dist_calc`, 30-jul) que **recalculaba en paralelo** con otra lógica: `ingresos − gastos − PM(4%) − ref30`, **por un solo inversionista**, y **solo para casas refinanciadas**. Tres problemas: (1) violaba la regla de oro — segunda consulta, segunda definición; (2) **no restaba el interés del HML** (solo la cuota ref30), así que en las casas todavía en Hard Money la deuda no se descontaba; (3) restaba un **PM fee del 4% MODELADO** que no es un gasto real de `pm_expenses` — un número inventado dentro de un cálculo que se presenta como "leído de la fuente".
