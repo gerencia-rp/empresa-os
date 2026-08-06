@@ -524,6 +524,24 @@ async function iaCrearDist() {
 }
 window.iaCrearDist = iaCrearDist;
 
+// ⚠ BUG DE ESTILOS (06-ago): este módulo usa `.ct-btn` en 21 botones, pero esa clase SOLO
+// la define os-ct-sabueso.js dentro de su propio <style> inyectado (pantalla /contable).
+// En /inversionistas nunca estaba definida → los botones salían como botones NATIVOS del
+// navegador. Por eso el toggle Manual/Automática pasaba desapercibido: parecía un glitch,
+// no un control. Se inyecta acá la MISMA regla, scopeada igual.
+function iaInjectCSS() {
+  if (document.getElementById('ia-styles')) return;
+  const st = document.createElement('style'); st.id = 'ia-styles';
+  st.textContent = "#os-root .ct-btn{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);border-radius:8px;cursor:pointer;font-size:11px;padding:5px 9px}"
+    + " #os-root .ct-btn:hover{color:var(--ink);border-color:var(--a2)}"
+    + " #os-root select.ct-btn{appearance:auto}"
+    // segmented control del modo de carga (Manual / Automática) — no depende de ninguna clase externa
+    + " #os-root .ia-seg{display:inline-flex;gap:0;border:1px solid var(--glassb);border-radius:11px;overflow:hidden;background:var(--glass)}"
+    + " #os-root .ia-seg button{background:transparent;border:none;color:var(--mut);font-weight:750;font-size:12.5px;padding:9px 18px;cursor:pointer;display:flex;align-items:center;gap:6px}"
+    + " #os-root .ia-seg button:hover{color:var(--ink)}"
+    + " #os-root .ia-seg button.on{background:var(--a1);color:#fff}";
+  document.head.appendChild(st);
+}
 // ─── Distribución AUTOMÁTICA (calculada desde Supabase, ver mapa de datos) ───
 function iaDistMode(m) { IA.distMode = m; IA.distCalc = null; osRender(); }
 window.iaDistMode = iaDistMode;
@@ -653,7 +671,11 @@ function iaTabDist() {
       + '</div><div style="display:flex;gap:6px;margin-top:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaSaveDist(\'' + d.id + '\')">💾 Guardar</button><button class="ct-btn" onclick="IA.distEdit=null;osRender()">Cancelar</button></div></td></tr>';
   };
   const mode = IA.distMode || 'manual';
-  const tabBtn = (m, lbl) => '<button class="ct-btn" style="padding:7px 15px;font-weight:700;border-radius:9px' + (mode === m ? ';background:var(--a1);color:#fff;border-color:var(--a1)' : '') + '" onclick="iaDistMode(\'' + m + '\')">' + lbl + '</button>';
+  // selector de MODO — segmented control autocontenido (.ia-seg se inyecta en iaInjectCSS;
+  // además lleva estilos inline de respaldo por si el <style> no llegara a montarse).
+  const tabBtn = (m, lbl) => '<button class="' + (mode === m ? 'on' : '') + '" style="'
+    + (mode === m ? 'background:var(--a1);color:#fff;' : 'background:transparent;color:var(--mut);')
+    + 'border:none;font-weight:750;font-size:12.5px;padding:9px 18px;cursor:pointer" onclick="iaDistMode(\'' + m + '\')">' + lbl + '</button>';
   // ── modalidad MANUAL (existente) ──
   const manualForm = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
     + '<select id="ia-d-inv" class="osa-in">' + invOpts + '</select>'
@@ -737,8 +759,15 @@ function iaTabDist() {
   const origenTag = d => d.origen === 'automatica'
     ? '<span class="badge b-ok" style="cursor:help" title="' + OS_E(origenTip(d.calc_meta)) + '">⚙️ Automática' + (d.calc_meta && d.calc_meta.editado ? ' 📝' : '') + '</span>'
     : '<span class="badge b-warn">✍️ Manual</span>';
+  const modoTxt = mode === 'auto'
+    ? 'El sistema calcula el neto del mes desde el 💰 Ledger de la casa y lo reparte entre sus inversionistas.'
+    : 'Cargás vos el inversionista, la casa y el monto.';
   return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">➕ Nueva distribución</div><div class="k">comprobante de pago (soporte) ≠ K-1 (fiscal) — ambos se guardan y se VEN como links</div></div>'
-    + '<div style="display:flex;gap:8px;margin-bottom:12px">' + tabBtn('manual', '✍️ Manual') + tabBtn('auto', '⚙️ Cálculo automático') + '</div>'
+    + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
+    + '<span class="lab" style="margin:0">Modo de carga</span>'
+    + '<span class="ia-seg" style="display:inline-flex;border:1px solid var(--glassb);border-radius:11px;overflow:hidden;background:var(--glass)">'
+    + tabBtn('manual', '✍️ Manual') + tabBtn('auto', '⚙️ Automática') + '</span></div>'
+    + '<div class="meta" style="margin-bottom:12px">' + modoTxt + '</div>'
     + form + '</div>'
     + '<div class="card overx"><div class="chart-h"><div class="t">Distribuciones (' + (IA.dists || []).length + ')</div><div class="k">✎ editar (queda en el audit) · ⏸ soft-delete</div></div>'
     + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Casa</th><th>Fecha</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Origen</th><th>Links</th><th>Estado</th><th style="text-align:right"></th></tr></thead><tbody>'
@@ -1776,6 +1805,7 @@ function invAdminView() {
   else if (IA.tab === 'glosario') body = iaTabGlosario();
   else if (IA.tab === 'analizador') body = iaTabAnalizador();
 
+  iaInjectCSS();
   return '<h1>💎 Inversionistas <span>· Portal & Modelo</span></h1>'
     + '<div class="sub">Accesos con RLS estricto (cada inversionista ve SOLO sus casas) · reparto por casa · motor compartido con el portal. Portal público: <b>' + location.origin + '/inversionista</b></div>'
     + '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' + tabBtns + '<button class="ibtn" style="margin-left:auto" onclick="iaLoad(true)">↻</button></div>'
