@@ -4,6 +4,13 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🚨 REGLA DURA — DÓNDE MIRAR PROD (06-ago, tras perder una sesión entera por esto)
+
+- **Hay DOS proyectos Vercel con el MISMO repo y builds distintos.** `empresa-os.vercel.app` = producción de **`main`** · **`empresa-os-admin.vercel.app`** = donde van los `vercel --prod` de las ramas (es el de `.vercel/project.json`).
+- `empresa-os` **sí auto-deploya por push**, pero una rama que no es `main` solo genera **PREVIEWS** (`target: null`): su alias de producción **se queda en el último build de `main`**. Por eso una feature de rama "no aparece en prod" **ni siquiera en incógnito** — no es caché, es **otro build**.
+- ⚠ La línea *"URL producción: https://empresa-os.vercel.app/"* del contexto de negocio (más abajo) **NO aplica al trabajo en ramas**. Antes de debuggear un "no se ve", **confirmá el dominio y el hash del bundle**: `curl -s <dominio>/ | grep -o 'assets/bundle\.[a-f0-9]*\.js'` y compará con `dist/`.
+- 🧪 **Verificar como el usuario, no con stubs**: `scripts/qa-dist-real.mjs` hace login por el formulario y navega de verdad (`QA_BASE=<dominio> QA_PASS=… node scripts/qa-dist-real.mjs`). Un harness que fuerza `osInit()` o stubbea el estado **puede pasar 15/15 sobre un bug real** — pasó. Gotcha de timing: `iaLoad()` tarda ~6-8 s y la pestaña Distribuciones dispara un 2º load (`IA.dists`); esperá esos dos flags, no un `sleep`.
+
 ## 🎯 Estado (06 Ago 2026 — 💸 LEDGER con servicio de deuda + DISTRIBUCIÓN AUTOMÁTICA desde el Ledger) · EN VIVO
 
 - 💰 **PARTE 1 — el Ledger contabiliza el SERVICIO DE DEUDA** (rama feat/portal-inversionista-v2; migr `20260806100000`): `inv_ledger` YA emitía `pago_hml`/`fee`/`ref30`; el hueco real era **no poder separarlos** del resto de los `financiero` (desembolso HML, cash-out, draws). Ahora la RPC devuelve **`subcategoria`**: `'servicio_deuda'` = interés HML + cuota refi 30a · `'fee_hml'` = comisiones puntuales · `null` = el resto. Conceptos renombrados a **"Pago interés HML"** / **"Pago refi 30 años (banco)"**. Verificado: Dove 10 cuotas refi $27,260 + 3 HML $10,269 · Virginia 11 HML $30,699.89 (+2 fees $2,444 **separados**) · Michelle 10 HML $21,161.30 + 1 refi $3,032.26.

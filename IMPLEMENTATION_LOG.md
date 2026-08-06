@@ -3,7 +3,30 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
-## 06-ago · 🐛 FIX — el toggle Manual/Automática de Distribuciones no se veía (`.ct-btn` nunca estuvo definida) ✅
+## 06-ago · 🎯 CAUSA REAL de "no se ve la carga automática": **el dominio equivocado** (no era el código) ✅
+
+**⚠ Corrección de la entrada anterior.** Ahí escribí que la causa raíz era `.ct-btn` sin definir. **Eso era un problema real de estilos, pero NO era por qué el CEO no veía el control.** Lo diagnostiqué con un harness que **forzaba `window.osInit()` y stubbeaba `IA`** — nunca reprodujo la carga real, así que "verificó" algo que el usuario nunca ejecuta. Reemplazado por `scripts/qa-dist-real.mjs`, que hace **login por el formulario** y navega como el usuario, **sin un solo stub**.
+
+**Reproducción REAL** (login `qa-admin-test@` → `osNav('/inversionistas')` → click en 💸 Distribuciones), **el mismo script contra los dos dominios**:
+
+| Dominio | Resultado | Botones de modo | `#ia-styles` | Errores de consola |
+|---|---|---|---|---|
+| **`empresa-os-admin.vercel.app`** | **17/17 ✓** | `["✍️ Manual","⚙️ Automática"]` · 101×37 y 125×37 px · `display:flex·visible·opacity 1` | sí | **0** |
+| `empresa-os.vercel.app` | **8/17 ✗** | **`[]` — ninguno** | no | **0** |
+
+**Hallazgo clave: no hay ningún error de JS en ninguno de los dos.** El render nunca se cortó. Lo que difiere es **qué build sirve cada dominio**:
+
+- `empresa-os` **sí auto-deploya desde GitHub**, pero la rama `feat/portal-inversionista-v2` solo genera **deployments de PREVIEW** (`target: null`). Su **alias de producción sigue apuntando al último build de `main`** (commit `09560ab`, "Planner: cascada multi-día"), que es **anterior a todo este trabajo** — ni Parte 1, ni Parte 2, ni el toggle.
+- Todos los `vercel --prod` de estas sesiones fueron a **`empresa-os-admin`** (es el proyecto de `.vercel/project.json`).
+- Por eso se ve **solo el formulario manual, también en incógnito**: no es caché — es **otro build**.
+
+⚠ **Corrección a CLAUDE.md:** la sección de contexto dice *"URL producción: https://empresa-os.vercel.app/"*. Para esta rama **eso es falso**: el trabajo del portal de inversionistas vive en **`empresa-os-admin.vercel.app`**. `empresa-os.vercel.app` = producción de **`main`**.
+
+**Timing (por qué mi primer intento de test real también falló):** `iaLoad()` tarda **~6-8 s** (4 queries + `iaLoadCasa`), y al entrar a Distribuciones hay un **segundo load** (`iaLoadProducto` → `IA.dists`). Medir antes de eso da "no existe la pestaña" y parece el bug. El script ahora **espera `IA.loaded` y después `IA.dists`**, sin forzar nada.
+
+**Lo que SÍ arregló el commit anterior (y se mantiene):** `.ct-btn` estaba genuinamente sin definir en `/inversionistas` (solo la define `os-ct-sabueso.js` al entrar a /contable) → los 21 botones del admin caían al render nativo. `iaInjectCSS()` lo corrige y el toggle es ahora un segmented control con label "Modo de carga". Verificado en la carga real: `#ia-styles` presente ✓.
+
+## 06-ago · 🐛 (parcial) `.ct-btn` sin definir en /inversionistas — mejora de estilos, NO la causa del síntoma
 
 **El reporte:** "en Distribuciones sigue apareciendo solo el formulario manual; el modo Automática no está visible".
 
