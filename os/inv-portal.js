@@ -147,6 +147,13 @@ async function ipLoad() {
 }
 
 // ─── params → motor ───
+// SERVICIO DE DEUDA del ledger (interés HML + cuota refi 30a): el motor lo marca con
+// subcategoria='servicio_deuda'. Fallback a la regla vieja (financiero+gasto) por si el
+// ledger viniera de una definición anterior — así el portal nunca queda sin el dato.
+function ipEsDeuda(m) {
+  if (m.subcategoria) return m.subcategoria === 'servicio_deuda';
+  return m.categoria === 'financiero' && m.tipo === 'gasto';
+}
 function num(P, k, d) { const r = P[k]; const v = r ? parseFloat(r.value) : NaN; return isNaN(v) ? d : v; }
 function txt(P, k) { const r = P[k]; return r ? r.value : null; }
 function ipEngineParams(pid) {
@@ -243,7 +250,7 @@ function ipMetrics(pid, p, r, holding) {
       const w = pasado.filter(m => m.fecha >= desde);
       const rw = w.filter(m => m.categoria === 'renta').reduce((s, m) => s + +m.monto, 0);
       const ow = w.filter(m => m.categoria === 'operativo').reduce((s, m) => s + +m.monto, 0);
-      const dw = w.filter(m => m.categoria === 'financiero' && m.tipo === 'gasto').reduce((s, m) => s + +m.monto, 0);
+      const dw = w.filter(ipEsDeuda).reduce((s, m) => s + +m.monto, 0);
       const nMeses = [...new Set(w.filter(m => m.categoria === 'renta').map(m => String(m.fecha).slice(0, 7)))].length || 1;
       real = { renta: rw, oper: ow, deuda: dw, nMeses, flujoCasa: rw - ow - dw, desde };
     }
@@ -1025,7 +1032,7 @@ function renderFlujo(pid, inv) {
   // la deuda (financiero) NO entra al balance — se declara informativa
   const rentas = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'ingreso');
   const oper = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'gasto');
-  const deuda = w.filter(m => m.categoria === 'financiero' && m.tipo === 'gasto');
+  const deuda = w.filter(ipEsDeuda);
   const tRenta = rentas.reduce((s, m) => s + +m.monto, 0);
   const tOper = oper.reduce((s, m) => s + +m.monto, 0);
   const tDeuda = deuda.reduce((s, m) => s + +m.monto, 0);
@@ -1043,7 +1050,7 @@ function renderFlujo(pid, inv) {
   const tres = '<div class="grid k3">'
     + box('💵 Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
     + box('🧾 Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
-    + box('⚖️ Balance operativo del período', $money(balanceOp), 'renta − gastos (solo P&L SÍ) · <span title="la deuda es financiero · P&L NO — no afecta el balance operativo">Deuda HML pendiente: ' + $money(tDeuda) + ' — informativo</span>', balanceOp >= 0 ? 'up' : 'down')
+    + box('⚖️ Balance operativo del período', $money(balanceOp), 'renta − gastos (solo P&L SÍ) · <span title="interés del HML + cuota de la refi a 30 años pagados en el período. Es financiero · P&L NO: no afecta el balance operativo, pero sí se resta para saber cuánto queda para repartir.">Servicio de deuda pagado (HML/refi): ' + $money(tDeuda) + ' — informativo</span>', balanceOp >= 0 ? 'up' : 'down')
     + '</div>';
 
   // detalle anual → mensual (ingresos vs gastos vs flujo neto de la OPERACIÓN)

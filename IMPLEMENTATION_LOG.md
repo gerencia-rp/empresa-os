@@ -3,6 +3,37 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 06-ago · 💸 PARTE 1 — El LEDGER contabiliza el SERVICIO DE DEUDA (interés HML + refi 30a) ✅
+
+**El pedido:** "el Ledger trae rentas y gastos operativos pero NO muestra el pago mensual del HML ni el de la refi a 30 años, aunque el dato ya existe en `ff_hml_payments`".
+
+**Lo que encontré (antes de tocar nada):** la RPC `inv_ledger` **ya emitía** esos movimientos (`pago_hml`, `fee`, `ref30`, cruzados por `address_norm` — el mismo puente que usa el resto del ledger) y los 18 `address_norm` de `ff_hml_payments` casan 1:1 con un `ff_deals` con `property_id`. Con el sync de hoy (153 filas, `last_synced_at` 06-ago 06:03) el dato **ya aparece**: Dove Springs devuelve 13 movimientos por $37,529.
+
+**El hueco REAL (y el que bloqueaba la Parte 2):** no había forma de **separar** el servicio de deuda del resto de los `financiero` (desembolso HML, cash-out, draws, aportes). Sin esa marca, "servicio de deuda del mes" solo se podía obtener con **una consulta paralela con otra lógica** — exactamente lo que la regla de oro prohíbe (un dato, una fuente).
+
+**El arreglo — una marca en el motor, no una segunda consulta** (migr `20260806100000_ledger_servicio_deuda.sql`):
+- `inv_ledger` gana la columna de salida **`subcategoria`**: `'servicio_deuda'` → `pago_hml` + `ref30` · `'fee_hml'` → comisiones puntuales (NO son deuda recurrente) · `null` → todo lo demás.
+- Conceptos renombrados al lenguaje del CEO: **"Pago interés HML"** y **"Pago refi 30 años (banco)"**.
+- ⚠ requirió `drop function` (no se puede cambiar el tipo de retorno con `create or replace`). Verificado antes: **0 vistas/funciones dependen** de `inv_ledger` (`pg_depend`).
+- **Las categorías NO cambian:** siguen siendo `financiero` → **P&L NO**. El **saldo operativo (NOI) no se movió**. La deuda es visible y totalizable aparte — que es justo lo que la Parte 2 le resta al NOI. (NOI = renta − operativos · flujo distribuible = NOI − deuda: dos cosas distintas.)
+
+**ANTES → DESPUÉS (verificado corriendo la RPC como admin en prod):**
+
+| Casa | Movimiento | ANTES | DESPUÉS |
+|---|---|---|---|
+| **2315 Dove Springs** | Pago refi 30 años (banco) | `Cuota banco (refi 30 años)`, indistinguible del resto de `financiero` | **10 pagos · $27,260** (sep-25 → jun-26, $2,726/mes) · `subcategoria=servicio_deuda` |
+| | Pago interés HML | ídem | **3 pagos · $10,269** (jun→ago-25) · `servicio_deuda` |
+| **902 Virginia** | Pago interés HML | ídem | **11 pagos · $30,699.89** (sep-25 → jul-26) · `servicio_deuda` |
+| | Fee HML | se mezclaba con la deuda | **2 fees · $2,444** · `fee_hml` — **separado**, no cuenta como servicio de deuda |
+| **5003 Michelle** | Pago interés HML | ídem | **10 pagos · $21,161.30** · `servicio_deuda` |
+| | Pago refi 30 años (banco) | ídem | **1 pago · $3,032.26** (jul-26) · `servicio_deuda` |
+
+- **Admin (`iaTabLedger`):** figura nueva **"Servicio de deuda"** en el encabezado (junto al Saldo operativo, con ⓘ que aclara que NO baja el NOI pero sí se resta para repartir) · badge rojo **`servicio de deuda`** por fila · los subtotales por categoría abren la línea `gasto · financiero · servicio de deuda (HML/refi)`. El panel **Fuentes** ya contaba `FF:ff_hml_payments` (13 movs en Dove).
+- **Portal del inversor:** helper único `ipEsDeuda(m)` (usa `subcategoria`, con fallback a la regla vieja por si el ledger viniera de una definición anterior) reemplaza los 2 lugares que asumían "todo `financiero`+`gasto` es deuda" — antes el **Fee HML se contaba como servicio de deuda** en el CoC real de 12 meses y en el Flujo Mensual. Label corregido: "Deuda HML **pendiente**" → **"Servicio de deuda pagado (HML/refi)"** (decía "pendiente" mostrando lo ya PAGADO).
+- **No se tocó:** ningún otro movimiento, ni el cálculo del saldo operativo, ni `pnlSi`. La exclusión de la "Hipoteca" de `pm_expenses` sigue (esa cuota entra por `ff_hml_payments` con fecha real — confirmado en Dove: 12 filas "Hipoteca" $2,725.57 en `pm_expenses` **excluidas**, contra `ref30` $2,726 del HML → sin doble conteo).
+
+**DoD Parte 1:** casa con refi muestra la cuota mensual (Dove, 10 meses) ✓ · casas con HML activo muestran el interés mensual (Virginia 11, Michelle 10) ✓ · el NOI no cambió (siguen P&L NO) ✓ · visibles en la tabla y en Fuentes ✓.
+
 ## 04-ago · 🔨 BLOQUE 3B — ESTADO HONESTO en casas EN REHAB (mueren "-Infinity / Infinity% / cap negativo") ✅
 
 **El síntoma (5320 Wellington Dr):** en el admin "Modelo & movimientos" y en el portal del inversor las tarjetas KPI se veían **rotas**: `CAP -1.1%` · `DSCR -Infinity` · `EQUILIBRIO Infinity%` · VPN negativo. Reproducido con los params REALES de prod antes de tocar nada.

@@ -943,21 +943,29 @@ function iaTabLedger() {
   const mesSel = "<select class=\"osa-in\" style=\"padding:6px\" onchange=\"IA.ledgerMes=this.value;osRender()\"><option value=\"todos\">Todos los meses</option>" + mesesAll.map(m => "<option value=\"" + m + "\"" + (mf === m ? " selected" : "") + ">" + invEngine.mesEs(m) + "</option>").join("") + "</select>";
   const vis = full.filter(m => mf === "todos" || String(m.fecha || "").startsWith(mf));
   const saldoPer = vis.filter(m => m.pnl).reduce((s2, m) => s2 + (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0), 0);
+  // 🔴 SERVICIO DE DEUDA (interés HML + cuota refi 30a) — marcado en el motor con
+  // subcategoria='servicio_deuda'. Es P&L NO (no toca el saldo operativo/NOI) pero se
+  // muestra y se totaliza aparte: es lo que la distribución automática le resta al NOI.
+  const esDeuda = m => m.subcategoria === "servicio_deuda";
+  const deudaPer = vis.filter(esDeuda).reduce((s2, m) => s2 + (+m.monto || 0), 0);
   const cats = {};
-  vis.forEach(m => { const k = m.tipo + ":" + m.categoria; cats[k] = (cats[k] || 0) + +m.monto; });
+  vis.forEach(m => { const k = m.tipo + ":" + m.categoria + (esDeuda(m) ? " · servicio de deuda (HML/refi)" : ""); cats[k] = (cats[k] || 0) + +m.monto; });
   const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span>" + OS_E(k.replace(":", " · ")) + (invEngine.pnlSi(k.split(":")[1]) ? "" : " <span class=\"badge b-warn\" style=\"font-size:8px\" title=\"informativo — no afecta balance operativo\">P&L NO</span>") + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
   const tagNo = "<span class=\"badge b-warn\" style=\"font-size:8px\" title=\"informativo — no afecta balance operativo\">P&L NO</span>";
   // BLOQUE 4 (03-ago): encabezado de ayuda — qué es el Ledger y cómo leerlo.
   const saldoTip = "utilidad de operar la casa: solo mueven el saldo los movimientos marcados P&L SÍ (rentas y gastos operativos). Inversión, financiero y distribución son informativos (P&L NO).";
+  const deudaTip = "pago mensual de deuda del período: interés del HML + cuota de la refi a 30 años [FF:ff_hml_payments]. NO baja el saldo operativo (es P&L NO), pero SÍ se le resta al NOI para saber cuánto queda realmente para repartir — es el número que usa la distribución automática.";
+  const tagDeuda = "<span class=\"badge\" style=\"font-size:8px;background:rgba(240,104,122,.16);color:#f0687a\" title=\"" + OS_E(deudaTip) + "\">servicio de deuda</span>";
   const ayuda = "<div class=\"card\" style=\"margin-bottom:12px;border-color:var(--a2)\"><div style=\"font-size:12.5px;line-height:1.6;color:var(--ink)\"><b>💰 Qué es el Ledger.</b> Es el libro contable P&L de esta casa: la lista de todos los movimientos reales (rentas cobradas y gastos) que forman la utilidad operativa. Es <b>SOLO LECTURA</b> y es el respaldo del NOI que ve el inversor. Se edita en <b>📐 Modelo &amp; movimientos</b>.</div></div>";
   return ayuda + "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap\">" + casaSel + mesSel
     + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + saldoTip + "\">Saldo operativo (P&L) ⓘ" + (mf === "todos" ? "" : " · " + OS_E(invEngine.mesEs(mf))) + ": <span style=\"color:" + (saldoPer >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(saldoPer) + "</span></span>"
+    + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + deudaTip + "\">Servicio de deuda ⓘ: <span style=\"color:var(--neg)\">" + iaMoney(deudaPer) + "</span></span>"
     + "<span class=\"meta\">" + vis.length + " movimientos · solo P&L SÍ mueve el saldo (inversión/financiero/distribución = informativos) · <b>SOLO LECTURA</b> — se edita en 📐 Modelo & movimientos</span></div>"
     + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div></div>" + subt + "</div>"
     + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
     + Object.entries(vis.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
     + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th title=\"P&L SÍ (renta/ingreso/operativo/tax) mueve el saldo; P&L NO (inversión/financiero/distribución) es informativo\" style=\"cursor:help\">Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\" title=\"acumulado de los movimientos P&L SÍ; las filas P&L NO repiten el saldo anterior\" >Saldo operativo</th><th title=\"de dónde salió el dato: FF = Fix&amp;Flip · Rentas = property management · OS = cargado a mano\" style=\"cursor:help\">Fuente ⓘ</th></tr></thead><tbody>"
-    + vis.slice().reverse().map(m => "<tr" + (m.pnl ? "" : " style=\"opacity:.55\"") + "><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.pnl ? "" : " " + tagNo) + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
+    + vis.slice().reverse().map(m => "<tr" + (m.pnl ? "" : " style=\"opacity:.55\"") + "><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.pnl ? "" : " " + tagNo) + (esDeuda(m) ? " " + tagDeuda : "") + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
       + "<td style=\"text-align:right\" class=\"" + (m.tipo === "ingreso" ? "up" : "down") + "\">" + (m.tipo === "ingreso" ? "+" : "−") + iaMoney(m.monto) + "</td>"
       + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\"" + (m.pnl ? "" : " title=\"P&L NO: repite el saldo anterior\"") + ">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>").join("")
     + "</tbody></table></div>";
