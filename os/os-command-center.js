@@ -14,6 +14,8 @@ const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
   agents: [], props: [], audit: [], lastRun: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  capital: null, nsCfg: null, nsEditing: false, _clock: null,
+  vaultSel: null, vaultNodes: {},
   busyId: null, chat: [], chatBusy: false,
 };
 window.JV = JV;
@@ -120,6 +122,12 @@ const JV_EMPRESAS = [
   { area: 'remodelacion', name: 'Remodelación', icon: 'hammer' },
   { area: 'rentas', name: 'Rentas', icon: 'house' },
   { area: 'education', name: 'Educación', icon: 'graduation-cap' },
+];
+const JV_FUENTES = [
+  { id: 'src-airtable', label: 'Airtable', icon: 'table', desc: 'Bases Rentas / Fix&Flip / Remodelación — origen operativo de las casas.' },
+  { id: 'src-qbo', label: 'QuickBooks', icon: 'receipt', desc: 'Flipping Rentals LLC + realms — la contabilidad real.' },
+  { id: 'src-clickup', label: 'ClickUp', icon: 'check-circle', desc: 'Cronograma y tareas de operación por empresa.' },
+  { id: 'src-supabase', label: 'Supabase OS', icon: 'dna', desc: 'agent_registry · agent_proposals · agent_audit_log — el OS compartido.' },
 ];
 
 // ════════════════════════════════════════════════════════════════
@@ -256,6 +264,70 @@ function jvCSS() {
     '#os-root .jv-step .hh{font-size:12px;font-weight:700}#os-root .jv-step .dd{font-size:11.5px;color:var(--jc-mut)}',
     '#os-root .jv-live{font-size:9px;color:var(--jc-grn);border:1px solid rgba(52,211,153,.3);border-radius:8px;padding:1px 6px;margin-left:6px}',
     '#os-root .jv-a{color:var(--jc-cyan);cursor:pointer}',
+    // HUD header + reloj
+    '#os-root .jv-hud-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;gap:16px;flex-wrap:wrap}',
+    '#os-root .jv-hi{font-size:23px;font-weight:700;letter-spacing:-.01em}',
+    '#os-root .jv-hi span{color:var(--jc-cyan)}',
+    '#os-root .jv-hud-date{font-size:12px;color:var(--jc-mut);margin-top:3px}',
+    '#os-root .jv-clock{text-align:right}',
+    '#os-root .jv-clock .t{font-size:25px;font-weight:700;font-variant-numeric:tabular-nums}',
+    '#os-root .jv-clock .w{font-size:11px;color:var(--jc-mut)}',
+    // strip contadores
+    '#os-root .jv-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}',
+    '@media(max-width:1000px){#os-root .jv-strip{grid-template-columns:repeat(2,1fr)}}',
+    '#os-root .jv-ct{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:11px;padding:11px 13px}',
+    '#os-root .jv-ct .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}',
+    '#os-root .jv-ct .l{font-size:9.5px;letter-spacing:.06em;color:var(--jc-mut);text-transform:uppercase;margin-top:2px}',
+    // north-star
+    '#os-root .jv-ns{background:linear-gradient(90deg,rgba(167,139,250,.12),rgba(56,189,248,.06));border:1px solid rgba(167,139,250,.28);border-radius:13px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px}',
+    '#os-root .jv-ns .star{color:var(--jc-amber);display:flex}',
+    '#os-root .jv-ns .body{flex:1;min-width:0}',
+    '#os-root .jv-ns .lab{font-size:10px;letter-spacing:.16em;color:var(--jc-purple);text-transform:uppercase}',
+    '#os-root .jv-ns .goal{font-size:15px;font-weight:650;margin:2px 0 8px}',
+    '#os-root .jv-ns-sub{font-size:10.5px;color:var(--jc-mut);margin-top:6px}',
+    '#os-root .jv-bar{height:8px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}',
+    '#os-root .jv-bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--jc-purple),var(--jc-cyan));border-radius:6px;transition:width .4s}',
+    '#os-root .jv-pct{font-size:20px;font-weight:700;color:var(--jc-cyan);font-variant-numeric:tabular-nums}',
+    '#os-root .jv-nsbtn{background:var(--jc-card);border:1px solid var(--jc-line);color:var(--jc-mut);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:5px}',
+    '#os-root .jv-nsbtn:hover{color:#fff;border-color:var(--jc-purple)}',
+    '#os-root .jv-nsbtn.ok{color:var(--jc-grn);border-color:rgba(52,211,153,.35)}',
+    '#os-root .jv-ns-edit{display:block}',
+    '#os-root .jv-nsin{background:var(--jc-bg);border:1px solid var(--jc-line);color:var(--jc-tx);border-radius:8px;padding:6px 10px;font-size:12.5px;outline:none}',
+    '#os-root .jv-nsin:focus{border-color:var(--jc-purple)}',
+    // command deck
+    '#os-root .jv-deck{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}',
+    '@media(max-width:1000px){#os-root .jv-deck{grid-template-columns:repeat(2,1fr)}}',
+    '#os-root .jv-cmd{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:12px;padding:14px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}',
+    '#os-root .jv-cmd::before{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:var(--c)}',
+    '#os-root .jv-cmd:hover{border-color:var(--c);box-shadow:0 0 20px color-mix(in srgb,var(--c) 22%,transparent)}',
+    '#os-root .jv-cmd .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c);margin-bottom:9px}',
+    '#os-root .jv-cmd b{font-size:13px;display:block}',
+    '#os-root .jv-cmd span{font-size:10.5px;color:var(--jc-mut)}',
+    // DNA map (Knowledge Vault)
+    '#os-root .jv-vault-wrap{position:relative;height:640px;margin-top:8px;border:1px solid var(--jc-line);border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 46%,rgba(20,30,60,.45),var(--jc-bg) 72%)}',
+    '#os-root .jv-vstage{position:absolute;inset:0;width:100%;height:100%}',
+    '#os-root .jv-vnode{cursor:pointer}',
+    '#os-root .jv-vnode circle{transition:.15s}',
+    '#os-root .jv-vnode:hover circle{filter:brightness(1.35)}',
+    '#os-root .jv-vnode.sel circle{filter:brightness(1.45)}',
+    '#os-root .jv-vnode text{user-select:none}',
+    '#os-root .jv-vcount{position:absolute;top:14px;right:14px;display:flex;gap:8px;z-index:3}',
+    '#os-root .jv-vcount .cbox{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:10px;padding:6px 12px;text-align:center}',
+    '#os-root .jv-vcount .n{font-size:16px;font-weight:750;color:var(--jc-cyan);font-variant-numeric:tabular-nums}',
+    '#os-root .jv-vcount .l{font-size:8.5px;letter-spacing:.08em;color:var(--jc-mut);text-transform:uppercase}',
+    '#os-root .jv-vlegend{position:absolute;left:14px;bottom:14px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:12px;padding:10px 12px;z-index:3}',
+    '#os-root .jv-vlegend .li{display:flex;align-items:center;gap:8px;font-size:11px;padding:2px 0;color:var(--jc-mut)}',
+    '#os-root .jv-vlegend .sw{width:10px;height:10px;border-radius:50%}',
+    '#os-root .jv-vpanel{position:absolute;right:14px;top:70px;width:262px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:14px;padding:16px;z-index:3;max-height:540px;overflow:auto}',
+    '#os-root .jv-vp-ic{margin-bottom:2px}',
+    '#os-root .jv-vpanel h3{font-size:15px;margin:4px 0 2px}',
+    '#os-root .jv-vp-lay{font-size:10px;letter-spacing:.1em;text-transform:uppercase}',
+    '#os-root .jv-vpanel p{font-size:12px;color:var(--jc-mut);margin-top:10px;line-height:1.5}',
+    '#os-root .jv-vp-meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}',
+    '#os-root .jv-vp-meta .tag{font-size:10px;padding:3px 8px;border-radius:8px;background:rgba(120,140,180,.14);color:var(--jc-tx)}',
+    '#os-root .jv-vp-run{margin-top:12px;font-size:11px;color:var(--jc-mut);border-top:1px solid var(--jc-line);padding-top:10px}',
+    '#os-root .jv-vhint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:10.5px;color:var(--jc-mut);z-index:2;pointer-events:none}',
+    '@media(max-width:1000px){#os-root .jv-vpanel{position:static;width:auto;max-height:none;margin-top:10px}#os-root .jv-vault-wrap{height:auto;padding-bottom:10px}#os-root .jv-vstage{position:relative;height:440px}#os-root .jv-vcount{position:static;justify-content:flex-end;padding:10px 10px 0}#os-root .jv-vlegend{position:static;margin:10px}}',
   ].join('\n');
   document.head.appendChild(st);
 }
@@ -269,13 +341,15 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, runs, crit, mem] = await Promise.all([
-      sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,nivel_riesgo,estado,dueno').is('deleted_at', null).order('nombre'),
+    const [reg, props, audit, runs, crit, mem, cap, ns] = await Promise.all([
+      sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,nivel_riesgo,estado,dueno').is('deleted_at', null).order('nombre'),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,resultado,output,ts').order('ts', { ascending: false }).limit(40),
       sb.from('agent_audit_log').select('id', { count: 'exact', head: true }),
       sb.from('ct_findings').select('titulo,impacto_usd').eq('active', true).is('resolved_at', null).eq('severidad', 'critica').order('impacto_usd', { ascending: false, nullsFirst: false }),
       sb.from('pm_brain_memory').select('id', { count: 'exact', head: true }).then(r => r).catch(() => ({ count: null })),
+      sb.from('v_inversionistas').select('capital_desplegado').then(r => r).catch(() => ({ data: null })),
+      sb.from('cc_northstar').select('*').maybeSingle().then(r => r).catch(() => ({ data: null })),
     ]);
     if (reg.error) throw reg.error;
     JV.agents = reg.data || [];
@@ -285,6 +359,8 @@ async function jvLoad(force) {
     JV.crit = crit.error ? [] : (crit.data || []);
     JV.critImpact = JV.crit.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
     JV.memCount = (mem && typeof mem.count === 'number') ? mem.count : null;
+    JV.capital = (cap && cap.data) ? cap.data.reduce((s, r) => s + (+r.capital_desplegado || 0), 0) : null;
+    JV.nsCfg = (ns && ns.data) ? ns.data : null;
     const rr = await Promise.all(JV.agents.map(a =>
       sb.from('agent_audit_log').select('ts').eq('agent_id', a.id).order('ts', { ascending: false }).limit(1)
         .then(r => ({ id: a.id, ts: (r.data && r.data[0] && r.data[0].ts) || null })).catch(() => ({ id: a.id, ts: null }))));
@@ -342,7 +418,7 @@ function jvTabBody() {
 // ════════════════════════════════════════════════════════════════
 function jvNetwork() {
   const pend = JV.props.filter(p => p.estado === 'propuesta').length;
-  const cerebro = JV.agents.find(a => a.capa === 'Command');
+  const cerebro = JV.agents.find(a => a.nombre === 'Cerebro Ejecutivo') || JV.agents.find(a => a.capa === 'Command');
   const cerebroSt = jvNetworkActive() ? 'work' : (cerebro ? jvAgentStatus(cerebro.id) : 'idle');
   const dotColors = JV_TEAMS.map(t => t.color);
   const dots = [10, 30, 50, 70, 90].map((l, i) => '<span class="jv-hdot" style="left:' + l + '%;background:' + dotColors[i] + ';box-shadow:0 0 7px ' + dotColors[i] + '"></span>').join('');
@@ -371,6 +447,7 @@ function jvAgentsList() {
       const st = jvAgentStatus(a.id);
       return '<div class="jv-arow"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 15 }) + '</div>'
         + '<div class="nm"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E((a.area || '') + ' · ' + (a.capa || '') + ' · ' + jvFmtTs(JV.lastRun[a.id])) + '</span></div>'
+        + (a.squad ? '<span class="jv-chip" style="border-color:rgba(251,191,36,.4);color:var(--jc-amber)">' + OS_E(a.squad) + '</span>' : '')
         + '<span class="jv-chip">' + OS_E(a.nivel_riesgo || '—') + '</span><span class="jv-chip">' + OS_E(a.estado || '') + '</span>' + jvBadge(st) + '</div>';
     }).join('');
   });
@@ -381,27 +458,154 @@ function jvAgentsList() {
 // VIEW · COMMAND CENTER (dashboard: KPIs + orbe + chat + lanes + feed)
 // ════════════════════════════════════════════════════════════════
 function jvDashboard() {
-  return '<div class="jv-eyebrow">Command Center</div><div class="jv-lead">Foto operativa del holding · todo propone un agente, vos aprobás.</div>'
-    + jvKpis() + jvCore() + jvChatUI()
+  jvClockStart();
+  return jvHudHeader() + jvCounters() + jvNorthStar() + jvDeck() + jvCore() + jvChatUI()
     + '<div class="jv-2col"><div><div class="jv-st">Task lanes · propuestas en vivo</div>' + jvLanesHTML() + '</div>'
     + '<div><div class="jv-st">Bitácora · agent_audit_log</div>' + jvFeedHTML() + '</div></div>';
 }
-function jvKpis() {
-  const dry = JV.agents.filter(a => a.estado === 'dry-run').length;
-  const asis = JV.agents.filter(a => a.estado === 'asistido').length;
-  const pend = JV.props.filter(p => p.estado === 'propuesta' && !jvIsAlert(p)).length;
-  const alert = JV.props.filter(jvIsAlert).length + JV.crit.length;
-  const exe = JV.props.filter(p => p.estado === 'ejecutada').length;
-  let occ = null; try { if (typeof osCompute === 'function') { const c = osCompute(); occ = c && c.rentas ? c.rentas.occPct : null; } } catch (e) {}
-  const kpi = (n, l, s, col) => '<div class="jv-kpi"><div class="n"' + (col ? ' style="color:' + col + '"' : '') + '>' + n + '</div><div class="l">' + l + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>';
-  return '<div class="jv-kpis">'
-    + kpi(jvNum(JV.agents.length), 'Agentes', asis + ' asistido · ' + dry + ' dry-run')
-    + kpi(jvNum(pend), 'Propuestas pendientes', 'esperan tu OK', pend ? 'var(--jc-amber)' : '')
-    + kpi(jvNum(alert), 'Alertas 🔴', 'Sabueso + integridad', alert ? 'var(--jc-pink)' : 'var(--jc-grn)')
-    + kpi(jvNum(exe), 'Ejecutadas', 'histórico')
-    + kpi(occ == null ? '—' : occ + '%', 'Ocupación Rentas', 'capa KPIs del OS', 'var(--jc-grn)')
+
+// ─── métricas vivas del holding (para strip + North-Star) ───
+function jvMetrics() {
+  let occ = null, deuda = null;
+  try { if (typeof osCompute === 'function') { const c = osCompute(); if (c) { occ = c.rentas ? c.rentas.occPct : null; deuda = c.cobranza ? c.cobranza.total : null; } } } catch (e) {}
+  const pend = JV.props.filter(p => p.estado === 'propuesta').length;
+  return { ocupacion: occ, deuda: deuda, pendientes: pend, criticas: JV.crit.length, capital: JV.capital };
+}
+function jvGreetName() {
+  try {
+    const u = state && state.user;
+    const fn = u && u.user_metadata && u.user_metadata.full_name;
+    if (fn) return String(fn).trim().split(/\s+/)[0];
+    const em = u && u.email || '';
+    if (/^gerencia@/.test(em)) return 'Nicolás';
+    if (em) { const p = em.split('@')[0]; return p.charAt(0).toUpperCase() + p.slice(1); }
+  } catch (e) {}
+  return 'Nicolás';
+}
+function jvHudHeader() {
+  const d = new Date();
+  const fecha = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Chicago' });
+  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Chicago' });
+  return '<div class="jv-hud-hdr"><div><div class="jv-hi">Buen día, <span>' + OS_E(jvGreetName()) + '</span> 👋</div><div class="jv-hud-date">' + OS_E(fecha.charAt(0).toUpperCase() + fecha.slice(1)) + ' · todo bajo control</div></div>'
+    + '<div class="jv-clock"><div class="t" id="jv-clock">' + hora + '</div><div class="w">Austin, TX</div></div></div>';
+}
+function jvClockStart() {
+  if (JV._clock) { clearInterval(JV._clock); JV._clock = null; }
+  JV._clock = setInterval(function () {
+    const el = document.getElementById('jv-clock');
+    if (!el) { clearInterval(JV._clock); JV._clock = null; return; }
+    el.textContent = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Chicago' });
+  }, 1000);
+}
+function jvCounters() {
+  const m = jvMetrics();
+  const ct = (n, l, col) => '<div class="jv-ct"><div class="n"' + (col ? ' style="color:' + col + '"' : '') + '>' + n + '</div><div class="l">' + l + '</div></div>';
+  return '<div class="jv-strip">'
+    + ct(m.ocupacion == null ? '—' : m.ocupacion + '%', 'Ocupación Rentas', 'var(--jc-grn)')
+    + ct(m.deuda == null ? '—' : jvMoney(m.deuda), 'Deuda cobrable', 'var(--jc-amber)')
+    + ct(jvNum(m.pendientes), 'Propuestas esperando', m.pendientes ? 'var(--jc-amber)' : '')
+    + ct(jvNum(m.criticas), 'Alertas críticas', m.criticas ? 'var(--jc-pink)' : 'var(--jc-grn)')
+    + ct(m.capital == null ? '—' : jvMoney(m.capital), 'Capital inversionistas', '')
     + '</div>';
 }
+
+// ─── North-Star ───
+function jvNsProgress() {
+  const c = JV.nsCfg; if (!c) return { pct: 0, cur: null, has: false };
+  if (c.metric_key) {
+    const m = jvMetrics(); const cur = m[c.metric_key];
+    const tgt = +c.target || 0;
+    if (cur == null || !tgt) return { pct: 0, cur: cur, has: true };
+    return { pct: Math.max(0, Math.min(100, Math.round(cur / tgt * 100))), cur: cur, has: true };
+  }
+  return { pct: Math.max(0, Math.min(100, Math.round(+c.manual_pct || 0))), cur: null, has: true };
+}
+function jvNorthStar() {
+  const c = JV.nsCfg;
+  if (JV.nsEditing) return jvNsEditor();
+  if (!c) return '<div class="jv-ns"><div class="star">' + osIcon('target', { size: 20 }) + '</div><div class="body"><div class="lab">North Star del holding</div><div class="goal">Sin meta configurada</div></div><button class="jv-nsbtn" onclick="jvNsEdit()">Configurar</button></div>';
+  const p = jvNsProgress();
+  const sub = c.metric_key ? ('en vivo · ' + (p.cur == null ? '—' : (c.metric_key === 'deuda' || c.metric_key === 'capital' ? jvMoney(p.cur) : jvNum(p.cur))) + ' / meta ' + jvNum(c.target) + (c.unit || '')) : 'meta manual';
+  return '<div class="jv-ns"><div class="star">' + osIcon('target', { size: 20 }) + '</div>'
+    + '<div class="body"><div class="lab">North Star del holding</div><div class="goal">' + OS_E(c.label) + '</div>'
+    + '<div class="jv-bar"><span style="width:' + p.pct + '%"></span></div><div class="jv-ns-sub">' + OS_E(sub) + '</div></div>'
+    + '<div class="jv-pct">' + p.pct + '%</div><button class="jv-nsbtn" onclick="jvNsEdit()" title="Editar meta">' + osIcon('pencil', { size: 14 }) + '</button></div>';
+}
+function jvNsEditor() {
+  const c = JV.nsCfg || { label: '', metric_key: 'ocupacion', target: 95, manual_pct: 50, unit: '%' };
+  const live = !!c.metric_key;
+  const opts = [['ocupacion', 'Ocupación Rentas (%)'], ['deuda', 'Deuda cobrable ($)'], ['pendientes', 'Propuestas pendientes'], ['criticas', 'Alertas críticas'], ['capital', 'Capital inversionistas ($)']]
+    .map(o => '<option value="' + o[0] + '"' + (c.metric_key === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('');
+  return '<div class="jv-ns jv-ns-edit"><div class="body"><div class="lab">Editar North Star</div>'
+    + '<input id="jv-ns-label" class="jv-nsin" placeholder="Nombre de la meta" value="' + OS_E(c.label || '') + '" style="width:100%;margin:6px 0">'
+    + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px">'
+    + '<label><input type="radio" name="jv-nsmode" value="live"' + (live ? ' checked' : '') + ' onchange="jvNsMode()"> Métrica en vivo</label>'
+    + '<label><input type="radio" name="jv-nsmode" value="manual"' + (live ? '' : ' checked') + ' onchange="jvNsMode()"> Manual %</label></div>'
+    + '<div id="jv-ns-live" style="display:' + (live ? 'flex' : 'none') + ';gap:8px;margin-top:8px;align-items:center">'
+    + '<select id="jv-ns-metric" class="jv-nsin">' + opts + '</select> meta: <input id="jv-ns-target" class="jv-nsin" type="number" value="' + (c.target != null ? c.target : 95) + '" style="width:100px"></div>'
+    + '<div id="jv-ns-manual" style="display:' + (live ? 'none' : 'flex') + ';gap:8px;margin-top:8px;align-items:center">% avance: <input id="jv-ns-pct" class="jv-nsin" type="number" min="0" max="100" value="' + (c.manual_pct != null ? c.manual_pct : 50) + '" style="width:100px"></div>'
+    + '<div style="margin-top:12px;display:flex;gap:8px"><button class="jv-nsbtn ok" onclick="jvNsSave()">Guardar</button><button class="jv-nsbtn" onclick="jvNsCancel()">Cancelar</button></div>'
+    + '</div></div>';
+}
+function jvNsEdit() { JV.nsEditing = true; if (window.osRender) osRender(); }
+window.jvNsEdit = jvNsEdit;
+function jvNsCancel() { JV.nsEditing = false; if (window.osRender) osRender(); }
+window.jvNsCancel = jvNsCancel;
+function jvNsMode() {
+  const live = document.querySelector('input[name="jv-nsmode"]:checked');
+  const isLive = live && live.value === 'live';
+  const l = document.getElementById('jv-ns-live'); const mm = document.getElementById('jv-ns-manual');
+  if (l) l.style.display = isLive ? 'flex' : 'none'; if (mm) mm.style.display = isLive ? 'none' : 'flex';
+}
+window.jvNsMode = jvNsMode;
+async function jvNsSave() {
+  const label = (document.getElementById('jv-ns-label') || {}).value || '';
+  const mode = (document.querySelector('input[name="jv-nsmode"]:checked') || {}).value || 'live';
+  const row = { id: true, label: label.trim() || 'North Star', updated_by: jvMe(), updated_at: new Date().toISOString() };
+  if (mode === 'live') { row.metric_key = (document.getElementById('jv-ns-metric') || {}).value || 'ocupacion'; row.target = Number((document.getElementById('jv-ns-target') || {}).value) || 0; row.manual_pct = null; }
+  else { row.metric_key = null; row.manual_pct = Number((document.getElementById('jv-ns-pct') || {}).value) || 0; }
+  try {
+    const { error } = await sb.from('cc_northstar').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    JV.nsCfg = Object.assign({}, JV.nsCfg, row); JV.nsEditing = false;
+    if (window.osRender) osRender();
+  } catch (e) { alert('No se pudo guardar la meta: ' + (e.message || e)); }
+}
+window.jvNsSave = jvNsSave;
+
+// ─── Command Deck ───
+const JV_DECK = [
+  { k: 'matutino', ic: 'sun', c: 'var(--jc-cyan)', t: 'Reporte matutino', s: 'El brief del Cerebro de hoy' },
+  { k: 'aprobar', ic: 'check-circle', c: 'var(--jc-grn)', t: 'Aprobar propuestas', s: '' },
+  { k: 'cobranza', ic: 'banknote', c: 'var(--jc-pink)', t: 'Cobranza', s: 'Aging + borradores' },
+  { k: 'empresas', ic: 'building', c: 'var(--jc-blue)', t: 'Estado por empresa', s: 'Ocupación · mora · contratos' },
+  { k: 'alertas', ic: 'alert', c: 'var(--jc-amber)', t: 'Alertas críticas', s: 'Lo que no cuadra hoy' },
+  { k: 'verificar', ic: 'shield-check', c: 'var(--jc-purple)', t: 'Verificar', s: 'Chequeo de fuentes (mapa)' },
+  { k: 'cerrar', ic: 'chart', c: 'var(--jc-cyan)', t: 'Cerrar el día', s: 'Cadena + cierre' },
+  { k: 'cerebro', ic: 'brain', c: 'var(--jc-pink)', t: 'Hablar con el Cerebro', s: 'Preguntale lo que sea' },
+];
+function jvDeck() {
+  const pend = JV.props.filter(p => p.estado === 'propuesta').length;
+  const cards = JV_DECK.map(d => {
+    const sub = d.k === 'aprobar' ? (pend + ' esperando tu OK') : d.s;
+    return '<div class="jv-cmd" style="--c:' + d.c + '" onclick="jvCmd(\'' + d.k + '\')"><div class="ic">' + osIcon(d.ic, { size: 16 }) + '</div><b>' + d.t + '</b><span>' + OS_E(sub) + '</span></div>';
+  }).join('');
+  return '<div class="jv-st">Command Deck · un clic</div><div class="jv-deck">' + cards + '</div>';
+}
+function jvCmd(k) {
+  switch (k) {
+    case 'matutino': return jvNav('brief');
+    case 'aprobar': return jvNav('propuestas');
+    case 'empresas': return jvNav('empresas');
+    case 'cerrar': return jvNav('horarios');
+    case 'cobranza': return (typeof osNav === 'function') ? osNav('/cobros') : null;
+    case 'alertas': return (typeof osNav === 'function') ? osNav('/contable') : null;
+    case 'verificar': return (typeof osNav === 'function') ? osNav('/mapa') : null;
+    case 'cerebro': { const el = document.getElementById('jv-ask'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); } return; }
+    default: return;
+  }
+}
+window.jvCmd = jvCmd;
 function jvCore() {
   return '<div class="jv-core"><div class="jv-orbw"><div class="jv-ring jv-r1"></div><div class="jv-ring jv-r2"></div><div class="jv-orb"></div></div><div class="t">CEREBRO EJECUTIVO</div></div>';
 }
@@ -502,17 +706,99 @@ function jvHorariosView() {
 // ════════════════════════════════════════════════════════════════
 // VIEW · KNOWLEDGE VAULT (skills + memoria)
 // ════════════════════════════════════════════════════════════════
+// ─── DNA map helpers ───
+const JV_CAPA_COL = { Command: '#a78bfa', Finance: '#38bdf8', Ops: '#f472b6', Integrity: '#34d399', Report: '#60a5fa', Signal: '#f87171' };
+const JV_CAPA_LABEL = { Command: 'Comando', Finance: 'Finance · Contable & Datos', Ops: 'Ops · Operación', Integrity: 'Integrity · Verificadores', Report: 'Report · Reporteros', Signal: 'Signal · Sabueso' };
+const JV_EMP_COL = '#fbbf24', JV_SRC_COL = '#8492ac';
+function jvSvgIcon(name, x, y, size, color) {
+  const inner = (window.OS_ICONS && OS_ICONS[name]) || '';
+  const h = size / 2;
+  return '<svg x="' + (x - h) + '" y="' + (y - h) + '" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+}
+function jvVaultFicha(n) {
+  if (!n) return '';
+  const chips = [];
+  if (n.riesgo) chips.push('<span class="tag">' + OS_E(n.riesgo) + '</span>');
+  if (n.estado) chips.push('<span class="tag">' + OS_E(n.estado) + '</span>');
+  if (n.area) chips.push('<span class="tag">' + OS_E(n.area) + '</span>');
+  const run = (n.kind === 'agent' || n.kind === 'cerebro') ? '<div class="jv-vp-run">Última corrida: ' + OS_E(jvFmtTs(n.run)) + '</div>' : '';
+  return '<div class="jv-vp-ic" style="color:' + n.color + '">' + osIcon(n.icon, { size: 22 }) + '</div>'
+    + '<h3>' + OS_E(n.label) + '</h3>'
+    + '<div class="jv-vp-lay" style="color:' + n.color + '">' + OS_E(n.capaLabel) + (n.squad ? ' · Escuadra ' + OS_E(n.squad) : '') + '</div>'
+    + '<p>' + OS_E(n.proceso || '') + '</p>'
+    + (chips.length ? '<div class="jv-vp-meta">' + chips.join('') + '</div>' : '') + run;
+}
+function jvVaultPick(id) {
+  const n = JV.vaultNodes && JV.vaultNodes[id]; if (!n) return;
+  JV.vaultSel = id;
+  const p = document.getElementById('jv-vault-panel'); if (p) p.innerHTML = jvVaultFicha(n);
+  const root = document.getElementById('os-root'); if (!root) return;
+  root.querySelectorAll('.jv-vnode.sel').forEach(g => g.classList.remove('sel'));
+  const g = root.querySelector('.jv-vnode[data-nid="' + id + '"]'); if (g) g.classList.add('sel');
+}
+window.jvVaultPick = jvVaultPick;
+
 function jvVaultView() {
-  const grp = JV_CAPAS.map(c => {
-    const ags = JV.agents.filter(a => a.capa === c.capa); if (!ags.length) return '';
-    const items = ags.map(a => '<div class="jv-arow" style="margin-bottom:6px"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 14 }) + '</div><div class="nm"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E((a.proceso || '').slice(0, 90)) + '</span></div></div>').join('');
-    return '<div class="jv-grp" style="--gc:' + c.color + '">' + OS_E(c.name) + '</div>' + items;
-  }).join('');
-  return '<div class="jv-eyebrow">Knowledge Vault</div><div class="jv-lead">La biblioteca de skills (cada agente = un prompt versionado) + la memoria del Cerebro.</div>'
-    + '<div class="jv-kpis" style="grid-template-columns:repeat(3,1fr)"><div class="jv-kpi"><div class="n">' + jvNum(JV.agents.length) + '</div><div class="l">Skills / agentes</div></div>'
-    + '<div class="jv-kpi"><div class="n">' + (JV.memCount == null ? '—' : jvNum(JV.memCount)) + '</div><div class="l">Memorias del Cerebro</div></div>'
-    + '<div class="jv-kpi"><div class="n">' + JV_CAPAS.length + '</div><div class="l">Capas</div></div></div>'
-    + '<div class="jv-alist">' + grp + '</div>';
+  const cx = 600, cy = 400;
+  const nodes = {}, lines = [];
+  const cerebro = JV.agents.find(a => a.nombre === 'Cerebro Ejecutivo') || JV.agents.find(a => a.capa === 'Command');
+  const cId = cerebro ? cerebro.id : 'cerebro';
+  const order = ['Finance', 'Ops', 'Integrity', 'Report', 'Signal', 'Command'];
+  const ring = JV.agents.filter(a => a.id !== cId).map(a => Object.assign({}, a)).sort((a, b) => order.indexOf(a.capa) - order.indexOf(b.capa));
+  const emps = JV_EMPRESAS.map(e => Object.assign({}, e));
+  const fus = JV_FUENTES.map(f => Object.assign({}, f));
+  const place = (arr, rad, start) => { const n = arr.length; arr.forEach((it, k) => { const ang = (start + k / n * 360) * Math.PI / 180; it._x = cx + rad * Math.cos(ang); it._y = cy + rad * Math.sin(ang); }); };
+  place(ring, 250, -90); place(emps, 365, -50); place(fus, 365, 130);
+  const cNode = { _x: cx, _y: cy };
+  const L = (a, b, col) => lines.push('<line x1="' + a._x + '" y1="' + a._y + '" x2="' + b._x + '" y2="' + b._y + '" stroke="' + col + '" stroke-width="1" stroke-opacity="0.22"/>');
+  ring.forEach(a => L(cNode, a, JV_CAPA_COL[a.capa] || '#888'));
+  fus.forEach(f => L(cNode, f, JV_SRC_COL));
+  emps.forEach(emp => {
+    const v = ring.find(a => a.capa === 'Integrity' && a.area === emp.area);
+    const r = ring.find(a => a.capa === 'Report' && a.area === emp.area && !a.squad);
+    if (v) L(v, emp, JV_EMP_COL); if (r) L(r, emp, JV_EMP_COL);
+  });
+  const rentasEmp = emps.find(e => e.area === 'rentas');
+  if (rentasEmp) ring.filter(a => a.squad === 'Rentas').forEach(a => L(a, rentasEmp, JV_EMP_COL));
+  const linkCount = lines.length;
+  let svg = '';
+  const nodeG = (id, x, y, r, icon, col) => {
+    const isSel = id === (JV.vaultSel || cId);
+    return '<g class="jv-vnode' + (isSel ? ' sel' : '') + '" data-nid="' + id + '" onclick="jvVaultPick(\'' + id + '\')">'
+      + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#0e1220" stroke="' + col + '" stroke-width="' + (id === cId ? 3 : 1.6) + '"/>'
+      + (id === cId ? '<circle cx="' + x + '" cy="' + y + '" r="' + (r + 8) + '" fill="none" stroke="' + col + '" stroke-opacity="0.4"/>' : '')
+      + jvSvgIcon(icon, x, y, Math.round(r * 0.85), col) + '</g>';
+  };
+  const lbl = (x, y, r, t) => '<text x="' + x + '" y="' + (y + r + 13) + '" text-anchor="middle" font-size="10" fill="#c7d0e0">' + OS_E(t.length > 15 ? t.slice(0, 14) + '…' : t) + '</text>';
+  // cerebro
+  nodes[cId] = { kind: 'cerebro', label: cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', icon: 'brain', color: JV_CAPA_COL.Command, capaLabel: 'Comando · Orquestador', proceso: cerebro ? cerebro.proceso : '', riesgo: cerebro && cerebro.nivel_riesgo, estado: cerebro && cerebro.estado, area: 'holding', squad: null, run: cerebro ? JV.lastRun[cerebro.id] : null };
+  svg += nodeG(cId, cx, cy, 40, 'brain', JV_CAPA_COL.Command) + lbl(cx, cy, 40, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo');
+  ring.forEach(a => {
+    const col = JV_CAPA_COL[a.capa] || '#888', ic = jvAgentIcon(a);
+    nodes[a.id] = { kind: 'agent', label: a.nombre, icon: ic, color: col, capaLabel: JV_CAPA_LABEL[a.capa] || a.capa, proceso: a.proceso, riesgo: a.nivel_riesgo, estado: a.estado, area: a.area, squad: a.squad, run: JV.lastRun[a.id] };
+    svg += nodeG(a.id, a._x, a._y, 19, ic, col) + lbl(a._x, a._y, 19, a.nombre);
+  });
+  emps.forEach(e => {
+    const id = 'emp-' + e.area;
+    nodes[id] = { kind: 'empresa', label: e.name, icon: e.icon, color: JV_EMP_COL, capaLabel: 'Empresa · property_id', proceso: 'La casa como clave común (property_id): una propiedad fluye Fix&Flip → Remodelación → Rentas con la misma identidad.', area: e.area, squad: null, run: null };
+    svg += nodeG(id, e._x, e._y, 20, e.icon, JV_EMP_COL) + lbl(e._x, e._y, 20, e.name);
+  });
+  fus.forEach(f => {
+    nodes[f.id] = { kind: 'fuente', label: f.label, icon: f.icon, color: JV_SRC_COL, capaLabel: 'Fuente de verdad', proceso: f.desc, area: null, squad: null, run: null };
+    svg += nodeG(f.id, f._x, f._y, 20, f.icon, JV_SRC_COL) + lbl(f._x, f._y, 20, f.label);
+  });
+  JV.vaultNodes = nodes;
+  if (!JV.vaultSel || !nodes[JV.vaultSel]) JV.vaultSel = cId;
+  const nodeCount = Object.keys(nodes).length;
+  const legItems = JV_CAPAS.map(c => ({ col: JV_CAPA_COL[c.capa], name: JV_CAPA_LABEL[c.capa] || c.name })).concat([{ col: JV_EMP_COL, name: 'Empresas (property_id)' }, { col: JV_SRC_COL, name: 'Fuentes de verdad' }]);
+  const legend = legItems.map(l => '<div class="li"><span class="sw" style="background:' + l.col + '"></span>' + OS_E(l.name) + '</div>').join('');
+  const counters = '<div class="jv-vcount"><div class="cbox"><div class="n">' + nodeCount + '</div><div class="l">Nodos</div></div><div class="cbox"><div class="n">' + linkCount + '</div><div class="l">Enlaces</div></div><div class="cbox"><div class="n">' + JV_TEAMS.length + '</div><div class="l">Capas</div></div></div>';
+  return '<div class="jv-eyebrow">Knowledge Vault · Mapa DNA</div><div class="jv-lead">El genoma de tu operación — el Cerebro conecta cada capa, empresa y fuente de datos. ' + JV.agents.length + ' agentes.</div>'
+    + '<div class="jv-vault-wrap">' + counters
+    + '<svg class="jv-vstage" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">' + lines.join('') + svg + '</svg>'
+    + '<div class="jv-vlegend">' + legend + '</div>'
+    + '<div class="jv-vpanel" id="jv-vault-panel">' + jvVaultFicha(nodes[JV.vaultSel]) + '</div>'
+    + '<div class="jv-vhint">Tocá un nodo para inspeccionarlo</div></div>';
 }
 
 // ════════════════════════════════════════════════════════════════
