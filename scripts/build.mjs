@@ -60,6 +60,7 @@ const BUNDLE_FILES = [
   "os/os-cobros.js",
   "os/os-informes.js",
   "os/os-admin.js",
+  "os/os-command-center.js",
   "os/os-cierre-engine.js",
   "os/os-ct-sabueso.js",
   "os/inv-engine.js",

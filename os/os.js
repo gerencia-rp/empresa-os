@@ -249,6 +249,7 @@ function osParse(path) {
   if (seg[0] === 'operacion') return { view: 'operacion' };
   if (seg[0] === 'contable') return { view: 'contable' };
   if (seg[0] === 'admin') return { view: 'admin' };
+  if (seg[0] === 'jarvis') return { view: 'jarvis' };
   if (seg[0] === 'inversionistas') return { view: 'invadmin' };
   if (seg[0] === 'mapa') return { view: 'mapa' };
   if (seg[0] === 'cartera') return { view: 'cartera' };
@@ -270,6 +271,7 @@ function osTitle(r) {
   if (r.view === 'operacion') return 'Operación · ' + base;
   if (r.view === 'contable') return 'Contable · ' + base;
   if (r.view === 'admin') return 'Admin · ' + base;
+  if (r.view === 'jarvis') return 'Command Center · ' + base;
   if (r.view === 'invadmin') return 'Inversionistas · ' + base;
   if (r.view === 'mapa') return 'Mapa de Conexiones · ' + base;
   if (r.view === 'cartera') return 'Informe de Cartera · ' + base;
@@ -505,6 +507,7 @@ window.osCanArea = osCanArea;
 // área requerida por ruta (empresa usa OS_EMPRESAS[].key; casa = cualquiera de las 3 de la casa)
 function osRouteGuard(r) {
   if (r.view === 'admin') return osRole() === 'admin' ? null : 'admin';
+  if (r.view === 'jarvis') return osRole() === 'admin' ? null : 'admin';
   let need = null;
   if (r.view === 'invadmin') need = ['fix-flip'];
   else if (r.view === 'operacion') need = ['operacion'];
@@ -537,7 +540,7 @@ function osRender() {
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
   const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), cobros: (window.osCobrosView || os404), informes: (window.osInformesView || os404), dash: (window.osDashView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), jarvis: (window.jvView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), cobros: (window.osCobrosView || os404), informes: (window.osInformesView || os404), dash: (window.osDashView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
@@ -547,6 +550,7 @@ function osCrumbs() {
   if (r.view === 'operacion') parts.push('<span class="sep">/</span><b>' + osIcon('settings') + ' Operación</b>');
   else if (r.view === 'contable') parts.push('<span class="sep">/</span><b>' + osIcon('notebook') + ' Contable</b>');
   else if (r.view === 'admin') parts.push('<span class="sep">/</span><b>' + osIcon('shield') + ' Admin</b>');
+  else if (r.view === 'jarvis') parts.push('<span class="sep">/</span><b>' + osIcon('bot') + ' Command Center</b>');
   else if (r.empresa) { const e = OS_EMPRESAS[r.empresa]; const eico = osIco(e.icon, { size: 14 }); parts.push(`<span class="sep">/</span>${r.view === 'empresa' ? `<b style="display:inline-flex;align-items:center;gap:5px">${eico} ${e.name}</b>` : `<a data-osnav="/${r.empresa}" style="display:inline-flex;align-items:center;gap:5px">${eico} ${e.name}</a>`}`); if (r.app) parts.push(`<span class="sep">/</span><b>${OS_E(r.app)}</b>`); }
   return parts.join(' ');
 }
@@ -554,7 +558,7 @@ function osShell(inner) {
   return `<div class="bgfx"></div><div class="wrap">
     <div class="bar"><div class="logo" data-osnav="/" style="cursor:pointer">FR</div><div class="brandt"><b>Flipping Rentals OS</b><span>RENTAL PROFITSS · HOLDING</span></div>
       <div class="crumbs">${osCrumbs()}</div>
-      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">' + osIcon('shield') + ' Admin</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
+      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/jarvis" title="Command Center (solo dueño)">' + osIcon('bot') + ' Command</button><button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">' + osIcon('shield') + ' Admin</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
     </div>${inner}</div>`;
 }
 function osOpenAdmin() { const root = document.getElementById('os-root'); if (root) root.style.display = 'none'; if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 }); }
