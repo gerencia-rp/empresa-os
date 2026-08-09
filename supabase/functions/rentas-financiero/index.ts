@@ -59,6 +59,12 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
   let mode = String(url.searchParams.get("mode") || (body as { mode?: string }).mode || "run");
   if (mode === "run") mode = "cobros";
+  // corteYm = MES ANTERIOR (el que se cierra); prevYm = el previo a ese
+  const _t = todayCT().split("-").map(Number);
+  const cY = _t[1] === 1 ? _t[0] - 1 : _t[0], cM = _t[1] === 1 ? 12 : _t[1] - 1;
+  const corteYm = `${cY}-${String(cM).padStart(2, "0")}`, corteDate = `${corteYm}-01`;
+  const pY = cM === 1 ? cY - 1 : cY, pM = cM === 1 ? 12 : cM - 1;
+  const prevYm = `${pY}-${String(pM).padStart(2, "0")}`;
 
   let sql: ReturnType<typeof postgres> | null = null;
   try {
@@ -134,9 +140,74 @@ Deno.serve(async (req) => {
         created++; (detail.resumen_new as number)++;
       } else { skipped++; (detail.resumen_skip as number)++; }
     } else if (mode === "servicios") {
-      detail.nota = "mode=servicios: conciliación de pagos de servicios Airtable↔QB — pendiente de reglas finas; sin escrituras esta versión";
+      // Dedup: claves de descuadres de servicio abiertos (casa|servicio|mes|subtipo)
+      const svcKeys = new Set<string>();
+      for (const p of open) { const e = (p.evidencia || {}) as Record<string, unknown>; if (p.tipo_accion === "conciliacion" && e.tipo === "descuadre_servicio") svcKeys.add([e.casa, e.servicio, e.mes, e.subtipo].join("|")); }
+      const found: Array<Record<string, unknown>> = [];
+      // "Servicios públicos" es un bundle multi-fila y de alta varianza → se excluye de
+      // doble-pago y monto-fuera-de-rango (daba falsos positivos); sí entra en sin-respaldo/vencido.
+      const BUNDLE = "Servicios públicos";
+      // R3 · pagado dos veces (mismo casa+servicio+mes, >1 fila) — excluye el bundle
+      for (const r of await sql`select pp.name casa, e.subcategory servicio, e.billing_ym mes, round(sum(e.amount)) monto, count(*)::int veces
+        from pm_expenses e join pm_properties pp on pp.id=e.property_id
+        where e.active and e.scope='casa' and e.subcategory is not null and e.subcategory <> ${BUNDLE} and e.billing_ym >= ${corteYm}
+        group by 1,2,3 having count(*) > 1`) found.push({ casa: r.casa, servicio: r.servicio, mes: r.mes, subtipo: "pagado_dos_veces", monto: r.monto, detalle: `Pagado ${r.veces} veces el mismo mes (${money(Number(r.monto))} total).` });
+      // R2 · monto fuera de rango (>15% vs promedio histórico del servicio/casa) — excluye el bundle
+      for (const r of await sql`with hist as (select property_id, subcategory, avg(amount) a, count(*) n from pm_expenses where active and scope='casa' and subcategory is not null and subcategory <> ${BUNDLE} group by 1,2 having count(*)>=3),
+        rec as (select property_id, subcategory, billing_ym, sum(amount) amt from pm_expenses where active and scope='casa' and subcategory is not null and subcategory <> ${BUNDLE} and billing_ym >= ${corteYm} group by 1,2,3)
+        select pp.name casa, rec.subcategory servicio, rec.billing_ym mes, round(rec.amt) monto, round(hist.a) esperado
+        from rec join hist on hist.property_id=rec.property_id and hist.subcategory=rec.subcategory join pm_properties pp on pp.id=rec.property_id
+        where abs(rec.amt - hist.a) > 0.15*hist.a`) found.push({ casa: r.casa, servicio: r.servicio, mes: r.mes, subtipo: "monto_fuera_de_rango", monto: r.monto, esperado: r.esperado, detalle: `Pagado ${money(Number(r.monto))} vs promedio ${money(Number(r.esperado))} (>15%).` });
+      // R1 · registrado sin respaldo (solo en servicios que SÍ suelen tener respaldo → anomalía real; QB/banco no está en el espejo)
+      for (const r of await sql`with tcr as (select subcategory from pm_expenses where active and scope='casa' and subcategory is not null group by 1 having avg(case when invoice_url is not null then 1 else 0 end) > 0.8)
+        select pp.name casa, e.subcategory servicio, e.billing_ym mes, round(e.amount) monto
+        from pm_expenses e join pm_properties pp on pp.id=e.property_id
+        where e.active and e.scope='casa' and e.subcategory in (select subcategory from tcr) and e.invoice_url is null and e.billing_ym >= ${corteYm}`) found.push({ casa: r.casa, servicio: r.servicio, mes: r.mes, subtipo: "sin_respaldo", monto: r.monto, detalle: `Registrado en Airtable sin respaldo de pago (${money(Number(r.monto))}); el servicio suele llevar comprobante.` });
+      // R4 · vencido sin pagar — con 1 MES DE LAG: chequea prevYm (mes ya asentado,
+      // no el recién cerrado que aún se está cargando) contra recurrencia previa.
+      for (const r of await sql`with recur as (select property_id, subcategory from pm_expenses where active and scope='casa' and subcategory is not null and billing_ym >= to_char((current_date - interval '5 month'),'YYYY-MM') and billing_ym < to_char((current_date - interval '2 month'),'YYYY-MM') group by 1,2 having count(distinct billing_ym) >= 2)
+        select pp.name casa, recur.subcategory servicio from recur join pm_properties pp on pp.id=recur.property_id
+        where not exists (select 1 from pm_expenses e where e.active and e.scope='casa' and e.property_id=recur.property_id and e.subcategory=recur.subcategory and e.billing_ym = ${prevYm})`) found.push({ casa: r.casa, servicio: r.servicio, mes: prevYm, subtipo: "vencido_sin_pagar", detalle: `Servicio recurrente sin pago registrado en ${prevYm}.` });
+      // Insertar propuestas (dedup por casa|servicio|mes|subtipo; excluir PadSplit no aplica a gastos)
+      detail.detectados = found.length; detail.por_tipo = {};
+      for (const f of found) {
+        const key = [f.casa, f.servicio, f.mes, f.subtipo].join("|");
+        (detail.por_tipo as Record<string, number>)[f.subtipo as string] = ((detail.por_tipo as Record<string, number>)[f.subtipo as string] || 0) + 1;
+        if (svcKeys.has(key)) { skipped++; continue; }
+        const evid = { tipo: "descuadre_servicio", casa: f.casa, servicio: f.servicio, mes: f.mes, subtipo: f.subtipo, monto: f.monto ?? null, esperado: f.esperado ?? null, hallazgo: f.detalle, accion_propuesta: "Revisar en Airtable/QB y corregir el registro del servicio.", fuente: "pm_expenses", origen: "ejecutor rentas-financiero" };
+        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json({ requiere_aprobacion: true, dedup_key: "svc:" + key })}, ${sql.json(evid)})`;
+        created++; svcKeys.add(key);
+      }
     } else if (mode === "cierre") {
-      detail.nota = "mode=cierre: informe financiero mensual — pendiente de plantilla; sin escrituras esta versión";
+      // Cierra el MES ANTERIOR (corteYm). Dedup: un borrador por tipo+corte.
+      const [ex] = await sql`select id from pm_informes where tipo='financiero_mensual_rentas' and corte=${corteDate} and archived_at is null limit 1`;
+      if (ex) { detail.informe = "dedup · ya existe borrador para " + corteYm; skipped++; }
+      else {
+        // 1) cobrado real vs pactado + ocupación por casa
+        const cob = await sql`select pp.name casa, round(coalesce(sum(p.amount),0)) cobrado, round(coalesce(sum(p.renta_pactada),0)) pactado
+          from pm_payments p join pm_properties pp on pp.id=p.property_id
+          where p.active and p.type='ingreso' and p.status='pagado' and p.billing_ym=${corteYm} group by 1 order by 2 desc`;
+        const occ = await sql`select pp.name casa, count(*) filter (where u.status='ocupada')::int ocup, count(*)::int total
+          from pm_units u join pm_properties pp on pp.id=u.property_id where u.active group by 1`;
+        const occMap: Record<string, { ocup: number; total: number }> = {}; for (const o of occ) occMap[o.casa] = { ocup: o.ocup, total: o.total };
+        const s1 = cob.map((c: Record<string, unknown>) => { const o = occMap[c.casa as string] || { ocup: 0, total: 0 }; return { casa: c.casa, cobrado: Number(c.cobrado), pactado: Number(c.pactado), ocupacion_pct: o.total ? Math.round(o.ocup / o.total * 100) : null }; });
+        // 2) aging del mes
+        const s2 = await sql`select case when mes_mas_viejo>='2026-07' then '0-30' when mes_mas_viejo='2026-06' then '31-60' when mes_mas_viejo<'2026-06' then '60+' else 's/d' end bucket, count(*)::int inquilinos, round(coalesce(sum(vencido_neto),0)) vencido_neto from v_cartera_inquilino where vencido_neto>0 group by 1 order by 1`;
+        // 3) gastos por categoría
+        const s3 = await sql`select coalesce(subcategory,'(otros)') categoria, round(sum(amount)) monto, count(*)::int n from pm_expenses where active and scope='casa' and billing_ym=${corteYm} group by 1 order by 2 desc`;
+        // 4) NOI por casa (corte vs mes anterior)
+        const s4 = await sql`with inc as (select property_id, sum(amount) v from pm_payments where active and type='ingreso' and status='pagado' and billing_ym=${corteYm} group by 1),
+          exp as (select property_id, sum(amount) v from pm_expenses where active and scope='casa' and billing_ym=${corteYm} group by 1),
+          inc0 as (select property_id, sum(amount) v from pm_payments where active and type='ingreso' and status='pagado' and billing_ym=${prevYm} group by 1),
+          exp0 as (select property_id, sum(amount) v from pm_expenses where active and scope='casa' and billing_ym=${prevYm} group by 1)
+          select pp.name casa, round(coalesce(inc.v,0)-coalesce(exp.v,0)) noi, round(coalesce(inc0.v,0)-coalesce(exp0.v,0)) noi_prev
+          from pm_properties pp left join inc on inc.property_id=pp.id left join exp on exp.property_id=pp.id left join inc0 on inc0.property_id=pp.id left join exp0 on exp0.property_id=pp.id
+          where inc.v is not null or exp.v is not null order by 2 desc`;
+        const tot = { cobrado: s1.reduce((a, x) => a + x.cobrado, 0), pactado: s1.reduce((a, x) => a + x.pactado, 0), gastos: s3.reduce((a: number, x: Record<string, unknown>) => a + Number(x.monto), 0), noi: s4.reduce((a: number, x: Record<string, unknown>) => a + Number(x.noi), 0), vencido_neto: s2.reduce((a: number, x: Record<string, unknown>) => a + Number(x.vencido_neto), 0) };
+        const payload = { corte: corteYm, regla: "plata REAL cobrada, no el contrato; depósitos NO son renta", secciones: { cobrado_vs_pactado_ocupacion: s1, aging: s2, gastos_por_categoria: s3, noi_por_casa: s4 }, totales: tot, origen: "ejecutor rentas-financiero", nota: "borrador automático (dry-run) — el PDF se imprime desde el Command Center" };
+        await sql`insert into pm_informes (tipo, corte, titulo, estado, origen, payload, generado_por) values ('financiero_mensual_rentas', ${corteDate}, ${"Cierre Financiero Rentas " + corteYm}, 'borrador', 'ejecutor', ${sql.json(payload)}, 'rentas-financiero (agentes_ia_exec)')`;
+        created++; detail.informe = "borrador creado para " + corteYm; detail.totales = tot;
+      }
     }
 
     // ── BITÁCORA de la corrida ──
