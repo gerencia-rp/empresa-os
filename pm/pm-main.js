@@ -4279,6 +4279,41 @@ function pmPaymentsCountLabel() {
   const total = pmaState.payments.filter(p => p.type === 'ingreso').length;
   return pmPaymentsHasFilters() ? `Mostrando <strong>${shown}</strong> de ${total} pagos` : `${shown} pagos`;
 }
+// Exporta EXACTAMENTE la tabla visible del tab Pagos a CSV (para Excel):
+// mismas filas (pmPaymentsFiltered = filtros + orden activos) y mismas columnas/valores.
+function pmPagosExportCSV() {
+  const pays = pmPaymentsFiltered();
+  const rows = [['Mes renta','Cobrado','Inquilino','Casa','Unit','Monto','Plataforma','Recurrencia','Estatus','Comprobante']];
+  pays.forEach(p => {
+    const prop = pmaState.properties.find(x => x.id === p.property_id);
+    const unit = pmaState.units.find(x => x.id === p.unit_id);
+    const bk = pmPaymentBooking(p);
+    const st = pmPayStatus(p);
+    rows.push([
+      p.month ? `${p.month} ${p.year||''}`.trim() : 'sin mes',
+      p.paid_at || '—',
+      p.tenant_id ? pmTenantName(p.tenant_id) : (p.concept || '—'),
+      p.property_id ? (prop?.name || '—') : 'Sin vincular',
+      unit?.code || unit?.name || '—',
+      `$${Number(st.debe||0).toLocaleString()}`,
+      p.platform || '—',
+      bk ? pmRecurrenceOf(bk.payment_day).label : '—',
+      st.label,
+      p.proof_url || p.attachment_url || ''
+    ]);
+  });
+  // BOM UTF-8 para que Excel muestre bien los acentos
+  const csv = '\ufeff' + rows.map(r => r.map(c => /[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g,'""')}"` : c).join(',')).join('\n');
+  const period = pmaState.payPeriod || 'month';
+  const ym = period === 'month' ? pmCurrentYM() : String(period);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `pagos_${ym.replace(/[^0-9A-Za-z_-]/g, '')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+window.pmPagosExportCSV = pmPagosExportCSV;
 function pmPaymentsSearchInput(value) {
   pmaState.paySearch = value;
   try { localStorage.setItem('pm_pagos_filter_search', value || ''); } catch (e) {}
@@ -4357,6 +4392,7 @@ function pmRenderPayments() {
       </div>
       <div class="flex items-center gap-2">
         ${pmPaymentsHasFilters() ? `<button onclick="pmPaymentsClearFilters()" class="text-[11px] text-[#b8941f] hover:underline font-bold">✕ Limpiar filtros</button>` : ''}
+        <button onclick="pmPagosExportCSV()" title="Descargar la tabla visible (filtros aplicados) como CSV para Excel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">⬇ Descargar</button>
         <button onclick="pmPickLeaseForPayment()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" style="border:1px solid #d4af37">+ Registrar pago</button>
       </div>
     </div>
