@@ -349,6 +349,7 @@ function jvCSS() {
     '#os-root .jv-c2-resp{font-size:12px;color:var(--jc-tx);opacity:.9;line-height:1.5;margin-bottom:8px}',
     '#os-root .jv-c2-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}',
     '#os-root .jv-c2-tareas{font-size:11px;color:var(--jc-mut);line-height:1.55;margin-bottom:10px}',
+    '#os-root .jv-c2-tsub{color:var(--jc-mut);opacity:.7}',
     '#os-root .jv-c2-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto;padding-top:8px;border-top:1px solid var(--jc-line)}',
     '#os-root .jv-c2-act{display:flex;gap:6px;margin-top:10px}',
     '#os-root .jv-c2-act button{background:transparent;border:1px solid var(--jc-line);color:var(--jc-mut);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:11px}',
@@ -507,6 +508,15 @@ function jvLineaHeader(L, count, planned) {
   return '<div class="jv-linea-h" style="--lc:' + L.color + '"><div class="ic">' + osIcon(L.icon, { size: 16 }) + '</div><b>' + OS_E(L.linea) + '</b>'
     + (planned ? '<span class="jv-chip">escuadra planificada</span>' : '<span class="jv-chip">' + count + ' agente' + (count !== 1 ? 's' : '') + '</span>') + '</div>';
 }
+// Una tarea puede venir como string o como objeto {tarea, salida}. Render seguro.
+function jvFmtTarea(t) {
+  if (t && typeof t === 'object') {
+    const main = t.tarea || t.nombre || t.name || '';
+    const sub = t.salida || t.output || '';
+    return '<div>· ' + OS_E(String(main)) + (sub ? '<span class="jv-c2-tsub"> → ' + OS_E(String(sub)) + '</span>' : '') + '</div>';
+  }
+  return '<div>· ' + OS_E(String(t)) + '</div>';
+}
 function jvAgentCard(a, canEdit, canUp, canDown) {
   if (JV.mapEdit === a.id) return jvAgentEditForm(a);
   const skills = Array.isArray(a.skills) ? a.skills : [];
@@ -520,7 +530,7 @@ function jvAgentCard(a, canEdit, canUp, canDown) {
     + jvEstadoBadge(a.estado) + '</div>'
     + '<p class="jv-c2-resp">' + OS_E(a.responsabilidad || a.proceso || '') + '</p>'
     + (skills.length ? '<div class="jv-c2-chips">' + skills.slice(0, 6).map(s => '<span class="jv-chip">' + OS_E(String(s)) + '</span>').join('') + '</div>' : '')
-    + (tareas.length ? '<div class="jv-c2-tareas">' + tareas.slice(0, 4).map(t => '<div>· ' + OS_E(String(t)) + '</div>').join('') + '</div>' : '')
+    + (tareas.length ? '<div class="jv-c2-tareas">' + tareas.slice(0, 4).map(jvFmtTarea).join('') + '</div>' : '')
     + '<div class="jv-c2-meta"><span class="jv-chip">' + OS_E(a.nivel_riesgo || '—') + '</span>'
     + (evalStr ? '<span class="jv-chip">' + OS_E(evalStr) + '</span>' : '')
     + (a.dueno_humano ? '<span class="jv-chip">' + osIcon('user', { size: 11 }) + ' ' + OS_E(a.dueno_humano) + '</span>' : '')
