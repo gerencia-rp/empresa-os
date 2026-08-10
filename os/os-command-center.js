@@ -15,7 +15,7 @@ const JV = {
   tab: 'network',
   agents: [], props: [], audit: [], lastRun: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
-  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false,
+  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null,
   busyId: null, chat: [], chatBusy: false,
 };
 window.JV = JV;
@@ -121,7 +121,6 @@ const JV_EMPRESAS = [
   { area: 'fix-flip', name: 'Fix & Flip', icon: 'construction' },
   { area: 'remodelacion', name: 'Remodelación', icon: 'hammer' },
   { area: 'rentas', name: 'Rentas', icon: 'house' },
-  { area: 'education', name: 'Educación', icon: 'graduation-cap' },
 ];
 const JV_FUENTES = [
   { id: 'src-airtable', label: 'Airtable', icon: 'table', desc: 'Bases Rentas / Fix&Flip / Remodelación — origen operativo de las casas.' },
@@ -136,11 +135,10 @@ const JV_LINEAS = [
   { linea: 'Rentas', icon: 'house', color: 'var(--jc-grn)' },
   { linea: 'Remodelación', icon: 'hammer', color: 'var(--jc-amber)' },
   { linea: 'Fix & Flip', icon: 'construction', color: 'var(--jc-cyan)' },
-  { linea: 'Educación', icon: 'graduation-cap', color: 'var(--jc-pink)' },
   { linea: 'Transversal (legacy)', icon: 'library', color: 'var(--jc-mut)' },
   { linea: 'Transversal (Señal)', icon: 'alert', color: 'var(--jc-amber)' },
 ];
-const JV_LINEA_PLANNED = ['Remodelación', 'Fix & Flip', 'Educación'];
+const JV_LINEA_PLANNED = [];
 function jvEstadoBadge(e) {
   const m = { 'activo': ['b-work', 'activo'], 'live': ['b-work', 'activo'], 'asistido': ['b-asis', 'asistido'], 'dry-run': ['b-wait', 'dry-run'], 'planificado': ['b-idle', 'planificado'], 'en-consolidación': ['b-cons', 'en consolidación'], 'pausado': ['b-paused', 'pausado'] };
   const x = m[e] || ['b-idle', e || '—'];
@@ -171,7 +169,13 @@ function jvCSS() {
     '#os-root .jv-nav a:hover{color:#fff;background:rgba(167,139,250,.06)}',
     '#os-root .jv-nav a .icn{width:15px;height:15px}',
     '#os-root .jv-lbl{font-size:9.5px;letter-spacing:.2em;color:var(--jc-mut);text-transform:uppercase;margin:18px 8px 8px}',
-    '#os-root .jv-mini{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;font-size:11.5px;color:var(--jc-tx)}',
+    '#os-root .jv-mini{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;font-size:11.5px;color:var(--jc-tx);border:1px solid transparent}',
+    '#os-root .jv-mini:hover{background:rgba(167,139,250,.06)}',
+    '#os-root .jv-mini.on{background:rgba(167,139,250,.16);border-color:rgba(167,139,250,.4);color:#fff}',
+    '#os-root .jv-mini-all{color:var(--jc-mut)}',
+    '#os-root .jv-filter-bar{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--jc-tx);background:rgba(167,139,250,.10);border:1px solid rgba(167,139,250,.28);border-radius:20px;padding:5px 12px;margin:-8px 0 18px}',
+    '#os-root .jv-filter-x{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--jc-mut);background:transparent;border:1px solid var(--jc-line);border-radius:14px;padding:2px 9px;cursor:pointer}',
+    '#os-root .jv-filter-x:hover{color:#fff;border-color:var(--jc-purple)}',
     '#os-root .jv-mini .ic{width:22px;height:22px;border-radius:6px;background:var(--jc-card);display:flex;align-items:center;justify-content:center}',
     '#os-root .jv-mini .stt{margin-left:auto;width:7px;height:7px;border-radius:50%}',
     '#os-root .jv-mini .stt.work{background:var(--jc-grn);box-shadow:0 0 7px var(--jc-grn)}',
@@ -425,6 +429,11 @@ async function jvLoad(force) {
 }
 window.jvLoad = jvLoad;
 function jvNav(tab) { JV.tab = tab; if (window.osRender) osRender(); }
+// Filtro del Mapa de Agentes por escuadra/línea (sidebar "Escuadras")
+function jvFilterLinea(linea) { JV.filterLinea = (JV.filterLinea === linea) ? null : linea; JV.tab = 'network'; if (window.osRender) osRender(); }
+window.jvFilterLinea = jvFilterLinea;
+function jvFilterClear() { JV.filterLinea = null; JV.tab = 'network'; if (window.osRender) osRender(); }
+window.jvFilterClear = jvFilterClear;
 window.jvNav = jvNav;
 
 // ════════════════════════════════════════════════════════════════
@@ -441,13 +450,14 @@ window.jvView = jvView;
 
 function jvSidebar() {
   const nav = JV_NAV.map(n => '<a class="' + (JV.tab === n.k ? 'on' : '') + '" onclick="jvNav(\'' + n.k + '\')">' + osIcon(n.ic, { size: 15 }) + ' ' + n.t + '</a>').join('');
+  const todos = '<div class="jv-mini jv-mini-all' + (JV.filterLinea == null ? ' on' : '') + '" onclick="jvFilterClear()" style="cursor:pointer"><div class="ic">' + osIcon('list', { size: 13 }) + '</div>Todos<span class="stt idle" style="visibility:hidden"></span></div>';
   const minis = JV_LINEAS.filter(L => JV.agents.some(a => a.linea === L.linea) || JV_LINEA_PLANNED.includes(L.linea)).map(L => {
     const st = jvLineaStatus(L.linea);
-    return '<div class="jv-mini" onclick="jvNav(\'network\')" style="cursor:pointer"><div class="ic">' + osIcon(L.icon, { size: 13 }) + '</div>' + OS_E(L.linea) + '<span class="stt ' + st + '"></span></div>';
+    return '<div class="jv-mini' + (JV.filterLinea === L.linea ? ' on' : '') + '" onclick="jvFilterLinea(\'' + OS_E(L.linea).replace(/'/g, "\\'") + '\')" style="cursor:pointer"><div class="ic">' + osIcon(L.icon, { size: 13 }) + '</div>' + OS_E(L.linea) + '<span class="stt ' + st + '"></span></div>';
   }).join('');
   return '<aside class="jv-side"><div class="jv-logo"><div class="m"></div><b>Rental Profitss</b></div>'
     + '<nav class="jv-nav">' + nav + '</nav>'
-    + '<div class="jv-lbl">Escuadras</div>' + minis + '</aside>';
+    + '<div class="jv-lbl">Escuadras</div>' + todos + minis + '</aside>';
 }
 function jvTopBar() {
   const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
@@ -472,9 +482,12 @@ function jvTabBody() {
 function jvMapaView() {
   const canEdit = jvRole() === 'admin';
   const activos = JV.agents.filter(a => ['activo', 'live'].includes(a.estado)).length;
+  const flt = JV.filterLinea;
+  const lineas = flt ? JV_LINEAS.filter(L => L.linea === flt) : JV_LINEAS;
   let html = '<div class="jv-eyebrow">Mapa de Agentes</div>'
-    + '<div class="jv-lead">La empresa de trabajadores digitales — holding → líneas → escuadras → agentes. ' + JV.agents.length + ' agentes · ' + activos + ' activos. Tarjetas editables' + (canEdit ? '' : ' (solo admin)') + '.</div>';
-  JV_LINEAS.forEach(L => {
+    + '<div class="jv-lead">La empresa de trabajadores digitales — holding → líneas → escuadras → agentes. ' + JV.agents.length + ' agentes · ' + activos + ' activos. Tarjetas editables' + (canEdit ? '' : ' (solo admin)') + '.</div>'
+    + (flt ? '<div class="jv-filter-bar">' + osIcon('filter', { size: 13 }) + ' Filtrando: <b>' + OS_E(flt) + '</b> <button class="jv-filter-x" onclick="jvFilterClear()">' + osIcon('x', { size: 12 }) + ' Todos</button></div>' : '');
+  lineas.forEach(L => {
     const ags = JV.agents.filter(a => a.linea === L.linea).sort((a, b) => (a.orden == null ? 99 : a.orden) - (b.orden == null ? 99 : b.orden));
     if (!ags.length) {
       if (JV_LINEA_PLANNED.includes(L.linea)) html += jvLineaHeader(L, 0, true);
