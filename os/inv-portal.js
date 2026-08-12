@@ -1022,11 +1022,15 @@ function renderFlujo(pid, inv) {
   if (led.err) return '<div class="empty">Error: ' + esc(led.err) + '</div>';
   if (!led.length) return '<div class="empty">Sin movimientos registrados todavía para esta casa. Cuando empiece a moverse la plata (rentas, gastos, deuda) lo ves acá, mes a mes.</div>';
 
-  const anios = [...new Set(led.map(m => String(m.fecha || '').slice(0, 4)))].filter(Boolean).sort().reverse();
+  // MES del dinero = el mes CONTABLE del ledger (`mes`: billing_ym en Rentas, mes de la fecha
+  // en el resto). Es el MISMO agrupador que usa la distribución automática (inv_dist_auto),
+  // así el neto que ve el inversionista y el que se reparte son el mismo número.
+  const mesDe = m => String(m.mes || String(m.fecha || '').slice(0, 7));
+  const anios = [...new Set(led.map(m => mesDe(m).slice(0, 4)))].filter(Boolean).sort().reverse();
   const F = IP.anio;
   const hoyIso = new Date().toISOString().slice(0, 10);
   // la OPERACIÓN se corta a HOY: movimientos con fecha futura (gastos programados) no inflan los totales
-  const w = led.filter(m => (F === 'todos' || String(m.fecha || '').startsWith(F)) && String(m.fecha || '') <= hoyIso);
+  const w = led.filter(m => (F === 'todos' || mesDe(m).startsWith(F)) && String(m.fecha || '') <= hoyIso);
   // operación mensual: renta / operativos / deuda — SIN draws-inversión y SIN distribuciones
   // E1: la OPERACIÓN = solo movimientos P&L SÍ (regla única invEngine.pnlSi);
   // la deuda (financiero) NO entra al balance — se declara informativa
@@ -1044,45 +1048,61 @@ function renderFlujo(pid, inv) {
   const porCat = {};
   oper.forEach(m => { const mm = String(m.concepto || '').match(/^Gasto ([^·]+?)( ·|$)/); const c = mm ? mm[1].trim() : 'otros'; porCat[c] = (porCat[c] || 0) + +m.monto; });
   const catRows = Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="kv"><span>' + esc(c) + '</span><b class="down">−' + $money(v) + '</b></div>').join('');
+  // el servicio de deuda también se itemiza (interés HML vs cuota de la refi) — es plata que sale de la casa
+  const porDeu = {};
+  deuda.forEach(m => { const c = String(m.concepto || 'Servicio de deuda').replace(/\s*·.*$/, ''); porDeu[c] = (porDeu[c] || 0) + +m.monto; });
+  const deuRows = Object.entries(porDeu).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="kv"><span>' + esc(c) + '</span><b class="down">−' + $money(v) + '</b></div>').join('');
   const anioSel = '<select class="ibtn" onchange="ipSetAnio(this.value)"><option value="todos"' + (F === 'todos' ? ' selected' : '') + '>Todo el historial</option>' + anios.map(y => '<option value="' + y + '"' + (F === y ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
 
   const box = (lab, val, meta, cls, extra) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + (extra || '') + '</div>';
-  const tres = '<div class="grid k3">'
+  const tres = '<div class="grid k4">'
     + box('💵 Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
     + box('🧾 Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
-    + box('⚖️ Balance operativo del período', $money(balanceOp), 'renta − gastos (solo P&L SÍ) · <span title="interés del HML + cuota de la refi a 30 años pagados en el período. Es financiero · P&L NO: no afecta el balance operativo, pero sí se resta para saber cuánto queda para repartir.">Servicio de deuda pagado (HML/refi): ' + $money(tDeuda) + ' — informativo</span>', balanceOp >= 0 ? 'up' : 'down')
-    + '</div>';
+    + box('🏦 Servicio de deuda', tDeuda ? '−' + $money(tDeuda) : $money(0), 'interés del HML + cuota de la refi a 30 años pagados en el período <span class="src">FF:ff_hml_payments</span>', 'down', '<div style="margin-top:8px">' + (deuRows || '<div class="meta">sin pagos de deuda en el período</div>') + '</div>')
+    + box('⚖️ Balance operativo (NOI)', $money(balanceOp), 'renta − gastos operativos (solo P&L SÍ) · <span title="el servicio de deuda es financiero · P&L NO: no entra en el NOI, pero sí se resta abajo para saber cuánto queda de verdad.">no incluye el servicio de deuda</span>', balanceOp >= 0 ? 'up' : 'down')
+    + '</div>'
+    // el número que importa: lo que queda DESPUÉS de pagarle al banco / al hard money
+    + '<div class="card" style="margin-top:14px;border-color:' + (balanceTot >= 0 ? 'var(--pos)' : 'var(--neg)') + '">'
+    + '<div class="lab">💰 Flujo después de deuda (lo que realmente queda)</div>'
+    + '<div class="big ' + (balanceTot >= 0 ? 'up' : 'down') + '">' + $money(balanceTot) + '</div>'
+    + '<div class="meta">renta ' + $money(tRenta) + ' − gastos operativos ' + $money(tOper) + ' − servicio de deuda ' + $money(tDeuda)
+    + ' · es el mismo neto que usa la distribución automática (tu parte = este número × ' + $pct(inv) + ')</div></div>';
 
-  // detalle anual → mensual (ingresos vs gastos vs flujo neto de la OPERACIÓN)
+  // detalle anual → mensual: ingresos · gastos operativos · SERVICIO DE DEUDA · flujo neto
+  // (el neto resta la deuda: es lo que de verdad queda, la misma cuenta de inv_dist_auto)
   const porMes = {};
   led.forEach(m => {
-    if (!invEngine.pnlSi(m.categoria)) return; // detalle año→mes: SOLO P&L SÍ (E1)
     if (String(m.fecha || '') > hoyIso) return; // lo programado a futuro no es operación ocurrida
-    const ym = String(m.fecha || '').slice(0, 7); if (!ym) return;
-    const o = porMes[ym] = porMes[ym] || { ing: 0, gas: 0 };
-    if (m.tipo === 'ingreso') o.ing += +m.monto; else o.gas += +m.monto;
+    const ym = mesDe(m); if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    const esDeu = ipEsDeuda(m);
+    if (!esDeu && !invEngine.pnlSi(m.categoria)) return; // el resto de lo financiero/inversión no es operación
+    const o = porMes[ym] = porMes[ym] || { ing: 0, gas: 0, deu: 0 };
+    if (esDeu) o.deu += +m.monto || 0;
+    else if (m.tipo === 'ingreso') o.ing += +m.monto; else o.gas += +m.monto;
   });
   const porAnio = {};
   Object.keys(porMes).forEach(ym => { const y = ym.slice(0, 4); (porAnio[y] = porAnio[y] || []).push(ym); });
   const anual = Object.keys(porAnio).sort().reverse().filter(y => F === 'todos' || y === F).map(y => {
     const meses = porAnio[y].sort();
     const ti = meses.reduce((s, ym) => s + porMes[ym].ing, 0), tg = meses.reduce((s, ym) => s + porMes[ym].gas, 0);
+    const td = meses.reduce((s, ym) => s + porMes[ym].deu, 0);
+    const tn = ti - tg - td;
     const open = IP.anioOpen[y] !== false; // abierto por default
     return '<div style="margin-bottom:8px">'
-      + '<div onclick="ipToggleAnio(\'' + y + '\')" style="display:flex;justify-content:space-between;gap:10px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:10px;background:var(--glass)">'
-      + '<b>' + (open ? '▾' : '▸') + ' ' + y + '</b><span style="font-variant-numeric:tabular-nums">ingresos <b class="up">' + $money(ti) + '</b> · gastos <b class="down">−' + $money(tg) + '</b> · neto <b class="' + (ti - tg >= 0 ? 'up' : 'down') + '">' + $money(ti - tg) + '</b></span></div>'
-      + (open ? '<div class="overx"><table style="margin-top:4px"><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Flujo neto</th></tr></thead><tbody>'
-        + meses.map(ym => { const o = porMes[ym]; const n = o.ing - o.gas; return '<tr><td>' + esc(invEngine.mesEs(ym)) + '</td><td class="up">' + $money(o.ing) + '</td><td class="down">−' + $money(o.gas) + '</td><td class="' + (n >= 0 ? 'up' : 'down') + '">' + $money(n) + '</td></tr>'; }).join('')
+      + '<div onclick="ipToggleAnio(\'' + y + '\')" style="display:flex;justify-content:space-between;gap:10px;cursor:pointer;padding:8px 10px;border:1px solid var(--glassb);border-radius:10px;background:var(--glass);flex-wrap:wrap">'
+      + '<b>' + (open ? '▾' : '▸') + ' ' + y + '</b><span style="font-variant-numeric:tabular-nums">ingresos <b class="up">' + $money(ti) + '</b> · gastos <b class="down">−' + $money(tg) + '</b> · deuda <b class="down">−' + $money(td) + '</b> · neto <b class="' + (tn >= 0 ? 'up' : 'down') + '">' + $money(tn) + '</b></span></div>'
+      + (open ? '<div class="overx"><table style="margin-top:4px"><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos operativos</th><th>Servicio de deuda</th><th>Flujo neto</th></tr></thead><tbody>'
+        + meses.map(ym => { const o = porMes[ym]; const n = o.ing - o.gas - o.deu; return '<tr><td>' + esc(invEngine.mesEs(ym)) + '</td><td class="up">' + $money(o.ing) + '</td><td class="down">−' + $money(o.gas) + '</td><td class="down">−' + $money(o.deu) + '</td><td class="' + (n >= 0 ? 'up' : 'down') + '">' + $money(n) + '</td></tr>'; }).join('')
         + '</tbody></table></div>' : '')
       + '</div>';
   }).join('');
 
   // línea de tiempo completa (todos los movimientos, con filtros)
   let acum = 0; // saldo OPERATIVO: solo avanza con P&L SÍ; las filas NO repiten el anterior
-  const full = led.map(m => { const si = invEngine.pnlSi(m.categoria); if (si) acum += (m.tipo === 'ingreso' ? 1 : -1) * (+m.monto || 0); return { ...m, acum, pnl: si }; });
-  const mesesAll = [...new Set(led.map(m => String(m.fecha || '').slice(0, 7)))].sort().reverse();
+  const full = led.map(m => { const si = invEngine.pnlSi(m.categoria); if (si) acum += (m.tipo === 'ingreso' ? 1 : -1) * (+m.monto || 0); return { ...m, acum, pnl: si, deu: ipEsDeuda(m) }; });
+  const mesesAll = [...new Set(led.map(m => mesDe(m)))].filter(x => /^\d{4}-\d{2}$/.test(x)).sort().reverse();
   const LF = IP.ledgerF;
-  const rows = full.filter(m => (LF.tipo === 'todos' || m.tipo === LF.tipo) && (LF.mes === 'todos' || String(m.fecha || '').startsWith(LF.mes)));
+  const rows = full.filter(m => (LF.tipo === 'todos' || m.tipo === LF.tipo) && (LF.mes === 'todos' || mesDe(m) === LF.mes));
   const srcTag = f => '<span class="src' + (/manual/.test(f) ? ' sup' : '') + '" title="' + esc(f) + '">' + esc(String(f).split(':')[0]) + '</span>';
   const sel = (campo, opts, cur) => '<select class="ibtn" style="padding:7px 10px" onchange="ipLedgerF(\'' + campo + '\', this.value)">' + opts.map(o => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
 
@@ -1094,8 +1114,12 @@ function renderFlujo(pid, inv) {
     + sel('mes', [['todos', 'Todos los meses']].concat(mesesAll.map(m => [m, invEngine.mesEs(m)])), LF.mes)
     + '</div></div>'
     + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right">Saldo operativo</th><th>Fuente</th></tr></thead><tbody>'
-    + rows.slice().reverse().map(m => '<tr' + (m.pnl ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
-      + '<td>' + esc(m.concepto) + (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>') + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">📎</a>' : '') + '</td>'
+    // las filas de SERVICIO DE DEUDA se ven a plena luz (son plata que sale de la casa), aunque
+    // sean P&L NO para el saldo operativo — el resto de lo financiero/inversión queda en tenue
+    + rows.slice().reverse().map(m => '<tr' + (m.pnl || m.deu ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
+      + '<td>' + esc(m.concepto)
+      + (m.deu ? ' <span class="src" title="interés del HML / cuota de la refi — se resta del flujo neto del mes, no del NOI">🏦 servicio de deuda</span>' : (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>'))
+      + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">📎</a>' : '') + '</td>'
       + '<td>' + esc(m.categoria) + '</td>'
       + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
       + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO: repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'

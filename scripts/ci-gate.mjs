@@ -3,14 +3,17 @@
 // Un tile no mergea si: (a) no lee de la capa de KPIs, (b) no resuelve por property_id,
 // (c) muestra $0 sobre vacío, (d) cifra contable no reconcilia con QBO.
 // Uso: SB_KEY=sb_secret_… node scripts/ci-gate.mjs   → exit 1 si algún check falla.
+// Sin la secret key a mano se puede correr con el JWT de un usuario ADMIN (mismas lecturas,
+// pero pasando por RLS): SB_APIKEY=<anon key> SB_KEY=<access_token del admin> npm run ci:gate
 // ════════════════════════════════════════════════════════════════
 import { readFileSync } from 'node:fs';
 
 const REST = 'https://nezbaljfhhyznhltpjnk.supabase.co/rest/v1/';
 const KEY = process.env.SB_KEY;
+const APIKEY = process.env.SB_APIKEY || KEY; // el gateway exige una API key válida en `apikey`
 if (!KEY) { console.error('Falta SB_KEY'); process.exit(1); }
 const q = async (path) => {
-  const r = await fetch(REST + path, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
+  const r = await fetch(REST + path, { headers: { apikey: APIKEY, Authorization: 'Bearer ' + KEY } });
   if (!r.ok) throw new Error(path + ' → ' + r.status);
   return r.json();
 };
