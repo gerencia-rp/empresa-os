@@ -147,12 +147,14 @@ async function ipLoad() {
 }
 
 // ─── params → motor ───
-// SERVICIO DE DEUDA del ledger (interés HML + cuota refi 30a): el motor lo marca con
-// subcategoria='servicio_deuda'. Fallback a la regla vieja (financiero+gasto) por si el
-// ledger viniera de una definición anterior — así el portal nunca queda sin el dato.
+// SERVICIO DE DEUDA del ledger = interés HML + cuota de la refi 30a, y NADA MÁS.
+// CRITERIO ESTRICTO, el MISMO del Ledger del admin (iaTabLedger): subcategoria='servicio_deuda'.
+// ⚠ NO volver al fallback `categoria === 'financiero' && tipo === 'gasto'`: "financiero" también
+// son el desembolso del HML, los draws y el cash-out del refi — plata que ENTRA o que es
+// inversión, no cuotas. En 5003 Michelle ese fallback tragaba 5 draws manuales ($76,500) y el
+// cash-out ($23,093.29) y sep-25 mostraba $49,116 de "deuda" en vez de $2,116.13.
 function ipEsDeuda(m) {
-  if (m.subcategoria) return m.subcategoria === 'servicio_deuda';
-  return m.categoria === 'financiero' && m.tipo === 'gasto';
+  return m.subcategoria === 'servicio_deuda';
 }
 function num(P, k, d) { const r = P[k]; const v = r ? parseFloat(r.value) : NaN; return isNaN(v) ? d : v; }
 function txt(P, k) { const r = P[k]; return r ? r.value : null; }
