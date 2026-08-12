@@ -3,6 +3,49 @@
 Rama `rebuild/os-audit-2026-07` · un commit por ítem · verificación contra fuente antes de commitear.
 Estados: ⬜ pendiente · 🔄 en curso · ✅ hecho · ⛔ bloqueado (con nota).
 
+## 12-ago · 📅 FLUJO MENSUAL del inversionista: el neto ya NO ignora el pago del HML/refi ✅ EN PROD
+
+**El problema (confirmado en código y en datos).** En la vista del inversionista, pestaña **📅 Flujo Mensual** (`renderFlujo`, `os/inv-portal.js`), el loop que arma la tabla "Detalle año → mes" empezaba con `if (!invEngine.pnlSi(m.categoria)) return;`. El servicio de deuda es `categoria='financiero'` → **P&L NO** → nunca entraba al detalle. El inversionista veía gastos ≈ $0 y un "neto" inflado. En el Ledger del admin sí se veía porque esa tabla lista **todas** las filas.
+
+**Antes → Después (5003 Michelle Ct, 40% · datos reales de prod, mismo `inv_ledger`):**
+
+| Mes | Ingresos | Gastos operativos | Servicio de deuda | Neto ANTES | Neto AHORA |
+|---|---|---|---|---|---|
+| ene-26 | $3,700 | $0 | $2,116.13 (interés HML) | ~~$3,700~~ | **$1,583.87** |
+| jun-26 | $3,700 | $0 | $2,116.13 (interés HML) | ~~$3,700~~ | **$1,583.87** |
+| jul-26 | $3,700 | $148 | $3,032.26 (cuota refi 30a) | ~~$3,552~~ | **$519.74** |
+| sep-25 | $0 | $0 | $2,116.13 | ~~el mes ni aparecía~~ | **−$2,116.13** |
+
+La columna "Servicio de deuda" **no existía** en la tabla; ahora la tabla mensual es **Ingresos · Gastos operativos · Servicio de deuda · Flujo neto**, con `Flujo neto = ingresos − operativos − deuda`. La fila colapsable del año suma las tres y su neto también resta la deuda.
+
+**Qué cambió (todo dentro de `renderFlujo`, un solo archivo — cero recálculo, una sola fuente):**
+1. **`porMes` acumula una tercera cifra `deu`** con `ipEsDeuda(m)` (los movimientos `subcategoria='servicio_deuda'` del ledger, con su fecha). Antes se descartaban.
+2. **El agrupador de mes pasa a ser `mes` del ledger** (mes CONTABLE: `billing_ym` en Rentas, mes de la fecha en el resto) — el **mismo** que usa `inv_dist_auto`. Cierra el pendiente declarado el 06-ago ("el Flujo Mensual del portal sigue en `fecha`"). El corte a HOY por `fecha` se mantiene (lo programado a futuro no es operación ocurrida) y **no genera divergencia**: 0 filas de `pm_expenses` con fecha futura y mes contable pasado en todo el portafolio.
+3. **Tarjetas de arriba**: se agrega **🏦 Servicio de deuda** (itemizado: "Pago interés HML" / "Pago refi 30 años (banco)") y, sobre todo, la cifra que se calculaba y **no se mostraba** — **💰 Flujo después de deuda (lo que realmente queda)** = `balanceOp − tDeuda`, en tarjeta destacada con la cuenta escrita y "tu parte = × 40%". Se mantiene el **NOI** (Balance operativo) y su nota de que la deuda no entra ahí.
+4. **"Todos los movimientos"**: las filas de servicio de deuda dejan de ir en tenue y llevan chip **🏦 servicio de deuda** (el resto de P&L NO sigue atenuado). No mueven el "Saldo operativo" — eso sigue siendo P&L.
+5. Los gastos operativos itemizados por categoría (`catRows`) quedan como estaban.
+
+**Sin doble conteo**: la "Hipoteca" de `pm_expenses` ya la excluye la RPC `inv_ledger` (filtro `subcategory/description !~* 'hipoteca'`); la deuda real entra una sola vez desde `ff_hml_payments`.
+
+**Verificación en CARGA NORMAL LOGUEADA** (`scripts/qa-flujo-deuda.mjs`, nuevo): login por el formulario en `empresa-os-admin.vercel.app` → portal del inversionista en la misma sesión → click real en la pestaña. **Sin forzar `osInit`, sin stubs.** **18 OK · 0 FALLAS · 0 pageerrors** (los únicos 404 son `/config.js` — by design — y `/favicon.ico`).
+
+**Coherencia con la distribución automática**, comprobada llamando la RPC desde la misma sesión del navegador:
+
+| Mes | `inv_dist_auto` | Tabla del portal |
+|---|---|---|
+| 2026-06 | renta 3700 · oper 0 · deuda 2116.13 · **neto 1583.87** | **$1,584** ✓ |
+| 2026-07 | renta 3700 · oper 148 · deuda 3032.26 · **neto 519.74** | **$520** ✓ |
+
+**Deploy**: `vercel --prod` a **empresa-os-admin** (`.vercel/project.json`), bundle `06546640daad` + `/os/inv-portal.js` (el portal es standalone: se sirve suelto, no del bundle) — verificados en el dominio.
+
+**`ci:gate`: 12/15.** Los 3 rojos son **pre-existentes, de datos/infra, y ninguno lo toca este cambio**:
+- `(a) v_ocupacion coherente` — 49 rentables vs 43 clasificadas: **6 `pm_units` con "Estado real" vacío** en Airtable (data quality del espejo).
+- `(d) espejo QBO fresco (≤30 días)` — último fetch **13-jul**: hay que correr el sync de QBO.
+- `(e) cobertura de linaje: corrida fresca (≤7 días)` — última corrida **29-jul** (ya venía roja el 06-ago); `npm run lineage:register` necesita la service key y el crawler tiene la ruta de puppeteer hardcodeada a un Mac.
+- `scripts/ci-gate.mjs` ahora acepta **`SB_APIKEY`** para poder correr el gate con el JWT de un admin cuando la service key no está a mano (`SB_APIKEY=<anon> SB_KEY=<access_token> npm run ci:gate`). Verificado que devuelve exactamente los mismos números que el service role.
+
+**Nota de datos (no es código):** Michelle tiene cargado poco más que el pago de hipoteca y un gasto de $148 en jul-26; PM/utilities no están como líneas separadas en `pm_expenses`. Donde el dato exista se muestra; donde no, no se inventa.
+
 ## 06-ago · 🔍 "El Ledger no muestra el servicio de deuda" — en empresa-os-admin SÍ lo muestra (verificado 4 veces) ✅
 
 Los 3 chequeos pedidos, con evidencia:
