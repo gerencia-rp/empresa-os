@@ -102,7 +102,9 @@ El markup `<svg class="icn">` crudo **no existe en la rama** (grep 0 resultados)
 
 **No tocado (decisión de negocio):** la FUENTE del número de déficit (Item 04, Opción A/B) — pendiente CEO.
 **Verificación:** `node --check os/os.js` OK · `node scripts/build.mjs` OK (bundle 95c37a4815ea).
-Commit `0435f8e` en la rama. Deploy: empresa-os-admin auto-deploya la rama vía GitHub (verificar badge de commit).
+Commit `0435f8e`. **Desplegado y verificado EN VIVO** en empresa-os-admin.vercel.app (bundle 95c37a4815ea
+contiene `osResolveNames` y "rehab real (Airtable)"). ⚠ Deploy: el push NO auto-deploya; se disparó con
+`npx vercel --prod --yes --scope rental-profits` (sin `--scope` → "Not authorized").
 
 ---
 
