@@ -230,6 +230,44 @@ la diluye el arranque. **Necesito que el CEO/Carlos fije la definición** antes 
 
 ---
 
+## FASE 3 — CORRECCIÓN (turno 4 · 2026-08-20) — lote de bugs/UX sin decisión de negocio
+
+Desplegado y verificado EN VIVO en empresa-os-admin (bundle `d938bab8c607`). 4 commits pusheados
+(`02aad58`, `54070a8`, `76cc1e3`, `0d33d8b`).
+
+- **Item 10** — Ocultar "🏗 Pipeline" (Calculadora de propuesta) del portal admin (CEO: "quitemos esto").
+  `inv-admin.js`: agregado a `IA_TABS_OCULTOS` (['docs2','msgs','pipeline']). Reversible; código/datos intactos.
+- **Item 22** — Ocultar "📄 Mis Documentos" y "💬 Mensajes" del portal del INVERSOR (CEO: "quitemos esto").
+  `inv-portal.js`: nuevo `IP_TABS_OCULTOS=['docs','msgs']` filtra los TABS. El 🤖 Asistente SE CONSERVA
+  (Item 23). Reversible. (Item 16 — mismos tabs en el admin — ya estaba hecho de antes.)
+- **Item 45** — Pestaña "3 Estimaciones" (y cualquier tab de remodel-pro) quedaba EN BLANCO si el render
+  tiraba un error. `remodel-pro.js` `rmRenderTab`: dispatch envuelto en try/catch → muestra mensaje claro
+  con "Reintentar" en vez de pantalla vacía. Protege TODOS los tabs, no solo compare. (El compare está
+  estáticamente sano; el blank venía de un error runtime sin manejo.)
+- **Item 55** — Layout de Gestión EVM con "medio pantallazo en blanco". `remodel-command-center.js`:
+  el `grid row2` tenía 3 cards (EVM + Vivo + Control) → la 3ª caía en fila 2 col 1 dejando la col 2 vacía.
+  Ahora EVM+Vivo comparten la fila de 2 columnas y "Control de presupuesto" (tabla ancha) va a ancho completo.
+- **Item 52** — Nómina: "Noe Hilario" duplicado. **Causa raíz confirmada en Supabase**: `"Noe Hilario"`
+  (linkea por rec_id → nombre limpio) vs `"Noe Hilario "` (espacio al final, sin link → `wh.worker` crudo).
+  Fix front (sin tocar datos de prod): la agregación por trabajador en las 2 vistas (Gestión línea 622 +
+  Nómina línea 941) ahora keyea por `(worker||'').trim()` → se fusionan. Además **Item 52 #2** (pagado
+  $33.376 >> devengado $6.398 = imposible): ya NO se esconde — badge visible "⚠ pagado > devengado" con
+  el sobrepago en tooltip, e incluidos en la lista aunque su deuda sea 0. La deuda inflada de horas/rate
+  (Item 40) queda como dato-calidad de Airtable a corregir en la fuente (documentado, no adivinado).
+- **Item 53/57** — "EVM por casa (en curso)" mostraba un SUBCONJUNTO (los que tienen fechas+costo) con la
+  etiqueta "en curso" → se contradecía con el titular "N en curso". Relabelado a "X de N en curso · con
+  fechas y costo". **Definición canónica confirmada en Supabase**: activas=28 → Finalizado 19 · En
+  construcción 5 · Pre construcción 3 · Paralizada 1. El CC ya es internamente consistente: "en curso" =
+  no-finalizado = **9** (headline). Los usos específicos de 'En construcción' (alertas, avance vivo,
+  control de presupuesto = 5) son correctos por su semántica (accionable hoy) y quedan rotulados así.
+  Reportes CEO hereda de `rcObraDataset()` (no cuenta aparte). El "6/7/8" del diagnóstico era del prod
+  viejo (main) — otro "bug fantasma".
+
+**Pendiente próximo (documentado):** Item 54 (EVM en lenguaje simple "rápida/lenta · cara/barata"),
+B4/Item 27 (unidades 98→51 en pm-main, riesgo medio, requiere QA logueado), Item 35 (cartera única).
+
+---
+
 ## FASE 5 — REPORTE (turno 3 · 2026-08-20)
 
 **Este turno (pasada 2 / turno 3):**

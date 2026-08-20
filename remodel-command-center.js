@@ -662,6 +662,23 @@ function rcVivoGanancia(o) {
     + '<span style="font-size:10px;opacity:.7">ROI ' + (o.roi_proyectado_pct != null ? o.roi_proyectado_pct + '%' : '—') + '</span></div>'
     + '<div class="meta" style="margin-top:3px;font-size:9px">cobra proy. ' + M(o.valor_cobro_proyectado != null ? o.valor_cobro_proyectado : o.valor_remodelacion) + ' (' + (o.modo_cobro === 'costplus' ? 'what-if cost-plus' : 'Valor Remodelación') + ') · costo proyectado @100%: ' + M(o.costo_proyectado_100) + ' (gasto ÷ avance técnico)</div>';
 }
+// Item 54: EVM en lenguaje de niño. Traduce los semáforos de tiempo y costo a "va rápida/lenta ·
+// cara/barata" con un color global (el peor de los dos). El número técnico (SPI/CPI/%) queda debajo.
+function rcVerdictoSimple(o) {
+  const rank = { verde: 0, amarillo: 1, rojo: 2, gris: -1 };
+  const tMap = { verde: 'a tiempo', amarillo: 'algo lenta', rojo: 'lenta', gris: 'sin cronograma' };
+  const cMap = { verde: 'barata', amarillo: 'en presupuesto', rojo: 'cara', gris: 'sin presupuesto' };
+  const t = o.sem_tiempo || 'gris', c = o.sem_costo || 'gris';
+  const peor = Math.max(rank[t], rank[c]);
+  const col = peor >= 2 ? 'var(--neg,#f87171)' : peor === 1 ? 'var(--amber,#e7b65e)' : peor === 0 ? 'var(--pos,#34d399)' : 'var(--txt3,#64748b)';
+  const emoji = peor >= 2 ? '🔴' : peor === 1 ? '🟡' : peor === 0 ? '🟢' : '⚪';
+  // frase: "va {tiempo} y {costo}" (si alguno es desconocido, se omite esa mitad)
+  const partes = [];
+  if (t !== 'gris') partes.push(tMap[t]);
+  if (c !== 'gris') partes.push(cMap[c]);
+  const frase = partes.length ? partes.join(' y ') : 'sin datos suficientes';
+  return `<div style="display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:2px 9px;border-radius:20px;background:color-mix(in srgb, ${col} 14%, transparent);color:${col};font-size:11px;font-weight:700" title="Traducción simple de los semáforos de tiempo (SPI) y costo (CPI). El detalle técnico está abajo.">${emoji} va ${frase}</div>`;
+}
 function rcVivoCard() {
   const obras = (RC.avanceVivo || []).filter(x => x.proceso === 'En construcción');
   const SEM = { verde: '🟢', amarillo: '🟡', rojo: '🔴', gris: '⚪' };
@@ -676,6 +693,7 @@ function rcVivoCard() {
     if (!o.presupuesto) revisar.push('sin presupuesto cargado en Airtable — semáforo de costo ciego');
     return `<div class="card" style="min-width:0">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b>${RC_E(rcShort(o.address))}</b><span style="font-size:11px;opacity:.7">${o.done || 0}/${o.total || 0} tareas</span></div>
+      ${rcVerdictoSimple(o)}
       <div style="font-size:10px;color:var(--txt3,#64748b);margin-top:8px">AVANCE TÉCNICO ${o.metodo === 'ponderado_actividad' ? '⭐ $ por actividad' : o.metodo === 'ponderado_etapa' ? '⭐ por etapa' : '(conteo)'} · ${o.pct_tecnico || 0}%${o.tareas_sin_map > 0 && o.metodo === 'conteo' ? ` <span style="color:#e7b65e" title="Tareas del Planner que no cruzan con actividades del Estimador (planner manual o pronóstico sin guardar) — no ponderan hasta mapear">· ${o.tareas_sin_map} sin mapear</span>` : ''}</div>${bar(o.pct_tecnico, 'linear-gradient(90deg,#12b5a0,#2f6ef0)')}
       <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE FINANCIERO${o.fuente_presupuesto === 'pronostico' ? ' (presup. del pronóstico)' : ''} · ${o.pct_financiero != null ? o.pct_financiero + '%' : 's/presup'} ${o.presupuesto ? `($${(+o.gasto_real).toLocaleString('en-US')} de $${(+o.presupuesto).toLocaleString('en-US')})` : ''}</div>${bar(o.pct_financiero, o.sobrecosto_vs_tecnico ? 'linear-gradient(90deg,#e7b65e,#f87171)' : 'linear-gradient(90deg,#34d399,#12b5a0)')}
       <div style="font-size:10px;color:var(--txt3,#64748b)">AVANCE TEMPORAL · ${o.pct_temporal != null ? o.pct_temporal + '%' : 's/cronograma'}</div>${bar(o.pct_temporal, 'linear-gradient(90deg,#64748b,#94a3b8)')}
