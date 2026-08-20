@@ -473,11 +473,9 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
       const flujo = rc.flujo_ult_mes != null
         ? '<span style="color:' + (rc.flujo_ult_mes >= 0 ? 'var(--pos)' : 'var(--neg)') + ';font-weight:700">' + $money(rc.flujo_ult_mes) + '</span> <span class="meta">(' + esc(rc.flujo_ult_mes_ym || '') + ')</span>'
         : '<span class="meta">sin rentas todavía</span>';
-      const desg = rc.deficit_desglose || {};
       const deficit = +rc.deficit > 0
-        ? '<div style="margin-top:6px;font-size:12px;color:var(--neg)">Déficit acumulado: <b>' + $money(rc.deficit) + '</b>'
-          + '<div class="meta" style="font-size:11px">renta ' + $money(desg.ingresos_renta || 0) + ' − gastos ' + $money(desg.gastos_operativos || 0) + ' − interés HML ' + $money(desg.interes_hml || 0) + '</div>'
-          + '<div class="meta" style="font-size:11px">se cubre con el refi/venta' + (rc.fecha_estimada_pago ? ' · fecha estimada: <b>' + esc(rc.fecha_estimada_pago) + '</b>' : '') + '</div></div>'
+        ? '<div style="margin-top:6px;font-size:12px;color:var(--neg)">Déficit acumulado: <b>' + $money(rc.deficit) + '</b> <span class="src" style="font-size:9px">Airtable</span>'
+          + '<div class="meta" style="font-size:11px">caja atrapada de la operación — se recupera con el refi/venta' + (rc.fecha_estimada_pago ? ' · fecha estimada: <b>' + esc(rc.fecha_estimada_pago) + '</b>' : '') + '</div></div>'
         : '';
       const dist = rc.proxima_dist_fecha
         ? '<div style="margin-top:6px;font-size:12px">💸 Próxima distribución: <b>' + esc(rc.proxima_dist_fecha) + '</b>' + (rc.proxima_dist_monto != null ? ' · ' + $money(rc.proxima_dist_monto) : '') + '</div>'
@@ -622,7 +620,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     + '<div class="kv"><span>Hard Money desembolsado (compra + draws)</span><b>' + $money(hmTotal || null) + '</b></div>'
     + '<div class="kv"><span>Préstamo del refi (banco nuevo)</span><b>' + (p.refiMes != null ? $money(p.refiMonto) : SD) + '</b></div>'
     + '<div class="kv"><span>Cash-out del refi' + (cashoutReal != null ? srcChip(P, 'cashout_real') : ' <span class="src sup">calculado</span>') + '</span><b class="' + (cashout != null && cashout >= 0 ? 'up' : 'down') + '">' + $money(cashout) + '</b></div>'
-    + '<div class="kv"><span>' + (deficitCiclo != null && deficitCiclo < 0 ? 'Déficit máximo del ciclo (mes ' + i.fases.fase0.mes + ')' : 'Superávit del ciclo') + '</span><b class="' + (deficitCiclo != null && deficitCiclo < 0 ? 'down' : 'up') + '">' + $money(deficitCiclo) + '</b></div>'
+    + '<div class="kv"><span>' + (deficitCiclo != null && deficitCiclo < 0 ? 'Cash máximo usado en el ciclo (mes ' + i.fases.fase0.mes + ') <span class="src sup">modelo</span>' : 'Superávit del ciclo <span class="src sup">modelo</span>') + '</span><b class="' + (deficitCiclo != null && deficitCiclo < 0 ? 'down' : 'up') + '">' + $money(deficitCiclo) + '</b></div>'
     + '<div class="kv"><span>Cash atrapado post-refi (año 0 oficial)' + srcChip(P, 'anio0_postrefi') + '</span><b>' + $money(i.anio0PostRefi) + '</b></div>'
     + '<div class="lab" style="margin-top:12px">Recuperación (análisis de 3 fases)</div>'
     + '<div class="kv"><span>Fase 1 · la operación cubre el déficit</span><b>' + (i.fases.fase1.anio ? 'año ' + i.fases.fase1.anio : 'no en 31 años') + '</b></div>'
