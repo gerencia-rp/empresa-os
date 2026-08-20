@@ -154,13 +154,55 @@ vía `githubDeployment`). No hace falta token/CLI para desplegar: basta push a `
 
 ---
 
-## FASE 5 — REPORTE (turno 1)
+### Batch 4 — Consolidación de deploy: PARADA por divergencia sustantiva (regla CEO 3d) · 2026-08-20 ⏸
 
-**Resuelto y desplegado (Batch 1):** Item 03 (Líder → nombre), Item 05a ("faltan draws" falso).
-**Fundado con datos reales y priorizado:** los 59 ajustes + hallazgos P0/P1/P2 (tabla B1–B8 arriba).
-**Bloqueado por decisión del CEO:** déficit fuente (04), horizontes (14/18), Cerebro IA (23/25/46),
-consolidación de deploy main↔rama, reconciliación deuda $1M.
-**Recomendaciones de proceso:** (1) exportar `SB_KEY` para correr `ci:gate` en CI; (2) agregar un test de
-invariante de reconciliación (ocupadas iguales entre vistas, Σopex Gastos=Finanzas) — hoy no existe;
-(3) linter que prohíba interpolar sin `esc()` en innerHTML; (4) consolidar el deploy en un solo dominio.
+El CEO autorizó fusionar rama→main **con backup y seguro**. Hecho el paso seguro; **la fusión NO se ejecuta**
+porque cae exactamente en la cláusula "si los commits de main son sustantivos/ambiguos o hay conflictos reales, PARÁ".
+
+- ✅ **Backup creado y pusheado:** tag `backup-main-antes-fusion` = `origin/main` actual (recuperable siempre).
+- **Divergencia real (2026-08-20):** rama **43 adelante** / **56 detrás** de `origin/main`.
+- **Los 56 commits que main tiene y la rama NO son enormes y sustantivos** (135 archivos, **+15.463 / −3.966**):
+  1. **Sistema "Jarvis" / Agent Network completo** (Command Center /jarvis, 18 agentes, escuadras FF/Remodel/Rentas
+     en modo asistido, Mapa de Agentes, grants least-privilege, 7 migraciones `2026080934…46…`).
+  2. **Rebrand de diseño COMPLETO** — dos olas: "cálida + verde bosque" y luego "royal (azabache+cobalto)",
+     con **codemods emoji→Lucide/StatusDot en TODOS los módulos**, `ui/icons.js` nuevo, `ui/tokens.css` +204/−…,
+     JetBrains Mono/Fraunces. Es OTRO sistema de diseño distinto al "light canon" de la rama.
+  3. **Remodel EVM** (C.1/C.2/C.3), **Rentas informes automáticos** (crons+snapshots), **Planner cascada multi-día**,
+     **Estimador take-off**, **Cobros tabla inquilinos**, WhatsApp CEO, CSV de Pagos.
+- **Conflictos reales confirmados** (`git merge-tree`): `os/os.js`, `pm/ff-command-center.js`, `os/inv-portal.js`,
+  `os/inv-admin.js`, `CLAUDE.md` (ambos lados tocaron los mismos archivos core + tokens).
+
+**➡ DECISIÓN DE NEGOCIO REQUERIDA (no la asumo):** la "consolidación de deploy" NO es un merge mecánico —
+son **dos sistemas de diseño y dos sets de features divergentes**. Antes de fusionar hay que decidir:
+(a) ¿qué diseño gana — "light canon" de la rama o "royal/cálida" de main? (b) ¿el Portal Inversor v2 + auditoría
+de la rama se lleva a main, o main (con Jarvis+rebrand) se lleva a la rama? Recomendación: sesión dedicada de
+merge asistido en un worktree aparte, archivo por archivo, con el CEO eligiendo el diseño; NO auto-merge.
+La raíz de los "bugs fantasma" es justamente esto: el CEO mira `empresa-os-admin` (rama) y `empresa-os` (main)
+que hoy son productos **diferentes**, no versiones del mismo.
+
+---
+
+## FASE 5 — REPORTE (turno 2 · 2026-08-20)
+
+**Resuelto, verificado con datos reales y desplegado a empresa-os-admin este turno:**
+- **Déficit fuente ÚNICA `ff_deals.deficit_total`** en ficha/global (os.js), FF Command Center y Portal
+  inversor (RPC) — antes 3-4 fórmulas distintas. Verificado: acumulado **$297.690,36**, 5 casas >$20k
+  (`9eb29a9`, `e00cabd`, migr `20260820120000`).
+- **Horizontes 3/5/8 FIJO** (constante única `HORIZONTES`) — eliminado el 4/6/8 (`8e6c314`). Golden 24/24.
+- **XIRR del portafolio excluye holds <1 año** (regla A1) — dejaba de anualizar casas recién cerradas con
+  equity en papel (`b7c7432`).
+- **Batch 1 (turno previo):** Líder rec ID→nombre, "faltan draws" falso.
+
+**Parada documentada (regla CEO):** consolidación de deploy — backup `backup-main-antes-fusion` creado; la
+fusión NO se hace porque main tiene 56 commits sustantivos (Jarvis + rebrand completo) con conflictos reales
+→ requiere decisión de diseño + sesión de merge dedicada (ver Batch 4).
+
+**Próximos lotes (código, sin decisión pendiente):** B4 Rentas unidades 51/ocupación por reservas (pm-main.js,
+riesgo medio), C-P0-1 NOI/DSCR/CoC con renta real (pm_payments) en indicadores del portal, B2 seguridad
+(auth en edge fns de escritura — cuidar crons), semáforo por estado (D-P1-6, ff-analitica salud), Cerebro IA
+(Anthropic key ya autorizada).
+
+**Recomendaciones de proceso:** (1) exportar `SB_KEY` para `ci:gate` en CI; (2) test de invariante de
+reconciliación (ocupadas iguales entre vistas, Σopex Gastos=Finanzas); (3) linter anti-interpolación sin
+`esc()`; (4) **resolver la bifurcación de diseño rama↔main** — es la causa raíz de los "bugs fantasma".
 
