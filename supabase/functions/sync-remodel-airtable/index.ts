@@ -157,8 +157,12 @@ function extractPrimaryName(r: any): string | null {
 function resolveLinked(v: any, cache: Map<string, string>): string | null {
   if (!v) return null;
   if (typeof v === "string") {
-    // ¿Parece un Airtable recID?
-    if (/^rec[A-Za-z0-9]{14,}$/.test(v)) return cache.get(v) || v;
+    // Item 03: puede venir un recID único O varios separados por coma ("rec…, rec…") — resolver cada uno.
+    if (v.includes(",") || /^rec[A-Za-z0-9]{14,}$/.test(v)) {
+      const parts = v.split(",").map((s) => s.trim()).filter(Boolean)
+        .map((id) => /^rec[A-Za-z0-9]{14,}$/.test(id) ? (cache.get(id) || id) : id);
+      return parts.join(", ");
+    }
     return v;
   }
   if (Array.isArray(v) && v.length > 0) {
