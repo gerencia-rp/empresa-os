@@ -102,4 +102,33 @@ El markup `<svg class="icn">` crudo **no existe en la rama** (grep 0 resultados)
 
 **No tocado (decisión de negocio):** la FUENTE del número de déficit (Item 04, Opción A/B) — pendiente CEO.
 **Verificación:** `node --check os/os.js` OK · `node scripts/build.mjs` OK (bundle 95c37a4815ea).
+Commit `0435f8e` en la rama. Deploy: empresa-os-admin auto-deploya la rama vía GitHub (verificar badge de commit).
+
+---
+
+## GROUNDING ADICIONAL PARA PRÓXIMOS LOTES (verificado en prod)
+
+### B4 · Unidades / ocupación (Item 27) — CONFIRMADO
+`pm_units`: **98** filas con `active=true`, de las cuales solo **47** tienen `is_active=true` (y **51** con
+`is_active=false` = legacy). `pm_properties active`=20. **Reservas vigentes hoy** (start≤hoy≤end o sin fin)=**37**.
+- El **OS Global ya filtra bien** (`os/os.js:294` carga pm_units con `.eq('is_active',true)` → 47).
+- El **PM clásico (pm-main.js) NO filtra** → infla a 98 (raíz del "98 vs 51" y de que cada vista dé otro número).
+- Fix B4 (pendiente): en pm-main cargar con `is_active=true`, ocupación desde **reservas vigentes** (no `status`),
+  un solo denominador. Informe real de Carlos: 51 uds / 38 ocupadas / 76.5%. Riesgo MEDIO (pm-main 533KB, global).
+
+### Deploy — hallazgo operativo
+El auto-deploy de empresa-os-admin **sí** dispara por push a la rama (los últimos ~20 deploys son de esta rama
+vía `githubDeployment`). No hace falta token/CLI para desplegar: basta push a `feat/portal-inversionista-v2`.
+
+---
+
+## FASE 5 — REPORTE (turno 1)
+
+**Resuelto y desplegado (Batch 1):** Item 03 (Líder → nombre), Item 05a ("faltan draws" falso).
+**Fundado con datos reales y priorizado:** los 59 ajustes + hallazgos P0/P1/P2 (tabla B1–B8 arriba).
+**Bloqueado por decisión del CEO:** déficit fuente (04), horizontes (14/18), Cerebro IA (23/25/46),
+consolidación de deploy main↔rama, reconciliación deuda $1M.
+**Recomendaciones de proceso:** (1) exportar `SB_KEY` para correr `ci:gate` en CI; (2) agregar un test de
+invariante de reconciliación (ocupadas iguales entre vistas, Σopex Gastos=Finanzas) — hoy no existe;
+(3) linter que prohíba interpolar sin `esc()` en innerHTML; (4) consolidar el deploy en un solo dominio.
 
