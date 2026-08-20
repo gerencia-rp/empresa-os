@@ -263,8 +263,32 @@ Desplegado y verificado EN VIVO en empresa-os-admin (bundle `d938bab8c607`). 4 c
   Reportes CEO hereda de `rcObraDataset()` (no cuenta aparte). El "6/7/8" del diagnóstico era del prod
   viejo (main) — otro "bug fantasma".
 
-**Pendiente próximo (documentado):** Item 54 (EVM en lenguaje simple "rápida/lenta · cara/barata"),
-B4/Item 27 (unidades 98→51 en pm-main, riesgo medio, requiere QA logueado), Item 35 (cartera única).
+### turno 4 (cont.) — más ítems verificados/corregidos (bundle `fd0260612c98`, commits `da2a1d3`, `7d74aa0`)
+
+- **Item 54** — EVM en lenguaje simple. `remodel-command-center.js` `rcVerdictoSimple(o)`: traduce los semáforos
+  de tiempo (SPI) y costo (CPI) a un chip "va {a tiempo/algo lenta/lenta} y {barata/en presupuesto/cara}" con
+  color global = el peor de los dos. Se muestra arriba de cada card de "Avance de obra EN VIVO"; el número
+  técnico queda debajo. (`da2a1d3`).
+- **Item 35** — Cartera "3 números" RESUELTO. **Causa raíz verificada en Supabase**: /cartera arrancaba con
+  `desde = mes-1` (solo mora reciente → $14.400) mientras /cobros y /dashboard usan `v_cartera_kpi.vencido_neto`
+  = **$18.636,01** (toda la historia). Confirmado al centavo: `cartera_informe('2026-08', null)` suma
+  **18.636,01 · 15 morosos** = IGUAL a v_cartera_kpi. Fix: `os-cartera.js` default `desde=null` (histórico
+  completo) → el titular "Deuda VENCIDA (neta)" ahora coincide con las otras 2 pantallas. El selector
+  "vencidos desde" queda como drill-down. (`7d74aa0`).
+- **Item 31 / 32 / 36 (opex $0 / NOI margen 100%)** — **VERIFICADO YA CORRECTO EN LA RAMA** (bug fantasma de
+  prod viejo). La categoría real de gasto vive en `pm_expenses.subcategory`: Hipoteca $289.756 (servicio de
+  deuda, NO opex) · Servicios públicos $34.014 · Aseo y Podada $17.250 · Mantenimiento $3.824 → opex real
+  $55.089. Las 3 superficies ya separan bien: os-dash `esHipo` (regex sobre subcategory), command-center
+  `ccIsHipo`, pm-main `pmFinAgg` (`opex = directos − hipoteca`, `NOI = income − opex`, margen = noi/income).
+  Ninguna filtra por `category='operational'` para el NOI. No requiere cambio.
+- **Item 26 / 47 (SVG crudo `<svg class="icn">`)** — **RECONFIRMADO: NO existe en la rama** (grep 0; el único
+  match "icn" es dentro de la palabra "Calibración"). Es de prod viejo (main). Se cierra al consolidar el
+  deploy (Batch 4, bloqueado por decisión de diseño rama↔main).
+
+**Pendiente próximo (documentado):** B4/Item 27 (unidades 98→51 en pm-main, riesgo MEDIO — dedup depende de
+ver units activo+inactivo, requiere QA logueado, no se toca a ciegas), Item 19 (portal inversor reorganizar
+real→indicadores, UX), Item 30 (Pagos: método de pago + quién recibió). Item 39 (GAP/Utilidad tooltips) ya
+resuelto en turno 3 (`5a6d25f`).
 
 ---
 
