@@ -148,9 +148,13 @@ Eliminado el set 4/6/8 que convivía con 3/5/8 (un inversor veía ambos en la mi
 - Fix B4 (pendiente): en pm-main cargar con `is_active=true`, ocupación desde **reservas vigentes** (no `status`),
   un solo denominador. Informe real de Carlos: 51 uds / 38 ocupadas / 76.5%. Riesgo MEDIO (pm-main 533KB, global).
 
-### Deploy — hallazgo operativo
-El auto-deploy de empresa-os-admin **sí** dispara por push a la rama (los últimos ~20 deploys son de esta rama
-vía `githubDeployment`). No hace falta token/CLI para desplegar: basta push a `feat/portal-inversionista-v2`.
+### Deploy — hallazgo operativo (CORREGIDO turno 3)
+⚠ **El auto-deploy por push a la rama YA NO dispara.** Los deploys viejos (githubDeployment) sí venían de
+GitHub, pero los últimos (turno 1/2) tienen `actor: claude-code` + `gitDirty:1` → fueron por **CLI**
+(`vercel --prod`), no por push. Verificado turno 3: tras pushear `fee342b`/`9c21ae6`/`5a6d25f`, el último
+deploy READY seguía en `b7c7432` (commit previo). **Hay que desplegar SIEMPRE con:**
+`npx vercel --prod --yes --scope rental-profits` (sin `--scope` → "Not authorized"). Confirmado en vivo:
+bundle `b3fd39163a92` contiene los fixes del turno 3.
 
 ---
 
@@ -179,6 +183,70 @@ de la rama se lleva a main, o main (con Jarvis+rebrand) se lleva a la rama? Reco
 merge asistido en un worktree aparte, archivo por archivo, con el CEO eligiendo el diseño; NO auto-merge.
 La raíz de los "bugs fantasma" es justamente esto: el CEO mira `empresa-os-admin` (rama) y `empresa-os` (main)
 que hoy son productos **diferentes**, no versiones del mismo.
+
+---
+
+### Batch 5 — Seguridad P0-SEG-1 (auth en edge fns de escritura) · 2026-08-20 (turno 3) ✅ código / ⏳ deploy
+
+**P0-SEG-1 confirmado y corregido en las 4 edge fns de escritura** (`fee342b`):
+`update-airtable-record`, `pm-payment-writeback`, `remodel-nomina-writeback`, `clickup-writeback`
+tenían `Access-Control-Allow-Origin: "*"` y **NO validaban auth** → cualquiera con la anon key
+podía mutar Airtable (crear pagos, nómina, aprobar acciones ClickUp) usando el SERVICE_ROLE interno.
+Fix: `requireAuth(req)` (JWT de usuario, `_shared/auth.ts`) + `corsHeaders(req)` con whitelist
+(`_shared/cors.ts`) al inicio de cada una.
+- **Verificado seguro:** los 4 callers del front mandan el JWT del usuario
+  (`education.js:4109`/`getAccessToken`, `pm-main.js:3993`/`tok`, `remodel-cc:894`/`getAccessToken`,
+  `os.js:1358`/`session.access_token`). **Ningún cron ni edge fn interna** los invoca
+  (`grep` en supabase/functions + api = 0) → no rompe crons.
+- ⏳ **DEPLOY PENDIENTE (acción del CEO / sesión con backend):** estas fns viven en el backend
+  Supabase **compartido** que sirve TAMBIÉN al sitio live `empresa-os` (main). No se auto-deployan
+  con el push a la rama. Comando: `npx supabase functions deploy update-airtable-record
+  pm-payment-writeback remodel-nomina-writeback clickup-writeback --use-api` (requiere
+  `SUPABASE_ACCESS_TOKEN`). No se auto-ejecutó por regla "avisar antes de tocar prod" + está
+  cerca del camino de dinero (nómina/pagos) → merece verificación E2E del login antes.
+- **Pendiente P0-SEG-2** (no crítico p/ escritura): `ai-deep-analyze`, `compute-insights`,
+  `get-market-prices`, `rentcast` sin auth → abuso de cuota. Mismo patrón `requireAuth` + rate-limit.
+
+### Batch 6 — Item 02 Kanban oculta columnas vacías · 2026-08-20 (turno 3) ✅ (`9c21ae6`)
+
+`pm/ff-command-center.js` `ffSecDeals`: el Kanban mostraba SIEMPRE las 6 etapas del pipeline;
+LEAD (0) y BAJO CONTRATO (0) quedaban vacías ocupando ancho. Ahora `cols` se filtra a
+`items.length > 0` — una etapa reaparece sola cuando una casa entra en ese stage. Fallback
+`kitEmpty` si el pipeline entero está vacío. Solo UI, sin cambio de datos. `node --check` +
+`build` OK (bundle 000f66306a54). Deploy por push (Vercel buildea de fuente).
+
+### Item 09 / C-P0-1 — renta real para NOI/DSCR/CoC → REQUIERE DECISIÓN DE NEGOCIO · 2026-08-20 (turno 3) ⚠
+
+Verificado en Supabase (trailing-12 `pm_payments.amount` vs `ff_deals.renta_mensual`): la modelada
+diverge fuerte de lo cobrado (Garden Path 2.800 vs ~714 · Bramble 4.500 vs 1.250 · Bethune 2.400 vs 417).
+**PERO** dividir el cobrado_12m / 12 **subestima** casas recién rentadas (Ramble 2 pagos→$399,
+Idlewood 2→$900, Virginia 3→$1.224): el trailing-12 promediado castiga a las nuevas y el NOI saldría
+AÚN peor → seguiría diciendo "vender/refi" a todas (el problema opuesto).
+→ **La DEFINICIÓN de "renta real" para NOI/DSCR es decisión de negocio** (cambia números que ve el
+inversor): opciones = (a) rent-roll del mes actual (Σ `renta_pactada` de las unidades activas), (b)
+promedio de los últimos N meses CON pago, (c) `pm_payments.renta_pactada` del período vigente. No la
+adivino (regla 7+9). Recomendación técnica: (a) rent-roll actual — es la renta estabilizada real y no
+la diluye el arranque. **Necesito que el CEO/Carlos fije la definición** antes de tocar el motor.
+
+---
+
+## FASE 5 — REPORTE (turno 3 · 2026-08-20)
+
+**Este turno (pasada 2 / turno 3):**
+- **B2 Seguridad P0-SEG-1** — auth + CORS whitelist en las 4 edge fns de escritura (`fee342b`).
+  Código listo y verificado seguro; **deploy de backend pendiente** (comando documentado, no auto por
+  ser prod compartido cerca del camino de dinero).
+- **Item 02** — Kanban oculta columnas vacías (`9c21ae6`). ✅ Desplegado+verificado en vivo (bundle b3fd39163a92).
+- **Item 40** — conteo real de trabajadores (Set(worker_rec_id) = 16, no 1: `worker` está vacío en las 209
+  filas, verificado en Supabase) + **Item 39a** tooltips GAP/Gasto/Utilidad/Rent.% (`5a6d25f`). ✅ Desplegado+verificado.
+- **Item 09 / C-P0-1** — grounding con datos reales; queda como **decisión de negocio** (definición de
+  renta real) con evidencia y recomendación. No se implementó una fórmula adivinada (habría empeorado).
+- **D-P1-6 semáforo por estado** — verificado ya cubierto por Batch 2 (déficit positivo → badge "Déficit"
+  en ff-command-center:526; no "Sano en rojo").
+
+**Decisiones de negocio que bloquean próximos lotes (además de las ya listadas arriba):**
+7. **Definición de "renta real" para NOI/DSCR/CoC** (Item 09): rent-roll actual vs trailing-N vs
+   renta_pactada. Recomiendo rent-roll actual.
 
 ---
 
