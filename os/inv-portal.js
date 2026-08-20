@@ -413,7 +413,12 @@ function render() {
       }).join('') + '</select>' : '';
 
   const noLeidos = (IP.msgs || []).filter(m => m.de === 'admin' && !(m.read_by || []).includes(IP.email.toLowerCase())).length;
-  const TABS = [['port', '🏠 Mi Portafolio'], ['rend', '📈 Rendimiento'], ['casa', '🏡 Mi Casa'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']];
+  // Auditoría Item 22 (20-ago): 'docs' (Mis Documentos) y 'msgs' (Mensajes) OCULTOS del portal del
+  // inversor por pedido del CEO ("quitemos esto"). El 🤖 Asistente SE CONSERVA (Item 23). Código y
+  // datos intactos (renderDocs/renderMsgs siguen y se renderizan si se navega directo). PARA REACTIVAR:
+  // sacá el tab de IP_TABS_OCULTOS.
+  const IP_TABS_OCULTOS = ['docs', 'msgs'];
+  const TABS = [['port', '🏠 Mi Portafolio'], ['rend', '📈 Rendimiento'], ['casa', '🏡 Mi Casa'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']].filter(t => !IP_TABS_OCULTOS.includes(t[0]));
   const head = ipVerBar()
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector
