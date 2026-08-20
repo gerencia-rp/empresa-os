@@ -888,13 +888,15 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
     }
   }
   const lab = t => '<div class="lab" style="margin:16px 0 8px">' + t + '</div>';
+  // Item 19: datos REALES primero (operación del mes, riesgos, qué sigue), indicadores financieros y
+  // proyecciones (paper value/TIR, riqueza modelada, cómo se crea valor, escenarios de venta) AL FINAL.
   return '<h1 style="font-size:18px">' + esc(dir.split(',')[0]) + ' <span>· tu casa de un vistazo</span></h1>'
-    + lab('1 · Los 5 números de tu casa') + sec1
-    + lab('2 · Tu riqueza en el tiempo') + '<div class="card" style="margin:0"><div style="position:relative;height:260px;width:100%;overflow:hidden"><canvas id="chCasa"></canvas></div><div class="meta" style="margin-top:6px;font-size:10.5px">tu parte año a año: amortización + rentabilidad + valorización (modelo)' + gI('valorizacion', vals) + '</div></div>'
-    + lab('3 · Tu casa en números simples') + sec3
-    + (secValor ? lab('4 · Cómo se crea valor') + secValor : '')
-    + lab('5 · Riesgos') + sec4
-    + lab('6 · Qué sigue') + sec5
+    + lab('1 · Tu casa en números simples') + sec3
+    + lab('2 · Riesgos') + sec4
+    + lab('3 · Qué sigue') + sec5
+    + lab('4 · Los 5 números de tu casa') + sec1
+    + lab('5 · Tu riqueza en el tiempo') + '<div class="card" style="margin:0"><div style="position:relative;height:260px;width:100%;overflow:hidden"><canvas id="chCasa"></canvas></div><div class="meta" style="margin-top:6px;font-size:10.5px">tu parte año a año: amortización + rentabilidad + valorización (modelo)' + gI('valorizacion', vals) + '</div></div>'
+    + (secValor ? lab('6 · Cómo se crea valor') + secValor : '')
     + lab('7 · ¿Y si vendemos?') + secVender;
 }
 function drawCasaChart(r, inv) {
