@@ -24,7 +24,12 @@ async function caLoad(force) {
   if (CA.loading || (CA.rows && !force)) return;
   CA.loading = true; CA.err = null;
   CA.mes = CA.mes || caYm(new Date());
-  if (CA.desde === undefined) CA.desde = caShift(CA.mes, -1);   // solo el primer load; null/'' = todo el historial
+  // Item 35 (un dato, una fuente): default = HISTÓRICO COMPLETO (desde=null) para que la "Deuda VENCIDA
+  // (neta)" del titular = $18,636.01, el MISMO número que /cobros y /dashboard (v_cartera_kpi.vencido_neto,
+  // verificado al centavo: cartera_informe('2026-08', null) suma 18,636.01 · 15 morosos). Antes el default
+  // era mes-1 → solo mora reciente ($14,400) → el "tercer número" distinto. El selector "vencidos desde"
+  // sigue disponible como drill-down.
+  if (CA.desde === undefined) CA.desde = null;
   try {
     const [cur, prev] = await Promise.all([
       sb.rpc('cartera_informe', { p_mes: CA.mes, p_desde: CA.desde || null }),
