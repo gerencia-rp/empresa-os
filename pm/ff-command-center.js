@@ -535,7 +535,10 @@ function ffDealTable(deals) {
 // ─── DEALS & PIPELINE (Kanban) ───
 function ffSecDeals(comp) {
   const { deals, kpi } = comp;
-  const cols = FF_PIPELINE.map(([k, lbl, stages]) => ({ k, lbl, items: deals.filter(d => stages.includes(d.stage)) }));
+  // Item 02: mostrar SOLO las etapas con casas. Una etapa vacía (ej. Lead / Bajo contrato)
+  // no ocupa espacio; reaparece sola en cuanto una casa entra en ese stage.
+  const cols = FF_PIPELINE.map(([k, lbl, stages]) => ({ k, lbl, items: deals.filter(d => stages.includes(d.stage)) }))
+    .filter(c => c.items.length > 0);
   const sinStage = deals.filter(d => !FF_PIPELINE.some(([, , st]) => st.includes(d.stage)));
   if (sinStage.length) cols.push({ k: 'otros', lbl: 'Sin etapa', items: sinStage });
   const nAllin = deals.filter(d => d.semAllin).length, nHml = deals.filter(d => d.semHml).length, nBud = deals.filter(d => d.semBudget).length;
@@ -547,10 +550,10 @@ function ffSecDeals(comp) {
   return `${ffHeader('Pipeline de casas', 'Blueprint FF', `${kpi.total} deals · semáforos: 🔴 all-in ${nAllin} · ⏰ HML ${nHml} · 📈 presupuesto ${nBud} (umbrales de ff_uw_config)`)}
     ${verdict}
     ${ffDQBar(comp)}
-    <div class="kan">${cols.map(c => `<div class="kcol">
+    <div class="kan">${cols.length ? cols.map(c => `<div class="kcol">
       <div class="kcol-h"><span>${c.lbl}</span><span class="cnt">${c.items.length}</span></div>
-      ${c.items.sort((a, b) => (b.deficit || 0) - (a.deficit || 0)).map(d => ffKanCard(d)).join('') || kitEmpty('👻', 'sin deals acá')}
-    </div>`).join('')}</div>`;
+      ${c.items.sort((a, b) => (b.deficit || 0) - (a.deficit || 0)).map(d => ffKanCard(d)).join('')}
+    </div>`).join('') : kitEmpty('👻', 'sin deals en el pipeline')}</div>`;
 }
 function ffKanCard(d) {
   const capturePct = d.arv ? Math.min(100, Math.round(d.allInPct * 100)) : 0;
