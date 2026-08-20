@@ -10,6 +10,8 @@
 //   - Responsable = "Lider asignado" de la Propiedad (Personal en Campo), resuelto en vivo.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const AIRTABLE_TOKEN = Deno.env.get("AIRTABLE_TOKEN")!;
 const BASE_ID = Deno.env.get("AIRTABLE_BASE_ID_REMODEL") || "appwFRqnkyyRljOld";
@@ -33,12 +35,8 @@ const F = {
 const PROP_LIDER = "fldGryDWkPw99eYCd";        // "Lider asignado" (link → Personal en Campo) en Propiedad en Reparación
 const ESTADO_INICIAL = "Pendiente";            // choice válido: Pendiente / Realizado / Congelado
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Content-Type": "application/json",
-};
-const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: cors });
+let _req: Request | null = null;
+const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: _req ? corsHeaders(_req) : { "Content-Type": "application/json" } });
 
 // Choices (nombres) por fieldId desde la Meta API. null si no está disponible (token sin schema.bases:read).
 async function getChoices(): Promise<Record<string, Set<string>> | null> {
@@ -73,7 +71,11 @@ async function resolveLider(propRecId: string): Promise<string | null> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  _req = req;
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
+  // P0-SEG-1: escribir nómina en Airtable (movimiento de plata) → exige usuario autenticado.
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
   try {
     if (!AIRTABLE_TOKEN) return json({ ok: false, error: "Falta AIRTABLE_TOKEN" }, 500);
     const body = await req.json().catch(() => ({}));

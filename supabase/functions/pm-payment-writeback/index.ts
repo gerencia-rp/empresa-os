@@ -6,6 +6,8 @@
 // casa_rec, reserva_rec) que saca de pmaState (tenant.external_id, property.airtable_address_id,
 // booking.external_id). Plataforma sigue siendo single-select (se valida en SAFE_MODE).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const AIRTABLE_KEY = Deno.env.get("AIRTABLE_API_KEY")!;
 const BASE_ID = Deno.env.get("AIRTABLE_BASE_ID") || "apptTKRYbx6gu701i";
@@ -24,12 +26,8 @@ const F = {
   reserva: "fldU0KUvfPEdpp1tY"    // Reserva (linked record)
 };
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Content-Type": "application/json"
-};
-const json = (b: any, s = 200) => new Response(JSON.stringify(b), { status: s, headers: cors });
+let _req: Request | null = null;
+const json = (b: any, s = 200) => new Response(JSON.stringify(b), { status: s, headers: _req ? corsHeaders(_req) : { "Content-Type": "application/json" } });
 
 // Choices (nombres) por fieldId desde la Meta API. null si la Meta API no está disponible.
 async function getChoices(token: string): Promise<Record<string, Set<string>> | null> {
@@ -48,7 +46,11 @@ async function getChoices(token: string): Promise<Record<string, Set<string>> | 
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  _req = req;
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
+  // P0-SEG-1: crear pagos en Airtable → exige usuario autenticado (cierra hueco anon-key).
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
   try {
     const body = await req.json().catch(() => ({}));
     const token = body.airtable_token || AIRTABLE_KEY;

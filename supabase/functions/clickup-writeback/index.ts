@@ -5,12 +5,14 @@
 // Auth: JWT de usuario o service key (mismo patrón que los crons).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const CLICKUP_TOKEN = Deno.env.get("CLICKUP_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Content-Type": "application/json" };
-const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: CORS });
+let _req: Request | null = null;
+const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: _req ? corsHeaders(_req) : { "Content-Type": "application/json" } });
 
 async function cu(path: string, method: string, body?: unknown) {
   const res = await fetch(`https://api.clickup.com/api/v2${path}`, {
@@ -23,7 +25,11 @@ async function cu(path: string, method: string, body?: unknown) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+  _req = req;
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
+  // P0-SEG-1: aprobar/ejecutar acciones en ClickUp → exige usuario autenticado.
+  const auth = await requireAuth(req);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
   try {
     const { proposal_id, decision, decidido_por } = await req.json();
     if (!proposal_id || !["aprobar", "rechazar"].includes(decision)) return json({ ok: false, error: "proposal_id + decision (aprobar|rechazar)" }, 400);
