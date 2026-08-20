@@ -230,7 +230,7 @@ async function dhLoadRM() {
   const [obras, oh, horas, riesgos] = await Promise.all([
     sb.from('remodel_at_properties').select('*').eq('active', true).then(r => r.data || []).catch(e => { DH.err.rm = e.message; return []; }),
     sb.from('remodel_overhead').select('monto,categoria,source').then(r => r.data || []).catch(() => []),
-    sb.from('remodel_worker_hours').select('fecha,horas,worker').gte('fecha', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).is('archived_at', null).then(r => r.data || []).catch(() => []),
+    sb.from('remodel_worker_hours').select('fecha,horas,worker,worker_rec_id').gte('fecha', new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).is('archived_at', null).then(r => r.data || []).catch(() => []),
     dhRiesgos('remodelacion'),
   ]);
   DH.d.rm = { obras, oh, horas, riesgos };
@@ -263,7 +263,7 @@ function dhViewRM() {
     { lab: 'Desviación costo · días', v: desvMed, txt: dhP(desvMed) + ' · ' + (retrMed != null ? retrMed + 'd' : '—'), meta: 'rm_desv_costo', fuente: 'mediana finalizadas (outliers >180d fuera)', linea: 'gasto real vs presupuesto · fin real vs plan' },
     { lab: '$/sqft real vs cobrado', v: psfCobr != null && psfReal != null ? psfCobr - psfReal : null, txt: (psfReal != null ? '$' + psfReal.toFixed(2) : '—') + ' / ' + (psfCobr != null ? '$' + psfCobr.toFixed(2) : '—'), meta: 'rm_psf_margen', fuente: 'gasto interno ÷ sqft · valor cliente ÷ sqft', linea: 'margen por pie²: ' + (psfCobr != null && psfReal != null ? '$' + (psfCobr - psfReal).toFixed(2) : '—') },
   ]);
-  const ue = '<div class="card overx" style="margin:0"><table class="dh-tbl"><thead><tr><th>Obra</th><th>Estado</th><th class="dh-num">Draws recibidos</th><th class="dh-num">Cobrado (cliente)</th><th class="dh-num">Gap</th><th class="dh-num">Gasto interno</th><th class="dh-num">Utilidad</th><th class="dh-num">Rent.%</th><th class="dh-num">Avance real</th></tr></thead><tbody>'
+  const ue = '<div class="card overx" style="margin:0"><table class="dh-tbl"><thead><tr><th>Obra</th><th>Estado</th><th class="dh-num">Draws recibidos</th><th class="dh-num">Cobrado (cliente)</th><th class="dh-num" title="Gap = Draws recibidos − Cobrado al cliente. Positivo: recibiste más draws de lo facturado (adelanto / por facturar). Negativo: facturaste de más al cliente. No es la utilidad.">Gap ⓘ</th><th class="dh-num" title="Gasto interno = materiales + mano de obra × 1.05 (5% margen).">Gasto interno</th><th class="dh-num" title="Utilidad = Cobrado al cliente − Gasto interno (solo obras Finalizadas).">Utilidad</th><th class="dh-num" title="Rentabilidad = Utilidad ÷ Cobrado al cliente.">Rent.%</th><th class="dh-num">Avance real</th></tr></thead><tbody>'
     + D.obras.slice().sort((a, b) => (b.valor_cliente || 0) - (a.valor_cliente || 0)).map(o => {
       const gap = (o.draws_ingresados != null && o.valor_cliente != null) ? +o.draws_ingresados - +o.valor_cliente : null;
       return '<tr><td>' + OS_E((o.address || '').split(',')[0]) + '</td><td class="meta" style="font-size:10px">' + OS_E(o.proceso || '—') + '</td>'
@@ -275,7 +275,7 @@ function dhViewRM() {
         + '<td class="dh-num">' + (o.avance_real != null ? dhP(o.avance_real / (o.avance_real > 1.5 ? 100 : 1), 0) : '—') + '</td></tr>';
     }).join('') + '</tbody></table></div>'
     + '<div class="grid k2" style="margin-top:12px;align-items:start">'
-    + '<div class="card" style="margin:0"><div class="lab">Utilización de cuadrillas (28 días)</div><div class="big">' + dhN(D.horas.reduce((s, h) => s + (+h.horas || 0), 0)) + ' h</div><div class="meta">' + new Set(D.horas.map(h => h.worker)).size + ' trabajadores · ' + act.length + ' obras activas' + dhSrc('remodel_worker_hours') + '</div></div>'
+    + '<div class="card" style="margin:0"><div class="lab">Utilización de cuadrillas (28 días)</div><div class="big">' + dhN(D.horas.reduce((s, h) => s + (+h.horas || 0), 0)) + ' h</div><div class="meta">' + new Set(D.horas.map(h => h.worker_rec_id || h.worker).filter(Boolean)).size + ' trabajadores · ' + act.length + ' obras activas' + dhSrc('remodel_worker_hours') + '</div></div>'
     + '<div class="card" style="margin:0"><div class="lab">Costo unitario por ítem</div><div class="big">' + dhPend('en medición') + '</div><div class="meta">sale del piloto de Denfield — jamás un número inventado</div></div></div>';
   // tendencia: por mes de fin real (finalizadas)
   const porMes = {};
