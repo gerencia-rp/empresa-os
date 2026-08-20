@@ -288,8 +288,10 @@ function ffCompute() {
     const margin = arv - allIn; // margen bruto (antes de costos de venta)
     const marginPct = arv ? margin / arv : 0;
     const allInPct = arv ? allIn / arv : 0;
-    // DÉFICIT del CEO = [Total Draws − Déficit Total] − Down Payment · GUARDRAIL: faltan draws → null (jamás rojo falso)
-    const deficit = port ? (faltanDraws || port.deficit == null ? 0 : Number(port.deficit)) : (dr ? Number(dr.net_total || 0) : 0);
+    // DÉFICIT = fuente ÚNICA ff_deals.deficit_total (Airtable). Positivo = caja atrapada (se recupera al
+    // refinanciar/vender) · null = obra en curso / no estabilizada · <=0 = recuperado. La app NO recalcula
+    // (decisión CEO ago-2026; antes usaba la fórmula draws−déficit−downpayment de la vista, otro número).
+    const deficit = (d.deficit_total == null || d.deficit_total === '') ? null : Number(d.deficit_total);
     const esPortafolio = port ? !!port.es_portafolio : true;
     const motivoExcl = port ? port.motivo_exclusion : null;
     const estrategia = d.estrategia || port && port.estrategia || null;   // palabra COMPLETA
@@ -317,8 +319,8 @@ function ffCompute() {
     // Equity y déficit acumulado: SOLO deals confiables (los del error $189k los distorsionan)
     equity: activeConf.reduce((s, d) => s + Math.max(0, d.equity), 0),
     // déficit acumulado CORREGIDO (14-jul): fórmula del CEO desde la vista, EXCLUYE faltan_draws y no-portafolio
-    deficitAcum: FF.portKpi && FF.portKpi.deficit_acumulado != null ? Number(FF.portKpi.deficit_acumulado)
-      : -confiables.reduce((s, d) => s + (d.deficit < 0 ? -d.deficit : 0), 0),
+    // Σ ff_deals.deficit_total sobre deals con dato (obras en curso = null → no suman) — MISMO número que el Dashboard.
+    deficitAcum: deals.reduce((s, d) => s + (d.deficit != null ? d.deficit : 0), 0),
     marginPctAvg: activeConf.length ? activeConf.reduce((s, d) => s + d.marginPct, 0) / activeConf.length : 0,
     flips: deals.filter(d => d.isFlip).length, holds: deals.filter(d => d.strategy === 'hold').length,
     investors: FF.investors.filter(x => !/flipping\s*rentals/i.test(x.name || '')).length, // sin la propia empresa (18)
@@ -349,10 +351,10 @@ function ffInsights(comp) {
         action: `Revisar ARV vs appraisal de ${ffShort(d.address)}` });
     });
   // 3) Déficit acumulado > $20k (excluye los del error de datos)
-  deals.filter(d => d.deficit < -20000 && !(d.dr && Number(d.dr.remodel_internal) >= 100000))
-    .sort((a, b) => a.deficit - b.deficit).forEach(d => {
-      ins.push({ sev: 'critical', impact: -d.deficit, tag: 'DÉFICIT > $20K', sec: 'deals',
-        tx: `<b>${FF_ESC(ffShort(d.address))}</b> arrastra un déficit de <b>${FF_MONEY(-d.deficit)}</b> (regla: OK si flujo+ y acumulado < $20k). Revisar recuperación vía refi o venta.`,
+  deals.filter(d => d.deficit != null && d.deficit > 20000)
+    .sort((a, b) => b.deficit - a.deficit).forEach(d => {
+      ins.push({ sev: 'critical', impact: d.deficit, tag: 'DÉFICIT > $20K', sec: 'deals',
+        tx: `<b>${FF_ESC(ffShort(d.address))}</b> arrastra una caja atrapada de <b>${FF_MONEY(d.deficit)}</b> (se recupera al refinanciar/vender — no es pérdida). Revisar recuperación vía refi o venta.`,
         action: `Plan de recuperación para ${ffShort(d.address)} (refi / venta)` });
     });
   // 4) All-in > 75% ARV (regla de compra)
@@ -487,7 +489,7 @@ function ffSecCommand(comp) {
       <div class="card kpi"><div class="lab">Equity del portafolio</div><div class="big ${pk.equity_portafolio > 0 ? 'up' : ''}">${kitMoney(pk.equity_portafolio)}</div><div class="meta">valor − deuda · lo que has construido en patrimonio</div></div>
       <div class="card kpi"><details><summary style="cursor:pointer;list-style:none"><div class="lab">Deuda del portafolio ▾</div><div class="big">${kitMoney(deudaOs)}</div><div class="meta">refi o HML por casa · QBO: ${kitMoney(deudaQbo)} ${deudaQbo && Math.abs(deudaQbo - deudaOs) / deudaQbo > 0.05 ? '<span style="color:var(--amber)">Δ ' + kitMoney(deudaQbo - deudaOs) + '</span>' : '✓'}</div></summary><div style="max-height:220px;overflow:auto;margin-top:8px;font-size:11.5px">${deudaRows || 'sin desglose'}</div></details></div>
       <div class="card kpi"><div class="lab">Rendimiento anual del portafolio</div><div class="big" style="font-size:19px;line-height:1.35">op. <span class="${opAnual >= 0 ? 'up' : 'down'}">${kitMoney(opAnual)}</span><br>c/deuda <span class="${netoAnual >= 0 ? 'up' : 'down'}">${kitMoney(netoAnual)}</span></div><div class="meta">operativo positivo, pero el servicio de deuda HML se lo come — casas aún en HML sin refinanciar${yieldPct != null ? ' · yield ' + yieldPct + '% del equity' : ''}</div></div>
-      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum < 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">fórmula CEO (draws − gastos − down payment) · ${pk.casas_sin_draws || 0} casas con ⚠ faltan draws EXCLUIDAS</div></div>
+      <div class="card kpi"><div class="lab">Déficit acumulado</div><div class="big ${kpi.deficitAcum > 0 ? 'down' : ''}">${kitMoney(kpi.deficitAcum)}</div><div class="meta">Σ ff_deals.deficit_total [Airtable] · caja atrapada a recuperar en refi/venta · obras en curso no suman</div></div>
     </div>
     <div class="card" style="margin-top:12px;padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;font-size:13px;align-items:center">
       <span>🏗 <b>${pk.casas_hechas != null ? pk.casas_hechas : '—'}</b> casas hechas <span style="color:var(--mut2);font-size:11px">(sin las pendientes/adquiridas sin cerrar)</span></span>
@@ -516,14 +518,14 @@ function ffSecCommand(comp) {
     ${experto}
     <div class="grid" style="margin-top:16px"><div class="card">
       <div class="chart-h"><div class="t">Pipeline resumido</div><div class="k">${kpi.activos} activos · abrí Deals para el Kanban</div></div>
-      <div class="overx">${ffDealTable(deals.filter(d => d.stage !== 'vendida').sort((a, b) => a.deficit - b.deficit).slice(0, 10))}</div>
+      <div class="overx">${ffDealTable(deals.filter(d => d.stage !== 'vendida').sort((a, b) => (b.deficit || 0) - (a.deficit || 0)).slice(0, 10))}</div>
     </div></div>`;
 }
 function ffDealTable(deals) {
   const badge = d => d.faltanDraws ? '<span class="badge b-warn" title="Total Draws desembolsados en 0 — cargarlo en Airtable">⚠ faltan draws</span>'
-    : d.deficit < -20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
+    : d.deficit != null && d.deficit > 20000 ? '<span class="badge b-red">Déficit</span>' : d.allInPct > 0.78 ? '<span class="badge b-warn">All-in alto</span>' : d.margin > 0 ? '<span class="badge b-ok">Sano</span>' : '<span class="badge b-warn">Vigilar</span>';
   const defCell = d => d.faltanDraws ? '<span style="color:var(--amber);font-size:11px">⚠ faltan datos de draws</span>'
-    : (d.port && d.port.deficit != null ? `<span class="${d.deficit < 0 ? 'down' : 'up'}">${FF_MONEY(d.deficit)}</span>` : '—');
+    : (d.deficit != null ? `<span class="${d.deficit > 0 ? 'down' : 'up'}">${FF_MONEY(d.deficit)}</span>` : '—');
   const margCell = d => d.faltanDraws || d.allIn == null ? '—' : `<span class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</span>`;
   return `<table class="ptable"><thead><tr><th>Dirección</th><th>Etapa</th><th>Estrategia</th><th>All-in <span style="font-weight:400;color:var(--mut2)">(compra+draws)</span></th><th>ARV</th><th>Margen</th><th>Déficit</th><th></th></tr></thead><tbody>
     ${deals.map(d => `<tr${d.esPortafolio === false ? ' style="opacity:.62"' : ''}><td>${FF_ESC(ffShort(d.address))}${ffPortBadge(d)}</td><td>${FF_STAGE_LBL[d.stage] || d.stage}</td><td>${ffStratBadge(d)}</td><td>${ffAllInCell(d)}</td><td>${FF_MONEY(d.arv)}</td><td>${margCell(d)}</td><td>${defCell(d)}</td><td>${badge(d)}</td></tr>`).join('')}
@@ -538,16 +540,16 @@ function ffSecDeals(comp) {
   if (sinStage.length) cols.push({ k: 'otros', lbl: 'Sin etapa', items: sinStage });
   const nAllin = deals.filter(d => d.semAllin).length, nHml = deals.filter(d => d.semHml).length, nBud = deals.filter(d => d.semBudget).length;
   // banda de decisión: derivada del déficit que YA calcula ffCompute (sin lógica nueva)
-  const enRojo = deals.filter(d => d.deficit < -20000).sort((a, b) => a.deficit - b.deficit);
+  const enRojo = deals.filter(d => d.deficit != null && d.deficit > 20000).sort((a, b) => b.deficit - a.deficit);
   const verdict = enRojo.length
-    ? kitVerdict('revisar', enRojo.length + (enRojo.length === 1 ? ' deal con déficit fuerte' : ' deals con déficit fuerte') + ' (más de $20k) 🕳', enRojo.map(d => FF_ESC(ffShort(d.address)) + ' (' + kitMoney(d.deficit) + ')').join(' · ') + ' — 👉 plan de recuperación vía refi o venta')
+    ? kitVerdict('revisar', enRojo.length + (enRojo.length === 1 ? ' deal con caja atrapada fuerte' : ' deals con caja atrapada fuerte') + ' (más de $20k) 🕳', enRojo.map(d => FF_ESC(ffShort(d.address)) + ' (' + kitMoney(d.deficit) + ')').join(' · ') + ' — 👉 plan de recuperación vía refi o venta')
     : kitVerdict('go', 'Pipeline sano — sin déficits fuertes 💪', kpi.activos + ' deals activos trabajando · ninguno arrastra más de $20k de déficit acumulado.');
   return `${ffHeader('Pipeline de casas', 'Blueprint FF', `${kpi.total} deals · semáforos: 🔴 all-in ${nAllin} · ⏰ HML ${nHml} · 📈 presupuesto ${nBud} (umbrales de ff_uw_config)`)}
     ${verdict}
     ${ffDQBar(comp)}
     <div class="kan">${cols.map(c => `<div class="kcol">
       <div class="kcol-h"><span>${c.lbl}</span><span class="cnt">${c.items.length}</span></div>
-      ${c.items.sort((a, b) => a.deficit - b.deficit).map(d => ffKanCard(d)).join('') || kitEmpty('👻', 'sin deals acá')}
+      ${c.items.sort((a, b) => (b.deficit || 0) - (a.deficit || 0)).map(d => ffKanCard(d)).join('') || kitEmpty('👻', 'sin deals acá')}
     </div>`).join('')}</div>`;
 }
 function ffKanCard(d) {
@@ -559,7 +561,7 @@ function ffKanCard(d) {
     <div class="meta">${FF_ESC(d.city || '')} · ${d.sqft ? d.sqft + ' sqft' : 's/d'}${d.faltanDraws ? ' · <span style="color:var(--amber)">⚠ faltan draws</span>' : ''}${d.esPortafolio === false ? ' · <span style="color:var(--mut2)">' + (d.motivoExcl === 'operador' ? 'operador' : 'vendida') + '</span>' : ''}</div>
     <div class="krow"><span>All-in</span><b>${ffAllInCell(d)}</b></div>
     <div class="krow"><span>ARV</span><b>${FF_MONEY(d.arv)}</b></div>
-    <div class="krow"><span>${d.faltanDraws ? 'Déficit' : d.deficit < 0 ? 'Déficit' : 'Margen'}</span><b class="${d.faltanDraws ? '' : (d.deficit < 0 ? -1 : d.margin) >= 0 ? 'up' : 'down'}"${d.faltanDraws ? ' style="color:var(--amber);font-size:10.5px"' : ''}>${d.faltanDraws ? '⚠ faltan datos de draws' : d.deficit < 0 ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
+    <div class="krow"><span>${d.faltanDraws ? 'Déficit' : (d.deficit != null && d.deficit > 0) ? 'Déficit' : 'Margen'}</span><b class="${d.faltanDraws ? '' : (d.deficit != null && d.deficit > 0) ? 'down' : (d.margin >= 0 ? 'up' : 'down')}"${d.faltanDraws ? ' style="color:var(--amber);font-size:10.5px"' : ''}>${d.faltanDraws ? '⚠ faltan datos de draws' : (d.deficit != null && d.deficit > 0) ? FF_MONEY(d.deficit) : FF_MONEY(d.margin)}</b></div>
     <div class="kbar"><i style="width:${capturePct}%;background:${d.allInPct > 0.75 ? 'linear-gradient(90deg,var(--amber),var(--neg))' : 'linear-gradient(90deg,var(--a1),var(--a2))'}"></i></div>
     <div style="font-size:9px;color:var(--mut2);margin-top:4px">all-in ${Math.round(d.allInPct * 100)}% del ARV${d.invLabel ? ' · ' + FF_ESC(d.invLabel) : ''}</div>
     <div class="kficha" onclick="event.stopPropagation();osOpenFicha('${window.osSlug ? osSlug(d.address) : ''}')">🏠 Ver ficha de casa →</div>
@@ -571,7 +573,7 @@ function ffSecPropiedades(comp) {
   const nExcl = comp.deals.filter(d => d.esPortafolio === false).length;
   const nFalta = comp.deals.filter(d => d.faltanDraws).length;
   return `${ffHeader('Propiedades', 'Fix &amp; Flip', `${comp.deals.length} propiedades · ${comp.deals.length - nExcl} en tu portafolio + ${nExcl} etiquetadas (operador/vendida, NO cuentan en los totales)${nFalta ? ' · ⚠ ' + nFalta + ' sin draws cargados en Airtable' : ''}`)}
-    <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => a.deficit - b.deficit))}</div></div>`;
+    <div class="grid"><div class="card">${ffDealTable([...comp.deals].sort((a, b) => (b.deficit || 0) - (a.deficit || 0)))}</div></div>`;
 }
 // ─── INVERSIONISTAS · ranking por capital desplegado (rediseño 14-jul, obs CEO) ───
 // Solo CO-INVERSIONISTAS con participación viva (0 < ownership nuestro < 100%) — v_inversionistas (capa O1).
@@ -786,7 +788,7 @@ function ffSnapshot(comp) {
     negocio: 'Fix & Flip (Rental Profits)', mes: new Date().toISOString().slice(0, 7),
     portafolio: { deals: comp.kpi.total, activos: comp.kpi.activos, flips: comp.kpi.flips, holds: comp.kpi.holds, capital_desplegado: Math.round(comp.kpi.capital), arv_total: Math.round(comp.kpi.arvTotal), equity_potencial: Math.round(comp.kpi.equity), deficit_acumulado: Math.round(comp.kpi.deficitAcum) },
     reglas: ['all-in ≤ 75% del ARV', 'déficit OK si flujo+ y acumulado < $20k', 'inversionista 15–18%, split 50/50', 'refi no supera el pago actual'],
-    deals: comp.deals.map(d => ({ dir: ffShort(d.address), etapa: FF_STAGE_LBL[d.stage], estrategia: d.strategy, compra: d.purchase, remodelacion: Math.round(d.remComplete), all_in: Math.round(d.allIn), arv: d.arv, appraisal: d.appraisal, margen: Math.round(d.margin), all_in_pct_arv: Math.round(d.allInPct * 100), deficit: Math.round(d.deficit) })),
+    deals: comp.deals.map(d => ({ dir: ffShort(d.address), etapa: FF_STAGE_LBL[d.stage], estrategia: d.strategy, compra: d.purchase, remodelacion: Math.round(d.remComplete), all_in: Math.round(d.allIn), arv: d.arv, appraisal: d.appraisal, margen: Math.round(d.margin), all_in_pct_arv: Math.round(d.allInPct * 100), deficit: d.deficit != null ? Math.round(d.deficit) : null })),
     insights: ffInsights(comp).slice(0, 10).map(i => ({ tag: i.tag, detalle: i.tx.replace(/<[^>]+>/g, ''), impacto: Math.round(i.impact) })),
   };
 }
@@ -833,8 +835,8 @@ function ffSecUnderwriting(comp) {
   const recRows = deals.filter(d => d.arv > 0).map(d => {
     const roi = d.allIn ? d.margin / d.allIn : 0;
     const monthlyNet = Math.max(1, Math.round(d.arv * 0.005)); // proxy neto mensual ~0.5% ARV
-    const rec = d.deficit < 0 ? Math.round(-d.deficit / monthlyNet) : 0;
-    return { ...d, roi, rec: d.deficit < 0 ? rec : null };
+    const rec = (d.deficit != null && d.deficit > 0) ? Math.round(d.deficit / monthlyNet) : 0;
+    return { ...d, roi, rec: (d.deficit != null && d.deficit > 0) ? rec : null };
   }).sort((a, b) => (a.dq.revisar - b.dq.revisar) || ((b.rec || 0) - (a.rec || 0))); // datos a revisar al fondo
   // Ingeniería inversa: casas que NO nacen en déficit (net ≥ -15k) → su fórmula de draw.
   const sanas = deals.filter(d => d.dr && Number(d.dr.net_total) > -15000).sort((a, b) => Number(b.dr.net_total) - Number(a.dr.net_total)).slice(0, 6);
@@ -872,7 +874,7 @@ function ffSecUnderwriting(comp) {
       <table class="ptable"><thead><tr><th>Casa</th><th>Estrat.</th><th>All-in</th><th>Margen/Equity</th><th>ROI</th><th>Déficit</th><th>Recuperación</th></tr></thead><tbody>
       ${recRows.map(d => d.dq.revisar
         ? `<tr style="opacity:.75"><td>${FF_ESC(ffShort(d.address))} ${ffDQBadge(d.dq)}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td style="color:var(--mut2)">${FF_MONEY(d.margin)}</td><td style="color:var(--mut2)">—</td><td style="color:var(--mut2)">—</td><td><span style="color:var(--neg);font-weight:700">excluido</span></td></tr>`
-        : `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td>${Math.round(d.roi * 100)}%</td><td class="${d.deficit < 0 ? 'down' : ''}">${d.deficit < 0 ? FF_MONEY(d.deficit) : '—'}</td><td>${d.rec != null ? `<span style="color:${semColor(d.rec)};font-weight:700">${d.rec} meses</span>` : '<span class="up">sin déficit ✓</span>'}</td></tr>`).join('')}</tbody></table>
+        : `<tr><td>${FF_ESC(ffShort(d.address))}</td><td>${ffStratBadge(d)}</td><td>${FF_MONEY(d.allIn)}</td><td class="${d.margin >= 0 ? 'up' : 'down'}">${FF_MONEY(d.margin)}</td><td>${Math.round(d.roi * 100)}%</td><td class="${(d.deficit != null && d.deficit > 0) ? 'down' : ''}">${(d.deficit != null && d.deficit > 0) ? FF_MONEY(d.deficit) : '—'}</td><td>${d.rec != null ? `<span style="color:${semColor(d.rec)};font-weight:700">${d.rec} meses</span>` : '<span class="up">sin déficit ✓</span>'}</td></tr>`).join('')}</tbody></table>
         <div class="meta" style="margin-top:8px">Las filas <b>⚠ dato a revisar</b> (all-in &gt; 100% del ARV) se excluyen del ROI y del semáforo — el margen/déficit está distorsionado por el error de carga.</div></div></div>`;
 }
 function ffUwIn(id, label, val) { return `<div class="uwrow"><label>${label}</label><input id="ff-${id}" value="${val === '' || val == null ? '' : val}" oninput="ffUwCalc()" inputmode="decimal"></div>`; }
@@ -1208,7 +1210,7 @@ function ffAggBy(deals, keyFn) {
     if (!map[k]) map[k] = { k, n: 0, capital: 0, margen: 0, entregada: 0, deficit: 0 };
     const m = map[k];
     m.n++; m.capital += d.allIn || 0; m.margen += (d.dq.confiable ? d.margin : 0);
-    m.entregada += +d.utilidad_entregada || 0; m.deficit += d.deficit < 0 ? d.deficit : 0;
+    m.entregada += +d.utilidad_entregada || 0; m.deficit += (d.deficit != null && d.deficit > 0) ? -d.deficit : 0;
   });
   return Object.values(map).sort((x, y) => y.capital - x.capital);
 }
@@ -1313,7 +1315,7 @@ function ffMountCharts(comp) {
   const byStage = FF_STAGES.map(([k, lbl]) => ({ lbl, v: comp.deals.filter(d => d.stage === k).reduce((s, d) => s + d.allIn, 0) / 1000 }));
   mk('ff-stage', { type: 'bar', data: { labels: byStage.map(x => x.lbl), datasets: [{ data: byStage.map(x => x.v), borderRadius: 5, backgroundColor: '#4f8dff' }] }, options: gext });
   // margen/déficit por deal
-  const md = comp.deals.filter(d => d.arv > 0).map(d => ({ n: ffShort(d.address).slice(0, 16), v: (d.deficit < 0 ? d.deficit : d.margin) })).sort((a, b) => a.v - b.v).slice(0, 14);
+  const md = comp.deals.filter(d => d.arv > 0).map(d => ({ n: ffShort(d.address).slice(0, 16), v: ((d.deficit != null && d.deficit > 0) ? -d.deficit : d.margin) })).sort((a, b) => a.v - b.v).slice(0, 14);
   mk('ff-margin', { type: 'bar', data: { labels: md.map(x => x.n), datasets: [{ data: md.map(x => Math.round(x.v / 1000)), borderRadius: 4, backgroundColor: md.map(x => x.v >= 0 ? '#48d69c' : '#f0687a') }] }, options: { ...gext, indexAxis: 'y', scales: { x: ax, y: { grid: { display: false }, ticks: { color: ffAx(), font: { size: 9 } } } } } });
   // deals por etapa (donut)
   const dc = FF_STAGES.map(([k, lbl]) => ({ lbl, n: comp.deals.filter(d => d.stage === k).length })).filter(x => x.n);

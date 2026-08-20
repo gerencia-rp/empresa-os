@@ -389,7 +389,7 @@ function osFFAlertCount(deals) {
   let n = 0;
   n += deals.filter(d => d.dr && Number(d.dr.remodel_internal) > Number(d.remodel_est || 0) * 2 && Number(d.dr.remodel_internal) >= 100000).length; // error de datos
   n += deals.filter(d => Number(d.appraisal) > 0 && d.arv > 0 && Number(d.appraisal) > d.arv * 1.05).length; // appraisal > ARV
-  n += deals.filter(d => d.deficit < -20000 && !(d.dr && Number(d.dr.remodel_internal) >= 100000)).length; // déficit > $20k
+  n += deals.filter(d => d.deficit != null && d.deficit > 20000).length; // caja atrapada > $20k (fuente Airtable deficit_total)
   n += Math.min(4, deals.filter(d => d.stage !== 'vendida' && d.arv > 0 && d.allInPct > 0.78 && d.allIn > 0).length); // all-in > 78% ARV (máx 4)
   if (deals.filter(d => !d.dr && d.stage !== 'vendida').length) n += 1; // deals sin draws
   n += 3; // conocidos del negocio: overhead + gap intereses + contrato Childress
@@ -407,7 +407,10 @@ function osCompute() {
     const holding = dr ? (Number(dr.interest_hml || 0) + Number(dr.services_hml || 0) + Number(dr.interest_until_rent || 0) + Number(dr.furniture || 0) + Number(dr.other_costs || 0)) : 0;
     const allIn = Number(d.purchase_price || 0) + remComplete + holding;
     const allInPct = arv ? allIn / arv : 0;
-    const deficit = dr ? Number(dr.net_total || 0) : 0;
+    // DÉFICIT = fuente ÚNICA ff_deals.deficit_total (Airtable). Convención: caja atrapada (magnitud POSITIVA,
+    // se recupera al refinanciar/vender). null = obra en curso / no estabilizada → NO inventar número.
+    // <=0 = ya recuperado. La app NO recalcula (decisión CEO ago-2026; antes usaba dr.net_total, otro número).
+    const deficit = (d.deficit_total == null || d.deficit_total === '') ? null : Number(d.deficit_total);
     const dq = (typeof ffDataQuality === 'function') ? ffDataQuality({ allIn, arv, allInPct, stage: d.stage }) : { revisar: false, sinDatos: false, preliminar: false, confiable: true, flags: [] };
     return { ...d, dr, arv, remComplete, holding, allIn, allInPct, deficit, dq };
   });
@@ -767,7 +770,7 @@ function osFichaNums(m) {
 function osCasaInsights(m) {
   const ins = [];
   if (m.ff && m.ff.dq && m.ff.dq.revisar) ins.push({ s: 'r', t: `Error de datos: all-in ${OS_M(m.ff.allIn)} = ${Math.round(m.ff.allInPct * 100)}% del ARV (imposible). Revisar la carga en Airtable (Draws).` });
-  if (m.ff && m.ff.dq && m.ff.dq.confiable && m.ff.deficit < -20000) ins.push({ s: 'r', t: `Déficit de ${OS_M(-m.ff.deficit)} (regla: OK si flujo+ y acumulado < $20k). Planear recuperación (refi/venta).`, accion: 'armar plan de refi o venta', quien: 'Juan' });
+  if (m.ff && m.ff.deficit != null && m.ff.deficit > 20000) ins.push({ s: 'r', t: `Caja atrapada de ${OS_M(m.ff.deficit)} (se recupera al refinanciar/vender — no es pérdida). Planear recuperación.`, accion: 'armar plan de refi o venta', quien: 'Juan' });
   if (m.ff && Number(m.ff.appraisal) > 0 && m.ff.arv > 0 && Number(m.ff.appraisal) > m.ff.arv * 1.05) ins.push({ s: 'y', t: `Appraisal ${OS_M(m.ff.appraisal)} supera el ARV ${OS_M(m.ff.arv)} — revisar (afecta refi y equity).` });
   if (m.remodel && m.remodel.proceso !== 'Finalizado') ins.push({ s: 'y', t: `Obra EN CURSO (${OS_E(m.remodel.proceso || 's/estado')}, ${Math.round(Number(m.remodel.avance_pct || 0))}% avance) — la utilidad de remodelación es preliminar, no final.` });
   if (m.rentas && m.rentas.deuda > 200) ins.push({ s: 'r', t: `Deuda de cobranza ${OS_M(m.rentas.deuda)} este mes (esperado ${OS_M(m.rentas.occRent)}, cobrado ${OS_M(m.rentas.cobrado)}).`, accion: 'gestionar cobro con el inquilino y registrar el pago', quien: 'Carlos' });
@@ -817,7 +820,7 @@ function osCasa(comp) {
       <div class="card"><div class="lab">Etapa actual${LIN('Etapa actual')}</div><div class="big" style="font-size:20px">${stageLbl}</div><div class="meta">${strat ? strat + ' · ' : ''}${m.ff ? 'Fix & Flip' : m.remodel ? 'Remodelación' : 'Rentas'} ${dqBadge}</div></div>
       <div class="card"><div class="lab">All-in (compra + draws)${LIN('All-in')}</div><div class="big">${fn.allIn != null ? OS_M(fn.allIn) : '—'}</div><div class="meta">${fn.allInSub || (m.ff ? 'sin datos de compra' : 'sin deal F&F')}</div></div>
       <div class="card"><div class="lab">ARV${LIN('ARV')}</div><div class="big">${fn.arv != null ? OS_M(fn.arv) : '—'}</div><div class="meta">${m.ff && m.ff.appraisal ? 'appraisal ' + OS_M(m.ff.appraisal) : ''}</div></div>
-      <div class="card"><div class="lab">Equity incorporado${LIN('Equity incorporado')}</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">⚠ con datos incompletos</span>' : ''}${m.port && !m.port.faltan_draws && m.port.deficit < 0 ? ` · cash en hold ${OS_M(+m.port.deficit)} (a recuperar, no es pérdida)` : ''}</div></div>
+      <div class="card"><div class="lab">Equity incorporado${LIN('Equity incorporado')}</div><div class="big ${fn.equity != null ? (fn.equity >= 0 ? 'up' : 'down') : ''}">${fn.equity != null ? OS_M(fn.equity) : '—'}</div><div class="meta">ARV − all-in (misma cadena que la tarjeta)${fn.faltan ? ' · <span style="color:var(--amber)">⚠ con datos incompletos</span>' : ''}${m.ff && m.ff.deficit != null && m.ff.deficit > 0 ? ` · caja atrapada ${OS_M(m.ff.deficit)} (a recuperar en refi/venta, no es pérdida)` : (m.ff && m.ff.deficit == null && m.ff.stage && !['vendida','refinanciada','rentada','rentada_y_refinanciada'].includes(m.ff.stage) ? ` · <span style="color:var(--mut2)">en proceso, aún no estabilizada</span>` : '')}</div></div>
     </div>
     <div class="chart-h" style="margin:22px 4px 6px"><div class="t">Ciclo de vida</div><div class="k">${cycle.map((c, i) => `<span style="color:${i <= cyIdx ? 'var(--a1)' : 'var(--mut2)'}">${i <= cyIdx ? '●' : '○'} ${c}</span>`).join(' → ')}</div></div>
     <div class="grid k2" style="margin-top:12px">
@@ -831,7 +834,7 @@ function osCasa(comp) {
         <div class="overx">${m.rentas ? `${m.rentas.renta != null ? kv('Renta mensual actual' + LIN('Renta mensual actual'), OS_M(m.rentas.renta) + ` <span style="font-size:10px;color:var(--mut2)">${OS_E(m.rentas.rentaChip)}</span>`) : (esRentada ? kv('Renta mensual actual' + LIN('Renta mensual actual'), faltaDato) : '')}${m.rentas.ffGastos != null ? kv('Gastos mensuales' + LIN('Gastos mensuales'), OS_M(m.rentas.ffGastos)) : (esRentada ? kv('Gastos mensuales', faltaDato) : '')}${m.rentas.flujoMes != null ? kv('Flujo mensual' + LIN('Flujo mensual'), OS_M(m.rentas.flujoMes), m.rentas.flujoMes >= 0 ? 'up' : 'down') : (esRentada ? kv('Flujo mensual', faltaDato) : '')}${m.rentas.pagoDeuda != null ? kv('Pago de deuda /mes', OS_M(m.rentas.pagoDeuda)) : ''}${m.rentas.detalle ? `${kv('Unidades rentables', m.rentas.totalU)}${kv('Ocupación', m.rentas.occPct + '% (' + m.rentas.occU + '/' + m.rentas.totalU + ')')}${kv('Renta objetivo (ocupadas)', OS_M(m.rentas.occRent))}${kv('Cobrado (plata real · ' + comp.mb.label + ')', OS_M(m.rentas.cobrado), 'up')}${kv('Deuda de cobranza', OS_M(m.rentas.deuda), m.rentas.deuda > 200 ? 'down' : '')}` : `<div class="meta" style="margin-top:8px">Sin espejo en la base de Rentas (detalle de unidades/cobranza no disponible) — los mensuales salen de FF·Propiedades.</div>`}` : (esRentada ? `<div class="empty" style="padding:26px;color:var(--amber)">⚠ La etapa dice <b>${OS_E(stageLbl)}</b> pero faltan los datos de renta en Airtable (FF·Propiedades: Renta mensual actual / Gastos mensuales) — es un dato FALTANTE, no "sin rentas".</div>` : `<div class="empty" style="padding:26px">Todavía no está en Rentas.</div>`)}</div></div>
       <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro · esta casa</b><span>INSIGHTS DE LA PROPIEDAD</span></div></div>
         ${insights.length ? insights.map(i => `<div class="insight"><div class="ic ${i.s === 'r' ? 'r' : i.s === 'y' ? 'y' : 'b'}">●</div><div class="tx">${i.t}${i.s === 'r' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('') : '<div class="meta" style="padding:12px 0">Sin alertas para esta casa. ✓</div>'}
-        ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && m.ff.deficit >= 0 ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
+        ${stageK === 'refinanciada' || stageK === 'vendida' ? `<div class="insight"><div class="ic g">●</div><div class="tx"><b>Salida:</b> ${stageLbl}${m.ff && (m.ff.deficit == null || m.ff.deficit <= 0) && m.ff.arv && m.ff.allIn ? ' · utilidad ' + OS_M(m.ff.arv - m.ff.allIn) : ''}.</div></div>` : ''}
       </div>
     </div>
     <div style="margin-top:18px"><button class="ibtn" data-osnav="/">← Panel Global</button></div>`;
