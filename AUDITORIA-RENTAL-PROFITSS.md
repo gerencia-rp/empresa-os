@@ -285,10 +285,26 @@ Desplegado y verificado EN VIVO en empresa-os-admin (bundle `d938bab8c607`). 4 c
   match "icn" es dentro de la palabra "Calibración"). Es de prod viejo (main). Se cierra al consolidar el
   deploy (Batch 4, bloqueado por decisión de diseño rama↔main).
 
-**Pendiente próximo (documentado):** B4/Item 27 (unidades 98→51 en pm-main, riesgo MEDIO — dedup depende de
-ver units activo+inactivo, requiere QA logueado, no se toca a ciegas), Item 19 (portal inversor reorganizar
-real→indicadores, UX), Item 30 (Pagos: método de pago + quién recibió). Item 39 (GAP/Utilidad tooltips) ya
-resuelto en turno 3 (`5a6d25f`).
+- **Item 19** — Portal inversor, detalle de casa reorganizado. `inv-portal.js` `renderCasaDash`: ahora
+  lidera con lo REAL (1·números simples de la operación · 2·Riesgos · 3·Qué sigue) y deja los indicadores
+  y proyecciones al final (4·los 5 números con paper/TIR · 5·riqueza en el tiempo (modelo) · 6·cómo se crea
+  valor · 7·¿y si vendemos?). Verificado en vivo (archivo standalone `dist/os/inv-portal.js` en prod).
+  (`25a14cd`).
+
+**Pendiente próximo (documentado, requiere insumo excluido — se salta y sigue):**
+- **B4/Item 27** — unidades 98→51 en `pm-main.js` (533KB, herramienta diaria de Carlos). El dedup del
+  calendario DEPENDE de ver units activo+inactivo → no es un simple `.eq('is_active',true)`. Requiere QA
+  logueado real (rompe la operación si sale mal). No se toca a ciegas.
+- **Item 30** — Pagos: método de pago + quién recibió. `pm_payments.payment_method` existe pero está
+  **100% null** (el sync no lo trae). Requiere confirmar el campo en Airtable + mapearlo en el sync +
+  deploy de backend (prod compartido). No se inventa (regla 8: sin dato → estado vacío honesto).
+- **Cerebro IA (Items 23/25/46)** — decisión CEO 4 (Anthropic, key de secrets). Requiere verificar que
+  `ANTHROPIC_API_KEY` tenga créditos (nota 11-jul del CLAUDE.md: la cuenta quedó sin créditos) + deploy de
+  edge functions. Queda pendiente por key/backend, no se pide la key en texto.
+- **B2 deploy de las 4 edge fns de escritura** — código listo (`fee342b`), deploy pendiente (CEO/backend).
+- **Consolidación de deploy (Batch 4)** — decisión de diseño rama↔main + sesión de merge dedicada.
+
+Item 39 (GAP/Utilidad tooltips) ya resuelto en turno 3 (`5a6d25f`).
 
 ---
 
