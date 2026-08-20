@@ -243,6 +243,22 @@ la diluye el arranque. **Necesito que el CEO/Carlos fije la definición** antes 
   renta real) con evidencia y recomendación. No se implementó una fórmula adivinada (habría empeorado).
 - **D-P1-6 semáforo por estado** — verificado ya cubierto por Batch 2 (déficit positivo → badge "Déficit"
   en ff-command-center:526; no "Sano en rojo").
+- **Item 08 / Item 19-23 (TIR y apreciación absurdas en holds cortos)** — **VERIFICADO ya resuelto en la
+  rama** (admin `inv-indicadores.js` casa(): `tirNA = dias<365`, `tirActivo=null`, `aprecAnual=null`; portal
+  `inv-portal.js:326/343/784` renderiza "aún no representativa (hold < 1 año)" / "—"). Los 3450%/1697.9%
+  del diagnóstico eran de **empresa-os (main, prod viejo)** → **es el "bug fantasma"**: el CEO los ve en el
+  dominio viejo, ya no en admin. Refuerza la urgencia de consolidar el deploy (Batch 4, decisión pendiente).
+
+**Próximo lote de código (documentado, requiere sesión con QA logueado):**
+- **B4 / Item 27 — unidades 98→51 en pm-main.js** (533KB, herramienta diaria de Carlos): `pm-main.js:169`
+  carga `pm_units` sin `.eq('is_active',true)` → infla a 98 (el OS Global ya filtra → 47). El dedup del
+  calendario depende de ver units activo+inactivo, así que el cambio NO es un simple filtro: exige extraer
+  `pmDedupeUnits()` global + ocupación desde reservas vigentes (no `status`) + un denominador único, y
+  **verificarlo logueado** (rompe la operación de Carlos si sale mal). Meta: 51 físicas / 38 ocupadas / 76.5%
+  (informe real de Carlos 18-ago). Riesgo MEDIO — no se toca a ciegas.
+- **Item 35 — cartera 3 números** (/cartera $14.400 vs /cobros y /dashboard $18.636 = v_cartera_kpi):
+  unificar a `v_cartera_kpi`, pero la reconciliación fina del neteo inquilino-por-inquilino necesita cruzar
+  con el informe de Carlos (29 inquilinos) → verificación de datos, no swap a ciegas.
 
 **Decisiones de negocio que bloquean próximos lotes (además de las ya listadas arriba):**
 7. **Definición de "renta real" para NOI/DSCR/CoC** (Item 09): rent-roll actual vs trailing-N vs
