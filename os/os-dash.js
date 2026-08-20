@@ -182,7 +182,7 @@ function dhViewFF() {
   const p = D.port;
   const invEng = window.invEngine || {};
   const big = dhBig([
-    { lab: 'TIR del portafolio', glos: 'xirr', v: p.xirrAllIn, txt: dhP(p.xirrAllIn), meta: 'ff_tir', fuente: 'inv_indicadores_data + invInd (XIRR all-in)', linea: p.n + ' casas · papel al corte ' + D.hoy, cls: p.xirrAllIn > 0 ? 'up' : 'down' },
+    { lab: 'TIR del portafolio', glos: 'xirr', v: p.xirrAllIn, txt: dhP(p.xirrAllIn), meta: 'ff_tir', fuente: 'inv_indicadores_data + invInd (XIRR all-in)', linea: p.nXirr + ' de ' + p.n + ' casas (holds ≥1 año) · papel al corte ' + D.hoy, cls: p.xirrAllIn > 0 ? 'up' : 'down' },
     { lab: 'Múltiplo equity', glos: 'mult_equity', v: p.multEquity, txt: dhX(p.multEquity), meta: 'ff_mult_eq', fuente: 'definición Excel (deuda faltante=0)', linea: p.porCompletar.length + ' casas con deuda por completar — sesgo declarado' },
     { lab: 'Capital vs equity · LTV', glos: 'ltv', v: p.ltvPond, txt: dhP(p.ltvPond), meta: 'ff_ltv', fuente: 'Σ deuda ÷ Σ papel (casas con deuda)', linea: 'desplegado ' + dhM(p.invTotal) + ' · equity propio ' + dhM(p.equityInv) },
     { lab: 'Ciclo compra→refi/venta', v: D.ciclo, txt: D.ciclo != null ? dhN(D.ciclo) + ' días' : '—', meta: 'ff_ciclo_dias', fuente: 'close_date → fecha_refi/venta (sin cierre = hoy)', linea: 'promedio del portafolio — bajarlo libera capital' },

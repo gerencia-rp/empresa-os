@@ -86,8 +86,13 @@
   // ─── PORTAFOLIO (admin): XIRR de todos los flujos + KPIs agregados ───
   function portfolio(rows, hoy) {
     const usadas = (rows || []).filter(r => r.close_date && r.paper_value != null && +r.all_in > 0);
+    // XIRR SOLO sobre holds >= 365 días — MISMA regla A1 que casa(): un hold <1 año se anualiza a valores
+    // extremos no representativos (una casa recién cerrada con equity en papel inflaba el XIRR del portafolio).
+    const holdDias = r => Math.max(1, Math.round((((r.vendida && r.fecha_venta) ? dt(r.fecha_venta) : dt(hoy)) - dt(r.close_date)) / DAY));
+    const paraXirr = usadas.filter(r => holdDias(r) >= 365);
+    const excluidasXirr = usadas.length - paraXirr.length;
     const fA = [], fC = [];
-    usadas.forEach(r => {
+    paraXirr.forEach(r => {
       const fin = (r.vendida && r.fecha_venta) ? r.fecha_venta : hoy;
       fA.push({ fecha: r.close_date, monto: -(+r.all_in) }, { fecha: fin, monto: +r.paper_value });
       fC.push({ fecha: r.close_date, monto: -(+r.compra) }, { fecha: fin, monto: +r.paper_value });
@@ -104,6 +109,7 @@
     const paperConDeuda = conDeuda.reduce((s, r) => s + +r.paper_value, 0);
     return {
       n: usadas.length, nConDeuda: conDeuda.length,
+      nXirr: paraXirr.length, excluidasXirr,
       xirrAllIn: xirr(fA), xirrCompra: xirr(fC),
       invTotal: inv, paperTotal: paper,
       equityInv: inv - hml, equityHoy: paper - deuda,

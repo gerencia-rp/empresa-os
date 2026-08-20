@@ -108,6 +108,36 @@ contiene `osResolveNames` y "rehab real (Airtable)"). ⚠ Deploy: el push NO aut
 
 ---
 
+### Batch 2 — Déficit fuente ÚNICA = ff_deals.deficit_total · 2026-08-20 ✅ (decisión CEO desbloqueada)
+
+El CEO fijó la fuente: **`ff_deals.deficit_total` (Airtable), la app NO recalcula.** Convención:
+**caja atrapada = magnitud POSITIVA** (se recupera al refi/venta) · `null` = obra en curso / no
+estabilizada (no se inventa número) · `<=0` = recuperado. Verificado en Supabase: Σ activas =
+**$297,690.36** (18 casas con dato), **5 casas** con caja atrapada > $20k (Stonleigh 70.855, Virginia
+70.529, Bartlett 40.000, Echo 36.391, Dove 30.430).
+
+- **os.js** (`9eb29a9`): per-casa `deficit` desde `d.deficit_total`; consumidores (alertas, insight de ficha,
+  tarjeta Equity, línea de salida) a la nueva convención. Antes usaba `dr.net_total` (otro número:
+  Capitol −$37.964 vs Airtable 0).
+- **ff-command-center.js** (`9eb29a9`): ~16 sitios convertidos; `deficitAcum = Σ deficit_total` (obras en
+  curso = null → no suman) = **$297,690**, MISMO número que el Dashboard (os-dash ya lo usaba). Draws
+  neto del ciclo (`dr.net_total`, tablas "sanas"/ingeniería inversa) se conservan como concepto aparte.
+- **Portal inversor** (`e00cabd`, migr `20260820120000`): RPC `inv_portal_resumen.deficit` ahora =
+  `greatest(0, deficit_total)` — MISMA fuente que ficha/admin. Antes `greatest(0,-utilidad_neta_post_interes)`
+  de v_pnl_casa daba un número distinto (Virginia 29.982 vs 70.529). JS: chip "Airtable", se quita el
+  desglose que no sumaba; el déficit modelado del ciclo se relabela "Cash máximo usado en el ciclo (modelo)".
+- **os-dash.js**: ya usaba `Σ ff_deals.deficit_total` → sin cambios, ahora consistente con todo.
+
+Cierra: D-P0-1/2/3/4, C-P0-3. **Falta propagar** a `ff-analitica.js` (salud usa flujo mensual, otro criterio —
+queda para el lote de semáforo por estado) y a inv-engine `fases.fase0` (modelo del ciclo, ya relabelado).
+
+### Batch 3 — Horizontes 3/5/8 FIJO (constante única HORIZONTES) · 2026-08-20 ✅ (`8e6c314`)
+
+Decisión CEO. `window.HORIZONTES=[3,5,8]` definido en **inv-engine.js** (fuente única). **inv-portal.js**
+(selector + defaults 6→5) e **inv-admin.js** (BLOQUE 3 default 6→5, selector) leen `(window.HORIZONTES||[3,5,8])`.
+Eliminado el set 4/6/8 que convivía con 3/5/8 (un inversor veía ambos en la misma casa). Golden inv-rehab
+**24/24** (tir31/vpn31 intactos).
+
 ## GROUNDING ADICIONAL PARA PRÓXIMOS LOTES (verificado en prod)
 
 ### B4 · Unidades / ocupación (Item 27) — CONFIRMADO

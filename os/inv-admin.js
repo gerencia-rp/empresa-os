@@ -924,7 +924,7 @@ function iaSecPortafolioE4() {
     + '</div>';
   return '<div class="card" style="margin-bottom:14px;border-color:rgba(245,178,61,.4)"><div style="font-size:12px;color:var(--amber)">📄 Indicadores sobre <b>valor en papel</b> (appraisal/ARV) — no incluyen rentas, intereses ni gastos; no son ganancias realizadas hasta la venta o refi. Vendidas usan precio REAL en su fecha (Arcadia $615,000 · 2026-05-04); Slaughter usa ARV como proxy (precio de venta por completar).</div></div>'
     + '<div class="grid k4">'
-    + kpi('XIRR portafolio (all-in)', iaPctI(port.xirrAllIn), port.n + ' casas · flujos compra→papel/venta [inv_indicadores_data]')
+    + kpi('XIRR portafolio (all-in)', iaPctI(port.xirrAllIn), port.nXirr + ' de ' + port.n + ' casas (holds ≥1 año) · flujos compra→papel/venta [inv_indicadores_data]')
     + kpi('XIRR solo compra', iaPctI(port.xirrCompra), 'sin contar la obra (draws)')
     + kpi('Múltiplo sobre equity', iaXI(port.multEquity), '(papel − deuda) ÷ (all-in − HML) · ' + port.nConDeuda + ' casas con deuda')
     + kpi('LTV promedio ponderado', iaPctI(port.ltvPond), 'deuda vigente ÷ valor papel')
