@@ -598,7 +598,7 @@ function rcSecGestion(c) {
   const cal = c.fin.filter(o => (+o.sqft || 0) > 0 && ((+o.monto_real || o.dq.gasto) > 0) && (+o.presupuesto_interno || 0) > 0);
   const realPsf = cal.length ? Math.round(avg(cal.map(o => (+o.monto_real || o.dq.gasto) / (+o.sqft)))) : 0;
   const estPsf = cal.length ? Math.round(avg(cal.map(o => (+o.presupuesto_interno) / (+o.sqft)))) : 0;
-  return rcHeader('Gestión (EVM)', 'CPI/SPI por casa (obras en curso), avance físico vs planeado, y agregados de calibración listos para el Estimador.') + `
+  return rcHeader('Gestión (EVM)', `CPI/SPI por casa (subconjunto de las ${c.activas.length} en curso que ya tienen fechas y costo cargados), avance físico vs planeado, y agregados de calibración listos para el Estimador.`) + `
     <div class="grid kpis">
       <div class="card kpi"><div class="lab">SPI promedio</div><div class="big ${(spiProm || 0) >= 1 ? 'up' : 'down'}">${spiProm != null ? spiProm.toFixed(2) : '—'}</div><div class="meta">cronograma (>1 adelantado)</div></div>
       <div class="card kpi"><div class="lab">CPI promedio</div><div class="big ${(cpiProm || 0) >= 1 ? 'up' : 'down'}">${cpiProm != null ? cpiProm.toFixed(2) : '—'}</div><div class="meta">costo (>1 bajo presupuesto)</div></div>
@@ -606,7 +606,7 @@ function rcSecGestion(c) {
       <div class="card kpi"><div class="lab">% en presupuesto</div><div class="big">${c.enPresupPct}%</div><div class="meta">finalizadas</div></div>
     </div>
     <div class="grid row2">
-      <div class="card"><div class="chart-h"><div class="t">EVM por casa (en curso)</div><div class="k">${rows.length} obras</div></div>
+      <div class="card"><div class="chart-h"><div class="t">EVM por casa</div><div class="k">${rows.length} de ${c.activas.length} en curso · con fechas y costo</div></div>
         <table class="ptable"><thead><tr><th>Casa</th><th>Físico %</th><th>Planeado %</th><th>SPI</th><th>CPI</th></tr></thead><tbody>
         ${rows.length ? rows.map(x => `<tr><td><b>${RC_E(rcShort(x.o.address))}</b></td><td>${Math.round(x.avance)}%</td><td>${x.timePct != null ? Math.round(x.timePct) + '%' : '—'}</td><td class="${(x.spi || 0) >= 1 ? 'up' : 'down'}">${x.spi != null ? x.spi.toFixed(2) : '—'}</td><td class="${(x.cpi || 0) >= 1 ? 'up' : 'down'}">${x.cpi != null ? x.cpi.toFixed(2) : '—'}</td></tr>`).join('') : '<tr><td colspan="5" class="meta" style="padding:16px">Sin obras en curso con fechas y costo cargados.</td></tr>'}
         </tbody></table></div>
