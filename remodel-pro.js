@@ -1621,24 +1621,37 @@ if (typeof window !== 'undefined' && !window._moOnlineHooked) {
 
 function rmRenderTab() {
   const body = document.getElementById('rm-body');
-  if (rmState.tab === 'projects') return rmRenderProjects(body);
-  if (rmState.tab === 'quick') return rmRenderQuick(body);
-  if (rmState.tab === 'compare') return rmRenderCompare(body);
-  if (rmState.tab === 'rates') return rmRenderRates(body);
-  if (rmState.tab === 'editor') return rmRenderEditor(body);
-  if (rmState.tab === 'forecast') return (typeof fcRenderTab === 'function') ? fcRenderTab(body) : (body.innerHTML = '<p class="text-slate-500 py-8 text-center">Módulo de pronóstico no cargado.</p>');
-  if (rmState.tab === 'seguimiento') return rmRenderSeguimiento(body);
-  if (rmState.tab === 'gantt') return rmRenderGantt(body);
-  if (rmState.tab === 'sow') return rmRenderSow(body);
-  if (rmState.tab === 'obrapro') return rmRenderObraPro(body);
-  if (rmState.tab === 'versions') return rmRenderVersions(body);
-  if (rmState.tab === 'crew') return rmRenderCrew(body);
-  if (rmState.tab === 'purchases') return rmRenderPurchases(body);
-  if (rmState.tab === 'field') return rmRenderField(body);
-  if (rmState.tab === 'agent') return rmRenderAgent(body);
-  if (rmState.tab === 'catalog') return rmRenderCatalog(body);
-  if (rmState.tab === 'learning') return rmRenderLearning(body);
-  if (rmState.tab === 'calibration') return rmRenderCalibration(body);
+  if (!body) return;
+  // Auditoría Item 45: cualquier render que tire un error dejaba el tab EN BLANCO en silencio
+  // (p.ej. "3 Estimaciones"/compare). Se envuelve el dispatch: ante un error, se muestra un mensaje
+  // claro con reintento en vez de una pantalla vacía. Nunca queda en blanco.
+  try {
+    if (rmState.tab === 'projects') return rmRenderProjects(body);
+    if (rmState.tab === 'quick') return rmRenderQuick(body);
+    if (rmState.tab === 'compare') return rmRenderCompare(body);
+    if (rmState.tab === 'rates') return rmRenderRates(body);
+    if (rmState.tab === 'editor') return rmRenderEditor(body);
+    if (rmState.tab === 'forecast') return (typeof fcRenderTab === 'function') ? fcRenderTab(body) : (body.innerHTML = '<p class="text-slate-500 py-8 text-center">Módulo de pronóstico no cargado.</p>');
+    if (rmState.tab === 'seguimiento') return rmRenderSeguimiento(body);
+    if (rmState.tab === 'gantt') return rmRenderGantt(body);
+    if (rmState.tab === 'sow') return rmRenderSow(body);
+    if (rmState.tab === 'obrapro') return rmRenderObraPro(body);
+    if (rmState.tab === 'versions') return rmRenderVersions(body);
+    if (rmState.tab === 'crew') return rmRenderCrew(body);
+    if (rmState.tab === 'purchases') return rmRenderPurchases(body);
+    if (rmState.tab === 'field') return rmRenderField(body);
+    if (rmState.tab === 'agent') return rmRenderAgent(body);
+    if (rmState.tab === 'catalog') return rmRenderCatalog(body);
+    if (rmState.tab === 'learning') return rmRenderLearning(body);
+    if (rmState.tab === 'calibration') return rmRenderCalibration(body);
+  } catch (e) {
+    console.error('[remodel-pro] error al renderizar tab "' + rmState.tab + '":', e);
+    const msg = (e && e.message) ? e.message : String(e);
+    body.innerHTML = '<div class="bg-white rounded-xl p-6 border border-red-200 text-center">'
+      + '<div class="text-red-600 font-bold mb-1">No se pudo mostrar esta pestaña</div>'
+      + '<div class="text-xs text-slate-500 mb-3">' + (msg ? msg.replace(/[<>&]/g, '') : 'Error inesperado') + '</div>'
+      + '<button onclick="rmRenderTab()" class="text-sm bg-slate-800 text-white rounded px-4 py-2">Reintentar</button></div>';
+  }
 }
 
 // ─── TAB: 3 ESTIMACIONES (Histórica / Mercado / Híbrida) ───
