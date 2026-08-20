@@ -682,7 +682,7 @@ function ipRendPaneles() {
   if (!window.invRend || !window.invEsc) return [];
   invRend.setEsc(invEsc);
   const hoy = new Date().toISOString().slice(0, 10);
-  const N = IP.rendHor || 6;
+  const N = IP.rendHor || 5;
   return (IP.holdings || []).map(h => {
     let ind = (IP.indData || []).find(x => x.property_id === h.property_id);
     if (!ind) return null;
@@ -729,11 +729,11 @@ function ipRendCard(pnl) {
 }
 function renderRendimiento() {
   if (!window.invRend || !window.invEsc || !IP.escCfg) return '<div class="empty">Cargando el panel de rendimiento…</div>';
-  const N = IP.rendHor || 6;
+  const N = IP.rendHor || 5;
   const paneles = ipRendPaneles();
   if (!paneles.length) return '<div class="empty">Todavía no hay datos de rendimiento para tus casas.</div>';
   const agg = invRend.portafolio(paneles, new Date().toISOString().slice(0, 10));
-  const horSel = [4, 6, 8].map(n => '<button class="ibtn' + (N === n ? ' on' : '') + '" onclick="ipSetHor(' + n + ')">' + n + ' años</button>').join('');
+  const horSel = (window.HORIZONTES || [3, 5, 8]).map(n => '<button class="ibtn' + (N === n ? ' on' : '') + '" onclick="ipSetHor(' + n + ')">' + n + ' años</button>').join('');
   const tip = t => ' <span class="src" title="' + esc(t) + '" style="cursor:help">ⓘ</span>';
   const banner = '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:12px">📈 <b>Realizado</b> = distribuciones ya pagadas + avalúo real. <b>Proyectado</b> (venta futura, apreciación, S&amp;P 500) = <b>supuestos editables</b>, no promesas. Apreciación ' + $pct(IP.escCfg.apreciacion_anual) + '/año · costo de venta ' + $pct(IP.escCfg.costo_venta) + ' · S&amp;P ' + $pct(IP.escCfg.sp500_anual) + '.</div>';
   const kpi = (lab, val, sub, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>';
@@ -855,7 +855,7 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
     if (indRow && h) {
       const Pv = {}; Object.keys(P).forEach(k => Pv[k] = P[k].value);
       let navEquity = null;
-      try { const pnl = invRend.panel({ ind: indRow, Pv, holding: h, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, monto: d.monto })), hoy }, IP.escCfg, IP.rendHor || 6); navEquity = pnl.equityActual; } catch (e) {}
+      try { const pnl = invRend.panel({ ind: indRow, Pv, holding: h, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, monto: d.monto })), hoy }, IP.escCfg, IP.rendHor || 5); navEquity = pnl.equityActual; } catch (e) {}
       const vc = invEsc.valorCreado(invEsc.desdeDatos(indRow, Pv, h), IP.escCfg, navEquity);
       const deudaEnRegistro = c && c.deuda_vigente == null && !(c && c.vendida);
       const tt = t => ' <span class="src" title="' + esc(t) + '" style="cursor:help">ⓘ</span>';

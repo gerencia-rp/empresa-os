@@ -392,8 +392,8 @@ function iaTabEscenarios() {
   const casas = [...new Set(IA.holdings.map(h => h.property_id))];
   const casaSel = '<select class="osa-in" onchange="iaSetCasa(this.value)">' + casas.map(c => '<option value="' + c + '" ' + (c === IA.casa ? 'selected' : '') + '>' + OS_E(iaCasaName(c)) + '</option>').join('') + '</select>';
   if (!IA.params.length) return '<div class="empty">Esta casa no tiene parámetros del modelo.</div>';
-  // BLOQUE 3 (03-ago): horizonte 4/6/8 (default 6) — MISMO set que el panel del inversor.
-  const N = [4, 6, 8].includes(IA.escHor) ? IA.escHor : 6;
+  // BLOQUE 3: horizonte 3/5/8 (default 5) — constante ÚNICA HORIZONTES, MISMO set que el panel del inversor.
+  const N = (window.HORIZONTES || [3, 5, 8]).includes(IA.escHor) ? IA.escHor : 5;
   const tipos = [
     ['estimado', '📋 Estimado', 'el underwriting original (lo que se proyectó al comprar).'],
     ['proyectado', '🎯 Proyectado', 'el modelo actual con los supuestos de hoy.'],
@@ -413,7 +413,7 @@ function iaTabEscenarios() {
   const inv = base.repartoInv;
   const hz = x => (x && x.r.indicadores.porHorizonte) ? x.r.indicadores.porHorizonte[N] : null;
   const supTip = ' <span class="src sup" title="proyección con supuestos — no es promesa; lo REALIZADO (movimientos reales) es lo que manda">supuesto</span>';
-  const horSel = [4, 6, 8].map(n => '<button class="ibtn" style="' + (N === n ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaSetEscHor(' + n + ')">' + n + ' años</button>').join(' ');
+  const horSel = (window.HORIZONTES || [3, 5, 8]).map(n => '<button class="ibtn" style="' + (N === n ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaSetEscHor(' + n + ')">' + n + ' años</button>').join(' ');
   // ¿por qué columnas iguales? se COMPARAN los valores reales al horizonte y se explica cada coincidencia.
   const hayMovs = (IA.cashflow || []).length > 0, haySim = Object.keys(IA.sim || {}).length > 0;
   const tirKey = k => { const h = hz(runs[k]); return h && h.tir != null ? Math.round(h.tir * 1e4) : null; };
@@ -1499,7 +1499,7 @@ function iaIndicadores() {
     // NAV = equityActual del panel (amortiza la deuda igual que el portal) → un solo número
     let navEquity = null, deudaPend = c.deuda_saldo;
     if (canRend) {
-      try { const pnl = invRend.panel({ ind: i, Pv, holding: agg, distribuciones: [], hoy }, cfg, IA.rendHor || 6); navEquity = pnl.equityActual; if (pnl.currentBalance != null) deudaPend = pnl.currentBalance; } catch (e) {}
+      try { const pnl = invRend.panel({ ind: i, Pv, holding: agg, distribuciones: [], hoy }, cfg, IA.rendHor || 5); navEquity = pnl.equityActual; if (pnl.currentBalance != null) deudaPend = pnl.currentBalance; } catch (e) {}
     }
     const vc = invEsc.valorCreado(c, cfg, navEquity);
     // deuda EN REGISTRO = no hay HML/refi registrado (el panel colapsa null→0, por eso miramos el indicador)
