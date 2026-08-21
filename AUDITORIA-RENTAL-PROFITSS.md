@@ -508,5 +508,67 @@ la rama**; de main solo capa visual (osIcon/tokens/CSS) y features nuevas.
 
 ---
 
+## FASE 3 — CORRECCIÓN (turno 9 · 2026-08-21) — 🧠 UN SOLO ASISTENTE (Cerebro + Jarvis combinados)
+
+**Decisión CEO #5 ejecutada:** UN asistente omnipresente. El **Cerebro** es el cerebro central /
+orquestador (snapshot de números reales = verdad, responde simple, define toda sigla) y **conserva
+TODA la red de agentes de Jarvis**: para una pregunta de un área, delega en el agente correcto y
+unifica la respuesta. Una sola entrada visible. SOLO LECTURA (puede PROPONER, nunca ejecuta).
+Mapa y diseño completos en **`COMBINAR-ASISTENTES.md`**.
+
+**Qué se hizo (todo sobre `merge/consolidacion`, la línea que alimenta `empresa-os-admin`):**
+- **Edge fn `cerebro` → ORQUESTADOR** (Supabase, desplegada v2 ACTIVE). Sigue armando su snapshot
+  transversal desde las fuentes únicas (`v_holding_pnl`, `v_cartera_kpi`, `v_ocupacion`,
+  `v_ff_portafolio_kpi`, `ff_deals.deficit_total`, `v_remodel_avance_vivo`, `inv_*`, `pm_brain_memory`)
+  y ahora conoce a su equipo (roster de `agent_registry`). Gana **tool-use `consultar_agentes_area`**:
+  ante una pregunta de un área lee el **producto de trabajo del agente correcto** (último informe de
+  `pm_informes` + cola de propuestas de esa escuadra en `agent_proposals` + su roster + Sabueso
+  `ct_findings` para contable) y lo traduce a lenguaje simple citando al agente. Loop de hasta 3 rondas;
+  el último turno fuerza texto.
+  - **Por qué "leer el producto" y no re-invocar los edge de los agentes:** los agentes de área NO son
+    chat — son ejecutores batch (rol DB `agentes_ia_exec`, test de aislamiento, **escriben** informes/
+    propuestas por cron con dedup). Leer su salida ES consultarlos, es instantáneo, solo-lectura y
+    refleja exactamente lo que decidieron. Nada de la red se elimina; los crons siguen igual.
+- **Entrada única omnipresente:** el FAB `os/os-cerebro.js` (flotante, sobre todo el OS para usuarios
+  logueados) se cableó en `index.html` + `scripts/build.mjs`. Es la entrada conversacional única.
+- **Un solo cerebro:** el chat del control room `/jarvis` (`jvAsk` en `os/os-command-center.js`) se
+  **repuntó del viejo `/api/brain-chat` al MISMO edge `cerebro`**. Así no hay dos cerebros compitiendo:
+  `/jarvis` queda como sala de control de la red (roster/propuestas/auditoría) y su chat es literalmente
+  el Cerebro. Se conservó la UI de Jarvis (recomendación del CEO) enchufándole el Cerebro por debajo.
+- ⚠ **Alcance:** la combinación vive SOLO en `merge/consolidacion` (donde están los agentes de Jarvis).
+  `feat/portal-inversionista-v2` **no tiene** ni la UI de Jarvis ni los agentes → la combinación no puede
+  existir ahí; y desplegar feat regresaría prod (turnos 7-8). Deploy productivo = CLI a `empresa-os-admin`.
+- Otros chats embebidos de módulo siguen en `/api/brain-chat` a propósito (fuera de alcance, sin
+  regresión): "Cerebro IA" del Rentas CC, insights del Remodel CC, FF CC, Sabueso (parse-doc) y — clave
+  por seguridad — el **asistente del Portal del Inversor** (`os/inv-portal.js`, externo, RLS del inversor)
+  que NO debe unificarse con el Cerebro interno.
+
+### Verificación EN VIVO (no grep de source: sobre lo desplegado)
+- `node --check` OK (os-cerebro.js, os-command-center.js) · `npm run build` → bundle `296d7ebf18f1` ·
+  `npx vercel --prod` a **empresa-os-admin** READY (target production).
+- **Bundle que sirve el dominio** (`empresa-os-admin.vercel.app/assets/bundle.296d7ebf18f1.js`):
+  `cerebro-fab` ×6 (FAB presente) · `functions/v1/cerebro` ×2 (FAB + jvAsk) · `Sala de control de
+  agentes` ×1 (repoint de Jarvis vivo). **Una sola entrada conversacional** (el FAB) + el control room
+  usando el mismo backend.
+- **Edge fn desplegada y booteando:** POST con token inválido → 401 `requireAuth` limpio (no boot/import
+  error → el código v2 con tool-use corre); OPTIONS → 200 con CORS. verify_jwt = true.
+- **Datos que verá el asistente (verificados a mano en Supabase prod, = targets de la tarea):**
+  caja atrapada (déficit) **$297.690,36** (18 casas) · cartera vencido_neto **$18.636,01 / 15 morosos** ·
+  ocupación **70,59%** (51/36). La delegación trae trabajo real: p.ej. remodelación → informe
+  `foto_ejecutiva_remodelacion 2026-08-21`. Cola de propuestas por escuadra: FF 22 · Remod 32 · Rentas 75.
+- ⚠ **NO verificado en vivo (honesto):** el round-trip conversacional real del LLM (pregunta → respuesta
+  del Cerebro, y la delegación disparando el tool) **no se pudo probar logueado**: las creds
+  `RP_QA_ADMIN_*` del entorno dan `invalid_credentials` (gotcha conocido: sesiones paralelas pisan el
+  password del usuario 🧪 QA). Es un tema de acceso, NO del código. Queda para el CEO / una corrida con la
+  contraseña QA reseteada. Verificado: el backend bootea, los datos son correctos y la UI está unificada.
+
+### 🙋 Verificación FINAL del CEO
+**Entrá logueado a `empresa-os-admin.vercel.app`: (1) el botón 🧠 flotante (abajo a la derecha) aparece en
+CUALQUIER pantalla — es la ÚNICA entrada de chat; (2) preguntá algo transversal ("¿cuánta caja atrapada
+hay?") y debe responder $297.690 simple; (3) preguntá de un área ("¿cómo viene la obra?") y debe citar al
+agente de Remodelación; (4) en `/jarvis` el chat es el mismo Cerebro. Confirmación en pantalla es tuya.**
+
+---
+
 === AUDITORIA COMPLETA ===
 === MERGE COMPLETO ===
