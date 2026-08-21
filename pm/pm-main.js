@@ -1110,10 +1110,12 @@ function pmRenderDashboard(){
       ${pmSyncStatusLabel()}
     </div>
 
-    ${(pmaState.dataWarnings||[]).length ? `<button onclick="pmSetTab('operations');pmaState.opsSubTab='datawarn';pmRender()" class="w-full text-left bg-amber-50 border-2 border-amber-300 hover:bg-amber-100 rounded-xl px-4 py-3 flex items-center justify-between transition">
-      <div class="flex items-center gap-3"><span class="text-2xl">${osIcon('search')}</span><div><div class="text-sm font-extrabold text-amber-900">${pmaState.dataWarnings.length} inconsistencia${pmaState.dataWarnings.length>1?'s':''} de datos</div><div class="text-xs text-amber-700">Airtable tiene datos contradictorios — revisá y corregí</div></div></div>
-      <span class="text-amber-800 font-bold text-sm">Ver →</span>
-    </button>` : ''}
+    ${(() => { const dg = pmDataWarnGroups(); if (!dg.length) return '';
+      const resumen = dg.map(g => `${g.count} ${g.label.toLowerCase()}`).join(' · ');
+      return `<button onclick="pmSetTab('operations');pmaState.opsSubTab='datawarn';pmRender()" class="w-full text-left bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl px-4 py-3 flex items-center justify-between transition">
+      <div class="flex items-center gap-3 min-w-0"><span class="text-xl">${osIcon('search')}</span><div class="min-w-0"><div class="text-sm font-bold text-slate-800">${dg.length} tipo${dg.length>1?'s':''} de dato por revisar en Airtable</div><div class="text-xs text-slate-500 truncate">${resumen}</div></div></div>
+      <span class="text-slate-600 font-bold text-sm flex-shrink-0">Ver →</span>
+    </button>`; })()}
 
     <!-- 2 · KPIs -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -6071,40 +6073,79 @@ function pmAlertCounts() {
     info: a.filter(x=>x.severity==='info').length };
 }
 
+// ── Agrupación honesta de alertas ──────────────────────────────────
+// Las alertas vienen 1 fila por (casa × chequeo × corrida): cientos de filas
+// que son EL MISMO puñado de problemas repetidos. Acá se colapsan por TIPO,
+// y "urgente" = SOLO lo que afecta plata/operación HOY (no volumen de filas).
+const PM_ALERT_META = {
+  payment_late:      { label: 'Pagos sin registrar (30+ días)',        urgent: true,  icon: 'banknote' },
+  contract_expired:  { label: 'Contratos vencidos sin renovar',        urgent: true,  icon: 'alert' },
+  contract_expiring: { label: 'Contratos por vencer',                  urgent: false, icon: 'calendar' },
+  occupancy_low:     { label: 'Ocupación por debajo del objetivo',     urgent: false, icon: 'house' },
+  unit_vacant_long:  { label: 'Unidades vacías hace 60+ días',         urgent: false, icon: 'door' },
+  utility_due_soon:  { label: 'Servicios por vencer / vencidos',       urgent: false, icon: 'bell' },
+  task_overdue:      { label: 'Tareas atrasadas',                      urgent: false, icon: 'loader' },
+  task_due:          { label: 'Tareas para hoy',                       urgent: false, icon: 'calendar' }
+};
+function pmAlertTypeMeta(t) { return PM_ALERT_META[t] || { label: (t||'Otros').replace(/_/g,' '), urgent: false, icon: 'bell' }; }
+// Colapsa las alertas activas por tipo de problema. Devuelve grupos ordenados
+// (urgentes primero, luego por # de casas afectadas). "props" = casas distintas
+// = el número honesto (una alerta repetida en la misma casa es el mismo problema).
+function pmAlertGroups() {
+  const by = {};
+  pmActiveAlerts().forEach(a => {
+    const t = a.type || a.category || 'otros';
+    if (!by[t]) by[t] = { type: t, rows: [], props: new Set() };
+    by[t].rows.push(a);
+    if (a.property_id) by[t].props.add(a.property_id);
+  });
+  return Object.values(by).map(g => {
+    const m = pmAlertTypeMeta(g.type);
+    return { type: g.type, label: m.label, urgent: !!m.urgent, icon: m.icon,
+      count: g.rows.length, props: g.props.size,
+      unread: g.rows.filter(x=>!x.read).length, rows: g.rows };
+  }).sort((a,b) => (b.urgent - a.urgent) || (b.props - a.props) || (b.count - a.count));
+}
+
 function pmRenderAlertsBar() {
-  const c = pmAlertCounts();
+  const groups = pmAlertGroups();
   const open = pmaState.alertsDropdownOpen;
-  const recent = pmActiveAlerts().slice(0, 10);
+  const urgent = groups.filter(g => g.urgent);
+  // Resumen calmo: cuántos ASUNTOS (tipos de problema) hay, no cuántas filas.
+  let summary;
+  if (!groups.length) {
+    summary = '<span class="text-emerald-600 font-medium">' + osIcon('check') + ' Todo al día — sin pendientes</span>';
+  } else {
+    const asuntos = `<strong>${groups.length}</strong> asunto${groups.length>1?'s':''} por revisar`;
+    summary = `<span class="text-slate-600">${osIcon('bell')} ${asuntos}</span>`
+      + (urgent.length ? ` · <span class="text-rose-600 font-semibold">${urgent.length} requiere${urgent.length>1?'n':''} atención</span>` : '');
+  }
   return `
   <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-    <div class="text-[11px] text-slate-600">
-      ${c.total ? `${osIcon('bell')} <strong>${c.total}</strong> alertas activas: <span class="text-red-600 font-bold">${c.critical} críticas</span> · <span class="text-amber-600 font-bold">${c.warning} advertencias</span> · <span class="text-blue-600 font-bold">${c.info} informativas</span>`
-                : '<span class="text-slate-400">' + osIcon('bell') + ' Sin alertas activas</span>'}
-    </div>
+    <div class="text-[11px]">${summary}</div>
     <div class="flex items-center gap-2 relative">
-      <button onclick="pmRunAlertChecks(this)" title="Generar alertas ahora" class="text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">↻ Revisar</button>
+      <button onclick="pmRunAlertChecks(this)" title="Volver a revisar las casas ahora" class="text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">↻ Revisar</button>
       <button onclick="pmaState.alertsDropdownOpen=${open?'false':'true'};pmRender()" class="relative bg-white border border-slate-200 hover:bg-slate-50 rounded-lg px-2.5 py-1.5">
         <span class="text-base leading-none">${osIcon('bell')}</span>
-        ${c.unread ? `<span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">${c.unread}</span>` : ''}
+        ${urgent.length ? `<span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">${urgent.length}</span>` : ''}
       </button>
       ${open ? `
-        <div class="absolute right-0 top-full mt-1 w-[340px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+        <div class="absolute right-0 top-full mt-1 w-[360px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
           <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100" style="background:#1e2430">
-            <span class="text-xs font-bold text-white">Alertas recientes</span>
-            <button onclick="pmAlertMarkAllRead()" class="text-[10px] font-bold" style="color:#d4af37">Marcar todas leídas</button>
+            <span class="text-xs font-bold text-white">${groups.length ? 'Asuntos por revisar' : 'Todo al día'}</span>
+            <button onclick="pmaState.alertsDropdownOpen=false;pmSetTab('operations');pmaState.opsSubTab='alerts';pmRender()" class="text-[10px] font-bold" style="color:#d4af37">Ver detalle →</button>
           </div>
-          <div class="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
-            ${recent.length ? recent.map(a => { const s = pmAlertSev(a.severity); return `
-              <div class="px-3 py-2 flex items-start gap-2 ${a.read?'':'bg-slate-50'}">
-                <span class="${s.dot} w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"></span>
+          <div class="max-h-[340px] overflow-y-auto divide-y divide-slate-100">
+            ${groups.length ? groups.map(g => `
+              <button onclick="pmaState.alertsDropdownOpen=false;pmaState.alertTypeFilter='${g.type}';pmaState.alertGroupOpen='${g.type}';pmSetTab('operations');pmaState.opsSubTab='alerts';pmRender()" class="w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-slate-50">
+                <span class="w-1.5 h-1.5 rounded-full mt-0.5 flex-shrink-0 ${g.urgent?'bg-rose-500':'bg-slate-300'}"></span>
                 <div class="flex-1 min-w-0">
-                  <div class="text-[11px] text-slate-700 leading-snug">${(a.message||'').replace(/</g,'&lt;')}</div>
-                  <div class="text-[9px] text-slate-400 mt-0.5">${(a.created_at||'').slice(0,16).replace('T',' ')}${a.property_id?` · ${pmPropertyName(a.property_id).slice(0,18)}`:''}</div>
+                  <div class="text-[12px] font-semibold text-slate-800 leading-snug">${g.label}</div>
+                  <div class="text-[10px] text-slate-400">${g.props?`${g.props} casa${g.props>1?'s':''}`:`${g.count} caso${g.count>1?'s':''}`}${g.urgent?' · atención':''}</div>
                 </div>
-                ${!a.read?`<button onclick="pmAlertMarkRead('${a.id}')" title="Marcar leída" class="text-slate-300 hover:text-slate-600 text-xs">✓</button>`:''}
-              </div>`; }).join('') : '<div class="px-3 py-6 text-center text-slate-400 text-xs italic">Sin alertas.</div>'}
+                <span class="text-slate-300 text-xs">→</span>
+              </button>`).join('') : '<div class="px-3 py-6 text-center text-emerald-600 text-xs">' + osIcon('check') + ' No hay nada pendiente.</div>'}
           </div>
-          <button onclick="pmaState.alertsDropdownOpen=false;pmSetTab('operations');pmaState.opsSubTab='alerts';pmRender()" class="w-full text-center text-[11px] font-bold text-slate-700 hover:bg-slate-50 py-2 border-t border-slate-100">Ver todas las alertas →</button>
         </div>` : ''}
     </div>
   </div>`;
@@ -6200,13 +6241,15 @@ function pmOpsHeaderCards() {
   const hoy = open.filter(t => pmTaskDate(t) === today).length;
   const limpiezas = open.filter(t => (t.task_type==='cleaning'||t.task_type==='aseo') && pmTaskDate(t) >= today && pmTaskDate(t) <= in7ISO).length;
   const utilVenc = (pmaState.utilities||[]).filter(u => { const s = pmUtilityStatus(u); return s.key==='due_soon' || s.key==='overdue'; }).length;
-  const alertas = pmActiveAlerts().length;
+  const groups = pmAlertGroups();
+  const asuntos = groups.length;
+  const urgentes = groups.filter(g => g.urgent).length;
   const card = (label, value, accent) => `<div class="bg-white border border-slate-200 rounded-xl p-3"><div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">${label}</div><div class="text-2xl font-extrabold mt-1 ${accent||'text-slate-900'}">${value}</div></div>`;
   return `<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
     ${card('Tareas pendientes hoy', hoy, hoy?'text-amber-600':'text-slate-900')}
     ${card('Limpiezas esta semana', limpiezas, 'text-blue-600')}
     ${card('Utilities por vencer 7d', utilVenc, utilVenc?'text-red-600':'text-slate-900')}
-    ${card('Alertas activas', alertas, alertas?'text-red-600':'text-slate-900')}
+    ${card('Asuntos por revisar', asuntos, urgentes?'text-rose-600':'text-slate-900')}
   </div>`;
 }
 function pmOpsGlobalFilters() {
@@ -6224,9 +6267,9 @@ function pmOpsGlobalFilters() {
 
 function pmRenderOperations() {
   const sub = pmaState.opsSubTab || 'tasks';
-  const c = pmAlertCounts();
-  const dwN = (pmaState.dataWarnings||[]).length;
-  const tabs = [['tasks','Cronograma'],['utilities','Utilities'],['datawarn',`Datos${dwN?` (${dwN})`:''}`],['services','Servicios'],['comms','Comunicación'],['alerts',`Alertas${c.total?` (${c.total})`:''}`]];
+  const gN = pmAlertGroups().length;                    // # de asuntos (tipos), no # de filas
+  const dwN = pmDataWarnGroups().length;                // # de tipos de inconsistencia, no # de filas
+  const tabs = [['tasks','Cronograma'],['utilities','Utilities'],['datawarn',`Datos${dwN?` (${dwN})`:''}`],['services','Servicios'],['comms','Comunicación'],['alerts',`Alertas${gN?` (${gN})`:''}`]];
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
@@ -6672,6 +6715,14 @@ const PM_WARN_META = {
   inquilino_duplicado:     { label: 'Inquilino duplicado (solapado)',   icon: osIcon('users'), table: 'tblzz3fokkBprEpIm' }
 };
 function pmWarnMeta(t) { return PM_WARN_META[t] || { label: t, icon: osIcon('alert'), table: null }; }
+// Colapsa las inconsistencias de datos por TIPO (no por fila). Devuelve grupos
+// {type,label,count} ordenados por # de filas — el número honesto y accionable.
+function pmDataWarnGroups() {
+  const by = {};
+  (pmaState.dataWarnings||[]).forEach(w => { (by[w.warning_type] = by[w.warning_type] || []).push(w); });
+  return Object.keys(by).map(t => ({ type: t, label: pmWarnMeta(t).label, count: by[t].length, rows: by[t] }))
+    .sort((a,b) => b.count - a.count);
+}
 function pmRenderDataWarnings() {
   const warns = pmaState.dataWarnings || [];
   const byType = {};
@@ -6957,50 +7008,69 @@ async function pmDeleteTemplate(key) {
 window.pmDeleteTemplate = pmDeleteTemplate;
 
 // ── Sub-tab D: Panel de alertas ──
-function pmRenderAlertsPanel() {
-  const sevF = pmaState.alertSeverityFilter;
-  const catF = pmaState.alertCategoryFilter;
-  let rows = (pmaState.alerts||[]).filter(a => pmaState.alertShowResolved ? true : !a.resolved);
-  if (sevF) rows = rows.filter(a => a.severity === sevF);
-  if (catF) rows = rows.filter(a => a.category === catF);
-  rows = rows.sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
-  const cats = [...new Set((pmaState.alerts||[]).map(a => a.category).filter(Boolean))];
-
-  const sevBtn = (k,l) => `<button onclick="pmaState.alertSeverityFilter=${k?`'${k}'`:'null'};pmRender()" class="px-2.5 py-1 rounded-full text-[10px] font-bold ${sevF===k||(!sevF&&!k)?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${l}</button>`;
-  const catBtn = (k,l) => `<button onclick="pmaState.alertCategoryFilter=${k?`'${k}'`:'null'};pmRender()" class="px-2.5 py-1 rounded-full text-[10px] font-bold ${catF===k||(!catF&&!k)?'bg-[#d4af37] text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${l}</button>`;
-
+// Fila individual de una alerta (dentro de un grupo expandido).
+function pmAlertRow(a) {
+  const s = pmAlertSev(a.severity);
   return `
-  <div class="space-y-3">
-    <div class="flex items-center justify-between flex-wrap gap-2">
-      <div class="flex gap-1.5 flex-wrap">
-        ${sevBtn(null,'Todas')}${sevBtn('critical','Críticas')}${sevBtn('warning','Advert.')}${sevBtn('info','Info')}
+    <div class="px-3 py-2 flex items-start gap-3 ${a.resolved?'opacity-50':''}">
+      <span class="${s.dot} w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"></span>
+      <div class="flex-1 min-w-0">
+        <div class="text-[12.5px] text-slate-800 leading-snug">${(a.message||'').replace(/</g,'&lt;')}</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">${(a.created_at||'').slice(0,16).replace('T',' ')}${a.property_id?` · ${pmPropertyName(a.property_id).replace(/</g,'&lt;').slice(0,20)}`:''}${a.assigned_to?` · ${osIcon('user')} ${(a.assigned_to||'').replace(/</g,'&lt;')}`:''}</div>
       </div>
-      <div class="flex items-center gap-2">
-        <button onclick="pmaState.alertShowResolved=${pmaState.alertShowResolved?'false':'true'};pmRender()" class="text-[10px] font-bold px-2.5 py-1 rounded-full ${pmaState.alertShowResolved?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'}">${pmaState.alertShowResolved?'Ocultar resueltas':'Ver resueltas'}</button>
-        <button onclick="pmRunAlertChecks(this)" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100">↻ Revisar ahora</button>
+      <div class="flex flex-col gap-1 flex-shrink-0 items-end">
+        ${!a.resolved?`<button onclick="pmAlertResolve('${a.id}')" class="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded whitespace-nowrap">✓ Resolver</button>` : '<span class="text-[10px] text-emerald-600 font-bold">Resuelta</span>'}
+        <button onclick="pmAlertAssign('${a.id}')" class="text-[10px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Asignar</button>
       </div>
-    </div>
-    <div class="flex gap-1.5 flex-wrap">${catBtn(null,'Todas las categorías')}${cats.map(c=>catBtn(c,c)).join('')}</div>
+    </div>`;
+}
 
-    ${rows.length ? `<div class="space-y-1.5">${rows.map(a => { const s = pmAlertSev(a.severity); return `
-      <div class="bg-white border border-slate-200 border-l-4 ${s.border} rounded-lg p-2.5 flex items-start gap-3 ${a.resolved?'opacity-50':''}">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-[9px] uppercase font-extrabold ${s.txt} tracking-wider">${s.label}</span>
-            ${a.category?`<span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded">${a.category}</span>`:''}
-            ${a.assigned_to?`<span class="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">${osIcon('user')} ${(a.assigned_to||'').replace(/</g,'&lt;')}</span>`:''}
-            ${a.read?'':'<span class="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded">nuevo</span>'}
+function pmRenderAlertsPanel() {
+  const groups = pmAlertGroups();
+  const urgentes = groups.filter(g => g.urgent).length;
+  const openType = pmaState.alertGroupOpen || pmaState.alertTypeFilter || null;
+
+  const header = `
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="text-sm">
+        ${groups.length
+          ? `<span class="font-bold text-slate-800">${groups.length} asunto${groups.length>1?'s':''} por revisar</span>${urgentes?` · <span class="text-rose-600 font-semibold">${urgentes} requiere${urgentes>1?'n':''} atención</span>`:''}`
+          : `<span class="font-bold text-emerald-600">${osIcon('check')} Todo al día — sin pendientes</span>`}
+        <div class="text-[11px] text-slate-500 mt-0.5">Agrupado por tipo de problema. Cada fila va a la casa concreta.</div>
+      </div>
+      <button onclick="pmRunAlertChecks(this)" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100">↻ Revisar ahora</button>
+    </div>`;
+
+  if (!groups.length) {
+    return `<div class="space-y-3">${header}
+      <div class="text-sm text-emerald-600 px-3 py-10 text-center bg-emerald-50 rounded-lg">${osIcon('check')} No hay nada pendiente. Usá «↻ Revisar ahora» para volver a chequear.</div>
+    </div>`;
+  }
+
+  const cards = groups.map(g => {
+    const isOpen = openType === g.type;
+    const chip = g.urgent
+      ? '<span class="text-[9px] uppercase font-extrabold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded tracking-wider">Atención</span>'
+      : '<span class="text-[9px] uppercase font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded tracking-wider">Por revisar</span>';
+    const where = g.props ? `${g.props} casa${g.props>1?'s':''}` : `${g.count} caso${g.count>1?'s':''}`;
+    const rows = g.rows.slice().sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+    return `
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden ${g.urgent?'border-l-4 border-l-rose-400':''}">
+        <button onclick="pmaState.alertGroupOpen=${isOpen?'null':`'${g.type}'`};pmaState.alertTypeFilter=null;pmRender()" class="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-slate-50">
+          <span class="text-lg flex-shrink-0">${osIcon(g.icon)}</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[13px] font-bold text-slate-800 leading-snug">${g.label}</div>
+            <div class="text-[11px] text-slate-500">${where}${g.count>g.props&&g.props?` · ${g.count} avisos`:''}</div>
           </div>
-          <div class="text-sm text-slate-800 leading-snug mt-0.5">${(a.message||'').replace(/</g,'&lt;')}</div>
-          <div class="text-[10px] text-slate-400 mt-0.5">${(a.created_at||'').slice(0,16).replace('T',' ')}${a.property_id?` · ${pmPropertyName(a.property_id).replace(/</g,'&lt;').slice(0,20)}`:''}</div>
-        </div>
-        <div class="flex flex-col gap-1 flex-shrink-0">
-          ${!a.resolved?`<button onclick="pmAlertResolve('${a.id}')" class="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded whitespace-nowrap">✓ Resolver</button>` : '<span class="text-[10px] text-emerald-600 font-bold">Resuelta</span>'}
-          ${!a.read?`<button onclick="pmAlertMarkRead('${a.id}')" class="text-[10px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Marcar leída</button>`:''}
-          <button onclick="pmAlertAssign('${a.id}')" class="text-[10px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Asignar</button>
-        </div>
-      </div>`; }).join('')}</div>`
-      : '<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Sin alertas con estos filtros. Usá «↻ Revisar ahora» para generarlas.</div>'}
+          ${chip}
+          <span class="text-slate-300 text-sm flex-shrink-0">${isOpen?'▾':'▸'}</span>
+        </button>
+        ${isOpen?`<div class="divide-y divide-slate-100 border-t border-slate-100 max-h-[420px] overflow-y-auto">${rows.map(pmAlertRow).join('')}</div>`:''}
+      </div>`;
+  }).join('');
+
+  return `<div class="space-y-3">${header}<div class="space-y-2">${cards}</div>
+    <div class="text-[10px] text-slate-400 text-center pt-1">Los avisos repetidos de la misma casa se cuentan como un solo asunto. Marcá «✓ Resolver» a medida que los atendés.</div>
   </div>`;
 }
 
