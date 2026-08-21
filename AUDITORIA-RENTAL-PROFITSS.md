@@ -493,5 +493,62 @@ Para que el panel aparezca en la producción del CEO hay DOS caminos, ambos deci
 Nota operativa: el password del usuario 🧪 `qa-admin-test@` se reseteó a un valor temporal para la verificación
 logueada (cuenta de test; las sesiones paralelas lo repisan — sin impacto real).
 
+---
+
+## 🐛 BUG VISUAL — "SVG crudo" del ícono como TEXTO en la barra de retorno (21-ago · RESUELTO Y VERIFICADO EN VIVO)
+
+**Síntoma que veía el CEO logueado en empresa-os-admin:** encima de "Rentas › Property Mgmt" (y equivalentes)
+salía el código del ícono como texto literal:
+`<svg class="icn" width="15" height="15" viewBox="0 0 24 24" …><path d="M15…`
+
+### Verificación honesta (NO fue "bug fantasma") — el bug ES real y estaba en el código EN VIVO
+- El bug **NO estaba en el source de la rama de trabajo `feat/portal-inversionista-v2`** (ahí `pmBreadcrumb`
+  usa labels de texto plano, sin íconos; `osCrumbs` no existe con íconos). Por eso los grep de la rama daban 0.
+- **El bundle EN VIVO de AMBOS dominios era `fa78be29789f`, que se buildea del worktree consolidado**
+  `/Users/…/empresa-os-admin` (rama `merge/consolidacion`, la fusión que trajo el rebrand + Jarvis de `main`).
+  Ese código SÍ tiene el sistema de íconos SVG (`ui/icons.js` → `osIcon`/`osIco`, `class="icn"`).
+- **Causa raíz exacta** (`os/os.js`): `osOpenSystem` armaba el label de la barra como
+  `` `${osIco(e.icon,{size:15})} ${e.name}` `` (texto + **markup SVG mezclados**) y `osInjectReturnBar` lo
+  escapaba entero con `OS_E(empresaLabel)` → el `<svg…>` salía como texto. Confirmado leyendo el bundle vivo
+  (`const s=t.size||16,o="icn"…` + `.jv-nav a .icn`).
+
+### Fix de raíz (ícono y texto en slots separados; el escape del texto NO se desactiva)
+`os/os.js` (worktree consolidado):
+- `osOpenSystem`: separa `const eico = osIco(e.icon,{size:15})` y pasa **nombre (texto) e ícono (SVG) por
+  argumentos distintos** a `osEnterClassic(returnTo, e.name, sysName, eico)`.
+- `osEnterClassic(…, empresaIco)`: guarda `OS._sysEmpresaIco` y lo reenvía a `osInjectReturnBar`.
+- `osInjectReturnBar(empresaLabel, sysName, empresaIco)`: renderiza
+  `` `<a …>${empresaIco || ''}${OS_E(empresaLabel)}</a>` `` → **ícono CRUDO** (SVG confiable de `osIco`, fuente
+  interna, sin input de usuario) **+ texto SIEMPRE escapado** con `OS_E`. XSS del texto intacto.
+- Commit `960fcb7` en `merge/consolidacion` (pusheado a origin).
+
+### Barrido de toda la app (que ningún otro slot escape un ícono)
+- `pmBreadcrumb` (pm-main.js): labels de texto plano, sin íconos → OK.
+- `osCrumbs` (os.js:566): inserta `eico` **crudo** (no lo escapa) → OK.
+- Rebrand Jarvis (`os/os-command-center.js`): TODO `osIcon(...)` se concatena crudo y el texto se escapa
+  aparte (`jvAgentIcon`, `jv-nav`, filtros, líneas) → OK.
+- Búsqueda dirigida `OS_E(...osIco/osIcon/e.icon...)` en `os/` y `pm/`: **0 resultados** aparte del que se
+  arregló. Único punto en toda la app donde un ícono pasaba por un slot escapado.
+
+### Verificación EN VIVO (sobre el bundle que sirve el sitio, no sobre el source ni el build local)
+- `node --check os/os.js` OK · `npm run build` → nuevo bundle `daf23ee59b53`.
+- Deploy a producción del proyecto **empresa-os-admin** (`npx vercel --prod`, project.json = empresa-os-admin):
+  `readyState: READY, target: production`.
+- `empresa-os-admin.vercel.app` sirve ahora **`daf23ee59b53`**. Descargado del dominio y verificado:
+  la barra de retorno es `${empresaIco||""}${OS_E(empresaLabel)}` (ícono crudo + texto escapado) y
+  **`&lt;svg` aparece 0 veces** como texto en TODO el bundle.
+
+### ⚠ Alcance del deploy (honesto)
+- **`empresa-os-admin.vercel.app` (dominio del CEO): ARREGLADO Y VERIFICADO EN VIVO** (`daf23ee59b53`).
+- **`empresa-os.vercel.app` (dominio público, auto-deploya de `main`): TODAVÍA sirve el bundle viejo
+  `fa78be29789f` con el bug.** Aplicar el mismo fix ahí exige tocar `main` → **bloqueado por decisión CEO #3
+  ("no tocar main / no re-mergear")**. Queda como acción humana: cherry-pick de `960fcb7` a `main` cuando el
+  CEO lo autorice (mismo cambio quirúrgico de `os/os.js`, sin conflictos).
+
+### 🙋 Verificación FINAL del CEO
+**El CEO debe recargar `empresa-os-admin.vercel.app` logueado y confirmar que ya no ve código de ícono como
+texto arriba (breadcrumbs/headers). Esta verificación final es del CEO, no automática.**
+
+---
 
 === AUDITORIA COMPLETA ===
