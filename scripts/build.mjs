@@ -65,6 +65,7 @@ const BUNDLE_FILES = [
   "os/inv-rendimiento.js",
   "os/inv-admin.js",
   "os/os-ia.js",
+  "os/os-cerebro.js",   // 🧠 Cerebro: panel flotante omnipresente (líder IA del negocio)
   "remodel-command-center.js",
   "remodel-reportes.js",
   "clickup-dashboard.js",
