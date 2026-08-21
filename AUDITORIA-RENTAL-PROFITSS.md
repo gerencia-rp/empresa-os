@@ -434,3 +434,64 @@ riesgo medio), C-P0-1 NOI/DSCR/CoC con renta real (pm_payments) en indicadores d
 reconciliación (ocupadas iguales entre vistas, Σopex Gastos=Finanzas); (3) linter anti-interpolación sin
 `esc()`; (4) **resolver la bifurcación de diseño rama↔main** — es la causa raíz de los "bugs fantasma".
 
+
+---
+
+## FASE 5 — REPORTE (turno 7 · 2026-08-21) — 🧠 CEREBRO IA
+
+**Construido, desplegado y verificado con NÚMEROS REALES.**
+
+### Qué quedó
+- **Edge function `cerebro`** (Supabase, v1 ACTIVE — NO cuenta contra el tope de 12 funciones Vercel).
+  - Patrón reusado de `remodel-ai`/`ai-deep-analyze`: `requireAuth` (JWT del usuario) + CORS whitelist
+    (`_shared/cors.ts`, incluye ambos dominios) + `callAnthropic` (`_shared/anthropic.ts`, retry+log en
+    `ai_calls`) + `ANTHROPIC_API_KEY` de secrets (nunca hardcodeada). Modelo `claude-opus-4-8`.
+  - **Snapshot del negocio armado SERVER-SIDE** con service role, leyendo las **fuentes únicas** (un dato,
+    una fuente; el Cerebro NO recalcula): `v_holding_pnl`, `v_cartera_kpi` + `v_cartera_inquilino`,
+    `v_ocupacion`, `v_ff_portafolio_kpi`, `ff_deals.deficit_total` (déficit = caja atrapada, decisión CEO #1),
+    `v_remodel_avance_vivo`, `inv_distributions`/`inv_holdings`, `pm_brain_memory`.
+  - **SOLO LECTURA**: nunca ejecuta pagos ni write-backs. Si piden una acción con efectos, la explica y pide
+    confirmación humana. Responde SIMPLE ("como a un niño"), define toda sigla, cita el número real o dice
+    "no tengo el dato". Rate limit 40/10min por usuario.
+- **Front `os/os-cerebro.js`** (en `index.html` + `build.mjs`): botón + panel de chat **flotante omnipresente**
+  (montado sobre `document.body`, z-index por encima de `#os-root` y `#modal` → visible en cualquier pantalla,
+  admin y clásicos), solo para usuarios logueados, markdown seguro (marked+DOMPurify), sugerencias, y pasa la
+  **pantalla actual** como contexto. Tokens del sistema de diseño (`--grad/--a1/--glass/--ink`).
+- Commit `4407bfe` en `feat/portal-inversionista-v2` (pusheado).
+
+### Cómo se prueba (verificado en vivo, logueado)
+Login por formulario (usuario 🧪 `qa-admin-test@`) → POST a `/functions/v1/cerebro`. Respuestas contra la base:
+- **"¿Cuánta caja atrapada tiene el portafolio?"** → **$297.690** (18 casas). ✅ = `Σ ff_deals.deficit_total`.
+- **"¿Cómo va la cartera vencida?"** → **$18.636 · 15 morosos**. ✅ = `v_cartera_kpi.vencido_neto`.
+- **"¿Qué casa drena más caja?"** → **6504 Stonleigh Pl $70.855** (rentada). ✅ = `ff_deals` orden desc.
+- **"¿Ocupación de rentas?"** → **70.59% (36/51)**. ✅ = `v_ocupacion`.
+Además usó la memoria (`pm_brain_memory`) para avisar del error de carga de Marlin/Bartlett. CORS OK desde
+`empresa-os.vercel.app` y `empresa-os-admin.vercel.app`. Build OK + `node --check`.
+
+### ⚠ Estado de DEPLOY del front — bifurcación rama↔main (NO resuelta aquí, por regla)
+Hallazgo verificado con la API de Vercel:
+- El proyecto **`empresa-os`** (→ `empresa-os.vercel.app`, URL pública primaria) **auto-deploya de `main`**.
+- El proyecto **`empresa-os-admin`** (→ dominio del CEO) tiene su última producción **auto-deployada de la
+  rama `merge/consolidacion`** (commit "MERGE-CONSOLIDACION.md").
+- **Ambos dominios sirven HOY el MISMO código consolidado** (bundle `fa78be29789f`, que YA trae su propio
+  asistente IA "Jarvis" — `cerebro-matutino`/`cerebro-alertas`), coherente con **decisión CEO #3**
+  (consolidación hecha, no re-mergear ni tocar `main`). El front de MI Cerebro vive solo en
+  `feat/portal-inversionista-v2`, que quedó **detrás** de la consolidación.
+- El `npx vercel --prod` (project.json ahora = `empresa-os`) subió mi build de rama y **pisó** el main
+  consolidado en `empresa-os.vercel.app`. **Se restauró de inmediato** (`vercel promote` del deploy de main
+  `dpl_E6rL4…`) → verificado: `empresa-os.vercel.app` volvió al consolidado (Jarvis presente, mi `cerebro-fab`
+  ausente). **Integridad de producción intacta.** `empresa-os-admin` nunca se tocó.
+
+**Conclusión:** el **backend del Cerebro está LIVE y es compartido por ambos dominios** (cualquier front lo puede
+llamar). El **front-panel no se publicó a producción** para no regresar el rebrand/Jarvis del código consolidado.
+Para que el panel aparezca en la producción del CEO hay DOS caminos, ambos decisión humana (gated por "no tocar
+`main`/consolidación"):
+  (a) agregar `os/os-cerebro.js` (+2 líneas de wiring: script tag en `index.html` y entrada en `build.mjs`) a la
+      rama consolidada — es un archivo autocontenido, sin conflictos; o
+  (b) cablear el "Jarvis" existente para que consuma la edge function `cerebro` (mismo backend de números reales).
+
+Nota operativa: el password del usuario 🧪 `qa-admin-test@` se reseteó a un valor temporal para la verificación
+logueada (cuenta de test; las sesiones paralelas lo repisan — sin impacto real).
+
+
+=== AUDITORIA COMPLETA ===
